@@ -1,27 +1,26 @@
-# Handover (Sep.02.40) - Issue #896 RESOLVED
+# Handover (Sep.02.41) - Issue #897 RESOLVED
 
 ## 🎯 Current Status
-- **Goal**: Address Battery Optimization navigation failure on Samsung A15.
-- **Status**: 🟢 **Issue #896 RESOLVED**.
-- **Version**: `Sep.02.40`
+- **Goal**: Address Sensor Sensitivity Sliders disconnection (Issue #897).
+- **Status**: 🟢 **Issue #897 RESOLVED**.
+- **Version**: `Sep.02.41`
 - **Database**: v75
-- **Current Audit Baseline**: SOT: 237 (40 Arch + 197 Func), Resolved: 817, Open: 20, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 237, QA Status: 222 Validated.
+- **Current Audit Baseline**: SOT: 238 (40 Arch + 198 Func), Resolved: 818, Open: 19, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 238, QA Status: 222 Validated.
 
-## 🧬 Forensic State Snapshot: Sep.02.40
+## 🧬 Forensic State Snapshot: Sep.02.41
 - **Validation Details**: 
-    - Hardened `launchBatteryExemptionSetting` in `MainActivity.kt` with a 3-tier fallback strategy: `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` -> `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS` -> `ACTION_APPLICATION_DETAILS_SETTINGS`.
-    - Migrated all permission-related intents in `MainActivity.kt` to use `Uri.fromParts("package", pkg, null)` to ensure robust encoding on Android 15+.
-    - Added Architectural Rule **R896** to `SOT_MASTER_REQUIREMENTS.md` mandating robust battery navigation patterns.
-    - Verified that the fallback to App Info provides access to the "Unrestricted" toggle on Samsung devices where direct whitelist requests might be suppressed by the OS.
+    - Propagated `vibrationSensitivity` and `tiltSensitivity` from `AlertSettings` to `AlarmEvaluationState` in `EngineModels.kt`.
+    - Refactored `SentinelValidator.kt` to implement dynamic threshold mapping (0.0-1.0 to physical ranges: Tilt 25°-5°, Vibration 1.4g-0.2g).
+    - Updated `MainAlarmLogic.detectViolations` to apply these dynamic thresholds, replacing hardcoded constants (R2.3).
+    - Verified `AppAlarmManager.kt` correctly syncs UI slider values into the evaluation state during the unified heartbeat cycle.
+    - Updated `SOT_MASTER_REQUIREMENTS.md` with Functional Rule **R-ID 198**.
 - **State Changes**:
-    - Modified `app/src/main/java/com/gps19/app/MainActivity.kt`.
-    - Modified `app/build.gradle` (vSep.02.40).
-    - Modified `STATUS/SOT_MASTER_REQUIREMENTS.md` (Added R896).
-    - Modified `issues.md` and `STATUS/RESOLUTION_ARCHIVE.md`.
-    - Modified `Simplify_Ideas2.md` (Added Idea #237).
+    - Modified `core:engine`: `EngineModels.kt`, `SentinelValidator.kt`, `MainAlarmLogic.kt`.
+    - Modified `app`: `AppAlarmManager.kt`, `build.gradle` (vSep.02.41).
+    - Modified `issues.md`, `STATUS/RESOLUTION_ARCHIVE.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`.
+    - Modified `Simplify_Ideas2.md` (Added Idea #238).
 
 ## 🚀 Next Steps
-- **Issue #897 (Pending)**: Connect Sensor Sensitivity sliders to the engine logic.
 - **Issue #898 (Pending)**: Address stalled HUD telemetry in Tracker Mode.
 
-vSep.02.40
+vSep.02.41

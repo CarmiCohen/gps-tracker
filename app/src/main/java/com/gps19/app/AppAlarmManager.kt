@@ -30,6 +30,9 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.02.01:
+ * - Issue #897: Propagated vibrationSensitivity and tiltSensitivity from 
+ *   AlertSettings to AlarmEvaluationState (R2.3).
  * Aug.07.131:
  * - Issue #124: GPS Hardware Revival Hardening (R124). Propagating 
  *   isGpsHardwareLock to SystemHealthState in evaluateAlarms.
@@ -211,7 +214,9 @@ class AppAlarmManager @Inject constructor(
             firstViolationWasJump = firstViolationWasJump, 
             maxDistance = maxDistanceAuthority,
             distToHomeAuthority = distToHomeAuthority, isGpsGap = isGpsGap, trackerBaroAltEma = trackerBaroAltEma, 
-            isTrackerMode = isTrackerMode, capabilities = capabilities
+            isTrackerMode = isTrackerMode, capabilities = capabilities,
+            vibrationSensitivity = currentSettings.vibrationSensitivity,
+            tiltSensitivity = currentSettings.tiltSensitivity
         )
 
         val report = MainAlarmLogic.detectViolations(

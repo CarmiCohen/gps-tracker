@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.02.40)
+# SOT Master Requirements (Sep.02.41)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -13,7 +13,8 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.16 16KB Page Alignment (R895)**: **MANDATORY**. Native libraries MUST be aligned to 16KB boundaries to support Android 15+ devices. Implementation requires AGP 8.3+, `useLegacyPackaging = false` in `app/build.gradle`, and `-Wl,-z,max-page-size=16384` linker flags (Sep.02.27).
 *   **1.17 Robust Battery Navigation (R896)**: **MANDATORY**. Battery optimization exemption intents MUST use `Uri.fromParts("package", pkg, null)` for URI encoding and implement a multi-tier fallback: (1) `ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`, (2) `ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS`, and (3) `ACTION_APPLICATION_DETAILS_SETTINGS` to ensure accessibility on Samsung/Xiaomi devices (Sep.02.40).
 
-## 🧩 Functional Requirements (197 IDs)
+## 🧩 Functional Requirements (198 IDs)
 *   **R-ID 197 (Forensic Teardown)**: Teardown logic MUST include forensic timing logs for each component's unregistration to identify OS-level disposal delays.
+*   **R-ID 198 (Dynamic Sensitivity Propagation)**: UI-driven sensor sensitivity adjustments (Vibration, Tilt) MUST be propagated to the tracking engine's `SentinelValidator` to replace hardcoded constants with dynamic user-defined thresholds (R2.3). (Sep.02.41).
 
-*(Total: 40 Architectural Rules + 197 Functional R-IDs = 237 Items)*
+*(Total: 40 Architectural Rules + 198 Functional R-IDs = 238 Items)*

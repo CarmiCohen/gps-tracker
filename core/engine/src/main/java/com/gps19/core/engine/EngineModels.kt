@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.02.01:
+ * - Issue #897: Added vibrationSensitivity and tiltSensitivity to 
+ *   AlarmEvaluationState for dynamic thresholding (R2.3).
  * Aug.31.00:
  * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
  *   violationUptimeMs to EngineConnectionPoint for parity (R782).
@@ -247,6 +250,10 @@ class AlarmEvaluationState {
     var maxDistance: Double = 0.0
     var distToHomeAuthority: Double? = null
 
+    // Issue #897: Sensitivity Propagation
+    var vibrationSensitivity: Float = 0.5f
+    var tiltSensitivity: Float = 0.5f
+
     fun getOrCreateHomePoint(index: Int): EngineGeoPoint {
         while (homePoints.size <= index) {
             homePoints.add(EngineGeoPoint())
@@ -293,7 +300,9 @@ class AlarmEvaluationState {
         isGpsGap: Boolean,
         trackerBaroAltEma: Double,
         isTrackerMode: Boolean,
-        capabilities: HardwareCapabilities
+        capabilities: HardwareCapabilities,
+        vibrationSensitivity: Float = 0.5f,
+        tiltSensitivity: Float = 0.5f
     ) {
         this.now = now
         this.nowRt = nowRt
@@ -328,6 +337,8 @@ class AlarmEvaluationState {
         this.trackerBaroAltEma = trackerBaroAltEma
         this.isTrackerMode = isTrackerMode
         this.capabilities = capabilities
+        this.vibrationSensitivity = vibrationSensitivity
+        this.tiltSensitivity = tiltSensitivity
     }
 }
 

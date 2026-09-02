@@ -6,6 +6,10 @@ import kotlin.math.min
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * Sep.02.01:
+ * - Issue #897: Added sensitivity mapping for Tilt and Vibration (R2.3).
+ *   Tilt range: 5° to 25° (0.5 -> 15°).
+ *   Vibration range: 0.2g to 1.4g (0.5 -> 0.8g).
  * Aug.29.11:
  * - Acoustic Refinement (R762b): Encapsulated adaptive acoustic duty-cycle 
  *   logic into computeAdaptiveAcousticOffCycle.
@@ -14,8 +18,10 @@ import kotlin.math.min
  */
 object SentinelValidator {
 
-    fun isTiltViolated(tiltDegrees: Double): Boolean {
-        return tiltDegrees > TILT_THRESHOLD_DEGREES
+    fun isTiltViolated(tiltDegrees: Double, sensitivity: Float = 0.5f): Boolean {
+        // Map 0.0..1.0 to 25.0..5.0 degrees (Higher sensitivity = Lower threshold)
+        val threshold = 5.0 + (25.0 - 5.0) * (1.0 - sensitivity)
+        return tiltDegrees > threshold
     }
 
     fun isAltitudeViolated(relativeAltitude: Double): Boolean {
@@ -24,13 +30,17 @@ object SentinelValidator {
     
     fun isLiftViolated(relativeAltitude: Double): Boolean = isAltitudeViolated(relativeAltitude)
 
-    fun isShockViolated(peakShock: Double, adaptiveFloor: Double = INITIAL_VIBRATION_FLOOR): Boolean {
-        val dynamicThreshold = maxOf(VIBRATION_SHOCK_THRESHOLD_G, adaptiveFloor * VIBRATION_SHOCK_MULTIPLIER)
+    fun isShockViolated(peakShock: Double, adaptiveFloor: Double = INITIAL_VIBRATION_FLOOR, sensitivity: Float = 0.5f): Boolean {
+        // Map 0.0..1.0 to 1.4g..0.2g (Higher sensitivity = Lower threshold)
+        val baseThreshold = 0.2 + (1.4 - 0.2) * (1.0 - sensitivity)
+        val dynamicThreshold = maxOf(baseThreshold, adaptiveFloor * VIBRATION_SHOCK_MULTIPLIER)
         return peakShock > dynamicThreshold
     }
 
-    fun isVibrationSuspicious(vibration: Double, adaptiveFloor: Double = INITIAL_VIBRATION_FLOOR): Boolean {
-        val dynamicThreshold = maxOf(VIBRATION_SUSPICIOUS_THRESHOLD_G, adaptiveFloor * VIBRATION_SUSPICIOUS_MULTIPLIER)
+    fun isVibrationSuspicious(vibration: Double, adaptiveFloor: Double = INITIAL_VIBRATION_FLOOR, sensitivity: Float = 0.5f): Boolean {
+        // Map 0.0..1.0 to 0.45g..0.05g (Higher sensitivity = Lower threshold)
+        val baseThreshold = 0.05 + (0.45 - 0.05) * (1.0 - sensitivity)
+        val dynamicThreshold = maxOf(baseThreshold, adaptiveFloor * VIBRATION_SUSPICIOUS_MULTIPLIER)
         return vibration > dynamicThreshold
     }
 

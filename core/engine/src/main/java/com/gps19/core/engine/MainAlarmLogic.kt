@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Sep.02.01:
+ * - Issue #897: Propagated vibrationSensitivity and tiltSensitivity to 
+ *   SentinelValidator for dynamic thresholding (R2.3).
  * Aug.25.01:
  * - Issue #315: Integrated GPS_WARMUP_GRACE_MS (30s) to suppress Signal Loss 
  *   and GPS Stall false positives during provider stabilization (R315).
@@ -136,8 +139,8 @@ object MainAlarmLogic {
                 conditionMet = isPowerViolation
             )
 
-            val isShock = SentinelValidator.isShockViolated(health.peakVibrationShock, health.adaptiveVibrationFloor)
-            val isTilt = SentinelValidator.isTiltViolated(health.tiltDegrees)
+            val isShock = SentinelValidator.isShockViolated(health.peakVibrationShock, health.adaptiveVibrationFloor, state.vibrationSensitivity)
+            val isTilt = SentinelValidator.isTiltViolated(health.tiltDegrees, state.tiltSensitivity)
             val isAcousticMet = SentinelValidator.isAcousticViolated(health.acousticDb, health.acousticFloorDb)
             
             val liftDelta = if (state.trackerBaroAltEma > -999.0) state.health.baroAlt - state.trackerBaroAltEma else 0.0
@@ -372,7 +375,7 @@ object MainAlarmLogic {
             )
 
             // Issue #716: Critical Battery Sentinel (Enhanced Correlation)
-            val isHighSensorActivity = health.vibration > VIBRATION_SUSPICIOUS_THRESHOLD_G
+            val isHighSensorActivity = SentinelValidator.isVibrationSuspicious(health.vibration, health.adaptiveVibrationFloor, state.vibrationSensitivity)
             val isHighSystemLoad = health.cpuLoad > 0.7
             val steepConditionMet = health.isBatterySteepDischarge
             
