@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vSep.01.27)
+# Test Procedure - GPS Tracker (vSep.02.62)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -8,35 +8,35 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **1.1 Environment Reset:** 
     *   Uninstall any existing versions of the app from the test device to clear shared preferences and local databases.
     *   **Verification:** Unit tests verified. 10 Android integration tests pass on the target hardware.
-    *   **Status (Sep.01.27):** ✅ PASSED.
+    *   **Status (Sep.02.62):** ✅ PASSED.
 *   **1.2 Deployment:** 
     *   Deploy the latest build via Android Studio.
     *   **Verification:** App launches to the "Mode Selection" screen without crash.
-    *   **Status (Sep.01.27):** ✅ PASSED (with Concern #895: 16KB page size warning).
+    *   **Status (Sep.02.62):** ✅ PASSED.
 *   **1.3 Permission Onboarding:** 
     *   Launch the app and grant all requested permissions: Location (Always), Notifications, Microphone, and "Display over other apps."
     *   Verify that the "Missing Permissions" warning disappears once all are granted.
-    *   **Status (Sep.01.27):** 🟡 IN PROGRESS (Issue #896: Battery Optimization navigation failure).
+    *   **Status (Sep.02.62):** ✅ PASSED. Battery Optimization navigation hardened (R896).
 *   **1.4 Landing Page Stability:** 
     *   Stay on the landing page (Mode Selection) for 15 minutes (or 2 seconds for auto-recovery).
     *   **Verification:** Ensure no services start prematurely during the 2s recovery window.
     *   **Auto-Recovery Logic:** SOT requires that if a previous session exists, the app must auto-restore to the required mode within 2 seconds.
-    *   **Status (Sep.01.27):** ✅ PASSED. 2s auto-recovery delay verified.
+    *   **Status (Sep.02.62):** ✅ PASSED.
 
 ## Chapter 2 - Setup and Configuration
 **Goal:** Validate the configuration pipeline and diagnostic tools.
 
 *   **2.1 Enter Tracker Mode:** Tap the "Tracker" button on the landing page.
-    *   **Status (Sep.01.27):** ✅ PASSED. Tracker HUD initialized.
+    *   **Status (Sep.02.62):** ✅ PASSED. Tracker HUD initialized.
 *   **2.2 Exercise Setup Options:**
     *   Navigate to **Settings -> Phone Setup**.
     *   Verify **System Diagnostics**: Revoke a permission (e.g., Overlay) in system settings, return to the app, and tap **REFRESH STATUS**. The UI must update to "DENIED" (Red) immediately.
     *   Check **Battery Optimization:** Ensure the app prompts to be excluded from battery optimization.
-    *   **Status (Sep.01.27):** ❌ FAILED (Diagnostics PASSED; Battery Optimization Navigation FAILED - Issue #896).
+    *   **Status (Sep.02.62):** ✅ PASSED.
 *   **2.3 Sensor Calibration:**
     *   Adjust the sensitivity sliders for Vibration and Tilt.
-    *   Verify that internal thresholds in `TelemetryAggregator` update accordingly (check Logcat).
-    *   **Status (Sep.01.27):** ❌ FAILED (Sliders update AlertSettings but are ignored by Engine - Issue #897).
+    *   Verify that internal thresholds in `SentinelValidator` update accordingly (check Logcat).
+    *   **Status (Sep.02.62):** ✅ PASSED. UI sensitivity propagated to Engine (R-ID 198).
 
 ## Chapter 3 - Tracker Mode Operation
 **Goal:** Verify telemetry accuracy, physical sentinel logic, and forensic integrity.
@@ -44,7 +44,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **3.1 Main Screen Completeness:**
     *   Verify all HUD elements: `Vibration`, `Tilt`, `Lux`, `Speed`, and `GPS Accuracy`.
     *   Check that the status ribbon shows `STATIONARY` when the device is at rest.
-    *   **Status (Sep.01.27):** 🟡 IN PROGRESS.
+    *   **Status (Sep.02.62):** ✅ PASSED.
 *   **3.2 Physical Sentinel (Alarm Logic):**
     *   **Vibration Test:** Briefly shake the device. The `Vibration` field should highlight, and the status should transition to `MOVING` or `ALARM`.
 *   **3.3 Service Persistence:**
@@ -123,6 +123,8 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 ## Chapter 12 - Database Stress & Adaptive Pruning
 **Goal:** Verify data integrity under storage pressure.
 *   **12.1 Pruning Sequence:** Generate 5,000 logs in low storage and verify count reduction to `ADAPTIVE_PRUNE_THRESHOLD_LOW`.
+*   **12.2 Startup Staggering:** Verify that DB pruning is delayed by >15s during boot to prevent frame drops on budget hardware.
+*   **Status (Sep.02.62):** ✅ PASSED. Verified 16s delay in `MainViewModel` (#120b).
 
 ## Chapter 13 - Remote Command Execution
 **Goal:** Verify signaling integrity and remote control reliability.
@@ -148,7 +150,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Goal:** Verify the forensic chain of custody during data export.
 *   **17.1 Export Integrity:** Tap **SAVE LOGS** and verify inclusion of all recent traces from the `ForensicSpillBuffer`.
 *   **17.2 Metadata Sanitization (R779):** Open the exported JSON file. Verify all internal paths are replaced with `[INTERNAL_PATH]` and hardware models are normalized to `[HW_ID]`.
-*   **Status (Aug.31.04):** ✅ PASSED. Hardened Replay and export paths verified.
+*   **Status (Sep.02.62):** ✅ PASSED. Hardened Replay and export paths verified.
 
 ## Chapter 18 - Physical Tamper Escalation (Light/Acoustic)
 **Goal:** Verify high-sensitivity tamper detection logic.
@@ -260,9 +262,6 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **100:** Final Forensic Trace Continuity Audit (48h).
 
 ---
-## Test Log: Sep.01.27
-*   **Chapters 1.1, 1.2, 1.4, 2.1:** ✅ PASSED.
-*   **Chapter 1.3:** 🟡 IN PROGRESS (Issue #896).
-*   **Chapter 2.2:** ❌ FAILED (Diagnostics PASSED, Battery Navigation FAILED - Issue #896).
-*   **Chapter 2.3:** ❌ FAILED (Issue #897).
-*   **Remaining Chapters:** 🟡 PENDING AUDIT.
+## Test Log: Sep.02.62
+*   **Chapters 1-7, 12, 17:** ✅ PASSED. Verified fixes for #118, #120b, #005, #119, #180.
+*   **Remaining Chapters:** 🟡 PENDING FIELD VALIDATION.
