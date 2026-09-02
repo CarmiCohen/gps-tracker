@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 1
-        versionName "Sep.01.26"
+        versionName "Sep.02.40"
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {
@@ -58,7 +58,10 @@ android {
     composeOptions {
         kotlinCompilerExtensionVersion '1.5.11'
     }
-    packagingOptions {
+    packaging {
+        jniLibs {
+            useLegacyPackaging = false
+        }
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }

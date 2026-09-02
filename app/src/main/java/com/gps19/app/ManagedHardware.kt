@@ -89,13 +89,14 @@ object ManagedUnregistrationHelper {
 
 /**
  * ManagedNetworkCallback: Encapsulates safe, synchronous unregistration of 
- * ConnectivityManager.NetworkCallback to prevent native BaseEventQueue leaks (R750/R887).
+ * ConnectivityManager.NetworkCallback to prevent native BaseEventQueue leaks (R750/R887/R893).
+ * Sep.01.27: Added handler parameter to unregister() to ensure looper alignment (R893).
  */
 abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
-    fun unregister(cm: ConnectivityManager) {
+    fun unregister(cm: ConnectivityManager, handler: Handler? = Handler(Looper.getMainLooper())) {
         ManagedUnregistrationHelper.safeUnregister(
             "ManagedNetworkCallback",
-            Handler(Looper.getMainLooper())
+            handler
         ) { cm.unregisterNetworkCallback(this) }
     }
 }

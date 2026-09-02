@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
@@ -33,11 +34,12 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.01.27:
+ * - Issue #893 Hardening: Standardized ManagedNetworkCallback to register on 
+ *   MainLooper to ensure alignment with unregistration logic, with API 26 compatibility (R893).
  * Sep.01.26:
  * - Issue #894 Remediation: Integrated ContextShadow delegate to eliminate 
  *   getPackageName log spam during ConnectivityManager interactions (R894).
- * Aug.31.12:
- * - Issue #877 Remediation: Implemented post-connection settling window (R877). 
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -206,7 +208,13 @@ class ConnectivitySuite @Inject constructor(
         
         try {
             val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
-            connectivityManager.registerNetworkCallback(request, networkCallback)
+            // Issue #893: Registering on MainLooper to align with unregistration logic.
+            // Using Build.VERSION check for API 26 compatibility.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                connectivityManager.registerNetworkCallback(request, networkCallback, Handler(Looper.getMainLooper()))
+            } else {
+                connectivityManager.registerNetworkCallback(request, networkCallback)
+            }
         } catch (e: Exception) { Timber.e("Failed to register network callback") }
 
         signalingProvider.setConnectionLostCallback {
@@ -843,7 +851,8 @@ class ConnectivitySuite @Inject constructor(
     fun stop() { 
         if (!isStarted.getAndSet(false)) return
         isStopped.set(true); keepAliveJob?.cancel(); syncJob?.cancel(); signalingJob?.cancel(); scope.cancel()
-        networkCallback.unregister(connectivityManager)
+        // Issue #893: Managed unregistration on MainLooper.
+        networkCallback.unregister(connectivityManager, Handler(Looper.getMainLooper()))
         signalingProvider.disconnect() 
     }
 

@@ -14,7 +14,9 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.os.BatteryManager
 import android.os.Build
+import android.os.Handler
 import android.os.HardwarePropertiesManager
+import android.os.Looper
 import android.os.PowerManager
 import android.os.StatFs
 import android.os.SystemClock
@@ -60,13 +62,13 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Sep.01.27:
+ * - Issue #893 Hardening: Standardized ManagedNetworkCallback to register on 
+ *   MainLooper to ensure alignment with unregistration logic (R893).
  * Aug.28.11:
  * - Issue #759 Hardening: Switched all Context.packageName lookups to 
  *   GpsApplication.PACKAGE_NAME shadow-cache to eliminate high-frequency 
  *   Samsung A15 diagnostic log spam (R759).
- * Aug.28.03:
- * - Issue #753 Hardening: Refactored Battery and Power status flows to use 
- *   ManagedBroadcastReceiver for deterministic native resource cleanup (R753).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -267,6 +269,7 @@ class SystemStatusProviderImpl @Inject constructor(
 
     /**
      * Issue #750 Hardening: Refactored to use ManagedNetworkCallback for deterministic unregistration.
+     * Issue #893: Standardized registration to MainLooper for consistency with unregistration.
      */
     private val sharedInternetStatusFlow = callbackFlow<Boolean> {
         val callback = object : ManagedNetworkCallback() {
@@ -278,14 +281,18 @@ class SystemStatusProviderImpl @Inject constructor(
         }
         val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
         try {
-            connectivityManager.registerNetworkCallback(request, callback)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                connectivityManager.registerNetworkCallback(request, callback, Handler(Looper.getMainLooper()))
+            } else {
+                connectivityManager.registerNetworkCallback(request, callback)
+            }
             launch { trySend(isLocalOnline()) }
         } catch (e: Exception) {
             Timber.e(e, "Connectivity callback registration failed")
             trySend(false)
         }
         awaitClose { 
-            callback.unregister(connectivityManager)
+            callback.unregister(connectivityManager, Handler(Looper.getMainLooper()))
         }
     }.distinctUntilChanged()
      .conflate()

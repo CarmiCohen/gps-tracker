@@ -19,12 +19,13 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * Sep.02.40:
+ * - Issue #896 Hardening: Implemented robust battery optimization navigation 
+ *   with multi-tier fallback for Samsung A15/Android 15+. Switched to 
+ *   Uri.fromParts for all system intents to ensure proper encoding (R896).
  * Aug.28.08:
  * - Issue #759: Logcat Spam Remediation. Switched to GpsApplication.PACKAGE_NAME 
  *   shadow-cache to eliminate repetitive getPackageName() system logs (R759).
- * Aug.18.08:
- * - Issue #206 Hardening: Refined onRequestOverlayPermission with fallback 
- *   logic to handle Samsung-specific intent URI failures (R206).
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -70,8 +71,9 @@ class MainActivity : ComponentActivity() {
                 onRequestBatteryExemption = { launchBatteryExemptionSetting() },
                 onRequestOverlayPermission = {
                     // Issue #206: Hardened intent for Samsung/API 35 compatibility.
+                    val pkg = cachedPkgName.ifBlank { packageName }
                     val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
-                        data = "package:$cachedPkgName".toUri()
+                        data = android.net.Uri.fromParts("package", pkg, null)
                     }
                     try {
                         startActivity(intent)
@@ -86,9 +88,10 @@ class MainActivity : ComponentActivity() {
                     }
                 },
                 onRequestAppInfo = {
+                    val pkg = cachedPkgName.ifBlank { packageName }
                     try {
                         val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            setData("package:$cachedPkgName".toUri())
+                            data = android.net.Uri.fromParts("package", pkg, null)
                         }
                         startActivity(intent)
                     } catch (e: Exception) {
@@ -97,9 +100,10 @@ class MainActivity : ComponentActivity() {
                 },
                 onRequestExactAlarm = {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val pkg = cachedPkgName.ifBlank { packageName }
                         try {
                             val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                                setData("package:$cachedPkgName".toUri())
+                                data = android.net.Uri.fromParts("package", pkg, null)
                             }
                             startActivity(intent)
                         } catch (e: Exception) {
@@ -119,18 +123,35 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun launchBatteryExemptionSetting() {
+        val pkg = cachedPkgName.ifBlank { packageName }
         try {
+            // Issue #896: Robust intent for Samsung A15/Android 15+.
+            // Using Uri.fromParts to ensure proper URI encoding for the 'package' scheme.
             val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                setData("package:$cachedPkgName".toUri())
+                data = android.net.Uri.fromParts("package", pkg, null)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             startActivity(intent)
         } catch (e: Exception) {
+            Timber.e(e, "Issue #896: Primary battery optimization intent failed for $pkg")
             try {
-                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                // Fallback 1: Open the general optimization settings list
+                val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
                 startActivity(intent)
             } catch (e2: Exception) {
-                Toast.makeText(this, "Could not open battery settings", Toast.LENGTH_SHORT).show()
-                Timber.e(e2, "Final battery exemption launch failure")
+                Timber.e(e2, "Issue #896: Fallback optimization intent failed. Navigating to App Info.")
+                // Fallback 2: Navigate to App Info (Samsung 'Unrestricted' toggle resides here)
+                try {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = android.net.Uri.fromParts("package", pkg, null)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    startActivity(intent)
+                } catch (e3: Exception) {
+                    Toast.makeText(this, "Could not open battery settings", Toast.LENGTH_SHORT).show()
+                }
             }
         }
     }
@@ -158,5 +179,9 @@ class MainActivity : ComponentActivity() {
         }
 
         // R405 logic moved to MainViewModel monitoring loop.
+    }
+
+    companion object {
+        const val ACTION_NAVIGATE_TO_MAP = "com.gps19.app.ACTION_NAVIGATE_TO_MAP"
     }
 }

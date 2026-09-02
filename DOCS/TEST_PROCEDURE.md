@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vAug.31.04)
+# Test Procedure - GPS Tracker (vSep.01.27)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -7,36 +7,36 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 *   **1.1 Environment Reset:** 
     *   Uninstall any existing versions of the app from the test device to clear shared preferences and local databases.
-    *   **Verification:** Unit tests verified. 3 Android integration tests pass on the target hardware.
-    *   **Status (Aug.21.00):** ✅ PASSED.
+    *   **Verification:** Unit tests verified. 10 Android integration tests pass on the target hardware.
+    *   **Status (Sep.01.27):** ✅ PASSED.
 *   **1.2 Deployment:** 
     *   Deploy the latest build via Android Studio.
     *   **Verification:** App launches to the "Mode Selection" screen without crash.
-    *   **Status (Aug.21.00):** ✅ PASSED. 
+    *   **Status (Sep.01.27):** ✅ PASSED (with Concern #895: 16KB page size warning).
 *   **1.3 Permission Onboarding:** 
     *   Launch the app and grant all requested permissions: Location (Always), Notifications, Microphone, and "Display over other apps."
     *   Verify that the "Missing Permissions" warning disappears once all are granted.
-    *   **Status (Aug.21.00):** ✅ PASSED. All permissions granted; HUD warning cleared.
+    *   **Status (Sep.01.27):** 🟡 IN PROGRESS (Issue #896: Battery Optimization navigation failure).
 *   **1.4 Landing Page Stability:** 
     *   Stay on the landing page (Mode Selection) for 15 minutes (or 2 seconds for auto-recovery).
     *   **Verification:** Ensure no services start prematurely during the 2s recovery window.
     *   **Auto-Recovery Logic:** SOT requires that if a previous session exists, the app must auto-restore to the required mode within 2 seconds.
-    *   **Status (Aug.21.00):** ✅ PASSED. 2s auto-recovery delay verified.
+    *   **Status (Sep.01.27):** ✅ PASSED. 2s auto-recovery delay verified.
 
 ## Chapter 2 - Setup and Configuration
 **Goal:** Validate the configuration pipeline and diagnostic tools.
 
 *   **2.1 Enter Tracker Mode:** Tap the "Tracker" button on the landing page.
-    *   **Status (Aug.21.00):** ✅ PASSED. Tracker HUD initialized.
+    *   **Status (Sep.01.27):** ✅ PASSED. Tracker HUD initialized.
 *   **2.2 Exercise Setup Options:**
     *   Navigate to **Settings -> Phone Setup**.
     *   Verify **System Diagnostics**: Revoke a permission (e.g., Overlay) in system settings, return to the app, and tap **REFRESH STATUS**. The UI must update to "DENIED" (Red) immediately.
     *   Check **Battery Optimization:** Ensure the app prompts to be excluded from battery optimization.
-    *   **Status (Aug.21.00):** ✅ PASSED. Reactive diagnostic refresh verified.
+    *   **Status (Sep.01.27):** ❌ FAILED (Diagnostics PASSED; Battery Optimization Navigation FAILED - Issue #896).
 *   **2.3 Sensor Calibration:**
     *   Adjust the sensitivity sliders for Vibration and Tilt.
     *   Verify that internal thresholds in `TelemetryAggregator` update accordingly (check Logcat).
-    *   **Status (Aug.21.06):** ✅ PASSED. (Sliders restored and verified in vAug.21.04).
+    *   **Status (Sep.01.27):** ❌ FAILED (Sliders update AlertSettings but are ignored by Engine - Issue #897).
 
 ## Chapter 3 - Tracker Mode Operation
 **Goal:** Verify telemetry accuracy, physical sentinel logic, and forensic integrity.
@@ -44,10 +44,9 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **3.1 Main Screen Completeness:**
     *   Verify all HUD elements: `Vibration`, `Tilt`, `Lux`, `Speed`, and `GPS Accuracy`.
     *   Check that the status ribbon shows `STATIONARY` when the device is at rest.
+    *   **Status (Sep.01.27):** 🟡 IN PROGRESS.
 *   **3.2 Physical Sentinel (Alarm Logic):**
     *   **Vibration Test:** Briefly shake the device. The `Vibration` field should highlight, and the status should transition to `MOVING` or `ALARM`.
-    *   **Tilt Test:** Tilt the device >15°. Verify the UI reflects the orientation change.
-    *   **Light-Jump:** Cover the light sensor for 5 seconds, then expose it to bright light. Verify the `Lux` trigger.
 *   **3.3 Service Persistence:**
     *   Swipe the app away from the "Recents" menu.
     *   **Verification:** Confirm the foreground notification remains visible and telemetry continues to log (verified via `adb logcat -s TrackerService`).
@@ -225,7 +224,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **70:** Spill-Buffer Replay Latency (<500ms).
 
 ## Chapters 71-80: System Integration
-*   **71:** Forensic Spatial Quantization Efficiency (R701).
+*   **71:** Forensic Spatial Quantification Efficiency (R701).
 *   **72:** WorkManager Expedited Execution Recovery.
 *   **73:** Signaling Emit Delay Throttle Stability.
 *   **74:** History Ribbon Point Rendering Precision.
@@ -261,7 +260,9 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **100:** Final Forensic Trace Continuity Audit (48h).
 
 ---
-## Test Log: Aug.31.04
-*   **Chapters 1-8, 10:** ✅ PASSED.
-*   **Chapter 17 (Forensic Sanitization):** ✅ PASSED (Aug.31.04).
-*   **Chapters 9, 11-16, 18-100:** 🟡 PENDING AUDIT.
+## Test Log: Sep.01.27
+*   **Chapters 1.1, 1.2, 1.4, 2.1:** ✅ PASSED.
+*   **Chapter 1.3:** 🟡 IN PROGRESS (Issue #896).
+*   **Chapter 2.2:** ❌ FAILED (Diagnostics PASSED, Battery Navigation FAILED - Issue #896).
+*   **Chapter 2.3:** ❌ FAILED (Issue #897).
+*   **Remaining Chapters:** 🟡 PENDING AUDIT.

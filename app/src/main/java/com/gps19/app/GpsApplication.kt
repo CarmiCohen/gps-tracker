@@ -1,9 +1,11 @@
+
 package com.gps19.app
 
 import android.app.Application
 import android.util.Log
 import androidx.preference.PreferenceManager
 import androidx.work.Configuration
+import androidx.work.WorkManager
 import android.content.Context
 import android.content.ComponentCallbacks2
 import android.os.Process
@@ -23,15 +25,9 @@ import com.gps19.core.engine.ShadowCache
 
 /**
  * GpsApplication: Application entry point and global dependency management.
- * Aug.31.12:
- * - Issue #877 Remediation: Restored PACKAGE_NAME and MY_UID to companion object 
- *   as direct cache-querying properties. This resolves the build errors in 
- *   Utils and NotificationManager while maintaining the zero-race hardening 
- *   required for Samsung IPC silencing (R759).
- * Aug.31.10:
- * - Issue #876 Hardening (R759): Fixed race condition in getPackageName() 
- *   shadow-cache. Removed lazy initializer to prevent permanent empty-string 
- *   caching during early framework initialization.
+ * Sep.01.24:
+ * - Issue #892 Fix: Manually initialize WorkManager in onCreate() to resolve 
+ *   IllegalStateException in BootReceiver, as auto-init is disabled in manifest.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -83,6 +79,10 @@ class GpsApplication : Application(), Configuration.Provider {
         // Populate caches immediately to silence framework IPC logs
         stringCache.put("pkg", super.getPackageName())
         intCache.put("uid", Process.myUid())
+
+        // Issue #892: Manual WorkManager initialization required because 
+        // WorkManagerInitializer was removed from manifest to support custom factories.
+        WorkManager.initialize(this, workManagerConfiguration)
 
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
