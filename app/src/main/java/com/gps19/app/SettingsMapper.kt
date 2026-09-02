@@ -4,13 +4,13 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsMapper: Conversion logic between DataStore Protos and Domain Models.
+ * Sep.02.60:
+ * - Issue #180: Proto-Mirror Parity Verification. Completed mapping for all 
+ *   TrackerStatus fields including RT, forensic indices, and behavior flags (R180).
  * Aug.14.04:
  * - Issue #172: Viewer-Side State Audit. Restored SIT forensic fields (lastSitTs, 
  *   sitVz, sitDz, sitBaro, sitTilt, sitShock, verticalVelocity) to TrackerStatus 
  *   mapping to ensure mirror parity during viewer restarts (R172).
- * July.1.16:
- * - Issue #510: Abandoned Chair Sit Detection. Removed sit-related fields from mapping.
- * - Issue #512 & #515: Removed legacy flags (isSuspicious, isJammer, isAnchorLocked) from TrackerStatus mapping.
  */
 object SettingsMapper {
 
@@ -74,7 +74,7 @@ object SettingsMapper {
         return TrackerStatus(
             lat = s.lat, lng = s.lng, alt = s.alt,
             speed = s.speed, bearing = s.bearing, accuracy = s.accuracy, maxAccuracy = s.maxAccuracy,
-            gpsTs = s.gpsTs, ts = s.ts, battery = s.battery, temp = s.temp, maxTemp = s.maxTemp, isCharging = s.isCharging,
+            gpsTs = s.gpsTs, ts = s.ts, rt = s.rt, battery = s.battery, temp = s.temp, maxTemp = s.maxTemp, isCharging = s.isCharging,
             satsView = s.satsView, satsUsed = s.satsUsed,
             lastConnTs = s.lastConnTs, lastDiscTs = s.lastDiscTs,
             uptimeMs = s.uptimeMs,
@@ -107,7 +107,7 @@ object SettingsMapper {
             trackerState = try { if (s.trackerState.isNullOrBlank()) TrackerState.UNKNOWN else TrackerState.valueOf(s.trackerState) } catch (e: Exception) { TrackerState.UNKNOWN },
             status = try { if (s.status.isNullOrBlank()) SentinelStatus.VALID else SentinelStatus.valueOf(s.status) } catch (e: Exception) { SentinelStatus.VALID },
             
-            // Issue #172: Forensic Parity
+            // Issue #172/180: Forensic Parity
             lastSitTs = s.lastSitTs,
             sitVz = s.sitVz,
             sitDz = s.sitDz,
@@ -119,7 +119,28 @@ object SettingsMapper {
             isAdaptiveJump = s.isAdaptiveJump,
             isBatteryLow = s.isBatteryLow,
             isBatteryCritical = s.isBatteryCritical,
-            isSilentFailure = s.isSilentFailure
+            isSilentFailure = s.isSilentFailure,
+            
+            // Issue #180: Completion
+            isJammer = s.isJammer,
+            isStalled = s.isStalled,
+            isClockRegression = s.isClockRegression,
+            jumpTier = s.jumpTier,
+            isLocationPending = s.isLocationPending,
+            locationPendingReason = try { LocationPendingReason.valueOf(s.locationPendingReason.name.removePrefix("LPR_")) } catch (e: Exception) { LocationPendingReason.NONE },
+            lastValidFixRt = s.lastValidFixRt,
+            snrIdx = s.snrIdx,
+            noiseIdx = s.noiseIdx,
+            luxIdx = s.luxIdx,
+            vibeIdx = s.vibeIdx,
+            liftIdx = s.liftIdx,
+            tiltIdx = s.tiltIdx,
+            baroIdx = s.baroIdx,
+            isSitDetected = s.isSitDetected,
+            isSitActive = s.isSitActive,
+            isUltraLongStationary = s.isUltraLongStationary,
+            isJump = s.isJump,
+            micPending = s.micPending
         )
     }
 
@@ -134,6 +155,7 @@ object SettingsMapper {
             .setMaxAccuracy(status.maxAccuracy)
             .setGpsTs(status.gpsTs)
             .setTs(status.ts)
+            .setRt(status.rt)
             .setBattery(status.battery)
             .setTemp(status.temp)
             .setMaxTemp(status.maxTemp)
@@ -176,7 +198,7 @@ object SettingsMapper {
             .setTrackerState(status.trackerState.name)
             .setStatus(status.status.name)
             
-            // Issue #172: Forensic Parity
+            // Issue #172/180: Forensic Parity
             .setLastSitTs(status.lastSitTs)
             .setSitVz(status.sitVz)
             .setSitDz(status.sitDz)
@@ -189,6 +211,27 @@ object SettingsMapper {
             .setIsBatteryLow(status.isBatteryLow)
             .setIsBatteryCritical(status.isBatteryCritical)
             .setIsSilentFailure(status.isSilentFailure)
+            
+            // Issue #180: Completion
+            .setIsJammer(status.isJammer)
+            .setIsStalled(status.isStalled)
+            .setIsClockRegression(status.isClockRegression)
+            .setJumpTier(status.jumpTier)
+            .setIsLocationPending(status.isLocationPending)
+            .setLocationPendingReason(try { LocationPendingReasonProto.valueOf("LPR_" + status.locationPendingReason.name) } catch (e: Exception) { LocationPendingReasonProto.LPR_NONE })
+            .setLastValidFixRt(status.lastValidFixRt)
+            .setSnrIdx(status.snrIdx)
+            .setNoiseIdx(status.noiseIdx)
+            .setLuxIdx(status.luxIdx)
+            .setVibeIdx(status.vibeIdx)
+            .setLiftIdx(status.liftIdx)
+            .setTiltIdx(status.tiltIdx)
+            .setBaroIdx(status.baroIdx)
+            .setIsSitDetected(status.isSitDetected)
+            .setIsSitActive(status.isSitActive)
+            .setIsUltraLongStationary(status.isUltraLongStationary)
+            .setIsJump(status.isJump)
+            .setMicPending(status.micPending)
             .build()
     }
 }

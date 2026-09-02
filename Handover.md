@@ -1,21 +1,24 @@
-# Forensic Handover Snapshot (Sep.02.55)
+# Forensic Handover Snapshot (Sep.02.60)
 
-## 🏁 Issue #119 Completion Summary
-- **Refined Thresholds**: `CRITICAL_BATTERY_THRESHOLD` reduced to 10% (from 20%). `BATTERY_STEEP_DISCHARGE_THRESHOLD_NORMAL` increased to 5%. `BATTERY_STEEP_DISCHARGE_THRESHOLD_HIGH_LOAD` increased to 10%.
-- **Logic Alignment**: Updated `EngineConstants.kt`, `IntegrityMonitor.kt`, and `MainAlarmLogic.kt` to consume the hardened gates.
-- **Documentation Authority**: Synchronized `event-tables.md`, `SETTINGS_PAGE_DETAIL.md`, and `SOT_MASTER_REQUIREMENTS.md` (R-ID 243).
-- **Versioning**: Advanced to `Sep.02.55` in `app/build.gradle`.
+## 🎯 Current Status
+*   **Last Version**: Sep.02.60
+*   **Active Issue**: Issue #180 (Resolved)
+*   **Build State**: 🟢 Success (`:app:assembleDebug`)
 
-## 📂 Current Audit Baseline
-- **Architectural Master Rules**: 41
-- **Functional R-IDs**: 202
-- **Total SOT Items**: 243
-- **Resolved Issues**: 838
-- **Open Issues**: 1 (#180)
-- **Simplification Ideas**: 239 Active (4 Resolved)
-- **QA Validation Status**: 224 Validated
+## 🛠️ Modifications
+1.  **`app/src/main/proto/app_settings.proto`**: Added fields 80-99 to `TrackerStatusProto` to cover all `TrackerStatus` fields.
+2.  **`app/src/main/java/com/gps19/app/SettingsMapper.kt`**: Implemented mapping for `rt`, `isJammer`, `isStalled`, `isClockRegression`, forensic indices, and SIT states.
+3.  **`app/build.gradle`**: Incremented `versionName` to `Sep.02.60`.
+4.  **`STATUS/SOT_MASTER_REQUIREMENTS.md`**: Added **R-ID 180 (Proto Mirror Parity)**.
+5.  **`STATUS/RESOLUTION_ARCHIVE.md`**: Documented Issue #180 resolution.
+6.  **`issues.md`**: Marked #180 as resolved; updated dashboard.
 
-## 🛠️ Next Chat Objectives
-1. Address **Issue #180**: Proto-Mirror Parity Verification.
-2. Evaluate **Idea #243**: Merging `BatteryStatus` into `SystemHealthState`.
-3. Monitor performance on Samsung A15 hardware with the new battery gates.
+## 📋 Audit Baseline
+*   **SOT Items**: 244 (41 Architectural Rules, 203 Functional R-IDs)
+*   **Resolved Issues**: 839
+*   **Open Issues**: 0
+*   **Simplification Ideas**: 2 (Active)
+*   **QA Validation Status**: 🟢 224 Items Validated
+
+## 🚀 Next Steps
+*   Session termination completed. Ready for a fresh audit or new task.

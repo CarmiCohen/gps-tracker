@@ -321,4 +321,26 @@ message TrackerStatusProto {
     double sit_tilt = 77;
     double sit_shock = 78;
     double vertical_velocity = 79;
+
+    // Issue #180: Mirror Parity Expansion
+    int64 rt = 80;
+    bool is_jammer = 81;
+    bool is_stalled = 82;
+    bool is_clock_regression = 83;
+    int32 jump_tier = 84;
+    bool is_location_pending = 85;
+    LocationPendingReasonProto location_pending_reason = 86;
+    int64 last_valid_fix_rt = 87;
+    double snr_idx = 88;
+    double noise_idx = 89;
+    double lux_idx = 90;
+    double vibe_idx = 91;
+    double lift_idx = 92;
+    double tilt_idx = 93;
+    double baro_idx = 94;
+    bool is_sit_detected = 95;
+    bool is_sit_active = 96;
+    bool is_ultra_long_stationary = 97;
+    bool is_jump = 98;
+    bool mic_pending = 99;
 }

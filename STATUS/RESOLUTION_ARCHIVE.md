@@ -2,6 +2,11 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Sep.02.60 (vSep.02.60)
+*   **Issue #180 RESOLVED: Proto-Mirror Parity Verification**.
+    *   **Problem**: Inconsistency between the `TrackerStatus` domain model and `TrackerStatusProto` persistence schema led to forensic data loss during viewer-side restarts and created technical debt in state mirroring.
+    *   **Remediation**: Expanded `TrackerStatusProto` in `app_settings.proto` to include all missing forensic fields (RT, SNR/Vibe/Lux/Lift/Tilt/Baro indices), behavioral flags (Jammer, Stalled, Clock Regression, Location Pending, Ultra-Long Stationary), and SIT detection states. Completed the bidirectional mapping in `SettingsMapper.kt`, ensuring absolute parity between runtime state and DataStore persistence (R-ID 180).
+
 ## 🟢 Sep.02.55 (vSep.02.55)
 *   **Issue #119 RESOLVED: Battery Steep Discharge Refinement**.
     *   **Problem**: Aggressive Power Save entries and false "Battery Health" alerts were being triggered by erratic battery percentage drops on budget hardware (Samsung A15) or during high-load forensic bursts.
