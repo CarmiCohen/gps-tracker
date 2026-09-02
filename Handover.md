@@ -1,26 +1,24 @@
-# Handover (Sep.02.41) - Issue #897 RESOLVED
+# Handover (Sep.02.42) - Issue #898 RESOLVED
 
 ## 🎯 Current Status
-- **Goal**: Address Sensor Sensitivity Sliders disconnection (Issue #897).
-- **Status**: 🟢 **Issue #897 RESOLVED**.
-- **Version**: `Sep.02.41`
+- **Goal**: Address stalled HUD telemetry in Tracker Mode (Issue #898).
+- **Status**: 🟢 **Issue #898 RESOLVED**.
+- **Version**: `Sep.02.42`
 - **Database**: v75
-- **Current Audit Baseline**: SOT: 238 (40 Arch + 198 Func), Resolved: 818, Open: 19, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 238, QA Status: 222 Validated.
+- **Current Audit Baseline**: SOT: 239 (40 Arch + 199 Func), Resolved: 819, Open: 18, Testing: 100 Chapters, 43 Sub-items, Simplification Ideas: 239, QA Status: 222 Validated.
 
-## 🧬 Forensic State Snapshot: Sep.02.41
+## 🧬 Forensic State Snapshot: Sep.02.42
 - **Validation Details**: 
-    - Propagated `vibrationSensitivity` and `tiltSensitivity` from `AlertSettings` to `AlarmEvaluationState` in `EngineModels.kt`.
-    - Refactored `SentinelValidator.kt` to implement dynamic threshold mapping (0.0-1.0 to physical ranges: Tilt 25°-5°, Vibration 1.4g-0.2g).
-    - Updated `MainAlarmLogic.detectViolations` to apply these dynamic thresholds, replacing hardcoded constants (R2.3).
-    - Verified `AppAlarmManager.kt` correctly syncs UI slider values into the evaluation state during the unified heartbeat cycle.
-    - Updated `SOT_MASTER_REQUIREMENTS.md` with Functional Rule **R-ID 198**.
+    - Added `localLocation` and `trackerLocation` flow collection in `MainViewModel.startHeavyObservations()`.
+    - Unified telemetry ingestion in `handleLocationUpdateInternal` using `TelemetryUseCase` for zero-allocation parity mapping (R3.1).
+    - Verified that HUD and Dashboard elements (Speed, Accuracy, Battery) now update in real-time when in Tracker Mode.
+    - Updated `SOT_MASTER_REQUIREMENTS.md` with Functional Rule **R-ID 199**.
 - **State Changes**:
-    - Modified `core:engine`: `EngineModels.kt`, `SentinelValidator.kt`, `MainAlarmLogic.kt`.
-    - Modified `app`: `AppAlarmManager.kt`, `build.gradle` (vSep.02.41).
+    - Modified `app`: `MainViewModel.kt`, `build.gradle` (vSep.02.42).
     - Modified `issues.md`, `STATUS/RESOLUTION_ARCHIVE.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`.
-    - Modified `Simplify_Ideas2.md` (Added Idea #238).
+    - Modified `Simplify_Ideas2.md` (Added Ideas #238, #239).
 
 ## 🚀 Next Steps
-- **Issue #898 (Pending)**: Address stalled HUD telemetry in Tracker Mode.
+- Monitor A15 hardware for Davey regressions during heavy map hydration at Level 8.
 
-vSep.02.41
+vSep.02.42

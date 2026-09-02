@@ -2,6 +2,11 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Sep.02.42 (vSep.02.42)
+*   **Issue #898 RESOLVED: HUD Telemetry Stalled in Tracker Mode**.
+    *   **Problem**: `MainViewModel` was missing observation logic for `localLocation` and `trackerLocation` flows from `MainRepository`. In tracker mode, telemetry remained at baseline values despite active background sampling by `TrackerService` (R3.1).
+    *   **Remediation**: Integrated observation of `localLocation` and `trackerLocation` flows in `MainViewModel.startHeavyObservations()`. Refactored `handleLocationUpdateInternal` to use `TelemetryUseCase` for comprehensive mapping of location, health, and diagnostic data into the `KinematicState` and related UI flows.
+
 ## 🟢 Sep.02.41 (vSep.02.41)
 *   **Issue #897 RESOLVED: Sensor Sensitivity Sliders Disconnected**.
     *   **Problem**: Vibration and Tilt sliders in UI updated `AlertSettings`, but values were not propagated to the core engine. `MainAlarmLogic` was using hardcoded constants, rendering user sensitivity adjustments ineffective (R2.3).

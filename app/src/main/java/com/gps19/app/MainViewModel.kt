@@ -36,15 +36,13 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.02.42:
+ * - Issue #898 RESOLVED: HUD Telemetry Stalled in Tracker Mode. Integrated 
+ *   observation of localLocation and trackerLocation flows. Mapped updates 
+ *   to kinematicState via TelemetryUseCase to ensure HUD parity (R3.1).
  * Aug.31.02:
  * - Issue #782 Validation: Hardened history flows with sample() to ensure 
  *   Davey immunity on budget hardware (R312, R650).
- * Aug.29.10:
- * - Concern #765: Integrated isUltraLongStationary into UI aggregation pipeline.
- * Aug.26.13:
- * - Concern #737 Remediation: Added DismissIdentitySanitization handler to 
- *   persist the dismissal of the identity warning. This prevents the warning 
- *   from re-initializing on every cold start (R976).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -484,6 +482,15 @@ class MainViewModel @Inject constructor(
         }
         .flowOn(Dispatchers.Main.immediate)
         .launchIn(viewModelScope)
+
+        // Issue #898: Observation of local and tracker location flows to ensure HUD parity.
+        repository.localLocation.onEach { handleLocationUpdateInternal(it) }
+            .flowOn(Dispatchers.Main.immediate)
+            .launchIn(viewModelScope)
+
+        repository.trackerLocation.onEach { handleLocationUpdateInternal(it) }
+            .flowOn(Dispatchers.Main.immediate)
+            .launchIn(viewModelScope)
     }
 
     fun onEvent(event: UiEvent) {
@@ -624,9 +631,29 @@ class MainViewModel @Inject constructor(
     }
 
     private fun handleLocationUpdateInternal(update: LocationUpdate) {
+        val nowMs = timeProvider.currentTimeMillis()
         val nowRt = timeProvider.elapsedRealtime()
         updateKinematicState { current ->
-            telemetryUseCase.mapHealthFromUpdate(update, if (update.isMe) current.localHealth else current.trackerHealth)
+            if (update.isMe) {
+                telemetryUseCase.mapLocalLocation(update, current.localLocation, nowMs, appStartTime)
+                telemetryUseCase.mapHealthFromUpdate(update, current.localHealth)
+                _localMaxTemp.value = update.maxTemp
+                _currentMa.value = update.currentMa
+                
+                if (_uiState.value.appMode == "tracker") {
+                    telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime)
+                    telemetryUseCase.mapHealthFromUpdate(update, current.trackerHealth)
+                    _trackerMaxTemp.value = update.maxTemp
+                    _trackerState.value = update.trackerState
+                    _trackerCurrentMa.value = update.currentMa
+                }
+            } else {
+                telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime)
+                telemetryUseCase.mapHealthFromUpdate(update, current.trackerHealth)
+                _trackerMaxTemp.value = update.maxTemp
+                _trackerState.value = update.trackerState
+                _trackerCurrentMa.value = update.currentMa
+            }
             current.apply { pulse = nowRt }
         }
     }
