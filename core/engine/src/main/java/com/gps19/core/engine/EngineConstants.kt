@@ -2,6 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.02.55:
+ * - Issue #119 Hardening: Refined battery thresholds. Reduced CRITICAL_BATTERY_THRESHOLD 
+ *   to 10% and increased steep discharge tolerances (5%/10% per window) to 
+ *   prevent aggressive Power Save entries and false health alerts (R119).
  * Aug.29.08:
  * - Concern #763: Added ULTRA_LONG_STATIONARY thresholds for GNSS relaxation.
  * Aug.29.01:
@@ -308,13 +312,13 @@ const val DISTANCE_ALARM_SAMPLES_REQUIRED = 6
 const val DEFAULT_ACCURACY_FALLBACK = 15.0
 const val RETURN_TO_SAFE_RANGE_ACCURACY_LIMIT = 20.0
 
-// Battery thresholds
+// Battery thresholds (Issue #119 Hardened)
 const val BATTERY_ALARM_THRESHOLD = 20
-const val CRITICAL_BATTERY_THRESHOLD = 20
+const val CRITICAL_BATTERY_THRESHOLD = 10
 const val MAX_SAFE_TEMPERATURE_CELSIUS = 46.0
 const val MAX_SAFE_TEMPERATURE_RECOVERY = 44.0
-const val BATTERY_STEEP_DISCHARGE_THRESHOLD_NORMAL = 4 
-const val BATTERY_STEEP_DISCHARGE_THRESHOLD_HIGH_LOAD = 8 
+const val BATTERY_STEEP_DISCHARGE_THRESHOLD_NORMAL = 5 
+const val BATTERY_STEEP_DISCHARGE_THRESHOLD_HIGH_LOAD = 10
 const val BATTERY_STEEP_DISCHARGE_WINDOW_MS = 600000L
 
 // Storage thresholds

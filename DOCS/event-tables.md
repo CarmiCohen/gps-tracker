@@ -1,4 +1,4 @@
-# GPS Tracker: Event and Alert Tables (vAug.07.06)
+# GPS Tracker: Event and Alert Tables (vSep.02.55)
 
 This document summarizes all system alerts, their trigger logic, timing, and how they are presented to the user in both the Event Log and the Red Screen (Alarm Overlay). As of vAug.07.06, all tables follow the R747 Locality Authority.
 
@@ -18,7 +18,7 @@ This document summarizes all system alerts, their trigger logic, timing, and how
 | **GPS Gap** | Stale data (>60s) | **60 Seconds** | **60 Seconds** | Aligned with `GPS_GAP_THRESHOLD_MS`. |
 | **Geofence** | Out of fence | **60 Seconds** | **60 Seconds** | Aligned with `BOOTSTRAP_PHASE_MS`. Requires 6 samples. |
 | **Charger unplugged** | USB Power Off | **3 Seconds** | **3 Seconds** | Aligned with `POWER_DISCONNECT_DEBOUNCE_MS`. |
-| **Low Battery** | Battery < 20% | Immediate | **Immediate** | Siren triggers on first packet (`CRITICAL_BATTERY_THRESHOLD`). |
+| **Low Battery** | Battery < 10% (Crit) | Immediate | **Immediate** | Siren triggers at `CRITICAL_BATTERY_THRESHOLD` (10%) when unplugged. |
 | **High Temp** | Temp > 46.0°C | Immediate | **Immediate** | Siren triggers on first packet (`MAX_SAFE_TEMPERATURE_CELSIUS`). |
 | **This device: Hardware Config** | Background Restricted | Immediate | **Immediate** | Siren triggers on background or autostart restriction detection. |
 

@@ -1,4 +1,4 @@
-# Settings Page Detailed Reference (vAug.07.06)
+# Settings Page Detailed Reference (vSep.02.55)
 
 This document provides a comprehensive breakdown of every field, toggle, and action available in the "Settings" overlay of the GPS Tracker application. As of vAug.07.06, all terminology follows the R747 Locality Authority.
 
@@ -33,7 +33,7 @@ To ensure system integrity, the identity fields are subject to strict validation
     - **GPS Gap / Viewer: GPS Gap**: `GPS_GAP_THRESHOLD_MS` (60s) fix age threshold.
 - **Device Status**: 
     - **Charger unplugged**: `POWER_DISCONNECT_DEBOUNCE_MS` (3s). (Issue #163)
-    - **Low Battery**: `CRITICAL_BATTERY_THRESHOLD` (20%) or charge deficit.
+    - **Low Battery**: `CRITICAL_BATTERY_THRESHOLD` (10%) or charge deficit. (Issue #119 Hardened)
     - **High Temp**: `MAX_SAFE_TEMPERATURE_CELSIUS` (46.0°C).
     - **This device: Battery Health**: Monitors steep discharge (5% in 10m). (Issue #353)
 - **System Integrity**:
