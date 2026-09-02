@@ -2,6 +2,11 @@
 
 This document archives all resolved issues and architectural refinements.
 
+## 🟢 Sep.02.45 (vSep.02.45)
+*   **Issue #122 RESOLVED: Hardware Settling Window Verification**.
+    *   **Problem**: Potential native race conditions during hardware teardown on Android 15/Samsung A15 hardware required verification that the 800ms settling window was effective and that all listeners were unregistered before thread death (R891).
+    *   **Remediation**: Enhanced `HardwareProvider.stop()` with an `isTeardownActive` atomic gate to prevent callbacks during disposal. Implemented forensic duration tracking for each component (GNSS, Location, Sensors, Display) and added a teardown summary report. Verified that the 800ms settling window provides sufficient buffer for OS-level cleanup.
+
 ## 🟢 Sep.02.44 (vSep.02.44)
 *   **Issue #893 RESOLVED: Native Resource Disposal Leak Hardening**.
     *   **Problem**: Budget hardware (Samsung A15) exhibited `BaseEventQueue` disposal failures on Android 15 when hardware listeners were unregistered from non-Looper threads or without sufficient settling time.

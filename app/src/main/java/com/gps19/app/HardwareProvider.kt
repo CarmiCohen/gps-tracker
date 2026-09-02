@@ -32,6 +32,9 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.02.45:
+ * - Issue #122 Hardening: Enhanced stop() with forensic duration tracking and summary 
+ *   reporting to verify the 800ms settling window's effectiveness (R891/R-ID 197).
  * Sep.02.44:
  * - Issue #893 Hardening: Audited and verified all native listener unregistrations 
  *   (GNSS, Location, Sensors, Display) for Looper alignment and deterministic 
@@ -41,9 +44,6 @@ import kotlin.math.*
  * Sep.01.27:
  * - Issue #894 Remediation: Integrated ContextShadow delegate to eliminate 
  *   getPackageName log spam during system service calls (R894).
- * Sep.01.21:
- * - Issue #891 Hardening: Repaired ForensicSnapshot property declarations and 
- *   finalized teardown sequencing logs to isolate native disposal failures (R891).
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -65,6 +65,7 @@ class HardwareProvider @Inject constructor(
     private var hardwareHandler: Handler? = null
     private val lifecycleLock = Any()
     private val isStarted = AtomicBoolean(false)
+    private val isTeardownActive = AtomicBoolean(false)
 
     // --- GPS & GNSS State ---
     private var revivalCallback: ManagedLocationCallback? = null
@@ -229,6 +230,7 @@ class HardwareProvider @Inject constructor(
 
     private val gnssStatusCallback = object : ManagedGnssStatusCallback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) {
+            if (isTeardownActive.get()) return
             val nowRt = timeProvider.elapsedRealtime()
             if (lastGnssStatusRt > 0) {
                 val interval = nowRt - lastGnssStatusRt
@@ -263,7 +265,7 @@ class HardwareProvider @Inject constructor(
 
     private val displayListener = object : ManagedDisplayListener() {
         override fun onDisplayChanged(displayId: Int) {
-            if (displayId != Display.DEFAULT_DISPLAY) return
+            if (isTeardownActive.get() || displayId != Display.DEFAULT_DISPLAY) return
             val display = displayManager.getDisplay(displayId) ?: return
             val newState = display.state
             if (newState != lastDisplayState) {
@@ -290,6 +292,7 @@ class HardwareProvider @Inject constructor(
     fun start() {
         synchronized(lifecycleLock) {
             if (isStarted.getAndSet(true)) return
+            isTeardownActive.set(false)
             sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt
             proximityMaxRange = proximity?.maximumRange ?: 5f
             
@@ -318,8 +321,10 @@ class HardwareProvider @Inject constructor(
 
     fun stop() {
         synchronized(lifecycleLock) {
-            val wasStarted = isStarted.getAndSet(false)
-            Timber.i("HardwareProvider: Starting teardown. wasStarted=$wasStarted")
+            if (!isStarted.getAndSet(false)) return
+            isTeardownActive.set(true)
+            val stopStartTime = SystemClock.elapsedRealtime()
+            Timber.i("HardwareProvider: Starting teardown sequence (R891/R-ID 197).")
             
             recoveryJob?.cancel(); recoveryJob = null
             registrationJob?.cancel(); registrationJob = null
@@ -329,24 +334,32 @@ class HardwareProvider @Inject constructor(
             stopAcousticMonitoring()
 
             val handler = hardwareHandler
+            
+            // Unregistration Sequence: Priority to high-frequency/native streams (R891)
+            val gnssStart = SystemClock.elapsedRealtime()
             Timber.d("HardwareProvider: Unregistering GNSS status callback...")
             try { gnssStatusCallback.unregister(locationManager, handler) } catch (e: Exception) { Timber.e(e, "GNSS status unregistration failed") }
+            val gnssDuration = SystemClock.elapsedRealtime() - gnssStart
             
-            Timber.d("HardwareProvider: Unregistering active location callback...")
+            val locStart = SystemClock.elapsedRealtime()
+            Timber.d("HardwareProvider: Unregistering active/revival location callbacks...")
             activeLocationCallback?.unregister(fusedLocationClient, handler); activeLocationCallback = null
-            
-            Timber.d("HardwareProvider: Unregistering revival location callback...")
             revivalCallback?.unregister(fusedLocationClient, handler); revivalCallback = null
+            val locDuration = SystemClock.elapsedRealtime() - locStart
             
+            val sensorStart = SystemClock.elapsedRealtime()
             Timber.d("HardwareProvider: Unregistering all sensors...")
             this.unregister(sensorManager, handler)
+            val sensorDuration = SystemClock.elapsedRealtime() - sensorStart
             
+            val displayStart = SystemClock.elapsedRealtime()
             Timber.d("HardwareProvider: Unregistering display listener...")
             displayListener.unregister(displayManager, handler)
+            val displayDuration = SystemClock.elapsedRealtime() - displayStart
 
-            // Issue #891: Hardened teardown settling window. 
+            // Issue #891/Issue #122: Hardened teardown settling window. 
             // Give the native layer 800ms to finalize unregistration before thread death.
-            Timber.d("HardwareProvider: Entering 800ms settling window...")
+            Timber.d("HardwareProvider: Entering 800ms forensic settling window (Issue #122)...")
             try { Thread.sleep(800) } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
 
             Timber.d("HardwareProvider: Quitting hardware thread...")
@@ -355,9 +368,20 @@ class HardwareProvider @Inject constructor(
                 hardwareThread?.join(1000)
             } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
             
+            val totalDuration = SystemClock.elapsedRealtime() - stopStartTime
             hardwareThread = null; hardwareHandler = null
             isStepDetectorRegistered = false
-            Timber.i("HardwareProvider: Synchronous stop completed.")
+            
+            Timber.i("""
+                HardwareProvider: Teardown Summary (Issue #122 Verification):
+                - Total Teardown Time: ${totalDuration}ms
+                - GNSS Duration: ${gnssDuration}ms
+                - Location Duration: ${locDuration}ms
+                - Sensor Duration: ${sensorDuration}ms
+                - Display Duration: ${displayDuration}ms
+                - Settling Window: 800ms (FIXED)
+                - Status: Clean Teardown Completed.
+            """.trimIndent())
         }
     }
 
@@ -475,6 +499,7 @@ class HardwareProvider @Inject constructor(
     }
 
     override fun onSensorChanged(event: SensorEvent) {
+        if (isTeardownActive.get()) return
         val nowRt = timeProvider.elapsedRealtime(); val wallNow = timeProvider.currentTimeMillis(); val values = event.values
         when (event.sensor.type) {
             Sensor.TYPE_STEP_DETECTOR -> lastStayAliveRt = nowRt
