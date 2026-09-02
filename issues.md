@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Sep.02.70)
+# Project Issues & Hardening Tracking (Sep.02.76)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -7,7 +7,7 @@ This document tracks active issues, technical debt, and pending implementation t
 | :--- | :--- | :--- |
 | **Open Technical Issues** | 🟢 Healthy | 0 |
 | **Validation Tasks** | 🟢 Validated | 227 |
-| **Resolved (Total)** | 🟢 Progress | 857 |
+| **Resolved (Total)** | 🟢 Progress | 858 |
 
 ---
 
@@ -23,12 +23,15 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Sep.02.70)
-*   **Idea #241 RESOLVED: Protobuf Mapping Unification**. Consolidated mapping logic for `RealtimeStatus` (Signaling) and `TrackerStatusProto` (Persistence) into `TelemetryProtobufMapper`. Synchronized schemas to ensure 100% field parity and removed redundant serialization boilerplate from domain models (R-ID 245).
-*   **Idea #240 RESOLVED: ContextShadow Automation**. Integrated Hilt-managed `@ShadowContext` injection across all singleton services and suites. Migrated `AudioSynthesizer` to a `@Singleton` class to support injection. This eliminates manual `ContextShadow` wrapping boilerplate and ensures consistent IPC optimization (R-ID 244).
-*   **Idea #239 RESOLVED: Signaling Interface Consolidation**. Simplified `SignalingProvider` by removing redundant `emitMap` and `emitBinary` methods in favor of a unified `transmit(TrackerStatus)` entry point (R-ID 239).
-*   **Issue #245 RESOLVED: "SYS" Badge Deactivation lifecycle**. Added handlers for `ConfirmStopTracking` and `ManualExit` in `MainViewModel` to ensure `isSystemActive` is toggled false upon session termination, maintaining visual parity (R-ID 246).
+## 🟢 Recently Resolved Issues (Sep.02.76)
+*   **Issue #246 RESOLVED: Map Settings in Viewer Mode**. Restored functionality to the map tools overlay in viewer mode by integrating `MapUseCase` and `HomePointUseCase` into the `MainViewModel` event pipeline. This ensures that toggles for fences, violations, and geofence editing are correctly handled when the app is in viewer role (R-ID 247).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.02.70)*
-*Simplification Ideas: 239 Active*
+## 🟢 Recently Resolved Issues (Sep.02.70)
+*   **Idea #241 RESOLVED: Protobuf Mapping Unification**. Consolidated mapping logic for `RealtimeStatus` (Signaling) and `TrackerStatusProto` (Persistence) into `TelemetryProtobufMapper` (R-ID 245).
+*   **Idea #240 RESOLVED: ContextShadow Automation**. Integrated Hilt-managed `@ShadowContext` injection across all singleton services and suites (R-ID 244).
+*   **Issue #245 RESOLVED: "SYS" Badge Deactivation lifecycle**. Added handlers for `ConfirmStopTracking` and `ManualExit` in `MainViewModel` to ensure `isSystemActive` is toggled false upon session termination (R-ID 246).
+
+---
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.02.76)*
+*Simplification Ideas: 241 Active*

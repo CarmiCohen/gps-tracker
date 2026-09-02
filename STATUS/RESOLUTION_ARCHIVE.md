@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.02.70)
+# Resolution Archive (Sep.02.76)
+
+## 🟢 Resolved Issues (Sep.02.76)
+*   **Issue #246: Map Settings in Viewer Mode**. User reported that map settings and tool buttons were unresponsive in viewer mode. Root cause was identified as missing event delegation in `MainViewModel.onEvent` for viewer-specific map interactions. Resolved by integrating `MapUseCase` and `HomePointUseCase` into the event pipeline and implementing `handleMapTap`, `handleAddHomePoint`, and `handleRemoveHomePoint` handlers. This ensures full parity of map functionality (fencing, violations, tools) across both app roles (R-ID 247).
 
 ## 🟢 Resolved Issues (Sep.02.70)
 *   **Idea #241: Protobuf Mapping Unification**. Consolidated mapping logic for `RealtimeStatus` (Signaling) and `TrackerStatusProto` (Persistence) into `TelemetryProtobufMapper`. Synchronized schemas to ensure 100% field parity and removed redundant serialization boilerplate from domain models (R-ID 245).

@@ -36,6 +36,10 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.02.72:
+ * - Issue #246 RESOLVED: Map Settings in Viewer Mode. Integrated MapUseCase 
+ *   into onEvent and implemented handleMapTap/handleAddHomePoint to restore 
+ *   functionality of MapToolsOverlay in viewer mode (R246).
  * Sep.02.70:
  * - Idea #240: ContextShadow Automation. Migrated AudioSynthesizer dependency 
  *   to injection (R-ID 240).
@@ -558,6 +562,15 @@ class MainViewModel @Inject constructor(
                     repository.saveBoolean(IDENTITY_SANITIZED_KEY, false)
                 }
             }
+            is UiEvent.SetFenceVisible, is UiEvent.SetViolationsVisible, is UiEvent.SetGeofenceViolationsVisible,
+            is UiEvent.SetMapButtonsVisible, is UiEvent.SetMapLocked, is UiEvent.MapZoomIn, is UiEvent.MapZoomOut,
+            is UiEvent.CenterTracker, is UiEvent.CenterViewer, is UiEvent.SetGeofenceMode -> {
+                updateState { mapUseCase.handleMapEvent(event, it) }
+            }
+            is UiEvent.MapTap -> handleMapTap(event.point)
+            is UiEvent.AddHomePoint -> handleAddHomePoint(event.point)
+            is UiEvent.RemoveHomePoint -> handleRemoveHomePoint(event.index)
+            is UiEvent.ClearHomePoints -> handleClearHomePoints()
             else -> {}
         }
     }
@@ -682,6 +695,43 @@ class MainViewModel @Inject constructor(
             val nextStartTime = settingsUseCase.fullInitialization(context)
             updateState { it.copy(appStartTime = nextStartTime) }
             addPersistentLog("system", "Full initialization performed", isImportant = true)
+        }
+    }
+
+    private fun handleMapTap(point: GeoPoint) {
+        val mode = _uiState.value.geofenceMode
+        if (mode == GeofenceMode.ADD) {
+            onEvent(UiEvent.AddHomePoint(point))
+        } else if (mode == GeofenceMode.REMOVE) {
+            val idx = homePointUseCase.findNearestPointIndex(_uiState.value.homePoints, point)
+            if (idx != -1) onEvent(UiEvent.RemoveHomePoint(idx))
+        }
+    }
+
+    private fun handleAddHomePoint(point: GeoPoint) {
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            val newPoints = homePointUseCase.addHomePoint(_uiState.value.homePoints, point, _uiState.value.maxDistance)
+            withContext(Dispatchers.Main.immediate) {
+                updateState { it.copy(homePoints = newPoints, geofenceMode = GeofenceMode.IDLE) }
+            }
+        }
+    }
+
+    private fun handleRemoveHomePoint(index: Int) {
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            val newPoints = homePointUseCase.removeHomePoint(_uiState.value.homePoints, index, _uiState.value.maxDistance)
+            withContext(Dispatchers.Main.immediate) {
+                updateState { it.copy(homePoints = newPoints, geofenceMode = GeofenceMode.IDLE) }
+            }
+        }
+    }
+
+    private fun handleClearHomePoints() {
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            val newPoints = homePointUseCase.clearHomePoints(_uiState.value.maxDistance)
+            withContext(Dispatchers.Main.immediate) {
+                updateState { it.copy(homePoints = newPoints) }
+            }
         }
     }
 }

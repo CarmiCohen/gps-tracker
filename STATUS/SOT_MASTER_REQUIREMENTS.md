@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.02.70)
+# SOT Master Requirements (Sep.02.76)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -9,7 +9,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.17 Robust Battery Navigation (R896)**: **MANDATORY**. Battery optimization exemption intents MUST use `Uri.fromParts("package", pkg, null)` for URI encoding and implement a multi-tier fallback (Sep.02.40).
 *   **1.18 Log Spillage Protection (R759)**: **MANDATORY**. All application-level logging MUST use `Timber`. Direct calls to `android.util.Log` or `System.out.println` are strictly prohibited (Sep.02.50).
 
-## 🧩 Functional Requirements (211 IDs)
+## 🧩 Functional Requirements (212 IDs)
 *   **R-ID 238 (Model Unification)**: The application MUST use `LocationUpdate` as the single source of truth for location data across both the Core Engine and UI layers (Sep.03.01).
 *   **R-ID 239 (Signaling Consolidation)**: The communication layer MUST expose a unified `transmit(TrackerStatus)` entry point that internally handles role-based serialization (Protobuf/JSON) to ensure schema enforcement and minimize interface sprawl (Sep.02.70).
 *   **R-ID 240 (Tracker HUD Telemetry)**: `TrackerService` MUST publish telemetry to the repository every tick, regardless of GPS fix status, to ensure the local HUD remains live (Sep.03.15).
@@ -19,5 +19,6 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 244 (ContextShadow Automation)**: The system MUST automatically inject the `ContextShadow` wrapper into all high-frequency singleton services via Hilt to ensure package-name shadowing and IPC optimization are enforced consistently (Sep.02.70).
 *   **R-ID 245 (Protobuf Unification)**: The system MUST use a centralized mapping utility for all Protobuf-to-domain transformations to ensure schema parity across signaling and persistence layers (Sep.02.70).
 *   **R-ID 246 (SYS Badge Lifecycle)**: The system MUST atomically deactivate the "SYS" tracking indicator upon session termination (including ManualExit and StopTracking) to ensure visual parity with the tracking engine (Sep.02.70).
+*   **R-ID 247 (Map Event Unification)**: `MainViewModel` MUST delegate all map-related UI events to `MapUseCase` and `HomePointUseCase` to ensure consistent tool functionality across both Tracker and Viewer modes (Sep.02.76).
 
-*(Total: 41 Architectural Rules + 211 Functional R-IDs = 252 Items)*
+*(Total: 41 Architectural Rules + 212 Functional R-IDs = 253 Items)*

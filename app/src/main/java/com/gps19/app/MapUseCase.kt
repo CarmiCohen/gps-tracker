@@ -4,10 +4,11 @@ import javax.inject.Inject
 
 /**
  * MapUseCase: Logic for map-related UI state transitions and triggers.
+ * Sep.03.30:
+ * - Issue #246 Remediation: Integrated SetGeofenceMode handling to ensure 
+ *   Viewer mode can transition into ADD/REMOVE geofence states (R246).
  * July.22.00:
  * - Hilt Hardening: Added @Inject constructor.
- * v9.5.0:
- * - Issue #503: Hilt Removal.
  */
 class MapUseCase @Inject constructor() {
     fun handleMapEvent(event: UiEvent, currentState: MainUiState): MainUiState {
@@ -17,6 +18,7 @@ class MapUseCase @Inject constructor() {
             is UiEvent.SetGeofenceViolationsVisible -> currentState.copy(isGeofenceViolationsVisible = event.visible)
             is UiEvent.SetMapButtonsVisible -> currentState.copy(isMapButtonsVisible = event.visible)
             is UiEvent.SetMapLocked -> currentState.copy(isMapLocked = event.locked)
+            is UiEvent.SetGeofenceMode -> currentState.copy(geofenceMode = event.mode)
             is UiEvent.MapZoomIn -> currentState.copy(zoomInTrigger = currentState.zoomInTrigger + 1)
             is UiEvent.MapZoomOut -> currentState.copy(zoomOutTrigger = currentState.zoomOutTrigger + 1)
             is UiEvent.CenterTracker -> currentState.copy(
