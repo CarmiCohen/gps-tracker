@@ -1,13 +1,13 @@
-# Project Issues & Hardening Tracking (Sep.02.45)
+# Project Issues & Hardening Tracking (Sep.02.46)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🔴 Needs Action | 7 |
+| **Open Technical Issues** | 🔴 Needs Action | 5 |
 | **Validation Tasks** | 🟢 Validated | 223 |
-| **Resolved (Total)** | 🟢 Progress | 830 |
+| **Resolved (Total)** | 🟢 Progress | 832 |
 
 ---
 
@@ -19,8 +19,7 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 🔴 Open Issues (Prioritized)
 
 ### High Priority (Stability & Compliance)
-*   **Issue #118**: 16KB Page Size Compatibility (Auditing secondary native dependencies for Android 15 alignment).
-*   **Issue #120b**: SIT (Stationary State) field validation (Verifying high-precision forensic timestamps).
+*   *No high-priority issues remaining.*
 
 ### Medium Priority (UX & Data Integrity)
 *   **Issue #005**: Log Spillage Hardening (Final validation of silence on Samsung G990/A15 hardware).
@@ -33,11 +32,11 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 
-## 🟢 Recently Resolved Issues (Sep.02.45)
-*   **Issue #122 RESOLVED: Hardware Settling Window Verification**. Enhanced `stop()` teardown with forensic duration tracking and summary reporting. Confirmed 800ms settling window effectively prevents native race conditions (R891). (Sep.02.45).
-*   **Issue #893 RESOLVED: Native Resource Disposal Leak Hardening**. Audited and verified Looper alignment for all `ManagedNetworkCallback` and `FusedLocationProvider` registrations, ensuring deterministic `BaseEventQueue` disposal on Android 15 (R893). (Sep.02.44).
-*   **Issue #894 RESOLVED: ContextShadow Coverage Expansion**. Expanded `ContextShadow` delegate usage to silence `getPackageName` IPC diagnostic logs (R1.14). (Sep.02.43).
+## 🟢 Recently Resolved Issues (Sep.02.46)
+*   **Issue #118 RESOLVED: 16KB Page Size Compatibility**. Confirmed native library `jdHardware` alignment using `-Wl,-z,max-page-size=16384` and set `extractNativeLibs="false"` for Android 15 compliance (R895). (Sep.02.46).
+*   **Issue #120b RESOLVED: SIT Forensic Timestamp Validation**. Verified end-to-end propagation of high-precision timestamps (`sitVzTs`, `sitVzRt`) from detection in `LocationSentinel` through the aggregator to Room persistence (R172). (Sep.02.46).
+*   **Issue #122 RESOLVED: Hardware Settling Window Verification**. Enhanced `stop()` teardown with forensic duration tracking (R891). (Sep.02.45).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.02.45)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.02.46)*
 *Simplification Ideas: 239 Active (2 Resolved)*
