@@ -4,15 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.02.68:
+ * - Idea #243: Flattened StatusBar indicator chain. Added isSystemActive 
+ *   to HudConnectivityState to support unified state propagation (R243).
  * Sep.02.01:
  * - Issue #897: Added vibrationSensitivity and tiltSensitivity to 
  *   AlarmEvaluationState for dynamic thresholding (R2.3).
- * Aug.31.00:
- * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
- *   violationUptimeMs to EngineConnectionPoint for parity (R782).
- * Aug.29.10:
- * - Concern #765: Added isUltraLongStationary to EngineConnectionPoint for 
- *   remote status transparency.
  */
 
 @Serializable
@@ -433,7 +430,8 @@ data class HudConnectivityState(
     val viewerId: String = "VIEW",
     val watchdogOk: Boolean = true,
     val rtt: Int = 0,
-    val remoteSignal: Int = 0
+    val remoteSignal: Int = 0,
+    val isSystemActive: Boolean = false
 )
 
 @Serializable
@@ -498,6 +496,7 @@ data class HudState(
     val trackerId get() = connectivity.trackerId
     val viewerId get() = connectivity.viewerId
     val watchdogOk get() = connectivity.watchdogOk
+    val isSystemActive get() = connectivity.isSystemActive
     
     val isLocalGpsActive get() = telemetry.isLocalGpsActive
     val isGpsFresh get() = telemetry.isGpsFresh

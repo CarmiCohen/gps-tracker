@@ -21,6 +21,14 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.03.15:
+ * - Issue #240 RESOLVED: Tracker Telemetry Publication. Decoupled telemetry 
+ *   updates from GPS availability. Local HUD now reflects real-time sensor 
+ *   data even without a satellite fix (R-ID 240).
+ * Sep.03.12:
+ * - Issue #240 RESOLVED: Tracker Telemetry Publication. Integrated 
+ *   repository.updateLocation() into processTick to ensure local HUD parity 
+ *   with the sensing engine (R-ID 240).
  * Sep.01.12:
  * - Issue #886 Remediation: Added 500ms settling delay after sequential 
  *   native init on A15 devices to prevent timing-related Monitor::Inflate 
@@ -529,10 +537,60 @@ class TrackerService : BaseMonitorService() {
             evaluateAlarmsInternal(now, nowRt, isSocketConnected, isViewerActive, processed, snapshot)
         }
 
+        // Issue #240: Publish local telemetry to repository for HUD visualization.
+        // vSep.03.15: Removed proc != null guard to ensure sensor telemetry reaches HUD without GPS fix.
+        val proc = lastProcessedLocation
+        repository.updateLocation(LocationUpdate(
+            lat = proc?.optimizedPoint?.lat ?: 0.0, 
+            lng = proc?.optimizedPoint?.lng ?: 0.0, 
+            alt = proc?.optimizedPoint?.alt ?: 0.0, 
+            speed = proc?.filteredSpeed ?: 0.0, 
+            accuracy = proc?.currentAccuracy ?: 0.0, 
+            bearing = lastGpsBearing, 
+            battery = health.batteryLevel, 
+            temp = health.batteryTemp, 
+            maxTemp = health.maxTemp, 
+            isCharging = health.isCharging, 
+            gpsTs = proc?.timestamp ?: 0L, 
+            ts = now, 
+            isMe = true, 
+            status = proc?.status ?: SentinelStatus.VALID, 
+            satsView = hardwareProvider.satellitesInView, 
+            satsUsed = hardwareProvider.satellitesUsed, 
+            maxAccuracy = proc?.maxAccuracy ?: 0.0, 
+            currentMa = health.currentMa, 
+            lastValidFixRt = locationProcessor.getLastValidFixRt(),
+            vibration = snapshot.vibration, heading = snapshot.heading, baroAlt = snapshot.baroAlt, 
+            lux = snapshot.lux, isNear = snapshot.isNear, tiltDegrees = snapshot.tiltDegrees, 
+            acousticDb = snapshot.acousticDb, peakVibrationShock = snapshot.peakShock, 
+            peakVibrationShockTs = now, luxBaseline = locationProcessor.getLuxBaseline(), 
+            acousticFloorDb = locationProcessor.getAcousticFloorDb(), 
+            adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), 
+            proxIdx = snapshot.proximityIdx, proximityCm = snapshot.proximityCm, 
+            proximityDebounceMs = snapshot.proximityDebounceMs, 
+            vibrationRollingSum = snapshot.vibrationRollingSum, isTamperDetected = proc?.tamperDetected ?: false, 
+            isPowerTamper = health.isPowerTamper, isSitDetected = isSuspiciousMode, 
+            lastSitTs = locationProcessor.getLastSitTs(), verticalVelocity = snapshot.peakVerticalVelocity, 
+            sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, 
+            sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, 
+            sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, 
+            kineticEnergy = snapshot.kineticEnergy, isLocationPending = health.isLocationPending, 
+            locationPendingReason = health.locationPendingReason, 
+            isPowerSaveMode = isPowerSaveActive || health.isPowerSaveMode, 
+            standbyBucket = health.standbyBucket, netInterface = health.netInterface, 
+            isStorageLow = health.isStorageLow, isStorageCritical = health.isStorageCritical, 
+            isBatterySteepDischarge = health.isBatterySteepDischarge, 
+            isCoolingModeActive = health.isCoolingModeActive, 
+            trackerState = if ((proc?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING, 
+            isBatteryLow = health.isBatteryLow, isBatteryCritical = health.isBatteryCritical, 
+            isUltraLongStationary = health.isUltraLongStationary, snrIdx = snrIdx, noiseIdx = noiseIdx, 
+            luxIdx = luxIdx, vibeIdx = vibeIdx, liftIdx = liftIdx, tiltIdx = tiltIdx, baroIdx = baroIdx
+        ))
+
         if (isViewerActive) {
-            val proc = lastProcessedLocation
+            val procViewer = lastProcessedLocation
             connectivitySuite.pushCurrentStatus(
-                deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true, loc = location, filtered = proc?.optimizedPoint, distToTracker = null, distToHome = proc?.distToHome, maxAccuracy = proc?.maxAccuracy ?: 0.0, filteredSpeed = proc?.filteredSpeed ?: 0.0, vibration = snapshot.vibration, heading = snapshot.heading, baroAlt = snapshot.baroAlt, lux = snapshot.lux, isNear = snapshot.isNear, tiltDegrees = snapshot.tiltDegrees, acousticDb = snapshot.acousticDb, jumpTier = proc?.jumpTier ?: 0, isJammer = proc?.jammerDetected ?: false, isStalled = health.gpsStalled, peakShock = snapshot.peakShock, peakShockTs = now, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = snapshot.proximityIdx, proximityCm = snapshot.proximityCm, proximityDebounceMs = snapshot.proximityDebounceMs, vibrationRollingSum = snapshot.vibrationRollingSum, micPending = false, isTamperDetected = proc?.tamperDetected ?: false, isPowerTamper = health.isPowerTamper, isSitDetected = isSuspiciousMode, isSitActive = false, lastSitTs = locationProcessor.getLastSitTs(), receiptRt = nowRt, violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(), verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isClockRegression = proc?.isClockRegression ?: false, isLocationPending = health.isLocationPending, locationPendingReason = health.locationPendingReason, lastValidFixRt = health.lastValidFixRt, gnssDetail = latestGnssDetail, snrIdx = snrIdx, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, liftIdx = liftIdx, tiltIdx = tiltIdx, baroIdx = baroIdx, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, batteryLevel = health.batteryLevel, temp = health.batteryTemp, isCharging = health.isCharging, trackerState = if ((proc?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING, status = proc?.status ?: SentinelStatus.VALID, isStorageLow = health.isStorageLow, isStorageCritical = health.isStorageCritical, isPowerSaveMode = isPowerSaveActive || health.isPowerSaveMode, standbyBucket = health.standbyBucket, netInterface = health.netInterface, kineticEnergy = snapshot.kineticEnergy, isAdaptiveJump = proc?.isAdaptiveJump ?: false, isBatteryLow = health.isBatteryLow, isBatteryCritical = health.isBatteryCritical, isUltraLongStationary = health.isUltraLongStationary
+                deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true, loc = location, filtered = procViewer?.optimizedPoint, distToTracker = null, distToHome = procViewer?.distToHome, maxAccuracy = procViewer?.maxAccuracy ?: 0.0, filteredSpeed = procViewer?.filteredSpeed ?: 0.0, vibration = snapshot.vibration, heading = snapshot.heading, baroAlt = snapshot.baroAlt, lux = snapshot.lux, isNear = snapshot.isNear, tiltDegrees = snapshot.tiltDegrees, acousticDb = snapshot.acousticDb, jumpTier = procViewer?.jumpTier ?: 0, isJammer = procViewer?.jammerDetected ?: false, isStalled = health.gpsStalled, peakShock = snapshot.peakShock, peakShockTs = now, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = snapshot.proximityIdx, proximityCm = snapshot.proximityCm, proximityDebounceMs = snapshot.proximityDebounceMs, vibrationRollingSum = snapshot.vibrationRollingSum, micPending = false, isTamperDetected = procViewer?.tamperDetected ?: false, isPowerTamper = health.isPowerTamper, isSitDetected = isSuspiciousMode, isSitActive = false, lastSitTs = locationProcessor.getLastSitTs(), receiptRt = nowRt, violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(), verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isClockRegression = procViewer?.isClockRegression ?: false, isLocationPending = health.isLocationPending, locationPendingReason = health.locationPendingReason, lastValidFixRt = health.lastValidFixRt, gnssDetail = latestGnssDetail, snrIdx = snrIdx, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, liftIdx = liftIdx, tiltIdx = tiltIdx, baroIdx = baroIdx, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, batteryLevel = health.batteryLevel, temp = health.batteryTemp, isCharging = health.isCharging, trackerState = if ((procViewer?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING, status = procViewer?.status ?: SentinelStatus.VALID, isStorageLow = health.isStorageLow, isStorageCritical = health.isStorageCritical, isPowerSaveMode = isPowerSaveActive || health.isPowerSaveMode, standbyBucket = health.standbyBucket, netInterface = health.netInterface, kineticEnergy = snapshot.kineticEnergy, isAdaptiveJump = procViewer?.isAdaptiveJump ?: false, isBatteryLow = health.isBatteryLow, isBatteryCritical = health.isBatteryCritical, isUltraLongStationary = health.isUltraLongStationary
             )
         }
 

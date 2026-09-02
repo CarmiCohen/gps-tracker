@@ -32,18 +32,13 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Sep.02.68:
+ * - Idea #243: Flattened StatusBar indicator chain. Updated GlobalStatusBar 
+ *   call to use unified HudState and fixed parameter naming in ViewerDashboard (R243).
  * Sep.03.01:
  * - Issue #238: Location Model Unification. Updated field references 
  *   from timestamp/telemetryTs to gpsTs/ts to align with unified 
  *   LocationUpdate model (R-ID 238).
- * Sep.01.12:
- * - Issue #885 Remediation: Decomposed overlay hydration into 4 levels (8-11) 
- *   to distribute JIT load for Settings, Log, Ribbons, and GNSS Detail 
- *   components respectively (R2.1).
- * Sep.01.10:
- * - Issue #882 Hardening: Segmented composition logic based on hydrationLevel 
- *   to remediate 1074ms Davey. Delayed heavy components (StatusBar, Dashboard) 
- *   until higher hydration levels to distribute JIT compilation load (R2.1/R882).
  */
 
 @Composable
@@ -116,7 +111,6 @@ fun ViewerScreen(
     val statusBar = @Composable {
         GlobalStatusBar(
             hudState = hudState,
-            isSystemActive = uiState.isSystemActive,
             modifier = Modifier.pointerInput(Unit) {
                 detectTapGestures(onTap = { viewModel.onEvent(UiEvent.SetRedScreenVisible(true)) })
             }
@@ -201,7 +195,7 @@ fun ViewerScreen(
                                     dashboardState = dashboardState,
                                     gpsIdx = gpsIndexData,
                                     rttValue = rtt,
-                                    trackerCurrentMaValue = trackerCurrentMa,
+                                    trackerCurrentMa = trackerCurrentMa,
                                     systemPulse = systemPulse,
                                     onEvent = { viewModel.onEvent(it) }
                                 )
@@ -324,7 +318,7 @@ fun ViewerScreen(
                                 dashboardState = dashboardState,
                                 gpsIdx = gpsIndexData,
                                 rttValue = rtt,
-                                trackerCurrentMaValue = trackerCurrentMa,
+                                trackerCurrentMa = trackerCurrentMa,
                                 systemPulse = systemPulse,
                                 onEvent = { viewModel.onEvent(it) }
                             )
@@ -419,7 +413,7 @@ fun ViewerDashboard(
     dashboardState: DashboardState,
     gpsIdx: GpsIndexData,
     rttValue: Int,
-    trackerCurrentMaValue: Int,
+    trackerCurrentMa: Int,
     systemPulse: Long,
     onEvent: (UiEvent) -> Unit
 ) {
@@ -493,7 +487,7 @@ fun ViewerDashboard(
                         vibrationFloor = dashboardState.vibrationFloor,
                         luxBaseline = dashboardState.luxBaseline,
                         acousticFloorDb = dashboardState.acousticFloorDb,
-                        trackerCurrentMa = dashboardState.trackerCurrentMa,
+                        trackerCurrentMa = trackerCurrentMa,
                         gpsIdx = gpsIdx,
                         rttValue = rttValue,
                         cpuLoad = dashboardState.cpuLoad,
@@ -509,7 +503,7 @@ fun ViewerDashboard(
                         trackerStateName = dashboardState.trackerState.name,
                         gpsAgeSec = if (gpsAge != Long.MAX_VALUE) gpsAge / 1000 else -1L,
                         rtt = rttValue,
-                        currentMa = trackerCurrentMaValue
+                        currentMa = trackerCurrentMa
                     )
                 }
                 

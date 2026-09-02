@@ -5,19 +5,14 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Sep.03.17:
+ * - Issue #242 RESOLVED: Unhandled TriggerRecovery Event. Added serviceRecoveryTrigger 
+ *   to NavigationState and implemented handlers in ViewModel to enable automated 
+ *   service restoration after OS-level FGS blocks (R-ID 242).
  * Sep.03.07:
  * - Issue #238 cleanup: Moved UiEvent and UiCommand to MainUiState.kt to 
  *   unify UI state definitions and resolve widespread unresolved reference 
  *   errors. Restored SetStorageSimulation as a UiEvent (R-ID 238).
- * Sep.03.04:
- * - Issue #238: Location Model Unification. Replaced LocationState with 
- *   LocationUpdate in KinematicState to eliminate mapping churn and 
- *   standardize on the core engine model (R-ID 238).
- * Aug.31.07:
- * - Issue #874 Remediation: Expanded hydrationLevel to 8 levels to further 
- *   segment Map Hydration. Level 6 (Current Positions) and Level 7 (Violations) 
- *   are now separated to ensure the 700ms Davey threshold is respected on 
- *   budget hardware (R874).
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -57,7 +52,7 @@ data class MainUiState(
     val isSetupBypassActive: Boolean = false
 ) {
     val isFullyHydrated: Boolean get() = hydrationLevel >= 3
-    val isMapHydrated: Boolean get() = hydrationLevel >= 4 // Map is visible but may still be adding overlays
+    val isMapHydrated: Boolean get() = hydrationLevel >= 4
 
     val isSystemReady: Boolean
         get() = isSetupBypassActive || (
@@ -256,7 +251,8 @@ data class NavigationState(
     val activeSubSettings: SubSettings? = null,
     val wasMapVisibleBeforeOverlay: Boolean = true,
     val pendingMode: String? = null,
-    val replayCursorTs: Long? = null
+    val replayCursorTs: Long? = null,
+    val serviceRecoveryTrigger: Int = 0
 )
 
 enum class SubSettings { ALERTS, SOUND, CLEAN }

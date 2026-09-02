@@ -28,12 +28,12 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Sep.02.66:
+ * - Issue #241 RESOLVED: Mode-Selection Activation. Migrated setAppMode to 
+ *   suspend to eliminate race conditions during role selection (R-ID 241).
  * Aug.29.05:
  * - Issue #761: Migrated from ForensicMapper to TelemetryMapper. Centralized 
  *   telemetry mapping authority (R761).
- * Aug.22.04:
- * - Issue #197 Standardization: Aligned triggerBackgroundPruning with R197 
- *   chunked standards for connection_history, violations, and trail_points.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -180,7 +180,7 @@ class MainRepository @Inject constructor(
     suspend fun getBoolean(key: String, default: Boolean): Boolean = settings.getBoolean(key, default)
 
     suspend fun getAppMode() = settings.getAppMode()
-    fun setAppMode(mode: String?) = settings.setAppMode(mode)
+    suspend fun setAppMode(mode: String?) = settings.setAppMode(mode)
     suspend fun getAppStartTime() = settings.getLong(APP_START_TIME_KEY, 0L)
     fun setAppStartTime(ts: Long) { saveLongSync(APP_START_TIME_KEY, ts) }
 

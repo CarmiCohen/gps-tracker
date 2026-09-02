@@ -45,6 +45,10 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Sep.03.11:
+ * - Issue #241 RESOLVED: Mode-Selection Activation. Added SetSystemActive(true) 
+ *   to proceedToMode and restoration logic to ensure background services 
+ *   transition out of INACTIVE state (R-ID 241).
  * Aug.26.13:
  * - Issue #735 Hardening: Connected isSetupBypassActive and ToggleSetupBypass 
  *   to DiagnosticsScreen to support automated soak test execution (R735).
@@ -99,6 +103,9 @@ fun MainAppContent(
         viewModel.onEvent(UiEvent.SetManualSelection(true))
         viewModel.onEvent(UiEvent.SetSettlingActive(false))
         viewModel.onEvent(UiEvent.SetAppMode(mode))
+        
+        // Issue #241: Activate system upon role selection.
+        viewModel.onEvent(UiEvent.SetSystemActive(true))
         
         val elapsed = System.currentTimeMillis() - startupTime
         if (elapsed < STARTUP_SETTLING_DELAY_MS) {
@@ -198,6 +205,8 @@ fun MainAppContent(
                 viewModel.onEvent(UiEvent.SetSettlingActive(false))
                 
                 if (hasRequiredPermissions(mode)) {
+                    // Issue #241: Ensure system is active during restoration.
+                    viewModel.onEvent(UiEvent.SetSystemActive(true))
                     onStartService(mode)
                 } else {
                     Timber.i("Automatic restoration: Missing permissions for mode $mode. Triggering request flow.")

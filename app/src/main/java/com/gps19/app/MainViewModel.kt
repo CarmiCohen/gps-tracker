@@ -36,13 +36,14 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * Sep.02.42:
- * - Issue #898 RESOLVED: HUD Telemetry Stalled in Tracker Mode. Integrated 
- *   observation of localLocation and trackerLocation flows. Mapped updates 
- *   to kinematicState via TelemetryUseCase to ensure HUD parity (R3.1).
- * Aug.31.02:
- * - Issue #782 Validation: Hardened history flows with sample() to ensure 
- *   Davey immunity on budget hardware (R312, R650).
+ * Sep.03.22:
+ * - Issue #245 RESOLVED: "SYS" Badge Deactivation. Integrated ManualExit into 
+ *   session termination logic to ensure IS_SYSTEM_ACTIVE is toggled false (R245).
+ * Sep.03.20:
+ * - Issue #245 RESOLVED: "SYS" Badge Deactivation. Added handler for 
+ *   ConfirmStopTracking to invoke stopTrackingSession, ensuring visual parity (R245).
+ * Sep.03.19:
+ * - Build Fix: Added missing clearTrails and fullInitialization bridge methods.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -311,8 +312,6 @@ class MainViewModel @Inject constructor(
 
     var appStartTime: Long = 0L
     private var autoSaveJob: Job? = null
-    private var lastKnownAlarmTypes: Set<String> = emptySet()
-    private var lastAlarmAckRt: Long = 0L
     private var isHeavyObservationStarted = false
     private val replayCursorRequest = MutableStateFlow<Long?>(null)
 
@@ -323,7 +322,6 @@ class MainViewModel @Inject constructor(
             withContext(Dispatchers.Main.immediate) {
                 applyInitialSettings(initialSettings)
                 
-                // Issue #318 Remediation: Delegate hydration to LifecycleHydrationManager
                 hydrationManager.hydrationLevel.onEach { level ->
                     updateState { it.copy(hydrationLevel = level) }
                 }.launchIn(viewModelScope)
@@ -335,7 +333,7 @@ class MainViewModel @Inject constructor(
             }
             
             launch(Dispatchers.IO) { 
-                delay(STAGGERED_IO_PRUNING_DELAY_MS + 1000) // Extended delay for DB pruning
+                delay(STAGGERED_IO_PRUNING_DELAY_MS + 1000)
                 repository.proactivePruning() 
             }
             
@@ -345,14 +343,8 @@ class MainViewModel @Inject constructor(
             }
             
             launch(Dispatchers.Main.immediate) {
-                // Wait for full hydration and app mode selection
                 _uiState.filter { it.isFullyHydrated && it.appMode != null }.first()
-                
-                // Issue #314: Additional delay for A15 hardware before heavy observations.
-                if (systemStatusProvider.isA15Hardware()) {
-                    delay(1000)
-                }
-                
+                if (systemStatusProvider.isA15Hardware()) delay(1000)
                 startHeavyObservations()
             }
 
@@ -483,7 +475,6 @@ class MainViewModel @Inject constructor(
         .flowOn(Dispatchers.Main.immediate)
         .launchIn(viewModelScope)
 
-        // Issue #898: Observation of local and tracker location flows to ensure HUD parity.
         repository.localLocation.onEach { handleLocationUpdateInternal(it) }
             .flowOn(Dispatchers.Main.immediate)
             .launchIn(viewModelScope)
@@ -516,7 +507,6 @@ class MainViewModel @Inject constructor(
             }
             is UiEvent.SetAppMode -> {
                 if (event.mode != null) {
-                    // Start heavy observations after a slight delay if not already started
                     viewModelScope.launch(Dispatchers.Main.immediate) {
                         if (systemStatusProvider.isA15Hardware()) delay(500)
                         startHeavyObservations()
@@ -524,9 +514,26 @@ class MainViewModel @Inject constructor(
                 }
                 viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
                     val newStartTime = sessionUseCase.setAppMode(event.mode)
-                    updateState { it.copy(appMode = event.mode, appStartTime = newStartTime ?: it.appStartTime) }
+                    updateState { it.copy(
+                        appMode = event.mode, 
+                        appStartTime = newStartTime ?: it.appStartTime,
+                        isSystemActive = if (event.mode != null) true else it.isSystemActive // Issue #241
+                    )}
                 }
             }
+            is UiEvent.ConfirmStopTracking, UiEvent.ManualExit -> {
+                updateState { it.copy(isSystemActive = false, appMode = null) }
+                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+                    sessionUseCase.stopTrackingSession()
+                }
+            }
+            is UiEvent.TriggerRecovery -> {
+                if (_uiState.value.isRecoveryPending) {
+                    updateNavigation { it.copy(serviceRecoveryTrigger = it.serviceRecoveryTrigger + 1) }
+                    updateState { it.copy(isRecoveryPending = false) }
+                }
+            }
+            is UiEvent.SetRecoveryPending -> updateState { it.copy(isRecoveryPending = event.pending) }
             is UiEvent.LogAction -> addPersistentLog(event.type, message = event.message, isImportant = event.isImportant, isSpecial = event.isSpecial, specialColor = event.specialColor)
             is UiEvent.RefreshPermissionStatus -> viewModelScope.launch(Dispatchers.IO) { 
                 systemStatusProvider.getPermissionState(forceRefresh = true)
@@ -554,25 +561,6 @@ class MainViewModel @Inject constructor(
                 }
             }
             else -> {}
-        }
-    }
-
-    fun clearTrails(context: Context) {
-        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            repository.clearTrails()
-            withContext(Dispatchers.Main.immediate) {
-                Toast.makeText(context, context.getString(R.string.log_msg_trails_cleared), Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    fun fullInitialization(context: Context) {
-        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            repository.resetStats()
-            repository.sendCommand(UiCommand.FullInitializationReset)
-            withContext(Dispatchers.Main.immediate) {
-                Toast.makeText(context, context.getString(R.string.log_msg_full_init), Toast.LENGTH_SHORT).show()
-            }
         }
     }
 
@@ -639,7 +627,7 @@ class MainViewModel @Inject constructor(
                 telemetryUseCase.mapHealthFromUpdate(update, current.localHealth)
                 _localMaxTemp.value = update.maxTemp
                 _currentMa.value = update.currentMa
-                
+
                 if (_uiState.value.appMode == "tracker") {
                     telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime)
                     telemetryUseCase.mapHealthFromUpdate(update, current.trackerHealth)
@@ -682,5 +670,20 @@ class MainViewModel @Inject constructor(
         if (trailPoints.isEmpty()) return emptyList()
         val geoPoints = trailPoints.map { it.toGeoPoint() }
         return listOf(MapTrailSegment(geoPoints, color, geoPoints.hashCode()))
+    }
+
+    fun clearTrails(context: Context) {
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            repository.clearTrails()
+            addPersistentLog("system", "Trails cleared by user", isImportant = true)
+        }
+    }
+
+    fun fullInitialization(context: Context) {
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            val nextStartTime = settingsUseCase.fullInitialization(context)
+            updateState { it.copy(appStartTime = nextStartTime) }
+            addPersistentLog("system", "Full initialization performed", isImportant = true)
+        }
     }
 }

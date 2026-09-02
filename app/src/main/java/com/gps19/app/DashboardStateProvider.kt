@@ -6,11 +6,12 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
+ * Sep.02.68:
+ * - Idea #243: Flattened StatusBar indicator chain. Populated isSystemActive 
+ *   in HudConnectivityState to support unified state propagation (R243).
  * Sep.03.01:
  * - Issue #238: Location Model Unification. Updated to use ts and gpsTs 
  *   from LocationUpdate instead of telemetryTs and timestamp (R-ID 238).
- * Aug.29.10:
- * - Concern #765: Added isUltraLongStationary support to Dashboard and HUD telemetry states.
  */
 interface DashboardStateProvider {
     fun buildDashboardConnectivityState(
@@ -221,7 +222,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             viewerId = viewerId,
             watchdogOk = if (appMode == "viewer") (isTelemetryFresh || (System.currentTimeMillis() - diagnosticState.connectivity.lastRemoteActivityTs < WATCH_DOG_UI_GRACE_MS)) else true,
             rtt = rtt,
-            remoteSignal = remoteSignal
+            remoteSignal = remoteSignal,
+            isSystemActive = isSystemActive
         )
     }
 

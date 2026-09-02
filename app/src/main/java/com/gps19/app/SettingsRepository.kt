@@ -46,14 +46,11 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Sep.02.66:
+ * - Issue #241 RESOLVED: Mode-Selection Activation. Migrated setAppMode to 
+ *   suspend to eliminate race conditions during role selection (R-ID 241).
  * July.30.28:
  * - Issue #630: Forensic Recovery Log Aggregation. Added cumulative recovery stats support.
- * July.30.27:
- * - Issue #629: Deferred Recovery Latency Audit. Added recoveryBlockedTs support.
- * July.30.26:
- * - Issue #626: Foreground Service Start Hardening. Added IS_RECOVERY_PENDING_KEY support.
- * July.27.00:
- * - Architecture Audit: Centralized PreferenceKeys into PreferenceKeys.kt.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -291,8 +288,9 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun getAppMode(): String? = dataStore.data.first().appMode.ifEmpty { null }
-    fun setAppMode(mode: String?) {
-        scope.launch { dataStore.updateData { it.toBuilder().setAppMode(mode ?: "").build() } }
+    
+    suspend fun setAppMode(mode: String?) {
+        dataStore.updateData { it.toBuilder().setAppMode(mode ?: "").build() }
     }
 
     suspend fun loadHomePoints(): List<GeoPoint> = dataStore.data.first().homePointsList.map { GeoPoint(it.lat, it.lng) }
@@ -376,9 +374,6 @@ class SettingsRepository @Inject constructor(
                current.hasDraftAlertSettings()
     }
 
-    /**
-     * Atomically saves multiple draft settings to reduce I/O cycles.
-     */
     suspend fun saveDraftSettings(
         deviceId: String,
         viewerId: String,
@@ -397,10 +392,6 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    /**
-     * Atomically commits draft settings to primary keys and clears drafts.
-     * Returns CommitResult indicating which primary values were updated.
-     */
     suspend fun commitDraftSettings(): CommitResult {
         var res = CommitResult()
         dataStore.updateData { current ->
@@ -416,7 +407,6 @@ class SettingsRepository @Inject constructor(
             val newMaxDistance = if (current.hasDraftMaxDistance()) current.draftMaxDistance else current.maxDistance
             val newAlertsProto = if (current.hasDraftAlertSettings()) current.draftAlertSettings else current.alertSettings
 
-            // v9.3.25: Refined Alias-Aware Uniqueness Check
             if (!SignalingConstants.areIdsUnique(newTrackerId, newViewerId)) {
                 res = CommitResult(error = "Identity Conflict: Some IDs (e.g., 'viewer', 'Trk') are reserved for cross-version compatibility. Please choose unique IDs.")
                 return@updateData current
@@ -454,9 +444,6 @@ class SettingsRepository @Inject constructor(
         return res
     }
 
-    /**
-     * Atomically saves multiple primary settings.
-     */
     suspend fun saveSettingsBulk(
         deviceId: String? = null,
         viewerId: String? = null,
@@ -480,9 +467,6 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    /**
-     * Atomically saves multiple session metrics to reduce I/O cycles.
-     */
     suspend fun saveSessionMetricsBulk(
         totalConnected: Long,
         uptime: Long,
@@ -505,9 +489,6 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    /**
-     * Atomically resets connectivity stats to reduce I/O cycles.
-     */
     suspend fun resetStatsBulk() {
         dataStore.updateData { current ->
             current.toBuilder()
@@ -524,10 +505,6 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    /**
-     * Issue #630: Forensic Recovery Log Aggregation.
-     * Atomically updates recovery stats.
-     */
     suspend fun incrementRecoveryStats(blackoutMs: Long) {
         dataStore.updateData { current ->
             current.toBuilder()

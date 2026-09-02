@@ -29,14 +29,13 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Sep.02.68:
+ * - Idea #243: Flattened StatusBar indicator chain. Fixed unresolved references 
+ *   to dashboardState and standbyBucket in TrackerDashboard (R243).
  * Sep.03.01:
  * - Issue #238: Location Model Unification. Updated field references 
  *   from timestamp/telemetryTs to gpsTs/ts to align with unified 
  *   LocationUpdate model (R-ID 238).
- * Aug.29.11:
- * - UI Refinement: Added visual indicator for Ultra-Long Stationary state (R765).
- * Aug.26.16:
- * - Issue #739 Remediation: Passed hydrationLevel to AppMapContainer.
  */
 
 @Composable
@@ -113,7 +112,6 @@ fun TrackerScreen(
     val statusBar = @Composable {
         GlobalStatusBar(
             hudState = hudState,
-            isSystemActive = uiState.isSystemActive,
             modifier = Modifier.pointerInput(Unit) {
                 detectTapGestures(onTap = { viewModel.onEvent(UiEvent.SetRedScreenVisible(true)) })
             }
@@ -464,7 +462,7 @@ fun TrackerScreen(
                 onUpdateMaxDistance = { viewModel.onEvent(UiEvent.UpdateDraftMaxDistance(it)) },
                 onUpdateAlertSettings = { viewModel.onEvent(UiEvent.UpdateDraftAlertSettings(it)) },
                 onUpdateSirenType = { viewModel.onEvent(UiEvent.SetSirenType(it)) },
-                onUpdateAlarmVolume = { viewModel.onEvent(UiEvent.UpdateDraftAlertSettings(uiState.draftSettings.alertSettings.copy(alarmVolume = it))) },
+                onUpdateAlarmVolume = { viewModel.onEvent(UiEvent.UpdateDraftAlarmVolume(it)) },
                 onTestSiren = { 
                     if (diagnosticState.isSirenPlaying) {
                         AudioSynthesizer.stopSiren(timeProvider = viewModel.timeProvider)
