@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.02.76)
+# Resolution Archive (Sep.03.100)
+
+## 🟢 Resolved Issues (Sep.03.100)
+*   **Issue #247: Signal Loss False Positives**. User reported "SIGNAL LOSS" alerts despite good GPS signal on S21FE and A15 devices. Root cause was lack of telemetry grace periods during aggressive power management and relay recovery. Resolved by introducing `BUDGET_HARDWARE_SIGNAL_GRACE_MS` (5s) for A15 hardware and correlating Signal Loss triggers with relay recovery states in `MainAlarmLogic`. This prevents false alarms during network handovers and device stabilization (R247).
 
 ## 🟢 Resolved Issues (Sep.02.76)
 *   **Issue #246: Map Settings in Viewer Mode**. User reported that map settings and tool buttons were unresponsive in viewer mode. Root cause was identified as missing event delegation in `MainViewModel.onEvent` for viewer-specific map interactions. Resolved by integrating `MapUseCase` and `HomePointUseCase` into the event pipeline and implementing `handleMapTap`, `handleAddHomePoint`, and `handleRemoveHomePoint` handlers. This ensures full parity of map functionality (fencing, violations, tools) across both app roles (R-ID 247).
@@ -18,12 +21,4 @@
 
 ## 🟢 Previously Resolved (Sep.02.66)
 *   **Issue #242: Unhandled TriggerRecovery Event**. Implemented a reactive signal-response pattern between `MainActivity`, `MainViewModel`, and `MainAppContent`. (Sep.02.66).
-*   **Issue #241: Missing Mode-Selection Activation**. Migrated `setAppMode` to suspend and integrated atomic `IS_SYSTEM_ACTIVE_KEY` toggle in `SessionUseCase`. (Sep.02.66).
-
-## 🟢 Previously Resolved (Sep.03.15)
-*   **Issue #240: Tracker Telemetry Publication Failure**. Decoupled `repository.updateLocation()` from GPS fix status in `TrackerService.kt`. (Sep.03.15).
-*   **Issue #118: Forensic Matrix Synchronization**. Standardized 15+ SIT and Indexing parameters across Engine, Room, and Telemetry layers. (Sep.02.62).
-*   **Issue #120b: I/O Stabilization - Startup Pruning Delay**. Implemented 16s delay for DB pruning to prevent startup frame drops on A15 hardware. (Sep.02.62).
-*   **Issue #005: Log Spillage Hardening**. Purged direct Log calls; implemented ForensicSanitizer in Timber pipeline. (Sep.02.62).
-*   **Issue #119: Boot/Battery Integrity**. Hardened isSystemActive authority in MaintenanceWorker and service lifecycle. (Sep.02.62).
 *   **Issue #180: Proto-Mirror Parity Verification**. Expanded Protobuf schema to mirror full forensic state of TrackerStatus domain model. (Sep.02.62).

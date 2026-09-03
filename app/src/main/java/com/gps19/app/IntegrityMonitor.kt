@@ -26,12 +26,14 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.02.72:
+ * - Issue #247: Implemented forensic grace period (5s) for Signal Loss 
+ *   auditing on budget hardware (A15) and hardened peer-visibility 
+ *   correlation (R247).
  * Aug.31.02:
  * - Issue #762 Validation: Added observation of isUltraLongStationaryFlow 
  *   from HardwareProvider to ensure the [ULTRA] badge reflects local 
  *   hardware relaxation state (R765, R778).
- * Aug.29.03:
- * - Issue #760 Hardening: Migrated from GpsManager to unified HardwareProvider (R760).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -535,14 +537,28 @@ class IntegrityMonitor @Inject constructor(
         return true
     }
 
+    /**
+     * checkSignalIntegrity: Enhanced Signal Loss auditing with forensic grace periods.
+     * Issue #247: Mitigates false positives on budget hardware (A15) by injecting 
+     * a hardware-specific grace period (5s) for telemetry gaps.
+     */
     fun checkSignalIntegrity(nowRt: Long, silenceDelta: Long, isTracker: Boolean): Boolean {
-        val threshold = if (isTracker) {
+        var threshold = if (isTracker) {
             VIEWER_SIGNAL_LOSS_THRESHOLD_MS
         } else {
             TRACKER_SIGNAL_LOSS_THRESHOLD_MS
         }
+
+        // Issue #247: Budget hardware adaptation grace
+        if (systemStatusProvider.isA15Hardware()) {
+            threshold += BUDGET_HARDWARE_SIGNAL_GRACE_MS
+        }
+
         val loss = silenceDelta > threshold
-        updateHealth { it.signalLoss = loss }
+        
+        if (loss != currentHealth.signalLoss) {
+            updateHealth { it.signalLoss = loss }
+        }
         return !loss
     }
 

@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.02.72:
+ * - Issue #247: Added BUDGET_HARDWARE_SIGNAL_GRACE_MS (5s) to mitigate false-positive 
+ *   Signal Loss alerts on Samsung A15/S21FE during telemetry gaps (R247).
  * Sep.02.55:
  * - Issue #119 Hardening: Refined battery thresholds. Reduced CRITICAL_BATTERY_THRESHOLD 
  *   to 10% and increased steep discharge tolerances (5%/10% per window) to 
@@ -157,7 +160,7 @@ const val ACOUSTIC_FLOOR_MIN_DB = 50.0
 const val ACOUSTIC_FLOOR_CONTRACTION_EMA = 0.995
 const val ACOUSTIC_LOCKOUT_MS = 1000L
 const val ACOUSTIC_RECOVERY_DELAY_MS = 30000L
-const val ACOUSTIC_SAMPLE_RATE = 8000
+const val ACOUSTIC_SAMPLE_RATE = 44100
 const val ACOUSTIC_INIT_RETRY_COUNT = 3
 const val ACOUSTIC_INIT_RETRY_DELAY_MS = 200L
 const val ACOUSTIC_GENERIC_RECOVERY_DELAY_MS = 2000L
@@ -307,6 +310,7 @@ const val GNSS_SAMPLING_INTERVAL_MS = 2000L
 // System Thresholds (Core Logic)
 const val TRACKER_SIGNAL_LOSS_THRESHOLD_MS = 180000L
 const val VIEWER_SIGNAL_LOSS_THRESHOLD_MS = 30000L
+const val BUDGET_HARDWARE_SIGNAL_GRACE_MS = 5000L
 const val INTERNET_LOSS_THRESHOLD_MS = 60000L 
 const val DISTANCE_ALARM_SAMPLES_REQUIRED = 6
 const val DEFAULT_ACCURACY_FALLBACK = 15.0

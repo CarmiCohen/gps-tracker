@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Sep.02.72:
+ * - Issue #247: Enhanced Signal Loss latching with grace periods for 
+ *   budget hardware and relay recovery correlation (R247).
  * Sep.02.01:
  * - Issue #897: Propagated vibrationSensitivity and tiltSensitivity to 
  *   SentinelValidator for dynamic thresholding (R2.3).
@@ -101,11 +104,19 @@ object MainAlarmLogic {
                 technicalDetails = if (visualJumpMet) "Tier: ${state.jumpTier}" else null
             )
             
+            // Issue #247: Enhanced Signal Loss Latching (Grace Period & Relay Correlation)
+            val isRelayRecovering = uptimeRt < HARDWARE_BOOT_GRACE_MS + ADAPTATION_SETTLING_MS
+            val isSignalLossMet = canCheckPeerErrors && 
+                                health.signalLoss && 
+                                !shouldSuppressPeerErrors && 
+                                !isGpsWarmupActive && 
+                                !isRelayRecovering
+
             report.getOrCreate(reportIdx++).update(
                 type = ALERT_ID_SIGNAL_LOSS,
                 title = getTrackerTitleCached(isTracker, if (isTracker) ALERT_TITLE_VIEWER_SIGNAL_LOSS else ALERT_TITLE_SIGNAL_LOSS),
                 subtitle = "Communication with device was lost", 
-                conditionMet = canCheckPeerErrors && health.signalLoss && !shouldSuppressPeerErrors && !isGpsWarmupActive
+                conditionMet = isSignalLossMet
             )
             
             report.getOrCreate(reportIdx++).update(
