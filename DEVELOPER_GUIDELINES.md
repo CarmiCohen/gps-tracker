@@ -8,6 +8,7 @@ The following rules MUST be followed strictly for every task:
 4. **Mark Resolved**: Record all fixed issues in the relevant status tracking file and mark them as resolved.
 5. **Continuous Handover**: Update `Handover.md` after each modification to any `.kt` file.
 6. **Transparency**: Briefly explain each action before executing it.
+7. **Large File Protection**: Prioritize using `replace_text` for targeted updates in large files (especially `.md` and `.xml`) to prevent accidental data loss or truncation. Avoid using summaries or placeholders when using `write_file`.
 
 ## 🏁 Completion Sequence
 Perform the following steps in order once an issue is resolved:

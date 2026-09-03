@@ -1,32 +1,29 @@
-# Handover Report - Sep.02.76
+# Handover Report - Sep.03.50
 
 ## 🎯 Current Context
 *   **Active Mode**: Session Termination / Handover.
-*   **Last Fix**: Issue #246 (Map Settings in Viewer Mode).
-*   **Version**: Sep.02.76.
+*   **Last Fix**: Issue #897 (Target SDK 35 FGS Compatibility).
+*   **Version**: Sep.03.50.
 
 ## 🛠️ Work Summary
-1.  **Map Event Delegation**: Refactored `MainViewModel.onEvent` to delegate all map-related UI events to `MapUseCase`.
-2.  **Geofence Mode Logic**: Enabled geofence state transitions (ADD/REMOVE) in Viewer mode via `MapUseCase`.
-3.  **Map Tap Restoration**: Integrated `HomePointUseCase` in `MainViewModel` to handle map interactions for geofence editing.
-4.  **Integrity Restoration**: Restored `DOCS/TEST_PROCEDURE.md` to its full 100-chapter state following accidental truncation.
-5.  **Versioning**: Promoted version to `Sep.02.76` across build scripts and documentation.
+1.  **SDK 35 Hardening**: Fixed `InvalidForegroundServiceTypeException` in `MaintenanceWorker` by explicitly declaring `specialUse` foreground service type in `AndroidManifest.xml` and passing it in `getForegroundInfo()`.
+2.  **Versioning**: Promoted version to `Sep.03.50` across build scripts and documentation.
+3.  **Deployment Verification**: Confirmed stable recovery and telemetry operation on Samsung A15 hardware running Android 15.
 
 ## 📂 Integrity Audit Baseline
 *   **SOT Items**: 253 (41 Architectural Rules + 212 Functional R-IDs).
-*   **Resolved Issues**: 858.
+*   **Resolved Issues**: 859.
 *   **Open Issues**: 0.
 *   **Testing Chapters**: 100 (Full 100-chapter protocol active).
-*   **Simplification Ideas**: 241 (Idea #240: ViewModel Decomposition).
-*   **QA Validation**: 227 Tasks Validated.
+*   **QA Validation**: 228 Tasks Validated.
 
 ## 🚀 Git Release Block
 ```bash
 git add --all
-git commit -m "Issue #246 RESOLVED: Map Settings in Viewer Mode parity (vSep.02.76)"
-git tag -a vSep.02.76 -m "Release Sep.02.76"
+git commit -m "Issue #897 RESOLVED: Target SDK 35 FGS Compatibility (vSep.03.50)"
+git tag -a vSep.03.50 -m "Release Sep.03.50"
 git push origin main --tags
 ```
 
 ## 🛑 Forensic State Stop
-Session terminated. All map tools are verified functional in viewer mode. Documentation integrity is confirmed.
+Session terminated. Background recovery logic is fully compliant with Target SDK 35 requirements. A15 stability is confirmed.

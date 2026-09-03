@@ -2,6 +2,7 @@ package com.gps19.app
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.work.*
@@ -16,13 +17,13 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * Sep.03.16:
+ * - Issue #897 RESOLVED: Target SDK 35 FGS Compatibility. Explicitly passing 
+ *   FOREGROUND_SERVICE_TYPE_SPECIAL_USE in getForegroundInfo() to prevent 
+ *   InvalidForegroundServiceTypeException during recovery (R897).
  * Sep.02.50:
  * - Issue #005 Hardening: Replaced all android.util.Log calls with Timber to 
  *   ensure log spillage protection on Samsung A15/G990 hardware (R759).
- * Aug.24.01:
- * - Issue #307 Remediation: Standardized monotonic authority for maintenance 
- *   uptime logging. Refactored silence detection to use elapsedRealtime() with 
- *   wall-clock fallbacks to prevent 56-year "Ghost Silence" logs (R307).
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -53,10 +54,14 @@ class MaintenanceWorker @AssistedInject constructor(
     }
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
-        return ForegroundInfo(
-            notificationManager.getNotificationId(),
-            notificationManager.buildForegroundNotification("System maintenance check...")
-        )
+        val id = notificationManager.getNotificationId()
+        val notification = notificationManager.buildForegroundNotification("System maintenance check...")
+        
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            ForegroundInfo(id, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+        } else {
+            ForegroundInfo(id, notification)
+        }
     }
 
     override suspend fun doWork(): Result {

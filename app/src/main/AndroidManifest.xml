@@ -77,6 +77,14 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="specialUse"
+            tools:node="merge">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_TYPE"
+                android:value="Ensures tracking service continuity and performs database maintenance." />
+        </service>
+
         <receiver android:name=".WatchdogReceiver" android:exported="false">
             <intent-filter>
                 <action android:name="com.gps19.app.ACTION_ALARM_WAKEUP" />
