@@ -5,9 +5,14 @@ This document tracks active issues, technical debt, and pending implementation t
 ## 📊 Hardening Progress Dashboard
 | Category | Status | Count |
 | :--- | :--- | :--- |
-| **Open Technical Issues** | 🟢 Healthy | 0 |
-| **Validation Tasks** | 🟢 Validated | 229 |
-| **Resolved (Total)** | 🟢 Progress | 860 |
+| **SOT Master Rules** | 🏗️ Standards | 41 |
+| **Functional R-IDs** | 🧩 Requirements | 213 |
+| **Resolved Issues** | 🟢 Progress | 860 |
+| **Open Technical Issues** | 🔴 Priority | 0 |
+| **Testing Chapters** | 🧪 Protocol | 100 |
+| **Testing Sub-items** | 🔍 Granularity | 124 |
+| **Simplification Ideas** | 💡 Future | 242 |
+| **QA Validation Tasks** | 🟢 Validated | 229 |
 
 ---
 
@@ -33,4 +38,4 @@ This document tracks active issues, technical debt, and pending implementation t
 
 ---
 *For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.03.100)*
-*Simplification Ideas: 242 Active*
+Current Audit Baseline: [SOT: 254 (Rules: 41, IDs: 213), Resolved: 860, Open: 0, Testing: 100 (Sub-items: 124), Ideas: 242, QA: 229]

@@ -15,9 +15,10 @@ Perform the following steps in order once an issue is resolved:
 
 1. **Integrity Audit**: Verify that no `*.md` or `*.xml` files were accidentally truncated and ensure the change is consistent with existing code and documentation.
 2. **State Tracking Update**: Update `issues.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, and `STATUS/RESOLUTION_ARCHIVE.md`. Record all fixed issues and verify that new concerns have issue numbers assigned.
-3. **App Build & Versioning**: Rebuild the app and update the `versionName` in `app/build.gradle`.
-4. **Git Release Block**: Prepare a Git command block to stage, commit, tag the version, and push to the remote repository.
-5. **Simplicity Audit**: Evaluate if the code or app architecture can be further simplified. Save these ideas in `Simplify_Ideas2.md`.
-6. **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot to prepare for a fresh chat session.
-7. **Session Termination**: Stop the chat immediately. Do not attempt to fix any other issues or continue work.
-8. **Audit Recalculation**: Recalculate number of items for SOT (sum of 34 Architectural master rules and 196 Functional R-IDs), Resolved issues, open issues, Testing chapters, sub-items, simplification ideas, and QA validation status. Display it in a format of: Current Audit Baseline.
+3. **Dashboard Extension**: Extend and synchronize the **Hardening Progress Dashboard** in `issues.md` to match the **Current Audit Baseline** (SOT Rules, SOT IDs, Resolved, Open, Testing Chapters, Testing Sub-items, Simplification Ideas, and QA Validation tasks).
+4. **App Build & Versioning**: Rebuild the app and update the `versionName` in `app/build.gradle`.
+5. **Git Release Block**: Prepare a Git command block to stage, commit, tag the version, and push to the remote repository.
+6. **Simplicity Audit**: Evaluate if the code or app architecture can be further simplified. Save these ideas in `Simplify_Ideas2.md`.
+7. **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot to prepare for a fresh chat session.
+8. **Session Termination**: Stop the chat immediately. Do not attempt to fix any other issues or continue work.
+9. **Audit Recalculation**: Recalculate all metrics and display them in the format: **Current Audit Baseline: [SOT: X (Rules: Y, IDs: Z), Resolved: A, Open: B, Testing: C (Sub-items: D), Ideas: E, QA: F]**.
