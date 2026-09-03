@@ -1,7 +1,14 @@
-# Simplification & Architecture Ideas (Sep.03.110)
+# Simplification & Optimization Ideas (Sep.03.120)
 
-## Active Ideas
-*   **Idea #240: ViewModel Decomposition**. As `MainViewModel` handles an increasing number of event types (Telemetry, Signaling, Navigation, Map), consider splitting it into feature-specific ViewModels (e.g., `MapViewModel`, `SessionViewModel`) to reduce cognitive load and JIT pressure on budget hardware (R-ID 247).
-*   **Idea #239: Event-to-Command Mapping Automation**. Explore using a metadata-driven approach or a sealed class hierarchy visitor for `onEvent` to reduce the boilerplate of manual delegation to UseCases.
-*   **Idea #242: ForensicGraceManager**. Centralize all timing-based suppressions (GPS Warmup, Relay recovery, Hardware-specific signal grace) into a unified domain service. This would simplify `MainAlarmLogic.detectViolations` by replacing manual uptime/recovery checks with a single `isSuppressed(ViolationType)` call (Issue #247).
-*   **Idea #244: Connectivity Lifecycle Observer**. The "poke" logic and heartbeat checks for A15 devices are currently scattered between `TrackerService` and `ConnectivitySuite`. Abstracting these into a `Lifecycle-aware ConnectivityWatchdog` would improve testability and reduce service-layer complexity.
+## 1. Service Consolidation
+*   **1.1. Location Processing Redundancy**: `TrackerService` and `ViewerService` share ~80% of their logic for observing `LocationProcessor` and `HardwareProvider` flows. This event delegation should be hoisted into `BaseMonitorService` to reduce forensic snapshot duplication and ensure logic parity across roles.
+*   **1.2. Command Routing**: Consolidate `commandRouter` observation into the base class to standardize the handling of `UiVisibilityChanged` and `SyncSensors` events.
+
+## 2. Telemetry Optimization
+*   **2.1. Snapshot Flyweights**: The `ForensicSnapshot` and `TrackerStatus` mapping logic in `ConnectivitySuite` can be further optimized using pre-allocated byte-buffer flyweights to eliminate the overhead of intermediate object creation during high-frequency GPS pulses.
+
+## 3. Lifecycle Hydration
+*   **3.1. Unified State Flow**: Migrate the remaining discrete flows in `MainViewModel` (RTT, Signal, CurrentMa) into the segmented `DashboardState` or `HudState` to reduce the number of individual collectors active in the UI layer.
+
+---
+**Audit Identification: Issue #899**

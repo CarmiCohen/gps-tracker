@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.03.110)
+# SOT Master Requirements (Sep.03.120)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -9,7 +9,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.17 Robust Battery Navigation (R896)**: **MANDATORY**. Battery optimization exemption intents MUST use `Uri.fromParts("package", pkg, null)` for URI encoding and implement a multi-tier fallback (Sep.02.40).
 *   **1.18 Log Spillage Protection (R759)**: **MANDATORY**. All application-level logging MUST use `Timber`. Direct calls to `android.util.Log` or `System.out.println` are strictly prohibited (Sep.02.50).
 
-## 🧩 Functional Requirements (213 IDs)
+## 🧩 Functional Requirements (215 IDs)
 *   **R-ID 238 (Model Unification)**: The application MUST use `LocationUpdate` as the single source of truth for location data across both the Core Engine and UI layers (Sep.03.01).
 *   **R-ID 239 (Signaling Consolidation)**: The communication layer MUST expose a unified `transmit(TrackerStatus)` entry point that internally handles role-based serialization (Protobuf/JSON) (Sep.02.70).
 *   **R-ID 240 (Tracker HUD Telemetry)**: `TrackerService` MUST publish telemetry to the repository every tick, regardless of GPS fix status, to ensure the local HUD remains live (Sep.03.15).
@@ -21,5 +21,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 246 (SYS Badge Lifecycle)**: The system MUST atomically deactivate the "SYS" tracking indicator upon session termination (Sep.02.70).
 *   **R-ID 247 (Map Event Unification)**: `MainViewModel` MUST delegate all map-related UI events to `MapUseCase` and `HomePointUseCase` (Sep.02.76).
 *   **R-ID 248 (Forensic Signal Latch)**: The system MUST implement a 5-second grace period (`BUDGET_HARDWARE_SIGNAL_GRACE_MS`) for Signal Loss auditing on budget hardware (e.g., A15) and correlate triggers with relay recovery states to prevent false alerts during telemetry gaps (Sep.03.100).
+*   **R-ID 249 (A15 Background Persistence)**: The system MUST maintain radio active state on Samsung A15 devices by pulsing the hardware every 30s and preventing GPS polling relaxation below 10s (`SUSPICIOUS_GPS_POLLING_MS`) when moving with the screen off to ensure UI freshness (Sep.04.01).
+*   **R-ID 250 (Field Test Readiness)**: The system MUST support real-world field testing by defaulting to high-accuracy GNSS and ensuring peer identities are pre-aligned ("T" and "V") for zero-config connectivity (Sep.03.120).
 
-*(Total: 41 Architectural Rules + 213 Functional R-IDs = 254 Items)*
+*(Total: 41 Architectural Rules + 215 Functional R-IDs = 256 Items)*

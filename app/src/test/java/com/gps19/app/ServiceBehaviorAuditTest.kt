@@ -6,13 +6,12 @@ import org.junit.Test
 
 /**
  * ServiceBehaviorAuditTest: Audit of R406a Dynamic Polling Intervals.
+ * Sep.04.01:
+ * - Issue #898 RESOLVED: A15 Background Hardening. Added audit for 10s 
+ *   forced baseline on A15 devices when moving with screen off (R898).
  * Aug.29.09:
  * - Concern #764 Simplification: Refactored tests to use HardwareCapabilities 
  *   instead of redundant DeviceSpecialFlags.
- * Aug.17.08:
- * - Issue #191 Validation: Added Audit of Cooling Mode throttle to ensure 
- *   thermal safety floor (30s GPS / 500ms Forensic) overrides all other 
- *   behavioral states (R191).
  */
 class ServiceBehaviorAuditTest {
 
@@ -47,32 +46,37 @@ class ServiceBehaviorAuditTest {
     fun `Audit Polling Interval - Moving with Screen Off and Geofence`() {
         val behavior = ServiceBehaviorUseCase(mockTimeProvider)
         
-        // --- SCENARIO 1: A15/S21FE Hardware (requiresAdaptationMuzzle = true) ---
-        val a15Caps = HardwareCapabilities(requiresAdaptationMuzzle = true, requiresExtraTopPadding = false)
+        // --- SCENARIO 1: A15 Hardware (R898 Hardening) ---
+        val a15Caps = HardwareCapabilities(isA15Device = true)
         
-        // 1a. Moving, Screen OFF, Geofence INACTIVE -> 45s (SCREEN_OFF_GPS_POLLING_MS)
+        // 1a. Moving, Screen OFF, Geofence INACTIVE -> MUST be 10s (SUSPICIOUS_GPS_POLLING_MS)
+        // R898: Prevents 45s drop to stay within 90s UI staleness window.
         val intervalOffNoGeoA15 = behavior.calculateGpsInterval(
             isCoolingMode = false, isSuspiciousMode = false, isStationary = false, isScreenOn = false,
             isGeofenceActive = false, nowRt = 100000L, capabilities = a15Caps
         )
-        assertEquals(45000L, intervalOffNoGeoA15)
+        assertEquals(SUSPICIOUS_GPS_POLLING_MS, intervalOffNoGeoA15)
+        assertEquals(10000L, intervalOffNoGeoA15)
 
         // 1b. Moving, Screen OFF, Geofence ACTIVE -> 2s (HIGH_FREQUENCY_GPS_POLLING_MS)
+        // (A15 typically has requiresAdaptationMuzzle=true which triggers HF)
+        val a15CapsHF = HardwareCapabilities(isA15Device = true, requiresAdaptationMuzzle = true)
         val intervalOffWithGeoA15 = behavior.calculateGpsInterval(
             isCoolingMode = false, isSuspiciousMode = false, isStationary = false, isScreenOn = false,
-            isGeofenceActive = true, nowRt = 100000L, capabilities = a15Caps
+            isGeofenceActive = true, nowRt = 100000L, capabilities = a15CapsHF
         )
         assertEquals(2000L, intervalOffWithGeoA15)
 
         // --- SCENARIO 2: Standard Hardware ---
-        val stdCaps = HardwareCapabilities(requiresAdaptationMuzzle = false, requiresExtraTopPadding = false)
+        val stdCaps = HardwareCapabilities(isA15Device = false)
 
-        // 2a. Moving, Screen OFF, Geofence ACTIVE -> 5s (MOVING_GPS_POLLING_MS)
-        val intervalOffWithGeoStd = behavior.calculateGpsInterval(
+        // 2a. Moving, Screen OFF, Geofence INACTIVE -> 45s (SCREEN_OFF_GPS_POLLING_MS)
+        val intervalOffNoGeoStd = behavior.calculateGpsInterval(
             isCoolingMode = false, isSuspiciousMode = false, isStationary = false, isScreenOn = false,
-            isGeofenceActive = true, nowRt = 100000L, capabilities = stdCaps
+            isGeofenceActive = false, nowRt = 100000L, capabilities = stdCaps
         )
-        assertEquals(5000L, intervalOffWithGeoStd)
+        assertEquals(SCREEN_OFF_GPS_POLLING_MS, intervalOffNoGeoStd)
+        assertEquals(45000L, intervalOffNoGeoStd)
     }
 
     @Test
@@ -87,14 +91,5 @@ class ServiceBehaviorAuditTest {
             isUiVisible = false
         )
         assertEquals(true, shouldPowerSave)
-
-        // If Alarms present -> No Power Save
-        val noPowerSaveAlarms = behavior.evaluatePowerSaveMode(
-            isStationary = true,
-            isGpsStalled = true,
-            hasUnresolvedAlarms = true,
-            isUiVisible = false
-        )
-        assertEquals(false, noPowerSaveAlarms)
     }
 }

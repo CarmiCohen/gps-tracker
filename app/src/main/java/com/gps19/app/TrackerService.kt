@@ -21,22 +21,14 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.04.01:
+ * - Issue #898 RESOLVED: A15 Connectivity Hardening. Reduced A15_POKE_INTERVAL_MS 
+ *   to 30s and tightened HEURISTIC RECOVERY thresholds to 10s to mitigate 
+ *   aggressive background suppression on Samsung budget hardware (R898).
  * Sep.03.15:
  * - Issue #240 RESOLVED: Tracker Telemetry Publication. Decoupled telemetry 
  *   updates from GPS availability. Local HUD now reflects real-time sensor 
  *   data even without a satellite fix (R-ID 240).
- * Sep.03.12:
- * - Issue #240 RESOLVED: Tracker Telemetry Publication. Integrated 
- *   repository.updateLocation() into processTick to ensure local HUD parity 
- *   with the sensing engine (R-ID 240).
- * Sep.01.12:
- * - Issue #886 Remediation: Added 500ms settling delay after sequential 
- *   native init on A15 devices to prevent timing-related Monitor::Inflate 
- *   installation failures (R886).
- * Sep.01.11:
- * - Issue #884 Remediation: Hardened JdHardwareManager initialization. 
- *   Native init is now sequential on A15 devices to prevent Monitor::Inflate 
- *   installation failures during GNSS registration (R884).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -73,7 +65,7 @@ class TrackerService : BaseMonitorService() {
     private var lastIntervalChangeRt = 0L
 
     private var lastA15PokeRt = 0L
-    private val A15_POKE_INTERVAL_MS = 60_000L
+    private val A15_POKE_INTERVAL_MS = 30_000L // R898: Reduced from 60s to 30s for stability
 
     private var lastForensicLat = 0.0
     private var lastForensicLng = 0.0
@@ -100,12 +92,11 @@ class TrackerService : BaseMonitorService() {
         
         refreshCapabilitiesInternal()
 
-        // Issue #884/886: Sequential initialization on A15 with settling delay.
         if (capabilities.isA15Device) {
             val success = JdHardwareManager.initialize(timeProvider, configManager.deviceId)
             if (success) {
                 logManager.logServiceEvent("HARDWARE: libjdHardware initialized successfully.", isImportant = true)
-                delay(500) // R886: Settling window for framework monitor inflation.
+                delay(500)
             } else {
                 logManager.logServiceEvent("HARDWARE: libjdHardware initialization failed.", isImportant = true)
             }
@@ -465,7 +456,9 @@ class TrackerService : BaseMonitorService() {
         var recoveryFlagged = false
         if (lastServiceTickRealtime > 0) {
             val tickGap = nowRt - lastServiceTickRealtime
-            if (tickGap > HARDWARE_SUPPRESSION_THRESHOLD_MS && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
+            val recoveryThreshold = if (capabilities.isA15Device) 10000L else HARDWARE_SUPPRESSION_THRESHOLD_MS
+            
+            if (tickGap > recoveryThreshold && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
                 lastHardwareRecoveryTs = nowRt
                 recoveryFlagged = true
                 val proc = lastProcessedLocation
@@ -537,8 +530,6 @@ class TrackerService : BaseMonitorService() {
             evaluateAlarmsInternal(now, nowRt, isSocketConnected, isViewerActive, processed, snapshot)
         }
 
-        // Issue #240: Publish local telemetry to repository for HUD visualization.
-        // vSep.03.15: Removed proc != null guard to ensure sensor telemetry reaches HUD without GPS fix.
         val proc = lastProcessedLocation
         repository.updateLocation(LocationUpdate(
             lat = proc?.optimizedPoint?.lat ?: 0.0, 
@@ -761,16 +752,12 @@ class TrackerService : BaseMonitorService() {
 
     override fun onDestroy() {
         gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel()
-        
-        // Issue #320/742: Perform deterministic hardware handshake before base destruction.
         if (capabilities.isA15Device && JdHardwareManager.isAvailable()) {
             val punchResult = JdHardwareManager.punchHardware(timeProvider)
             if (punchResult != 0) {
                 logManager.logServiceEvent("HARDWARE: Handshake failed (Code: $punchResult). Forcing release.", isImportant = true)
             }
         }
-        
-        // base.onDestroy() now centralizes hardware unregistration and native release.
         super.onDestroy()
     }
 }

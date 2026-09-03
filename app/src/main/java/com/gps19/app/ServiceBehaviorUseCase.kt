@@ -6,16 +6,13 @@ import javax.inject.Singleton
 
 /**
  * ServiceBehaviorUseCase: Encapsulates high-level logic for service-level state transitions.
+ * Sep.04.01:
+ * - Issue #898 RESOLVED: A15 Connectivity Hardening. Forced SUSPICIOUS_GPS_POLLING_MS (10s) 
+ *   as the baseline for A15 devices when the screen is off to prevent 90s staleness 
+ *   timeouts during aggressive background suppression (R898).
  * Aug.29.09:
  * - Concern #764 Simplification: Refactored calculateGpsInterval to use 
  *   HardwareCapabilities directly, removing redundant DeviceSpecialFlags.
- * Aug.29.08:
- * - Concern #763: GNSS Relaxation. Added ultra-long stationary check to relax 
- *   polling to 5 minutes after 4 hours of confirmed immobility (R763).
- * Aug.14.01:
- * - Issue #169: Geofence Accuracy vs. Battery Audit. Added isGeofenceActive to 
- *   calculateGpsInterval to prevent 45s polling blind-spots when moving with 
- *   screen off (R406a).
  */
 @Singleton
 class ServiceBehaviorUseCase @Inject constructor(
@@ -36,6 +33,7 @@ class ServiceBehaviorUseCase @Inject constructor(
      * Calculates the target GPS polling interval based on device state and forensic triggers.
      * R406a: Dynamic Polling.
      * R763: Ultra-long Stationary Relaxation.
+     * R898: A15 Background Hardening.
      */
     fun calculateGpsInterval(
         isCoolingMode: Boolean,
@@ -58,8 +56,11 @@ class ServiceBehaviorUseCase @Inject constructor(
             isSuspiciousMode -> SUSPICIOUS_GPS_POLLING_MS
             isUltraLongStationary -> ULTRA_LONG_STATIONARY_GPS_POLLING_MS
             isStationaryState -> STATIONARY_GPS_POLLING_MS
-            // Issue #169: If Geofence is active and we are moving, do NOT drop to 45s even if screen is off.
-            !isScreenOn && !isGeofenceActive -> SCREEN_OFF_GPS_POLLING_MS
+            // Issue #898: On A15, never drop to 45s when moving (even with screen off) 
+            // to ensure we stay well within the 90s staleness window.
+            !isScreenOn && !isGeofenceActive -> {
+                if (capabilities.isA15Device) SUSPICIOUS_GPS_POLLING_MS else SCREEN_OFF_GPS_POLLING_MS
+            }
             capabilities.requiresAdaptationMuzzle || capabilities.requiresExtraTopPadding -> HIGH_FREQUENCY_GPS_POLLING_MS
             else -> MOVING_GPS_POLLING_MS
         }
