@@ -1,14 +1,7 @@
-# Simplification & Optimization Ideas (Sep.03.120)
+# Simplification Ideas - Session Sep.03.120
 
-## 1. Service Consolidation
-*   **1.1. Location Processing Redundancy**: `TrackerService` and `ViewerService` share ~80% of their logic for observing `LocationProcessor` and `HardwareProvider` flows. This event delegation should be hoisted into `BaseMonitorService` to reduce forensic snapshot duplication and ensure logic parity across roles.
-*   **1.2. Command Routing**: Consolidate `commandRouter` observation into the base class to standardize the handling of `UiVisibilityChanged` and `SyncSensors` events.
-
-## 2. Telemetry Optimization
-*   **2.1. Snapshot Flyweights**: The `ForensicSnapshot` and `TrackerStatus` mapping logic in `ConnectivitySuite` can be further optimized using pre-allocated byte-buffer flyweights to eliminate the overhead of intermediate object creation during high-frequency GPS pulses.
-
-## 3. Lifecycle Hydration
-*   **3.1. Unified State Flow**: Migrate the remaining discrete flows in `MainViewModel` (RTT, Signal, CurrentMa) into the segmented `DashboardState` or `HudState` to reduce the number of individual collectors active in the UI layer.
-
----
-**Audit Identification: Issue #899**
+## 💡 Architectural Simplification Ideas
+1.  **Context Authority Consolidation**: The persistent `getPackageName` spam suggests that the `ShadowContext` / `ContextShadow` delegation is either being bypassed by system frameworks or is overly complex. Idea: Explore a bytecode-level transformer to redirect all `getPackageName` calls to a static constant, rather than relying on manual Hilt injection wrappers.
+2.  **Service Start Orchestration**: To address `BackgroundServiceStartNotAllowedException` on Android 14+, simplify the `BootWorker` / `MaintenanceWorker` logic by moving to a "Work-First" model where the `WorkManager` task performs the initial sync/poke, and only attempts to start a Foreground Service if a high-priority event is detected, rather than always attempting FGS start on boot.
+3.  **Signaling Handshake UI**: Simplify the `StatusRow` components by merging "SRV" and "GPS" into a single "Connectivity" state if the relay is down, reducing UI noise during the initial handshake phase.
+4.  **Telemetry Mapping**: Prune `RealtimeStatus` (Protobuf) to only include active deltas, simplifying the `handleBinaryUpdate` logic in `ConnectivitySuite`.
