@@ -16,13 +16,14 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * Sep.01.13:
- * - Issue #886 Remediation: Added 500ms settling delay after sequential 
- *   native init on A15 devices to prevent Monitor::Inflate failures (R886).
- * Sep.01.11:
- * - Issue #884 Remediation: Hardened JdHardwareManager initialization. 
- *   Native init is now sequential on A15 devices to prevent Monitor::Inflate 
- *   installation failures (R884).
+ * Sep.03.102:
+ * - Issue #247 Enforcement: Hardened initial Signal Loss calculation. 
+ *   Using time since service start as fallback for silenceDelta to ensure 
+ *   immediate forensic visibility if peer handshake fails (R248).
+ * Sep.03.101:
+ * - Bug Fix: Corrected tracker identity persistence in handleTrackerPulse. 
+ *   Saving to TRACKER_ID_KEY instead of VIEWER_ID_KEY to prevent role 
+ *   corruption (R182).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -342,7 +343,7 @@ class ViewerService : BaseMonitorService() {
         if (!SignalingConstants.isValidTrackerId(id)) return
         if ((configManager.deviceId == SettingsRepository.DEFAULT_TRACKER_ID || configManager.deviceId.isEmpty()) && id.isNotEmpty() && id != "Active Tracker") {
             configManager.deviceId = id; connectivitySuite.updateIdentity(id, configManager.viewerId, false)
-            lifecycleScope.launch(Dispatchers.IO) { repository.saveString(VIEWER_ID_KEY, id) }
+            lifecycleScope.launch(Dispatchers.IO) { repository.saveString(TRACKER_ID_KEY, id) }
         }
         if (sessionManager.onTrackerPulse(id, timeProvider.currentTimeMillis(), false)) {
             val proc = lastProcessedLocation
@@ -430,7 +431,7 @@ class ViewerService : BaseMonitorService() {
         val isTrackerActive = connectivitySuite.lastPeerActivityTs > 0 && (nowRt - connectivitySuite.lastPeerActivityTs < WATCH_TIMEOUT_MS)
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isTrackerActive, false)
 
-        val silenceDelta = if (connectivitySuite.lastPeerActivityTs > 0) nowRt - connectivitySuite.lastPeerActivityTs else 0L
+        val silenceDelta = if (connectivitySuite.lastPeerActivityTs > 0) nowRt - connectivitySuite.lastPeerActivityTs else (nowRt - serviceStartRealtime)
         val isSignalLoss = !integrityMonitor.checkSignalIntegrity(nowRt, silenceDelta, false)
         val isTrackerStalled = connectivitySuite.trackerGpsStallStartTs > 0L && (nowRt - connectivitySuite.trackerGpsStallStartTs > GPS_STALL_THRESHOLD_MS)
         val isTrackerGap = connectivitySuite.trackerLastValidFixRt > 0L && (nowRt - connectivitySuite.trackerLastValidFixRt > GPS_GAP_THRESHOLD_MS)

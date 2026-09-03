@@ -2,6 +2,7 @@ package com.gps19.app
 
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
@@ -19,10 +20,6 @@ import timber.log.Timber
 
 /**
  * BootReceiver: Triggered when the device restarts.
- * July.27.00:
- * - Architecture Audit: Updated to use centralized PreferenceKeys.
- * July.24.04:
- * - Issue #539: Background Start Hardening.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
@@ -42,6 +39,9 @@ class BootReceiver : BroadcastReceiver() {
 
 /**
  * Worker that bridges the boot broadcast to the Foreground Service.
+ * Sep.03.101:
+ * - Issue #897 Enforcement: Fixed InvalidForegroundServiceTypeException on 
+ *   Target SDK 35 by explicitly declaring FOREGROUND_SERVICE_TYPE_SPECIAL_USE (R897).
  */
 @HiltWorker
 class BootServiceStartWorker @AssistedInject constructor(
@@ -53,10 +53,23 @@ class BootServiceStartWorker @AssistedInject constructor(
 ) : CoroutineWorker(context, params) {
 
     override suspend fun getForegroundInfo(): ForegroundInfo {
-        return ForegroundInfo(
-            notificationManager.getNotificationId(),
-            notificationManager.buildForegroundNotification("System revival in progress...")
-        )
+        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // R897: Special Use is required for internal system-bridge workers on A15+
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        } else 0
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ForegroundInfo(
+                notificationManager.getNotificationId(),
+                notificationManager.buildForegroundNotification("System revival in progress..."),
+                type
+            )
+        } else {
+            ForegroundInfo(
+                notificationManager.getNotificationId(),
+                notificationManager.buildForegroundNotification("System revival in progress...")
+            )
+        }
     }
 
     override suspend fun doWork(): Result {
@@ -66,7 +79,6 @@ class BootServiceStartWorker @AssistedInject constructor(
         if (isSystemActive && appMode != null) {
             Timber.i("BootWorker: Restarting service in $appMode mode (System Active)")
             
-            // Redundancy Hardening: Update start time to trigger MaintenanceWorker grace period
             repository.setAppStartTime(timeProvider.currentTimeMillis())
 
             val serviceClass = if (appMode == "tracker") TrackerService::class.java else ViewerService::class.java
