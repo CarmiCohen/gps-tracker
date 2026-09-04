@@ -32,14 +32,12 @@ import timber.log.Timber
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Sep.04.18:
+ * - Issue #900/904 Hardening: Enhanced PhoneSetupOverlay with explicit Samsung 
+ *   "Unrestricted" and "Precise Location" instructions for A15 hardware (R900).
  * Sep.01.08:
  * - Issue #882 Hardening: Implemented 8-level staggered hydration for 
- *   PhoneSetupOverlay to remediate 751ms Davey on SM-A155F. Increased yielding 
- *   granularity to ensure sub-700ms frame budget during transition (R2.1/R882).
- * Aug.26.15:
- * - Issue #740 Logic Fix: Synchronized PhoneSetupOverlay items with 
- *   MainUiState.systemIssuesCount. Added Step 0 (Precise Location) and corrected 
- *   Auto-start completion flag to resolve counter mismatch (R740).
+ *   PhoneSetupOverlay to remediate 751ms Davey on SM-A155F.
  */
 
 @Composable
@@ -75,7 +73,6 @@ fun SettingsOverlay(
     LaunchedEffect(Unit) {
         delay(150) 
         isHydrated = true
-        // Staggered to 5 phases for hardware stability (R2.1)
         repeat(5) { 
             visibleCount++
             delay(100) 
@@ -298,7 +295,6 @@ fun PhoneSetupOverlay(
         Timber.d("PhoneSetupOverlay: Initializing hydration sequence (R882)")
         delay(150) 
         isHydrated = true
-        // Staggered to 8 levels to maintain frame budget on mid-range hardware (R2.1/R882)
         repeat(8) { 
             visibleCount++
             delay(80) 
@@ -328,12 +324,14 @@ fun PhoneSetupOverlay(
                     }
                     
                     if (visibleCount >= 1) {
-                        Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step0_title), stringResource(R.string.setup_step0_desc), onAppInfo, stringResource(R.string.btn_app_info), permissions.isFineLocationGranted, Icons.Default.MyLocation, reason = if (!permissions.isFineLocationGranted) "Precise Location: Permission NOT granted" else null)
+                        val preciseReason = if (permissions.isSamsungDevice) "Precise Location: REQUIRED for A15 GNSS. Open App Info -> Permissions -> Location -> Toggle 'Use precise location' ON." else "Precise Location: Permission NOT granted"
+                        Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step0_title), stringResource(R.string.setup_step0_desc), onAppInfo, stringResource(R.string.btn_app_info), permissions.isFineLocationGranted, Icons.Default.MyLocation, reason = if (!permissions.isFineLocationGranted) preciseReason else null)
                     }
                     
                     if (visibleCount >= 2) {
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step1_title), recentsLockDesc, {}, stringResource(R.string.setup_info_only), if (permissions.requiresWakeLockRenewal) true else null, Icons.Default.Lock)
-                        Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step2_title), batteryOptDesc, onWhitelist, stringResource(R.string.btn_open_settings), permissions.isBatteryWhitelisted, Icons.Default.BatteryChargingFull, reason = if (!permissions.isBatteryWhitelisted) "Battery Optimization: Unrestricted mode NOT active" else null)
+                        val batteryReason = if (permissions.isSamsungDevice) "Battery Optimization: Unrestricted mode NOT active. Open App Info -> Battery -> Select 'Unrestricted'." else "Battery Optimization: Unrestricted mode NOT active"
+                        Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step2_title), batteryOptDesc, onWhitelist, stringResource(R.string.btn_open_settings), permissions.isBatteryWhitelisted, Icons.Default.BatteryChargingFull, reason = if (!permissions.isBatteryWhitelisted) batteryReason else null)
                     }
                     
                     if (visibleCount >= 3) {

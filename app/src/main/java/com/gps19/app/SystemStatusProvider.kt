@@ -61,19 +61,13 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Sep.04.16:
+ * - Issue #900/904 Hardening: Populated isSamsungDevice flag and verified 
+ *   isFineLocationGranted logic to ensure Precise Location detection on 
+ *   budget hardware (A15).
  * Sep.03.25:
  * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
  *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 240).
- * Sep.02.43:
- * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
- *   getPackageName log spam during system service lookups (R1.14).
- * Sep.01.27:
- * - Issue #893 Hardening: Standardized ManagedNetworkCallback to register on 
- *   MainLooper to ensure alignment with unregistration logic (R893).
- * Aug.28.11:
- * - Issue #759 Hardening: Switched all Context.packageName lookups to 
- *   GpsApplication.PACKAGE_NAME shadow-cache to eliminate high-frequency 
- *   Samsung A15 diagnostic log spam (R759).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -216,7 +210,7 @@ class SystemStatusProviderImpl @Inject constructor(
                 if (doubleCheckExecute) {
                     try {
                         val current = cachedState.get()
-                        val pkg = cachedPkgName // Issue #759: Use shadow-cache
+                        val pkg = cachedPkgName 
                         withContext(Dispatchers.IO) {
                             val fineLocGranted = ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
                             val batteryWhitelisted = powerManager.isIgnoringBatteryOptimizations(pkg)
@@ -251,7 +245,8 @@ class SystemStatusProviderImpl @Inject constructor(
                                 requiresWakeLockRenewal = isSamsung,
                                 requiresExtraTopPadding = isXiaomi,
                                 requiresAdaptationMuzzle = isS21FE,
-                                isA15Device = isA15
+                                isA15Device = isA15,
+                                isSamsungDevice = isSamsung
                             )
                             cachedState.set(newState)
                         }
@@ -272,10 +267,6 @@ class SystemStatusProviderImpl @Inject constructor(
         }
     }
 
-    /**
-     * Issue #750 Hardening: Refactored to use ManagedNetworkCallback for deterministic unregistration.
-     * Issue #893: Standardized registration to MainLooper for consistency with unregistration.
-     */
     private val sharedInternetStatusFlow = callbackFlow<Boolean> {
         val callback = object : ManagedNetworkCallback() {
             override fun onAvailable(network: Network) { trySend(true) }
@@ -309,10 +300,6 @@ class SystemStatusProviderImpl @Inject constructor(
 
     override fun observeInternetStatus(): Flow<Boolean> = sharedInternetStatusFlow
 
-    /**
-     * Issue #753 Hardening: Deterministic unregistration of BroadcastReceiver 
-     * using ManagedBroadcastReceiver to resolve BaseEventQueue leaks (R753).
-     */
     private val sharedBatteryStatusFlow = callbackFlow<BatteryStatus> {
         val receiver = object : ManagedBroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
@@ -402,10 +389,6 @@ class SystemStatusProviderImpl @Inject constructor(
         }
     }
 
-    /**
-     * Issue #753 Hardening: Deterministic unregistration of BroadcastReceiver 
-     * using ManagedBroadcastReceiver to resolve BaseEventQueue leaks (R753).
-     */
     private val sharedPowerStatusFlow = callbackFlow<PowerStatus> {
         val receiver = object : ManagedBroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {

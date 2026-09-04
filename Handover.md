@@ -1,36 +1,30 @@
-# Handover Report - Sep.03.121
+# Handover Report - Sep.04.10
 
 ## 🎯 Current Context
-*   **Active Mode**: Multi-Device Field Test Verification & Release.
-*   **Target Hardware**: Samsung SM-G990E (S21FE) - Viewer | Samsung SM-A155F (A15) - Tracker.
-*   **Version**: Sep.03.121 (Target SDK 35).
-*   **Key Focus**: Background reliability and lifecycle stability on A15 hardware.
+*   **Active Mode**: Hardening & Connectivity Remediation (Target SDK 35).
+*   **Target Hardware**: Samsung SM-G990E (Viewer) | Samsung SM-A155F (Tracker).
+*   **Version**: Sep.04.10.
+*   **Key Focus**: Resolving critical system failures (#905, #906, #907). Signaling layer (#906) is now restored.
 
 ## 🛠️ Work Summary (Current Session)
-1.  **Deployment**: Successfully pushed `Sep.03.121` to both S21FE and A15.
-2.  **Issue #899 RESOLVED**: Prepared and executed multi-device deployment. Aligned identities and verified Viewer side "Waiting for Telemetry" status.
-3.  **Concern Identified (Issue #900)**: `BackgroundServiceStartNotAllowedException` on A15. OS blocks `SystemForegroundService` start from background (Critical).
-4.  **Concern Identified (Issue #901)**: Persistent `getPackageName` log spam regression on both devices.
-5.  **Concern Identified (Issue #902)**: Indoor Signal Loss and socket instability on budget hardware (A15).
-6.  **Concern Identified (Issue #903)**: Lifecycle teardown/reconnect loop detected on A15 during hydration.
-7.  **Versioning**: Incremented app version to `Sep.03.121`.
+1.  **Issue #906 RESOLVED**: Signaling Transport Robustness. Identified that strict `websocket` transport enforcement was causing connection failures on Render-based relays and budget hardware. Reverted to default `socket.io` transport negotiation (polling-to-websocket upgrade). Verified R-ID 251 (Signaling Transport Robustness) implementation in `CommunicationManager`.
+2.  **SOT Synchronization**: Updated `SOT_MASTER_REQUIREMENTS.md` with R-ID 251.
+3.  **App Versioning**: Incremented `versionName` to `Sep.04.10` in `app/build.gradle`.
+4.  **Dashboard Extension**: Synchronized `issues.md` dashboard: Resolved Issues (871), Open Issues (2).
 
 ## 📂 Integrity Audit Baseline
-*   **SOT Items**: 256 (41 Architectural Rules + 215 Functional R-IDs).
-*   **Resolved Issues**: 867.
-*   **Open Issues**: 0 (New concerns documented for triage).
+*   **SOT Items**: 257 (41 Architectural Rules + 216 Functional R-IDs).
+*   **Resolved Issues**: 871.
+*   **Open Issues**: 2 (Critical: #905, #907).
 *   **Testing Items**: 100 Chapters (124 Sub-items).
-*   **Ideas**: 244.
+*   **Ideas**: 249.
 *   **QA Validation**: 234 Tasks Validated.
 
-## 🚀 Git Release Block
-```bash
-git add --all
-git commit -m "Test Audit vSep.03.121: Multi-device field test (S21FE-V/A15-T) - Critical Concerns identified (#900-#903)"
-git tag -a vSep.03.121 -m "Release Sep.03.121"
-git push origin main --tags
-```
+## 🚀 Next Steps (Action Plan)
+1.  **Triage #905**: Debug GNSS engine initialization on A15/S21FE to identify why reception is zeroed in both modes.
+2.  **Verify #907**: Attempt end-to-end pairing between S21FE and A15 now that signaling is operational.
+3.  **Simplicity Audit**: Review `Simplify_Ideas2.md` for potential Signaling Provider abstraction to prevent future transport regressions.
 
 ## 🛑 Forensic State Stop
-Session terminated. Issue #899 resolved. Issues #900-#903 identified and documented for next-phase remediation.
-Current Audit Baseline: [SOT: 256 (Rules: 41, IDs: 215), Resolved: 867, Open: 0, Testing: 100 (Sub-items: 124), Ideas: 244, QA: 234]
+Session terminated. Issue #906 resolved. Signaling connectivity is operational. GNSS loss (#905) remains the primary blocker for system testing.
+Current Audit Baseline: [SOT: 257 (Rules: 41, IDs: 216), Resolved: 871, Open: 2, Testing: 100 (Sub-items: 124), Ideas: 249, QA: 234]

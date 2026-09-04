@@ -25,6 +25,10 @@ import com.gps19.core.engine.ShadowCache
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Sep.03.132:
+ * - Issue #901 Fix: Hardened trimCaches() to preserve "pkg" and "uid" identity 
+ *   tokens. Previous implementation cleared these tokens during memory pressure, 
+ *   leading to persistent IPC log spam regression (R759).
  * Sep.01.24:
  * - Issue #892 Fix: Manually initialize WorkManager in onCreate() to resolve 
  *   IllegalStateException in BootReceiver, as auto-init is disabled in manifest.
@@ -159,8 +163,16 @@ class GpsApplication : Application(), Configuration.Provider {
     private fun trimCaches() {
         applicationScope.launch(Dispatchers.IO) {
             try {
+                // Issue #901: Preserve identity tokens to prevent log spam regression
+                val pkg = stringCache.get("pkg")
+                val uid = intCache.get("uid")
+                
                 stringCache.clear()
                 intCache.clear()
+                
+                pkg?.let { stringCache.put("pkg", it) }
+                uid?.let { intCache.put("uid", it) }
+
                 System.gc()
             } catch (e: Exception) {
                 Timber.e(e, "Issue #656: Cache trim failed")

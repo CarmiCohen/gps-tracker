@@ -5,14 +5,14 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Sep.04.12:
+ * - Issue #900/904 Hardening: Enhanced PermissionState with isSamsungDevice flag 
+ *   and refined systemReady logic to prioritize "Unrestricted" battery mode 
+ *   and "Precise Location" on budget Samsung hardware (A15).
  * Sep.03.17:
  * - Issue #242 RESOLVED: Unhandled TriggerRecovery Event. Added serviceRecoveryTrigger 
  *   to NavigationState and implemented handlers in ViewModel to enable automated 
  *   service restoration after OS-level FGS blocks (R-ID 242).
- * Sep.03.07:
- * - Issue #238 cleanup: Moved UiEvent and UiCommand to MainUiState.kt to 
- *   unify UI state definitions and resolve widespread unresolved reference 
- *   errors. Restored SetStorageSimulation as a UiEvent (R-ID 238).
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -237,7 +237,8 @@ data class PermissionState(
     val requiresWakeLockRenewal: Boolean = false,
     val requiresExtraTopPadding: Boolean = false,
     val requiresAdaptationMuzzle: Boolean = false,
-    val isA15Device: Boolean = false
+    val isA15Device: Boolean = false,
+    val isSamsungDevice: Boolean = false
 )
 
 data class NavigationState(

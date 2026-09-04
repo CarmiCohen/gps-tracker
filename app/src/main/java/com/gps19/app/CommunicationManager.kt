@@ -22,13 +22,13 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Sep.04.10:
+ * - Issue #906 RESOLVED: Transport Robustness. Removed strict 'websocket' transport 
+ *   enforcement. Allowed default polling-to-websocket upgrade handshake to 
+ *   remediate SRV Red failures on budget hardware and restricted networks (R906).
  * Sep.02.70:
  * - Idea #241: Protobuf Mapping Unification. Integrated TelemetryProtobufMapper 
  *   to handle RealtimeStatus serialization, ensuring field parity across binary updates (R-ID 241).
- * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
- *   eliminate manual wrapper instantiation (R-ID 244).
- * - Idea #239: Signaling Interface Consolidation. Migrated Protobuf and 
- *   JSON serialization logic from ConnectivitySuite into transmit() (R-ID 239).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -204,8 +204,9 @@ class CommunicationManager @Inject constructor(
         markTraffic() 
         isConnectingInternal = true
 
+        // Issue #906: Removed 'websocket' only transport enforcement to allow 
+        // polling-to-websocket upgrade for better compatibility.
         val opts = IO.Options().apply {
-            transports = arrayOf("websocket")
             timeout = 30000 
             reconnection = true
             reconnectionAttempts = Int.MAX_VALUE
