@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.04.20)
+# SOT Master Requirements (Sep.04.40)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -9,7 +9,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.17 Robust Battery Navigation (R896)**: **MANDATORY**. Battery optimization exemption intents MUST use `Uri.fromParts("package", pkg, null)` for URI encoding and implement a multi-tier fallback (Sep.02.40).
 *   **1.18 Log Spillage Protection (R759)**: **MANDATORY**. All application-level logging MUST use `Timber`. Direct calls to `android.util.Log` or `System.out.println` are strictly prohibited (Sep.02.50).
 
-## 🧩 Functional Requirements (218 IDs)
+## 🧩 Functional Requirements (219 IDs)
 *   **R-ID 238 (Model Unification)**: The application MUST use `LocationUpdate` as the single source of truth for location data across both the Core Engine and UI layers (Sep.03.01).
 *   **R-ID 239 (Signaling Consolidation)**: The communication layer MUST expose a unified `transmit(TrackerStatus)` entry point that internally handles role-based serialization (Protobuf/JSON) (Sep.02.70).
 *   **R-ID 240 (Tracker HUD Telemetry)**: `TrackerService` MUST publish telemetry to the repository every tick, regardless of GPS fix status, to ensure the local HUD remains live (Sep.03.15).
@@ -21,10 +21,11 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 246 (SYS Badge Lifecycle)**: The system MUST atomically deactivate the "SYS" tracking indicator upon session termination (Sep.02.70).
 *   **R-ID 247 (Map Event Unification)**: `MainViewModel` MUST delegate all map-related UI events to `MapUseCase` and `HomePointUseCase` (Sep.02.76).
 *   **R-ID 248 (Forensic Signal Latch)**: The system MUST implement a 5-second grace period (`BUDGET_HARDWARE_SIGNAL_GRACE_MS`) for Signal Loss auditing on budget hardware (e.g., A15) and correlate triggers with relay recovery states to prevent false alerts during telemetry gaps (Sep.03.100).
-*   **R-ID 249 (A15 Background Persistence)**: The system MUST maintain radio active state on Samsung A15 devices by pulsing the hardware every 30s and preventing GPS polling relaxation below 10s (`SUSPICIOUS_GPS_POLLING_MS`) when moving with the screen off to ensure UI freshness (Sep.04.01).
+*   **R-ID 249 (A15 Background Persistence)**: The system MUST maintain radio active state on Samsung A15 devices by pulsing the hardware every 30s and preventing GPS polling relaxation below 10s (`SUSPICIOUS_GPS_POLLING_MS`) when moving with the screen off to ensure UI freshness (Sep.03.111).
 *   **R-ID 250 (Field Test Readiness)**: The system MUST support real-world field testing by defaulting to high-accuracy GNSS and ensuring peer identities are pre-aligned ("T" and "V") for zero-config connectivity (Sep.03.120).
-*   **R-ID 251 (Signaling Transport Robustness)**: The signaling layer MUST allow default transport negotiation (polling-to-websocket) to ensure connection stability across diverse network environments and hardware architectures (Sep.04.10).
-*   **R-ID 252 (GNSS Zombie Recovery)**: The system MUST trigger a hardware-level revival pulse (location update restart) when GNSS visibility drops to zero (`SIGNAL_LOSS`) or stalls for more than 120s on Samsung hardware to remediate native stack "Zombie States" (Sep.04.20).
-*   **R-ID 253 (Protobuf Identity Parity)**: The signaling layer MUST apply alias-aware ID mapping (via `SignalingConstants.getTransmissionId`) to all binary Protobuf payloads to ensure protocol parity with the JSON path and prevent peer-to-peer handshake failures (Sep.04.20).
+*   **R-ID 251 (Signaling Transport Robustness)**: The signaling layer MUST allow default transport negotiation (polling-to-websocket) to ensure connection stability across diverse network environments and hardware architectures (Sep.04.30).
+*   **R-ID 252 (GNSS Zombie Recovery)**: The system MUST trigger a hardware-level revival pulse (location update restart) when GNSS visibility drops to zero (`SIGNAL_LOSS`) or stalls for more than 120s on Samsung hardware to remediate native stack "Zombie States" (Sep.04.30).
+*   **R-ID 253 (Protobuf Identity Parity)**: The signaling layer MUST apply alias-aware ID mapping (via `SignalingConstants.getTransmissionId`) to all binary Protobuf payloads to ensure protocol parity with the JSON path and prevent peer-to-peer handshake failures (Sep.04.30).
+*   **R-ID 254 (Rolling Deployment Sync)**: The signaling layer MUST re-broadcast its identity (Join payload) every 60s while connected to ensure peer discovery and synchronization during rolling deployments, remediating "Red SRV" lag on budget hardware (Sep.04.40).
 
-*(Total: 41 Architectural Rules + 218 Functional R-IDs = 259 Items)*
+*(Total: 41 Architectural Rules + 219 Functional R-IDs = 260 Items)*

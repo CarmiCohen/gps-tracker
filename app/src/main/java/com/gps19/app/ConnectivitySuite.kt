@@ -34,22 +34,13 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
- * Sep.03.25:
- * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
- *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 240).
+ * Sep.04.40:
+ * - Issue #908 RESOLVED: Deployment Synchronization. Implemented R-ID 254 periodic 
+ *   identity re-broadcast (60s) to ensure zero-interaction peer discovery during 
+ *   rolling deployments on budget hardware (R254).
  * Sep.03.22:
  * - Idea #239: Signaling Interface Consolidation. Removed local Protobuf 
- *   serialization logic and redundant emit proxies. Delegated telemetry 
- *   transmission and schema enforcement to SignalingProvider.transmit() (R-ID 239).
- * Sep.03.02:
- * - Issue #197 Hardening: Enhanced stop() with forensic duration tracking to 
- *   ensure parity with HardwareProvider's teardown auditing (R-ID 197).
- * Sep.01.27:
- * - Issue #893 Hardening: Standardized ManagedNetworkCallback to register on 
- *   MainLooper to ensure alignment with unregistration logic, with API 26 compatibility (R893).
- * Sep.01.26:
- * - Issue #894 Remediation: Integrated ContextShadow delegate to eliminate 
- *   getPackageName log spam during ConnectivityManager interactions (R894).
+ *   serialization logic and redundant emit proxies (R-ID 239).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -96,6 +87,7 @@ class ConnectivitySuite @Inject constructor(
     private var keepAliveJob: Job? = null
     private var syncJob: Job? = null
     private var signalingJob: Job? = null
+    private var identitySyncJob: Job? = null
 
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
@@ -213,8 +205,6 @@ class ConnectivitySuite @Inject constructor(
         
         try {
             val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
-            // Issue #893: Registering on MainLooper to align with unregistration logic.
-            // Using Build.VERSION check for API 26 compatibility.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 connectivityManager.registerNetworkCallback(request, networkCallback, Handler(Looper.getMainLooper()))
             } else {
@@ -245,6 +235,7 @@ class ConnectivitySuite @Inject constructor(
 
         startKeepAliveLoop()
         startSyncLoop()
+        startIdentitySyncLoop()
         initializePeerState()
     }
 
@@ -265,6 +256,7 @@ class ConnectivitySuite @Inject constructor(
         startKeepAliveLoop()
         startSyncLoop()
         startSignalingObservation()
+        startIdentitySyncLoop()
     }
 
     private fun startKeepAliveLoop() {
@@ -275,6 +267,24 @@ class ConnectivitySuite @Inject constructor(
                     try { performKeepAlive() } catch (e: Exception) { if (e is CancellationException) throw e }
                 }
                 delay(NET_REJOIN_THRESHOLD_MS)
+            }
+        }
+    }
+
+    /**
+     * Issue #908: Periodic Identity Sync Loop (R-ID 254).
+     * Re-broadcasts the identity (Join payload) every 60 seconds while connected 
+     * to ensure peer discovery during rolling deployments on budget hardware.
+     */
+    private fun startIdentitySyncLoop() {
+        identitySyncJob?.cancel()
+        identitySyncJob = scope.launch {
+            while (isActive) {
+                delay(60000) 
+                if (isConnected() && !isStopped.get()) {
+                    Timber.d("ConnectivitySuite: Periodic identity sync (R254)")
+                    signalingProvider.updateIdentity(deviceId, viewerId, isTrackerMode, force = true)
+                }
             }
         }
     }
@@ -348,9 +358,6 @@ class ConnectivitySuite @Inject constructor(
         }
     }
 
-    /**
-     * Issue #877: Refactored sync loop to incorporate a post-connection settling delay.
-     */
     private fun startSyncLoop() {
         syncJob?.cancel()
         syncJob = scope.launch(Dispatchers.IO) {
@@ -361,9 +368,6 @@ class ConnectivitySuite @Inject constructor(
                 val isCurrentlyConnected = isConnected()
                 
                 if (isCurrentlyConnected) {
-                    // R877: Settling Window. If we just connected, wait 500ms before 
-                    // starting the offline sync to avoid Main-thread starvation during 
-                    // simultaneous map hydration.
                     if (!wasConnected) {
                         lastConnectionSuccessRt = timeProvider.elapsedRealtime()
                         delay(500) 
@@ -835,10 +839,10 @@ class ConnectivitySuite @Inject constructor(
         keepAliveJob?.cancel(); keepAliveJob = null
         syncJob?.cancel(); syncJob = null
         signalingJob?.cancel(); signalingJob = null
+        identitySyncJob?.cancel(); identitySyncJob = null
         scope.cancel()
         
         val unregStart = SystemClock.elapsedRealtime()
-        // Issue #893: Managed unregistration on MainLooper.
         networkCallback.unregister(connectivityManager, Handler(Looper.getMainLooper()))
         val unregDuration = SystemClock.elapsedRealtime() - unregStart
         

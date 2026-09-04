@@ -6,7 +6,7 @@ import javax.inject.Singleton
 
 /**
  * ServiceBehaviorUseCase: Encapsulates high-level logic for service-level state transitions.
- * Sep.04.01:
+ * Sep.03.111:
  * - Issue #898 RESOLVED: A15 Connectivity Hardening. Forced SUSPICIOUS_GPS_POLLING_MS (10s) 
  *   as the baseline for A15 devices when the screen is off to prevent 90s staleness 
  *   timeouts during aggressive background suppression (R898).

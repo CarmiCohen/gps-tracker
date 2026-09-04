@@ -6,7 +6,7 @@ import org.junit.Test
 
 /**
  * ServiceBehaviorAuditTest: Audit of R406a Dynamic Polling Intervals.
- * Sep.04.01:
+ * Sep.03.111:
  * - Issue #898 RESOLVED: A15 Background Hardening. Added audit for 10s 
  *   forced baseline on A15 devices when moving with screen off (R898).
  * Aug.29.09:

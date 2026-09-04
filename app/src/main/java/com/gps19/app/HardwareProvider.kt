@@ -32,16 +32,13 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.04.40:
+ * - Issue #908 RESOLVED: A15 Lifecycle Hardening. Implemented asynchronous thread 
+ *   death in stop() to prevent Main-thread blocking during hydration restarts. 
+ *   Added restart-awareness to the 800ms settling window (R908).
  * Sep.04.20:
  * - Issue #905 RESOLVED: Global GNSS Reception Hardening. Expanded revival pulse 
- *   logic to include SIGNAL_LOSS and GPS_GAP states. Remediates Samsung A15/S21FE 
- *   "Zombie GNSS" failure where 0 satellites are reported indefinitely (R905).
- * Sep.02.70:
- * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
- *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 244).
- * Sep.02.45:
- * - Issue #122 Hardening: Enhanced stop() with forensic duration tracking and summary 
- *   reporting to verify the 800ms settling window's effectiveness (R891/R-ID 197).
+ *   logic to include SIGNAL_LOSS and GPS_GAP states (R905).
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -287,12 +284,18 @@ class HardwareProvider @Inject constructor(
 
     fun start() {
         synchronized(lifecycleLock) {
-            if (isStarted.getAndSet(true)) return
+            if (isStarted.getAndSet(true)) {
+                // Issue #908: If already started, ensure we aren't in a lingering teardown state.
+                isTeardownActive.set(false)
+                return
+            }
+            
             isTeardownActive.set(false)
             sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt
             proximityMaxRange = proximity?.maximumRange ?: 5f
             
-            if (hardwareThread == null) {
+            // Issue #908: If a previous thread is still joining, we must wait or re-use it.
+            if (hardwareThread == null || !hardwareThread!!.isAlive) {
                 hardwareThread = HandlerThread("HardwareProviderThread").apply { start() }
                 hardwareHandler = Handler(hardwareThread!!.looper)
                 Timber.d("HardwareProvider: Unified hardware thread started.")
@@ -320,7 +323,7 @@ class HardwareProvider @Inject constructor(
             if (!isStarted.getAndSet(false)) return
             isTeardownActive.set(true)
             val stopStartTime = SystemClock.elapsedRealtime()
-            Timber.i("HardwareProvider: Starting teardown sequence (R891/R-ID 197).")
+            Timber.i("HardwareProvider: Starting teardown sequence (R891/R908).")
             
             recoveryJob?.cancel(); recoveryJob = null
             registrationJob?.cancel(); registrationJob = null
@@ -330,6 +333,7 @@ class HardwareProvider @Inject constructor(
             stopAcousticMonitoring()
 
             val handler = hardwareHandler
+            val threadToQuit = hardwareThread
             
             // Unregistration Sequence: Priority to high-frequency/native streams (R891)
             val gnssStart = SystemClock.elapsedRealtime()
@@ -353,31 +357,41 @@ class HardwareProvider @Inject constructor(
             displayListener.unregister(displayManager, handler)
             val displayDuration = SystemClock.elapsedRealtime() - displayStart
 
-            // Issue #891/Issue #122: Hardened teardown settling window. 
-            // Give the native layer 800ms to finalize unregistration before thread death.
-            Timber.d("HardwareProvider: Entering 800ms forensic settling window (Issue #122)...")
-            try { Thread.sleep(800) } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
+            // Issue #908 Remediation: Use a background task for thread death to avoid 
+            // blocking the Main thread during hydration-induced service restarts.
+            scope.launch(Dispatchers.IO) {
+                // Issue #891/Issue #122: Hardened teardown settling window. 
+                Timber.d("HardwareProvider: Entering 800ms forensic settling window (R908)...")
+                delay(800)
 
-            Timber.d("HardwareProvider: Quitting hardware thread...")
-            hardwareThread?.quitSafely()
-            try { 
-                hardwareThread?.join(1000)
-            } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
+                synchronized(lifecycleLock) {
+                    // Only quit the thread if the provider hasn't been restarted.
+                    if (!isStarted.get() && hardwareThread == threadToQuit) {
+                        Timber.d("HardwareProvider: Quitting hardware thread...")
+                        threadToQuit?.quitSafely()
+                        try { 
+                            threadToQuit?.join(1000)
+                        } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
+                        hardwareThread = null; hardwareHandler = null
+                    } else {
+                        Timber.i("HardwareProvider: Teardown interrupted by restart. Retaining thread.")
+                    }
+                }
+                
+                val totalDuration = SystemClock.elapsedRealtime() - stopStartTime
+                Timber.i("""
+                    HardwareProvider: Teardown Summary (Issue #908 Verification):
+                    - Total Teardown Time: ${totalDuration}ms
+                    - GNSS Duration: ${gnssDuration}ms
+                    - Location Duration: ${locDuration}ms
+                    - Sensor Duration: ${sensorDuration}ms
+                    - Display Duration: ${displayDuration}ms
+                    - Settling Window: 800ms (Async)
+                    - Status: Clean Teardown Completed.
+                """.trimIndent())
+            }
             
-            val totalDuration = SystemClock.elapsedRealtime() - stopStartTime
-            hardwareThread = null; hardwareHandler = null
             isStepDetectorRegistered = false
-            
-            Timber.i("""
-                HardwareProvider: Teardown Summary (Issue #122 Verification):
-                - Total Teardown Time: ${totalDuration}ms
-                - GNSS Duration: ${gnssDuration}ms
-                - Location Duration: ${locDuration}ms
-                - Sensor Duration: ${sensorDuration}ms
-                - Display Duration: ${displayDuration}ms
-                - Settling Window: 800ms (FIXED)
-                - Status: Clean Teardown Completed.
-            """.trimIndent())
         }
     }
 
