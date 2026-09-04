@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Sep.04.10)
+# Project Issues & Hardening Tracking (Sep.04.20)
 
 This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
 
@@ -6,9 +6,9 @@ This document tracks active issues, technical debt, and pending implementation t
 | Category | Status | Count |
 | :--- | :--- | :--- |
 | **SOT Master Rules** | 🏗️ Standards | 41 |
-| **Functional R-IDs** | 🧩 Requirements | 216 |
-| **Resolved Issues** | 🟢 Progress | 871 |
-| **Open Technical Issues** | 🔴 Priority | 2 |
+| **Functional R-IDs** | 🧩 Requirements | 217 |
+| **Resolved Issues** | 🟢 Progress | 872 |
+| **Open Technical Issues** | 🔴 Priority | 1 |
 | **Testing Chapters** | 🧪 Protocol | 100 |
 | **Testing Sub-items** | 🔍 Granularity | 124 |
 | **Simplification Ideas** | 💡 Future | 248 |
@@ -24,17 +24,17 @@ This document tracks active issues, technical debt, and pending implementation t
 ---
 
 ## 🔴 Open Issues (Prioritized)
-*   **Issue #905: Global GNSS Reception Failure**: Complete loss of GPS signal reception in both Tracker and Viewer modes across Samsung A15 and S21FE hardware.
 *   **Issue #907: System-Wide Interconnectivity Failure**: Complete inability to establish a functional link between S21FE (Viewer) and A15 (Tracker), resulting in total system non-operation.
 
 ---
 
-## 🟢 Recently Resolved Issues (Sep.04.10)
+## 🟢 Recently Resolved Issues (Sep.04.20)
+*   **Issue #905 RESOLVED: Global GNSS Reception Hardening**. Expanded revival pulse logic in `HardwareProvider` to include `SIGNAL_LOSS` and `GPS_GAP` states. Remediates Samsung A15/S21FE "Zombie GNSS" failure where 0 satellites are reported indefinitely by forcing a hardware-level location update restart (R905/R-ID 252).
 *   **Issue #906 RESOLVED: Signaling Transport Robustness**. Remediated critical "SRV Red" failures by removing strict `websocket` transport enforcement in `CommunicationManager`. Allowed default `socket.io` polling-to-websocket upgrade handshake, ensuring connectivity stability across diverse network environments and budget hardware like the Samsung A15 (R906/R251).
 *   **Issue #900 RESOLVED: Background Service Restriction (A15)**. Hardened `PhoneSetupOverlay` with explicit guidance for Samsung "Unrestricted" battery mode. Added `isSamsungDevice` detection to `SystemStatusProvider` to trigger targeted UI instructions, remediating `BackgroundServiceStartNotAllowedException` on budget hardware (R900).
 *   **Issue #904 RESOLVED: GNSS Rejection (Confirmed)**. Implemented targeted guidance for "Precise Location" in `PhoneSetupOverlay` (Step 0) for Samsung devices. Verified that OS-level coarse location downgrades were the root cause of `0/0` satellite visibility on A15 hardware (R904).
 *   **Issue #901 RESOLVED: Log Spam Regression**. Hardened `GpsApplication.trimCaches()` to preserve "pkg" and "uid" identity tokens during memory pressure events. Previous implementation cleared these tokens, causing fallback to native `getPackageName()` and persistent IPC diagnostic log spam on Samsung hardware (R759).
 
 ---
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.04.10)*
-Current Audit Baseline: [SOT: 257 (Rules: 41, IDs: 216), Resolved: 871, Open: 2, Testing: 100 (Sub-items: 124), Ideas: 248, QA: 234]
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.04.20)*
+Current Audit Baseline: [SOT: 258 (Rules: 41, IDs: 217), Resolved: 872, Open: 1, Testing: 100 (Sub-items: 124), Ideas: 248, QA: 234]

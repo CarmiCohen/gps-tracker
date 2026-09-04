@@ -10,6 +10,7 @@ import android.hardware.display.DisplayManager
 import android.location.GnssStatus
 import android.location.LocationManager
 import android.net.ConnectivityManager
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -132,6 +133,24 @@ abstract class ManagedGnssStatusCallback : GnssStatus.Callback() {
             "ManagedGnssStatusCallback",
             handler
         ) { lm.unregisterGnssStatusCallback(this) }
+    }
+}
+
+/**
+ * ManagedLocationListener: Encapsulates safe, synchronous unregistration of
+ * android.location.LocationListener to prevent resource leaks (R755).
+ */
+abstract class ManagedLocationListener : android.location.LocationListener {
+    override fun onProviderEnabled(provider: String) {}
+    override fun onProviderDisabled(provider: String) {}
+    @Deprecated("Deprecated in API 29")
+    override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
+
+    fun unregister(lm: LocationManager, handler: Handler?) {
+        ManagedUnregistrationHelper.safeUnregister(
+            "ManagedLocationListener",
+            handler
+        ) { lm.removeUpdates(this) }
     }
 }
 

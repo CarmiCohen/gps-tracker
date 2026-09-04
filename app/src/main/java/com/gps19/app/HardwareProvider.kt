@@ -32,16 +32,16 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.04.20:
+ * - Issue #905 RESOLVED: Global GNSS Reception Hardening. Expanded revival pulse 
+ *   logic to include SIGNAL_LOSS and GPS_GAP states. Remediates Samsung A15/S21FE 
+ *   "Zombie GNSS" failure where 0 satellites are reported indefinitely (R905).
  * Sep.02.70:
  * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
  *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 244).
  * Sep.02.45:
  * - Issue #122 Hardening: Enhanced stop() with forensic duration tracking and summary 
  *   reporting to verify the 800ms settling window's effectiveness (R891/R-ID 197).
- * Sep.02.44:
- * - Issue #893 Hardening: Audited and verified all native listener unregistrations 
- *   (GNSS, Location, Sensors, Display) for Looper alignment and deterministic 
- *   settling windows to eliminate BaseEventQueue leaks on Android 15 (R893).
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -393,20 +393,6 @@ class HardwareProvider @Inject constructor(
         attemptStepDetectorRegistration(); startStepDetectorRecoveryLoop()
     }
 
-    private fun checkRevivalLifecycle() {
-        if (!isStarted.get()) return
-        val nowRt = timeProvider.elapsedRealtime(); val currentStatus = _locationStatus.value
-        if (currentStatus.isPending && currentStatus.reason == LocationPendingReason.GPS_STALL) {
-            val stallDuration = nowRt - pendingEnterRt
-            if (stallDuration > (revivalAttemptCount + 1) * GPS_REVIVAL_RETRY_INTERVAL_MS) {
-                if (revivalAttemptCount < MAX_REVIVAL_ATTEMPTS) {
-                    revivalAttemptCount++; _revivalEvents.tryEmit(RevivalEvent.Attempt(revivalAttemptCount))
-                    restartLocationUpdates()
-                }
-            }
-        } else if (!currentStatus.isPending) { revivalAttemptCount = 0 }
-    }
-
     private fun restartLocationUpdates() {
         if (!isStarted.get() || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
         scope.launch(Dispatchers.Main) {
@@ -740,4 +726,28 @@ class HardwareProvider @Inject constructor(
         }
     }
     private fun attemptStepRegistration() = attemptStepDetectorRegistration()
+
+    /**
+     * Issue #905 Hardening: Expanded revival pulses to SIGNAL_LOSS and GPS_GAP.
+     * Samsung budget hardware (A15) frequently enters a "Zombie State" where 
+     * GNSS visibility drops to 0 indefinitely; pulsing location updates forces 
+     * the system to re-scan for satellites (R905).
+     */
+    private fun checkRevivalLifecycle() {
+        if (!isStarted.get()) return
+        val nowRt = timeProvider.elapsedRealtime(); val currentStatus = _locationStatus.value
+        if (currentStatus.isPending) {
+            val stallDuration = nowRt - pendingEnterRt
+            val retryThreshold = (revivalAttemptCount + 1) * GPS_REVIVAL_RETRY_INTERVAL_MS
+            
+            if (stallDuration > retryThreshold) {
+                if (revivalAttemptCount < MAX_REVIVAL_ATTEMPTS) {
+                    revivalAttemptCount++
+                    Timber.w("HardwareProvider: GNSS Recovery Pulse triggered (Attempt $revivalAttemptCount, Reason: ${currentStatus.reason})")
+                    _revivalEvents.tryEmit(RevivalEvent.Attempt(revivalAttemptCount))
+                    restartLocationUpdates()
+                }
+            }
+        } else { revivalAttemptCount = 0 }
+    }
 }

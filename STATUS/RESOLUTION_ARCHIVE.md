@@ -1,6 +1,9 @@
-# Resolution Archive (Sep.04.10)
+# Resolution Archive (Sep.04.20)
 
-## 🟢 Resolved Issues (Sep.04.10)
+## 🟢 Resolved Issues (Sep.04.20)
+*   **Issue #905 RESOLVED: Global GNSS Reception Hardening**. Expanded revival pulse logic in `HardwareProvider` to include `SIGNAL_LOSS` and `GPS_GAP` states. Remediates Samsung A15/S21FE "Zombie GNSS" failure where 0 satellites are reported indefinitely by forcing a hardware-level location update restart (R905/R-ID 252).
+
+## 🟢 Recently Resolved Issues (Sep.04.10)
 *   **Issue #906 RESOLVED: Signaling Transport Robustness**. Remediated critical "SRV Red" failures by removing strict `websocket` transport enforcement in `CommunicationManager`. Allowed default `socket.io` polling-to-websocket upgrade handshake, ensuring connectivity stability across diverse network environments and budget hardware like the Samsung A15 (R906/R251).
 
 ## 🟢 Recently Resolved Issues (Sep.04.05)
