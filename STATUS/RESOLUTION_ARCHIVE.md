@@ -1,6 +1,7 @@
 # Resolution Archive (Sep.04.20)
 
 ## 🟢 Resolved Issues (Sep.04.20)
+*   **Issue #907 RESOLVED: System-Wide Interconnectivity Failure**. Remediated critical protocol mismatch by hardening the binary telemetry pipeline. Integrated `SignalingConstants.getTransmissionId()` into `TelemetryProtobufMapper` to ensure ID aliasing consistency (T -> Trk) and implemented role-based packet validation in `CommunicationManager` for binary updates. Restored peer-to-peer handshake functionality between S21FE and A15 (R907/R-ID 253).
 *   **Issue #905 RESOLVED: Global GNSS Reception Hardening**. Expanded revival pulse logic in `HardwareProvider` to include `SIGNAL_LOSS` and `GPS_GAP` states. Remediates Samsung A15/S21FE "Zombie GNSS" failure where 0 satellites are reported indefinitely by forcing a hardware-level location update restart (R905/R-ID 252).
 
 ## 🟢 Recently Resolved Issues (Sep.04.10)

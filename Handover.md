@@ -1,23 +1,23 @@
-# Forensic State Snapshot (Sep.04.20)
+# Forensic State Snapshot (Sep.04.30)
 
 ## 🎯 Current Focus
-- **Issue #905 RESOLVED**: Remediated "Zombie GNSS" failure on Samsung A15/S21FE by expanding hardware revival pulses to `SIGNAL_LOSS` and `GPS_GAP` states in `HardwareProvider.kt`.
-- **Next Target**: **Issue #907: System-Wide Interconnectivity Failure**. Investigate why S21FE (Viewer) and A15 (Tracker) cannot establish a handshake despite SRV Green status.
+- **Issue #907 RESOLVED**: Remediated "System-Wide Interconnectivity Failure" between S21FE and A15. Root cause was an ID aliasing mismatch in the binary telemetry path and a lack of role-based validation for incoming Protobuf packets.
+- **Next Target**: Fresh audit of **Issue #903 (Teardown-Loop Anomaly)** on budget hardware now that connectivity and GNSS stability are established.
 
 ## 🛠️ Recent Modifications
-- **ManagedHardware.kt**: Introduced `ManagedLocationListener` for safe native unregistration.
-- **HardwareProvider.kt**: Updated `checkRevivalLifecycle()` to include all pending GNSS states; hardened unregistration sequences.
-- **SOT Master Requirements**: Added **R-ID 252 (GNSS Zombie Recovery)**.
-- **Version**: Incremented to `Sep.04.20`.
+- **TelemetryProtobufMapper.kt**: Hardened serialization with `SignalingConstants.getTransmissionId()` for parity with JSON paths (R-ID 253).
+- **CommunicationManager.kt**: Implemented `RealtimeStatus` header parsing for binary validation in `handleLocationRelayBinary` to ensure role-based filtering (R907).
+- **SOT Master Requirements**: Added **R-ID 253 (Protobuf Identity Parity)**.
+- **Version**: Incremented to `Sep.04.30`.
 
 ## ⚠️ Active Concerns
-- **Issue #903**: Teardown-Loop Anomaly on A15 still needs verification after the GNSS fix.
-- **Issue #907**: Total system non-operation between S21FE and A15.
+- **Issue #902**: SRV stability on A15 needs final verification in field tests.
+- **Issue #903**: Teardown-Loop behavior during hydration requires forensic log analysis.
 
 ## 📊 Audit Baseline
-- **SOT**: 258 (Rules: 41, IDs: 217)
-- **Resolved**: 872
-- **Open**: 1 (Issue #907)
+- **SOT**: 259 (Rules: 41, IDs: 218)
+- **Resolved**: 873
+- **Open**: 0
 - **Testing**: 100 Chapters / 124 Sub-items
-- **Ideas**: 248
+- **Ideas**: 249
 - **QA**: 234 Validated

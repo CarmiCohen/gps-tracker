@@ -4,6 +4,11 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Sep.04.20:
+ * - Issue #907 RESOLVED: System-Wide Interconnectivity Failure. Hardened ID 
+ *   aliasing by using SignalingConstants.getTransmissionId() during serialization. 
+ *   Ensures Protobuf parity with JSON path (T -> Trk) to prevent handshake 
+ *   rejections on budget hardware (R907).
  * Sep.02.70:
  * - Idea #241: Protobuf Mapping Unification. Consolidated mapping logic for 
  *   RealtimeStatus (Signaling) and TrackerStatusProto (Persistence) to ensure 
@@ -16,8 +21,9 @@ object TelemetryProtobufMapper {
      */
     fun mapToRealtime(status: TrackerStatus, builder: RealtimeStatus.Builder, fromViewer: Boolean) {
         builder.apply {
-            setId(status.deviceId)
-            setViewerId(status.viewerId)
+            // R907: Ensure transmission IDs are aliased for relay room compatibility.
+            setId(SignalingConstants.getTransmissionId(status.deviceId))
+            setViewerId(SignalingConstants.getTransmissionId(status.viewerId))
             setFromViewer(fromViewer)
             
             // Common Geometry & Physics

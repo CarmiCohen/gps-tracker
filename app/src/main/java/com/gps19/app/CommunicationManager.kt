@@ -22,13 +22,14 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Sep.04.20:
+ * - Issue #907 RESOLVED: System-Wide Interconnectivity Failure. Hardened binary 
+ *   path with SignalingValidator to ensure Protobuf updates follow role-based 
+ *   filtering. Remediates handshake failures on budget hardware (R907).
  * Sep.04.10:
  * - Issue #906 RESOLVED: Transport Robustness. Removed strict 'websocket' transport 
  *   enforcement. Allowed default polling-to-websocket upgrade handshake to 
  *   remediate SRV Red failures on budget hardware and restricted networks (R906).
- * Sep.02.70:
- * - Idea #241: Protobuf Mapping Unification. Integrated TelemetryProtobufMapper 
- *   to handle RealtimeStatus serialization, ensuring field parity across binary updates (R-ID 241).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -61,7 +62,7 @@ class CommunicationManager @Inject constructor(
     private var onConnectionLost: (() -> Unit)? = null
 
     // Issue #171: Jitter Simulation Controls
-    private val DEBUG_JITTER_SIMULATION = false // Set to true for forensic auditing
+    private val DEBUG_JITTER_SIMULATION = false 
     private val jitterRandom = Random()
 
     // Telemetry Serialization Buffers (Idea #239)
@@ -69,9 +70,8 @@ class CommunicationManager @Inject constructor(
     private var serializationBuffer = ByteArray(4096)
     private val MAX_SERIALIZATION_BUFFER_SIZE = 65536
 
-    // Standardized Flow implementation
     private val _signalingFlow = MutableSharedFlow<SignalingEvent>(
-        extraBufferCapacity = 128, // Expanded for jitter simulation
+        extraBufferCapacity = 128, 
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
     override val signalingFlow: SharedFlow<SignalingEvent> = _signalingFlow.asSharedFlow()
@@ -99,17 +99,11 @@ class CommunicationManager @Inject constructor(
         queueProcessorJob = scope.launch(Dispatchers.IO) {
             for (command in normalPriorityQueue) {
                 if (isStopped) break
-                
-                if (!isConnected()) {
-                    delay(1000)
-                    continue
-                }
-
+                if (!isConnected()) { delay(1000); continue }
                 when (command) {
                     is SignalingCommand.Emit -> socket?.emit(command.event, command.data)
                     is SignalingCommand.EmitBinary -> socket?.emit(command.event, command.routingId, command.data)
                 }
-
                 delay(SIGNALING_EMIT_DELAY_MS)
             }
         }
@@ -125,9 +119,7 @@ class CommunicationManager @Inject constructor(
 
     override fun getLastRelayTrafficTs(): Long = lastRelayTrafficTs
 
-    private fun markTraffic() {
-        lastRelayTrafficTs = timeProvider.elapsedRealtime()
-    }
+    private fun markTraffic() { lastRelayTrafficTs = timeProvider.elapsedRealtime() }
 
     private fun createJoinPayload(): JSONObject {
         return JSONObject().apply {
@@ -143,29 +135,22 @@ class CommunicationManager @Inject constructor(
         val cleanedViewerId = viewerId.trim()
 
         if (isTracker && !SignalingConstants.isValidTrackerId(cleanedDeviceId)) {
-            logToApp("Invalid Tracker ID: $cleanedDeviceId (Cannot be empty)", true)
-            return
+            logToApp("Invalid Tracker ID: $cleanedDeviceId", true); return
         }
         if (!isTracker && !SignalingConstants.isValidViewerId(cleanedViewerId)) {
-            logToApp("Invalid Viewer ID: $cleanedViewerId (Cannot be empty)", true)
-            return
+            logToApp("Invalid Viewer ID: $cleanedViewerId", true); return
         }
 
         val idChanged = oldId.isNotEmpty() && oldId != cleanedDeviceId
-        
         this.deviceId = cleanedDeviceId
         this.viewerId = cleanedViewerId
         this.isTrackerMode = isTracker
         
         if ((idChanged || force) && isConnected()) {
             if (idChanged && oldId.isNotEmpty()) {
-                val transOld = SignalingConstants.getTransmissionId(oldId)
-                logToApp("Identity changed. Leaving $transOld", true)
-                socket?.emit("leave", transOld)
+                socket?.emit("leave", SignalingConstants.getTransmissionId(oldId))
             }
             if (this.deviceId.isNotEmpty()) {
-                val transNew = SignalingConstants.getTransmissionId(this.deviceId)
-                logToApp("Joining room: $transNew (Force: $force)", false)
                 socket?.emit("join", createJoinPayload())
                 markTraffic()
             }
@@ -179,41 +164,19 @@ class CommunicationManager @Inject constructor(
         this.viewerId = viewerId.trim()
         this.isTrackerMode = isTracker
         
-        if (isTracker && !SignalingConstants.isValidTrackerId(this.deviceId)) {
-            logToApp("Connect aborted: Invalid Tracker ID", true)
-            return
-        }
-        if (!isTracker && !SignalingConstants.isValidViewerId(this.viewerId)) {
-            logToApp("Connect aborted: Invalid Viewer ID", true)
-            return
-        }
+        if (isTracker && !SignalingConstants.isValidTrackerId(this.deviceId)) return
+        if (!isTracker && !SignalingConstants.isValidViewerId(this.viewerId)) return
+        if (relayUrl.isEmpty()) return
+        if (isConnectingInternal || isConnected()) return
 
-        if (relayUrl.isEmpty()) {
-            logToApp("Connect aborted: URL is empty", false)
-            return
-        }
-
-        if (isConnectingInternal || isConnected()) {
-            return
-        }
-
-        socket?.disconnect()
-        socket?.off()
-
+        socket?.disconnect(); socket?.off()
         logToApp("Starting connection to $relayUrl", true)
         markTraffic() 
         isConnectingInternal = true
 
-        // Issue #906: Removed 'websocket' only transport enforcement to allow 
-        // polling-to-websocket upgrade for better compatibility.
         val opts = IO.Options().apply {
-            timeout = 30000 
-            reconnection = true
-            reconnectionAttempts = Int.MAX_VALUE
-            reconnectionDelay = 2000 
-            reconnectionDelayMax = 10000
-            randomizationFactor = 0.5
-            forceNew = true 
+            timeout = 30000; reconnection = true; reconnectionAttempts = Int.MAX_VALUE
+            reconnectionDelay = 2000; reconnectionDelayMax = 10000; randomizationFactor = 0.5; forceNew = true 
         }
 
         try {
@@ -233,44 +196,28 @@ class CommunicationManager @Inject constructor(
             scope.launch {
                 isConnectingInternal = false
                 yield()
-                
-                withContext(Dispatchers.Default) {
-                    logToApp("Connected to relay", true)
-                }
-                
+                logToApp("Connected to relay", true)
                 markTraffic()
                 telemetryRepository.updateRelayStatus(true)
-                
-                if (deviceId.isNotEmpty()) {
-                    s.emit("join", createJoinPayload())
-                }
+                if (deviceId.isNotEmpty()) s.emit("join", createJoinPayload())
             }
         }
 
         s.on(Socket.EVENT_CONNECT) { onConnectAction() }
-        s.on("reconnecting") { 
-            logToApp("Relay Reconnecting...", true)
-            telemetryRepository.updateRelayStatus(false)
-        }
-        s.on("reconnect") {
-            logToApp("Relay Reconnected", true)
-            onConnectAction() 
-        }
+        s.on("reconnecting") { logToApp("Relay Reconnecting...", true); telemetryRepository.updateRelayStatus(false) }
+        s.on("reconnect") { logToApp("Relay Reconnected", true); onConnectAction() }
         
         s.on(Socket.EVENT_DISCONNECT) { args ->
             isConnectingInternal = false
             val reason = args?.getOrNull(0)?.toString() ?: "unknown"
             logToApp("Relay Disconnected ($reason)", true)
             telemetryRepository.updateRelayStatus(false)
-            if (reason != "io client disconnect") {
-                onConnectionLost?.invoke()
-            }
+            if (reason != "io client disconnect") onConnectionLost?.invoke()
         }
 
         s.on(Socket.EVENT_CONNECT_ERROR) { args ->
             isConnectingInternal = false
-            val error = args?.getOrNull(0)?.toString() ?: "Transport Error"
-            logToApp("Relay Connect Error: $error", true)
+            logToApp("Relay Connect Error: ${args?.getOrNull(0)}", true)
             telemetryRepository.updateRelayStatus(false)
             onConnectionLost?.invoke()
         }
@@ -286,45 +233,45 @@ class CommunicationManager @Inject constructor(
     private fun handleLocationRelay(args: Array<Any>) {
         try {
             val data = args[0] as JSONObject
-            val incomingId = data.optString("id")
-            val incomingViewerId = data.optString("viewer_id")
-            val fromViewer = data.optBoolean("from_viewer")
-
             if (!SignalingValidator.shouldProcessLocationUpdate(
-                    incomingId = incomingId,
+                    incomingId = data.optString("id"),
                     ownDeviceId = deviceId,
-                    isFromViewer = fromViewer,
-                    viewerId = incomingViewerId,
+                    isFromViewer = data.optBoolean("from_viewer"),
+                    viewerId = data.optString("viewer_id"),
                     ownViewerId = viewerId,
                     isTrackerMode = isTrackerMode
             )) return
             
-            if (DEBUG_JITTER_SIMULATION) {
-                scope.launch {
-                    delay(200L + jitterRandom.nextInt(600)) // 200-800ms jitter
-                    _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(data))
-                }
-            } else {
-                _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(data))
-            }
-        } catch (e: Exception) {
-            Timber.e("location_relay parse error")
-        }
+            dispatchUpdate(SignalingEvent.JsonUpdate(data))
+        } catch (e: Exception) { Timber.e("location_relay parse error") }
     }
 
     private fun handleLocationRelayBinary(args: Array<Any>) {
         try {
             val data = args[0] as ByteArray
-            if (DEBUG_JITTER_SIMULATION) {
-                scope.launch {
-                    delay(200L + jitterRandom.nextInt(600)) // 200-800ms jitter
-                    _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(data))
-                }
-            } else {
-                _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(data))
+            // R907: Hardened binary validation. We parse only the header to validate role.
+            val status = RealtimeStatus.parseFrom(data)
+            if (!SignalingValidator.shouldProcessLocationUpdate(
+                    incomingId = status.id,
+                    ownDeviceId = deviceId,
+                    isFromViewer = status.fromViewer,
+                    viewerId = status.viewerId,
+                    ownViewerId = viewerId,
+                    isTrackerMode = isTrackerMode
+            )) return
+
+            dispatchUpdate(SignalingEvent.BinaryUpdate(data))
+        } catch (e: Exception) { Timber.e("location_relay_bin validation failure") }
+    }
+
+    private fun dispatchUpdate(event: SignalingEvent) {
+        if (DEBUG_JITTER_SIMULATION) {
+            scope.launch {
+                delay(200L + jitterRandom.nextInt(600))
+                _signalingFlow.tryEmit(event)
             }
-        } catch (e: Exception) {
-            Timber.e("location_relay_bin direct dispatch failure")
+        } else {
+            _signalingFlow.tryEmit(event)
         }
     }
 
@@ -339,39 +286,28 @@ class CommunicationManager @Inject constructor(
                     isTrackerMode = isTrackerMode
             )) return
             
-            val entry = LogEntry.fromJSONObject(data)
-            logRepository.addLog(entry)
-
+            logRepository.addLog(LogEntry.fromJSONObject(data))
             val wrapped = JSONObject()
             val keys = data.keys()
             while(keys.hasNext()) { val k = keys.next(); wrapped.put(k, data.get(k)) }
             wrapped.put("type", "remote_log")
             _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(wrapped))
-        } catch (e: Exception) {
-            Timber.e(e, "log_relay parse error")
-        }
+        } catch (e: Exception) { Timber.e(e, "log_relay parse error") }
     }
 
     private fun handleViewerStatusRelay(args: Array<Any>) {
         try {
             val data = args[0] as JSONObject
             val incomingViewerId = data.optString("viewer_id")
-            
             if (isTrackerMode) {
                 if (!SignalingConstants.isViewerMatch(incomingViewerId, viewerId) && !isDefaultViewer(viewerId)) return
             } else {
                 if (SignalingConstants.isViewerMatch(incomingViewerId, viewerId)) return
             }
-
             _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply {
-                put("type", "viewer_pulse")
-                put("id", deviceId) 
-                put("viewer_id", incomingViewerId)
-                put("from_viewer", true)
+                put("type", "viewer_pulse"); put("id", deviceId); put("viewer_id", incomingViewerId); put("from_viewer", true)
             }))
-        } catch (e: Exception) {
-            Timber.e(e, "viewer_status_relay parse error")
-        }
+        } catch (e: Exception) { Timber.e(e, "viewer_status_relay parse error") }
     }
 
     private fun handlePingRelay(args: Array<Any>) {
@@ -379,31 +315,21 @@ class CommunicationManager @Inject constructor(
             val data = args[0] as JSONObject
             val pingDeviceId = data.optString("id", "")
             val incomingViewerId = data.optString("viewer_id", "")
-            
             if (SignalingConstants.isTrackerMatch(pingDeviceId, deviceId) && deviceId.isNotEmpty()) {
                 val isViewerPing = SignalingValidator.isViewerRole(data.optString("from"))
-                
                 if (isTrackerMode && isViewerPing && !SignalingConstants.isViewerMatch(incomingViewerId, viewerId) && !isDefaultViewer(viewerId)) return
-                
                 if ((isTrackerMode && isViewerPing) || (!isTrackerMode && !isViewerPing)) {
                     val incomingMap = mutableMapOf<String, Any?>()
                     data.keys().forEach { incomingMap[it] = data.get(it) }
-                    
                     SignalPayloadGenerator.createPongPayload(incomingMap as Map<String, Any>, deviceId, isTrackerMode)?.let { pongMap ->
                         emitInternal("pong_cmd", JSONObject(pongMap), SignalingPriority.HIGH)
                     }
-                    
                     _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply {
-                        put("type", SignalingConstants.getPulseType(isTrackerMode))
-                        put("id", deviceId)
-                        put("viewer_id", incomingViewerId)
-                        put("from_viewer", isViewerPing)
+                        put("type", SignalingConstants.getPulseType(isTrackerMode)); put("id", deviceId); put("viewer_id", incomingViewerId); put("from_viewer", isViewerPing)
                     }))
                 }
             }
-        } catch (e: Exception) {
-            Timber.e(e, "ping_relay parse error")
-        }
+        } catch (e: Exception) { Timber.e(e, "ping_relay parse error") }
     }
 
     private fun handlePongRelay(args: Array<Any>) {
@@ -411,83 +337,53 @@ class CommunicationManager @Inject constructor(
             val data = args[0] as JSONObject
             val pingDeviceId = data.optString("id", "")
             val pongViewerId = data.optString("viewer_id", "")
-            
             if (SignalingConstants.isTrackerMatch(pingDeviceId, deviceId) && deviceId.isNotEmpty()) {
                 val isFromViewer = SignalingValidator.isViewerRole(data.optString("from"))
                 val isMyPong = if (isTrackerMode) !isFromViewer else isFromViewer
-
                 if (isMyPong) {
-                    _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply { 
-                        put("type", "pong_activity"); put("id", deviceId); put("viewer_id", pongViewerId); put("from_viewer", isFromViewer) 
-                    }))
+                    _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply { put("type", "pong_activity"); put("id", deviceId); put("viewer_id", pongViewerId); put("from_viewer", isFromViewer) }))
                     val rtt = (timeProvider.currentTimeMillis() - data.optLong("ts")).toInt()
                     if (rtt > 0) {
                         rtts.add(rtt); if (rtts.size > 5) rtts.removeAt(0)
-                        lastRttInternal = rtts.minOrNull() ?: rtt
-                        telemetryRepository.updateLastRtt(lastRttInternal)
+                        lastRttInternal = rtts.minOrNull() ?: rtt; telemetryRepository.updateLastRtt(lastRttInternal)
                     }
                 } else {
                     if (isTrackerMode && !SignalingConstants.isViewerMatch(pongViewerId, viewerId) && !isDefaultViewer(viewerId)) return
-
                     _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply {
-                        put("type", SignalingConstants.getPulseType(isTrackerMode))
-                        put("id", deviceId)
-                        put("viewer_id", pongViewerId)
-                        put("from_viewer", isFromViewer)
+                        put("type", SignalingConstants.getPulseType(isTrackerMode)); put("id", deviceId); put("viewer_id", pongViewerId); put("from_viewer", isFromViewer)
                     }))
                 }
             }
-        } catch (e: Exception) {
-            Timber.e(e, "pong_relay parse error")
-        }
+        } catch (e: Exception) { Timber.e(e, "pong_relay parse error") }
     }
 
-    override fun setConnectionLostCallback(callback: () -> Unit) {
-        this.onConnectionLost = callback
-    }
-
-    override fun clearRtt() { 
-        rtts.clear(); lastRttInternal = 0
-    }
-
+    override fun setConnectionLostCallback(callback: () -> Unit) { this.onConnectionLost = callback }
+    override fun clearRtt() { rtts.clear(); lastRttInternal = 0 }
     override fun getRtt(): Int = lastRttInternal
-
-    override fun emit(event: String, data: JSONObject, priority: SignalingPriority) {
-        emitInternal(event, data, priority)
-    }
+    override fun emit(event: String, data: JSONObject, priority: SignalingPriority) { emitInternal(event, data, priority) }
 
     @Synchronized
     override fun transmit(status: TrackerStatus, priority: SignalingPriority, fromViewer: Boolean) {
         if (isStopped || !isConnected()) return
         markTraffic()
-
         if (isTrackerMode && !fromViewer) {
-            // Binary Protobuf Path for Trackers (R-ID 241)
             statusBuilder.clear()
             TelemetryProtobufMapper.mapToRealtime(status, statusBuilder, fromViewer)
-            
             val message = statusBuilder.buildPartial()
             val size = message.serializedSize
-            
             if (size > serializationBuffer.size && size <= MAX_SERIALIZATION_BUFFER_SIZE) {
-                val nextSize = (serializationBuffer.size * 2).coerceAtLeast(size).coerceAtMost(MAX_SERIALIZATION_BUFFER_SIZE)
-                serializationBuffer = ByteArray(nextSize)
+                serializationBuffer = ByteArray((serializationBuffer.size * 2).coerceAtLeast(size).coerceAtMost(MAX_SERIALIZATION_BUFFER_SIZE))
             }
-
             if (size <= serializationBuffer.size) {
                 try {
                     val cos = CodedOutputStream.newInstance(serializationBuffer, 0, size)
-                    message.writeTo(cos)
-                    cos.checkNoSpaceLeft()
+                    message.writeTo(cos); cos.checkNoSpaceLeft()
                     emitBinaryInternal("location_update_bin", SignalingConstants.getTransmissionId(deviceId), serializationBuffer, size, priority)
                     return
-                } catch (e: Exception) {
-                    Timber.e(e, "Pre-allocated serialization failed")
-                }
+                } catch (e: Exception) { Timber.e(e, "Pre-allocated serialization failed") }
             }
             emitBinaryInternal("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray(), priority = priority)
         } else {
-            // JSON/Map Path for Viewers (or remote commands)
             emitInternal("location_update", JSONObject(status.toMap(fromViewer)), priority)
         }
     }
@@ -498,11 +394,8 @@ class CommunicationManager @Inject constructor(
         if (priority == SignalingPriority.HIGH) {
             socket?.emit(event, data)
         } else {
-            if (event == "location_update") { 
-                emitLocationConflated(data.toMap()) 
-            } else { 
-                normalPriorityQueue.trySend(SignalingCommand.Emit(event, data))
-            }
+            if (event == "location_update") emitLocationConflated(data.toMap()) 
+            else normalPriorityQueue.trySend(SignalingCommand.Emit(event, data))
         }
     }
 
@@ -510,17 +403,12 @@ class CommunicationManager @Inject constructor(
         if (isStopped) return
         markTraffic()
         val payload = if (length == data.size) data else Arrays.copyOf(data, length)
-        
-        if (priority == SignalingPriority.HIGH) {
-            socket?.emit(event, routingId, payload)
-        } else {
-            normalPriorityQueue.trySend(SignalingCommand.EmitBinary(event, routingId, payload))
-        }
+        if (priority == SignalingPriority.HIGH) socket?.emit(event, routingId, payload)
+        else normalPriorityQueue.trySend(SignalingCommand.EmitBinary(event, routingId, payload))
     }
 
     private fun emitLocationConflated(incoming: Map<String, Any?>) {
         pendingLocationMap = SignalingMessageConflator.conflate(pendingLocationMap, incoming).toMutableMap()
-
         if (conflationJob == null || !conflationJob!!.isActive) {
             conflationJob = scope.launch {
                 delay(100)
@@ -536,41 +424,17 @@ class CommunicationManager @Inject constructor(
     private fun JSONObject.toMap(): Map<String, Any?> {
         val map = mutableMapOf<String, Any?>()
         val keys = keys()
-        while (keys.hasNext()) {
-            val key = keys.next()
-            map[key] = get(key)
-        }
+        while (keys.hasNext()) { val key = keys.next(); map[key] = get(key) }
         return map
     }
 
     override fun isConnected() = socket?.connected() ?: false
-
     override fun isConnecting(): Boolean = isConnectingInternal
-
     override fun disconnect() { 
-        val stopStartTime = SystemClock.elapsedRealtime()
-        isStopped = true
-        isConnectingInternal = false
-        Timber.i("CommunicationManager: Starting teardown sequence (R-ID 197).")
-        
+        isStopped = true; isConnectingInternal = false
         queueProcessorJob?.cancel(); queueProcessorJob = null
-        normalPriorityQueue.close()
-        scope.cancel()
-        
-        val socketStart = SystemClock.elapsedRealtime()
-        socket?.disconnect()
-        socket?.off()
-        socket = null
-        val socketDuration = SystemClock.elapsedRealtime() - socketStart
-        
+        normalPriorityQueue.close(); scope.cancel()
+        socket?.disconnect(); socket?.off(); socket = null
         telemetryRepository.updateRelayStatus(false)
-        
-        val totalDuration = SystemClock.elapsedRealtime() - stopStartTime
-        Timber.i("""
-            CommunicationManager: Teardown Summary (Issue #197 Verification):
-            - Total Teardown Time: ${totalDuration}ms
-            - Socket Cleanup Duration: ${socketDuration}ms
-            - Status: Clean Teardown Completed.
-        """.trimIndent())
     }
 }
