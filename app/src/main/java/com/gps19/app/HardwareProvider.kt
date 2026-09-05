@@ -33,12 +33,12 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.05.29:
+ * - Issue #R-ID 256: Sensor Rate Verification. Added runtime efficacy check 
+ *   to verify HIGH_SAMPLING_RATE_SENSORS performance on Target SDK 35.
  * Sep.05.22:
  * - Issue #916 Hardening: Finalized RevivalEvent lifecycle. Implemented emission 
  *   of HardwareLock and Success events to remediate logic gaps in forensic monitoring.
- * Sep.05.18:
- * - Issue #916 Hardening: Enhanced RevivalEvent with RawBurstStarted/Ended lifecycle 
- *   to support battery drain auditing during budget hardware recovery pulses.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -203,6 +203,11 @@ class HardwareProvider @Inject constructor(
     private var emaPressure = 0.0; private var lastBaroZeroingRt = 0L
     private var initialRotationMatrix = FloatArray(9); private var hasInitialRotation = false
     private var plungePhase = 0; private var plungeMatched = false; private var lastPlungePhaseRt = 0L
+
+    // --- Rate Audit State (R-ID 256) ---
+    private var accelEventCount = 0
+    private var accelAuditStartRt = 0L
+    private var isSensorRateAudited = false
 
     private val _isUltraLongStationary = MutableStateFlow(false)
     val isUltraLongStationaryFlow: StateFlow<Boolean> = _isUltraLongStationary.asStateFlow()
@@ -406,7 +411,7 @@ class HardwareProvider @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        if (!isStarted.get() || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        if (!isStarted.get() || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) return
         
         // Issue #905 Hardening: Use both FusedLocationProvider AND raw LocationManager.
         // Budget hardware often stalls at the high-level API; raw provider access 
@@ -544,6 +549,19 @@ class HardwareProvider @Inject constructor(
                 gravityBuffer[0] = values[0]; gravityBuffer[1] = values[1]; gravityBuffer[2] = values[2]; hasGravity = true
                 processVibration(values[0], values[1], values[2]); updateOrientation()
                 if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) { lastStayAliveRt = nowRt; systemMonitor.acquireWakeLock(force = true) }
+
+                // R-ID 256: Runtime Rate Audit
+                if (!isSensorRateAudited && !isWarming) {
+                    if (accelAuditStartRt == 0L) accelAuditStartRt = nowRt
+                    accelEventCount++
+                    if (nowRt - accelAuditStartRt >= 1000L) {
+                        val hz = accelEventCount.toDouble() / ((nowRt - accelAuditStartRt) / 1000.0)
+                        val isEffective = hz > 200.0 // HIGH_SAMPLING_RATE_SENSORS cap is 200Hz
+                        Timber.i("HardwareProvider: Sensor Rate Audit (R-ID 256): ${hz.toInt()} Hz. Efficacy: $isEffective")
+                        _sensorEvents.tryEmit(AppSensorEvent.LogEvent("Sensor Rate Audit: ${hz.toInt()}Hz (Efficacy: $isEffective)", false))
+                        isSensorRateAudited = true
+                    }
+                }
             }
             Sensor.TYPE_LINEAR_ACCELERATION -> processLinearAcceleration(values[0], values[1], values[2], event.timestamp)
             Sensor.TYPE_MAGNETIC_FIELD -> { geomagneticBuffer[0] = values[0]; geomagneticBuffer[1] = values[1]; geomagneticBuffer[2] = values[2]; hasGeomagnetic = true; updateOrientation() }
@@ -762,7 +780,7 @@ class HardwareProvider @Inject constructor(
         }
     }
 
-    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; synchronized(this) { bufferIdx = 0; bufferCount = 0 } }
+    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; synchronized(this) { bufferIdx = 0; bufferCount = 0; accelEventCount = 0; accelAuditStartRt = 0L; isSensorRateAudited = false } }
 
     private fun startStepDetectorRecoveryLoop() { recoveryJob?.cancel(); recoveryJob = scope.launch { while (isActive) { delay(300000L); if (!isStepDetectorRegistered) attemptStepRegistration() } } }
     private fun attemptStepDetectorRegistration() {

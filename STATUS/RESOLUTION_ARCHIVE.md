@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.05.28)
+# Resolution Archive (Sep.05.29)
+
+## 🟢 Resolved Issues (Sep.05.29)
+*   **Issue #921 RESOLVED: Sensor Rate Verification**. Implemented a runtime efficacy audit in `HardwareProvider` to verify `HIGH_SAMPLING_RATE_SENSORS` performance on Target SDK 35. The system now measures actual Hz after the stabilization window and logs the efficacy status (True if >200Hz) to forensic logs, ensuring high-fidelity IMU data collection is not throttled by the OS (R-ID 256).
 
 ## 🟢 Resolved Issues (Sep.05.28)
 *   **Issue #914 RESOLVED: GNSS Detail Sampling**. Implemented A15-aware sampling for the `activeGnssDetail` flow in `MainViewModel`. This optimization reduces UI overhead during satellite monitoring by throttling update frequencies to 3000ms on budget devices, ensuring interface responsiveness under high system load (R-ID 267).

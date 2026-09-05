@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.05.28)
+# SOT Master Requirements (Sep.05.29)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -32,7 +32,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 253 (Protobuf Identity Parity)**: The signaling layer MUST apply alias-aware ID mapping (via `SignalingConstants.getTransmissionId`) to all binary Protobuf payloads to ensure protocol parity with the JSON path and prevent peer-to-peer handshake failures (Sep.04.30).
 *   **R-ID 254 (Rolling Deployment Sync)**: The signaling layer MUST re-broadcast its identity (Join payload) every 60s while connected to ensure peer discovery and synchronization during rolling deployments, remediating "Red SRV" lag on budget hardware (Sep.04.40).
 *   **R-ID 255 (Hydration Navigation Guard)**: The UI layer MUST NOT navigate to the Landing route if `isSystemActive` is true, regardless of `appMode` state, to prevent accidental service termination via BackHandler during hydration gaps (Sep.05.10).
-*   **R-ID 256 (High Frequency Sensor Authority)**: The application MUST declare `HIGH_SAMPLING_RATE_SENSORS` permission in the manifest to support high-fidelity IMU data collection for forensic analysis on Target SDK 35+ (Sep.05.11).
+*   **R-ID 256 (High Frequency Sensor Authority)**: The application MUST declare `HIGH_SAMPLING_RATE_SENSORS` permission in the manifest and implement a runtime efficacy check to verify actual Hz performance on Target SDK 35+, ensuring high-fidelity IMU data collection for forensic analysis (Sep.05.29).
 *   **R-ID 257 (Exact Actual LED Status)**: The HUD state aggregator MUST correctly monitor peer pulses and local service heartbeats using monotonic `elapsedRealtime()` to ensure all LED indicators (VWR, DAT, WATCHDOG) reflect real-time status with a synchronized 35s staleness gate (R338/R972) (Sep.05.27).
 *   **R-ID 258 (Tracker-side Telemetry Processing)**: The signaling layer MUST process incoming binary telemetry packets in Tracker mode to ensure the local HUD correctly displays the Viewer's active presence during two-way signaling (Sep.05.16).
 *   **R-ID 259 (High-Resolution Battery Current Audit)**: The system MUST capture and log instantaneous battery current (mA) and temperature snapshots at the start and end of every GNSS revival burst to forensicly quantify hardware energy consumption on Helio G99 chipset (Sep.05.23).
