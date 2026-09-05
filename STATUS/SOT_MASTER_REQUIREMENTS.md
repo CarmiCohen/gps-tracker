@@ -1,13 +1,14 @@
-# SOT Master Requirements (Sep.05.11)
+# SOT Master Requirements (Sep.05.12)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-## 🏗️ Architectural Master Rules (42 Rules)
+## 🏗️ Architectural Master Rules (43 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context权威 (R001)**: **MANDATORY**. Use `ApplicationContext` for all singleton services. Activity context is strictly for UI-only components.
 *   **1.17 Robust Battery Navigation (R896)**: **MANDATORY**. Battery optimization exemption intents MUST use `Uri.fromParts("package", pkg, null)` for URI encoding and implement a multi-tier fallback (Sep.02.40).
 *   **1.18 Log Spillage Protection (R759)**: **MANDATORY**. All application-level logging MUST use `Timber`. Direct calls to `android.util.Log` or `System.out.println` are strictly prohibited (Sep.02.50).
+*   **1.19 Mapnik Budget Optimization (R915)**: **MANDATORY**. On budget hardware (e.g., Samsung A15), Mapnik tile download threads MUST be limited to 2 to prevent CPU thrashing, and the tile cache MUST be expanded to 600MB to minimize I/O-induced UI latency (Sep.05.12).
 
 ## 🧩 Functional Requirements (221 IDs)
 *   **R-ID 238 (Model Unification)**: The application MUST use `LocationUpdate` as the single source of truth for location data across both the Core Engine and UI layers (Sep.03.01).
@@ -30,4 +31,4 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 255 (Hydration Navigation Guard)**: The UI layer MUST NOT navigate to the Landing route if `isSystemActive` is true, regardless of `appMode` state, to prevent accidental service termination via BackHandler during hydration gaps (Sep.05.10).
 *   **R-ID 256 (High Frequency Sensor Authority)**: The application MUST declare `HIGH_SAMPLING_RATE_SENSORS` permission in the manifest to support high-fidelity IMU data collection for forensic analysis on Target SDK 35+ (Sep.05.11).
 
-*(Total: 42 Architectural Rules + 221 Functional R-IDs = 263 Items)*
+*(Total: 43 Architectural Rules + 221 Functional R-IDs = 264 Items)*

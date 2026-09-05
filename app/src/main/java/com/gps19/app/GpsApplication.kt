@@ -25,13 +25,14 @@ import com.gps19.core.engine.ShadowCache
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Sep.05.12:
+ * - Issue #915 Fix: Implemented R915 (Mapnik Budget Optimization). Throttled 
+ *   download threads to 2 and expanded disk cache to 600MB to remediate 
+ *   tile latency on Samsung A15 budget hardware.
  * Sep.03.132:
  * - Issue #901 Fix: Hardened trimCaches() to preserve "pkg" and "uid" identity 
  *   tokens. Previous implementation cleared these tokens during memory pressure, 
  *   leading to persistent IPC log spam regression (R759).
- * Sep.01.24:
- * - Issue #892 Fix: Manually initialize WorkManager in onCreate() to resolve 
- *   IllegalStateException in BootReceiver, as auto-init is disabled in manifest.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -68,11 +69,6 @@ class GpsApplication : Application(), Configuration.Provider {
             .setWorkerFactory(workerFactory)
             .build()
 
-    /**
-     * Issue #876 Fix: Direct cache query to avoid lazy initialization race 
-     * conditions. Ensures framework log spam is eliminated as soon as 
-     * the cache is populated in onCreate() (R759).
-     */
     override fun getPackageName(): String {
         return stringCache.get("pkg") ?: super.getPackageName()
     }
@@ -80,12 +76,9 @@ class GpsApplication : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
         
-        // Populate caches immediately to silence framework IPC logs
         stringCache.put("pkg", super.getPackageName())
         intCache.put("uid", Process.myUid())
 
-        // Issue #892: Manual WorkManager initialization required because 
-        // WorkManagerInitializer was removed from manifest to support custom factories.
         WorkManager.initialize(this, workManagerConfiguration)
 
         if (BuildConfig.DEBUG) {
@@ -119,12 +112,20 @@ class GpsApplication : Application(), Configuration.Provider {
                 osmConfig.osmdroidTileCache = cacheDir
 
                 osmConfig.load(this@GpsApplication, PreferenceManager.getDefaultSharedPreferences(this@GpsApplication))
+                
+                // Issue #915 Optimization (R915)
+                osmConfig.tileDownloadThreads = 2
+                osmConfig.tileDownloadMaxQueueSize = 40
+                osmConfig.cacheMapTileCount = 64
+                osmConfig.tileFileSystemCacheMaxBytes = 600L * 1024 * 1024
+                osmConfig.tileFileSystemCacheTrimBytes = 500L * 1024 * 1024
+
                 osmConfig.isDebugMode = false
                 osmConfig.isDebugTileProviders = false
                 
                 try {
                     SqlTileWriter()
-                    Timber.d("Issue #758: SqlTileWriter pre-warmed on IO thread.")
+                    Timber.d("Issue #758: SqlTileWriter pre-warmed.")
                 } catch (e: Exception) {
                     Timber.e(e, "Issue #758: SqlTileWriter pre-warm failed")
                 }
@@ -133,8 +134,6 @@ class GpsApplication : Application(), Configuration.Provider {
 
                 MaintenanceWorker.schedule(this@GpsApplication)
                 delay(3000)
-                
-                Timber.d("Issue #721: Shadow-cache synchronized with LRU strategy.")
             } catch (e: Exception) {
                 Timber.e(e, "Issue #664: Deferred startup failed")
             }
@@ -163,7 +162,6 @@ class GpsApplication : Application(), Configuration.Provider {
     private fun trimCaches() {
         applicationScope.launch(Dispatchers.IO) {
             try {
-                // Issue #901: Preserve identity tokens to prevent log spam regression
                 val pkg = stringCache.get("pkg")
                 val uid = intCache.get("uid")
                 
