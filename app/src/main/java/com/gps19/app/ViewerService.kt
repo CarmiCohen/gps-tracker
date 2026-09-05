@@ -16,14 +16,15 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.05.27:
+ * - Issue #918 RESOLVED: Clock Source Consistency. Fixed regression where 
+ *   peer pulse timestamps were updated with wall-clock time, causing 35s 
+ *   HUD badge staleness failures. Standardized to monotonic elapsedRealtime() 
+ *   (R-ID 257).
  * Sep.03.102:
  * - Issue #247 Enforcement: Hardened initial Signal Loss calculation. 
  *   Using time since service start as fallback for silenceDelta to ensure 
  *   immediate forensic visibility if peer handshake fails (R248).
- * Sep.03.101:
- * - Bug Fix: Corrected tracker identity persistence in handleTrackerPulse. 
- *   Saving to TRACKER_ID_KEY instead of VIEWER_ID_KEY to prevent role 
- *   corruption (R182).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -75,12 +76,11 @@ class ViewerService : BaseMonitorService() {
 
         refreshCapabilitiesInternal()
         
-        // Issue #884/886: Sequential initialization on A15 with settling delay.
         if (capabilities.isA15Device) {
             val success = JdHardwareManager.initialize(timeProvider, configManager.deviceId)
             if (success) {
                 logManager.logServiceEvent("HARDWARE: libjdHardware initialized successfully.", isImportant = true)
-                delay(500) // R886: Settling window for framework monitor inflation.
+                delay(500)
             } else {
                 logManager.logServiceEvent("HARDWARE: libjdHardware initialization failed.", isImportant = true)
             }
@@ -341,11 +341,12 @@ class ViewerService : BaseMonitorService() {
 
     private fun handleTrackerPulse(id: String) {
         if (!SignalingConstants.isValidTrackerId(id)) return
+        val nowRt = timeProvider.elapsedRealtime()
         if ((configManager.deviceId == SettingsRepository.DEFAULT_TRACKER_ID || configManager.deviceId.isEmpty()) && id.isNotEmpty() && id != "Active Tracker") {
             configManager.deviceId = id; connectivitySuite.updateIdentity(id, configManager.viewerId, false)
             lifecycleScope.launch(Dispatchers.IO) { repository.saveString(TRACKER_ID_KEY, id) }
         }
-        if (sessionManager.onTrackerPulse(id, timeProvider.currentTimeMillis(), false)) {
+        if (sessionManager.onTrackerPulse(id, nowRt)) {
             val proc = lastProcessedLocation
             logManager.logServiceEvent("Device connected: $id", lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
             startTickLoop()

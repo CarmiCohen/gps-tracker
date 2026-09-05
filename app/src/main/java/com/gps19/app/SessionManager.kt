@@ -6,11 +6,12 @@ import javax.inject.Singleton
 
 /**
  * SessionManager: Tracks session-level state and uptime metrics.
+ * Sep.05.27:
+ * - Issue #918 RESOLVED: Pulse Source Consistency. Standardized onViewerPulse 
+ *   and onTrackerPulse to strictly use monotonic nowRt to prevent HUD 
+ *   staleness logic failures (R-ID 257).
  * July.22.00:
  * - Hilt Hardening: Added @Inject constructor and @Singleton.
- * July.20.07:
- * - Issue #102: Temporal Forensic Integrity. Standardized monotonic timestamp 
- *   parameter naming to 'nowRt'.
  */
 @Singleton
 class SessionManager @Inject constructor(
@@ -52,15 +53,21 @@ class SessionManager @Inject constructor(
         currentDropStartTs = 0L
     }
 
-    fun onViewerPulse(id: String, ts: Long, isRealtime: Boolean): Boolean {
+    /**
+     * Issue #918: Standardized to monotonic nowRt to ensure HUD staleness accuracy.
+     */
+    fun onViewerPulse(id: String, nowRt: Long): Boolean {
         val isNew = !viewerPulseMap.containsKey(id)
-        viewerPulseMap[id] = if (isRealtime) ts else timeProvider.elapsedRealtime()
+        viewerPulseMap[id] = nowRt
         return isNew
     }
 
-    fun onTrackerPulse(id: String, ts: Long, isRealtime: Boolean): Boolean {
+    /**
+     * Issue #918: Standardized to monotonic nowRt to ensure HUD staleness accuracy.
+     */
+    fun onTrackerPulse(id: String, nowRt: Long): Boolean {
         val isNew = !trackerPulseMap.containsKey(id)
-        trackerPulseMap[id] = if (isRealtime) ts else timeProvider.elapsedRealtime()
+        trackerPulseMap[id] = nowRt
         return isNew
     }
 

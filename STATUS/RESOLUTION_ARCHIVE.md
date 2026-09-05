@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.05.26)
+# Resolution Archive (Sep.05.27)
+
+## 🟢 Resolved Issues (Sep.05.27)
+*   **Issue #918 RESOLVED: VWR Badge Consistency & Verification**. Standardized all peer activity tracking and staleness evaluation to strictly use monotonic `elapsedRealtime()`. Remediated a clock-source mismatch where wall-clock timestamps were compared against monotonic gates, ensuring the 35s RED transition is robust and accurate across all HUD indicators (R-ID 257).
 
 ## 🟢 Resolved Issues (Sep.05.26)
 *   **Issue #912 RESOLVED: WebSocket Fallback**. Re-enabled XHR polling fallback by allowing transport negotiation (`polling` to `websocket`) in `CommunicationManager`. This ensures connectivity on restricted networks that block direct WebSocket upgrades, while maintaining the 60s timeout for instance spin-up to accommodate Render free tier latency (R-ID 251).

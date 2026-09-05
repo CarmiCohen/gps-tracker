@@ -34,6 +34,11 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.05.27:
+ * - Issue #918 RESOLVED: Clock Source Consistency. Fixed regression where 
+ *   mainRepository.updateRemoteActivity was updated with wall-clock time, 
+ *   causing 35s HUD badge staleness failures. Standardized to monotonic 
+ *   elapsedRealtime() (R-ID 257).
  * Sep.05.16:
  * - Issue #918 RESOLVED: VWR Badge Persistence Leak. Restricted lastRemoteActivityTs 
  *   updates to high-assurance telemetry packets. Removed generic signaling 
@@ -550,7 +555,7 @@ class ConnectivitySuite @Inject constructor(
             _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt)
             remoteStatusRepository.setTrackerConnected(true)
-            mainRepository.updateRemoteActivity(now)
+            mainRepository.updateRemoteActivity(nowRt) // Issue #918: Switched to monotonic clock
             
             remoteStatusRepository.setPeerSignal((statusProto.snrIdx * 10.0).toInt().coerceIn(0, 10))
 
@@ -671,7 +676,7 @@ class ConnectivitySuite @Inject constructor(
             ))
             Handler(Looper.getMainLooper()).post { Toast.makeText(shadowContext, "REMOTE: Chair Baseline Zeroed", Toast.LENGTH_SHORT).show() }
             _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
-            remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(now)
+            remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt)
             return
         }
 
@@ -686,7 +691,7 @@ class ConnectivitySuite @Inject constructor(
         if (isTrackerMode && fromViewer) {
             // Only non-telemetry Viewer commands go here (e.g. settings sync)
             _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
-            remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(now); return
+            remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt); return
         }
 
         if (!isTrackerMode && !fromViewer) {
@@ -694,7 +699,7 @@ class ConnectivitySuite @Inject constructor(
             if (!remoteStatusRepository.shouldProcessPacket(remoteTs)) return
 
             _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
-            remoteStatusRepository.updatePeerActivity(nowRt); remoteStatusRepository.setTrackerConnected(true); mainRepository.updateRemoteActivity(now)
+            remoteStatusRepository.updatePeerActivity(nowRt); remoteStatusRepository.setTrackerConnected(true); mainRepository.updateRemoteActivity(nowRt)
             remoteStatusRepository.setPeerSignal(data.optInt("signal", 0))
 
             remoteStatusRepository.updateStatusAtomic { current ->
@@ -827,7 +832,7 @@ class ConnectivitySuite @Inject constructor(
 
     private fun handleRemoteLog(entry: LogEntry) {
         val now = timeProvider.currentTimeMillis(); val nowRt = timeProvider.elapsedRealtime()
-        remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(now)
+        remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt) // Issue #918: Switched to monotonic clock
     }
 
     fun onRelayLost() { remoteStatusRepository.setTrackerConnected(false) }

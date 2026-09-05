@@ -321,7 +321,7 @@ class TrackerService : BaseMonitorService() {
 
     private fun handleViewerPulse(id: String) {
         if (!SignalingConstants.isValidViewerId(id)) return
-        repository.updateRemoteActivity(timeProvider.currentTimeMillis())
+        repository.updateRemoteActivity(timeProvider.elapsedRealtime())
 
         if ((configManager.viewerId == SettingsRepository.DEFAULT_TRACKER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer") {
             configManager.viewerId = id

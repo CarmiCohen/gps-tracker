@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 1
-        versionName "Sep.05.26" // WebSocket Fallback (R-ID 251) Implemented
+        versionName "Sep.05.27" // Peer Activity Monotonic Time Authority (R-ID 257)
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

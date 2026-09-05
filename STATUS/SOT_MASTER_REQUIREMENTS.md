@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.05.26)
+# SOT Master Requirements (Sep.05.27)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -10,7 +10,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.18 Log Spillage Protection (R759)**: **MANDATORY**. All application-level logging MUST use `Timber`. Direct calls to `android.util.Log` or `System.out.println` are strictly prohibited (Sep.02.50).
 *   **1.19 Mapnik Budget Optimization (R915)**: **MANDATORY**. On budget hardware (e.g., Samsung A15), Mapnik tile download threads MUST be limited to 2 to prevent CPU thrashing, and the tile cache MUST be expanded to 600MB to minimize I/O-induced UI latency (Sep.05.12).
 *   **1.20 Telemetry Assurance (R918)**: **MANDATORY**. Peer activity indicators (VWR/TRK badges) MUST only be reset by high-assurance telemetry packets (Location/Health). Generic signaling heartbeats (pulses/pongs) MUST NOT trigger a freshness reset to prevent HUD persistence leaks after app termination (Sep.05.16).
-*   **1.21 Monotonic Time Authority (R919)**: **MANDATORY**. All service-level staleness gates and peer activity timers MUST use monotonic `SystemClock.elapsedRealtime()` to ensure HUD accuracy across system clock jumps or NTP regressions (Sep.05.20).
+*   **1.21 Monotonic Time Authority (R919)**: **MANDATORY**. All service-level staleness gates and peer activity timers MUST use monotonic `SystemClock.elapsedRealtime()` to ensure HUD accuracy across system clock jumps or NTP regressions. Peer pulses MUST strictly record monotonic timestamps to ensure 35s RED transition accuracy (Sep.05.27).
 *   **1.22 Mali Driver Mitigation (R920)**: **MANDATORY**. Upon detection of Mali driver instability (correlated by high CPU load and I/O latency on budget hardware), the UI layer MUST automatically throttle high-frequency animations and displays to prevent process-level ANRs (Sep.05.25).
 
 ## 🧩 Functional Requirements (227 IDs)
@@ -18,7 +18,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 239 (Signaling Consolidation)**: The communication layer MUST expose a unified `transmit(TrackerStatus)` entry point that internally handles role-based serialization (Protobuf/JSON) (Sep.02.70).
 *   **R-ID 240 (Tracker HUD Telemetry)**: `TrackerService` MUST publish telemetry to the repository every tick, regardless of GPS fix status, to ensure the local HUD remains live (Sep.03.15).
 *   **R-ID 241 (Atomic Activation)**: The system MUST atomically persist `IS_SYSTEM_ACTIVE_KEY = true` during role selection to ensure that background workers are unblocked (Sep.02.66).
-*   **R-ID 242 (Recovery Pipeline)**: The system MUST implement a reactive signal-response loop between the Activity lifecycle and the UI layer (Sep.02.66).
+*   **R-ID 242 (Atomic Recovery)**: The system MUST implement a reactive signal-response loop between the Activity lifecycle and the UI layer (Sep.02.66).
 *   **R-ID 243 (Status Visibility)**: `GlobalStatusBar` MUST propagate the `isSystemActive` flag to all child indicators (Sep.02.68).
 *   **R-ID 244 (ContextShadow Automation)**: The system MUST automatically inject the `ContextShadow` wrapper into all high-frequency singleton services via Hilt (Sep.02.70).
 *   **R-ID 245 (Protobuf Unification)**: The system MUST use a centralized mapping utility for all Protobuf-to-domain transformations (Sep.02.70).
@@ -33,7 +33,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 254 (Rolling Deployment Sync)**: The signaling layer MUST re-broadcast its identity (Join payload) every 60s while connected to ensure peer discovery and synchronization during rolling deployments, remediating "Red SRV" lag on budget hardware (Sep.04.40).
 *   **R-ID 255 (Hydration Navigation Guard)**: The UI layer MUST NOT navigate to the Landing route if `isSystemActive` is true, regardless of `appMode` state, to prevent accidental service termination via BackHandler during hydration gaps (Sep.05.10).
 *   **R-ID 256 (High Frequency Sensor Authority)**: The application MUST declare `HIGH_SAMPLING_RATE_SENSORS` permission in the manifest to support high-fidelity IMU data collection for forensic analysis on Target SDK 35+ (Sep.05.11).
-*   **R-ID 257 (Exact Actual LED Status)**: The HUD state aggregator MUST correctly monitor peer pulses and local service heartbeats to ensure all LED indicators (VWR, DAT, WATCHDOG) reflect real-time status with a synchronized 35s staleness gate (R338/R972) (Sep.05.15).
+*   **R-ID 257 (Exact Actual LED Status)**: The HUD state aggregator MUST correctly monitor peer pulses and local service heartbeats using monotonic `elapsedRealtime()` to ensure all LED indicators (VWR, DAT, WATCHDOG) reflect real-time status with a synchronized 35s staleness gate (R338/R972) (Sep.05.27).
 *   **R-ID 258 (Tracker-side Telemetry Processing)**: The signaling layer MUST process incoming binary telemetry packets in Tracker mode to ensure the local HUD correctly displays the Viewer's active presence during two-way signaling (Sep.05.16).
 *   **R-ID 259 (High-Resolution Battery Current Audit)**: The system MUST capture and log instantaneous battery current (mA) and temperature snapshots at the start and end of every GNSS revival burst to forensicly quantify hardware energy consumption on Helio G99 chipset (Sep.05.23).
 *   **R-ID 260 (GNSS Revival Lifecycle Transparency)**: The system MUST emit definitive `Success` and `HardwareLock` events during GNSS recovery routines to ensure UI/Monitor transparency and remediate silent failure risks on budget hardware (Sep.05.23).
