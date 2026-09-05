@@ -36,6 +36,9 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.05.28:
+ * - Issue #914 RESOLVED: GNSS Detail Sampling. Implemented A15-aware sampling 
+ *   for activeGnssDetail flow to reduce UI overhead during satellite monitoring (R-ID 267).
  * Sep.05.25:
  * - Issue #266: Propagated Mali Anomaly status to HUD for UI-throttling.
  * Sep.05.24:
@@ -280,7 +283,11 @@ class MainViewModel @Inject constructor(
         .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    /**
+     * Issue #914 Hardening: Sampling GNSS updates to mitigate UI overhead on budget devices.
+     */
     val activeGnssDetail: StateFlow<GnssDetail?> = repository.gnssDetail
+        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private var lastTrackerTrailSize = -1

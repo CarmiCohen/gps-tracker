@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.05.27)
+# SOT Master Requirements (Sep.05.28)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -13,7 +13,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.21 Monotonic Time Authority (R919)**: **MANDATORY**. All service-level staleness gates and peer activity timers MUST use monotonic `SystemClock.elapsedRealtime()` to ensure HUD accuracy across system clock jumps or NTP regressions. Peer pulses MUST strictly record monotonic timestamps to ensure 35s RED transition accuracy (Sep.05.27).
 *   **1.22 Mali Driver Mitigation (R920)**: **MANDATORY**. Upon detection of Mali driver instability (correlated by high CPU load and I/O latency on budget hardware), the UI layer MUST automatically throttle high-frequency animations and displays to prevent process-level ANRs (Sep.05.25).
 
-## 🧩 Functional Requirements (227 IDs)
+## 🧩 Functional Requirements (228 IDs)
 *   **R-ID 238 (Model Unification)**: The application MUST use `LocationUpdate` as the single source of truth for location data across both the Core Engine and UI layers (Sep.03.01).
 *   **R-ID 239 (Signaling Consolidation)**: The communication layer MUST expose a unified `transmit(TrackerStatus)` entry point that internally handles role-based serialization (Protobuf/JSON) (Sep.02.70).
 *   **R-ID 240 (Tracker HUD Telemetry)**: `TrackerService` MUST publish telemetry to the repository every tick, regardless of GPS fix status, to ensure the local HUD remains live (Sep.03.15).
@@ -39,5 +39,6 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 260 (GNSS Revival Lifecycle Transparency)**: The system MUST emit definitive `Success` and `HardwareLock` events during GNSS recovery routines to ensure UI/Monitor transparency and remediate silent failure risks on budget hardware (Sep.05.23).
 *   **R-ID 261 (Hydration Watchdog)**: The `MainViewModel` MUST implement a 15s hydration watchdog (`WATCH_DOG_UI_GRACE_MS`) that forces the UI initialization state if Level 2 hydration hangs, ensuring a recovery path from black-screen locks (Sep.05.24).
 *   **R-ID 266 (Mali Driver Mitigation)**: `IntegrityMonitor` MUST detect Mali Driver Anomalies (High CPU + High I/O on budget hardware) and trigger automated UI-throttling to prevent process-level ANRs (Sep.05.25).
+*   **R-ID 267 (GNSS Detail Sampling)**: The UI layer MUST apply A15-aware sampling to the `activeGnssDetail` flow (3000ms on budget hardware) to minimize UI overhead and prevent performance degradation during active satellite monitoring (Sep.05.28).
 
-*(Total: 46 Architectural Rules + 227 Functional R-IDs = 273 Items)*
+*(Total: 46 Architectural Rules + 228 Functional R-IDs = 274 Items)*

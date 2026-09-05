@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.05.27)
+# Resolution Archive (Sep.05.28)
+
+## 🟢 Resolved Issues (Sep.05.28)
+*   **Issue #914 RESOLVED: GNSS Detail Sampling**. Implemented A15-aware sampling for the `activeGnssDetail` flow in `MainViewModel`. This optimization reduces UI overhead during satellite monitoring by throttling update frequencies to 3000ms on budget devices, ensuring interface responsiveness under high system load (R-ID 267).
 
 ## 🟢 Resolved Issues (Sep.05.27)
 *   **Issue #918 RESOLVED: VWR Badge Consistency & Verification**. Standardized all peer activity tracking and staleness evaluation to strictly use monotonic `elapsedRealtime()`. Remediated a clock-source mismatch where wall-clock timestamps were compared against monotonic gates, ensuring the 35s RED transition is robust and accurate across all HUD indicators (R-ID 257).
