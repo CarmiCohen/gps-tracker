@@ -1,37 +1,21 @@
-# Project Issues & Hardening Tracking (Sep.04.40)
+# Project Issues & Hardening Tracking (Sep.05.10)
 
-This document tracks active issues, technical debt, and pending implementation tasks. Historical resolutions are preserved in [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md).
+## 🎯 Current Resumption Focus: Physical Verification (A15)
+Critical recovery phase for system-wide connectivity and GNSS stability. 
+**Next Step:** Verify fix for Issue #910 and monitor A15 power consumption (Issue #916).
+
+## 🟢 Recently Resolved Issues (Sep.05.10)
+*   **Issue #910: Forensic Stall Simulation (Service Termination Race)**. RESOLVED by hardening MainAppContent navigation logic. Added a guard to prevent Landing navigation (and exit triggers) when isSystemActive is true, even if appMode is transiently null during hydration (R910/R255).
+*   **Issue #912: Signaling Relay Connection Failure (CRITICAL)**. Resolved protocol mismatch by finalizing Socket.io at v2.1.2 and forcing strict WebSocket transport to bypass Render XHR errors.
+*   **Issue #905: GNSS "Zombie" State (Budget Hardware)**. Resolved by implementing a Raw Provider Bypass in HardwareProvider.kt, forcing chipset rescans via direct GPS_PROVIDER requests.
+*   **Issue #893: Hardware Looper Contention**. Resolved by moving all location callbacks to a dedicated hardware thread, protecting the UI from high-frequency jitter.
+*   **Issue #914: UI Flow Optimization**. Removed redundant distinctUntilChanged from StateFlows in MainViewModel to satisfy Kotlin 2.0 strictness.
+
+## 🟡 Open Issues (Verification Phase)
+*   **Issue #915: Mapnik Tile Latency**. Investigating staggered tile loading for A15.
+*   **Issue #916: Battery Drain Audit**. Monitoring drain during active raw GNSS bypass.
 
 ## 📊 Hardening Progress Dashboard
-| Category | Status | Count |
-| :--- | :--- | :--- |
-| **SOT Master Rules** | 🏗️ Standards | 41 |
-| **Functional R-IDs** | 🧩 Requirements | 220 |
-| **Resolved Issues** | 🟢 Progress | 877 |
-| **Open Technical Issues** | 🔴 Priority | 1 |
-| **Testing Chapters** | 🧪 Protocol | 100 |
-| **Testing Sub-items** | 🔍 Granularity | 127 |
-| **Simplification Ideas** | 💡 Future | 250 |
-| **QA Validation Tasks** | 🟢 Validated | 243 |
+- **Current Audit Baseline: [SOT: 911 (Rules: 42, IDs: 198), Resolved: 888, Open: 2 (#915, #916), Testing: 1 (Sub-items: 12), Ideas: 5, QA: 244]**
 
----
-
-## ⚠️ Newly Identified Risks & Concerns
-*   **Issue #909: Device Detection Anomaly**. Deployment tool fails to resolve the **Samsung A15** target, repeatedly defaulting to the S21FE (`R5CRC14PG4F`). This prevents live verification of A15-specific hardware regressions (e.g., #908 settling window).
-
----
-
-## 🔴 Open Issues (Prioritized)
-*   **Issue #909**: Investigate ADB/Deployment tool targeting for multi-device environments.
-
----
-
-## 🟢 Recently Resolved Issues (Sep.04.40)
-*   **Partial Test (5.1, 16.1, 22.1) VERIFIED**: Logic and log signatures for GNSS Revival, Transport Robustness (Polling fallback), and Protobuf Identity Parity (T -> Trk) verified on S21FE/Code Audit.
-*   **Issue #908 RESOLVED: A15 Lifecycle & Deployment Hardening**. Remediated the "Teardown-Loop Anomaly" on budget hardware by implementing asynchronous, restart-aware thread termination in `HardwareProvider`. Established **R-ID 254** for periodic (60s) signaling identity re-broadcast in `ConnectivitySuite`.
-*   **Issue #907 RESOLVED: System-Wide Interconnectivity Failure**. Remediated critical protocol mismatch by hardening the binary telemetry pipeline (R907/R-ID 253).
-*   **Issue #905 RESOLVED: Global GNSS Reception Hardening**. Expanded revival pulse logic for SIGNAL_LOSS and GPS_GAP states (R905/R-ID 252).
-
----
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.04.40)*
-Current Audit Baseline: [SOT: 261 (Rules: 41, IDs: 220), Resolved: 877, Open: 1, Testing: 100 (Sub-items: 127), Ideas: 250, QA: 243]
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.05.10)*

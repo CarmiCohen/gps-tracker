@@ -36,15 +36,14 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * Sep.02.72:
- * - Issue #246 RESOLVED: Map Settings in Viewer Mode. Integrated MapUseCase 
- *   into onEvent and implemented handleMapTap/handleAddHomePoint to restore 
- *   functionality of MapToolsOverlay in viewer mode (R246).
- * Sep.02.70:
- * - Idea #240: ContextShadow Automation. Migrated AudioSynthesizer dependency 
- *   to injection (R-ID 240).
- * - Issue #245 RESOLVED: "SYS" Badge Deactivation. Integrated ManualExit into 
- *   session termination logic to ensure IS_SYSTEM_ACTIVE is toggled false (R245).
+ * Sep.05.09:
+ * - Issue #910 Forensic Instrumentation: Added detailed logging for state 
+ *   transitions (appMode, hydration, isSystemActive) to catch race conditions 
+ *   during startup (R910).
+ * Sep.05.05:
+ * - Issue #914 RESOLVED: Fixed compilation error where distinctUntilChanged was 
+ *   applied to a StateFlow. Pruned redundant operator to satisfy Kotlin 2.0 
+ *   strictness (R914).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -318,6 +317,28 @@ class MainViewModel @Inject constructor(
     private val replayCursorRequest = MutableStateFlow<Long?>(null)
 
     init {
+        // Issue #910 Forensic: Log state changes
+        viewModelScope.launch {
+            _uiState.map { it.hydrationLevel }.distinctUntilChanged().collect {
+                Timber.d("Issue #910: Hydration Level: $it")
+            }
+        }
+        viewModelScope.launch {
+            _uiState.map { it.isInitialized }.distinctUntilChanged().collect {
+                Timber.d("Issue #910: Is Initialized: $it")
+            }
+        }
+        viewModelScope.launch {
+            _uiState.map { it.appMode }.distinctUntilChanged().collect {
+                Timber.d("Issue #910: App Mode: $it")
+            }
+        }
+        viewModelScope.launch {
+            _uiState.map { it.isSystemActive }.distinctUntilChanged().collect {
+                Timber.d("Issue #910: Is System Active: $it")
+            }
+        }
+
         viewModelScope.launch(Dispatchers.Default + uiExceptionHandler) {
             val initialSettings = settingsUseCase.loadAllSettings()
             
@@ -447,7 +468,7 @@ class MainViewModel @Inject constructor(
 
         stateSubscriptionUseCase.observeBatteryStatus().onEach { status -> 
             updateDiagnosticState { current -> 
-                current.battery.level = status.level
+                current. battery.level = status.level
                 current.battery.temp = status.temp
                 current.apply { pulse = timeProvider.elapsedRealtime() }
             } 
@@ -657,7 +678,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun applyInitialSettings(initial: InitialSettings) {
+    private fun handleInitialSettings(initial: InitialSettings) {
         appStartTime = initial.appStartTime
         updateState { it.copy(
             deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, 
@@ -733,5 +754,16 @@ class MainViewModel @Inject constructor(
                 updateState { it.copy(homePoints = newPoints) }
             }
         }
+    }
+
+    private fun applyInitialSettings(initial: InitialSettings) {
+        appStartTime = initial.appStartTime
+        updateState { it.copy(
+            deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, 
+            appMode = initial.appMode, isSystemActive = initial.isSystemActive,
+            draftSettings = initial.draftSettings ?: it.draftSettings,
+            isIdentitySanitized = initial.identitySanitized
+        )}
+        _localMaxTemp.value = initial.maxTemp
     }
 }

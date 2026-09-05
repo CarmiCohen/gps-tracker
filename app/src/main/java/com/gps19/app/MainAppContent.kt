@@ -45,17 +45,13 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Sep.05.10:
+ * - Issue #910 Hardening: Protected Landing navigation with isSystemActive 
+ *   check to prevent race-driven service termination during hydration (R910).
  * Sep.03.11:
  * - Issue #241 RESOLVED: Mode-Selection Activation. Added SetSystemActive(true) 
  *   to proceedToMode and restoration logic to ensure background services 
  *   transition out of INACTIVE state (R-ID 241).
- * Aug.26.13:
- * - Issue #735 Hardening: Connected isSetupBypassActive and ToggleSetupBypass 
- *   to DiagnosticsScreen to support automated soak test execution (R735).
- * Aug.25.01:
- * - Issue #311 Hardening: Migrated isManualSelectionInProgress and isSettlingActive 
- *   to MainUiState to ensure navigation state survives Activity destruction during 
- *   Samsung A15 permission flows.
  */
 @Composable
 fun MainAppContent(
@@ -183,7 +179,7 @@ fun MainAppContent(
         return fineLocation && audio && notification && activityRec
     }
 
-    LaunchedEffect(uiState.isInitialized, uiState.appMode, uiState.navigation.isDiagnosticsVisible, uiState.isManualSelectionInProgress, uiState.isSettlingActive) {
+    LaunchedEffect(uiState.isInitialized, uiState.appMode, uiState.navigation.isDiagnosticsVisible, uiState.isManualSelectionInProgress, uiState.isSettlingActive, uiState.isSystemActive) {
         if (!uiState.isInitialized) return@LaunchedEffect
         
         val mode = uiState.appMode
@@ -235,6 +231,14 @@ fun MainAppContent(
                 }
             }
             null -> {
+                // Issue #910 Hardening: If system is active, do NOT navigate to Landing 
+                // even if mode is transiently null. This prevents the BackHandler from 
+                // triggering onCleanupAndExit() during hydration gaps.
+                if (uiState.isSystemActive) {
+                    Timber.w("Issue #910: appMode is null but isSystemActive is true. Deferring Landing navigation.")
+                    return@LaunchedEffect
+                }
+
                 if (uiState.navigation.pendingMode == null) {
                     viewModel.onEvent(UiEvent.SetManualSelection(false))
                 }
