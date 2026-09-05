@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.05.25)
+# Resolution Archive (Sep.05.26)
+
+## 🟢 Resolved Issues (Sep.05.26)
+*   **Issue #912 RESOLVED: WebSocket Fallback**. Re-enabled XHR polling fallback by allowing transport negotiation (`polling` to `websocket`) in `CommunicationManager`. This ensures connectivity on restricted networks that block direct WebSocket upgrades, while maintaining the 60s timeout for instance spin-up to accommodate Render free tier latency (R-ID 251).
 
 ## 🟢 Resolved Issues (Sep.05.25)
 *   **Issue #266 RESOLVED: Mali Driver Mitigation**. Implemented automated detection of Mali driver instability in `IntegrityMonitor` (correlated via CPU load and I/O latency on budget hardware). Propagated state through the HUD aggregator and implemented reactive UI-throttling in `SharedUiComponents` (suppressing high-frequency animations) to prevent process-level ANRs on budget devices (R-ID 266).

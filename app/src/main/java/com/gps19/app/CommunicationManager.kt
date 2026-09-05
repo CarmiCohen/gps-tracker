@@ -22,10 +22,10 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * Sep.05.06:
- * - Issue #912 RESOLVED: Switched to strict 'websocket' transport to bypass
- *   XHR polling errors on Render free tier. Increased timeout to 60s to 
- *   accommodate instance spin-up (R906).
+ * Sep.05.26:
+ * - Issue #912 RESOLVED: Re-enabled XHR polling fallback. Strict 'websocket' 
+ *   transport bypassed polling but failed on restricted networks. Restored 
+ *   negotiation (polling-to-websocket) per R-ID 251 while keeping 60s timeout.
  * Sep.04.20:
  * - Issue #907 RESOLVED: System-Wide Interconnectivity Failure. Hardened binary 
  *   path with SignalingValidator to ensure Protobuf updates follow role-based 
@@ -175,11 +175,11 @@ class CommunicationManager @Inject constructor(
         isConnectingInternal = true
 
         val opts = IO.Options().apply {
-            // Issue #912: Bypass XHR polling and use direct WebSockets. 
-            // Render free tier instances often fail during the polling phase 
-            // of the handshake due to aggressive load balancing.
-            transports = arrayOf("websocket")
-            timeout = 60000 // R906: Increased to 60s for instance spin-up
+            // R-ID 251: Enable transport negotiation (polling + websocket) to ensure 
+            // connectivity on restricted networks while maintaining 60s timeout 
+            // to accommodate spin-up latencies (R906).
+            transports = arrayOf("polling", "websocket")
+            timeout = 60000
             reconnection = true; reconnectionAttempts = Int.MAX_VALUE
             reconnectionDelay = 2000; reconnectionDelayMax = 10000; randomizationFactor = 0.5; forceNew = true 
         }

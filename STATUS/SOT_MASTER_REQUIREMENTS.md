@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.05.25)
+# SOT Master Requirements (Sep.05.26)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -27,7 +27,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 248 (Forensic Signal Latch)**: The system MUST implement a 5-second grace period (`BUDGET_HARDWARE_SIGNAL_GRACE_MS`) for Signal Loss auditing on budget hardware (e.g., A15) and correlate triggers with relay recovery states to prevent false alerts during telemetry gaps (Sep.03.100).
 *   **R-ID 249 (A15 Background Persistence)**: The system MUST maintain radio active state on Samsung A15 devices by pulsing the hardware every 30s and preventing GPS polling relaxation below 10s (`SUSPICIOUS_GPS_POLLING_MS`) when moving with the screen off to ensure UI freshness (Sep.03.111).
 *   **R-ID 250 (Field Test Readiness)**: The system MUST support real-world field testing by defaulting to high-accuracy GNSS and ensuring peer identities are pre-aligned ("T" and "V") for zero-config connectivity (Sep.03.120).
-*   **R-ID 251 (Signaling Transport Robustness)**: The signaling layer MUST allow default transport negotiation (polling-to-websocket) to ensure connection stability across diverse network environments and hardware architectures (Sep.04.30).
+*   **R-ID 251 (Signaling Transport Robustness)**: The signaling layer MUST allow default transport negotiation (polling-to-websocket) to ensure connection stability across diverse network environments and hardware architectures (Sep.05.26).
 *   **R-ID 252 (GNSS Zombie Recovery)**: The system MUST trigger a hardware-level revival pulse (location update restart) when GNSS visibility drops to zero (`SIGNAL_LOSS`) or stalls for more than 120s on Samsung hardware to remediate native stack "Zombie States" (Sep.04.30).
 *   **R-ID 253 (Protobuf Identity Parity)**: The signaling layer MUST apply alias-aware ID mapping (via `SignalingConstants.getTransmissionId`) to all binary Protobuf payloads to ensure protocol parity with the JSON path and prevent peer-to-peer handshake failures (Sep.04.30).
 *   **R-ID 254 (Rolling Deployment Sync)**: The signaling layer MUST re-broadcast its identity (Join payload) every 60s while connected to ensure peer discovery and synchronization during rolling deployments, remediating "Red SRV" lag on budget hardware (Sep.04.40).

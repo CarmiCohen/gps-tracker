@@ -10,6 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.05.26:
+ * - Issue #266 Remediation: Added missing isMaliAnomaly to DashboardHealthState 
+ *   to fix compilation breakage.
  * Sep.02.70:
  * - Idea #241: Protobuf Mapping Unification. Removed redundant writeTo() from 
  *   TrackerStatus; serialization is now centralized in TelemetryProtobufMapper (R-ID 241).
@@ -492,7 +495,8 @@ data class DashboardHealthState(
     val cpuLoad: Double = 0.0,
     val ioWait: Double = 0.0,
     val maxIoLatency: Long = 0L,
-    val isSilentFailure: Boolean = false
+    val isSilentFailure: Boolean = false,
+    val isMaliAnomaly: Boolean = false
 )
 
 /**
@@ -573,6 +577,7 @@ data class DashboardState(
     val ioWait get() = health.ioWait
     val maxIoLatency get() = health.maxIoLatency
     val isSilentFailure get() = health.isSilentFailure
+    val isMaliAnomaly get() = health.isMaliAnomaly
 }
 
 class StatsState(
