@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Sep.05.25:
+ * - Issue #266: Added isMaliAnomaly for automated UI throttling on budget hardware.
  * Aug.29.10:
  * - Concern #765: Added isUltraLongStationary for GNSS relaxation transparency.
  * Aug.11.08:
@@ -108,7 +110,8 @@ class SystemHealthState(
 
     // Issue #133: Forensic Anomaly Correlation
     var isSilentFailure: Boolean = false,
-    var isUltraLongStationary: Boolean = false
+    var isUltraLongStationary: Boolean = false,
+    var isMaliAnomaly: Boolean = false
 ) {
     fun copyFrom(other: SystemHealthState) {
         this.signalLoss = other.signalLoss
@@ -195,6 +198,7 @@ class SystemHealthState(
         this.isBatteryCritical = other.isBatteryCritical
         this.isSilentFailure = other.isSilentFailure
         this.isUltraLongStationary = other.isUltraLongStationary
+        this.isMaliAnomaly = other.isMaliAnomaly
     }
 
     fun update(
@@ -211,7 +215,7 @@ class SystemHealthState(
         vibration: Double = 0.0, storageAvailableMb: Long = 0L, storageTotalMb: Long = 0L,
         isBatteryLow: Boolean = false, isBatteryCritical: Boolean = false, maxIoLatency: Long = 0L,
         isSilentFailure: Boolean = false, isThermalThrottling: Boolean = false,
-        isUltraLongStationary: Boolean = false
+        isUltraLongStationary: Boolean = false, isMaliAnomaly: Boolean = false
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -256,6 +260,7 @@ class SystemHealthState(
         this.isBatteryCritical = isBatteryCritical
         this.isSilentFailure = isSilentFailure
         this.isUltraLongStationary = isUltraLongStationary
+        this.isMaliAnomaly = isMaliAnomaly
     }
     
     fun reset() {
@@ -343,5 +348,6 @@ class SystemHealthState(
         isBatteryCritical = false
         isSilentFailure = false
         isUltraLongStationary = false
+        isMaliAnomaly = false
     }
 }

@@ -36,18 +36,10 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.05.25:
+ * - Issue #266: Propagated Mali Anomaly status to HUD for UI-throttling.
  * Sep.05.24:
- * - Issue #910 RESOLVED: Implemented Hydration Watchdog. The system now monitors 
- *   startup hydration and forces initialization after 15s (WATCH_DOG_UI_GRACE_MS) 
- *   if a hang is detected, preventing black-screen locks on budget hardware (R-ID 261).
- * Sep.05.09:
- * - Issue #910 Forensic Instrumentation: Added detailed logging for state 
- *   transitions (appMode, hydration, isSystemActive) to catch race conditions 
- *   during startup (R910).
- * Sep.05.05:
- * - Issue #914 RESOLVED: Fixed compilation error where distinctUntilChanged was 
- *   applied to a StateFlow. Pruned redundant operator to satisfy Kotlin 2.0 
- *   strictness (R914).
+ * - Issue #910 RESOLVED: Implemented Hydration Watchdog.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -195,9 +187,10 @@ class MainViewModel @Inject constructor(
 
     val hudHealthState: StateFlow<HudHealthState> = combine(
         _diagnosticState,
-        _systemPulse
-    ) { diag, pulse ->
-        aggregator.aggregateHudHealth(diag, pulse)
+        _systemPulse,
+        _kinematicState.map { it.localHealth.isMaliAnomaly }.distinctUntilChanged()
+    ) { diag, pulse, isMali ->
+        aggregator.aggregateHudHealth(diag, pulse, isMali)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudHealthState())
@@ -477,6 +470,7 @@ class MainViewModel @Inject constructor(
                 }
                 updateDiagnosticState { current -> 
                     current.activeAlarms = update.activeAlarms
+                    current.isMaliAnomaly = update.health.isMaliAnomaly
                     current.pulse = timeProvider.elapsedRealtime()
                     current
                 }
@@ -560,7 +554,7 @@ class MainViewModel @Inject constructor(
                     updateState { it.copy(
                         appMode = event.mode, 
                         appStartTime = newStartTime ?: it.appStartTime,
-                        isSystemActive = if (event.mode != null) true else it.isSystemActive // Issue #241
+                        isSystemActive = if (event.mode != null) true else it.isSystemActive
                     )}
                 }
             }
@@ -698,7 +692,7 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun handleInitialSettings(initial: InitialSettings) {
+    private fun applyInitialSettings(initial: InitialSettings) {
         appStartTime = initial.appStartTime
         updateState { it.copy(
             deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, 
@@ -774,16 +768,5 @@ class MainViewModel @Inject constructor(
                 updateState { it.copy(homePoints = newPoints) }
             }
         }
-    }
-
-    private fun applyInitialSettings(initial: InitialSettings) {
-        appStartTime = initial.appStartTime
-        updateState { it.copy(
-            deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, 
-            appMode = initial.appMode, isSystemActive = initial.isSystemActive,
-            draftSettings = initial.draftSettings ?: it.draftSettings,
-            isIdentitySanitized = initial.identitySanitized
-        )}
-        _localMaxTemp.value = initial.maxTemp
     }
 }

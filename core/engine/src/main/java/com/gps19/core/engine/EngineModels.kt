@@ -4,12 +4,11 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.05.25:
+ * - Issue #266: Added isMaliAnomaly to HudHealthState for UI-throttling.
  * Sep.02.68:
  * - Idea #243: Flattened StatusBar indicator chain. Added isSystemActive 
  *   to HudConnectivityState to support unified state propagation (R243).
- * Sep.02.01:
- * - Issue #897: Added vibrationSensitivity and tiltSensitivity to 
- *   AlarmEvaluationState for dynamic thresholding (R2.3).
  */
 
 @Serializable
@@ -472,7 +471,8 @@ data class HudHealthState(
     val isSirenPlaying: Boolean = false,
     val activeAlarms: List<AlarmInfo> = emptyList(),
     val progressPulse: Float = 0f,
-    val systemPulse: Long = 0L
+    val systemPulse: Long = 0L,
+    val isMaliAnomaly: Boolean = false
 )
 
 /**
@@ -532,4 +532,5 @@ data class HudState(
     val activeAlarms get() = health.activeAlarms
     val progressPulse get() = health.progressPulse
     val systemPulse get() = health.systemPulse
+    val isMaliAnomaly get() = health.isMaliAnomaly
 }

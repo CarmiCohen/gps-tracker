@@ -7,14 +7,12 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
+ * Sep.05.25:
+ * - Issue #266: Propagated isMaliAnomaly to HUD and Dashboard states.
  * Sep.05.20:
  * - Issue #918 RESOLVED: Clock Source Consistency. Migrated all staleness gates 
  *   from wall-clock to monotonic elapsedRealtime() to prevent HUD staleness 
  *   failures during peer activity monitoring (R-ID 257).
- * Sep.05.15:
- * - Issue #917 RESOLVED: Exact Actual Colors. Standardized all HUD LEDs 
- *   (WDG, DAT, VWR/TRK) to monitor actual service heartbeats and peer pulses 
- *   with a synchronized 35s staleness gate across all roles (R-ID 257).
  */
 interface DashboardStateProvider {
     fun buildDashboardConnectivityState(
@@ -59,7 +57,8 @@ interface DashboardStateProvider {
 
     fun buildHudHealthState(
         diagnosticState: DiagnosticState,
-        systemPulseRt: Long
+        systemPulseRt: Long,
+        isMaliAnomaly: Boolean
     ): HudHealthState
 }
 
@@ -75,10 +74,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         val activeStats = if (isViewer) diagnosticState.trackerStats else diagnosticState.stats
         val lastSeenTs = diagnosticState.connectivity.lastRemoteActivityTs // Monotonic
 
-        // Local Watchdog: Check if the background service is ticking (Synchronized 35s gate)
         val isLocalServiceAlive = (nowRt - diagnosticState.pulse) < TELEMETRY_UI_STALE_THRESHOLD_MS
         
-        // Remote Watchdog (only relevant for Viewer): Check if Tracker is active
         val watchdogSec = if (isViewer && lastSeenTs > 0) {
             val remaining = (WATCH_TIMEOUT_MS - (nowRt - lastSeenTs)) / 1000
             maxOf(0L, remaining)
@@ -109,12 +106,9 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         val isViewer = appMode == "viewer"
         val loc = if (isViewer) kinematicState.trackerLocation else kinematicState.localLocation
         
-        // Note: loc.ts is wall-clock, but kinematicState.pulse is monotonic.
-        // We prioritize monotonic gap for telemetry freshness.
         val telemetryAge = if (kinematicState.pulse > 0) nowRt - kinematicState.pulse else Long.MAX_VALUE
         val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
         
-        // GpsActive check remains semi-hybrid but aligned to monotonic baseline
         val isGpsActive = (nowRt - loc.rt) < GPS_UI_FAIL_THRESHOLD_MS && loc.gpsTs > 0
 
         val gnss = loc.gnssDetail
@@ -193,7 +187,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             cpuLoad = health.cpuLoad,
             ioWait = health.ioWait,
             maxIoLatency = health.maxIoLatency,
-            isSilentFailure = health.isSilentFailure
+            isSilentFailure = health.isSilentFailure,
+            isMaliAnomaly = health.isMaliAnomaly
         )
     }
 
@@ -220,12 +215,10 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             TelemetryUtils.calculateCommIndex(rtt, remoteSignal, 10)
         } else 0
 
-        // DAT LED: Reflects actual end-to-end data integrity (Pipeline: Net + Relay + Peer heartbeat)
         val isDataHealthy = isTelemetryFresh && 
                             diagnosticState.connectivity.isLocalOnline && 
                             diagnosticState.connectivity.isRelayConnected
 
-        // WATCHDOG LED: Reflects local service pulse freshness (Synchronized 35s gate)
         val isLocalServiceAlive = (nowRt - diagnosticState.pulse) < TELEMETRY_UI_STALE_THRESHOLD_MS
 
         return HudConnectivityState(
@@ -253,8 +246,6 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         isUltra: Boolean
     ): HudTelemetryState {
         val loc = if (appMode == "viewer") kinematicState.trackerLocation else kinematicState.localLocation
-        
-        // Freshness check aligned to monotonic systemPulseRt
         val isGpsFresh = (systemPulseRt - loc.rt) < GPS_UI_FAIL_THRESHOLD_MS && loc.gpsTs > 0
 
         return HudTelemetryState(
@@ -281,7 +272,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
 
     override fun buildHudHealthState(
         diagnosticState: DiagnosticState,
-        systemPulseRt: Long
+        systemPulseRt: Long,
+        isMaliAnomaly: Boolean
     ): HudHealthState {
         val rawPulse = diagnosticState.connectivity.lastRemoteActivityTs // Monotonic
         val age = if (rawPulse > 0) systemPulseRt - rawPulse else Long.MAX_VALUE
@@ -301,7 +293,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             isSirenPlaying = diagnosticState.isSirenPlaying,
             activeAlarms = diagnosticState.activeAlarms,
             progressPulse = progressValue,
-            systemPulse = systemPulseRt
+            systemPulse = systemPulseRt,
+            isMaliAnomaly = isMaliAnomaly
         )
     }
 }

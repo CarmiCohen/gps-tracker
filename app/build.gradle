@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 1
-        versionName "Sep.05.24" // Hydration Watchdog Implemented
+        versionName "Sep.05.25" // Mali Driver Mitigation Implemented
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

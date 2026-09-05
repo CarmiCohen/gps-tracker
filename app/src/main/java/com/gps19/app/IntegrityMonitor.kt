@@ -26,14 +26,13 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.05.25:
+ * - Issue #266: Implemented automated Mali Driver Anomaly detection 
+ *   to trigger UI-throttling on budget hardware.
  * Sep.05.18:
  * - Issue #916 Hardening: Implemented RawBurstStarted/Ended telemetry 
  *   snapshots in handleRevivalEvent to audit Helio G99 battery drain 
  *   during high-power GNSS revival windows.
- * Sep.02.72:
- * - Issue #247: Implemented forensic grace period (5s) for Signal Loss 
- *   auditing on budget hardware (A15) and hardened peer-visibility 
- *   correlation (R247).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -207,6 +206,7 @@ class IntegrityMonitor @Inject constructor(
             iow = 2.0
         }
 
+        var maliAnomaly = false
         if (systemStatusProvider.isA15Hardware() || isMaliAnomalySimulated.get()) {
             if (maxIo > LATENCY_THRESHOLD_DB_WRITE_MS) {
                 val msg = "PERFORMANCE WARNING: Critical I/O Spike detected on budget hardware (%dms). System stress: [CPU: %.1f, IOW: %.1f]".format(maxIo, cpu, iow)
@@ -214,7 +214,7 @@ class IntegrityMonitor @Inject constructor(
                 _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_PERFORMANCE_SPIKE))
             }
             
-            auditMaliDriverPerformance(maxIo, cpu, iow)
+            maliAnomaly = checkMaliDriverAnomaly(maxIo, cpu, iow)
         }
 
         updateHealth { h ->
@@ -222,6 +222,7 @@ class IntegrityMonitor @Inject constructor(
             h.cpuLoad = cpu
             h.ioWait = iow
             h.maxIoLatency = maxIo
+            h.isMaliAnomaly = maliAnomaly
             
             val isSilent = SentinelValidator.isSilentFailure(
                 gpsStalled = h.gpsStalled,
@@ -242,15 +243,18 @@ class IntegrityMonitor @Inject constructor(
         }
     }
 
-    private fun auditMaliDriverPerformance(maxIo: Long, cpu: Double, iow: Double) {
+    private fun checkMaliDriverAnomaly(maxIo: Long, cpu: Double, iow: Double): Boolean {
         if (maxIo > 500 && cpu > 6.0) {
-            Timber.w("Forensic Audit (R266): Potential Mali driver configuration failure suspected. [IO: %dms, CPU: %.1f]", maxIo, cpu)
-            
-            _integrityEvents.tryEmit(IntegrityEvent.LogEvent(
-                "STRESS AUDIT: Mali Driver Anomaly detected on this device (High I/O correlation). Verify graphics layer stability.",
-                isImportant = true
-            ))
+            if (!currentHealth.isMaliAnomaly) {
+                Timber.w("Forensic Audit (R266): Potential Mali driver configuration failure suspected. [IO: %dms, CPU: %.1f]", maxIo, cpu)
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent(
+                    "STRESS AUDIT: Mali Driver Anomaly detected on this device (High I/O correlation). UI throttling engaged.",
+                    isImportant = true
+                ))
+            }
+            return true
         }
+        return false
     }
 
     private fun updateHealth(mutator: (SystemHealthState) -> Unit) {

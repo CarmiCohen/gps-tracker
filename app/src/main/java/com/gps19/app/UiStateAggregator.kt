@@ -6,10 +6,10 @@ import javax.inject.Singleton
 
 /**
  * UiStateAggregator: Orchestrates the transformation of raw domain states into UI-ready models.
+ * Sep.05.25:
+ * - Issue #266: Added isMaliAnomaly to HudHealth aggregation for UI-throttling.
  * Aug.29.10:
  * - Concern #765: Added isUltra support to Dashboard and HUD aggregation methods.
- * Aug.21.09:
- * - Issue #248 Performance Optimization: Refined HUD aggregation signatures.
  */
 interface UiStateAggregator {
     fun aggregateDashboardConnectivity(
@@ -20,7 +20,7 @@ interface UiStateAggregator {
 
     fun aggregateDashboardTelemetry(
         appMode: String?,
-        kin: KinematicState,
+        kinematicState: KinematicState,
         pulse: Long,
         trkState: TrackerState,
         isUltra: Boolean
@@ -28,7 +28,7 @@ interface UiStateAggregator {
 
     fun aggregateDashboardHealth(
         appMode: String?,
-        kin: KinematicState,
+        kinematicState: KinematicState,
         diag: DiagnosticState,
         lMax: Double,
         tMax: Double
@@ -46,7 +46,7 @@ interface UiStateAggregator {
 
     fun aggregateHudTelemetry(
         appMode: String?,
-        kin: KinematicState,
+        kinematicState: KinematicState,
         pulse: Long,
         trkState: TrackerState,
         isUltra: Boolean
@@ -54,7 +54,8 @@ interface UiStateAggregator {
 
     fun aggregateHudHealth(
         diag: DiagnosticState,
-        pulse: Long
+        pulse: Long,
+        isMaliAnomaly: Boolean
     ): HudHealthState
 }
 
@@ -73,22 +74,22 @@ class UiStateAggregatorImpl @Inject constructor(
 
     override fun aggregateDashboardTelemetry(
         appMode: String?,
-        kin: KinematicState,
+        kinematicState: KinematicState,
         pulse: Long,
         trkState: TrackerState,
         isUltra: Boolean
     ): DashboardTelemetryState {
-        return dashboardStateProvider.buildDashboardTelemetryState(appMode, kin, pulse, trkState, isUltra)
+        return dashboardStateProvider.buildDashboardTelemetryState(appMode, kinematicState, pulse, trkState, isUltra)
     }
 
     override fun aggregateDashboardHealth(
         appMode: String?,
-        kin: KinematicState,
+        kinematicState: KinematicState,
         diag: DiagnosticState,
         lMax: Double,
         tMax: Double
     ): DashboardHealthState {
-        return dashboardStateProvider.buildDashboardHealthState(appMode, kin, diag, lMax, tMax)
+        return dashboardStateProvider.buildDashboardHealthState(appMode, kinematicState, diag, lMax, tMax)
     }
 
     override fun aggregateHudConnectivity(
@@ -105,18 +106,19 @@ class UiStateAggregatorImpl @Inject constructor(
 
     override fun aggregateHudTelemetry(
         appMode: String?,
-        kin: KinematicState,
+        kinematicState: KinematicState,
         pulse: Long,
         trkState: TrackerState,
         isUltra: Boolean
     ): HudTelemetryState {
-        return dashboardStateProvider.buildHudTelemetryState(appMode, kin, pulse, trkState, isUltra)
+        return dashboardStateProvider.buildHudTelemetryState(appMode, kinematicState, pulse, trkState, isUltra)
     }
 
     override fun aggregateHudHealth(
         diag: DiagnosticState,
-        pulse: Long
+        pulse: Long,
+        isMaliAnomaly: Boolean
     ): HudHealthState {
-        return dashboardStateProvider.buildHudHealthState(diag, pulse)
+        return dashboardStateProvider.buildHudHealthState(diag, pulse, isMaliAnomaly)
     }
 }

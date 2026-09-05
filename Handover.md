@@ -1,32 +1,39 @@
-# Forensic State Snapshot (vSep.05.24) - FINAL HANDOVER
+# Forensic State Snapshot (vSep.05.25) - FINAL HANDOVER
 
-## 🎯 Resumption Focus: Hydration Resilience & A15 Hardening
-The project has implemented a critical watchdog for the startup hydration sequence, remediating the risk of black-screen locks on budget hardware (SM-A155F).
+## 🎯 Resumption Focus: Physical Verification & Network Robustness
+The implementation of automated Mali Driver Mitigation (R-ID 266) has established a critical safety layer for budget hardware (Samsung A15). Resumption should focus on network transport intelligent fallbacks (Issue #912).
 
-### 🟢 Completed: Hydration Watchdog Implementation (vSep.05.24)
-Standardized the startup recovery path to ensure UI shell availability even during resource-induced hydration hangs.
+### 🟢 Completed: Mali Driver Mitigation (vSep.05.25)
+Implemented process-level protection against ANRs induced by GPU driver instability on the Helio G99 chipset.
 
-#### 1. Hydration Guard: `MainViewModel.kt`
-*   **Watchdog Logic**: Implemented a 15s timeout (`WATCH_DOG_UI_GRACE_MS`) in the `init` block.
-*   **Forced Initialization**: The system now forces `isInitialized = true` if Level 2 hydration hangs, ensuring the UI shell is rendered.
-*   **Forensic Auditing**: Added `HYDRATION WATCHDOG` error logging to capture Level 2 stalls for forensic analysis on the Helio G99 chipset.
+#### 1. Detection Engine: `IntegrityMonitor.kt`
+*   **Correlation Logic**: Monitors CPU load (> 6.0) and I/O latency (> 500ms) on A15 hardware.
+*   **Anomaly State**: Triggers `isMaliAnomaly` and emits a high-priority `STRESS AUDIT` log.
+*   **Propagation**: State is updated in `SystemHealthState` and synchronized with the repository.
 
-#### 2. SOT Authority: `SOT_MASTER_REQUIREMENTS.md`
-*   **R-ID 261**: Formalized the requirement for the Hydration Watchdog and its 15s grace period.
+#### 2. UI Throttling: `SharedUiComponents.kt`
+*   **"MAL" Badge**: Added a high-visibility badge to the `StatusBar` that activates during driver instability.
+*   **Animation Suppression**: Automatically throttles or snaps high-frequency animations (Speed pulses, Alarm pulses, Circular progress indicators, Handshake fades) when `isThrottled` is active.
+*   **Rendering Load**: Reduced GPU command buffer overhead by removing overlapping circular progress draws during anomalies.
 
-#### 3. Simplicity Audit: `Simplify_Ideas2.md`
-*   **Idea #15**: Proposed unifying the Hydration and System watchdogs into a single `LifecycleWatchdog` to reduce coroutine overhead.
+#### 3. State Pipeline: `HudState` & `DashboardState`
+*   **Aggregator**: Updated `UiStateAggregator` and `DashboardStateProvider` to propagate the anomaly flag from domain models to the UI facade.
+*   **ViewModel**: `MainViewModel` now observes the `isMaliAnomaly` flag via the kinematic flow and injects it into the segmented HUD health state.
+
+#### 4. Hardening Authority: `SOT_MASTER_REQUIREMENTS.md`
+*   **Rule 1.22**: Formalized the mandatory requirement for Mali Driver mitigation.
+*   **R-ID 266**: Defined functional requirements for automated UI-throttling.
 
 ### 🟡 Open Issues & Resumption Tasks
 *   **Issue #912**: WebSocket Fallback. Implement intelligent XHR fallback for restricted networks (R-ID 251).
 *   **Issue #918 Verification**: Physical confirmation of the 35s HUD badge transition under signal stress.
-*   **R-ID 266**: Mali Driver Mitigation. Implement automated UI-throttling to prevent ANRs on Samsung A15 hardware.
+*   **Issue #914**: GNSS Detail Sampling. Implement sampling for the `gnssDetail` flow to further reduce A15 overhead.
 
 ## 🛠️ Architectural State
 - **Target SDK:** 35 (Android 15)
-- **Version:** vSep.05.24
-- **Watchdog:** 15s Hydration Watchdog active.
-- **Hardening:** Level 2 hang recovery path established.
+- **Version:** vSep.05.25
+- **Mitigation:** Mali UI-Throttling active.
+- **Hardening:** Automated GPU driver instability recovery path established.
 
 ## 📊 Current Audit Baseline
-- **Current Audit Baseline: [SOT: 271 (Rules: 45, IDs: 226), Resolved: 900, Open: 6, Testing: 92% (Chapters), Ideas: 15, QA: 242]**
+- **Current Audit Baseline: [SOT: 273 (Rules: 46, IDs: 227), Resolved: 901, Open: 5, Testing: 92% (Chapters), Ideas: 216, QA: 242]**

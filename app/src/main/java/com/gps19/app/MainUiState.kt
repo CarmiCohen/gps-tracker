@@ -5,14 +5,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Sep.05.25:
+ * - Issue #266: Added isMaliAnomaly to DiagnosticState for automated UI-throttling.
  * Sep.04.12:
  * - Issue #900/904 Hardening: Enhanced PermissionState with isSamsungDevice flag 
  *   and refined systemReady logic to prioritize "Unrestricted" battery mode 
  *   and "Precise Location" on budget Samsung hardware (A15).
- * Sep.03.17:
- * - Issue #242 RESOLVED: Unhandled TriggerRecovery Event. Added serviceRecoveryTrigger 
- *   to NavigationState and implemented handlers in ViewModel to enable automated 
- *   service restoration after OS-level FGS blocks (R-ID 242).
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -161,6 +159,7 @@ class DiagnosticState(
     var maxViewerAccuracy: Double = 0.0,
     var cumulativeRecoveryBlackoutMs: Long = 0L,
     var recoveryCount: Int = 0,
+    var isMaliAnomaly: Boolean = false,
     var pulse: Long = 0L
 ) {
     fun copyFrom(other: DiagnosticState) {
@@ -183,6 +182,7 @@ class DiagnosticState(
         this.maxViewerAccuracy = other.maxViewerAccuracy
         this.cumulativeRecoveryBlackoutMs = other.cumulativeRecoveryBlackoutMs
         this.recoveryCount = other.recoveryCount
+        this.isMaliAnomaly = other.isMaliAnomaly
         this.pulse = other.pulse
     }
 
@@ -206,6 +206,7 @@ class DiagnosticState(
         maxViewerAccuracy = 0.0
         cumulativeRecoveryBlackoutMs = 0L
         recoveryCount = 0
+        isMaliAnomaly = false
         pulse = 0L
     }
 }

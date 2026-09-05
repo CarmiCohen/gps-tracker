@@ -1,8 +1,8 @@
-# SOT Master Requirements (Sep.05.24)
+# SOT Master Requirements (Sep.05.25)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-## 🏗️ Architectural Master Rules (45 Rules)
+## 🏗️ Architectural Master Rules (46 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context权威 (R001)**: **MANDATORY**. Use `ApplicationContext` for all singleton services. Activity context is strictly for UI-only components.
@@ -11,8 +11,9 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.19 Mapnik Budget Optimization (R915)**: **MANDATORY**. On budget hardware (e.g., Samsung A15), Mapnik tile download threads MUST be limited to 2 to prevent CPU thrashing, and the tile cache MUST be expanded to 600MB to minimize I/O-induced UI latency (Sep.05.12).
 *   **1.20 Telemetry Assurance (R918)**: **MANDATORY**. Peer activity indicators (VWR/TRK badges) MUST only be reset by high-assurance telemetry packets (Location/Health). Generic signaling heartbeats (pulses/pongs) MUST NOT trigger a freshness reset to prevent HUD persistence leaks after app termination (Sep.05.16).
 *   **1.21 Monotonic Time Authority (R919)**: **MANDATORY**. All service-level staleness gates and peer activity timers MUST use monotonic `SystemClock.elapsedRealtime()` to ensure HUD accuracy across system clock jumps or NTP regressions (Sep.05.20).
+*   **1.22 Mali Driver Mitigation (R920)**: **MANDATORY**. Upon detection of Mali driver instability (correlated by high CPU load and I/O latency on budget hardware), the UI layer MUST automatically throttle high-frequency animations and displays to prevent process-level ANRs (Sep.05.25).
 
-## 🧩 Functional Requirements (226 IDs)
+## 🧩 Functional Requirements (227 IDs)
 *   **R-ID 238 (Model Unification)**: The application MUST use `LocationUpdate` as the single source of truth for location data across both the Core Engine and UI layers (Sep.03.01).
 *   **R-ID 239 (Signaling Consolidation)**: The communication layer MUST expose a unified `transmit(TrackerStatus)` entry point that internally handles role-based serialization (Protobuf/JSON) (Sep.02.70).
 *   **R-ID 240 (Tracker HUD Telemetry)**: `TrackerService` MUST publish telemetry to the repository every tick, regardless of GPS fix status, to ensure the local HUD remains live (Sep.03.15).
@@ -37,5 +38,6 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 259 (High-Resolution Battery Current Audit)**: The system MUST capture and log instantaneous battery current (mA) and temperature snapshots at the start and end of every GNSS revival burst to forensicly quantify hardware energy consumption on Helio G99 chipset (Sep.05.23).
 *   **R-ID 260 (GNSS Revival Lifecycle Transparency)**: The system MUST emit definitive `Success` and `HardwareLock` events during GNSS recovery routines to ensure UI/Monitor transparency and remediate silent failure risks on budget hardware (Sep.05.23).
 *   **R-ID 261 (Hydration Watchdog)**: The `MainViewModel` MUST implement a 15s hydration watchdog (`WATCH_DOG_UI_GRACE_MS`) that forces the UI initialization state if Level 2 hydration hangs, ensuring a recovery path from black-screen locks (Sep.05.24).
+*   **R-ID 266 (Mali Driver Mitigation)**: `IntegrityMonitor` MUST detect Mali Driver Anomalies (High CPU + High I/O on budget hardware) and trigger automated UI-throttling to prevent process-level ANRs (Sep.05.25).
 
-*(Total: 45 Architectural Rules + 226 Functional R-IDs = 271 Items)*
+*(Total: 46 Architectural Rules + 227 Functional R-IDs = 273 Items)*
