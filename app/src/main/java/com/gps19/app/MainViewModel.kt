@@ -36,6 +36,10 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.05.24:
+ * - Issue #910 RESOLVED: Implemented Hydration Watchdog. The system now monitors 
+ *   startup hydration and forces initialization after 15s (WATCH_DOG_UI_GRACE_MS) 
+ *   if a hang is detected, preventing black-screen locks on budget hardware (R-ID 261).
  * Sep.05.09:
  * - Issue #910 Forensic Instrumentation: Added detailed logging for state 
  *   transitions (appMode, hydration, isSystemActive) to catch race conditions 
@@ -336,6 +340,22 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.map { it.isSystemActive }.distinctUntilChanged().collect {
                 Timber.d("Issue #910: Is System Active: $it")
+            }
+        }
+
+        // Issue #910: Hydration Watchdog
+        viewModelScope.launch(Dispatchers.Default) {
+            delay(WATCH_DOG_UI_GRACE_MS)
+            if (_uiState.value.hydrationLevel < 3) {
+                Timber.e("Issue #910: Hydration Watchdog Triggered. Stuck at level ${_uiState.value.hydrationLevel}")
+                addPersistentLog(
+                    type = "error", 
+                    message = "HYDRATION WATCHDOG: Level 2 Hang Detected. Forcing UI shell.", 
+                    isImportant = true
+                )
+                withContext(Dispatchers.Main.immediate) {
+                    updateState { it.copy(isInitialized = true) }
+                }
             }
         }
 

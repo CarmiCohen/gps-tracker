@@ -1,10 +1,22 @@
-# Simplification Ideas (Sep.05.23)
+# Simplification Ideas - Master List (Sep.05.24)
 
-## 💡 Architectural Streamlining
-1.  **LED Logic Centralization**: Currently, LED status logic (INT, SRV, GPS, VWR/TRK, DAT) is calculated during HUD aggregation in `DashboardStateProviderImpl`. Consider moving these definitions into a `LedStateEvaluator` utility in the `:core:engine` to ensure consistent "Actual Color" behavior between the dashboard, HUD, and potential future notification LEDs.
-2.  **Hydration State Consolidation**: The current 11-level hydration process, while robust, introduces complex race conditions. Consider merging levels 3-10 into a single "Engine Warmup" phase to reduce transient state emissions.
-3.  **Navigation Guard Decorator**: Instead of manual `isSystemActive` checks in `MainAppContent`, implement a custom `NavHost` wrapper that automatically enforces system-active invariants for the `Landing` route.
-4.  **Forensic Log Pruning**: The stack trace capture in `MainActivity` should be moved to a `ForensicManager` utility to keep the Activity lifecycle code clean once Issue #910 is fully verified in production.
-5.  **Role-Agnostic Signaling Pipeline**: With Issue #918, binary telemetry processing is now enabled for both Tracker and Viewer modes. This allows for a further simplification where the signaling reception logic is unified entirely, removing "if (isTrackerMode)" guards from the telemetry handling path.
-6.  **Consolidated Hardware Lifecycle Management**: `TrackerService` currently manages `JdHardwareManager` syncs (poke) while `HardwareProvider` manages GNSS revival pulses. Consolidating all "stay-alive" hardware logic into a single `HardwarePersistenceManager` would simplify `TrackerService` and unify energy-saving duty cycles.
-7.  **Dedicated GNSS Coordinator**: Extract revival logic and state management from the monolithic `HardwareProvider` into a `GnssRevivalCoordinator`. This would separate low-level hardware access from high-level recovery state machines (R-ID 260).
+## 💡 Architectural & System Streamlining
+1.  **LED Logic Centralization**: Move LED status evaluations (INT, SRV, GPS, VWR, DAT) from `DashboardStateProviderImpl` into a dedicated `LedStateEvaluator` in `:core:engine` to ensure parity between HUD and Notifications.
+2.  **Hydration State Consolidation**: Merge the 11-level hydration process into 3 phases: `Pre-flight`, `Engine Warmup`, and `Active` to reduce transient state race conditions.
+3.  **Navigation Guard Decorator**: Implement a custom `NavHost` wrapper to enforce `isSystemActive` invariants globally for the `Landing` route.
+4.  **Forensic Log Pruning**: Move `MainActivity` stack trace capture to a `ForensicManager` utility to keep the UI layer clean.
+5.  **Role-Agnostic Signaling Pipeline**: Unify binary telemetry reception for both Tracker and Viewer modes, removing mode-specific guards.
+6.  **Consolidated Hardware Lifecycle Management**: Unify `JdHardwareManager` (poke) and `HardwareProvider` (revival) into a single `HardwarePersistenceManager`.
+7.  **Dedicated GNSS Coordinator**: Extract recovery state machines from `HardwareProvider` into a `GnssRevivalCoordinator` (R-ID 260).
+8.  **Context Authority Consolidation**: Replace the complex `ContextShadow` delegation with a bytecode-level transformer to redirect `getPackageName` calls to a static constant.
+9.  **Service Start Orchestration**: Move to a "Work-First" model where `WorkManager` handles initial sync, only starting FGS if high-priority triggers are detected.
+10. **Signaling Handshake UI**: Merge "SRV" and "GPS" HUD badges into a single "Connectivity" indicator during initial handshake phases to reduce UI noise.
+11. **Telemetry Mapping**: Prune `RealtimeStatus` (Protobuf) to include only active deltas, simplifying `ConnectivitySuite` updates.
+12. **Signaling Provider Abstraction**: Implement a `SignalingTransportFactory` to decouple the core manager from transport-specific (Socket.io) configuration.
+13. **Unified Identity Aliasing**: Move ID aliasing logic (T -> Trk) into a `TransmissionIdentity` value class to prevent protocol mismatches (R907).
+14. **Hardware Lifecycle State Machine**: Replace manual `AtomicBoolean` flags in `HardwareProvider` with a formal Sealed Class state machine (`STARTING`, `STARTED`, `STOPPING`, `IDLE`).
+15. **Watchdog Unification**: Consolidate the `Hydration Watchdog` and the `System Watchdog` into a single `LifecycleWatchdog` to reduce coroutine overhead in `MainViewModel`.
+
+---
+**New Ideas Total: 15**
+*(Updated Sep.05.24)*

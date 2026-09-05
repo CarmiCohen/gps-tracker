@@ -1,19 +1,26 @@
-# Project Issues & Hardening Tracking (Sep.05.23)
+# Project Issues & Hardening Tracking (Sep.05.24)
 
-## 🎯 Current Resumption Focus: Physical Verification (A15)
-Critical recovery phase for system-wide connectivity and GNSS stability. 
+## 🎯 Current Resumption Focus: Physical Verification & Forensic Closing
+Finalizing the high-assurance baseline for Samsung A15 hardware and signaling transport.
 
-## 🟢 Recently Resolved Issues (Sep.05.23)
-*   **Issue #916 RESOLVED: GNSS Revival Lifecycle Transparency & Battery Audit**. Finalized the GNSS recovery event chain in `HardwareProvider.kt` and instrumented `IntegrityMonitor.kt` to log battery current (mA) snapshots during revival pulses. Remediated "Silent Failure" risks on budget hardware (A15) and enabled empirical quantification of the energy footprint of the recovery mechanism (R-ID 259/260).
-*   **Issue #918 RESOLVED: Clock Source Consistency**. RESOLVED a logic defect where peer activity was tracked using monotonic `elapsedRealtime()` but evaluated against wall-clock `currentTimeMillis()`. Standardized all staleness gates to strictly use `SystemClock.elapsedRealtime()` to ensure the `VWR` badge accurately reflects peer presence without being affected by NTP regressions or user clock changes (R919/R-ID 257).
-*   **Issue #918 RESOLVED: VWR Badge Persistence Leak**. RESOLVED by restricting `lastRemoteActivityTs` updates to high-assurance telemetry (Location/Health) packets. Removed generic signaling heartbeats (pulses/pongs) from the freshness calculation to ensure the `VWR` badge accurately reflects the Peer app's lifecycle state. Enabled binary telemetry processing on the Tracker to support high-efficiency Viewer pulses (R-ID 258).
-*   **Issue #917 RESOLVED: Exact Actual Colors (HUD LED Synchronization)**. RESOLVED by remediating hardcoded "always-true" telemetry freshness logic in `DashboardStateProviderImpl`. Standardized all HUD LEDs (**WDG**, **DAT**, **VWR/TRK**) to monitor actual service pulses and peer activity with a synchronized **35s** staleness gate. Verified role parity where both Tracker and Viewer reflect internal service integrity (R-ID 257).
-*   **Issue #915 RESOLVED: Mapnik Tile Latency (Samsung A15)**. Remediated map interaction lag on budget hardware by implementing specialized resource profiles (R915).
+## 🟢 Recently Resolved Issues (Sep.05.24)
+*   **Issue #910 RESOLVED: Hydration Watchdog**. Implemented a 15s hydration watchdog (`WATCH_DOG_UI_GRACE_MS`) in `MainViewModel`. The system now monitors startup hydration levels and forces the UI initialization state if a hang is detected at Level 2, ensuring a recovery path from black-screen locks on budget hardware (R-ID 261).
+*   **Issue #916 RESOLVED: GNSS Revival Lifecycle Transparency & Battery Audit**. Finalized the GNSS recovery event chain in `HardwareProvider.kt` and instrumented `IntegrityMonitor.kt` to log battery current (mA) snapshots during revival pulses (Sep.05.23).
+*   **Issue #918 RESOLVED: Clock Source Consistency**. Standardized all staleness gates to strictly use `SystemClock.elapsedRealtime()` to ensure HUD accuracy across system clock jumps (Sep.05.23).
+*   **Issue #918 RESOLVED: VWR Badge Persistence Leak**. Restricted activity indicators to high-assurance telemetry packets (Location/Health) to prevent persistence leaks (Sep.05.23).
+*   **Issue #917 RESOLVED: Exact Actual Colors (HUD LED Synchronization)**. Standardized all HUD LEDs to monitor actual service pulses with a synchronized 35s staleness gate (Sep.05.23).
+*   **Issue #915 RESOLVED: Mapnik Tile Latency (Samsung A15)**. Expanded disk cache to 600MB and throttled concurrency for budget hardware (Sep.05.23).
+*   **Issue #910 RESOLVED: Forensic Stall Simulation (Service Termination Race)**. Hardened navigation guards to prevent Landing retreats during hydration (Sep.05.23).
 
-## 🟡 Open Issues (Verification Phase)
-*   *None. System baseline reached for Sep.05.23.*
+## 🟡 Open Issues & Hardening Tasks (vSep.05.24)
+*   **R-ID 266: Mali Driver Mitigation**. [RISK] [HIGH] `IntegrityMonitor` detects Mali Driver Anomalies, but there is no automated UI-throttling to prevent process-level ANRs on budget hardware.
+*   **Issue #912: WebSocket Fallback**. [EDGE CASE] [MEDIUM] Strict `websocket` transport bypasses polling but fails on restricted networks. Intelligent XHR fallback is required (R-ID 251).
+*   **Issue #918 Verification**: [PENDING] [MEDIUM] Physical confirmation of the 35s transition to RED for the VWR badge under signal stress.
+*   **Issue #914: GNSS Detail Sampling**. [INCONSISTENCY] [LOW] The `gnssDetail` flow is not sampled. High-frequency updates may cause UI overhead on A15 devices.
+*   **Issue #916: Energy Footprint Verdict**. [MISSING] [LOW] Implement automated mA delta and temperature rise calculation to quantify revival power cost (R-ID 259).
+*   **R-ID 256: Sensor Rate Verification**. [PENDING] [LOW] Add a runtime check to verify `HIGH_SAMPLING_RATE_SENSORS` efficacy on Target SDK 35.
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 270 (Rules: 45, IDs: 225), Resolved: 896, Open: 0, Testing: 1 (Sub-items: 12), Ideas: 9, QA: 242]**
+- **Current Audit Baseline: [SOT: 271 (Rules: 45, IDs: 226), Resolved: 900, Open: 6, Testing: 92% (Chapters), Ideas: 214, QA: 242]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.05.23)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.05.24)*
