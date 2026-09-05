@@ -19,6 +19,9 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Sep.05.12:
+ * - Issue #910 Forensic Hardening: Enhanced serviceExceptionHandler with full 
+ *   stack trace capture to identify internal stopSelf() triggers (R910).
  * Aug.29.03:
  * - Issue #760 Hardening: Migrated from GpsManager and AppSensorManager to 
  *   the unified HardwareProvider (R760).
@@ -74,12 +77,17 @@ abstract class BaseMonitorService : LifecycleService() {
 
     protected val serviceExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException) return@CoroutineExceptionHandler
+        
+        val trace = throwable.stackTrace.take(20).joinToString("\n")
+        Timber.e(throwable, "Issue #910: CRITICAL Coroutine failure. Triggering stopSelf(). Trace:\n$trace")
+        
         logManager.logServiceEvent("CRITICAL: Coroutine failure in Service: ${throwable.message}", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
         stopSelf() 
     }
 
     override fun onCreate() {
         super.onCreate()
+        Timber.d("Issue #910: Service onCreate starting")
         
         serviceStartRealtime = timeProvider.elapsedRealtime()
         serviceStartWall = timeProvider.currentTimeMillis()
@@ -184,12 +192,13 @@ abstract class BaseMonitorService : LifecycleService() {
     }
 
     override fun onDestroy() {
+        Timber.w("Issue #910: Service onDestroy invoked. Stack:\n${Thread.currentThread().stackTrace.take(15).joinToString("\n")}")
+        
         tickJob?.cancel()
         heartbeatJob?.cancel()
         fgsUpdateJob?.cancel()
         
         // Issue #760: Hardened cleanup sequence.
-        // 1. Unregister all hardware callbacks synchronously via unified provider.
         hardwareProvider.stop()
 
         // Issue #320/249: Deterministic native hardware release.

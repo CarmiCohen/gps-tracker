@@ -19,13 +19,12 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
- * Sep.02.40:
- * - Issue #896 Hardening: Implemented robust battery optimization navigation 
- *   with multi-tier fallback for Samsung A15/Android 15+. Switched to 
- *   Uri.fromParts for all system intents to ensure proper encoding (R896).
- * Aug.28.08:
- * - Issue #759: Logcat Spam Remediation. Switched to GpsApplication.PACKAGE_NAME 
- *   shadow-cache to eliminate repetitive getPackageName() system logs (R759).
+ * Sep.05.11:
+ * - Issue #910 Forensic Instrumentation: Added logging to onStopTracking to 
+ *   identify the source of service termination (R910).
+ * Sep.05.08:
+ * - Issue #910 Forensic Instrumentation: Added detailed logging and stack trace 
+ *   capture to onCleanupAndExit.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -48,7 +47,6 @@ class MainActivity : ComponentActivity() {
                 activity = this,
                 viewModel = viewModel,
                 onStartService = { mode ->
-                    // Issue #661: Prevent start crash if OS blocks FGS despite foreground state.
                     try {
                         if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
                             val serviceClass = if (mode == "tracker") TrackerService::class.java else ViewerService::class.java
@@ -64,13 +62,14 @@ class MainActivity : ComponentActivity() {
                     }
                 },
                 onCleanupAndExit = {
+                    val trace = Thread.currentThread().stackTrace.take(15).joinToString("\n")
+                    Timber.w("Issue #910: onCleanupAndExit invoked. Trace:\n$trace")
                     stopService(Intent(this, TrackerService::class.java))
                     stopService(Intent(this, ViewerService::class.java))
                     finishAffinity()
                 },
                 onRequestBatteryExemption = { launchBatteryExemptionSetting() },
                 onRequestOverlayPermission = {
-                    // Issue #206: Hardened intent for Samsung/API 35 compatibility.
                     val pkg = cachedPkgName.ifBlank { packageName }
                     val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
                         data = android.net.Uri.fromParts("package", pkg, null)
@@ -79,7 +78,6 @@ class MainActivity : ComponentActivity() {
                         startActivity(intent)
                     } catch (e: Exception) {
                         try {
-                            // Fallback to general list if specific package URI is rejected
                             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
                         } catch (e2: Exception) {
                             Toast.makeText(this, "Could not open overlay settings", Toast.LENGTH_SHORT).show()
@@ -112,9 +110,10 @@ class MainActivity : ComponentActivity() {
                     }
                 },
                 onRequestHardwarePermission = {
-                    // Logic to open manufacturer-specific settings or generic permissions
                 },
                 onStopTracking = {
+                    val trace = Thread.currentThread().stackTrace.take(15).joinToString("\n")
+                    Timber.w("Issue #910: onStopTracking invoked. Trace:\n$trace")
                     stopService(Intent(this, TrackerService::class.java))
                     stopService(Intent(this, ViewerService::class.java))
                 }
@@ -125,8 +124,6 @@ class MainActivity : ComponentActivity() {
     private fun launchBatteryExemptionSetting() {
         val pkg = cachedPkgName.ifBlank { packageName }
         try {
-            // Issue #896: Robust intent for Samsung A15/Android 15+.
-            // Using Uri.fromParts to ensure proper URI encoding for the 'package' scheme.
             val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
                 data = android.net.Uri.fromParts("package", pkg, null)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -135,14 +132,12 @@ class MainActivity : ComponentActivity() {
         } catch (e: Exception) {
             Timber.e(e, "Issue #896: Primary battery optimization intent failed for $pkg")
             try {
-                // Fallback 1: Open the general optimization settings list
                 val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
                 startActivity(intent)
             } catch (e2: Exception) {
                 Timber.e(e2, "Issue #896: Fallback optimization intent failed. Navigating to App Info.")
-                // Fallback 2: Navigate to App Info (Samsung 'Unrestricted' toggle resides here)
                 try {
                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                         data = android.net.Uri.fromParts("package", pkg, null)
@@ -171,14 +166,10 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.onEvent(UiEvent.RefreshPermissionStatus)
-        
-        // Issue #626/634: Automated recovery trigger for restricted background starts
         if (viewModel.uiState.value.isRecoveryPending) {
             Timber.i("Issue #634: Resuming deferred service recovery in onResume")
             viewModel.onEvent(UiEvent.TriggerRecovery)
         }
-
-        // R405 logic moved to MainViewModel monitoring loop.
     }
 
     companion object {

@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 1
-        versionName "Sep.05.10" // Hardened Hydration Guard
+        versionName "Sep.05.11" // Hardened Sensor Permissions & Hydration Guard
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {
