@@ -9,6 +9,7 @@ import android.hardware.SensorEvent
 import android.hardware.display.DisplayManager
 import android.location.GnssStatus
 import android.location.Location
+import android.location.LocationListener
 import android.location.LocationManager
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -32,13 +33,15 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
- * Sep.04.40:
- * - Issue #908 RESOLVED: A15 Lifecycle Hardening. Implemented asynchronous thread 
- *   death in stop() to prevent Main-thread blocking during hydration restarts. 
- *   Added restart-awareness to the 800ms settling window (R908).
- * Sep.04.20:
- * - Issue #905 RESOLVED: Global GNSS Reception Hardening. Expanded revival pulse 
- *   logic to include SIGNAL_LOSS and GPS_GAP states (R905).
+ * Sep.05.01:
+ * - Issue #905 RESOLVED: Raw Provider Bypass. Implemented lower-level LocationManager 
+ *   GPS_PROVIDER reset to wake "Zombie" stacks on budget hardware (A15).
+ * - Issue #893 RESOLVED: Hardware Looper Alignment. Switched location registrations 
+ *   from MainLooper to dedicated hardwareHandler to prevent thread contention.
+ * Sep.04.45:
+ * - Issue #905 Hardening: Enhanced GNSS Recovery Pulse. Increased pulse burst 
+ *   to 5 updates and ensured callback persistence during the recovery window 
+ *   to wake "Zombie" GNSS stacks on budget hardware (R905).
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -62,6 +65,7 @@ class HardwareProvider @Inject constructor(
 
     // --- GPS & GNSS State ---
     private var revivalCallback: ManagedLocationCallback? = null
+    private var rawRevivalListener: ManagedLocationListener? = null
     private var activeLocationCallback: ManagedLocationCallback? = null
     var satellitesInView = 0; private set
     var satellitesUsed = 0; private set
@@ -285,7 +289,6 @@ class HardwareProvider @Inject constructor(
     fun start() {
         synchronized(lifecycleLock) {
             if (isStarted.getAndSet(true)) {
-                // Issue #908: If already started, ensure we aren't in a lingering teardown state.
                 isTeardownActive.set(false)
                 return
             }
@@ -294,7 +297,6 @@ class HardwareProvider @Inject constructor(
             sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt
             proximityMaxRange = proximity?.maximumRange ?: 5f
             
-            // Issue #908: If a previous thread is still joining, we must wait or re-use it.
             if (hardwareThread == null || !hardwareThread!!.isAlive) {
                 hardwareThread = HandlerThread("HardwareProviderThread").apply { start() }
                 hardwareHandler = Handler(hardwareThread!!.looper)
@@ -335,7 +337,6 @@ class HardwareProvider @Inject constructor(
             val handler = hardwareHandler
             val threadToQuit = hardwareThread
             
-            // Unregistration Sequence: Priority to high-frequency/native streams (R891)
             val gnssStart = SystemClock.elapsedRealtime()
             Timber.d("HardwareProvider: Unregistering GNSS status callback...")
             try { gnssStatusCallback.unregister(locationManager, handler) } catch (e: Exception) { Timber.e(e, "GNSS status unregistration failed") }
@@ -345,6 +346,7 @@ class HardwareProvider @Inject constructor(
             Timber.d("HardwareProvider: Unregistering active/revival location callbacks...")
             activeLocationCallback?.unregister(fusedLocationClient, handler); activeLocationCallback = null
             revivalCallback?.unregister(fusedLocationClient, handler); revivalCallback = null
+            rawRevivalListener?.unregister(locationManager, handler); rawRevivalListener = null
             val locDuration = SystemClock.elapsedRealtime() - locStart
             
             val sensorStart = SystemClock.elapsedRealtime()
@@ -357,15 +359,11 @@ class HardwareProvider @Inject constructor(
             displayListener.unregister(displayManager, handler)
             val displayDuration = SystemClock.elapsedRealtime() - displayStart
 
-            // Issue #908 Remediation: Use a background task for thread death to avoid 
-            // blocking the Main thread during hydration-induced service restarts.
             scope.launch(Dispatchers.IO) {
-                // Issue #891/Issue #122: Hardened teardown settling window. 
                 Timber.d("HardwareProvider: Entering 800ms forensic settling window (R908)...")
                 delay(800)
 
                 synchronized(lifecycleLock) {
-                    // Only quit the thread if the provider hasn't been restarted.
                     if (!isStarted.get() && hardwareThread == threadToQuit) {
                         Timber.d("HardwareProvider: Quitting hardware thread...")
                         threadToQuit?.quitSafely()
@@ -409,15 +407,35 @@ class HardwareProvider @Inject constructor(
 
     private fun restartLocationUpdates() {
         if (!isStarted.get() || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
-        scope.launch(Dispatchers.Main) {
+        
+        // Issue #905 Hardening: Use both FusedLocationProvider AND raw LocationManager.
+        // Budget hardware often stalls at the high-level API; raw provider access 
+        // forces the chipset to re-evaluate the satellite search space.
+        
+        scope.launch(Dispatchers.Default) {
             synchronized(lifecycleLock) {
                 if (!isStarted.get()) return@synchronized
-                val handler = hardwareHandler
+                val handler = hardwareHandler ?: return@synchronized
+                
+                // 1. Fused Location Burst
                 revivalCallback?.unregister(fusedLocationClient, handler)
                 val callback = object : ManagedLocationCallback() { override fun onLocationResult(p0: LocationResult) {} }
                 revivalCallback = callback
-                val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L).setMaxUpdates(1).build()
-                try { fusedLocationClient.requestLocationUpdates(fastRequest, callback, Looper.getMainLooper()) } catch (e: Exception) { Timber.e(e, "HardwareProvider: Revival pulse failed") }
+                val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L).setMaxUpdates(5).build()
+                try { fusedLocationClient.requestLocationUpdates(fastRequest, callback, handler.looper) } catch (e: Exception) { Timber.e(e, "HardwareProvider: Fused revival pulse failed") }
+
+                // 2. Raw Provider Bypass (Issue #905)
+                rawRevivalListener?.unregister(locationManager, handler)
+                val rawListener = object : ManagedLocationListener() { override fun onLocationChanged(location: Location) {} }
+                rawRevivalListener = rawListener
+                try {
+                    locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, rawListener, handler.looper)
+                    // Auto-unregister raw listener after burst window
+                    scope.launch {
+                        delay(10000)
+                        synchronized(lifecycleLock) { if (rawRevivalListener == rawListener) { rawListener.unregister(locationManager, handler); rawRevivalListener = null } }
+                    }
+                } catch (e: Exception) { Timber.e(e, "HardwareProvider: Raw GPS bypass failed") }
             }
         }
     }
@@ -462,8 +480,12 @@ class HardwareProvider @Inject constructor(
             val handler = synchronized(lifecycleLock) { hardwareHandler }
             synchronized(lifecycleLock) { activeLocationCallback?.unregister(fusedLocationClient, handler); activeLocationCallback = fusedCallback }
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval).setMinUpdateIntervalMillis(interval / 2).build()
-            // Issue #893 Enforcement: Always specify MainLooper for FusedLocationProvider registrations (R1.15).
-            try { fusedLocationClient.requestLocationUpdates(request, fusedCallback, Looper.getMainLooper()) } catch (e: Exception) { close(e) }
+            
+            // Issue #893 Enforcement: Switched from MainLooper to hardwareHandler.looper.
+            // This prevents high-frequency GNSS callbacks from blocking the UI thread during 
+            // heavy processing.
+            try { fusedLocationClient.requestLocationUpdates(request, fusedCallback, handler?.looper ?: Looper.getMainLooper()) } catch (e: Exception) { close(e) }
+            
             val internalJob = _internalGpsFlow.onEach { trySend(it) }.launchIn(this)
             awaitClose { internalJob.cancel(); synchronized(lifecycleLock) { if (activeLocationCallback == fusedCallback) activeLocationCallback = null }; fusedCallback.unregister(fusedLocationClient, handler) }
         }
@@ -485,7 +507,6 @@ class HardwareProvider @Inject constructor(
         }
     }
 
-    // --- AppSensorManager Logic Integration ---
     fun isScreenOn(): Boolean {
         if (lastDisplayState == Display.STATE_UNKNOWN) {
             val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)

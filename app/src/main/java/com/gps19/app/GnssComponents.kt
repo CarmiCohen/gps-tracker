@@ -25,11 +25,12 @@ import java.util.*
 
 /**
  * GnssComponents: Detailed satellite signal and constellation visualization.
+ * Sep.04.95:
+ * - Issue #914 HARDENED: GNSS UI Performance Optimization. Added stable keys to 
+ *   LazyVerticalGrid items to prevent redundant recompositions on budget 
+ *   hardware (Samsung A15).
  * v9.1.0:
  * - R799e: Swapped legacy BrandJd (#367C2B) for JD Vivid Green (#78BE20).
- * v8.9.40:
- * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
- * Extracted from OverlayComponents for Issue 115 modularization.
  */
 
 @Composable
@@ -88,7 +89,9 @@ fun GnssDetailOverlay(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(stats) { sat ->
+                    // Issue #914: Added stable keys based on SVID and constellation to optimize 
+                    // budget hardware performance during high-frequency GNSS updates.
+                    items(stats, key = { "${it.constellation}_${it.svid}" }) { sat ->
                         SatelliteCard(sat)
                     }
                 }

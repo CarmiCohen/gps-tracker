@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.05.15)
+# Resolution Archive (Sep.05.16)
+
+## 🟢 Resolved Issues (Sep.05.16)
+*   **Issue #918 RESOLVED: VWR Badge Persistence Leak**. Remediated the "sticky green" badge issue where the `VWR` (Viewer) indicator remained active after the peer app was closed. Restricted `lastRemoteActivityTs` updates to high-assurance telemetry (Location/Health) packets and pruned generic signaling heartbeat resets (pulses/pongs). Enabled binary Protobuf telemetry processing in Tracker mode to ensure accurate two-way presence monitoring (R-ID 258).
 
 ## 🟢 Resolved Issues (Sep.05.15)
 *   **Issue #917 RESOLVED: Exact Actual Colors (HUD LED Synchronization)**. Remediated hardcoded "always-true" telemetry freshness logic on the Tracker side. Synchronized all UI staleness gates to **35s** (`TELEMETRY_UI_STALE_THRESHOLD_MS`) to match the definitive HUD Specification (R338/R972). Standardized `DAT` and `WATCHDOG` LEDs to reflect real-time service heartbeats and peer presence (R-ID 257).

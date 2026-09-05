@@ -34,13 +34,15 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.05.16:
+ * - Issue #918 RESOLVED: VWR Badge Persistence Leak. Restricted lastRemoteActivityTs 
+ *   updates to high-assurance telemetry packets. Removed generic signaling 
+ *   heartbeats from freshness resets and enabled binary processing for Tracker 
+ *   mode to ensure role parity (R-ID 258).
  * Sep.04.40:
  * - Issue #908 RESOLVED: Deployment Synchronization. Implemented R-ID 254 periodic 
  *   identity re-broadcast (60s) to ensure zero-interaction peer discovery during 
  *   rolling deployments on budget hardware (R254).
- * Sep.03.22:
- * - Idea #239: Signaling Interface Consolidation. Removed local Protobuf 
- *   serialization logic and redundant emit proxies (R-ID 239).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -509,7 +511,7 @@ class ConnectivitySuite @Inject constructor(
             micPending = micPending, isSitDetected = isSitDetected, isSitActive = isSitActive, lastSitTs = lastSitTs,
             verticalVelocity = verticalVelocity, sitVz = sitVz, sitVzTs = sitVzTs, sitVzRt = sitVzRt, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
             kineticEnergy = kineticEnergy, isAdaptiveJump = if (isTrackerMode) isAdaptiveJump else false,
-            isBatteryLow = isBatteryLow, isBatteryCritical = isBatteryCritical,
+            isBatteryLow = if (isTrackerMode) isBatteryLow else false, isBatteryCritical = if (isTrackerMode) isBatteryCritical else false,
             isUltraLongStationary = isUltraLongStationary
         )
         sendTelemetry(trackerStatus)
@@ -521,8 +523,13 @@ class ConnectivitySuite @Inject constructor(
         }
     }
 
+    /**
+     * handleBinaryUpdate: Processes Protobuf-encoded telemetry.
+     * Sep.05.16 remediation (Issue #918): Enabled processing for Tracker mode 
+     * and ensured activity timers only reset on telemetry arrival.
+     */
     private fun handleBinaryUpdate(data: ByteArray) {
-        if (isTrackerMode || isStopped.get()) return
+        if (isStopped.get()) return
         try {
             val statusProto = RealtimeStatus.parseFrom(data)
             
@@ -539,6 +546,7 @@ class ConnectivitySuite @Inject constructor(
             val nowRt = timeProvider.elapsedRealtime()
             val peerId = statusProto.id
 
+            // High-assurance activity reset (Telemetry present)
             _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt)
             remoteStatusRepository.setTrackerConnected(true)
@@ -667,15 +675,16 @@ class ConnectivitySuite @Inject constructor(
             return
         }
 
+        // Issue #918 remediation: Pruned activity resets from generic heartbeats.
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
-            if ((isTrackerMode && fromViewer) || (!isTrackerMode && !fromViewer)) {
-                _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
-                remoteStatusRepository.updatePeerActivity(nowRt); remoteStatusRepository.setTrackerConnected(!isTrackerMode); mainRepository.updateRemoteActivity(now)
+            if (!isTrackerMode && !fromViewer) {
+                remoteStatusRepository.setTrackerConnected(true)
             }
             return
         }
 
         if (isTrackerMode && fromViewer) {
+            // Only non-telemetry Viewer commands go here (e.g. settings sync)
             _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(now); return
         }
