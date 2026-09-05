@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 1
-        versionName "Sep.05.16" // Telemetry Assurance (VWR Badge remediation)
+        versionName "Sep.05.23" // GNSS Revival & Battery Audit Finalized
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

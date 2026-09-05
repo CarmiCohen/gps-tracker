@@ -26,14 +26,14 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.05.18:
+ * - Issue #916 Hardening: Implemented RawBurstStarted/Ended telemetry 
+ *   snapshots in handleRevivalEvent to audit Helio G99 battery drain 
+ *   during high-power GNSS revival windows.
  * Sep.02.72:
  * - Issue #247: Implemented forensic grace period (5s) for Signal Loss 
  *   auditing on budget hardware (A15) and hardened peer-visibility 
  *   correlation (R247).
- * Aug.31.02:
- * - Issue #762 Validation: Added observation of isUltraLongStationaryFlow 
- *   from HardwareProvider to ensure the [ULTRA] badge reflects local 
- *   hardware relaxation state (R765, R778).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -157,6 +157,14 @@ class IntegrityMonitor @Inject constructor(
                     _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_GPS_HARDWARE_LOCK))
                     updateHealth { it.gpsHardwareLock = false }
                 }
+            }
+            is HardwareProvider.RevivalEvent.RawBurstStarted -> {
+                val h = currentHealth
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("AUDIT: Raw GNSS Burst STARTED. [Batt: ${h.batteryLevel}%, Current: ${h.currentMa}mA, Temp: ${h.batteryTemp}°C]", false))
+            }
+            is HardwareProvider.RevivalEvent.RawBurstEnded -> {
+                val h = currentHealth
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent("AUDIT: Raw GNSS Burst ENDED. [Batt: ${h.batteryLevel}%, Current: ${h.currentMa}mA, Temp: ${h.batteryTemp}°C]", false))
             }
         }
     }

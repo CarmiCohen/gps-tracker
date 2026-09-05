@@ -33,15 +33,12 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
- * Sep.05.01:
- * - Issue #905 RESOLVED: Raw Provider Bypass. Implemented lower-level LocationManager 
- *   GPS_PROVIDER reset to wake "Zombie" stacks on budget hardware (A15).
- * - Issue #893 RESOLVED: Hardware Looper Alignment. Switched location registrations 
- *   from MainLooper to dedicated hardwareHandler to prevent thread contention.
- * Sep.04.45:
- * - Issue #905 Hardening: Enhanced GNSS Recovery Pulse. Increased pulse burst 
- *   to 5 updates and ensured callback persistence during the recovery window 
- *   to wake "Zombie" GNSS stacks on budget hardware (R905).
+ * Sep.05.22:
+ * - Issue #916 Hardening: Finalized RevivalEvent lifecycle. Implemented emission 
+ *   of HardwareLock and Success events to remediate logic gaps in forensic monitoring.
+ * Sep.05.18:
+ * - Issue #916 Hardening: Enhanced RevivalEvent with RawBurstStarted/Ended lifecycle 
+ *   to support battery drain auditing during budget hardware recovery pulses.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -77,6 +74,7 @@ class HardwareProvider @Inject constructor(
     private var recoveryStartRt = 0L
     private val pollingIntervalFlow = MutableStateFlow(TICK_INTERVAL_MS)
     private var revivalAttemptCount = 0
+    private var isHardwareLocked = false
     var maxGnssJitterMs = 0L; private set
 
     private val _revivalEvents = MutableSharedFlow<RevivalEvent>(extraBufferCapacity = 8)
@@ -86,6 +84,8 @@ class HardwareProvider @Inject constructor(
         data class Attempt(val count: Int) : RevivalEvent()
         object HardwareLock : RevivalEvent()
         object Success : RevivalEvent()
+        object RawBurstStarted : RevivalEvent()
+        object RawBurstEnded : RevivalEvent()
     }
 
     data class LocationStatus(
@@ -429,13 +429,23 @@ class HardwareProvider @Inject constructor(
                 val rawListener = object : ManagedLocationListener() { override fun onLocationChanged(location: Location) {} }
                 rawRevivalListener = rawListener
                 try {
+                    _revivalEvents.tryEmit(RevivalEvent.RawBurstStarted)
                     locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, rawListener, handler.looper)
                     // Auto-unregister raw listener after burst window
                     scope.launch {
                         delay(10000)
-                        synchronized(lifecycleLock) { if (rawRevivalListener == rawListener) { rawListener.unregister(locationManager, handler); rawRevivalListener = null } }
+                        synchronized(lifecycleLock) { 
+                            if (rawRevivalListener == rawListener) { 
+                                rawListener.unregister(locationManager, handler)
+                                rawRevivalListener = null 
+                                _revivalEvents.tryEmit(RevivalEvent.RawBurstEnded)
+                            } 
+                        }
                     }
-                } catch (e: Exception) { Timber.e(e, "HardwareProvider: Raw GPS bypass failed") }
+                } catch (e: Exception) { 
+                    Timber.e(e, "HardwareProvider: Raw GPS bypass failed") 
+                    _revivalEvents.tryEmit(RevivalEvent.RawBurstEnded)
+                }
             }
         }
     }
@@ -443,6 +453,8 @@ class HardwareProvider @Inject constructor(
     private fun updateLocationStatus() {
         val nowRt = timeProvider.elapsedRealtime()
         val deltaSinceFix = if (lastFixRt > 0) nowRt - lastFixRt else nowRt
+        var shouldEmitSuccess = false
+        
         _locationStatus.update { current ->
             var nextPending = current.isPending; var nextReason = current.reason
             var recoveryConfirmed = current.recoveryConfirmed; var lastPendingDuration = current.lastPendingDurationMs
@@ -454,9 +466,17 @@ class HardwareProvider @Inject constructor(
                 if (recoveryStartRt == 0L) recoveryStartRt = nowRt
                 val recoveryDuration = nowRt - recoveryStartRt
                 if (recoveryDuration < LOCATION_RECOVERY_DEBOUNCE_MS) { if (nowRt - pendingEnterRt > 0) lastPendingDuration = nowRt - pendingEnterRt; nextReason = LocationPendingReason.NONE } 
-                else { nextPending = false; nextReason = LocationPendingReason.NONE; recoveryConfirmed = true; recoveryStartRt = 0L }
+                else { 
+                    nextPending = false; nextReason = LocationPendingReason.NONE; recoveryConfirmed = true; recoveryStartRt = 0L 
+                    shouldEmitSuccess = true
+                    isHardwareLocked = false
+                }
             } else { recoveryConfirmed = false; recoveryStartRt = 0L }
             current.copy(isPending = nextPending, reason = nextReason, lastFixRt = lastFixRt, lastPendingDurationMs = lastPendingDuration, recoveryConfirmed = recoveryConfirmed)
+        }
+        
+        if (shouldEmitSuccess) {
+            _revivalEvents.tryEmit(RevivalEvent.Success)
         }
     }
 
@@ -610,7 +630,7 @@ class HardwareProvider @Inject constructor(
                             val db = if (maxAmp > 0) 20 * log10(maxAmp.toDouble()) else 0.0
                             synchronized(this) {
                                 currentAcousticDb = db; if (db > logicPeakDb) logicPeakDb = db; if (db < logicMinDb) logicMinDb = db; if (db > forensicPeakDb) forensicPeakDb = db; if (db < forensicMinDb) forensicMinDb = db; if (db > secPeakDb) secPeakDb = db
-                                if (!isWarming && fastPathFloor >= 0 && (db - fastPathFloor) > fastPathSpikeThreshold && db >= fastPathMinDb) { val spikeRt = timeProvider.elapsedRealtime(); if (spikeRt - lastAcousticSpikeRt > SPIKE_DEBOUNCE_MS) { lastAcousticSpikeRt = spikeRt; lastAcousticLockoutRt = spikeRt; onAcousticSpike?.invoke() } }
+                                if (!isWarming && fastPathFloor >= 0 && (db - fastPathFloor) > fastPathSpikeThreshold && db >= fastPathMinDb) { val spikeRt = timeProvider.elapsedRealtime() ; if (spikeRt - lastAcousticSpikeRt > SPIKE_DEBOUNCE_MS) { lastAcousticSpikeRt = spikeRt; lastAcousticLockoutRt = spikeRt; onAcousticSpike?.invoke() } }
                             }
                         } else if (read < 0) { if (!isMonitoring) break; _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Hardware error")); break }
                     }
@@ -781,8 +801,12 @@ class HardwareProvider @Inject constructor(
                     Timber.w("HardwareProvider: GNSS Recovery Pulse triggered (Attempt $revivalAttemptCount, Reason: ${currentStatus.reason})")
                     _revivalEvents.tryEmit(RevivalEvent.Attempt(revivalAttemptCount))
                     restartLocationUpdates()
+                } else if (!isHardwareLocked) {
+                    isHardwareLocked = true
+                    Timber.e("HardwareProvider: MAX REVIVAL ATTEMPTS REACHED. GPS_HARDWARE_LOCK triggered.")
+                    _revivalEvents.tryEmit(RevivalEvent.HardwareLock)
                 }
             }
-        } else { revivalAttemptCount = 0 }
+        } else { revivalAttemptCount = 0; isHardwareLocked = false }
     }
 }
