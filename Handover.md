@@ -1,29 +1,37 @@
-# Forensic State Snapshot (vSep.05.15) - HANDOVER READY (STOPPING POINT)
+# Forensic State Snapshot (vSep.05.15) - FINAL HANDOVER
 
-## 🎯 Physical Verification Baseline: Samsung A15 (SM-A155F)
-The synchronization package for **Issue #917** (Exact Actual Colors) is fully deployed. All HUD LED indicators are now role-aware and governed by a synchronized 35s staleness gate.
+## 🎯 Resumption Focus: Physical Validation (SM-A155F)
+The project has completed the **Issue #917** synchronization cycle. All HUD diagnostic indicators (LEDs) are now role-agnostic and reflect the exact actual status of the local engine and peer telemetry pipeline.
 
-### 🟢 Recently Verified (vSep.05.15)
-*   **Actual LED Status (#917)**: Implemented **R-ID 257**. Remediated hardcoded activity flags. Verified that the **VWR** (or **TRK**) badge correctly turns **Red** if peer activity ceases for > 35s.
-*   **Staleness Gate Sync**: Synchronized `TELEMETRY_UI_STALE_THRESHOLD_MS` to 35,000ms across engine and UI.
-*   **Watchdog Integrity (WDG)**: Standardized the **WDG** badge to reflect the actual local service pulse freshness (`diagnosticState.pulse`) instead of role-based hardcoding.
-*   **Data Parity (DAT)**: Enabled the `DAT` badge for both Tracker and Viewer modes to reflect real-time pipeline integrity (Net + Relay + Peer context).
+### 🟢 Completed: Exact Actual LED Synchronization (vSep.05.15)
+Standardized the diagnostic surface to eliminate role-based hardcoding and synchronized all staleness gates to **35 seconds**.
 
-### 🟡 Open Issues (Verification Phase)
-*   **Issue #916**: Battery Drain Audit during active raw GNSS bypass.
+#### 1. Logic Authority: `DashboardStateProviderImpl.kt`
+*   **WATCHDOG (WDG)**: Remediated from hardcoded `true` (Tracker) to a strict pulse monitor: `(now - diagnosticState.pulse) < 35000ms`. This ensures the LED reflects the actual health of the background `TrackerService` or `ViewerService`.
+*   **DATA (DAT)**: Standardized to monitor the full end-to-end pipeline: `isTelemetryFresh` (Peer) && `isInternet` && `isRelayConnected`.
+*   **PEER (VWR/TRK)**: Monitors `isTelemetryFresh` (last remote activity < 35s).
+*   **GNSS (GPS)**: Monitors `isGpsFresh` (Total age: Telemetry Age + Source GPS Age < 35s).
 
-## 🛠️ Project Configuration
-- **Hardware:** Samsung A15 (SM-A155F) / S21FE (Monitoring Peer)
-- **Version:** Sep.05.15
-- **Status:** Engine Online / HUD LEDs Synchronized / Role-Agnostic Integrity
+#### 2. UI Manifest: `SharedUiComponents.kt`
+*   **StatusBar**: Refactored to include `WDG` and `DAT` badges for both roles.
+*   **LED Color Parity**: All badges now use `StatusBadge` (Green/Red) driven by the logic above.
+*   **Visual Polish**: Converted the Watchdog "OK/FAIL" text to a standard "WDG" badge for architectural consistency.
 
-## 💾 Git Commit Block (Final Release)
-```bash
-git add Handover.md issues.md app/build.gradle core/engine/src/main/java/com/gps19/core/engine/EngineConstants.kt app/src/main/java/com/gps19/app/DashboardStateProvider.kt app/src/main/java/com/gps19/app/SharedUiComponents.kt STATUS/SOT_MASTER_REQUIREMENTS.md STATUS/RESOLUTION_ARCHIVE.md Simplify_Ideas2.md
-git commit -m "Hardening: Resolved Issue #917 (Exact Actual LED Colors). Synchronized HUD staleness gates to 35s and standardized watchdog/data LEDs. vSep.05.15."
-git tag -a vSep.05.15 -m "Release vSep.05.15: HUD LED Synchronization"
-git push origin main --tags
-```
+#### 3. Threshold Synchronization: `EngineConstants.kt`
+*   Locked `TELEMETRY_UI_STALE_THRESHOLD_MS` and `GPS_UI_FAIL_THRESHOLD_MS` to **35,000ms** (R338/R972).
+
+### 🟡 Open Issues & Verification
+*   **Issue #916**: Battery Drain Audit. Monitor the impact of the **Raw Location Provider Bypass** on Samsung A15.
+*   **Soak Test**: Verify long-term stability of the 35s heartbeat logic during extended deep-sleep cycles.
+
+## 🛠️ Architectural State
+- **Target SDK:** 35 (Android 15)
+- **Hardening:** `HIGH_SAMPLING_RATE_SENSORS` permission declared and verified.
+- **Hydration:** 11-tier level established. Nav guards in `MainAppContent` prevent accidental session termination during hydration gaps.
+
+## 💾 Release Archive (Git)
+*   **Commit:** `6704e37` (Hardening: Resolved Issue #917)
+*   **Tag:** `vSep.05.15` (Synchronization of HUD Staleness Gates)
 
 ## 📊 Current Audit Baseline
-**Current Audit Baseline: [SOT: 265 (Rules: 43, IDs: 222), Resolved: 891, Open: 1 (#916), Testing: 1 (Sub-items: 12), Ideas: 7, QA: 242]**
+- **Current Audit Baseline: [SOT: 265 (Rules: 43, IDs: 222), Resolved: 891, Open: 1 (#916), Testing: 1 (Sub-items: 12), Ideas: 7, QA: 242]**
