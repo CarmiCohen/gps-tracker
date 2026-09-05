@@ -2,24 +2,16 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.05.15:
+ * - Issue #917 RESOLVED: Exact Actual Colors. Updated stale thresholds 
+ *   to 35s to match HUD LED Specifications (R338/R972).
+ * Sep.04.45:
+ * - Issue #905 Hardening: Reduced GPS_GAP_THRESHOLD_MS to 15s and 
+ *   GPS_REVIVAL_RETRY_INTERVAL_MS to 30s to ensure high-assurance recovery 
+ *   on budget hardware (R905).
  * Sep.02.72:
  * - Issue #247: Added BUDGET_HARDWARE_SIGNAL_GRACE_MS (5s) to mitigate false-positive 
  *   Signal Loss alerts on Samsung A15/S21FE during telemetry gaps (R247).
- * Sep.02.55:
- * - Issue #119 Hardening: Refined battery thresholds. Reduced CRITICAL_BATTERY_THRESHOLD 
- *   to 10% and increased steep discharge tolerances (5%/10% per window) to 
- *   prevent aggressive Power Save entries and false health alerts (R119).
- * Aug.29.08:
- * - Concern #763: Added ULTRA_LONG_STATIONARY thresholds for GNSS relaxation.
- * Aug.29.01:
- * - Issue #315: Added GPS_WARMUP_GRACE_MS (30s) to prevent immediate false 
- *   positives during GPS stabilization (R315).
- * Aug.21.09:
- * - Issue #257/271 Optimization: Added STAGGERED_IO_PRUNING_DELAY_MS to 
- *   mitigate Samsung A15 Kumiho auditing pressure during launch.
- * Aug.21.00:
- * - Issue #243 SOT Alignment: Reduced STARTUP_SETTLING_DELAY_MS and 
- *   LANDING_PAGE_PAUSE_MS to 2000ms.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -235,8 +227,8 @@ const val BOOTSTRAP_PHASE_MS = 60000L
 const val DISCOVERY_PHASE_MS = 60000L
 const val JUMP_HOLD_DURATION_MS = 180000L
 const val MOVING_HOLD_DURATION_MS = 60000L
-const val GPS_GAP_THRESHOLD_MS = 120000L    
-const val GPS_STALL_THRESHOLD_MS = 120000L  
+const val GPS_GAP_THRESHOLD_MS = 15000L    
+const val GPS_STALL_THRESHOLD_MS = 15000L  
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
 const val LOCATION_RECOVERY_DEBOUNCE_MS = 3000L
 
@@ -250,7 +242,7 @@ const val CLOCK_REGRESSION_GATE_MS = 100L
 const val SENSOR_WARMING_MS = 5000L
 const val SUSPICIOUS_STATE_COOLDOWN_MS = 60000L
 const val ADAPTATION_SETTLING_MS = 5000L 
-const val GPS_REVIVAL_RETRY_INTERVAL_MS = 120000L
+const val GPS_REVIVAL_RETRY_INTERVAL_MS = 30000L
 const val MAX_REVIVAL_ATTEMPTS = 3
 const val HARDWARE_BOOT_GRACE_MS = 30000L
 const val LANDING_PAGE_PAUSE_MS = 2000L
@@ -379,8 +371,8 @@ const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0
 const val GNSS_EXPECTED_INTERVAL_MS = 1000L
 const val GNSS_JITTER_THRESHOLD_MS = 500L
 
-const val TELEMETRY_UI_STALE_THRESHOLD_MS = 90000L 
-const val GPS_UI_FAIL_THRESHOLD_MS = 90000L
+const val TELEMETRY_UI_STALE_THRESHOLD_MS = 35000L 
+const val GPS_UI_FAIL_THRESHOLD_MS = 35000L
 
 const val NOTIFICATION_THROTTLE_MS = 30000L
 

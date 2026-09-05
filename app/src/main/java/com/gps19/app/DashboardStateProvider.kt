@@ -198,9 +198,11 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         rtt: Int,
         remoteSignal: Int
     ): HudConnectivityState {
-        val isTelemetryFresh = if (appMode == "viewer") {
-            (System.currentTimeMillis() - diagnosticState.connectivity.lastUpdateTs) < TELEMETRY_UI_STALE_THRESHOLD_MS
-        } else true
+        val now = System.currentTimeMillis()
+        val lastSeenTs = diagnosticState.connectivity.lastRemoteActivityTs
+        val isTelemetryFresh = if (lastSeenTs > 0) {
+            (now - lastSeenTs) < TELEMETRY_UI_STALE_THRESHOLD_MS
+        } else false
 
         val commIndex = if (isSystemActive && diagnosticState.connectivity.isRelayConnected) {
             TelemetryUtils.calculateCommIndex(rtt, 10, 10)
@@ -210,17 +212,23 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             TelemetryUtils.calculateCommIndex(rtt, remoteSignal, 10)
         } else 0
 
+        val isDataHealthy = if (appMode == "viewer") {
+            isTelemetryFresh && diagnosticState.connectivity.isLocalOnline && diagnosticState.connectivity.isRelayConnected
+        } else {
+            diagnosticState.connectivity.isLocalOnline && diagnosticState.connectivity.isRelayConnected
+        }
+
         return HudConnectivityState(
             appMode = appMode,
             isInternet = diagnosticState.connectivity.isLocalOnline,
             isRelayConnected = diagnosticState.connectivity.isRelayConnected,
             isTelemetryFresh = isTelemetryFresh,
-            isDataHealthy = isTelemetryFresh && diagnosticState.connectivity.isLocalOnline && diagnosticState.connectivity.isRelayConnected,
+            isDataHealthy = isDataHealthy,
             commIndex = commIndex,
             remoteCommIndex = remoteCommIndex,
             trackerId = deviceId,
             viewerId = viewerId,
-            watchdogOk = if (appMode == "viewer") (isTelemetryFresh || (System.currentTimeMillis() - diagnosticState.connectivity.lastRemoteActivityTs < WATCH_DOG_UI_GRACE_MS)) else true,
+            watchdogOk = if (appMode == "viewer") (isTelemetryFresh || (now - lastSeenTs < WATCH_DOG_UI_GRACE_MS)) else true,
             rtt = rtt,
             remoteSignal = remoteSignal,
             isSystemActive = isSystemActive
