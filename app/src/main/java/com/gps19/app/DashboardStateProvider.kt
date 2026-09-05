@@ -6,12 +6,10 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
- * Sep.02.68:
- * - Idea #243: Flattened StatusBar indicator chain. Populated isSystemActive 
- *   in HudConnectivityState to support unified state propagation (R243).
- * Sep.03.01:
- * - Issue #238: Location Model Unification. Updated to use ts and gpsTs 
- *   from LocationUpdate instead of telemetryTs and timestamp (R-ID 238).
+ * Sep.05.15:
+ * - Issue #917 RESOLVED: Exact Actual Colors. Standardized all HUD LEDs 
+ *   (WDG, DAT, VWR/TRK) to monitor actual service heartbeats and peer pulses 
+ *   with a synchronized 35s staleness gate across all roles (R-ID 257).
  */
 interface DashboardStateProvider {
     fun buildDashboardConnectivityState(
@@ -72,15 +70,19 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         val activeStats = if (isViewer) diagnosticState.trackerStats else diagnosticState.stats
         val lastSeenTs = diagnosticState.connectivity.lastRemoteActivityTs
 
-        val watchdogSec = if (lastSeenTs > 0) {
+        // Local Watchdog: Check if the background service is ticking (Synchronized 35s gate)
+        val isLocalServiceAlive = (now - diagnosticState.pulse) < TELEMETRY_UI_STALE_THRESHOLD_MS
+        
+        // Remote Watchdog (only relevant for Viewer): Check if Tracker is active
+        val watchdogSec = if (isViewer && lastSeenTs > 0) {
             val remaining = (WATCH_TIMEOUT_MS - (now - lastSeenTs)) / 1000
             maxOf(0L, remaining)
         } else 0L
 
         return DashboardConnectivityState(
             lastSeenTs = lastSeenTs,
-            watchdogOk = if (appMode == "tracker") true else (watchdogSec > 0),
-            watchdogCountdownSec = if (appMode == "tracker") 0L else watchdogSec,
+            watchdogOk = isLocalServiceAlive,
+            watchdogCountdownSec = if (isViewer) watchdogSec else 0L,
             totalUptimeMs = activeStats.uptimeMs,
             sessionMs = if (activeStats.lastConnTs > 0) activeStats.sessionConnectedMs else 0L,
             sinceConnMs = if (activeStats.lastConnTs > 0) (now - activeStats.lastConnTs) else 0L,
@@ -212,11 +214,13 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             TelemetryUtils.calculateCommIndex(rtt, remoteSignal, 10)
         } else 0
 
-        val isDataHealthy = if (appMode == "viewer") {
-            isTelemetryFresh && diagnosticState.connectivity.isLocalOnline && diagnosticState.connectivity.isRelayConnected
-        } else {
-            diagnosticState.connectivity.isLocalOnline && diagnosticState.connectivity.isRelayConnected
-        }
+        // DAT LED: Reflects actual end-to-end data integrity (Pipeline: Net + Relay + Peer heartbeat)
+        val isDataHealthy = isTelemetryFresh && 
+                            diagnosticState.connectivity.isLocalOnline && 
+                            diagnosticState.connectivity.isRelayConnected
+
+        // WATCHDOG LED: Reflects local service pulse freshness (Synchronized 35s gate)
+        val isLocalServiceAlive = (now - diagnosticState.pulse) < TELEMETRY_UI_STALE_THRESHOLD_MS
 
         return HudConnectivityState(
             appMode = appMode,
@@ -228,7 +232,7 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             remoteCommIndex = remoteCommIndex,
             trackerId = deviceId,
             viewerId = viewerId,
-            watchdogOk = if (appMode == "viewer") (isTelemetryFresh || (now - lastSeenTs < WATCH_DOG_UI_GRACE_MS)) else true,
+            watchdogOk = isLocalServiceAlive,
             rtt = rtt,
             remoteSignal = remoteSignal,
             isSystemActive = isSystemActive

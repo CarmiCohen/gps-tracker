@@ -49,10 +49,10 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * Sep.02.68:
- * - Idea #243: Flattened StatusBar indicator chain. Refactored StatusBar to 
- *   consume unified HudState instead of 40+ individual parameters to improve 
- *   readability and JIT performance (R243).
+ * Sep.05.15:
+ * - Issue #917 RESOLVED: Exact Actual Colors. Standardized all HUD badges (LEDs). 
+ *   Added WDG badge and enabled DAT badge for both Tracker and Viewer modes 
+ *   to ensure role parity (R-ID 257).
  * Sep.03.18:
  * - Issue #243 RESOLVED: GlobalStatusBar isSystemActive Pass-through. Propagated 
  *   isSystemActive flag to StatusBar child component and added "SYS" badge (R-ID 243).
@@ -626,7 +626,8 @@ fun StatusBar(
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         StatusBadge(label = "SYS", active = hudState.isSystemActive, isBold = true); StatusBadge(label = "INT", active = hudState.isInternet, isBold = true); StatusBadge(label = "SRV", active = hudState.isRelayConnected, isBold = true); StatusBadge(label = "GPS", active = hudState.isLocalGpsActive)
                         StatusBadge(label = if (mode == "tracker") "VWR" else "TRK", active = isPeerActive, activeColor = BrandJd)
-                        if (mode != "tracker") StatusBadge(label = "DAT", active = hudState.isDataHealthy)
+                        StatusBadge(label = "DAT", active = hudState.isDataHealthy)
+                        StatusBadge(label = "WDG", active = hudState.watchdogOk, isBold = true)
                         if (hudState.hasActiveAlarms) StatusBadge(label = "ALM", active = true, activeColor = Rose500.copy(alpha = alarmAlpha), isBold = true)
                         if (hudState.isRedScreenSuppressed) {
                              Spacer(modifier = Modifier.width(2.dp))
@@ -638,7 +639,6 @@ fun StatusBar(
                             CircularProgressIndicator(progress = { progressValue }, modifier = Modifier.size(16.dp), color = if (hudState.isDataHealthy) BrandJd else Rose500, strokeWidth = 2.dp)
                             Icon(imageVector = if (hudState.isDataHealthy) Icons.Default.CheckCircle else Icons.Default.Error, contentDescription = null, modifier = Modifier.size(8.dp), tint = if (hudState.isDataHealthy) BrandJd else Rose500)
                         }
-                        Text(text = if(hudState.watchdogOk) "OK" else "FAIL", color = if(hudState.watchdogOk) BrandJd else Rose500, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(text = if (hudState.trackerState == TrackerState.MOVING && isTrackerGpsActive) "»\u2009${hudState.trackerState.name}\u2009«" else hudState.trackerState.name, color = (if (!isTrackerGpsActive) Slate500 else BrandJd).copy(alpha = if (hudState.trackerState == TrackerState.MOVING && isTrackerGpsActive) movingAlpha else 1f), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
@@ -665,7 +665,7 @@ fun StatusBar(
                         Spacer(modifier = Modifier.height(3.dp))
                     }
                     val tAge = if(lastGpsTs > 0) hudState.systemPulse - lastGpsTs else -1L
-                    StatusRowData(StatusRowState(label = trkIdLabel, battery = if (mode == "viewer") hudState.remoteBattery else hudState.battery, commIndex = if (mode == "viewer") (if(isPeerActive) hudState.remoteCommIndex else 0) else hudState.commIndex, color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, isCharging = if (mode == "viewer") hudState.remoteCharging else hudState.isCharging, accuracy = hudState.trackerAccuracy, maxAccuracy = hudState.maxTrackerAccuracy, satsView = hudState.satsView, satsUsed = hudState.satsUsed, gpsAgeMs = tAge, temp = hudState.trackerTemp, distance = hudState.distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = hudState.isTrackerLocPending, locPendingReason = hudState.trackerLocPendingReason, isTelemetryFresh = if (mode == "tracker") (hudState.viewerGpsTs > 0 && (hudState.systemPulse - hudState.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isPeerActive, isGpsFresh = isTrackerGpsActive, isUltraLongStationary = hudState.isUltraLongStationary))
+                    StatusRowData(StatusRowState(label = trkIdLabel, battery = if (mode == "viewer") hudState.remoteBattery else hudState.battery, commIndex = if (mode == "viewer") (if(isPeerActive) hudState.remoteCommIndex else 0) else hudState.commIndex, color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, isCharging = if (mode == "viewer") hudState.remoteCharging else hudState.isCharging, accuracy = if (mode == "viewer") hudState.trackerAccuracy else hudState.trackerAccuracy, maxAccuracy = if (mode == "viewer") hudState.maxTrackerAccuracy else hudState.maxTrackerAccuracy, satsView = hudState.satsView, satsUsed = hudState.satsUsed, gpsAgeMs = tAge, temp = hudState.trackerTemp, distance = hudState.distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = hudState.isTrackerLocPending, locPendingReason = hudState.trackerLocPendingReason, isTelemetryFresh = if (mode == "tracker") (hudState.viewerGpsTs > 0 && (hudState.systemPulse - hudState.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isPeerActive, isGpsFresh = isTrackerGpsActive, isUltraLongStationary = hudState.isUltraLongStationary))
                 }
             }
         }
