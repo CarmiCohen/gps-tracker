@@ -1,11 +1,13 @@
-# Project Issues & Hardening Tracking (Sep.06.31)
+# Project Issues & Hardening Tracking (Sep.06.32)
 
 ## 🎯 Current Resumption Focus: Physical Verification & Forensic Closing
 Finalizing the high-assurance baseline for Samsung A15 hardware and signaling transport.
 
+## 🟢 Recently Resolved Issues (Sep.06.32)
+*   **Issue #927 RESOLVED: Safe-Mode vs. GNSS Revival**. Updated `HardwareProvider` to honor the `isSafeMode` state, preventing battery-draining revival pulses during signaling recovery hangs (R-ID 271). Fixed logic inversion in permission auditing.
+
 ## 🟢 Recently Resolved Issues (Sep.06.31)
 *   **Issue #926 RESOLVED: Revival Integration**. Implemented collector for `hardwareProvider.revivalEvents` in `TrackerService`. Energy footprint verdicts (R-ID 259) are now transmitted as important logs to the viewer. Hardware locks are now propagated through the entire logic chain to the HUD.
-*   **Issue #927 RESOLVED: Safe-Mode vs. GNSS Revival**. Updated `HardwareProvider` to honor the `isSafeMode` state, preventing battery-draining revival pulses during signaling recovery hangs (R-ID 271).
 *   **Issue #928 RESOLVED: Integrity Mapping**. Mapped all critical integrity violations (Silent Failure, Performance Spikes, Hardware Lock) from `IntegrityMonitor` to `AlarmManager` to ensure they trigger valid system alerts (R-ID 272).
 
 ## 🟢 Recently Resolved Issues (Sep.06.30)
@@ -25,4 +27,4 @@ Finalizing the high-assurance baseline for Samsung A15 hardware and signaling tr
 ## 📊 Hardening Progress Dashboard
 - **Current Audit Baseline: [SOT: 285 (Rules: 50, IDs: 235), Resolved: 928, Open: 2, Testing: 90%, Ideas: 222, QA: 252]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.06.31)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.06.32)*

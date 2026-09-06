@@ -36,6 +36,7 @@ import kotlin.math.*
  * Sep.06.31:
  * - Issue #927 RESOLVED: Safe-Mode Integration. implemented isSafeMode check in 
  *   checkRevivalLifecycle to prevent revival loops during recovery (R-ID 271).
+ *   Fixed logic inversion in permission check and added job cancellation.
  * Sep.06.30:
  * - Issue #925 RESOLVED: Async Teardown Race Condition. Converted start() to 
  *   suspend and implemented join() on teardownJob to ensure deterministic 
@@ -433,7 +434,7 @@ class HardwareProvider @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        if (!isStarted.get() || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) return
+        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
         
         revivalPulseJob?.cancel()
         revivalPulseJob = scope.launch(Dispatchers.Default) {
@@ -791,7 +792,15 @@ class HardwareProvider @Inject constructor(
     fun setLightFastPath(baseline: Double, spikeThreshold: Double, onSpike: () -> Unit) { synchronized(this) { this.fastPathLightBaseline = baseline; this.fastPathLightSpikeThreshold = spikeThreshold; this.onLightSpike = onSpike } }
     fun setHighLoad(high: Boolean) { this.isHighLoad = high }
     fun setMaliAnomaly(active: Boolean) { this.maliAnomaly = active }
-    fun setSafeMode(active: Boolean) { this.isSafeMode = active }
+    
+    fun setSafeMode(active: Boolean) { 
+        this.isSafeMode = active 
+        if (active) {
+            revivalPulseJob?.cancel()
+            revivalPulseJob = null
+            Timber.i("HardwareProvider: Safe Mode active. Revival pulses suppressed.")
+        }
+    }
     
     fun setPowerSaveMode(active: Boolean) {
         synchronized(lifecycleLock) {
