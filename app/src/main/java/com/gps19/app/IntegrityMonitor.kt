@@ -26,6 +26,9 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.06.31:
+ * - Issue #926 RESOLVED: Footprint Visibility. Marked ENERGY AUDIT as 
+ *   important to ensure transmission to viewer (R-ID 259).
  * Sep.06.20:
  * - Issue #924 (Part B): Dynamic GNSS Rates. Propagating MaliAnomaly 
  *   to HardwareProvider to trigger resource-aware throttling (R-ID 267).
@@ -165,7 +168,7 @@ class IntegrityMonitor @Inject constructor(
             }
             is HardwareProvider.RevivalEvent.Footprint -> {
                 val msg = "ENERGY AUDIT: Revival Footprint (R-ID 259) - Delta: ${event.deltaMa}mA, Temp Rise: ${event.deltaTemp}°C, Duration: ${event.durationMs}ms"
-                _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, false))
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
                 Timber.i("IntegrityMonitor: $msg")
             }
         }

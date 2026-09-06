@@ -10,15 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.06.31:
+ * - Issue #926 RESOLVED: Revival Integration. Added gpsHardwareLock 
+ *   to TrackerStatus to ensure parity between roles (R-ID 272).
  * Sep.05.26:
  * - Issue #266 Remediation: Added missing isMaliAnomaly to DashboardHealthState 
  *   to fix compilation breakage.
- * Sep.02.70:
- * - Idea #241: Protobuf Mapping Unification. Removed redundant writeTo() from 
- *   TrackerStatus; serialization is now centralized in TelemetryProtobufMapper (R-ID 241).
- * Sep.03.06:
- * - Issue #238: Location Model Unification. Removed obsolete LocationState 
- *   class; project now standardizes on LocationUpdate (R-ID 238).
  */
 
 sealed class AppSensorEvent {
@@ -150,7 +147,8 @@ class ConnectionPoint(
     var maxIoLatency: Long = 0L,
     var isSilentFailure: Boolean = false,
     var isUltraLongStationary: Boolean = false,
-    var violationUptimeMs: Long = 0L
+    var violationUptimeMs: Long = 0L,
+    var gpsHardwareLock: Boolean = false
 ) {
     fun copyFrom(other: ConnectionPoint) {
         this.localId = other.localId; this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt
@@ -170,6 +168,7 @@ class ConnectionPoint(
         this.sitShock = other.sitShock; this.kineticEnergy = other.kineticEnergy; this.cpuLoad = other.cpuLoad
         this.ioWait = other.ioWait; this.maxIoLatency = other.maxIoLatency; this.isSilentFailure = other.isSilentFailure
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
+        this.gpsHardwareLock = other.gpsHardwareLock
     }
 
     /**
@@ -182,7 +181,8 @@ class ConnectionPoint(
                gpsIndex == other.gpsIndex && snrIdx == other.snrIdx && vibeIdx == other.vibeIdx &&
                luxIdx == other.luxIdx && noiseIdx == other.noiseIdx && liftIdx == other.liftIdx &&
                tiltIdx == other.tiltIdx && baroIdx == other.baroIdx && isSitActive == other.isSitActive &&
-               isUltraLongStationary == other.isUltraLongStationary && violationUptimeMs == other.violationUptimeMs
+               isUltraLongStationary == other.isUltraLongStationary && violationUptimeMs == other.violationUptimeMs &&
+               gpsHardwareLock == other.gpsHardwareLock
     }
 
     fun reset() {
@@ -197,6 +197,7 @@ class ConnectionPoint(
         sitVz = 0.0; sitVzTs = 0L; sitVzRt = 0L; sitDz = 0.0; sitBaro = 0.0; sitTilt = 0.0
         sitShock = 0.0; kineticEnergy = 0.0; cpuLoad = 0.0; ioWait = 0.0; maxIoLatency = 0L
         isSilentFailure = false; isUltraLongStationary = false; violationUptimeMs = 0L
+        gpsHardwareLock = false
     }
 }
 
@@ -359,7 +360,8 @@ data class TrackerStatus(
     val kineticEnergy: Double = 0.0, val isAdaptiveJump: Boolean = false,
     val isBatteryLow: Boolean = false, val isBatteryCritical: Boolean = false, val isSilentFailure: Boolean = false,
     val isUltraLongStationary: Boolean = false,
-    val currentProximityCm: Double = -1.0
+    val currentProximityCm: Double = -1.0,
+    val gpsHardwareLock: Boolean = false
 ) : SpatialAnchor {
     
     fun toMap(fromViewer: Boolean): Map<String, Any?> = mutableMapOf<String, Any?>().apply {
@@ -398,6 +400,7 @@ data class TrackerStatus(
         put("is_adaptive_jump", isAdaptiveJump); put("is_battery_low", isBatteryLow)
         put("is_battery_critical", isBatteryCritical); put("is_silent_failure", isSilentFailure)
         put("is_ultra_long_stationary", isUltraLongStationary)
+        put("gps_hardware_lock", gpsHardwareLock)
     }
 
     companion object {

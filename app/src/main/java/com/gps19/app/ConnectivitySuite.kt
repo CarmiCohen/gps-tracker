@@ -34,20 +34,14 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.06.31:
+ * - Issue #926 RESOLVED: Revival Integration. Mapped gpsHardwareLock 
+ *   in binary and JSON telemetry handlers to ensure role parity (R-ID 272).
  * Sep.05.27:
  * - Issue #918 RESOLVED: Clock Source Consistency. Fixed regression where 
  *   mainRepository.updateRemoteActivity was updated with wall-clock time, 
  *   causing 35s HUD badge staleness failures. Standardized to monotonic 
  *   elapsedRealtime() (R-ID 257).
- * Sep.05.16:
- * - Issue #918 RESOLVED: VWR Badge Persistence Leak. Restricted lastRemoteActivityTs 
- *   updates to high-assurance telemetry packets. Removed generic signaling 
- *   heartbeats from freshness resets and enabled binary processing for Tracker 
- *   mode to ensure role parity (R-ID 258).
- * Sep.04.40:
- * - Issue #908 RESOLVED: Deployment Synchronization. Implemented R-ID 254 periodic 
- *   identity re-broadcast (60s) to ensure zero-interaction peer discovery during 
- *   rolling deployments on budget hardware (R254).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -166,6 +160,7 @@ class ConnectivitySuite @Inject constructor(
     var trackerGpsStallStartTs = 0L 
     val trackerDistToHome get() = trackerStatus.sitDz 
     val trackerKineticEnergy get() = trackerStatus.kineticEnergy
+    val isTrackerGpsHardwareLock get() = trackerStatus.gpsHardwareLock
 
     private val networkCallback = object : ManagedNetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -415,7 +410,7 @@ class ConnectivitySuite @Inject constructor(
                 isPowerSaveMode = entity.isPowerSaveMode, standbyBucket = entity.standbyBucket, netInterface = entity.netInterface,
                 kineticEnergy = 0.0, isBatteryLow = entity.isBatteryLow, isBatteryCritical = entity.isBatteryCritical,
                 verticalVelocity = entity.verticalVelocity, violationUptimeMs = entity.violationUptimeMs,
-                isUltraLongStationary = entity.isUltraLongStationary
+                isUltraLongStationary = entity.isUltraLongStationary, gpsHardwareLock = false
             )
             val status = TelemetryMapper.mapPendingToStatus(entity, statusTemplate)
 
@@ -490,7 +485,8 @@ class ConnectivitySuite @Inject constructor(
         isAdaptiveJump: Boolean = false,
         isBatteryLow: Boolean = false,
         isBatteryCritical: Boolean = false,
-        isUltraLongStationary: Boolean = false
+        isUltraLongStationary: Boolean = false,
+        gpsHardwareLock: Boolean = false
     ) {
         val trackerStatus = TrackerStatus(
             deviceId = deviceId, viewerId = viewerId, ts = timeProvider.currentTimeMillis(),
@@ -517,7 +513,7 @@ class ConnectivitySuite @Inject constructor(
             verticalVelocity = verticalVelocity, sitVz = sitVz, sitVzTs = sitVzTs, sitVzRt = sitVzRt, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
             kineticEnergy = kineticEnergy, isAdaptiveJump = if (isTrackerMode) isAdaptiveJump else false,
             isBatteryLow = if (isTrackerMode) isBatteryLow else false, isBatteryCritical = if (isTrackerMode) isBatteryCritical else false,
-            isUltraLongStationary = isUltraLongStationary
+            isUltraLongStationary = isUltraLongStationary, gpsHardwareLock = gpsHardwareLock
         )
         sendTelemetry(trackerStatus)
     }
@@ -625,7 +621,8 @@ class ConnectivitySuite @Inject constructor(
                     kineticEnergy = statusProto.kineticEnergy,
                     isAdaptiveJump = statusProto.isAdaptiveJump,
                     violationUptimeMs = statusProto.violationUptimeMs,
-                    isUltraLongStationary = statusProto.isUltraLongStationary
+                    isUltraLongStationary = statusProto.isUltraLongStationary,
+                    gpsHardwareLock = statusProto.gpsHardwareLock
                 )
 
                 scope.launch {
@@ -802,7 +799,8 @@ class ConnectivitySuite @Inject constructor(
                     kineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy),
                     isAdaptiveJump = data.optBoolean("is_adaptive_jump", current.isAdaptiveJump),
                     violationUptimeMs = data.optLong("violation_uptime_ms", current.violationUptimeMs),
-                    isUltraLongStationary = data.optBoolean("is_ultra_long_stationary", current.isUltraLongStationary)
+                    isUltraLongStationary = data.optBoolean("is_ultra_long_stationary", current.isUltraLongStationary),
+                    gpsHardwareLock = data.optBoolean("gps_hw_lock", current.gpsHardwareLock)
                 )
 
                 scope.launch {

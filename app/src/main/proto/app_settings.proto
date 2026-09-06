@@ -198,6 +198,7 @@ message RealtimeStatus {
     // Issue #782: Protocol Audit - Binary Schema Expansion
     int64 violation_uptime_ms = 66;
     bool is_ultra_long_stationary = 67;
+    bool gps_hardware_lock = 68;
 }
 
 message GeoPointProto {
@@ -354,4 +355,5 @@ message TrackerStatusProto {
     bool is_suspicious = 106;
     bool is_anchor_locked = 107;
     bool is_battery_whitelisted = 108;
+    bool gps_hardware_lock = 109;
 }

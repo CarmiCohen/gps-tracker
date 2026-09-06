@@ -33,6 +33,9 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.06.31:
+ * - Issue #927 RESOLVED: Safe-Mode Integration. implemented isSafeMode check in 
+ *   checkRevivalLifecycle to prevent revival loops during recovery (R-ID 271).
  * Sep.06.30:
  * - Issue #925 RESOLVED: Async Teardown Race Condition. Converted start() to 
  *   suspend and implemented join() on teardownJob to ensure deterministic 
@@ -161,6 +164,7 @@ class HardwareProvider @Inject constructor(
     @Volatile private var isHighLoad = false
     @Volatile private var maliAnomaly = false
     @Volatile private var powerSaveMode = false
+    @Volatile private var isSafeMode = false
 
     private val logicSnapshotBuffer = CircularStateBuffer(2, { ForensicSnapshot() }, { it.reset() })
     private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
@@ -787,6 +791,7 @@ class HardwareProvider @Inject constructor(
     fun setLightFastPath(baseline: Double, spikeThreshold: Double, onSpike: () -> Unit) { synchronized(this) { this.fastPathLightBaseline = baseline; this.fastPathLightSpikeThreshold = spikeThreshold; this.onLightSpike = onSpike } }
     fun setHighLoad(high: Boolean) { this.isHighLoad = high }
     fun setMaliAnomaly(active: Boolean) { this.maliAnomaly = active }
+    fun setSafeMode(active: Boolean) { this.isSafeMode = active }
     
     fun setPowerSaveMode(active: Boolean) {
         synchronized(lifecycleLock) {
@@ -821,7 +826,7 @@ class HardwareProvider @Inject constructor(
     private fun attemptStepRegistration() = attemptStepDetectorRegistration()
 
     private fun checkRevivalLifecycle() {
-        if (!isStarted.get()) return
+        if (!isStarted.get() || isSafeMode) return
         val nowRt = timeProvider.elapsedRealtime(); val currentStatus = _locationStatus.value
         if (currentStatus.isPending) {
             val stallDuration = nowRt - pendingEnterRt

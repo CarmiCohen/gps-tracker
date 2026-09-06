@@ -4,15 +4,14 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Sep.06.31:
+ * - Issue #926 RESOLVED: Revival Integration. Mapped gpsHardwareLock 
+ *   to Protobuf builders for signaling and persistence parity (R-ID 272).
  * Sep.04.20:
  * - Issue #907 RESOLVED: System-Wide Interconnectivity Failure. Hardened ID 
  *   aliasing by using SignalingConstants.getTransmissionId() during serialization. 
  *   Ensures Protobuf parity with JSON path (T -> Trk) to prevent handshake 
  *   rejections on budget hardware (R907).
- * Sep.02.70:
- * - Idea #241: Protobuf Mapping Unification. Consolidated mapping logic for 
- *   RealtimeStatus (Signaling) and TrackerStatusProto (Persistence) to ensure 
- *   field parity and reduce Technical Debt (R-ID 241).
  */
 object TelemetryProtobufMapper {
 
@@ -95,6 +94,7 @@ object TelemetryProtobufMapper {
             setIsSilentFailure(status.isSilentFailure)
             setViolationUptimeMs(status.violationUptimeMs)
             setIsUltraLongStationary(status.isUltraLongStationary)
+            setGpsHardwareLock(status.gpsHardwareLock)
 
             // Enums
             setState(TrackerStateProto.valueOf("TS_" + status.trackerState.name))
@@ -215,6 +215,7 @@ object TelemetryProtobufMapper {
             setIsSuspicious(status.isSuspicious)
             setIsAnchorLocked(status.isAnchorLocked)
             setIsBatteryWhitelisted(status.isBatteryWhitelisted)
+            setGpsHardwareLock(status.gpsHardwareLock)
 
             // Enums
             setTrackerState(status.trackerState.name)

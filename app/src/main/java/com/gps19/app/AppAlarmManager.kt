@@ -30,15 +30,13 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.06.31:
+ * - Issue #928 RESOLVED: Performance Alarm Mapping. Expanded evaluateAlarms 
+ *   signature to ingest all critical integrity signals (CPU Load, IO Wait, 
+ *   Silent Failure, Mali Anomaly) for detection logic parity (R928).
  * Sep.03.25:
  * - Idea #240: ContextShadow Automation. Migrated AudioSynthesizer dependency 
  *   to injection (R-ID 240).
- * Sep.02.01:
- * - Issue #897: Propagated vibrationSensitivity and tiltSensitivity from 
- *   AlertSettings to AlarmEvaluationState (R2.3).
- * Aug.07.131:
- * - Issue #124: GPS Hardware Revival Hardening (R124). Propagating 
- *   isGpsHardwareLock to SystemHealthState in evaluateAlarms.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -161,7 +159,11 @@ class AppAlarmManager @Inject constructor(
         discoveryPhase: DiscoveryPhase? = null, capabilities: HardwareCapabilities = HardwareCapabilities(),
         isLocationPending: Boolean = false, locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
         snrSnapshot: Double? = null, vibeSnapshot: Double? = null,
-        isGpsHardwareLock: Boolean = false
+        isGpsHardwareLock: Boolean = false,
+        cpuLoad: Double = 0.0, ioWait: Double = 0.0, maxIoLatency: Long = 0L, 
+        isSilentFailure: Boolean = false, isMaliAnomaly: Boolean = false, 
+        isUltraLongStationary: Boolean = false,
+        isBatteryLow: Boolean = false, isBatteryCritical: Boolean = false
     ) {
         this.isTrackerMode = isTrackerMode
         val versionTag = "[${BuildConfig.VERSION_NAME}]"
@@ -183,7 +185,11 @@ class AppAlarmManager @Inject constructor(
             standbyBucket = standbyBucket, netInterface = netInterface,
             isStorageLow = isStorageLow, isStorageCritical = isStorageCritical,
             isBatterySteepDischarge = isBatterySteepDischarge, isCoolingModeActive = isCoolingModeActive,
-            vibration = vibeSnapshot ?: 0.0
+            vibration = vibeSnapshot ?: 0.0,
+            cpuLoad = cpuLoad, ioWait = ioWait, maxIoLatency = maxIoLatency,
+            isSilentFailure = isSilentFailure, isMaliAnomaly = isMaliAnomaly,
+            isUltraLongStationary = isUltraLongStationary,
+            isBatteryLow = isBatteryLow, isBatteryCritical = isBatteryCritical
         )
 
         // Map home points to persistent EngineGeoPoint pool
