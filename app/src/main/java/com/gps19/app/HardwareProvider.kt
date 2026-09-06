@@ -33,12 +33,13 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.06.30:
+ * - Issue #925 RESOLVED: Async Teardown Race Condition. Converted start() to 
+ *   suspend and implemented join() on teardownJob to ensure deterministic 
+ *   initialization after rapid stop/start sequences (R925).
  * Sep.06.20:
  * - Issue #924 (Part B): A15 Resource Throttling. Implemented dynamic GNSS throttling 
  *   (5000ms) triggered by High Load or MaliAnomaly on budget hardware (R-ID 267).
- * Sep.06.17:
- * - Issue #922 (Part B): Extracted forensic auditing (Jitter, Sensor Rates, Energy) 
- *   into ForensicAuditor to restore lean hardware bridge SRP.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -165,7 +166,7 @@ class HardwareProvider @Inject constructor(
     private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
 
     private val sensorBuffer = CircularStateBuffer(256, { EngineSensorSnapshot() }, {
-        it.ts = 0L; it.rt = 0L; it.acoustic = 0.0; it.lux = 0.0; it.vibe = 0.0; it.proxIdx = 0.0; it.lift = 0.0; it.tilt = 0.0; it.isSitDetected = false; it.sitVzTs = 0L; it.sitVzRt = 0L; it.sitShock = 0.0; it.kineticEnergy = 0.0
+        it.ts = 0L; it.rt = 0L; it.lux = 0.0; it.vibe = 0.0; it.proxIdx = 0.0; it.lift = 0.0; it.tilt = 0.0; it.isSitDetected = false; it.sitVzTs = 0L; it.sitVzRt = 0L; it.sitShock = 0.0; it.kineticEnergy = 0.0
     })
     private var lastBufferRecordRt = 0L
 
@@ -296,7 +297,13 @@ class HardwareProvider @Inject constructor(
         }
     }
 
-    fun start() {
+    suspend fun start() {
+        // Issue #925: Await completion of any active teardown before re-initializing.
+        teardownJob?.let {
+            Timber.i("HardwareProvider: Awaiting active teardown completion (Issue #925).")
+            it.join()
+        }
+
         synchronized(lifecycleLock) {
             if (isStarted.getAndSet(true)) {
                 isTeardownActive.set(false)
@@ -304,7 +311,6 @@ class HardwareProvider @Inject constructor(
             }
             
             isTeardownActive.set(false)
-            teardownJob?.cancel(); teardownJob = null
             sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt
             proximityMaxRange = proximity?.maximumRange ?: 5f
             
@@ -390,6 +396,7 @@ class HardwareProvider @Inject constructor(
                     } else {
                         Timber.i("HardwareProvider: Teardown interrupted by restart. Retaining thread.")
                     }
+                    teardownJob = null
                 }
                 
                 val totalDuration = SystemClock.elapsedRealtime() - stopStartTime

@@ -16,15 +16,14 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.06.30:
+ * - Issue #925 RESOLVED: Async Teardown Race Condition. Synchronized HardwareProvider 
+ *   initialization by awaiting suspend start() (R925).
  * Sep.05.27:
  * - Issue #918 RESOLVED: Clock Source Consistency. Fixed regression where 
  *   peer pulse timestamps were updated with wall-clock time, causing 35s 
  *   HUD badge staleness failures. Standardized to monotonic elapsedRealtime() 
  *   (R-ID 257).
- * Sep.03.102:
- * - Issue #247 Enforcement: Hardened initial Signal Loss calculation. 
- *   Using time since service start as fallback for silenceDelta to ensure 
- *   immediate forensic visibility if peer handshake fails (R248).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -122,6 +121,8 @@ class ViewerService : BaseMonitorService() {
         selfProcessor.loadState(0.0, 0L, -1000.0, null, homePoints, maxDist)
 
         historyManager.initialize(lifecycleScope)
+        
+        // Issue #925: Synchronous wait for hardware availability
         hardwareProvider.start()
 
         commandRouter.register()
@@ -280,7 +281,11 @@ class ViewerService : BaseMonitorService() {
                     is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
                     is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
-                    is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); hardwareProvider.start() }
+                    is CommandEvent.SyncSensors -> { 
+                        refreshCapabilitiesInternal()
+                        // Issue #925: Ensure synchronous restart after hardware sync command
+                        launch { hardwareProvider.start() }
+                    }
                     else -> {}
                 }
             }

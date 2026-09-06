@@ -21,14 +21,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.06.30:
+ * - Issue #925 RESOLVED: Async Teardown Race Condition. Synchronized HardwareProvider 
+ *   initialization by awaiting suspend start() (R925).
  * Sep.03.111:
  * - Issue #898 RESOLVED: A15 Connectivity Hardening. Reduced A15_POKE_INTERVAL_MS 
  *   to 30s and tightened HEURISTIC RECOVERY thresholds to 10s to mitigate 
  *   aggressive background suppression on Samsung budget hardware (R898).
- * Sep.03.15:
- * - Issue #240 RESOLVED: Tracker Telemetry Publication. Decoupled telemetry 
- *   updates from GPS availability. Local HUD now reflects real-time sensor 
- *   data even without a satellite fix (R-ID 240).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -124,6 +123,8 @@ class TrackerService : BaseMonitorService() {
         alarmManager.restoreState(savedAlarms)
 
         historyManager.initialize(lifecycleScope)
+        
+        // Issue #925: Synchronous wait for hardware availability
         hardwareProvider.start()
 
         commandRouter.register()
@@ -286,7 +287,11 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
                     is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
-                    is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); hardwareProvider.start() }
+                    is CommandEvent.SyncSensors -> { 
+                        refreshCapabilitiesInternal()
+                        // Issue #925: Ensure synchronous restart after hardware sync command
+                        launch { hardwareProvider.start() }
+                    }
                     is CommandEvent.ExecuteStressTest -> executeAutomatedStressTest()
                     is CommandEvent.SimulateStoragePressure -> {} 
                 }

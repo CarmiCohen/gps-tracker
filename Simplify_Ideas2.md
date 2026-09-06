@@ -1,9 +1,9 @@
-# Simplicity Audit & Future Simplification Ideas (Sep.06.17)
+# Simplicity Audit & Future Simplification Ideas (Sep.06.30)
 
-## 🎯 Current Audit: Issue #922
-The introduction of `CircularStateBuffer` significantly simplified the internal state management of `HardwareProvider` by removing manual index wrapping logic (`(idx + 1) % size`). 
+## 🎯 Current Audit: Issue #925
+The conversion of `HardwareProvider.start()` to a suspend function significantly simplified the coordination logic in `TrackerService` and `ViewerService`, removing the need for manual delay hacks or complex re-entry checks.
 
 ## 💡 Simplification Ideas
-1.  **Generic Snapshotting**: The `ForensicSnapshot` class in `HardwareProvider` could be moved to `EngineModels` to allow better reuse in the upcoming `ForensicAuditor` extraction (Issue #922 Part B).
-2.  **Unified Buffer Access**: Currently, `snrBuffer` and `sensorBuffer` have slightly different "sample" types. Standardizing these into a single forensic event wrapper would reduce the number of `asSequence()` iterations in `HistoryManager`.
-3.  **Managed Sensor Unification**: The `ManagedSensorListener` base class could be extended to handle the `CircularStateBuffer` lifecycle automatically, further reducing boilerplate in `HardwareProvider`.
+1.  **Lifecycle Managed Bridge**: The pattern of `teardownJob?.join()` followed by `synchronized` initialization could be abstracted into a `ManagedLifecycleBridge` base class to prevent similar race conditions in `ConnectivitySuite` or `CommunicationManager`.
+2.  **Forensic Snapshot Decoupling**: Move `ForensicSnapshot` to `EngineModels` to reduce dependencies between the bridge layer and the forensic auditor (Issue #922).
+3.  **Unified Buffer Access**: Standardizing forensic event wrappers would further reduce the `asSequence()` boilerplate in history backfill logic.

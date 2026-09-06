@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.06.20)
+# Resolution Archive (Sep.06.30)
+
+## 🟢 Resolved Issues (Sep.06.30)
+*   **Issue #925 RESOLVED: Async Teardown Race Condition**. Remediated critical race condition where rapid `stop() -> start()` sequences attempted re-initialization before the forensic settling window (800ms) completed. Converted `HardwareProvider.start()` to a suspend function that joins the `teardownJob` for deterministic lifecycle transitions (R925).
 
 ## 🟢 Resolved Issues (Sep.06.20)
 *   **Issue #924 RESOLVED (Part B): A15 Resource Throttling**. Migrated GNSS throttling from the UI layer (`MainViewModel`) down to the `HardwareProvider` source. Implemented resource-aware emission logic that automatically throttles satellite status updates to 5000ms on A15 hardware when high system load or Mali driver anomalies are detected (R-ID 267).
