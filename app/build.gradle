@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 1
-        versionName "Sep.06.17" // Clock Parity & Forensic Buffering (#922)
+        versionName "Sep.06.20" // A15 Resource Throttling (#924)
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

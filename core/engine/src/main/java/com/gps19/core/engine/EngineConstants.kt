@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.06.20:
+ * - Issue #924 (Part B): Added GNSS_SAMPLING_INTERVAL_THROTTLED_MS (5000ms) 
+ *   for A15 resource throttling during high load or MaliAnomaly.
  * Sep.05.15:
  * - Issue #917 RESOLVED: Exact Actual Colors. Updated stale thresholds 
  *   to 35s to match HUD LED Specifications (R338/R972).
@@ -298,6 +301,7 @@ const val THROTTLE_ACOUSTIC_LIMIT = 15.0
 const val THROTTLE_COMPASS_LIMIT = 5.0
 const val THROTTLE_BARO_LIMIT = 0.5
 const val GNSS_SAMPLING_INTERVAL_MS = 2000L
+const val GNSS_SAMPLING_INTERVAL_THROTTLED_MS = 5000L
 
 // System Thresholds (Core Logic)
 const val TRACKER_SIGNAL_LOSS_THRESHOLD_MS = 180000L

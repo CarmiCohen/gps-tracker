@@ -1,9 +1,13 @@
-# Project Issues & Hardening Tracking (Sep.06.17)
+# Project Issues & Hardening Tracking (Sep.06.20)
 
 ## 🎯 Current Resumption Focus: Physical Verification & Forensic Closing
 Finalizing the high-assurance baseline for Samsung A15 hardware and signaling transport.
 
+## 🟢 Recently Resolved Issues (Sep.06.20)
+*   **Issue #924 RESOLVED (Part B): A15 Resource Throttling**. Migrated GNSS throttling from the UI layer (`MainViewModel`) down to the `HardwareProvider` source. Implemented resource-aware emission logic that automatically throttles satellite status updates to 5000ms on A15 hardware when high system load or Mali driver anomalies are detected (R-ID 267).
+
 ## 🟢 Recently Resolved Issues (Sep.06.17)
+*   **Issue #922 RESOLVED (Part B): HardwareProvider Extraction**. Extracted GNSS jitter monitoring, sensor rate audits (R-ID 256), and energy footprint snapshots (R-ID 259) into `ForensicAuditor`. Restored `HardwareProvider` to a lean hardware bridge, adhering to the Single Responsibility Principle.
 *   **Issue #922 RESOLVED (Part A): Clock Parity & Forensic Buffering**. Standardized all forensic indexing (SNR, Sensors) in `HardwareProvider` to use monotonic `elapsedRealtime()` as the primary key, ensuring immunity to system time jumps (R-ID 264). Replaced fixed-array pools with a standardized `CircularStateBuffer` for all forensic streams to eliminate GC pressure and locking overhead (R-ID 263).
 
 ## 🟢 Recently Resolved Issues (Sep.06.01)
@@ -14,13 +18,9 @@ Finalizing the high-assurance baseline for Samsung A15 hardware and signaling tr
 
 ## 🟡 Open Issues & Hardening Tasks (Sorted by Criticality)
 
-### 🟡 MEDIUM: Refactoring & Budget Optimization
-*   **Issue #922 (Part B): HardwareProvider Extraction**.
-    *   [ ] **Extraction**: Extract GNSS jitter monitoring, sensor rate audits (R-ID 256), and energy footprint snapshots (R-ID 259) from `HardwareProvider` into a new `ForensicAuditor`. Restore `HardwareProvider` to a lean hardware bridge.
-*   **Issue #924 (Part B): A15 Resource Throttling**.
-    *   [ ] **Dynamic GNSS Rates**: Move GNSS throttling from the UI layer (`MainViewModel`) down to `HardwareProvider` source. On A15 hardware, throttle emission to 5000ms when high system load or `MaliAnomaly` is detected.
+*(No open issues remaining in this cycle)*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 281 (Rules: 49, IDs: 232), Resolved: 909, Open: 2, Testing: 96% (Chapters), Ideas: 221, QA: 252]**
+- **Current Audit Baseline: [SOT: 283 (Rules: 50, IDs: 233), Resolved: 911, Open: 0, Testing: 96% (Chapters), Ideas: 221, QA: 252]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.06.17)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.06.20)*

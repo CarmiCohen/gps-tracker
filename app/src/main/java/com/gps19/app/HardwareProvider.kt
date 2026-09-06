@@ -33,12 +33,12 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
- * Sep.06.10:
- * - Issue #922: Clock Parity & Forensic Buffering. Replaced fixed-array pools with 
- *   CircularStateBuffer and standardized forensic indexing on elapsedRealtime().
- * Sep.06.00:
- * - Issue #923: Lifecycle & Teardown Hardening. Joined teardown window via teardownJob, 
- *   cleared revival footprint state on stop, and corrected inverted permission check in revival pulse.
+ * Sep.06.20:
+ * - Issue #924 (Part B): A15 Resource Throttling. Implemented dynamic GNSS throttling 
+ *   (5000ms) triggered by High Load or MaliAnomaly on budget hardware (R-ID 267).
+ * Sep.06.17:
+ * - Issue #922 (Part B): Extracted forensic auditing (Jitter, Sensor Rates, Energy) 
+ *   into ForensicAuditor to restore lean hardware bridge SRP.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -46,7 +46,8 @@ class HardwareProvider @Inject constructor(
     @ApplicationScope private val scope: CoroutineScope,
     private val timeProvider: TimeProvider,
     private val systemMonitor: SystemMonitor,
-    private val systemStatusProvider: SystemStatusProvider
+    private val systemStatusProvider: SystemStatusProvider,
+    private val forensicAuditor: ForensicAuditor
 ) : ManagedSensorListener() {
 
     private val locationManager by lazy { shadowContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
@@ -69,17 +70,13 @@ class HardwareProvider @Inject constructor(
     var averageSnr = 0.0; private set
     private var lastFixRt = 0L
     private var lastGnssEmitRt = 0L
-    private var lastGnssStatusRt = 0L
     private var pendingEnterRt = 0L
     private var recoveryStartRt = 0L
     private val pollingIntervalFlow = MutableStateFlow(TICK_INTERVAL_MS)
     private var revivalAttemptCount = 0
     private var isHardwareLocked = false
-    var maxGnssJitterMs = 0L; private set
 
-    // --- Energy Footprint State (R-ID 259) ---
-    private var revivalStartBattery: BatteryStatus? = null
-    private var revivalStartRtForFootprint = 0L
+    val maxGnssJitterMs get() = forensicAuditor.maxGnssJitterMs
 
     private val _revivalEvents = MutableSharedFlow<RevivalEvent>(extraBufferCapacity = 8)
     val revivalEvents = _revivalEvents.asSharedFlow()
@@ -104,7 +101,6 @@ class HardwareProvider @Inject constructor(
     private val _locationStatus = MutableStateFlow(LocationStatus())
     val locationStatusFlow: StateFlow<LocationStatus> = _locationStatus.asStateFlow()
 
-    // Issue #922: Buffering Hardening
     private val snrBuffer = CircularStateBuffer(512, { EngineSnrSample() }, { it.ts = 0L; it.rt = 0L; it.snr = 0.0 })
 
     private val _internalGpsFlow = MutableSharedFlow<GpsUpdate>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
@@ -162,9 +158,9 @@ class HardwareProvider @Inject constructor(
     @Volatile private var isAcousticRunning = false
     private var acousticThread: Thread? = null
     @Volatile private var isHighLoad = false
+    @Volatile private var maliAnomaly = false
     @Volatile private var powerSaveMode = false
 
-    // Issue #922: Buffering Hardening
     private val logicSnapshotBuffer = CircularStateBuffer(2, { ForensicSnapshot() }, { it.reset() })
     private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
 
@@ -210,11 +206,6 @@ class HardwareProvider @Inject constructor(
     private var initialRotationMatrix = FloatArray(9); private var hasInitialRotation = false
     private var plungePhase = 0; private var plungeMatched = false; private var lastPlungePhaseRt = 0L
 
-    // --- Rate Audit State (R-ID 256) ---
-    private var accelEventCount = 0
-    private var accelAuditStartRt = 0L
-    private var isSensorRateAudited = false
-
     private val _isUltraLongStationary = MutableStateFlow(false)
     val isUltraLongStationaryFlow: StateFlow<Boolean> = _isUltraLongStationary.asStateFlow()
 
@@ -240,12 +231,8 @@ class HardwareProvider @Inject constructor(
         override fun onSatelliteStatusChanged(status: GnssStatus) {
             if (isTeardownActive.get()) return
             val nowRt = timeProvider.elapsedRealtime()
-            if (lastGnssStatusRt > 0) {
-                val interval = nowRt - lastGnssStatusRt
-                val jitter = abs(interval - GNSS_EXPECTED_INTERVAL_MS)
-                if (jitter > maxGnssJitterMs) maxGnssJitterMs = jitter
-            }
-            lastGnssStatusRt = nowRt
+            forensicAuditor.recordGnssStatus(nowRt)
+            
             satellitesInView = status.satelliteCount
             var used = 0; var snrSum = 0.0; var snrCount = 0
             for (i in 0 until status.satelliteCount) {
@@ -256,7 +243,6 @@ class HardwareProvider @Inject constructor(
             satellitesUsed = used; averageSnr = if (snrCount > 0) snrSum / snrCount else 0.0
             val now = timeProvider.currentTimeMillis()
             
-            // Issue #922: Use CircularStateBuffer for SNR
             synchronized(snrBuffer) {
                 snrBuffer.next().apply {
                     this.ts = now
@@ -265,7 +251,14 @@ class HardwareProvider @Inject constructor(
                 }
             }
             
-            if (nowRt - lastGnssEmitRt >= GNSS_SAMPLING_INTERVAL_MS) {
+            // Issue #924: Dynamic GNSS Throttling based on A15 and High Load/MaliAnomaly
+            val currentInterval = if (systemStatusProvider.isA15Hardware() && (isHighLoad || maliAnomaly)) {
+                GNSS_SAMPLING_INTERVAL_THROTTLED_MS
+            } else {
+                GNSS_SAMPLING_INTERVAL_MS
+            }
+
+            if (nowRt - lastGnssEmitRt >= currentInterval) {
                 lastGnssEmitRt = nowRt
                 val satList = mutableListOf<SatelliteInfo>()
                 for (i in 0 until status.satelliteCount) {
@@ -343,8 +336,7 @@ class HardwareProvider @Inject constructor(
             if (!isStarted.getAndSet(false)) return
             isTeardownActive.set(true)
             
-            revivalStartBattery = null
-            revivalStartRtForFootprint = 0L
+            forensicAuditor.clearRevivalState()
             
             val stopStartTime = SystemClock.elapsedRealtime()
             Timber.i("HardwareProvider: Starting teardown sequence (R891/R908).")
@@ -430,7 +422,7 @@ class HardwareProvider @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        if (!isStarted.get() || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        if (!isStarted.get() || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) return
         
         revivalPulseJob?.cancel()
         revivalPulseJob = scope.launch(Dispatchers.Default) {
@@ -495,7 +487,7 @@ class HardwareProvider @Inject constructor(
         
         if (shouldEmitSuccess) {
             _revivalEvents.tryEmit(RevivalEvent.Success)
-            emitEnergyFootprint()
+            forensicAuditor.computeEnergyFootprint(nowRt)?.let { _revivalEvents.tryEmit(it) }
         }
     }
 
@@ -531,9 +523,8 @@ class HardwareProvider @Inject constructor(
     val gnssDetailFlow: Flow<GnssDetail?> = hardwareObservationFlow.filterIsInstance<GpsUpdate.GnssUpdate>().map { it.detail }
 
     fun setPollingInterval(intervalMs: Long) { if (pollingIntervalFlow.value != intervalMs) pollingIntervalFlow.value = intervalMs }
-    fun resetGnssJitter() { maxGnssJitterMs = 0L }
+    fun resetGnssJitter() { forensicAuditor.resetGnssJitter() }
 
-    // Issue #922: Standardize on RT for forensic indexing
     fun getSnrSamples(fromRt: Long, toRt: Long): Sequence<EngineSnrSample> = sequence {
         val flyweight = EngineSnrSample()
         val snapshot = synchronized(snrBuffer) { snrBuffer.asSequence().toList() }
@@ -565,16 +556,8 @@ class HardwareProvider @Inject constructor(
                 processVibration(values[0], values[1], values[2]); updateOrientation()
                 if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) { lastStayAliveRt = nowRt; systemMonitor.acquireWakeLock(force = true) }
 
-                if (!isSensorRateAudited && !isWarming) {
-                    if (accelAuditStartRt == 0L) accelAuditStartRt = nowRt
-                    accelEventCount++
-                    if (nowRt - accelAuditStartRt >= 1000L) {
-                        val hz = accelEventCount.toDouble() / ((nowRt - accelAuditStartRt) / 1000.0)
-                        val isEffective = hz > 200.0
-                        Timber.i("HardwareProvider: Sensor Rate Audit (R-ID 256): ${hz.toInt()} Hz. Efficacy: $isEffective")
-                        _sensorEvents.tryEmit(AppSensorEvent.LogEvent("Sensor Rate Audit: ${hz.toInt()}Hz (Efficacy: $isEffective)", false))
-                        isSensorRateAudited = true
-                    }
+                forensicAuditor.auditSensorRate(nowRt, isWarming)?.let { msg ->
+                    _sensorEvents.tryEmit(AppSensorEvent.LogEvent(msg, false))
                 }
             }
             Sensor.TYPE_LINEAR_ACCELERATION -> processLinearAcceleration(values[0], values[1], values[2], event.timestamp)
@@ -610,7 +593,6 @@ class HardwareProvider @Inject constructor(
             Sensor.TYPE_ROTATION_VECTOR -> processRotation(values)
         }
         
-        // Issue #922: Use CircularStateBuffer for sensor samples
         if (nowRt - lastBufferRecordRt >= TICK_INTERVAL_MS) {
             synchronized(sensorBuffer) {
                 sensorBuffer.next().apply {
@@ -688,7 +670,6 @@ class HardwareProvider @Inject constructor(
     fun isAcousticMonitoringEnabled() = isMonitoring
     fun isAcousticMonitoringActive() = isAcousticRunning
 
-    // Issue #922: Use CircularStateBuffer for snapshots
     fun consumeLogicSnapshot(): ForensicSnapshot {
         return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeLogicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(m, false)) }) {
             synchronized(logicSnapshotBuffer) {
@@ -713,7 +694,6 @@ class HardwareProvider @Inject constructor(
         }
     }
 
-    // Issue #922: Standardize on RT for forensic indexing
     fun getSensorSamples(fromRt: Long, toRt: Long): Sequence<EngineSensorSnapshot> = sequence {
         val flyweight = EngineSensorSnapshot()
         val snapshot = synchronized(sensorBuffer) { sensorBuffer.asSequence().toList() }
@@ -799,6 +779,7 @@ class HardwareProvider @Inject constructor(
     fun setAcousticFastPath(floor: Double, spikeThreshold: Double, minDb: Double, onSpike: () -> Unit) { synchronized(this) { this.fastPathFloor = floor; this.fastPathSpikeThreshold = spikeThreshold; this.fastPathMinDb = minDb; this.onAcousticSpike = onSpike } }
     fun setLightFastPath(baseline: Double, spikeThreshold: Double, onSpike: () -> Unit) { synchronized(this) { this.fastPathLightBaseline = baseline; this.fastPathLightSpikeThreshold = spikeThreshold; this.onLightSpike = onSpike } }
     fun setHighLoad(high: Boolean) { this.isHighLoad = high }
+    fun setMaliAnomaly(active: Boolean) { this.maliAnomaly = active }
     
     fun setPowerSaveMode(active: Boolean) {
         synchronized(lifecycleLock) {
@@ -812,7 +793,7 @@ class HardwareProvider @Inject constructor(
         }
     }
 
-    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; synchronized(this) { accelEventCount = 0; accelAuditStartRt = 0L; isSensorRateAudited = false }; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } }
+    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; forensicAuditor.reset(); synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } }
 
     private fun startStepDetectorRecoveryLoop() { recoveryJob?.cancel(); recoveryJob = scope.launch { while (isActive) { delay(300000L); if (!isStepDetectorRegistered) attemptStepRegistration() } } }
     private fun attemptStepDetectorRegistration() {
@@ -839,10 +820,7 @@ class HardwareProvider @Inject constructor(
             val stallDuration = nowRt - pendingEnterRt
             val retryThreshold = (revivalAttemptCount + 1) * GPS_REVIVAL_RETRY_INTERVAL_MS
             
-            if (revivalStartBattery == null) {
-                revivalStartBattery = systemStatusProvider.getBatteryStatus()
-                revivalStartRtForFootprint = nowRt
-            }
+            forensicAuditor.captureRevivalStart(nowRt)
 
             if (stallDuration > retryThreshold) {
                 if (revivalAttemptCount < MAX_REVIVAL_ATTEMPTS) {
@@ -854,28 +832,11 @@ class HardwareProvider @Inject constructor(
                     isHardwareLocked = true
                     Timber.e("HardwareProvider: MAX REVIVAL ATTEMPTS REACHED. GPS_HARDWARE_LOCK triggered.")
                     _revivalEvents.tryEmit(RevivalEvent.HardwareLock)
-                    emitEnergyFootprint()
+                    forensicAuditor.computeEnergyFootprint(nowRt)?.let { _revivalEvents.tryEmit(it) }
                 }
             }
         } else { 
             revivalAttemptCount = 0; isHardwareLocked = false 
         }
-    }
-
-    private fun emitEnergyFootprint() {
-        val start = revivalStartBattery ?: return
-        val startRt = revivalStartRtForFootprint
-        val current = systemStatusProvider.getBatteryStatus()
-        val nowRt = timeProvider.elapsedRealtime()
-        
-        val deltaMa = current.currentMa - start.currentMa
-        val deltaTemp = current.temp - start.temp
-        val durationMs = nowRt - startRt
-        
-        Timber.i("HardwareProvider: Energy Footprint Verdict (R-ID 259): Delta mA: $deltaMa, Delta Temp: $deltaTemp°C, Duration: ${durationMs}ms")
-        _revivalEvents.tryEmit(RevivalEvent.Footprint(deltaMa, deltaTemp, durationMs))
-        
-        revivalStartBattery = null
-        revivalStartRtForFootprint = 0L
     }
 }

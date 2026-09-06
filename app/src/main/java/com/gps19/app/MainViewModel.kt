@@ -37,12 +37,12 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.06.20:
+ * - Issue #924 RESOLVED (Part B): A15 Resource Throttling. Migrated GNSS 
+ *   throttling to HardwareProvider source. Removed redundant UI sampling (R-ID 267).
  * Sep.06.01:
  * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. The Hydration Watchdog 
  *   now triggers isSafeMode = true to prevent signaling loops during recovery.
- * Sep.05.28:
- * - Issue #914 RESOLVED: GNSS Detail Sampling. Implemented A15-aware sampling 
- *   for activeGnssDetail flow to reduce UI overhead during satellite monitoring (R-ID 267).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -284,10 +284,10 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /**
-     * Issue #914 Hardening: Sampling GNSS updates to mitigate UI overhead on budget devices.
+     * activeGnssDetail: GNSS Detail publication flow.
+     * Throttling migrated to HardwareProvider source (R-ID 267) for A15 load-awareness.
      */
     val activeGnssDetail: StateFlow<GnssDetail?> = repository.gnssDetail
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private var lastTrackerTrailSize = -1

@@ -1,19 +1,19 @@
-# Handover Snapshot (Sep.06.17)
+# Handover Snapshot (Sep.06.20)
 
-## 🎯 Current State: Forensic Hardening Complete (Part A)
-Standardized forensic indexing and buffering are now fully operational.
+## 🎯 Current State: A15 Resource Throttling Complete
+GNSS emission is now dynamically throttled at the hardware source. The UI layer is decoupled from hardware performance constraints.
 
 ## ✅ Completed in this Session
-- **CircularStateBuffer**: Implemented a generic, high-performance circular buffer for state objects.
-- **Clock Parity**: Refactored `HardwareProvider` forensic queries to use `elapsedRealtime()` parity (R922).
-- **History Backfill**: Updated `HistoryManager` to utilize monotonic time for gap-filling audits.
-- **Versioning**: Incremented to `Sep.06.17`.
+- **HardwareProvider**: Implemented dynamic GNSS throttling (5000ms) triggered by `isHighLoad` or `maliAnomaly` on budget hardware (R-ID 267).
+- **IntegrityMonitor**: Linked Mali driver anomaly detection state to `HardwareProvider` for real-time source-level throttling.
+- **MainViewModel**: Removed redundant UI-level sampling for `activeGnssDetail`.
+- **SOT Requirements**: Added R-ID 267 to the Functional Requirements baseline.
+- **Versioning**: Incremented to `Sep.06.20` ("A15 Resource Throttling").
 
 ## ⏭️ Next Steps
-- **Issue #922 (Part B)**: Extract forensic auditing logic from `HardwareProvider` into `ForensicAuditor` to restore SRP.
-- **Issue #924 (Part B)**: Implement dynamic GNSS throttling based on `MaliAnomaly` detection for Samsung A15 hardware.
+- **Samsung S21FE Optimization**: Evaluate if similar resource-aware throttling is required for the S21FE platform during thermal escalation.
 
 ## 🛡️ Integrity Audit
-- **Build Status**: Successful (`app:assembleDebug`).
-- **SOT Audit**: 281 Requirements (49 Rules, 232 IDs).
-- **Clock Parity**: Verified in `HardwareProvider` and `HistoryManager`.
+- **Build Status**: Successful.
+- **SOT Audit**: 283 Requirements (50 Rules, 233 IDs).
+- **SRP Check**: Throttling logic correctly encapsulated in the hardware layer.

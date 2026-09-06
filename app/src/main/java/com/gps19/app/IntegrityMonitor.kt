@@ -26,12 +26,11 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.06.20:
+ * - Issue #924 (Part B): Dynamic GNSS Rates. Propagating MaliAnomaly 
+ *   to HardwareProvider to trigger resource-aware throttling (R-ID 267).
  * Sep.05.30:
  * - Issue #916 Hardening: Integrated Energy Footprint Verdict (R-ID 259). 
- *   Added handling for RevivalEvent.Footprint to log mA delta and temperature rise.
- * Sep.05.25:
- * - Issue #266: Implemented automated Mali Driver Anomaly detection 
- *   to trigger UI-throttling on budget hardware.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -220,6 +219,9 @@ class IntegrityMonitor @Inject constructor(
             
             maliAnomaly = checkMaliDriverAnomaly(maxIo, cpu, iow)
         }
+
+        // Issue #924: Propagate MaliAnomaly to HardwareProvider for source throttling
+        hardwareProvider.setMaliAnomaly(maliAnomaly)
 
         updateHealth { h ->
             h.lastIntegrityHeartbeatRt = nowRt
