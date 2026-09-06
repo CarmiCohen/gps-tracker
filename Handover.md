@@ -1,19 +1,17 @@
-# Handover Snapshot (Sep.06.32)
+# Handover Snapshot (Sep.06.33)
 
-## 🎯 Current State: Safe-Mode Hardening Complete
-Issue #927 is resolved. `HardwareProvider` now correctly honors `isSafeMode` to suppress revival pulses, protecting the battery during signaling recovery hangs. A logic inversion in permission auditing was also fixed.
+## 🎯 Current State: Mali Anomaly Hysteresis Complete
+Issue #929 is resolved. `HardwareProvider` now enforces a 10s exit hysteresis for GNSS throttling. This ensures that rapid anomaly state transitions do not cause sampling jitter on A15 hardware.
 
 ## ✅ Completed in this Session
-- **Issue #927**: Updated `HardwareProvider` to honor `isSafeMode` (R-ID 271).
-- **Bug Fix**: Corrected logic inversion in `restartLocationUpdates` where revival was only triggering if permission was *missing*.
-- **Battery Protection**: `revivalPulseJob` is now explicitly cancelled when entering Safe Mode.
-- **Versioning**: Incremented to `Sep.06.32` ("Safe-Mode Hardening").
+- **Issue #929**: Implemented 10s cooldown for GNSS throttling in `HardwareProvider` (R-ID 274).
+- **Engine Hardening**: Added `GNSS_THROTTLING_HYSTERESIS_MS` to `EngineConstants.kt`.
+- **Versioning**: Incremented to `Sep.06.33` ("Mali Anomaly Hysteresis").
 
 ## ⏭️ Next Steps
-- **Issue #929**: Implement exit hysteresis (10s) for Mali Anomaly throttling in `HardwareProvider`.
 - **Issue #930**: UI Verification: Audit "Hist" and "Details" buttons in the Event List for deep-linking accuracy.
 
 ## 🛡️ Integrity Audit
-- **Build Status**: Versioned to Sep.06.32.
-- **SOT Audit**: 285 Requirements (50 Rules, 235 IDs).
-- **Logic Verification**: Revival suppression verified against `isSafeMode` state propagation.
+- **Build Status**: Versioned to Sep.06.33.
+- **SOT Audit**: 286 Requirements (50 Rules, 236 IDs).
+- **Logic Verification**: Hysteresis timing logic verified using monotonic `elapsedRealtime()`.

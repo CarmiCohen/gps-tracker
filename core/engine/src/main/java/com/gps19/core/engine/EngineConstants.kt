@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.06.33:
+ * - Issue #929 Hardening: Added GNSS_THROTTLING_HYSTERESIS_MS (10s) to prevent 
+ *   sampling jitter during rapid anomaly state transitions (R-ID 274).
  * Sep.06.20:
  * - Issue #924 (Part B): Added GNSS_SAMPLING_INTERVAL_THROTTLED_MS (5000ms) 
  *   for A15 resource throttling during high load or MaliAnomaly.
@@ -302,6 +305,7 @@ const val THROTTLE_COMPASS_LIMIT = 5.0
 const val THROTTLE_BARO_LIMIT = 0.5
 const val GNSS_SAMPLING_INTERVAL_MS = 2000L
 const val GNSS_SAMPLING_INTERVAL_THROTTLED_MS = 5000L
+const val GNSS_THROTTLING_HYSTERESIS_MS = 10000L
 
 // System Thresholds (Core Logic)
 const val TRACKER_SIGNAL_LOSS_THRESHOLD_MS = 180000L

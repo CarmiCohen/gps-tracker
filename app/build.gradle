@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 1
-        versionName "Sep.06.32" // Safe-Mode Hardening (#927)
+        versionName "Sep.06.33" // Mali Anomaly Hysteresis (#929)
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

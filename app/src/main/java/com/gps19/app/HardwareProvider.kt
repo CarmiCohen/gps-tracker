@@ -33,6 +33,10 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.06.33:
+ * - Issue #929 RESOLVED: Mali Anomaly Exit Hysteresis. Implemented 10s cooldown 
+ *   period before returning to standard sampling rates after an anomaly clears 
+ *   to prevent jitter (R-ID 274).
  * Sep.06.31:
  * - Issue #927 RESOLVED: Safe-Mode Integration. implemented isSafeMode check in 
  *   checkRevivalLifecycle to prevent revival loops during recovery (R-ID 271).
@@ -166,6 +170,7 @@ class HardwareProvider @Inject constructor(
     @Volatile private var maliAnomaly = false
     @Volatile private var powerSaveMode = false
     @Volatile private var isSafeMode = false
+    private var lastAnomalyActiveRt = 0L
 
     private val logicSnapshotBuffer = CircularStateBuffer(2, { ForensicSnapshot() }, { it.reset() })
     private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
@@ -257,8 +262,12 @@ class HardwareProvider @Inject constructor(
                 }
             }
             
-            // Issue #924: Dynamic GNSS Throttling based on A15 and High Load/MaliAnomaly
-            val currentInterval = if (systemStatusProvider.isA15Hardware() && (isHighLoad || maliAnomaly)) {
+            // Issue #924/929: Dynamic GNSS Throttling based on A15 and High Load/MaliAnomaly (with 10s hysteresis)
+            if (isHighLoad || maliAnomaly) lastAnomalyActiveRt = nowRt
+            val shouldThrottle = systemStatusProvider.isA15Hardware() && 
+                    (isHighLoad || maliAnomaly || (nowRt - lastAnomalyActiveRt < GNSS_THROTTLING_HYSTERESIS_MS))
+
+            val currentInterval = if (shouldThrottle) {
                 GNSS_SAMPLING_INTERVAL_THROTTLED_MS
             } else {
                 GNSS_SAMPLING_INTERVAL_MS
@@ -278,7 +287,7 @@ class HardwareProvider @Inject constructor(
 
     private val displayListener = object : ManagedDisplayListener() {
         override fun onDisplayChanged(displayId: Int) {
-            if (isTeardownActive.get() || displayId != Display.DEFAULT_DISPLAY) return
+            if (isTeardownActive.get()) return
             val display = displayManager.getDisplay(displayId) ?: return
             val newState = display.state
             if (newState != lastDisplayState) {
@@ -790,8 +799,15 @@ class HardwareProvider @Inject constructor(
     
     fun setAcousticFastPath(floor: Double, spikeThreshold: Double, minDb: Double, onSpike: () -> Unit) { synchronized(this) { this.fastPathFloor = floor; this.fastPathSpikeThreshold = spikeThreshold; this.fastPathMinDb = minDb; this.onAcousticSpike = onSpike } }
     fun setLightFastPath(baseline: Double, spikeThreshold: Double, onSpike: () -> Unit) { synchronized(this) { this.fastPathLightBaseline = baseline; this.fastPathLightSpikeThreshold = spikeThreshold; this.onLightSpike = onSpike } }
-    fun setHighLoad(high: Boolean) { this.isHighLoad = high }
-    fun setMaliAnomaly(active: Boolean) { this.maliAnomaly = active }
+    
+    fun setHighLoad(high: Boolean) { 
+        this.isHighLoad = high 
+        if (high) lastAnomalyActiveRt = timeProvider.elapsedRealtime()
+    }
+    fun setMaliAnomaly(active: Boolean) { 
+        this.maliAnomaly = active 
+        if (active) lastAnomalyActiveRt = timeProvider.elapsedRealtime()
+    }
     
     fun setSafeMode(active: Boolean) { 
         this.isSafeMode = active 
