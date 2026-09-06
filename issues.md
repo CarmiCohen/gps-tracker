@@ -1,7 +1,10 @@
-# Project Issues & Hardening Tracking (Sep.06.33)
+# Project Issues & Hardening Tracking (Sep.06.35)
 
 ## 🎯 Current Resumption Focus: Physical Verification & Forensic Closing
 Finalizing the high-assurance baseline for Samsung A15 hardware and signaling transport.
+
+## 🟢 Recently Resolved Issues (Sep.06.35)
+*   **Issue #930 RESOLVED: Event List Deep-Linking**. Added functional "HIST" and "DIAG" buttons to the `LogDetailPane` in `LogOverlay`. Users can now navigate from a specific forensic log entry directly to the analytical history ribbons (synchronized with the log's timestamp via replay cursor) or the system diagnostics screen (R-ID 930).
 
 ## 🟢 Recently Resolved Issues (Sep.06.33)
 *   **Issue #929 RESOLVED: Mali Anomaly Exit Hysteresis**. Implemented a 10s cooldown period in `HardwareProvider` before returning to standard sampling rates after an anomaly (High Load or Mali Anomaly) clears. This prevents "sampling jitter" on budget hardware like the Samsung A15 (R-ID 274).
@@ -17,12 +20,9 @@ Finalizing the high-assurance baseline for Samsung A15 hardware and signaling tr
 *   **Issue #925 RESOLVED: Async Teardown Race Condition**. Remediated critical race condition where rapid `stop() -> start()` sequences attempted re-initialization before the forensic settling window (800ms) completed (R925/R-ID 273).
 
 ## 🟡 Open Issues & Hardening Tasks (Sorted by Recommended Priority)
-
-### 1. Issue #930: [LOW] UI Verification: Hist and Details buttons in Event List
-*   **Description**: Verify that the "Hist" and "Details" buttons in the event list are working correctly across different alert types.
-*   **Action**: Audit navigation logic in `SharedUiComponents.kt` and `ViewerScreen.kt` to ensure correct deep-linking to history and diagnostic details.
+*(No open high-priority issues)*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 286 (Rules: 50, IDs: 236), Resolved: 929, Open: 1, Testing: 90% (Sub-items: 45), Ideas: 222, QA: 252]**
+- **Current Audit Baseline: [SOT: 286 (Rules: 50, IDs: 236), Resolved: 930, Open: 0, Testing: 90% (Sub-items: 45), Ideas: 222, QA: 252]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.06.33)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.06.35)*

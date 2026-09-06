@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.06.33)
+# Resolution Archive (Sep.06.35)
+
+## 🟢 Resolved Issues (Sep.06.35)
+*   **Issue #930 RESOLVED: Event List Deep-Linking**. Added functional "HIST" and "DIAG" buttons to the `LogDetailPane` in `LogOverlay`. Users can now navigate from a specific forensic log entry directly to the analytical history ribbons (synchronized with the log's timestamp via replay cursor) or the system diagnostics screen (R-ID 930).
 
 ## 🟢 Resolved Issues (Sep.06.33)
 *   **Issue #929 RESOLVED: Mali Anomaly Exit Hysteresis**. Implemented a 10s cooldown period in `HardwareProvider` before returning to standard sampling rates after an anomaly (High Load or Mali Anomaly) clears. This prevents "sampling jitter" on budget hardware like the Samsung A15 (R-ID 274).

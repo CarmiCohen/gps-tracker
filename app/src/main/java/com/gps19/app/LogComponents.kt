@@ -9,9 +9,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.DeleteSweep
-import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,12 +32,12 @@ import java.util.*
 
 /**
  * LogComponents: UI for system logs and diagnostic history.
+ * Sep.06.35:
+ * - Issue #930 RESOLVED: Deep-Linking. Added HIST and DIAG buttons to 
+ *   LogDetailPane to support forensic navigation to ribbons and diagnostics (R-ID 930).
  * July.27.04:
  * - Issue #598: UI Performance under Signaling Stress. De-coupled log collection 
- *   from top-level screens. LogOverlay now collects logsFlow internally to 
- *   prevent Main-thread contention during high-frequency forensic bursts.
- * v9.1.0:
- * - R799e: Swapped legacy BrandJd (#367C2B) for JD Vivid Green (#78BE20).
+ *   from top-level screens.
  */
 
 @Composable
@@ -54,7 +52,9 @@ fun LogOverlay(
     onSetShowRecovered: (Boolean) -> Unit, 
     appStartTime: Long, 
     systemPulse: Long,
-    isTelemetryFresh: Boolean = true
+    isTelemetryFresh: Boolean = true,
+    onHistLink: (Long) -> Unit = {},
+    onDetailsLink: () -> Unit = {}
 ) {
     val logs by logsFlow.collectAsStateWithLifecycle()
     val timeFormatter = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
@@ -149,14 +149,24 @@ fun LogOverlay(
             }
 
             if (selectedLog != null) {
-                LogDetailPane(log = selectedLog!!, onClose = { selectedLog = null })
+                LogDetailPane(
+                    log = selectedLog!!, 
+                    onClose = { selectedLog = null },
+                    onHistLink = onHistLink,
+                    onDetailsLink = onDetailsLink
+                )
             }
         }
     }
 }
 
 @Composable
-fun LogDetailPane(log: LogEntry, onClose: () -> Unit) {
+fun LogDetailPane(
+    log: LogEntry, 
+    onClose: () -> Unit,
+    onHistLink: (Long) -> Unit = {},
+    onDetailsLink: () -> Unit = {}
+) {
     Card(
         modifier = Modifier.fillMaxWidth().padding(8.dp),
         colors = CardDefaults.cardColors(containerColor = Slate900.copy(alpha = 0.95f)),
@@ -165,7 +175,38 @@ fun LogDetailPane(log: LogEntry, onClose: () -> Unit) {
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("FORENSIC DETAIL", color = Teal500, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("FORENSIC DETAIL", color = Teal500, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                    Spacer(Modifier.width(12.dp))
+                    
+                    // Issue #930: Deep-linking buttons
+                    Text(
+                        text = "HIST",
+                        color = Amber500,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Amber500.copy(alpha = 0.2f))
+                            .clickable { onHistLink(log.timestamp) }
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = "DIAG",
+                        color = Teal500,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Black,
+                        fontFamily = FontFamily.Monospace,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Teal500.copy(alpha = 0.2f))
+                            .clickable { onDetailsLink() }
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+
                 IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
                     Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(16.dp))
                 }

@@ -32,16 +32,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Sep.06.35:
+ * - Issue #930 RESOLVED: Deep-Linking. Implemented onHistLink and 
+ *   onDetailsLink callbacks for LogOverlay (R-ID 930).
  * Sep.03.25:
  * - Idea #240: ContextShadow Automation. Updated AudioSynthesizer calls to use 
  *   the injected instance from viewModel (R-ID 240).
- * Sep.02.68:
- * - Idea #243: Flattened StatusBar indicator chain. Updated GlobalStatusBar 
- *   call to use unified HudState and fixed parameter naming in ViewerDashboard (R243).
- * Sep.03.01:
- * - Issue #238: Location Model Unification. Updated field references 
- *   from timestamp/telemetryTs to gpsTs/ts to align with unified 
- *   LocationUpdate model (R-ID 238).
  */
 
 @Composable
@@ -379,7 +375,12 @@ fun ViewerScreen(
                 onSetShowRecovered = { viewModel.onEvent(UiEvent.SetLogFilterShowRecovered(it)) },
                 appStartTime = uiState.appStartTime,
                 systemPulse = systemPulse,
-                isTelemetryFresh = dashboardState.isTelemetryFresh
+                isTelemetryFresh = dashboardState.isTelemetryFresh,
+                onHistLink = { ts -> 
+                    viewModel.onEvent(UiEvent.SetReplayCursor(ts))
+                    viewModel.onEvent(UiEvent.ToggleRibbons(true))
+                },
+                onDetailsLink = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) }
             )
         } else if (isRibbonsVisible && uiState.hydrationLevel >= 10) {
             RibbonsOverlay(

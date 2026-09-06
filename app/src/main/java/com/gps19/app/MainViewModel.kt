@@ -37,12 +37,12 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.06.35:
+ * - Issue #930 RESOLVED: Deep-Linking. Added handler for SetLogFilter UI events 
+ *   to support forensic navigation parity (R-ID 930).
  * Sep.06.20:
  * - Issue #924 RESOLVED (Part B): A15 Resource Throttling. Migrated GNSS 
- *   throttling to HardwareProvider source. Removed redundant UI sampling (R-ID 267).
- * Sep.06.01:
- * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. The Hydration Watchdog 
- *   now triggers isSafeMode = true to prevent signaling loops during recovery.
+ *   throttling to HardwareProvider source.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -616,6 +616,8 @@ class MainViewModel @Inject constructor(
             is UiEvent.AddHomePoint -> handleAddHomePoint(event.point)
             is UiEvent.RemoveHomePoint -> handleRemoveHomePoint(event.index)
             is UiEvent.ClearHomePoints -> handleClearHomePoints()
+            is UiEvent.SetLogFilterShowDetails -> repository.updateLogFilters(details = event.show)
+            is UiEvent.SetLogFilterShowRecovered -> repository.updateLogFilters(recovered = event.show)
             else -> {}
         }
     }

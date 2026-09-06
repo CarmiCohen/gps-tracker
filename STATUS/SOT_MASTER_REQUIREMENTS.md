@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.06.33)
+# SOT Master Requirements (Sep.06.35)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -11,7 +11,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.25 Clock Parity (R922)**: **MANDATORY**. All forensic indexing and backfill queries MUST use monotonic `SystemClock.elapsedRealtime()` as the primary key. Wall-clock time (UTC) MUST only be used for display and persistence metadata, never for interval calculation or sample correlation (Sep.06.17).
 *   **1.26 Forensic Separation (R922b)**: **MANDATORY**. Specialized hardware audits (GNSS jitter, sensor rates, energy footprints) MUST be decoupled from hardware bridge implementations (e.g., `HardwareProvider`) into dedicated forensic auditors to maintain bridge leaness and SRP (Sep.06.17).
 
-## 🧩 Functional Requirements (236 IDs)
+## 🧩 Functional Requirements (237 IDs)
 *   **R-ID 256 (Sensor Rate Auditing)**: The system MUST perform a runtime audit of accelerometer sampling rates to ensure efficacy on high-Target-SDK devices (Sep.05.29).
 *   **R-ID 259 (Energy Footprint Verdicts)**: The system MUST quantify the power cost of GNSS revival pulses via mA delta and temperature rise calculation (Sep.05.30).
 *   **R-ID 260 (GNSS Revival Lifecycle Transparency)**: The system MUST emit definitive `Success` and `HardwareLock` events during GNSS recovery routines (Sep.05.30).
@@ -23,5 +23,6 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 272 (Hardware Lock Parity)**: The system MUST propagate the `gpsHardwareLock` signal across all roles (Tracker/Viewer) via Protobuf and local persistence to ensure HUD awareness of hardware failure (Sep.06.31).
 *   **R-ID 273 (Synchronous Hardware Initialization)**: `HardwareProvider.start()` MUST suspend until any active `teardownJob` completes to prevent race conditions during rapid session restarts (Sep.06.30).
 *   **R-ID 274 (Mali Exit Hysteresis)**: The hardware layer MUST enforce a 10s cooldown/hysteresis period after an anomaly state (High Load or Mali Anomaly) clears before returning to standard GNSS sampling rates to prevent sampling jitter on budget hardware (Sep.06.33).
+*   **R-ID 275 (Forensic Deep-Linking)**: The event log detail pane MUST provide functional "HIST" and "DIAG" links to allow direct navigation to analytical history (synchronized via replay cursor) and system diagnostics respectively (Sep.06.35).
 
-*(Total: 50 Architectural Rules + 236 Functional R-IDs = 286 Items)*
+*(Total: 50 Architectural Rules + 237 Functional R-IDs = 287 Items)*

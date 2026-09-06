@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 1
-        versionName "Sep.06.33" // Mali Anomaly Hysteresis (#929)
+        versionName "Sep.06.35" // Event List Deep-Linking (#930)
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {
