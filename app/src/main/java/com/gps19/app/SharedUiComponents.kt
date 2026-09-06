@@ -49,12 +49,13 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Sep.06.08:
+ * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Added SAF badge 
+ *   to StatusBar to indicate active signaling suppression (R-ID 271).
  * Sep.05.25:
  * - Issue #266 RESOLVED: Automated Mali Driver Mitigation. Added MAL badge 
  *   and implemented UI-throttling to suppress high-frequency animations 
  *   during driver instability, preventing process-level ANRs (R-ID 266).
- * Sep.05.15:
- * - Issue #917 RESOLVED: Exact Actual Colors.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -521,10 +522,6 @@ fun HeaderBar(
     val commitAnd = { action: () -> Unit -> if (isSettingsOpen) onEvent(UiEvent.CommitSettings); action() }
     val alertPulse = rememberInfiniteTransition(label = "AlertPulse")
     
-    // Issue #266: Animation Throttling for Mali Anomaly
-    // Note: HeaderBar doesn't have hudState directly, but we use isSystemReady 
-    // to gate critical animations if needed. In R-ID 266, we primarily throttle 
-    // status animations in StatusBar.
     val alertAlpha by alertPulse.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), label = "Alpha")
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -640,6 +637,9 @@ fun StatusBar(
                         StatusBadge(label = "DAT", active = hudState.isDataHealthy)
                         StatusBadge(label = "WDG", active = hudState.watchdogOk, isBold = true)
                         
+                        // Issue #924: Watchdog Safe-Mode Indicator
+                        if (hudState.isSafeMode) StatusBadge(label = "SAF", active = false, isBold = true)
+
                         // Issue #266: Mali Anomaly Indicator
                         if (hudState.isMaliAnomaly) StatusBadge(label = "MAL", active = true, activeColor = Rose500, isBold = true)
                         

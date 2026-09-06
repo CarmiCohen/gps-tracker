@@ -4,11 +4,11 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.06.05:
+ * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Added isSafeMode 
+ *   to HudConnectivityState to support visual safety status (R-ID 271).
  * Sep.05.25:
  * - Issue #266: Added isMaliAnomaly to HudHealthState for UI-throttling.
- * Sep.02.68:
- * - Idea #243: Flattened StatusBar indicator chain. Added isSystemActive 
- *   to HudConnectivityState to support unified state propagation (R243).
  */
 
 @Serializable
@@ -430,7 +430,8 @@ data class HudConnectivityState(
     val watchdogOk: Boolean = true,
     val rtt: Int = 0,
     val remoteSignal: Int = 0,
-    val isSystemActive: Boolean = false
+    val isSystemActive: Boolean = false,
+    val isSafeMode: Boolean = false
 )
 
 @Serializable
@@ -497,6 +498,7 @@ data class HudState(
     val viewerId get() = connectivity.viewerId
     val watchdogOk get() = connectivity.watchdogOk
     val isSystemActive get() = connectivity.isSystemActive
+    val isSafeMode get() = connectivity.isSafeMode
     
     val isLocalGpsActive get() = telemetry.isLocalGpsActive
     val isGpsFresh get() = telemetry.isGpsFresh

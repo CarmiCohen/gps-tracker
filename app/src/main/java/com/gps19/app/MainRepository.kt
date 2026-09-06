@@ -28,12 +28,12 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Sep.06.03:
+ * - Issue #924 RESOLVED: Watchdog Safe-Mode. Exposed isSafeMode and 
+ *   setSafeMode to coordinate signaling suppression (R-ID 271).
  * Sep.02.66:
  * - Issue #241 RESOLVED: Mode-Selection Activation. Migrated setAppMode to 
  *   suspend to eliminate race conditions during role selection (R-ID 241).
- * Aug.29.05:
- * - Issue #761: Migrated from ForensicMapper to TelemetryMapper. Centralized 
- *   telemetry mapping authority (R761).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -82,6 +82,7 @@ class MainRepository @Inject constructor(
 
     val isRelayConnected = telemetry.isRelayConnected
     val lastRtt = telemetry.lastRtt
+    val isSafeMode = telemetry.isSafeMode
     val systemHealth = telemetry.systemHealth
     val localLocation = telemetry.localLocation
     val trackerLocation = telemetry.trackerLocation
@@ -121,6 +122,7 @@ class MainRepository @Inject constructor(
 
     fun updateRelayStatus(connected: Boolean) { telemetry.updateRelayStatus(connected) }
     fun updateLastRtt(rtt: Int) { telemetry.updateLastRtt(rtt) }
+    fun setSafeMode(enabled: Boolean) { telemetry.setSafeMode(enabled) }
     fun updateHealth(state: SystemHealthState) { telemetry.updateHealth(state) }
     fun updateLocation(update: LocationUpdate) { telemetry.updateLocation(update) }
     fun updateConnectedViewers(viewers: List<String>) { telemetry.updateConnectedViewers(viewers) }

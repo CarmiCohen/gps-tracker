@@ -6,10 +6,11 @@ import javax.inject.Singleton
 
 /**
  * UiStateAggregator: Orchestrates the transformation of raw domain states into UI-ready models.
+ * Sep.06.06:
+ * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Added isSafeMode 
+ *   to aggregateHudConnectivity for visual safety status (R-ID 271).
  * Sep.05.25:
  * - Issue #266: Added isMaliAnomaly to HudHealth aggregation for UI-throttling.
- * Aug.29.10:
- * - Concern #765: Added isUltra support to Dashboard and HUD aggregation methods.
  */
 interface UiStateAggregator {
     fun aggregateDashboardConnectivity(
@@ -39,6 +40,7 @@ interface UiStateAggregator {
         deviceId: String,
         viewerId: String,
         isSystemActive: Boolean,
+        isSafeMode: Boolean,
         diag: DiagnosticState,
         rtt: Int,
         sig: Int
@@ -97,11 +99,12 @@ class UiStateAggregatorImpl @Inject constructor(
         deviceId: String,
         viewerId: String,
         isSystemActive: Boolean,
+        isSafeMode: Boolean,
         diag: DiagnosticState,
         rtt: Int,
         sig: Int
     ): HudConnectivityState {
-        return dashboardStateProvider.buildHudConnectivityState(appMode, deviceId, viewerId, isSystemActive, diag, rtt, sig)
+        return dashboardStateProvider.buildHudConnectivityState(appMode, deviceId, viewerId, isSystemActive, isSafeMode, diag, rtt, sig)
     }
 
     override fun aggregateHudTelemetry(

@@ -1,9 +1,9 @@
-# Simplification Ideas (Sep.06.00)
+# Simplicity Audit & Future Simplification Ideas (Sep.06.17)
 
-## 🎯 Architecture & Logic
-- **[A021] Managed Lifecycle Delegate**: Create a reusable delegate to handle the `Job? = null` + `cancel()` + `launch` pattern used for async tasks in services. This would remove repetitive boilerplate from `HardwareProvider` and `TrackerService`.
-- **[A022] Forensic Auditor Extraction**: Extract GNSS jitter monitoring, sensor rate audits (R-ID 256), and energy footprint snapshots (R-ID 259) from `HardwareProvider` into a standalone `ForensicAuditor`. This would restore `HardwareProvider` to a clean bridge for hardware events.
-- **[A023] Revival Logic Unification**: Unify the Fused Location burst and Raw Provider bypass logic into a single `LocationReviver` component. The current implementation in `HardwareProvider` is becoming complex.
+## 🎯 Current Audit: Issue #922
+The introduction of `CircularStateBuffer` significantly simplified the internal state management of `HardwareProvider` by removing manual index wrapping logic (`(idx + 1) % size`). 
 
-## ⚙️ Performance & Efficiency
-- **[P015] Circular State Buffers**: Replace the fixed-array snr and sensor buffers with a generic `CircularBuffer<T>` to simplify indexing logic and prevent manual synchronization errors.
+## 💡 Simplification Ideas
+1.  **Generic Snapshotting**: The `ForensicSnapshot` class in `HardwareProvider` could be moved to `EngineModels` to allow better reuse in the upcoming `ForensicAuditor` extraction (Issue #922 Part B).
+2.  **Unified Buffer Access**: Currently, `snrBuffer` and `sensorBuffer` have slightly different "sample" types. Standardizing these into a single forensic event wrapper would reduce the number of `asSequence()` iterations in `HistoryManager`.
+3.  **Managed Sensor Unification**: The `ManagedSensorListener` base class could be extended to handle the `CircularStateBuffer` lifecycle automatically, further reducing boilerplate in `HardwareProvider`.

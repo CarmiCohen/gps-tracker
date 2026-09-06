@@ -22,14 +22,14 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Sep.06.04:
+ * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Implemented connection 
+ *   suppression in connect() when TelemetryRepository.isSafeMode is active 
+ *   to prevent signaling handshake loops during hydration hangs (R-ID 271).
  * Sep.05.26:
  * - Issue #912 RESOLVED: Re-enabled XHR polling fallback. Strict 'websocket' 
  *   transport bypassed polling but failed on restricted networks. Restored 
  *   negotiation (polling-to-websocket) per R-ID 251 while keeping 60s timeout.
- * Sep.04.20:
- * - Issue #907 RESOLVED: System-Wide Interconnectivity Failure. Hardened binary 
- *   path with SignalingValidator to ensure Protobuf updates follow role-based 
- *   filtering. Remediates handshake failures on budget hardware (R907).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -164,6 +164,12 @@ class CommunicationManager @Inject constructor(
         this.viewerId = viewerId.trim()
         this.isTrackerMode = isTracker
         
+        // Issue #924: Suppress connection in Safe Mode to prevent handshake loops.
+        if (telemetryRepository.isSafeMode.value) {
+            logToApp("SAFE MODE: Connection suppressed to prevent signaling loops.", true)
+            return
+        }
+
         if (isTracker && !SignalingConstants.isValidTrackerId(this.deviceId)) return
         if (!isTracker && !SignalingConstants.isValidViewerId(this.viewerId)) return
         if (relayUrl.isEmpty()) return
@@ -175,9 +181,6 @@ class CommunicationManager @Inject constructor(
         isConnectingInternal = true
 
         val opts = IO.Options().apply {
-            // R-ID 251: Enable transport negotiation (polling + websocket) to ensure 
-            // connectivity on restricted networks while maintaining 60s timeout 
-            // to accommodate spin-up latencies (R906).
             transports = arrayOf("polling", "websocket")
             timeout = 60000
             reconnection = true; reconnectionAttempts = Int.MAX_VALUE
@@ -254,7 +257,6 @@ class CommunicationManager @Inject constructor(
     private fun handleLocationRelayBinary(args: Array<Any>) {
         try {
             val data = args[0] as ByteArray
-            // R907: Hardened binary validation. We parse only the header to validate role.
             val status = RealtimeStatus.parseFrom(data)
             if (!SignalingValidator.shouldProcessLocationUpdate(
                     incomingId = status.id,

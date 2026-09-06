@@ -33,12 +33,12 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.06.10:
+ * - Issue #922: Clock Parity & Forensic Buffering. Replaced fixed-array pools with 
+ *   CircularStateBuffer and standardized forensic indexing on elapsedRealtime().
  * Sep.06.00:
  * - Issue #923: Lifecycle & Teardown Hardening. Joined teardown window via teardownJob, 
  *   cleared revival footprint state on stop, and corrected inverted permission check in revival pulse.
- * Sep.05.30:
- * - Issue #916 Hardening: Energy Footprint Verdict (R-ID 259). Implemented mA delta 
- *   and temperature rise calculation during GNSS revival cycles to quantify power cost.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -104,8 +104,8 @@ class HardwareProvider @Inject constructor(
     private val _locationStatus = MutableStateFlow(LocationStatus())
     val locationStatusFlow: StateFlow<LocationStatus> = _locationStatus.asStateFlow()
 
-    private val snrTsBuffer = LongArray(512); private val snrRtBuffer = LongArray(512); private val snrValBuffer = DoubleArray(512)
-    private var snrBufferIdx = 0; private var snrBufferCount = 0
+    // Issue #922: Buffering Hardening
+    private val snrBuffer = CircularStateBuffer(512, { EngineSnrSample() }, { it.ts = 0L; it.rt = 0L; it.snr = 0.0 })
 
     private val _internalGpsFlow = MutableSharedFlow<GpsUpdate>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
@@ -164,15 +164,14 @@ class HardwareProvider @Inject constructor(
     @Volatile private var isHighLoad = false
     @Volatile private var powerSaveMode = false
 
-    private val logicSnapshotPool = Array(2) { ForensicSnapshot() }; private var logicSnapshotIdx = 0
-    private val forensicSnapshotPool = Array(4) { ForensicSnapshot() }; private var forensicSnapshotIdx = 0
+    // Issue #922: Buffering Hardening
+    private val logicSnapshotBuffer = CircularStateBuffer(2, { ForensicSnapshot() }, { it.reset() })
+    private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
 
-    private val bufferTs = LongArray(256); private val bufferRt = LongArray(256)
-    private val bufferLux = DoubleArray(256); private val bufferVibe = DoubleArray(256)
-    private val bufferProxIdx = DoubleArray(256); private val bufferTilt = DoubleArray(256)
-    private val bufferLift = DoubleArray(256); private val bufferAcoustic = DoubleArray(256)
-    private val bufferSit = BooleanArray(256); private val bufferKinetic = DoubleArray(256)
-    private var bufferIdx = 0; private var bufferCount = 0; private var lastBufferRecordRt = 0L
+    private val sensorBuffer = CircularStateBuffer(256, { EngineSensorSnapshot() }, {
+        it.ts = 0L; it.rt = 0L; it.acoustic = 0.0; it.lux = 0.0; it.vibe = 0.0; it.proxIdx = 0.0; it.lift = 0.0; it.tilt = 0.0; it.isSitDetected = false; it.sitVzTs = 0L; it.sitVzRt = 0L; it.sitShock = 0.0; it.kineticEnergy = 0.0
+    })
+    private var lastBufferRecordRt = 0L
 
     private var secPeakLux = 0.0; private var secPeakVibe = 0.0; private var secSumProxIdx = 0.0; private var secProxCount = 0
     private var secPeakTilt = 0.0; private var secPeakLift = 0.0; private var secPeakDb = 0.0; private var secSitDetected = false; private var secPeakKinetic = 0.0
@@ -256,10 +255,16 @@ class HardwareProvider @Inject constructor(
             }
             satellitesUsed = used; averageSnr = if (snrCount > 0) snrSum / snrCount else 0.0
             val now = timeProvider.currentTimeMillis()
-            synchronized(snrTsBuffer) {
-                snrTsBuffer[snrBufferIdx] = now; snrRtBuffer[snrBufferIdx] = nowRt; snrValBuffer[snrBufferIdx] = averageSnr
-                snrBufferIdx = (snrBufferIdx + 1) % 512; if (snrBufferCount < 512) snrBufferCount++
+            
+            // Issue #922: Use CircularStateBuffer for SNR
+            synchronized(snrBuffer) {
+                snrBuffer.next().apply {
+                    this.ts = now
+                    this.rt = nowRt
+                    this.snr = averageSnr
+                }
             }
+            
             if (nowRt - lastGnssEmitRt >= GNSS_SAMPLING_INTERVAL_MS) {
                 lastGnssEmitRt = nowRt
                 val satList = mutableListOf<SatelliteInfo>()
@@ -338,7 +343,6 @@ class HardwareProvider @Inject constructor(
             if (!isStarted.getAndSet(false)) return
             isTeardownActive.set(true)
             
-            // Issue #923: Clear revival footprint state to prevent forensic energy leaks across sessions.
             revivalStartBattery = null
             revivalStartRtForFootprint = 0L
             
@@ -378,7 +382,6 @@ class HardwareProvider @Inject constructor(
             displayListener.unregister(displayManager, handler)
             val displayDuration = SystemClock.elapsedRealtime() - displayStart
 
-            // Issue #923: Join teardown window via teardownJob to prevent race conditions during rapid toggles.
             teardownJob?.cancel()
             teardownJob = scope.launch(Dispatchers.IO) {
                 Timber.d("HardwareProvider: Entering 800ms forensic settling window (R908)...")
@@ -427,12 +430,7 @@ class HardwareProvider @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        // Issue #923: Fix inverted permission check. We MUST have permission to continue.
         if (!isStarted.get() || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
-        
-        // Issue #905 Hardening: Use both FusedLocationProvider AND raw LocationManager.
-        // Budget hardware often stalls at the high-level API; raw provider access 
-        // forces the chipset to re-evaluate the satellite search space.
         
         revivalPulseJob?.cancel()
         revivalPulseJob = scope.launch(Dispatchers.Default) {
@@ -440,21 +438,18 @@ class HardwareProvider @Inject constructor(
                 if (!isStarted.get()) return@synchronized
                 val handler = hardwareHandler ?: return@synchronized
                 
-                // 1. Fused Location Burst
                 revivalCallback?.unregister(fusedLocationClient, handler)
                 val callback = object : ManagedLocationCallback() { override fun onLocationResult(p0: LocationResult) {} }
                 revivalCallback = callback
                 val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L).setMaxUpdates(5).build()
                 try { fusedLocationClient.requestLocationUpdates(fastRequest, callback, handler.looper) } catch (e: Exception) { Timber.e(e, "HardwareProvider: Fused revival pulse failed") }
 
-                // 2. Raw Provider Bypass (Issue #905)
                 rawRevivalListener?.unregister(locationManager, handler)
                 val rawListener = object : ManagedLocationListener() { override fun onLocationChanged(location: Location) {} }
                 rawRevivalListener = rawListener
                 try {
                     _revivalEvents.tryEmit(RevivalEvent.RawBurstStarted)
                     locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, rawListener, handler.looper)
-                    // Auto-unregister raw listener after burst window
                     scope.launch {
                         delay(10000)
                         synchronized(lifecycleLock) { 
@@ -525,9 +520,6 @@ class HardwareProvider @Inject constructor(
             synchronized(lifecycleLock) { activeLocationCallback?.unregister(fusedLocationClient, handler); activeLocationCallback = fusedCallback }
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval).setMinUpdateIntervalMillis(interval / 2).build()
             
-            // Issue #893 Enforcement: Switched from MainLooper to hardwareHandler.looper.
-            // This prevents high-frequency GNSS callbacks from blocking the UI thread during 
-            // heavy processing.
             try { fusedLocationClient.requestLocationUpdates(request, fusedCallback, handler?.looper ?: Looper.getMainLooper()) } catch (e: Exception) { close(e) }
             
             val internalJob = _internalGpsFlow.onEach { trySend(it) }.launchIn(this)
@@ -541,13 +533,17 @@ class HardwareProvider @Inject constructor(
     fun setPollingInterval(intervalMs: Long) { if (pollingIntervalFlow.value != intervalMs) pollingIntervalFlow.value = intervalMs }
     fun resetGnssJitter() { maxGnssJitterMs = 0L }
 
-    fun getSnrSamples(fromTs: Long, toTs: Long): Sequence<EngineSnrSample> = sequence {
-        val flyweight = EngineSnrSample(); val c: Int; val startIdx: Int
-        synchronized(snrTsBuffer) { c = snrBufferCount; startIdx = (snrBufferIdx - c + 512) % 512 }
-        for (i in 0 until c) {
-            val idx = (startIdx + i) % 512; val ts: Long; val rt: Long; val snr: Double
-            synchronized(snrTsBuffer) { ts = snrTsBuffer[idx]; rt = snrRtBuffer[idx]; snr = snrValBuffer[idx] }
-            if (ts in fromTs..toTs) { flyweight.ts = ts; flyweight.rt = rt; flyweight.snr = snr; yield(flyweight) }
+    // Issue #922: Standardize on RT for forensic indexing
+    fun getSnrSamples(fromRt: Long, toRt: Long): Sequence<EngineSnrSample> = sequence {
+        val flyweight = EngineSnrSample()
+        val snapshot = synchronized(snrBuffer) { snrBuffer.asSequence().toList() }
+        for (sample in snapshot) {
+            if (sample.rt in fromRt..toRt) {
+                flyweight.ts = sample.ts
+                flyweight.rt = sample.rt
+                flyweight.snr = sample.snr
+                yield(flyweight)
+            }
         }
     }
 
@@ -569,13 +565,12 @@ class HardwareProvider @Inject constructor(
                 processVibration(values[0], values[1], values[2]); updateOrientation()
                 if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) { lastStayAliveRt = nowRt; systemMonitor.acquireWakeLock(force = true) }
 
-                // R-ID 256: Runtime Rate Audit
                 if (!isSensorRateAudited && !isWarming) {
                     if (accelAuditStartRt == 0L) accelAuditStartRt = nowRt
                     accelEventCount++
                     if (nowRt - accelAuditStartRt >= 1000L) {
                         val hz = accelEventCount.toDouble() / ((nowRt - accelAuditStartRt) / 1000.0)
-                        val isEffective = hz > 200.0 // HIGH_SAMPLING_RATE_SENSORS cap is 200Hz
+                        val isEffective = hz > 200.0
                         Timber.i("HardwareProvider: Sensor Rate Audit (R-ID 256): ${hz.toInt()} Hz. Efficacy: $isEffective")
                         _sensorEvents.tryEmit(AppSensorEvent.LogEvent("Sensor Rate Audit: ${hz.toInt()}Hz (Efficacy: $isEffective)", false))
                         isSensorRateAudited = true
@@ -614,14 +609,24 @@ class HardwareProvider @Inject constructor(
             }
             Sensor.TYPE_ROTATION_VECTOR -> processRotation(values)
         }
+        
+        // Issue #922: Use CircularStateBuffer for sensor samples
         if (nowRt - lastBufferRecordRt >= TICK_INTERVAL_MS) {
-            synchronized(this) {
-                bufferTs[bufferIdx] = wallNow; bufferRt[bufferIdx] = nowRt; bufferLux[bufferIdx] = secPeakLux; bufferVibe[bufferIdx] = secPeakVibe
-                bufferProxIdx[bufferIdx] = if (secProxCount > 0) secSumProxIdx / secProxCount else proximityIdx
-                bufferTilt[bufferIdx] = secPeakTilt; bufferLift[bufferIdx] = secPeakLift; bufferAcoustic[bufferIdx] = secPeakDb; bufferSit[bufferIdx] = secSitDetected; bufferKinetic[bufferIdx] = secPeakKinetic
-                bufferIdx = (bufferIdx + 1) % 256; if (bufferCount < 256) bufferCount++; secSitDetected = false
+            synchronized(sensorBuffer) {
+                sensorBuffer.next().apply {
+                    this.ts = wallNow
+                    this.rt = nowRt
+                    this.lux = secPeakLux
+                    this.vibe = secPeakVibe
+                    this.proxIdx = if (secProxCount > 0) secSumProxIdx / secProxCount else proximityIdx
+                    this.tilt = secPeakTilt
+                    this.lift = secPeakLift
+                    this.acoustic = secPeakDb
+                    this.isSitDetected = secSitDetected
+                    this.kineticEnergy = secPeakKinetic
+                }
             }
-            lastBufferRecordRt = nowRt; secPeakLux = currentLux; secPeakVibe = currentVibrationIndex; secSumProxIdx = 0.0; secProxCount = 0; secPeakTilt = currentTiltDegrees; secPeakLift = abs(relativeAltitude); secPeakDb = currentAcousticDb; secPeakKinetic = currentKineticEnergy
+            lastBufferRecordRt = nowRt; secPeakLux = currentLux; secPeakVibe = currentVibrationIndex; secSumProxIdx = 0.0; secProxCount = 0; secPeakTilt = currentTiltDegrees; secPeakLift = abs(relativeAltitude); secPeakDb = currentAcousticDb; secPeakKinetic = currentKineticEnergy; secSitDetected = false
         }
     }
 
@@ -683,11 +688,14 @@ class HardwareProvider @Inject constructor(
     fun isAcousticMonitoringEnabled() = isMonitoring
     fun isAcousticMonitoringActive() = isAcousticRunning
 
+    // Issue #922: Use CircularStateBuffer for snapshots
     fun consumeLogicSnapshot(): ForensicSnapshot {
         return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeLogicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(m, false)) }) {
-            synchronized(this) {
-                val snapshot = logicSnapshotPool[logicSnapshotIdx]; logicSnapshotIdx = (logicSnapshotIdx + 1) % logicSnapshotPool.size
-                snapshot.apply { reset(); vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = logicPeakVibration; peakVerticalVelocity = logicPeakVerticalVelocity; peakVerticalVelocityTs = logicPeakVerticalVelocityTs; peakVerticalVelocityRt = logicPeakVerticalVelocityRt; plungeMatched = !isWarming && plungeMatched; peakVerticalDisplacement = logicPeakVerticalDisplacement; proximityIdx = this@HardwareProvider.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareProvider.proximityDebounceMs; vibrationRollingSum = this@HardwareProvider.vibrationRollingSum; acousticPeak = logicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareProvider.currentKineticEnergy }
+            synchronized(logicSnapshotBuffer) {
+                val snapshot = logicSnapshotBuffer.next()
+                snapshot.apply { 
+                    vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = logicPeakVibration; peakVerticalVelocity = logicPeakVerticalVelocity; peakVerticalVelocityTs = logicPeakVerticalVelocityTs; peakVerticalVelocityRt = logicPeakVerticalVelocityRt; plungeMatched = !isWarming && plungeMatched; peakVerticalDisplacement = logicPeakVerticalDisplacement; proximityIdx = this@HardwareProvider.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareProvider.proximityDebounceMs; vibrationRollingSum = this@HardwareProvider.vibrationRollingSum; acousticPeak = logicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareProvider.currentKineticEnergy 
+                }
                 logicPeakVibration = 0.0; logicPeakVerticalVelocity = 0.0; logicPeakVerticalVelocityTs = 0L; logicPeakVerticalVelocityRt = 0L; logicPeakVerticalDisplacement = 0.0; plungeMatched = false; logicPeakDb = 0.0; logicMinDb = 100.0; snapshot
             }
         }
@@ -695,31 +703,36 @@ class HardwareProvider @Inject constructor(
 
     fun consumeForensicSnapshot(): ForensicSnapshot {
         return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeForensicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(m, false)) }) {
-            synchronized(this) {
-                val snapshot = forensicSnapshotPool[forensicSnapshotIdx]; forensicSnapshotIdx = (forensicSnapshotIdx + 1) % forensicSnapshotPool.size
-                snapshot.apply { reset(); vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = forensicPeakVibration; peakVerticalVelocity = forensicPeakVerticalVelocity; peakVerticalVelocityTs = forensicPeakVerticalVelocityTs; peakVerticalVelocityRt = forensicPeakVerticalVelocityRt; plungeMatched = false; peakVerticalDisplacement = forensicPeakVerticalDisplacement; proximityIdx = this@HardwareProvider.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareProvider.proximityDebounceMs; vibrationRollingSum = this@HardwareProvider.vibrationRollingSum; acousticPeak = forensicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareProvider.currentKineticEnergy }
+            synchronized(forensicSnapshotBuffer) {
+                val snapshot = forensicSnapshotBuffer.next()
+                snapshot.apply { 
+                    vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = forensicPeakVibration; peakVerticalVelocity = forensicPeakVerticalVelocity; peakVerticalVelocityTs = forensicPeakVerticalVelocityTs; peakVerticalVelocityRt = forensicPeakVerticalVelocityRt; plungeMatched = false; peakVerticalDisplacement = forensicPeakVerticalDisplacement; proximityIdx = this@HardwareProvider.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareProvider.proximityDebounceMs; vibrationRollingSum = this@HardwareProvider.vibrationRollingSum; acousticPeak = forensicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareProvider.currentKineticEnergy 
+                }
                 forensicPeakVibration = 0.0; forensicPeakVerticalVelocity = 0.0; forensicPeakVerticalVelocityTs = 0L; forensicPeakVerticalVelocityRt = 0L; forensicPeakVerticalDisplacement = 0.0; forensicPeakDb = 0.0; forensicMinDb = 100.0; snapshot
             }
         }
     }
 
-    fun getSensorSamples(fromTs: Long, toTs: Long): Sequence<EngineSensorSnapshot> = sequence {
-        val flyweight = EngineSensorSnapshot(); val c: Int; val startIdx: Int
-        synchronized(this@HardwareProvider) { c = bufferCount; startIdx = (bufferIdx - c + 256) % 256 }
-        for (i in 0 until c) {
-            val idx = (startIdx + i) % 256; val ts: Long; val rt: Long; val lux: Double; val vibe: Double; val proxIdx: Double; val tilt: Double; val lift: Double; val acoustic: Double; val sit: Boolean; val kinetic: Double
-            synchronized(this@HardwareProvider) { ts = bufferTs[idx]; rt = bufferRt[idx]; lux = bufferLux[idx]; vibe = bufferVibe[idx]; proxIdx = bufferProxIdx[idx]; tilt = bufferTilt[idx]; lift = bufferLift[idx]; acoustic = bufferAcoustic[idx]; sit = bufferSit[idx]; kinetic = bufferKinetic[idx] }
-            if (ts in fromTs..toTs) { flyweight.apply { this.ts = ts; this.rt = rt; this.lux = lux; this.vibe = vibe; this.proxIdx = proxIdx; this.tilt = tilt; this.lift = lift; this.acoustic = acoustic; this.isSitDetected = sit; this.kineticEnergy = kinetic }; yield(flyweight) }
+    // Issue #922: Standardize on RT for forensic indexing
+    fun getSensorSamples(fromRt: Long, toRt: Long): Sequence<EngineSensorSnapshot> = sequence {
+        val flyweight = EngineSensorSnapshot()
+        val snapshot = synchronized(sensorBuffer) { sensorBuffer.asSequence().toList() }
+        for (sample in snapshot) {
+            if (sample.rt in fromRt..toRt) {
+                flyweight.copyFrom(sample)
+                yield(flyweight)
+            }
         }
     }
 
-    fun getAcousticSamples(fromTs: Long, toTs: Long): Sequence<EngineSnrSample> = sequence {
-        val flyweight = EngineSnrSample(); val c: Int; val startIdx: Int
-        synchronized(this@HardwareProvider) { c = bufferCount; startIdx = (bufferIdx - c + 256) % 256 }
-        for (i in 0 until c) {
-            val idx = (startIdx + i) % 256; val ts: Long; val rt: Long; val acoustic: Double
-            synchronized(this@HardwareProvider) { ts = bufferTs[idx]; rt = bufferRt[idx]; acoustic = bufferAcoustic[idx] }
-            if (ts in fromTs..toTs) { flyweight.apply { this.ts = ts; this.rt = rt; this.snr = acoustic }; yield(flyweight) }
+    fun getAcousticSamples(fromRt: Long, toRt: Long): Sequence<EngineSnrSample> = sequence {
+        val flyweight = EngineSnrSample()
+        val snapshot = synchronized(sensorBuffer) { sensorBuffer.asSequence().toList() }
+        for (sample in snapshot) {
+            if (sample.rt in fromRt..toRt) {
+                flyweight.apply { this.ts = sample.ts; this.rt = sample.rt; this.snr = sample.acoustic }
+                yield(flyweight)
+            }
         }
     }
 
@@ -799,7 +812,7 @@ class HardwareProvider @Inject constructor(
         }
     }
 
-    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; synchronized(this) { bufferIdx = 0; bufferCount = 0; accelEventCount = 0; accelAuditStartRt = 0L; isSensorRateAudited = false } }
+    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; synchronized(this) { accelEventCount = 0; accelAuditStartRt = 0L; isSensorRateAudited = false }; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } }
 
     private fun startStepDetectorRecoveryLoop() { recoveryJob?.cancel(); recoveryJob = scope.launch { while (isActive) { delay(300000L); if (!isStepDetectorRegistered) attemptStepRegistration() } } }
     private fun attemptStepDetectorRegistration() {
@@ -819,12 +832,6 @@ class HardwareProvider @Inject constructor(
     }
     private fun attemptStepRegistration() = attemptStepDetectorRegistration()
 
-    /**
-     * Issue #905 Hardening: Expanded revival pulses to SIGNAL_LOSS and GPS_GAP.
-     * Samsung budget hardware (A15) frequently enters a "Zombie State" where 
-     * GNSS visibility drops to 0 indefinitely; pulsing location updates forces 
-     * the system to re-scan for satellites (R905).
-     */
     private fun checkRevivalLifecycle() {
         if (!isStarted.get()) return
         val nowRt = timeProvider.elapsedRealtime(); val currentStatus = _locationStatus.value
@@ -832,7 +839,6 @@ class HardwareProvider @Inject constructor(
             val stallDuration = nowRt - pendingEnterRt
             val retryThreshold = (revivalAttemptCount + 1) * GPS_REVIVAL_RETRY_INTERVAL_MS
             
-            // R-ID 259: Capture start battery state for Energy Footprint Verdict
             if (revivalStartBattery == null) {
                 revivalStartBattery = systemStatusProvider.getBatteryStatus()
                 revivalStartRtForFootprint = nowRt
@@ -853,13 +859,9 @@ class HardwareProvider @Inject constructor(
             }
         } else { 
             revivalAttemptCount = 0; isHardwareLocked = false 
-            // Note: revivalStartBattery is cleared in emitEnergyFootprint() or when Success/Lock occurs.
         }
     }
 
-    /**
-     * R-ID 259: Automated mA delta and temperature rise calculation to quantify revival power cost.
-     */
     private fun emitEnergyFootprint() {
         val start = revivalStartBattery ?: return
         val startRt = revivalStartRtForFootprint

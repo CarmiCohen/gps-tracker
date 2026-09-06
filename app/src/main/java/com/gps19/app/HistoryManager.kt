@@ -27,12 +27,12 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.06.10:
+ * - Issue #922: Clock Parity. Updated forensic queries to use elapsedRealtime() 
+ *   parity for backfilling consistency during system clock jumps.
  * Aug.31.04:
  * - Issue #779 Hardening: Integrated ForensicSanitizer into diagnostic log 
  *   emission to ensure parity with global forensic policy (R779).
- * Aug.31.03:
- * - Issue #762 Validation: Added isUltraLongStationary support to updateRibbons 
- *   to ensure history parity for the [ULTRA] relaxation state (R765, R778).
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -58,11 +58,9 @@ class HistoryManager @Inject constructor(
     private var clockDriftRef: Long = 0L
     private val aggregator = TelemetryAggregator()
     
-    // Issue #668/152: Flyweights to eliminate tick-level allocation
     private val currentPointFlyweight = EngineConnectionPoint()
     private val baseTemplateFlyweight = EngineConnectionPoint()
     
-    // Issue #152: Pooled app-level points for aggregator callbacks
     private val appPointPool = Array(RibbonScale.entries.size) { ConnectionPoint() }
 
     private var backfillAuditCount = 0
@@ -185,8 +183,9 @@ class HistoryManager @Inject constructor(
         isSilentFailure: Boolean, isBatteryLow: Boolean, isBatteryCritical: Boolean,
         isUltraLongStationary: Boolean
     ) {
-        val snrSamples = if (isTrackerMode) hardwareProvider.getSnrSamples(lastTickTs + 1, now) else emptySequence()
-        val sensorSamples = if (isTrackerMode) hardwareProvider.getSensorSamples(lastTickTs + 1, now) else emptySequence()
+        // Issue #922: Use Rt parity for backfill queries
+        val snrSamples = if (isTrackerMode) hardwareProvider.getSnrSamples(lastTickRt + 1, nowRt) else emptySequence()
+        val sensorSamples = if (isTrackerMode) hardwareProvider.getSensorSamples(lastTickRt + 1, nowRt) else emptySequence()
         
         baseTemplateFlyweight.apply {
             ts = 0L; rt = 0L; this.rtt = rtt; remoteSig = peerSignal; isConnected = peerAvail; this.hasGps = hasGps
@@ -226,8 +225,9 @@ class HistoryManager @Inject constructor(
     }
 
     private fun fillRealGap(lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, isTrackerMode: Boolean) {
-        val snrSamples = if (isTrackerMode) hardwareProvider.getSnrSamples(lastTickTs, now) else emptySequence()
-        val sensorSamples = if (isTrackerMode) hardwareProvider.getSensorSamples(lastTickTs, now) else emptySequence()
+        // Issue #922: Use Rt parity for gap queries
+        val snrSamples = if (isTrackerMode) hardwareProvider.getSnrSamples(lastTickRt, nowRt) else emptySequence()
+        val sensorSamples = if (isTrackerMode) hardwareProvider.getSensorSamples(lastTickRt, nowRt) else emptySequence()
         
         RibbonScale.entries.forEach { scale ->
             val gapPoints = ArrayList<ConnectionPoint>()

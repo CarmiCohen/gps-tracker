@@ -42,6 +42,7 @@ data class MainUiState(
     val draftSettings: DraftSettings = DraftSettings(),
     val isIdentitySanitized: Boolean = false,
     val isRecoveryPending: Boolean = false,
+    val isSafeMode: Boolean = false,
     val isForensicStallSimulated: Boolean = false,
     val isStorageSimulated: Boolean = false,
     val isStorageCriticalSimulated: Boolean = false,

@@ -8,12 +8,13 @@ import javax.inject.Singleton
 
 /**
  * TelemetryRepository: In-memory store for live system status.
+ * Sep.06.02:
+ * - Issue #924 RESOLVED: Watchdog Safe-Mode. Added isSafeMode to prevent 
+ *   signaling loops during hydration failures (R-ID 271).
  * Aug.01.10:
  * - Issue #668: Performance: Object Churn. Implemented double-buffering for 
  *   LocationUpdate and SystemHealthState to ensure zero-allocation StateFlow 
  *   emissions (R-HARDWARE-01). Refactored updateLocation to use mergeInto().
- * July.22.00:
- * - Hilt Hardening: Added @Inject constructor and @Singleton.
  */
 @Singleton
 class TelemetryRepository @Inject constructor() {
@@ -22,6 +23,9 @@ class TelemetryRepository @Inject constructor() {
 
     private val _lastRtt = MutableStateFlow(0)
     val lastRtt = _lastRtt.asStateFlow()
+
+    private val _isSafeMode = MutableStateFlow(false)
+    val isSafeMode = _isSafeMode.asStateFlow()
 
     // Flyweight buffers for zero-churn StateFlow emissions
     private val healthBuffers = listOf(SystemHealthState(), SystemHealthState())
@@ -53,6 +57,7 @@ class TelemetryRepository @Inject constructor() {
 
     fun updateRelayStatus(connected: Boolean) { _isRelayConnected.value = connected }
     fun updateLastRtt(rtt: Int) { _lastRtt.value = rtt }
+    fun setSafeMode(enabled: Boolean) { _isSafeMode.value = enabled }
 
     /**
      * updateHealth: Swaps buffers to force StateFlow emission while reusing objects.
@@ -113,5 +118,6 @@ class TelemetryRepository @Inject constructor() {
         _connectedViewers.value = emptyList()
         _lastRemoteActivityTs.value = 0L
         _gnssDetail.value = null
+        _isSafeMode.value = false
     }
 }

@@ -31,18 +31,18 @@ private data class HudUiParts(
     val appMode: String?,
     val deviceId: String,
     val viewerId: String,
-    val isSystemActive: Boolean
+    val isSystemActive: Boolean,
+    val isSafeMode: Boolean
 )
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.06.01:
+ * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. The Hydration Watchdog 
+ *   now triggers isSafeMode = true to prevent signaling loops during recovery.
  * Sep.05.28:
  * - Issue #914 RESOLVED: GNSS Detail Sampling. Implemented A15-aware sampling 
  *   for activeGnssDetail flow to reduce UI overhead during satellite monitoring (R-ID 267).
- * Sep.05.25:
- * - Issue #266: Propagated Mali Anomaly status to HUD for UI-throttling.
- * Sep.05.24:
- * - Issue #910 RESOLVED: Implemented Hydration Watchdog.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -162,7 +162,7 @@ class MainViewModel @Inject constructor(
 
     // Segmented HUD Flows (R248 Remediation)
     private val hudUiConnectivityFlow = _uiState.map { 
-        HudUiParts(it.appMode, it.deviceId, it.viewerId, it.isSystemActive) 
+        HudUiParts(it.appMode, it.deviceId, it.viewerId, it.isSystemActive, it.isSafeMode) 
     }.distinctUntilChanged()
 
     val hudConnectivityState: StateFlow<HudConnectivityState> = combine(
@@ -171,7 +171,7 @@ class MainViewModel @Inject constructor(
         _rtt,
         _remoteSignal
     ) { ui, diag, rtt, sig ->
-        aggregator.aggregateHudConnectivity(ui.appMode, ui.deviceId, ui.viewerId, ui.isSystemActive, diag, rtt, sig)
+        aggregator.aggregateHudConnectivity(ui.appMode, ui.deviceId, ui.viewerId, ui.isSystemActive, ui.isSafeMode, diag, rtt, sig)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudConnectivityState())
@@ -350,11 +350,13 @@ class MainViewModel @Inject constructor(
                 Timber.e("Issue #910: Hydration Watchdog Triggered. Stuck at level ${_uiState.value.hydrationLevel}")
                 addPersistentLog(
                     type = "error", 
-                    message = "HYDRATION WATCHDOG: Level 2 Hang Detected. Forcing UI shell.", 
+                    message = "HYDRATION WATCHDOG: Level 2 Hang Detected. Entering SAFE MODE.", 
                     isImportant = true
                 )
                 withContext(Dispatchers.Main.immediate) {
-                    updateState { it.copy(isInitialized = true) }
+                    // Issue #924: Part A - Enter Safe Mode to prevent signaling loops
+                    updateState { it.copy(isInitialized = true, isSafeMode = true) }
+                    repository.setSafeMode(true)
                 }
             }
         }
@@ -566,7 +568,8 @@ class MainViewModel @Inject constructor(
                 }
             }
             is UiEvent.ConfirmStopTracking, UiEvent.ManualExit -> {
-                updateState { it.copy(isSystemActive = false, appMode = null) }
+                updateState { it.copy(isSystemActive = false, appMode = null, isSafeMode = false) }
+                repository.setSafeMode(false)
                 viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
                     sessionUseCase.stopTrackingSession()
                 }

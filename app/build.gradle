@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 1
-        versionName "Sep.06.00" // Lifecycle & Teardown Hardening (#923)
+        versionName "Sep.06.17" // Clock Parity & Forensic Buffering (#922)
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {
@@ -106,7 +106,6 @@ dependencies {
     implementation "com.google.protobuf:protobuf-javalite:3.25.1"
 
     // Networking & Socket.io
-    // Issue #912 Fix: Finalized at v2.1.2 with strict WebSocket transport.
     implementation ('io.socket:socket.io-client:2.1.2') {
         exclude group: 'org.json', module: 'json'
     }

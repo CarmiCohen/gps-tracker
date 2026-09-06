@@ -7,12 +7,11 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
+ * Sep.06.07:
+ * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Added isSafeMode 
+ *   to buildHudConnectivityState for visual safety status (R-ID 271).
  * Sep.05.25:
  * - Issue #266: Propagated isMaliAnomaly to HUD and Dashboard states.
- * Sep.05.20:
- * - Issue #918 RESOLVED: Clock Source Consistency. Migrated all staleness gates 
- *   from wall-clock to monotonic elapsedRealtime() to prevent HUD staleness 
- *   failures during peer activity monitoring (R-ID 257).
  */
 interface DashboardStateProvider {
     fun buildDashboardConnectivityState(
@@ -42,6 +41,7 @@ interface DashboardStateProvider {
         deviceId: String,
         viewerId: String,
         isSystemActive: Boolean,
+        isSafeMode: Boolean,
         diagnosticState: DiagnosticState,
         rtt: Int,
         remoteSignal: Int
@@ -197,6 +197,7 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         deviceId: String,
         viewerId: String,
         isSystemActive: Boolean,
+        isSafeMode: Boolean,
         diagnosticState: DiagnosticState,
         rtt: Int,
         remoteSignal: Int
@@ -234,7 +235,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             watchdogOk = isLocalServiceAlive,
             rtt = rtt,
             remoteSignal = remoteSignal,
-            isSystemActive = isSystemActive
+            isSystemActive = isSystemActive,
+            isSafeMode = isSafeMode
         )
     }
 
