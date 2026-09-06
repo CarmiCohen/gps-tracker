@@ -33,12 +33,12 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.06.00:
+ * - Issue #923: Lifecycle & Teardown Hardening. Joined teardown window via teardownJob, 
+ *   cleared revival footprint state on stop, and corrected inverted permission check in revival pulse.
  * Sep.05.30:
  * - Issue #916 Hardening: Energy Footprint Verdict (R-ID 259). Implemented mA delta 
  *   and temperature rise calculation during GNSS revival cycles to quantify power cost.
- * Sep.05.29:
- * - Issue #R-ID 256: Sensor Rate Verification. Added runtime efficacy check 
- *   to verify HIGH_SAMPLING_RATE_SENSORS performance on Target SDK 35.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -130,6 +130,8 @@ class HardwareProvider @Inject constructor(
     private var isStepDetectorRegistered = false
     private var recoveryJob: Job? = null
     private var registrationJob: Job? = null
+    private var teardownJob: Job? = null
+    private var revivalPulseJob: Job? = null
     private var lastDisplayState = Display.STATE_UNKNOWN
     private var lastDisplayTransitionRt = 0L
     private val isDisplayFlickering = AtomicBoolean(false)
@@ -304,6 +306,7 @@ class HardwareProvider @Inject constructor(
             }
             
             isTeardownActive.set(false)
+            teardownJob?.cancel(); teardownJob = null
             sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt
             proximityMaxRange = proximity?.maximumRange ?: 5f
             
@@ -334,12 +337,18 @@ class HardwareProvider @Inject constructor(
         synchronized(lifecycleLock) {
             if (!isStarted.getAndSet(false)) return
             isTeardownActive.set(true)
+            
+            // Issue #923: Clear revival footprint state to prevent forensic energy leaks across sessions.
+            revivalStartBattery = null
+            revivalStartRtForFootprint = 0L
+            
             val stopStartTime = SystemClock.elapsedRealtime()
             Timber.i("HardwareProvider: Starting teardown sequence (R891/R908).")
             
             recoveryJob?.cancel(); recoveryJob = null
             registrationJob?.cancel(); registrationJob = null
             proximityJob?.cancel(); proximityJob = null
+            revivalPulseJob?.cancel(); revivalPulseJob = null
             
             Timber.d("HardwareProvider: Stopping Acoustic Monitoring...")
             stopAcousticMonitoring()
@@ -369,7 +378,9 @@ class HardwareProvider @Inject constructor(
             displayListener.unregister(displayManager, handler)
             val displayDuration = SystemClock.elapsedRealtime() - displayStart
 
-            scope.launch(Dispatchers.IO) {
+            // Issue #923: Join teardown window via teardownJob to prevent race conditions during rapid toggles.
+            teardownJob?.cancel()
+            teardownJob = scope.launch(Dispatchers.IO) {
                 Timber.d("HardwareProvider: Entering 800ms forensic settling window (R908)...")
                 delay(800)
 
@@ -416,13 +427,15 @@ class HardwareProvider @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        if (!isStarted.get() || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) return
+        // Issue #923: Fix inverted permission check. We MUST have permission to continue.
+        if (!isStarted.get() || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
         
         // Issue #905 Hardening: Use both FusedLocationProvider AND raw LocationManager.
         // Budget hardware often stalls at the high-level API; raw provider access 
         // forces the chipset to re-evaluate the satellite search space.
         
-        scope.launch(Dispatchers.Default) {
+        revivalPulseJob?.cancel()
+        revivalPulseJob = scope.launch(Dispatchers.Default) {
             synchronized(lifecycleLock) {
                 if (!isStarted.get()) return@synchronized
                 val handler = hardwareHandler ?: return@synchronized

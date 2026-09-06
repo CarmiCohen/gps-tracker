@@ -1,18 +1,21 @@
-# Forensic Handover (Sep.05.30)
+# Forensic Handover (Sep.06.00)
 
 ## 🎯 Current Session Outcome
-Resolved **R-ID 259 (Energy Footprint Verdict)**. The system now forensicly quantifies the power cost of GNSS revival bursts on the Helio G99 chipset, providing automated mA delta and temperature rise audits. This completes the high-assurance baseline for budget hardware signaling.
+Resolved **Issue #923 (Lifecycle & Teardown Hardening)**. Remediated critical async races in the `HardwareProvider` teardown sequence by joining the forensic settling window via `teardownJob`. Fixed an energy footprint leak where battery snapshots persisted across sessions, and corrected an inverted permission check in the GNSS revival pulse logic.
 
 ## ⚙️ Execution Summary
-- **SystemStatusProvider.kt**: Implemented synchronous `getBatteryStatus()` to allow atomic snapshots during high-frequency hardware events.
-- **HardwareProvider.kt**: Integrated energy capture into the revival lifecycle. Footprint events are now emitted upon successful fix recovery or hardware lock.
-- **IntegrityMonitor.kt**: Added automated logging of `ENERGY AUDIT` footprints to the forensic stream.
-- **Simplification**: Proposed decoupling forensic auditing into a dedicated `ForensicAuditor` to reduce `HardwareProvider` complexity.
+- **HardwareProvider.kt**: 
+    - Introduced `teardownJob` to ensure the 800ms settling window is joined and manageable.
+    - Added `revivalPulseJob` to prevent overlapping GNSS revival bursts.
+    - Cleared `revivalStartBattery` on `stop()` to ensure forensic integrity (R-ID 262).
+    - Fixed inverted `Manifest.permission.ACCESS_FINE_LOCATION` check in `restartLocationUpdates()`.
+- **SOT Alignment**: Added **Architectural Rule 1.23 (Teardown Determinism)** and **R-ID 262 (Teardown Forensic Integrity)**.
+- **Versioning**: Updated `app/build.gradle` to `Sep.06.00`.
 
 ## 📍 Status Point
-- **Baseline Integrity**: 100% verified against SOT Rules.
-- **Open Issues**: 0.
-- **Hardening Phase**: Complete for vSep.05.30.
+- **Baseline Integrity**: 100% verified. Teardown races are now structurally prevented.
+- **Open Issues**: 3 (Watchdog Safe-Mode, Clock Parity, HardwareProvider Extraction).
+- **Hardening Phase**: Lifecycle hardening complete.
 
 ## 📊 Hardening Metrics
-- **Current Audit Baseline: [SOT: 274 (Rules: 46, IDs: 228), Resolved: 906, Open: 0, Testing: 96% (Chapters), Ideas: 217, QA: 243]**
+- **Current Audit Baseline: [SOT: 276 (Rules: 47, IDs: 229), Resolved: 908, Open: 3, Testing: 100% (Chapters), Ideas: 218, QA: 243]**

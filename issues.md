@@ -1,30 +1,33 @@
-# Project Issues & Hardening Tracking (Sep.05.30)
+# Project Issues & Hardening Tracking (Sep.06.00)
 
 ## 🎯 Current Resumption Focus: Physical Verification & Forensic Closing
 Finalizing the high-assurance baseline for Samsung A15 hardware and signaling transport.
 
+## 🟢 Recently Resolved Issues (Sep.06.00)
+*   **Issue #923 RESOLVED: Lifecycle & Teardown Hardening**. Remediated async races in `HardwareProvider` by joining the teardown window via `teardownJob`. Cleared revival footprint state on session stop to prevent energy leaks and corrected the inverted permission check in GNSS revival pulses.
+
 ## 🟢 Recently Resolved Issues (Sep.05.30)
-*   **Issue #916 RESOLVED: Energy Footprint Verdict**. Implemented automated mA delta and temperature rise calculation in `HardwareProvider` to quantify the power cost of GNSS revival cycles. The system now captures instantaneous battery snapshots via `SystemStatusProvider` at the start and end of recovery bursts, logging a definitive energy footprint to forensic logs (R-ID 259).
+*   **Issue #916 RESOLVED: Energy Footprint Verdict**. Implemented automated mA delta and temperature rise calculation in `HardwareProvider` to quantify the power cost of GNSS revival cycles (R-ID 259).
+*   **Issue #921 RESOLVED: Sensor Rate Verification**. Implemented a runtime efficacy audit in `HardwareProvider` for Target SDK 35 (R-ID 256).
 
-## 🟢 Recently Resolved Issues (Sep.05.29)
-*   **Issue #921 RESOLVED: Sensor Rate Verification**. Implemented a runtime efficacy audit in `HardwareProvider` to verify `HIGH_SAMPLING_RATE_SENSORS` performance on Target SDK 35. The system now measures actual Hz after the stabilization window and logs the efficacy status (True if >200Hz) to forensic logs, ensuring high-fidelity IMU data collection is not throttled by the OS (R-ID 256).
+## 🟡 Open Issues & Hardening Tasks (Sorted by Criticality)
 
-## 🟢 Recently Resolved Issues (Sep.05.28)
-*   **Issue #914 RESOLVED: GNSS Detail Sampling**. Implemented A15-aware sampling for the `activeGnssDetail` flow in `MainViewModel`. This optimization reduces UI overhead during satellite monitoring by throttling update frequencies to 3000ms on budget devices, ensuring interface responsiveness under high system load (R-ID 267).
+### 🔴 CRITICAL: Stability & Lifecycle Blockers
+*   **Issue #924 (Part A): Watchdog Safe-Mode**.
+    *   [ ] **Safe-Mode UI**: When the Hydration Watchdog (#910) fires, the UI must enter a "Safe Mode" that prevents `CommunicationManager` from attempting to connect with null identities, which would cause signaling handshake loops.
 
-## 🟢 Recently Resolved Issues (Sep.05.27)
-*   **Issue #918 RESOLVED: VWR Badge Consistency & Verification**. Standardized all peer activity tracking and staleness evaluation to strictly use monotonic `elapsedRealtime()`. Remediated a clock-source mismatch where wall-clock timestamps were compared against monotonic gates, ensuring the 35s RED transition is robust and accurate across all HUD indicators (R-ID 257).
+### 🟠 HIGH: Forensic Integrity & Signal Parity
+*   **Issue #922 (Part A): Clock Parity & Forensic Buffering**.
+    *   [ ] **Clock Parity**: Standardize all forensic indexing (SNR, Sensors) in `HardwareProvider` to use monotonic `elapsedRealtime()` as the primary key. Current wall-clock reliance is susceptible to drift during system time jumps (Issue #918 parity).
+    *   [ ] **State Buffering**: Replace fixed-array pools with a standardized `CircularStateBuffer` for `ForensicSnapshot` and `snrTsBuffer` to reduce GC pressure and locking overhead on budget devices.
 
-## 🟢 Recently Resolved Issues (Sep.05.26)
-*   **Issue #912 RESOLVED: WebSocket Fallback**. Re-enabled XHR polling fallback by allowing transport negotiation (`polling` to `websocket`) in `CommunicationManager`. This ensures connectivity on restricted networks that block direct WebSocket upgrades, while maintaining the 60s timeout for instance spin-up (R-ID 251).
-
-## 🟢 Recently Resolved Issues (Sep.05.25)
-*   **Issue #266 RESOLVED: Mali Driver Mitigation**. Implemented automated detection of Mali driver instability in `IntegrityMonitor`. Propagated state through the HUD aggregator and implemented reactive UI-throttling in `SharedUiComponents` to prevent process-level ANRs on budget devices (R-ID 266).
-
-## 🟡 Open Issues & Hardening Tasks (vSep.05.30)
-*   [NONE] All high-assurance hardening tasks for the current baseline are completed.
+### 🟡 MEDIUM: Refactoring & Budget Optimization
+*   **Issue #922 (Part B): HardwareProvider Extraction**.
+    *   [ ] **Extraction**: Extract GNSS jitter monitoring, sensor rate audits (R-ID 256), and energy footprint snapshots (R-ID 259) from `HardwareProvider` into a new `ForensicAuditor`. Restore `HardwareProvider` to a lean hardware bridge.
+*   **Issue #924 (Part B): A15 Resource Throttling**.
+    *   [ ] **Dynamic GNSS Rates**: Move GNSS throttling from the UI layer (`MainViewModel`) down to `HardwareProvider` source. On A15 hardware, throttle emission to 5000ms when high system load or `MaliAnomaly` is detected.
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 274 (Rules: 46, IDs: 228), Resolved: 906, Open: 0, Testing: 100% (Chapters), Ideas: 217, QA: 252]**
+- **Current Audit Baseline: [SOT: 276 (Rules: 47, IDs: 229), Resolved: 907, Open: 4, Testing: 96% (Chapters), Ideas: 221, QA: 243]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.05.30)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.06.00)*
