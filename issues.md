@@ -1,7 +1,10 @@
-# Project Issues & Hardening Tracking (Sep.05.29)
+# Project Issues & Hardening Tracking (Sep.05.30)
 
 ## 🎯 Current Resumption Focus: Physical Verification & Forensic Closing
 Finalizing the high-assurance baseline for Samsung A15 hardware and signaling transport.
+
+## 🟢 Recently Resolved Issues (Sep.05.30)
+*   **Issue #916 RESOLVED: Energy Footprint Verdict**. Implemented automated mA delta and temperature rise calculation in `HardwareProvider` to quantify the power cost of GNSS revival cycles. The system now captures instantaneous battery snapshots via `SystemStatusProvider` at the start and end of recovery bursts, logging a definitive energy footprint to forensic logs (R-ID 259).
 
 ## 🟢 Recently Resolved Issues (Sep.05.29)
 *   **Issue #921 RESOLVED: Sensor Rate Verification**. Implemented a runtime efficacy audit in `HardwareProvider` to verify `HIGH_SAMPLING_RATE_SENSORS` performance on Target SDK 35. The system now measures actual Hz after the stabilization window and logs the efficacy status (True if >200Hz) to forensic logs, ensuring high-fidelity IMU data collection is not throttled by the OS (R-ID 256).
@@ -18,10 +21,10 @@ Finalizing the high-assurance baseline for Samsung A15 hardware and signaling tr
 ## 🟢 Recently Resolved Issues (Sep.05.25)
 *   **Issue #266 RESOLVED: Mali Driver Mitigation**. Implemented automated detection of Mali driver instability in `IntegrityMonitor`. Propagated state through the HUD aggregator and implemented reactive UI-throttling in `SharedUiComponents` to prevent process-level ANRs on budget devices (R-ID 266).
 
-## 🟡 Open Issues & Hardening Tasks (vSep.05.29)
-*   **Issue #916: Energy Footprint Verdict**. [MISSING] [LOW] Implement automated mA delta and temperature rise calculation to quantify revival power cost (R-ID 259).
+## 🟡 Open Issues & Hardening Tasks (vSep.05.30)
+*   [NONE] All high-assurance hardening tasks for the current baseline are completed.
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 274 (Rules: 46, IDs: 228), Resolved: 905, Open: 1, Testing: 94% (Chapters), Ideas: 216, QA: 243]**
+- **Current Audit Baseline: [SOT: 274 (Rules: 46, IDs: 228), Resolved: 906, Open: 0, Testing: 100% (Chapters), Ideas: 217, QA: 252]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.05.29)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.05.30)*

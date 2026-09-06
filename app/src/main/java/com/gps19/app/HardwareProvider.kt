@@ -33,12 +33,12 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.05.30:
+ * - Issue #916 Hardening: Energy Footprint Verdict (R-ID 259). Implemented mA delta 
+ *   and temperature rise calculation during GNSS revival cycles to quantify power cost.
  * Sep.05.29:
  * - Issue #R-ID 256: Sensor Rate Verification. Added runtime efficacy check 
  *   to verify HIGH_SAMPLING_RATE_SENSORS performance on Target SDK 35.
- * Sep.05.22:
- * - Issue #916 Hardening: Finalized RevivalEvent lifecycle. Implemented emission 
- *   of HardwareLock and Success events to remediate logic gaps in forensic monitoring.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -77,6 +77,10 @@ class HardwareProvider @Inject constructor(
     private var isHardwareLocked = false
     var maxGnssJitterMs = 0L; private set
 
+    // --- Energy Footprint State (R-ID 259) ---
+    private var revivalStartBattery: BatteryStatus? = null
+    private var revivalStartRtForFootprint = 0L
+
     private val _revivalEvents = MutableSharedFlow<RevivalEvent>(extraBufferCapacity = 8)
     val revivalEvents = _revivalEvents.asSharedFlow()
 
@@ -86,6 +90,7 @@ class HardwareProvider @Inject constructor(
         object Success : RevivalEvent()
         object RawBurstStarted : RevivalEvent()
         object RawBurstEnded : RevivalEvent()
+        data class Footprint(val deltaMa: Int, val deltaTemp: Double, val durationMs: Long) : RevivalEvent()
     }
 
     data class LocationStatus(
@@ -482,6 +487,7 @@ class HardwareProvider @Inject constructor(
         
         if (shouldEmitSuccess) {
             _revivalEvents.tryEmit(RevivalEvent.Success)
+            emitEnergyFootprint()
         }
     }
 
@@ -813,6 +819,12 @@ class HardwareProvider @Inject constructor(
             val stallDuration = nowRt - pendingEnterRt
             val retryThreshold = (revivalAttemptCount + 1) * GPS_REVIVAL_RETRY_INTERVAL_MS
             
+            // R-ID 259: Capture start battery state for Energy Footprint Verdict
+            if (revivalStartBattery == null) {
+                revivalStartBattery = systemStatusProvider.getBatteryStatus()
+                revivalStartRtForFootprint = nowRt
+            }
+
             if (stallDuration > retryThreshold) {
                 if (revivalAttemptCount < MAX_REVIVAL_ATTEMPTS) {
                     revivalAttemptCount++
@@ -823,8 +835,32 @@ class HardwareProvider @Inject constructor(
                     isHardwareLocked = true
                     Timber.e("HardwareProvider: MAX REVIVAL ATTEMPTS REACHED. GPS_HARDWARE_LOCK triggered.")
                     _revivalEvents.tryEmit(RevivalEvent.HardwareLock)
+                    emitEnergyFootprint()
                 }
             }
-        } else { revivalAttemptCount = 0; isHardwareLocked = false }
+        } else { 
+            revivalAttemptCount = 0; isHardwareLocked = false 
+            // Note: revivalStartBattery is cleared in emitEnergyFootprint() or when Success/Lock occurs.
+        }
+    }
+
+    /**
+     * R-ID 259: Automated mA delta and temperature rise calculation to quantify revival power cost.
+     */
+    private fun emitEnergyFootprint() {
+        val start = revivalStartBattery ?: return
+        val startRt = revivalStartRtForFootprint
+        val current = systemStatusProvider.getBatteryStatus()
+        val nowRt = timeProvider.elapsedRealtime()
+        
+        val deltaMa = current.currentMa - start.currentMa
+        val deltaTemp = current.temp - start.temp
+        val durationMs = nowRt - startRt
+        
+        Timber.i("HardwareProvider: Energy Footprint Verdict (R-ID 259): Delta mA: $deltaMa, Delta Temp: $deltaTemp°C, Duration: ${durationMs}ms")
+        _revivalEvents.tryEmit(RevivalEvent.Footprint(deltaMa, deltaTemp, durationMs))
+        
+        revivalStartBattery = null
+        revivalStartRtForFootprint = 0L
     }
 }

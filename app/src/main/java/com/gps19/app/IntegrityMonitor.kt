@@ -26,13 +26,12 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.05.30:
+ * - Issue #916 Hardening: Integrated Energy Footprint Verdict (R-ID 259). 
+ *   Added handling for RevivalEvent.Footprint to log mA delta and temperature rise.
  * Sep.05.25:
  * - Issue #266: Implemented automated Mali Driver Anomaly detection 
  *   to trigger UI-throttling on budget hardware.
- * Sep.05.18:
- * - Issue #916 Hardening: Implemented RawBurstStarted/Ended telemetry 
- *   snapshots in handleRevivalEvent to audit Helio G99 battery drain 
- *   during high-power GNSS revival windows.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -164,6 +163,11 @@ class IntegrityMonitor @Inject constructor(
             is HardwareProvider.RevivalEvent.RawBurstEnded -> {
                 val h = currentHealth
                 _integrityEvents.tryEmit(IntegrityEvent.LogEvent("AUDIT: Raw GNSS Burst ENDED. [Batt: ${h.batteryLevel}%, Current: ${h.currentMa}mA, Temp: ${h.batteryTemp}°C]", false))
+            }
+            is HardwareProvider.RevivalEvent.Footprint -> {
+                val msg = "ENERGY AUDIT: Revival Footprint (R-ID 259) - Delta: ${event.deltaMa}mA, Temp Rise: ${event.deltaTemp}°C, Duration: ${event.durationMs}ms"
+                _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, false))
+                Timber.i("IntegrityMonitor: $msg")
             }
         }
     }

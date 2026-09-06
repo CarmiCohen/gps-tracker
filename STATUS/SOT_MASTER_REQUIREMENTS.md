@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.05.29)
+# SOT Master Requirements (Sep.05.30)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -35,8 +35,8 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 256 (High Frequency Sensor Authority)**: The application MUST declare `HIGH_SAMPLING_RATE_SENSORS` permission in the manifest and implement a runtime efficacy check to verify actual Hz performance on Target SDK 35+, ensuring high-fidelity IMU data collection for forensic analysis (Sep.05.29).
 *   **R-ID 257 (Exact Actual LED Status)**: The HUD state aggregator MUST correctly monitor peer pulses and local service heartbeats using monotonic `elapsedRealtime()` to ensure all LED indicators (VWR, DAT, WATCHDOG) reflect real-time status with a synchronized 35s staleness gate (R338/R972) (Sep.05.27).
 *   **R-ID 258 (Tracker-side Telemetry Processing)**: The signaling layer MUST process incoming binary telemetry packets in Tracker mode to ensure the local HUD correctly displays the Viewer's active presence during two-way signaling (Sep.05.16).
-*   **R-ID 259 (High-Resolution Battery Current Audit)**: The system MUST capture and log instantaneous battery current (mA) and temperature snapshots at the start and end of every GNSS revival burst to forensicly quantify hardware energy consumption on Helio G99 chipset (Sep.05.23).
-*   **R-ID 260 (GNSS Revival Lifecycle Transparency)**: The system MUST emit definitive `Success` and `HardwareLock` events during GNSS recovery routines to ensure UI/Monitor transparency and remediate silent failure risks on budget hardware (Sep.05.23).
+*   **R-ID 259 (High-Resolution Battery Current Audit)**: The system MUST capture and log instantaneous battery current (mA) and temperature snapshots at the start and end of every GNSS revival burst to forensicly quantify hardware energy consumption on Helio G99 chipset (Sep.05.30).
+*   **R-ID 260 (GNSS Revival Lifecycle Transparency)**: The system MUST emit definitive `Success` and `HardwareLock` events during GNSS recovery routines to ensure UI/Monitor transparency and remediate silent failure risks on budget hardware (Sep.05.30).
 *   **R-ID 261 (Hydration Watchdog)**: The `MainViewModel` MUST implement a 15s hydration watchdog (`WATCH_DOG_UI_GRACE_MS`) that forces the UI initialization state if Level 2 hydration hangs, ensuring a recovery path from black-screen locks (Sep.05.24).
 *   **R-ID 266 (Mali Driver Mitigation)**: `IntegrityMonitor` MUST detect Mali Driver Anomalies (High CPU + High I/O on budget hardware) and trigger automated UI-throttling to prevent process-level ANRs (Sep.05.25).
 *   **R-ID 267 (GNSS Detail Sampling)**: The UI layer MUST apply A15-aware sampling to the `activeGnssDetail` flow (3000ms on budget hardware) to minimize UI overhead and prevent performance degradation during active satellite monitoring (Sep.05.28).

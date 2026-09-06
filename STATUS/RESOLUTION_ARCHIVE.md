@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.05.29)
+# Resolution Archive (Sep.05.30)
+
+## 🟢 Resolved Issues (Sep.05.30)
+*   **Issue #916 RESOLVED: Energy Footprint Verdict**. Implemented automated mA delta and temperature rise calculation in `HardwareProvider` to quantify the power cost of GNSS revival cycles. The system now captures instantaneous battery snapshots via `SystemStatusProvider` at the start and end of recovery bursts, logging a definitive energy footprint to forensic logs (R-ID 259).
 
 ## 🟢 Resolved Issues (Sep.05.29)
 *   **Issue #921 RESOLVED: Sensor Rate Verification**. Implemented a runtime efficacy audit in `HardwareProvider` to verify `HIGH_SAMPLING_RATE_SENSORS` performance on Target SDK 35. The system now measures actual Hz after the stabilization window and logs the efficacy status (True if >200Hz) to forensic logs, ensuring high-fidelity IMU data collection is not throttled by the OS (R-ID 256).
@@ -16,10 +19,4 @@
 *   **Issue #266 RESOLVED: Mali Driver Mitigation**. Implemented automated detection of Mali driver instability in `IntegrityMonitor` (correlated via CPU load and I/O latency on budget hardware). Propagated state through the HUD aggregator and implemented reactive UI-throttling in `SharedUiComponents` (suppressing high-frequency animations) to prevent process-level ANRs on budget devices (R-ID 266).
 *   **Issue #910 RESOLVED: Hydration Watchdog**. Implemented a 15s hydration watchdog (`WATCH_DOG_UI_GRACE_MS`) in `MainViewModel`. The system now monitors startup hydration levels and forces the UI initialization state if a hang is detected at Level 2, ensuring a recovery path from black-screen locks on budget hardware (R-ID 261).
 
-## 🟢 Resolved Issues (Sep.05.24)
-*   **Issue #916 RESOLVED: GNSS Revival Lifecycle Transparency & Battery Audit**. Finalized the GNSS recovery event chain in `HardwareProvider.kt` and instrumented `IntegrityMonitor.kt` to log battery current (mA) snapshots during revival pulses (Sep.05.23).
-*   **Issue #918 RESOLVED: Clock Source Consistency**. Standardized all staleness gates to strictly use `SystemClock.elapsedRealtime()` to ensure HUD accuracy across system clock jumps (Sep.05.23).
-*   **Issue #918 RESOLVED: VWR Badge Persistence Leak**. Restricted activity indicators to high-assurance telemetry packets (Location/Health) to prevent persistence leaks (Sep.05.23).
-*   **Issue #917 RESOLVED: Exact Actual Colors (HUD LED Synchronization)**. Standardized all HUD LEDs to monitor actual service pulses with a synchronized 35s staleness gate (Sep.05.23).
-*   **Issue #915 RESOLVED: Mapnik Tile Latency (Samsung A15)**. Expanded disk cache to 600MB and throttled concurrency for budget hardware (Sep.05.23).
-*   **Issue #910 RESOLVED: Forensic Stall Simulation (Service Termination Race)**. Hardened navigation guards to prevent Landing retreats during hydration (Sep.05.23).
+*(For older resolutions, see history logs.)*

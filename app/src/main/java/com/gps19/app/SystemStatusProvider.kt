@@ -61,13 +61,12 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Sep.05.30:
+ * - Issue #916 Hardening: Added getBatteryStatus() to support Energy Footprint Verdict.
  * Sep.04.16:
  * - Issue #900/904 Hardening: Populated isSamsungDevice flag and verified 
  *   isFineLocationGranted logic to ensure Precise Location detection on 
  *   budget hardware (A15).
- * Sep.03.25:
- * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
- *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 240).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -93,6 +92,7 @@ interface SystemStatusProvider {
     
     fun getStorageStatus(): StorageStatus
     fun getPowerStatus(): PowerStatus
+    fun getBatteryStatus(): BatteryStatus
 
     suspend fun getCpuLoad(): Double
     suspend fun getIoWait(): Double
@@ -303,20 +303,7 @@ class SystemStatusProviderImpl @Inject constructor(
     private val sharedBatteryStatusFlow = callbackFlow<BatteryStatus> {
         val receiver = object : ManagedBroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
-                val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
-                val pct = if (level != -1 && scale != -1) (level * 100 / scale.toFloat()).toInt() else 100
-                val temp = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10.0
-                val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
-                val isCharging = plugged > 0
-                val currentMa = try {
-                    batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) / 1000
-                } catch (e: Exception) { 0 }
-                
-                val isLow = pct <= BATTERY_ALARM_THRESHOLD
-                val isCritical = pct <= CRITICAL_BATTERY_THRESHOLD
-                
-                trySend(BatteryStatus(pct, temp, isCharging, currentMa, isLow, isCritical))
+                trySend(getBatteryStatus(intent))
             }
         }
         try {
@@ -336,6 +323,30 @@ class SystemStatusProviderImpl @Inject constructor(
      )
 
     override fun observeBatteryStatus(): Flow<BatteryStatus> = sharedBatteryStatusFlow
+
+    override fun getBatteryStatus(): BatteryStatus {
+        val intent = shadowContext.registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        return getBatteryStatus(intent)
+    }
+
+    private fun getBatteryStatus(intent: Intent?): BatteryStatus {
+        if (intent == null) return BatteryStatus(0, 0.0, false)
+        
+        val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+        val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, -1)
+        val pct = if (level != -1 && scale != -1) (level * 100 / scale.toFloat()).toInt() else 100
+        val temp = intent.getIntExtra(BatteryManager.EXTRA_TEMPERATURE, 0) / 10.0
+        val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
+        val isCharging = plugged > 0
+        val currentMa = try {
+            batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CURRENT_NOW) / 1000
+        } catch (e: Exception) { 0 }
+        
+        val isLow = pct <= BATTERY_ALARM_THRESHOLD
+        val isCritical = pct <= CRITICAL_BATTERY_THRESHOLD
+        
+        return BatteryStatus(pct, temp, isCharging, currentMa, isLow, isCritical)
+    }
 
     private val sharedStorageStatusFlow = flow {
         while (true) {
