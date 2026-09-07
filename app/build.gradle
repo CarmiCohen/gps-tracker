@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 1
-        versionName "Sep.06.57" // Soak Test Initiation
+        versionName "Sep.06.58" // GPS Red-Lock Regression Fix
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

@@ -16,6 +16,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.06.58:
+ * - Issue #935 RESOLVED: Fixed GPS Red-Lock regression by correctly populating 
+ *   rt (monotonic timestamp) in local LocationUpdate emissions.
  * Sep.06.55:
  * - Issue #933 RESOLVED: Viewer Forensic Parity. Implemented Stability Audit loop 
  *   (Reliability % / Jitter) and Revival Event observation (Energy Footprints) 
@@ -382,6 +385,7 @@ class ViewerService : BaseMonitorService() {
             lat = lat, lng = lng, alt = alt, speed = lastGpsSpeed, accuracy = lastGpsAccuracy, 
             bearing = lastGpsBearing, battery = health.batteryLevel, temp = health.batteryTemp, 
             maxTemp = health.maxTemp, isCharging = health.isCharging, gpsTs = location.time, ts = nowWall, 
+            rt = nowRt,
             isMe = true, satsView = hardwareProvider.satellitesInView, satsUsed = location.extras?.getInt("satellites") ?: hardwareProvider.satellitesUsed, maxAccuracy = processed.maxAccuracy, currentMa = health.currentMa, 
             lastValidFixRt = selfProcessor.getLastValidFixRt(), status = processed.status, snrIdx = (hardwareProvider.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
         ))
@@ -584,7 +588,7 @@ class ViewerService : BaseMonitorService() {
     }
 
     override fun onDestroy() {
-        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); revivalEventsJob?.cancel()
+        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); revivalEventsJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel()
         super.onDestroy()
     }
 }

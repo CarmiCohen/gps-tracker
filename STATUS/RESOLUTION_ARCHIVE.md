@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.06.57)
+# Resolution Archive (Sep.06.58)
+
+## 🟢 Resolved Issues (Sep.06.58)
+*   **Issue #935 RESOLVED: GPS Red-Lock Regression**. Remediated critical HUD signaling latency where the GPS badge remained RED despite active GNSS callbacks. The regression occurred during the monotonic clock migration (vSep.05.20) where `TrackerService` and `ViewerService` failed to populate the new `rt` (elapsedRealtime) field in local `LocationUpdate` emissions. Corrected the telemetry pipeline to ensure all role-local updates include monotonic authority for UI staleness parity (R-ID 276).
 
 ## 🟢 Verified Deployment & Soak (Sep.06.57)
 *   **Deployment Session: Soak Test Initiation**. Verified A15 signaling continuity and forensic loop instrumentation. Confirmed Energy Footprint (R-ID 259) and Sensor Rate (R-ID 256) audits are functional on physical hardware. Identified Issue #935 (GPS lock latency) during log monitoring.

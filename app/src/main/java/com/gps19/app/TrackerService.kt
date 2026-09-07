@@ -21,6 +21,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.06.58:
+ * - Issue #935 RESOLVED: Fixed GPS Red-Lock regression by correctly populating 
+ *   rt (monotonic timestamp) in local LocationUpdate emissions.
  * Sep.06.31:
  * - Issue #926 RESOLVED: Revival Integration. Implemented collector for 
  *   hardwareProvider.revivalEvents to transmit energy footprints (R-ID 259) 
@@ -593,6 +596,7 @@ class TrackerService : BaseMonitorService() {
             isCharging = health.isCharging, 
             gpsTs = proc?.timestamp ?: 0L, 
             ts = now, 
+            rt = nowRt,
             isMe = true, 
             status = proc?.status ?: SentinelStatus.VALID, 
             satsView = hardwareProvider.satellitesInView, 
@@ -788,7 +792,7 @@ class TrackerService : BaseMonitorService() {
         if (lastStabilityAuditTs == 0L) lastStabilityAuditTs = nowRt
     }
 
-    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerConnected: Boolean, processed: ProcessedLocation, snapshot: HardwareProvider.ForensicSnapshot) {
+    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerActive: Boolean, processed: ProcessedLocation, snapshot: HardwareProvider.ForensicSnapshot) {
         val health = integrityMonitor.currentHealth
         alarmEvalJob?.cancel()
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
