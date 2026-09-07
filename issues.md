@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Sep.07.70)
+# Project Issues & Hardening Tracking (Sep.07.80)
 
 ## 🎯 Current Resumption Focus: Forensic Auditor Consolidation
 Extract shared audit logic into a unified ForensicAuditor (Simplicity Idea #3).
@@ -12,7 +12,10 @@ Extract shared audit logic into a unified ForensicAuditor (Simplicity Idea #3).
 ## 🟢 Recently Resolved Issues (Sep.07.61)
 *   **HUD LED Specification Compliance (R960/R972)**: Remediated false-positive green indicators for `VWR` and `DAT` in Tracker Mode. Gated `DAT` strictly to Viewer Mode and restricted `VWR` activity resets to genuine peer pulses, preventing generic signaling heartbeats from masking peer absence.
 
-## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 288 (Rules: 50, IDs: 238), Resolved: 975, Open: 0, Testing: 95% (Sub-items: 47), Ideas: 5, QA: 263]**
+## 🟢 Recently Resolved Issues (Sep.07.60)
+*   **Issue #935 RESOLVED: GPS Red-Lock Regression**. Remediated critical HUD signaling latency where the GPS badge remained RED despite active GNSS callbacks. Fixed by correctly populating the monotonic `rt` field in local `LocationUpdate` emissions from `TrackerService` and `ViewerService`.
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.07.70)*
+## 📊 Hardening Progress Dashboard
+- **Current Audit Baseline: [SOT: 290 (Rules: 51, IDs: 239), Resolved: 940, Open: 0, Testing: 95% (Sub-items: 47), Ideas: 5, QA: 265]**
+
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.07.80)*
