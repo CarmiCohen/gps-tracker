@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.06.45)
+# SOT Master Requirements (Sep.06.55)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -25,6 +25,6 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 273 (Synchronous Hardware Initialization)**: `HardwareProvider.start()` MUST suspend until any active `teardownJob` completes to prevent race conditions during rapid session restarts (Sep.06.30).
 *   **R-ID 274 (Mali Exit Hysteresis)**: The hardware layer MUST enforce a 10s cooldown/hysteresis period after an anomaly state (High Load or Mali Anomaly) clears before returning to standard GNSS sampling rates to prevent sampling jitter on budget hardware (Sep.06.33).
 *   **R-ID 275 (Forensic Deep-Linking)**: The event log detail pane MUST provide functional "HIST" and "DIAG" links to allow direct navigation to analytical history (synchronized via replay cursor) and system diagnostics respectively (Sep.06.35).
-*   **R-ID 276 (A15 Viewer Parity)**: The Viewer role MUST maintain parity with Tracker GPS reception by implementing 30s monotonic WakeLock pokes and adaptive 2000ms polling when the UI is foregrounded (Sep.06.45).
+*   **R-ID 276 (A15 Viewer Parity)**: The Viewer role MUST maintain parity with Tracker GPS reception by implementing 30s monotonic WakeLock pokes, adaptive 2000ms polling when the UI is foregrounded, and a full Stability Audit loop (Reliability % / GNSS Jitter / Energy Footprints) (Sep.06.55).
 
 *(Total: 50 Architectural Rules + 238 Functional R-IDs = 288 Items)*

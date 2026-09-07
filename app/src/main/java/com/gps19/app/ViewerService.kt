@@ -16,13 +16,14 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.06.55:
+ * - Issue #933 RESOLVED: Viewer Forensic Parity. Implemented Stability Audit loop 
+ *   (Reliability % / Jitter) and Revival Event observation (Energy Footprints) 
+ *   to match Tracker forensic baseline (R-ID 276).
  * Sep.06.47:
  * - Issue #931 RESOLVED: GPS Reception Parity. Final parameter fix for 
  *   evaluateAlarms (trackerLastValidFixRt). Aligned FGS type to 
  *   location|specialUse and added A15 Poke logic (R-ID 276).
- * Sep.06.31:
- * - Issue #926 RESOLVED: Revival Integration. Mapped isGpsHardwareLock 
- *   to AlarmManager evaluation (R928).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -31,6 +32,7 @@ class ViewerService : BaseMonitorService() {
     private var alarmEvalJob: Job? = null
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
+    private var revivalEventsJob: Job? = null
     
     private var lastKnownLocation: Location? = null
     private var lastProcessedLocation: ProcessedLocation? = null
@@ -57,6 +59,8 @@ class ViewerService : BaseMonitorService() {
 
     private lateinit var selfProcessor: LocationProcessor
     private lateinit var remoteProcessor: LocationProcessor
+
+    private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
 
     override fun onServicePreInit() {
         notificationManager.setTrackerMode(false)
@@ -94,6 +98,7 @@ class ViewerService : BaseMonitorService() {
         observeConnectivityEvents()
         observeHistoryEvents()
         observeCommandEvents()
+        observeRevivalEvents()
         
         connectivitySuite.updateRemoteProcessor(remoteProcessor)
         connectivitySuite.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, false)
@@ -205,6 +210,32 @@ class ViewerService : BaseMonitorService() {
                 when (event) {
                     is IntegrityEvent.LogEvent -> logManager.logServiceEvent(event.message, isImportant = event.isImportant)
                     else -> {} 
+                }
+            }
+        }
+    }
+
+    private fun observeRevivalEvents() {
+        revivalEventsJob?.cancel()
+        revivalEventsJob = lifecycleScope.launch(Dispatchers.Default) {
+            hardwareProvider.revivalEvents.collect { event ->
+                when (event) {
+                    is HardwareProvider.RevivalEvent.Footprint -> {
+                        val msg = "ENERGY AUDIT (V): Revival Footprint - Delta: ${event.deltaMa}mA, Temp Rise: ${event.deltaTemp}°C, Duration: ${event.durationMs}ms"
+                        val proc = lastProcessedLocation
+                        logManager.logServiceEvent(msg, isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                    }
+                    is HardwareProvider.RevivalEvent.HardwareLock -> {
+                        val proc = lastProcessedLocation
+                        logManager.logServiceEvent("CRITICAL (V): GPS_HARDWARE_LOCK - All revival attempts failed. Hardware stall confirmed.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                    }
+                    is HardwareProvider.RevivalEvent.Attempt -> {
+                        logManager.logServiceEvent("GPS REVIVAL (V): Hardware restart attempt ${event.count} triggered.", isImportant = false)
+                    }
+                    is HardwareProvider.RevivalEvent.Success -> {
+                        logManager.logServiceEvent("GPS REVIVAL (V): Hardware fix restored successfully.", isImportant = true)
+                    }
+                    else -> {}
                 }
             }
         }
@@ -323,12 +354,17 @@ class ViewerService : BaseMonitorService() {
 
         if (lastGpsFixRealtime > 0) {
             val gap = nowRt - lastGpsFixRealtime
-            if (gap > TICK_INTERVAL_MS + GPS_STABILITY_GAP_THRESHOLD_MS) {
-                val proc = lastProcessedLocation
-                logManager.logServiceEvent("STABILITY GAP (V): ${gap}ms detected during logic pulse.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
+            if (currentIntervalMs == TICK_INTERVAL_MS || currentIntervalMs == HIGH_FREQUENCY_GPS_POLLING_MS) {
+                stabilityAuditFixCount++
+                if (gap > currentIntervalMs + GPS_STABILITY_GAP_THRESHOLD_MS) {
+                    stabilityAuditViolationCount++
+                    val proc = lastProcessedLocation
+                    logManager.logServiceEvent("STABILITY GAP (V): ${gap}ms detected during logic pulse.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
+                }
             }
         }
         lastGpsFixRealtime = nowRt
+        if (lastStabilityAuditTs == 0L) lastStabilityAuditTs = nowRt
 
         val processed = selfProcessor.processGpsPoint(
             lat = lat, lng = lng, alt = alt, androidSpeedMps = lastGpsSpeed, 
@@ -453,6 +489,27 @@ class ViewerService : BaseMonitorService() {
             }
         }
 
+        if (nowRt - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
+            val maxJitter = hardwareProvider.maxGnssJitterMs
+            if (stabilityAuditFixCount > 0 || maxJitter > 0) {
+                val reliability = if (stabilityAuditFixCount > 0) 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount else 100.0
+                val jitterViolation = maxJitter > GNSS_JITTER_THRESHOLD_MS
+                val reliabilityViolation = reliability < GPS_STABILITY_RELIABILITY_THRESHOLD
+                
+                if (reliabilityViolation || jitterViolation) {
+                    val proc = lastProcessedLocation
+                    val msg = StringBuilder("STABILITY AUDIT (V): ")
+                    if (reliabilityViolation) msg.append("Reliability ${reliability.roundToOneDecimal()}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes). ")
+                    if (jitterViolation) msg.append("GNSS Jitter: ${maxJitter}ms (Hardware Instability).")
+                    
+                    logManager.logServiceEvent(msg.toString().trim(), isImportant = true, isSpecial = jitterViolation, specialColor = if (jitterViolation) FORENSIC_PINK_COLOR else null, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
+                }
+                stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
+                hardwareProvider.resetGnssJitter()
+            }
+            lastStabilityAuditTs = nowRt
+        }
+
         if (nowRt - lastPowerSaveCheckRt > 5000L) {
             val hasUnresolved = alarmManager.hasUnresolvedAlarms()
             val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(hardwareProvider.isStationary(), health.gpsStalled, hasUnresolved, isUiVisible())
@@ -527,8 +584,7 @@ class ViewerService : BaseMonitorService() {
     }
 
     override fun onDestroy() {
-        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel()
-        // base.onDestroy() now centralizes hardware unregistration and native release.
+        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); revivalEventsJob?.cancel()
         super.onDestroy()
     }
 }
