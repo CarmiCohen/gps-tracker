@@ -1,15 +1,15 @@
-# QA Validation Status (Sep.07.80)
+# QA Validation Status (Sep.07.82)
 
 This document tracks the verification status of all high-assurance logic and forensic refinements.
 
 ## 🏁 Validation Dashboard
 | Category | Passed | Pending | Failed |
 | :--- | :--- | :--- | :--- |
-| **Logic Refinement** | 170 | 0 | 0 |
+| **Logic Refinement** | 171 | 0 | 0 |
 | **Hardware Compatibility** | 50 | 0 | 0 |
 | **Stability / Long-Run** | 27 | 0 | 0 |
 | **UI / UX** | 18 | 0 | 0 |
-| **Total Validated** | **265** | **0** | **0** |
+| **Total Validated** | **266** | **0** | **0** |
 
 ---
 
@@ -21,7 +21,7 @@ This document tracks the verification status of all high-assurance logic and for
 ## 🟢 Validated & Resolved (Core Record)
 | ID | Feature | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **R975** | **Service Mutual Exclusivity** | **Passed** | Verified termination of non-target role services during mode transitions to prevent ghost telemetry (Sep.07.70). |
+| **R975** | **Service Mutual Exclusivity** | **Passed** | Verified termination of non-target role services during mode transitions and explicit telemetry reset to prevent ghost status (Sep.07.82). |
 | **R257** | **Exact Actual LED Status** | **Passed** | Verified 35s HUD transition consistency. (Regression #935 resolved via monotonic alignment in Sep.07.60). |
 | **R276** | **A15 Viewer Parity** | **Passed** | Verified 30s Poke logic, specialUse FGS, and full Forensic Audit/Revival parity in Viewer role (Sep.06.55). |
 | **R275** | **Forensic Deep-Linking** | **Passed** | Verified HIST/DIAG navigation from LogDetailPane (Sep.06.35). |

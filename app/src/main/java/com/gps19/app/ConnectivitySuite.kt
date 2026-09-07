@@ -34,14 +34,13 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.07.82:
+ * - HUD LED Specification Compliance (R975): Updated stop() and resetPeerStats() 
+ *   to ensure monotonic activity timestamps are cleared during role switches, 
+ *   eliminating "ghost" peer status on single-device testing.
  * Sep.06.31:
  * - Issue #926 RESOLVED: Revival Integration. Mapped gpsHardwareLock 
  *   in binary and JSON telemetry handlers to ensure role parity (R-ID 272).
- * Sep.05.27:
- * - Issue #918 RESOLVED: Clock Source Consistency. Fixed regression where 
- *   mainRepository.updateRemoteActivity was updated with wall-clock time, 
- *   causing 35s HUD badge staleness failures. Standardized to monotonic 
- *   elapsedRealtime() (R-ID 257).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -273,11 +272,6 @@ class ConnectivitySuite @Inject constructor(
         }
     }
 
-    /**
-     * Issue #908: Periodic Identity Sync Loop (R-ID 254).
-     * Re-broadcasts the identity (Join payload) every 60 seconds while connected 
-     * to ensure peer discovery during rolling deployments on budget hardware.
-     */
     private fun startIdentitySyncLoop() {
         identitySyncJob?.cancel()
         identitySyncJob = scope.launch {
@@ -524,11 +518,6 @@ class ConnectivitySuite @Inject constructor(
         }
     }
 
-    /**
-     * handleBinaryUpdate: Processes Protobuf-encoded telemetry.
-     * Sep.05.16 remediation (Issue #918): Enabled processing for Tracker mode 
-     * and ensured activity timers only reset on telemetry arrival.
-     */
     private fun handleBinaryUpdate(data: ByteArray) {
         if (isStopped.get()) return
         try {
@@ -547,11 +536,10 @@ class ConnectivitySuite @Inject constructor(
             val nowRt = timeProvider.elapsedRealtime()
             val peerId = statusProto.id
 
-            // High-assurance activity reset (Telemetry present)
             _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt)
             remoteStatusRepository.setTrackerConnected(true)
-            mainRepository.updateRemoteActivity(nowRt) // Issue #918: Switched to monotonic clock
+            mainRepository.updateRemoteActivity(nowRt) 
             
             remoteStatusRepository.setPeerSignal((statusProto.snrIdx * 10.0).toInt().coerceIn(0, 10))
 
@@ -677,7 +665,6 @@ class ConnectivitySuite @Inject constructor(
             return
         }
 
-        // Issue #918 remediation: Pruned activity resets from generic heartbeats.
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
             if (!isTrackerMode && !fromViewer) {
                 remoteStatusRepository.setTrackerConnected(true)
@@ -686,7 +673,6 @@ class ConnectivitySuite @Inject constructor(
         }
 
         if (isTrackerMode && fromViewer) {
-            // Only non-telemetry Viewer commands go here (e.g. settings sync)
             _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt); return
         }
@@ -829,14 +815,15 @@ class ConnectivitySuite @Inject constructor(
     }
 
     private fun handleRemoteLog(entry: LogEntry) {
-        val now = timeProvider.currentTimeMillis(); val nowRt = timeProvider.elapsedRealtime()
-        remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt) // Issue #918: Switched to monotonic clock
+        val nowRt = timeProvider.elapsedRealtime()
+        remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt)
     }
 
     fun onRelayLost() { remoteStatusRepository.setTrackerConnected(false) }
 
     fun resetPeerStats() {
         remoteStatusRepository.reset()
+        mainRepository.updateRemoteActivity(0L) // R975: Explicitly clear singleton timestamp
         trackerGpsStallStartTs = 0L
         mainRepository.saveDoubleSync(TRACKER_LUX_BASELINE_KEY, 0.0)
         mainRepository.saveDoubleSync(TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
@@ -847,6 +834,9 @@ class ConnectivitySuite @Inject constructor(
         isStopped.set(true)
         val stopStartTime = SystemClock.elapsedRealtime()
         Timber.i("ConnectivitySuite: Starting teardown sequence (R-ID 197).")
+
+        // R975: Reset peer status during stop to avoid cross-role ghost activity
+        resetPeerStats()
         
         keepAliveJob?.cancel(); keepAliveJob = null
         syncJob?.cancel(); syncJob = null

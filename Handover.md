@@ -1,14 +1,14 @@
-# Forensic Handover (vSep.07.80)
+# Forensic Handover (vSep.07.82)
 
 ## 📍 Current State
-- **Active Version**: Sep.07.80
-- **Baseline**: Service Mutual Exclusivity (Issue #975/R975) is fully implemented in `MainActivity.kt`.
-- **Forensic Status**: `TrackerService` and `ViewerService` now share the `Stability Audit` loop and `Revival Event` observation baseline (R-ID 276).
-- **Architecture**: `ForensicAuditor` is utilized as a singleton, though further consolidation of redundant audit loops in the services is planned (Idea #3).
+- **Active Version**: Sep.07.82
+- **Baseline**: Issue #975 Hardened. Ghost telemetry on single-device role switches is remediated.
+- **Forensic Status**: `SessionUseCase` and `ConnectivitySuite` now perform atomic clearing of in-memory telemetry (`TelemetryRepository` and `RemoteStatusRepository`) during mode transitions.
+- **Architecture**: `R975` (Rule 1.28) now strictly enforces forensic boundary integrity between Tracker and Viewer roles.
 
 ## 🛠️ Next Steps
 1.  **Forensic Consolidation**: Execute Idea #3 to move the `Stability Audit` polling loops from `TrackerService` and `ViewerService` into `ForensicAuditor` to reduce code duplication.
-2.  **QA Validation**: Perform a thermal recovery soak test on A15 hardware to verify the `Mali Exit Hysteresis` (R-ID 274).
+2.  **QA Validation**: Perform a multi-device soak test to verify peer discovery timing after the repository clear implementation.
 
 ## 🔐 Credentials & Environment
 - **Target SDK**: 35

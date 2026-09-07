@@ -7,11 +7,13 @@ import javax.inject.Inject
 
 /**
  * SessionUseCase: Logic for managing tracking sessions, mode transitions, and resource cleanup.
+ * Sep.07.81:
+ * - HUD LED Specification Compliance (R975): Integrated repository.clear() into 
+ *   setAppMode to ensure telemetry state is reset during mode transitions, 
+ *   preventing "ghost" peer status on single-device switches.
  * Sep.02.66:
  * - Issue #241 RESOLVED: Mode-Selection Activation. Integrated IS_SYSTEM_ACTIVE_KEY 
  *   toggle into setAppMode to ensure atomic state transition during role selection (R-ID 241).
- * July.27.00:
- * - Architecture Audit: Updated to use centralized PreferenceKeys.
  */
 class SessionUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -19,11 +21,14 @@ class SessionUseCase @Inject constructor(
 ) {
     /**
      * Sets the application mode and activates the system if a mode is selected.
-     * Sep.02.66: Now sets IS_SYSTEM_ACTIVE_KEY to true for non-null modes (Issue #241).
+     * Sep.07.81: Now calls repository.clear() to reset peer activity during role change.
      */
     suspend fun setAppMode(mode: String?): Long? {
         repository.setAppMode(mode)
         if (mode != null) {
+            // R975: Clear shared telemetry state to prevent stale peer activity from previous role
+            repository.clear()
+
             val appStartTime = timeProvider.currentTimeMillis()
             repository.saveLong(APP_START_TIME_KEY, appStartTime)
             repository.saveBoolean(IS_MANUAL_EXIT_KEY, false)
