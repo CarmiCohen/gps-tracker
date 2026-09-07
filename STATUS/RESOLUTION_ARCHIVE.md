@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.06.55)
+# Resolution Archive (Sep.06.56)
+
+## 🟢 Resolved Issues (Sep.06.56)
+*   **Issue #934 RESOLVED: Documentation Integrity Restoration**. Restored accidentally truncated forensic requirements (R251-R267) in `STATUS/QA_VALIDATION_STATUS.md` to maintain the high-assurance audit record.
 
 ## 🟢 Resolved Issues (Sep.06.55)
 *   **Issue #933 RESOLVED: Viewer Forensic Parity (Audit & Revival)**. Implemented the `Stability Audit` loop and `Revival Event` observation in `ViewerService`. The Viewer role now captures high-resolution reliability percentages, GNSS jitter violations, and energy footprint verdicts (Revival delta mA/Temp), matching the forensic baseline of the Tracker role (R-ID 276).

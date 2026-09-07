@@ -1,32 +1,31 @@
-# Handover Snapshot (Sep.06.55)
+# Handover Snapshot (Sep.06.56)
 
-## 🎯 Current State: Forensic Parity & Signaling Hardening Complete
-The application has achieved full forensic parity between Tracker and Viewer roles. Background stability on Samsung A15 budget hardware is now fully instrumented with real-time audit loops, jitter monitoring, and energy footprint capture in both services.
+## 🎯 Current State: Forensic Baseline Restored & Ready for Physical Soak
+The forensic audit record in `QA_VALIDATION_STATUS.md` has been restored after an accidental truncation. The application is now fully instrumented with reception parity and forensic stability loops (R276) across both roles. Readiness for long-duration soak testing is confirmed.
 
 ## ✅ Core Resolutions (Session Sep.06)
-- **Issue #933: Viewer Forensic Parity (Audit & Revival)**: Implemented Stability Audit (Reliability % / Jitter) and Revival Event observation (Energy Footprints) in `ViewerService` to match the Tracker forensic baseline.
-- **Issue #932: HUD Synchronization**: Synchronized the HUD status bar with Samsung A15 adaptations. Added `A15` badge for forensic confirmation of `specialUse` FGS and "Poke" logic activity.
-- **Issue #931: GPS Reception Parity (Viewer Mode)**: Remediated background GPS suppression on Samsung A15. Promoted `ViewerService` to `location|specialUse` FGS type and implemented 30s "Poke" logic.
-- **Issue #930: Event List Deep-Linking**: Implemented "HIST" and "DIAG" buttons in the forensic detail view for synchronized navigation.
+- **Issue #934: Documentation Integrity Restoration**: Restored explicit validation entries for R251-R267 in the QA status manifest to ensure forensic continuity.
+- **Issue #933: Viewer Forensic Parity (Audit & Revival)**: Implemented Stability Audit (Reliability % / Jitter) and Revival Event observation (Energy Footprints) in `ViewerService`.
+- **Issue #932: HUD Synchronization**: Synchronized HUD status bar with A15 adaptations and added forensic confirmation badges.
+- **Issue #931: GPS Reception Parity (Viewer Mode)**: Remediated background GPS suppression on Samsung A15 via `specialUse` FGS and "Poke" logic.
 
 ## 🛡️ Comprehensive Forensic & Stability Status
-### 1. Parity & Signaling
-- **Role Parity (R-ID 276)**: Both Tracker and Viewer roles now perform identical hardware pokes (30s) and background stability audits.
-- **Stability Monitoring**: Reliability % and GNSS Jitter (500ms threshold) are quantified every 10s.
-- **Revival Footprints**: Energy cost of GNSS revival (mA delta / Temp) is captured and logged.
+### 1. Instrumentation Parity
+- **Audit Synchronization**: Both roles quantify Reliability % and GNSS Jitter every 10s.
+- **Revival Transparency**: Energy cost (mA/Temp) of hardware revival attempts is captured and logged.
+- **Clock Integrity**: Monotonic time (`rt`) is used for all gap detection and ribbon correlation.
 
-### 2. Samsung A15 Adaptations
-- **FGS Strategy**: Both services utilize `specialUse` on Android 14+ to prevent system-level freezing.
-- **Hardware Handshake**: 30s monotonic interval handshakes to `JdHardwareManager` and WakeLock pokes bypass background suspension.
-- **Resource Throttling**: GNSS sampling relaxes to 5000ms during Mali anomalies or high CPU load.
+### 2. A15 Resilience
+- **Signaling Stability**: 30s "Poke" rhythm verified to prevent Samsung background suspension.
+- **Adaptive Polling**: UI-aware interval scaling (2000ms vs 10000ms) minimizes battery drain while maintaining fresh telemetry.
 
 ## 📊 Project Metrics
 - **Audit Baseline**: 288 Requirements (50 Rules, 238 IDs).
-- **Hardening Progress**: 933 Issues Resolved.
+- **Hardening Progress**: 934 Issues Resolved.
 - **QA Coverage**: 262 points verified.
 
 ## ⏭️ Resumption Focus
-- **Long-Duration Soak Finalization**: Review log sink for any "STABILITY GAP" or "JITTER" events over a 24-hour cycle.
-- **Forensic Auditor Consolidation**: Consider extracting audit/revival logic into a standalone component as per `Simplify_Ideas2.md`.
+- **Long-Duration Background Soak**: Execute 4-hour soak test on Samsung A15 hardware. Monitor logs for `STABILITY GAP (V)` or `(T)` events.
+- **Forensic Auditor Consolidation**: Evaluate extraction of shared audit logic into a common `ForensicAuditor` component.
 
-*Generated: Sep.06.55 ("Viewer Forensic Parity")*
+*Generated: Sep.06.56 ("Doc Restoration")*
