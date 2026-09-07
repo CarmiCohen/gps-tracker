@@ -38,15 +38,12 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.06.60:
+ * - Issue #935 FIX: HUD Red-Lock. Switched Dashboard and HUD telemetry flows 
+ *   to use monotonic systemPulseRt instead of wall-clock systemPulse (R-ID 935).
  * Sep.06.50:
  * - Issue #932: HUD Synchronization. Updated HudUiParts and connectivity flow 
  *   to pass isA15 flag to the HUD (R-ID 276).
- * Sep.06.35:
- * - Issue #930 RESOLVED: Deep-Linking. Added handler for SetLogFilter UI events 
- *   to support forensic navigation parity (R-ID 930).
- * Sep.06.20:
- * - Issue #924 RESOLVED (Part B): A15 Resource Throttling. Migrated GNSS 
- *   throttling to HardwareProvider source.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -122,9 +119,9 @@ class MainViewModel @Inject constructor(
     val dashboardConnectivityState: StateFlow<DashboardConnectivityState> = combine(
         _uiState.map { it.appMode }.distinctUntilChanged(),
         _diagnosticState,
-        _systemPulse
-    ) { mode, diag, pulse ->
-        aggregator.aggregateDashboardConnectivity(mode, diag, pulse)
+        _systemPulseRt // Fix #935: Use monotonic pulse
+    ) { mode, diag, pulseRt ->
+        aggregator.aggregateDashboardConnectivity(mode, diag, pulseRt)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardConnectivityState())
@@ -132,11 +129,11 @@ class MainViewModel @Inject constructor(
     val dashboardTelemetryState: StateFlow<DashboardTelemetryState> = combine(
         _uiState.map { it.appMode }.distinctUntilChanged(),
         _kinematicState,
-        _systemPulse,
+        _systemPulseRt, // Fix #935: Use monotonic pulse
         _trackerState
-    ) { mode, kin, pulse, state ->
+    ) { mode, kin, pulseRt, state ->
         val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
-        aggregator.aggregateDashboardTelemetry(mode, kin, pulse, state, isUltra)
+        aggregator.aggregateDashboardTelemetry(mode, kin, pulseRt, state, isUltra)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardTelemetryState())
@@ -183,21 +180,21 @@ class MainViewModel @Inject constructor(
     val hudTelemetryState: StateFlow<HudTelemetryState> = combine(
         _uiState.map { it.appMode }.distinctUntilChanged(),
         _kinematicState,
-        _systemPulse,
+        _systemPulseRt, // Fix #935: Use monotonic pulse
         _trackerState
-    ) { mode, kin, pulse, state ->
+    ) { mode, kin, pulseRt, state ->
         val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
-        aggregator.aggregateHudTelemetry(mode, kin, pulse, state, isUltra)
+        aggregator.aggregateHudTelemetry(mode, kin, pulseRt, state, isUltra)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudTelemetryState())
 
     val hudHealthState: StateFlow<HudHealthState> = combine(
         _diagnosticState,
-        _systemPulse,
+        _systemPulseRt, // Fix #935: Use monotonic pulse
         _kinematicState.map { it.localHealth.isMaliAnomaly }.distinctUntilChanged()
-    ) { diag, pulse, isMali ->
-        aggregator.aggregateHudHealth(diag, pulse, isMali)
+    ) { diag, pulseRt, isMali ->
+        aggregator.aggregateHudHealth(diag, pulseRt, isMali)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudHealthState())

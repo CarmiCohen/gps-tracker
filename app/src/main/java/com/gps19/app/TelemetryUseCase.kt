@@ -5,14 +5,13 @@ import javax.inject.Inject
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
+ * Sep.06.59:
+ * - Issue #935 FIX: Monotonic Propagation. Added missing rt field mapping 
+ *   in mapTrackerLocation and mapLocalLocation to resolve HUD GPS red-lock.
  * Sep.03.05:
  * - Issue #238: Location Model Unification. Refactored all mapping methods 
  *   to use LocationUpdate as the unified model, eliminating LocationState 
  *   to reduce allocation churn (R-ID 238).
- * Aug.31.02:
- * - Issue #762 Validation: Hardened isUltraLongStationary mapping in 
- *   mapHealthFromUpdate and mapHealthFromStatus to ensure state parity 
- *   across all ingestion paths (R765, R778).
  */
 class TelemetryUseCase @Inject constructor(
     private val timeProvider: TimeProvider
@@ -39,6 +38,7 @@ class TelemetryUseCase @Inject constructor(
         if (newTimestamp > 0) currentLoc.gpsTs = newTimestamp
         
         currentLoc.ts = effectiveTelemetryTs
+        currentLoc.rt = update.rt // Fix #935: Propagate monotonic timestamp
         currentLoc.status = update.status
         currentLoc.trackerState = update.trackerState
         update.gnssDetail?.let { currentLoc.gnssDetail = it }
@@ -207,6 +207,7 @@ class TelemetryUseCase @Inject constructor(
         currentLoc.maxAccuracy = status.maxAccuracy
         currentLoc.gpsTs = status.gpsTs
         currentLoc.ts = status.ts
+        currentLoc.rt = status.ts - (timeProvider.currentTimeMillis() - timeProvider.elapsedRealtime()) // Heuristic rt for remote status
         currentLoc.status = status.status
         currentLoc.trackerState = status.trackerState
         currentLoc.gnssDetail = status.gnssDetail
@@ -233,6 +234,7 @@ class TelemetryUseCase @Inject constructor(
         if (newTimestamp > 0) currentLoc.gpsTs = newTimestamp
         
         currentLoc.ts = if (update.ts > 0) update.ts else nowMs
+        currentLoc.rt = update.rt // Fix #935: Propagate monotonic timestamp
         currentLoc.status = update.status
         currentLoc.trackerState = update.trackerState
         update.gnssDetail?.let { currentLoc.gnssDetail = it }

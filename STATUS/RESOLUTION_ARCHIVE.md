@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.06.58)
+# Resolution Archive (Sep.07.60)
+
+## 🟢 Resolved Issues (Sep.07.60)
+*   **Issue #935 RESOLVED: GPS Red-Lock Regression**. Remediated critical HUD signaling latency where the GPS badge remained RED despite active GNSS callbacks. The root cause was the omission of monotonic `rt` (elapsedRealtime) propagation in `TelemetryUseCase.kt` and the use of wall-clock `systemPulse` in `MainViewModel.kt` for UI staleness checks. Corrected the pipeline to use monotonic authority, ensuring the 35s staleness gate (R-ID 276) functions correctly regardless of system uptime.
 
 ## 🟢 Resolved Issues (Sep.06.58)
 *   **Issue #935 RESOLVED: GPS Red-Lock Regression**. Remediated critical HUD signaling latency where the GPS badge remained RED despite active GNSS callbacks. The regression occurred during the monotonic clock migration (vSep.05.20) where `TrackerService` and `ViewerService` failed to populate the new `rt` (elapsedRealtime) field in local `LocationUpdate` emissions. Corrected the telemetry pipeline to ensure all role-local updates include monotonic authority for UI staleness parity (R-ID 276).
