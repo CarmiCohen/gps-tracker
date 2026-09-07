@@ -32,11 +32,15 @@ private data class HudUiParts(
     val deviceId: String,
     val viewerId: String,
     val isSystemActive: Boolean,
-    val isSafeMode: Boolean
+    val isSafeMode: Boolean,
+    val isA15: Boolean
 )
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.06.50:
+ * - Issue #932: HUD Synchronization. Updated HudUiParts and connectivity flow 
+ *   to pass isA15 flag to the HUD (R-ID 276).
  * Sep.06.35:
  * - Issue #930 RESOLVED: Deep-Linking. Added handler for SetLogFilter UI events 
  *   to support forensic navigation parity (R-ID 930).
@@ -162,7 +166,7 @@ class MainViewModel @Inject constructor(
 
     // Segmented HUD Flows (R248 Remediation)
     private val hudUiConnectivityFlow = _uiState.map { 
-        HudUiParts(it.appMode, it.deviceId, it.viewerId, it.isSystemActive, it.isSafeMode) 
+        HudUiParts(it.appMode, it.deviceId, it.viewerId, it.isSystemActive, it.isSafeMode, it.permissions.isA15Device) 
     }.distinctUntilChanged()
 
     val hudConnectivityState: StateFlow<HudConnectivityState> = combine(
@@ -171,7 +175,7 @@ class MainViewModel @Inject constructor(
         _rtt,
         _remoteSignal
     ) { ui, diag, rtt, sig ->
-        aggregator.aggregateHudConnectivity(ui.appMode, ui.deviceId, ui.viewerId, ui.isSystemActive, ui.isSafeMode, diag, rtt, sig)
+        aggregator.aggregateHudConnectivity(ui.appMode, ui.deviceId, ui.viewerId, ui.isSystemActive, ui.isSafeMode, ui.isA15, diag, rtt, sig)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudConnectivityState())

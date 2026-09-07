@@ -16,12 +16,13 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.06.47:
+ * - Issue #931 RESOLVED: GPS Reception Parity. Final parameter fix for 
+ *   evaluateAlarms (trackerLastValidFixRt). Aligned FGS type to 
+ *   location|specialUse and added A15 Poke logic (R-ID 276).
  * Sep.06.31:
  * - Issue #926 RESOLVED: Revival Integration. Mapped isGpsHardwareLock 
  *   to AlarmManager evaluation (R928).
- * Sep.06.30:
- * - Issue #925 RESOLVED: Async Teardown Race Condition. Synchronized HardwareProvider 
- *   initialization by awaiting suspend start() (R925).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -49,6 +50,10 @@ class ViewerService : BaseMonitorService() {
 
     private var isPowerSaveActive = false
     private var lastPowerSaveCheckRt = 0L
+
+    private var currentIntervalMs = TICK_INTERVAL_MS
+    private var lastA15PokeRt = 0L
+    private val A15_POKE_INTERVAL_MS = 30_000L
 
     private lateinit var selfProcessor: LocationProcessor
     private lateinit var remoteProcessor: LocationProcessor
@@ -122,6 +127,10 @@ class ViewerService : BaseMonitorService() {
         
         // Issue #925: Synchronous wait for hardware availability
         hardwareProvider.start()
+        
+        // Issue #931: Start with high-frequency polling if UI is visible
+        currentIntervalMs = if (isUiVisible()) HIGH_FREQUENCY_GPS_POLLING_MS else VIEWER_GPS_POLLING_MS
+        hardwareProvider.setPollingInterval(currentIntervalMs)
 
         commandRouter.register()
         commandRouter.startObservingCommands(lifecycleScope)
@@ -323,7 +332,7 @@ class ViewerService : BaseMonitorService() {
 
         val processed = selfProcessor.processGpsPoint(
             lat = lat, lng = lng, alt = alt, androidSpeedMps = lastGpsSpeed, 
-            gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing, 
+            gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing,
             snr = hardwareProvider.averageSnr, satsUsed = location.extras?.getInt("satellites") ?: hardwareProvider.satellitesUsed, isViewerTrail = true, lastGpsTs = sessionManager.lastGpsTs, isLocal = true, 
             nowRt = nowRt, nowWall = nowWall
         )
@@ -375,7 +384,7 @@ class ViewerService : BaseMonitorService() {
     }
 
     override fun startServiceForeground() {
-        val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION else 0
+        val type = getAvailableForegroundServiceType() 
         val health = integrityMonitor.currentHealth
         val battery = if (health.batteryLevel > 0) health.batteryLevel else integrityMonitor.getBatteryLevel()
         val msg = notificationManager.getPulseMessage(
@@ -393,7 +402,7 @@ class ViewerService : BaseMonitorService() {
             fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main.immediate) {
                 try {
                     delay(200)
-                    val type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                    val type = getAvailableForegroundServiceType()
                     val health = integrityMonitor.currentHealth
                     val msg = notificationManager.getPulseMessage(
                         hardwareProvider.satellitesUsed,
@@ -406,13 +415,43 @@ class ViewerService : BaseMonitorService() {
             }
         }
     }
+
+    @SuppressLint("InlinedApi")
+    private fun getAvailableForegroundServiceType(): Int {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0
+        var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+        // Issue #931: Ensure Viewer on A15 uses specialUse to prevent background GPS suppression.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && capabilities.isA15Device) {
+            type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        }
+        return type
+    }
     
     override fun getRequiredTickInterval(): Long { return TICK_INTERVAL_MS }
 
     override suspend fun processTick(now: Long, nowRt: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRt); integrityMonitor.checkInternetIntegrity(nowRt)
         val health = integrityMonitor.currentHealth; val snapshot = hardwareProvider.consumeLogicSnapshot()
+        
+        // Issue #931: Adaptive Polling Interval (2s when UI visible, 10s otherwise)
+        val targetGpsInterval = if (isUiVisible()) HIGH_FREQUENCY_GPS_POLLING_MS else VIEWER_GPS_POLLING_MS
+        if (targetGpsInterval != currentIntervalMs) {
+            currentIntervalMs = targetGpsInterval
+            hardwareProvider.setPollingInterval(targetGpsInterval)
+        }
+
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
+
+        // Issue #931: A15 Poke Logic to prevent background freezing
+        if (capabilities.isA15Device) {
+            if (JdHardwareManager.isAvailable()) {
+                val flags = if (isPowerSaveActive || health.isPowerSaveMode) 0x01 else 0x00
+                JdHardwareManager.syncState(timeProvider, serviceTickCounter, flags)
+            } else if (nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
+                lastA15PokeRt = nowRt
+                systemMonitor.acquireWakeLock(force = true)
+            }
+        }
 
         if (nowRt - lastPowerSaveCheckRt > 5000L) {
             val hasUnresolved = alarmManager.hasUnresolvedAlarms()

@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.06.50:
+ * - Issue #932: HUD Synchronization. Added isA15 to HudConnectivityState 
+ *   to provide visual confirmation of hardware adaptations (R-ID 276).
  * Sep.06.05:
  * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Added isSafeMode 
  *   to HudConnectivityState to support visual safety status (R-ID 271).
@@ -431,7 +434,8 @@ data class HudConnectivityState(
     val rtt: Int = 0,
     val remoteSignal: Int = 0,
     val isSystemActive: Boolean = false,
-    val isSafeMode: Boolean = false
+    val isSafeMode: Boolean = false,
+    val isA15: Boolean = false
 )
 
 @Serializable
@@ -499,6 +503,7 @@ data class HudState(
     val watchdogOk get() = connectivity.watchdogOk
     val isSystemActive get() = connectivity.isSystemActive
     val isSafeMode get() = connectivity.isSafeMode
+    val isA15 get() = connectivity.isA15
     
     val isLocalGpsActive get() = telemetry.isLocalGpsActive
     val isGpsFresh get() = telemetry.isGpsFresh

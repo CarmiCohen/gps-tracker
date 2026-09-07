@@ -76,7 +76,10 @@
             android:name=".ViewerService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="location" />
+            android:foregroundServiceType="location|specialUse">
+            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_TYPE"
+                android:value="Maintains high-precision local coordinate state and peer telemetry synchronization on budget hardware." />
+        </service>
 
         <service
             android:name="androidx.work.impl.foreground.SystemForegroundService"

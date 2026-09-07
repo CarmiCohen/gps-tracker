@@ -49,6 +49,9 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Sep.06.50:
+ * - Issue #932 RESOLVED: HUD Synchronization. Added A15 badge to StatusBar 
+ *   to indicate active hardware-specific background adaptations (R-ID 276).
  * Sep.06.08:
  * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Added SAF badge 
  *   to StatusBar to indicate active signaling suppression (R-ID 271).
@@ -485,7 +488,7 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
                 if (isStrictMode && index > 0 && kotlin.math.abs((p.ts - p.rt) - (history[index-1].ts - history[index-1].rt)) > 2000L) {
                     drawRect(Color.Yellow.copy(alpha = 0.5f), Offset(xPos, effectiveBaseY - (ribbonMaxHeight * 1.5f)), Size(maxOf(2f, pointWidth), ribbonMaxHeight * 0.5f))
                 }
-                if (p.isRecoveryEvent) drawRect(Color.White.copy(alpha = 0.8f), Offset(xPos - (rectW * 0.5f), effectiveBaseY - maxHeight), Size(maxOf(2f, rectW), maxHeight + 4.dp.toPx()))
+                if (isRecoveryEvent) drawRect(Color.White.copy(alpha = 0.8f), Offset(xPos - (rectW * 0.5f), effectiveBaseY - maxHeight), Size(maxOf(2f, rectW), maxHeight + 4.dp.toPx()))
                 if (p.hasGps && p.gpsIndex > 0.0) {
                     val yPos = effectiveBaseY - ribbonMaxHeight - (if (landscape) 4.dp.toPx() else 2.dp.toPx()) - (p.gpsIndex.toFloat().coerceIn(0f, 1f) * (if (landscape) 24.dp.toPx() else 14.dp.toPx()))
                     val currentPos = Offset(xPos + (rectW / 2f), yPos)
@@ -639,6 +642,9 @@ fun StatusBar(
                         
                         // Issue #924: Watchdog Safe-Mode Indicator
                         if (hudState.isSafeMode) StatusBadge(label = "SAF", active = false, isBold = true)
+
+                        // Issue #932: A15 Hardware Adaptation Indicator
+                        if (hudState.isA15) StatusBadge(label = "A15", active = true, activeColor = BrandJd, isBold = true)
 
                         // Issue #266: Mali Anomaly Indicator
                         if (hudState.isMaliAnomaly) StatusBadge(label = "MAL", active = true, activeColor = Rose500, isBold = true)

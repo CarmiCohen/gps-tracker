@@ -1,4 +1,10 @@
-# Resolution Archive (Sep.06.35)
+# Resolution Archive (Sep.06.50)
+
+## 🟢 Resolved Issues (Sep.06.50)
+*   **Issue #932 RESOLVED: HUD Synchronization**. Synchronized the HUD status bar to reflect Samsung A15 hardware adaptations. Propagated `isA15Device` from the hardware layer through `MainViewModel` and `UiStateAggregator`. Added a new `A15` badge to the `StatusBar` in `SharedUiComponents.kt` to provide forensic confirmation that background "Poke" logic and `specialUse` FGS adaptations are active (R-ID 276).
+
+## 🟢 Resolved Issues (Sep.06.45)
+*   **Issue #931 RESOLVED: GPS Reception Parity (Viewer Mode)**. Remediated discrepancy where the Viewer role suffered from background GPS suppression on Samsung A15 hardware compared to Waze/Maps. Promoted `ViewerService` to include `specialUse` FGS type, implemented A15 "Poke" logic (30s hardware handshake/WakeLock), and added adaptive polling (2000ms when UI is active) to keep the GPS pipeline fresh (R-ID 276).
 
 ## 🟢 Resolved Issues (Sep.06.35)
 *   **Issue #930 RESOLVED: Event List Deep-Linking**. Added functional "HIST" and "DIAG" buttons to the `LogDetailPane` in `LogOverlay`. Users can now navigate from a specific forensic log entry directly to the analytical history ribbons (synchronized with the log's timestamp via replay cursor) or the system diagnostics screen (R-ID 930).

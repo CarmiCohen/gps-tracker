@@ -7,6 +7,9 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
+ * Sep.06.50:
+ * - Issue #932: HUD Synchronization. Added isA15 to buildHudConnectivityState 
+ *   to provide visual confirmation of hardware adaptations (R-ID 276).
  * Sep.06.07:
  * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Added isSafeMode 
  *   to buildHudConnectivityState for visual safety status (R-ID 271).
@@ -42,6 +45,7 @@ interface DashboardStateProvider {
         viewerId: String,
         isSystemActive: Boolean,
         isSafeMode: Boolean,
+        isA15: Boolean,
         diagnosticState: DiagnosticState,
         rtt: Int,
         remoteSignal: Int
@@ -198,6 +202,7 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         viewerId: String,
         isSystemActive: Boolean,
         isSafeMode: Boolean,
+        isA15: Boolean,
         diagnosticState: DiagnosticState,
         rtt: Int,
         remoteSignal: Int
@@ -236,7 +241,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             rtt = rtt,
             remoteSignal = remoteSignal,
             isSystemActive = isSystemActive,
-            isSafeMode = isSafeMode
+            isSafeMode = isSafeMode,
+            isA15 = isA15
         )
     }
 

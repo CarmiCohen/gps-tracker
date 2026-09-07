@@ -6,6 +6,9 @@ import javax.inject.Singleton
 
 /**
  * UiStateAggregator: Orchestrates the transformation of raw domain states into UI-ready models.
+ * Sep.06.50:
+ * - Issue #932: HUD Synchronization. Added isA15 to aggregateHudConnectivity 
+ *   to provide visual confirmation of hardware adaptations (R-ID 276).
  * Sep.06.06:
  * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Added isSafeMode 
  *   to aggregateHudConnectivity for visual safety status (R-ID 271).
@@ -41,6 +44,7 @@ interface UiStateAggregator {
         viewerId: String,
         isSystemActive: Boolean,
         isSafeMode: Boolean,
+        isA15: Boolean,
         diag: DiagnosticState,
         rtt: Int,
         sig: Int
@@ -100,11 +104,12 @@ class UiStateAggregatorImpl @Inject constructor(
         viewerId: String,
         isSystemActive: Boolean,
         isSafeMode: Boolean,
+        isA15: Boolean,
         diag: DiagnosticState,
         rtt: Int,
         sig: Int
     ): HudConnectivityState {
-        return dashboardStateProvider.buildHudConnectivityState(appMode, deviceId, viewerId, isSystemActive, isSafeMode, diag, rtt, sig)
+        return dashboardStateProvider.buildHudConnectivityState(appMode, deviceId, viewerId, isSystemActive, isSafeMode, isA15, diag, rtt, sig)
     }
 
     override fun aggregateHudTelemetry(
