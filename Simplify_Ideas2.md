@@ -6,3 +6,4 @@
 
 ## Logic & Architecture
 3.  **Forensic Auditor Encapsulation**: Extract the `Stability Audit` loop and `Revival Event` observation logic into a standalone `ForensicAuditor` component. Currently, this logic is duplicated between `TrackerService` and `ViewerService`. Encapsulation would reduce boilerplate and ensure uniform audit standards across roles.
+4.  **GPS Staleness Thresholding**: Simplify the `UiStateAggregator` GPS status logic by using a unified "Pipeline Health" signal instead of checking individual callback timestamps, which seems to be causing the post-hydration RED lock (Issue #935).

@@ -1,31 +1,19 @@
-# Handover Snapshot (Sep.06.56)
+# Handover Snapshot (Sep.06.57)
 
-## 🎯 Current State: Forensic Baseline Restored & Ready for Physical Soak
-The forensic audit record in `QA_VALIDATION_STATUS.md` has been restored after an accidental truncation. The application is now fully instrumented with reception parity and forensic stability loops (R276) across both roles. Readiness for long-duration soak testing is confirmed.
+## 🎯 Current State: Physical Baseline Verified & Issue #935 Identified
+Version **Sep.06.57** has been successfully soak-tested on Samsung A15 hardware. Forensic loops (Energy/Sensor Audits) are verified functional. A new signaling latency issue (#935) was identified during the post-hydration lock sequence.
 
-## ✅ Core Resolutions (Session Sep.06)
-- **Issue #934: Documentation Integrity Restoration**: Restored explicit validation entries for R251-R267 in the QA status manifest to ensure forensic continuity.
-- **Issue #933: Viewer Forensic Parity (Audit & Revival)**: Implemented Stability Audit (Reliability % / Jitter) and Revival Event observation (Energy Footprints) in `ViewerService`.
-- **Issue #932: HUD Synchronization**: Synchronized HUD status bar with A15 adaptations and added forensic confirmation badges.
-- **Issue #931: GPS Reception Parity (Viewer Mode)**: Remediated background GPS suppression on Samsung A15 via `specialUse` FGS and "Poke" logic.
+## ✅ Core Resolutions (Session Sep.06.57)
+- **Issue #936: Soak Test Initiation & Forensic Verification**: Deployed and monitored vSep.06.57. Confirmed Samsung A15 signaling continuity (30s Poke logic) and verified forensic audit instrumentation (R-ID 259/256).
+- **Issue #935: GPS Indicator Latency**: Documented a regression where the GPS HUD badge remains RED despite active GNSS callbacks after hydration.
 
-## 🛡️ Comprehensive Forensic & Stability Status
-### 1. Instrumentation Parity
-- **Audit Synchronization**: Both roles quantify Reliability % and GNSS Jitter every 10s.
-- **Revival Transparency**: Energy cost (mA/Temp) of hardware revival attempts is captured and logged.
-- **Clock Integrity**: Monotonic time (`rt`) is used for all gap detection and ribbon correlation.
-
-### 2. A15 Resilience
-- **Signaling Stability**: 30s "Poke" rhythm verified to prevent Samsung background suspension.
-- **Adaptive Polling**: UI-aware interval scaling (2000ms vs 10000ms) minimizes battery drain while maintaining fresh telemetry.
-
-## 📊 Project Metrics
-- **Audit Baseline**: 288 Requirements (50 Rules, 238 IDs).
-- **Hardening Progress**: 934 Issues Resolved.
-- **QA Coverage**: 262 points verified.
+## 🛡️ Forensic & Stability Status
+- **A15 Signaling**: Green HUD badge confirmed. SpecialUse FGS and Poke logic are active.
+- **Audit Efficacy**: Energy footprint verdicts (mA/Temp) and 250Hz sensor audits are appearing in logs as expected.
+- **GPS Pipeline**: active but signaling state in `UiStateAggregator` is lagging (Issue #935).
 
 ## ⏭️ Resumption Focus
-- **Long-Duration Background Soak**: Execute 4-hour soak test on Samsung A15 hardware. Monitor logs for `STABILITY GAP (V)` or `(T)` events.
-- **Forensic Auditor Consolidation**: Evaluate extraction of shared audit logic into a common `ForensicAuditor` component.
+- **Issue #935 Remediation**: Investigate `ManagedLocationCallback` re-registration timing and stale-check thresholds in `UiStateAggregator`.
+- **Forensic Auditor Consolidation**: Extract shared audit logic from `TrackerService` and `ViewerService` into a unified `ForensicAuditor` (Simplicity Idea #3).
 
-*Generated: Sep.06.56 ("Doc Restoration")*
+*Generated: Sep.06.57 ("Soak Test Initiation")*
