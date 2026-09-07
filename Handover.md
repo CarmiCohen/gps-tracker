@@ -1,33 +1,32 @@
-# Handover Snapshot (Sep.07.60)
+# Handover Snapshot (Sep.07.70)
 
-## 🎯 Current State: GPS Signaling & Monotonic Alignment Verified
-Version **Sep.07.60** resolves the critical HUD latency regression (#935) on Samsung A15 hardware. The GPS HUD badge now accurately reflects fix status using monotonic authority (`elapsedRealtime`), preventing false-positive red-locks after 35 seconds of system uptime.
+## 🎯 Current State: Service Mutual Exclusivity Enforced
+Version **Sep.07.70** remediates the "ghost" telemetry issue identified during single-device mode switching. Mode transitions in `MainActivity.kt` now synchronously terminate the non-target role service, ensuring clear forensic boundaries and accurate HUD LED reporting.
 
-## ✅ Core Resolutions (Session Sep.07.60)
-- **Issue #935 RESOLVED: GPS Red-Lock Remediation**: 
-    - Updated `TelemetryUseCase.kt` to propagate the `rt` (elapsedRealtime) field in both `mapTrackerLocation` and `mapLocalLocation`.
-    - Updated `MainViewModel.kt` to use `systemPulseRt` (monotonic) instead of `systemPulse` (wall-clock) for state aggregation.
-    - Verified fix on physical hardware: GPS badge is now GREEN and reports "0s" fix age in the HUD.
-- **Documentation Integrity**: Restored missing historical records in `STATUS/RESOLUTION_ARCHIVE.md` and synchronized `SOT_MASTER_REQUIREMENTS.md` to the latest version.
-- **Build Verification**: Executed `app:assembleDebug` successfully.
+## ✅ Core Resolutions (Session Sep.07.70)
+- **Issue #975 RESOLVED: Service Mutual Exclusivity**: 
+    - Enforced `stopService` for the opposite role in `MainActivity.onStartService`.
+    - Verified that switching to Viewer Mode correctly turns the `TRK` and `DAT` LEDs RED until peer traffic is detected.
+    - Verified A15 hardware identification and background adaptations remain stable.
+- **R-ID 277 Codified**: Formally added Service Transition Integrity to the Source of Truth.
+- **Version Bump**: Increment to **Sep.07.70**.
 
 ## 🛡️ Forensic & Stability Status
-- **GPS Integrity**: Verified 35s HUD transition consistency (R257).
-- **A15 Signaling**: Confirmed End-to-End telemetry pipeline (Hardware -> Service -> Repository -> Aggregator -> UI).
-- **Audit Parity**: Tracker and Viewer reliability loops are fully synchronized with monotonic authority, ensuring accurate stability audits.
+- **Service Boundaries**: Verified no overlapping foreground services during role transitions.
+- **HUD Accuracy**: Confirmed LEDs reflect actual service lifecycle, not relay state persistence.
+- **A15 Hardening**: Monotonic WakeLock pokes and adaptive polling remain active in Viewer mode.
 
 ## ⏭️ Resumption Focus
 - **Forensic Auditor Consolidation**: Extract shared audit logic (Stability Audit / Revival Events) from `TrackerService` and `ViewerService` into a unified `ForensicAuditor` (Simplicity Idea #3).
-- **Time-Stamping Factory**: Implement `LocationUpdate.markNow()` to prevent future `rt` field omission regressions (Simplicity Idea #5).
 
 ## 🚀 Release Block
 ```bash
 git add .
-git commit -m "chore: version bump to Sep.07.60 and GPS red-lock fix (#935)"
-git tag Sep.07.60
+git commit -m "chore: version bump to Sep.07.70 and service mutual exclusivity (R975)"
+git tag Sep.07.70
 git push origin main --tags
 ```
 
-**Current Audit Baseline: [SOT: 288 (Rules: 50, IDs: 238), Resolved: 936, Open: 0, Testing: 90% (Sub-items: 46), Ideas: 5, QA: 263]**
+**Current Audit Baseline: [SOT: 290 (Rules: 51, IDs: 239), Resolved: 939, Open: 0, Testing: 95% (Sub-items: 47), Ideas: 5, QA: 265]**
 
-*Generated: Sep.07.60 ("Monotonic HUD Synchronization")*
+*Generated: Sep.07.70 ("Service Mutual Exclusivity")*

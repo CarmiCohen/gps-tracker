@@ -19,12 +19,13 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * Sep.07.70:
+ * - Service Mutual Exclusivity: Enforced service termination of the opposite 
+ *   role during mode transitions to prevent "ghost" telemetry in single-device 
+ *   testing (R-ID 975).
  * Sep.05.11:
  * - Issue #910 Forensic Instrumentation: Added logging to onStopTracking to 
  *   identify the source of service termination (R910).
- * Sep.05.08:
- * - Issue #910 Forensic Instrumentation: Added detailed logging and stack trace 
- *   capture to onCleanupAndExit.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -49,6 +50,10 @@ class MainActivity : ComponentActivity() {
                 onStartService = { mode ->
                     try {
                         if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                            // R-ID 975: Ensure mutual exclusivity of services
+                            val stopIntent = Intent(this, if (mode == "tracker") ViewerService::class.java else TrackerService::class.java)
+                            stopService(stopIntent)
+
                             val serviceClass = if (mode == "tracker") TrackerService::class.java else ViewerService::class.java
                             val intent = Intent(this, serviceClass)
                             ContextCompat.startForegroundService(this, intent)

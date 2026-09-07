@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 1
-        versionName "Sep.07.60" // GPS Red-Lock Resolution & Monotonic Alignment
+        versionName "Sep.07.70" // Service Mutual Exclusivity (R975)
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

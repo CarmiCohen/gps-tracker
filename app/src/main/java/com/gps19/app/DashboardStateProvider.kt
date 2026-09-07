@@ -7,14 +7,14 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
+ * Sep.07.61:
+ * - HUD LED Specification Compliance (R960): Gated DAT badge to Viewer Mode Only.
+ * - HUD LED Specification Compliance (R972): Restricted VWR/TRK badge activation 
+ *   to actual peer traffic, preventing generic relay pulses from triggering 
+ *   false-positive connectivity indicators.
  * Sep.06.50:
  * - Issue #932: HUD Synchronization. Added isA15 to buildHudConnectivityState 
  *   to provide visual confirmation of hardware adaptations (R-ID 276).
- * Sep.06.07:
- * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Added isSafeMode 
- *   to buildHudConnectivityState for visual safety status (R-ID 271).
- * Sep.05.25:
- * - Issue #266: Propagated isMaliAnomaly to HUD and Dashboard states.
  */
 interface DashboardStateProvider {
     fun buildDashboardConnectivityState(
@@ -181,6 +181,7 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             violationPercentage = health.violationPercentage,
             isPowerSaveMode = health.isPowerSaveMode,
             standbyBucket = health.standbyBucket,
+            netInterface = health.netInterface,
             isStorageLow = health.isStorageLow,
             isStorageCritical = health.isStorageCritical,
             isBatterySteepDischarge = health.isBatterySteepDischarge,
@@ -209,6 +210,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
     ): HudConnectivityState {
         val nowRt = SystemClock.elapsedRealtime()
         val lastSeenTs = diagnosticState.connectivity.lastRemoteActivityTs // Monotonic
+        
+        // R972 Enforcement: isTelemetryFresh strictly tracks peer activity age.
         val isTelemetryFresh = if (lastSeenTs > 0) {
             (nowRt - lastSeenTs) < TELEMETRY_UI_STALE_THRESHOLD_MS
         } else false
@@ -221,7 +224,10 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             TelemetryUtils.calculateCommIndex(rtt, remoteSignal, 10)
         } else 0
 
-        val isDataHealthy = isTelemetryFresh && 
+        // HUD Specification R960: DAT badge is Viewer Mode Only. 
+        // In Tracker mode, DAT always reflects RED/False as there is no remote peer to validate integrity of.
+        val isDataHealthy = (appMode == "viewer") && 
+                            isTelemetryFresh &&
                             diagnosticState.connectivity.isLocalOnline && 
                             diagnosticState.connectivity.isRelayConnected
 
