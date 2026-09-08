@@ -26,7 +26,7 @@ class ForensicAuditor @Inject constructor(
     var maxGnssJitterMs = 0L; private set
     private var lastGnssStatusRt = 0L
     
-    private var lastGpsFixRealtime = 0L
+    var lastGpsFixRealtime = 0L; private set
     private var stabilityAuditFixCount = 0
     private var stabilityAuditViolationCount = 0
     private var lastStabilityAuditTs = 0L

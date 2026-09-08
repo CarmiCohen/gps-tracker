@@ -40,9 +40,6 @@ class ViewerService : BaseMonitorService() {
     private var lastGpsAccuracy = 0.0
     private var lastGpsBearing = 0.0
 
-    private var lastGpsFixRealtime = 0L
-    private var lastStabilityAuditTs = 0L
-    
     private var lastHardwareRecoveryTs = 0L
     private var capabilities = HardwareCapabilities()
 
@@ -360,8 +357,6 @@ class ViewerService : BaseMonitorService() {
                 )
             }
         }
-        lastGpsFixRealtime = nowRt
-        if (lastStabilityAuditTs == 0L) lastStabilityAuditTs = nowRt
 
         val processed = selfProcessor.processGpsPoint(
             lat = lat, lng = lng, alt = alt, androidSpeedMps = lastGpsSpeed, 
