@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.08.00)
+# SOT Master Requirements (Sep.08.10)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -14,7 +14,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.28 Service Mutual Exclusivity (R975)**: **MANDATORY**. The application MUST ensure that only one role-specific foreground service (Tracker or Viewer) is active at any time. Mode transitions MUST explicitly terminate the previous service and clear all in-memory telemetry state (activity timestamps/buffers) before initiating the next to prevent cross-role status ghosting (Sep.07.82).
 *   **1.29 Reference-Counted Hardware (R975b)**: **MANDATORY**. `HardwareProvider` MUST utilize internal reference counting to manage the lifecycle of physical sensors and GNSS status callbacks. Teardown sequences MUST be suppressed if an active user (Tracker or Viewer) remains, ensuring continuity during rapid mode transitions (Sep.08.00).
 
-## 🧩 Functional Requirements (240 IDs)
+## 🧩 Functional Requirements (241 IDs)
 *   **R-ID 256 (Sensor Rate Auditing)**: The system MUST perform a runtime audit of accelerometer sampling rates to ensure efficacy on high-Target-SDK devices (Sep.05.29).
 *   **R-ID 259 (Energy Footprint Verdicts)**: The system MUST quantify the power cost of GNSS revival pulses via mA delta and temperature rise calculation (Sep.05.30).
 *   **R-ID 260 (GNSS Revival Lifecycle Transparency)**: The system MUST emit definitive `Success` and `HardwareLock` events during GNSS recovery routines (Sep.05.30).
@@ -30,5 +30,6 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 276 (A15 Viewer Parity)**: The Viewer role MUST maintain parity with Tracker GPS reception by implementing 30s monotonic WakeLock pokes, adaptive 2000ms polling when the UI is foregrounded, and a full Stability Audit loop (Reliability % / GNSS Jitter / Energy Footprints) (Sep.06.55).
 *   **R-ID 277 (Service Transition Integrity)**: Mode transitions triggered via `MainActivity` MUST perform a synchronous `stopService` call for the non-target role to ensure clear forensic boundaries (Sep.07.70).
 *   **R-ID 278 (Hardware User Tracking)**: `HardwareProvider` MUST maintain an `activeUsers` atomic counter to coordinate shared access between `TrackerService`, `ViewerService`, and UI-bound `hardwareObservationFlow` (Sep.08.00).
+*   **R-ID 279 (Monotonic Signaling Hardening)**: The system MUST include the monotonic `rt` (elapsedRealtime) field in all `RealtimeStatus` Protobuf payloads to eliminate heuristic drift in remote HUD signaling and resolve false-positive "Red-Lock" states (Sep.08.10).
 
-*(Total: 53 Architectural Rules + 240 Functional R-IDs = 293 Items)*
+*(Total: 53 Architectural Rules + 241 Functional R-IDs = 294 Items)*

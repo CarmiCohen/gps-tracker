@@ -1,16 +1,17 @@
-# Forensic Handover (Sep.08.00)
+# Forensic Handover (Sep.08.10)
 
-## 🎯 Current Context: Issue #975 Resolution
-The system has been hardened against rapid role-switching race conditions. `HardwareProvider` now utilizes an `AtomicInteger` reference counter to coordinate lifecycle transitions between `TrackerService` and `ViewerService`.
+## 🎯 Current Context: Issue #935 Resolution
+The signaling layer has been hardened against heuristic drift by adding monotonic `rt` parity to the `RealtimeStatus` Protobuf schema. Remote HUDs now have access to the source's `SystemClock.elapsedRealtime()` for precise staleness calculations, resolving false-positive "Red-Lock" states.
 
 ## 🛠️ Key Changes
-*   **HardwareProvider.kt**: Implemented `activeUsers` ref-counting. `start()` and `stop()` now coordinate based on usage. Teardown is deferred until the last consumer releases the provider.
-*   **app/build.gradle**: Updated version to `Sep.08.00`.
-*   **SOT**: Added Rule 1.29 (Reference-Counted Hardware) and R-ID 278.
+*   **app_settings.proto**: Added `rt` field (ID 69) to `RealtimeStatus`.
+*   **TelemetryProtobufMapper.kt**: Integrated `setRt(status.rt)` in `mapToRealtime`.
+*   **app/build.gradle**: Updated version to `Sep.08.10`.
+*   **SOT**: Added R-ID 279 (Monotonic Signaling Hardening).
 
 ## 📡 Next Priority
-*   **Issue #935 Hardening**: Add monotonic `rt` field to `RealtimeStatus` Protobuf to eliminate heuristic drift in remote signaling.
-*   **Idea #3**: Consolidate stability audit loops into `ForensicAuditor`.
+*   **Idea #3: Forensic Auditor Consolidation**. Extract shared audit logic (Reliability/Jitter) from `TrackerService` and `ViewerService` into a unified `ForensicAuditor`.
+*   **Issue #910 Hardening**: Active recovery for `Hydration Watchdog` stuck at Level 2.
 
 ## 📊 Dashboard Snapshot
-- **Current Audit Baseline: [SOT: 293 (Rules: 53, IDs: 240), Resolved: 942, Open: 5, Testing: 95% (Sub-items: 48), Ideas: 5, QA: 266]**
+- **Current Audit Baseline: [SOT: 294 (Rules: 53, IDs: 241), Resolved: 943, Open: 4, Testing: 95% (Sub-items: 48), Ideas: 5, QA: 266]**

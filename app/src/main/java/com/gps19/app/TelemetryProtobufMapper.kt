@@ -4,6 +4,9 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Sep.08.10:
+ * - Issue #935 RESOLVED: Monotonic Signaling Hardening. Added rt field 
+ *   mapping to RealtimeStatus to eliminate heuristic drift in remote HUDs.
  * Sep.06.31:
  * - Issue #926 RESOLVED: Revival Integration. Mapped gpsHardwareLock 
  *   to Protobuf builders for signaling and persistence parity (R-ID 272).
@@ -37,6 +40,7 @@ object TelemetryProtobufMapper {
             // Common Lifecycle
             setGpsTs(status.gpsTs)
             setTs(status.ts)
+            setRt(status.rt)
             setUptimeMs(status.uptimeMs)
             setTotalConnectedMs(status.totalConnectedMs)
             setSessionConnectedMs(status.sessionConnectedMs)

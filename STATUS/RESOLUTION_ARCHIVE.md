@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.08.00)
+# Resolution Archive (Sep.08.10)
+
+## 🟢 Resolved Issues (Sep.08.10)
+*   **Issue #935 RESOLVED: Monotonic Signaling Hardening**. Added monotonic `rt` field to `RealtimeStatus` Protobuf and `TelemetryProtobufMapper`. Eliminates heuristic drift in remote signaling to resolve HUD "Red-Lock" false positives (R-ID 279).
 
 ## 🟢 Resolved Issues (Sep.08.00)
 *   **Issue #975 RESOLVED: Race Condition Audit**. Implemented reference-counted lifecycle management in `HardwareProvider` to resolve asynchronous teardown races during rapid Tracker/Viewer mode toggling in `MainActivity`. This ensures hardware listeners and threads are only terminated when the last active service releases the provider, preventing "Ghosting" and initialization failures (R-ID 975).
@@ -18,4 +21,4 @@
 ## 🟢 Recently Resolved Issues (Sep.07.60)
 *   **Issue #935 RESOLVED: GPS Red-Lock Regression**. Remediated critical HUD signaling latency where the GPS badge remained RED despite active GNSS callbacks. Corrected the telemetry pipeline to ensure all role-local updates include monotonic authority for UI staleness parity (R-ID 276).
 
-*(Total: 942 Issues Resolved since inception)*
+*(Total: 943 Issues Resolved since inception)*
