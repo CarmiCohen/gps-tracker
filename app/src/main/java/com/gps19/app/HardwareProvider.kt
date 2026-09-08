@@ -27,12 +27,17 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.08.00:
+ * - Issue #975 RESOLVED: Reference-Counted Lifecycle. Implemented activeUsers 
+ *   counter to prevent premature teardown during rapid Tracker/Viewer mode 
+ *   switching in MainActivity (R-ID 975).
  * Sep.06.33:
  * - Issue #929 RESOLVED: Mali Anomaly Exit Hysteresis. Implemented 10s cooldown 
  *   period before returning to standard sampling rates after an anomaly clears 
@@ -45,9 +50,6 @@ import kotlin.math.*
  * - Issue #925 RESOLVED: Async Teardown Race Condition. Converted start() to 
  *   suspend and implemented join() on teardownJob to ensure deterministic 
  *   initialization after rapid stop/start sequences (R925).
- * Sep.06.20:
- * - Issue #924 (Part B): A15 Resource Throttling. Implemented dynamic GNSS throttling 
- *   (5000ms) triggered by High Load or MaliAnomaly on budget hardware (R-ID 267).
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -69,6 +71,7 @@ class HardwareProvider @Inject constructor(
     private val lifecycleLock = Any()
     private val isStarted = AtomicBoolean(false)
     private val isTeardownActive = AtomicBoolean(false)
+    private val activeUsers = AtomicInteger(0)
 
     // --- GPS & GNSS State ---
     private var revivalCallback: ManagedLocationCallback? = null
@@ -319,6 +322,9 @@ class HardwareProvider @Inject constructor(
         }
 
         synchronized(lifecycleLock) {
+            val count = activeUsers.incrementAndGet()
+            Timber.d("HardwareProvider: start() called. Active users: $count")
+
             if (isStarted.getAndSet(true)) {
                 isTeardownActive.set(false)
                 return
@@ -353,6 +359,14 @@ class HardwareProvider @Inject constructor(
 
     fun stop() {
         synchronized(lifecycleLock) {
+            val count = activeUsers.decrementAndGet()
+            Timber.d("HardwareProvider: stop() called. Remaining users: $count")
+            
+            if (count > 0) {
+                Timber.i("HardwareProvider: Suppression of stop() - $count active users remain.")
+                return
+            }
+
             if (!isStarted.getAndSet(false)) return
             isTeardownActive.set(true)
             
@@ -400,7 +414,7 @@ class HardwareProvider @Inject constructor(
                 delay(800)
 
                 synchronized(lifecycleLock) {
-                    if (!isStarted.get() && hardwareThread == threadToQuit) {
+                    if (!isStarted.get() && activeUsers.get() == 0 && hardwareThread == threadToQuit) {
                         Timber.d("HardwareProvider: Quitting hardware thread...")
                         threadToQuit?.quitSafely()
                         try { 
@@ -408,7 +422,7 @@ class HardwareProvider @Inject constructor(
                         } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
                         hardwareThread = null; hardwareHandler = null
                     } else {
-                        Timber.i("HardwareProvider: Teardown interrupted by restart. Retaining thread.")
+                        Timber.i("HardwareProvider: Teardown interrupted by restart (Users: ${activeUsers.get()}). Retaining thread.")
                     }
                     teardownJob = null
                 }
@@ -536,7 +550,7 @@ class HardwareProvider @Inject constructor(
             try { fusedLocationClient.requestLocationUpdates(request, fusedCallback, handler?.looper ?: Looper.getMainLooper()) } catch (e: Exception) { close(e) }
             
             val internalJob = _internalGpsFlow.onEach { trySend(it) }.launchIn(this)
-            awaitClose { internalJob.cancel(); synchronized(lifecycleLock) { if (activeLocationCallback == fusedCallback) activeLocationCallback = null }; fusedCallback.unregister(fusedLocationClient, handler) }
+            awaitClose { internalJob.cancel(); synchronized(lifecycleLock) { if (activeLocationCallback == fusedCallback) activeLocationCallback = null }; fusedCallback.unregister(fusedLocationClient, handler); stop() }
         }
     }.shareIn(scope = scope, started = SharingStarted.WhileSubscribed(5000), replay = 1)
 
@@ -651,7 +665,7 @@ class HardwareProvider @Inject constructor(
                     }
                     if (!isMonitoring || audioRecord == null) continue
                     try { audioRecord.startRecording() } catch (e: Exception) { try { audioRecord.release() } catch (ex: Exception) {}; try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
-                    isAcousticRunning = true; val buffer = ShortArray(bufferSize); var lastDutyCycleTransitionRt = timeProvider.elapsedRealtime(); var isInOffCycle = false
+                    isAcousticRunning = true; val buffer = ShortArray(bufferSize); var lastDutyCycleTransitionRt = timeProvider.elapsedRealtime() ; var isInOffCycle = false
                     while (isMonitoring && !Thread.currentThread().isInterrupted) {
                         val nowRt = timeProvider.elapsedRealtime()
                         if (powerSaveMode) {

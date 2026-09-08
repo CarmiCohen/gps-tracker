@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.07.82)
+# Resolution Archive (Sep.08.00)
+
+## 🟢 Resolved Issues (Sep.08.00)
+*   **Issue #975 RESOLVED: Race Condition Audit**. Implemented reference-counted lifecycle management in `HardwareProvider` to resolve asynchronous teardown races during rapid Tracker/Viewer mode toggling in `MainActivity`. This ensures hardware listeners and threads are only terminated when the last active service releases the provider, preventing "Ghosting" and initialization failures (R-ID 975).
 
 ## 🟢 Resolved Issues (Sep.07.82)
 *   **Issue #975 HARDENED: HUD Ghosting Remediation**. Remediated the "green TRK LED" bug when switching modes on the same device. Fixed by explicitly clearing the `TelemetryRepository` and `RemoteStatusRepository` singleton states in `SessionUseCase` and `ConnectivitySuite` during mode transitions, preventing stale activity timestamps from being misinterpreted by the new role.
@@ -15,4 +18,4 @@
 ## 🟢 Recently Resolved Issues (Sep.07.60)
 *   **Issue #935 RESOLVED: GPS Red-Lock Regression**. Remediated critical HUD signaling latency where the GPS badge remained RED despite active GNSS callbacks. Corrected the telemetry pipeline to ensure all role-local updates include monotonic authority for UI staleness parity (R-ID 276).
 
-*(Total: 941 Issues Resolved since inception)*
+*(Total: 942 Issues Resolved since inception)*

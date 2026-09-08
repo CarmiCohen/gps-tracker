@@ -1,18 +1,16 @@
-# Forensic Handover (vSep.07.82)
+# Forensic Handover (Sep.08.00)
 
-## 📍 Current State
-- **Active Version**: Sep.07.82
-- **Baseline**: Issue #975 Hardened. Ghost telemetry on single-device role switches is remediated.
-- **Forensic Status**: `SessionUseCase` and `ConnectivitySuite` now perform atomic clearing of in-memory telemetry (`TelemetryRepository` and `RemoteStatusRepository`) during mode transitions.
-- **Architecture**: `R975` (Rule 1.28) now strictly enforces forensic boundary integrity between Tracker and Viewer roles.
+## 🎯 Current Context: Issue #975 Resolution
+The system has been hardened against rapid role-switching race conditions. `HardwareProvider` now utilizes an `AtomicInteger` reference counter to coordinate lifecycle transitions between `TrackerService` and `ViewerService`.
 
-## 🛠️ Next Steps
-1.  **Forensic Consolidation**: Execute Idea #3 to move the `Stability Audit` polling loops from `TrackerService` and `ViewerService` into `ForensicAuditor` to reduce code duplication.
-2.  **QA Validation**: Perform a multi-device soak test to verify peer discovery timing after the repository clear implementation.
+## 🛠️ Key Changes
+*   **HardwareProvider.kt**: Implemented `activeUsers` ref-counting. `start()` and `stop()` now coordinate based on usage. Teardown is deferred until the last consumer releases the provider.
+*   **app/build.gradle**: Updated version to `Sep.08.00`.
+*   **SOT**: Added Rule 1.29 (Reference-Counted Hardware) and R-ID 278.
 
-## 🔐 Credentials & Environment
-- **Target SDK**: 35
-- **Hardware**: Samsung A15 (A54-Parity for Background Policy).
-- **Relay**: WebSocket (Socket.io 2.1.2).
+## 📡 Next Priority
+*   **Issue #935 Hardening**: Add monotonic `rt` field to `RealtimeStatus` Protobuf to eliminate heuristic drift in remote signaling.
+*   **Idea #3**: Consolidate stability audit loops into `ForensicAuditor`.
 
-*Forensic Snapshot generated at session termination.*
+## 📊 Dashboard Snapshot
+- **Current Audit Baseline: [SOT: 293 (Rules: 53, IDs: 240), Resolved: 942, Open: 5, Testing: 95% (Sub-items: 48), Ideas: 5, QA: 266]**

@@ -1,8 +1,8 @@
-# SOT Master Requirements (Sep.07.82)
+# SOT Master Requirements (Sep.08.00)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-## 🏗️ Architectural Master Rules (52 Rules)
+## 🏗️ Architectural Master Rules (53 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context权威 (R001)**: **MANDATORY**. Use `ApplicationContext` for all singleton services. Activity context is strictly for UI-only components.
@@ -12,8 +12,9 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.26 Forensic Separation (R922b)**: **MANDATORY**. Specialized hardware audits (GNSS jitter, sensor rates, energy footprints) MUST be decoupled from hardware bridge implementations (e.g., `HardwareProvider`) into dedicated forensic auditors to maintain bridge leaness and SRP (Sep.06.17).
 *   **1.27 Viewer Background Persistence (R926)**: **MANDATORY**. The `ViewerService` MUST utilize `specialUse` FGS type on Android 14+ and maintain a 30s hardware "Poke" rhythm to prevent Samsung-specific background suspension (Sep.06.45).
 *   **1.28 Service Mutual Exclusivity (R975)**: **MANDATORY**. The application MUST ensure that only one role-specific foreground service (Tracker or Viewer) is active at any time. Mode transitions MUST explicitly terminate the previous service and clear all in-memory telemetry state (activity timestamps/buffers) before initiating the next to prevent cross-role status ghosting (Sep.07.82).
+*   **1.29 Reference-Counted Hardware (R975b)**: **MANDATORY**. `HardwareProvider` MUST utilize internal reference counting to manage the lifecycle of physical sensors and GNSS status callbacks. Teardown sequences MUST be suppressed if an active user (Tracker or Viewer) remains, ensuring continuity during rapid mode transitions (Sep.08.00).
 
-## 🧩 Functional Requirements (239 IDs)
+## 🧩 Functional Requirements (240 IDs)
 *   **R-ID 256 (Sensor Rate Auditing)**: The system MUST perform a runtime audit of accelerometer sampling rates to ensure efficacy on high-Target-SDK devices (Sep.05.29).
 *   **R-ID 259 (Energy Footprint Verdicts)**: The system MUST quantify the power cost of GNSS revival pulses via mA delta and temperature rise calculation (Sep.05.30).
 *   **R-ID 260 (GNSS Revival Lifecycle Transparency)**: The system MUST emit definitive `Success` and `HardwareLock` events during GNSS recovery routines (Sep.05.30).
@@ -28,5 +29,6 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 275 (Forensic Deep-Linking)**: The event log detail pane MUST provide functional "HIST" and "DIAG" links to allow direct navigation to analytical history (synchronized via replay cursor) and system diagnostics respectively (Sep.06.35).
 *   **R-ID 276 (A15 Viewer Parity)**: The Viewer role MUST maintain parity with Tracker GPS reception by implementing 30s monotonic WakeLock pokes, adaptive 2000ms polling when the UI is foregrounded, and a full Stability Audit loop (Reliability % / GNSS Jitter / Energy Footprints) (Sep.06.55).
 *   **R-ID 277 (Service Transition Integrity)**: Mode transitions triggered via `MainActivity` MUST perform a synchronous `stopService` call for the non-target role to ensure clear forensic boundaries (Sep.07.70).
+*   **R-ID 278 (Hardware User Tracking)**: `HardwareProvider` MUST maintain an `activeUsers` atomic counter to coordinate shared access between `TrackerService`, `ViewerService`, and UI-bound `hardwareObservationFlow` (Sep.08.00).
 
-*(Total: 52 Architectural Rules + 239 Functional R-IDs = 291 Items)*
+*(Total: 53 Architectural Rules + 240 Functional R-IDs = 293 Items)*
