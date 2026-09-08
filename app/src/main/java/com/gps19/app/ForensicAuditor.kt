@@ -5,9 +5,13 @@ import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
+import kotlin.math.round
 
 /**
- * ForensicAuditor: Encapsulates high-assurance hardware audits (Jitter, Sensor Rates, Energy).
+ * ForensicAuditor: Encapsulates high-assurance hardware audits (Stability, Jitter, Sensor Rates, Energy).
+ * Sep.08.11:
+ * - Issue #936: Forensic Auditor Consolidation (Idea #3). Consolidated Stability 
+ *   Audit logic (Reliability % / Jitter) from Tracker/Viewer services (R-ID 280).
  * Sep.06.17:
  * - Issue #922 (Part B): Extracted from HardwareProvider to restore SRP.
  * - R-ID 256: Sensor Rate Auditing.
@@ -18,9 +22,14 @@ class ForensicAuditor @Inject constructor(
     private val timeProvider: TimeProvider,
     private val systemStatusProvider: SystemStatusProvider
 ) {
-    // --- GNSS Jitter Monitoring ---
+    // --- GNSS Jitter & Stability Monitoring ---
     var maxGnssJitterMs = 0L; private set
     private var lastGnssStatusRt = 0L
+    
+    private var lastGpsFixRealtime = 0L
+    private var stabilityAuditFixCount = 0
+    private var stabilityAuditViolationCount = 0
+    private var lastStabilityAuditTs = 0L
 
     fun recordGnssStatus(nowRt: Long) {
         if (lastGnssStatusRt > 0) {
@@ -32,6 +41,77 @@ class ForensicAuditor @Inject constructor(
         }
         lastGnssStatusRt = nowRt
     }
+
+    /**
+     * Records a GPS fix and returns a gap message if a stability violation is detected.
+     */
+    fun recordGpsFix(nowRt: Long, expectedIntervalMs: Long): String? {
+        var gapMessage: String? = null
+        if (lastGpsFixRealtime > 0) {
+            val gap = nowRt - lastGpsFixRealtime
+            stabilityAuditFixCount++
+            if (gap > expectedIntervalMs + GPS_STABILITY_GAP_THRESHOLD_MS) {
+                stabilityAuditViolationCount++
+                gapMessage = "${gap}ms detected during logic pulse."
+            }
+        }
+        lastGpsFixRealtime = nowRt
+        if (lastStabilityAuditTs == 0L) lastStabilityAuditTs = nowRt
+        return gapMessage
+    }
+
+    data class StabilityVerdict(
+        val message: String,
+        val isJitterViolation: Boolean,
+        val isReliabilityViolation: Boolean
+    )
+
+    /**
+     * Evaluates stability over the audit interval.
+     */
+    fun evaluateStability(nowRt: Long, roleTag: String): StabilityVerdict? {
+        if (nowRt - lastStabilityAuditTs <= GPS_STABILITY_AUDIT_INTERVAL_MS) return null
+        
+        val fixCount = stabilityAuditFixCount
+        val violationCount = stabilityAuditViolationCount
+        val jitter = maxGnssJitterMs
+        
+        if (fixCount == 0 && jitter == 0L) {
+            lastStabilityAuditTs = nowRt
+            return null
+        }
+
+        val reliability = if (fixCount > 0) 100.0 * (fixCount - violationCount) / fixCount else 100.0
+        val jitterViolation = jitter > GNSS_JITTER_THRESHOLD_MS
+        val reliabilityViolation = reliability < GPS_STABILITY_RELIABILITY_THRESHOLD
+        
+        var verdict: StabilityVerdict? = null
+        
+        if (reliabilityViolation || jitterViolation) {
+            val msg = StringBuilder("STABILITY AUDIT ($roleTag): ")
+            if (reliabilityViolation) {
+                msg.append("Reliability ${reliability.roundToOneDecimal()}% ($violationCount gaps in $fixCount fixes). ")
+            }
+            if (jitterViolation) {
+                msg.append("GNSS Jitter: ${jitter}ms (Hardware Instability).")
+            }
+            verdict = StabilityVerdict(
+                message = msg.toString().trim(),
+                isJitterViolation = jitterViolation,
+                isReliabilityViolation = reliabilityViolation
+            )
+        }
+
+        // Reset for next window
+        stabilityAuditFixCount = 0
+        stabilityAuditViolationCount = 0
+        maxGnssJitterMs = 0L
+        lastStabilityAuditTs = nowRt
+        
+        return verdict
+    }
+
+    private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
 
     fun resetGnssJitter() {
         maxGnssJitterMs = 0L
@@ -99,6 +179,10 @@ class ForensicAuditor @Inject constructor(
 
     fun reset() {
         resetGnssJitter()
+        lastGpsFixRealtime = 0L
+        stabilityAuditFixCount = 0
+        stabilityAuditViolationCount = 0
+        lastStabilityAuditTs = 0L
         accelEventCount = 0
         accelAuditStartRt = 0L
         isSensorRateAudited = false

@@ -16,17 +16,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.08.11:
+ * - Issue #936: Forensic Auditor Consolidation (Idea #3). Delegated Stability 
+ *   Audit logic (Reliability/Jitter) to ForensicAuditor (R-ID 280).
  * Sep.06.58:
  * - Issue #935 RESOLVED: Fixed GPS Red-Lock regression by correctly populating 
  *   rt (monotonic timestamp) in local LocationUpdate emissions.
- * Sep.06.55:
- * - Issue #933 RESOLVED: Viewer Forensic Parity. Implemented Stability Audit loop 
- *   (Reliability % / Jitter) and Revival Event observation (Energy Footprints) 
- *   to match Tracker forensic baseline (R-ID 276).
- * Sep.06.47:
- * - Issue #931 RESOLVED: GPS Reception Parity. Final parameter fix for 
- *   evaluateAlarms (trackerLastValidFixRt). Aligned FGS type to 
- *   location|specialUse and added A15 Poke logic (R-ID 276).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -46,8 +41,6 @@ class ViewerService : BaseMonitorService() {
     private var lastGpsBearing = 0.0
 
     private var lastGpsFixRealtime = 0L
-    private var stabilityAuditFixCount = 0
-    private var stabilityAuditViolationCount = 0
     private var lastStabilityAuditTs = 0L
     
     private var lastHardwareRecoveryTs = 0L
@@ -133,10 +126,8 @@ class ViewerService : BaseMonitorService() {
 
         historyManager.initialize(lifecycleScope)
         
-        // Issue #925: Synchronous wait for hardware availability
         hardwareProvider.start()
         
-        // Issue #931: Start with high-frequency polling if UI is visible
         currentIntervalMs = if (isUiVisible()) HIGH_FREQUENCY_GPS_POLLING_MS else VIEWER_GPS_POLLING_MS
         hardwareProvider.setPollingInterval(currentIntervalMs)
 
@@ -324,7 +315,6 @@ class ViewerService : BaseMonitorService() {
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { 
                         refreshCapabilitiesInternal()
-                        // Issue #925: Ensure synchronous restart after hardware sync command
                         launch { hardwareProvider.start() }
                     }
                     else -> {}
@@ -355,15 +345,19 @@ class ViewerService : BaseMonitorService() {
         
         lastGpsSpeed = location.speed.toDouble(); lastGpsAccuracy = location.accuracy.toDouble(); lastGpsBearing = location.bearing.toDouble()
 
-        if (lastGpsFixRealtime > 0) {
-            val gap = nowRt - lastGpsFixRealtime
-            if (currentIntervalMs == TICK_INTERVAL_MS || currentIntervalMs == HIGH_FREQUENCY_GPS_POLLING_MS) {
-                stabilityAuditFixCount++
-                if (gap > currentIntervalMs + GPS_STABILITY_GAP_THRESHOLD_MS) {
-                    stabilityAuditViolationCount++
-                    val proc = lastProcessedLocation
-                    logManager.logServiceEvent("STABILITY GAP (V): ${gap}ms detected during logic pulse.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
-                }
+        // Issue #936: Record fix in ForensicAuditor
+        if (currentIntervalMs == TICK_INTERVAL_MS || currentIntervalMs == HIGH_FREQUENCY_GPS_POLLING_MS) {
+            forensicAuditor.recordGpsFix(nowRt, currentIntervalMs)?.let { gapMsg ->
+                val proc = lastProcessedLocation
+                logManager.logServiceEvent(
+                    message = "STABILITY GAP (V): $gapMsg",
+                    isImportant = true,
+                    isSpecial = true,
+                    specialColor = FORENSIC_PINK_COLOR,
+                    lat = proc?.optimizedPoint?.lat ?: 0.0,
+                    lng = proc?.optimizedPoint?.lng ?: 0.0,
+                    accuracy = lastGpsAccuracy
+                )
             }
         }
         lastGpsFixRealtime = nowRt
@@ -408,8 +402,8 @@ class ViewerService : BaseMonitorService() {
     private fun resetServiceTimers() {
         val proc = lastProcessedLocation
         serviceStartRealtime = timeProvider.elapsedRealtime(); serviceStartWall = timeProvider.currentTimeMillis()
-        alarmManager.resetEvaluation(); sessionManager.reset(); integrityMonitor.resetStats(); forensicUseCase.resetLatches(); stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
-        hardwareProvider.resetGnssJitter()
+        alarmManager.resetEvaluation(); sessionManager.reset(); integrityMonitor.resetStats(); forensicUseCase.resetLatches(); 
+        forensicAuditor.reset()
         lastHardwareRecoveryTs = 0L
         
         selfProcessor.resetStats()
@@ -460,7 +454,6 @@ class ViewerService : BaseMonitorService() {
     private fun getAvailableForegroundServiceType(): Int {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return 0
         var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-        // Issue #931: Ensure Viewer on A15 uses specialUse to prevent background GPS suppression.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && capabilities.isA15Device) {
             type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
         }
@@ -473,7 +466,6 @@ class ViewerService : BaseMonitorService() {
         integrityMonitor.pollSystemStatus(now, nowRt); integrityMonitor.checkInternetIntegrity(nowRt)
         val health = integrityMonitor.currentHealth; val snapshot = hardwareProvider.consumeLogicSnapshot()
         
-        // Issue #931: Adaptive Polling Interval (2s when UI visible, 10s otherwise)
         val targetGpsInterval = if (isUiVisible()) HIGH_FREQUENCY_GPS_POLLING_MS else VIEWER_GPS_POLLING_MS
         if (targetGpsInterval != currentIntervalMs) {
             currentIntervalMs = targetGpsInterval
@@ -482,7 +474,6 @@ class ViewerService : BaseMonitorService() {
 
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
 
-        // Issue #931: A15 Poke Logic to prevent background freezing
         if (capabilities.isA15Device) {
             if (JdHardwareManager.isAvailable()) {
                 val flags = if (isPowerSaveActive || health.isPowerSaveMode) 0x01 else 0x00
@@ -493,25 +484,18 @@ class ViewerService : BaseMonitorService() {
             }
         }
 
-        if (nowRt - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
-            val maxJitter = hardwareProvider.maxGnssJitterMs
-            if (stabilityAuditFixCount > 0 || maxJitter > 0) {
-                val reliability = if (stabilityAuditFixCount > 0) 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount else 100.0
-                val jitterViolation = maxJitter > GNSS_JITTER_THRESHOLD_MS
-                val reliabilityViolation = reliability < GPS_STABILITY_RELIABILITY_THRESHOLD
-                
-                if (reliabilityViolation || jitterViolation) {
-                    val proc = lastProcessedLocation
-                    val msg = StringBuilder("STABILITY AUDIT (V): ")
-                    if (reliabilityViolation) msg.append("Reliability ${reliability.roundToOneDecimal()}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes). ")
-                    if (jitterViolation) msg.append("GNSS Jitter: ${maxJitter}ms (Hardware Instability).")
-                    
-                    logManager.logServiceEvent(msg.toString().trim(), isImportant = true, isSpecial = jitterViolation, specialColor = if (jitterViolation) FORENSIC_PINK_COLOR else null, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
-                }
-                stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
-                hardwareProvider.resetGnssJitter()
-            }
-            lastStabilityAuditTs = nowRt
+        // Issue #936: Consolidated Stability Audit report
+        forensicAuditor.evaluateStability(nowRt, "V")?.let { verdict ->
+            val proc = lastProcessedLocation
+            logManager.logServiceEvent(
+                message = verdict.message,
+                isImportant = true,
+                isSpecial = verdict.isJitterViolation,
+                specialColor = if (verdict.isJitterViolation) FORENSIC_PINK_COLOR else null,
+                lat = proc?.optimizedPoint?.lat ?: 0.0,
+                lng = proc?.optimizedPoint?.lng ?: 0.0,
+                accuracy = lastGpsAccuracy
+            )
         }
 
         if (nowRt - lastPowerSaveCheckRt > 5000L) {

@@ -21,18 +21,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.08.11:
+ * - Issue #936: Forensic Auditor Consolidation (Idea #3). Delegated Stability 
+ *   Audit logic (Reliability/Jitter) to ForensicAuditor (R-ID 280).
  * Sep.06.58:
  * - Issue #935 RESOLVED: Fixed GPS Red-Lock regression by correctly populating 
  *   rt (monotonic timestamp) in local LocationUpdate emissions.
- * Sep.06.31:
- * - Issue #926 RESOLVED: Revival Integration. Implemented collector for 
- *   hardwareProvider.revivalEvents to transmit energy footprints (R-ID 259) 
- *   and synchronized isSafeMode to HardwareProvider (R-ID 271).
- * - Issue #928 RESOLVED: Integrity Mapping. Mapped all critical integrity 
- *   violations to the AlarmManager (R928).
- * Sep.06.30:
- * - Issue #925 RESOLVED: Async Teardown Race Condition. Synchronized HardwareProvider 
- *   initialization by awaiting suspend start() (R925).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -56,8 +50,6 @@ class TrackerService : BaseMonitorService() {
     private var capabilities = HardwareCapabilities()
 
     private var lastGpsFixRealtime = 0L
-    private var stabilityAuditFixCount = 0
-    private var stabilityAuditViolationCount = 0
     private var lastStabilityAuditTs = 0L
     
     private var lastFastPathAcousticSpikeTs = 0L
@@ -70,7 +62,7 @@ class TrackerService : BaseMonitorService() {
     private var lastIntervalChangeRt = 0L
 
     private var lastA15PokeRt = 0L
-    private val A15_POKE_INTERVAL_MS = 30_000L // R898: Reduced from 60s to 30s for stability
+    private val A15_POKE_INTERVAL_MS = 30_000L
 
     private var lastForensicLat = 0.0
     private var lastForensicLng = 0.0
@@ -131,7 +123,6 @@ class TrackerService : BaseMonitorService() {
 
         historyManager.initialize(lifecycleScope)
         
-        // Issue #925: Synchronous wait for hardware availability
         hardwareProvider.start()
 
         commandRouter.register()
@@ -203,7 +194,6 @@ class TrackerService : BaseMonitorService() {
                             ALERT_ID_PERFORMANCE_SPIKE, ALERT_ID_SYSTEM_STORAGE_LOW, 
                             ALERT_ID_SYSTEM_STORAGE_CRITICAL, ALERT_ID_BATTERY_STEEP_DISCHARGE -> {
                                 // R928: Integrity signals are now directly swallowed by AlarmManager 
-                                // during evaluateAlarms pulse.
                             }
                         }
                     }
@@ -336,7 +326,6 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { 
                         refreshCapabilitiesInternal()
-                        // Issue #925: Ensure synchronous restart after hardware sync command
                         launch { hardwareProvider.start() }
                     }
                     is CommandEvent.ExecuteStressTest -> executeAutomatedStressTest()
@@ -397,9 +386,7 @@ class TrackerService : BaseMonitorService() {
         systemMonitor.resetSimulatedAnomalies()
         serviceBehaviorUseCase.reset()
         lastHardwareRecoveryTs = 0L
-        stabilityAuditFixCount = 0
-        stabilityAuditViolationCount = 0
-        hardwareProvider.resetGnssJitter()
+        forensicAuditor.reset()
         logManager.logServiceEvent("Session Terminated", isImportant = false)
     }
 
@@ -520,25 +507,18 @@ class TrackerService : BaseMonitorService() {
             }
         }
 
-        if (nowRt - lastStabilityAuditTs > GPS_STABILITY_AUDIT_INTERVAL_MS) {
-            val maxJitter = hardwareProvider.maxGnssJitterMs
-            if (stabilityAuditFixCount > 0 || maxJitter > 0) {
-                val reliability = if (stabilityAuditFixCount > 0) 100.0 * (stabilityAuditFixCount - stabilityAuditViolationCount) / stabilityAuditFixCount else 100.0
-                val jitterViolation = maxJitter > GNSS_JITTER_THRESHOLD_MS
-                val reliabilityViolation = reliability < GPS_STABILITY_RELIABILITY_THRESHOLD
-                
-                if (reliabilityViolation || jitterViolation) {
-                    val proc = lastProcessedLocation
-                    val msg = StringBuilder("STABILITY AUDIT (T): ")
-                    if (reliabilityViolation) msg.append("Reliability ${reliability.roundToOneDecimal()}% ($stabilityAuditViolationCount gaps in $stabilityAuditFixCount fixes). ")
-                    if (jitterViolation) msg.append("GNSS Jitter: ${maxJitter}ms (Hardware Instability).")
-                    
-                    logManager.logServiceEvent(msg.toString().trim(), isImportant = true, isSpecial = jitterViolation, specialColor = if (jitterViolation) FORENSIC_PINK_COLOR else null, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
-                }
-                stabilityAuditFixCount = 0; stabilityAuditViolationCount = 0
-                hardwareProvider.resetGnssJitter()
-            }
-            lastStabilityAuditTs = nowRt
+        // Issue #936: Consolidated Stability Audit report
+        forensicAuditor.evaluateStability(nowRt, "T")?.let { verdict ->
+            val proc = lastProcessedLocation
+            logManager.logServiceEvent(
+                message = verdict.message,
+                isImportant = true,
+                isSpecial = verdict.isJitterViolation,
+                specialColor = if (verdict.isJitterViolation) FORENSIC_PINK_COLOR else null,
+                lat = proc?.optimizedPoint?.lat ?: 0.0,
+                lng = proc?.optimizedPoint?.lng ?: 0.0,
+                accuracy = lastGpsAccuracy
+            )
         }
         
         val isSocketConnected = connectivitySuite.isConnected() && !transientDropDetected.getAndSet(false)
@@ -777,15 +757,19 @@ class TrackerService : BaseMonitorService() {
         val nowRt = timeProvider.elapsedRealtime()
         lastKnownLocation = location; lastGpsSpeed = location.speed.toDouble(); lastGpsAccuracy = location.accuracy.toDouble(); lastGpsBearing = location.bearing.toDouble()
         
-        if (lastGpsFixRealtime > 0) {
-            val gap = nowRt - lastGpsFixRealtime
-            if (HIGH_FREQUENCY_GPS_POLLING_MS == TICK_INTERVAL_MS) {
-                stabilityAuditFixCount++
-                if (gap > TICK_INTERVAL_MS + GPS_STABILITY_GAP_THRESHOLD_MS) {
-                    stabilityAuditViolationCount++
-                    val proc = lastProcessedLocation
-                    logManager.logServiceEvent("STABILITY GAP (T): ${gap}ms detected during logic pulse.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy)
-                }
+        // Issue #936: Record fix in ForensicAuditor
+        if (HIGH_FREQUENCY_GPS_POLLING_MS == TICK_INTERVAL_MS) {
+            forensicAuditor.recordGpsFix(nowRt, TICK_INTERVAL_MS)?.let { gapMsg ->
+                val proc = lastProcessedLocation
+                logManager.logServiceEvent(
+                    message = "STABILITY GAP (T): $gapMsg",
+                    isImportant = true,
+                    isSpecial = true,
+                    specialColor = FORENSIC_PINK_COLOR,
+                    lat = proc?.optimizedPoint?.lat ?: 0.0,
+                    lng = proc?.optimizedPoint?.lng ?: 0.0,
+                    accuracy = lastGpsAccuracy
+                )
             }
         }
         lastGpsFixRealtime = nowRt
