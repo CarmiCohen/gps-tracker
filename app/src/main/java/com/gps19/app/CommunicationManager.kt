@@ -1,7 +1,10 @@
 package com.gps19.app
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
+import android.widget.Toast
 import com.google.protobuf.CodedOutputStream
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -22,14 +25,11 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * Sep.06.04:
- * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Implemented connection 
- *   suppression in connect() when TelemetryRepository.isSafeMode is active 
- *   to prevent signaling handshake loops during hydration hangs (R-ID 271).
- * Sep.05.26:
- * - Issue #912 RESOLVED: Re-enabled XHR polling fallback. Strict 'websocket' 
- *   transport bypassed polling but failed on restricted networks. Restored 
- *   negotiation (polling-to-websocket) per R-ID 251 while keeping 60s timeout.
+ * Sep.08.13:
+ * - HUD LED Specification Compliance (R975): Updated connect() to recreate 
+ *   cancelled coroutine scope and closed channels upon role switch. 
+ *   Ensures correct room registration and loop recovery on the relay 
+ *   during single-device testing (R-ID 282).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -82,9 +82,9 @@ class CommunicationManager @Inject constructor(
         logManager.logServiceEvent("CRITICAL: Communication failure: ${throwable.message}", true)
     }
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
+    private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
     
-    private val normalPriorityQueue = Channel<SignalingCommand>(capacity = Channel.UNLIMITED)
+    private var normalPriorityQueue = Channel<SignalingCommand>(capacity = Channel.UNLIMITED)
     private var queueProcessorJob: Job? = null
     
     private var pendingLocationMap: MutableMap<String, Any?>? = null
@@ -131,6 +131,7 @@ class CommunicationManager @Inject constructor(
 
     override fun updateIdentity(deviceId: String, viewerId: String, isTracker: Boolean, force: Boolean) {
         val oldId = this.deviceId
+        val oldIsTracker = this.isTrackerMode
         val cleanedDeviceId = deviceId.trim()
         val cleanedViewerId = viewerId.trim()
 
@@ -142,11 +143,13 @@ class CommunicationManager @Inject constructor(
         }
 
         val idChanged = oldId.isNotEmpty() && oldId != cleanedDeviceId
+        val roleChanged = oldIsTracker != isTracker
+        
         this.deviceId = cleanedDeviceId
         this.viewerId = cleanedViewerId
         this.isTrackerMode = isTracker
         
-        if ((idChanged || force) && isConnected()) {
+        if ((idChanged || roleChanged || force) && isConnected()) {
             if (idChanged && oldId.isNotEmpty()) {
                 socket?.emit("leave", SignalingConstants.getTransmissionId(oldId))
             }
@@ -159,6 +162,9 @@ class CommunicationManager @Inject constructor(
 
     override fun connect(url: String, deviceId: String, viewerId: String, isTracker: Boolean) {
         this.isStopped = false
+        val oldIsTracker = this.isTrackerMode
+        val roleChanged = oldIsTracker != isTracker && this.deviceId.isNotEmpty()
+
         this.relayUrl = url.trim()
         this.deviceId = deviceId.trim()
         this.viewerId = viewerId.trim()
@@ -173,10 +179,20 @@ class CommunicationManager @Inject constructor(
         if (isTracker && !SignalingConstants.isValidTrackerId(this.deviceId)) return
         if (!isTracker && !SignalingConstants.isValidViewerId(this.viewerId)) return
         if (relayUrl.isEmpty()) return
-        if (isConnectingInternal || isConnected()) return
+        
+        // R975 Hardening: Recreate scope and channel if previously terminated.
+        if (!scope.isActive) {
+            scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
+            normalPriorityQueue = Channel(capacity = Channel.UNLIMITED)
+            startQueueProcessor()
+        }
+
+        // R975: Force fresh connection on role switch even if socket is "connected" 
+        // to ensure room/identity synchronization on the relay.
+        if (!roleChanged && (isConnectingInternal || isConnected())) return
 
         socket?.disconnect(); socket?.off()
-        logToApp("Starting connection to $relayUrl", true)
+        logToApp("Starting connection to $relayUrl (Role: ${if(isTracker) "Tracker" else "Viewer"})", true)
         markTraffic() 
         isConnectingInternal = true
 
@@ -440,8 +456,9 @@ class CommunicationManager @Inject constructor(
     override fun disconnect() { 
         isStopped = true; isConnectingInternal = false
         queueProcessorJob?.cancel(); queueProcessorJob = null
-        normalPriorityQueue.close(); scope.cancel()
+        normalPriorityQueue.close()
         socket?.disconnect(); socket?.off(); socket = null
         telemetryRepository.updateRelayStatus(false)
+        scope.cancel()
     }
 }

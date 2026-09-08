@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.08.13)
+# SOT Master Requirements (Sep.08.20)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -14,11 +14,13 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.28 Service Mutual Exclusivity (R975)**: **MANDATORY**. The application MUST ensure that only one role-specific foreground service (Tracker or Viewer) is active at any time. Mode transitions MUST explicitly terminate the previous service and clear all in-memory telemetry state (activity timestamps/buffers) before initiating the next to prevent cross-role status ghosting (Sep.07.82).
 *   **1.29 Reference-Counted Hardware (R975b)**: **MANDATORY**. `HardwareProvider` MUST utilize internal reference counting to manage the lifecycle of physical sensors and GNSS status callbacks. Teardown sequences MUST be suppressed if an active user (Tracker or Viewer) remains, ensuring continuity during rapid mode transitions (Sep.08.00).
 
-## 🧩 Functional Requirements (245 IDs)
+## 🧩 Functional Requirements (247 IDs)
 *   **R-ID 259 (Energy Footprint Integration)**: Forensic energy footprints (Delta mA, Temp Rise, Duration) MUST be structured and propagated from `ForensicAuditor` through the tracking engine to provide a persistent "Last Revival Impact" metric in the HUD and logs (Sep.08.13).
 *   **R-ID 267 (A15 Hysteresis Visibility)**: The UI MUST display a "THR" (Throttled) badge when GNSS sampling rates are reduced due to A15 resource load or MaliAnomaly hysteresis to explain telemetry latency to the user (Sep.08.13).
 *   **R-ID 279 (Monotonic Signaling Hardening)**: The system MUST include the monotonic `rt` (elapsedRealtime) field in all `RealtimeStatus` Protobuf payloads to eliminate heuristic drift in remote HUD signaling and resolve false-positive "Red-Lock" states (Sep.08.10).
 *   **R-ID 280 (Forensic Auditor Consolidation)**: Shared stability audit logic (Reliability % / GNSS Jitter) MUST be centralized in `ForensicAuditor` to ensure consistent reporting across Tracker and Viewer roles (Sep.08.12).
 *   **R-ID 281 (Hydration Watchdog Recovery)**: The system MUST implement active recovery for hydration stalls. If stuck at Level 2, the system MUST force a reset and restart of the `LifecycleHydrationManager` sequence (Sep.08.12).
+*   **R-ID 282 (Single-Device Role Parity)**: The system MUST detect role switches (Tracker ↔ Viewer) on the same device and force a fresh signaling handshake and room registration in `CommunicationManager` to prevent stale peer status (Sep.08.13).
+*   **R-ID 283 (Teardown Constraint Hardening)**: The system MUST utilize `safeAverage()` or explicit `isNaN()` guards for all satellite signal averages and derived indices to prevent `NaN` propagation into the persistence layer and avoid SQLite `NOT NULL` constraint violations during service teardown (Sep.08.20).
 
-*(Total: 53 Architectural Rules + 245 Functional R-IDs = 298 Items)*
+*(Total: 53 Architectural Rules + 247 Functional R-IDs = 300 Items)*

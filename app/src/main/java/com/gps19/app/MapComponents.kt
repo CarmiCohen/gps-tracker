@@ -40,14 +40,13 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Sep.08.13:
+ * - Fix: Corrected isViewerFresh calculation in AppMapContainer to use 
+ *   viewerTelemetryTs instead of trackerTelemetryTs (R-ID 282).
  * Sep.01.00:
  * - Issue #878 Remediation: Integrated low-memory eviction strategy. Added 
  *   ComponentCallbacks2 registration to OsmMap to trigger proactive cache 
  *   pruning in MapOverlayManager during memory pressure events (R878).
- * Aug.31.07:
- * - Issue #874 Remediation: Further segmented the hydration update block. 
- *   Current Positions (Level 6) and Violations (Level 7) are now decoupled 
- *   to ensure frame budget remains under 700ms on budget hardware (R874).
  */
 
 @Composable

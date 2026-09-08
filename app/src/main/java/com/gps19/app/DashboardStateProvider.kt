@@ -7,17 +7,12 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
+ * Sep.08.20:
+ * - Issue #283 RESOLVED: Hardened avgCn0 calculation using safeAverage() 
+ *   to prevent NaN propagation (R-ID 283).
  * Sep.08.12:
  * - Issue #924 Visibility: Added isGnssThrottled to HudConnectivityState and 
  *   DashboardHealthState for A15 Hysteresis transparency.
- * Sep.07.61:
- * - HUD LED Specification Compliance (R960): Gated DAT badge to Viewer Mode Only.
- * - HUD LED Specification Compliance (R972): Restricted VWR/TRK badge activation 
- *   to actual peer traffic, preventing generic relay pulses from triggering 
- *   false-positive connectivity indicators.
- * Sep.06.50:
- * - Issue #932: HUD Synchronization. Added isA15 to buildHudConnectivityState 
- *   to provide visual confirmation of hardware adaptations (R-ID 276).
  */
 interface DashboardStateProvider {
     fun buildDashboardConnectivityState(
@@ -119,10 +114,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         val isGpsActive = (nowRt - loc.rt) < GPS_UI_FAIL_THRESHOLD_MS && loc.gpsTs > 0
 
         val gnss = loc.gnssDetail
-        var avgCn0 = 0.0
-        gnss?.satellites?.let { sats ->
-            if (sats.isNotEmpty()) avgCn0 = sats.map { it.cn0 }.average()
-        }
+        // Issue #283: Hardened against NaN
+        val avgCn0 = gnss?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0
 
         return DashboardTelemetryState(
             lat = if (isGpsActive) loc.lat else 0.0,
@@ -261,7 +254,7 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
 
     override fun buildHudTelemetryState(
         appMode: String?,
-        kinematicState: KinematicState,
+        kinematicState: KineticState,
         systemPulseRt: Long,
         trackerState: TrackerState,
         isUltra: Boolean

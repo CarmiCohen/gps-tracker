@@ -4,6 +4,9 @@ import kotlin.math.*
 
 /**
  * TelemetryUtils: Logic for scoring and evaluating signal quality.
+ * Sep.08.20:
+ * - Issue #283: Added safeAverage() extension to prevent NaN leakage 
+ *   into persistence layers (R-ID 283).
  * Aug.14.05:
  * - Issue #174: Forensic Replay Latency Audit. Added high-performance 
  *   binary search utilities for telemetry and trail lookups (R174).
@@ -12,6 +15,14 @@ import kotlin.math.*
  */
 
 data class GpsIndexData(val ageIndex: Double, val accIndex: Double, val satsIndex: Double, val totalIndex: Double)
+
+/**
+ * Issue #283: Hardened average calculation that avoids NaN on empty collections.
+ */
+fun Iterable<Double>.safeAverage(default: Double = 0.0): Double {
+    val avg = this.average()
+    return if (avg.isNaN()) default else avg
+}
 
 object TelemetryUtils {
 

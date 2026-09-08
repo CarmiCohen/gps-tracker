@@ -32,12 +32,14 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Sep.08.13:
+ * - Fix: Corrected viewerTelemetryTs in AppMapContainer. Local viewer data is 
+ *   always considered "fresh" if GPS is active (R-ID 282).
+ * - Fix: Corrected unresolved references in ViewerDashboard (gpsIdx, rttValue) 
+ *   within TelemetryBox call.
  * Sep.06.35:
  * - Issue #930 RESOLVED: Deep-Linking. Implemented onHistLink and 
  *   onDetailsLink callbacks for LogOverlay (R-ID 930).
- * Sep.03.25:
- * - Idea #240: ContextShadow Automation. Updated AudioSynthesizer calls to use 
- *   the injected instance from viewModel (R-ID 240).
  */
 
 @Composable
@@ -167,7 +169,7 @@ fun ViewerScreen(
                                     viewerAccuracy = kinematicState.localLocation.accuracy,
                                     viewerMaxAcc = kinematicState.localLocation.maxAccuracy,
                                     viewerGpsTs = kinematicState.localLocation.gpsTs,
-                                    viewerTelemetryTs = 0L,
+                                    viewerTelemetryTs = systemPulse,
                                     viewerLocPending = kinematicState.localHealth.isLocationPending,
                                     viewerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
                                     replayCursorPos = kinematicState.replayCursorPos,
@@ -236,7 +238,7 @@ fun ViewerScreen(
                         viewerAccuracy = kinematicState.localLocation.accuracy,
                         viewerMaxAcc = kinematicState.localLocation.maxAccuracy,
                         viewerGpsTs = kinematicState.localLocation.gpsTs,
-                        viewerTelemetryTs = 0L,
+                        viewerTelemetryTs = systemPulse,
                         viewerLocPending = kinematicState.localHealth.isLocationPending,
                         viewerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
                         replayCursorPos = kinematicState.replayCursorPos,
