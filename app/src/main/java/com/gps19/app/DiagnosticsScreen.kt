@@ -19,6 +19,9 @@ import com.gps19.core.engine.CapabilityStatus
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Sep.08.12:
+ * - Issue #924 Visibility: Added GNSS Throttling (THR) status to the hardware 
+ *   capabilities section for A15 Hysteresis transparency (R-ID 267).
  * Aug.26.12:
  * - Issue #735 Hardening: Added Setup Overlay Bypass toggle to Validation Hooks 
  *   to allow automated soak tests to skip manual permission flows (R735).
@@ -36,6 +39,7 @@ fun DiagnosticsScreen(
     isStorageSimulated: Boolean,
     isStorageCriticalSimulated: Boolean,
     isSetupBypassActive: Boolean = false,
+    isGnssThrottled: Boolean = false,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onToggleManualOverride: () -> Unit,
@@ -138,6 +142,16 @@ fun DiagnosticsScreen(
                 color = Color.Gray,
                 fontWeight = FontWeight.Bold
             )
+
+            if (permissions.isA15Device) {
+                DiagnosticItem(
+                    title = "GNSS Sampling Status",
+                    status = if (isGnssThrottled) "THROTTLED (5s)" else "STANDARD (2s)",
+                    isOk = !isGnssThrottled,
+                    icon = Icons.Default.Speed,
+                    onClick = {}
+                )
+            }
 
             if (permissions.hasBackgroundRestriction) {
                 DiagnosticItem(

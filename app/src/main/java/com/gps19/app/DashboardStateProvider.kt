@@ -7,6 +7,9 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
+ * Sep.08.12:
+ * - Issue #924 Visibility: Added isGnssThrottled to HudConnectivityState and 
+ *   DashboardHealthState for A15 Hysteresis transparency.
  * Sep.07.61:
  * - HUD LED Specification Compliance (R960): Gated DAT badge to Viewer Mode Only.
  * - HUD LED Specification Compliance (R972): Restricted VWR/TRK badge activation 
@@ -193,7 +196,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             ioWait = health.ioWait,
             maxIoLatency = health.maxIoLatency,
             isSilentFailure = health.isSilentFailure,
-            isMaliAnomaly = health.isMaliAnomaly
+            isMaliAnomaly = health.isMaliAnomaly,
+            isGnssThrottled = health.isGnssThrottled
         )
     }
 
@@ -233,6 +237,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
 
         val isLocalServiceAlive = (nowRt - diagnosticState.pulse) < TELEMETRY_UI_STALE_THRESHOLD_MS
 
+        val throttled = if (appMode == "viewer") diagnosticState.trackerIsGnssThrottled else diagnosticState.isGnssThrottled
+
         return HudConnectivityState(
             appMode = appMode,
             isInternet = diagnosticState.connectivity.isLocalOnline,
@@ -248,7 +254,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             remoteSignal = remoteSignal,
             isSystemActive = isSystemActive,
             isSafeMode = isSafeMode,
-            isA15 = isA15
+            isA15 = isA15,
+            isGnssThrottled = throttled
         )
     }
 

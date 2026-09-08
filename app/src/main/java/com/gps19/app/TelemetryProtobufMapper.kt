@@ -4,17 +4,14 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Sep.08.12:
+ * - Issue #924 Visibility: Mapped isGnssThrottled for A15 Hysteresis 
+ *   transparency in remote HUDs (R-ID 267).
+ * - R-ID 259: Mapped structured Energy Footprint verdicts (deltaMa, deltaTemp, 
+ *   durationMs) for structured auditing parity.
  * Sep.08.10:
  * - Issue #935 RESOLVED: Monotonic Signaling Hardening. Added rt field 
  *   mapping to RealtimeStatus to eliminate heuristic drift in remote HUDs.
- * Sep.06.31:
- * - Issue #926 RESOLVED: Revival Integration. Mapped gpsHardwareLock 
- *   to Protobuf builders for signaling and persistence parity (R-ID 272).
- * Sep.04.20:
- * - Issue #907 RESOLVED: System-Wide Interconnectivity Failure. Hardened ID 
- *   aliasing by using SignalingConstants.getTransmissionId() during serialization. 
- *   Ensures Protobuf parity with JSON path (T -> Trk) to prevent handshake 
- *   rejections on budget hardware (R907).
  */
 object TelemetryProtobufMapper {
 
@@ -99,6 +96,12 @@ object TelemetryProtobufMapper {
             setViolationUptimeMs(status.violationUptimeMs)
             setIsUltraLongStationary(status.isUltraLongStationary)
             setGpsHardwareLock(status.gpsHardwareLock)
+
+            // Issue #924 & R-ID 259
+            setIsGnssThrottled(status.isGnssThrottled)
+            setEnergyDeltaMa(status.lastEnergyDeltaMa)
+            setEnergyDeltaTemp(status.lastEnergyDeltaTemp)
+            setEnergyDurationMs(status.lastEnergyDurationMs)
 
             // Enums
             setState(TrackerStateProto.valueOf("TS_" + status.trackerState.name))
@@ -220,6 +223,12 @@ object TelemetryProtobufMapper {
             setIsAnchorLocked(status.isAnchorLocked)
             setIsBatteryWhitelisted(status.isBatteryWhitelisted)
             setGpsHardwareLock(status.gpsHardwareLock)
+
+            // Issue #924 & R-ID 259
+            setIsGnssThrottled(status.isGnssThrottled)
+            setEnergyDeltaMa(status.lastEnergyDeltaMa)
+            setEnergyDeltaTemp(status.lastEnergyDeltaTemp)
+            setEnergyDurationMs(status.lastEnergyDurationMs)
 
             // Enums
             setTrackerState(status.trackerState.name)

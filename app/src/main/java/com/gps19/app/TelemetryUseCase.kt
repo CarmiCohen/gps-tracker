@@ -5,13 +5,11 @@ import javax.inject.Inject
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
+ * Sep.08.12:
+ * - Issue #924 Visibility: Added isGnssThrottled mapping for A15 Hysteresis transparency.
  * Sep.06.59:
  * - Issue #935 FIX: Monotonic Propagation. Added missing rt field mapping 
  *   in mapTrackerLocation and mapLocalLocation to resolve HUD GPS red-lock.
- * Sep.03.05:
- * - Issue #238: Location Model Unification. Refactored all mapping methods 
- *   to use LocationUpdate as the unified model, eliminating LocationState 
- *   to reduce allocation churn (R-ID 238).
  */
 class TelemetryUseCase @Inject constructor(
     private val timeProvider: TimeProvider
@@ -42,6 +40,7 @@ class TelemetryUseCase @Inject constructor(
         currentLoc.status = update.status
         currentLoc.trackerState = update.trackerState
         update.gnssDetail?.let { currentLoc.gnssDetail = it }
+        currentLoc.isGnssThrottled = update.isGnssThrottled
         
         return currentLoc
     }
@@ -81,7 +80,8 @@ class TelemetryUseCase @Inject constructor(
             isCoolingModeActive = update.isCoolingModeActive,
             isBatteryLow = update.isBatteryLow,
             isBatteryCritical = update.isBatteryCritical,
-            isUltraLongStationary = update.isUltraLongStationary
+            isUltraLongStationary = update.isUltraLongStationary,
+            isGnssThrottled = update.isGnssThrottled
         )
         
         if (update.maxTemp > 0.0) current.maxTemp = update.maxTemp
@@ -195,6 +195,7 @@ class TelemetryUseCase @Inject constructor(
         current.sitTilt = status.sitTilt
         current.sitShock = status.sitShock
         current.kineticEnergy = status.kineticEnergy
+        current.isGnssThrottled = status.isGnssThrottled
         return current
     }
 
@@ -211,6 +212,7 @@ class TelemetryUseCase @Inject constructor(
         currentLoc.status = status.status
         currentLoc.trackerState = status.trackerState
         currentLoc.gnssDetail = status.gnssDetail
+        currentLoc.isGnssThrottled = status.isGnssThrottled
         return currentLoc
     }
 
@@ -238,6 +240,7 @@ class TelemetryUseCase @Inject constructor(
         currentLoc.status = update.status
         currentLoc.trackerState = update.trackerState
         update.gnssDetail?.let { currentLoc.gnssDetail = it }
+        currentLoc.isGnssThrottled = update.isGnssThrottled
 
         return currentLoc
     }

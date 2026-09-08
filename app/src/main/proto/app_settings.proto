@@ -202,6 +202,14 @@ message RealtimeStatus {
 
     // Issue #935: Monotonic Signaling Hardening
     int64 rt = 69;
+
+    // Issue #924: A15 Hysteresis Visibility
+    bool is_gnss_throttled = 70;
+
+    // R-ID 259: Energy Footprint Verdicts
+    int32 energy_delta_ma = 71;
+    double energy_delta_temp = 72;
+    int64 energy_duration_ms = 73;
 }
 
 message GeoPointProto {
@@ -359,4 +367,12 @@ message TrackerStatusProto {
     bool is_anchor_locked = 107;
     bool is_battery_whitelisted = 108;
     bool gps_hardware_lock = 109;
+
+    // Issue #924: A15 Hysteresis Visibility
+    bool is_gnss_throttled = 110;
+
+    // R-ID 259: Energy Footprint Verdicts
+    int32 energy_delta_ma = 111;
+    double energy_delta_temp = 112;
+    int64 energy_duration_ms = 113;
 }

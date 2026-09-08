@@ -26,14 +26,10 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * Sep.06.31:
- * - Issue #926 RESOLVED: Footprint Visibility. Marked ENERGY AUDIT as 
- *   important to ensure transmission to viewer (R-ID 259).
- * Sep.06.20:
- * - Issue #924 (Part B): Dynamic GNSS Rates. Propagating MaliAnomaly 
- *   to HardwareProvider to trigger resource-aware throttling (R-ID 267).
- * Sep.05.30:
- * - Issue #916 Hardening: Integrated Energy Footprint Verdict (R-ID 259). 
+ * Sep.08.12:
+ * - R-ID 259: Integrated structured Energy Footprint fields into health updates.
+ * - Issue #924 Visibility: Propagating isGnssThrottled (A15 Hysteresis) to health state.
+ * - Fix: Corrected constant name to BATTERY_STEEP_DISCHARGE_WINDOW_MS.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -138,6 +134,13 @@ class IntegrityMonitor @Inject constructor(
                 .collect()
         }
 
+        // Issue #924: Local transparency for GNSS Throttling (A15 Hysteresis)
+        scope.launch {
+            hardwareProvider.isGnssThrottledFlow
+                .onEach { throttled -> updateHealth { it.isGnssThrottled = throttled } }
+                .collect()
+        }
+
         startHeartbeat()
     }
 
@@ -170,6 +173,12 @@ class IntegrityMonitor @Inject constructor(
                 val msg = "ENERGY AUDIT: Revival Footprint (R-ID 259) - Delta: ${event.deltaMa}mA, Temp Rise: ${event.deltaTemp}°C, Duration: ${event.durationMs}ms"
                 _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
                 Timber.i("IntegrityMonitor: $msg")
+                
+                updateHealth { h ->
+                    h.lastEnergyDeltaMa = event.deltaMa
+                    h.lastEnergyDeltaTemp = event.deltaTemp
+                    h.lastEnergyDurationMs = event.durationMs
+                }
             }
         }
     }

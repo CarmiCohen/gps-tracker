@@ -4,12 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
- * Sep.05.25:
- * - Issue #266: Added isMaliAnomaly for automated UI throttling on budget hardware.
- * Aug.29.10:
- * - Concern #765: Added isUltraLongStationary for GNSS relaxation transparency.
- * Aug.11.08:
- * - Issue #143: Forensic Integrity Verification. Added isThermalThrottling (R133).
+ * Sep.08.12:
+ * - Issue #924 Visibility: Added isGnssThrottled for A15 Hysteresis transparency.
+ * - R-ID 259: Added structured Energy Footprint fields (deltaMa, deltaTemp, durationMs).
  */
 @Serializable
 class SystemHealthState(
@@ -111,7 +108,13 @@ class SystemHealthState(
     // Issue #133: Forensic Anomaly Correlation
     var isSilentFailure: Boolean = false,
     var isUltraLongStationary: Boolean = false,
-    var isMaliAnomaly: Boolean = false
+    var isMaliAnomaly: Boolean = false,
+    var isGnssThrottled: Boolean = false,
+
+    // R-ID 259: Energy Footprint Verdicts
+    var lastEnergyDeltaMa: Int = 0,
+    var lastEnergyDeltaTemp: Double = 0.0,
+    var lastEnergyDurationMs: Long = 0L
 ) {
     fun copyFrom(other: SystemHealthState) {
         this.signalLoss = other.signalLoss
@@ -199,6 +202,10 @@ class SystemHealthState(
         this.isSilentFailure = other.isSilentFailure
         this.isUltraLongStationary = other.isUltraLongStationary
         this.isMaliAnomaly = other.isMaliAnomaly
+        this.isGnssThrottled = other.isGnssThrottled
+        this.lastEnergyDeltaMa = other.lastEnergyDeltaMa
+        this.lastEnergyDeltaTemp = other.lastEnergyDeltaTemp
+        this.lastEnergyDurationMs = other.lastEnergyDurationMs
     }
 
     fun update(
@@ -215,7 +222,9 @@ class SystemHealthState(
         vibration: Double = 0.0, storageAvailableMb: Long = 0L, storageTotalMb: Long = 0L,
         isBatteryLow: Boolean = false, isBatteryCritical: Boolean = false, maxIoLatency: Long = 0L,
         isSilentFailure: Boolean = false, isThermalThrottling: Boolean = false,
-        isUltraLongStationary: Boolean = false, isMaliAnomaly: Boolean = false
+        isUltraLongStationary: Boolean = false, isMaliAnomaly: Boolean = false,
+        isGnssThrottled: Boolean = false,
+        lastEnergyDeltaMa: Int = 0, lastEnergyDeltaTemp: Double = 0.0, lastEnergyDurationMs: Long = 0L
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -261,6 +270,10 @@ class SystemHealthState(
         this.isSilentFailure = isSilentFailure
         this.isUltraLongStationary = isUltraLongStationary
         this.isMaliAnomaly = isMaliAnomaly
+        this.isGnssThrottled = isGnssThrottled
+        this.lastEnergyDeltaMa = lastEnergyDeltaMa
+        this.lastEnergyDeltaTemp = lastEnergyDeltaTemp
+        this.lastEnergyDurationMs = lastEnergyDurationMs
     }
     
     fun reset() {
@@ -349,5 +362,9 @@ class SystemHealthState(
         isSilentFailure = false
         isUltraLongStationary = false
         isMaliAnomaly = false
+        isGnssThrottled = false
+        lastEnergyDeltaMa = 0
+        lastEnergyDeltaTemp = 0.0
+        lastEnergyDurationMs = 0L
     }
 }

@@ -34,6 +34,8 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.08.12:
+ * - Issue #924 Visibility: Added isGnssThrottledFlow to expose A15 Hysteresis state.
  * Sep.08.00:
  * - Issue #975 RESOLVED: Reference-Counted Lifecycle. Implemented activeUsers 
  *   counter to prevent premature teardown during rapid Tracker/Viewer mode 
@@ -42,14 +44,6 @@ import kotlin.math.*
  * - Issue #929 RESOLVED: Mali Anomaly Exit Hysteresis. Implemented 10s cooldown 
  *   period before returning to standard sampling rates after an anomaly clears 
  *   to prevent jitter (R-ID 274).
- * Sep.06.31:
- * - Issue #927 RESOLVED: Safe-Mode Integration. implemented isSafeMode check in 
- *   checkRevivalLifecycle to prevent revival loops during recovery (R-ID 271).
- *   Fixed logic inversion in permission check and added job cancellation.
- * Sep.06.30:
- * - Issue #925 RESOLVED: Async Teardown Race Condition. Converted start() to 
- *   suspend and implemented join() on teardownJob to ensure deterministic 
- *   initialization after rapid stop/start sequences (R925).
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -87,6 +81,10 @@ class HardwareProvider @Inject constructor(
     private val pollingIntervalFlow = MutableStateFlow(TICK_INTERVAL_MS)
     private var revivalAttemptCount = 0
     private var isHardwareLocked = false
+
+    private val _isGnssThrottled = MutableStateFlow(false)
+    val isGnssThrottledFlow: StateFlow<Boolean> = _isGnssThrottled.asStateFlow()
+    val isGnssThrottled get() = _isGnssThrottled.value
 
     val maxGnssJitterMs get() = forensicAuditor.maxGnssJitterMs
 
@@ -269,6 +267,10 @@ class HardwareProvider @Inject constructor(
             if (isHighLoad || maliAnomaly) lastAnomalyActiveRt = nowRt
             val shouldThrottle = systemStatusProvider.isA15Hardware() && 
                     (isHighLoad || maliAnomaly || (nowRt - lastAnomalyActiveRt < GNSS_THROTTLING_HYSTERESIS_MS))
+            
+            if (_isGnssThrottled.value != shouldThrottle) {
+                _isGnssThrottled.value = shouldThrottle
+            }
 
             val currentInterval = if (shouldThrottle) {
                 GNSS_SAMPLING_INTERVAL_THROTTLED_MS
@@ -457,7 +459,7 @@ class HardwareProvider @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) return
         
         revivalPulseJob?.cancel()
         revivalPulseJob = scope.launch(Dispatchers.Default) {

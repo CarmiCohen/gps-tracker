@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.08.12:
+ * - Issue #924 Visibility: Added isGnssThrottled to HudConnectivityState 
+ *   for visual confirmation of A15 Hysteresis (R-ID 267).
  * Sep.06.50:
  * - Issue #932: HUD Synchronization. Added isA15 to HudConnectivityState 
  *   to provide visual confirmation of hardware adaptations (R-ID 276).
@@ -435,7 +438,8 @@ data class HudConnectivityState(
     val remoteSignal: Int = 0,
     val isSystemActive: Boolean = false,
     val isSafeMode: Boolean = false,
-    val isA15: Boolean = false
+    val isA15: Boolean = false,
+    val isGnssThrottled: Boolean = false
 )
 
 @Serializable
@@ -504,6 +508,7 @@ data class HudState(
     val isSystemActive get() = connectivity.isSystemActive
     val isSafeMode get() = connectivity.isSafeMode
     val isA15 get() = connectivity.isA15
+    val isGnssThrottled get() = connectivity.isGnssThrottled
     
     val isLocalGpsActive get() = telemetry.isLocalGpsActive
     val isGpsFresh get() = telemetry.isGpsFresh

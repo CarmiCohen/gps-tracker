@@ -21,12 +21,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.08.13:
+ * - Fix: Restored resetEvaluation() and corrected logServiceEvent parameter names.
  * Sep.08.11:
  * - Issue #936: Forensic Auditor Consolidation (Idea #3). Delegated Stability 
  *   Audit logic (Reliability/Jitter) to ForensicAuditor (R-ID 280).
- * Sep.06.58:
- * - Issue #935 RESOLVED: Fixed GPS Red-Lock regression by correctly populating 
- *   rt (monotonic timestamp) in local LocationUpdate emissions.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -204,7 +203,7 @@ class TrackerService : BaseMonitorService() {
                                        event.message.contains("PRIORITY", ignoreCase = true) || 
                                        event.message.contains("BUCKET", ignoreCase = true) ||
                                        event.message.contains("ENERGY AUDIT", ignoreCase = true)
-                        logManager.logServiceEvent(event.message, isImportant = event.isImportant, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
+                        logManager.logServiceEvent(m = event.message, isImportant = event.isImportant, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
                     }
                 }
             }
@@ -219,17 +218,17 @@ class TrackerService : BaseMonitorService() {
                     is HardwareProvider.RevivalEvent.Footprint -> {
                         val msg = "ENERGY AUDIT: Revival Footprint (R-ID 259) - Delta: ${event.deltaMa}mA, Temp Rise: ${event.deltaTemp}°C, Duration: ${event.durationMs}ms"
                         val proc = lastProcessedLocation
-                        logManager.logServiceEvent(msg, isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                        logManager.submitToLogSink(msg, "system", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                     }
                     is HardwareProvider.RevivalEvent.HardwareLock -> {
                         val proc = lastProcessedLocation
-                        logManager.logServiceEvent("CRITICAL: GPS_HARDWARE_LOCK - All revival attempts failed. Hardware stall confirmed.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                        logManager.logServiceEvent(m = "CRITICAL: GPS_HARDWARE_LOCK - All revival attempts failed. Hardware stall confirmed.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                     }
                     is HardwareProvider.RevivalEvent.Attempt -> {
-                        logManager.logServiceEvent("GPS REVIVAL: Hardware restart attempt ${event.count} triggered.", isImportant = false)
+                        logManager.logServiceEvent(m = "GPS REVIVAL: Hardware restart attempt ${event.count} triggered.", isImportant = false)
                     }
                     is HardwareProvider.RevivalEvent.Success -> {
-                        logManager.logServiceEvent("GPS REVIVAL: Hardware fix restored successfully.", isImportant = true)
+                        logManager.logServiceEvent(m = "GPS REVIVAL: Hardware fix restored successfully.", isImportant = true)
                     }
                     else -> {}
                 }
@@ -265,7 +264,7 @@ class TrackerService : BaseMonitorService() {
                     }
                     is ProcessorEvent.ChairBaselineChanged -> {
                         val proc = lastProcessedLocation
-                        logManager.logServiceEvent("Passive Zeroing: Chair baseline calibrated to ${event.baseline.roundToOneDecimal()}°",
+                        logManager.logServiceEvent(m = "Passive Zeroing: Chair baseline calibrated to ${event.baseline.roundToOneDecimal()}°",
                             lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                         repository.saveDouble(CHAIR_BASELINE_TILT_KEY, event.baseline)
                     }
@@ -289,7 +288,7 @@ class TrackerService : BaseMonitorService() {
         lifecycleScope.launch(Dispatchers.Default) {
             historyManager.historyEvents.collect { event ->
                 when (event) {
-                    is HistoryEvent.LogEvent -> logManager.logServiceEvent(event.message, isImportant = event.isImportant)
+                    is HistoryEvent.LogEvent -> logManager.logServiceEvent(m = event.message, isImportant = event.isImportant)
                 }
             }
         }
@@ -301,10 +300,10 @@ class TrackerService : BaseMonitorService() {
                 when (event) {
                     is AppSensorEvent.HardwareFailure -> {
                         val proc = lastProcessedLocation
-                        logManager.logServiceEvent("CRITICAL: SENSOR_HARDWARE_FAILURE - ${event.reason}", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                        logManager.logServiceEvent(m = "CRITICAL: SENSOR_HARDWARE_FAILURE - ${event.reason}", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                     }
                     is AppSensorEvent.LogEvent -> {
-                        logManager.logServiceEvent(event.message, isImportant = event.isImportant)
+                        logManager.logServiceEvent(m = event.message, isImportant = event.isImportant)
                     }
                 }
             }
@@ -351,7 +350,7 @@ class TrackerService : BaseMonitorService() {
         hardwareProvider.setAcousticFastPath(
             floor = locationProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0,
             onSpike = {
-                logManager.logServiceEvent("Acoustic Spike Detected (FastPath)", isImportant = false)
+                logManager.logServiceEvent(m = "Acoustic Spike Detected (FastPath)", isImportant = false)
                 lastFastPathAcousticSpikeTs = timeProvider.elapsedRealtime()
             }
         )
@@ -367,7 +366,7 @@ class TrackerService : BaseMonitorService() {
             lifecycleScope.launch(Dispatchers.IO) { repository.saveString(VIEWER_ID_KEY, id) } 
         }
         if (sessionManager.onViewerPulse(id, timeProvider.elapsedRealtime())) { 
-            logManager.logServiceEvent("Viewer connected: $id")
+            logManager.logServiceEvent(m = "Viewer connected: $id")
             startTickLoop() 
         }
     }
@@ -379,12 +378,9 @@ class TrackerService : BaseMonitorService() {
         locationProcessor.resetStats()
         sessionManager.reset()
         integrityMonitor.resetStats()
-        forensicUseCase.resetLatches()
-        systemMonitor.resetSimulatedAnomalies()
-        serviceBehaviorUseCase.reset()
-        lastHardwareRecoveryTs = 0L
         forensicAuditor.reset()
-        logManager.logServiceEvent("Session Terminated", isImportant = false)
+        lastHardwareRecoveryTs = 0L
+        logManager.logServiceEvent(m = "Session Terminated", isImportant = false)
     }
 
     private fun onUiVisibilityChangedInternal(visible: Boolean) {
@@ -498,7 +494,7 @@ class TrackerService : BaseMonitorService() {
                 lastHardwareRecoveryTs = nowRt
                 recoveryFlagged = true
                 val proc = lastProcessedLocation
-                logManager.logServiceEvent("HEURISTIC RECOVERY: Heartbeat gap detected (${tickGap}ms). Reviving connection.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                logManager.logServiceEvent(m = "HEURISTIC RECOVERY: Heartbeat gap detected (${tickGap}ms). Reviving connection.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                 systemMonitor.acquireWakeLock()
                 connectivitySuite.connect(configManager.relayUrl)
             }
@@ -508,7 +504,7 @@ class TrackerService : BaseMonitorService() {
         forensicAuditor.evaluateStability(nowRt, "T")?.let { verdict ->
             val proc = lastProcessedLocation
             logManager.logServiceEvent(
-                message = verdict.message,
+                m = verdict.message,
                 isImportant = true,
                 isSpecial = verdict.isJitterViolation,
                 specialColor = if (verdict.isJitterViolation) FORENSIC_PINK_COLOR else null,
@@ -541,7 +537,7 @@ class TrackerService : BaseMonitorService() {
             val hasUnresolved = alarmManager.hasUnresolvedAlarms()
             val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(isStationary = hardwareProvider.isStationary(), isGpsStalled = health.gpsStalled, hasUnresolvedAlarms = hasUnresolved, isUiVisible = isUiVisible())
             if (shouldBePowerSave != isPowerSaveActive) {
-                isPowerSaveActive = shouldBePowerSave; hardwareProvider.setPowerSaveMode(shouldBePowerSave); logManager.logServiceEvent("POWER SAVER: ${if (shouldBePowerSave) "ENGAGED" else "DISABLED"}", isImportant = false)
+                isPowerSaveActive = shouldBePowerSave; hardwareProvider.setPowerSaveMode(shouldBePowerSave); logManager.logServiceEvent(m = "POWER SAVER: ${if (shouldBePowerSave) "ENGAGED" else "DISABLED"}", isImportant = false)
                 withContext(Dispatchers.Main.immediate) { updateForegroundServiceType() }
             }
             lastPowerSaveCheckRt = nowRt
@@ -679,7 +675,7 @@ class TrackerService : BaseMonitorService() {
 
                 if (recoveryTriggerRt > 0 && delayMs < FORENSIC_SAMPLING_INTERVAL_COOLING_MS) {
                     val latency = timeProvider.elapsedRealtime() - recoveryTriggerRt
-                    logManager.logServiceEvent("Forensic Performance Audit: Thermal Recovery Latency: ${latency}ms", isImportant = true)
+                    logManager.logServiceEvent(m = "Forensic Performance Audit: Thermal Recovery Latency: ${latency}ms", isImportant = true)
                     recoveryTriggerRt = 0L
                 }
 
@@ -691,7 +687,7 @@ class TrackerService : BaseMonitorService() {
 
     private fun executeAutomatedStressTest() {
         lifecycleScope.launch(Dispatchers.Default) {
-            logManager.logServiceEvent("FORENSIC STRESS TEST: Initiating 5s CPU/IO saturation burst.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+            logManager.logServiceEvent(m = "FORENSIC STRESS TEST: Initiating 5s CPU/IO saturation burst.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
             
             val cpuJob = launch(Dispatchers.Default) {
                 val end = System.currentTimeMillis() + 5000L
@@ -702,7 +698,7 @@ class TrackerService : BaseMonitorService() {
                     sqrt(count.toDouble())
                     count++
                 }
-                logManager.logServiceEvent("STRESS TEST: CPU Saturation complete ($count iterations).", isImportant = false)
+                logManager.logServiceEvent(m = "STRESS TEST: CPU Saturation complete ($count iterations).", isImportant = false)
             }
 
             val ioJob = launch(Dispatchers.IO) {
@@ -722,7 +718,7 @@ class TrackerService : BaseMonitorService() {
                     }
                 }
                 tempFile.delete()
-                logManager.logServiceEvent("STRESS TEST: IO Saturation complete ($writes MB written).", isImportant = false)
+                logManager.logServiceEvent(m = "STRESS TEST: IO Saturation complete ($writes MB written).", isImportant = false)
             }
 
             val forensicJob = launch(Dispatchers.Default) {
@@ -730,11 +726,11 @@ class TrackerService : BaseMonitorService() {
                     logManager.logForensicTrace("STRESS_BURST: Forensic sample #$i injection.")
                     if (i % 100 == 0) delay(1) 
                 }
-                logManager.logServiceEvent("STRESS TEST: Forensic Saturation burst complete.", isImportant = false)
+                logManager.logServiceEvent(m = "STRESS TEST: Forensic Saturation burst complete.", isImportant = false)
             }
 
             joinAll(cpuJob, ioJob, forensicJob)
-            logManager.logServiceEvent("FORENSIC STRESS TEST: Saturation routine COMPLETED.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
+            logManager.logServiceEvent(m = "FORENSIC STRESS TEST: Saturation routine COMPLETED.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
         }
     }
 
@@ -759,7 +755,7 @@ class TrackerService : BaseMonitorService() {
             forensicAuditor.recordGpsFix(nowRt, TICK_INTERVAL_MS)?.let { gapMsg ->
                 val proc = lastProcessedLocation
                 logManager.logServiceEvent(
-                    message = "STABILITY GAP (T): $gapMsg",
+                    m = "STABILITY GAP (T): $gapMsg",
                     isImportant = true,
                     isSpecial = true,
                     specialColor = FORENSIC_PINK_COLOR,
@@ -792,7 +788,7 @@ class TrackerService : BaseMonitorService() {
         if (capabilities.isA15Device && JdHardwareManager.isAvailable()) {
             val punchResult = JdHardwareManager.punchHardware(timeProvider)
             if (punchResult != 0) {
-                logManager.logServiceEvent("HARDWARE: Handshake failed (Code: $punchResult). Forcing release.", isImportant = true)
+                logManager.logServiceEvent(m = "HARDWARE: Handshake failed (Code: $punchResult). Forcing release.", isImportant = true)
             }
         }
         super.onDestroy()

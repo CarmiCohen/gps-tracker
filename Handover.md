@@ -1,18 +1,17 @@
-# Forensic Handover (Sep.08.12)
+# Forensic Handover (Sep.08.13)
 
-## 🎯 Current Context: Issue #936 & #910 Resolution
-The stability audit logic (Reliability % and GNSS Jitter) has been fully consolidated into `ForensicAuditor`, restoring SRP to the background services. Additionally, the `Hydration Watchdog` in `MainViewModel` now implements active recovery, forcing a re-hydration of the UI if a Level 2 stall is detected.
+## 🎯 Current Context: Issue #924 & R-ID 259 Resolution
+The visibility layer for hardware adaptations is fully implemented. Users receive visual feedback via `SAF` (Safe Mode) and `THR` (Throttled) badges in the HUD/Dashboard. Energy Footprint verdicts are now structured and propagated across the network for Tracker/Viewer parity.
 
 ## 🛠️ Key Changes
-*   **ForensicAuditor.kt**: Unified `recordGpsFix` and `evaluateStability` logic; exposed `lastGpsFixRealtime`.
-*   **TrackerService.kt / ViewerService.kt**: Removed local audit state variables; delegated stability reporting to the auditor.
-*   **MainViewModel.kt**: Added recovery branch to the Hydration Watchdog to reset and restart `hydrationManager`.
-*   **app/build.gradle**: Updated version to `Sep.08.12`.
-*   **SOT**: Added R-ID 280 (Consolidation) and R-ID 281 (Hydration Recovery).
+*   **Throttling Visibility (#924)**: Added `THR` badge to HUD/Dashboard and sampling status to Diagnostics.
+*   **Energy Integration (R-ID 259)**: Structured verdicts (`deltaMa`, `deltaTemp`, `durationMs`) propagated through health and diagnostic states.
+*   **Protocol Hardening**: Updated Protobuf schema and mapper for energy/throttling field transmission.
+*   **SOT Updates**: Added R-ID 259 and R-ID 267 to the master requirements.
 
 ## 📡 Next Priority
-*   **Issue #924 Visibility**: Add "Safe Mode" and "GNSS Throttled" (A15 Hysteresis) status indicators to the HUD.
-*   **Energy Audit Integration**: Propagate `ForensicAuditor` energy verdicts to the UI log.
+*   **Telemetry Model Flattening (Idea #2)**: Partition the 70+ field `LocationUpdate` into specialized state objects.
+*   **Alarm Refactoring (Idea #3)**: Decompose `evaluateAlarms` to reduce complexity and improve testability.
 
 ## 📊 Dashboard Snapshot
-- **Current Audit Baseline: [SOT: 296 (Rules: 53, IDs: 243), Resolved: 945, Open: 2, Testing: 95% (Sub-items: 48), Ideas: 4, QA: 266]**
+- **Current Audit Baseline: [SOT: 298 (Rules: 53, IDs: 245), Resolved: 947, Open: 2, Testing: 95% (Sub-items: 48), Ideas: 4, QA: 267]**

@@ -1,5 +1,5 @@
-# Simplification Ideas (vSep.07.80)
+# Simplification Ideas (vSep.08.13)
 
-1.  **Forensic Auditor Consolidation (Priority)**: Unify the duplicate GNSS jitter and stability audit logic between `TrackerService` and `ViewerService` by fully utilizing the `ForensicAuditor` singleton for both roles.
-2.  **Telemetry Data Class Flattening**: The `LocationUpdate` class contains over 60 fields. Consider splitting this into `KineticState`, `AtmosphericState`, and `IntegrityState` to reduce the overhead of partial updates.
-3.  **Alarm Evaluation Logic**: The `evaluateAlarms` method in `AlarmManager` has reached high cyclomatic complexity. Logic can be partitioned into specialized evaluators (e.g., `PhysicalTamperEvaluator`, `HardwareHealthEvaluator`).
+1.  **Telemetry Data Class Flattening (Priority)**: `LocationUpdate` now exceeds 70 fields. Partition it into specialized, lean states: `KinematicState` (Position/Speed), `AtmosphericState` (Baro/Temp/Lux), and `IntegrityState` (Errors/Throttling). This will reduce allocation churn and improve serialization performance on budget hardware (R-ID 238).
+2.  **Alarm Evaluation Logic partitioning**: Partition the monolithic `evaluateAlarms` method in `AlarmManager` into specialized evaluators (e.g., `PhysicalTamperEvaluator`, `HardwareHealthEvaluator`) to reduce cyclomatic complexity and improve unit test coverage.
+3.  **UiStateAggregator Refactoring**: As UI flags increase, the aggregator is becoming complex. Transition to a "Plugin" architecture where different modules contribute to the final UI state independently.

@@ -10,12 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.08.12:
+ * - Issue #924 Visibility: Added isGnssThrottled to DashboardHealthState (R-ID 267).
+ * - R-ID 259: Added structured Energy Footprint fields to TrackerStatus for role parity.
  * Sep.06.31:
  * - Issue #926 RESOLVED: Revival Integration. Added gpsHardwareLock 
  *   to TrackerStatus to ensure parity between roles (R-ID 272).
- * Sep.05.26:
- * - Issue #266 Remediation: Added missing isMaliAnomaly to DashboardHealthState 
- *   to fix compilation breakage.
  */
 
 sealed class AppSensorEvent {
@@ -163,10 +163,11 @@ class ConnectionPoint(
         this.luxIdx = other.luxIdx; this.vibeIdx = other.vibeIdx; this.proxIdx = other.proxIdx
         this.liftIdx = other.liftIdx; this.tiltIdx = other.tiltIdx; this.baroIdx = other.baroIdx
         this.isSitDetected = other.isSitDetected; this.isSitActive = other.isSitActive
-        this.sitVz = other.sitVz; this.sitVzTs = other.sitVzTs; this.sitVzRt = other.sitVzRt
-        this.sitDz = other.sitDz; this.sitBaro = other.sitBaro; this.sitTilt = other.sitTilt
-        this.sitShock = other.sitShock; this.kineticEnergy = other.kineticEnergy; this.cpuLoad = other.cpuLoad
-        this.ioWait = other.ioWait; this.maxIoLatency = other.maxIoLatency; this.isSilentFailure = other.isSilentFailure
+        this.verticalVelocity = other.verticalVelocity; this.sitVz = other.sitVz
+        this.sitVzTs = other.sitVzTs; this.sitVzRt = other.sitVzRt; this.sitDz = other.sitDz
+        this.sitBaro = other.sitBaro; this.sitTilt = other.sitTilt; this.sitShock = other.sitShock
+        this.kineticEnergy = other.kineticEnergy; this.cpuLoad = other.cpuLoad; this.ioWait = other.ioWait
+        this.maxIoLatency = other.maxIoLatency; this.isSilentFailure = other.isSilentFailure
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
         this.gpsHardwareLock = other.gpsHardwareLock
     }
@@ -361,7 +362,13 @@ data class TrackerStatus(
     val isBatteryLow: Boolean = false, val isBatteryCritical: Boolean = false, val isSilentFailure: Boolean = false,
     val isUltraLongStationary: Boolean = false,
     val currentProximityCm: Double = -1.0,
-    val gpsHardwareLock: Boolean = false
+    val gpsHardwareLock: Boolean = false,
+    val isGnssThrottled: Boolean = false,
+    
+    // R-ID 259: Energy Footprint
+    val lastEnergyDeltaMa: Int = 0,
+    val lastEnergyDeltaTemp: Double = 0.0,
+    val lastEnergyDurationMs: Long = 0L
 ) : SpatialAnchor {
     
     fun toMap(fromViewer: Boolean): Map<String, Any?> = mutableMapOf<String, Any?>().apply {
@@ -369,11 +376,12 @@ data class TrackerStatus(
         put("from_viewer", fromViewer); put("lat", lat); put("lng", lng); put("alt", alt)
         put("speed", speed); put("bearing", bearing); put("accuracy", accuracy); put("max_accuracy", maxAccuracy)
         put("gps_ts", gpsTs); put("ts", ts); put("rt", rt); put("uptime_ms", uptimeMs)
-        put("last_conn_ts", lastConnTs); put("last_disc_ts", lastDiscTs); put("total_drop_ms", totalDropMs)
-        put("max_drop_ms", maxDropMs); put("max_drop_ts", maxDropTs); put("total_connected_ms", totalConnectedMs)
-        put("session_connected_ms", sessionConnectedMs); put("battery", battery); put("temp", temp); put("max_temp", maxTemp)
-        put("is_charging", isCharging); put("current_ma", currentMa); put("sats_view", satsView); put("sats_used", satsUsed)
-        put("peak_vibration_shock", peakVibrationShock); put("peak_shock_ts", peakVibrationShockTs); put("is_power_tamper", isPowerTamper)
+        put("last_conn_ts", lastConnTs); put("last_disc_ts", lastDiscTs)
+        put("total_drop_ms", totalDropMs); put("max_drop_ms", maxDropMs); put("max_drop_ts", maxDropTs)
+        put("total_connected_ms", totalConnectedMs); put("session_connected_ms", sessionConnectedMs); put("battery", battery)
+        put("temp", temp); put("max_temp", maxTemp); put("is_charging", isCharging); put("current_ma", currentMa)
+        put("sats_view", satsView); put("sats_used", satsUsed); put("peak_vibration_shock", peakVibrationShock)
+        put("peak_shock_ts", peakVibrationShockTs); put("is_power_tamper", isPowerTamper)
         put("violation_uptime_ms", violationUptimeMs); put("violation_percentage", violationPercentage)
         put("status", status.name); put("is_jammer", isJammer); put("is_stalled", isStalled)
         put("is_tamper_detected", isTamperDetected); put("vibration", vibration); put("heading", heading); put("tilt_degrees", tiltDegrees)
@@ -400,7 +408,12 @@ data class TrackerStatus(
         put("is_adaptive_jump", isAdaptiveJump); put("is_battery_low", isBatteryLow)
         put("is_battery_critical", isBatteryCritical); put("is_silent_failure", isSilentFailure)
         put("is_ultra_long_stationary", isUltraLongStationary)
-        put("gps_hardware_lock", gpsHardwareLock)
+        put("gps_hardware_lock", gpsHardwareLock); put("is_gnss_throttled", isGnssThrottled)
+        
+        // R-ID 259: Energy Footprint mapping for serialization
+        put("last_energy_delta_ma", lastEnergyDeltaMa)
+        put("last_energy_delta_temp", lastEnergyDeltaTemp)
+        put("last_energy_duration_ms", lastEnergyDurationMs)
     }
 
     companion object {
@@ -499,7 +512,13 @@ data class DashboardHealthState(
     val ioWait: Double = 0.0,
     val maxIoLatency: Long = 0L,
     val isSilentFailure: Boolean = false,
-    val isMaliAnomaly: Boolean = false
+    val isMaliAnomaly: Boolean = false,
+    val isGnssThrottled: Boolean = false,
+    
+    // R-ID 259: Energy Footprint structured fields
+    val lastEnergyDeltaMa: Int = 0,
+    val lastEnergyDeltaTemp: Double = 0.0,
+    val lastEnergyDurationMs: Long = 0L
 )
 
 /**
@@ -581,6 +600,10 @@ data class DashboardState(
     val maxIoLatency get() = health.maxIoLatency
     val isSilentFailure get() = health.isSilentFailure
     val isMaliAnomaly get() = health.isMaliAnomaly
+    val isGnssThrottled get() = health.isGnssThrottled
+    val lastEnergyDeltaMa get() = health.lastEnergyDeltaMa
+    val lastEnergyDeltaTemp get() = health.lastEnergyDeltaTemp
+    val lastEnergyDurationMs get() = health.lastEnergyDurationMs
 }
 
 class StatsState(
@@ -592,7 +615,7 @@ class StatsState(
     fun copyFrom(other: StatsState) {
         this.totalConnectedMs = other.totalConnectedMs; this.sessionConnectedMs = other.sessionConnectedMs
         this.maxDropMs = other.maxDropMs; this.maxDropTs = other.maxDropTs; this.totalDropMs = totalDropMs
-        this.uptimeMs = other.uptimeMs; this.lastConnTs = lastConnTs; this.lastDiscTs = lastDiscTs
+        this.uptimeMs = other.uptimeMs; this.lastConnTs = other.lastConnTs; this.lastDiscTs = lastDiscTs
         this.violationUptimeMs = other.violationUptimeMs; this.violationPercentage = other.violationPercentage
     }
     fun update(totalConnectedMs: Long, sessionConnectedMs: Long, maxDropMs: Long, maxDropTs: Long, totalDropMs: Long, uptimeMs: Long, lastConnTs: Long, lastDiscTs: Long) {

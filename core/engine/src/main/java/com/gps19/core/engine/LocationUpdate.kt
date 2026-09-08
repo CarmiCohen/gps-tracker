@@ -4,12 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * LocationUpdate: Core engine model for position and sensor telemetry.
+ * Sep.08.12:
+ * - Issue #924 Visibility: Added isGnssThrottled for A15 Hysteresis transparency.
+ * - R-ID 259: Added structured Energy Footprint fields for structured auditing.
  * Aug.31.00:
  * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
  *   isUltraLongStationary to maintain forensic parity (R782).
- * Aug.10.24:
- * - Issue #130: Proto Health Parity. Added isBatteryLow and isBatteryCritical 
- *   to maintain forensic parity in viewer mode (R130).
  */
 @Serializable
 class LocationUpdate(
@@ -91,7 +91,13 @@ class LocationUpdate(
     var isAdaptiveJump: Boolean = false,
     var isBatteryLow: Boolean = false,
     var isBatteryCritical: Boolean = false,
-    var isUltraLongStationary: Boolean = false
+    var isUltraLongStationary: Boolean = false,
+    var isGnssThrottled: Boolean = false,
+
+    // R-ID 259: Energy Footprint
+    var lastEnergyDeltaMa: Int = 0,
+    var lastEnergyDeltaTemp: Double = 0.0,
+    var lastEnergyDurationMs: Long = 0L
 ) {
     fun copyFrom(other: LocationUpdate) {
         this.lat = other.lat; this.lng = other.lng; this.alt = other.alt
@@ -132,5 +138,9 @@ class LocationUpdate(
         this.isBatteryLow = other.isBatteryLow
         this.isBatteryCritical = other.isBatteryCritical
         this.isUltraLongStationary = other.isUltraLongStationary
+        this.isGnssThrottled = other.isGnssThrottled
+        this.lastEnergyDeltaMa = other.lastEnergyDeltaMa
+        this.lastEnergyDeltaTemp = other.lastEnergyDeltaTemp
+        this.lastEnergyDurationMs = other.lastEnergyDurationMs
     }
 }

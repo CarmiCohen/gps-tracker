@@ -5,12 +5,11 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Sep.08.12:
+ * - Issue #924 Visibility: Added isGnssThrottled to DiagnosticState (R-ID 267).
+ * - R-ID 259: Added structured Energy Footprint fields to DiagnosticState.
  * Sep.05.25:
  * - Issue #266: Added isMaliAnomaly to DiagnosticState for automated UI-throttling.
- * Sep.04.12:
- * - Issue #900/904 Hardening: Enhanced PermissionState with isSamsungDevice flag 
- *   and refined systemReady logic to prioritize "Unrestricted" battery mode 
- *   and "Precise Location" on budget Samsung hardware (A15).
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -161,7 +160,14 @@ class DiagnosticState(
     var cumulativeRecoveryBlackoutMs: Long = 0L,
     var recoveryCount: Int = 0,
     var isMaliAnomaly: Boolean = false,
-    var pulse: Long = 0L
+    var isGnssThrottled: Boolean = false,
+    var trackerIsGnssThrottled: Boolean = false,
+    var pulse: Long = 0L,
+    
+    // R-ID 259: Energy Footprint structured fields
+    var lastEnergyDeltaMa: Int = 0,
+    var lastEnergyDeltaTemp: Double = 0.0,
+    var lastEnergyDurationMs: Long = 0L
 ) {
     fun copyFrom(other: DiagnosticState) {
         this.battery.copyFrom(other.battery)
@@ -184,7 +190,12 @@ class DiagnosticState(
         this.cumulativeRecoveryBlackoutMs = other.cumulativeRecoveryBlackoutMs
         this.recoveryCount = other.recoveryCount
         this.isMaliAnomaly = other.isMaliAnomaly
+        this.isGnssThrottled = other.isGnssThrottled
+        this.trackerIsGnssThrottled = other.trackerIsGnssThrottled
         this.pulse = other.pulse
+        this.lastEnergyDeltaMa = other.lastEnergyDeltaMa
+        this.lastEnergyDeltaTemp = other.lastEnergyDeltaTemp
+        this.lastEnergyDurationMs = other.lastEnergyDurationMs
     }
 
     fun reset() {
@@ -208,7 +219,12 @@ class DiagnosticState(
         cumulativeRecoveryBlackoutMs = 0L
         recoveryCount = 0
         isMaliAnomaly = false
+        isGnssThrottled = false
+        trackerIsGnssThrottled = false
         pulse = 0L
+        lastEnergyDeltaMa = 0
+        lastEnergyDeltaTemp = 0.0
+        lastEnergyDurationMs = 0L
     }
 }
 

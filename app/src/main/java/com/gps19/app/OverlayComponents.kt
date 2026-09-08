@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,11 +26,14 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Sep.08.12:
+ * - Issue #924 Visibility: Added isSafeMode to DashboardHeader for full 
+ *   transparency of signaling suppression (R-ID 271).
+ * - Issue #924 Visibility: Added isGnssThrottled to MainDashboardGrid and 
+ *   DashboardHeader for A15 Hysteresis transparency (R-ID 267).
  * Aug.29.11:
  * - UI Refinement: Added visual indicator for Ultra-Long Stationary state 
  *   in Dashboard header (R765).
- * Aug.22.04:
- * - Issue #140 Restoration Build Fix: Unified naming to maxIoLatency.
  */
 
 @Composable
@@ -102,6 +106,8 @@ fun MainDashboardGrid(
     ioWait: Double,
     maxIoLatency: Long,
     isUltraLongStationary: Boolean = false,
+    isGnssThrottled: Boolean = false,
+    isSafeMode: Boolean = false,
     onShowGnssDetail: () -> Unit = {}
 ) {
     val isViewer = appMode == "viewer"
@@ -127,7 +133,9 @@ fun MainDashboardGrid(
                 isBatterySteepDischarge = isBatterySteepDischarge,
                 isBatteryLow = isBatteryLow,
                 isBatteryCritical = isBatteryCritical,
-                isUltraLongStationary = isUltraLongStationary
+                isUltraLongStationary = isUltraLongStationary,
+                isGnssThrottled = isGnssThrottled,
+                isSafeMode = isSafeMode
             )
             
             HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
@@ -174,7 +182,9 @@ private fun DashboardHeader(
     isBatterySteepDischarge: Boolean,
     isBatteryLow: Boolean,
     isBatteryCritical: Boolean,
-    isUltraLongStationary: Boolean
+    isUltraLongStationary: Boolean,
+    isGnssThrottled: Boolean,
+    isSafeMode: Boolean
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "DashboardPulse")
     val movingAlpha by infiniteTransition.animateFloat(
@@ -211,6 +221,8 @@ private fun DashboardHeader(
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (isUltraLongStationary) Badge("[ULTRA]", BrandJd)
+            if (isSafeMode) Badge("[SAFE MODE]", Rose500)
+            if (isGnssThrottled) Badge("[THROTTLED]", Amber500)
             if (status == SentinelStatus.TAMPER) Badge("[TAMPER]", if (isTelemetryFresh) Rose500 else Slate500)
             if (isTamperDetected) Badge("[HW TAMPER]", if (isTelemetryFresh) Rose500 else Slate500)
             if (isBatterySteepDischarge) Badge("[BATT HEALTH]", if (isTelemetryFresh) Rose500 else Slate500)
@@ -458,6 +470,8 @@ fun TelemetryBox(
     rollingVibration: Double, trackerMaxTemp: Double, viewerMaxTemp: Double, peakShock: Double, vibrationFloor: Double, luxBaseline: Double,
     acousticFloorDb: Double, trackerCurrentMa: Int, gpsIdx: GpsIndexData, rttValue: Int, cpuLoad: Double, ioWait: Double, maxIoLatency: Long,
     isUltraLongStationary: Boolean = false,
+    isGnssThrottled: Boolean = false,
+    isSafeMode: Boolean = false,
     onShowGnssDetail: () -> Unit = {}
 ) {
     MainDashboardGrid(
@@ -474,7 +488,7 @@ fun TelemetryBox(
         heading = heading, tilt = tilt, acousticDb = acousticDb, baroAlt = baroAlt, lux = lux, proximityCm = proximityCm, proximityDebounceMs = proximityDebounceMs,
         rollingVibration = rollingVibration, trackerMaxTemp = trackerMaxTemp, viewerMaxTemp = viewerMaxTemp, peakShock = peakShock, vibrationFloor = vibrationFloor,
         luxBaseline = luxBaseline, acousticFloorDb = acousticFloorDb, trackerCurrentMa = trackerCurrentMa, gpsIdx = gpsIdx, rttValue = rttValue,
-        cpuLoad = cpuLoad, ioWait = ioWait, maxIoLatency = maxIoLatency, isUltraLongStationary = isUltraLongStationary, onShowGnssDetail = onShowGnssDetail
+        cpuLoad = cpuLoad, ioWait = ioWait, maxIoLatency = maxIoLatency, isUltraLongStationary = isUltraLongStationary, isGnssThrottled = isGnssThrottled, isSafeMode = isSafeMode, onShowGnssDetail = onShowGnssDetail
     )
 }
 

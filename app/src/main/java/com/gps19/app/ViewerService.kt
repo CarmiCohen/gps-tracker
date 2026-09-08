@@ -16,12 +16,13 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.08.13:
+ * - Fix: Corrected 'isTrackerActive' and 'maxTrackerAccuracy' references in evaluateAlarmsInternal.
+ * - Fix: Corrected logServiceEvent parameter names to 'm' and fixed build issues.
+ * - Fix: Corrected alarmManager.resetEvaluation() reference.
  * Sep.08.11:
  * - Issue #936: Forensic Auditor Consolidation (Idea #3). Delegated Stability 
  *   Audit logic (Reliability/Jitter) to ForensicAuditor (R-ID 280).
- * Sep.06.58:
- * - Issue #935 RESOLVED: Fixed GPS Red-Lock regression by correctly populating 
- *   rt (monotonic timestamp) in local LocationUpdate emissions.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -199,7 +200,7 @@ class ViewerService : BaseMonitorService() {
         lifecycleScope.launch(Dispatchers.Default) {
             integrityMonitor.integrityEvents.collectLatest { event ->
                 when (event) {
-                    is IntegrityEvent.LogEvent -> logManager.logServiceEvent(event.message, isImportant = event.isImportant)
+                    is IntegrityEvent.LogEvent -> logManager.logServiceEvent(m = event.message, isImportant = event.isImportant)
                     else -> {} 
                 }
             }
@@ -214,17 +215,17 @@ class ViewerService : BaseMonitorService() {
                     is HardwareProvider.RevivalEvent.Footprint -> {
                         val msg = "ENERGY AUDIT (V): Revival Footprint - Delta: ${event.deltaMa}mA, Temp Rise: ${event.deltaTemp}°C, Duration: ${event.durationMs}ms"
                         val proc = lastProcessedLocation
-                        logManager.logServiceEvent(msg, isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                        logManager.submitToLogSink(msg, "system", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                     }
                     is HardwareProvider.RevivalEvent.HardwareLock -> {
                         val proc = lastProcessedLocation
-                        logManager.logServiceEvent("CRITICAL (V): GPS_HARDWARE_LOCK - All revival attempts failed. Hardware stall confirmed.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                        logManager.logServiceEvent(m = "CRITICAL (V): GPS_HARDWARE_LOCK - All revival attempts failed. Hardware stall confirmed.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                     }
                     is HardwareProvider.RevivalEvent.Attempt -> {
-                        logManager.logServiceEvent("GPS REVIVAL (V): Hardware restart attempt ${event.count} triggered.", isImportant = false)
+                        logManager.logServiceEvent(m = "GPS REVIVAL (V): Hardware restart attempt ${event.count} triggered.", isImportant = false)
                     }
                     is HardwareProvider.RevivalEvent.Success -> {
-                        logManager.logServiceEvent("GPS REVIVAL (V): Hardware fix restored successfully.", isImportant = true)
+                        logManager.logServiceEvent(m = "GPS REVIVAL (V): Hardware fix restored successfully.", isImportant = true)
                     }
                     else -> {}
                 }
@@ -251,7 +252,7 @@ class ViewerService : BaseMonitorService() {
                 val prefix = if (isSelf) "[Self] " else ""
                 val specialColor = if (event.isSpecial || event.message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
                 logManager.logServiceEvent(
-                    prefix + event.message, 
+                    m = prefix + event.message, 
                     isImportant = event.isImportant, 
                     isSpecial = event.isSpecial || event.message.contains("Merge-on-Stale"), 
                     specialColor = specialColor, 
@@ -271,11 +272,11 @@ class ViewerService : BaseMonitorService() {
                     Triple(status.lat, status.lng, status.maxAccuracy)
                 }
                 
-                logManager.logServiceEvent("Passive Zeroing - Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", event.baseline)}°",
+                logManager.logServiceEvent(m = "Passive Zeroing - Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", event.baseline)}°",
                     lat = lat, lng = lng, accuracy = maxAcc)
             }
             is ProcessorEvent.GpsStallDetected -> {
-                if (isSelf) logManager.logServiceEvent("GPS STALL: Fix unchanged for >1s", isImportant = false)
+                if (isSelf) logManager.logServiceEvent(m = "GPS STALL: Fix unchanged for >1s", isImportant = false)
             }
         }
     }
@@ -294,7 +295,7 @@ class ViewerService : BaseMonitorService() {
         lifecycleScope.launch(Dispatchers.Default) {
             historyManager.historyEvents.collectLatest { event ->
                 when (event) {
-                    is HistoryEvent.LogEvent -> logManager.logServiceEvent(event.message, isImportant = event.isImportant)
+                    is HistoryEvent.LogEvent -> logManager.logServiceEvent(m = event.message, isImportant = event.isImportant)
                 }
             }
         }
@@ -347,7 +348,7 @@ class ViewerService : BaseMonitorService() {
             forensicAuditor.recordGpsFix(nowRt, currentIntervalMs)?.let { gapMsg ->
                 val proc = lastProcessedLocation
                 logManager.logServiceEvent(
-                    message = "STABILITY GAP (V): $gapMsg",
+                    m = "STABILITY GAP (V): $gapMsg",
                     isImportant = true,
                     isSpecial = true,
                     specialColor = FORENSIC_PINK_COLOR,
@@ -389,7 +390,7 @@ class ViewerService : BaseMonitorService() {
         }
         if (sessionManager.onTrackerPulse(id, nowRt)) {
             val proc = lastProcessedLocation
-            logManager.logServiceEvent("Device connected: $id", lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+            logManager.logServiceEvent(m = "Device connected: $id", lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
             startTickLoop()
         }
     }
@@ -404,7 +405,7 @@ class ViewerService : BaseMonitorService() {
         selfProcessor.resetStats()
         remoteProcessor.resetStats()
         
-        logManager.logServiceEvent("Session Terminated", isImportant = false, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+        logManager.logServiceEvent(m = "Session Terminated", isImportant = false, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
     }
 
     private fun onUiVisibilityChangedInternal(visible: Boolean) {
@@ -483,7 +484,7 @@ class ViewerService : BaseMonitorService() {
         forensicAuditor.evaluateStability(nowRt, "V")?.let { verdict ->
             val proc = lastProcessedLocation
             logManager.logServiceEvent(
-                message = verdict.message,
+                m = verdict.message,
                 isImportant = true,
                 isSpecial = verdict.isJitterViolation,
                 specialColor = if (verdict.isJitterViolation) FORENSIC_PINK_COLOR else null,

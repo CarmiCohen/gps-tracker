@@ -38,12 +38,10 @@ private data class HudUiParts(
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * Sep.06.60:
- * - Issue #935 FIX: HUD Red-Lock. Switched Dashboard and HUD telemetry flows 
- *   to use monotonic systemPulseRt instead of wall-clock systemPulse (R-ID 935).
- * Sep.06.50:
- * - Issue #932: HUD Synchronization. Updated HudUiParts and connectivity flow 
- *   to pass isA15 flag to the HUD (R-ID 276).
+ * Sep.08.12:
+ * - Issue #924 Visibility: Propagated isGnssThrottled to DiagnosticState 
+ *   for local and remote roles (R-ID 267).
+ * - R-ID 259: Integrated structured Energy Footprint into DiagnosticState.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -119,7 +117,7 @@ class MainViewModel @Inject constructor(
     val dashboardConnectivityState: StateFlow<DashboardConnectivityState> = combine(
         _uiState.map { it.appMode }.distinctUntilChanged(),
         _diagnosticState,
-        _systemPulseRt // Fix #935: Use monotonic pulse
+        _systemPulseRt 
     ) { mode, diag, pulseRt ->
         aggregator.aggregateDashboardConnectivity(mode, diag, pulseRt)
     }
@@ -129,7 +127,7 @@ class MainViewModel @Inject constructor(
     val dashboardTelemetryState: StateFlow<DashboardTelemetryState> = combine(
         _uiState.map { it.appMode }.distinctUntilChanged(),
         _kinematicState,
-        _systemPulseRt, // Fix #935: Use monotonic pulse
+        _systemPulseRt, 
         _trackerState
     ) { mode, kin, pulseRt, state ->
         val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
@@ -180,7 +178,7 @@ class MainViewModel @Inject constructor(
     val hudTelemetryState: StateFlow<HudTelemetryState> = combine(
         _uiState.map { it.appMode }.distinctUntilChanged(),
         _kinematicState,
-        _systemPulseRt, // Fix #935: Use monotonic pulse
+        _systemPulseRt, 
         _trackerState
     ) { mode, kin, pulseRt, state ->
         val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
@@ -191,7 +189,7 @@ class MainViewModel @Inject constructor(
 
     val hudHealthState: StateFlow<HudHealthState> = combine(
         _diagnosticState,
-        _systemPulseRt, // Fix #935: Use monotonic pulse
+        _systemPulseRt, 
         _kinematicState.map { it.localHealth.isMaliAnomaly }.distinctUntilChanged()
     ) { diag, pulseRt, isMali ->
         aggregator.aggregateHudHealth(diag, pulseRt, isMali)
@@ -355,7 +353,6 @@ class MainViewModel @Inject constructor(
                     isImportant = true
                 )
                 withContext(Dispatchers.Main.immediate) {
-                    // Issue #924: Part A - Enter Safe Mode to prevent signaling loops
                     updateState { it.copy(isInitialized = true, isSafeMode = true) }
                     repository.setSafeMode(true)
                 }
@@ -481,6 +478,13 @@ class MainViewModel @Inject constructor(
                 updateDiagnosticState { current -> 
                     current.activeAlarms = update.activeAlarms
                     current.isMaliAnomaly = update.health.isMaliAnomaly
+                    current.isGnssThrottled = update.health.isGnssThrottled
+                    
+                    // R-ID 259 Mapping
+                    current.lastEnergyDeltaMa = update.health.lastEnergyDeltaMa
+                    current.lastEnergyDeltaTemp = update.health.lastEnergyDeltaTemp
+                    current.lastEnergyDurationMs = update.health.lastEnergyDurationMs
+                    
                     current.pulse = timeProvider.elapsedRealtime()
                     current
                 }
@@ -514,6 +518,13 @@ class MainViewModel @Inject constructor(
                 updateDiagnosticState { current ->
                     current.trackerBattery.level = status.battery
                     current.trackerBattery.temp = status.temp
+                    current.trackerIsGnssThrottled = status.isGnssThrottled
+                    
+                    // Remote R-ID 259 Mapping
+                    current.lastEnergyDeltaMa = status.lastEnergyDeltaMa
+                    current.lastEnergyDeltaTemp = status.lastEnergyDeltaTemp
+                    current.lastEnergyDurationMs = status.lastEnergyDurationMs
+
                     current.pulse = timeProvider.elapsedRealtime()
                     current
                 }

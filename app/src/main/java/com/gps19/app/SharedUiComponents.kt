@@ -49,6 +49,9 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Sep.08.12:
+ * - Issue #924 Visibility: Added THR badge to StatusBar for GNSS Throttling 
+ *   (A15 Hysteresis) transparency (R-ID 267).
  * Sep.06.57:
  * - Issue #936 RESOLVED: Fixed compilation error in ConnectionQualityRibbon (p.isRecoveryEvent).
  * Sep.06.50:
@@ -648,6 +651,9 @@ fun StatusBar(
                         // Issue #932: A15 Hardware Adaptation Indicator
                         if (hudState.isA15) StatusBadge(label = "A15", active = true, activeColor = BrandJd, isBold = true)
 
+                        // Issue #924: GNSS Throttling Indicator (A15 Hysteresis)
+                        if (hudState.isGnssThrottled) StatusBadge(label = "THR", active = true, activeColor = Amber500, isBold = true)
+
                         // Issue #266: Mali Anomaly Indicator
                         if (hudState.isMaliAnomaly) StatusBadge(label = "MAL", active = true, activeColor = Rose500, isBold = true)
                         
@@ -669,7 +675,7 @@ fun StatusBar(
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(text = if (hudState.trackerState == TrackerState.MOVING && isTrackerGpsActive) "»\u2009${hudState.trackerState.name}\u2009«" else hudState.trackerState.name, color = (if (!isTrackerGpsActive) Slate500 else BrandJd).copy(alpha = if (hudState.trackerState == TrackerState.MOVING && isTrackerGpsActive) movingAlpha else 1f), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.width(8.dp))
                     val animatedSpeed by animateFloatAsState(if (isTrackerGpsActive && !hudState.speedMps.isNaN()) hudState.speedMps * 3.6f else 0f, if (isThrottled) snap() else tween(1000), label = "SpeedAnim")
                     Text(text = "${if (animatedSpeed < 10.0f) String.format(Locale.getDefault(), "%.1f", animatedSpeed) else animatedSpeed.toInt().toString()}km/h", color = if (isTrackerGpsActive) BrandJd else Slate500, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle, textAlign = TextAlign.End)
                 }
