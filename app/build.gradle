@@ -15,8 +15,8 @@ android {
         applicationId "com.gps19.app"
         minSdk 24
         targetSdk 35
-        versionCode 966
-        versionName "Sep.09.11" // Legacy Cleanup & Build Restoration
+        versionCode 970
+        versionName "Sep.09.15" // Fixed Grid Watchdog & A15 Hysteresis
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

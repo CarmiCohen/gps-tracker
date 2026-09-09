@@ -26,15 +26,13 @@ sealed class SystemMonitorEvent {
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
+ * Sep.09.15:
+ * - Issue #940 RESOLVED: Fixed Grid Scheduling. Implemented grid-aligned 
+ *   watchdog pulses to eliminate cumulative drift during long-running 
+ *   background sessions (>12h).
  * Sep.03.25:
  * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
  *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 240).
- * Sep.02.43:
- * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
- *   getPackageName log spam during system service lookups (R1.14).
- * Aug.13.08:
- * - Issue #156: WakeLock Log Saturation. Throttled WakeLock acquisition logging 
- *   to once per minute to prevent logcat saturation (R156).
  */
 @Singleton
 class SystemMonitor @Inject constructor(
@@ -52,6 +50,7 @@ class SystemMonitor @Inject constructor(
     private var lastScheduledWatchdogTs = 0L
     private var nextExpectedExpiryTs = 0L
     private var skippedCounter = 0
+    private var sessionStartRt = 0L
     
     private var lastWakeLockRenewalTs = 0L
     private var lastWakeLockLogTs = 0L
@@ -59,6 +58,11 @@ class SystemMonitor @Inject constructor(
 
     var jumpStateStartTs = 0L
     var gpsStallStartTs = 0L
+
+    fun setSessionStart(rt: Long) {
+        sessionStartRt = rt
+        Timber.d("SystemMonitor: Session anchor set to Rt=$rt for Fixed Grid Scheduling.")
+    }
 
     /**
      * resetSimulatedAnomalies: Clears synthetic stress-test timestamps (R141).
@@ -135,7 +139,14 @@ class SystemMonitor @Inject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
-        val triggerAt = now + SYSTEM_WATCHDOG_INTERVAL_MS
+        // Sep.09.15: Use Fixed Grid Scheduling to prevent cumulative drift.
+        val triggerAt = if (sessionStartRt > 0) {
+            val elapsed = now - sessionStartRt
+            val nextIntervalIndex = (elapsed / SYSTEM_WATCHDOG_INTERVAL_MS) + 1
+            sessionStartRt + (nextIntervalIndex * SYSTEM_WATCHDOG_INTERVAL_MS)
+        } else {
+            now + SYSTEM_WATCHDOG_INTERVAL_MS
+        }
         
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -173,6 +184,7 @@ class SystemMonitor @Inject constructor(
                 Timber.d("Watchdog alarm cancelled")
             }
             nextExpectedExpiryTs = 0L
+            sessionStartRt = 0L
         } catch (e: Exception) {
             Timber.e(e, "Failed to cancel watchdog alarm")
         }

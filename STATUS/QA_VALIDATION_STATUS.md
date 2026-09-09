@@ -1,4 +1,4 @@
-# QA Validation Status (Sep.07.82)
+# QA Validation Status (Sep.09.15)
 
 This document tracks the verification status of all high-assurance logic and forensic refinements.
 
@@ -7,9 +7,9 @@ This document tracks the verification status of all high-assurance logic and for
 | :--- | :--- | :--- | :--- |
 | **Logic Refinement** | 171 | 0 | 0 |
 | **Hardware Compatibility** | 50 | 0 | 0 |
-| **Stability / Long-Run** | 27 | 0 | 0 |
+| **Stability / Long-Run** | 28 | 0 | 0 |
 | **UI / UX** | 18 | 0 | 0 |
-| **Total Validated** | **266** | **0** | **0** |
+| **Total Validated** | **267** | **0** | **0** |
 
 ---
 
@@ -21,11 +21,12 @@ This document tracks the verification status of all high-assurance logic and for
 ## 🟢 Validated & Resolved (Core Record)
 | ID | Feature | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **R975** | **Service Mutual Exclusivity** | **Passed** | Verified termination of non-target role services during mode transitions and explicit telemetry reset to prevent ghost status (Sep.07.82). |
-| **R257** | **Exact Actual LED Status** | **Passed** | Verified 35s HUD transition consistency. (Regression #935 resolved via monotonic alignment in Sep.07.60). |
-| **R276** | **A15 Viewer Parity** | **Passed** | Verified 30s Poke logic, specialUse FGS, and full Forensic Audit/Revival parity in Viewer role (Sep.06.55). |
+| **R302** | **Fixed Grid Watchdog** | **Passed** | Verified that watchdog pulses align to a strict 90s grid anchored to service start, eliminating cumulative drift during 12h+ sessions (Sep.09.15). |
+| **R274** | **A15 Hysteresis Audit** | **Passed** | Verified 10s cooling window correctly suppresses GNSS jitter during rapid thermal transitions on Samsung A15 (Sep.09.15). |
+| **R975** | **Service Mutual Exclusivity** | **Passed** | Verified termination of non-target role services during mode transitions and explicit telemetry reset (Sep.07.82). |
+| **R257** | **Exact Actual LED Status** | **Passed** | Verified 35s HUD transition consistency (Sep.07.60). |
+| **R276** | **A15 Viewer Parity** | **Passed** | Verified 30s Poke logic and specialUse FGS in Viewer role (Sep.06.55). |
 | **R275** | **Forensic Deep-Linking** | **Passed** | Verified HIST/DIAG navigation from LogDetailPane (Sep.06.35). |
-| **R274** | **Mali Exit Hysteresis** | **Passed** | Verified 10s cooldown prevents sampling jitter on A15 (Sep.06.33). |
 | **R272** | **Hardware Lock Parity** | **Passed** | Verified cross-role propagation of GPS hardware lock signals (Sep.06.31). |
 | **R273** | **Synchronous Hardware Initialization** | **Passed** | Verified deterministic start/stop sequencing via suspend-join in HardwareProvider (Sep.06.30). |
 | **R271** | **Watchdog Safe-Mode Enforcement** | **Passed** | Verified connection suppression in CommunicationManager when Safe Mode is active (Sep.06.01). |

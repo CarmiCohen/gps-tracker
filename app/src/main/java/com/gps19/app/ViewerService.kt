@@ -16,6 +16,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.09.15:
+ * - Issue #940 RESOLVED: Fixed Grid Scheduling. Anchored watchdog pulses to 
+ *   serviceStartRealtime to eliminate cumulative drift (R-ID 281).
  * Sep.09.10:
  * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .atmospheric, .integrity)
  *   in LocationUpdate to support bridge removal (R-ID 284).
@@ -159,6 +162,9 @@ class ViewerService : BaseMonitorService() {
         
         serviceStartRealtime = timeProvider.elapsedRealtime()
         serviceStartWall = timeProvider.currentTimeMillis()
+
+        // Sep.09.15: Anchor watchdog pulses to fixed grid
+        systemMonitor.setSessionStart(serviceStartRealtime)
 
         startTickLoop()
         startHeartbeatLoop()
@@ -528,13 +534,13 @@ class ViewerService : BaseMonitorService() {
         val silenceDelta = if (connectivitySuite.lastPeerActivityTs > 0) nowRt - connectivitySuite.lastPeerActivityTs else (nowRt - serviceStartRealtime)
         val isSignalLoss = !integrityMonitor.checkSignalIntegrity(nowRt, silenceDelta, false)
         val isTrackerStalled = connectivitySuite.trackerGpsStallStartTs > 0L && (nowRt - connectivitySuite.trackerGpsStallStartTs > GPS_STALL_THRESHOLD_MS)
-        val isTrackerGap = connectivitySuite.trackerLastValidFixRt > 0L && (nowRt - connectivitySuite.trackerLastValidFixRt > GPS_GAP_THRESHOLD_MS)
+        val isTrackerStalledRelay = connectivitySuite.trackerLastValidFixRt > 0L && (nowRt - connectivitySuite.trackerLastValidFixRt > GPS_GAP_THRESHOLD_MS)
 
         val status = connectivitySuite.trackerStatus
         val home = repository.getCachedHomePoints().firstOrNull()
         val distToHome = if (status.lat != 0.0 && home != null) PhysicsUtils.calculateDistance(status.lat, status.lng, home.latitude, home.longitude) else null
 
-        evaluateAlarmsInternal(now, nowRt, isSignalLoss, connectivitySuite.isTrackerJammerSuspicion, isTrackerStalled, isTrackerGap, isTrackerActive)
+        evaluateAlarmsInternal(now, nowRt, isSignalLoss, connectivitySuite.isTrackerJammerSuspicion, isTrackerStalled, isTrackerStalledRelay, isTrackerActive)
 
         val noiseIdx = (snapshot.acousticDb - selfProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB
         val liftIdx = (snapshot.baroAlt - selfProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS

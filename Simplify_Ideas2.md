@@ -1,6 +1,7 @@
-# Simplification Ideas (vSep.08.20)
+# Simplification Ideas (vSep.09.15)
 
-1.  **Telemetry Data Class Flattening (Priority)**: `LocationUpdate` now exceeds 70 fields. Partition it into specialized, lean states: `KineticState` (Position/Speed), `AtmosphericState` (Baro/Temp/Lux), and `IntegrityState` (Errors/Throttling). This will reduce allocation churn and improve serialization performance on budget hardware (R-ID 238).
-2.  **Alarm Evaluation Logic partitioning**: Partition the monolithic `evaluateAlarms` method in `AlarmManager` into specialized evaluators (e.g., `PhysicalTamperEvaluator`, `HardwareHealthEvaluator`) to reduce cyclomatic complexity and improve unit test coverage.
+1.  **Telemetry Data Class Flattening (Priority)**: `LocationUpdate` now exceeds 70 fields. Partition it into specialized, lean states: `KineticState` (Position/Speed), `AtmosphericState` (Baro/Temp/Lux), and `IntegrityState` (Errors/Throttling). This will reduce allocation churn and improve serialization performance on budget hardware (R-ID 238). [Partially Resolved - Sep.09.10]
+2.  **Alarm Evaluation Logic partitioning**: Partition the monolithic `evaluateAlarms` method in `AlarmManager` into specialized evaluators (e.g., `PhysicalTamperEvaluator`, `HardwareHealthEvaluator`) to reduce cyclomatic complexity and improve unit test coverage. [Partially Resolved - Sep.09.00]
 3.  **UiStateAggregator Refactoring**: As UI flags increase, the aggregator is becoming complex. Transition to a "Plugin" architecture where different modules contribute to the final UI state independently.
 4.  **Telemetry Mapper Unification**: Once the model flattening (Idea #1) is stable, refactor `TelemetryMapper` to map entire state sub-objects (Kinetic, Atmospheric, Integrity) instead of individual primitive fields. This will reduce boilerplate and the risk of "mapping gaps" in forensic data (Sep.08.20).
+5.  **Fixed Grid Pulse Unification**: Consolidate the 90s fixed grid pulse (R-ID 302) and the 30s hardware "Poke" (R-ID 926) into a single, unified system heartbeat cadence to reduce wake-alarm overhead and simplify background lifecycle maintenance (Sep.09.15).

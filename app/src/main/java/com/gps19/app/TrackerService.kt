@@ -21,6 +21,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.09.15:
+ * - Issue #940 RESOLVED: Fixed Grid Scheduling. Anchored watchdog pulses to 
+ *   serviceStartRealtime to eliminate cumulative drift (R-ID 281).
  * Sep.09.10:
  * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .atmospheric, .integrity)
  *   in LocationUpdate to support bridge removal (R-ID 284).
@@ -141,6 +144,9 @@ class TrackerService : BaseMonitorService() {
         
         serviceStartRealtime = timeProvider.elapsedRealtime()
         serviceStartWall = timeProvider.currentTimeMillis()
+
+        // Sep.09.15: Anchor watchdog pulses to fixed grid
+        systemMonitor.setSessionStart(serviceStartRealtime)
 
         setupPhysicalFastPaths()
         startTickLoop()
