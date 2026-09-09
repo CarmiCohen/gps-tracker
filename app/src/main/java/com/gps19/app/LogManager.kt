@@ -9,13 +9,9 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
- * Aug.30.13:
- * - Issue #779 Hardening: Integrated ForensicSanitizer into submitToLogSink 
- *   to ensure all persisted and emitted logs are scrubbed of forensic 
- *   metadata at the edge of the pipeline (R779).
- * Aug.22.05:
- * - Audit Chapter 12.3: Hardened startup muzzle logic to allow isSpecial logs 
- *   to bypass the suppression window.
+ * Sep.09.10:
+ * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .atmospheric)
+ *   in LocationUpdate to support bridge removal (R-ID 284).
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -160,29 +156,29 @@ class LogManager @Inject constructor(
         val tracker = telemetry.trackerLocation.value
         
         val fallbackTelem = if (configManager.isTrackerMode) {
-            if (local.lat != 0.0) local else tracker
+            if (local.kinetic.lat != 0.0) local else tracker
         } else {
-            if (tracker.lat != 0.0) tracker else local
+            if (tracker.kinetic.lat != 0.0) tracker else local
         }
 
         if (finalLat == 0.0 && finalLng == 0.0) {
-            if (fallbackTelem.lat != 0.0 && fallbackTelem.lng != 0.0) {
-                finalLat = fallbackTelem.lat
-                finalLng = fallbackTelem.lng
-                finalAccuracy = fallbackTelem.accuracy
-                finalMaxAccuracy = fallbackTelem.maxAccuracy
+            if (fallbackTelem.kinetic.lat != 0.0 && fallbackTelem.kinetic.lng != 0.0) {
+                finalLat = fallbackTelem.kinetic.lat
+                finalLng = fallbackTelem.kinetic.lng
+                finalAccuracy = fallbackTelem.kinetic.accuracy
+                finalMaxAccuracy = fallbackTelem.kinetic.maxAccuracy
             }
         } else {
-            if (finalAccuracy == 0.0 && finalLat == fallbackTelem.lat) {
-                finalAccuracy = fallbackTelem.accuracy
+            if (finalAccuracy == 0.0 && finalLat == fallbackTelem.kinetic.lat) {
+                finalAccuracy = fallbackTelem.kinetic.accuracy
             }
-            if (finalMaxAccuracy == 0.0 && finalLat == fallbackTelem.lat) {
-                finalMaxAccuracy = fallbackTelem.maxAccuracy
+            if (finalMaxAccuracy == 0.0 && finalLat == fallbackTelem.kinetic.lat) {
+                finalMaxAccuracy = fallbackTelem.kinetic.maxAccuracy
             }
         }
 
-        if (finalVibe == null && (fallbackTelem.vibration ?: 0.0) > 0.0) {
-            finalVibe = fallbackTelem.vibration
+        if (finalVibe == null && fallbackTelem.atmospheric.vibration > 0.0) {
+            finalVibe = fallbackTelem.atmospheric.vibration
         }
 
         val log = LogEntry(

@@ -21,11 +21,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * Sep.08.20:
- * - Issue #283 RESOLVED: Teardown Crash. Hardened snrIdx calculation against 
- *   NaN values from empty satellite collections to prevent NOT NULL 
- *   constraint failures in Room (R-ID 283).
- * - Build Restoration: Migrated to refactored LocationUpdate architecture.
+ * Sep.09.10:
+ * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .atmospheric, .integrity)
+ *   in LocationUpdate to support bridge removal (R-ID 284).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -550,7 +548,7 @@ class TrackerService : BaseMonitorService() {
         val location = lastKnownLocation
         if (location != null) {
             val processed = locationProcessor.processGpsPoint(
-                lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed, gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing, snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = forensicAuditor.lastGpsFixRealtime, isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, nowWall = now, nowRt = nowRt,
+                lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed, gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = location.bearing.toDouble(), snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = forensicAuditor.lastGpsFixRealtime, isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, nowWall = now, nowRt = nowRt,
                 providedIsStalled = health.gpsStalled,
                 isSuspicious = isSuspiciousMode,
                 isAdaptationMuzzled = isAdaptationMuzzled
@@ -560,64 +558,31 @@ class TrackerService : BaseMonitorService() {
         }
 
         val proc = lastProcessedLocation
-        // R-ID 284: Build Restoration using refactored LocationUpdate property accessors
+        // Sep.09.10: Using partitioned states (.kinetic, .atmospheric, .integrity) directly.
         repository.updateLocation(LocationUpdate().apply {
-            this.lat = proc?.optimizedPoint?.lat ?: 0.0
-            this.lng = proc?.optimizedPoint?.lng ?: 0.0
-            this.alt = proc?.optimizedPoint?.alt ?: 0.0
-            this.speed = proc?.filteredSpeed ?: 0.0
-            this.accuracy = proc?.currentAccuracy ?: 0.0
-            this.bearing = lastGpsBearing
-            this.battery = health.batteryLevel
-            this.temp = health.batteryTemp
-            this.maxTemp = health.maxTemp
-            this.isCharging = health.isCharging
-            this.gpsTs = proc?.timestamp ?: 0L
-            this.ts = now
-            this.rt = nowRt
-            this.isMe = true
-            this.status = proc?.status ?: SentinelStatus.VALID
-            this.satsView = hardwareProvider.satellitesInView
-            this.satsUsed = hardwareProvider.satellitesUsed
-            this.maxAccuracy = proc?.maxAccuracy ?: 0.0
-            this.currentMa = health.currentMa
-            this.lastValidFixRt = locationProcessor.getLastValidFixRt()
-            this.vibration = snapshot.vibration
-            this.heading = snapshot.heading
-            this.baroAlt = snapshot.baroAlt
-            this.lux = snapshot.lux
-            this.isNear = snapshot.isNear
-            this.tiltDegrees = snapshot.tiltDegrees
-            this.acousticDb = snapshot.acousticDb
-            this.peakVibrationShock = snapshot.peakShock
-            this.peakVibrationShockTs = now
-            this.isPowerTamper = health.isPowerTamper
-            this.isSitDetected = isSuspiciousMode
-            this.lastSitTs = locationProcessor.getLastSitTs()
-            this.sitVz = snapshot.peakVerticalVelocity
-            this.sitVzTs = snapshot.peakVerticalVelocityTs
-            this.sitVzRt = snapshot.peakVerticalVelocityRt
-            this.sitDz = snapshot.peakVerticalDisplacement
-            this.sitBaro = snapshot.baroAlt
-            this.sitTilt = snapshot.tiltDegrees
-            this.sitShock = snapshot.peakShock
-            this.kineticEnergy = snapshot.kineticEnergy
-            this.isBatteryLow = health.isBatteryLow
-            this.isBatteryCritical = health.isBatteryCritical
-            this.snrIdx = snrIdx
-            this.trackerState = if ((proc?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING
-            
-            // Nested-only properties
-            this.integrity.locationPendingReason = health.locationPendingReason
-            this.integrity.isPowerSaveMode = isPowerSaveActive || health.isPowerSaveMode
-            this.integrity.standbyBucket = health.standbyBucket
-            this.integrity.netInterface = health.netInterface
-            this.integrity.isStorageLow = health.isStorageLow
-            this.integrity.isStorageCritical = health.isStorageCritical
-            this.integrity.isBatterySteepDischarge = health.isBatterySteepDischarge
-            this.integrity.isCoolingModeActive = health.isCoolingModeActive
-            this.integrity.gpsHardwareLock = health.gpsHardwareLock
-            this.integrity.isUltraLongStationary = health.isUltraLongStationary
+            this.kinetic.lat = proc?.optimizedPoint?.lat ?: 0.0
+            this.kinetic.lng = proc?.optimizedPoint?.lng ?: 0.0
+            this.kinetic.alt = proc?.optimizedPoint?.alt ?: 0.0
+            this.kinetic.speed = proc?.filteredSpeed ?: 0.0
+            this.kinetic.accuracy = proc?.currentAccuracy ?: 0.0
+            this.kinetic.bearing = lastGpsBearing
+            this.kinetic.gpsTs = proc?.timestamp ?: 0L
+            this.kinetic.rt = nowRt
+            this.kinetic.maxAccuracy = proc?.maxAccuracy ?: 0.0
+            this.kinetic.kineticEnergy = snapshot.kineticEnergy
+            this.kinetic.verticalVelocity = snapshot.peakVerticalVelocity
+
+            this.atmospheric.temp = health.batteryTemp
+            this.atmospheric.maxTemp = health.maxTemp
+            this.atmospheric.vibration = snapshot.vibration
+            this.atmospheric.heading = snapshot.heading
+            this.atmospheric.baroAlt = snapshot.baroAlt
+            this.atmospheric.lux = snapshot.lux
+            this.atmospheric.isNear = snapshot.isNear
+            this.atmospheric.tiltDegrees = snapshot.tiltDegrees
+            this.atmospheric.acousticDb = snapshot.acousticDb
+            this.atmospheric.peakVibrationShock = snapshot.peakShock
+            this.atmospheric.peakVibrationShockTs = now
             this.atmospheric.noiseIdx = noiseIdx
             this.atmospheric.luxIdx = luxIdx
             this.atmospheric.vibeIdx = vibeIdx
@@ -631,8 +596,42 @@ class TrackerService : BaseMonitorService() {
             this.atmospheric.proximityCm = snapshot.proximityCm
             this.atmospheric.proximityDebounceMs = snapshot.proximityDebounceMs
             this.atmospheric.vibrationRollingSum = snapshot.vibrationRollingSum
+
+            this.integrity.battery = health.batteryLevel
+            this.integrity.isCharging = health.isCharging
+            this.integrity.currentMa = health.currentMa
+            this.integrity.satsView = hardwareProvider.satellitesInView
+            this.integrity.satsUsed = hardwareProvider.satellitesUsed
+            this.integrity.snrIdx = snrIdx
+            this.integrity.isPowerTamper = health.isPowerTamper
+            this.integrity.isSitDetected = isSuspiciousMode
+            this.integrity.lastSitTs = locationProcessor.getLastSitTs()
+            this.integrity.sitVz = snapshot.peakVerticalVelocity
+            this.integrity.sitVzTs = snapshot.peakVerticalVelocityTs
+            this.integrity.sitVzRt = snapshot.peakVerticalVelocityRt
+            this.integrity.sitDz = snapshot.peakVerticalDisplacement
+            this.integrity.sitBaro = snapshot.baroAlt
+            this.integrity.sitTilt = snapshot.tiltDegrees
+            this.integrity.sitShock = snapshot.peakShock
+            this.integrity.isBatteryLow = health.isBatteryLow
+            this.integrity.isBatteryCritical = health.isBatteryCritical
+            this.integrity.locationPendingReason = health.locationPendingReason
+            this.integrity.isPowerSaveMode = isPowerSaveActive || health.isPowerSaveMode
+            this.integrity.standbyBucket = health.standbyBucket
+            this.integrity.netInterface = health.netInterface
+            this.integrity.isStorageLow = health.isStorageLow
+            this.integrity.isStorageCritical = health.isStorageCritical
+            this.integrity.isBatterySteepDischarge = health.isBatterySteepDischarge
+            this.integrity.isCoolingModeActive = health.isCoolingModeActive
+            this.integrity.gpsHardwareLock = health.gpsHardwareLock
+            this.integrity.isUltraLongStationary = health.isUltraLongStationary
             this.integrity.isTamperDetected = proc?.tamperDetected ?: false
-            this.kinetic.verticalVelocity = snapshot.peakVerticalVelocity
+
+            this.ts = now
+            this.isMe = true
+            this.status = proc?.status ?: SentinelStatus.VALID
+            this.lastValidFixRt = locationProcessor.getLastValidFixRt()
+            this.trackerState = if ((proc?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING
         })
 
         if (isViewerActive) {

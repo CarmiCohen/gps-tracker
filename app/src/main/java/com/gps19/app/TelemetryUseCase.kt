@@ -5,6 +5,14 @@ import javax.inject.Inject
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
+ * Sep.09.11:
+ * - Forensic Audit Hardening: Enhanced maxTemp propagation using maxOf to ensure peak 
+ *   values are captured across partitioned updates (R-ID 284).
+ * - Health Mapping: Ensured isHardwareOnline considers signal non-nullability from 
+ *   ConnectivitySuite fix to resolve HUD "Offline" regressions.
+ * Sep.09.00:
+ * - Legacy Field Cleanup (Part A): Migrated to direct partitioned state access 
+ *   (.kinetic, .atmospheric, .integrity) to bypass aggregate bridges (R-ID 284).
  * Sep.08.12:
  * - Issue #924 Visibility: Added isGnssThrottled mapping for A15 Hysteresis transparency.
  * Sep.06.59:
@@ -20,108 +28,108 @@ class TelemetryUseCase @Inject constructor(
         nowMs: Long, 
         appStartTime: Long
     ): LocationUpdate {
-        val isLocationValid = PhysicsUtils.isValidLocation(update.lat, update.lng)
-        val newTimestamp = update.gpsTs
+        val isLocationValid = PhysicsUtils.isValidLocation(update.kinetic.lat, update.kinetic.lng)
+        val newTimestamp = update.kinetic.gpsTs
         
         val effectiveTelemetryTs = if (!update.isMe) nowMs else (if (update.ts > 0) update.ts else nowMs)
         
         if (isLocationValid) {
-            currentLoc.lat = update.lat
-            currentLoc.lng = update.lng
-            currentLoc.speed = update.speed
-            currentLoc.accuracy = update.accuracy
-            currentLoc.bearing = update.bearing
+            currentLoc.kinetic.lat = update.kinetic.lat
+            currentLoc.kinetic.lng = update.kinetic.lng
+            currentLoc.kinetic.speed = update.kinetic.speed
+            currentLoc.kinetic.accuracy = update.kinetic.accuracy
+            currentLoc.kinetic.bearing = update.kinetic.bearing
         }
-        if (update.maxAccuracy > 0.0) currentLoc.maxAccuracy = update.maxAccuracy
-        if (newTimestamp > 0) currentLoc.gpsTs = newTimestamp
+        if (update.kinetic.maxAccuracy > 0.0) currentLoc.kinetic.maxAccuracy = update.kinetic.maxAccuracy
+        if (newTimestamp > 0) currentLoc.kinetic.gpsTs = newTimestamp
         
         currentLoc.ts = effectiveTelemetryTs
-        currentLoc.rt = update.rt // Fix #935: Propagate monotonic timestamp
+        currentLoc.kinetic.rt = update.kinetic.rt // Fix #935: Propagate monotonic timestamp
         currentLoc.status = update.status
         currentLoc.trackerState = update.trackerState
-        update.gnssDetail?.let { currentLoc.gnssDetail = it }
-        currentLoc.isGnssThrottled = update.isGnssThrottled
+        update.integrity.gnssDetail?.let { currentLoc.integrity.gnssDetail = it }
+        currentLoc.integrity.isGnssThrottled = update.integrity.isGnssThrottled
         
         return currentLoc
     }
 
     fun mapHealthFromUpdate(update: LocationUpdate, current: SystemHealthState): SystemHealthState {
         current.update(
-            signalLoss = update.signal?.let { it < 2 } ?: current.signalLoss,
-            gpsStalled = update.locationPendingReason == LocationPendingReason.GPS_STALL,
-            gpsHardwareLock = update.gpsHardwareLock,
+            signalLoss = update.integrity.signal?.let { it < 2 } ?: current.signalLoss,
+            gpsStalled = update.integrity.locationPendingReason == LocationPendingReason.GPS_STALL,
+            gpsHardwareLock = update.integrity.gpsHardwareLock,
             localInternetLoss = current.localInternetLoss, 
-            isHardwareOnline = update.signal != null,
-            batteryLevel = if (update.battery >= 0) update.battery else current.batteryLevel,
-            batteryTemp = update.temp,
-            isCharging = update.isCharging,
-            currentMa = update.currentMa,
+            isHardwareOnline = update.integrity.signal != null,
+            batteryLevel = if (update.integrity.battery >= 0) update.integrity.battery else current.batteryLevel,
+            batteryTemp = update.atmospheric.temp,
+            isCharging = update.integrity.isCharging,
+            currentMa = update.integrity.currentMa,
             status = update.status,
-            isJammer = update.locationPendingReason == LocationPendingReason.JAMMER_SUSPICION,
-            isTamperDetected = update.isTamperDetected,
-            tiltDegrees = update.tiltDegrees ?: current.tiltDegrees,
-            acousticDb = update.acousticDb ?: current.acousticDb,
-            baroAlt = update.baroAlt ?: current.baroAlt,
-            lux = update.lux ?: current.lux,
-            isNear = update.isNear ?: current.isNear,
-            luxBaseline = update.luxBaseline ?: current.luxBaseline,
-            acousticFloorDb = update.acousticFloorDb ?: current.acousticFloorDb,
-            adaptiveVibrationFloor = update.adaptiveVibrationFloor ?: current.adaptiveVibrationFloor,
-            peakVibrationShock = update.peakVibrationShock ?: current.peakVibrationShock,
-            isPowerTamper = update.isPowerTamper,
-            isLocationPending = update.isLocationPending,
-            locationPendingReason = update.locationPendingReason,
-            isPowerSaveMode = update.isPowerSaveMode,
-            standbyBucket = update.standbyBucket,
-            netInterface = update.netInterface,
-            isStorageLow = update.isStorageLow,
-            isStorageCritical = update.isStorageCritical,
-            isBatterySteepDischarge = update.isBatterySteepDischarge,
-            isCoolingModeActive = update.isCoolingModeActive,
-            isBatteryLow = update.isBatteryLow,
-            isBatteryCritical = update.isBatteryCritical,
-            isUltraLongStationary = update.isUltraLongStationary,
-            isGnssThrottled = update.isGnssThrottled
+            isJammer = update.integrity.locationPendingReason == LocationPendingReason.JAMMER_SUSPICION,
+            isTamperDetected = update.integrity.isTamperDetected,
+            tiltDegrees = update.atmospheric.tiltDegrees,
+            acousticDb = update.atmospheric.acousticDb,
+            baroAlt = update.atmospheric.baroAlt,
+            lux = update.atmospheric.lux,
+            isNear = update.atmospheric.isNear,
+            luxBaseline = update.atmospheric.luxBaseline,
+            acousticFloorDb = update.atmospheric.acousticFloorDb,
+            adaptiveVibrationFloor = update.atmospheric.adaptiveVibrationFloor,
+            peakVibrationShock = update.atmospheric.peakVibrationShock,
+            isPowerTamper = update.integrity.isPowerTamper,
+            isLocationPending = update.integrity.isLocationPending,
+            locationPendingReason = update.integrity.locationPendingReason,
+            isPowerSaveMode = update.integrity.isPowerSaveMode,
+            standbyBucket = update.integrity.standbyBucket,
+            netInterface = update.integrity.netInterface,
+            isStorageLow = update.integrity.isStorageLow,
+            isStorageCritical = update.integrity.isStorageCritical,
+            isBatterySteepDischarge = update.integrity.isBatterySteepDischarge,
+            isCoolingModeActive = update.integrity.isCoolingModeActive,
+            isBatteryLow = update.integrity.isBatteryLow,
+            isBatteryCritical = update.integrity.isBatteryCritical,
+            isUltraLongStationary = update.integrity.isUltraLongStationary,
+            isGnssThrottled = update.integrity.isGnssThrottled
         )
         
-        if (update.maxTemp > 0.0) current.maxTemp = update.maxTemp
+        current.maxTemp = maxOf(current.maxTemp, update.atmospheric.maxTemp)
         current.trackerState = update.trackerState
         if (update.lastValidFixRt > 0L) current.lastValidFixRt = update.lastValidFixRt
-        update.gnssDetail?.let { current.gnssDetail = it }
-        current.snrIdx = update.snrIdx
-        current.noiseIdx = update.noiseIdx
-        current.luxIdx = update.luxIdx
-        current.vibeIdx = update.vibeIdx
-        current.liftIdx = update.liftIdx
-        current.tiltIdx = update.tiltIdx
-        current.baroIdx = update.baroIdx
-        update.uptimeMs?.let { current.uptimeMs = it }
-        update.lastConnTs?.let { current.lastConnTs = it }
-        update.lastDiscTs?.let { current.lastDiscTs = it }
-        update.totalDropMs?.let { current.totalDropMs = it }
-        update.maxDropMs?.let { current.maxDropMs = it }
-        update.maxDropTs?.let { current.maxDropTs = it }
-        update.totalConnectedMs?.let { current.totalConnectedMs = it }
-        update.sessionConnectedMs?.let { current.sessionConnectedMs = it }
-        update.violationUptimeMs?.let { current.violationUptimeMs = it }
-        update.violationPercentage?.let { current.violationPercentage = it }
-        update.vibration?.let { current.vibration = it }
-        update.heading?.let { current.heading = it }
-        update.peakVibrationShockTs?.let { current.peakVibrationShockTs = it }
-        update.proxIdx?.let { current.proxIdx = it }
-        update.proximityCm?.let { current.proximityCm = it }
-        update.proximityDebounceMs?.let { current.proximityDebounceMs = it }
-        update.vibrationRollingSum?.let { current.vibrationRollingSum = it }
-        current.isSitDetected = update.isSitDetected
-        current.isSitActive = update.isSitActive
-        current.lastSitTs = update.lastSitTs
-        update.verticalVelocity?.let { current.verticalVelocity = it }
-        update.sitVz?.let { current.sitVz = it }
-        update.sitDz?.let { current.sitDz = it }
-        update.sitBaro?.let { current.sitBaro = it }
-        update.sitTilt?.let { current.sitTilt = it }
-        update.sitShock?.let { current.sitShock = it }
-        current.kineticEnergy = update.kineticEnergy
+        update.integrity.gnssDetail?.let { current.gnssDetail = it }
+        current.snrIdx = update.integrity.snrIdx
+        current.noiseIdx = update.atmospheric.noiseIdx
+        current.luxIdx = update.atmospheric.luxIdx
+        current.vibeIdx = update.atmospheric.vibeIdx
+        current.liftIdx = update.atmospheric.liftIdx
+        current.tiltIdx = update.atmospheric.tiltIdx
+        current.baroIdx = update.atmospheric.baroIdx
+        current.uptimeMs = update.integrity.uptimeMs
+        current.lastConnTs = update.integrity.lastConnTs
+        current.lastDiscTs = update.integrity.lastDiscTs
+        current.totalDropMs = update.integrity.totalDropMs
+        current.maxDropMs = update.integrity.maxDropMs
+        current.maxDropTs = update.integrity.maxDropTs
+        current.totalConnectedMs = update.integrity.totalConnectedMs
+        current.sessionConnectedMs = update.integrity.sessionConnectedMs
+        current.violationUptimeMs = update.integrity.violationUptimeMs
+        current.violationPercentage = update.integrity.violationPercentage
+        current.vibration = update.atmospheric.vibration
+        current.heading = update.atmospheric.heading
+        current.peakVibrationShockTs = update.atmospheric.peakVibrationShockTs
+        current.proxIdx = update.atmospheric.proxIdx
+        current.proximityCm = update.atmospheric.proximityCm
+        current.proximityDebounceMs = update.atmospheric.proximityDebounceMs
+        current.vibrationRollingSum = update.atmospheric.vibrationRollingSum
+        current.isSitDetected = update.integrity.isSitDetected
+        current.isSitActive = update.integrity.isSitActive
+        current.lastSitTs = update.integrity.lastSitTs
+        current.verticalVelocity = update.kinetic.verticalVelocity
+        current.sitVz = update.integrity.sitVz
+        current.sitDz = update.integrity.sitDz
+        current.sitBaro = update.integrity.sitBaro
+        current.sitTilt = update.integrity.sitTilt
+        current.sitShock = update.integrity.sitShock
+        current.kineticEnergy = update.kinetic.kineticEnergy
 
         return current
     }
@@ -129,7 +137,7 @@ class TelemetryUseCase @Inject constructor(
     fun mapHealthFromStatus(status: TrackerStatus, current: SystemHealthState): SystemHealthState {
         current.batteryLevel = status.battery
         current.batteryTemp = status.temp
-        current.maxTemp = status.maxTemp
+        current.maxTemp = maxOf(current.maxTemp, status.maxTemp)
         current.isCharging = status.isCharging
         current.currentMa = status.currentMa
         current.status = status.status
@@ -200,19 +208,19 @@ class TelemetryUseCase @Inject constructor(
     }
 
     fun mapTrackerLocationFromStatus(status: TrackerStatus, currentLoc: LocationUpdate): LocationUpdate {
-        currentLoc.lat = status.lat
-        currentLoc.lng = status.lng
-        currentLoc.speed = status.speed
-        currentLoc.bearing = status.bearing
-        currentLoc.accuracy = status.accuracy
-        currentLoc.maxAccuracy = status.maxAccuracy
-        currentLoc.gpsTs = status.gpsTs
+        currentLoc.kinetic.lat = status.lat
+        currentLoc.kinetic.lng = status.lng
+        currentLoc.kinetic.speed = status.speed
+        currentLoc.kinetic.bearing = status.bearing
+        currentLoc.kinetic.accuracy = status.accuracy
+        currentLoc.kinetic.maxAccuracy = status.maxAccuracy
+        currentLoc.kinetic.gpsTs = status.gpsTs
         currentLoc.ts = status.ts
-        currentLoc.rt = status.ts - (timeProvider.currentTimeMillis() - timeProvider.elapsedRealtime()) // Heuristic rt for remote status
+        currentLoc.kinetic.rt = status.ts - (timeProvider.currentTimeMillis() - timeProvider.elapsedRealtime()) // Heuristic rt for remote status
         currentLoc.status = status.status
         currentLoc.trackerState = status.trackerState
-        currentLoc.gnssDetail = status.gnssDetail
-        currentLoc.isGnssThrottled = status.isGnssThrottled
+        currentLoc.integrity.gnssDetail = status.gnssDetail
+        currentLoc.integrity.isGnssThrottled = status.isGnssThrottled
         return currentLoc
     }
 
@@ -222,39 +230,39 @@ class TelemetryUseCase @Inject constructor(
         nowMs: Long, 
         appStartTime: Long
     ): LocationUpdate {
-        val isLocationValid = PhysicsUtils.isValidLocation(update.lat, update.lng)
-        val newTimestamp = update.gpsTs
+        val isLocationValid = PhysicsUtils.isValidLocation(update.kinetic.lat, update.kinetic.lng)
+        val newTimestamp = update.kinetic.gpsTs
         
         if (isLocationValid) {
-            currentLoc.lat = update.lat
-            currentLoc.lng = update.lng
-            currentLoc.speed = update.speed
-            currentLoc.accuracy = update.accuracy
-            currentLoc.bearing = update.bearing
+            currentLoc.kinetic.lat = update.kinetic.lat
+            currentLoc.kinetic.lng = update.kinetic.lng
+            currentLoc.kinetic.speed = update.kinetic.speed
+            currentLoc.kinetic.accuracy = update.kinetic.accuracy
+            currentLoc.kinetic.bearing = update.kinetic.bearing
         }
-        if (update.maxAccuracy > 0.0) currentLoc.maxAccuracy = update.maxAccuracy
-        if (newTimestamp > 0) currentLoc.gpsTs = newTimestamp
+        if (update.kinetic.maxAccuracy > 0.0) currentLoc.kinetic.maxAccuracy = update.kinetic.maxAccuracy
+        if (newTimestamp > 0) currentLoc.kinetic.gpsTs = newTimestamp
         
         currentLoc.ts = if (update.ts > 0) update.ts else nowMs
-        currentLoc.rt = update.rt // Fix #935: Propagate monotonic timestamp
+        currentLoc.kinetic.rt = update.kinetic.rt // Fix #935: Propagate monotonic timestamp
         currentLoc.status = update.status
         currentLoc.trackerState = update.trackerState
-        update.gnssDetail?.let { currentLoc.gnssDetail = it }
-        currentLoc.isGnssThrottled = update.isGnssThrottled
+        update.integrity.gnssDetail?.let { currentLoc.integrity.gnssDetail = it }
+        currentLoc.integrity.isGnssThrottled = update.integrity.isGnssThrottled
 
         return currentLoc
     }
 
     fun mapStats(update: LocationUpdate, currentStats: StatsState): StatsState {
         currentStats.update(
-            totalConnectedMs = update.totalConnectedMs ?: currentStats.totalConnectedMs, 
-            sessionConnectedMs = update.sessionConnectedMs ?: currentStats.sessionConnectedMs, 
-            maxDropMs = update.maxDropMs ?: currentStats.maxDropMs,
-            maxDropTs = update.maxDropTs ?: currentStats.maxDropTs,
-            totalDropMs = update.totalDropMs ?: currentStats.totalDropMs, 
-            uptimeMs = update.uptimeMs ?: currentStats.uptimeMs, 
-            lastConnTs = update.lastConnTs ?: currentStats.lastConnTs, 
-            lastDiscTs = update.lastDiscTs ?: currentStats.lastDiscTs
+            totalConnectedMs = update.integrity.totalConnectedMs, 
+            sessionConnectedMs = update.integrity.sessionConnectedMs, 
+            maxDropMs = update.integrity.maxDropMs,
+            maxDropTs = update.integrity.maxDropTs,
+            totalDropMs = update.integrity.totalDropMs, 
+            uptimeMs = update.integrity.uptimeMs, 
+            lastConnTs = update.integrity.lastConnTs, 
+            lastDiscTs = update.integrity.lastDiscTs
         )
         return currentStats
     }

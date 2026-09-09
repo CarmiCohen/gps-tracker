@@ -12,14 +12,9 @@ import javax.inject.Singleton
 
 /**
  * GpsStatusManager: Centralized reactive Flow for the GPS-Index.
- * Aug.20.00:
- * - Issue #219 Performance Audit: Implemented flowOn(Dispatchers.Default) 
- *   and 500ms sampling to prevent UI thread jitter during 100Hz forensic 
- *   bursts. Offloads weighted averaging math from the UI pulse (R219).
- * July.26.03:
- * - Issue #545c: Flow Architecture Standardization. Refactored to manage a 
- *   SharedFlow pipeline using @ApplicationScope, ensuring all collectors 
- *   share a single logic pulse and calculation sequence.
+ * Sep.09.10:
+ * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .integrity)
+ *   in LocationUpdate to support bridge removal (R-ID 284).
  */
 @Singleton
 class GpsStatusManager @Inject constructor(
@@ -52,9 +47,9 @@ class GpsStatusManager @Inject constructor(
             val effectiveUpdate = if (isTracker) localUpdate else if (isRelayConnected) trackerUpdate else null
             
             val params = if (effectiveUpdate != null && 
-                effectiveUpdate.gpsTs > 0 && 
-                PhysicsUtils.isValidLocation(effectiveUpdate.lat, effectiveUpdate.lng)) {
-                IndexParams(effectiveUpdate.gpsTs, effectiveUpdate.maxAccuracy, effectiveUpdate.satsUsed)
+                effectiveUpdate.kinetic.gpsTs > 0 && 
+                PhysicsUtils.isValidLocation(effectiveUpdate.kinetic.lat, effectiveUpdate.kinetic.lng)) {
+                IndexParams(effectiveUpdate.kinetic.gpsTs, effectiveUpdate.kinetic.maxAccuracy, effectiveUpdate.integrity.satsUsed)
             } else null
             
             params to now

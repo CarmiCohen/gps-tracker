@@ -7,12 +7,9 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
- * Sep.08.20:
- * - Issue #283 RESOLVED: Hardened avgCn0 calculation using safeAverage() 
- *   to prevent NaN propagation (R-ID 283).
- * Sep.08.12:
- * - Issue #924 Visibility: Added isGnssThrottled to HudConnectivityState and 
- *   DashboardHealthState for A15 Hysteresis transparency.
+ * Sep.09.10:
+ * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .atmospheric, .integrity)
+ *   in LocationUpdate to support bridge removal (R-ID 284).
  */
 interface DashboardStateProvider {
     fun buildDashboardConnectivityState(
@@ -111,20 +108,20 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         val telemetryAge = if (kinematicState.pulse > 0) nowRt - kinematicState.pulse else Long.MAX_VALUE
         val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
         
-        val isGpsActive = (nowRt - loc.rt) < GPS_UI_FAIL_THRESHOLD_MS && loc.gpsTs > 0
+        val isGpsActive = (nowRt - loc.kinetic.rt) < GPS_UI_FAIL_THRESHOLD_MS && loc.kinetic.gpsTs > 0
 
-        val gnss = loc.gnssDetail
+        val gnss = loc.integrity.gnssDetail
         // Issue #283: Hardened against NaN
         val avgCn0 = gnss?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0
 
         return DashboardTelemetryState(
-            lat = if (isGpsActive) loc.lat else 0.0,
-            lng = if (isGpsActive) loc.lng else 0.0,
-            gpsSpeedMps = loc.speed,
-            trackerAccuracy = loc.accuracy,
-            trackerMaxAcc = if (loc.maxAccuracy > 0) loc.maxAccuracy else loc.accuracy,
-            viewerAccuracy = if (appMode == "tracker") 0.0 else kinematicState.localLocation.accuracy,
-            viewerMaxAcc = if (appMode == "tracker") 0.0 else (if(kinematicState.localLocation.maxAccuracy > 0) kinematicState.localLocation.maxAccuracy else kinematicState.localLocation.accuracy),
+            lat = if (isGpsActive) loc.kinetic.lat else 0.0,
+            lng = if (isGpsActive) loc.kinetic.lng else 0.0,
+            gpsSpeedMps = loc.kinetic.speed,
+            trackerAccuracy = loc.kinetic.accuracy,
+            trackerMaxAcc = if (loc.kinetic.maxAccuracy > 0) loc.kinetic.maxAccuracy else loc.kinetic.accuracy,
+            viewerAccuracy = if (appMode == "tracker") 0.0 else kinematicState.localLocation.kinetic.accuracy,
+            viewerMaxAcc = if (appMode == "tracker") 0.0 else (if(kinematicState.localLocation.kinetic.maxAccuracy > 0) kinematicState.localLocation.kinetic.maxAccuracy else kinematicState.localLocation.kinetic.accuracy),
             satsUsed = 0,
             satsView = 0,
             snr = avgCn0,
@@ -254,27 +251,27 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
 
     override fun buildHudTelemetryState(
         appMode: String?,
-        kinematicState: KineticState,
+        kinematicState: KinematicState,
         systemPulseRt: Long,
         trackerState: TrackerState,
         isUltra: Boolean
     ): HudTelemetryState {
         val loc = if (appMode == "viewer") kinematicState.trackerLocation else kinematicState.localLocation
-        val isGpsFresh = (systemPulseRt - loc.rt) < GPS_UI_FAIL_THRESHOLD_MS && loc.gpsTs > 0
+        val isGpsFresh = (systemPulseRt - loc.kinetic.rt) < GPS_UI_FAIL_THRESHOLD_MS && loc.kinetic.gpsTs > 0
 
         return HudTelemetryState(
-            isLocalGpsActive = if (appMode == "tracker") isGpsFresh else (systemPulseRt - kinematicState.localLocation.rt < GPS_UI_FAIL_THRESHOLD_MS),
+            isLocalGpsActive = if (appMode == "tracker") isGpsFresh else (systemPulseRt - kinematicState.localLocation.kinetic.rt < GPS_UI_FAIL_THRESHOLD_MS),
             isGpsFresh = isGpsFresh,
-            speedMps = (if (appMode == "viewer") kinematicState.trackerLocation.speed else 0.0).toFloat(),
-            trackerAccuracy = kinematicState.trackerLocation.accuracy.toFloat(),
-            maxTrackerAccuracy = kinematicState.trackerLocation.maxAccuracy.toFloat(),
-            viewerAccuracy = (if (kinematicState.localLocation.lat != 0.0) kinematicState.localLocation.accuracy.toFloat() else 0f),
-            maxViewerAccuracy = kinematicState.localLocation.maxAccuracy.toFloat(),
+            speedMps = (if (appMode == "viewer") kinematicState.trackerLocation.kinetic.speed else 0.0).toFloat(),
+            trackerAccuracy = kinematicState.trackerLocation.kinetic.accuracy.toFloat(),
+            maxTrackerAccuracy = kinematicState.trackerLocation.kinetic.maxAccuracy.toFloat(),
+            viewerAccuracy = (if (kinematicState.localLocation.kinetic.lat != 0.0) kinematicState.localLocation.kinetic.accuracy.toFloat() else 0f),
+            maxViewerAccuracy = kinematicState.localLocation.kinetic.maxAccuracy.toFloat(),
             satsUsed = 0,
             distToHome = kinematicState.distanceTrackerToHome,
             distToViewer = kinematicState.distanceTrackerToViewer,
-            lastGpsTs = loc.gpsTs,
-            viewerGpsTs = kinematicState.localLocation.gpsTs,
+            lastGpsTs = loc.kinetic.gpsTs,
+            viewerGpsTs = kinematicState.localLocation.kinetic.gpsTs,
             trackerState = trackerState,
             isTrackerLocPending = kinematicState.trackerHealth.isLocationPending,
             trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,

@@ -16,13 +16,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * Sep.08.13:
- * - Fix: Corrected 'isTrackerActive' and 'maxTrackerAccuracy' references in evaluateAlarmsInternal.
- * - Fix: Corrected logServiceEvent parameter names to 'm' and fixed build issues.
- * - Fix: Corrected alarmManager.resetEvaluation() reference.
- * Sep.08.11:
- * - Issue #936: Forensic Auditor Consolidation (Idea #3). Delegated Stability 
- *   Audit logic (Reliability/Jitter) to ForensicAuditor (R-ID 280).
+ * Sep.09.10:
+ * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .atmospheric, .integrity)
+ *   in LocationUpdate to support bridge removal (R-ID 284).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -371,14 +367,28 @@ class ViewerService : BaseMonitorService() {
         lastKnownLocation = location; lastProcessedLocation = processed
 
         val health = integrityMonitor.currentHealth
-        repository.updateLocation(LocationUpdate(
-            lat = lat, lng = lng, alt = alt, speed = lastGpsSpeed, accuracy = lastGpsAccuracy, 
-            bearing = lastGpsBearing, battery = health.batteryLevel, temp = health.batteryTemp, 
-            maxTemp = health.maxTemp, isCharging = health.isCharging, gpsTs = location.time, ts = nowWall, 
-            rt = nowRt,
-            isMe = true, satsView = hardwareProvider.satellitesInView, satsUsed = location.extras?.getInt("satellites") ?: hardwareProvider.satellitesUsed, maxAccuracy = processed.maxAccuracy, currentMa = health.currentMa, 
-            lastValidFixRt = selfProcessor.getLastValidFixRt(), status = processed.status, snrIdx = (hardwareProvider.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
-        ))
+        repository.updateLocation(LocationUpdate().apply {
+            this.kinetic.lat = lat; this.kinetic.lng = lng; this.kinetic.alt = alt; this.kinetic.speed = lastGpsSpeed; this.kinetic.accuracy = lastGpsAccuracy; 
+            this.kinetic.bearing = lastGpsBearing; this.kinetic.gpsTs = location.time; 
+            this.kinetic.rt = nowRt;
+            this.kinetic.maxAccuracy = processed.maxAccuracy;
+
+            this.atmospheric.temp = health.batteryTemp; 
+            this.atmospheric.maxTemp = health.maxTemp;
+
+            this.integrity.battery = health.batteryLevel; 
+            this.integrity.isCharging = health.isCharging; 
+            this.integrity.satsView = hardwareProvider.satellitesInView; 
+            this.integrity.satsUsed = location.extras?.getInt("satellites") ?: hardwareProvider.satellitesUsed; 
+            this.integrity.currentMa = health.currentMa; 
+            this.integrity.snrIdx = (hardwareProvider.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
+
+            this.ts = nowWall; 
+            this.isMe = true; 
+            this.lastValidFixRt = selfProcessor.getLastValidFixRt(); 
+            this.status = processed.status; 
+            this.isClockRegression = processed.isClockRegression
+        })
     }
 
     private fun handleTrackerPulse(id: String) {

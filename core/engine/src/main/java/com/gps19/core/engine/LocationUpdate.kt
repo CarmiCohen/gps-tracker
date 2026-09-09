@@ -110,15 +110,17 @@ data class IntegrityState(
     var sitBaro: Double = 0.0,
     var sitTilt: Double = 0.0,
     var sitShock: Double = 0.0,
-    var isSitActive: Boolean = false
+    var isSitActive: Boolean = false,
+    var isLocationPending: Boolean = false,
+    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    var signal: Int? = null
 )
 
 /**
  * LocationUpdate: Aggregated telemetry container.
- * Sep.08.20:
- * - Idea #2 RESOLVED: Telemetry Model Flattening. Partitioned monolithic fields 
- *   into Kinetic, Atmospheric, and Integrity sub-states (R-ID 284).
- * - Legacy Mapping Helpers: Added accessors to simplify build restoration.
+ * Sep.09.10:
+ * - Legacy Field Cleanup RESOLVED: Removed all bridge properties. 
+ *   Consumers now use .kinetic, .atmospheric, and .integrity directly (R-ID 284).
  */
 @Serializable
 class LocationUpdate(
@@ -129,73 +131,9 @@ class LocationUpdate(
     var ts: Long = 0L,
     var isMe: Boolean = true,
     var trackerState: TrackerState = TrackerState.UNKNOWN,
-    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     var isClockRegression: Boolean = false,
     var lastValidFixRt: Long = 0L
 ) {
-    // --- Legacy Mapping Helpers (Bridge for R-ID 284) ---
-    var lat: Double get() = kinetic.lat; set(value) { kinetic.lat = value }
-    var lng: Double get() = kinetic.lng; set(value) { kinetic.lng = value }
-    var alt: Double get() = kinetic.alt; set(value) { kinetic.alt = value }
-    var speed: Double get() = kinetic.speed; set(value) { kinetic.speed = value }
-    var accuracy: Double get() = kinetic.accuracy; set(value) { kinetic.accuracy = value }
-    var maxAccuracy: Double get() = kinetic.maxAccuracy; set(value) { kinetic.maxAccuracy = value }
-    var bearing: Double get() = kinetic.bearing; set(value) { kinetic.bearing = value }
-    var gpsTs: Long get() = kinetic.gpsTs; set(value) { kinetic.gpsTs = value }
-    var rt: Long get() = kinetic.rt; set(value) { kinetic.rt = value }
-    
-    var temp: Double get() = atmospheric.temp; set(value) { atmospheric.temp = value }
-    var maxTemp: Double get() = atmospheric.maxTemp; set(value) { atmospheric.maxTemp = value }
-    var vibration: Double get() = atmospheric.vibration; set(value) { atmospheric.vibration = value }
-    var heading: Double get() = atmospheric.heading; set(value) { atmospheric.heading = value }
-    var baroAlt: Double get() = atmospheric.baroAlt; set(value) { atmospheric.baroAlt = value }
-    var baroIdx: Double get() = atmospheric.baroIdx; set(value) { atmospheric.baroIdx = value }
-    var lux: Double get() = atmospheric.lux; set(value) { atmospheric.lux = value }
-    var luxIdx: Double get() = atmospheric.luxIdx; set(value) { atmospheric.luxIdx = value }
-    var luxBaseline: Double get() = atmospheric.luxBaseline; set(value) { atmospheric.luxBaseline = value }
-    var noiseIdx: Double get() = atmospheric.noiseIdx; set(value) { atmospheric.noiseIdx = value }
-    var isNear: Boolean get() = atmospheric.isNear; set(value) { atmospheric.isNear = value }
-    var tiltDegrees: Double get() = atmospheric.tiltDegrees; set(value) { atmospheric.tiltDegrees = value }
-    var acousticDb: Double get() = atmospheric.acousticDb; set(value) { atmospheric.acousticDb = value }
-    var acousticFloorDb: Double get() = atmospheric.acousticFloorDb; set(value) { atmospheric.acousticFloorDb = value }
-    var adaptiveVibrationFloor: Double get() = atmospheric.adaptiveVibrationFloor; set(value) { atmospheric.adaptiveVibrationFloor = value }
-    var peakVibrationShock: Double get() = atmospheric.peakVibrationShock; set(value) { atmospheric.peakVibrationShock = value }
-    var peakVibrationShockTs: Long get() = atmospheric.peakVibrationShockTs; set(value) { atmospheric.peakVibrationShockTs = value }
-    var liftIdx: Double get() = atmospheric.liftIdx; set(value) { atmospheric.liftIdx = value }
-    var tiltIdx: Double get() = atmospheric.tiltIdx; set(value) { atmospheric.tiltIdx = value }
-    var vibeIdx: Double get() = atmospheric.vibeIdx; set(value) { atmospheric.vibeIdx = value }
-    var proxIdx: Double get() = atmospheric.proxIdx; set(value) { atmospheric.proxIdx = value }
-    var proximityCm: Double get() = atmospheric.proximityCm; set(value) { atmospheric.proximityCm = value }
-    var proximityDebounceMs: Long get() = atmospheric.proximityDebounceMs; set(value) { atmospheric.proximityDebounceMs = value }
-    var vibrationRollingSum: Double get() = atmospheric.vibrationRollingSum; set(value) { atmospheric.vibrationRollingSum = value }
-    
-    var battery: Int get() = integrity.battery; set(value) { integrity.battery = value }
-    var isCharging: Boolean get() = integrity.isCharging; set(value) { integrity.isCharging = value }
-    var currentMa: Int get() = integrity.currentMa; set(value) { integrity.currentMa = value }
-    var satsView: Int get() = integrity.satsView; set(value) { integrity.satsView = value }
-    var satsUsed: Int get() = integrity.satsUsed; set(value) { integrity.satsUsed = value }
-    var snrIdx: Double get() = integrity.snrIdx; set(value) { integrity.snrIdx = value }
-    var isTamperDetected: Boolean get() = integrity.isTamperDetected; set(value) { integrity.isTamperDetected = value }
-    var isPowerTamper: Boolean get() = integrity.isPowerTamper; set(value) { integrity.isPowerTamper = value }
-    var isSitDetected: Boolean get() = integrity.isSitDetected; set(value) { integrity.isSitDetected = value }
-    var lastSitTs: Long get() = integrity.lastSitTs; set(value) { integrity.lastSitTs = value }
-    var sitVz: Double get() = integrity.sitVz; set(value) { integrity.sitVz = value }
-    var sitVzTs: Long get() = integrity.sitVzTs; set(value) { integrity.sitVzTs = value }
-    var sitVzRt: Long get() = integrity.sitVzRt; set(value) { integrity.sitVzRt = value }
-    var sitDz: Double get() = integrity.sitDz; set(value) { integrity.sitDz = value }
-    var sitBaro: Double get() = integrity.sitBaro; set(value) { integrity.sitBaro = value }
-    var sitTilt: Double get() = integrity.sitTilt; set(value) { integrity.sitTilt = value }
-    var sitShock: Double get() = integrity.sitShock; set(value) { integrity.sitShock = value }
-    var kineticEnergy: Double get() = kinetic.kineticEnergy; set(value) { kinetic.kineticEnergy = value }
-    var isBatteryLow: Boolean get() = integrity.isBatteryLow; set(value) { integrity.isBatteryLow = value }
-    var isBatteryCritical: Boolean get() = integrity.isBatteryCritical; set(value) { integrity.isBatteryCritical = value }
-    var isStorageLow: Boolean get() = integrity.isStorageLow; set(value) { integrity.isStorageLow = value }
-    var isStorageCritical: Boolean get() = integrity.isStorageCritical; set(value) { integrity.isStorageCritical = value }
-    var isBatterySteepDischarge: Boolean get() = integrity.isBatterySteepDischarge; set(value) { integrity.isBatterySteepDischarge = value }
-    var isCoolingModeActive: Boolean get() = integrity.isCoolingModeActive; set(value) { integrity.isCoolingModeActive = value }
-    var isUltraLongStationary: Boolean get() = integrity.isUltraLongStationary; set(value) { integrity.isUltraLongStationary = value }
-    var gpsHardwareLock: Boolean get() = integrity.gpsHardwareLock; set(value) { integrity.gpsHardwareLock = value }
-
     fun copyFrom(other: LocationUpdate) {
         this.kinetic = other.kinetic.copy()
         this.atmospheric = other.atmospheric.copy()
@@ -204,7 +142,6 @@ class LocationUpdate(
         this.ts = other.ts
         this.isMe = other.isMe
         this.trackerState = other.trackerState
-        this.locationPendingReason = other.locationPendingReason
         this.isClockRegression = other.isClockRegression
         this.lastValidFixRt = other.lastValidFixRt
     }
