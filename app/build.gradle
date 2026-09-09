@@ -15,8 +15,8 @@ android {
         applicationId "com.gps19.app"
         minSdk 24
         targetSdk 35
-        versionCode 965
-        versionName "Sep.09.10" // Legacy Cleanup Baseline
+        versionCode 966
+        versionName "Sep.09.11" // Legacy Cleanup & Build Restoration
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

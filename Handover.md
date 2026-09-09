@@ -1,30 +1,32 @@
-# 🏁 Forensic Handover (Sep.09.10 - Legacy Debt Cleared)
+# 🏁 Forensic Handover (Sep.09.11 - Build Restored & Audit Hardened)
 
-## 🎯 Current Context: Telemetry Partitioning Finalized
-The project has successfully cleared the technical debt associated with the Telemetry Model Partitioning (R-ID 284). All consumers in the `:app` module have been migrated to the new partitioned state architecture (`.kinetic`, `.atmospheric`, `.integrity`), and all legacy bridge properties have been removed from the core engine's `LocationUpdate.kt`. The build is stable and the model is lean.
+## 🎯 Current Context: Build Stability Re-established
+The project has successfully resolved the compilation errors introduced during the Telemetry Partitioning (R-ID 284). All high-frequency motion data (`speed`) and health scalars (`maxTemp`, `currentMa`) are now correctly accessed via their respective sub-states (`kinetic`, `atmospheric`, `integrity`). 
 
-## 🛠️ Work Completed (Sep.09.10)
-*   **Legacy Field Cleanup (R-ID 284 - COMPLETE)**:
-    *   **Migration**: Refactored `TrackerService.kt`, `ViewerService.kt`, `ConnectivitySuite.kt`, `LogManager.kt`, `GpsStatusManager.kt`, `DashboardStateProvider.kt`, and `TelemetryUseCase.kt` to use partitioned state sub-objects directly.
-    *   **Bridge Removal**: Removed all 26+ legacy mapping helpers (getters/setters) from `LocationUpdate.kt`.
-    *   **Monotonic Parity**: Ensured `rt` (elapsedRealtime) and `isClockRegression` are correctly propagated across the engine and app layers during mapping.
+## 🛠️ Work Completed (Sep.09.11)
+*   **Build Restoration (Issue #939)**:
+    *   Fixed `BehaviorUseCase.kt` to use `effectiveLocation.kinetic.speed`.
+    *   Fixed `MainViewModel.kt` to map `maxTemp` to `atmospheric.maxTemp` and `currentMa` to `integrity.currentMa`.
+*   **Forensic Integrity Audit**:
+    *   Remediated mapping gaps in `ConnectivitySuite.kt` where remote signal strength, max temperature, and GNSS throttling status were being dropped.
+    *   Restored HUD signal indicators for remote peers by correctly mapping `integrity.signal`.
+*   **Siren Cooldown Hardening (R-ID 301)**:
+    *   Modified `AppAlarmManager` to ensure the 15s safety cooldown is preserved during role switches, preventing siren re-triggers during mode transitions.
 *   **State Tracking Update**:
-    *   `issues.md` updated to reflect the resolution of Part C.
-    *   `RESOLUTION_ARCHIVE.md` synchronized with the latest milestones.
-    *   `app/build.gradle` version incremented to `Sep.09.10`.
+    *   `issues.md` and `RESOLUTION_ARCHIVE.md` updated to reflect the resolution of build blockers and integrity gaps.
+    *   `app/build.gradle` version incremented to `Sep.09.11`.
 
 ## 📂 Forensic File Snapshot
-*   `core:engine:LocationUpdate.kt`: Now a clean container for `KineticState`, `AtmosphericState`, and `IntegrityState`. No legacy bridges.
-*   `app:TelemetryUseCase.kt`: Primary mapping logic using partitioned states.
-*   `app:ConnectivitySuite.kt`: Handles remote telemetry sync and maps incoming flat JSON/Protobuf to partitioned `LocationUpdate` instances.
-*   `app:TrackerService.kt` / `ViewerService.kt`: Background engines fully migrated to the new state model.
+*   `app:BehaviorUseCase.kt`: Uses partitioned speed for state determination.
+*   `app:MainViewModel.kt`: Correctly maps all partitioned telemetry fields in both local and remote flows.
+*   `app:ConnectivitySuite.kt`: Full parity for remote telemetry ingestion.
 
 ## 🟡 Open Issues (Resumption Priority)
-1.  **Forensic Audit**: Perform a deep audit of `null` handling in `TelemetryUseCase` post-refactor to ensure no regressions in HUD data freshness or display logic.
-2.  **Siren Resumption Validation**: Verify that `AppAlarmManager`'s partitioned logic (R-ID 301) handles siren resumption edge cases correctly during role transitions (Tracker <-> Viewer).
+1.  **A15 Hysteresis Validation**: Verify that the "THR" badge correctly appears on Samsung A15 devices when thermal throttling kicks in.
+2.  **Watchdog Precision Audit**: Audit `SystemWatchdog` for drift in long-running background sessions (>12h).
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 302 (Rules: 53, IDs: 249), Resolved: 965, Open: 2, Testing: 98% (Sub-items: 50), Ideas: 2, QA: 269]**
+- **Current Audit Baseline: [SOT: 302 (Rules: 53, IDs: 249), Resolved: 968, Open: 2, Testing: 98% (Sub-items: 50), Ideas: 2, QA: 269]**
 
 ---
 **Resumption Command**: `🏁 Resume from Handover.md and follow the logic in DEVELOPER_GUIDELINES.md strictly.`

@@ -48,7 +48,7 @@ class BehaviorUseCase @Inject constructor() {
 
         return TrackerStateManager.updateState(
             status = effectiveLocation.status,
-            speed = effectiveLocation.speed,
+            speed = effectiveLocation.kinetic.speed,
             vibration = effectiveHealth.vibration,
             vibrationFloor = effectiveHealth.adaptiveVibrationFloor,
             isTrackerConnected = isConnected,

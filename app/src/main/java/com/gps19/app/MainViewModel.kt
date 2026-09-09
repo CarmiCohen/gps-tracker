@@ -695,22 +695,22 @@ class MainViewModel @Inject constructor(
             if (update.isMe) {
                 telemetryUseCase.mapLocalLocation(update, current.localLocation, nowMs, appStartTime)
                 telemetryUseCase.mapHealthFromUpdate(update, current.localHealth)
-                _localMaxTemp.value = update.maxTemp
-                _currentMa.value = update.currentMa
+                _localMaxTemp.value = update.atmospheric.maxTemp
+                _currentMa.value = update.integrity.currentMa
 
                 if (_uiState.value.appMode == "tracker") {
                     telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime)
                     telemetryUseCase.mapHealthFromUpdate(update, current.trackerHealth)
-                    _trackerMaxTemp.value = update.maxTemp
+                    _trackerMaxTemp.value = update.atmospheric.maxTemp
                     _trackerState.value = update.trackerState
-                    _trackerCurrentMa.value = update.currentMa
+                    _trackerCurrentMa.value = update.integrity.currentMa
                 }
             } else {
                 telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime)
                 telemetryUseCase.mapHealthFromUpdate(update, current.trackerHealth)
-                _trackerMaxTemp.value = update.maxTemp
+                _trackerMaxTemp.value = update.atmospheric.maxTemp
                 _trackerState.value = update.trackerState
-                _trackerCurrentMa.value = update.currentMa
+                _trackerCurrentMa.value = update.integrity.currentMa
             }
             current.apply { pulse = nowRt }
         }
