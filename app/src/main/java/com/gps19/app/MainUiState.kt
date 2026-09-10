@@ -6,15 +6,12 @@ import org.osmdroid.util.GeoPoint
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
  * Sep.10.20:
- * - Idea #243 Rigorous Audit: Consolidated freshness and validity flags into 
- *   MapViewState to eliminate UI-side derived state (R-ID 287).
- * Sep.11.10:
- * - Idea #243: Map State Partitioning RESOLVED. Added MapViewState to group 
- *   map parameters and reduce recomposition cost (R-ID 287).
+ * - Idea #243 Rigorous Audit: Consolidated smoothed coordinates into MapViewState 
+ *   to eliminate all derivation from the UI layer (R-ID 287).
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
-    val hydrationLevel: Int = 0, // 0:Cold, 1:Surface, 2:Core, 3:Full, 4:MapBase, 5:MapTrails, 6:MapPositions, 7:MapViolations, 8:MapReady
+    val hydrationLevel: Int = 0,
     val appMode: String? = null,
     val isSystemActive: Boolean = false,
     val deviceId: String = MainRepository.DEFAULT_TRACKER_ID,
@@ -90,9 +87,7 @@ data class MainUiState(
                              (permissions.backgroundStatus == CapabilityStatus.GRANTED || 
                               permissions.autostartStatus == CapabilityStatus.GRANTED) &&
                              !(permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride)
-            if (count > 0 || configIssue) {
-                // If configIssue is true, at least one is incremented.
-            }
+            if (count > 0 || configIssue) {}
             if (configIssue) count++
             
             return count
@@ -100,7 +95,7 @@ data class MainUiState(
 }
 
 /**
- * MapViewState: Partitioned state for AppMapContainer to reduce recomposition cost (R-ID 287).
+ * MapViewState: Partitioned state for AppMapContainer (R-ID 287).
  */
 data class MapViewState(
     val appMode: String? = null,
@@ -147,13 +142,20 @@ data class MapViewState(
     val showAccuracyBadge: Boolean = true,
     val showSettingsButton: Boolean = true,
     val showToolsOverlay: Boolean = true,
-    
-    // R-ID 287 Rigorous Audit additions
     val isTrackerFresh: Boolean = false,
     val isViewerFresh: Boolean = false,
     val isTrackerValid: Boolean = false,
-    val isViewerValid: Boolean = false
-)
+    val isViewerValid: Boolean = false,
+    
+    // R-ID 287: Smoothed positions moved to ViewModel
+    val smoothedTrackerLat: Double = 0.0,
+    val smoothedTrackerLng: Double = 0.0,
+    val smoothedViewerLat: Double = 0.0,
+    val smoothedViewerLng: Double = 0.0
+) {
+    val smoothedTrackerPos: GeoPoint? get() = if (isTrackerValid) GeoPoint(smoothedTrackerLat, smoothedTrackerLng) else null
+    val smoothedViewerPos: GeoPoint? get() = if (isViewerValid) GeoPoint(smoothedViewerLat, smoothedViewerLng) else null
+}
 
 /**
  * KinematicState: High-frequency transient state.
@@ -224,8 +226,6 @@ class DiagnosticState(
     var isGnssThrottled: Boolean = false,
     var trackerIsGnssThrottled: Boolean = false,
     var pulse: Long = 0L,
-    
-    // R-ID 259: Energy Footprint structured fields
     var lastEnergyDeltaMa: Int = 0,
     var lastEnergyDeltaTemp: Double = 0.0,
     var lastEnergyDurationMs: Long = 0L

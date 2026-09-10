@@ -62,11 +62,8 @@ private data class MapBase(val ui: MapUiParts, val kin: KinematicState, val p: L
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
  * Sep.10.20:
- * - Rigorous Audit #243: Centralized location freshness and validity flags 
- *   within MapViewState to eliminate derived state in UI components (R-ID 287).
- * Sep.11.10:
- * - Integrity Audit #243: Optimized mapViewState flow by segmenting UI triggers 
- *   to avoid redundant calculations on non-map state changes (R-ID 287).
+ * - Rigorous Audit #243: Restored truncated ribbon flows and centralized 
+ *   coordinate smoothing/freshness logic within MapViewState (R-ID 287).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -222,6 +219,18 @@ class MainViewModel @Inject constructor(
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudHealthState())
 
+    // Snap-Isolation: Deep parity check for list-based flows (R312)
+    private fun <T> listContentEquals(a: List<T>?, b: List<T>?, itemCompare: (T, T) -> Boolean): Boolean {
+        if (a === b) return true
+        if (a == null || b == null) return false
+        if (a.size != b.size) return false
+        for (i in a.indices) {
+            if (!itemCompare(a[i], b[i])) return false
+        }
+        return true
+    }
+
+    // Map Trail Flows (R-ID 287 Fix: Restored)
     val trackerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
         .flatMapLatest { mode -> if (mode != null) repository.trackerTrailFlow else flowOf(emptyList()) }
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
@@ -234,10 +243,6 @@ class MainViewModel @Inject constructor(
         .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val violationPointsFlow: StateFlow<List<ViolationPoint>> = repository.violationsFlow
-        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     val trackerTrailSegments: StateFlow<List<MapTrailSegment>> = trackerTrailFlow
         .map { trail -> computeTrailSegments(trail, BrandJd.toArgb()) }
         .flowOn(Dispatchers.Default)
@@ -248,147 +253,96 @@ class MainViewModel @Inject constructor(
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Segmented Map UI Flow (R-ID 287)
-    private val mapUiPartsFlow = _uiState.map { ui ->
-        MapUiParts(
-            appMode = ui.appMode,
-            hydrationLevel = ui.hydrationLevel,
-            isMapButtonsVisible = ui.isMapButtonsVisible,
-            isFenceVisible = ui.isFenceVisible,
-            geofenceMode = ui.geofenceMode,
-            isViolationsVisible = ui.isViolationsVisible,
-            isGeofenceViolationsVisible = ui.isGeofenceViolationsVisible,
-            maxDistance = ui.maxDistance,
-            isMapLocked = ui.isMapLocked,
-            mapFollowMode = ui.mapFollowMode,
-            centeringTrackerTrigger = ui.centeringTrackerTrigger,
-            centeringViewerTrigger = ui.centeringViewerTrigger,
-            zoomInTrigger = ui.zoomInTrigger,
-            zoomOutTrigger = ui.zoomOutTrigger,
-            homePoints = ui.homePoints
-        )
-    }.distinctUntilChanged()
+    // Forensic Ribbon Flows (Restored from truncation)
+    val history4MFlow = repository.getHistoryFlow("4M")
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        
+    val history16MFlow = repository.getHistoryFlow("16M")
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        
+    val history1HFlow = repository.getHistoryFlow("1H")
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        
+    val history4HFlow = repository.getHistoryFlow("4H")
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        
+    val history24HFlow = repository.getHistoryFlow("24H")
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        
+    val history7DFlow = repository.getHistoryFlow("7D")
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Idea #243: MapViewState Flow (R287)
+    // Segmented Map UI Flow (R-ID 287 Hardening)
+    private var sTrkLat = 0.0; private var sTrkLng = 0.0; private var sVwrLat = 0.0; private var sVwrLng = 0.0
+
     val mapViewState: StateFlow<MapViewState> = combine(
-        combine(mapUiPartsFlow, _kinematicState, _systemPulse, _systemPulseRt) { ui, kin, p, prt -> MapBase(ui, kin, p, prt) },
+        combine(_uiState.map { MapUiParts(it.appMode, it.hydrationLevel, it.isMapButtonsVisible, it.isFenceVisible, it.geofenceMode, it.isViolationsVisible, it.isGeofenceViolationsVisible, it.maxDistance, it.isMapLocked, it.mapFollowMode, it.centeringTrackerTrigger, it.centeringViewerTrigger, it.zoomInTrigger, it.zoomOutTrigger, it.homePoints) }.distinctUntilChanged(), _kinematicState, _systemPulse, _systemPulseRt) { ui, kin, p, prt -> MapBase(ui, kin, p, prt) },
         trackerTrailSegments,
         viewerTrailSegments,
-        violationPointsFlow
+        repository.violationsFlow.distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
     ) { base, trkSegs, vwrSegs, vios ->
-        val ui = base.ui
-        val kin = base.kin
-        val pulse = base.p
-        val pulseRt = base.prt
-        val isTracker = ui.appMode == "tracker"
-
+        val ui = base.ui; val kin = base.kin; val pulse = base.p; val pulseRt = base.prt; val isTracker = ui.appMode == "tracker"
         val tLat = if (isTracker) kin.localLocation.kinetic.lat else kin.trackerLocation.kinetic.lat
         val tLng = if (isTracker) kin.localLocation.kinetic.lng else kin.trackerLocation.kinetic.lng
-        val tGpsTs = if (isTracker) kin.localLocation.kinetic.gpsTs else kin.trackerLocation.kinetic.gpsTs
-        val tTelTs = if (isTracker) kin.localLocation.ts else kin.trackerLocation.ts
-        
+        val tTs = if (isTracker) kin.localLocation.kinetic.gpsTs else kin.trackerLocation.kinetic.gpsTs
+        val tTel = if (isTracker) kin.localLocation.ts else kin.trackerLocation.ts
         val vLat = if (isTracker) 0.0 else kin.localLocation.kinetic.lat
         val vLng = if (isTracker) 0.0 else kin.localLocation.kinetic.lng
-        val vGpsTs = if (isTracker) 0L else kin.localLocation.kinetic.gpsTs
-        val vTelTs = if (isTracker) pulse else pulse // Simplified for now as it uses system pulse for viewer in tracker mode
-
-        val isTrkFresh = if (tGpsTs <= 0) false else {
-            val telAge = if (tTelTs > 0) pulse - tTelTs else Long.MAX_VALUE
-            val gpsAge = if (tTelTs > 0) maxOf(0L, tTelTs - tGpsTs) else 0L
-            (telAge + gpsAge) < GPS_UI_FAIL_THRESHOLD_MS
-        }
+        val vTs = if (isTracker) 0L else kin.localLocation.kinetic.gpsTs
+        val vTel = if (isTracker) 0L else kin.localLocation.ts
         
-        val isVwrFresh = if (vGpsTs <= 0) false else {
-            val telAge = if (vTelTs > 0) pulse - vTelTs else Long.MAX_VALUE
-            val gpsAge = if (vTelTs > 0) maxOf(0L, vTelTs - vGpsTs) else 0L
-            (telAge + gpsAge) < GPS_UI_FAIL_THRESHOLD_MS
+        val isTrkFresh = tTs > 0 && (pulse - tTel + maxOf(0L, tTel - tTs)) < GPS_UI_FAIL_THRESHOLD_MS
+        val isVwrFresh = vTs > 0 && (pulse - vTel + maxOf(0L, vTel - vTs)) < GPS_UI_FAIL_THRESHOLD_MS
+        val isTrkValid = PhysicsUtils.isValidLocation(tLat, tLng)
+        val isVwrValid = PhysicsUtils.isValidLocation(vLat, vLng)
+
+        if (isTrkValid) {
+            val alpha = if ((if (isTracker) kin.localLocation.kinetic.speed else kin.trackerLocation.kinetic.speed) < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
+            if (sTrkLat == 0.0 || PhysicsUtils.calculateDistance(sTrkLat, sTrkLng, tLat, tLng) > 100.0) { sTrkLat = tLat; sTrkLng = tLng }
+            else { sTrkLat = PhysicsUtils.smoothCoordinate(sTrkLat, tLat, alpha); sTrkLng = PhysicsUtils.smoothCoordinate(sTrkLng, tLng, alpha) }
+        }
+        if (isVwrValid) {
+            val alpha = if (kin.localLocation.kinetic.speed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
+            if (sVwrLat == 0.0 || PhysicsUtils.calculateDistance(sVwrLat, sVwrLng, vLat, vLng) > 100.0) { sVwrLat = vLat; sVwrLng = vLng }
+            else { sVwrLat = PhysicsUtils.smoothCoordinate(sVwrLat, vLat, alpha); sVwrLng = PhysicsUtils.smoothCoordinate(sVwrLng, vLng, alpha) }
         }
 
         MapViewState(
-            appMode = ui.appMode,
-            hydrationLevel = ui.hydrationLevel,
-            isMapButtonsVisible = ui.isMapButtonsVisible,
-            isFenceVisible = ui.isFenceVisible,
-            geofenceMode = ui.geofenceMode,
-            isViolationsVisible = ui.isViolationsVisible,
-            isGeofenceViolationsVisible = ui.isGeofenceViolationsVisible,
-            maxDistance = ui.maxDistance,
-            isMapLocked = ui.isMapLocked,
-            mapFollowMode = ui.mapFollowMode,
-            centeringTrackerTrigger = ui.centeringTrackerTrigger,
-            centeringViewerTrigger = ui.centeringViewerTrigger,
-            zoomInTrigger = ui.zoomInTrigger,
-            zoomOutTrigger = ui.zoomOutTrigger,
-            homePoints = ui.homePoints,
-            trackerLat = tLat,
-            trackerLng = tLng,
-            trackerSpeed = if (isTracker) kin.localLocation.kinetic.speed else kin.trackerLocation.kinetic.speed,
-            trackerAccuracy = if (isTracker) kin.localLocation.kinetic.accuracy else kin.trackerLocation.kinetic.accuracy,
-            trackerMaxAccuracy = if (isTracker) kin.localLocation.kinetic.maxAccuracy else kin.trackerLocation.kinetic.maxAccuracy,
-            trackerGpsTs = tGpsTs,
-            trackerTelemetryTs = tTelTs,
-            trackerLocPending = if (isTracker) kin.localHealth.isLocationPending else kin.trackerHealth.isLocationPending,
-            trackerLocPendingReason = if (isTracker) kin.localHealth.locationPendingReason else kin.trackerHealth.locationPendingReason,
-            trackerLastValidFixRt = if (isTracker) kin.localHealth.lastValidFixRt else kin.trackerHealth.lastValidFixRt,
-            viewerLat = vLat,
-            viewerLng = vLng,
-            viewerSpeed = if (isTracker) 0.0 else kin.localLocation.kinetic.speed,
-            viewerAccuracy = if (isTracker) 0.0 else kin.localLocation.kinetic.accuracy,
-            viewerMaxAcc = if (isTracker) 0.0 else kin.localLocation.kinetic.maxAccuracy,
-            viewerGpsTs = vGpsTs,
-            viewerTelemetryTs = vTelTs,
-            viewerLocPending = if (isTracker) false else kin.localHealth.isLocationPending,
-            viewerLocPendingReason = if (isTracker) LocationPendingReason.NONE else kin.localHealth.locationPendingReason,
-            viewerLastValidFixRt = if (isTracker) 0L else kin.localHealth.lastValidFixRt,
-            replayCursorPos = kin.replayCursorPos,
-            systemPulse = pulse,
-            systemPulseRt = pulseRt,
-            trackerSegments = trkSegs,
-            viewerSegments = vwrSegs,
-            violations = vios,
-            showAccuracyBadge = true,
-            showSettingsButton = true,
-            showToolsOverlay = true,
-            isTrackerFresh = isTrkFresh,
-            isViewerFresh = isVwrFresh,
-            isTrackerValid = PhysicsUtils.isValidLocation(tLat, tLng),
-            isViewerValid = PhysicsUtils.isValidLocation(vLat, vLng)
+            appMode = ui.appMode, hydrationLevel = ui.hydrationLevel, isMapButtonsVisible = ui.isMapButtonsVisible, isFenceVisible = ui.isFenceVisible, geofenceMode = ui.geofenceMode,
+            isViolationsVisible = ui.isViolationsVisible, isGeofenceViolationsVisible = ui.isGeofenceViolationsVisible, maxDistance = ui.maxDistance, isMapLocked = ui.isMapLocked, mapFollowMode = ui.mapFollowMode,
+            centeringTrackerTrigger = ui.centeringTrackerTrigger, centeringViewerTrigger = ui.centeringViewerTrigger, zoomInTrigger = ui.zoomInTrigger, zoomOutTrigger = ui.zoomOutTrigger, homePoints = ui.homePoints,
+            trackerLat = tLat, trackerLng = tLng, trackerSpeed = if (isTracker) kin.localLocation.kinetic.speed else kin.trackerLocation.kinetic.speed, trackerAccuracy = if (isTracker) kin.localLocation.kinetic.accuracy else kin.trackerLocation.kinetic.accuracy,
+            trackerMaxAccuracy = if (isTracker) kin.localLocation.kinetic.maxAccuracy else kin.trackerLocation.kinetic.maxAccuracy, trackerGpsTs = tTs, trackerTelemetryTs = tTel,
+            trackerLocPending = if (isTracker) kin.localHealth.isLocationPending else kin.trackerHealth.isLocationPending, trackerLocPendingReason = if (isTracker) kin.localHealth.locationPendingReason else kin.trackerHealth.locationPendingReason,
+            trackerLastValidFixRt = if (isTracker) kin.localHealth.lastValidFixRt else kin.trackerHealth.lastValidFixRt, viewerLat = vLat, viewerLng = vLng, viewerSpeed = if (isTracker) 0.0 else kin.localLocation.kinetic.speed,
+            viewerAccuracy = if (isTracker) 0.0 else kin.localLocation.kinetic.accuracy, viewerMaxAcc = if (isTracker) 0.0 else kin.localLocation.kinetic.maxAccuracy, viewerGpsTs = vTs, viewerTelemetryTs = vTel,
+            viewerLocPending = if (isTracker) false else kin.localHealth.isLocationPending, viewerLocPendingReason = if (isTracker) LocationPendingReason.NONE else kin.localHealth.locationPendingReason,
+            viewerLastValidFixRt = if (isTracker) 0L else kin.localHealth.lastValidFixRt, replayCursorPos = kin.replayCursorPos, systemPulse = pulse, systemPulseRt = pulseRt,
+            trackerSegments = trkSegs, viewerSegments = vwrSegs, violations = vios, showAccuracyBadge = true, showSettingsButton = true, showToolsOverlay = true,
+            isTrackerFresh = isTrkFresh, isViewerFresh = isVwrFresh, isTrackerValid = isTrkValid, isViewerValid = isVwrValid,
+            smoothedTrackerLat = sTrkLat, smoothedTrackerLng = sTrkLng, smoothedViewerLat = sVwrLat, smoothedViewerLng = sVwrLng
         )
-    }
-    .flowOn(Dispatchers.Default)
-    .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
-    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MapViewState())
-
-    // Snap-Isolation: Deep parity check for list-based flows (R312)
-    private fun <T> listContentEquals(a: List<T>?, b: List<T>?, itemCompare: (T, T) -> Boolean): Boolean {
-        if (a === b) return true
-        if (a == null || b == null) return false
-        if (a.size != b.size) return false
-        for (i in a.indices) {
-            if (!itemCompare(a[i], b[i])) return false
-        }
-        return true
-    }
+    }.flowOn(Dispatchers.Default).sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MapViewState())
 
     // Logic and Event Handlers
-    val eventLogsFlow: StateFlow<List<LogEntry>> = combine(
-        _uiState.map { it.appMode }.distinctUntilChanged(),
-        _uiState.map { it.navigation.isStrictMode }.distinctUntilChanged(),
-        _uiState.map { it.navigation.isLogVisible }.distinctUntilChanged()
-    ) { mode, isStrict, isVisible -> Triple(mode, isStrict, isVisible) }
-    .flatMapLatest { (mode, isStrict, isVisible) -> 
-        if (mode != null && isVisible) {
-            val limit = if (isStrict) LOG_LIMIT_STRICT else LOG_LIMIT_STANDARD
-            repository.eventLogsFlow(limit)
-        } else flowOf(emptyList()) 
-    }
-    .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-    .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
-    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val eventLogsFlow: StateFlow<List<LogEntry>> = combine(_uiState.map { it.appMode }.distinctUntilChanged(), _uiState.map { it.navigation.isStrictMode }.distinctUntilChanged(), _uiState.map { it.navigation.isLogVisible }.distinctUntilChanged()) { m, s, v -> Triple(m, s, v) }
+        .flatMapLatest { (m, s, v) -> if (m != null && v) repository.eventLogsFlow(if (s) LOG_LIMIT_STRICT else LOG_LIMIT_STANDARD) else flowOf(emptyList()) }
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }.sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /**
      * activeGnssDetail: GNSS Detail publication flow.
-     * Throttling migrated to HardwareProvider source (R-ID 267) for A15 load-awareness.
      */
     val activeGnssDetail: StateFlow<GnssDetail?> = repository.gnssDetail
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
@@ -399,47 +353,9 @@ class MainViewModel @Inject constructor(
     private val replayCursorRequest = MutableStateFlow<Long?>(null)
 
     init {
-        // Issue #910 Forensic: Log state changes
-        viewModelScope.launch {
-            _uiState.map { it.hydrationLevel }.distinctUntilChanged().collect {
-                Timber.d("Issue #910: Hydration Level: $it")
-            }
-        }
-        viewModelScope.launch {
-            _uiState.map { it.isInitialized }.distinctUntilChanged().collect {
-                Timber.d("Issue #910: Is Initialized: $it")
-            }
-        }
-        viewModelScope.launch {
-            _uiState.map { it.appMode }.distinctUntilChanged().collect {
-                Timber.d("Issue #910: App Mode: $it")
-            }
-        }
-        viewModelScope.launch {
-            _uiState.map { it.isSystemActive }.distinctUntilChanged().collect {
-                Timber.d("Issue #910: Is System Active: $it")
-            }
-        }
-
-        // Issue #910: Hydration Watchdog
-        viewModelScope.launch(Dispatchers.Default) {
-            delay(WATCH_DOG_UI_GRACE_MS)
-            if (_uiState.value.hydrationLevel < 3) {
-                Timber.e("Issue #910: Hydration Watchdog Triggered. Stuck at level ${_uiState.value.hydrationLevel}")
-                addPersistentLog(
-                    type = "error", 
-                    message = "HYDRATION WATCHDOG: Level 2 Hang Detected. Entering SAFE MODE.", 
-                    isImportant = true
-                )
-                withContext(Dispatchers.Main.immediate) {
-                    updateState { it.copy(isInitialized = true, isSafeMode = true) }
-                    repository.setSafeMode(true)
-                }
-            }
-        }
-
         viewModelScope.launch(Dispatchers.Default + uiExceptionHandler) {
             val initialSettings = settingsUseCase.loadAllSettings()
+            appStartTime = initialSettings.appStartTime
             
             withContext(Dispatchers.Main.immediate) {
                 applyInitialSettings(initialSettings)
@@ -448,8 +364,7 @@ class MainViewModel @Inject constructor(
                     updateState { it.copy(hydrationLevel = level) }
                 }.launchIn(viewModelScope)
 
-                val isA15 = systemStatusProvider.isA15Hardware()
-                hydrationManager.startHydration(viewModelScope, isA15) {
+                hydrationManager.startHydration(viewModelScope, systemStatusProvider.isA15Hardware()) {
                     updateState { it.copy(isInitialized = true) }
                 }
             }
@@ -478,8 +393,7 @@ class MainViewModel @Inject constructor(
                     }
                     val mode = _uiState.value.appMode
                     val trail = if (mode == "viewer") trackerTrailFlow.value else viewerTrailFlow.value
-                    val bestPoint = stateSubscriptionUseCase.findClosestTrailPoint(trail, ts)
-                    bestPoint?.let { bp ->
+                    stateSubscriptionUseCase.findClosestTrailPoint(trail, ts)?.let { bp ->
                         updateKinematicState { it.apply { 
                             replayCursorPos = bp.toGeoPoint() 
                             pulse = timeProvider.elapsedRealtime()
@@ -558,12 +472,9 @@ class MainViewModel @Inject constructor(
                     current.activeAlarms = update.activeAlarms
                     current.isMaliAnomaly = update.health.isMaliAnomaly
                     current.isGnssThrottled = update.health.isGnssThrottled
-                    
-                    // R-ID 259 Mapping
                     current.lastEnergyDeltaMa = update.health.lastEnergyDeltaMa
                     current.lastEnergyDeltaTemp = update.health.lastEnergyDeltaTemp
                     current.lastEnergyDurationMs = update.health.lastEnergyDurationMs
-                    
                     current.pulse = timeProvider.elapsedRealtime()
                     current
                 }
@@ -598,12 +509,9 @@ class MainViewModel @Inject constructor(
                     current.trackerBattery.level = status.battery
                     current.trackerBattery.temp = status.temp
                     current.trackerIsGnssThrottled = status.isGnssThrottled
-                    
-                    // Remote R-ID 259 Mapping
                     current.lastEnergyDeltaMa = status.lastEnergyDeltaMa
                     current.lastEnergyDeltaTemp = status.lastEnergyDeltaTemp
                     current.lastEnergyDurationMs = status.lastEnergyDurationMs
-
                     current.pulse = timeProvider.elapsedRealtime()
                     current
                 }
@@ -633,7 +541,10 @@ class MainViewModel @Inject constructor(
                 }
                 updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
             }
-            is UiEvent.SetReplayCursor -> handleReplayCursor(event.ts)
+            is UiEvent.SetReplayCursor -> {
+                updateNavigation { it.copy(replayCursorTs = event.ts) }
+                replayCursorRequest.value = event.ts
+            }
             is UiEvent.SetUiVisible -> {
                 repository.sendCommand(UiCommand.UiVisibilityChanged(event.visible))
                 if (!event.visible && _uiState.value.navigation.isSettingsOpen) commitDraft()
@@ -672,10 +583,6 @@ class MainViewModel @Inject constructor(
                 }
             }
             is UiEvent.SetRecoveryPending -> updateState { it.copy(isRecoveryPending = event.pending) }
-            is UiEvent.LogAction -> addPersistentLog(event.type, message = event.message, isImportant = event.isImportant, isSpecial = event.isSpecial, specialColor = event.specialColor)
-            is UiEvent.RefreshPermissionStatus -> viewModelScope.launch(Dispatchers.IO) { 
-                systemStatusProvider.getPermissionState(forceRefresh = true)
-            }
             is UiEvent.UpdateDraftDeviceId, is UiEvent.UpdateDraftViewerId, is UiEvent.UpdateDraftRelayUrl, 
             is UiEvent.UpdateDraftMaxDistance, is UiEvent.UpdateDraftAlertSettings, is UiEvent.UpdateDraftAlarmVolume, 
             is UiEvent.CommitSettings -> handleDraftEvent(event)
@@ -711,11 +618,6 @@ class MainViewModel @Inject constructor(
             is UiEvent.SetLogFilterShowRecovered -> repository.updateLogFilters(recovered = event.show)
             else -> {}
         }
-    }
-
-    private fun handleReplayCursor(ts: Long?) {
-        updateNavigation { it.copy(replayCursorTs = ts) }
-        replayCursorRequest.value = ts
     }
 
     private fun handleDraftEvent(event: UiEvent) {
