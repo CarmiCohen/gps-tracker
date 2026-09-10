@@ -15,8 +15,8 @@ android {
         applicationId "com.gps19.app"
         minSdk 24
         targetSdk 35
-        versionCode 971
-        versionName "Sep.09.16" // Identity Color Role Confusion RESOLVED
+        versionCode 973
+        versionName "Sep.10.00" // Legacy Field Cleanup & Peer LED Verification RESOLVED
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

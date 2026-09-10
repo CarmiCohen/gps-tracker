@@ -1,7 +1,9 @@
-# Simplification Ideas (vSep.09.15)
+# Simplification Ideas (Sep.10.00)
 
-1.  **Telemetry Data Class Flattening (Priority)**: `LocationUpdate` now exceeds 70 fields. Partition it into specialized, lean states: `KineticState` (Position/Speed), `AtmosphericState` (Baro/Temp/Lux), and `IntegrityState` (Errors/Throttling). This will reduce allocation churn and improve serialization performance on budget hardware (R-ID 238). [Partially Resolved - Sep.09.10]
-2.  **Alarm Evaluation Logic partitioning**: Partition the monolithic `evaluateAlarms` method in `AlarmManager` into specialized evaluators (e.g., `PhysicalTamperEvaluator`, `HardwareHealthEvaluator`) to reduce cyclomatic complexity and improve unit test coverage. [Partially Resolved - Sep.09.00]
-3.  **UiStateAggregator Refactoring**: As UI flags increase, the aggregator is becoming complex. Transition to a "Plugin" architecture where different modules contribute to the final UI state independently.
-4.  **Telemetry Mapper Unification**: Once the model flattening (Idea #1) is stable, refactor `TelemetryMapper` to map entire state sub-objects (Kinetic, Atmospheric, Integrity) instead of individual primitive fields. This will reduce boilerplate and the risk of "mapping gaps" in forensic data (Sep.08.20).
-5.  **Fixed Grid Pulse Unification**: Consolidate the 90s fixed grid pulse (R-ID 302) and the 30s hardware "Poke" (R-ID 926) into a single, unified system heartbeat cadence to reduce wake-alarm overhead and simplify background lifecycle maintenance (Sep.09.15).
+## 💡 Idea #241: HudState Aggregator Refactoring
+**Status**: PROPOSED
+**Description**: The `HudState` data class in `EngineModels.kt` currently serves as a monolithic facade for legacy Compose compatibility. As the aggregator transitions to segmented emissions (`HudConnectivityState`, `HudTelemetryState`, `HudHealthState`), we should remove the top-level `HudState` and have the UI components subscribe to the specific sub-states directly. This will reduce recomposition scope and simplify the `MainViewModel` logic.
+
+## 💡 Idea #242: Unified Termination Logic
+**Status**: PROPOSED
+**Description**: Currently, session termination is handled slightly differently in `TrackerScreen` vs `ViewerScreen` (button labels, confirmation flows). Centralizing this into a single `SessionTerminationComponent` within `SharedUiComponents.kt` would reduce boilerplate and ensure visual consistency across modes.
