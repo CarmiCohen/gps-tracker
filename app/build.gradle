@@ -15,8 +15,8 @@ android {
         applicationId "com.gps19.app"
         minSdk 24
         targetSdk 35
-        versionCode 973
-        versionName "Sep.10.00" // Legacy Field Cleanup & Peer LED Verification RESOLVED
+        versionCode 974
+        versionName "Sep.10.05" // SRV Status Inconsistency RESOLVED (#941)
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

@@ -8,6 +8,9 @@ import javax.inject.Singleton
 
 /**
  * TelemetryRepository: In-memory store for live system status.
+ * Sep.10.02:
+ * - Issue #941 RESOLVED: Fixed SRV Status Inconsistency. Added isRelayConnected 
+ *   and lastRtt to clear() sequence to ensure clean state transitions (R941).
  * Sep.06.02:
  * - Issue #924 RESOLVED: Watchdog Safe-Mode. Added isSafeMode to prevent 
  *   signaling loops during hydration failures (R-ID 271).
@@ -115,6 +118,8 @@ class TelemetryRepository @Inject constructor() {
         t.copyFrom(LocationUpdate(isMe = false))
         _trackerLocation.value = t
 
+        _isRelayConnected.value = false
+        _lastRtt.value = 0
         _connectedViewers.value = emptyList()
         _lastRemoteActivityTs.value = 0L
         _gnssDetail.value = null

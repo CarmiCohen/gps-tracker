@@ -34,6 +34,10 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.10.03:
+ * - Issue #941 RESOLVED: Fixed SRV Status Inconsistency. Explicitly reset relay 
+ *   status and RTT in stop() to prevent stale GREEN indicators during role 
+ *   transitions (R941).
  * Sep.09.11:
  * - Forensic Audit Hardening: Fixed mapping gaps for signal, maxTemp, isGnssThrottled, 
  *   and maxAccuracy in partitioned state reconstruction (R-ID 284).
@@ -871,6 +875,10 @@ class ConnectivitySuite @Inject constructor(
 
         // R975: Reset peer status during stop to avoid cross-role ghost activity
         resetPeerStats()
+
+        // Issue #941: Explicitly reset local relay status and RTT to avoid stale GREEN UI badges.
+        telemetryRepository.updateRelayStatus(false)
+        telemetryRepository.updateLastRtt(0)
         
         keepAliveJob?.cancel(); keepAliveJob = null
         syncJob?.cancel(); syncJob = null
