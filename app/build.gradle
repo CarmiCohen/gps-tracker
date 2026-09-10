@@ -15,8 +15,8 @@ android {
         applicationId "com.gps19.app"
         minSdk 24
         targetSdk 35
-        versionCode 978
-        versionName "Sep.11.10" // Map Partitioning Integrity RESOLVED (#243-Audit)
+        versionCode 979
+        versionName "Sep.10.20" // Rigorous Audit #243: Map State Consolidation
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

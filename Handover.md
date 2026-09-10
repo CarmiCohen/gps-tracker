@@ -1,30 +1,27 @@
-# 🏁 Forensic Handover (Sep.11.10 - Map Integrity Audit)
+# 🏁 Forensic Handover (Sep.10.20 - Map Consolidation Hardening)
 
-## 🎯 Current Context: Map Layer Hardened
-The Map UI layer has undergone a rigorous integrity audit following the #243 refactor. All redundant parameters and manual tool overlays have been eliminated. The subsystem is now fully encapsulated within `AppMapContainer` and optimized via trigger pruning in the ViewModel.
+## 🎯 Current Context: Map State Partitioning Hardened
+The Map UI layer has been rigorously audited and hardened. Derived state (freshness/validity) has been entirely removed from the UI layer and centralized in the ViewModel's `mapViewState` flow. The system now strictly follows R-ID 287.
 
-## 🛠️ Work Completed (Sep.11.10)
-*   **Map Partitioning Integrity RESOLVED (#243-Audit)**:
-    *   **UI Delegation**: Removed redundant `MapToolsOverlay` and `MapSettingsToggle` from `TrackerScreen` and `ViewerScreen`.
-    *   **Trigger Pruning**: Introduced `MapUiParts` in `MainViewModel` to isolate map state updates from unrelated UI changes.
-    *   **Signature Cleanup**: Simplified screen calls in `MainAppContent`, removing ~20 redundant individual parameter passes.
-    *   **Build Hardening**: Resolved parameter mapping defects in `SettingsOverlay`.
-*   **Completed Resolutions (Recent)**:
-    *   `Sep.10.12`: Map State Partitioning RESOLVED (#243).
-    *   `Sep.10.08`: HUD Aggregator Refactoring RESOLVED (#241).
-*   **Versioning**: Incremented `versionCode` to 978 and `versionName` to `Sep.11.10`.
+## 🛠️ Work Completed (Sep.10.20)
+*   **Map State Partitioning RIGOROUS AUDIT (#243-Audit)**:
+    *   **Logic Migration**: Moved staleness logic (15s gate) to `MainViewModel.kt`.
+    *   **Interface Simplification**: `MapToolsOverlay` and `AppMapContainer` now consume a single `MapViewState` object.
+    *   **Leftover Removal**: Eliminated `remember(state.trackerLat...)` blocks in `MapComponents.kt` that were performing duplicate validation logic.
+*   **Hardening Progress**: Updated `issues.md` and `SOT_MASTER_REQUIREMENTS.md`.
+*   **Versioning**: Incremented to `versionName "Sep.10.20"` and `versionCode 979`.
 
 ## 📂 Forensic File Snapshot
-*   `app:TrackerScreen.kt` & `app:ViewerScreen.kt`: Leaner signatures; delegated map UI to container.
-*   `app:MainViewModel.kt`: Optimized `mapViewState` flow with trigged-based pruning.
-*   `app:MainAppContent.kt`: Cleaned of redundant collections and parameters.
-*   `issues.md`: Dashboard updated to 978 resolved items.
+*   `app:MainUiState.kt`: Expanded `MapViewState` with freshness and validity flags.
+*   `app:MainViewModel.kt`: Implemented centralized map state calculation logic.
+*   `app:MapComponents.kt`: Fully refactored to be a passive consumer of `MapViewState`.
+*   `app:build.gradle`: Updated to vSep.10.20.
 
 ## 🟡 Open Issues (Resumption Priority)
 *   *No high-priority open issues.*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 311 (Rules: 58, IDs: 253), Resolved: 978, Open: 0, Testing: 100% (Sub-items: 50), Ideas: 3, QA: 269]**
+- **Current Audit Baseline: [SOT: 311 (Rules: 58, IDs: 253), Resolved: 979, Open: 0, Testing: 100% (Sub-items: 50), Ideas: 3, QA: 269]**
 
 ---
 **Resumption Command**: `🏁 Resume from Handover.md and follow the logic in DEVELOPER_GUIDELINES.md strictly.`

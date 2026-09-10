@@ -40,13 +40,13 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Sep.10.20:
+ * - Rigorous Audit #243: Fully consolidated MapToolsOverlay and marker 
+ *   freshness into MapViewState. Eliminated all remaining individual 
+ *   parameter passing and UI-side derived state (R-ID 287).
  * Sep.10.12:
  * - Idea #243: Map State Partitioning RESOLVED. Refactored AppMapContainer 
- *   and OsmMap to consume MapViewState, reducing parameter surface and 
- *   optimizing recomposition (R-ID 287).
- * Sep.08.13:
- * - Fix: Corrected isViewerFresh calculation in AppMapContainer to use 
- *   viewerTelemetryTs instead of trackerTelemetryTs (R-ID 282).
+ *   and OsmMap to consume MapViewState (R-ID 287).
  */
 
 @Composable
@@ -57,35 +57,12 @@ fun AppMapContainer(
     onSaveTrail: () -> Unit,
     onLoadTrail: () -> Unit
 ) {
-    val context = LocalContext.current
     val isTrackerMode = state.appMode == "tracker"
-
-    val isTrackerFresh by remember(state.trackerGpsTs, state.trackerTelemetryTs, state.systemPulse) {
-        derivedStateOf {
-            if (state.trackerGpsTs <= 0) false
-            else {
-                val telemetryAge = if (state.trackerTelemetryTs > 0) state.systemPulse - state.trackerTelemetryTs else Long.MAX_VALUE
-                val sourceGpsAge = if (state.trackerTelemetryTs > 0) maxOf(0L, state.trackerTelemetryTs - state.trackerGpsTs) else 0L
-                (telemetryAge + sourceGpsAge) < GPS_UI_FAIL_THRESHOLD_MS
-            }
-        }
-    }
-
-    val isViewerFresh by remember(state.viewerGpsTs, state.viewerTelemetryTs, state.systemPulse) {
-        derivedStateOf {
-            if (state.viewerGpsTs <= 0) false
-            else {
-                val telemetryAge = if (state.viewerTelemetryTs > 0) state.systemPulse - state.viewerTelemetryTs else Long.MAX_VALUE
-                val sourceGpsAge = if (state.viewerTelemetryTs > 0) maxOf(0L, state.viewerTelemetryTs - state.viewerGpsTs) else 0L
-                (telemetryAge + sourceGpsAge) < GPS_UI_FAIL_THRESHOLD_MS
-            }
-        }
-    }
 
     val initialCenter = remember(state.trackerLat, state.viewerLat) {
         when {
-            PhysicsUtils.isValidLocation(state.trackerLat, state.trackerLng) -> GeoPoint(state.trackerLat, state.trackerLng)
-            PhysicsUtils.isValidLocation(state.viewerLat, state.viewerLng) -> GeoPoint(state.viewerLat, state.viewerLng)
+            state.isTrackerValid -> GeoPoint(state.trackerLat, state.trackerLng)
+            state.isViewerValid -> GeoPoint(state.viewerLat, state.viewerLng)
             else -> GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
         }
     }
@@ -95,8 +72,6 @@ fun AppMapContainer(
     Box(modifier = Modifier.fillMaxSize()) {
         OsmMap(
             state = state,
-            isTrackerFresh = isTrackerFresh,
-            isViewerFresh = isViewerFresh,
             initialCenter = initialCenter,
             onTap = { onEvent(UiEvent.MapTap(it)) },
             onRemoveMarker = { if (!isTrackerMode) onEvent(UiEvent.RemoveHomePoint(it)) },
@@ -129,13 +104,11 @@ fun AppMapContainer(
             Box(Modifier.fillMaxSize()) {
                 Box(Modifier.align(Alignment.CenterStart).padding(start = 8.dp).fillMaxHeight(0.85f).width(140.dp)) { 
                     MapToolsOverlay(
-                        isTrackerMode = isTrackerMode, 
-                        trackerValid = PhysicsUtils.isValidLocation(state.trackerLat, state.trackerLng), 
-                        viewerValid = PhysicsUtils.isValidLocation(state.viewerLat, state.viewerLng),
-                        showFence = state.isFenceVisible, onToggleFence = { onEvent(UiEvent.SetFenceVisible(!state.isFenceVisible)) }, geofenceMode = state.geofenceMode, onSetGeofenceMode = { onSetGeofenceMode -> onEvent(UiEvent.SetGeofenceMode(onSetGeofenceMode)) },
-                        showViolations = state.isViolationsVisible, onToggleViolations = { onEvent(UiEvent.SetViolationsVisible(!state.isViolationsVisible)) },
-                        showGeofenceViolations = state.isGeofenceViolationsVisible, onToggleGeofenceViolations = { onEvent(UiEvent.SetGeofenceViolationsVisible(!state.isGeofenceViolationsVisible)) },
-                        onClear = onClearTrails, onSave = onSaveTrail, onLoad = onLoadTrail, onCenterTracker = { onEvent(UiEvent.CenterTracker) }, onCenterViewer = { onEvent(UiEvent.CenterViewer) }, onZoomIn = { onEvent(UiEvent.MapZoomIn) }, onZoomOut = { onEvent(UiEvent.MapZoomOut) }
+                        state = state,
+                        onClear = onClearTrails, 
+                        onSave = onSaveTrail, 
+                        onLoad = onLoadTrail, 
+                        onEvent = onEvent
                     ) 
                 }
             }
@@ -175,8 +148,6 @@ fun MapSettingsToggle(isMapButtonsVisible: Boolean, onToggle: () -> Unit, modifi
 @Composable
 fun OsmMap(
     state: MapViewState,
-    isTrackerFresh: Boolean,
-    isViewerFresh: Boolean,
     initialCenter: GeoPoint? = null,
     onTap: (GeoPoint) -> Unit,
     onRemoveMarker: (Int) -> Unit,
@@ -185,7 +156,6 @@ fun OsmMap(
 ) {
     val context = LocalContext.current
     val density = context.resources.displayMetrics.density
-    
     val isTrackerMode = state.appMode == "tracker"
 
     val overlayManager = remember(mapViewRef.value) {
@@ -194,25 +164,19 @@ fun OsmMap(
 
     DisposableEffect(overlayManager) {
         val callback = object : ComponentCallbacks2 {
-            override fun onTrimMemory(level: Int) {
-                overlayManager?.trimMemory(level)
-            }
+            override fun onTrimMemory(level: Int) { overlayManager?.trimMemory(level) }
             override fun onConfigurationChanged(newConfig: Configuration) {}
-            override fun onLowMemory() {
-                overlayManager?.trimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW)
-            }
+            override fun onLowMemory() { overlayManager?.trimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) }
         }
         context.registerComponentCallbacks(callback)
-        onDispose {
-            context.unregisterComponentCallbacks(callback)
-        }
+        onDispose { context.unregisterComponentCallbacks(callback) }
     }
 
     val smoothedTrackerPos = remember { mutableStateOf<GeoPoint?>(null) }
     val smoothedViewerPos = remember { mutableStateOf<GeoPoint?>(null) }
 
     LaunchedEffect(state.trackerLat, state.trackerLng, state.trackerSpeed) {
-        if (PhysicsUtils.isValidLocation(state.trackerLat, state.trackerLng)) {
+        if (state.isTrackerValid) {
             val last = smoothedTrackerPos.value
             val alpha = if (state.trackerSpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
             smoothedTrackerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, state.trackerLat, state.trackerLng) > 100.0) {
@@ -227,7 +191,7 @@ fun OsmMap(
     }
 
     LaunchedEffect(state.viewerLat, state.viewerLng, state.viewerSpeed) {
-        if (PhysicsUtils.isValidLocation(state.viewerLat, state.viewerLng)) {
+        if (state.isViewerValid) {
             val last = smoothedViewerPos.value
             val alpha = if (state.viewerSpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
             smoothedViewerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, state.viewerLat, state.viewerLng) > 100.0) {
@@ -246,7 +210,7 @@ fun OsmMap(
 
     var lastTriggerTs by remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(localLockStatus.value, state.trackerLat, state.trackerLng, state.viewerLat, state.viewerLng, isTrackerFresh, isViewerFresh, state.mapFollowMode, smoothedTrackerPos.value, smoothedViewerPos.value) {
+    LaunchedEffect(localLockStatus.value, state.trackerLat, state.trackerLng, state.viewerLat, state.viewerLng, state.isTrackerFresh, state.isViewerFresh, state.mapFollowMode, smoothedTrackerPos.value, smoothedViewerPos.value) {
         if (localLockStatus.value) {
             if (state.systemPulse - lastTriggerTs < 500) return@LaunchedEffect
             val sTrk = smoothedTrackerPos.value
@@ -257,7 +221,7 @@ fun OsmMap(
                 MapFollowMode.VIEWER -> { if (sVwr != null) view.controller.setCenter(sVwr) }
                 MapFollowMode.TRACKER -> { if (sTrk != null) view.controller.setCenter(sTrk) }
                 MapFollowMode.AUTO -> {
-                    if (sTrk != null && sVwr != null && isTrackerFresh && isViewerFresh) {
+                    if (sTrk != null && sVwr != null && state.isTrackerFresh && state.isViewerFresh) {
                         val dist = PhysicsUtils.calculateDistance(sTrk.latitude, sTrk.longitude, sVwr.latitude, sVwr.longitude)
                         if (dist in 100.0..100000.0) {
                             val box = BoundingBox.fromGeoPoints(listOf(sTrk, sVwr))
@@ -328,17 +292,17 @@ fun OsmMap(
                 
                 if (state.hydrationLevel >= 6) {
                     changed = om.updateCurrentPositions(
-                        trackerValid = smoothedTrackerPos.value != null,
+                        trackerValid = state.isTrackerValid,
                         trackerPos = smoothedTrackerPos.value,
-                        isTrackerFresh = isTrackerFresh,
+                        isTrackerFresh = state.isTrackerFresh,
                         trackerAccuracy = state.trackerAccuracy,
                         maxTrackerAccuracy = state.trackerMaxAccuracy,
                         trackerSpeed = state.trackerSpeed,
                         isTrackerPending = state.trackerLocPending,
                         trackerLastValidFixRt = state.trackerLastValidFixRt,
-                        viewerValid = smoothedViewerPos.value != null,
+                        viewerValid = state.isViewerValid,
                         viewerPos = smoothedViewerPos.value,
-                        isViewerFresh = isViewerFresh,
+                        isViewerFresh = state.isViewerFresh,
                         viewerAccuracy = state.viewerAccuracy,
                         viewerMaxAcc = state.viewerMaxAcc,
                         viewerSpeed = state.viewerSpeed,
@@ -356,9 +320,7 @@ fun OsmMap(
                     changed = om.updateReplayCursor(state.replayCursorPos) || changed
                 }
                 
-                if (changed) {
-                    view.invalidate()
-                }
+                if (changed) { view.invalidate() }
             }
         }
     }, onRelease = { view -> 
@@ -369,26 +331,40 @@ fun OsmMap(
 
 @Composable
 fun MapToolsOverlay(
-    isTrackerMode: Boolean, trackerValid: Boolean = true, viewerValid: Boolean = true, showFence: Boolean, onToggleFence: () -> Unit,
-    geofenceMode: GeofenceMode, onSetGeofenceMode: (GeofenceMode) -> Unit, showViolations: Boolean = true, onToggleViolations: () -> Unit = {},
-    showGeofenceViolations: Boolean = true, onToggleGeofenceViolations: () -> Unit = {}, onClear: () -> Unit, onSave: () -> Unit, 
-    onLoad: () -> Unit, onCenterTracker: () -> Unit = {}, onCenterViewer: () -> Unit = {},
-    onZoomIn: () -> Unit = {}, onZoomOut: () -> Unit = { }
+    state: MapViewState,
+    onClear: () -> Unit,
+    onSave: () -> Unit,
+    onLoad: () -> Unit,
+    onEvent: (UiEvent) -> Unit
 ) {
     val sc = rememberScrollState(); val sp = 16.dp; val prp = Color(0xFF800080)
-    val curTrk by rememberUpdatedState(isTrackerMode); val curTrkVal by rememberUpdatedState(trackerValid); val curVwrVal by rememberUpdatedState(viewerValid)
-    val curFnc by rememberUpdatedState(showFence); val curGeo by rememberUpdatedState(geofenceMode); val curVio by rememberUpdatedState(showViolations); val curGeoVio by rememberUpdatedState(showGeofenceViolations)
+    val isTrackerMode = state.appMode == "tracker"
 
     Column(modifier = Modifier.wrapContentWidth().verticalScroll(sc).padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(sp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(horizontalArrangement = Arrangement.spacedBy(sp)) { MapToolButton(label = "IN", symbol = "+", onClick = onZoomIn, iconColor = prp); MapToolButton(label = "OUT", symbol = "-", onClick = onZoomOut, iconColor = prp) }
-        Row(horizontalArrangement = Arrangement.spacedBy(sp)) { MapToolButton(icon = Icons.Default.Person, label = "VIEWER", onClick = onCenterViewer, iconColor = if(curVwrVal) ViewerCyan else Color.Gray); MapToolButton(icon = Icons.Default.Agriculture, label = "TRACKER", onClick = onCenterTracker, iconColor = if(curTrkVal) BrandJd else Color.Gray) }
-        Row(horizontalArrangement = Arrangement.spacedBy(sp)) { MapToolButton(icon = if (curGeoVio) Icons.Default.LocationOn else Icons.Default.LocationOff, label = "OUT", onClick = onToggleGeofenceViolations, iconColor = if (curGeoVio) Color.Red else Color.Gray); MapToolButton(icon = if (curVio) Icons.Default.Report else Icons.Default.ReportOff, label = "JUMP", onClick = onToggleViolations, iconColor = if (curVio) Color(0xFFFF00FF) else Color.Gray) }
-        Row(horizontalArrangement = Arrangement.spacedBy(sp)) { MapToolButton(icon = Icons.Default.Upload, label = "LOAD", onClick = onLoad, iconColor = BrandJd); MapToolButton(icon = Icons.Default.Save, label = "SAVE", onClick = onSave, iconColor = Indigo500) }
         Row(horizontalArrangement = Arrangement.spacedBy(sp)) { 
-            MapToolButton(icon = Icons.Default.AddLocation, label = "ADD", onClick = { if (!curTrk) onSetGeofenceMode(GeofenceMode.ADD) }, iconColor = if (curGeo == GeofenceMode.ADD) Color.White else BrandJd, containerColor = if (curGeo == GeofenceMode.ADD) BrandJd else Color.White)
-            MapToolButton(icon = Icons.Default.WrongLocation, label = "DEL", onClick = { if (!curTrk) onSetGeofenceMode(GeofenceMode.REMOVE) }, iconColor = if (curGeo == GeofenceMode.REMOVE) Color.White else Rose500, containerColor = if (curGeo == GeofenceMode.REMOVE) Rose500 else Color.White)
+            MapToolButton(label = "IN", symbol = "+", onClick = { onEvent(UiEvent.MapZoomIn) }, iconColor = prp)
+            MapToolButton(label = "OUT", symbol = "-", onClick = { onEvent(UiEvent.MapZoomOut) }, iconColor = prp)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(sp)) { MapToolButton(icon = if (curFnc) Icons.Default.Visibility else Icons.Default.VisibilityOff, label = "FENCE", onClick = onToggleFence, iconColor = if (curFnc) BrandJd else Color.Gray); MapToolButton(icon = Icons.Default.Delete, label = "CLEAR", onClick = { onCenterTracker(); onClear() }, iconColor = Rose500) }
+        Row(horizontalArrangement = Arrangement.spacedBy(sp)) { 
+            MapToolButton(icon = Icons.Default.Person, label = "VIEWER", onClick = { onEvent(UiEvent.CenterViewer) }, iconColor = if(state.isViewerValid) ViewerCyan else Color.Gray)
+            MapToolButton(icon = Icons.Default.Agriculture, label = "TRACKER", onClick = { onEvent(UiEvent.CenterTracker) }, iconColor = if(state.isTrackerValid) BrandJd else Color.Gray) 
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(sp)) { 
+            MapToolButton(icon = if (state.isGeofenceViolationsVisible) Icons.Default.LocationOn else Icons.Default.LocationOff, label = "OUT", onClick = { onEvent(UiEvent.SetGeofenceViolationsVisible(!state.isGeofenceViolationsVisible)) }, iconColor = if (state.isGeofenceViolationsVisible) Color.Red else Color.Gray)
+            MapToolButton(icon = if (state.isViolationsVisible) Icons.Default.Report else Icons.Default.ReportOff, label = "JUMP", onClick = { onEvent(UiEvent.SetViolationsVisible(!state.isViolationsVisible)) }, iconColor = if (state.isViolationsVisible) Color(0xFFFF00FF) else Color.Gray) 
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(sp)) { 
+            MapToolButton(icon = Icons.Default.Upload, label = "LOAD", onClick = onLoad, iconColor = BrandJd)
+            MapToolButton(icon = Icons.Default.Save, label = "SAVE", onClick = onSave, iconColor = Indigo500) 
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(sp)) { 
+            MapToolButton(icon = Icons.Default.AddLocation, label = "ADD", onClick = { if (!isTrackerMode) onEvent(UiEvent.SetGeofenceMode(GeofenceMode.ADD)) }, iconColor = if (state.geofenceMode == GeofenceMode.ADD) Color.White else BrandJd, containerColor = if (state.geofenceMode == GeofenceMode.ADD) BrandJd else Color.White)
+            MapToolButton(icon = Icons.Default.WrongLocation, label = "DEL", onClick = { if (!isTrackerMode) onEvent(UiEvent.SetGeofenceMode(GeofenceMode.REMOVE)) }, iconColor = if (state.geofenceMode == GeofenceMode.REMOVE) Color.White else Rose500, containerColor = if (state.geofenceMode == GeofenceMode.REMOVE) Rose500 else Color.White)
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(sp)) { 
+            MapToolButton(icon = if (state.isFenceVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, label = "FENCE", onClick = { onEvent(UiEvent.SetFenceVisible(!state.isFenceVisible)) }, iconColor = if (state.isFenceVisible) BrandJd else Color.Gray)
+            MapToolButton(icon = Icons.Default.Delete, label = "CLEAR", onClick = { onEvent(UiEvent.CenterTracker); onClear() }, iconColor = Rose500) 
+        }
     }
 }
 

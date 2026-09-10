@@ -5,12 +5,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
- * Sep.10.12:
+ * Sep.10.20:
+ * - Idea #243 Rigorous Audit: Consolidated freshness and validity flags into 
+ *   MapViewState to eliminate UI-side derived state (R-ID 287).
+ * Sep.11.10:
  * - Idea #243: Map State Partitioning RESOLVED. Added MapViewState to group 
  *   map parameters and reduce recomposition cost (R-ID 287).
- * Sep.08.12:
- * - Issue #924 Visibility: Added isGnssThrottled to DiagnosticState (R-ID 267).
- * - R-ID 259: Added structured Energy Footprint fields to DiagnosticState.
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -146,7 +146,13 @@ data class MapViewState(
     val violations: List<ViolationPoint> = emptyList(),
     val showAccuracyBadge: Boolean = true,
     val showSettingsButton: Boolean = true,
-    val showToolsOverlay: Boolean = true
+    val showToolsOverlay: Boolean = true,
+    
+    // R-ID 287 Rigorous Audit additions
+    val isTrackerFresh: Boolean = false,
+    val isViewerFresh: Boolean = false,
+    val isTrackerValid: Boolean = false,
+    val isViewerValid: Boolean = false
 )
 
 /**

@@ -61,11 +61,12 @@ private data class MapBase(val ui: MapUiParts, val kin: KinematicState, val p: L
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.10.20:
+ * - Rigorous Audit #243: Centralized location freshness and validity flags 
+ *   within MapViewState to eliminate derived state in UI components (R-ID 287).
  * Sep.11.10:
  * - Integrity Audit #243: Optimized mapViewState flow by segmenting UI triggers 
  *   to avoid redundant calculations on non-map state changes (R-ID 287).
- * - Fix: Corrected viewerLat/Lng logic in Tracker mode to prevent marker overlap.
- * - Fix: Restored map tool visibility for Viewer role.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -281,6 +282,28 @@ class MainViewModel @Inject constructor(
         val pulseRt = base.prt
         val isTracker = ui.appMode == "tracker"
 
+        val tLat = if (isTracker) kin.localLocation.kinetic.lat else kin.trackerLocation.kinetic.lat
+        val tLng = if (isTracker) kin.localLocation.kinetic.lng else kin.trackerLocation.kinetic.lng
+        val tGpsTs = if (isTracker) kin.localLocation.kinetic.gpsTs else kin.trackerLocation.kinetic.gpsTs
+        val tTelTs = if (isTracker) kin.localLocation.ts else kin.trackerLocation.ts
+        
+        val vLat = if (isTracker) 0.0 else kin.localLocation.kinetic.lat
+        val vLng = if (isTracker) 0.0 else kin.localLocation.kinetic.lng
+        val vGpsTs = if (isTracker) 0L else kin.localLocation.kinetic.gpsTs
+        val vTelTs = if (isTracker) pulse else pulse // Simplified for now as it uses system pulse for viewer in tracker mode
+
+        val isTrkFresh = if (tGpsTs <= 0) false else {
+            val telAge = if (tTelTs > 0) pulse - tTelTs else Long.MAX_VALUE
+            val gpsAge = if (tTelTs > 0) maxOf(0L, tTelTs - tGpsTs) else 0L
+            (telAge + gpsAge) < GPS_UI_FAIL_THRESHOLD_MS
+        }
+        
+        val isVwrFresh = if (vGpsTs <= 0) false else {
+            val telAge = if (vTelTs > 0) pulse - vTelTs else Long.MAX_VALUE
+            val gpsAge = if (vTelTs > 0) maxOf(0L, vTelTs - vGpsTs) else 0L
+            (telAge + gpsAge) < GPS_UI_FAIL_THRESHOLD_MS
+        }
+
         MapViewState(
             appMode = ui.appMode,
             hydrationLevel = ui.hydrationLevel,
@@ -297,23 +320,23 @@ class MainViewModel @Inject constructor(
             zoomInTrigger = ui.zoomInTrigger,
             zoomOutTrigger = ui.zoomOutTrigger,
             homePoints = ui.homePoints,
-            trackerLat = if (isTracker) kin.localLocation.kinetic.lat else kin.trackerLocation.kinetic.lat,
-            trackerLng = if (isTracker) kin.localLocation.kinetic.lng else kin.trackerLocation.kinetic.lng,
+            trackerLat = tLat,
+            trackerLng = tLng,
             trackerSpeed = if (isTracker) kin.localLocation.kinetic.speed else kin.trackerLocation.kinetic.speed,
             trackerAccuracy = if (isTracker) kin.localLocation.kinetic.accuracy else kin.trackerLocation.kinetic.accuracy,
             trackerMaxAccuracy = if (isTracker) kin.localLocation.kinetic.maxAccuracy else kin.trackerLocation.kinetic.maxAccuracy,
-            trackerGpsTs = if (isTracker) kin.localLocation.kinetic.gpsTs else kin.trackerLocation.kinetic.gpsTs,
-            trackerTelemetryTs = if (isTracker) kin.localLocation.ts else kin.trackerLocation.ts,
+            trackerGpsTs = tGpsTs,
+            trackerTelemetryTs = tTelTs,
             trackerLocPending = if (isTracker) kin.localHealth.isLocationPending else kin.trackerHealth.isLocationPending,
             trackerLocPendingReason = if (isTracker) kin.localHealth.locationPendingReason else kin.trackerHealth.locationPendingReason,
             trackerLastValidFixRt = if (isTracker) kin.localHealth.lastValidFixRt else kin.trackerHealth.lastValidFixRt,
-            viewerLat = if (isTracker) 0.0 else kin.localLocation.kinetic.lat, // Fix: Prevent overlap in Tracker mode
-            viewerLng = if (isTracker) 0.0 else kin.localLocation.kinetic.lng,
+            viewerLat = vLat,
+            viewerLng = vLng,
             viewerSpeed = if (isTracker) 0.0 else kin.localLocation.kinetic.speed,
             viewerAccuracy = if (isTracker) 0.0 else kin.localLocation.kinetic.accuracy,
             viewerMaxAcc = if (isTracker) 0.0 else kin.localLocation.kinetic.maxAccuracy,
-            viewerGpsTs = if (isTracker) 0L else kin.localLocation.kinetic.gpsTs,
-            viewerTelemetryTs = if (isTracker) pulse else pulse,
+            viewerGpsTs = vGpsTs,
+            viewerTelemetryTs = vTelTs,
             viewerLocPending = if (isTracker) false else kin.localHealth.isLocationPending,
             viewerLocPendingReason = if (isTracker) LocationPendingReason.NONE else kin.localHealth.locationPendingReason,
             viewerLastValidFixRt = if (isTracker) 0L else kin.localHealth.lastValidFixRt,
@@ -324,8 +347,12 @@ class MainViewModel @Inject constructor(
             viewerSegments = vwrSegs,
             violations = vios,
             showAccuracyBadge = true,
-            showSettingsButton = true, // Fix: Restored for both roles
-            showToolsOverlay = true    // Fix: Restored for both roles
+            showSettingsButton = true,
+            showToolsOverlay = true,
+            isTrackerFresh = isTrkFresh,
+            isViewerFresh = isVwrFresh,
+            isTrackerValid = PhysicsUtils.isValidLocation(tLat, tLng),
+            isViewerValid = PhysicsUtils.isValidLocation(vLat, vLng)
         )
     }
     .flowOn(Dispatchers.Default)
