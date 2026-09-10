@@ -1,4 +1,8 @@
-# Resolution Archive (Sep.10.20)
+# Resolution Archive (Sep.10.30)
+
+## 🟢 Resolved Issues (Sep.10.30)
+*   **S21 FE Reactive Flow Stall & Viewer Recovery Loop RESOLVED (#945)**:
+    *   **Root-Cause Remediation**: Hardened `SystemMonitor` grid-aligned scheduling to prevent "danger window" overlaps that triggered reactive flow stalls on Samsung S21 FE hardware. By ensuring alarms are never scheduled within 20s of the current time, the recovery loop is eliminated (R-ID 302).
 
 ## 🟢 Resolved Issues (Sep.10.20)
 *   **Map State Partitioning RIGOROUS AUDIT (#243-Audit)**: Performed a deep-forensic audit of the Map UI layer to eliminate remaining derived state and redundant parameters.
@@ -19,10 +23,7 @@
 *   **Peer Status LED Verification RESOLVED (#943)**: Finalized and verified the behavior of Peer Role LEDs (VWR/TRK) in `StatusBar` and `Dashboard`. 
     *   **Logic Enforcement (R972)**: Verified that peer indicators correctly default to **RED** (Rose500) in single-device isolation tests when no remote telemetry is detected.
 
-## 🟢 Resolved Issues (Sep.09.16)
-*   **Identity Color Role Confusion RESOLVED (#942)**: Remediated role-color confusion in icons, StatusBar badges, and Dashboard metrics.
-
 ## 🟢 Resolved Issues (Sep.09.15)
 *   **Watchdog Precision Audit RESOLVED (R-ID 302)**: Remediated cumulative scheduling drift in `SystemMonitor.kt` by implementing **Fixed Grid Scheduling**. Watchdog pulses are now anchored to the service start monotonic time (`elapsedRealtime`) and aligned to a strict 90s grid.
 
-*(Total: 979 Issues Resolved since inception)*
+*(Total: 980 Issues Resolved since inception)*

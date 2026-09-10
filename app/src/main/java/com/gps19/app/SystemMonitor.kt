@@ -26,6 +26,10 @@ sealed class SystemMonitorEvent {
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
+ * Sep.10.30:
+ * - Issue #945: Hardened Grid Scheduling to prevent recovery loops. 
+ *   Ensured candidate grid points are pushed to the next slot if they fall 
+ *   within the danger window (<20s).
  * Sep.09.15:
  * - Issue #940 RESOLVED: Fixed Grid Scheduling. Implemented grid-aligned 
  *   watchdog pulses to eliminate cumulative drift during long-running 
@@ -139,11 +143,18 @@ class SystemMonitor @Inject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
-        // Sep.09.15: Use Fixed Grid Scheduling to prevent cumulative drift.
+        // Sep.10.30: Hardened Grid Scheduling to prevent recovery loops.
+        // If the candidate grid point is within the danger window, push to the next slot.
         val triggerAt = if (sessionStartRt > 0) {
             val elapsed = now - sessionStartRt
-            val nextIntervalIndex = (elapsed / SYSTEM_WATCHDOG_INTERVAL_MS) + 1
-            sessionStartRt + (nextIntervalIndex * SYSTEM_WATCHDOG_INTERVAL_MS)
+            var nextIntervalIndex = (elapsed / SYSTEM_WATCHDOG_INTERVAL_MS) + 1
+            var candidate = sessionStartRt + (nextIntervalIndex * SYSTEM_WATCHDOG_INTERVAL_MS)
+            
+            if (candidate - now < WATCHDOG_DANGER_WINDOW_MS) {
+                nextIntervalIndex++
+                candidate = sessionStartRt + (nextIntervalIndex * SYSTEM_WATCHDOG_INTERVAL_MS)
+            }
+            candidate
         } else {
             now + SYSTEM_WATCHDOG_INTERVAL_MS
         }

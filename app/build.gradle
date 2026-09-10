@@ -15,8 +15,8 @@ android {
         applicationId "com.gps19.app"
         minSdk 24
         targetSdk 35
-        versionCode 979
-        versionName "Sep.10.20" // Rigorous Audit #243: Map State Consolidation
+        versionCode 980
+        versionName "Sep.10.30" // Hardened Grid Scheduling #945
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

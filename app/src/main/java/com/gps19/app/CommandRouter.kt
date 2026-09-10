@@ -171,6 +171,10 @@ class CommandRouter @Inject constructor(
                         is UiCommand.SimulateStoragePressure -> {
                             integrityMonitor.simulateStoragePressure(command.active, command.isCritical)
                         }
+                        is UiCommand.CommitSettings -> {
+                            // Handled at ViewModel level, but mapped here for exhaustiveness if needed in future
+                            logManager.logServiceEvent("UI COMMAND: CommitSettings received", false)
+                        }
                     }
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e

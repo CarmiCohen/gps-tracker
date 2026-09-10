@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.10.20)
+# SOT Master Requirements (Sep.10.30)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -33,6 +33,6 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 286 (Segmented HUD Emissions)**: The HUD state aggregation logic MUST emit segmented flows for Connectivity, Telemetry, and Health to distribute JIT load and minimize the impact of high-frequency telemetry updates on UI responsiveness (Sep.10.08).
 *   **R-ID 287 (Map View State Consolidation)**: The map UI must consume a single `MapViewState` object to aggregate configuration and telemetry, reducing the parameter surface area of `AppMapContainer` from ~40 to 1. Rigorous Audit (Sep.10.20) eliminated all UI-side derived flags (Freshness/Validity) in favor of ViewModel-driven state (Sep.10.20).
 *   **R-ID 301 (Alarm Logic Partitioning)**: The alarm evaluation pipeline MUST be partitioned into specialized evaluators (Connectivity, Physical, Geofence, System) to reduce cyclomatic complexity and enable granular forensic auditing of subsystem violations (Sep.09.00).
-*   **R-ID 302 (Fixed Grid Watchdog)**: The system MUST utilize Fixed Grid Scheduling for all watchdog pulses, anchored to the service start monotonic time (`elapsedRealtime`). Each subsequent pulse MUST align to a strict 90s grid relative to the anchor to eliminate cumulative drift during background sessions (>12h) (Sep.09.15).
+*   **R-ID 302 (Fixed Grid Watchdog Hardening)**: The system MUST utilize Fixed Grid Scheduling for all watchdog pulses, anchored to the service start monotonic time (`elapsedRealtime`). Each subsequent pulse MUST align to a strict 90s grid. **Hardening (Sep.10.30)**: Alarms MUST NOT be scheduled within the 20s danger window; if a grid point falls within this window, the schedule MUST push to the next grid interval to prevent recovery loops on Samsung S21 FE hardware.
 
 *(Total: 58 Architectural Rules + 253 Functional R-IDs = 311 Items)*

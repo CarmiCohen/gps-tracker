@@ -385,7 +385,7 @@ sealed class UiEvent {
     data class UpdateDraftMaxDistance(val distance: String) : UiEvent()
     data class UpdateDraftAlertSettings(val settings: AlertSettings) : UiEvent()
     data class UpdateDraftAlarmVolume(val volume: Float) : UiEvent()
-    object CommitSettings : UiCommand()
+    object CommitSettings : UiEvent()
     object RefreshPermissionStatus : UiEvent()
     object RequestTestAlarm : UiEvent()
     data class ToggleAlertsSetup(val visible: Boolean) : UiEvent()
