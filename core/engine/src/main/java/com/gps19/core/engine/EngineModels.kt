@@ -4,17 +4,13 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.10.08:
+ * - Idea #241: HudState Aggregator Refactoring. Removed monolithic HudState 
+ *   facade. UI components now subscribe directly to segmented sub-states 
+ *   to optimize performance (R-ID 286).
  * Sep.08.12:
  * - Issue #924 Visibility: Added isGnssThrottled to HudConnectivityState 
  *   for visual confirmation of A15 Hysteresis (R-ID 267).
- * Sep.06.50:
- * - Issue #932: HUD Synchronization. Added isA15 to HudConnectivityState 
- *   to provide visual confirmation of hardware adaptations (R-ID 276).
- * Sep.06.05:
- * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Added isSafeMode 
- *   to HudConnectivityState to support visual safety status (R-ID 271).
- * Sep.05.25:
- * - Issue #266: Added isMaliAnomaly to HudHealthState for UI-throttling.
  */
 
 @Serializable
@@ -64,8 +60,7 @@ enum class LocationPendingReason {
     NONE,
     GPS_STALL,
     GPS_GAP,
-    ACOUSTIC_VIOLATION,
-    SIGNAL_LOSS,
+    ACOUSTIC_VIOLATION, SIGNAL_LOSS,
     JAMMER_SUSPICION
 }
 
@@ -483,66 +478,3 @@ data class HudHealthState(
     val systemPulse: Long = 0L,
     val isMaliAnomaly: Boolean = false
 )
-
-/**
- * Monolithic HudState retained as a facade for legacy Compose compatibility 
- * while aggregator transitions to segmented emissions.
- */
-@Serializable
-data class HudState(
-    val connectivity: HudConnectivityState = HudConnectivityState(),
-    val telemetry: HudTelemetryState = HudTelemetryState(),
-    val health: HudHealthState = HudHealthState()
-) {
-    // Convenience properties for legacy UI code
-    val appMode get() = connectivity.appMode
-    val isInternet get() = connectivity.isInternet
-    val isRelayConnected get() = connectivity.isRelayConnected
-    val isTelemetryFresh get() = connectivity.isTelemetryFresh
-    val isDataHealthy get() = connectivity.isDataHealthy
-    val commIndex get() = connectivity.commIndex
-    val remoteCommIndex get() = connectivity.remoteCommIndex
-    val trackerId get() = connectivity.trackerId
-    val viewerId get() = connectivity.viewerId
-    val watchdogOk get() = connectivity.watchdogOk
-    val isSystemActive get() = connectivity.isSystemActive
-    val isSafeMode get() = connectivity.isSafeMode
-    val isA15 get() = connectivity.isA15
-    val isGnssThrottled get() = connectivity.isGnssThrottled
-    
-    val isLocalGpsActive get() = telemetry.isLocalGpsActive
-    val isGpsFresh get() = telemetry.isGpsFresh
-    val speedMps get() = telemetry.speedMps
-    val trackerAccuracy get() = telemetry.trackerAccuracy
-    val maxTrackerAccuracy get() = telemetry.maxTrackerAccuracy
-    val viewerAccuracy get() = telemetry.viewerAccuracy
-    val maxViewerAccuracy get() = telemetry.maxViewerAccuracy
-    val satsUsed get() = telemetry.satsUsed
-    val satsView get() = telemetry.satsView
-    val viewerSatsUsed get() = telemetry.viewerSatsUsed
-    val viewerSatsView get() = telemetry.viewerSatsView
-    val distToHome get() = telemetry.distToHome
-    val distToViewer get() = telemetry.distToViewer
-    val lastGpsTs get() = telemetry.lastGpsTs
-    val viewerGpsTs get() = telemetry.viewerGpsTs
-    val trackerState get() = telemetry.trackerState
-    val isTrackerLocPending get() = telemetry.isTrackerLocPending
-    val trackerLocPendingReason get() = telemetry.trackerLocPendingReason
-    val isViewerLocPending get() = telemetry.isViewerLocPending
-    val viewerLocPendingReason get() = telemetry.viewerLocPendingReason
-    val isUltraLongStationary get() = telemetry.isUltraLongStationary
-
-    val battery get() = health.battery
-    val remoteBattery get() = health.remoteBattery
-    val isCharging get() = health.isCharging
-    val remoteCharging get() = health.remoteCharging
-    val trackerTemp get() = health.trackerTemp
-    val viewerTemp get() = health.viewerTemp
-    val hasActiveAlarms get() = health.hasActiveAlarms
-    val isRedScreenSuppressed get() = health.isRedScreenSuppressed
-    val isSirenPlaying get() = health.isSirenPlaying
-    val activeAlarms get() = health.activeAlarms
-    val progressPulse get() = health.progressPulse
-    val systemPulse get() = health.systemPulse
-    val isMaliAnomaly get() = health.isMaliAnomaly
-}

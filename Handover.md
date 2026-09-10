@@ -1,29 +1,30 @@
-# 🏁 Forensic Handover (Sep.10.05 - SRV Status Resolution)
+# 🏁 Forensic Handover (Sep.11.10 - Map Integrity Audit)
 
-## 🎯 Current Context: Connectivity Lifecycle Hardening
-The application has been hardened against stale signaling status indicators. The "SRV" badge now correctly and immediately reflects the connection state during role transitions (Tracker ↔ Viewer) and service termination.
+## 🎯 Current Context: Map Layer Hardened
+The Map UI layer has undergone a rigorous integrity audit following the #243 refactor. All redundant parameters and manual tool overlays have been eliminated. The subsystem is now fully encapsulated within `AppMapContainer` and optimized via trigger pruning in the ViewModel.
 
-## 🛠️ Work Completed (Sep.10.05)
-*   **SRV Status Inconsistency RESOLVED (#941)**:
-    *   **Remediation**: Hardened `TelemetryRepository.clear()` to reset `isRelayConnected` and `lastRtt` flows.
-    *   **Lifecycle Fix**: Updated `ConnectivitySuite.stop()` to force an immediate relay status reset in the repository upon signaling teardown.
-    *   **SOT Enforcement**: Added Architectural Rule 1.31 (Connectivity State Determinism) to `SOT_MASTER_REQUIREMENTS.md`.
-*   **Versioning**:
-    *   Incremented `versionCode` to 974 and `versionName` to `Sep.10.05` in `app/build.gradle`.
-*   **Documentation**:
-    *   Synchronized `issues.md` and `RESOLUTION_ARCHIVE.md`.
+## 🛠️ Work Completed (Sep.11.10)
+*   **Map Partitioning Integrity RESOLVED (#243-Audit)**:
+    *   **UI Delegation**: Removed redundant `MapToolsOverlay` and `MapSettingsToggle` from `TrackerScreen` and `ViewerScreen`.
+    *   **Trigger Pruning**: Introduced `MapUiParts` in `MainViewModel` to isolate map state updates from unrelated UI changes.
+    *   **Signature Cleanup**: Simplified screen calls in `MainAppContent`, removing ~20 redundant individual parameter passes.
+    *   **Build Hardening**: Resolved parameter mapping defects in `SettingsOverlay`.
+*   **Completed Resolutions (Recent)**:
+    *   `Sep.10.12`: Map State Partitioning RESOLVED (#243).
+    *   `Sep.10.08`: HUD Aggregator Refactoring RESOLVED (#241).
+*   **Versioning**: Incremented `versionCode` to 978 and `versionName` to `Sep.11.10`.
 
 ## 📂 Forensic File Snapshot
-*   `app:TelemetryRepository.kt`: Hardened `clear()` sequence.
-*   `app:ConnectivitySuite.kt`: Explicit reset in `stop()`.
-*   `STATUS:SOT_MASTER_REQUIREMENTS.md`: Added Rule 1.31.
-*   `issues.md`: Dashboard synchronized to 974 resolved issues.
+*   `app:TrackerScreen.kt` & `app:ViewerScreen.kt`: Leaner signatures; delegated map UI to container.
+*   `app:MainViewModel.kt`: Optimized `mapViewState` flow with trigged-based pruning.
+*   `app:MainAppContent.kt`: Cleaned of redundant collections and parameters.
+*   `issues.md`: Dashboard updated to 978 resolved items.
 
 ## 🟡 Open Issues (Resumption Priority)
 *   *No high-priority open issues.*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 305 (Rules: 55, IDs: 250), Resolved: 974, Open: 0, Testing: 100% (Sub-items: 50), Ideas: 5, QA: 269]**
+- **Current Audit Baseline: [SOT: 311 (Rules: 58, IDs: 253), Resolved: 978, Open: 0, Testing: 100% (Sub-items: 50), Ideas: 3, QA: 269]**
 
 ---
 **Resumption Command**: `🏁 Resume from Handover.md and follow the logic in DEVELOPER_GUIDELINES.md strictly.`

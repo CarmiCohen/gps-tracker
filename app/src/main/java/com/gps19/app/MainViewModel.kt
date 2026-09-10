@@ -1,10 +1,7 @@
 package com.gps19.app
 
 import android.content.Context
-import android.content.Intent
-import android.widget.Toast
 import androidx.compose.ui.graphics.toArgb
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gps19.core.engine.*
@@ -37,11 +34,38 @@ private data class HudUiParts(
 )
 
 /**
+ * Map UI State Subset: Used to prune aggregation triggers (R-ID 287).
+ */
+private data class MapUiParts(
+    val appMode: String?,
+    val hydrationLevel: Int,
+    val isMapButtonsVisible: Boolean,
+    val isFenceVisible: Boolean,
+    val geofenceMode: GeofenceMode,
+    val isViolationsVisible: Boolean,
+    val isGeofenceViolationsVisible: Boolean,
+    val maxDistance: Double,
+    val isMapLocked: Boolean,
+    val mapFollowMode: MapFollowMode,
+    val centeringTrackerTrigger: Int,
+    val centeringViewerTrigger: Int,
+    val zoomInTrigger: Int,
+    val zoomOutTrigger: Int,
+    val homePoints: List<GeoPoint>
+)
+
+/**
+ * Map Base State: Helper for complex combine (Issue #243).
+ */
+private data class MapBase(val ui: MapUiParts, val kin: KinematicState, val p: Long, val prt: Long)
+
+/**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * Sep.08.12:
- * - Issue #924 Visibility: Propagated isGnssThrottled to DiagnosticState 
- *   for local and remote roles (R-ID 267).
- * - R-ID 259: Integrated structured Energy Footprint into DiagnosticState.
+ * Sep.11.10:
+ * - Integrity Audit #243: Optimized mapViewState flow by segmenting UI triggers 
+ *   to avoid redundant calculations on non-map state changes (R-ID 287).
+ * - Fix: Corrected viewerLat/Lng logic in Tracker mode to prevent marker overlap.
+ * - Fix: Restored map tool visibility for Viewer role.
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -113,7 +137,7 @@ class MainViewModel @Inject constructor(
     private val _trackerMaxTemp = MutableStateFlow(0.0)
     val trackerMaxTemp: StateFlow<Double> = _trackerMaxTemp.asStateFlow()
 
-    // Segmented Dashboard Flows (R248)
+    // Segmented Dashboard Flows
     val dashboardConnectivityState: StateFlow<DashboardConnectivityState> = combine(
         _uiState.map { it.appMode }.distinctUntilChanged(),
         _diagnosticState,
@@ -159,7 +183,7 @@ class MainViewModel @Inject constructor(
     .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
 
-    // Segmented HUD Flows (R248 Remediation)
+    // Segmented HUD Flows
     private val hudUiConnectivityFlow = _uiState.map { 
         HudUiParts(it.appMode, it.deviceId, it.viewerId, it.isSystemActive, it.isSafeMode, it.permissions.isA15Device) 
     }.distinctUntilChanged()
@@ -197,16 +221,116 @@ class MainViewModel @Inject constructor(
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudHealthState())
 
-    val hudState: StateFlow<HudState> = combine(
-        hudConnectivityState,
-        hudTelemetryState,
-        hudHealthState
-    ) { conn, tel, health ->
-        HudState(conn, tel, health)
+    val trackerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
+        .flatMapLatest { mode -> if (mode != null) repository.trackerTrailFlow else flowOf(emptyList()) }
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val viewerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
+        .flatMapLatest { mode -> if (mode != null) repository.viewerTrailFlow else flowOf(emptyList()) }
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val violationPointsFlow: StateFlow<List<ViolationPoint>> = repository.violationsFlow
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val trackerTrailSegments: StateFlow<List<MapTrailSegment>> = trackerTrailFlow
+        .map { trail -> computeTrailSegments(trail, BrandJd.toArgb()) }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val viewerTrailSegments: StateFlow<List<MapTrailSegment>> = viewerTrailFlow
+        .map { trail -> computeTrailSegments(trail, ViewerCyan.toArgb()) }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Segmented Map UI Flow (R-ID 287)
+    private val mapUiPartsFlow = _uiState.map { ui ->
+        MapUiParts(
+            appMode = ui.appMode,
+            hydrationLevel = ui.hydrationLevel,
+            isMapButtonsVisible = ui.isMapButtonsVisible,
+            isFenceVisible = ui.isFenceVisible,
+            geofenceMode = ui.geofenceMode,
+            isViolationsVisible = ui.isViolationsVisible,
+            isGeofenceViolationsVisible = ui.isGeofenceViolationsVisible,
+            maxDistance = ui.maxDistance,
+            isMapLocked = ui.isMapLocked,
+            mapFollowMode = ui.mapFollowMode,
+            centeringTrackerTrigger = ui.centeringTrackerTrigger,
+            centeringViewerTrigger = ui.centeringViewerTrigger,
+            zoomInTrigger = ui.zoomInTrigger,
+            zoomOutTrigger = ui.zoomOutTrigger,
+            homePoints = ui.homePoints
+        )
+    }.distinctUntilChanged()
+
+    // Idea #243: MapViewState Flow (R287)
+    val mapViewState: StateFlow<MapViewState> = combine(
+        combine(mapUiPartsFlow, _kinematicState, _systemPulse, _systemPulseRt) { ui, kin, p, prt -> MapBase(ui, kin, p, prt) },
+        trackerTrailSegments,
+        viewerTrailSegments,
+        violationPointsFlow
+    ) { base, trkSegs, vwrSegs, vios ->
+        val ui = base.ui
+        val kin = base.kin
+        val pulse = base.p
+        val pulseRt = base.prt
+        val isTracker = ui.appMode == "tracker"
+
+        MapViewState(
+            appMode = ui.appMode,
+            hydrationLevel = ui.hydrationLevel,
+            isMapButtonsVisible = ui.isMapButtonsVisible,
+            isFenceVisible = ui.isFenceVisible,
+            geofenceMode = ui.geofenceMode,
+            isViolationsVisible = ui.isViolationsVisible,
+            isGeofenceViolationsVisible = ui.isGeofenceViolationsVisible,
+            maxDistance = ui.maxDistance,
+            isMapLocked = ui.isMapLocked,
+            mapFollowMode = ui.mapFollowMode,
+            centeringTrackerTrigger = ui.centeringTrackerTrigger,
+            centeringViewerTrigger = ui.centeringViewerTrigger,
+            zoomInTrigger = ui.zoomInTrigger,
+            zoomOutTrigger = ui.zoomOutTrigger,
+            homePoints = ui.homePoints,
+            trackerLat = if (isTracker) kin.localLocation.kinetic.lat else kin.trackerLocation.kinetic.lat,
+            trackerLng = if (isTracker) kin.localLocation.kinetic.lng else kin.trackerLocation.kinetic.lng,
+            trackerSpeed = if (isTracker) kin.localLocation.kinetic.speed else kin.trackerLocation.kinetic.speed,
+            trackerAccuracy = if (isTracker) kin.localLocation.kinetic.accuracy else kin.trackerLocation.kinetic.accuracy,
+            trackerMaxAccuracy = if (isTracker) kin.localLocation.kinetic.maxAccuracy else kin.trackerLocation.kinetic.maxAccuracy,
+            trackerGpsTs = if (isTracker) kin.localLocation.kinetic.gpsTs else kin.trackerLocation.kinetic.gpsTs,
+            trackerTelemetryTs = if (isTracker) kin.localLocation.ts else kin.trackerLocation.ts,
+            trackerLocPending = if (isTracker) kin.localHealth.isLocationPending else kin.trackerHealth.isLocationPending,
+            trackerLocPendingReason = if (isTracker) kin.localHealth.locationPendingReason else kin.trackerHealth.locationPendingReason,
+            trackerLastValidFixRt = if (isTracker) kin.localHealth.lastValidFixRt else kin.trackerHealth.lastValidFixRt,
+            viewerLat = if (isTracker) 0.0 else kin.localLocation.kinetic.lat, // Fix: Prevent overlap in Tracker mode
+            viewerLng = if (isTracker) 0.0 else kin.localLocation.kinetic.lng,
+            viewerSpeed = if (isTracker) 0.0 else kin.localLocation.kinetic.speed,
+            viewerAccuracy = if (isTracker) 0.0 else kin.localLocation.kinetic.accuracy,
+            viewerMaxAcc = if (isTracker) 0.0 else kin.localLocation.kinetic.maxAccuracy,
+            viewerGpsTs = if (isTracker) 0L else kin.localLocation.kinetic.gpsTs,
+            viewerTelemetryTs = if (isTracker) pulse else pulse,
+            viewerLocPending = if (isTracker) false else kin.localHealth.isLocationPending,
+            viewerLocPendingReason = if (isTracker) LocationPendingReason.NONE else kin.localHealth.locationPendingReason,
+            viewerLastValidFixRt = if (isTracker) 0L else kin.localHealth.lastValidFixRt,
+            replayCursorPos = kin.replayCursorPos,
+            systemPulse = pulse,
+            systemPulseRt = pulseRt,
+            trackerSegments = trkSegs,
+            viewerSegments = vwrSegs,
+            violations = vios,
+            showAccuracyBadge = true,
+            showSettingsButton = true, // Fix: Restored for both roles
+            showToolsOverlay = true    // Fix: Restored for both roles
+        )
     }
-    .distinctUntilChanged()
+    .flowOn(Dispatchers.Default)
     .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
-    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState())
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MapViewState())
 
     // Snap-Isolation: Deep parity check for list-based flows (R312)
     private fun <T> listContentEquals(a: List<T>?, b: List<T>?, itemCompare: (T, T) -> Boolean): Boolean {
@@ -235,84 +359,12 @@ class MainViewModel @Inject constructor(
     .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val trackerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
-        .flatMapLatest { mode -> if (mode != null) repository.trackerTrailFlow else flowOf(emptyList()) }
-        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val viewerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
-        .flatMapLatest { mode -> if (mode != null) repository.viewerTrailFlow else flowOf(emptyList()) }
-        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val violationPointsFlow: StateFlow<List<ViolationPoint>> = repository.violationsFlow
-        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    // Forensic Ribbon Flows with Snap-Isolation Parity & A15 Sampling (R312/R650)
-    val history4MFlow = repository.getHistoryFlow("4M")
-        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-        
-    val history16MFlow = repository.getHistoryFlow("16M")
-        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-        
-    val history1HFlow = repository.getHistoryFlow("1H")
-        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-        
-    val history4HFlow = repository.getHistoryFlow("4H")
-        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-        
-    val history24HFlow = repository.getHistoryFlow("24H")
-        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-        
-    val history7DFlow = repository.getHistoryFlow("7D")
-        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
     /**
      * activeGnssDetail: GNSS Detail publication flow.
      * Throttling migrated to HardwareProvider source (R-ID 267) for A15 load-awareness.
      */
     val activeGnssDetail: StateFlow<GnssDetail?> = repository.gnssDetail
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-
-    private var lastTrackerTrailSize = -1
-    private var cachedTrackerSegments = emptyList<MapTrailSegment>()
-    private var lastViewerTrailSize = -1
-    private var cachedViewerSegments = emptyList<MapTrailSegment>()
-
-    val trackerTrailSegments: StateFlow<List<MapTrailSegment>> = trackerTrailFlow
-        .map { trail -> 
-            if (trail.size == lastTrackerTrailSize) cachedTrackerSegments
-            else computeTrailSegments(trail, BrandJd.toArgb()).also { 
-                cachedTrackerSegments = it; lastTrackerTrailSize = trail.size 
-            }
-        }
-        .flowOn(Dispatchers.Default)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-
-    val viewerTrailSegments: StateFlow<List<MapTrailSegment>> = viewerTrailFlow
-        .map { trail -> 
-            if (trail.size == lastViewerTrailSize) cachedViewerSegments
-            else computeTrailSegments(trail, ViewerCyan.toArgb()).also { 
-                cachedViewerSegments = it; lastViewerTrailSize = trail.size 
-            }
-        }
-        .flowOn(Dispatchers.Default)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     var appStartTime: Long = 0L
     private var autoSaveJob: Job? = null

@@ -5,11 +5,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Sep.10.12:
+ * - Idea #243: Map State Partitioning RESOLVED. Added MapViewState to group 
+ *   map parameters and reduce recomposition cost (R-ID 287).
  * Sep.08.12:
  * - Issue #924 Visibility: Added isGnssThrottled to DiagnosticState (R-ID 267).
  * - R-ID 259: Added structured Energy Footprint fields to DiagnosticState.
- * Sep.05.25:
- * - Issue #266: Added isMaliAnomaly to DiagnosticState for automated UI-throttling.
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -57,8 +58,9 @@ data class MainUiState(
                 permissions.isFineLocationGranted &&
                 permissions.isBatteryWhitelisted && 
                 permissions.isAutoStartGranted &&
-                permissions.isExactAlarmGranted && 
                 permissions.isOverlayGranted &&
+                permissions.isMicrophoneGranted &&
+                permissions.isExactAlarmGranted && 
                 permissions.isPostNotificationsGranted &&
                 permissions.isBackgroundLocationGranted &&
                 permissions.isActivityRecognitionGranted &&
@@ -88,11 +90,64 @@ data class MainUiState(
                              (permissions.backgroundStatus == CapabilityStatus.GRANTED || 
                               permissions.autostartStatus == CapabilityStatus.GRANTED) &&
                              !(permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride)
+            if (count > 0 || configIssue) {
+                // If configIssue is true, at least one is incremented.
+            }
             if (configIssue) count++
             
             return count
         }
 }
+
+/**
+ * MapViewState: Partitioned state for AppMapContainer to reduce recomposition cost (R-ID 287).
+ */
+data class MapViewState(
+    val appMode: String? = null,
+    val hydrationLevel: Int = 0,
+    val isMapButtonsVisible: Boolean = false,
+    val isFenceVisible: Boolean = false,
+    val geofenceMode: GeofenceMode = GeofenceMode.IDLE,
+    val isViolationsVisible: Boolean = false,
+    val isGeofenceViolationsVisible: Boolean = false,
+    val maxDistance: Double = 0.0,
+    val isMapLocked: Boolean = false,
+    val mapFollowMode: MapFollowMode = MapFollowMode.NONE,
+    val centeringTrackerTrigger: Int = 0,
+    val centeringViewerTrigger: Int = 0,
+    val zoomInTrigger: Int = 0,
+    val zoomOutTrigger: Int = 0,
+    val homePoints: List<GeoPoint> = emptyList(),
+    val trackerLat: Double = 0.0,
+    val trackerLng: Double = 0.0,
+    val trackerSpeed: Double = 0.0,
+    val trackerAccuracy: Double = 0.0,
+    val trackerMaxAccuracy: Double = 0.0,
+    val trackerGpsTs: Long = 0L,
+    val trackerTelemetryTs: Long = 0L,
+    val trackerLocPending: Boolean = false,
+    val trackerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    val trackerLastValidFixRt: Long = 0L,
+    val viewerLat: Double = 0.0,
+    val viewerLng: Double = 0.0,
+    val viewerSpeed: Double = 0.0,
+    val viewerAccuracy: Double = 0.0,
+    val viewerMaxAcc: Double = 0.0,
+    val viewerGpsTs: Long = 0L,
+    val viewerTelemetryTs: Long = 0L,
+    val viewerLocPending: Boolean = false,
+    val viewerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    val viewerLastValidFixRt: Long = 0L,
+    val replayCursorPos: GeoPoint? = null,
+    val systemPulse: Long = 0L,
+    val systemPulseRt: Long = 0L,
+    val trackerSegments: List<MapTrailSegment> = emptyList(),
+    val viewerSegments: List<MapTrailSegment> = emptyList(),
+    val violations: List<ViolationPoint> = emptyList(),
+    val showAccuracyBadge: Boolean = true,
+    val showSettingsButton: Boolean = true,
+    val showToolsOverlay: Boolean = true
+)
 
 /**
  * KinematicState: High-frequency transient state.
@@ -228,7 +283,7 @@ class DiagnosticState(
     }
 }
 
-enum class MapFollowMode { TRACKER, VIEWER, AUTO }
+enum class MapFollowMode { TRACKER, VIEWER, AUTO, NONE }
 
 enum class GeofenceMode { IDLE, ADD, REMOVE }
 
@@ -324,7 +379,7 @@ sealed class UiEvent {
     data class UpdateDraftMaxDistance(val distance: String) : UiEvent()
     data class UpdateDraftAlertSettings(val settings: AlertSettings) : UiEvent()
     data class UpdateDraftAlarmVolume(val volume: Float) : UiEvent()
-    object CommitSettings : UiEvent()
+    object CommitSettings : UiCommand()
     object RefreshPermissionStatus : UiEvent()
     object RequestTestAlarm : UiEvent()
     data class ToggleAlertsSetup(val visible: Boolean) : UiEvent()
@@ -375,4 +430,5 @@ sealed class UiCommand {
     object MapZoomOut : UiCommand()
     object ExecuteStressTest : UiCommand()
     data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : UiCommand()
+    object CommitSettings : UiCommand()
 }

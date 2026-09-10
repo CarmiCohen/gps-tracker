@@ -40,95 +40,52 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Sep.10.12:
+ * - Idea #243: Map State Partitioning RESOLVED. Refactored AppMapContainer 
+ *   and OsmMap to consume MapViewState, reducing parameter surface and 
+ *   optimizing recomposition (R-ID 287).
  * Sep.08.13:
  * - Fix: Corrected isViewerFresh calculation in AppMapContainer to use 
  *   viewerTelemetryTs instead of trackerTelemetryTs (R-ID 282).
- * Sep.01.00:
- * - Issue #878 Remediation: Integrated low-memory eviction strategy. Added 
- *   ComponentCallbacks2 registration to OsmMap to trigger proactive cache 
- *   pruning in MapOverlayManager during memory pressure events (R878).
  */
 
 @Composable
 fun AppMapContainer(
-    appMode: String?,
-    hydrationLevel: Int,
-    isMapButtonsVisible: Boolean,
-    isFenceVisible: Boolean,
-    geofenceMode: GeofenceMode,
-    isViolationsVisible: Boolean,
-    isGeofenceViolationsVisible: Boolean,
-    maxDistance: Double,
-    isMapLocked: Boolean,
-    mapFollowMode: MapFollowMode,
-    centeringTrackerTrigger: Int,
-    centeringViewerTrigger: Int,
-    zoomInTrigger: Int,
-    zoomOutTrigger: Int,
-    homePoints: List<GeoPoint>,
-    trackerLat: Double,
-    trackerLng: Double,
-    trackerSpeed: Double,
-    trackerAccuracy: Double,
-    trackerMaxAccuracy: Double,
-    trackerGpsTs: Long,
-    trackerTelemetryTs: Long,
-    trackerLocPending: Boolean,
-    trackerLocPendingReason: LocationPendingReason,
-    trackerLastValidFixRt: Long,
-    viewerLat: Double,
-    viewerLng: Double,
-    viewerSpeed: Double,
-    viewerAccuracy: Double,
-    viewerMaxAcc: Double,
-    viewerGpsTs: Long,
-    viewerTelemetryTs: Long,
-    viewerLocPending: Boolean,
-    viewerLastValidFixRt: Long,
-    replayCursorPos: GeoPoint?,
-    systemPulse: Long,
-    systemPulseRt: Long,
+    state: MapViewState,
     onEvent: (UiEvent) -> Unit,
     onClearTrails: () -> Unit,
-    trackerSegments: List<MapTrailSegment>,
-    viewerSegments: List<MapTrailSegment>,
-    violations: List<ViolationPoint>,
     onSaveTrail: () -> Unit,
-    onLoadTrail: () -> Unit,
-    showAccuracyBadge: Boolean = true,
-    showSettingsButton: Boolean = true,
-    showToolsOverlay: Boolean = true
+    onLoadTrail: () -> Unit
 ) {
     val context = LocalContext.current
-    
-    val isTrackerMode = appMode == "tracker"
+    val isTrackerMode = state.appMode == "tracker"
 
-    val isTrackerFresh by remember(trackerGpsTs, trackerTelemetryTs, systemPulse) {
+    val isTrackerFresh by remember(state.trackerGpsTs, state.trackerTelemetryTs, state.systemPulse) {
         derivedStateOf {
-            if (trackerGpsTs <= 0) false
+            if (state.trackerGpsTs <= 0) false
             else {
-                val telemetryAge = if (trackerTelemetryTs > 0) systemPulse - trackerTelemetryTs else Long.MAX_VALUE
-                val sourceGpsAge = if (trackerTelemetryTs > 0) maxOf(0L, trackerTelemetryTs - trackerGpsTs) else 0L
+                val telemetryAge = if (state.trackerTelemetryTs > 0) state.systemPulse - state.trackerTelemetryTs else Long.MAX_VALUE
+                val sourceGpsAge = if (state.trackerTelemetryTs > 0) maxOf(0L, state.trackerTelemetryTs - state.trackerGpsTs) else 0L
                 (telemetryAge + sourceGpsAge) < GPS_UI_FAIL_THRESHOLD_MS
             }
         }
     }
 
-    val isViewerFresh by remember(viewerGpsTs, viewerTelemetryTs, systemPulse) {
+    val isViewerFresh by remember(state.viewerGpsTs, state.viewerTelemetryTs, state.systemPulse) {
         derivedStateOf {
-            if (viewerGpsTs <= 0) false
+            if (state.viewerGpsTs <= 0) false
             else {
-                val telemetryAge = if (viewerTelemetryTs > 0) systemPulse - viewerTelemetryTs else Long.MAX_VALUE
-                val sourceGpsAge = if (viewerTelemetryTs > 0) maxOf(0L, viewerTelemetryTs - viewerGpsTs) else 0L
+                val telemetryAge = if (state.viewerTelemetryTs > 0) state.systemPulse - state.viewerTelemetryTs else Long.MAX_VALUE
+                val sourceGpsAge = if (state.viewerTelemetryTs > 0) maxOf(0L, state.viewerTelemetryTs - state.viewerGpsTs) else 0L
                 (telemetryAge + sourceGpsAge) < GPS_UI_FAIL_THRESHOLD_MS
             }
         }
     }
 
-    val initialCenter = remember(trackerLat, viewerLat) {
+    val initialCenter = remember(state.trackerLat, state.viewerLat) {
         when {
-            PhysicsUtils.isValidLocation(trackerLat, trackerLng) -> GeoPoint(trackerLat, trackerLng)
-            PhysicsUtils.isValidLocation(viewerLat, viewerLng) -> GeoPoint(viewerLat, viewerLng)
+            PhysicsUtils.isValidLocation(state.trackerLat, state.trackerLng) -> GeoPoint(state.trackerLat, state.trackerLng)
+            PhysicsUtils.isValidLocation(state.viewerLat, state.viewerLng) -> GeoPoint(state.viewerLat, state.viewerLng)
             else -> GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
         }
     }
@@ -137,45 +94,12 @@ fun AppMapContainer(
 
     Box(modifier = Modifier.fillMaxSize()) {
         OsmMap(
-            appMode = appMode,
-            hydrationLevel = hydrationLevel,
-            isMapLocked = isMapLocked,
-            mapFollowMode = mapFollowMode,
-            centeringTrackerTrigger = centeringTrackerTrigger,
-            centeringViewerTrigger = centeringViewerTrigger,
-            zoomInTrigger = zoomInTrigger,
-            zoomOutTrigger = zoomOutTrigger,
-            homePoints = homePoints,
-            isFenceVisible = isFenceVisible,
-            maxDistance = maxDistance,
-            geofenceMode = geofenceMode,
-            isViolationsVisible = isViolationsVisible,
-            isGeofenceViolationsVisible = isGeofenceViolationsVisible,
-            trackerLat = trackerLat,
-            trackerLng = trackerLng,
-            trackerSpeed = trackerSpeed,
-            trackerAccuracy = trackerAccuracy,
-            trackerMaxAccuracy = trackerMaxAccuracy,
-            trackerLocPending = trackerLocPending,
-            trackerLastValidFixRt = trackerLastValidFixRt,
-            viewerLat = viewerLat,
-            viewerLng = viewerLng,
-            viewerSpeed = viewerSpeed,
-            viewerAccuracy = viewerAccuracy,
-            viewerMaxAcc = viewerMaxAcc,
-            viewerLocPending = viewerLocPending,
-            viewerLastValidFixRt = viewerLastValidFixRt,
-            replayCursorPos = replayCursorPos,
-            trackerSegments = trackerSegments,
-            viewerSegments = viewerSegments,
-            violations = violations,
-            onTap = { onEvent(UiEvent.MapTap(it)) },
-            onRemoveMarker = { if (!isTrackerMode) onEvent(UiEvent.RemoveHomePoint(it)) },
+            state = state,
             isTrackerFresh = isTrackerFresh,
             isViewerFresh = isViewerFresh,
             initialCenter = initialCenter,
-            systemPulse = systemPulse,
-            systemPulseRt = systemPulseRt,
+            onTap = { onEvent(UiEvent.MapTap(it)) },
+            onRemoveMarker = { if (!isTrackerMode) onEvent(UiEvent.RemoveHomePoint(it)) },
             onLockChange = { onLockChange -> onEvent(UiEvent.SetMapLocked(onLockChange)) },
             mapViewRef = mapViewRef
         )
@@ -193,33 +117,33 @@ fun AppMapContainer(
                 .padding(horizontal = 4.dp, vertical = 1.dp)
         )
 
-        if (showSettingsButton) {
+        if (state.showSettingsButton) {
             MapSettingsToggle(
-                isMapButtonsVisible = isMapButtonsVisible, 
-                onToggle = { onEvent(UiEvent.SetMapButtonsVisible(!isMapButtonsVisible)) }, 
+                isMapButtonsVisible = state.isMapButtonsVisible, 
+                onToggle = { onEvent(UiEvent.SetMapButtonsVisible(!state.isMapButtonsVisible)) }, 
                 modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = 12.dp)
             )
         }
         
-        if (showToolsOverlay && isMapButtonsVisible) {
+        if (state.showToolsOverlay && state.isMapButtonsVisible) {
             Box(Modifier.fillMaxSize()) {
                 Box(Modifier.align(Alignment.CenterStart).padding(start = 8.dp).fillMaxHeight(0.85f).width(140.dp)) { 
                     MapToolsOverlay(
                         isTrackerMode = isTrackerMode, 
-                        trackerValid = PhysicsUtils.isValidLocation(trackerLat, trackerLng), 
-                        viewerValid = PhysicsUtils.isValidLocation(viewerLat, viewerLng),
-                        showFence = isFenceVisible, onToggleFence = { onEvent(UiEvent.SetFenceVisible(!isFenceVisible)) }, geofenceMode = geofenceMode, onSetGeofenceMode = { onSetGeofenceMode -> onEvent(UiEvent.SetGeofenceMode(onSetGeofenceMode)) },
-                        showViolations = isViolationsVisible, onToggleViolations = { onEvent(UiEvent.SetViolationsVisible(!isViolationsVisible)) },
-                        showGeofenceViolations = isGeofenceViolationsVisible, onToggleGeofenceViolations = { onEvent(UiEvent.SetGeofenceViolationsVisible(!isGeofenceViolationsVisible)) },
+                        trackerValid = PhysicsUtils.isValidLocation(state.trackerLat, state.trackerLng), 
+                        viewerValid = PhysicsUtils.isValidLocation(state.viewerLat, state.viewerLng),
+                        showFence = state.isFenceVisible, onToggleFence = { onEvent(UiEvent.SetFenceVisible(!state.isFenceVisible)) }, geofenceMode = state.geofenceMode, onSetGeofenceMode = { onSetGeofenceMode -> onEvent(UiEvent.SetGeofenceMode(onSetGeofenceMode)) },
+                        showViolations = state.isViolationsVisible, onToggleViolations = { onEvent(UiEvent.SetViolationsVisible(!state.isViolationsVisible)) },
+                        showGeofenceViolations = state.isGeofenceViolationsVisible, onToggleGeofenceViolations = { onEvent(UiEvent.SetGeofenceViolationsVisible(!state.isGeofenceViolationsVisible)) },
                         onClear = onClearTrails, onSave = onSaveTrail, onLoad = onLoadTrail, onCenterTracker = { onEvent(UiEvent.CenterTracker) }, onCenterViewer = { onEvent(UiEvent.CenterViewer) }, onZoomIn = { onEvent(UiEvent.MapZoomIn) }, onZoomOut = { onEvent(UiEvent.MapZoomOut) }
                     ) 
                 }
             }
         }
 
-        if (trackerLocPending && trackerLocPendingReason != LocationPendingReason.NONE) {
+        if (state.trackerLocPending && state.trackerLocPendingReason != LocationPendingReason.NONE) {
             Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp).background(Amber500.copy(alpha = 0.95f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                Text(text = "UNCERTAINTY: ${trackerLocPendingReason.name.replace("_", " ")}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                Text(text = "UNCERTAINTY: ${state.trackerLocPendingReason.name.replace("_", " ")}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
             }
         }
     }
@@ -250,58 +174,24 @@ fun MapSettingsToggle(isMapButtonsVisible: Boolean, onToggle: () -> Unit, modifi
 
 @Composable
 fun OsmMap(
-    appMode: String?,
-    hydrationLevel: Int,
-    isMapLocked: Boolean,
-    mapFollowMode: MapFollowMode,
-    centeringTrackerTrigger: Int,
-    centeringViewerTrigger: Int,
-    zoomInTrigger: Int,
-    zoomOutTrigger: Int,
-    homePoints: List<GeoPoint>,
-    isFenceVisible: Boolean,
-    maxDistance: Double,
-    geofenceMode: GeofenceMode,
-    isViolationsVisible: Boolean,
-    isGeofenceViolationsVisible: Boolean,
-    trackerLat: Double,
-    trackerLng: Double,
-    trackerSpeed: Double,
-    trackerAccuracy: Double,
-    trackerMaxAccuracy: Double,
-    trackerLocPending: Boolean,
-    trackerLastValidFixRt: Long,
-    viewerLat: Double,
-    viewerLng: Double,
-    viewerSpeed: Double,
-    viewerAccuracy: Double,
-    viewerMaxAcc: Double,
-    viewerLocPending: Boolean,
-    viewerLastValidFixRt: Long,
-    replayCursorPos: GeoPoint?,
-    trackerSegments: List<MapTrailSegment>,
-    viewerSegments: List<MapTrailSegment>,
-    violations: List<ViolationPoint>, 
-    onTap: (GeoPoint) -> Unit,
-    onRemoveMarker: (Int) -> Unit,
+    state: MapViewState,
     isTrackerFresh: Boolean,
     isViewerFresh: Boolean,
     initialCenter: GeoPoint? = null,
-    systemPulse: Long,
-    systemPulseRt: Long,
+    onTap: (GeoPoint) -> Unit,
+    onRemoveMarker: (Int) -> Unit,
     onLockChange: (Boolean) -> Unit,
     mapViewRef: MutableState<MapView?>
 ) {
     val context = LocalContext.current
     val density = context.resources.displayMetrics.density
     
-    val isTrackerMode = appMode == "tracker"
+    val isTrackerMode = state.appMode == "tracker"
 
     val overlayManager = remember(mapViewRef.value) {
         mapViewRef.value?.let { MapOverlayManager(context, it, density) }
     }
 
-    // Issue #878: Register memory callbacks for proactive cache eviction
     DisposableEffect(overlayManager) {
         val callback = object : ComponentCallbacks2 {
             override fun onTrimMemory(level: Int) {
@@ -321,49 +211,49 @@ fun OsmMap(
     val smoothedTrackerPos = remember { mutableStateOf<GeoPoint?>(null) }
     val smoothedViewerPos = remember { mutableStateOf<GeoPoint?>(null) }
 
-    LaunchedEffect(trackerLat, trackerLng, trackerSpeed) {
-        if (PhysicsUtils.isValidLocation(trackerLat, trackerLng)) {
+    LaunchedEffect(state.trackerLat, state.trackerLng, state.trackerSpeed) {
+        if (PhysicsUtils.isValidLocation(state.trackerLat, state.trackerLng)) {
             val last = smoothedTrackerPos.value
-            val alpha = if (trackerSpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
-            smoothedTrackerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, trackerLat, trackerLng) > 100.0) {
-                GeoPoint(trackerLat, trackerLng)
+            val alpha = if (state.trackerSpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
+            smoothedTrackerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, state.trackerLat, state.trackerLng) > 100.0) {
+                GeoPoint(state.trackerLat, state.trackerLng)
             } else {
                 GeoPoint(
-                    PhysicsUtils.smoothCoordinate(last.latitude, trackerLat, alpha),
-                    PhysicsUtils.smoothCoordinate(last.longitude, trackerLng, alpha)
+                    PhysicsUtils.smoothCoordinate(last.latitude, state.trackerLat, alpha),
+                    PhysicsUtils.smoothCoordinate(last.longitude, state.trackerLng, alpha)
                 )
             }
         }
     }
 
-    LaunchedEffect(viewerLat, viewerLng, viewerSpeed) {
-        if (PhysicsUtils.isValidLocation(viewerLat, viewerLng)) {
+    LaunchedEffect(state.viewerLat, state.viewerLng, state.viewerSpeed) {
+        if (PhysicsUtils.isValidLocation(state.viewerLat, state.viewerLng)) {
             val last = smoothedViewerPos.value
-            val alpha = if (viewerSpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
-            smoothedViewerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, viewerLat, viewerLng) > 100.0) {
-                GeoPoint(viewerLat, viewerLng)
+            val alpha = if (state.viewerSpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
+            smoothedViewerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, state.viewerLat, state.viewerLng) > 100.0) {
+                GeoPoint(state.viewerLat, state.viewerLng)
             } else {
                 GeoPoint(
-                    PhysicsUtils.smoothCoordinate(last.latitude, viewerLat, alpha),
-                    PhysicsUtils.smoothCoordinate(last.longitude, viewerLng, alpha)
+                    PhysicsUtils.smoothCoordinate(last.latitude, state.viewerLat, alpha),
+                    PhysicsUtils.smoothCoordinate(last.longitude, state.viewerLng, alpha)
                 )
             }
         }
     }
 
-    val localLockStatus = remember { mutableStateOf(isMapLocked) }
-    LaunchedEffect(isMapLocked) { localLockStatus.value = isMapLocked }
+    val localLockStatus = remember { mutableStateOf(state.isMapLocked) }
+    LaunchedEffect(state.isMapLocked) { localLockStatus.value = state.isMapLocked }
 
     var lastTriggerTs by remember { mutableLongStateOf(0L) }
 
-    LaunchedEffect(localLockStatus.value, trackerLat, trackerLng, viewerLat, viewerLng, isTrackerFresh, isViewerFresh, mapFollowMode, smoothedTrackerPos.value, smoothedViewerPos.value) {
+    LaunchedEffect(localLockStatus.value, state.trackerLat, state.trackerLng, state.viewerLat, state.viewerLng, isTrackerFresh, isViewerFresh, state.mapFollowMode, smoothedTrackerPos.value, smoothedViewerPos.value) {
         if (localLockStatus.value) {
-            if (systemPulse - lastTriggerTs < 500) return@LaunchedEffect
+            if (state.systemPulse - lastTriggerTs < 500) return@LaunchedEffect
             val sTrk = smoothedTrackerPos.value
             val sVwr = smoothedViewerPos.value
             val view = mapViewRef.value ?: return@LaunchedEffect
             
-            when (mapFollowMode) {
+            when (state.mapFollowMode) {
                 MapFollowMode.VIEWER -> { if (sVwr != null) view.controller.setCenter(sVwr) }
                 MapFollowMode.TRACKER -> { if (sTrk != null) view.controller.setCenter(sTrk) }
                 MapFollowMode.AUTO -> {
@@ -378,26 +268,27 @@ fun OsmMap(
                         view.controller.setCenter(sTrk ?: sVwr!!)
                     }
                 }
+                MapFollowMode.NONE -> {}
             }
         }
     }
 
-    LaunchedEffect(centeringTrackerTrigger) {
+    LaunchedEffect(state.centeringTrackerTrigger) {
         val sTrk = smoothedTrackerPos.value
-        if (centeringTrackerTrigger > 0 && sTrk != null) {
-            lastTriggerTs = systemPulse; mapViewRef.value?.controller?.animateTo(sTrk); mapViewRef.value?.controller?.setZoom(18.0)
+        if (state.centeringTrackerTrigger > 0 && sTrk != null) {
+            lastTriggerTs = state.systemPulse; mapViewRef.value?.controller?.animateTo(sTrk); mapViewRef.value?.controller?.setZoom(18.0)
         }
     }
 
-    LaunchedEffect(centeringViewerTrigger) {
+    LaunchedEffect(state.centeringViewerTrigger) {
         val sVwr = smoothedViewerPos.value
-        if (centeringViewerTrigger > 0 && sVwr != null) {
-            lastTriggerTs = systemPulse; mapViewRef.value?.controller?.animateTo(sVwr); mapViewRef.value?.controller?.setZoom(18.0)
+        if (state.centeringViewerTrigger > 0 && sVwr != null) {
+            lastTriggerTs = state.systemPulse; mapViewRef.value?.controller?.animateTo(sVwr); mapViewRef.value?.controller?.setZoom(18.0)
         }
     }
 
-    LaunchedEffect(zoomInTrigger) { if (zoomInTrigger > 0) mapViewRef.value?.controller?.zoomIn() }
-    LaunchedEffect(zoomOutTrigger) { if (zoomOutTrigger > 0) mapViewRef.value?.controller?.zoomOut() }
+    LaunchedEffect(state.zoomInTrigger) { if (state.zoomInTrigger > 0) mapViewRef.value?.controller?.zoomIn() }
+    LaunchedEffect(state.zoomOutTrigger) { if (state.zoomOutTrigger > 0) mapViewRef.value?.controller?.zoomOut() }
 
     AndroidView(factory = { 
         MapView(context).apply { 
@@ -427,48 +318,42 @@ fun OsmMap(
             overlayManager?.let { om ->
                 var changed = false
                 
-                // Issue #739/874: Hydration-level gating to stagger overlay initialization
-                // Level 4: Map Base (Home points and geofence)
-                if (hydrationLevel >= 4) {
-                    changed = om.updateHomePoints(homePoints, isFenceVisible, maxDistance, isTrackerMode, geofenceMode, onTap, onRemoveMarker) || changed
+                if (state.hydrationLevel >= 4) {
+                    changed = om.updateHomePoints(state.homePoints, state.isFenceVisible, state.maxDistance, isTrackerMode, state.geofenceMode, onTap, onRemoveMarker) || changed
                 }
                 
-                // Level 5: Map Trails
-                if (hydrationLevel >= 5) {
-                    changed = om.updateTrails(trackerSegments, viewerSegments, systemPulseRt) || changed
+                if (state.hydrationLevel >= 5) {
+                    changed = om.updateTrails(state.trackerSegments, state.viewerSegments, state.systemPulseRt) || changed
                 }
                 
-                // Level 6: Current Positions & Accuracy Circles (R874)
-                if (hydrationLevel >= 6) {
+                if (state.hydrationLevel >= 6) {
                     changed = om.updateCurrentPositions(
                         trackerValid = smoothedTrackerPos.value != null,
                         trackerPos = smoothedTrackerPos.value,
                         isTrackerFresh = isTrackerFresh,
-                        trackerAccuracy = trackerAccuracy,
-                        maxTrackerAccuracy = trackerMaxAccuracy,
-                        trackerSpeed = trackerSpeed,
-                        isTrackerPending = trackerLocPending,
-                        trackerLastValidFixRt = trackerLastValidFixRt,
+                        trackerAccuracy = state.trackerAccuracy,
+                        maxTrackerAccuracy = state.trackerMaxAccuracy,
+                        trackerSpeed = state.trackerSpeed,
+                        isTrackerPending = state.trackerLocPending,
+                        trackerLastValidFixRt = state.trackerLastValidFixRt,
                         viewerValid = smoothedViewerPos.value != null,
                         viewerPos = smoothedViewerPos.value,
                         isViewerFresh = isViewerFresh,
-                        viewerAccuracy = viewerAccuracy,
-                        viewerMaxAcc = viewerMaxAcc,
-                        viewerSpeed = viewerSpeed,
-                        isViewerPending = viewerLocPending,
-                        viewerLastValidFixRt = viewerLastValidFixRt,
-                        systemPulseRt = systemPulseRt
+                        viewerAccuracy = state.viewerAccuracy,
+                        viewerMaxAcc = state.viewerMaxAcc,
+                        viewerSpeed = state.viewerSpeed,
+                        isViewerPending = state.viewerLocPending,
+                        viewerLastValidFixRt = state.viewerLastValidFixRt,
+                        systemPulseRt = state.systemPulseRt
                     ) || changed
                 }
 
-                // Level 7: Violations (R874 - Separated from Level 6 to stay under 700ms)
-                if (hydrationLevel >= 7) {
-                    changed = om.updateViolations(violations, isViolationsVisible, isGeofenceViolationsVisible, systemPulseRt) || changed
+                if (state.hydrationLevel >= 7) {
+                    changed = om.updateViolations(state.violations, state.isViolationsVisible, state.isGeofenceViolationsVisible, state.systemPulseRt) || changed
                 }
                 
-                // Level 8: Final Hydration (Replay Cursor)
-                if (hydrationLevel >= 8) {
-                    changed = om.updateReplayCursor(replayCursorPos) || changed
+                if (state.hydrationLevel >= 8) {
+                    changed = om.updateReplayCursor(state.replayCursorPos) || changed
                 }
                 
                 if (changed) {

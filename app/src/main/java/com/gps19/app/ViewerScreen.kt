@@ -1,49 +1,44 @@
 package com.gps19.app
 
 import android.content.res.Configuration
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.StopCircle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import org.osmdroid.util.GeoPoint
 import com.gps19.core.engine.*
 import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
- * Sep.09.16:
- * - Issue #284 Hardening: Refactored all LocationUpdate field accesses to use
- *   partitioned states (.kinetic, .atmospheric, .integrity) to fix
- *   NoSuchMethodError (R-ID 284).
- * Sep.08.13:
- * - Fix: Corrected viewerTelemetryTs in AppMapContainer. Local viewer data is 
- *   always considered "fresh" if GPS is active (R-ID 282).
- * - Fix: Corrected unresolved references in ViewerDashboard (gpsIdx, rttValue) 
- *   within TelemetryBox call.
- * Sep.06.35:
- * - Issue #930 RESOLVED: Deep-Linking. Implemented onHistLink and 
- *   onDetailsLink callbacks for LogOverlay (R-ID 930).
+ * Sep.11.10:
+ * - Integrity Audit #243: Removed redundant map tool overlays and individual 
+ *   map parameters; fully delegated Map UI to AppMapContainer (R-ID 287).
+ * - Fix: Corrected SettingsOverlay parameter mapping to match SettingsComponents.kt.
+ * Sep.10.12:
+ * - Idea #243: Map State Partitioning RESOLVED. Integrated mapViewState flow 
+ *   to reduce parameter surface area in AppMapContainer (R-ID 287).
+ * Sep.10.08:
+ * - Idea #241: HudState Aggregator Refactoring. Transitioned to segmented HUD
+ *   state flows (Connectivity, Telemetry, Health) to optimize recomposition
+ *   scope (R-ID 286).
+ * Sep.10.06:
+ * - Idea #242: Unified Termination Logic. Integrated SessionTerminationButton 
+ *   to ensure visual consistency across modes (R-ID 285).
  */
 
 @Composable
@@ -53,11 +48,6 @@ fun ViewerScreen(
     diagnosticState: DiagnosticState,
     viewModel: MainViewModel,
     logsFlow: StateFlow<List<LogEntry>>,
-    trackerSegments: List<MapTrailSegment>,
-    viewerSegments: List<MapTrailSegment>,
-    violations: List<ViolationPoint>,
-    systemPulse: Long,
-    systemPulseRt: Long,
     onToggleMap: () -> Unit,
     onToggleLog: () -> Unit,
     onToggleSettings: () -> Unit,
@@ -82,10 +72,17 @@ fun ViewerScreen(
     val context = LocalContext.current
 
     val dashboardState by viewModel.dashboardState.collectAsStateWithLifecycle()
-    val hudState by viewModel.hudState.collectAsStateWithLifecycle()
     val gpsIndexData by viewModel.gpsIndexData.collectAsStateWithLifecycle()
     val rtt by viewModel.rtt.collectAsStateWithLifecycle()
     val trackerCurrentMa by viewModel.trackerCurrentMa.collectAsStateWithLifecycle()
+    
+    // Idea #241: Segmented HUD State Subscriptions
+    val hudConnectivity by viewModel.hudConnectivityState.collectAsStateWithLifecycle()
+    val hudTelemetry by viewModel.hudTelemetryState.collectAsStateWithLifecycle()
+    val hudHealth by viewModel.hudHealthState.collectAsStateWithLifecycle()
+
+    // Idea #243: Map State Partitioning
+    val mapViewState by viewModel.mapViewState.collectAsStateWithLifecycle()
 
     val onDashboard = {
         if (isMapVisible) onToggleMap()
@@ -109,13 +106,15 @@ fun ViewerScreen(
             onL = onToggleLog,
             onM = onToggleMap,
             onR = { viewModel.onEvent(UiEvent.ToggleRibbons(!isRibbonsVisible)) },
-            onEvent = { viewModel.onEvent(it) }
+            onEvent = { event -> viewModel.onEvent(event) }
         )
     }
 
     val statusBar = @Composable {
         GlobalStatusBar(
-            hudState = hudState,
+            connectivity = hudConnectivity,
+            telemetry = hudTelemetry,
+            health = hudHealth,
             modifier = Modifier.pointerInput(Unit) {
                 detectTapGestures(onTap = { viewModel.onEvent(UiEvent.SetRedScreenVisible(true)) })
             }
@@ -142,51 +141,11 @@ fun ViewerScreen(
                         Box(modifier = Modifier.weight(1f)) {
                             if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen && uiState.hydrationLevel >= 6) {
                                 AppMapContainer(
-                                    appMode = uiState.appMode,
-                                    hydrationLevel = uiState.hydrationLevel,
-                                    isMapButtonsVisible = uiState.isMapButtonsVisible,
-                                    isFenceVisible = uiState.isFenceVisible,
-                                    geofenceMode = uiState.geofenceMode,
-                                    isViolationsVisible = uiState.isViolationsVisible,
-                                    isGeofenceViolationsVisible = uiState.isGeofenceViolationsVisible,
-                                    maxDistance = uiState.maxDistance,
-                                    isMapLocked = uiState.isMapLocked,
-                                    mapFollowMode = uiState.mapFollowMode,
-                                    centeringTrackerTrigger = uiState.centeringTrackerTrigger,
-                                    centeringViewerTrigger = uiState.centeringViewerTrigger,
-                                    zoomInTrigger = uiState.zoomInTrigger,
-                                    zoomOutTrigger = uiState.zoomOutTrigger,
-                                    homePoints = uiState.homePoints,
-                                    trackerLat = kinematicState.trackerLocation.kinetic.lat,
-                                    trackerLng = kinematicState.trackerLocation.kinetic.lng,
-                                    trackerSpeed = kinematicState.trackerLocation.kinetic.speed,
-                                    trackerAccuracy = kinematicState.trackerLocation.kinetic.accuracy,
-                                    trackerMaxAccuracy = kinematicState.trackerLocation.kinetic.maxAccuracy,
-                                    trackerGpsTs = kinematicState.trackerLocation.kinetic.gpsTs,
-                                    trackerTelemetryTs = kinematicState.trackerLocation.ts,
-                                    trackerLocPending = kinematicState.trackerHealth.isLocationPending,
-                                    trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
-                                    trackerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
-                                    viewerLat = kinematicState.localLocation.kinetic.lat,
-                                    viewerLng = kinematicState.localLocation.kinetic.lng,
-                                    viewerSpeed = kinematicState.localLocation.kinetic.speed,
-                                    viewerAccuracy = kinematicState.localLocation.kinetic.accuracy,
-                                    viewerMaxAcc = kinematicState.localLocation.kinetic.maxAccuracy,
-                                    viewerGpsTs = kinematicState.localLocation.kinetic.gpsTs,
-                                    viewerTelemetryTs = systemPulse,
-                                    viewerLocPending = kinematicState.localHealth.isLocationPending,
-                                    viewerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
-                                    replayCursorPos = kinematicState.replayCursorPos,
-                                    systemPulse = systemPulse,
-                                    systemPulseRt = systemPulseRt,
-                                    onEvent = { viewModel.onEvent(it) },
+                                    state = mapViewState,
+                                    onEvent = { event -> viewModel.onEvent(event) },
                                     onClearTrails = { viewModel.clearTrails(context) },
-                                    trackerSegments = trackerSegments,
-                                    viewerSegments = viewerSegments,
-                                    violations = violations, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail, 
-                                    showAccuracyBadge = false,
-                                    showSettingsButton = true,
-                                    showToolsOverlay = true
+                                    onSaveTrail = onSaveTrail,
+                                    onLoadTrail = onLoadTrail
                                 )
                             } else if (uiState.hydrationLevel >= 4 && !isMapVisible) {
                                 ViewerDashboard(
@@ -201,8 +160,8 @@ fun ViewerScreen(
                                     gpsIdx = gpsIndexData,
                                     rttValue = rtt,
                                     trackerCurrentMa = trackerCurrentMa,
-                                    systemPulse = systemPulse,
-                                    onEvent = { viewModel.onEvent(it) }
+                                    systemPulse = mapViewState.systemPulse,
+                                    onEvent = { event -> viewModel.onEvent(event) }
                                 )
                             }
                         }
@@ -211,51 +170,11 @@ fun ViewerScreen(
             } else {
                 if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen && uiState.hydrationLevel >= 6) {
                     AppMapContainer(
-                        appMode = uiState.appMode,
-                        hydrationLevel = uiState.hydrationLevel,
-                        isMapButtonsVisible = uiState.isMapButtonsVisible,
-                        isFenceVisible = uiState.isFenceVisible,
-                        geofenceMode = uiState.geofenceMode,
-                        isViolationsVisible = uiState.isViolationsVisible,
-                        isGeofenceViolationsVisible = uiState.isGeofenceViolationsVisible,
-                        maxDistance = uiState.maxDistance,
-                        isMapLocked = uiState.isMapLocked,
-                        mapFollowMode = uiState.mapFollowMode,
-                        centeringTrackerTrigger = uiState.centeringTrackerTrigger,
-                        centeringViewerTrigger = uiState.centeringViewerTrigger,
-                        zoomInTrigger = uiState.zoomInTrigger,
-                        zoomOutTrigger = uiState.zoomOutTrigger,
-                        homePoints = uiState.homePoints,
-                        trackerLat = kinematicState.trackerLocation.kinetic.lat,
-                        trackerLng = kinematicState.trackerLocation.kinetic.lng,
-                        trackerSpeed = kinematicState.trackerLocation.kinetic.speed,
-                        trackerAccuracy = kinematicState.trackerLocation.kinetic.accuracy,
-                        trackerMaxAccuracy = kinematicState.trackerLocation.kinetic.maxAccuracy,
-                        trackerGpsTs = kinematicState.trackerLocation.kinetic.gpsTs,
-                        trackerTelemetryTs = kinematicState.trackerLocation.ts,
-                        trackerLocPending = kinematicState.trackerHealth.isLocationPending,
-                        trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
-                        trackerLastValidFixRt = kinematicState.trackerHealth.lastValidFixRt,
-                        viewerLat = kinematicState.localLocation.kinetic.lat,
-                        viewerLng = kinematicState.localLocation.kinetic.lng,
-                        viewerSpeed = kinematicState.localLocation.kinetic.speed,
-                        viewerAccuracy = kinematicState.localLocation.kinetic.accuracy,
-                        viewerMaxAcc = kinematicState.localLocation.kinetic.maxAccuracy,
-                        viewerGpsTs = kinematicState.localLocation.kinetic.gpsTs,
-                        viewerTelemetryTs = systemPulse,
-                        viewerLocPending = kinematicState.localHealth.isLocationPending,
-                        viewerLastValidFixRt = kinematicState.localHealth.lastValidFixRt,
-                        replayCursorPos = kinematicState.replayCursorPos,
-                        systemPulse = systemPulse,
-                        systemPulseRt = systemPulseRt,
-                        onEvent = { viewModel.onEvent(it) },
+                        state = mapViewState,
+                        onEvent = { event -> viewModel.onEvent(event) },
                         onClearTrails = { viewModel.clearTrails(context) },
-                        trackerSegments = trackerSegments,
-                        viewerSegments = viewerSegments,
-                        violations = violations, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail, 
-                        showAccuracyBadge = false,
-                        showSettingsButton = false,
-                        showToolsOverlay = false 
+                        onSaveTrail = onSaveTrail,
+                        onLoadTrail = onLoadTrail
                     )
                 }
 
@@ -276,40 +195,6 @@ fun ViewerScreen(
                                 }
                             }
                         }
-
-                        if (uiState.isMapHydrated && isMapVisible && uiState.hydrationLevel >= 7) {
-                            Box(Modifier.fillMaxWidth().padding(top = 8.dp, end = 12.dp), contentAlignment = Alignment.CenterEnd) {
-                                MapSettingsToggle(
-                                    isMapButtonsVisible = uiState.isMapButtonsVisible,
-                                    onToggle = { viewModel.onEvent(UiEvent.SetMapButtonsVisible(!uiState.isMapButtonsVisible)) }
-                                )
-                            }
-                            
-                            if (uiState.isMapButtonsVisible) {
-                                Box(Modifier.fillMaxWidth().padding(end = 8.dp), contentAlignment = Alignment.CenterEnd) {
-                                    MapToolsOverlay(
-                                        isTrackerMode = false,
-                                        trackerValid = PhysicsUtils.isValidLocation(kinematicState.trackerLocation.kinetic.lat, kinematicState.trackerLocation.kinetic.lng),
-                                        viewerValid = PhysicsUtils.isValidLocation(kinematicState.localLocation.kinetic.lat, kinematicState.localLocation.kinetic.lng),
-                                        showFence = uiState.isFenceVisible,
-                                        onToggleFence = { viewModel.onEvent(UiEvent.SetFenceVisible(!uiState.isFenceVisible)) },
-                                        geofenceMode = uiState.geofenceMode,
-                                        onSetGeofenceMode = { viewModel.onEvent(UiEvent.SetGeofenceMode(it)) },
-                                        showViolations = uiState.isViolationsVisible,
-                                        onToggleViolations = { viewModel.onEvent(UiEvent.SetViolationsVisible(!uiState.isViolationsVisible)) },
-                                        showGeofenceViolations = uiState.isGeofenceViolationsVisible,
-                                        onToggleGeofenceViolations = { viewModel.onEvent(UiEvent.SetGeofenceViolationsVisible(!uiState.isGeofenceViolationsVisible)) },
-                                        onClear = { viewModel.clearTrails(context) },
-                                        onSave = onSaveTrail,
-                                        onLoad = onLoadTrail,
-                                        onCenterTracker = { viewModel.onEvent(UiEvent.CenterTracker) },
-                                        onCenterViewer = { viewModel.onEvent(UiEvent.CenterViewer) },
-                                        onZoomIn = { viewModel.onEvent(UiEvent.MapZoomIn) },
-                                        onZoomOut = { viewModel.onEvent(UiEvent.MapZoomOut) }
-                                    )
-                                }
-                            }
-                        }
                         
                         if (uiState.hydrationLevel >= 4 && !isMapVisible) {
                             ViewerDashboard(
@@ -324,8 +209,8 @@ fun ViewerScreen(
                                 gpsIdx = gpsIndexData,
                                 rttValue = rtt,
                                 trackerCurrentMa = trackerCurrentMa,
-                                systemPulse = systemPulse,
-                                onEvent = { viewModel.onEvent(it) }
+                                systemPulse = mapViewState.systemPulse,
+                                onEvent = { event -> viewModel.onEvent(event) }
                             )
                         }
                     }
@@ -344,16 +229,19 @@ fun ViewerScreen(
                 draftAlertSettings = uiState.draftSettings.alertSettings,
                 selectedSirenType = uiState.selectedSirenType,
                 isSirenPlaying = diagnosticState.isSirenPlaying,
-                onClose = onToggleSettings, onReset = onResetStats,
-                onExport = onExportLogs, onClear = onClearHome, onImportConfig = onImportConfig,
+                onClose = onToggleSettings, 
+                onReset = onResetStats,
+                onExport = onExportLogs, 
+                onClear = onClearHome, 
+                onImportConfig = onImportConfig,
                 onFullInitialization = { viewModel.fullInitialization(context) },
-                onUpdateDeviceId = { viewModel.onEvent(UiEvent.UpdateDraftDeviceId(it)) },
-                onUpdateViewerId = { viewModel.onEvent(UiEvent.UpdateDraftViewerId(it)) },
-                onUpdateRelayUrl = { viewModel.onEvent(UiEvent.UpdateDraftRelayUrl(it)) },
-                onUpdateMaxDistance = { viewModel.onEvent(UiEvent.UpdateDraftMaxDistance(it)) },
-                onUpdateAlertSettings = { viewModel.onEvent(UiEvent.UpdateDraftAlertSettings(it)) },
-                onUpdateSirenType = { viewModel.onEvent(UiEvent.SetSirenType(it)) },
-                onUpdateAlarmVolume = { viewModel.onEvent(UiEvent.UpdateDraftAlertSettings(uiState.draftSettings.alertSettings.copy(alarmVolume = it))) },
+                onUpdateDeviceId = { id -> viewModel.onEvent(UiEvent.UpdateDraftDeviceId(id)) },
+                onUpdateViewerId = { id -> viewModel.onEvent(UiEvent.UpdateDraftViewerId(id)) },
+                onUpdateRelayUrl = { url -> viewModel.onEvent(UiEvent.UpdateDraftRelayUrl(url)) },
+                onUpdateMaxDistance = { dist -> viewModel.onEvent(UiEvent.UpdateDraftMaxDistance(dist)) },
+                onUpdateAlertSettings = { settings -> viewModel.onEvent(UiEvent.UpdateDraftAlertSettings(settings)) },
+                onUpdateSirenType = { type -> viewModel.onEvent(UiEvent.SetSirenType(type)) },
+                onUpdateAlarmVolume = { vol -> viewModel.onEvent(UiEvent.UpdateDraftAlarmVolume(vol)) },
                 onTestSiren = { 
                     if (diagnosticState.isSirenPlaying) {
                         viewModel.audioSynthesizer.stopSiren(timeProvider = viewModel.timeProvider)
@@ -369,7 +257,7 @@ fun ViewerScreen(
                     }
                 },
                 onShowPhoneSetup = { viewModel.onEvent(UiEvent.TogglePhoneSetup(true)) },
-                onEvent = { viewModel.onEvent(it) }
+                onEvent = { event -> viewModel.onEvent(event) }
             )
         } else if (isLogVisible && uiState.hydrationLevel >= 9) {
             val showDetails by viewModel.repository.logFilterDetails.collectAsStateWithLifecycle()
@@ -377,10 +265,10 @@ fun ViewerScreen(
             LogOverlay(
                 logsFlow = logsFlow, onExport = onExportLogs, onToggle = onToggleLog, onClear = onClearLogs,
                 showDetails = showDetails, showRecovered = showRecovered, 
-                onSetShowDetails = { viewModel.onEvent(UiEvent.SetLogFilterShowDetails(it)) }, 
-                onSetShowRecovered = { viewModel.onEvent(UiEvent.SetLogFilterShowRecovered(it)) },
+                onSetShowDetails = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowDetails(show)) }, 
+                onSetShowRecovered = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowRecovered(show)) },
                 appStartTime = uiState.appStartTime,
-                systemPulse = systemPulse,
+                systemPulse = mapViewState.systemPulse,
                 isTelemetryFresh = dashboardState.isTelemetryFresh,
                 onHistLink = { ts -> 
                     viewModel.onEvent(UiEvent.SetReplayCursor(ts))
@@ -398,8 +286,8 @@ fun ViewerScreen(
                 history4HFlow = viewModel.history4HFlow,
                 history24HFlow = viewModel.history24HFlow,
                 history7DFlow = viewModel.history7DFlow,
-                onToggleStrictMode = { viewModel.onEvent(UiEvent.ToggleStrictMode(it)) },
-                onScrub = { viewModel.onEvent(UiEvent.SetReplayCursor(it)) },
+                onToggleStrictMode = { strict -> viewModel.onEvent(UiEvent.ToggleStrictMode(strict)) },
+                onScrub = { ts -> viewModel.onEvent(UiEvent.SetReplayCursor(ts)) },
                 onDismiss = { viewModel.onEvent(UiEvent.ToggleRibbons(false)) }
             )
         } else if (isGnssDetailVisible && uiState.hydrationLevel >= 11) {
@@ -518,17 +406,10 @@ fun ViewerDashboard(
                 }
                 
                 Spacer(Modifier.height(16.dp))
-                Button(
-                    onClick = { onEvent(UiEvent.ShowStopTrackingConfirmation(true)) },
-                    colors = ButtonDefaults.buttonColors(containerColor = Rose500.copy(alpha = 0.1f)),
-                    border = BorderStroke(1.dp, Rose500.copy(alpha = 0.4f)),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                ) {
-                    Icon(Icons.Default.StopCircle, null, tint = Rose500, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("TERMINATE MONITORING SESSION", color = Rose500, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
+                SessionTerminationButton(
+                    appMode = appMode,
+                    onTerminate = { onEvent(UiEvent.ShowStopTrackingConfirmation(true)) }
+                )
             } else {
                 Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                     Text("Tap status card above to expand dashboard", color = Slate500, fontSize = 11.sp, fontWeight = FontWeight.Medium)

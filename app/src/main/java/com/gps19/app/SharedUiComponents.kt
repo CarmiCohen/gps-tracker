@@ -2,6 +2,7 @@ package com.gps19.app
 
 import android.content.res.Configuration
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
@@ -49,15 +50,17 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Sep.10.12:
+ * - Idea #242: Unified Termination Logic. Implemented SessionTerminationButton 
+ *   to centralize exit flows and ensure visual consistency (R-ID 285).
+ * Sep.10.08:
+ * - Idea #241: HudState Aggregator Refactoring. Segmented GlobalStatusBar and 
+ *   StatusBar to use HudConnectivityState, HudTelemetryState, and 
+ *   HudHealthState directly, reducing recomposition scope (R-ID 286).
  * Sep.09.16:
  * - Issue #942 RESOLVED: Fixed Identity Color Confusion in StatusBar. Peer role 
  *   badge (VWR/TRK) now uses role-appropriate colors (ViewerCyan/BrandJd). Local 
  *   progress indicators and badges now respect local role identity (R942).
- * Sep.08.12:
- * - Issue #924 Visibility: Added THR badge to StatusBar for GNSS Throttling 
- *   (A15 Hysteresis) transparency (R-ID 267).
- * Sep.06.57:
- * - Issue #936 RESOLVED: Fixed compilation error in ConnectionQualityRibbon (p.isRecoveryEvent).
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -597,31 +600,35 @@ fun HeaderBar(
 
 @Composable
 fun GlobalStatusBar(
-    hudState: HudState,
+    connectivity: HudConnectivityState,
+    telemetry: HudTelemetryState,
+    health: HudHealthState,
     modifier: Modifier = Modifier
 ) {
-    StatusBar(hudState = hudState, modifier = modifier)
+    StatusBar(connectivity = connectivity, telemetry = telemetry, health = health, modifier = modifier)
 }
 
 @Composable
 fun StatusBar(
-    hudState: HudState,
+    connectivity: HudConnectivityState,
+    telemetry: HudTelemetryState,
+    health: HudHealthState,
     modifier: Modifier = Modifier
 ) {
-    val mode = hudState.appMode ?: return
-    val lastGpsTs = if (mode == "viewer") hudState.lastGpsTs else hudState.viewerGpsTs
+    val mode = connectivity.appMode ?: return
+    val lastGpsTs = if (mode == "viewer") telemetry.lastGpsTs else telemetry.viewerGpsTs
     
-    val isPeerActive = hudState.isTelemetryFresh
-    val isTrackerGpsActive = if (mode == "viewer") hudState.isGpsFresh else hudState.isLocalGpsActive
+    val isPeerActive = connectivity.isTelemetryFresh
+    val isTrackerGpsActive = if (mode == "viewer") telemetry.isGpsFresh else telemetry.isLocalGpsActive
 
-    val progressValue = if (hudState.health.progressPulse > 0f) hudState.health.progressPulse else 0f
+    val progressValue = if (health.progressPulse > 0f) health.progressPulse else 0f
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val trkIdLabel = hudState.trackerId.take(6).uppercase()
-    val viewIdLabel = hudState.viewerId.take(6).uppercase()
+    val trkIdLabel = connectivity.trackerId.take(6).uppercase()
+    val viewIdLabel = connectivity.viewerId.take(6).uppercase()
     
     // Issue #266: Animation Throttling
-    val isThrottled = hudState.isMaliAnomaly
+    val isThrottled = health.isMaliAnomaly
     val infiniteTransition = rememberInfiniteTransition(label = "StatusBarAnimations")
     val alarmAlpha by if (isThrottled) remember { mutableStateOf(1f) } else infiniteTransition.animateFloat(0.4f, 1f, infiniteRepeatable(tween(500), repeatMode = RepeatMode.Reverse), label = "AlarmAlpha")
     val movingAlpha by if (isThrottled) remember { mutableStateOf(1f) } else infiniteTransition.animateFloat(0.5f, 1f, infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), label = "MovingAlpha")
@@ -634,68 +641,68 @@ fun StatusBar(
             Column(modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 3.dp)) {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        StatusBadge(label = "SYS", active = hudState.isSystemActive, activeColor = localColor, isBold = true)
-                        StatusBadge(label = "INT", active = hudState.isInternet, activeColor = localColor, isBold = true)
-                        StatusBadge(label = "SRV", active = hudState.isRelayConnected, activeColor = localColor, isBold = true)
-                        StatusBadge(label = "GPS", active = hudState.isLocalGpsActive, activeColor = localColor)
+                        StatusBadge(label = "SYS", active = connectivity.isSystemActive, activeColor = localColor, isBold = true)
+                        StatusBadge(label = "INT", active = connectivity.isInternet, activeColor = localColor, isBold = true)
+                        StatusBadge(label = "SRV", active = connectivity.isRelayConnected, activeColor = localColor, isBold = true)
+                        StatusBadge(label = "GPS", active = telemetry.isLocalGpsActive, activeColor = localColor)
                         StatusBadge(label = if (mode == "tracker") "VWR" else "TRK", active = isPeerActive, activeColor = peerColor)
-                        StatusBadge(label = "DAT", active = hudState.isDataHealthy, activeColor = localColor)
-                        StatusBadge(label = "WDG", active = hudState.watchdogOk, activeColor = localColor, isBold = true)
+                        StatusBadge(label = "DAT", active = connectivity.isDataHealthy, activeColor = localColor)
+                        StatusBadge(label = "WDG", active = connectivity.watchdogOk, activeColor = localColor, isBold = true)
                         
                         // Issue #924: Watchdog Safe-Mode Indicator
-                        if (hudState.isSafeMode) StatusBadge(label = "SAF", active = false, isBold = true)
+                        if (connectivity.isSafeMode) StatusBadge(label = "SAF", active = false, isBold = true)
 
                         // Issue #932: A15 Hardware Adaptation Indicator
-                        if (hudState.isA15) StatusBadge(label = "A15", active = true, activeColor = localColor, isBold = true)
+                        if (connectivity.isA15) StatusBadge(label = "A15", active = true, activeColor = localColor, isBold = true)
 
                         // Issue #924: GNSS Throttling Indicator (A15 Hysteresis)
-                        if (hudState.isGnssThrottled) StatusBadge(label = "THR", active = true, activeColor = Amber500, isBold = true)
+                        if (connectivity.isGnssThrottled) StatusBadge(label = "THR", active = true, activeColor = Amber500, isBold = true)
 
                         // Issue #266: Mali Anomaly Indicator
-                        if (hudState.isMaliAnomaly) StatusBadge(label = "MAL", active = true, activeColor = Rose500, isBold = true)
+                        if (health.isMaliAnomaly) StatusBadge(label = "MAL", active = true, activeColor = Rose500, isBold = true)
                         
-                        if (hudState.hasActiveAlarms) StatusBadge(label = "ALM", active = true, activeColor = Rose500.copy(alpha = alarmAlpha), isBold = true)
-                        if (hudState.isRedScreenSuppressed) {
+                        if (health.hasActiveAlarms) StatusBadge(label = "ALM", active = true, activeColor = Rose500.copy(alpha = alarmAlpha), isBold = true)
+                        if (health.isRedScreenSuppressed) {
                              Spacer(modifier = Modifier.width(2.dp))
-                             Box(modifier = Modifier.background(if (hudState.isSirenPlaying) Rose500.copy(alpha = alarmAlpha) else Slate500, RoundedCornerShape(2.dp)).padding(horizontal = 2.dp)) {
-                                 Text(text = if (hudState.isSirenPlaying) "SIREN LOCKOUT" else "LOCKOUT", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Bold, style = compactStyle)
+                             Box(modifier = Modifier.background(if (health.isSirenPlaying) Rose500.copy(alpha = alarmAlpha) else Slate500, RoundedCornerShape(2.dp)).padding(horizontal = 2.dp)) {
+                                 Text(text = if (health.isSirenPlaying) "SIREN LOCKOUT" else "LOCKOUT", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Bold, style = compactStyle)
                              }
                         }
                         
                         // Issue #266: Throttle circular progress indicator
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(18.dp)) { 
                             if (!isThrottled) {
-                                CircularProgressIndicator(progress = { progressValue }, modifier = Modifier.size(16.dp), color = if (hudState.isDataHealthy) localColor else Rose500, strokeWidth = 2.dp)
+                                CircularProgressIndicator(progress = { progressValue }, modifier = Modifier.size(16.dp), color = if (connectivity.isDataHealthy) localColor else Rose500, strokeWidth = 2.dp)
                             }
-                            Icon(imageVector = if (hudState.isDataHealthy) Icons.Default.CheckCircle else Icons.Default.Error, contentDescription = null, modifier = Modifier.size(8.dp), tint = if (hudState.isDataHealthy) localColor else Rose500)
+                            Icon(imageVector = if (connectivity.isDataHealthy) Icons.Default.CheckCircle else Icons.Default.Error, contentDescription = null, modifier = Modifier.size(8.dp), tint = if (connectivity.isDataHealthy) localColor else Rose500)
                         }
                     }
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text(text = if (hudState.trackerState == TrackerState.MOVING && isTrackerGpsActive) "»\u2009${hudState.trackerState.name}\u2009«" else hudState.trackerState.name, color = (if (!isTrackerGpsActive) Slate500 else BrandJd).copy(alpha = if (hudState.trackerState == TrackerState.MOVING && isTrackerGpsActive) movingAlpha else 1f), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
+                    Text(text = if (telemetry.trackerState == TrackerState.MOVING && isTrackerGpsActive) "»\u2009${telemetry.trackerState.name}\u2009«" else telemetry.trackerState.name, color = (if (!isTrackerGpsActive) Slate500 else BrandJd).copy(alpha = if (telemetry.trackerState == TrackerState.MOVING && isTrackerGpsActive) movingAlpha else 1f), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                     Spacer(modifier = Modifier.width(8.dp))
-                    val animatedSpeed by animateFloatAsState(if (isTrackerGpsActive && !hudState.speedMps.isNaN()) hudState.speedMps * 3.6f else 0f, if (isThrottled) snap() else tween(1000), label = "SpeedAnim")
+                    val animatedSpeed by animateFloatAsState(if (isTrackerGpsActive && !telemetry.speedMps.isNaN()) telemetry.speedMps * 3.6f else 0f, if (isThrottled) snap() else tween(1000), label = "SpeedAnim")
                     Text(text = "${if (animatedSpeed < 10.0f) String.format(Locale.getDefault(), "%.1f", animatedSpeed) else animatedSpeed.toInt().toString()}km/h", color = if (isTrackerGpsActive) BrandJd else Slate500, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle, textAlign = TextAlign.End)
                 }
                 Spacer(modifier = Modifier.height(3.dp))
                 if (isLandscape && mode == "viewer") {
                     Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-                        val vAge = if(hudState.viewerGpsTs > 0) hudState.systemPulse - hudState.viewerGpsTs else -1L
+                        val vAge = if(telemetry.viewerGpsTs > 0) health.systemPulse - telemetry.viewerGpsTs else -1L
                         Box(modifier = Modifier.weight(1f)) { 
-                            StatusRowData(StatusRowState(label = viewIdLabel, battery = hudState.battery, commIndex = hudState.commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = hudState.isCharging, accuracy = hudState.viewerAccuracy, maxAccuracy = hudState.maxViewerAccuracy, temp = hudState.viewerTemp, distance = hudState.distToViewer, satsUsed = hudState.viewerSatsUsed, satsView = hudState.viewerSatsView, gpsAgeMs = vAge, isRemote = false, isLocPending = hudState.isViewerLocPending, locPendingReason = hudState.viewerLocPendingReason, isTelemetryFresh = hudState.viewerGpsTs > 0 && (hudState.systemPulse - hudState.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS, isThrottled = isThrottled)) 
+                            StatusRowData(StatusRowState(label = viewIdLabel, battery = health.battery, commIndex = connectivity.commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = health.isCharging, accuracy = telemetry.viewerAccuracy, maxAccuracy = telemetry.maxViewerAccuracy, temp = health.viewerTemp, distance = telemetry.distToViewer, satsUsed = telemetry.viewerSatsUsed, satsView = telemetry.viewerSatsView, gpsAgeMs = vAge, isRemote = false, isLocPending = telemetry.isViewerLocPending, locPendingReason = telemetry.viewerLocPendingReason, isTelemetryFresh = telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS, isThrottled = isThrottled)) 
                         }
-                        val tAge = if(lastGpsTs > 0) hudState.systemPulse - lastGpsTs else -1L
+                        val tAge = if(lastGpsTs > 0) health.systemPulse - lastGpsTs else -1L
                         Box(modifier = Modifier.weight(1f)) { 
-                            StatusRowData(StatusRowState(label = trkIdLabel, battery = hudState.battery, commIndex = if(isPeerActive) hudState.remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = hudState.remoteCharging, accuracy = hudState.trackerAccuracy, maxAccuracy = hudState.maxTrackerAccuracy, satsView = hudState.satsView, satsUsed = hudState.satsUsed, gpsAgeMs = tAge, temp = hudState.trackerTemp, distance = hudState.distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = hudState.isTrackerLocPending, locPendingReason = hudState.trackerLocPendingReason, isTelemetryFresh = isPeerActive, isGpsFresh = isTrackerGpsActive, isUltraLongStationary = hudState.isUltraLongStationary, isThrottled = isThrottled)) 
+                            StatusRowData(StatusRowState(label = trkIdLabel, battery = health.battery, commIndex = if(isPeerActive) connectivity.remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = health.remoteCharging, accuracy = telemetry.trackerAccuracy, maxAccuracy = telemetry.maxTrackerAccuracy, satsView = telemetry.satsView, satsUsed = telemetry.satsUsed, gpsAgeMs = tAge, temp = health.trackerTemp, distance = telemetry.distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = telemetry.isTrackerLocPending, locPendingReason = telemetry.trackerLocPendingReason, isTelemetryFresh = isPeerActive, isGpsFresh = isTrackerGpsActive, isUltraLongStationary = telemetry.isUltraLongStationary, isThrottled = isThrottled)) 
                         }
                     }
                 } else {
                     if (mode == "viewer") {
-                        val vAge = if(hudState.viewerGpsTs > 0) hudState.systemPulse - hudState.viewerGpsTs else -1L
-                        StatusRowData(StatusRowState(label = viewIdLabel, battery = hudState.battery, commIndex = hudState.commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = hudState.isCharging, accuracy = hudState.viewerAccuracy, maxAccuracy = hudState.maxViewerAccuracy, temp = hudState.viewerTemp, distance = hudState.distToViewer, satsUsed = hudState.viewerSatsUsed, satsView = hudState.viewerSatsView, gpsAgeMs = vAge, horizontalPadding = 8.dp, isLocPending = hudState.isViewerLocPending, locPendingReason = hudState.viewerLocPendingReason, isTelemetryFresh = hudState.viewerGpsTs > 0 && (hudState.systemPulse - hudState.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS, isThrottled = isThrottled))
+                        val vAge = if(telemetry.viewerGpsTs > 0) health.systemPulse - telemetry.viewerGpsTs else -1L
+                        StatusRowData(StatusRowState(label = viewIdLabel, battery = health.battery, commIndex = connectivity.commIndex, color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = health.isCharging, accuracy = telemetry.viewerAccuracy, maxAccuracy = telemetry.maxViewerAccuracy, temp = health.viewerTemp, distance = telemetry.distToViewer, satsUsed = telemetry.viewerSatsUsed, satsView = telemetry.viewerSatsView, gpsAgeMs = vAge, horizontalPadding = 8.dp, isLocPending = telemetry.isViewerLocPending, locPendingReason = telemetry.viewerLocPendingReason, isTelemetryFresh = telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS, isThrottled = isThrottled))
                         Spacer(modifier = Modifier.height(3.dp))
                     }
-                    val tAge = if(lastGpsTs > 0) hudState.systemPulse - lastGpsTs else -1L
-                    StatusRowData(StatusRowState(label = trkIdLabel, battery = if (mode == "viewer") hudState.remoteBattery else hudState.battery, commIndex = if (mode == "viewer") (if(isPeerActive) hudState.remoteCommIndex else 0) else hudState.commIndex, color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, isCharging = if (mode == "viewer") hudState.remoteCharging else hudState.isCharging, accuracy = if (mode == "viewer") hudState.trackerAccuracy else hudState.trackerAccuracy, maxAccuracy = if (mode == "viewer") hudState.maxTrackerAccuracy else hudState.maxTrackerAccuracy, satsView = hudState.satsView, satsUsed = hudState.satsUsed, gpsAgeMs = tAge, temp = hudState.trackerTemp, distance = hudState.distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = hudState.isTrackerLocPending, locPendingReason = hudState.trackerLocPendingReason, isTelemetryFresh = if (mode == "tracker") (hudState.viewerGpsTs > 0 && (hudState.systemPulse - hudState.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isPeerActive, isGpsFresh = isTrackerGpsActive, isUltraLongStationary = hudState.isUltraLongStationary, isThrottled = isThrottled))
+                    val tAge = if(lastGpsTs > 0) health.systemPulse - lastGpsTs else -1L
+                    StatusRowData(StatusRowState(label = trkIdLabel, battery = if (mode == "viewer") health.remoteBattery else health.battery, commIndex = if (mode == "viewer") (if(isPeerActive) connectivity.remoteCommIndex else 0) else connectivity.commIndex, color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, isCharging = if (mode == "viewer") health.remoteCharging else health.isCharging, accuracy = if (mode == "viewer") telemetry.trackerAccuracy else telemetry.trackerAccuracy, maxAccuracy = if (mode == "viewer") telemetry.maxTrackerAccuracy else telemetry.maxTrackerAccuracy, satsView = telemetry.satsView, satsUsed = telemetry.satsUsed, gpsAgeMs = tAge, temp = health.trackerTemp, distance = telemetry.distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = telemetry.isTrackerLocPending, locPendingReason = telemetry.trackerLocPendingReason, isTelemetryFresh = if (mode == "tracker") (telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isPeerActive, isGpsFresh = isTrackerGpsActive, isUltraLongStationary = telemetry.isUltraLongStationary, isThrottled = isThrottled))
                 }
             }
         }
@@ -789,6 +796,30 @@ fun CommBar(index: Int, color: Color) {
 fun StatusBadge(label: String, active: Boolean, activeColor: Color = BrandJd, isBold: Boolean = true) {
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
     Text(text = label, color = if (active) activeColor else Rose500, fontSize = 9.sp, fontWeight = if(isBold) FontWeight.ExtraBold else FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1, style = compactStyle)
+}
+
+/**
+ * SessionTerminationButton: Unified termination button for Tracker and Viewer modes (Idea #242).
+ */
+@Composable
+fun SessionTerminationButton(
+    appMode: String,
+    onTerminate: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val label = if (appMode == "tracker") "TERMINATE TRACKING SESSION" else "TERMINATE MONITORING SESSION"
+    
+    Button(
+        onClick = onTerminate,
+        colors = ButtonDefaults.buttonColors(containerColor = Rose500.copy(alpha = 0.1f)),
+        border = BorderStroke(1.dp, Rose500.copy(alpha = 0.4f)),
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.fillMaxWidth().height(48.dp)
+    ) {
+        Icon(Icons.Default.StopCircle, null, tint = Rose500, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(8.dp))
+        Text(text = label, color = Rose500, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
 }
 
 @Preview(showBackground = true, backgroundColor = 0xFF000000)

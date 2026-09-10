@@ -1,8 +1,8 @@
-# SOT Master Requirements (Sep.10.05)
+# SOT Master Requirements (Sep.10.12)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-## 🏗️ Architectural Master Rules (55 Rules)
+## 🏗️ Architectural Master Rules (58 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context权威 (R001)**: **MANDATORY**. Use `ApplicationContext` for all singleton services. Activity context is strictly for UI-only components.
@@ -15,8 +15,11 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.29 Reference-Counted Hardware (R975b)**: **MANDATORY**. `HardwareProvider` MUST utilize internal reference counting to manage the lifecycle of physical sensors and GNSS status callbacks. Teardown sequences MUST be suppressed if an active user (Tracker or Viewer) remains, ensuring continuity during rapid mode transitions (Sep.08.00).
 *   **1.30 Role Identity Segregation (R799f)**: **MANDATORY**. All UI components representing role-specific data (Map markers, status badges, telemetry labels) MUST use `BrandJd` for Tracker and `ViewerCyan` for Viewer identity. Mixing or defaulting to a single color for both roles is strictly prohibited (Sep.09.16).
 *   **1.31 Connectivity State Determinism (R941)**: **MANDATORY**. All signaling lifecycle managers (e.g., `ConnectivitySuite`) MUST explicitly reset local relay connection status (`isRelayConnected`) and RTT metrics in their teardown/stop sequence. The `TelemetryRepository` MUST likewise clear these fields during its `clear()` sequence to prevent stale UI status badges during role transitions (Sep.10.05).
+*   **1.32 Unified Session Controls (R285)**: **MANDATORY**. Critical session lifecycle controls (e.g., Termination/Exit) MUST utilize unified components from `SharedUiComponents.kt` to ensure identical visual feedback, labeling, and confirmation logic across all application modes (Tracker/Viewer) (Sep.10.06).
+*   **1.33 HUD State Segmentation (R286)**: **MANDATORY**. The UI layer MUST subscribe directly to segmented HUD sub-state flows (`HudConnectivityState`, `HudTelemetryState`, `HudHealthState`). The use of monolithic HUD state facades is prohibited to ensure optimal recomposition performance and clear data-path separation (Sep.10.08).
+*   **1.34 Map State Partitioning (R287)**: **MANDATORY**. The Map UI layer MUST utilize a partitioned state model via `MapViewState`. All map telemetry, configuration, and camera triggers MUST be bundled into this object before reaching map components to minimize recomposition overhead and maintain interface stability (Sep.10.12).
 
-## 🧩 Functional Requirements (250 IDs)
+## 🧩 Functional Requirements (253 IDs)
 *   **R-ID 259 (Energy Footprint Integration)**: Forensic energy footprints (Delta mA, Temp Rise, Duration) MUST be structured and propagated from `ForensicAuditor` through the tracking engine to provide a persistent "Last Revival Impact" metric in the HUD and logs (Sep.08.13).
 *   **R-ID 267 (A15 Hysteresis Visibility)**: The UI MUST display a "THR" (Throttled) badge when GNSS sampling rates are reduced due to A15 resource load or MaliAnomaly hysteresis to explain telemetry latency to the user (Sep.08.13).
 *   **R-ID 274 (GNSS Hysteresis Suppression)**: The system MUST utilize a 10s cooldown window (GNSS_THROTTLING_HYSTERESIS_MS) after a thermal or load-based anomaly clears on Samsung A15 hardware to prevent HUD speed jitter and UI status flickering (Sep.09.15).
@@ -26,7 +29,10 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 282 (Single-Device Role Parity)**: The system MUST detect role switches (Tracker ↔ Viewer) on the same device and force a fresh signaling handshake and room registration in `CommunicationManager` to prevent stale peer status (Sep.08.13).
 *   **R-ID 283 (Teardown Constraint Hardening)**: The system MUST utilize `safeAverage()` or explicit `isNaN()` guards for all satellite signal averages and derived indices to prevent `NaN` propagation into the persistence layer and avoid SQLite `NOT NULL` constraint violations during service teardown (Sep.08.20).
 *   **R-ID 284 (Telemetry Partitioning)**: The `LocationUpdate` model MUST utilize partitioned sub-states (`KineticState`, `AtmosphericState`, `IntegrityState`) for logical separation. Consumers MUST access fields via these sub-states directly. Legacy bridge properties are strictly prohibited (Sep.09.10).
+*   **R-ID 285 (Session Termination Unification)**: The session termination flow MUST be visually and functionally identical in both Tracker and Viewer modes, utilizing the `SessionTerminationButton` to prevent user confusion and reduce maintenance overhead (Sep.10.06).
+*   **R-ID 286 (Segmented HUD Emissions)**: The HUD state aggregation logic MUST emit segmented flows for Connectivity, Telemetry, and Health to distribute JIT load and minimize the impact of high-frequency telemetry updates on UI responsiveness (Sep.10.08).
+*   **R-ID 287 (Map View State Consolidation)**: The map UI must consume a single `MapViewState` object to aggregate configuration and telemetry, reducing the parameter surface area of `AppMapContainer` from ~40 to 1 (Sep.10.12).
 *   **R-ID 301 (Alarm Logic Partitioning)**: The alarm evaluation pipeline MUST be partitioned into specialized evaluators (Connectivity, Physical, Geofence, System) to reduce cyclomatic complexity and enable granular forensic auditing of subsystem violations (Sep.09.00).
 *   **R-ID 302 (Fixed Grid Watchdog)**: The system MUST utilize Fixed Grid Scheduling for all watchdog pulses, anchored to the service start monotonic time (`elapsedRealtime`). Each subsequent pulse MUST align to a strict 90s grid relative to the anchor to eliminate cumulative drift during background sessions (>12h) (Sep.09.15).
 
-*(Total: 55 Architectural Rules + 250 Functional R-IDs = 305 Items)*
+*(Total: 58 Architectural Rules + 253 Functional R-IDs = 311 Items)*

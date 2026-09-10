@@ -1,7 +1,6 @@
 package com.gps19.app
 
 import android.Manifest
-import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.widget.Toast
@@ -25,33 +24,28 @@ import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.getValue
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.gps19.core.engine.STARTUP_SETTLING_DELAY_MS
-import com.gps19.core.engine.CapabilityStatus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Sep.11.10:
+ * - Integrity Audit #243: Eliminated redundant collections for trails and 
+ *   violations; fully delegated to consolidated mapViewState (R-ID 287).
  * Sep.05.10:
  * - Issue #910 Hardening: Protected Landing navigation with isSystemActive 
  *   check to prevent race-driven service termination during hydration (R910).
- * Sep.03.11:
- * - Issue #241 RESOLVED: Mode-Selection Activation. Added SetSystemActive(true) 
- *   to proceedToMode and restoration logic to ensure background services 
- *   transition out of INACTIVE state (R-ID 241).
  */
 @Composable
 fun MainAppContent(
@@ -70,8 +64,6 @@ fun MainAppContent(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val kinematicState by viewModel.kinematicState.collectAsStateWithLifecycle()
     val diagnosticState by viewModel.diagnosticState.collectAsStateWithLifecycle()
-    val systemPulse by viewModel.systemPulse.collectAsStateWithLifecycle()
-    val systemPulseRt by viewModel.systemPulseRt.collectAsStateWithLifecycle()
     
     val navController = rememberNavController()
     val context = LocalContext.current
@@ -81,9 +73,7 @@ fun MainAppContent(
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_RESUME -> {
-                    viewModel.onEvent(UiEvent.SetUiVisible(true))
-                }
+                Lifecycle.Event.ON_RESUME -> viewModel.onEvent(UiEvent.SetUiVisible(true))
                 Lifecycle.Event.ON_PAUSE -> viewModel.onEvent(UiEvent.SetUiVisible(false))
                 else -> {}
             }
@@ -99,14 +89,11 @@ fun MainAppContent(
         viewModel.onEvent(UiEvent.SetManualSelection(true))
         viewModel.onEvent(UiEvent.SetSettlingActive(false))
         viewModel.onEvent(UiEvent.SetAppMode(mode))
-        
-        // Issue #241: Activate system upon role selection.
         viewModel.onEvent(UiEvent.SetSystemActive(true))
         
         val elapsed = System.currentTimeMillis() - startupTime
         if (elapsed < STARTUP_SETTLING_DELAY_MS) {
             val remaining = STARTUP_SETTLING_DELAY_MS - elapsed
-            Timber.i("Manual selection: waiting ${remaining}ms for startup stabilization")
             scope.launch {
                 delay(remaining)
                 onStartService(mode)
@@ -132,21 +119,12 @@ fun MainAppContent(
         }
     }
 
-    val requestPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+    val requestPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         viewModel.onEvent(UiEvent.RefreshPermissionStatus)
-        val allGranted = permissions.entries.all { it.value }
-        if (allGranted) {
-            uiState.navigation.pendingMode?.let { mode ->
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !uiState.permissions.isBackgroundLocationGranted) {
-                    showBackgroundDisclosure = true
-                } else {
-                    proceedToMode(mode)
-                    viewModel.onEvent(UiEvent.SetPendingMode(null))
-                }
-            }
-        } else {
-            viewModel.onEvent(UiEvent.SetManualSelection(false))
-            uiState.navigation.pendingMode?.let { mode ->
+        uiState.navigation.pendingMode?.let { mode ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !uiState.permissions.isBackgroundLocationGranted) {
+                showBackgroundDisclosure = true
+            } else {
                 proceedToMode(mode)
                 viewModel.onEvent(UiEvent.SetPendingMode(null))
             }
@@ -187,25 +165,20 @@ fun MainAppContent(
 
         if (isDiagnostics) {
             if (navController.currentDestination?.route != Screen.Diagnostics.route) {
-                navController.navigate(Screen.Diagnostics.route) {
-                    launchSingleTop = true
-                }
+                navController.navigate(Screen.Diagnostics.route) { launchSingleTop = true }
             }
             return@LaunchedEffect
         }
 
         if (mode != null && uiState.isSettlingActive && !uiState.isManualSelectionInProgress) {
             if (navController.currentDestination?.route == Screen.Landing.route) {
-                Timber.d("Issue #243: Deferring restoration navigation for ${STARTUP_SETTLING_DELAY_MS}ms settling")
                 delay(STARTUP_SETTLING_DELAY_MS)
                 viewModel.onEvent(UiEvent.SetSettlingActive(false))
                 
                 if (hasRequiredPermissions(mode)) {
-                    // Issue #241: Ensure system is active during restoration.
                     viewModel.onEvent(UiEvent.SetSystemActive(true))
                     onStartService(mode)
                 } else {
-                    Timber.i("Automatic restoration: Missing permissions for mode $mode. Triggering request flow.")
                     checkAndRequestPermissions(mode)
                 }
             }
@@ -231,17 +204,8 @@ fun MainAppContent(
                 }
             }
             null -> {
-                // Issue #910 Hardening: If system is active, do NOT navigate to Landing 
-                // even if mode is transiently null. This prevents the BackHandler from 
-                // triggering onCleanupAndExit() during hydration gaps.
-                if (uiState.isSystemActive) {
-                    Timber.w("Issue #910: appMode is null but isSystemActive is true. Deferring Landing navigation.")
-                    return@LaunchedEffect
-                }
-
-                if (uiState.navigation.pendingMode == null) {
-                    viewModel.onEvent(UiEvent.SetManualSelection(false))
-                }
+                if (uiState.isSystemActive) return@LaunchedEffect
+                if (uiState.navigation.pendingMode == null) viewModel.onEvent(UiEvent.SetManualSelection(false))
                 if (navController.currentDestination?.route != Screen.Landing.route) {
                     navController.navigate(Screen.Landing.route) { 
                         popUpTo(Screen.Landing.route) { inclusive = true }
@@ -300,11 +264,7 @@ fun MainAppContent(
             onDismissRequest = { viewModel.onEvent(UiEvent.DismissIdentitySanitization) },
             title = { Text(stringResource(R.string.sanitization_title)) },
             text = { Text(stringResource(R.string.sanitization_desc)) },
-            confirmButton = {
-                Button(onClick = { viewModel.onEvent(UiEvent.DismissIdentitySanitization) }) {
-                    Text(stringResource(R.string.btn_dismiss))
-                }
-            }
+            confirmButton = { Button(onClick = { viewModel.onEvent(UiEvent.DismissIdentitySanitization) }) { Text(stringResource(R.string.btn_dismiss)) } }
         )
     }
 
@@ -312,15 +272,8 @@ fun MainAppContent(
     val importTrailLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> MainFileHelper.importTrails(activity, viewModel, uris) }
     
     GpsTrackerTheme(appMode = uiState.appMode) {
-        Surface(
-            modifier = Modifier
-                .fillMaxSize()
-                .safeDrawingPadding(),
-            color = MaterialTheme.colorScheme.background
-        ) {
-            BackHandler(enabled = diagnosticState.isRedScreenVisible && uiState.appMode != null) {
-                viewModel.onEvent(UiEvent.DismissAlarms)
-            }
+        Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding(), color = MaterialTheme.colorScheme.background) {
+            BackHandler(enabled = diagnosticState.isRedScreenVisible && uiState.appMode != null) { viewModel.onEvent(UiEvent.DismissAlarms) }
 
             Box(modifier = Modifier.fillMaxSize()) {
                 if (uiState.hydrationLevel >= 2) {
@@ -331,22 +284,13 @@ fun MainAppContent(
                                 LandingScreen { mode -> 
                                     if (hasRequiredPermissions(mode)) { 
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !uiState.permissions.isBackgroundLocationGranted) {
-                                            viewModel.onEvent(UiEvent.SetPendingMode(mode))
-                                            showBackgroundDisclosure = true
-                                        } else {
-                                            proceedToMode(mode)
-                                        }
-                                    } else { 
-                                        checkAndRequestPermissions(mode)
-                                    } 
+                                            viewModel.onEvent(UiEvent.SetPendingMode(mode)); showBackgroundDisclosure = true
+                                        } else proceedToMode(mode)
+                                    } else checkAndRequestPermissions(mode)
                                 }
                             }
                         }
                         composable(Screen.Tracker.route) {
-                            val trackerSegments by viewModel.trackerTrailSegments.collectAsStateWithLifecycle()
-                            val viewerSegments by viewModel.viewerTrailSegments.collectAsStateWithLifecycle()
-                            val violations by viewModel.violationPointsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
-
                             BackHandler {
                                 val nav = uiState.navigation
                                 when {
@@ -362,9 +306,7 @@ fun MainAppContent(
                             }
                             if (uiState.hydrationLevel >= 3) {
                                 TrackerScreen(
-                                    uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, 
-                                    trackerSegments = trackerSegments, viewerSegments = viewerSegments, violations = violations,
-                                    systemPulse = systemPulse, systemPulseRt = systemPulseRt,
+                                    uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow,
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
@@ -376,10 +318,6 @@ fun MainAppContent(
                             }
                         }
                         composable(Screen.Viewer.route) {
-                            val trackerSegments by viewModel.trackerTrailSegments.collectAsStateWithLifecycle()
-                            val viewerSegments by viewModel.viewerTrailSegments.collectAsStateWithLifecycle()
-                            val violations by viewModel.violationPointsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
-
                             BackHandler {
                                 val nav = uiState.navigation
                                 when {
@@ -396,8 +334,6 @@ fun MainAppContent(
                             if (uiState.hydrationLevel >= 3) {
                                 ViewerScreen(
                                     uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, 
-                                    trackerSegments = trackerSegments, viewerSegments = viewerSegments, violations = violations,
-                                    systemPulse = systemPulse, systemPulseRt = systemPulseRt,
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) },
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
@@ -438,24 +374,14 @@ fun MainAppContent(
                 
                 if (uiState.navigation.isPhoneSetupVisible && uiState.hydrationLevel >= 3) {
                     PhoneSetupOverlay(
-                        onClose = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)) }, 
-                        onWhitelist = { onRequestBatteryExemption() },
-                        onOverlay = { onRequestOverlayPermission() }, 
-                        onAppInfo = { onRequestAppInfo() },
-                        onExactAlarm = { onRequestExactAlarm() },
-                        onHardwarePermission = { onRequestHardwarePermission() },
-                        onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, 
-                        onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
+                        onClose = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)) }, onWhitelist = { onRequestBatteryExemption() },
+                        onOverlay = { onRequestOverlayPermission() }, onAppInfo = { onRequestAppInfo() },
+                        onExactAlarm = { onRequestExactAlarm() }, onHardwarePermission = { onRequestHardwarePermission() },
+                        onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                         onTestAlarm = { viewModel.onEvent(UiEvent.RequestTestAlarm) },
-                        onNavigateToDiagnostics = { 
-                            viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
-                            viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) 
-                        },
-                        isSetupBypassActive = uiState.isSetupBypassActive,
-                        permissions = uiState.permissions,
-                        homePointsCount = uiState.homePoints.size,
-                        isTrackerMode = uiState.appMode == "tracker",
-                        onGoToMap = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.ToggleMap(true)) }
+                        onNavigateToDiagnostics = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
+                        isSetupBypassActive = uiState.isSetupBypassActive, permissions = uiState.permissions, homePointsCount = uiState.homePoints.size,
+                        isTrackerMode = uiState.appMode == "tracker", onGoToMap = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.ToggleMap(true)) }
                     )
                 }
 
@@ -463,8 +389,7 @@ fun MainAppContent(
                     AlarmOverlay(
                         alarms = diagnosticState.activeAlarms, isMuted = diagnosticState.isAlarmSilenced,
                         isLocationPending = kinematicState.trackerHealth.isLocationPending,
-                        backgroundStatus = uiState.permissions.backgroundStatus,
-                        hasBackgroundRestriction = uiState.permissions.hasBackgroundRestriction,
+                        backgroundStatus = uiState.permissions.backgroundStatus, hasBackgroundRestriction = uiState.permissions.hasBackgroundRestriction,
                         onHardwarePermissionClick = { onRequestHardwarePermission() },
                         onMute = { 
                             val currentCauses = diagnosticState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { context.getString(R.string.status_muted) }
@@ -477,27 +402,13 @@ fun MainAppContent(
 
                 if (uiState.navigation.isStopTrackingConfirmationVisible && uiState.hydrationLevel >= 3) {
                     var timeLeft by remember { mutableStateOf(5) }
-                    LaunchedEffect(Unit) {
-                        while (timeLeft > 0) {
-                            delay(1000)
-                            timeLeft--
-                        }
-                        viewModel.onEvent(UiEvent.ShowStopTrackingConfirmation(false))
-                    }
-
+                    LaunchedEffect(Unit) { while (timeLeft > 0) { delay(1000); timeLeft-- }; viewModel.onEvent(UiEvent.ShowStopTrackingConfirmation(false)) }
                     AlertDialog(
                         onDismissRequest = { viewModel.onEvent(UiEvent.ShowStopTrackingConfirmation(false)) },
                         title = { Text(stringResource(R.string.stop_tracking_title)) },
                         text = { Text(stringResource(R.string.stop_tracking_desc, timeLeft)) },
-                        confirmButton = {
-                            Button(onClick = { 
-                                viewModel.onEvent(UiEvent.ConfirmStopTracking)
-                                onStopTracking() 
-                            }) { Text(stringResource(R.string.btn_stop_tracking)) }
-                        },
-                        dismissButton = {
-                            Button(onClick = { viewModel.onEvent(UiEvent.ShowStopTrackingConfirmation(false)) }) { Text(stringResource(R.string.btn_cancel)) }
-                        }
+                        confirmButton = { Button(onClick = { viewModel.onEvent(UiEvent.ConfirmStopTracking); onStopTracking() }) { Text(stringResource(R.string.btn_stop_tracking)) } },
+                        dismissButton = { Button(onClick = { viewModel.onEvent(UiEvent.ShowStopTrackingConfirmation(false)) }) { Text(stringResource(R.string.btn_cancel)) } }
                     )
                 }
             }

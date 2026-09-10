@@ -1,9 +1,16 @@
-# Simplification Ideas (Sep.10.00)
+# Simplification Ideas (Sep.11.10)
+
+## 💡 Idea #243: Map UI Consolidation & Delegation
+**Status**: RESOLVED (Sep.11.10)
+**Description**: Following the introduction of `MapViewState`, the `TrackerScreen` and `ViewerScreen` still manually managed map tools and passed ~40 parameters. By delegating all map-related UI (buttons, tools, state triggers) strictly to `AppMapContainer`, we reduce screen complexity and ensure the map subsystem is self-contained.
+**Resolution**: Eliminated redundant UI overlays and simplified screen signatures. Optimized `MainViewModel` flow triggers using `MapUiParts` segmentation (R-ID 287).
 
 ## 💡 Idea #241: HudState Aggregator Refactoring
-**Status**: PROPOSED
-**Description**: The `HudState` data class in `EngineModels.kt` currently serves as a monolithic facade for legacy Compose compatibility. As the aggregator transitions to segmented emissions (`HudConnectivityState`, `HudTelemetryState`, `HudHealthState`), we should remove the top-level `HudState` and have the UI components subscribe to the specific sub-states directly. This will reduce recomposition scope and simplify the `MainViewModel` logic.
+**Status**: RESOLVED (Sep.10.08)
+**Description**: Transitioned to segmented emissions (`HudConnectivityState`, `HudTelemetryState`, `HudHealthState`) to reduce recomposition scope.
+**Resolution**: Removed `HudState` facade; UI components now subscribe to specific sub-states directly (R-ID 286).
 
 ## 💡 Idea #242: Unified Termination Logic
-**Status**: PROPOSED
-**Description**: Currently, session termination is handled slightly differently in `TrackerScreen` vs `ViewerScreen` (button labels, confirmation flows). Centralizing this into a single `SessionTerminationComponent` within `SharedUiComponents.kt` would reduce boilerplate and ensure visual consistency across modes.
+**Status**: RESOLVED (Sep.10.06)
+**Description**: Centralized session termination into a single component to ensure visual consistency across modes.
+**Resolution**: Implemented `SessionTerminationButton` in `SharedUiComponents.kt` (R-ID 285).
