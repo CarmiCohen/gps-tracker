@@ -49,21 +49,15 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Sep.09.16:
+ * - Issue #942 RESOLVED: Fixed Identity Color Confusion in StatusBar. Peer role 
+ *   badge (VWR/TRK) now uses role-appropriate colors (ViewerCyan/BrandJd). Local 
+ *   progress indicators and badges now respect local role identity (R942).
  * Sep.08.12:
  * - Issue #924 Visibility: Added THR badge to StatusBar for GNSS Throttling 
  *   (A15 Hysteresis) transparency (R-ID 267).
  * Sep.06.57:
  * - Issue #936 RESOLVED: Fixed compilation error in ConnectionQualityRibbon (p.isRecoveryEvent).
- * Sep.06.50:
- * - Issue #932 RESOLVED: HUD Synchronization. Added A15 badge to StatusBar 
- *   to indicate active hardware-specific background adaptations (R-ID 276).
- * Sep.06.08:
- * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Added SAF badge 
- *   to StatusBar to indicate active signaling suppression (R-ID 271).
- * Sep.05.25:
- * - Issue #266 RESOLVED: Automated Mali Driver Mitigation. Added MAL badge 
- *   and implemented UI-throttling to suppress high-frequency animations 
- *   during driver instability, preventing process-level ANRs (R-ID 266).
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -487,7 +481,7 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
             val p = history[index]
             val xPos = (startOffset + index) * pointWidth
             if (!p.isGap) {
-                val hFactor = if (p.isConnected) (TelemetryUtils.calculateCommIndex(p.rtt, p.remoteSig, p.localSig).toFloat() / 10f).coerceIn(0.1f, 1f) else 1f
+                val hFactor = if (p.isConnected) (TelemetryUtils.calculateCommIndex(p.rtt, p.localSig, p.remoteSig).toFloat() / 10f).coerceIn(0.1f, 1f) else 1f
                 val r = Rect(Offset(xPos, effectiveBaseY - (ribbonMaxHeight * hFactor)), Size(rectW, ribbonMaxHeight * hFactor))
                 if (p.isConnected) connectedPath.addRect(r) else disconnectedPath.addRect(r)
                 if (isStrictMode && index > 0 && kotlin.math.abs((p.ts - p.rt) - (history[index-1].ts - history[index-1].rt)) > 2000L) {
@@ -632,24 +626,27 @@ fun StatusBar(
     val alarmAlpha by if (isThrottled) remember { mutableStateOf(1f) } else infiniteTransition.animateFloat(0.4f, 1f, infiniteRepeatable(tween(500), repeatMode = RepeatMode.Reverse), label = "AlarmAlpha")
     val movingAlpha by if (isThrottled) remember { mutableStateOf(1f) } else infiniteTransition.animateFloat(0.5f, 1f, infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), label = "MovingAlpha")
 
+    val localColor = if (mode == "viewer") ViewerCyan else BrandJd
+    val peerColor = if (mode == "viewer") BrandJd else ViewerCyan
+
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Card(modifier = modifier.fillMaxWidth(), shape = RectangleShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = if (isLandscape) 0.7f else 0.9f)), elevation = CardDefaults.cardElevation(0.dp)) {
             Column(modifier = Modifier.fillMaxWidth().padding(top = 3.dp, bottom = 3.dp)) {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        StatusBadge(label = "SYS", active = hudState.isSystemActive, isBold = true)
-                        StatusBadge(label = "INT", active = hudState.isInternet, isBold = true)
-                        StatusBadge(label = "SRV", active = hudState.isRelayConnected, isBold = true)
-                        StatusBadge(label = "GPS", active = hudState.isLocalGpsActive)
-                        StatusBadge(label = if (mode == "tracker") "VWR" else "TRK", active = isPeerActive, activeColor = BrandJd)
-                        StatusBadge(label = "DAT", active = hudState.isDataHealthy)
-                        StatusBadge(label = "WDG", active = hudState.watchdogOk, isBold = true)
+                        StatusBadge(label = "SYS", active = hudState.isSystemActive, activeColor = localColor, isBold = true)
+                        StatusBadge(label = "INT", active = hudState.isInternet, activeColor = localColor, isBold = true)
+                        StatusBadge(label = "SRV", active = hudState.isRelayConnected, activeColor = localColor, isBold = true)
+                        StatusBadge(label = "GPS", active = hudState.isLocalGpsActive, activeColor = localColor)
+                        StatusBadge(label = if (mode == "tracker") "VWR" else "TRK", active = isPeerActive, activeColor = peerColor)
+                        StatusBadge(label = "DAT", active = hudState.isDataHealthy, activeColor = localColor)
+                        StatusBadge(label = "WDG", active = hudState.watchdogOk, activeColor = localColor, isBold = true)
                         
                         // Issue #924: Watchdog Safe-Mode Indicator
                         if (hudState.isSafeMode) StatusBadge(label = "SAF", active = false, isBold = true)
 
                         // Issue #932: A15 Hardware Adaptation Indicator
-                        if (hudState.isA15) StatusBadge(label = "A15", active = true, activeColor = BrandJd, isBold = true)
+                        if (hudState.isA15) StatusBadge(label = "A15", active = true, activeColor = localColor, isBold = true)
 
                         // Issue #924: GNSS Throttling Indicator (A15 Hysteresis)
                         if (hudState.isGnssThrottled) StatusBadge(label = "THR", active = true, activeColor = Amber500, isBold = true)
@@ -668,9 +665,9 @@ fun StatusBar(
                         // Issue #266: Throttle circular progress indicator
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(18.dp)) { 
                             if (!isThrottled) {
-                                CircularProgressIndicator(progress = { progressValue }, modifier = Modifier.size(16.dp), color = if (hudState.isDataHealthy) BrandJd else Rose500, strokeWidth = 2.dp)
+                                CircularProgressIndicator(progress = { progressValue }, modifier = Modifier.size(16.dp), color = if (hudState.isDataHealthy) localColor else Rose500, strokeWidth = 2.dp)
                             }
-                            Icon(imageVector = if (hudState.isDataHealthy) Icons.Default.CheckCircle else Icons.Default.Error, contentDescription = null, modifier = Modifier.size(8.dp), tint = if (hudState.isDataHealthy) BrandJd else Rose500)
+                            Icon(imageVector = if (hudState.isDataHealthy) Icons.Default.CheckCircle else Icons.Default.Error, contentDescription = null, modifier = Modifier.size(8.dp), tint = if (hudState.isDataHealthy) localColor else Rose500)
                         }
                     }
                     Spacer(modifier = Modifier.width(8.dp))

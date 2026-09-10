@@ -25,6 +25,10 @@ import kotlin.math.round
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Sep.09.16:
+ * - Issue #942 RESOLVED: Fixed Identity Color Confusion. Updated createTrackerBitmap 
+ *   to use Style.FILL for the inner circle, ensuring parity with Viewer icon. 
+ *   Strictly enforced BrandJd/ViewerCyan segregation (R942).
  * Sep.01.06:
  * - Issue #881 Hardening: Optimized for datasets >500 items. Increased 
  *   circleCache capacity to 600. Refined yielding to dynamic batching (size 5 
@@ -34,11 +38,6 @@ import kotlin.math.round
  * - Issue #880 Remediation: Increased hydration granularity to "High". Reduced 
  *   yield batch size from 5 to 2 items and added intra-position yields to 
  *   eliminate the residual 751ms frame stall on SM-A155F (R880).
- * Sep.01.00:
- * - Issue #878 Remediation: Implemented low-memory eviction strategy. Migrated 
- *   circleCache to ShadowCache (LRU) and added trimMemory() to handle 
- *   ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW. Prunes all pools to minimum 
- *   functional levels under pressure (R878).
  */
 class MapOverlayManager(
     private val context: Context,
@@ -590,7 +589,7 @@ class MapOverlayManager(
         b.applyCanvas {
             p.style = Paint.Style.STROKE; p.color = android.graphics.Color.WHITE; p.strokeWidth = density
             drawCircle(sz/2f, sz/2f, sz/2f - density, p)
-            p.color = if (isFresh) BrandJd.toArgb() else Slate500.toArgb(); p.strokeWidth = 3f * density
+            p.color = if (isFresh) BrandJd.toArgb() else Slate500.toArgb(); p.style = Paint.Style.FILL
             drawCircle(sz/2f, sz/2f, sz/2f - 3.5f * density, p)
         }
         return b

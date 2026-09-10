@@ -26,14 +26,15 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Sep.09.16:
+ * - Issue #942 RESOLVED: Fixed Identity Color Confusion. Updated PositionSection 
+ *   to strictly use BrandJd for Tracker metrics and ViewerCyan for Viewer metrics, 
+ *   ensuring role identity segregation (R942).
  * Sep.08.12:
  * - Issue #924 Visibility: Added isSafeMode to DashboardHeader for full 
  *   transparency of signaling suppression (R-ID 271).
  * - Issue #924 Visibility: Added isGnssThrottled to MainDashboardGrid and 
  *   DashboardHeader for A15 Hysteresis transparency (R-ID 267).
- * Aug.29.11:
- * - UI Refinement: Added visual indicator for Ultra-Long Stationary state 
- *   in Dashboard header (R765).
  */
 
 @Composable
@@ -291,13 +292,16 @@ private fun PositionSection(
     satsUsed: Int, satsView: Int, isSatsIndexWarning: Boolean, snr: Double, isGpsFresh: Boolean,
     gpsIdx: GpsIndexData, isViewer: Boolean, isLocalOnline: Boolean, gpsColor: Color, onShowGnssDetail: () -> Unit
 ) {
+    val tFreshColor = if (isGpsFresh) BrandJd else Slate500
+    val vFreshColor = if (isViewer && !isLocalOnline) Slate500 else ViewerCyan
+    
     val distToHomeStr = remember(distToHome) { formatDist(distToHome) }
     val distToViewerStr = remember(distToViewer) { formatDist(distToViewer) }
-    InfoRow(leftVal = distToHomeStr, leftLabel = "Dist Home", leftColor = gpsColor, rightVal = distToViewerStr, rightLabel = "Dist Other", rightColor = gpsColor)
+    InfoRow(leftVal = distToHomeStr, leftLabel = "Dist Home", leftColor = tFreshColor, rightVal = distToViewerStr, rightLabel = "Dist Other", rightColor = vFreshColor)
     
     val latStr = remember(lat, isGpsFresh) { if (isGpsFresh) "%.6f".format(Locale.getDefault(), lat) else "--" }
     val lngStr = remember(lng, isGpsFresh) { if (isGpsFresh) "%.6f".format(Locale.getDefault(), lng) else "--" }
-    InfoRow(leftVal = latStr, leftLabel = "Lat", leftColor = gpsColor, rightVal = lngStr, rightLabel = "Long", rightColor = gpsColor)
+    InfoRow(leftVal = latStr, leftLabel = "Lat", leftColor = tFreshColor, rightVal = lngStr, rightLabel = "Long", rightColor = tFreshColor)
     
     val gpsIdxStr = remember(gpsIdx.totalIndex) { "%.2f".format(Locale.getDefault(), gpsIdx.totalIndex) }
     val gpsSpeedStr = remember(gpsSpeedMps, isGpsFresh) { if (isGpsFresh) "%.1fkm/h".format(Locale.getDefault(), gpsSpeedMps * 3.6) else "--" }
@@ -305,7 +309,7 @@ private fun PositionSection(
     
     val trkAccDisplay = remember(trackerAccuracy, trackerMaxAcc, isGpsFresh) { if (isGpsFresh) "±%.1fm (±%.1fm)".format(Locale.getDefault(), trackerAccuracy, trackerMaxAcc) else "--" }
     val vwrAccDisplay = remember(viewerAccuracy, viewerMaxAcc, isViewer) { if (isViewer) "±%.1fm (±%.1fm)".format(Locale.getDefault(), viewerAccuracy, viewerMaxAcc) else "" }
-    InfoRow(leftVal = vwrAccDisplay, leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = if (isViewer && !isLocalOnline) Slate500 else ViewerCyan, rightVal = trkAccDisplay, rightLabel = "Tr Accuracy", rightColor = gpsColor)
+    InfoRow(leftVal = vwrAccDisplay, leftLabel = if (isViewer) stringResource(R.string.label_accuracy) else "", leftColor = vFreshColor, rightVal = trkAccDisplay, rightLabel = "Tr Accuracy", rightColor = tFreshColor)
     
     val satsIndexStr = remember(satsUsed, satsView, isGpsFresh) { if (isGpsFresh) "$satsUsed/$satsView" else "--" }
     val ageIdxStr = remember(gpsIdx.ageIndex) { "%.2f".format(Locale.getDefault(), gpsIdx.ageIndex) }

@@ -1,8 +1,8 @@
-# SOT Master Requirements (Sep.09.15)
+# SOT Master Requirements (Sep.09.16)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
-## 🏗️ Architectural Master Rules (53 Rules)
+## 🏗️ Architectural Master Rules (54 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context权威 (R001)**: **MANDATORY**. Use `ApplicationContext` for all singleton services. Activity context is strictly for UI-only components.
@@ -13,6 +13,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.27 Viewer Background Persistence (R926)**: **MANDATORY**. The `ViewerService` MUST utilize `specialUse` FGS type on Android 14+ and maintain a 30s hardware "Poke" rhythm to prevent Samsung-specific background suspension (Sep.06.45).
 *   **1.28 Service Mutual Exclusivity (R975)**: **MANDATORY**. The application MUST ensure that only one role-specific foreground service (Tracker or Viewer) is active at any time. Mode transitions MUST explicitly terminate the previous service and clear all in-memory telemetry state (activity timestamps/buffers) before initiating the next to prevent cross-role status ghosting (Sep.07.82).
 *   **1.29 Reference-Counted Hardware (R975b)**: **MANDATORY**. `HardwareProvider` MUST utilize internal reference counting to manage the lifecycle of physical sensors and GNSS status callbacks. Teardown sequences MUST be suppressed if an active user (Tracker or Viewer) remains, ensuring continuity during rapid mode transitions (Sep.08.00).
+*   **1.30 Role Identity Segregation (R799f)**: **MANDATORY**. All UI components representing role-specific data (Map markers, status badges, telemetry labels) MUST use `BrandJd` for Tracker and `ViewerCyan` for Viewer identity. Mixing or defaulting to a single color for both roles is strictly prohibited (Sep.09.16).
 
 ## 🧩 Functional Requirements (250 IDs)
 *   **R-ID 259 (Energy Footprint Integration)**: Forensic energy footprints (Delta mA, Temp Rise, Duration) MUST be structured and propagated from `ForensicAuditor` through the tracking engine to provide a persistent "Last Revival Impact" metric in the HUD and logs (Sep.08.13).
@@ -27,4 +28,4 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 301 (Alarm Logic Partitioning)**: The alarm evaluation pipeline MUST be partitioned into specialized evaluators (Connectivity, Physical, Geofence, System) to reduce cyclomatic complexity and enable granular forensic auditing of subsystem violations (Sep.09.00).
 *   **R-ID 302 (Fixed Grid Watchdog)**: The system MUST utilize Fixed Grid Scheduling for all watchdog pulses, anchored to the service start monotonic time (`elapsedRealtime`). Each subsequent pulse MUST align to a strict 90s grid relative to the anchor to eliminate cumulative drift during background sessions (>12h) (Sep.09.15).
 
-*(Total: 53 Architectural Rules + 250 Functional R-IDs = 303 Items)*
+*(Total: 54 Architectural Rules + 250 Functional R-IDs = 304 Items)*

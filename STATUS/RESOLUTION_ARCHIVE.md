@@ -1,4 +1,10 @@
-# Resolution Archive (Sep.09.15)
+# Resolution Archive (Sep.09.16)
+
+## 🟢 Resolved Issues (Sep.09.16)
+*   **Identity Color Role Confusion RESOLVED (#942)**: 
+    *   **Map Icons**: Remediated `MapOverlayManager.kt` where both icons used Cyan. Fixed `createTrackerBitmap` to use `BrandJd` Green with `Style.FILL` for the inner circle.
+    *   **HUD StatusBar**: Fixed `SharedUiComponents.kt` to ensure peer badges (TRK/VWR) use role-appropriate colors (`BrandJd`/`ViewerCyan`). Local status indicators and progress bars now also follow role identity.
+    *   **Telemetry Dashboard**: Refined `OverlayComponents.kt` to enforce identity colors for metrics (Tracker=Green, Viewer=Cyan) regardless of active mode.
 
 ## 🟢 Resolved Issues (Sep.09.15)
 *   **Watchdog Precision Audit RESOLVED (R-ID 302)**: Remediated cumulative scheduling drift in `SystemMonitor.kt` by implementing **Fixed Grid Scheduling**. Watchdog pulses are now anchored to the service start monotonic time (`elapsedRealtime`) and aligned to a strict 90s grid. Updated `TrackerService.kt` and `ViewerService.kt` to set the session anchor at initialization.
@@ -12,4 +18,4 @@
 *   **Siren Resumption Hardening RESOLVED (R-ID 301)**: 
     *   **Cooldown Protection**: Refactored `AppAlarmManager.resetEvaluation()` to preserve `lastSirenStopTs` during role transitions (Tracker <-> Viewer).
 
-*(Total: 970 Issues Resolved since inception)*
+*(Total: 971 Issues Resolved since inception)*
