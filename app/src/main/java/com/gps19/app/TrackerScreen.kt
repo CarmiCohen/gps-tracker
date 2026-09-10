@@ -29,7 +29,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
- * Sep.09.16:
+ * Sep.10.00:
  * - Issue #284 Hardening: Refactored all LocationUpdate field accesses to use 
  *   partitioned states (.kinetic, .atmospheric, .integrity) to fix 
  *   NoSuchMethodError (R-ID 284).
