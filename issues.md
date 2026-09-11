@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Sep.10.30)
+# Project Issues & Hardening Tracking (Sep.11.10)
 
 ## 🎯 Current Resumption Focus: Background Service Stability & Grid Precision
 Watchdog precision gaps and GNSS hysteresis for Android 15 have been fully remediated. Focus shifts to long-term lifecycle stability and potential simplification of the service orchestration layer.
@@ -6,14 +6,11 @@ Watchdog precision gaps and GNSS hysteresis for Android 15 have been fully remed
 ## 🟡 Open Issues & Hardening Tasks (Sorted by Implementation Priority)
 *   *No high-priority open issues identified.*
 
-## 🟢 Recently Resolved Issues (Sep.10.30)
-*   **S21 FE Reactive Flow Stall & Viewer Recovery Loop RESOLVED (#945)**:
-    *   **Root-Cause Remediation**: Hardened `SystemMonitor` grid-aligned scheduling to prevent "danger window" overlaps that triggered reactive flow stalls on Samsung S21 FE hardware. By ensuring alarms are never scheduled within 20s of the current time, the recovery loop is eliminated (R-ID 302).
-*   **Peer Status LED Verification (#943)**: Verified role-appropriate LED logic (VWR/TRK) on S21 and A15 hardware. Confirmed isolated devices correctly default to Red, and established handshakes transition to Cyan/Green.
-*   **Map State Partitioning RIGOROUS AUDIT (#243-Audit)**: Performed a deep-forensic audit of the Map UI layer to eliminate remaining derived state and redundant parameters.
-    *   **Root-Cause Remediation**: Consolidated `MapToolsOverlay` and marker freshness logic into `MapViewState`. Moved staleness calculations (15s gate) into the `MainViewModel` flow to ensure UI-side calculations are entirely eliminated. Simplified `AppMapContainer` signature to consume a single state object, fulfilling the strict interpretation of R-ID 287.
+## 🟢 Recently Resolved Issues (Sep.11.10)
+*   **Map Partitioning Integrity RESOLVED (#243-Audit-Initial)**:
+    *   **Root-Cause Remediation**: Eliminated "leftovers of leftovers" by removing redundant map tool overlays and individual parameters from `TrackerScreen.kt` and `ViewerScreen.kt`. Optimized `MainViewModel.kt` with trigger pruning via `MapUiParts` to ensure map state updates only on relevant changes (R-ID 287).
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 311 (Rules: 58, IDs: 253), Resolved: 981, Open: 0, Testing: 100% (Sub-items: 50), Ideas: 3, QA: 269]**
+- **Current Audit Baseline: [SOT: 312 (Rules: 58, IDs: 254), Resolved: 985, Open: 0, Testing: 100% (Sub-items: 51), Ideas: 7, QA: 270]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.10.30)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.11.10)*

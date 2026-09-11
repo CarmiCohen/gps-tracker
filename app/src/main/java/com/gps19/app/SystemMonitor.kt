@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import timber.log.Timber
 import javax.inject.Inject
 import javax.inject.Singleton
+import org.jetbrains.annotations.VisibleForTesting
 
 /**
  * SystemMonitorEvent: Reactive event container for system-level triggers.
@@ -26,17 +27,13 @@ sealed class SystemMonitorEvent {
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
+ * Sep.10.39:
+ * - Hardened Testability: Moved `calculateNextGridPoint` to companion object 
+ *   to allow deterministic logic testing without Android Context (Issue #945).
  * Sep.10.30:
  * - Issue #945: Hardened Grid Scheduling to prevent recovery loops. 
  *   Ensured candidate grid points are pushed to the next slot if they fall 
  *   within the danger window (<20s).
- * Sep.09.15:
- * - Issue #940 RESOLVED: Fixed Grid Scheduling. Implemented grid-aligned 
- *   watchdog pulses to eliminate cumulative drift during long-running 
- *   background sessions (>12h).
- * Sep.03.25:
- * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
- *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 240).
  */
 @Singleton
 class SystemMonitor @Inject constructor(
@@ -68,18 +65,12 @@ class SystemMonitor @Inject constructor(
         Timber.d("SystemMonitor: Session anchor set to Rt=$rt for Fixed Grid Scheduling.")
     }
 
-    /**
-     * resetSimulatedAnomalies: Clears synthetic stress-test timestamps (R141).
-     */
     fun resetSimulatedAnomalies() {
         jumpStateStartTs = 0L
         gpsStallStartTs = 0L
         Timber.i("Stress Recovery: Simulated anomaly latches cleared.")
     }
 
-    /**
-     * acquireWakeLock: Acquires or renews the partial wake lock.
-     */
     fun acquireWakeLock(force: Boolean = false) {
         val now = timeProvider.elapsedRealtime()
         if (!force && lastWakeLockRenewalTs != 0L && (now - lastWakeLockRenewalTs < WAKELOCK_RENEWAL_TTL_MS)) {
@@ -143,21 +134,7 @@ class SystemMonitor @Inject constructor(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         
-        // Sep.10.30: Hardened Grid Scheduling to prevent recovery loops.
-        // If the candidate grid point is within the danger window, push to the next slot.
-        val triggerAt = if (sessionStartRt > 0) {
-            val elapsed = now - sessionStartRt
-            var nextIntervalIndex = (elapsed / SYSTEM_WATCHDOG_INTERVAL_MS) + 1
-            var candidate = sessionStartRt + (nextIntervalIndex * SYSTEM_WATCHDOG_INTERVAL_MS)
-            
-            if (candidate - now < WATCHDOG_DANGER_WINDOW_MS) {
-                nextIntervalIndex++
-                candidate = sessionStartRt + (nextIntervalIndex * SYSTEM_WATCHDOG_INTERVAL_MS)
-            }
-            candidate
-        } else {
-            now + SYSTEM_WATCHDOG_INTERVAL_MS
-        }
+        val triggerAt = calculateNextGridPoint(now, sessionStartRt)
         
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -198,6 +175,25 @@ class SystemMonitor @Inject constructor(
             sessionStartRt = 0L
         } catch (e: Exception) {
             Timber.e(e, "Failed to cancel watchdog alarm")
+        }
+    }
+
+    companion object {
+        @VisibleForTesting
+        fun calculateNextGridPoint(now: Long, sessionStart: Long): Long {
+            if (sessionStart <= 0) return now + SYSTEM_WATCHDOG_INTERVAL_MS
+            
+            val elapsed = now - sessionStart
+            var nextIntervalIndex = (elapsed / SYSTEM_WATCHDOG_INTERVAL_MS) + 1
+            var candidate = sessionStart + (nextIntervalIndex * SYSTEM_WATCHDOG_INTERVAL_MS)
+            
+            // Sep.10.30: Hardened Grid Scheduling to prevent recovery loops.
+            // If the candidate grid point is within the danger window, push to the next slot.
+            if (candidate - now < WATCHDOG_DANGER_WINDOW_MS) {
+                nextIntervalIndex++
+                candidate = sessionStart + (nextIntervalIndex * SYSTEM_WATCHDOG_INTERVAL_MS)
+            }
+            return candidate
         }
     }
 }

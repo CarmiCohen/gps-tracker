@@ -25,6 +25,9 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Sep.11.12:
+ * - Issue #946 Visibility RESOLVED: Added tamperReason to ViewerDashboard and
+ *   TelemetryBox for header forensic transparency (R-ID 288).
  * Sep.11.10:
  * - Integrity Audit #243: Removed redundant map tool overlays and individual 
  *   map parameters; fully delegated Map UI to AppMapContainer (R-ID 287).
@@ -337,6 +340,7 @@ fun ViewerDashboard(
                         isLocationPending = dashboardState.isLocationPending,
                         locationPendingReason = dashboardState.locationPendingReason,
                         status = dashboardState.status,
+                        tamperReason = dashboardState.tamperReason,
                         isTamperDetected = dashboardState.isTamperDetected,
                         isBatterySteepDischarge = dashboardState.isBatterySteepDischarge,
                         isBatteryLow = dashboardState.isBatteryLow,

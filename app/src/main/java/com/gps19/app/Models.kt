@@ -10,6 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.10.40:
+ * - Issue #946 Visibility: Added tamperNote to TrackerStatus for 
+ *   role-appropriate forensic transparency (R-ID 288).
  * Sep.08.12:
  * - Issue #924 Visibility: Added isGnssThrottled to DashboardHealthState (R-ID 267).
  * - R-ID 259: Added structured Energy Footprint fields to TrackerStatus for role parity.
@@ -368,7 +371,8 @@ data class TrackerStatus(
     // R-ID 259: Energy Footprint
     val lastEnergyDeltaMa: Int = 0,
     val lastEnergyDeltaTemp: Double = 0.0,
-    val lastEnergyDurationMs: Long = 0L
+    val lastEnergyDurationMs: Long = 0L,
+    val tamperNote: String? = null
 ) : SpatialAnchor {
     
     fun toMap(fromViewer: Boolean): Map<String, Any?> = mutableMapOf<String, Any?>().apply {
@@ -414,6 +418,7 @@ data class TrackerStatus(
         put("last_energy_delta_ma", lastEnergyDeltaMa)
         put("last_energy_delta_temp", lastEnergyDeltaTemp)
         put("last_energy_duration_ms", lastEnergyDurationMs)
+        put("tamper_note", tamperNote)
     }
 
     companion object {
@@ -468,6 +473,7 @@ data class DashboardTelemetryState(
     val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val trackerState: TrackerState = TrackerState.UNKNOWN,
     val status: SentinelStatus = SentinelStatus.VALID,
+    val tamperReason: String? = null,
     val isTamperDetected: Boolean = false,
     val isUltraLongStationary: Boolean = false
 )
@@ -562,6 +568,7 @@ data class DashboardState(
     val locationPendingReason get() = telemetry.locationPendingReason
     val trackerState get() = telemetry.trackerState
     val status get() = telemetry.status
+    val tamperReason get() = telemetry.tamperReason
     val isTamperDetected get() = telemetry.isTamperDetected
     val isUltraLongStationary get() = telemetry.isUltraLongStationary
 

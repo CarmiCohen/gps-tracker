@@ -26,6 +26,9 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Sep.11.12:
+ * - Issue #946 Visibility RESOLVED: Added tamperReason to MainDashboardGrid and 
+ *   DashboardHeader for forensic transparency (R-ID 288).
  * Sep.09.16:
  * - Issue #942 RESOLVED: Fixed Identity Color Confusion. Updated PositionSection 
  *   to strictly use BrandJd for Tracker metrics and ViewerCyan for Viewer metrics, 
@@ -52,6 +55,7 @@ fun MainDashboardGrid(
     isLocationPending: Boolean,
     locationPendingReason: LocationPendingReason,
     status: SentinelStatus,
+    tamperReason: String? = null,
     isTamperDetected: Boolean,
     isBatterySteepDischarge: Boolean,
     isBatteryLow: Boolean,
@@ -129,6 +133,7 @@ fun MainDashboardGrid(
                 isLocationPending = isLocationPending,
                 locationPendingReason = locationPendingReason,
                 status = status,
+                tamperReason = tamperReason,
                 isTelemetryFresh = isTelemetryFresh,
                 isTamperDetected = isTamperDetected,
                 isBatterySteepDischarge = isBatterySteepDischarge,
@@ -178,6 +183,7 @@ private fun DashboardHeader(
     isLocationPending: Boolean,
     locationPendingReason: LocationPendingReason,
     status: SentinelStatus,
+    tamperReason: String? = null,
     isTelemetryFresh: Boolean,
     isTamperDetected: Boolean,
     isBatterySteepDischarge: Boolean,
@@ -224,7 +230,10 @@ private fun DashboardHeader(
             if (isUltraLongStationary) Badge("[ULTRA]", BrandJd)
             if (isSafeMode) Badge("[SAFE MODE]", Rose500)
             if (isGnssThrottled) Badge("[THROTTLED]", Amber500)
-            if (status == SentinelStatus.TAMPER) Badge("[TAMPER]", if (isTelemetryFresh) Rose500 else Slate500)
+            if (status == SentinelStatus.TAMPER) {
+                val label = if (tamperReason.isNullOrBlank()) "[TAMPER]" else "[TAMPER: ${tamperReason.uppercase()}]"
+                Badge(label, if (isTelemetryFresh) Rose500 else Slate500)
+            }
             if (isTamperDetected) Badge("[HW TAMPER]", if (isTelemetryFresh) Rose500 else Slate500)
             if (isBatterySteepDischarge) Badge("[BATT HEALTH]", if (isTelemetryFresh) Rose500 else Slate500)
             if (isBatteryCritical) Badge("[BATT CRITICAL]", if (isTelemetryFresh) Rose500 else Slate500)
@@ -464,7 +473,7 @@ private fun InfoRow(
 fun TelemetryBox(
     appMode: String, isBatteryWhitelisted: Boolean, isLocalOnline: Boolean, isRelayConnected: Boolean, lastRemoteActivityTs: Long, systemPulse: Long,
     isGpsFresh: Boolean, isTelemetryFresh: Boolean, isLinkFresh: Boolean, trackerState: TrackerState, isLocationPending: Boolean,
-    locationPendingReason: LocationPendingReason, status: SentinelStatus, isTamperDetected: Boolean, isBatterySteepDischarge: Boolean,
+    locationPendingReason: LocationPendingReason, status: SentinelStatus, tamperReason: String? = null, isTamperDetected: Boolean, isBatterySteepDischarge: Boolean,
     isBatteryLow: Boolean, isBatteryCritical: Boolean, maxDropMs: Long, lastSeenTs: Long, totalDropMs: Long, totalUptimeMs: Long,
     sessionMs: Long, engineVersion: String, sinceConnMs: Long, sinceDiscoMs: Long, violationUptimeMs: Long, watchdogCountdownSec: Long,
     watchdogOk: Boolean, isPowerSaveMode: Boolean, standbyBucket: Int, netInterface: String, isStorageLow: Boolean, isStorageCritical: Boolean,
@@ -482,7 +491,7 @@ fun TelemetryBox(
         appMode = appMode, isBatteryWhitelisted = isBatteryWhitelisted, isLocalOnline = isLocalOnline, isRelayConnected = isRelayConnected,
         lastRemoteActivityTs = lastRemoteActivityTs, systemPulse = systemPulse, isGpsFresh = isGpsFresh, isTelemetryFresh = isTelemetryFresh,
         isLinkFresh = isLinkFresh, trackerState = trackerState, isLocationPending = isLocationPending, locationPendingReason = locationPendingReason,
-        status = status, isTamperDetected = isTamperDetected, isBatterySteepDischarge = isBatterySteepDischarge, isBatteryLow = isBatteryLow,
+        status = status, tamperReason = tamperReason, isTamperDetected = isTamperDetected, isBatterySteepDischarge = isBatterySteepDischarge, isBatteryLow = isBatteryLow,
         isBatteryCritical = isBatteryCritical, maxDropMs = maxDropMs, lastSeenTs = lastSeenTs, totalDropMs = totalDropMs, totalUptimeMs = totalUptimeMs,
         sessionMs = sessionMs, engineVersion = engineVersion, sinceConnMs = sinceConnMs, sinceDiscoMs = sinceDiscoMs, violationUptimeMs = violationUptimeMs,
         watchdogCountdownSec = watchdogCountdownSec, watchdogOk = watchdogOk, isPowerSaveMode = isPowerSaveMode, standbyBucket = standbyBucket,

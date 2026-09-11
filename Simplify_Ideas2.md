@@ -1,5 +1,6 @@
-# Simplification Ideas (Sep.10.30)
+# Simplicity Audit Ideas (Sep.11.10)
 
-## 🏗️ Architectural Simplifications
-*   **Vitality Tracking Unification (Idea #4)**: Currently, `IntegrityMonitor.kt` tracks `lastStorageUpdateRt`, `lastPowerUpdateRt`, etc., as individual variables. These could be unified into a `Map<VitalitySource, Long>` or a single `SharedFlow<VitalityHeartbeat>` to simplify the heartbeat auditing logic and reduce boilerplate when adding new monitored components.
-*   **Watchdog Danger Window Abstraction**: The "danger window" check in `SystemMonitor` is now hardened but adds complexity to the grid calculation. Moving the grid alignment logic to a dedicated `GridScheduler` utility would clean up the `SystemMonitor` service wrapper.
+## 🎯 UI & State Simplification
+*   **Idea #6 (Consolidated Dashboard State)**: Further merge `TrackerDashboard` parameters into a single `DashboardViewState`. Currently, ~50 parameters are passed, which can be bundled to reduce the parameter surface and simplify the `TrackerScreen` signature (similar to the Map State Partitioning success).
+*   **Idea #7 (HUD State Logic Extraction)**: Move the logic for mapping `ConnectivitySuite` flows to `HudConnectivityState` directly into a dedicated mapper class or the `ConnectivitySuite` itself to keep `MainViewModel` lean.
+*   **Idea #8 (Uniform Overlay Logic)**: Standardize the overlay animation and backdrop logic across `LogOverlay`, `SettingsOverlay`, and `RibbonsOverlay` using a shared `FullScreenOverlay` wrapper to reduce boilerplate in `TrackerScreen` and `ViewerScreen`.

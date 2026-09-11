@@ -113,11 +113,15 @@ data class IntegrityState(
     var isSitActive: Boolean = false,
     var isLocationPending: Boolean = false,
     var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    var signal: Int? = null
+    var signal: Int? = null,
+    var tamperNote: String? = null
 )
 
 /**
  * LocationUpdate: Aggregated telemetry container.
+ * Sep.10.40:
+ * - Issue #946 Visibility: Added tamperNote to IntegrityState for 
+ *   role-agnostic forensic transparency (R-ID 288).
  * Sep.09.10:
  * - Legacy Field Cleanup RESOLVED: Removed all bridge properties. 
  *   Consumers now use .kinetic, .atmospheric, and .integrity directly (R-ID 284).

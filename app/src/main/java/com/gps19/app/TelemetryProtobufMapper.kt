@@ -4,6 +4,9 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Sep.10.40:
+ * - Issue #946 Visibility RESOLVED: Added tamperNote mapping for forensic 
+ *   transparency in both Realtime (binary) and Persistence builders (R-ID 288).
  * Sep.08.12:
  * - Issue #924 Visibility: Mapped isGnssThrottled for A15 Hysteresis 
  *   transparency in remote HUDs (R-ID 267).
@@ -19,221 +22,223 @@ object TelemetryProtobufMapper {
      * mapToRealtime: Maps TrackerStatus to RealtimeStatus (Signaling/Relay).
      */
     fun mapToRealtime(status: TrackerStatus, builder: RealtimeStatus.Builder, fromViewer: Boolean) {
-        builder.apply {
-            // R907: Ensure transmission IDs are aliased for relay room compatibility.
-            setId(SignalingConstants.getTransmissionId(status.deviceId))
-            setViewerId(SignalingConstants.getTransmissionId(status.viewerId))
-            setFromViewer(fromViewer)
-            
-            // Common Geometry & Physics
-            setLat(status.lat)
-            setLng(status.lng)
-            setAlt(status.alt)
-            setSpeed(status.speed)
-            setBearing(status.bearing)
-            setAccuracy(status.accuracy)
-            setMaxAccuracy(status.maxAccuracy)
-            
-            // Common Lifecycle
-            setGpsTs(status.gpsTs)
-            setTs(status.ts)
-            setRt(status.rt)
-            setUptimeMs(status.uptimeMs)
-            setTotalConnectedMs(status.totalConnectedMs)
-            setSessionConnectedMs(status.sessionConnectedMs)
-            setTotalDropMs(status.totalDropMs)
-            setMaxDropMs(status.maxDropMs)
-            setLastConnTs(status.lastConnTs)
-            setLastDiscTs(status.lastDiscTs)
-            
-            // Common Health
-            setBattery(status.battery)
-            setTemp(status.temp)
-            setIsCharging(status.isCharging)
-            setSatsView(status.satsView)
-            setSatsUsed(status.satsUsed)
-            
-            // Behavioral Flags
-            setIsJammer(status.isJammer)
-            setIsStalled(status.isStalled)
-            setIsTamperDetected(status.isTamperDetected)
-            setJumpTier(status.jumpTier)
-            setIsLocationPending(status.isLocationPending)
-            setLastValidFixRt(status.lastValidFixRt)
-            setIsBatterySteepDischarge(status.isBatterySteepDischarge)
-            setIsCoolingModeActive(status.isCoolingModeActive)
-            
-            // Forensic Indices
-            setSnrIdx(status.snrIdx)
-            setNoiseIdx(status.noiseIdx)
-            setLuxIdx(status.luxIdx)
-            setVibeIdx(status.vibeIdx)
-            setLiftIdx(status.liftIdx)
-            setTiltIdx(status.tiltIdx)
-            setBaroIdx(status.baroIdx)
-            setProxIdx(status.proxIdx)
-            
-            // SIT States
-            setIsSitDetected(status.isSitDetected)
-            setIsSitActive(status.isSitActive)
-            setLastSitTs(status.lastSitTs)
-            setSitVz(status.sitVz)
-            setSitDz(status.sitDz)
-            setSitBaro(status.sitBaro)
-            setSitTilt(status.sitTilt)
-            setSitShock(status.sitShock)
-            setVerticalVelocity(status.verticalVelocity)
-            
-            // Extended Forensic
-            setIsClockRegression(status.isClockRegression)
-            setKineticEnergy(status.kineticEnergy)
-            setSitVzTs(status.sitVzTs)
-            setSitVzRt(status.sitVzRt)
-            setIsAdaptiveJump(status.isAdaptiveJump)
-            setIsBatteryLow(status.isBatteryLow)
-            setIsBatteryCritical(status.isBatteryCritical)
-            setIsSilentFailure(status.isSilentFailure)
-            setViolationUptimeMs(status.violationUptimeMs)
-            setIsUltraLongStationary(status.isUltraLongStationary)
-            setGpsHardwareLock(status.gpsHardwareLock)
+        // R907: Ensure transmission IDs are aliased for relay room compatibility.
+        builder.setId(SignalingConstants.getTransmissionId(status.deviceId))
+        builder.setViewerId(SignalingConstants.getTransmissionId(status.viewerId))
+        builder.setFromViewer(fromViewer)
+        
+        // Common Geometry & Physics
+        builder.setLat(status.lat)
+        builder.setLng(status.lng)
+        builder.setAlt(status.alt)
+        builder.setSpeed(status.speed)
+        builder.setBearing(status.bearing)
+        builder.setAccuracy(status.accuracy)
+        builder.setMaxAccuracy(status.maxAccuracy)
+        
+        // Common Lifecycle
+        builder.setGpsTs(status.gpsTs)
+        builder.setTs(status.ts)
+        builder.setRt(status.rt)
+        builder.setUptimeMs(status.uptimeMs)
+        builder.setTotalConnectedMs(status.totalConnectedMs)
+        builder.setSessionConnectedMs(status.sessionConnectedMs)
+        builder.setTotalDropMs(status.totalDropMs)
+        builder.setMaxDropMs(status.maxDropMs)
+        builder.setLastConnTs(status.lastConnTs)
+        builder.setLastDiscTs(status.lastDiscTs)
+        
+        // Common Health
+        builder.setBattery(status.battery)
+        builder.setTemp(status.temp)
+        builder.setIsCharging(status.isCharging)
+        builder.setSatsView(status.satsView)
+        builder.setSatsUsed(status.satsUsed)
+        
+        // Behavioral Flags
+        builder.setIsJammer(status.isJammer)
+        builder.setIsStalled(status.isStalled)
+        builder.setIsTamperDetected(status.isTamperDetected)
+        builder.setJumpTier(status.jumpTier)
+        builder.setIsLocationPending(status.isLocationPending)
+        builder.setLastValidFixRt(status.lastValidFixRt)
+        builder.setIsBatterySteepDischarge(status.isBatterySteepDischarge)
+        builder.setIsCoolingModeActive(status.isCoolingModeActive)
+        
+        // Forensic Indices
+        builder.setSnrIdx(status.snrIdx)
+        builder.setNoiseIdx(status.noiseIdx)
+        builder.setLuxIdx(status.luxIdx)
+        builder.setVibeIdx(status.vibeIdx)
+        builder.setLiftIdx(status.liftIdx)
+        builder.setTiltIdx(status.tiltIdx)
+        builder.setBaroIdx(status.baroIdx)
+        builder.setProxIdx(status.proxIdx)
+        
+        // SIT States
+        builder.setIsSitDetected(status.isSitDetected)
+        builder.setIsSitActive(status.isSitActive)
+        builder.setLastSitTs(status.lastSitTs)
+        builder.setSitVz(status.sitVz)
+        builder.setSitDz(status.sitDz)
+        builder.setSitBaro(status.sitBaro)
+        builder.setSitTilt(status.sitTilt)
+        builder.setSitShock(status.sitShock)
+        builder.setVerticalVelocity(status.verticalVelocity)
+        
+        // Extended Forensic
+        builder.setIsClockRegression(status.isClockRegression)
+        builder.setKineticEnergy(status.kineticEnergy)
+        builder.setSitVzTs(status.sitVzTs)
+        builder.setSitVzRt(status.sitVzRt)
+        builder.setIsAdaptiveJump(status.isAdaptiveJump)
+        builder.setIsBatteryLow(status.isBatteryLow)
+        builder.setIsBatteryCritical(status.isBatteryCritical)
+        builder.setIsSilentFailure(status.isSilentFailure)
+        builder.setViolationUptimeMs(status.violationUptimeMs)
+        builder.setIsUltraLongStationary(status.isUltraLongStationary)
+        builder.setGpsHardwareLock(status.gpsHardwareLock)
 
-            // Issue #924 & R-ID 259
-            setIsGnssThrottled(status.isGnssThrottled)
-            setEnergyDeltaMa(status.lastEnergyDeltaMa)
-            setEnergyDeltaTemp(status.lastEnergyDeltaTemp)
-            setEnergyDurationMs(status.lastEnergyDurationMs)
+        // Issue #924 & R-ID 259
+        builder.setIsGnssThrottled(status.isGnssThrottled)
+        builder.setEnergyDeltaMa(status.lastEnergyDeltaMa)
+        builder.setEnergyDeltaTemp(status.lastEnergyDeltaTemp)
+        builder.setEnergyDurationMs(status.lastEnergyDurationMs)
+        
+        // Issue #946: Forensic Reason propagation
+        status.tamperNote?.let { builder.setTamperNote(it) }
 
-            // Enums
-            setState(TrackerStateProto.valueOf("TS_" + status.trackerState.name))
-            setPendingReason(LocationPendingReasonProto.valueOf("LPR_" + status.locationPendingReason.name))
-        }
+        // Enums
+        builder.setState(TrackerStateProto.valueOf("TS_" + status.trackerState.name))
+        builder.setPendingReason(LocationPendingReasonProto.valueOf("LPR_" + status.locationPendingReason.name))
     }
 
     /**
      * mapToPersistence: Maps TrackerStatus to TrackerStatusProto (Local DataStore).
      */
     fun mapToPersistence(status: TrackerStatus, builder: TrackerStatusProto.Builder) {
-        builder.apply {
-            // Common Geometry & Physics
-            setLat(status.lat)
-            setLng(status.lng)
-            setAlt(status.alt)
-            setSpeed(status.speed)
-            setBearing(status.bearing)
-            setAccuracy(status.accuracy)
-            setMaxAccuracy(status.maxAccuracy)
-            
-            // Common Lifecycle
-            setGpsTs(status.gpsTs)
-            setTs(status.ts)
-            setRt(status.rt)
-            setUptimeMs(status.uptimeMs)
-            setTotalConnectedMs(status.totalConnectedMs)
-            setSessionConnectedMs(status.sessionConnectedMs)
-            setTotalDropMs(status.totalDropMs)
-            setMaxDropMs(status.maxDropMs)
-            setMaxDropTs(status.maxDropTs)
-            setLastConnTs(status.lastConnTs)
-            setLastDiscTs(status.lastDiscTs)
-            
-            // Common Health
-            setBattery(status.battery)
-            setTemp(status.temp)
-            setMaxTemp(status.maxTemp)
-            setIsCharging(status.isCharging)
-            setSatsView(status.satsView)
-            setSatsUsed(status.satsUsed)
-            setCurrentMa(status.currentMa)
-            
-            // Behavioral Flags
-            setIsJammer(status.isJammer)
-            setIsStalled(status.isStalled)
-            setIsTamperDetected(status.isTamperDetected)
-            setJumpTier(status.jumpTier)
-            setIsLocationPending(status.isLocationPending)
-            setLastValidFixRt(status.lastValidFixRt)
-            setIsBatterySteepDischarge(status.isBatterySteepDischarge)
-            setIsCoolingModeActive(status.isCoolingModeActive)
-            setIsPowerSaveMode(status.isPowerSaveMode)
-            setStandbyBucket(status.standbyBucket)
-            setIsStorageLow(status.isStorageLow)
-            setIsStorageCritical(status.isStorageCritical)
-            setIsPowerTamper(status.isPowerTamper)
-            setMicPending(status.micPending)
+        // Common Geometry & Physics
+        builder.setLat(status.lat)
+        builder.setLng(status.lng)
+        builder.setAlt(status.alt)
+        builder.setSpeed(status.speed)
+        builder.setBearing(status.bearing)
+        builder.setAccuracy(status.accuracy)
+        builder.setMaxAccuracy(status.maxAccuracy)
+        
+        // Common Lifecycle
+        builder.setGpsTs(status.gpsTs)
+        builder.setTs(status.ts)
+        builder.setRt(status.rt)
+        builder.setUptimeMs(status.uptimeMs)
+        builder.setTotalConnectedMs(status.totalConnectedMs)
+        builder.setSessionConnectedMs(status.sessionConnectedMs)
+        builder.setTotalDropMs(status.totalDropMs)
+        builder.setMaxDropMs(status.maxDropMs)
+        builder.setMaxDropTs(status.maxDropTs)
+        builder.setLastConnTs(status.lastConnTs)
+        builder.setLastDiscTs(status.lastDiscTs)
+        
+        // Common Health
+        builder.setBattery(status.battery)
+        builder.setTemp(status.temp)
+        builder.setMaxTemp(status.maxTemp)
+        builder.setIsCharging(status.isCharging)
+        builder.setSatsView(status.satsView)
+        builder.setSatsUsed(status.satsUsed)
+        builder.setCurrentMa(status.currentMa)
+        
+        // Behavioral Flags
+        builder.setIsJammer(status.isJammer)
+        builder.setIsStalled(status.isStalled)
+        builder.setIsTamperDetected(status.isTamperDetected)
+        builder.setJumpTier(status.jumpTier)
+        builder.setIsLocationPending(status.isLocationPending)
+        builder.setLastValidFixRt(status.lastValidFixRt)
+        builder.setIsBatterySteepDischarge(status.isBatterySteepDischarge)
+        builder.setIsCoolingModeActive(status.isCoolingModeActive)
+        builder.setIsPowerSaveMode(status.isPowerSaveMode)
+        builder.setStandbyBucket(status.standbyBucket)
+        builder.setIsStorageLow(status.isStorageLow)
+        builder.setIsStorageCritical(status.isStorageCritical)
+        builder.setIsPowerTamper(status.isPowerTamper)
+        builder.setMicPending(status.micPending)
 
-            // Forensic Indices
-            setSnrIdx(status.snrIdx)
-            setNoiseIdx(status.noiseIdx)
-            setLuxIdx(status.luxIdx)
-            setVibeIdx(status.vibeIdx)
-            setLiftIdx(status.liftIdx)
-            setTiltIdx(status.tiltIdx)
-            setBaroIdx(status.baroIdx)
-            setProxIdx(status.proxIdx)
-            
-            // SIT States
-            setIsSitDetected(status.isSitDetected)
-            setIsSitActive(status.isSitActive)
-            setLastSitTs(status.lastSitTs)
-            setSitVz(status.sitVz)
-            setSitDz(status.sitDz)
-            setSitBaro(status.sitBaro)
-            setSitTilt(status.sitTilt)
-            setSitShock(status.sitShock)
-            setVerticalVelocity(status.verticalVelocity)
-            
-            // Extended Forensic
-            setIsClockRegression(status.isClockRegression)
-            setKineticEnergy(status.kineticEnergy)
-            setSitVzTs(status.sitVzTs)
-            setSitVzRt(status.sitVzRt)
-            setIsAdaptiveJump(status.isAdaptiveJump)
-            setIsBatteryLow(status.isBatteryLow)
-            setIsBatteryCritical(status.isBatteryCritical)
-            setIsSilentFailure(status.isSilentFailure)
-            setViolationUptimeMs(status.violationUptimeMs)
-            setViolationPercentage(status.violationPercentage)
-            setIsUltraLongStationary(status.isUltraLongStationary)
-            setIsJump(status.isJump)
+        // Forensic Indices
+        builder.setSnrIdx(status.snrIdx)
+        builder.setNoiseIdx(status.noiseIdx)
+        builder.setLuxIdx(status.luxIdx)
+        builder.setVibeIdx(status.vibeIdx)
+        builder.setLiftIdx(status.liftIdx)
+        builder.setTiltIdx(status.tiltIdx)
+        builder.setBaroIdx(status.baroIdx)
+        builder.setProxIdx(status.proxIdx)
+        
+        // SIT States
+        builder.setIsSitDetected(status.isSitDetected)
+        builder.setIsSitActive(status.isSitActive)
+        builder.setLastSitTs(status.lastSitTs)
+        builder.setSitVz(status.sitVz)
+        builder.setSitDz(status.sitDz)
+        builder.setSitBaro(status.sitBaro)
+        builder.setSitTilt(status.sitTilt)
+        builder.setSitShock(status.sitShock)
+        builder.setVerticalVelocity(status.verticalVelocity)
+        
+        // Extended Forensic
+        builder.setIsClockRegression(status.isClockRegression)
+        builder.setKineticEnergy(status.kineticEnergy)
+        builder.setSitVzTs(status.sitVzTs)
+        builder.setSitVzRt(status.sitVzRt)
+        builder.setIsAdaptiveJump(status.isAdaptiveJump)
+        builder.setIsBatteryLow(status.isBatteryLow)
+        builder.setIsBatteryCritical(status.isBatteryCritical)
+        builder.setIsSilentFailure(status.isSilentFailure)
+        builder.setViolationUptimeMs(status.violationUptimeMs)
+        builder.setViolationPercentage(status.violationPercentage)
+        builder.setIsUltraLongStationary(status.isUltraLongStationary)
+        builder.setIsJump(status.isJump)
 
-            // High-res Raw Sensors (Persistence Only)
-            setVibration(status.vibration)
-            setHeading(status.heading)
-            setBaroAlt(status.baroAlt)
-            setLux(status.lux)
-            setIsNear(status.isNear)
-            setTiltDegrees(status.tiltDegrees)
-            setAcousticDb(status.acousticDb)
-            setPeakShock(status.peakVibrationShock)
-            setPeakShockTs(status.peakVibrationShockTs)
-            setLuxBaseline(status.luxBaseline)
-            setAcousticFloor(status.acousticFloorDb)
-            setAdaptiveVibrationFloor(status.adaptiveVibrationFloor)
-            setNetInterface(status.netInterface)
-            setVer(BuildConfig.VERSION_NAME)
-            
-            // Idea #241: Persistence Parity Completion
-            setDeviceId(status.deviceId)
-            setViewerId(status.viewerId)
-            setProximityCm(status.currentProximityCm)
-            setProximityDebounceMs(status.proximityDebounceMs)
-            setVibrationRollingSum(status.vibrationRollingSum)
-            setIsTrajectoryPromoted(status.isTrajectoryPromoted)
-            setIsSuspicious(status.isSuspicious)
-            setIsAnchorLocked(status.isAnchorLocked)
-            setIsBatteryWhitelisted(status.isBatteryWhitelisted)
-            setGpsHardwareLock(status.gpsHardwareLock)
+        // High-res Raw Sensors (Persistence Only)
+        builder.setVibration(status.vibration)
+        builder.setHeading(status.heading)
+        builder.setBaroAlt(status.baroAlt)
+        builder.setLux(status.lux)
+        builder.setIsNear(status.isNear)
+        builder.setTiltDegrees(status.tiltDegrees)
+        builder.setAcousticDb(status.acousticDb)
+        builder.setPeakShock(status.peakVibrationShock)
+        builder.setPeakShockTs(status.peakVibrationShockTs)
+        builder.setLuxBaseline(status.luxBaseline)
+        builder.setAcousticFloor(status.acousticFloorDb)
+        builder.setAdaptiveVibrationFloor(status.adaptiveVibrationFloor)
+        builder.setNetInterface(status.netInterface)
+        builder.setVer(BuildConfig.VERSION_NAME)
+        
+        // Idea #241: Persistence Parity Completion
+        builder.setDeviceId(status.deviceId)
+        builder.setViewerId(status.viewerId)
+        builder.setProximityCm(status.currentProximityCm)
+        builder.setProximityDebounceMs(status.proximityDebounceMs)
+        builder.setVibrationRollingSum(status.vibrationRollingSum)
+        builder.setIsTrajectoryPromoted(status.isTrajectoryPromoted)
+        builder.setIsSuspicious(status.isSuspicious)
+        builder.setIsAnchorLocked(status.isAnchorLocked)
+        builder.setIsBatteryWhitelisted(status.isBatteryWhitelisted)
+        builder.setGpsHardwareLock(status.gpsHardwareLock)
 
-            // Issue #924 & R-ID 259
-            setIsGnssThrottled(status.isGnssThrottled)
-            setEnergyDeltaMa(status.lastEnergyDeltaMa)
-            setEnergyDeltaTemp(status.lastEnergyDeltaTemp)
-            setEnergyDurationMs(status.lastEnergyDurationMs)
+        // Issue #924 & R-ID 259
+        builder.setIsGnssThrottled(status.isGnssThrottled)
+        builder.setEnergyDeltaMa(status.lastEnergyDeltaMa)
+        builder.setEnergyDeltaTemp(status.lastEnergyDeltaTemp)
+        builder.setEnergyDurationMs(status.lastEnergyDurationMs)
+        
+        // Issue #946: Forensic Reason propagation
+        status.tamperNote?.let { builder.setTamperNote(it) }
 
-            // Enums
-            setTrackerState(status.trackerState.name)
-            setStatus(status.status.name)
-            setLocationPendingReason(LocationPendingReasonProto.valueOf("LPR_" + status.locationPendingReason.name))
-        }
+        // Enums
+        builder.setTrackerState(status.trackerState.name)
+        builder.setStatus(status.status.name)
+        builder.setLocationPendingReason(LocationPendingReasonProto.valueOf("LPR_" + status.locationPendingReason.name))
     }
 }

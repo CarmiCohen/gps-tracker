@@ -34,6 +34,9 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.10.40:
+ * - Issue #946 Visibility RESOLVED: Integrated tamperNote propagation in binary 
+ *   and JSON handlers for header-level forensic transparency (R-ID 288).
  * Sep.10.03:
  * - Issue #941 RESOLVED: Fixed SRV Status Inconsistency. Explicitly reset relay 
  *   status and RTT in stop() to prevent stale GREEN indicators during role 
@@ -163,6 +166,7 @@ class ConnectivitySuite @Inject constructor(
     val trackerDistToHome get() = trackerStatus.sitDz 
     val trackerKineticEnergy get() = trackerStatus.kineticEnergy
     val isTrackerGpsHardwareLock get() = trackerStatus.gpsHardwareLock
+    val trackerTamperNote get() = trackerStatus.tamperNote
 
     private val networkCallback = object : ManagedNetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -483,7 +487,8 @@ class ConnectivitySuite @Inject constructor(
         isBatteryLow: Boolean = false,
         isBatteryCritical: Boolean = false,
         isUltraLongStationary: Boolean = false,
-        gpsHardwareLock: Boolean = false
+        gpsHardwareLock: Boolean = false,
+        tamperNote: String? = null
     ) {
         val trackerStatus = TrackerStatus(
             deviceId = deviceId, viewerId = viewerId, ts = timeProvider.currentTimeMillis(),
@@ -510,7 +515,8 @@ class ConnectivitySuite @Inject constructor(
             verticalVelocity = verticalVelocity, sitVz = sitVz, sitVzTs = sitVzTs, sitVzRt = sitVzRt, sitDz = sitDz, sitBaro = sitBaro, sitTilt = sitTilt, sitShock = sitShock,
             kineticEnergy = kineticEnergy, isAdaptiveJump = if (isTrackerMode) isAdaptiveJump else false,
             isBatteryLow = if (isTrackerMode) isBatteryLow else false, isBatteryCritical = if (isTrackerMode) isBatteryCritical else false,
-            isUltraLongStationary = isUltraLongStationary, gpsHardwareLock = gpsHardwareLock
+            isUltraLongStationary = isUltraLongStationary, gpsHardwareLock = gpsHardwareLock,
+            tamperNote = tamperNote
         )
         sendTelemetry(trackerStatus)
     }
@@ -613,7 +619,8 @@ class ConnectivitySuite @Inject constructor(
                     isAdaptiveJump = statusProto.isAdaptiveJump,
                     violationUptimeMs = statusProto.violationUptimeMs,
                     isUltraLongStationary = statusProto.isUltraLongStationary,
-                    gpsHardwareLock = statusProto.gpsHardwareLock
+                    gpsHardwareLock = statusProto.gpsHardwareLock,
+                    tamperNote = if (statusProto.hasTamperNote()) statusProto.tamperNote else null
                 )
 
                 scope.launch {
@@ -644,6 +651,7 @@ class ConnectivitySuite @Inject constructor(
                         this.integrity.violationUptimeMs = updatedStatus.violationUptimeMs
                         this.integrity.gpsHardwareLock = updatedStatus.gpsHardwareLock
                         this.integrity.isGnssThrottled = updatedStatus.isGnssThrottled
+                        this.integrity.tamperNote = updatedStatus.tamperNote
 
                         this.status = updatedStatus.status 
                         this.trackerState = updatedStatus.trackerState
@@ -807,7 +815,8 @@ class ConnectivitySuite @Inject constructor(
                     violationUptimeMs = data.optLong("violation_uptime_ms", current.violationUptimeMs),
                     isUltraLongStationary = data.optBoolean("is_ultra_long_stationary", current.isUltraLongStationary),
                     gpsHardwareLock = data.optBoolean("gps_hw_lock", current.gpsHardwareLock),
-                    isGnssThrottled = data.optBoolean("is_gnss_throttled", current.isGnssThrottled)
+                    isGnssThrottled = data.optBoolean("is_gnss_throttled", current.isGnssThrottled),
+                    tamperNote = data.optString("tamper_note", current.tamperNote)
                 )
 
                 scope.launch {
@@ -838,6 +847,7 @@ class ConnectivitySuite @Inject constructor(
                         this.integrity.violationUptimeMs = updatedStatus.violationUptimeMs
                         this.integrity.gpsHardwareLock = updatedStatus.gpsHardwareLock
                         this.integrity.isGnssThrottled = updatedStatus.isGnssThrottled
+                        this.integrity.tamperNote = updatedStatus.tamperNote
 
                         this.status = updatedStatus.status 
                         this.trackerState = updatedStatus.trackerState

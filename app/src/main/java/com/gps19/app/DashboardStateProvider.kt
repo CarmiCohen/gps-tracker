@@ -7,6 +7,9 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
+ * Sep.10.40:
+ * - Issue #946 Visibility: Added tamperReason to buildDashboardTelemetryState 
+ *   mapping for header forensic transparency (R-ID 288).
  * Sep.09.10:
  * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .atmospheric, .integrity)
  *   in LocationUpdate to support bridge removal (R-ID 284).
@@ -111,7 +114,6 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         val isGpsActive = (nowRt - loc.kinetic.rt) < GPS_UI_FAIL_THRESHOLD_MS && loc.kinetic.gpsTs > 0
 
         val gnss = loc.integrity.gnssDetail
-        // Issue #283: Hardened against NaN
         val avgCn0 = gnss?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0
 
         return DashboardTelemetryState(
@@ -133,6 +135,7 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             locationPendingReason = if (isViewer) kinematicState.trackerHealth.locationPendingReason else kinematicState.localHealth.locationPendingReason,
             trackerState = trackerState,
             status = loc.status,
+            tamperReason = if (isViewer) kinematicState.trackerHealth.tamperNote else kinematicState.localHealth.tamperNote,
             isUltraLongStationary = isUltra
         )
     }
@@ -187,7 +190,10 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             maxIoLatency = health.maxIoLatency,
             isSilentFailure = health.isSilentFailure,
             isMaliAnomaly = health.isMaliAnomaly,
-            isGnssThrottled = health.isGnssThrottled
+            isGnssThrottled = health.isGnssThrottled,
+            lastEnergyDeltaMa = health.lastEnergyDeltaMa,
+            lastEnergyDeltaTemp = health.lastEnergyDeltaTemp,
+            lastEnergyDurationMs = health.lastEnergyDurationMs
         )
     }
 
@@ -205,7 +211,6 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         val nowRt = SystemClock.elapsedRealtime()
         val lastSeenTs = diagnosticState.connectivity.lastRemoteActivityTs // Monotonic
         
-        // R972 Enforcement: isTelemetryFresh strictly tracks peer activity age.
         val isTelemetryFresh = if (lastSeenTs > 0) {
             (nowRt - lastSeenTs) < TELEMETRY_UI_STALE_THRESHOLD_MS
         } else false
@@ -218,8 +223,6 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             TelemetryUtils.calculateCommIndex(rtt, remoteSignal, 10)
         } else 0
 
-        // HUD Specification R960: DAT badge is Viewer Mode Only. 
-        // In Tracker mode, DAT always reflects RED/False as there is no remote peer to validate integrity of.
         val isDataHealthy = (appMode == "viewer") && 
                             isTelemetryFresh &&
                             diagnosticState.connectivity.isLocalOnline && 

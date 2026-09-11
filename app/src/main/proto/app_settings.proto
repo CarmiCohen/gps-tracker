@@ -210,6 +210,7 @@ message RealtimeStatus {
     int32 energy_delta_ma = 71;
     double energy_delta_temp = 72;
     int64 energy_duration_ms = 73;
+    optional string tamper_note = 74;
 }
 
 message GeoPointProto {
@@ -375,4 +376,5 @@ message TrackerStatusProto {
     int32 energy_delta_ma = 111;
     double energy_delta_temp = 112;
     int64 energy_duration_ms = 113;
+    optional string tamper_note = 114;
 }

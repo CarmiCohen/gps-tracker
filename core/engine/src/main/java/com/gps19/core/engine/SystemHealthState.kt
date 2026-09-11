@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Sep.10.40:
+ * - Issue #946 Visibility: Added tamperNote for header-level forensic 
+ *   transparency (R-ID 288).
  * Sep.08.12:
  * - Issue #924 Visibility: Added isGnssThrottled for A15 Hysteresis transparency.
  * - R-ID 259: Added structured Energy Footprint fields (deltaMa, deltaTemp, durationMs).
@@ -114,7 +117,8 @@ class SystemHealthState(
     // R-ID 259: Energy Footprint Verdicts
     var lastEnergyDeltaMa: Int = 0,
     var lastEnergyDeltaTemp: Double = 0.0,
-    var lastEnergyDurationMs: Long = 0L
+    var lastEnergyDurationMs: Long = 0L,
+    var tamperNote: String? = null
 ) {
     fun copyFrom(other: SystemHealthState) {
         this.signalLoss = other.signalLoss
@@ -206,6 +210,7 @@ class SystemHealthState(
         this.lastEnergyDeltaMa = other.lastEnergyDeltaMa
         this.lastEnergyDeltaTemp = other.lastEnergyDeltaTemp
         this.lastEnergyDurationMs = other.lastEnergyDurationMs
+        this.tamperNote = other.tamperNote
     }
 
     fun update(
@@ -224,7 +229,8 @@ class SystemHealthState(
         isSilentFailure: Boolean = false, isThermalThrottling: Boolean = false,
         isUltraLongStationary: Boolean = false, isMaliAnomaly: Boolean = false,
         isGnssThrottled: Boolean = false,
-        lastEnergyDeltaMa: Int = 0, lastEnergyDeltaTemp: Double = 0.0, lastEnergyDurationMs: Long = 0L
+        lastEnergyDeltaMa: Int = 0, lastEnergyDeltaTemp: Double = 0.0, lastEnergyDurationMs: Long = 0L,
+        tamperNote: String? = null
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -274,6 +280,7 @@ class SystemHealthState(
         this.lastEnergyDeltaMa = lastEnergyDeltaMa
         this.lastEnergyDeltaTemp = lastEnergyDeltaTemp
         this.lastEnergyDurationMs = lastEnergyDurationMs
+        this.tamperNote = tamperNote
     }
     
     fun reset() {
@@ -366,5 +373,6 @@ class SystemHealthState(
         lastEnergyDeltaMa = 0
         lastEnergyDeltaTemp = 0.0
         lastEnergyDurationMs = 0L
+        tamperNote = null
     }
 }

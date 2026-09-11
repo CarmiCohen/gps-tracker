@@ -26,6 +26,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 /**
  * TrackerScreen: Tracker-mode UI.
  * Sep.11.10:
+ * - Fix: Corrected unresolved references in portrait layout (satsUsed/snr) by 
+ *   using dashboardState.isSatsIndexWarning.
  * - Integrity Audit #243: Removed redundant map tool overlays and individual 
  *   map parameters; fully delegated Map UI to AppMapContainer (R-ID 287).
  * - Fix: Corrected SettingsOverlay parameter mapping to match SettingsComponents.kt.
@@ -165,6 +167,7 @@ fun TrackerScreen(
                                     isLocationPending = dashboardState.isLocationPending,
                                     locationPendingReason = dashboardState.locationPendingReason,
                                     status = dashboardState.status,
+                                    tamperReason = dashboardState.tamperReason,
                                     isTamperDetected = dashboardState.isTamperDetected,
                                     isBatterySteepDischarge = dashboardState.isBatterySteepDischarge,
                                     isBatteryLow = dashboardState.isBatteryLow,
@@ -271,6 +274,7 @@ fun TrackerScreen(
                                 isLocationPending = dashboardState.isLocationPending,
                                 locationPendingReason = dashboardState.locationPendingReason,
                                 status = dashboardState.status,
+                                tamperReason = dashboardState.tamperReason,
                                 isTamperDetected = dashboardState.isTamperDetected,
                                 isBatterySteepDischarge = dashboardState.isBatterySteepDischarge,
                                 isBatteryLow = dashboardState.isBatteryLow,
@@ -434,6 +438,7 @@ fun TrackerDashboard(
     isLocationPending: Boolean,
     locationPendingReason: LocationPendingReason,
     status: SentinelStatus,
+    tamperReason: String? = null,
     isTamperDetected: Boolean,
     isBatterySteepDischarge: Boolean,
     isBatteryLow: Boolean,
@@ -513,6 +518,7 @@ fun TrackerDashboard(
                     isLocationPending = isLocationPending,
                     locationPendingReason = locationPendingReason,
                     status = status,
+                    tamperReason = tamperReason,
                     isTamperDetected = isTamperDetected,
                     isBatterySteepDischarge = isBatterySteepDischarge,
                     isBatteryLow = isBatteryLow,
@@ -544,7 +550,7 @@ fun TrackerDashboard(
                     viewerMaxAcc = viewerMaxAcc,
                     satsUsed = satsUsed,
                     satsView = satsView,
-                    isSatsIndexWarning = satsUsed < 4 || snr < 25.0,
+                    isSatsIndexWarning = isSatsIndexWarning,
                     snr = snr,
                     vibration = vibration,
                     heading = heading,

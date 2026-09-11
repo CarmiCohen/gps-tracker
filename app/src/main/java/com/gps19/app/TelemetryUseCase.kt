@@ -5,19 +5,14 @@ import javax.inject.Inject
 
 /**
  * TelemetryUseCase: Logic for processing and mapping raw telemetry updates to UI states.
+ * Sep.10.40:
+ * - Issue #946 Visibility RESOLVED: Added tamperNote mapping to mapHealth, 
+ *   mapTrackerLocation, and mapHealthFromStatus for header forensic parity (R-ID 288).
  * Sep.09.11:
  * - Forensic Audit Hardening: Enhanced maxTemp propagation using maxOf to ensure peak 
  *   values are captured across partitioned updates (R-ID 284).
  * - Health Mapping: Ensured isHardwareOnline considers signal non-nullability from 
  *   ConnectivitySuite fix to resolve HUD "Offline" regressions.
- * Sep.09.00:
- * - Legacy Field Cleanup (Part A): Migrated to direct partitioned state access 
- *   (.kinetic, .atmospheric, .integrity) to bypass aggregate bridges (R-ID 284).
- * Sep.08.12:
- * - Issue #924 Visibility: Added isGnssThrottled mapping for A15 Hysteresis transparency.
- * Sep.06.59:
- * - Issue #935 FIX: Monotonic Propagation. Added missing rt field mapping 
- *   in mapTrackerLocation and mapLocalLocation to resolve HUD GPS red-lock.
  */
 class TelemetryUseCase @Inject constructor(
     private val timeProvider: TimeProvider
@@ -38,17 +33,19 @@ class TelemetryUseCase @Inject constructor(
             currentLoc.kinetic.lng = update.kinetic.lng
             currentLoc.kinetic.speed = update.kinetic.speed
             currentLoc.kinetic.accuracy = update.kinetic.accuracy
+            currentLoc.kinetic.maxAccuracy = update.kinetic.maxAccuracy
             currentLoc.kinetic.bearing = update.kinetic.bearing
         }
         if (update.kinetic.maxAccuracy > 0.0) currentLoc.kinetic.maxAccuracy = update.kinetic.maxAccuracy
         if (newTimestamp > 0) currentLoc.kinetic.gpsTs = newTimestamp
         
         currentLoc.ts = effectiveTelemetryTs
-        currentLoc.kinetic.rt = update.kinetic.rt // Fix #935: Propagate monotonic timestamp
+        currentLoc.kinetic.rt = update.kinetic.rt 
         currentLoc.status = update.status
         currentLoc.trackerState = update.trackerState
         update.integrity.gnssDetail?.let { currentLoc.integrity.gnssDetail = it }
         currentLoc.integrity.isGnssThrottled = update.integrity.isGnssThrottled
+        currentLoc.integrity.tamperNote = update.integrity.tamperNote
         
         return currentLoc
     }
@@ -89,7 +86,8 @@ class TelemetryUseCase @Inject constructor(
             isBatteryLow = update.integrity.isBatteryLow,
             isBatteryCritical = update.integrity.isBatteryCritical,
             isUltraLongStationary = update.integrity.isUltraLongStationary,
-            isGnssThrottled = update.integrity.isGnssThrottled
+            isGnssThrottled = update.integrity.isGnssThrottled,
+            tamperNote = update.integrity.tamperNote
         )
         
         current.maxTemp = maxOf(current.maxTemp, update.atmospheric.maxTemp)
@@ -204,6 +202,8 @@ class TelemetryUseCase @Inject constructor(
         current.sitShock = status.sitShock
         current.kineticEnergy = status.kineticEnergy
         current.isGnssThrottled = status.isGnssThrottled
+        // Sep.10.40: Added tamperNote mapping for forensic parity
+        current.tamperNote = status.tamperNote
         return current
     }
 
@@ -216,11 +216,12 @@ class TelemetryUseCase @Inject constructor(
         currentLoc.kinetic.maxAccuracy = status.maxAccuracy
         currentLoc.kinetic.gpsTs = status.gpsTs
         currentLoc.ts = status.ts
-        currentLoc.kinetic.rt = status.ts - (timeProvider.currentTimeMillis() - timeProvider.elapsedRealtime()) // Heuristic rt for remote status
+        currentLoc.kinetic.rt = status.ts - (timeProvider.currentTimeMillis() - timeProvider.elapsedRealtime()) 
         currentLoc.status = status.status
         currentLoc.trackerState = status.trackerState
         currentLoc.integrity.gnssDetail = status.gnssDetail
         currentLoc.integrity.isGnssThrottled = status.isGnssThrottled
+        currentLoc.integrity.tamperNote = status.tamperNote
         return currentLoc
     }
 
@@ -238,17 +239,19 @@ class TelemetryUseCase @Inject constructor(
             currentLoc.kinetic.lng = update.kinetic.lng
             currentLoc.kinetic.speed = update.kinetic.speed
             currentLoc.kinetic.accuracy = update.kinetic.accuracy
+            currentLoc.kinetic.maxAccuracy = update.kinetic.maxAccuracy
             currentLoc.kinetic.bearing = update.kinetic.bearing
         }
         if (update.kinetic.maxAccuracy > 0.0) currentLoc.kinetic.maxAccuracy = update.kinetic.maxAccuracy
         if (newTimestamp > 0) currentLoc.kinetic.gpsTs = newTimestamp
         
         currentLoc.ts = if (update.ts > 0) update.ts else nowMs
-        currentLoc.kinetic.rt = update.kinetic.rt // Fix #935: Propagate monotonic timestamp
+        currentLoc.kinetic.rt = update.kinetic.rt 
         currentLoc.status = update.status
         currentLoc.trackerState = update.trackerState
         update.integrity.gnssDetail?.let { currentLoc.integrity.gnssDetail = it }
         currentLoc.integrity.isGnssThrottled = update.integrity.isGnssThrottled
+        currentLoc.integrity.tamperNote = update.integrity.tamperNote
 
         return currentLoc
     }

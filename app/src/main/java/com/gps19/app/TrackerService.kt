@@ -21,6 +21,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.10.40:
+ * - Issue #946 Visibility: Populated tamperNote in LocationUpdate for 
+ *   header-level forensic transparency (R-ID 288).
  * Sep.09.15:
  * - Issue #940 RESOLVED: Fixed Grid Scheduling. Anchored watchdog pulses to 
  *   serviceStartRealtime to eliminate cumulative drift (R-ID 281).
@@ -632,6 +635,7 @@ class TrackerService : BaseMonitorService() {
             this.integrity.gpsHardwareLock = health.gpsHardwareLock
             this.integrity.isUltraLongStationary = health.isUltraLongStationary
             this.integrity.isTamperDetected = proc?.tamperDetected ?: false
+            this.integrity.tamperNote = proc?.suppressionNote
 
             this.ts = now
             this.isMe = true
