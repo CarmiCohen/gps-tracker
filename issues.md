@@ -1,10 +1,14 @@
-# Project Issues & Hardening Tracking (Sep.11.42)
+# Project Issues & Hardening Tracking (Sep.11.43)
 
 ## 🎯 Current Resumption Focus: Release Candidate Deployment & LED Verification
-Signaling session integrity and identity adoption have been fully remediated. Focus shifts to final verification of hardware LEDs and telemetry backfill convergence in the Sep.11.42 release candidate.
+Signaling session integrity and identity adoption have been fully remediated. Focus shifts to final verification of hardware LEDs and telemetry backfill convergence in the Sep.11.43 release candidate.
 
 ## 🟡 Open Issues & Hardening Tasks (Sorted by Implementation Priority)
 *   *(None)*
+
+## 🟢 Recently Resolved Issues (Sep.11.43)
+*   **Telemetry Backfill Convergence RESOLVED (#923)**:
+    *   **Root-Cause Remediation**: Synchronized `HistoryManager.fillRealGap` with forensic audit counters (`backfillAuditCount` and `hourlyBackfillTotal`). This ensures that telemetry points backfilled during sustained offline periods (>10s) are correctly reported in continuity audits, matching the behavior of analytical backfilling.
 
 ## 🟢 Recently Resolved Issues (Sep.11.42)
 *   **GNSS Jitter & Stability Gaps RESOLVED (#916)**:
@@ -15,6 +19,6 @@ Signaling session integrity and identity adoption have been fully remediated. Fo
 *   **A15 Deployment Failure RESOLVED (#908)**: SM-A155F device successfully verified.
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 314 (Rules: 58, IDs: 256), Resolved: 996, Open: 0, Testing: 100% (Sub-items: 51), Ideas: 9, QA: 270]**
+- **Current Audit Baseline: [SOT: 314 (Rules: 58, IDs: 256), Resolved: 997, Open: 0, Testing: 100% (Sub-items: 51), Ideas: 10, QA: 270]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.11.42)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.11.43)*

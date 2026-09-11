@@ -27,12 +27,12 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.11.43:
+ * - Issue #923: Telemetry Backfill Convergence. Synchronized fillRealGap with 
+ *   forensic audit counters (backfillAuditCount) for consistency in continuity reporting.
  * Sep.06.10:
  * - Issue #922: Clock Parity. Updated forensic queries to use elapsedRealtime() 
  *   parity for backfilling consistency during system clock jumps.
- * Aug.31.04:
- * - Issue #779 Hardening: Integrated ForensicSanitizer into diagnostic log 
- *   emission to ensure parity with global forensic policy (R779).
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -183,7 +183,6 @@ class HistoryManager @Inject constructor(
         isSilentFailure: Boolean, isBatteryLow: Boolean, isBatteryCritical: Boolean,
         isUltraLongStationary: Boolean
     ) {
-        // Issue #922: Use Rt parity for backfill queries
         val snrSamples = if (isTrackerMode) hardwareProvider.getSnrSamples(lastTickRt + 1, nowRt) else emptySequence()
         val sensorSamples = if (isTrackerMode) hardwareProvider.getSensorSamples(lastTickRt + 1, nowRt) else emptySequence()
         
@@ -225,7 +224,6 @@ class HistoryManager @Inject constructor(
     }
 
     private fun fillRealGap(lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, isTrackerMode: Boolean) {
-        // Issue #922: Use Rt parity for gap queries
         val snrSamples = if (isTrackerMode) hardwareProvider.getSnrSamples(lastTickRt, nowRt) else emptySequence()
         val sensorSamples = if (isTrackerMode) hardwareProvider.getSensorSamples(lastTickRt, nowRt) else emptySequence()
         
@@ -238,6 +236,11 @@ class HistoryManager @Inject constructor(
             }
             if (gapPoints.isNotEmpty()) { 
                 repository.addHistoryPoints(scale.key, gapPoints)
+                // Issue #923: Synchronize forensic audit counters for 4M ribbons
+                if (scale == RibbonScale.FOUR_MIN) {
+                    backfillAuditCount += gapPoints.size
+                    hourlyBackfillTotal += gapPoints.size
+                }
             }
         }
     }

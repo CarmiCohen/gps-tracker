@@ -1,4 +1,8 @@
-# Hardening Resolution Archive (Sep.11.42)
+# Hardening Resolution Archive (Sep.11.43)
+
+## 🟢 Resolved in Sep.11.43
+*   **Telemetry Backfill Convergence (#923)**:
+    *   **Remediation**: Synchronized `HistoryManager.fillRealGap` with forensic audit counters (`backfillAuditCount` and `hourlyBackfillTotal`). This ensures that telemetry points backfilled during sustained offline periods (>10s) are correctly reported in continuity audits, matching the behavior of analytical backfilling.
 
 ## 🟢 Resolved in Sep.11.42
 *   **GNSS Jitter & Stability Gaps (#916)**:
@@ -9,8 +13,5 @@
 ## 🟢 Resolved in Sep.11.41
 *   **Reactive Flow Stalls (#915)**: Decoupled vitality monitoring from state-change detection by removing `.distinctUntilChanged()` from low-level shared flows.
 
-## 🟢 Resolved in Sep.11.35
-*   **Viewer ID Adoption Failure (#912)**: Corrected a logic error in `TrackerService.handleViewerPulse`.
-
 ---
-*For older records, see historical git logs. (vSep.11.42)*
+*For older records, see historical git logs. (vSep.11.43)*
