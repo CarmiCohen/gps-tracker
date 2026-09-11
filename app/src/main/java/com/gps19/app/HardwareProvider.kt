@@ -34,10 +34,12 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.11.52:
+ * - Issue #945 Hardening: Elevated GNSSThread priority to THREAD_PRIORITY_URGENT_DISPLAY 
+ *   to eliminate 9000ms jitter caused by background scheduling starvation on A15 hardware.
  * Sep.11.42:
  * - Issue #916 Hardening: Decoupled GNSS Status callbacks into a dedicated HandlerThread 
  *   (GNSSThread) to eliminate 9000ms jitter caused by sensor processing contention on A15 hardware.
- * - Issue #915 Hardening: Converted status flows to SharedFlows for vitality pulsing.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -342,11 +344,12 @@ class HardwareProvider @Inject constructor(
                 Timber.d("HardwareProvider: Unified hardware thread started.")
             }
 
-            // Issue #916: Dedicated GNSS thread to prevent sensor contention on budget hardware (A15).
+            // Issue #916 & #945: Dedicated GNSS thread with elevated priority.
+            // Priority raised to URGENT_DISPLAY to prevent scheduling starvation on budget A15 cores.
             if (gnssThread == null || !gnssThread!!.isAlive) {
-                gnssThread = HandlerThread("GNSSThread", Process.THREAD_PRIORITY_BACKGROUND).apply { start() }
+                gnssThread = HandlerThread("GNSSThread", Process.THREAD_PRIORITY_URGENT_DISPLAY).apply { start() }
                 gnssHandler = Handler(gnssThread!!.looper)
-                Timber.d("HardwareProvider: Dedicated GNSS thread started.")
+                Timber.d("HardwareProvider: Dedicated GNSS thread started (Priority: URGENT_DISPLAY).")
             }
             
             val handler = hardwareHandler

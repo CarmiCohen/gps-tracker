@@ -1,4 +1,8 @@
-# Hardening Resolution Archive (Sep.11.48)
+# Hardening Resolution Archive (Sep.11.52)
+
+## 🟢 Resolved in Sep.11.52
+*   **Recurring GNSS Jitter on A15 (#945)**:
+    *   **Remediation**: Elevated `GNSSThread` priority to `THREAD_PRIORITY_URGENT_DISPLAY` in `HardwareProvider`. Budget hardware (A15) cores were causing scheduling starvation for background threads during sensor-heavy logic pulses, leading to ~9000ms jitter. Priority alignment ensures GNSS status callbacks are processed within the urgent scheduling window (R-ID 260).
 
 ## 🟢 Resolved in Sep.11.48
 *   **Persistent Reactive Flow Stalls (#946)**:
@@ -13,4 +17,4 @@
     *   **Remediation**: Synchronized `HistoryManager.fillRealGap` with forensic audit counters (`backfillAuditCount` and `hourlyBackfillTotal`). This ensures that telemetry points backfilled during sustained offline periods (>10s) are correctly reported in continuity audits, matching the behavior of analytical backfilling.
 
 ---
-*For older records, see historical git logs. (vSep.11.48)*
+*For older records, see historical git logs. (vSep.11.52)*
