@@ -1,24 +1,21 @@
-# Project Issues & Hardening Tracking (Sep.11.43)
+# Project Issues & Hardening Tracking (Sep.11.44)
 
 ## 🎯 Current Resumption Focus: Release Candidate Deployment & LED Verification
-Signaling session integrity and identity adoption have been fully remediated. Focus shifts to final verification of hardware LEDs and telemetry backfill convergence in the Sep.11.43 release candidate.
+Signaling session integrity and identity adoption have been fully remediated. Focus shifts to final verification of hardware LEDs and telemetry backfill convergence in the Sep.11.44 release candidate.
 
 ## 🟡 Open Issues & Hardening Tasks (Sorted by Implementation Priority)
+*   **Recurring GNSS Jitter on A15 (#945)**: Event Log reports "GNSS Jitter: 8997ms (Hardware Instability)" despite `GNSSThread` implementation. Indicates persistent scheduling contention or driver-level latency on SM-A155F.
+*   **Persistent Reactive Flow Stalls (#946)**: Event Log reports "Reactive flow stall detected (Power)" during session start. Vitality monitoring still triggering on power-related state changes.
+*   **Invalid "Last Seen" Display (#947)**: Dashboard reports "29,786,995m" (Epoch 1970 delta) due to monotonic vs wall-clock time-base mismatch in `DashboardStateProvider`.
+
+## 🟢 Recently Resolved Issues (Sep.11.44)
 *   *(None)*
 
 ## 🟢 Recently Resolved Issues (Sep.11.43)
 *   **Telemetry Backfill Convergence RESOLVED (#923)**:
     *   **Root-Cause Remediation**: Synchronized `HistoryManager.fillRealGap` with forensic audit counters (`backfillAuditCount` and `hourlyBackfillTotal`). This ensures that telemetry points backfilled during sustained offline periods (>10s) are correctly reported in continuity audits, matching the behavior of analytical backfilling.
 
-## 🟢 Recently Resolved Issues (Sep.11.42)
-*   **GNSS Jitter & Stability Gaps RESOLVED (#916)**:
-    *   **Root-Cause Remediation (Gaps)**: Identified that `TrackerService` and `ViewerService` hardcoded a 2s interval for stability auditing, causing false-positives when dynamic polling scaled to 60s. Updated to use `currentIntervalMs`.
-    *   **Root-Cause Remediation (Jitter)**: Decoupled GNSS Status callbacks in `HardwareProvider` into a dedicated `HandlerThread` (`GNSSThread`) with background priority. This eliminates 9000ms jitter caused by scheduling contention with high-frequency sensor data (200Hz) on budget hardware (A15).
-*   **Reactive Flow Stalls RESOLVED (#915)**: Decoupled vitality monitoring from state-change detection.
-*   **Viewer ID Adoption Failure RESOLVED (#912)**: Corrected logic error in `TrackerService.handleViewerPulse`.
-*   **A15 Deployment Failure RESOLVED (#908)**: SM-A155F device successfully verified.
-
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 314 (Rules: 58, IDs: 256), Resolved: 997, Open: 0, Testing: 100% (Sub-items: 51), Ideas: 10, QA: 270]**
+- **Current Audit Baseline: [SOT: 314 (Rules: 58, IDs: 256), Resolved: 997, Open: 3, Testing: 100% (Sub-items: 51), Ideas: 10, QA: 270]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.11.43)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.11.44)*
