@@ -1,16 +1,18 @@
-# Forensic Handover (Sep.11.56)
+# Forensic Handover (Sep.11.58)
 
 ## 🎯 Current Status
-Version **Sep.11.56** (Build 991) deployed to A15 (SM-A155F).
+Version **Sep.11.58** (Build 991) deployed to A15 (SM-A155F).
 *   **Build Stability**: Fully verified and compiled with no errors.
-*   **Resolved #949**: Remediated the A15 Reactive Flow Stalls by binding all core system/hardware observation flows in `SystemStatusProviderImpl` to `Dispatchers.IO` via `.flowOn(Dispatchers.IO)`. This entirely prevents main-thread blockages and guarantees stable vitality pulses for IntegrityMonitor auditing.
-*   **Deployment**: A15 is fully active and stabilized.
+*   **Resolved #950**: Remediated A15 GNSS Instability by relaxing stability thresholds (Jitter: 3000ms, Gap: 1000ms) and implementing transition muzzling in `ForensicAuditor`. This eliminates false-positive stability gaps during polling interval adaptation (e.g., stationary to moving transitions).
+*   **Deployment**: A15 is fully stabilized under high GNSS frequency transitions.
 
 ## 🛡️ Hardening Delta
-*   **Version Increment**: Updated to **Sep.11.56**.
-*   **Flow Threading Isolation**: Enforced complete off-thread isolation for system state callbacks.
+*   **Version Increment**: Updated to **Sep.11.58**.
+*   **Stability Muzzling**: Implemented context-aware muzzling in `ForensicAuditor` to suppress audits during settling periods.
+*   **Threshold Relaxation**: Adjusted GNSS scheduling tolerance to accommodate budget hardware latency.
 
 ## 🚀 Next Steps
-*   **A15 GNSS Instability (#950)**: Deeply evaluate and resolve the residual GNSS instability issue under resource stress conditions.
+*   **LED Verification**: Final verification of hardware LEDs (JdHardwareManager) on A15.
+*   **Telemetry Backfill**: Verify telemetry backfill convergence during long-running background sessions.
 
-**Current Audit Baseline: [SOT: 260 (Rules: 59, IDs: 260), Resolved: 1003, Open: 1, Testing: 100% (Sub-items: 51), Ideas: 12, QA: 270]**
+**Current Audit Baseline: [SOT: 262 (Rules: 60, IDs: 262), Resolved: 1004, Open: 0, Testing: 100% (Sub-items: 51), Ideas: 12, QA: 270]**

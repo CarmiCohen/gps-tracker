@@ -21,6 +21,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.11.58:
+ * - Issue #950 Hardening: Propagated isAdaptationMuzzled to recordGpsFix 
+ *   to eliminate false-positive Stability Gaps during polling transitions.
  * Sep.11.42:
  * - Issue #916 Hardening: Use currentIntervalMs in ForensicAuditor.recordGpsFix 
  *   to eliminate false-positive Stability Gaps during dynamic polling transitions.
@@ -784,8 +787,10 @@ class TrackerService : BaseMonitorService() {
         val nowRt = timeProvider.elapsedRealtime()
         lastKnownLocation = location; lastGpsSpeed = location.speed.toDouble(); lastGpsAccuracy = location.accuracy.toDouble(); lastGpsBearing = location.bearing.toDouble()
         
-        // Issue #916: Use currentIntervalMs to avoid false-positive gaps during dynamic polling transitions.
-        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs)?.let { gapMsg ->
+        // Issue #950: Suppress stability gaps during polling interval transitions.
+        val isMuzzled = nowRt - lastIntervalChangeRt < ADAPTATION_SETTLING_MS
+        
+        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, isMuzzled)?.let { gapMsg ->
             val proc = lastProcessedLocation
             logManager.logServiceEvent(
                 m = "STABILITY GAP (T): $gapMsg",

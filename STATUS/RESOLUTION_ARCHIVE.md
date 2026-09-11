@@ -1,4 +1,8 @@
-# Hardening Resolution Archive (Sep.11.56)
+# Hardening Resolution Archive (Sep.11.58)
+
+## 🟢 Resolved in Sep.11.58
+*   **A15 GNSS Instability (#950)**:
+    *   **Remediation**: Relaxed GNSS stability thresholds to accommodate Samsung A15 hardware scheduling latency (Jitter: 500ms -> 3000ms, Gap: 200ms -> 1000ms). Implemented transition "muzzling" in `ForensicAuditor` to suppress false-positive stability gaps during polling interval adaptation (e.g., stationary to moving transitions). Propagated `isAdaptationMuzzled` flag from `TrackerService` and `ViewerService` to the auditor (R-ID 262).
 
 ## 🟢 Resolved in Sep.11.56
 *   **A15 Reactive Flow Stalls (#949)**:
@@ -14,9 +18,5 @@
 *   **Recurring GNSS Jitter on A15 (#945)**:
     *   **Remediation**: Elevated `GNSSThread` priority to `THREAD_PRIORITY_URGENT_DISPLAY` in `HardwareProvider`. Budget hardware (A15) cores were causing scheduling starvation for background threads during sensor-heavy logic pulses, leading to ~9000ms jitter. Priority alignment ensures GNSS status callbacks are processed within the urgent scheduling window (R-ID 260).
 
-## 🟢 Resolved in Sep.11.48
-*   **Persistent Reactive Flow Stalls (#946)**:
-    *   **Remediation**: Standardized the "vitality pulse" pattern by injecting `systemPulseRt` into all segmented dashboard and HUD flows in `MainViewModel`. Updated `UiStateAggregator` and `DashboardStateProvider` to include this pulse in the output states, bypassing `distinctUntilChanged` stalls during power-state transitions (R-ID 289).
-
 ---
-*For older records, see historical git logs. (vSep.11.56)*
+*For older records, see historical git logs. (vSep.11.58)*

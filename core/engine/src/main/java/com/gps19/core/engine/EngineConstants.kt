@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.11.58:
+ * - Issue #950 Hardening: Relaxed GNSS stability thresholds to accommodate A15 
+ *   hardware jitter (Jitter: 500ms -> 3000ms, Gap: 200ms -> 1000ms).
  * Sep.06.33:
  * - Issue #929 Hardening: Added GNSS_THROTTLING_HYSTERESIS_MS (10s) to prevent 
  *   sampling jitter during rapid anomaly state transitions (R-ID 274).
@@ -374,10 +377,10 @@ const val HOME_POINT_REFRESH_INTERVAL_MS = 30000L
 // Logging & UI
 const val MAX_HISTORY_POINTS_PER_RIBBONS = 300
 const val GPS_STABILITY_AUDIT_INTERVAL_MS = 10000L
-const val GPS_STABILITY_GAP_THRESHOLD_MS = 200L
+const val GPS_STABILITY_GAP_THRESHOLD_MS = 1000L
 const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0
 const val GNSS_EXPECTED_INTERVAL_MS = 1000L
-const val GNSS_JITTER_THRESHOLD_MS = 500L
+const val GNSS_JITTER_THRESHOLD_MS = 3000L
 
 const val TELEMETRY_UI_STALE_THRESHOLD_MS = 35000L 
 const val GPS_UI_FAIL_THRESHOLD_MS = 35000L

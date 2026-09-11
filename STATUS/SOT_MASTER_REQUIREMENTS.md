@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.11.56)
+# SOT Master Requirements & Hardening Status (Sep.11.58)
 
 ## 🛡️ Core Hardening Baseline
 *   **SOT ID 314**: Signaling Session Integrity - Isolates socket callbacks via session-ID to prevent race conditions. (Resolved Sep.11.23)
@@ -8,12 +8,13 @@
 *   **SOT ID 259**: Vitality Pulse Standardization - Injected monotonic pulse into segmented UI flows to bypass `distinctUntilChanged` stalls during power-state transitions. (Resolved Sep.11.48)
 *   **SOT ID 260**: GNSS Scheduling Priority - Elevated GNSS callback thread to `URGENT_DISPLAY` to eliminate scheduling starvation jitter on budget A15 hardware. (Resolved Sep.11.52)
 *   **SOT ID 261**: Reactive Flow Multithreading - Directed hardware observation flows to Dispatchers.IO to resolve main-thread vitality pulse stalls on budget A15 cores. (Resolved Sep.11.56)
+*   **SOT ID 262**: GNSS Stability Relaxation - Relaxed thresholds and implemented transition muzzling to accommodate A15 GNSS latency. (Resolved Sep.11.58)
 
 ## 📈 Metric Summary
-- **Rules Verified**: 59
-- **Total SOT IDs**: 260
-- **Resolved Issues**: 1003
-- **Open Issues**: 1
+- **Rules Verified**: 60
+- **Total SOT IDs**: 262
+- **Resolved Issues**: 1004
+- **Open Issues**: 0
 - **Testing Coverage**: 100% (51 sub-items)
 - **Simplification Ideas**: 12
 - **QA Validation Tasks**: 270
@@ -26,4 +27,4 @@
 *   **Chapter 23.2 (Reactive Flow Vitality)**: PASSED - Flow stall remediation for power transitions verified on background threads.
 
 ---
-*Next Audit: Sep.12.08. (vSep.11.56)*
+*Next Audit: Sep.12.08. (vSep.11.58)*

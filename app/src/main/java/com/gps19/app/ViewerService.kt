@@ -16,6 +16,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.11.58:
+ * - Issue #950 Hardening: Propagated isAdaptationMuzzled to recordGpsFix 
+ *   to eliminate false-positive Stability Gaps during polling transitions.
  * Sep.11.42:
  * - Issue #916 Hardening: Use currentIntervalMs in ForensicAuditor.recordGpsFix 
  *   to eliminate false-positive Stability Gaps during dynamic polling transitions.
@@ -47,6 +50,7 @@ class ViewerService : BaseMonitorService() {
     private var lastPowerSaveCheckRt = 0L
 
     private var currentIntervalMs = TICK_INTERVAL_MS
+    private var lastIntervalChangeRt = 0L
     private var lastA15PokeRt = 0L
     private val A15_POKE_INTERVAL_MS = 30_000L
 
@@ -344,8 +348,10 @@ class ViewerService : BaseMonitorService() {
         
         lastGpsSpeed = location.speed.toDouble(); lastGpsAccuracy = location.accuracy.toDouble(); lastGpsBearing = location.bearing.toDouble()
 
-        // Issue #916: Use currentIntervalMs to avoid false-positive gaps during dynamic polling transitions.
-        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs)?.let { gapMsg ->
+        // Issue #950: Suppress stability gaps during polling interval transitions.
+        val isMuzzled = nowRt - lastIntervalChangeRt < ADAPTATION_SETTLING_MS
+
+        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, isMuzzled)?.let { gapMsg ->
             val proc = lastProcessedLocation
             logManager.logServiceEvent(
                 m = "STABILITY GAP (V): $gapMsg",
@@ -478,6 +484,7 @@ class ViewerService : BaseMonitorService() {
         val targetGpsInterval = if (isUiVisible()) HIGH_FREQUENCY_GPS_POLLING_MS else VIEWER_GPS_POLLING_MS
         if (targetGpsInterval != currentIntervalMs) {
             currentIntervalMs = targetGpsInterval
+            lastIntervalChangeRt = nowRt
             hardwareProvider.setPollingInterval(targetGpsInterval)
         }
 

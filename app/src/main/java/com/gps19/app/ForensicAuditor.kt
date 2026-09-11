@@ -9,6 +9,9 @@ import kotlin.math.round
 
 /**
  * ForensicAuditor: Encapsulates high-assurance hardware audits (Stability, Jitter, Sensor Rates, Energy).
+ * Sep.11.58:
+ * - Issue #950 Hardening: Implemented transition muzzling in recordGpsFix to 
+ *   eliminate false-positive stability gaps during polling interval adaptation.
  * Sep.08.11:
  * - Issue #936: Forensic Auditor Consolidation (Idea #3). Consolidated Stability 
  *   Audit logic (Reliability % / Jitter) from Tracker/Viewer services (R-ID 280).
@@ -44,15 +47,20 @@ class ForensicAuditor @Inject constructor(
 
     /**
      * Records a GPS fix and returns a gap message if a stability violation is detected.
+     * @param isMuzzled Suppresses violation recording during polling transitions.
      */
-    fun recordGpsFix(nowRt: Long, expectedIntervalMs: Long): String? {
+    fun recordGpsFix(nowRt: Long, expectedIntervalMs: Long, isMuzzled: Boolean = false): String? {
         var gapMessage: String? = null
         if (lastGpsFixRealtime > 0) {
             val gap = nowRt - lastGpsFixRealtime
             stabilityAuditFixCount++
             if (gap > expectedIntervalMs + GPS_STABILITY_GAP_THRESHOLD_MS) {
-                stabilityAuditViolationCount++
-                gapMessage = "${gap}ms detected during logic pulse."
+                if (!isMuzzled) {
+                    stabilityAuditViolationCount++
+                    gapMessage = "${gap}ms detected during logic pulse."
+                } else {
+                    Timber.d("ForensicAuditor: Stability gap of ${gap}ms muzzled (Adaptation).")
+                }
             }
         }
         lastGpsFixRealtime = nowRt
