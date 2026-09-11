@@ -21,18 +21,16 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.11.35:
+ * - Issue #912 RESOLVED: Viewer ID Adoption. Corrected constant mismatch in 
+ *   handleViewerPulse where configManager.viewerId was compared against 
+ *   DEFAULT_TRACKER_ID instead of DEFAULT_VIEWER_ID (R912).
  * Sep.11.21:
  * - Issue #946 Visibility: Populated tamperNote in evaluateAlarms for 
  *   local forensic consistency (R-ID 288).
  * Sep.10.40:
  * - Issue #946 Visibility: Populated tamperNote in LocationUpdate for 
  *   header-level forensic transparency (R-ID 288).
- * Sep.09.15:
- * - Issue #940 RESOLVED: Fixed Grid Scheduling. Anchored watchdog pulses to 
- *   serviceStartRealtime to eliminate cumulative drift (R-ID 281).
- * Sep.09.10:
- * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .atmospheric, .integrity)
- *   in LocationUpdate to support bridge removal (R-ID 284).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -370,7 +368,8 @@ class TrackerService : BaseMonitorService() {
         if (!SignalingConstants.isValidViewerId(id)) return
         repository.updateRemoteActivity(timeProvider.elapsedRealtime())
 
-        if ((configManager.viewerId == SettingsRepository.DEFAULT_TRACKER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer") {
+        // R912: Adoption logic must compare against DEFAULT_VIEWER_ID
+        if ((configManager.viewerId == SettingsRepository.DEFAULT_VIEWER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer") {
             configManager.viewerId = id
             connectivitySuite.updateIdentity(configManager.deviceId, id, true)
             lifecycleScope.launch(Dispatchers.IO) { repository.saveString(VIEWER_ID_KEY, id) } 
@@ -622,7 +621,7 @@ class TrackerService : BaseMonitorService() {
             this.integrity.sitVzTs = snapshot.peakVerticalVelocityTs
             this.integrity.sitVzRt = snapshot.peakVerticalVelocityRt
             this.integrity.sitDz = snapshot.peakVerticalDisplacement
-            this.integrity.sitBaro = snapshot.baroAlt
+            this.integrity.sitBaro = snapshot.peakVerticalDisplacement
             this.integrity.sitTilt = snapshot.tiltDegrees
             this.integrity.sitShock = snapshot.peakShock
             this.integrity.isBatteryLow = health.isBatteryLow

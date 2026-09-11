@@ -1,15 +1,15 @@
-# Forensic Handover (Sep.11.30)
+# Forensic Handover (Sep.11.35)
 
 ## 🎯 Current Status
-Release candidate **Sep.11.30** (Build 987) successfully deployed to both A15 and S21 FE. 
-*   **A15 (Tracker)**: All hardware LEDs green. GNSS lock stable.
-*   **S21 FE (Viewer)**: Connected and receiving telemetry.
-*   **Peer Connection**: Verified stable via relay [Session 1].
+Release candidate **Sep.11.35** (Build 987) deployed to remediate signaling adoption failure. 
+*   **A15 (Tracker)**: Verified broadcasting as `TRK2`. Corrected to adopt Viewer ID `V2`.
+*   **S21 FE (Viewer)**: All LEDs (SYS, INT, SRV, GPS, TRK, DAT) now verified Green after Tracker identity adoption fix.
+*   **Peer Connection**: Signaling handshake confirmed stable across custom ID sets.
 
 ## 🛡️ Hardening Delta
-*   **A15 Deployment RESOLVED**: Issue #908 resolved. Device detected and integrated into the hardening cycle.
-*   **Signaling Integrity**: Verified that session-ID isolation prevents state corruption during multi-device deployment.
-*   **Versioning**: Incremented to **Sep.11.30** (Build 987).
+*   **Viewer ID Adoption RESOLVED (#912)**: Corrected a logic mismatch in `TrackerService.handleViewerPulse` where adoption was gated by a Tracker ID constant instead of a Viewer ID constant.
+*   **A15 Connectivity**: Verified full telemetry loop between SM-A155F and S21 FE using custom `TRK2`/`V2` identities.
+*   **Versioning**: Incremented to **Sep.11.35** (Build 987).
 
 ## 🚀 Next Steps
 *   Perform long-term stability audit of the telemetry backfill convergence (Chapter 22.1).
