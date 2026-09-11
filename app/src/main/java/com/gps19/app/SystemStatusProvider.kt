@@ -61,12 +61,12 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
- * Sep.05.30:
- * - Issue #916 Hardening: Added getBatteryStatus() to support Energy Footprint Verdict.
- * Sep.04.16:
- * - Issue #900/904 Hardening: Populated isSamsungDevice flag and verified 
- *   isFineLocationGranted logic to ensure Precise Location detection on 
- *   budget hardware (A15).
+ * Sep.11.42:
+ * - Issue #915 Hardening: Added periodic polling (60s) to observeInternetStatus 
+ *   and observeBatteryStatus to ensure "vitality pulses" are emitted even during 
+ *   stable hardware states.
+ * - Removed .distinctUntilChanged() from all shared flows to support heartbeat 
+ *   monitoring in IntegrityMonitor.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -135,6 +135,7 @@ class SystemStatusProviderImpl @Inject constructor(
     private val FORCED_REFRESH_COOLDOWN_MS = 1000L 
     private val STORAGE_POLL_INTERVAL_MS = 60_000L
     private val POWER_POLL_INTERVAL_MS = 60_000L
+    private val VITALITY_POLL_INTERVAL_MS = 60_000L
     
     private var lastInternetCheckRt = 0L
     private var cachedInternetStatus = false
@@ -143,7 +144,6 @@ class SystemStatusProviderImpl @Inject constructor(
 
     private var lastHardwareCheckRt = 0L
     
-    // R759: Centralized package name via shadow-cache
     private val cachedPkgName: String get() = GpsApplication.PACKAGE_NAME
 
     override suspend fun isBatteryWhitelisted(): Boolean = getPermissionState().isBatteryWhitelisted
@@ -282,7 +282,13 @@ class SystemStatusProviderImpl @Inject constructor(
             } else {
                 connectivityManager.registerNetworkCallback(request, callback)
             }
-            launch { trySend(isLocalOnline()) }
+            
+            launch { 
+                while (isActive) {
+                    trySend(isLocalOnline())
+                    delay(VITALITY_POLL_INTERVAL_MS)
+                }
+            }
         } catch (e: Exception) {
             Timber.e(e, "Connectivity callback registration failed")
             trySend(false)
@@ -290,8 +296,7 @@ class SystemStatusProviderImpl @Inject constructor(
         awaitClose { 
             callback.unregister(connectivityManager, Handler(Looper.getMainLooper()))
         }
-    }.distinctUntilChanged()
-     .conflate()
+    }.conflate()
      .shareIn(
         scope = externalScope,
         started = SharingStarted.Eagerly,
@@ -308,14 +313,20 @@ class SystemStatusProviderImpl @Inject constructor(
         }
         try {
             shadowContext.registerReceiver(receiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+            
+            launch {
+                while (isActive) {
+                    trySend(getBatteryStatus())
+                    delay(VITALITY_POLL_INTERVAL_MS)
+                }
+            }
         } catch (e: Exception) {
             Timber.e(e, "Battery receiver registration failed")
         }
         awaitClose { 
             receiver.unregister(shadowContext)
         }
-    }.distinctUntilChanged()
-     .conflate()
+    }.conflate()
      .shareIn(
         scope = externalScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -353,8 +364,7 @@ class SystemStatusProviderImpl @Inject constructor(
             emit(getStorageStatus())
             delay(STORAGE_POLL_INTERVAL_MS)
         }
-    }.distinctUntilChanged()
-     .shareIn(
+    }.shareIn(
          scope = externalScope,
          started = SharingStarted.WhileSubscribed(5000),
          replay = 1
@@ -425,8 +435,7 @@ class SystemStatusProviderImpl @Inject constructor(
             receiver.unregister(shadowContext)
             pollJob.cancel()
         }
-    }.distinctUntilChanged()
-     .conflate()
+    }.conflate()
      .shareIn(
         scope = externalScope,
         started = SharingStarted.WhileSubscribed(5000),

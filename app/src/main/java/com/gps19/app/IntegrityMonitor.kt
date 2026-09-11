@@ -26,10 +26,12 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * Sep.08.12:
- * - R-ID 259: Integrated structured Energy Footprint fields into health updates.
- * - Issue #924 Visibility: Propagating isGnssThrottled (A15 Hysteresis) to health state.
- * - Fix: Corrected constant name to BATTERY_STEEP_DISCHARGE_WINDOW_MS.
+ * Sep.11.41:
+ * - Issue #915 Root-Cause Fix: Decoupled flow vitality from state changes. 
+ *   Vitality timestamps (lastUpdateRt) are updated on every emission, while 
+ *   state logic now uses .distinctUntilChanged() locally to prevent redundant 
+ *   processing of stable hardware states.
+ * - Reduced stall detection false-positives on budget hardware (A15).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -76,8 +78,9 @@ class IntegrityMonitor @Inject constructor(
     init {
         scope.launch {
             systemStatusProvider.observeInternetStatus()
+                .onEach { lastInternetUpdateRt = timeProvider.elapsedRealtime() }
+                .distinctUntilChanged()
                 .onEach { online -> 
-                    lastInternetUpdateRt = timeProvider.elapsedRealtime()
                     updateHealth { it.isHardwareOnline = online } 
                 }
                 .collect()
@@ -85,8 +88,9 @@ class IntegrityMonitor @Inject constructor(
 
         scope.launch {
             systemStatusProvider.observeBatteryStatus()
+                .onEach { lastBatteryUpdateRt = timeProvider.elapsedRealtime() }
+                .distinctUntilChanged()
                 .onEach { status -> 
-                    lastBatteryUpdateRt = timeProvider.elapsedRealtime()
                     handleBatteryUpdate(status) 
                 }
                 .collect()
@@ -94,8 +98,9 @@ class IntegrityMonitor @Inject constructor(
 
         scope.launch {
             systemStatusProvider.observeStorageStatus()
+                .onEach { lastStorageUpdateRt = timeProvider.elapsedRealtime() }
+                .distinctUntilChanged()
                 .onEach { status -> 
-                    lastStorageUpdateRt = timeProvider.elapsedRealtime()
                     if (!isStorageSimulated.get()) {
                         handleStorageUpdate(status)
                     }
@@ -105,8 +110,9 @@ class IntegrityMonitor @Inject constructor(
 
         scope.launch {
             systemStatusProvider.observePowerStatus()
+                .onEach { lastPowerUpdateRt = timeProvider.elapsedRealtime() }
+                .distinctUntilChanged()
                 .onEach { status -> 
-                    lastPowerUpdateRt = timeProvider.elapsedRealtime()
                     handlePowerUpdate(status) 
                 }
                 .collect()
@@ -114,8 +120,9 @@ class IntegrityMonitor @Inject constructor(
 
         scope.launch {
             hardwareProvider.locationStatusFlow
+                .onEach { lastLocationStatusUpdateRt = timeProvider.elapsedRealtime() }
+                .distinctUntilChanged()
                 .onEach { status -> 
-                    lastLocationStatusUpdateRt = timeProvider.elapsedRealtime()
                     handleLocationStatusUpdate(status) 
                 }
                 .collect()
@@ -130,6 +137,7 @@ class IntegrityMonitor @Inject constructor(
         // Issue #762: Local transparency for [ULTRA] relaxation state
         scope.launch {
             hardwareProvider.isUltraLongStationaryFlow
+                .distinctUntilChanged()
                 .onEach { isUltra -> updateHealth { it.isUltraLongStationary = isUltra } }
                 .collect()
         }
@@ -137,6 +145,7 @@ class IntegrityMonitor @Inject constructor(
         // Issue #924: Local transparency for GNSS Throttling (A15 Hysteresis)
         scope.launch {
             hardwareProvider.isGnssThrottledFlow
+                .distinctUntilChanged()
                 .onEach { throttled -> updateHealth { it.isGnssThrottled = throttled } }
                 .collect()
         }

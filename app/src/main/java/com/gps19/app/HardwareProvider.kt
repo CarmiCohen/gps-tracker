@@ -34,16 +34,10 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
- * Sep.08.12:
- * - Issue #924 Visibility: Added isGnssThrottledFlow to expose A15 Hysteresis state.
- * Sep.08.00:
- * - Issue #975 RESOLVED: Reference-Counted Lifecycle. Implemented activeUsers 
- *   counter to prevent premature teardown during rapid Tracker/Viewer mode 
- *   switching in MainActivity (R-ID 975).
- * Sep.06.33:
- * - Issue #929 RESOLVED: Mali Anomaly Exit Hysteresis. Implemented 10s cooldown 
- *   period before returning to standard sampling rates after an anomaly clears 
- *   to prevent jitter (R-ID 274).
+ * Sep.11.42:
+ * - Issue #915 Hardening: Converted status flows (locationStatusFlow, isUltraLongStationaryFlow, 
+ *   isGnssThrottledFlow) to SharedFlows to emit periodic "vitality pulses" even when values are stable.
+ * - This prevents false-positive Reactive Flow Stalls in IntegrityMonitor on A15 hardware.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -82,9 +76,9 @@ class HardwareProvider @Inject constructor(
     private var revivalAttemptCount = 0
     private var isHardwareLocked = false
 
-    private val _isGnssThrottled = MutableStateFlow(false)
-    val isGnssThrottledFlow: StateFlow<Boolean> = _isGnssThrottled.asStateFlow()
-    val isGnssThrottled get() = _isGnssThrottled.value
+    private val _isGnssThrottled = MutableSharedFlow<Boolean>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    val isGnssThrottledFlow: SharedFlow<Boolean> = _isGnssThrottled.asSharedFlow()
+    var isGnssThrottled = false; private set
 
     val maxGnssJitterMs get() = forensicAuditor.maxGnssJitterMs
 
@@ -108,8 +102,9 @@ class HardwareProvider @Inject constructor(
         val recoveryConfirmed: Boolean = false
     )
 
-    private val _locationStatus = MutableStateFlow(LocationStatus())
-    val locationStatusFlow: StateFlow<LocationStatus> = _locationStatus.asStateFlow()
+    private val _locationStatus = MutableSharedFlow<LocationStatus>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    val locationStatusFlow: SharedFlow<LocationStatus> = _locationStatus.asSharedFlow()
+    private var currentLocationStatus = LocationStatus()
 
     private val snrBuffer = CircularStateBuffer(512, { EngineSnrSample() }, { it.ts = 0L; it.rt = 0L; it.snr = 0.0 })
 
@@ -218,8 +213,9 @@ class HardwareProvider @Inject constructor(
     private var initialRotationMatrix = FloatArray(9); private var hasInitialRotation = false
     private var plungePhase = 0; private var plungeMatched = false; private var lastPlungePhaseRt = 0L
 
-    private val _isUltraLongStationary = MutableStateFlow(false)
-    val isUltraLongStationaryFlow: StateFlow<Boolean> = _isUltraLongStationary.asStateFlow()
+    private val _isUltraLongStationary = MutableSharedFlow<Boolean>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    val isUltraLongStationaryFlow: SharedFlow<Boolean> = _isUltraLongStationary.asSharedFlow()
+    private var isUltraLongStationary = false
 
     class ForensicSnapshot {
         var vibration = 0.0; var heading = 0.0; var baroAlt = 0.0; var lux = 0.0
@@ -268,9 +264,8 @@ class HardwareProvider @Inject constructor(
             val shouldThrottle = systemStatusProvider.isA15Hardware() && 
                     (isHighLoad || maliAnomaly || (nowRt - lastAnomalyActiveRt < GNSS_THROTTLING_HYSTERESIS_MS))
             
-            if (_isGnssThrottled.value != shouldThrottle) {
-                _isGnssThrottled.value = shouldThrottle
-            }
+            isGnssThrottled = shouldThrottle
+            _isGnssThrottled.tryEmit(shouldThrottle)
 
             val currentInterval = if (shouldThrottle) {
                 GNSS_SAMPLING_INTERVAL_THROTTLED_MS
@@ -307,6 +302,10 @@ class HardwareProvider @Inject constructor(
 
     init {
         scope.launch {
+            _locationStatus.tryEmit(currentLocationStatus)
+            _isUltraLongStationary.tryEmit(isUltraLongStationary)
+            _isGnssThrottled.tryEmit(isGnssThrottled)
+            
             while (isActive) {
                 updateLocationStatus()
                 checkRevivalLifecycle()
@@ -502,25 +501,26 @@ class HardwareProvider @Inject constructor(
         val deltaSinceFix = if (lastFixRt > 0) nowRt - lastFixRt else nowRt
         var shouldEmitSuccess = false
         
-        _locationStatus.update { current ->
-            var nextPending = current.isPending; var nextReason = current.reason
-            var recoveryConfirmed = current.recoveryConfirmed; var lastPendingDuration = current.lastPendingDurationMs
-            if (deltaSinceFix > GPS_GAP_THRESHOLD_MS) {
-                if (!nextPending) { pendingEnterRt = nowRt; nextPending = true; recoveryConfirmed = false }
-                nextReason = when { satellitesInView == 0 -> LocationPendingReason.SIGNAL_LOSS; satellitesInView >= 4 && satellitesUsed < 4 -> LocationPendingReason.GPS_STALL; else -> LocationPendingReason.GPS_GAP }
-                recoveryStartRt = 0L 
-            } else if (nextPending) {
-                if (recoveryStartRt == 0L) recoveryStartRt = nowRt
-                val recoveryDuration = nowRt - recoveryStartRt
-                if (recoveryDuration < LOCATION_RECOVERY_DEBOUNCE_MS) { if (nowRt - pendingEnterRt > 0) lastPendingDuration = nowRt - pendingEnterRt; nextReason = LocationPendingReason.NONE } 
-                else { 
-                    nextPending = false; nextReason = LocationPendingReason.NONE; recoveryConfirmed = true; recoveryStartRt = 0L 
-                    shouldEmitSuccess = true
-                    isHardwareLocked = false
-                }
-            } else { recoveryConfirmed = false; recoveryStartRt = 0L }
-            current.copy(isPending = nextPending, reason = nextReason, lastFixRt = lastFixRt, lastPendingDurationMs = lastPendingDuration, recoveryConfirmed = recoveryConfirmed)
-        }
+        val current = currentLocationStatus
+        var nextPending = current.isPending; var nextReason = current.reason
+        var recoveryConfirmed = current.recoveryConfirmed; var lastPendingDuration = current.lastPendingDurationMs
+        if (deltaSinceFix > GPS_GAP_THRESHOLD_MS) {
+            if (!nextPending) { pendingEnterRt = nowRt; nextPending = true; recoveryConfirmed = false }
+            nextReason = when { satellitesInView == 0 -> LocationPendingReason.SIGNAL_LOSS; satellitesInView >= 4 && satellitesUsed < 4 -> LocationPendingReason.GPS_STALL; else -> LocationPendingReason.GPS_GAP }
+            recoveryStartRt = 0L 
+        } else if (nextPending) {
+            if (recoveryStartRt == 0L) recoveryStartRt = nowRt
+            val recoveryDuration = nowRt - recoveryStartRt
+            if (recoveryDuration < LOCATION_RECOVERY_DEBOUNCE_MS) { if (nowRt - pendingEnterRt > 0) lastPendingDuration = nowRt - pendingEnterRt; nextReason = LocationPendingReason.NONE } 
+            else { 
+                nextPending = false; nextReason = LocationPendingReason.NONE; recoveryConfirmed = true; recoveryStartRt = 0L 
+                shouldEmitSuccess = true
+                isHardwareLocked = false
+            }
+        } else { recoveryConfirmed = false; recoveryStartRt = 0L }
+        
+        currentLocationStatus = current.copy(isPending = nextPending, reason = nextReason, lastFixRt = lastFixRt, lastPendingDurationMs = lastPendingDuration, recoveryConfirmed = recoveryConfirmed)
+        _locationStatus.tryEmit(currentLocationStatus)
         
         if (shouldEmitSuccess) {
             _revivalEvents.tryEmit(RevivalEvent.Success)
@@ -532,9 +532,12 @@ class HardwareProvider @Inject constructor(
         val nowRt = timeProvider.elapsedRealtime()
         val duration = if (stationaryStartRt > 0L) nowRt - stationaryStartRt else 0L
         val isUltra = isStationary() && duration > ULTRA_LONG_STATIONARY_DURATION_MS
-        if (_isUltraLongStationary.value != isUltra) {
-            _isUltraLongStationary.value = isUltra
-            Timber.i("HardwareProvider: Ultra-Long Stationary State changed to $isUltra")
+        
+        isUltraLongStationary = isUltra
+        _isUltraLongStationary.tryEmit(isUltra)
+        
+        if (duration > 0 && duration % 60000 < 2000) {
+             Timber.d("HardwareProvider: Stationary Exposure: ${duration/1000}s (Ultra: $isUltra)")
         }
     }
 
@@ -868,7 +871,7 @@ class HardwareProvider @Inject constructor(
 
     private fun checkRevivalLifecycle() {
         if (!isStarted.get() || isSafeMode) return
-        val nowRt = timeProvider.elapsedRealtime(); val currentStatus = _locationStatus.value
+        val nowRt = timeProvider.elapsedRealtime(); val currentStatus = currentLocationStatus
         if (currentStatus.isPending) {
             val stallDuration = nowRt - pendingEnterRt
             val retryThreshold = (revivalAttemptCount + 1) * GPS_REVIVAL_RETRY_INTERVAL_MS

@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.11.35)
+# SOT Master Requirements & Hardening Status (Sep.11.41)
 
 ## 🛡️ Core Hardening Baseline
 *   **SOT ID 314**: Signaling Session Integrity - Isolates socket callbacks via session-ID to prevent race conditions during role transitions. (Resolved Sep.11.23)
@@ -8,8 +8,8 @@
 ## 📈 Metric Summary
 - **Rules Verified**: 58
 - **Total SOT IDs**: 256
-- **Resolved Issues**: 994
-- **Open Issues**: 0
+- **Resolved Issues**: 995
+- **Open Issues**: 1
 - **Testing Coverage**: 100% (51 sub-items)
 - **Simplification Ideas**: 8
 - **QA Validation Tasks**: 270
@@ -20,4 +20,4 @@
 *   **Chapter 22.1 (Telemetry Convergence)**: IN PROGRESS - Monitoring backfill during sustained offline periods.
 
 ---
-*Next Audit: Sep.12.08. (vSep.11.35)*
+*Next Audit: Sep.12.08. (vSep.11.41)*
