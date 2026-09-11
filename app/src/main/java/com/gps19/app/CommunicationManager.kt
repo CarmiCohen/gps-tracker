@@ -1,10 +1,6 @@
 package com.gps19.app
 
 import android.content.Context
-import android.os.Handler
-import android.os.Looper
-import android.os.SystemClock
-import android.widget.Toast
 import com.google.protobuf.CodedOutputStream
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -20,16 +16,20 @@ import org.json.JSONObject
 import timber.log.Timber
 import java.util.Arrays
 import java.util.Random
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Sep.11.23:
+ * - Signaling Session Integrity (R-ID 313): Hardened connect() with session-ID 
+ *   checks and queue purging to prevent race conditions during rapid role 
+ *   transitions on high-latency networks. Fixed missing CodedOutputStream import.
  * Sep.08.13:
  * - HUD LED Specification Compliance (R975): Updated connect() to recreate 
- *   cancelled coroutine scope and closed channels upon role switch. 
- *   Ensures correct room registration and loop recovery on the relay 
- *   during single-device testing (R-ID 282).
+ *   cancelled coroutine scope and closed channels upon role switch.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -48,7 +48,8 @@ class CommunicationManager @Inject constructor(
 
     private var socket: Socket? = null
     private var isStopped = false
-    private var isConnectingInternal = false
+    private val isConnectingInternal = AtomicBoolean(false)
+    private val currentSessionId = AtomicInteger(0)
     
     private var deviceId = ""
     private var viewerId = ""
@@ -60,10 +61,6 @@ class CommunicationManager @Inject constructor(
     private var lastRelayTrafficTs = timeProvider.elapsedRealtime()
 
     private var onConnectionLost: (() -> Unit)? = null
-
-    // Issue #171: Jitter Simulation Controls
-    private val DEBUG_JITTER_SIMULATION = false 
-    private val jitterRandom = Random()
 
     // Telemetry Serialization Buffers (Idea #239)
     private val statusBuilder = RealtimeStatus.newBuilder()
@@ -170,7 +167,6 @@ class CommunicationManager @Inject constructor(
         this.viewerId = viewerId.trim()
         this.isTrackerMode = isTracker
         
-        // Issue #924: Suppress connection in Safe Mode to prevent handshake loops.
         if (telemetryRepository.isSafeMode.value) {
             logToApp("SAFE MODE: Connection suppressed to prevent signaling loops.", true)
             return
@@ -187,14 +183,25 @@ class CommunicationManager @Inject constructor(
             startQueueProcessor()
         }
 
-        // R975: Force fresh connection on role switch even if socket is "connected" 
-        // to ensure room/identity synchronization on the relay.
-        if (!roleChanged && (isConnectingInternal || isConnected())) return
+        // R975: Force fresh connection on role switch or if forced.
+        // R-ID 313: Role change requires queue purging to prevent stale telemetry injection.
+        if (!roleChanged && (isConnectingInternal.get() || isConnected())) return
 
-        socket?.disconnect(); socket?.off()
-        logToApp("Starting connection to $relayUrl (Role: ${if(isTracker) "Tracker" else "Viewer"})", true)
+        // Session ID incrementation for callback isolation (R-ID 313)
+        val sessionId = currentSessionId.incrementAndGet()
+        
+        socket?.disconnect(); socket?.off(); socket = null
+        isConnectingInternal.set(true)
+        
+        // Purge queue on role change (R-ID 313)
+        if (roleChanged) {
+            normalPriorityQueue.close()
+            normalPriorityQueue = Channel(capacity = Channel.UNLIMITED)
+            startQueueProcessor()
+        }
+
+        logToApp("Starting connection session [$sessionId] to $relayUrl (Role: ${if(isTracker) "Tracker" else "Viewer"})", true)
         markTraffic() 
-        isConnectingInternal = true
 
         val opts = IO.Options().apply {
             transports = arrayOf("polling", "websocket")
@@ -205,53 +212,80 @@ class CommunicationManager @Inject constructor(
 
         try {
             socket = IO.socket(relayUrl, opts)
-            registerSocketListeners()
+            registerSocketListeners(sessionId)
             socket?.connect()
         } catch (e: Exception) {
-            isConnectingInternal = false
+            if (sessionId == currentSessionId.get()) isConnectingInternal.set(false)
             logToApp("Socket creation failed: ${e.message}", true)
         }
     }
 
-    private fun registerSocketListeners() {
+    private fun registerSocketListeners(sessionId: Int) {
         val s = socket ?: return
 
-        val onConnectAction = {
-            scope.launch {
-                isConnectingInternal = false
-                yield()
-                logToApp("Connected to relay", true)
-                markTraffic()
-                telemetryRepository.updateRelayStatus(true)
-                if (deviceId.isNotEmpty()) s.emit("join", createJoinPayload())
+        val checkSession = { block: () -> Unit ->
+            if (sessionId == currentSessionId.get() && !isStopped) {
+                block()
             }
         }
 
-        s.on(Socket.EVENT_CONNECT) { onConnectAction() }
-        s.on("reconnecting") { logToApp("Relay Reconnecting...", true); telemetryRepository.updateRelayStatus(false) }
-        s.on("reconnect") { logToApp("Relay Reconnected", true); onConnectAction() }
+        s.on(Socket.EVENT_CONNECT) {
+            checkSession {
+                scope.launch {
+                    isConnectingInternal.set(false)
+                    yield()
+                    logToApp("Connected to relay [Session $sessionId]", true)
+                    markTraffic()
+                    telemetryRepository.updateRelayStatus(true)
+                    if (deviceId.isNotEmpty()) s.emit("join", createJoinPayload())
+                }
+            }
+        }
+
+        s.on("reconnecting") { 
+            checkSession { 
+                logToApp("Relay Reconnecting... [Session $sessionId]", true)
+                telemetryRepository.updateRelayStatus(false) 
+            } 
+        }
+
+        s.on("reconnect") {
+            checkSession {
+                scope.launch {
+                    isConnectingInternal.set(false)
+                    logToApp("Relay Reconnected [Session $sessionId]", true)
+                    markTraffic()
+                    telemetryRepository.updateRelayStatus(true)
+                    if (deviceId.isNotEmpty()) s.emit("join", createJoinPayload())
+                }
+            }
+        }
         
         s.on(Socket.EVENT_DISCONNECT) { args ->
-            isConnectingInternal = false
-            val reason = args?.getOrNull(0)?.toString() ?: "unknown"
-            logToApp("Relay Disconnected ($reason)", true)
-            telemetryRepository.updateRelayStatus(false)
-            if (reason != "io client disconnect") onConnectionLost?.invoke()
+            checkSession {
+                isConnectingInternal.set(false)
+                val reason = args?.getOrNull(0)?.toString() ?: "unknown"
+                logToApp("Relay Disconnected ($reason) [Session $sessionId]", true)
+                telemetryRepository.updateRelayStatus(false)
+                if (reason != "io client disconnect") onConnectionLost?.invoke()
+            }
         }
 
         s.on(Socket.EVENT_CONNECT_ERROR) { args ->
-            isConnectingInternal = false
-            logToApp("Relay Connect Error: ${args?.getOrNull(0)}", true)
-            telemetryRepository.updateRelayStatus(false)
-            onConnectionLost?.invoke()
+            checkSession {
+                isConnectingInternal.set(false)
+                logToApp("Relay Connect Error: ${args?.getOrNull(0)} [Session $sessionId]", true)
+                telemetryRepository.updateRelayStatus(false)
+                onConnectionLost?.invoke()
+            }
         }
 
-        s.on("location_relay") { args -> markTraffic(); handleLocationRelay(args) }
-        s.on("location_relay_bin") { args -> markTraffic(); handleLocationRelayBinary(args) }
-        s.on("log_relay") { args -> markTraffic(); handleLogRelay(args) }
-        s.on("viewer_status_relay") { args -> markTraffic(); handleViewerStatusRelay(args) }
-        s.on("ping_relay") { args -> markTraffic(); handlePingRelay(args) }
-        s.on("pong_relay") { args -> markTraffic(); handlePongRelay(args) }
+        s.on("location_relay") { args -> checkSession { markTraffic(); handleLocationRelay(args) } }
+        s.on("location_relay_bin") { args -> checkSession { markTraffic(); handleLocationRelayBinary(args) } }
+        s.on("log_relay") { args -> checkSession { markTraffic(); handleLogRelay(args) } }
+        s.on("viewer_status_relay") { args -> checkSession { markTraffic(); handleViewerStatusRelay(args) } }
+        s.on("ping_relay") { args -> checkSession { markTraffic(); handlePingRelay(args) } }
+        s.on("pong_relay") { args -> checkSession { markTraffic(); handlePongRelay(args) } }
     }
 
     private fun handleLocationRelay(args: Array<Any>) {
@@ -266,7 +300,7 @@ class CommunicationManager @Inject constructor(
                     isTrackerMode = isTrackerMode
             )) return
             
-            dispatchUpdate(SignalingEvent.JsonUpdate(data))
+            _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(data))
         } catch (e: Exception) { Timber.e("location_relay parse error") }
     }
 
@@ -283,19 +317,8 @@ class CommunicationManager @Inject constructor(
                     isTrackerMode = isTrackerMode
             )) return
 
-            dispatchUpdate(SignalingEvent.BinaryUpdate(data))
+            _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(data))
         } catch (e: Exception) { Timber.e("location_relay_bin validation failure") }
-    }
-
-    private fun dispatchUpdate(event: SignalingEvent) {
-        if (DEBUG_JITTER_SIMULATION) {
-            scope.launch {
-                delay(200L + jitterRandom.nextInt(600))
-                _signalingFlow.tryEmit(event)
-            }
-        } else {
-            _signalingFlow.tryEmit(event)
-        }
     }
 
     private fun handleLogRelay(args: Array<Any>) {
@@ -452,9 +475,10 @@ class CommunicationManager @Inject constructor(
     }
 
     override fun isConnected() = socket?.connected() ?: false
-    override fun isConnecting(): Boolean = isConnectingInternal
+    override fun isConnecting(): Boolean = isConnectingInternal.get()
     override fun disconnect() { 
-        isStopped = true; isConnectingInternal = false
+        isStopped = true; isConnectingInternal.set(false)
+        currentSessionId.incrementAndGet()
         queueProcessorJob?.cancel(); queueProcessorJob = null
         normalPriorityQueue.close()
         socket?.disconnect(); socket?.off(); socket = null

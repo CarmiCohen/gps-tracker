@@ -1,4 +1,4 @@
-# SOT Master Requirements (Sep.11.20)
+# SOT Master Requirements (Sep.11.23)
 
 This document defines the Source of Truth (SOT) for all high-assurance logic, architectural standards, and forensic requirements.
 
@@ -66,7 +66,7 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **1.57 Binary Trace Delta-Encoding Authority (R706)**: Forensic traces MUST utilize header-based delta encoding for high-fidelity fields.
 *   **1.58 Transactional Forensic Backfill Authority (R704)**: Forensic traces MUST be drained from the spill-buffer using a transactional peek/commit pattern.
 
-## 🧩 Functional Requirements (254 IDs)
+## 🧩 Functional Requirements (256 IDs)
 *   **R-ID 259 (Energy Footprint Integration)**: Forensic energy footprints (Delta mA, Temp Rise, Duration) MUST be structured and propagated from `ForensicAuditor` through the tracking engine to provide a persistent "Last Revival Impact" metric in the HUD and logs (Sep.08.13).
 *   **R-ID 267 (A15 Hysteresis Visibility)**: The UI MUST display a "THR" (Throttled) badge when GNSS sampling rates are reduced due to A15 resource load or MaliAnomaly hysteresis to explain telemetry latency to the user (Sep.08.13).
 *   **R-ID 274 (GNSS Hysteresis Suppression)**: The system MUST utilize a 10s cooldown window (GNSS_THROTTLING_HYSTERESIS_MS) after a thermal or load-based anomaly clears on Samsung A15 hardware to prevent HUD speed jitter and UI status flickering (Sep.09.15).
@@ -79,10 +79,10 @@ This document defines the Source of Truth (SOT) for all high-assurance logic, ar
 *   **R-ID 285 (Session Termination Unification)**: The session termination flow MUST be visually and functionally identical in both Tracker and Viewer modes, utilizing the `SessionTerminationButton` to prevent user confusion and reduce maintenance overhead (Sep.10.06).
 *   **R-ID 286 (Segmented HUD Emissions)**: The HUD state aggregation logic MUST emit segmented flows for Connectivity, Telemetry, and Health to distribute JIT load and minimize the impact of high-frequency telemetry updates on UI responsiveness (Sep.10.08).
 *   **R-ID 287 (Map View State Consolidation)**: The map UI must consume a single `MapViewState` object to aggregate configuration and telemetry, reducing the parameter surface area of `AppMapContainer` from ~40 to 1. Rigorous Audit (Sep.10.20) eliminated all UI-side derived flags (Freshness/Validity) in favor of ViewModel-driven state (Sep.10.20).
-*   **R-ID 288 (Forensic Tamper Visibility)**: The UI MUST display the specific forensic cause (e.g., Tilt, Shock) beside the `[TAMPER]` badge. This reason MUST be propagated from the tracking engine through signaling and persistence to ensure transparency across roles (Sep.10.40).
+*   **R-ID 288 (Forensic Tamper Visibility)**: The UI MUST display the specific forensic cause (e.g., Tilt, Shock) beside the `[TAMPER]` badge. This reason MUST be propagated from the tracking engine through signaling and persistence to ensure transparency across roles (Sep.11.21).
 *   **R-ID 301 (Alarm Logic Partitioning)**: The alarm evaluation pipeline MUST be partitioned into specialized evaluators (Connectivity, Physical, Geofence, System) to reduce cyclomatic complexity and enable granular forensic auditing of subsystem violations (Sep.09.00).
-*   **R-ID 302 (Fixed Grid Watchdog Hardening)**: The system MUST utilize Fixed Grid Scheduling for all watchdog pulses, anchored to the service start monotonic time (`elapsedRealtime`). Each subsequent pulse MUST align to a strict 90s grid. 
-    *   **Hardening (Sep.10.30)**: Alarms MUST NOT be scheduled within the 20s danger window; if a grid point falls within this window, the schedule MUST push to the next grid interval to prevent recovery loops on Samsung S21 FE hardware.
-    *   **Hardening (Sep.10.39)**: The scheduling calculation MUST be implemented as a deterministic pure function (Companion Object) to ensure full unit test coverage of the danger window logic (Issue #945).
+*   **R-ID 302 (Fixed Grid Watchdog Hardening)**: The system MUST utilize Fixed Grid Scheduling for all watchdog pulses, anchored to the service start monotonic time (`elapsedRealtime`). Each subsequent pulse MUST align to a strict 90s grid (Sep.10.39).
+*   **R-ID 312 (Silent Failure Correlation Hardening)**: The system MUST correctly suppress "Silent Failure" alerts when physical tampering is detected. This requires strict synchronization of the `isTamperDetected` flag from the physical evaluator to the system evaluator within the alarm logic pipeline (Sep.11.22).
+*   **R-ID 313 (Signaling Session Integrity)**: All signaling providers MUST implement session-ID isolation for asynchronous callbacks. Events from stale connections MUST be ignored if they do not match the `currentSessionId` to prevent race conditions during rapid role transitions on high-latency networks (Sep.11.23).
 
-*(Total: 58 Architectural Rules + 254 Functional R-IDs = 312 Items)*
+*(Total: 58 Architectural Rules + 256 Functional R-IDs = 314 Items)*

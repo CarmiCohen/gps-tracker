@@ -30,6 +30,12 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.11.22:
+ * - Issue #133 Audit: Fixed plumbing gap for isTamperDetected to ensure 
+ *   proper Silent Failure suppression (R-ID 312).
+ * Sep.11.21:
+ * - Issue #946 Visibility: Integrated tamperNote propagation in evaluateAlarms 
+ *   for role-agnostic forensic transparency (R-ID 288).
  * Sep.09.11:
  * - Siren Hardening: Refactored resetEvaluation to preserve lastSirenStopTs 
  *   during role transitions, preventing cooldown bypass (R-ID 301).
@@ -37,9 +43,6 @@ sealed class AlarmEvent {
  * - Idea #3 RESOLVED: AppAlarmManager Cleanup (Part B). Refactored evaluateAlarms 
  *   to utilize specialized state-mapping and report-processing functions, 
  *   reducing monolithic complexity (R-ID 301).
- * Sep.06.31:
- * - Issue #928 RESOLVED: Performance Alarm Mapping. Expanded evaluateAlarms 
- *   signature to ingest all critical integrity signals.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -168,7 +171,8 @@ class AppAlarmManager @Inject constructor(
         cpuLoad: Double = 0.0, ioWait: Double = 0.0, maxIoLatency: Long = 0L, 
         isSilentFailure: Boolean = false, isMaliAnomaly: Boolean = false, 
         isUltraLongStationary: Boolean = false,
-        isBatteryLow: Boolean = false, isBatteryCritical: Boolean = false
+        isBatteryLow: Boolean = false, isBatteryCritical: Boolean = false,
+        tamperNote: String? = null
     ) {
         this.isTrackerMode = isTrackerMode
         val versionTag = "[${BuildConfig.VERSION_NAME}]"
@@ -179,14 +183,15 @@ class AppAlarmManager @Inject constructor(
             trackerLng, trackerAccuracy, maxTrackerAccuracy, trackerLastGpsTs, 
             trackerLastGpsRt, trackerLastValidFixTs, trackerLastValidFixRt, trackerSpeed, 
             trackerBattery, trackerTemp, isHardwareOnline, isLocalInternetLoss, 
-            isSignalLoss, isGpsStalling, isPowerTamper, trackerTiltDegrees, 
+            isSignalLoss, isGpsStalling, isTamperDetected, isPowerTamper, trackerTiltDegrees, 
             trackerAcousticDb, trackerBaroAlt, trackerBaroAltEma, trackerLux, isNear, 
             luxBaseline, acousticFloorDb, adaptiveVibrationFloor, peakVibrationShock, 
             trackerCurrentMa, isPowerSaveMode, standbyBucket, netInterface, isStorageLow, 
             isStorageCritical, isBatterySteepDischarge, isCoolingModeActive, discoveryPhase, 
             capabilities, isLocationPending, locationPendingReason, vibeSnapshot, 
             isGpsHardwareLock, cpuLoad, ioWait, maxIoLatency, isSilentFailure, 
-            isMaliAnomaly, isUltraLongStationary, isBatteryLow, isBatteryCritical
+            isMaliAnomaly, isUltraLongStationary, isBatteryLow, isBatteryCritical,
+            tamperNote
         )
 
         val report = MainAlarmLogic.detectViolations(
@@ -220,7 +225,7 @@ class AppAlarmManager @Inject constructor(
         trackerLastGpsTs: Long, trackerLastGpsRt: Long, trackerLastValidFixTs: Long, 
         trackerLastValidFixRt: Long, trackerSpeed: Double, trackerBattery: Int, 
         trackerTemp: Double, isHardwareOnline: Boolean, isLocalInternetLoss: Boolean, 
-        isSignalLoss: Boolean, isGpsStalling: Boolean, isPowerTamper: Boolean, 
+        isSignalLoss: Boolean, isGpsStalling: Boolean, isTamperDetected: Boolean, isPowerTamper: Boolean, 
         trackerTiltDegrees: Double, trackerAcousticDb: Double, trackerBaroAlt: Double, 
         trackerBaroAltEma: Double, trackerLux: Double, isNear: Boolean, luxBaseline: Double, 
         acousticFloorDb: Double, adaptiveVibrationFloor: Double, peakVibrationShock: Double, 
@@ -231,14 +236,15 @@ class AppAlarmManager @Inject constructor(
         isLocationPending: Boolean, locationPendingReason: LocationPendingReason, 
         vibeSnapshot: Double?, isGpsHardwareLock: Boolean, cpuLoad: Double, ioWait: Double, 
         maxIoLatency: Long, isSilentFailure: Boolean, isMaliAnomaly: Boolean, 
-        isUltraLongStationary: Boolean, isBatteryLow: Boolean, isBatteryCritical: Boolean
+        isUltraLongStationary: Boolean, isBatteryLow: Boolean, isBatteryCritical: Boolean,
+        tamperNote: String?
     ) {
         evaluationState.health.update(
             signalLoss = isSignalLoss, gpsStalled = isGpsStalling, 
             gpsHardwareLock = isGpsHardwareLock, localInternetLoss = isLocalInternetLoss,
             isHardwareOnline = isHardwareOnline, batteryLevel = trackerBattery, batteryTemp = trackerTemp,
             isCharging = false, currentMa = trackerCurrentMa, status = status, isJammer = isJammer,
-            isTamperDetected = false, // Derived in logic
+            isTamperDetected = isTamperDetected,
             tiltDegrees = trackerTiltDegrees, acousticDb = trackerAcousticDb, baroAlt = trackerBaroAlt, 
             lux = trackerLux, isNear = isNear, luxBaseline = luxBaseline, acousticFloorDb = acousticFloorDb, 
             adaptiveVibrationFloor = adaptiveVibrationFloor, peakVibrationShock = peakVibrationShock,
@@ -250,7 +256,8 @@ class AppAlarmManager @Inject constructor(
             vibration = vibeSnapshot ?: 0.0, cpuLoad = cpuLoad, ioWait = ioWait, 
             maxIoLatency = maxIoLatency, isSilentFailure = isSilentFailure, 
             isMaliAnomaly = isMaliAnomaly, isUltraLongStationary = isUltraLongStationary,
-            isBatteryLow = isBatteryLow, isBatteryCritical = isBatteryCritical
+            isBatteryLow = isBatteryLow, isBatteryCritical = isBatteryCritical,
+            tamperNote = tamperNote
         )
 
         val cachedPoints = repository.getCachedHomePoints()

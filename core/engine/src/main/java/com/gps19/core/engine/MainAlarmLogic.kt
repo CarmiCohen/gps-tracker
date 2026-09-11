@@ -5,12 +5,16 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Sep.11.22:
+ * - Issue #133 Audit: Updated evaluatePhysical to sync isTamperDetected 
+ *   flag into health state for Silent Failure suppression (R-ID 312).
+ * Sep.11.21:
+ * - Issue #946 Visibility: Prioritized tamperNote in evaluatePhysical for 
+ *   role-agnostic forensic transparency (R-ID 288).
  * Sep.09.00:
  * - Idea #3 RESOLVED: Alarm Logic Partitioning. Refactored detectViolations 
  *   into specialized evaluators (Connectivity, Physical, Geofence, System) 
  *   to reduce cyclomatic complexity and improve forensic maintainability (R-ID 301).
- * Sep.02.72:
- * - Issue #247: Enhanced Signal Loss latching with grace periods.
  */
 object MainAlarmLogic {
 
@@ -181,8 +185,12 @@ object MainAlarmLogic {
         val isTamperCondition = health.status == SentinelStatus.TAMPER || health.isTamperDetected || (!health.isNear) || 
                                 isLightMet || isShock || isTilt || isAcousticMet || isLift || health.isPowerTamper
 
+        // R-ID 312: Sync calculated tamper status back to health state for downstream suppression (e.g., Silent Failure).
+        health.isTamperDetected = isTamperCondition
+
         val tamperSubtitle = if (isTamperCondition) {
-            when {
+            // R-ID 288: Prioritize specific note from sentinel/remote peer if available
+            health.tamperNote ?: when {
                 health.status == SentinelStatus.TAMPER -> "Hardware sentinel violation"
                 isShock -> "Shock: ${String.format(Locale.getDefault(), "%.1f", health.peakVibrationShock)}G"
                 isLightMet -> "Light: ${health.lux.roundToInt()} lux"
