@@ -25,6 +25,10 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Sep.11.46:
+ * - Issue #947 RESOLVED: Synchronized Dashboard time-base by passing 
+ *   systemPulseRt (monotonic) instead of wall-clock to ViewerDashboard, 
+ *   ensuring correct "Last Seen" delta calculation (R947).
  * Sep.11.12:
  * - Issue #946 Visibility RESOLVED: Added tamperReason to ViewerDashboard and
  *   TelemetryBox for header forensic transparency (R-ID 288).
@@ -35,13 +39,6 @@ import kotlinx.coroutines.flow.StateFlow
  * Sep.10.12:
  * - Idea #243: Map State Partitioning RESOLVED. Integrated mapViewState flow 
  *   to reduce parameter surface area in AppMapContainer (R-ID 287).
- * Sep.10.08:
- * - Idea #241: HudState Aggregator Refactoring. Transitioned to segmented HUD
- *   state flows (Connectivity, Telemetry, Health) to optimize recomposition
- *   scope (R-ID 286).
- * Sep.10.06:
- * - Idea #242: Unified Termination Logic. Integrated SessionTerminationButton 
- *   to ensure visual consistency across modes (R-ID 285).
  */
 
 @Composable
@@ -163,7 +160,7 @@ fun ViewerScreen(
                                     gpsIdx = gpsIndexData,
                                     rttValue = rtt,
                                     trackerCurrentMa = trackerCurrentMa,
-                                    systemPulse = mapViewState.systemPulse,
+                                    systemPulse = mapViewState.systemPulseRt,
                                     onEvent = { event -> viewModel.onEvent(event) }
                                 )
                             }
@@ -212,7 +209,7 @@ fun ViewerScreen(
                                 gpsIdx = gpsIndexData,
                                 rttValue = rtt,
                                 trackerCurrentMa = trackerCurrentMa,
-                                systemPulse = mapViewState.systemPulse,
+                                systemPulse = mapViewState.systemPulseRt,
                                 onEvent = { event -> viewModel.onEvent(event) }
                             )
                         }

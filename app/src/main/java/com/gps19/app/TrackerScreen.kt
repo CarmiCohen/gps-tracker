@@ -25,6 +25,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Sep.11.46:
+ * - Issue #947 RESOLVED: Synchronized Dashboard time-base by passing 
+ *   systemPulseRt (monotonic) instead of wall-clock to TrackerDashboard, 
+ *   ensuring correct "Last Seen" delta calculation (R947).
  * Sep.11.10:
  * - Fix: Corrected unresolved references in portrait layout (satsUsed/snr) by 
  *   using dashboardState.isSatsIndexWarning.
@@ -34,13 +38,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
  * Sep.10.12:
  * - Idea #243: Map State Partitioning RESOLVED. Integrated mapViewState flow 
  *   to reduce parameter surface area in AppMapContainer (R-ID 287).
- * Sep.10.08:
- * - Idea #241: HudState Aggregator Refactoring. Transitioned to segmented HUD 
- *   state flows (Connectivity, Telemetry, Health) to optimize recomposition 
- *   scope (R-ID 286).
- * Sep.10.06:
- * - Idea #242: Unified Termination Logic. Integrated SessionTerminationButton 
- *   to ensure visual consistency across modes (R-ID 285).
  */
 
 @Composable
@@ -220,7 +217,7 @@ fun TrackerScreen(
                                     gpsIdx = gpsIndexData,
                                     rttValue = rttValue,
                                     currentMaValue = currentMa,
-                                    systemPulse = mapViewState.systemPulse,
+                                    systemPulse = mapViewState.systemPulseRt,
                                     cpuLoad = dashboardState.cpuLoad,
                                     ioWait = dashboardState.ioWait,
                                     maxIoLatency = dashboardState.maxIoLatency,
@@ -327,7 +324,7 @@ fun TrackerScreen(
                                 gpsIdx = gpsIndexData,
                                 rttValue = rttValue,
                                 currentMaValue = currentMa,
-                                systemPulse = mapViewState.systemPulse,
+                                systemPulse = mapViewState.systemPulseRt,
                                 cpuLoad = dashboardState.cpuLoad,
                                 ioWait = dashboardState.ioWait,
                                 maxIoLatency = dashboardState.maxIoLatency,
