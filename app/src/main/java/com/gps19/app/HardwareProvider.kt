@@ -35,9 +35,9 @@ import kotlin.math.*
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
  * Sep.11.42:
- * - Issue #915 Hardening: Converted status flows (locationStatusFlow, isUltraLongStationaryFlow, 
- *   isGnssThrottledFlow) to SharedFlows to emit periodic "vitality pulses" even when values are stable.
- * - This prevents false-positive Reactive Flow Stalls in IntegrityMonitor on A15 hardware.
+ * - Issue #916 Hardening: Decoupled GNSS Status callbacks into a dedicated HandlerThread 
+ *   (GNSSThread) to eliminate 9000ms jitter caused by sensor processing contention on A15 hardware.
+ * - Issue #915 Hardening: Converted status flows to SharedFlows for vitality pulsing.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -56,6 +56,9 @@ class HardwareProvider @Inject constructor(
 
     private var hardwareThread: HandlerThread? = null
     private var hardwareHandler: Handler? = null
+    private var gnssThread: HandlerThread? = null
+    private var gnssHandler: Handler? = null
+
     private val lifecycleLock = Any()
     private val isStarted = AtomicBoolean(false)
     private val isTeardownActive = AtomicBoolean(false)
@@ -259,7 +262,6 @@ class HardwareProvider @Inject constructor(
                 }
             }
             
-            // Issue #924/929: Dynamic GNSS Throttling based on A15 and High Load/MaliAnomaly (with 10s hysteresis)
             if (isHighLoad || maliAnomaly) lastAnomalyActiveRt = nowRt
             val shouldThrottle = systemStatusProvider.isA15Hardware() && 
                     (isHighLoad || maliAnomaly || (nowRt - lastAnomalyActiveRt < GNSS_THROTTLING_HYSTERESIS_MS))
@@ -316,7 +318,6 @@ class HardwareProvider @Inject constructor(
     }
 
     suspend fun start() {
-        // Issue #925: Await completion of any active teardown before re-initializing.
         teardownJob?.let {
             Timber.i("HardwareProvider: Awaiting active teardown completion (Issue #925).")
             it.join()
@@ -340,12 +341,20 @@ class HardwareProvider @Inject constructor(
                 hardwareHandler = Handler(hardwareThread!!.looper)
                 Timber.d("HardwareProvider: Unified hardware thread started.")
             }
+
+            // Issue #916: Dedicated GNSS thread to prevent sensor contention on budget hardware (A15).
+            if (gnssThread == null || !gnssThread!!.isAlive) {
+                gnssThread = HandlerThread("GNSSThread", Process.THREAD_PRIORITY_BACKGROUND).apply { start() }
+                gnssHandler = Handler(gnssThread!!.looper)
+                Timber.d("HardwareProvider: Dedicated GNSS thread started.")
+            }
             
             val handler = hardwareHandler
-            if (handler != null && ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            val gHandler = gnssHandler
+            if (gHandler != null && ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 try {
-                    locationManager.registerGnssStatusCallback(gnssStatusCallback, handler)
-                    Timber.d("HardwareProvider: GNSS callback registered.")
+                    locationManager.registerGnssStatusCallback(gnssStatusCallback, gHandler)
+                    Timber.d("HardwareProvider: GNSS callback registered on GNSSThread.")
                 } catch (e: Exception) { Timber.e(e, "HardwareProvider: GNSS registration failed") }
             }
 
@@ -374,22 +383,23 @@ class HardwareProvider @Inject constructor(
             forensicAuditor.clearRevivalState()
             
             val stopStartTime = SystemClock.elapsedRealtime()
-            Timber.i("HardwareProvider: Starting teardown sequence (R891/R908).")
+            Timber.i("HardwareProvider: Starting teardown sequence (Issue #916).")
             
             recoveryJob?.cancel(); recoveryJob = null
             registrationJob?.cancel(); registrationJob = null
             proximityJob?.cancel(); proximityJob = null
             revivalPulseJob?.cancel(); revivalPulseJob = null
             
-            Timber.d("HardwareProvider: Stopping Acoustic Monitoring...")
             stopAcousticMonitoring()
 
             val handler = hardwareHandler
+            val gHandler = gnssHandler
             val threadToQuit = hardwareThread
+            val gThreadToQuit = gnssThread
             
             val gnssStart = SystemClock.elapsedRealtime()
             Timber.d("HardwareProvider: Unregistering GNSS status callback...")
-            try { gnssStatusCallback.unregister(locationManager, handler) } catch (e: Exception) { Timber.e(e, "GNSS status unregistration failed") }
+            try { gnssStatusCallback.unregister(locationManager, gHandler) } catch (e: Exception) { Timber.e(e, "GNSS status unregistration failed") }
             val gnssDuration = SystemClock.elapsedRealtime() - gnssStart
             
             val locStart = SystemClock.elapsedRealtime()
@@ -411,34 +421,30 @@ class HardwareProvider @Inject constructor(
 
             teardownJob?.cancel()
             teardownJob = scope.launch(Dispatchers.IO) {
-                Timber.d("HardwareProvider: Entering 800ms forensic settling window (R908)...")
                 delay(800)
 
                 synchronized(lifecycleLock) {
-                    if (!isStarted.get() && activeUsers.get() == 0 && hardwareThread == threadToQuit) {
-                        Timber.d("HardwareProvider: Quitting hardware thread...")
-                        threadToQuit?.quitSafely()
-                        try { 
-                            threadToQuit?.join(1000)
-                        } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
-                        hardwareThread = null; hardwareHandler = null
+                    if (!isStarted.get() && activeUsers.get() == 0) {
+                        if (hardwareThread == threadToQuit) {
+                            Timber.d("HardwareProvider: Quitting hardware thread...")
+                            threadToQuit?.quitSafely()
+                            try { threadToQuit?.join(1000) } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
+                            hardwareThread = null; hardwareHandler = null
+                        }
+                        if (gnssThread == gThreadToQuit) {
+                            Timber.d("HardwareProvider: Quitting GNSS thread...")
+                            gThreadToQuit?.quitSafely()
+                            try { gThreadToQuit?.join(1000) } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
+                            gnssThread = null; gnssHandler = null
+                        }
                     } else {
-                        Timber.i("HardwareProvider: Teardown interrupted by restart (Users: ${activeUsers.get()}). Retaining thread.")
+                        Timber.i("HardwareProvider: Teardown interrupted by restart.")
                     }
                     teardownJob = null
                 }
                 
                 val totalDuration = SystemClock.elapsedRealtime() - stopStartTime
-                Timber.i("""
-                    HardwareProvider: Teardown Summary (Issue #908 Verification):
-                    - Total Teardown Time: ${totalDuration}ms
-                    - GNSS Duration: ${gnssDuration}ms
-                    - Location Duration: ${locDuration}ms
-                    - Sensor Duration: ${sensorDuration}ms
-                    - Display Duration: ${displayDuration}ms
-                    - Settling Window: 800ms (Async)
-                    - Status: Clean Teardown Completed.
-                """.trimIndent())
+                Timber.i("HardwareProvider: Teardown Summary - Total: ${totalDuration}ms, GNSS: ${gnssDuration}ms")
             }
             
             isStepDetectorRegistered = false
@@ -458,7 +464,7 @@ class HardwareProvider @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) return
+        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
         
         revivalPulseJob?.cancel()
         revivalPulseJob = scope.launch(Dispatchers.Default) {
@@ -679,7 +685,6 @@ class HardwareProvider @Inject constructor(
                                 stationaryStartRt = stationaryStartRt,
                                 nowRt = nowRt
                             )
-
                             if (!isInOffCycle && (nowRt - lastDutyCycleTransitionRt > ACOUSTIC_DUTY_CYCLE_ON_MS)) { 
                                 isInOffCycle = true; lastDutyCycleTransitionRt = nowRt; try { audioRecord.stop() } catch (e: Exception) {} 
                             }
@@ -875,13 +880,11 @@ class HardwareProvider @Inject constructor(
         if (currentStatus.isPending) {
             val stallDuration = nowRt - pendingEnterRt
             val retryThreshold = (revivalAttemptCount + 1) * GPS_REVIVAL_RETRY_INTERVAL_MS
-            
             forensicAuditor.captureRevivalStart(nowRt)
-
             if (stallDuration > retryThreshold) {
                 if (revivalAttemptCount < MAX_REVIVAL_ATTEMPTS) {
                     revivalAttemptCount++
-                    Timber.w("HardwareProvider: GNSS Recovery Pulse triggered (Attempt $revivalAttemptCount, Reason: ${currentStatus.reason})")
+                    Timber.w("HardwareProvider: GNSS Recovery Pulse triggered (Attempt $revivalAttemptCount)")
                     _revivalEvents.tryEmit(RevivalEvent.Attempt(revivalAttemptCount))
                     restartLocationUpdates()
                 } else if (!isHardwareLocked) {
@@ -891,8 +894,6 @@ class HardwareProvider @Inject constructor(
                     forensicAuditor.computeEnergyFootprint(nowRt)?.let { _revivalEvents.tryEmit(it) }
                 }
             }
-        } else { 
-            revivalAttemptCount = 0; isHardwareLocked = false 
-        }
+        } else { revivalAttemptCount = 0; isHardwareLocked = false }
     }
 }

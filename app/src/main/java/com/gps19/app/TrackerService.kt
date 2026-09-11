@@ -21,16 +21,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.11.42:
+ * - Issue #916 Hardening: Use currentIntervalMs in ForensicAuditor.recordGpsFix 
+ *   to eliminate false-positive Stability Gaps during dynamic polling transitions.
  * Sep.11.35:
  * - Issue #912 RESOLVED: Viewer ID Adoption. Corrected constant mismatch in 
  *   handleViewerPulse where configManager.viewerId was compared against 
  *   DEFAULT_TRACKER_ID instead of DEFAULT_VIEWER_ID (R912).
- * Sep.11.21:
- * - Issue #946 Visibility: Populated tamperNote in evaluateAlarms for 
- *   local forensic consistency (R-ID 288).
- * Sep.10.40:
- * - Issue #946 Visibility: Populated tamperNote in LocationUpdate for 
- *   header-level forensic transparency (R-ID 288).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -197,7 +194,6 @@ class TrackerService : BaseMonitorService() {
                             ALERT_ID_GPS_HARDWARE_LOCK, ALERT_ID_SILENT_FAILURE, 
                             ALERT_ID_PERFORMANCE_SPIKE, ALERT_ID_SYSTEM_STORAGE_LOW, 
                             ALERT_ID_SYSTEM_STORAGE_CRITICAL, ALERT_ID_BATTERY_STEEP_DISCHARGE -> {
-                                // R928: Integrity signals are now directly swallowed by AlarmManager 
                             }
                         }
                     }
@@ -368,7 +364,6 @@ class TrackerService : BaseMonitorService() {
         if (!SignalingConstants.isValidViewerId(id)) return
         repository.updateRemoteActivity(timeProvider.elapsedRealtime())
 
-        // R912: Adoption logic must compare against DEFAULT_VIEWER_ID
         if ((configManager.viewerId == SettingsRepository.DEFAULT_VIEWER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer") {
             configManager.viewerId = id
             connectivitySuite.updateIdentity(configManager.deviceId, id, true)
@@ -509,7 +504,6 @@ class TrackerService : BaseMonitorService() {
             }
         }
 
-        // Issue #936: Consolidated Stability Audit report
         forensicAuditor.evaluateStability(nowRt, "T")?.let { verdict ->
             val proc = lastProcessedLocation
             logManager.logServiceEvent(
@@ -538,7 +532,6 @@ class TrackerService : BaseMonitorService() {
         val vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G
         val liftIdx = (snapshot.baroAlt - locationProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS
         
-        // Issue #283: Hardened against NaN for empty satellite lists using safeAverage()
         val satellites = latestGnssDetail?.satellites ?: emptyList()
         val avgCn0 = satellites.map { it.cn0 }.safeAverage()
         val snrIdx = avgCn0 / RIBBON_SNR_SCALE_DB
@@ -569,7 +562,6 @@ class TrackerService : BaseMonitorService() {
         }
 
         val proc = lastProcessedLocation
-        // Sep.09.10: Using partitioned states (.kinetic, .atmospheric, .integrity) directly.
         repository.updateLocation(LocationUpdate().apply {
             this.kinetic.lat = proc?.optimizedPoint?.lat ?: 0.0
             this.kinetic.lng = proc?.optimizedPoint?.lng ?: 0.0
@@ -792,20 +784,18 @@ class TrackerService : BaseMonitorService() {
         val nowRt = timeProvider.elapsedRealtime()
         lastKnownLocation = location; lastGpsSpeed = location.speed.toDouble(); lastGpsAccuracy = location.accuracy.toDouble(); lastGpsBearing = location.bearing.toDouble()
         
-        // Issue #936: Record fix in ForensicAuditor
-        if (HIGH_FREQUENCY_GPS_POLLING_MS == TICK_INTERVAL_MS) {
-            forensicAuditor.recordGpsFix(nowRt, TICK_INTERVAL_MS)?.let { gapMsg ->
-                val proc = lastProcessedLocation
-                logManager.logServiceEvent(
-                    m = "STABILITY GAP (T): $gapMsg",
-                    isImportant = true,
-                    isSpecial = true,
-                    specialColor = FORENSIC_PINK_COLOR,
-                    lat = proc?.optimizedPoint?.lat ?: 0.0,
-                    lng = proc?.optimizedPoint?.lng ?: 0.0,
-                    accuracy = lastGpsAccuracy
-                )
-            }
+        // Issue #916: Use currentIntervalMs to avoid false-positive gaps during dynamic polling transitions.
+        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs)?.let { gapMsg ->
+            val proc = lastProcessedLocation
+            logManager.logServiceEvent(
+                m = "STABILITY GAP (T): $gapMsg",
+                isImportant = true,
+                isSpecial = true,
+                specialColor = FORENSIC_PINK_COLOR,
+                lat = proc?.optimizedPoint?.lat ?: 0.0,
+                lng = proc?.optimizedPoint?.lng ?: 0.0,
+                accuracy = lastGpsAccuracy
+            )
         }
     }
 

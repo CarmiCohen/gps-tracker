@@ -16,15 +16,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.11.42:
+ * - Issue #916 Hardening: Use currentIntervalMs in ForensicAuditor.recordGpsFix 
+ *   to eliminate false-positive Stability Gaps during dynamic polling transitions.
  * Sep.11.21:
  * - Issue #946 Visibility: Propagated remote tamperNote to AlarmManager for 
  *   forensic transparency (R-ID 288).
- * Sep.09.15:
- * - Issue #940 RESOLVED: Fixed Grid Scheduling. Anchored watchdog pulses to 
- *   serviceStartRealtime to eliminate cumulative drift (R-ID 281).
- * Sep.09.10:
- * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .atmospheric, .integrity)
- *   in LocationUpdate to support bridge removal (R-ID 284).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -166,7 +163,6 @@ class ViewerService : BaseMonitorService() {
         serviceStartRealtime = timeProvider.elapsedRealtime()
         serviceStartWall = timeProvider.currentTimeMillis()
 
-        // Sep.09.15: Anchor watchdog pulses to fixed grid
         systemMonitor.setSessionStart(serviceStartRealtime)
 
         startTickLoop()
@@ -348,20 +344,18 @@ class ViewerService : BaseMonitorService() {
         
         lastGpsSpeed = location.speed.toDouble(); lastGpsAccuracy = location.accuracy.toDouble(); lastGpsBearing = location.bearing.toDouble()
 
-        // Issue #936: Record fix in ForensicAuditor
-        if (currentIntervalMs == TICK_INTERVAL_MS || currentIntervalMs == HIGH_FREQUENCY_GPS_POLLING_MS) {
-            forensicAuditor.recordGpsFix(nowRt, currentIntervalMs)?.let { gapMsg ->
-                val proc = lastProcessedLocation
-                logManager.logServiceEvent(
-                    m = "STABILITY GAP (V): $gapMsg",
-                    isImportant = true,
-                    isSpecial = true,
-                    specialColor = FORENSIC_PINK_COLOR,
-                    lat = proc?.optimizedPoint?.lat ?: 0.0,
-                    lng = proc?.optimizedPoint?.lng ?: 0.0,
-                    accuracy = lastGpsAccuracy
-                )
-            }
+        // Issue #916: Use currentIntervalMs to avoid false-positive gaps during dynamic polling transitions.
+        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs)?.let { gapMsg ->
+            val proc = lastProcessedLocation
+            logManager.logServiceEvent(
+                m = "STABILITY GAP (V): $gapMsg",
+                isImportant = true,
+                isSpecial = true,
+                specialColor = FORENSIC_PINK_COLOR,
+                lat = proc?.optimizedPoint?.lat ?: 0.0,
+                lng = proc?.optimizedPoint?.lng ?: 0.0,
+                accuracy = lastGpsAccuracy
+            )
         }
 
         val processed = selfProcessor.processGpsPoint(
@@ -499,7 +493,6 @@ class ViewerService : BaseMonitorService() {
             }
         }
 
-        // Issue #936: Consolidated Stability Audit report
         forensicAuditor.evaluateStability(nowRt, "V")?.let { verdict ->
             val proc = lastProcessedLocation
             logManager.logServiceEvent(
