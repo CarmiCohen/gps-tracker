@@ -1,4 +1,8 @@
-# Resolution Archive (Sep.11.10)
+# Resolution Archive (Sep.11.20)
+
+## 🟢 Resolved Issues (Sep.11.20)
+*   **Release Versioning & Deployment Verification RESOLVED (#244-Release)**:
+    *   **Root-Cause Remediation**: Synchronized all SOT and Resolution archives for the Sep.11.20 release candidate. Updated `versionName` and validated build configuration to ensure deployment integrity for hardware LED and signaling audit.
 
 ## 🟢 Resolved Issues (Sep.11.10)
 *   **Map Partitioning Integrity RESOLVED (#243-Audit-Initial)**:
@@ -42,4 +46,4 @@
 ## 🟢 Resolved Issues (Sep.09.11)
 *   **Hardening Audit RESOLVED (Forensic Integrity) (#284-Audit)**: Fixed mapping gaps in `ConnectivitySuite.kt` for signal strength, maxTemp, and isGnssThrottled. Ensured peak values and critical integrity flags are correctly propagated in partitioned state reconstruction (R-ID 284).
 
-*(Total: 985 Issues Resolved since inception)*
+*(Total: 986 Issues Resolved since inception)*

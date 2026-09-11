@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 35
         versionCode 983
-        versionName "Sep.11.10" // Map Partitioning Integrity #243-Audit-Initial
+        versionName "Sep.11.20" // Release Candidate
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {
