@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.11.54:
+ * - Issue #948 RESOLVED: Removed redundant HUD state definitions. These are 
+ *   now managed exclusively in the app module to prevent type ambiguity (R-ID 286).
  * Sep.10.08:
  * - Idea #241: HudState Aggregator Refactoring. Removed monolithic HudState 
  *   facade. UI components now subscribe directly to segmented sub-states 
@@ -413,68 +416,3 @@ class SystemHealthReport(val reports: MutableList<ViolationReport> = mutableList
 
 @Serializable
 data class AlarmInfo(val title: String, val subtitle: String, val type: String = "", val isResolved: Boolean = false, val isSirenDisabled: Boolean = false)
-
-/**
- * HUD Component States: Segmented for performance on budget hardware.
- */
-@Serializable
-data class HudConnectivityState(
-    val appMode: String? = null,
-    val isInternet: Boolean = false,
-    val isRelayConnected: Boolean = false,
-    val isTelemetryFresh: Boolean = false,
-    val isDataHealthy: Boolean = false,
-    val commIndex: Int = 0,
-    val remoteCommIndex: Int = 0,
-    val trackerId: String = "TRK",
-    val viewerId: String = "VIEW",
-    val watchdogOk: Boolean = true,
-    val rtt: Int = 0,
-    val remoteSignal: Int = 0,
-    val isSystemActive: Boolean = false,
-    val isSafeMode: Boolean = false,
-    val isA15: Boolean = false,
-    val isGnssThrottled: Boolean = false
-)
-
-@Serializable
-data class HudTelemetryState(
-    val isLocalGpsActive: Boolean = false,
-    val isGpsFresh: Boolean = false,
-    val speedMps: Float = 0f,
-    val trackerAccuracy: Float = 0f,
-    val maxTrackerAccuracy: Float = 0f,
-    val viewerAccuracy: Float = 0f,
-    val maxViewerAccuracy: Float = 0f,
-    val satsUsed: Int = 0,
-    val satsView: Int = 0,
-    val viewerSatsUsed: Int = 0,
-    val viewerSatsView: Int = 0,
-    val distToHome: Double? = null,
-    val distToViewer: Double? = null,
-    val lastGpsTs: Long = 0L,
-    val viewerGpsTs: Long = 0L,
-    val trackerState: TrackerState = TrackerState.UNKNOWN,
-    val isTrackerLocPending: Boolean = false,
-    val trackerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val isViewerLocPending: Boolean = false,
-    val viewerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val isUltraLongStationary: Boolean = false
-)
-
-@Serializable
-data class HudHealthState(
-    val battery: Int = 100,
-    val remoteBattery: Int = -1,
-    val isCharging: Boolean = false,
-    val remoteCharging: Boolean = false,
-    val trackerTemp: Float = 0f,
-    val viewerTemp: Float = 0f,
-    val hasActiveAlarms: Boolean = false,
-    val isRedScreenSuppressed: Boolean = false,
-    val isSirenPlaying: Boolean = false,
-    val activeAlarms: List<AlarmInfo> = emptyList(),
-    val progressPulse: Float = 0f,
-    val systemPulse: Long = 0L,
-    val isMaliAnomaly: Boolean = false
-)

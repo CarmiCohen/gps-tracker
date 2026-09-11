@@ -160,13 +160,15 @@ class MainViewModel @Inject constructor(
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardTelemetryState())
 
     val dashboardHealthState: StateFlow<DashboardHealthState> = combine(
-        _uiState.map { it.appMode }.distinctUntilChanged(),
-        _kinematicState,
-        _diagnosticState,
+        combine(
+            _uiState.map { it.appMode }.distinctUntilChanged(),
+            _kinematicState,
+            _diagnosticState
+        ) { mode, kin, diag -> Triple(mode, kin, diag) },
         _localMaxTemp,
         _trackerMaxTemp,
         _systemPulseRt
-    ) { mode, kin, diag, lMax, tMax, pulseRt ->
+    ) { (mode, kin, diag), lMax, tMax, pulseRt ->
         aggregator.aggregateDashboardHealth(mode, kin, diag, lMax, tMax, pulseRt)
     }
     .flowOn(Dispatchers.Default)

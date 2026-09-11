@@ -1,4 +1,10 @@
-# Hardening Resolution Archive (Sep.11.52)
+# Hardening Resolution Archive (Sep.11.54)
+
+## 🟢 Resolved in Sep.11.54
+*   **Build Failure: Type Mismatch in MainViewModel (#947)**:
+    *   **Remediation**: Lambda parameter mismatch resolved by nesting `combine` calls for `dashboardHealthState`. Standard `combine` is limited to 5 heterogeneous flows; nesting 3 flows inside a sub-combine brought the main arity to 4, satisfying the compiler (R-ID 289).
+*   **Build Failure: HUD State Type Mismatch (#948)**:
+    *   **Remediation**: Removed duplicate `HudConnectivityState`, `HudTelemetryState`, and `HudHealthState` from `:core:engine`. These UI-facing models are now exclusively managed in the `:app` module to prevent import ambiguity and ensure consistency (R-ID 286).
 
 ## 🟢 Resolved in Sep.11.52
 *   **Recurring GNSS Jitter on A15 (#945)**:
@@ -8,13 +14,5 @@
 *   **Persistent Reactive Flow Stalls (#946)**:
     *   **Remediation**: Standardized the "vitality pulse" pattern by injecting `systemPulseRt` into all segmented dashboard and HUD flows in `MainViewModel`. Updated `UiStateAggregator` and `DashboardStateProvider` to include this pulse in the output states, bypassing `distinctUntilChanged` stalls during power-state transitions (R-ID 289).
 
-## 🟢 Resolved in Sep.11.46
-*   **Invalid "Last Seen" Display (#947)**:
-    *   **Remediation**: Synchronized the UI telemetry layer to use `systemPulseRt` (monotonic) for all real-time deltas. Updated `TrackerScreen` and `ViewerScreen` to pass the correct time-base to `TrackerDashboard`/`ViewerDashboard`, resolving the 56-year Epoch offset in the "Last Seen" field.
-
-## 🟢 Resolved in Sep.11.43
-*   **Telemetry Backfill Convergence (#923)**:
-    *   **Remediation**: Synchronized `HistoryManager.fillRealGap` with forensic audit counters (`backfillAuditCount` and `hourlyBackfillTotal`). This ensures that telemetry points backfilled during sustained offline periods (>10s) are correctly reported in continuity audits, matching the behavior of analytical backfilling.
-
 ---
-*For older records, see historical git logs. (vSep.11.52)*
+*For older records, see historical git logs. (vSep.11.54)*
