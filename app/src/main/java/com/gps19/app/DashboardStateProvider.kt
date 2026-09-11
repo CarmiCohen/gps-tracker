@@ -7,12 +7,12 @@ import javax.inject.Singleton
 
 /**
  * DashboardStateProvider: Dedicated provider for UI-ready dashboard and HUD states.
+ * Sep.11.48:
+ * - Issue #946: Vitality Pulse Standardization. Added systemPulse to all 
+ *   build methods to bypass distinctUntilChanged stalls (R-ID 289).
  * Sep.10.40:
  * - Issue #946 Visibility: Added tamperReason to buildDashboardTelemetryState 
  *   mapping for header forensic transparency (R-ID 288).
- * Sep.09.10:
- * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .atmospheric, .integrity)
- *   in LocationUpdate to support bridge removal (R-ID 284).
  */
 interface DashboardStateProvider {
     fun buildDashboardConnectivityState(
@@ -34,7 +34,8 @@ interface DashboardStateProvider {
         kinematicState: KinematicState,
         diagnosticState: DiagnosticState,
         localMaxTemp: Double,
-        trackerMaxTemp: Double
+        trackerMaxTemp: Double,
+        nowRt: Long
     ): DashboardHealthState
 
     fun buildHudConnectivityState(
@@ -46,7 +47,8 @@ interface DashboardStateProvider {
         isA15: Boolean,
         diagnosticState: DiagnosticState,
         rtt: Int,
-        remoteSignal: Int
+        remoteSignal: Int,
+        nowRt: Long
     ): HudConnectivityState
 
     fun buildHudTelemetryState(
@@ -94,7 +96,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             totalDropMs = activeStats.totalDropMs,
             maxDropMs = activeStats.maxDropMs,
             engineVersion = BuildConfig.VERSION_NAME,
-            netInterface = diagnosticState.connectivity.netInterface
+            netInterface = diagnosticState.connectivity.netInterface,
+            systemPulse = nowRt
         )
     }
 
@@ -136,7 +139,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             trackerState = trackerState,
             status = loc.status,
             tamperReason = if (isViewer) kinematicState.trackerHealth.tamperNote else kinematicState.localHealth.tamperNote,
-            isUltraLongStationary = isUltra
+            isUltraLongStationary = isUltra,
+            systemPulse = nowRt
         )
     }
 
@@ -145,7 +149,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         kinematicState: KinematicState,
         diagnosticState: DiagnosticState,
         localMaxTemp: Double,
-        trackerMaxTemp: Double
+        trackerMaxTemp: Double,
+        nowRt: Long
     ): DashboardHealthState {
         val isViewer = appMode == "viewer"
         val health = if (isViewer) kinematicState.trackerHealth else kinematicState.localHealth
@@ -193,7 +198,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             isGnssThrottled = health.isGnssThrottled,
             lastEnergyDeltaMa = health.lastEnergyDeltaMa,
             lastEnergyDeltaTemp = health.lastEnergyDeltaTemp,
-            lastEnergyDurationMs = health.lastEnergyDurationMs
+            lastEnergyDurationMs = health.lastEnergyDurationMs,
+            systemPulse = nowRt
         )
     }
 
@@ -206,9 +212,9 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
         isA15: Boolean,
         diagnosticState: DiagnosticState,
         rtt: Int,
-        remoteSignal: Int
+        remoteSignal: Int,
+        nowRt: Long
     ): HudConnectivityState {
-        val nowRt = SystemClock.elapsedRealtime()
         val lastSeenTs = diagnosticState.connectivity.lastRemoteActivityTs // Monotonic
         
         val isTelemetryFresh = if (lastSeenTs > 0) {
@@ -248,7 +254,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             isSystemActive = isSystemActive,
             isSafeMode = isSafeMode,
             isA15 = isA15,
-            isGnssThrottled = throttled
+            isGnssThrottled = throttled,
+            systemPulse = nowRt
         )
     }
 
@@ -280,7 +287,8 @@ class DashboardStateProviderImpl @Inject constructor() : DashboardStateProvider 
             trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
             isViewerLocPending = kinematicState.localHealth.isLocationPending,
             viewerLocPendingReason = kinematicState.localHealth.locationPendingReason,
-            isUltraLongStationary = isUltra
+            isUltraLongStationary = isUltra,
+            systemPulse = systemPulseRt
         )
     }
 

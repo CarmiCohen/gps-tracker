@@ -10,15 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.11.48:
+ * - Issue #946: Vitality Pulse Standardization. Added systemPulse to all 
+ *   segmented UI states to bypass distinctUntilChanged stalls (R-ID 289).
  * Sep.10.40:
  * - Issue #946 Visibility: Added tamperNote to TrackerStatus for 
  *   role-appropriate forensic transparency (R-ID 288).
- * Sep.08.12:
- * - Issue #924 Visibility: Added isGnssThrottled to DashboardHealthState (R-ID 267).
- * - R-ID 259: Added structured Energy Footprint fields to TrackerStatus for role parity.
- * Sep.06.31:
- * - Issue #926 RESOLVED: Revival Integration. Added gpsHardwareLock 
- *   to TrackerStatus to ensure parity between roles (R-ID 272).
  */
 
 sealed class AppSensorEvent {
@@ -448,7 +445,8 @@ data class DashboardConnectivityState(
     val engineVersion: String = "--",
     val trackerConnIndex: Int = 0,
     val viewerConnIndex: Int = 0,
-    val netInterface: String = "UNKNOWN"
+    val netInterface: String = "UNKNOWN",
+    val systemPulse: Long = 0L
 )
 
 @Serializable
@@ -475,7 +473,8 @@ data class DashboardTelemetryState(
     val status: SentinelStatus = SentinelStatus.VALID,
     val tamperReason: String? = null,
     val isTamperDetected: Boolean = false,
-    val isUltraLongStationary: Boolean = false
+    val isUltraLongStationary: Boolean = false,
+    val systemPulse: Long = 0L
 )
 
 @Serializable
@@ -520,11 +519,10 @@ data class DashboardHealthState(
     val isSilentFailure: Boolean = false,
     val isMaliAnomaly: Boolean = false,
     val isGnssThrottled: Boolean = false,
-    
-    // R-ID 259: Energy Footprint structured fields
     val lastEnergyDeltaMa: Int = 0,
     val lastEnergyDeltaTemp: Double = 0.0,
-    val lastEnergyDurationMs: Long = 0L
+    val lastEnergyDurationMs: Long = 0L,
+    val systemPulse: Long = 0L
 )
 
 /**
@@ -679,3 +677,70 @@ class BatteryState(
     }
     fun reset() { level = 100; temp = 0.0; isCharging = false; isChargingStable = false }
 }
+
+/**
+ * HUD Component States: Segmented for performance on budget hardware.
+ */
+@Serializable
+data class HudConnectivityState(
+    val appMode: String? = null,
+    val isInternet: Boolean = false,
+    val isRelayConnected: Boolean = false,
+    val isTelemetryFresh: Boolean = false,
+    val isDataHealthy: Boolean = false,
+    val commIndex: Int = 0,
+    val remoteCommIndex: Int = 0,
+    val trackerId: String = "TRK",
+    val viewerId: String = "VIEW",
+    val watchdogOk: Boolean = true,
+    val rtt: Int = 0,
+    val remoteSignal: Int = 0,
+    val isSystemActive: Boolean = false,
+    val isSafeMode: Boolean = false,
+    val isA15: Boolean = false,
+    val isGnssThrottled: Boolean = false,
+    val systemPulse: Long = 0L
+)
+
+@Serializable
+data class HudTelemetryState(
+    val isLocalGpsActive: Boolean = false,
+    val isGpsFresh: Boolean = false,
+    val speedMps: Float = 0f,
+    val trackerAccuracy: Float = 0f,
+    val maxTrackerAccuracy: Float = 0f,
+    val viewerAccuracy: Float = 0f,
+    val maxViewerAccuracy: Float = 0f,
+    val satsUsed: Int = 0,
+    val satsView: Int = 0,
+    val viewerSatsUsed: Int = 0,
+    val viewerSatsView: Int = 0,
+    val distToHome: Double? = null,
+    val distToViewer: Double? = null,
+    val lastGpsTs: Long = 0L,
+    val viewerGpsTs: Long = 0L,
+    val trackerState: TrackerState = TrackerState.UNKNOWN,
+    val isTrackerLocPending: Boolean = false,
+    val trackerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    val isViewerLocPending: Boolean = false,
+    val viewerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    val isUltraLongStationary: Boolean = false,
+    val systemPulse: Long = 0L
+)
+
+@Serializable
+data class HudHealthState(
+    val battery: Int = 100,
+    val remoteBattery: Int = -1,
+    val isCharging: Boolean = false,
+    val remoteCharging: Boolean = false,
+    val trackerTemp: Float = 0f,
+    val viewerTemp: Float = 0f,
+    val hasActiveAlarms: Boolean = false,
+    val isRedScreenSuppressed: Boolean = false,
+    val isSirenPlaying: Boolean = false,
+    val activeAlarms: List<AlarmInfo> = emptyList(),
+    val progressPulse: Float = 0f,
+    val systemPulse: Long = 0L,
+    val isMaliAnomaly: Boolean = false
+)

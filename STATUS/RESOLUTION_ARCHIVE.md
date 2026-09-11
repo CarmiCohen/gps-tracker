@@ -1,4 +1,8 @@
-# Hardening Resolution Archive (Sep.11.46)
+# Hardening Resolution Archive (Sep.11.48)
+
+## 🟢 Resolved in Sep.11.48
+*   **Persistent Reactive Flow Stalls (#946)**:
+    *   **Remediation**: Standardized the "vitality pulse" pattern by injecting `systemPulseRt` into all segmented dashboard and HUD flows in `MainViewModel`. Updated `UiStateAggregator` and `DashboardStateProvider` to include this pulse in the output states, bypassing `distinctUntilChanged` stalls during power-state transitions (R-ID 289).
 
 ## 🟢 Resolved in Sep.11.46
 *   **Invalid "Last Seen" Display (#947)**:
@@ -8,10 +12,5 @@
 *   **Telemetry Backfill Convergence (#923)**:
     *   **Remediation**: Synchronized `HistoryManager.fillRealGap` with forensic audit counters (`backfillAuditCount` and `hourlyBackfillTotal`). This ensures that telemetry points backfilled during sustained offline periods (>10s) are correctly reported in continuity audits, matching the behavior of analytical backfilling.
 
-## 🟢 Resolved in Sep.11.42
-*   **GNSS Jitter & Stability Gaps (#916)**:
-    *   **Remediation**: Eliminated false-positive stability gap reports by passing the dynamic `currentIntervalMs` to the `ForensicAuditor`.
-    *   **Hardware Decoupling**: Decoupled GNSS status callbacks into a dedicated `GNSSThread` in `HardwareProvider` to resolve 9000ms jitter caused by scheduling contention.
-
 ---
-*For older records, see historical git logs. (vSep.11.46)*
+*For older records, see historical git logs. (vSep.11.48)*

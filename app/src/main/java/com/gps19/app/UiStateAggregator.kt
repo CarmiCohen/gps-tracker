@@ -6,14 +6,12 @@ import javax.inject.Singleton
 
 /**
  * UiStateAggregator: Orchestrates the transformation of raw domain states into UI-ready models.
+ * Sep.11.48:
+ * - Issue #946: Vitality Pulse Standardization. Added pulse to all 
+ *   aggregation methods to ensure flow freshness (R-ID 289).
  * Sep.06.50:
  * - Issue #932: HUD Synchronization. Added isA15 to aggregateHudConnectivity 
  *   to provide visual confirmation of hardware adaptations (R-ID 276).
- * Sep.06.06:
- * - Issue #924 RESOLVED (Part A): Watchdog Safe-Mode. Added isSafeMode 
- *   to aggregateHudConnectivity for visual safety status (R-ID 271).
- * Sep.05.25:
- * - Issue #266: Added isMaliAnomaly to HudHealth aggregation for UI-throttling.
  */
 interface UiStateAggregator {
     fun aggregateDashboardConnectivity(
@@ -35,7 +33,8 @@ interface UiStateAggregator {
         kinematicState: KinematicState,
         diag: DiagnosticState,
         lMax: Double,
-        tMax: Double
+        tMax: Double,
+        pulse: Long
     ): DashboardHealthState
 
     fun aggregateHudConnectivity(
@@ -47,7 +46,8 @@ interface UiStateAggregator {
         isA15: Boolean,
         diag: DiagnosticState,
         rtt: Int,
-        sig: Int
+        sig: Int,
+        pulse: Long
     ): HudConnectivityState
 
     fun aggregateHudTelemetry(
@@ -93,9 +93,10 @@ class UiStateAggregatorImpl @Inject constructor(
         kinematicState: KinematicState,
         diag: DiagnosticState,
         lMax: Double,
-        tMax: Double
+        tMax: Double,
+        pulse: Long
     ): DashboardHealthState {
-        return dashboardStateProvider.buildDashboardHealthState(appMode, kinematicState, diag, lMax, tMax)
+        return dashboardStateProvider.buildDashboardHealthState(appMode, kinematicState, diag, lMax, tMax, pulse)
     }
 
     override fun aggregateHudConnectivity(
@@ -107,9 +108,10 @@ class UiStateAggregatorImpl @Inject constructor(
         isA15: Boolean,
         diag: DiagnosticState,
         rtt: Int,
-        sig: Int
+        sig: Int,
+        pulse: Long
     ): HudConnectivityState {
-        return dashboardStateProvider.buildHudConnectivityState(appMode, deviceId, viewerId, isSystemActive, isSafeMode, isA15, diag, rtt, sig)
+        return dashboardStateProvider.buildHudConnectivityState(appMode, deviceId, viewerId, isSystemActive, isSafeMode, isA15, diag, rtt, sig, pulse)
     }
 
     override fun aggregateHudTelemetry(

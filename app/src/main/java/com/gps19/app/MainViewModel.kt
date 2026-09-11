@@ -61,9 +61,10 @@ private data class MapBase(val ui: MapUiParts, val kin: KinematicState, val p: L
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
- * Sep.10.20:
- * - Rigorous Audit #243: Restored truncated ribbon flows and centralized 
- *   coordinate smoothing/freshness logic within MapViewState (R-ID 287).
+ * Sep.11.48:
+ * - Issue #946: Vitality Pulse Standardization. Included systemPulseRt 
+ *   in all segmented dashboard and HUD flow combinations to ensure 
+ *   freshness despite distinctUntilChanged (R-ID 289).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -163,9 +164,10 @@ class MainViewModel @Inject constructor(
         _kinematicState,
         _diagnosticState,
         _localMaxTemp,
-        _trackerMaxTemp
-    ) { mode, kin, diag, lMax, tMax ->
-        aggregator.aggregateDashboardHealth(mode, kin, diag, lMax, tMax)
+        _trackerMaxTemp,
+        _systemPulseRt
+    ) { mode, kin, diag, lMax, tMax, pulseRt ->
+        aggregator.aggregateDashboardHealth(mode, kin, diag, lMax, tMax, pulseRt)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardHealthState())
@@ -190,9 +192,10 @@ class MainViewModel @Inject constructor(
         hudUiConnectivityFlow,
         _diagnosticState,
         _rtt,
-        _remoteSignal
-    ) { ui, diag, rtt, sig ->
-        aggregator.aggregateHudConnectivity(ui.appMode, ui.deviceId, ui.viewerId, ui.isSystemActive, ui.isSafeMode, ui.isA15, diag, rtt, sig)
+        _remoteSignal,
+        _systemPulseRt
+    ) { ui, diag, rtt, sig, pulseRt ->
+        aggregator.aggregateHudConnectivity(ui.appMode, ui.deviceId, ui.viewerId, ui.isSystemActive, ui.isSafeMode, ui.isA15, diag, rtt, sig, pulseRt)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudConnectivityState())
