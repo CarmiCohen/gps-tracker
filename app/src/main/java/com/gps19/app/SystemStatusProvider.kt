@@ -61,6 +61,10 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Sep.11.56:
+ * - Issue #949 Hardening: Directed all shared observation flows to execute on Dispatchers.IO 
+ *   using .flowOn(Dispatchers.IO) to eliminate reactive flow stalls caused by main thread contention 
+ *   on budget hardware (A15).
  * Sep.11.42:
  * - Issue #915 Hardening: Added periodic polling (60s) to observeInternetStatus 
  *   and observeBatteryStatus to ensure "vitality pulses" are emitted even during 
@@ -296,7 +300,8 @@ class SystemStatusProviderImpl @Inject constructor(
         awaitClose { 
             callback.unregister(connectivityManager, Handler(Looper.getMainLooper()))
         }
-    }.conflate()
+    }.flowOn(Dispatchers.IO)
+     .conflate()
      .shareIn(
         scope = externalScope,
         started = SharingStarted.Eagerly,
@@ -326,7 +331,8 @@ class SystemStatusProviderImpl @Inject constructor(
         awaitClose { 
             receiver.unregister(shadowContext)
         }
-    }.conflate()
+    }.flowOn(Dispatchers.IO)
+     .conflate()
      .shareIn(
         scope = externalScope,
         started = SharingStarted.WhileSubscribed(5000),
@@ -364,7 +370,8 @@ class SystemStatusProviderImpl @Inject constructor(
             emit(getStorageStatus())
             delay(STORAGE_POLL_INTERVAL_MS)
         }
-    }.shareIn(
+    }.flowOn(Dispatchers.IO)
+     .shareIn(
          scope = externalScope,
          started = SharingStarted.WhileSubscribed(5000),
          replay = 1
@@ -435,7 +442,8 @@ class SystemStatusProviderImpl @Inject constructor(
             receiver.unregister(shadowContext)
             pollJob.cancel()
         }
-    }.conflate()
+    }.flowOn(Dispatchers.IO)
+     .conflate()
      .shareIn(
         scope = externalScope,
         started = SharingStarted.WhileSubscribed(5000),

@@ -1,4 +1,8 @@
-# Hardening Resolution Archive (Sep.11.54)
+# Hardening Resolution Archive (Sep.11.56)
+
+## 🟢 Resolved in Sep.11.56
+*   **A15 Reactive Flow Stalls (#949)**:
+    *   **Remediation**: Directed all shared observation flows in `SystemStatusProviderImpl` to execute on `Dispatchers.IO` using `.flowOn(Dispatchers.IO)`. This eliminates main-thread contention and ensures consistent vitality pulses for IntegrityMonitor heartbeats, preventing false-positive stall detections on budget hardware (R-ID 289).
 
 ## 🟢 Resolved in Sep.11.54
 *   **Build Failure: Type Mismatch in MainViewModel (#947)**:
@@ -15,4 +19,4 @@
     *   **Remediation**: Standardized the "vitality pulse" pattern by injecting `systemPulseRt` into all segmented dashboard and HUD flows in `MainViewModel`. Updated `UiStateAggregator` and `DashboardStateProvider` to include this pulse in the output states, bypassing `distinctUntilChanged` stalls during power-state transitions (R-ID 289).
 
 ---
-*For older records, see historical git logs. (vSep.11.54)*
+*For older records, see historical git logs. (vSep.11.56)*

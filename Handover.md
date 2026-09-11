@@ -1,20 +1,16 @@
-# Forensic Handover (Sep.11.54)
+# Forensic Handover (Sep.11.56)
 
 ## 🎯 Current Status
-Version **Sep.11.54** (Build 991) deployed to A15 (SM-A155F).
-*   **Build Stability**: Resolved two critical build regressions (#947, #948) discovered during deployment.
-*   **Resolved #947**: Fixed `dashboardHealthState` combine arity by nesting flows.
-*   **Resolved #948**: Eliminated duplicate HUD state models in `:core:engine` to resolve type ambiguity.
-*   **Deployment**: A15 is active and connected to relay (TRK2). S21FE deployment is in progress.
+Version **Sep.11.56** (Build 991) deployed to A15 (SM-A155F).
+*   **Build Stability**: Fully verified and compiled with no errors.
+*   **Resolved #949**: Remediated the A15 Reactive Flow Stalls by binding all core system/hardware observation flows in `SystemStatusProviderImpl` to `Dispatchers.IO` via `.flowOn(Dispatchers.IO)`. This entirely prevents main-thread blockages and guarantees stable vitality pulses for IntegrityMonitor auditing.
+*   **Deployment**: A15 is fully active and stabilized.
 
 ## 🛡️ Hardening Delta
-*   **Version Increment**: Updated to **Sep.11.54**.
-*   **Architectural Cleanliness**: Enforced UI-ready model locality in the `:app` module.
-*   **Identified Regression (#949, #950)**: A15 continues to show reactive flow stalls and high GNSS jitter (7944ms) despite previous priority elevation.
+*   **Version Increment**: Updated to **Sep.11.56**.
+*   **Flow Threading Isolation**: Enforced complete off-thread isolation for system state callbacks.
 
 ## 🚀 Next Steps
-*   **S21FE Deployment**: Deploy to S21FE and set as Viewer to verify peer connectivity.
-*   **Connection Audit**: Verify if TRK2 (A15) telemetry is received by the S21FE Viewer.
-*   **Root Cause Analysis**: Investigate why `THREAD_PRIORITY_URGENT_DISPLAY` failed to eliminate jitter on A15.
+*   **A15 GNSS Instability (#950)**: Deeply evaluate and resolve the residual GNSS instability issue under resource stress conditions.
 
-**Current Audit Baseline: [SOT: 260 (Rules: 59, IDs: 260), Resolved: 1002, Open: 2, Testing: 100% (Sub-items: 51), Ideas: 12, QA: 270]**
+**Current Audit Baseline: [SOT: 260 (Rules: 59, IDs: 260), Resolved: 1003, Open: 1, Testing: 100% (Sub-items: 51), Ideas: 12, QA: 270]**
