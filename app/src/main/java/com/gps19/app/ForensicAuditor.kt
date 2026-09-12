@@ -9,16 +9,14 @@ import kotlin.math.round
 
 /**
  * ForensicAuditor: Encapsulates high-assurance hardware audits (Stability, Jitter, Sensor Rates, Energy).
+ * Sep.11.60:
+ * - Issue #1006: Simplification Idea #14. Centralized GNSS Stability Muzzling. 
+ *   ForensicAuditor now tracks interval history to automatically suppress 
+ *   false-positives during transitions (R-ID 262).
+ * - Issue #917 Hardening (Part B): Consolidated stability muzzling logic.
  * Sep.11.58:
  * - Issue #950 Hardening: Implemented transition muzzling in recordGpsFix to 
  *   eliminate false-positive stability gaps during polling interval adaptation.
- * Sep.08.11:
- * - Issue #936: Forensic Auditor Consolidation (Idea #3). Consolidated Stability 
- *   Audit logic (Reliability % / Jitter) from Tracker/Viewer services (R-ID 280).
- * Sep.06.17:
- * - Issue #922 (Part B): Extracted from HardwareProvider to restore SRP.
- * - R-ID 256: Sensor Rate Auditing.
- * - R-ID 259: Energy Footprint Verdicts.
  */
 @Singleton
 class ForensicAuditor @Inject constructor(
@@ -34,6 +32,9 @@ class ForensicAuditor @Inject constructor(
     private var stabilityAuditViolationCount = 0
     private var lastStabilityAuditTs = 0L
 
+    private var lastExpectedIntervalMs = 0L
+    private var lastIntervalChangeRt = 0L
+
     fun recordGnssStatus(nowRt: Long) {
         if (lastGnssStatusRt > 0) {
             val interval = nowRt - lastGnssStatusRt
@@ -46,10 +47,33 @@ class ForensicAuditor @Inject constructor(
     }
 
     /**
-     * Records a GPS fix and returns a gap message if a stability violation is detected.
-     * @param isMuzzled Suppresses violation recording during polling transitions.
+     * Updates the expected polling interval and tracks transitions for muzzling.
      */
-    fun recordGpsFix(nowRt: Long, expectedIntervalMs: Long, isMuzzled: Boolean = false): String? {
+    fun updateExpectedInterval(nowRt: Long, expectedIntervalMs: Long) {
+        if (expectedIntervalMs != lastExpectedIntervalMs) {
+            if (lastExpectedIntervalMs != 0L) {
+                lastIntervalChangeRt = nowRt
+            }
+            lastExpectedIntervalMs = expectedIntervalMs
+        }
+    }
+
+    /**
+     * Returns true if the system is currently in a stability muzzling window (adaptation).
+     */
+    fun isAdaptationMuzzled(nowRt: Long): Boolean {
+        if (lastIntervalChangeRt == 0L) return false
+        return nowRt - lastIntervalChangeRt < ADAPTATION_SETTLING_MS
+    }
+
+    /**
+     * Records a GPS fix and returns a gap message if a stability violation is detected.
+     * Centralized Muzzling: Automatically ignores gaps during polling interval transitions.
+     */
+    fun recordGpsFix(nowRt: Long, expectedIntervalMs: Long): String? {
+        updateExpectedInterval(nowRt, expectedIntervalMs)
+        val isMuzzled = isAdaptationMuzzled(nowRt)
+        
         var gapMessage: String? = null
         if (lastGpsFixRealtime > 0) {
             val gap = nowRt - lastGpsFixRealtime
@@ -195,5 +219,7 @@ class ForensicAuditor @Inject constructor(
         accelAuditStartRt = 0L
         isSensorRateAudited = false
         clearRevivalState()
+        lastExpectedIntervalMs = 0L
+        lastIntervalChangeRt = 0L
     }
 }

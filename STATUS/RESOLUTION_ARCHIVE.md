@@ -1,6 +1,8 @@
 # Hardening Resolution Archive (Sep.11.60)
 
 ## 🟢 Resolved in Sep.11.60
+*   **GNSS Stability Muzzling Centralization (#1006)**:
+    *   **Remediation**: Centralized polling adaptation muzzling into `ForensicAuditor` and `LocationProcessor`. Components now track interval history internally via `updateExpectedInterval()` to automatically suppress false-positive stability gaps and jumps during transitions. This eliminates redundant local muzzling logic and service-side boilerplate in `TrackerService` and `ViewerService` (R-ID 262).
 *   **HUD LED Specification Compliance (#917)**:
     *   **Remediation**: Implemented full hardware LED synchronization for A15 devices as per HUD Spec R338/R972. Updated `JdHardwareManager.syncState` to propagate GPS staleness (35s gate), internet loss, and relay connectivity status. This ensures physical LED parity with the UI status row and remediates Requirement R972 (R-ID 263).
 

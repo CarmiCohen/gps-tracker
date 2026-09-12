@@ -15,15 +15,24 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
 /**
+ * LedStatus: Type-safe abstraction for hardware LED states (Idea #15).
+ */
+data class LedStatus(
+    val isPowerSave: Boolean = false,
+    val isGpsStale: Boolean = false,
+    val isInternetLoss: Boolean = false,
+    val isRelayLoss: Boolean = false,
+    val isPeerStale: Boolean = false
+)
+
+/**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
  * Sep.11.60:
+ * - Issue #1007: Simplification Idea #15. Hardware Flag Abstraction. 
+ *   Consolidated bitmask flags into type-safe LedStatus object to eliminate 
+ *   manual bitwise operations in Services (R-ID 263).
  * - Issue #917 Hardening (Part B): Implemented HUD LED Specification compliance (R960/R972). 
- *   Added FLAG_PEER_STALE (0x10) and consolidated flag logic into syncHardwareState() 
- *   to eliminate duplication in Tracker/Viewer services (Idea #15).
- * Aug.26.00:
- * - Issue #319 Remediation: Added robust retry mechanism with exponential backoff 
- *   to native initialization to resolve Monitor::Inflate installation failures 
- *   during background service startup (R319).
+ *   Added FLAG_PEER_STALE (0x10) and consolidated flag logic into syncHardwareState().
  */
 object JdHardwareManager {
 
@@ -54,18 +63,14 @@ object JdHardwareManager {
     suspend fun syncHardwareState(
         timeProvider: TimeProvider,
         tick: Int,
-        isPowerSave: Boolean,
-        isGpsStale: Boolean,
-        isInternetLoss: Boolean,
-        isRelayLoss: Boolean,
-        isPeerStale: Boolean
+        status: LedStatus
     ): Int {
         var flags = 0
-        if (isPowerSave) flags = flags or FLAG_POWER_SAVE
-        if (isGpsStale) flags = flags or FLAG_GPS_STALE
-        if (isInternetLoss) flags = flags or FLAG_INTERNET_LOSS
-        if (isRelayLoss) flags = flags or FLAG_RELAY_LOSS
-        if (isPeerStale) flags = flags or FLAG_PEER_STALE
+        if (status.isPowerSave) flags = flags or FLAG_POWER_SAVE
+        if (status.isGpsStale) flags = flags or FLAG_GPS_STALE
+        if (status.isInternetLoss) flags = flags or FLAG_INTERNET_LOSS
+        if (status.isRelayLoss) flags = flags or FLAG_RELAY_LOSS
+        if (status.isPeerStale) flags = flags or FLAG_PEER_STALE
         
         return syncState(timeProvider, tick, flags)
     }

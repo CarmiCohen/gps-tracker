@@ -16,13 +16,13 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.11.62:
+ * - Issue #1006: Simplification Idea #14. Centralized GNSS Stability Muzzling 
+ *   into ForensicAuditor and LocationProcessor (R-ID 262). Logic now tracks 
+ *   interval transitions internally to suppress false-positives.
  * Sep.11.60:
  * - Issue #917 Hardening (Part B): Implemented HUD LED Specification compliance (R960/R972). 
- *   Migrated to JdHardwareManager.syncHardwareState to propagate GPS staleness, 
- *   internet loss, relay loss, and Peer (Tracker) presence to A15 hardware LEDs.
- * Sep.11.58:
- * - Issue #950 Hardening: Propagated isAdaptationMuzzled to recordGpsFix 
- *   to eliminate false-positive Stability Gaps during polling transitions.
+ *   Migrated to JdHardwareManager.syncHardwareState.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -48,7 +48,6 @@ class ViewerService : BaseMonitorService() {
     private var lastPowerSaveCheckRt = 0L
 
     private var currentIntervalMs = TICK_INTERVAL_MS
-    private var lastIntervalChangeRt = 0L
     private var lastA15PokeRt = 0L
     private val A15_POKE_INTERVAL_MS = 30_000L
 
@@ -346,13 +345,11 @@ class ViewerService : BaseMonitorService() {
         
         lastGpsSpeed = location.speed.toDouble(); lastGpsAccuracy = location.accuracy.toDouble(); lastGpsBearing = location.bearing.toDouble()
 
-        // Issue #950: Suppress stability gaps during polling interval transitions.
-        val isMuzzled = nowRt - lastIntervalChangeRt < ADAPTATION_SETTLING_MS
-
-        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, isMuzzled)?.let { gapMsg ->
+        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs)?.let { gapMsg ->
             val proc = lastProcessedLocation
-            logManager.logServiceEvent(
-                m = "STABILITY GAP (V): $gapMsg",
+            logManager.submitToLogSink(
+                message = "STABILITY GAP (V): $gapMsg",
+                type = "system",
                 isImportant = true,
                 isSpecial = true,
                 specialColor = FORENSIC_PINK_COLOR,
@@ -482,7 +479,8 @@ class ViewerService : BaseMonitorService() {
         val targetGpsInterval = if (isUiVisible()) HIGH_FREQUENCY_GPS_POLLING_MS else VIEWER_GPS_POLLING_MS
         if (targetGpsInterval != currentIntervalMs) {
             currentIntervalMs = targetGpsInterval
-            lastIntervalChangeRt = nowRt
+            forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval)
+            selfProcessor.updateExpectedInterval(nowRt, targetGpsInterval)
             hardwareProvider.setPollingInterval(targetGpsInterval)
         }
 
@@ -490,10 +488,8 @@ class ViewerService : BaseMonitorService() {
 
         if (capabilities.isA15Device) {
             if (JdHardwareManager.isAvailable()) {
-                // Issue #917 (Part B): Consolidate HUD LED Specification compliance logic.
                 val isTrackerActive = connectivitySuite.lastPeerActivityTs > 0 && (nowRt - connectivitySuite.lastPeerActivityTs < WATCH_TIMEOUT_MS)
                 val gpsAge = nowRt - selfProcessor.getLastValidFixRt()
-                
                 JdHardwareManager.syncHardwareState(
                     timeProvider = timeProvider,
                     tick = serviceTickCounter,

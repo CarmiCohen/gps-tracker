@@ -21,13 +21,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.11.62:
+ * - Issue #1006: Simplification Idea #14. Centralized GNSS Stability Muzzling 
+ *   into ForensicAuditor and LocationProcessor (R-ID 262). Logic now tracks 
+ *   interval transitions internally to suppress false-positives.
  * Sep.11.60:
  * - Issue #917 Hardening (Part B): Implemented HUD LED Specification compliance (R960/R972). 
- *   Migrated to JdHardwareManager.syncHardwareState to propagate GPS staleness, 
- *   internet loss, relay loss, and Peer (Viewer) presence to A15 hardware LEDs.
- * Sep.11.58:
- * - Issue #950 Hardening: Propagated isAdaptationMuzzled to recordGpsFix 
- *   to eliminate false-positive Stability Gaps during polling transitions.
+ *   Migrated to JdHardwareManager.syncHardwareState.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -57,7 +57,6 @@ class TrackerService : BaseMonitorService() {
     
     private var isSuspiciousMode = false
     private var currentIntervalMs = TICK_INTERVAL_MS
-    private var lastIntervalChangeRt = 0L
 
     private var lastA15PokeRt = 0L
     private val A15_POKE_INTERVAL_MS = 30_000L
@@ -146,7 +145,6 @@ class TrackerService : BaseMonitorService() {
         serviceStartRealtime = timeProvider.elapsedRealtime()
         serviceStartWall = timeProvider.currentTimeMillis()
 
-        // Sep.09.15: Anchor watchdog pulses to fixed grid
         systemMonitor.setSessionStart(serviceStartRealtime)
 
         setupPhysicalFastPaths()
@@ -471,12 +469,11 @@ class TrackerService : BaseMonitorService() {
         
         if (targetGpsInterval != currentIntervalMs) {
             currentIntervalMs = targetGpsInterval
-            lastIntervalChangeRt = nowRt
+            forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval)
+            locationProcessor.updateExpectedInterval(nowRt, targetGpsInterval)
             hardwareProvider.setPollingInterval(targetGpsInterval)
         }
         
-        val isAdaptationMuzzled = nowRt - lastIntervalChangeRt < ADAPTATION_SETTLING_MS
-
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
 
         val isSocketConnected = connectivitySuite.isConnected() && !transientDropDetected.getAndSet(false)
@@ -487,9 +484,7 @@ class TrackerService : BaseMonitorService() {
 
         if (capabilities.isA15Device) {
             if (JdHardwareManager.isAvailable()) {
-                // Issue #917 (Part B): Consolidate HUD LED Specification compliance logic.
                 val gpsAge = nowRt - locationProcessor.getLastValidFixRt()
-                
                 JdHardwareManager.syncHardwareState(
                     timeProvider = timeProvider,
                     tick = serviceTickCounter,
@@ -564,8 +559,8 @@ class TrackerService : BaseMonitorService() {
             val processed = locationProcessor.processGpsPoint(
                 lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed, gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = location.bearing.toDouble(), snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = forensicAuditor.lastGpsFixRealtime, isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, nowWall = now, nowRt = nowRt,
                 providedIsStalled = health.gpsStalled,
-                isSuspicious = isSuspiciousMode,
-                isAdaptationMuzzled = isAdaptationMuzzled
+                isSuspicious = isSuspiciousMode
+                // isAdaptationMuzzled is now internal to LocationProcessor (R-ID 262)
             )
             lastProcessedLocation = processed
             evaluateAlarmsInternal(now, nowRt, isSocketConnected, isViewerActive, processed, snapshot)
@@ -794,13 +789,11 @@ class TrackerService : BaseMonitorService() {
         val nowRt = timeProvider.elapsedRealtime()
         lastKnownLocation = location; lastGpsSpeed = location.speed.toDouble(); lastGpsAccuracy = location.accuracy.toDouble(); lastGpsBearing = location.bearing.toDouble()
         
-        // Issue #950: Suppress stability gaps during polling interval transitions.
-        val isMuzzled = nowRt - lastIntervalChangeRt < ADAPTATION_SETTLING_MS
-        
-        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, isMuzzled)?.let { gapMsg ->
+        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs)?.let { gapMsg ->
             val proc = lastProcessedLocation
-            logManager.logServiceEvent(
-                m = "STABILITY GAP (T): $gapMsg",
+            logManager.submitToLogSink(
+                message = "STABILITY GAP (T): $gapMsg",
+                type = "system",
                 isImportant = true,
                 isSpecial = true,
                 specialColor = FORENSIC_PINK_COLOR,

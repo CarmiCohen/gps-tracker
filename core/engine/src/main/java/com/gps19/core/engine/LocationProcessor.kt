@@ -20,6 +20,10 @@ sealed class ProcessorEvent {
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.11.62:
+ * - Issue #1006: Simplification Idea #14. Centralized GNSS Stability Muzzling 
+ *   (R-ID 262). Logic now tracks interval transitions to suppress false-positive 
+ *   jumps during adaptation without requiring service-side flags.
  * Aug.18.05:
  * - Issue #201: Urban Edge Case Multipath Mitigation. Integrated SNR-based 
  *   anchor evaluation to harden stationary state management in urban canyons (R201).
@@ -73,6 +77,10 @@ class LocationProcessor(
 
     private var cachedHomePoints: List<EngineGeoPoint>? = null
     private var maxDistanceAuthority: Double = 60.0
+
+    // Issue #1006: Internal Muzzling State
+    private var lastExpectedIntervalMs = 0L
+    private var lastIntervalChangeRt = 0L
 
     fun loadState(
         savedMaxAccuracy: Double,
@@ -165,6 +173,23 @@ class LocationProcessor(
 
     fun consumeSitDetected(): Boolean = sentinel.consumeSitDetected()
 
+    /**
+     * Updates the expected polling interval to manage internal muzzling (R-ID 262).
+     */
+    fun updateExpectedInterval(nowRt: Long, expectedIntervalMs: Long) {
+        if (expectedIntervalMs != lastExpectedIntervalMs) {
+            if (lastExpectedIntervalMs != 0L) {
+                lastIntervalChangeRt = nowRt
+            }
+            lastExpectedIntervalMs = expectedIntervalMs
+        }
+    }
+
+    private fun isAdaptationMuzzled(nowRt: Long): Boolean {
+        if (lastIntervalChangeRt == 0L) return false
+        return nowRt - lastIntervalChangeRt < ADAPTATION_SETTLING_MS
+    }
+
     fun updateSensorData(
         vibration: Double, heading: Double, baroAlt: Double, 
         lux: Double = 0.0, isNear: Boolean = true, powerTamper: Boolean = false,
@@ -250,7 +275,6 @@ class LocationProcessor(
         providedAcousticLockoutRt: Long = 0L,
         isSuspicious: Boolean = false, 
         isMuzzled: Boolean = false,
-        isAdaptationMuzzled: Boolean = false,
         providedKineticEnergy: Double = 0.0,
         nowWall: Long = timeProvider.currentTimeMillis(),
         nowRt: Long = timeProvider.elapsedRealtime()
@@ -266,6 +290,7 @@ class LocationProcessor(
         ) {
             processedLocationFlyweight.reset()
             val effectiveTs = if (gpsTs > 0) gpsTs else nowWall
+            val adaptationMuzzled = isAdaptationMuzzled(nowRt)
 
             if (lastTs > 0 && effectiveTs < lastTs) {
                 val delta = lastTs - effectiveTs
@@ -336,7 +361,7 @@ class LocationProcessor(
             val sentinelResult = sentinel.processLocation(
                 lat = lat, lng = lng, alt = alt, accuracy = accuracy, maxAccuracy = maxAccuracy, 
                 bearing = bearing, snr = snr, satsUsed = satsUsed, timestamp = effectiveTs, 
-                bypassBehavioral = !isLocal, isSuspicious = isSuspicious || isAdaptationMuzzled,
+                bypassBehavioral = !isLocal, isSuspicious = isSuspicious || adaptationMuzzled,
                 isMuzzled = isMuzzled, nowTs = nowWall, nowRt = nowRt
             )
             
@@ -357,7 +382,7 @@ class LocationProcessor(
             }
 
             val isActualJump = (sentinelResult.status == SentinelStatus.JUMP || sentinelResult.status == SentinelStatus.OUTLIER || sentinelResult.status == SentinelStatus.JITTER || (sentinelResult.jumpConfidence?.isJump == true))
-            val isMuzzledJump = isAdaptationMuzzled && (sentinelResult.status == SentinelStatus.JUMP || sentinelResult.status == SentinelStatus.JITTER)
+            val isMuzzledJump = adaptationMuzzled && (sentinelResult.status == SentinelStatus.JUMP || sentinelResult.status == SentinelStatus.JITTER)
             val finalStatus = if (isMuzzledJump) SentinelStatus.VALID else sentinelResult.status
             val finalSuppressionNote = if (isMuzzledJump) "Settling A15 Polling..." else sentinelResult.reason
 
@@ -367,14 +392,14 @@ class LocationProcessor(
             val finalJumpTier = maxOf(sentinelResult.jumpConfidence?.tier ?: 0, providedJumpTier)
             val finalIsAdaptiveJump = (sentinelResult.jumpConfidence?.isAdaptiveJump == true) || providedIsAdaptiveJump
             val finalIsTamper = sentinelResult.status == SentinelStatus.TAMPER || providedIsTamper
-            val finalIsJammer = isActualJammer || providedIsJammer
+            val finalIsJammer = finalIsJump || finalIsTamper || isActualJammer || providedIsJammer
             val finalIsStalled = if (isLocal) (gpsTs != 0L && gpsTs == lastGpsTs) else providedIsStalled
             val isSpatiallyValid = !finalIsJump && !finalIsJammer && finalStatus != SentinelStatus.OUTLIER
             
             val fallbackPoint = EngineGeoPoint(if (lastLat != 0.0) lastLat else lat, if (lastLng != 0.0) lastLng else lng, alt = alt, ts = if (lastTs != 0L) lastTs else effectiveTs, rt = if (lastRt != 0L) lastRt else nowRt, accuracy = lastAcc, maxAccuracy = lastMaxAcc)
 
             if (!isSpatiallyValid) {
-                if (shouldSavePoint(isSuspicious || isAdaptationMuzzled, true, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, lat, lng), 0L, maxAccuracy, nowRt)) {
+                if (shouldSavePoint(isSuspicious || adaptationMuzzled, true, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, lat, lng), 0L, maxAccuracy, nowRt)) {
                     _processorEvents.tryEmit(ProcessorEvent.TrailPointSaved(lat, lng, isViewerTrail, finalStatus, effectiveTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
                 }
                 return@measureAndAudit processedLocationFlyweight.apply {
@@ -441,8 +466,8 @@ class LocationProcessor(
                 stationaryProb = stationaryProb,
                 estimatedSpeed = estimatedSpeed,
                 maxAccuracy = maxAccuracy,
-                isSuspicious = isSuspicious || isAdaptationMuzzled,
-                isAdaptationMuzzled = isAdaptationMuzzled,
+                isSuspicious = isSuspicious || adaptationMuzzled,
+                isAdaptationMuzzled = adaptationMuzzled,
                 isAccuracySnap = sentinelResult.jumpConfidence?.reason?.contains("Suppressed Accuracy Snap") == true,
                 snr = snr,
                 vibeIndex = sentinel.currentVibrationIndex
@@ -452,7 +477,7 @@ class LocationProcessor(
             val isAnchorLockedNow = anchorResult.isLocked
 
             val timeSinceLastGpsSaveRt = if (nowRt > 0 && lastSavedRt > 0) nowRt - lastSavedRt else 0L
-            if (shouldSavePoint(isSuspicious || isAdaptationMuzzled, isThrottled, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSaveRt, maxAccuracy, nowRt) && !skipPersistence) {
+            if (shouldSavePoint(isSuspicious || adaptationMuzzled, isThrottled, PhysicsUtils.calculateDistance(lastSavedLat, lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSaveRt, maxAccuracy, nowRt) && !skipPersistence) {
                 _processorEvents.tryEmit(ProcessorEvent.TrailPointSaved(persistencePoint.lat, persistencePoint.lng, isViewerTrail, finalStatus, effectiveTs, accuracy = persistencePoint.accuracy, maxAccuracy = persistencePoint.maxAccuracy))
                 lastSavedLat = persistencePoint.lat; lastSavedLng = persistencePoint.lng; lastSavedTs = nowWall; lastSavedRt = nowRt; lastSavedGpsTs = gpsTs
             }
@@ -539,5 +564,7 @@ class LocationProcessor(
         anchorEvaluator.reset()
         invalidateHomePointsCache(); sentinel.reset(); 
         _processorEvents.tryEmit(ProcessorEvent.MaxAccuracyChanged(0.0))
+        lastExpectedIntervalMs = 0L
+        lastIntervalChangeRt = 0L
     }
 }
