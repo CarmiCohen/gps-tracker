@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.12.02)
+# SOT Master Requirements & Hardening Status (Sep.12.12)
 
 ## 🛡️ Core Hardening Baseline
 *   **SOT ID 314**: Signaling Session Integrity - Isolates socket callbacks via session-ID to prevent race conditions. (Resolved Sep.11.23)
@@ -10,15 +10,16 @@
 *   **SOT ID 261**: Reactive Flow Multithreading - Directed hardware observation flows to Dispatchers.IO to resolve main-thread vitality pulse stalls on budget A15 cores. (Resolved Sep.11.56)
 *   **SOT ID 262**: GNSS Stability Relaxation & Muzzling - Relaxed thresholds and centralized transition muzzling into `ForensicAuditor` to eliminate service-side boilerplate and handle A15 GNSS latency (R-ID 262). (Resolved Sep.11.60)
 *   **SOT ID 263**: HUD LED Synchronization - Implemented full hardware LED status propagation (GPS staleness, internet, relay) for A15 compliance (R338/R972). (Resolved Sep.11.60)
-*   **SOT ID 264**: Hardware Flag Abstraction - Consolidated bitmask flags into type-safe `LedStatus` object to eliminate manual bitwise operations in Services (R-ID 264). (Resolved Sep.12.00)
+*   **SOT ID 264**: Hardware Flag Abstraction - Consolidated bitmask flags into a type-safe `LedStatus` object to eliminate manual bitwise operations in Services (R-ID 264). (Resolved Sep.12.00)
 *   **SOT ID 286**: HUD Mapping Centralization - Unified HUD and Dashboard state construction logic into a single stateless `UiStateMapper` to prevent flow arity issues and simplify ViewModel architecture (Idea #13). (Resolved Sep.12.02)
+*   **SOT ID 290**: Display Volatility Management - Refined flickering detection to ignore non-user-perceivable state transitions between DOZE and DOZE_SUSPEND on Samsung hardware (R-ID 290). (Resolved Sep.12.12)
 
 ## 📈 Metric Summary
 - **Rules Verified**: 62
-- **Total SOT IDs**: 286
-- **Resolved Issues**: 1008
-- **Open Issues**: 0
-- **Testing Coverage**: 100% (51 sub-items)
+- **Total SOT IDs**: 287
+- **Resolved Issues**: 1009
+- **Open Issues**: 1
+- **Testing Coverage**: Testing (Sub-items: 271)
 - **Simplification Ideas**: 14
 - **QA Validation Tasks**: 271
 
@@ -29,6 +30,7 @@
 *   **Chapter 23.1 (UI Forensic Integrity)**: PASSED - Time-base synchronization for "Last Seen" deltas verified.
 *   **Chapter 23.2 (Reactive Flow Vitality)**: PASSED - Flow stall remediation for power transitions verified on background threads.
 *   **Chapter 24.1 (Abstraction Safety)**: PASSED - Type-safe hardware synchronization and unified mapping architecture verified.
+*   **Chapter 25.1 (Display Power Hardening)**: PASSED - Suppressed low-power state volatility noise in flickering logs.
 
 ---
-*Next Audit: Sep.12.08. (vSep.12.02)*
+*Next Audit: Sep.12.14. (vSep.12.12)*

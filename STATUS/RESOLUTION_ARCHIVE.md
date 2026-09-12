@@ -1,4 +1,8 @@
-# Hardening Resolution Archive (Sep.12.02)
+# Hardening Resolution Archive (Sep.12.12)
+
+## 🟢 Resolved in Sep.12.12
+*   **Rapid Display Flickering (#1010)**:
+    *   **Remediation**: Refined `HardwareProvider.displayListener` to ignore volatility between `STATE_DOZE` and `STATE_DOZE_SUSPEND`. These transitions are typical for Samsung AOD (S21FE) during background hydration and do not represent UI performance degradation. Hardened the flickering detector to maintain integrity for active state transitions while suppressing low-power noise. (R-ID 290).
 
 ## 🟢 Resolved in Sep.12.02
 *   **HUD Mapping Centralization (#1008)**:
@@ -15,4 +19,4 @@
     *   **Remediation**: Implemented full hardware LED synchronization for A15 devices as per HUD Spec R338/R972. Updated `JdHardwareManager.syncState` to propagate GPS staleness, internet loss, and relay connectivity status. (R-ID 263).
 
 ---
-*For older records, see historical git logs. (vSep.12.02)*
+*For older records, see historical git logs. (vSep.12.12)*

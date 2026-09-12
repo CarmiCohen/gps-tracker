@@ -34,6 +34,9 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.12.12:
+ * - Issue #1010 Hardening: Refined display flickering detection to ignore volatility 
+ *   between DOZE and DOZE_SUSPEND states, typical for Samsung AOD (R-ID 290).
  * Sep.11.52:
  * - Issue #945 Hardening: Elevated GNSSThread priority to THREAD_PRIORITY_URGENT_DISPLAY 
  *   to eliminate 9000ms jitter caused by background scheduling starvation on A15 hardware.
@@ -177,7 +180,7 @@ class HardwareProvider @Inject constructor(
     private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
 
     private val sensorBuffer = CircularStateBuffer(256, { EngineSensorSnapshot() }, {
-        it.ts = 0L; it.rt = 0L; it.lux = 0.0; it.vibe = 0.0; it.proxIdx = 0.0; it.lift = 0.0; it.tilt = 0.0; it.isSitDetected = false; it.sitVzTs = 0L; it.sitVzRt = 0L; it.sitShock = 0.0; it.kineticEnergy = 0.0
+        it.ts = 0L; it.rt = 0L; it.lux = 0.0; it.vibe = 0.0; it.proxIdx = 0.0; it.lift = 0.0; it.tilt = 0.0; it.acoustic = 0.0; it.isSitDetected = false; it.sitVzTs = 0L; it.sitVzRt = 0L; it.sitShock = 0.0; it.kineticEnergy = 0.0
     })
     private var lastBufferRecordRt = 0L
 
@@ -296,10 +299,23 @@ class HardwareProvider @Inject constructor(
             val newState = display.state
             if (newState != lastDisplayState) {
                 val nowRt = timeProvider.elapsedRealtime()
-                if (nowRt - lastDisplayTransitionRt < 1000L) {
-                    if (!isDisplayFlickering.get()) { isDisplayFlickering.set(true); Timber.w("Forensic: Rapid Display Flickering detected.") }
-                } else { isDisplayFlickering.set(false) }
-                lastDisplayState = newState; lastDisplayTransitionRt = nowRt
+                
+                // Issue #1010 Hardening: Ignore volatility between DOZE and DOZE_SUSPEND.
+                // Samsung AOD often toggles between these states rapidly during background hydration.
+                val isDozeVolatility = (lastDisplayState == Display.STATE_DOZE && newState == Display.STATE_DOZE_SUSPEND) ||
+                                       (lastDisplayState == Display.STATE_DOZE_SUSPEND && newState == Display.STATE_DOZE)
+
+                if (!isDozeVolatility && nowRt - lastDisplayTransitionRt < 1000L) {
+                    if (!isDisplayFlickering.get()) {
+                        isDisplayFlickering.set(true)
+                        Timber.w("Forensic: Rapid Display Flickering detected ($lastDisplayState -> $newState).")
+                    }
+                } else if (!isDozeVolatility) {
+                    isDisplayFlickering.set(false)
+                }
+                
+                lastDisplayState = newState
+                lastDisplayTransitionRt = nowRt
             }
         }
     }
