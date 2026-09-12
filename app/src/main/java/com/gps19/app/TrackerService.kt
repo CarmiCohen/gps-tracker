@@ -21,13 +21,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.12.00:
+ * - Issue #1007: Simplification Idea #15. Hardware Flag Abstraction.
+ *   Refactored LED synchronization to use type-safe LedStatus object, 
+ *   eliminating manual bitwise operations (R-ID 263).
  * Sep.11.62:
  * - Issue #1006: Simplification Idea #14. Centralized GNSS Stability Muzzling 
- *   into ForensicAuditor and LocationProcessor (R-ID 262). Logic now tracks 
- *   interval transitions internally to suppress false-positives.
- * Sep.11.60:
- * - Issue #917 Hardening (Part B): Implemented HUD LED Specification compliance (R960/R972). 
- *   Migrated to JdHardwareManager.syncHardwareState.
+ *   into ForensicAuditor and LocationProcessor (R-ID 262).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -488,11 +488,13 @@ class TrackerService : BaseMonitorService() {
                 JdHardwareManager.syncHardwareState(
                     timeProvider = timeProvider,
                     tick = serviceTickCounter,
-                    isPowerSave = isPowerSaveActive || health.isPowerSaveMode,
-                    isGpsStale = gpsAge > TELEMETRY_UI_STALE_THRESHOLD_MS,
-                    isInternetLoss = health.localInternetLoss,
-                    isRelayLoss = !isSocketConnected,
-                    isPeerStale = !isViewerActive
+                    status = LedStatus(
+                        isPowerSave = isPowerSaveActive || health.isPowerSaveMode,
+                        isGpsStale = gpsAge > TELEMETRY_UI_STALE_THRESHOLD_MS,
+                        isInternetLoss = health.localInternetLoss,
+                        isRelayLoss = !isSocketConnected,
+                        isPeerStale = !isViewerActive
+                    )
                 )
             } else if (nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
                 lastA15PokeRt = nowRt
@@ -560,7 +562,6 @@ class TrackerService : BaseMonitorService() {
                 lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed, gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = location.bearing.toDouble(), snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = forensicAuditor.lastGpsFixRealtime, isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, nowWall = now, nowRt = nowRt,
                 providedIsStalled = health.gpsStalled,
                 isSuspicious = isSuspiciousMode
-                // isAdaptationMuzzled is now internal to LocationProcessor (R-ID 262)
             )
             lastProcessedLocation = processed
             evaluateAlarmsInternal(now, nowRt, isSocketConnected, isViewerActive, processed, snapshot)

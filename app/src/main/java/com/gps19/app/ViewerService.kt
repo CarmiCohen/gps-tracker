@@ -16,13 +16,13 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.12.00:
+ * - Issue #1007: Simplification Idea #15. Hardware Flag Abstraction.
+ *   Refactored LED synchronization to use type-safe LedStatus object, 
+ *   eliminating manual bitwise operations (R-ID 263).
  * Sep.11.62:
  * - Issue #1006: Simplification Idea #14. Centralized GNSS Stability Muzzling 
- *   into ForensicAuditor and LocationProcessor (R-ID 262). Logic now tracks 
- *   interval transitions internally to suppress false-positives.
- * Sep.11.60:
- * - Issue #917 Hardening (Part B): Implemented HUD LED Specification compliance (R960/R972). 
- *   Migrated to JdHardwareManager.syncHardwareState.
+ *   into ForensicAuditor and LocationProcessor (R-ID 262).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -486,18 +486,25 @@ class ViewerService : BaseMonitorService() {
 
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
 
+        val isSocketConnected = connectivitySuite.isConnected() && !transientDropDetected.getAndSet(false)
+        connectivitySuite.updateRelayStatus(isSocketConnected)
+        
+        val isTrackerActive = connectivitySuite.lastPeerActivityTs > 0 && (nowRt - connectivitySuite.lastPeerActivityTs < WATCH_TIMEOUT_MS)
+        sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isTrackerActive, false)
+
         if (capabilities.isA15Device) {
             if (JdHardwareManager.isAvailable()) {
-                val isTrackerActive = connectivitySuite.lastPeerActivityTs > 0 && (nowRt - connectivitySuite.lastPeerActivityTs < WATCH_TIMEOUT_MS)
                 val gpsAge = nowRt - selfProcessor.getLastValidFixRt()
                 JdHardwareManager.syncHardwareState(
                     timeProvider = timeProvider,
                     tick = serviceTickCounter,
-                    isPowerSave = isPowerSaveActive || health.isPowerSaveMode,
-                    isGpsStale = gpsAge > TELEMETRY_UI_STALE_THRESHOLD_MS,
-                    isInternetLoss = health.localInternetLoss,
-                    isRelayLoss = !connectivitySuite.isConnected(),
-                    isPeerStale = !isTrackerActive
+                    status = LedStatus(
+                        isPowerSave = isPowerSaveActive || health.isPowerSaveMode,
+                        isGpsStale = gpsAge > TELEMETRY_UI_STALE_THRESHOLD_MS,
+                        isInternetLoss = health.localInternetLoss,
+                        isRelayLoss = !isSocketConnected,
+                        isPeerStale = !isTrackerActive
+                    )
                 )
             } else if (nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
                 lastA15PokeRt = nowRt
@@ -533,18 +540,14 @@ class ViewerService : BaseMonitorService() {
             selfProcessor.processGpsPoint(location.latitude, location.longitude, location.altitude, location.speed.toDouble(), location.time, lastGpsAccuracy, location.bearing.toDouble(), 0.0, 0, true, 0L, true, nowRt = nowRt, nowWall = now)
         }
 
-        val isSocketConnected = connectivitySuite.isConnected() && !transientDropDetected.getAndSet(false)
-        connectivitySuite.updateRelayStatus(isSocketConnected)
-        
-        val isTrackerActive = connectivitySuite.lastPeerActivityTs > 0 && (nowRt - connectivitySuite.lastPeerActivityTs < WATCH_TIMEOUT_MS)
-        sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isTrackerActive, false)
-
         val noiseIdx = (snapshot.acousticDb - selfProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB
         val liftIdx = (snapshot.baroAlt - selfProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS
 
         historyManager.updateRibbons(
             now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = 10, peerAvail = isSocketConnected && isTrackerActive, hasGps = (lastProcessedLocation?.timestamp ?: 0L) > 0, isTrackerMode = false, accuracy = lastGpsAccuracy, maxAccuracy = selfProcessor.getMaxTrackerAccuracy(), noiseIdx = noiseIdx, luxIdx = log10(snapshot.lux + 1.0) / RIBBON_LUX_LOG_SCALE, vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = (hardwareProvider.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0), tiltIdx = abs(snapshot.tiltDegrees - selfProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG, baroIdx = (snapshot.baroAlt - selfProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = lastGpsBearing, isSitDetected = false, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = snapshot.kineticEnergy, isRecoveryEvent = false
         )
+
+        evaluateAlarmsInternal(now, nowRt, health.signalLoss, false, false, false, isTrackerActive)
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
         repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, now)
