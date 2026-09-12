@@ -47,11 +47,7 @@ abstract class AppModule {
 
     @Binds
     @Singleton
-    abstract fun bindDashboardStateProvider(impl: DashboardStateProviderImpl): DashboardStateProvider
-
-    @Binds
-    @Singleton
-    abstract fun bindUiStateAggregator(impl: UiStateAggregatorImpl): UiStateAggregator
+    abstract fun bindUiStateMapper(impl: UiStateMapperImpl): UiStateMapper
 
     companion object {
         @Provides

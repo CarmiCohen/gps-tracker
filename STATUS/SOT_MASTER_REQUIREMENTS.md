@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.12.00)
+# SOT Master Requirements & Hardening Status (Sep.12.02)
 
 ## 🛡️ Core Hardening Baseline
 *   **SOT ID 314**: Signaling Session Integrity - Isolates socket callbacks via session-ID to prevent race conditions. (Resolved Sep.11.23)
@@ -11,11 +11,12 @@
 *   **SOT ID 262**: GNSS Stability Relaxation & Muzzling - Relaxed thresholds and centralized transition muzzling into `ForensicAuditor` to eliminate service-side boilerplate and handle A15 GNSS latency (R-ID 262). (Resolved Sep.11.60)
 *   **SOT ID 263**: HUD LED Synchronization - Implemented full hardware LED status propagation (GPS staleness, internet, relay) for A15 compliance (R338/R972). (Resolved Sep.11.60)
 *   **SOT ID 264**: Hardware Flag Abstraction - Consolidated bitmask flags into type-safe `LedStatus` object to eliminate manual bitwise operations in Services (R-ID 264). (Resolved Sep.12.00)
+*   **SOT ID 286**: HUD Mapping Centralization - Unified HUD and Dashboard state construction logic into a single stateless `UiStateMapper` to prevent flow arity issues and simplify ViewModel architecture (Idea #13). (Resolved Sep.12.02)
 
 ## 📈 Metric Summary
-- **Rules Verified**: 61
-- **Total SOT IDs**: 264
-- **Resolved Issues**: 1007
+- **Rules Verified**: 62
+- **Total SOT IDs**: 286
+- **Resolved Issues**: 1008
 - **Open Issues**: 0
 - **Testing Coverage**: 100% (51 sub-items)
 - **Simplification Ideas**: 14
@@ -27,7 +28,7 @@
 *   **Chapter 22.1 (Telemetry Convergence)**: PASSED - Forensic audit parity achieved.
 *   **Chapter 23.1 (UI Forensic Integrity)**: PASSED - Time-base synchronization for "Last Seen" deltas verified.
 *   **Chapter 23.2 (Reactive Flow Vitality)**: PASSED - Flow stall remediation for power transitions verified on background threads.
-*   **Chapter 24.1 (Abstraction Safety)**: PASSED - Type-safe hardware synchronization verified in Services.
+*   **Chapter 24.1 (Abstraction Safety)**: PASSED - Type-safe hardware synchronization and unified mapping architecture verified.
 
 ---
-*Next Audit: Sep.12.08. (vSep.12.00)*
+*Next Audit: Sep.12.08. (vSep.12.02)*
