@@ -1,4 +1,8 @@
-# Hardening Resolution Archive (Sep.12.15)
+# Hardening Resolution Archive (Sep.12.20)
+
+## 🟢 Resolved in Sep.12.20
+*   **Main-Thread Task Await Regression (#1011)**:
+    *   **Remediation**: Remediated by adding a Main-thread check in `ManagedLocationCallback.unregister` to skip `Tasks.await` if called on the Main thread. This prevents `IllegalStateException` during fallback unregistration while maintaining synchronous behavior on background handler threads. (R-ID 291).
 
 ## 🟢 Resolved in Sep.12.12
 *   **Rapid Display Flickering (#1010)**:
@@ -13,4 +17,4 @@
     *   **Remediation**: Consolidated hardware LED bitmask flags into a type-safe `LedStatus` data class. Refactored `TrackerService` and `ViewerService` to use `JdHardwareManager.syncHardwareState(..., LedStatus)`, eliminating manual bitwise operations and improving arity safety. (R-ID 264).
 
 ---
-*For older records, see historical git logs. (vSep.12.15)*
+*For older records, see historical git logs. (vSep.12.20)*

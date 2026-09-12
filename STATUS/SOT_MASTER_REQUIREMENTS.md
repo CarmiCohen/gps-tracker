@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.12.15)
+# SOT Master Requirements & Hardening Status (Sep.12.20)
 
 ## 🛡️ Core Hardening Baseline
 *   **SOT ID 314**: Signaling Session Integrity - Isolates socket callbacks via session-ID to prevent race conditions. (Resolved Sep.11.23)
@@ -13,11 +13,12 @@
 *   **SOT ID 264**: Hardware Flag Abstraction - Consolidated bitmask flags into a type-safe `LedStatus` object to eliminate manual bitwise operations in Services (R-ID 264). (Resolved Sep.12.00)
 *   **SOT ID 286**: HUD Mapping Centralization - Unified HUD and Dashboard state construction logic into a single stateless `UiStateMapper` to prevent flow arity issues and simplify ViewModel architecture (Idea #13). (Resolved Sep.12.02)
 *   **SOT ID 290**: Display Volatility Management - Refined flickering detection to ignore non-user-perceivable state transitions between DOZE and DOZE_SUSPEND on Samsung hardware (R-ID 290). (Resolved Sep.12.12)
+*   **SOT ID 291**: Main-Thread Task Safety - Remediated `IllegalStateException` during location unregistration by preventing `Tasks.await` from executing on the Main thread during fallback. (Resolved Sep.12.20)
 
 ## 📈 Metric Summary
 - **Rules Verified**: 62
-- **Total SOT IDs**: 287
-- **Resolved Issues**: 1010
+- **Total SOT IDs**: 288
+- **Resolved Issues**: 1011
 - **Open Issues**: 1
 - **Testing Coverage**: Testing (Sub-items: 271)
 - **Simplification Ideas**: 16
@@ -31,6 +32,7 @@
 *   **Chapter 23.2 (Reactive Flow Vitality)**: PASSED - Flow stall remediation for power transitions verified on background threads.
 *   **Chapter 24.1 (Abstraction Safety)**: PASSED - Type-safe hardware synchronization and unified mapping architecture verified.
 *   **Chapter 25.1 (Display Power Hardening)**: PASSED - Suppressed low-power state volatility noise in flickering logs.
+*   **Chapter 26.1 (Lifecycle Robustness)**: PASSED - Main-thread task safety for hardware unregistration verified.
 
 ---
-*Next Audit: Sep.12.16. (vSep.12.15)*
+*Next Audit: Sep.12.21. (vSep.12.20)*

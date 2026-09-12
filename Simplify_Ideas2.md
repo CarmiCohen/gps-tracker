@@ -1,7 +1,5 @@
-# Simplification Ideas 2
+# Project Simplification Ideas
 
-*   **Idea #7 (HUD State Logic Extraction)**: Move the logic for mapping `ConnectivitySuite` flows to HUD states into a dedicated `HudStateMapper` to reduce `MainViewModel` complexity.
-*   **Idea #8 (Common Repository Base)**: Create a base class for `OfflineRepository` and `LogRepository` to share common serialization and pruning logic.
-*   **Idea #13 (HUD Mapping Centralization)**: [RESOLVED Sep.12.02] Consolidated HUD state construction logic into a single stateless `UiStateMapper` (R-ID 286).
-*   **Idea #15 (Hardware Flag Abstraction)**: [RESOLVED Sep.12.00] Consolidated bitmask flags into type-safe `LedStatus` object (R-ID 264).
-*   **Idea #16 (Display State Extraction)**: Extract `DisplayManager.DisplayListener` and flickering detection logic from `HardwareProvider` into a dedicated `DisplayStateMonitor` to reduce provider complexity (R-ID 290).
+... (previous ideas)
+
+17. **Cleanup Logic Simplification**: Evaluate removing `Tasks.await` from `ManagedHardware` unregistration sequences. If modern Play Services handle asynchronous unregistration without leaking native `BaseEventQueue` resources, switching to pure async cleanup would eliminate the need for thread-checks and synchronous wait blocks.

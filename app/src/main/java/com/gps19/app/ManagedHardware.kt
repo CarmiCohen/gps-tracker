@@ -105,6 +105,8 @@ abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
 /**
  * ManagedLocationCallback: Encapsulates safe, synchronous unregistration of
  * FusedLocationProvider location updates to prevent native leaks (R747/R748/R890).
+ * Sep.12.20: Remediated Issue #1011. Added Main-thread check before Tasks.await to 
+ * prevent IllegalStateException during fallback unregistration (R-ID 291).
  */
 abstract class ManagedLocationCallback : LocationCallback() {
     fun unregister(client: FusedLocationProviderClient, handler: Handler?) {
@@ -113,11 +115,16 @@ abstract class ManagedLocationCallback : LocationCallback() {
             handler
         ) {
             val task = client.removeLocationUpdates(this)
-            try {
-                Tasks.await(task, 4000, TimeUnit.MILLISECONDS)
-                Timber.d("ManagedLocationCallback: Native task await successful.")
-            } catch (e: Exception) {
-                Timber.e(e, "ManagedLocationCallback: Native task await failed")
+            // Tasks.await must NOT be called on the main thread (Issue #1011).
+            if (Looper.myLooper() != Looper.getMainLooper()) {
+                try {
+                    Tasks.await(task, 4000, TimeUnit.MILLISECONDS)
+                    Timber.d("ManagedLocationCallback: Native task await successful.")
+                } catch (e: Exception) {
+                    Timber.e(e, "ManagedLocationCallback: Native task await failed")
+                }
+            } else {
+                Timber.w("ManagedLocationCallback: Skipping Tasks.await on Main thread to prevent regression.")
             }
         }
     }
