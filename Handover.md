@@ -14,8 +14,8 @@ Version **Sep.12.46** (Build 1000) is verified and stable.
 *   **State Sanitation**: Volatile telemetry reset and accuracy window synchronization integrated into mode transition lifecycle.
 
 ## 🚀 Next Steps (Resumption Focus)
-1.  **Field Stability Monitoring**: Monitor connection resilience and telemetry consistency under varying network conditions.
-2.  **Audit Persistence**: Verify forensic counter parity during long-running sessions (>24h).
-3.  **UI Performance**: Evaluate if further reduction in UI update frequency (Idea #14) is required for budget devices.
+1.  **Signaling Handshake Recovery (#1019, #1020, #1021, #1022)**: Resolve the connection failure between Viewer and Tracker roles using forensic log audits and identity alignment checks.
+2.  **Field Stability Monitoring**: Monitor connection resilience and telemetry consistency under varying network conditions.
+3.  **Audit Persistence**: Verify forensic counter parity during long-running sessions (>24h).
 
-**Current Audit Baseline: [SOT: 291 (Rules: 62, IDs: 291), Resolved: 1018, Open: 0, Testing: 0, Ideas: 18, QA: 276]**
+**Current Audit Baseline: [SOT: 291 (Rules: 62, IDs: 291), Resolved: 1018, Open: 4, Testing: 0, Ideas: 18, QA: 276]**
