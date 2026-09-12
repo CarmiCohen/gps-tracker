@@ -1,4 +1,8 @@
-# Hardening Resolution Archive (Sep.11.58)
+# Hardening Resolution Archive (Sep.11.60)
+
+## 🟢 Resolved in Sep.11.60
+*   **HUD LED Specification Compliance (#917)**:
+    *   **Remediation**: Implemented full hardware LED synchronization for A15 devices as per HUD Spec R338/R972. Updated `JdHardwareManager.syncState` to propagate GPS staleness (35s gate), internet loss, and relay connectivity status. This ensures physical LED parity with the UI status row and remediates Requirement R972 (R-ID 263).
 
 ## 🟢 Resolved in Sep.11.58
 *   **A15 GNSS Instability (#950)**:
@@ -8,15 +12,5 @@
 *   **A15 Reactive Flow Stalls (#949)**:
     *   **Remediation**: Directed all shared observation flows in `SystemStatusProviderImpl` to execute on `Dispatchers.IO` using `.flowOn(Dispatchers.IO)`. This eliminates main-thread contention and ensures consistent vitality pulses for IntegrityMonitor heartbeats, preventing false-positive stall detections on budget hardware (R-ID 289).
 
-## 🟢 Resolved in Sep.11.54
-*   **Build Failure: Type Mismatch in MainViewModel (#947)**:
-    *   **Remediation**: Lambda parameter mismatch resolved by nesting `combine` calls for `dashboardHealthState`. Standard `combine` is limited to 5 heterogeneous flows; nesting 3 flows inside a sub-combine brought the main arity to 4, satisfying the compiler (R-ID 289).
-*   **Build Failure: HUD State Type Mismatch (#948)**:
-    *   **Remediation**: Removed duplicate `HudConnectivityState`, `HudTelemetryState`, and `HudHealthState` from `:core:engine`. These UI-facing models are now exclusively managed in the `:app` module to prevent import ambiguity and ensure consistency (R-ID 286).
-
-## 🟢 Resolved in Sep.11.52
-*   **Recurring GNSS Jitter on A15 (#945)**:
-    *   **Remediation**: Elevated `GNSSThread` priority to `THREAD_PRIORITY_URGENT_DISPLAY` in `HardwareProvider`. Budget hardware (A15) cores were causing scheduling starvation for background threads during sensor-heavy logic pulses, leading to ~9000ms jitter. Priority alignment ensures GNSS status callbacks are processed within the urgent scheduling window (R-ID 260).
-
 ---
-*For older records, see historical git logs. (vSep.11.58)*
+*For older records, see historical git logs. (vSep.11.60)*

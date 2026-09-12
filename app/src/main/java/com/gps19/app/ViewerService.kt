@@ -16,15 +16,13 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.11.60:
+ * - Issue #917 Hardening (Part B): Implemented HUD LED Specification compliance (R960/R972). 
+ *   Migrated to JdHardwareManager.syncHardwareState to propagate GPS staleness, 
+ *   internet loss, relay loss, and Peer (Tracker) presence to A15 hardware LEDs.
  * Sep.11.58:
  * - Issue #950 Hardening: Propagated isAdaptationMuzzled to recordGpsFix 
  *   to eliminate false-positive Stability Gaps during polling transitions.
- * Sep.11.42:
- * - Issue #916 Hardening: Use currentIntervalMs in ForensicAuditor.recordGpsFix 
- *   to eliminate false-positive Stability Gaps during dynamic polling transitions.
- * Sep.11.21:
- * - Issue #946 Visibility: Propagated remote tamperNote to AlarmManager for 
- *   forensic transparency (R-ID 288).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -492,8 +490,19 @@ class ViewerService : BaseMonitorService() {
 
         if (capabilities.isA15Device) {
             if (JdHardwareManager.isAvailable()) {
-                val flags = if (isPowerSaveActive || health.isPowerSaveMode) 0x01 else 0x00
-                JdHardwareManager.syncState(timeProvider, serviceTickCounter, flags)
+                // Issue #917 (Part B): Consolidate HUD LED Specification compliance logic.
+                val isTrackerActive = connectivitySuite.lastPeerActivityTs > 0 && (nowRt - connectivitySuite.lastPeerActivityTs < WATCH_TIMEOUT_MS)
+                val gpsAge = nowRt - selfProcessor.getLastValidFixRt()
+                
+                JdHardwareManager.syncHardwareState(
+                    timeProvider = timeProvider,
+                    tick = serviceTickCounter,
+                    isPowerSave = isPowerSaveActive || health.isPowerSaveMode,
+                    isGpsStale = gpsAge > TELEMETRY_UI_STALE_THRESHOLD_MS,
+                    isInternetLoss = health.localInternetLoss,
+                    isRelayLoss = !connectivitySuite.isConnected(),
+                    isPeerStale = !isTrackerActive
+                )
             } else if (nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
                 lastA15PokeRt = nowRt
                 systemMonitor.acquireWakeLock(force = true)
@@ -533,17 +542,6 @@ class ViewerService : BaseMonitorService() {
         
         val isTrackerActive = connectivitySuite.lastPeerActivityTs > 0 && (nowRt - connectivitySuite.lastPeerActivityTs < WATCH_TIMEOUT_MS)
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isTrackerActive, false)
-
-        val silenceDelta = if (connectivitySuite.lastPeerActivityTs > 0) nowRt - connectivitySuite.lastPeerActivityTs else (nowRt - serviceStartRealtime)
-        val isSignalLoss = !integrityMonitor.checkSignalIntegrity(nowRt, silenceDelta, false)
-        val isTrackerStalled = connectivitySuite.trackerGpsStallStartTs > 0L && (nowRt - connectivitySuite.trackerGpsStallStartTs > GPS_STALL_THRESHOLD_MS)
-        val isTrackerStalledRelay = connectivitySuite.trackerLastValidFixRt > 0L && (nowRt - connectivitySuite.trackerLastValidFixRt > GPS_GAP_THRESHOLD_MS)
-
-        val status = connectivitySuite.trackerStatus
-        val home = repository.getCachedHomePoints().firstOrNull()
-        val distToHome = if (status.lat != 0.0 && home != null) PhysicsUtils.calculateDistance(status.lat, status.lng, home.latitude, home.longitude) else null
-
-        evaluateAlarmsInternal(now, nowRt, isSignalLoss, connectivitySuite.isTrackerJammerSuspicion, isTrackerStalled, isTrackerStalledRelay, isTrackerActive)
 
         val noiseIdx = (snapshot.acousticDb - selfProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB
         val liftIdx = (snapshot.baroAlt - selfProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS

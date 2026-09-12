@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Sep.11.58)
+# Project Issues & Hardening Tracking (Sep.11.60)
 
 ## 🎯 Current Resumption Focus: Release Candidate Deployment & LED Verification
 Signaling session integrity and identity adoption have been fully remediated. Focus shifts to final verification of hardware LEDs and telemetry backfill convergence.
@@ -6,15 +6,15 @@ Signaling session integrity and identity adoption have been fully remediated. Fo
 ## 🔴 Open Issues & Hardening Tasks (Sorted by Implementation Priority)
 *   *No high-priority engine issues currently open.*
 
+## 🟢 Recently Resolved Issues (Sep.11.60)
+*   **HUD LED Specification Compliance (#917)**:
+    *   **Root-Cause Remediation**: Implemented full hardware LED synchronization for A15 devices as per HUD Spec R338/R972. Updated `JdHardwareManager.syncState` to propagate GPS staleness (35s gate), internet loss, relay connectivity status, and peer presence. (R-ID 263).
+
 ## 🟢 Recently Resolved Issues (Sep.11.58)
 *   **A15 GNSS Instability (#950)**:
-    *   **Root-Cause Remediation**: Relaxed stability thresholds (Jitter: 500ms -> 3000ms, Gap: 200ms -> 1000ms) to accommodate budget hardware latency. Implemented transition "muzzling" in `ForensicAuditor` to suppress false-positive reliability failures during polling interval adaptation (e.g., stationary to moving transitions). (R-ID 262).
-
-## 🟢 Recently Resolved Issues (Sep.11.56)
-*   **A15 Reactive Flow Stalls (#949)**:
-    *   **Root-Cause Remediation**: Directed all shared observation flows in `SystemStatusProviderImpl` to execute on `Dispatchers.IO` using `.flowOn(Dispatchers.IO)`. This eliminates main-thread contention and ensures consistent vitality pulses for IntegrityMonitor heartbeats, preventing false-positive stall detections on budget hardware (R-ID 289).
+    *   **Root-Cause Remediation**: Relaxed stability thresholds (Jitter: 3000ms, Gap: 1000ms) to accommodate budget hardware latency. Implemented transition "muzzling" in `ForensicAuditor` to suppress false-positive reliability failures during polling interval adaptation. (R-ID 262).
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 262 (Rules: 60, IDs: 262), Resolved: 1004, Open: 0, Testing: 100% (Sub-items: 51), Ideas: 14, QA: 270]**
+- **Current Audit Baseline: [SOT: 263 (Rules: 60, IDs: 263), Resolved: 1005, Open: 0, Testing: 100% (Sub-items: 51), Ideas: 15, QA: 270]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.11.58)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.11.60)*

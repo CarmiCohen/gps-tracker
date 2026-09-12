@@ -16,19 +16,23 @@ import kotlinx.coroutines.sync.withLock
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Sep.11.60:
+ * - Issue #917 Hardening (Part B): Implemented HUD LED Specification compliance (R960/R972). 
+ *   Added FLAG_PEER_STALE (0x10) and consolidated flag logic into syncHardwareState() 
+ *   to eliminate duplication in Tracker/Viewer services (Idea #15).
  * Aug.26.00:
  * - Issue #319 Remediation: Added robust retry mechanism with exponential backoff 
  *   to native initialization to resolve Monitor::Inflate installation failures 
  *   during background service startup (R319).
- * Aug.25.00:
- * - Issue #310 Remediation: Neutralized literal legacy SDK strings in log messages 
- *   to prevent CFMS string-pool scanning from triggering Ghost Loads (R212).
- * Aug.21.09:
- * - Issue #265 Remediation: Replaced callback-based loadLibraryAsync with 
- *   suspend initialize() and switched to Mutex to avoid thread-blocking 
- *   stalls during bootstrap (R265).
  */
 object JdHardwareManager {
+
+    // Issue #917: LED Status Flags (R338/R972)
+    const val FLAG_POWER_SAVE = 0x01
+    const val FLAG_GPS_STALE = 0x02
+    const val FLAG_INTERNET_LOSS = 0x04
+    const val FLAG_RELAY_LOSS = 0x08
+    const val FLAG_PEER_STALE = 0x10
 
     private val isLibraryLoaded = AtomicBoolean(false)
     private val initializationMutex = Mutex()
@@ -45,7 +49,29 @@ object JdHardwareManager {
     }
 
     /**
-     * initialize: Load and initialize the native SDK off the main thread with retries (Issue #319).
+     * syncHardwareState: High-level helper to consolidate LED flag construction (Idea #15).
+     */
+    suspend fun syncHardwareState(
+        timeProvider: TimeProvider,
+        tick: Int,
+        isPowerSave: Boolean,
+        isGpsStale: Boolean,
+        isInternetLoss: Boolean,
+        isRelayLoss: Boolean,
+        isPeerStale: Boolean
+    ): Int {
+        var flags = 0
+        if (isPowerSave) flags = flags or FLAG_POWER_SAVE
+        if (isGpsStale) flags = flags or FLAG_GPS_STALE
+        if (isInternetLoss) flags = flags or FLAG_INTERNET_LOSS
+        if (isRelayLoss) flags = flags or FLAG_RELAY_LOSS
+        if (isPeerStale) flags = flags or FLAG_PEER_STALE
+        
+        return syncState(timeProvider, tick, flags)
+    }
+
+    /**
+     * initialize: Load and initialize the native SDK off the main thread with retries.
      */
     suspend fun initialize(timeProvider: TimeProvider, deviceId: String): Boolean = withContext(Dispatchers.IO) {
         if (isLibraryLoaded.get()) return@withContext true
