@@ -33,12 +33,13 @@ sealed class CommandEvent {
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Sep.12.47:
+ * - Issue #1017 Hardening: Integrated integrityMonitor.resetStats() into reset 
+ *   commands to ensure forensic parity and clear hardware health counters 
+ *   during session transitions (R-ID 317).
  * Sep.03.25:
  * - Idea #240: ContextShadow Automation. Migrated AudioSynthesizer dependency 
  *   to injection (R-ID 240).
- * Aug.28.04:
- * - Issue #753 Hardening: Refactored power and legacy receivers to use 
- *   ManagedBroadcastReceiver for deterministic native resource cleanup (R753).
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -54,7 +55,8 @@ class CommandRouter @Inject constructor(
     private val repository: MainRepository,
     private val integrityMonitor: IntegrityMonitor,
     private val timeProvider: TimeProvider,
-    private val audioSynthesizer: AudioSynthesizer
+    private val audioSynthesizer: AudioSynthesizer,
+    private val historyManager: HistoryManager
 ) {
     private val isRegistered = AtomicBoolean(false)
     private val isObserving = AtomicBoolean(false)
@@ -123,6 +125,8 @@ class CommandRouter @Inject constructor(
                             sessionManager.reset()
                             locationProcessor.resetStats()
                             connectivitySuite.resetPeerStats()
+                            historyManager.reset()
+                            integrityMonitor.resetStats()
                         }
                         is UiCommand.SettingsUpdated -> {
                             _commandEvents.emit(CommandEvent.SyncSensors)
@@ -135,6 +139,8 @@ class CommandRouter @Inject constructor(
                             sessionManager.reset()
                             locationProcessor.resetStats()
                             connectivitySuite.resetPeerStats()
+                            historyManager.reset()
+                            integrityMonitor.resetStats()
                             _commandEvents.emit(CommandEvent.SyncSensors)
                         }
                         is UiCommand.ExecuteTestAlarm -> {

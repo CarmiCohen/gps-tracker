@@ -1,7 +1,10 @@
-# SOT Master Requirements & Hardening Status (Sep.12.45)
+# SOT Master Requirements & Hardening Status (Sep.12.46)
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 314**: Signaling Session Integrity - Isolates socket callbacks via session-ID and ensures PeerPulse emission for heartbeats. Hardened in Sep.12.45 to ensure proactive tick-loop initiation on every pulse to prevent session stalls (R-ID 314). (Resolved Sep.12.45)
+*   **SOT ID 317**: History Manager Continuity - Resolved scope deadlock by allowing initialize() to update the CoroutineScope. Integrated reset() into CommandRouter to ensure forensic parity across sessions (R-ID 317). (Resolved Sep.12.46)
+*   **SOT ID 316**: State Restoration Integrity - loadState() now fills the accuracy window buffer with the restored baseline to prevent "ghost" high-accuracy spikes during role transitions (R-ID 316). (Resolved Sep.12.46)
+*   **SOT ID 315**: Centralized Build Logic - Migrated dependency and plugin management to Gradle Version Catalog (`libs.versions.toml`) to ensure build reproducible and eliminate hardcoded volatility (Idea #18). (Resolved Sep.12.46)
+*   **SOT ID 314**: Signaling Session Integrity - Isolates socket callbacks via session-ID and ensures PeerPulse emission for heartbeats. Hardened in Sep.12.46 to ensure proactive tick-loop initiation on every pulse to prevent session stalls (R-ID 314). (Resolved Sep.12.46)
 *   **SOT ID 256**: GNSS Temporal Integrity - Decoupled GNSS callbacks into a dedicated thread to eliminate jitter on budget hardware (A15). (Resolved Sep.11.42)
 *   **SOT ID 257**: Telemetry Convergence Audit - Synchronized gap-filling logic with forensic counters for parity across all backfill modes. (Resolved Sep.11.43)
 *   **SOT ID 258**: UI Temporal Consistency - Synchronized Dashboard time-base to monotonic `systemPulseRt` to eliminate Epoch-1970 deltas in "Last Seen" fields. (Resolved Sep.11.46)
@@ -17,12 +20,12 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 62
-- **Total SOT IDs**: 288
-- **Resolved Issues**: 1015
+- **Total SOT IDs**: 291
+- **Resolved Issues**: 1018
 - **Open Issues**: 0
-- **Testing Coverage**: Testing (Sub-items: 271)
+- **Testing Coverage**: 0
 - **Simplification Ideas**: 18
-- **QA Validation Tasks**: 273
+- **QA Validation Tasks**: 276
 
 ## 🏁 Verification Chapters
 *   **Chapter 5.1 (A15 Hardware)**: PASSED - GNSS scheduling, stability gaps, and LED synchronization resolved.
@@ -33,6 +36,7 @@
 *   **Chapter 24.1 (Abstraction Safety)**: PASSED - Type-safe hardware synchronization and unified mapping architecture verified.
 *   **Chapter 25.1 (Display Power Hardening)**: PASSED - Suppressed low-power state volatility noise in flickering logs.
 *   **Chapter 26.1 (Lifecycle Robustness)**: PASSED - Main-thread task safety for hardware unregistration verified.
+*   **Chapter 27.1 (Build Reproducibility)**: PASSED - Centralized version management via Version Catalog verified.
 
 ---
-*Next Audit: Sep.12.46. (vSep.12.45)*
+*Next Audit: Sep.12.47. (vSep.12.46)*

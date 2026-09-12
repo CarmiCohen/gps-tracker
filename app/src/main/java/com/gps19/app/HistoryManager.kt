@@ -27,12 +27,13 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.12.47:
+ * - Issue #1017 Hardening: Resolved Scope Deadlock during role transitions. 
+ *   initialize() now correctly updates the CoroutineScope to prevent binding 
+ *   to cancelled service scopes. Added reset() to ensure forensic parity (R-ID 317).
  * Sep.11.43:
  * - Issue #923: Telemetry Backfill Convergence. Synchronized fillRealGap with 
  *   forensic audit counters (backfillAuditCount) for consistency in continuity reporting.
- * Sep.06.10:
- * - Issue #922: Clock Parity. Updated forensic queries to use elapsedRealtime() 
- *   parity for backfilling consistency during system clock jumps.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -69,9 +70,14 @@ class HistoryManager @Inject constructor(
     private var lastTimeTriggerTs = 0L
     private var lastSitDetectedRt = 0L
 
+    /**
+     * initialize: Binds the manager to an active service scope.
+     * Sep.12.47: Removed AtomicBoolean guard to allow scope migration during transitions.
+     */
     suspend fun initialize(scope: CoroutineScope) {
-        if (isInitialized.getAndSet(true)) return
         this.scope = scope
+        if (isInitialized.getAndSet(true)) return
+        
         withContext(Dispatchers.IO) {
             val lastSitTs = repository.getLong(LAST_HISTORY_SIT_TS_KEY, 0L)
             if (lastSitTs > 0) {
@@ -79,6 +85,20 @@ class HistoryManager @Inject constructor(
             }
             clockDriftRef = repository.getLong(CLOCK_DRIFT_REF_KEY, 0L)
         }
+    }
+
+    /**
+     * reset: Clears all forensic counters and transient state (R-ID 317).
+     */
+    fun reset() {
+        lastProcessedHour = -1
+        lastCleanupDate = ""
+        lastArchiveDate = ""
+        backfillAuditCount = 0
+        hourlyBackfillTotal = 0
+        lastAuditTs = 0L
+        lastTimeTriggerTs = 0L
+        aggregator.reset()
     }
 
     private fun emitSanitizedLog(message: String, isImportant: Boolean = false) {

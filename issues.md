@@ -1,22 +1,22 @@
-# Project Issues & Hardening Tracking (Sep.12.45)
+# Project Issues & Hardening Tracking (Sep.12.46)
 
-## 🎯 Current Resumption Focus: Signaling Integrity & Multi-Device Sync
-Verifying connection handshake reliability and session initialization across roles.
+## 🎯 Current Resumption Focus: Field Stability & Audit Persistence
+Monitoring connection resilience and telemetry consistency in the field.
 
 ## 🔴 Open Issues & Hardening Tasks (Sorted by Implementation Priority)
-*None.*
+*None. All high-priority hardening tasks for vSep.12.46 are resolved.*
 
-## 🟢 Recently Resolved Issues (Sep.12.45)
+## 🟢 Recently Resolved Issues (Sep.12.46)
+*   **Stability Audit & Role Transition Verification (#1017)**:
+    *   **Root-Cause Remediation**: Performed a forensic audit of the role transition logic. Verified mutual exclusivity in `MainActivity`, state sanitation in `SessionUseCase`/`TelemetryRepository`, and hardened resumption in `ViewerService`/`TrackerService`. Implemented **R-ID 316** (Accuracy Window Integrity) and **R-ID 317** (History Manager Continuity).
+*   **Version Centralization (#1018)**:
+    *   **Root-Cause Remediation**: Implemented Gradle Version Catalog (`libs.versions.toml`) to centralize dependency and plugin management across `:app` and `:core:engine` (Simplification Idea #18).
+*   **Connectivity & Telemetry Audit (#1016)**:
+    *   **Root-Cause Remediation**: Verified dual-device handshake stability and tick-loop initiation between S21FE and A15. Forensic audit confirmed that the signaling resumption hardening successfully prevents session stalls. (R-ID 314).
 *   **Signaling Resumption Hardening (#1015)**:
-    *   **Root-Cause Remediation**: Hardened `ViewerService` and `TrackerService` to ensure the operational tick loop is initiated on *every* peer pulse if the job is not active. This prevents session stalls that occurred when a service loop was terminated (e.g., via exception or lifecycle) but the peer remained in the `SessionManager` pulse map, causing subsequent pulses to be ignored. (R-ID 314).
-*   **Dual-Device Deployment & Baseline Sync (#1014)**:
-    *   **Root-Cause Remediation**: Synchronized project baseline to version Sep.12.45. Prepared for dual-device deployment to S21FE and A15 to verify signaling fixes from Sep.12.31.
-
-## 🟢 Recently Resolved Issues (Sep.12.31)
-*   **Viewer Connection Handshake Bug (#1013)**:
-    *   **Root-Cause Remediation**: Fixed a logic error in `ConnectivitySuite.handleJsonUpdate` where `viewer_pulse` and `tracker_pulse` packets were being consumed without emitting a `PeerPulse` event. (R-ID 314).
+    *   **Root-Cause Remediation**: Hardened services to ensure the operational tick loop is proactively initiated on *every* peer pulse if the job is not active. (R-ID 314).
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 288 (Rules: 62, IDs: 288), Resolved: 1015, Open: 0, Testing: 1 (Sub-items: 271), Ideas: 18, QA: 271]**
+- **Current Audit Baseline: [SOT: 291 (Rules: 62, IDs: 291), Resolved: 1018, Open: 0, Testing: 0, Ideas: 18, QA: 276]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.12.45)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.12.46)*

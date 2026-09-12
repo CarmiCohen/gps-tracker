@@ -20,16 +20,14 @@ sealed class ProcessorEvent {
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.12.46:
+ * - Issue #1017 Hardening: Fixed accuracy window leakage during state restoration. 
+ *   loadState() now fills the entire window buffer with the restored max accuracy 
+ *   to ensure forensic parity during role transitions (R-ID 316).
  * Sep.11.62:
  * - Issue #1006: Simplification Idea #14. Centralized GNSS Stability Muzzling 
  *   (R-ID 262). Logic now tracks interval transitions to suppress false-positive 
  *   jumps during adaptation without requiring service-side flags.
- * Aug.18.05:
- * - Issue #201: Urban Edge Case Multipath Mitigation. Integrated SNR-based 
- *   anchor evaluation to harden stationary state management in urban canyons (R201).
- * Aug.14.06:
- * - Issue #172: Viewer-Side State Audit. Finalized forensic parity by adding 
- *   Vz timestamps (sitVzTs, sitVzRt) to loadState (R172).
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -100,7 +98,10 @@ class LocationProcessor(
     ) {
         if (savedMaxAccuracy > 0.0) {
             maxAccuracy = savedMaxAccuracy
-            addAccuracyToWindow(savedMaxAccuracy)
+            // R-ID 316: Fill the entire window to prevent stale max accuracy leakage
+            fillAccuracyWindow(savedMaxAccuracy)
+        } else {
+            resetAccuracyWindow()
         }
         
         sentinel.loadForensicState(
@@ -126,6 +127,20 @@ class LocationProcessor(
         accuracyWindowBuffer[accuracyWindowHead] = acc
         accuracyWindowHead = (accuracyWindowHead + 1) % ACCURACY_WINDOW_MAX_SIZE
         if (accuracyWindowSize < ACCURACY_WINDOW_MAX_SIZE) accuracyWindowSize++
+    }
+
+    private fun fillAccuracyWindow(acc: Double) {
+        for (i in 0 until ACCURACY_WINDOW_MAX_SIZE) {
+            accuracyWindowBuffer[i] = acc
+        }
+        accuracyWindowSize = ACCURACY_WINDOW_MAX_SIZE
+        accuracyWindowHead = 0
+    }
+
+    private fun resetAccuracyWindow() {
+        accuracyWindowSize = 0
+        accuracyWindowHead = 0
+        accuracyWindowBuffer.fill(0.0)
     }
 
     private fun updateLastAccuracyInWindow(acc: Double) {
@@ -556,7 +571,7 @@ class LocationProcessor(
     fun invalidateHomePointsCache() { cachedHomePoints = null }
     fun resetStats() {
         lastProcessedAccuracy = 0.0; maxAccuracy = 0.0
-        accuracyWindowSize = 0; accuracyWindowHead = 0; lastWindowUpdateRt = 0L
+        resetAccuracyWindow()
         lastDistanceToTracker = null; lastNearestHomeDistance = null
         lastLat = 0.0; lastLng = 0.0; lastTs = 0L; lastRt = 0L; lastAcc = 0.0; lastMaxAcc = 0.0
         lastSavedLat = 0.0; lastSavedLng = 0.0; lastSavedTs = 0L; lastSavedRt = 0L; lastSavedGpsTs = 0L
