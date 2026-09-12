@@ -1,7 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.12.20)
+# SOT Master Requirements & Hardening Status (Sep.12.45)
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 314**: Signaling Session Integrity - Isolates socket callbacks via session-ID to prevent race conditions. (Resolved Sep.11.23)
+*   **SOT ID 314**: Signaling Session Integrity - Isolates socket callbacks via session-ID and ensures PeerPulse emission for heartbeats. Hardened in Sep.12.45 to ensure proactive tick-loop initiation on every pulse to prevent session stalls (R-ID 314). (Resolved Sep.12.45)
 *   **SOT ID 256**: GNSS Temporal Integrity - Decoupled GNSS callbacks into a dedicated thread to eliminate jitter on budget hardware (A15). (Resolved Sep.11.42)
 *   **SOT ID 257**: Telemetry Convergence Audit - Synchronized gap-filling logic with forensic counters for parity across all backfill modes. (Resolved Sep.11.43)
 *   **SOT ID 258**: UI Temporal Consistency - Synchronized Dashboard time-base to monotonic `systemPulseRt` to eliminate Epoch-1970 deltas in "Last Seen" fields. (Resolved Sep.11.46)
@@ -18,15 +18,15 @@
 ## 📈 Metric Summary
 - **Rules Verified**: 62
 - **Total SOT IDs**: 288
-- **Resolved Issues**: 1011
-- **Open Issues**: 1
+- **Resolved Issues**: 1015
+- **Open Issues**: 0
 - **Testing Coverage**: Testing (Sub-items: 271)
-- **Simplification Ideas**: 16
-- **QA Validation Tasks**: 271
+- **Simplification Ideas**: 18
+- **QA Validation Tasks**: 273
 
 ## 🏁 Verification Chapters
 *   **Chapter 5.1 (A15 Hardware)**: PASSED - GNSS scheduling, stability gaps, and LED synchronization resolved.
-*   **Chapter 16.1 (Signaling Resilience)**: PASSED - Session isolation and identity adoption verified.
+*   **Chapter 16.1 (Signaling Resilience)**: PASSED - Session isolation, identity adoption, and hardened heartbeat-triggered PeerPulse verified.
 *   **Chapter 22.1 (Telemetry Convergence)**: PASSED - Forensic audit parity achieved.
 *   **Chapter 23.1 (UI Forensic Integrity)**: PASSED - Time-base synchronization for "Last Seen" deltas verified.
 *   **Chapter 23.2 (Reactive Flow Vitality)**: PASSED - Flow stall remediation for power transitions verified on background threads.
@@ -35,4 +35,4 @@
 *   **Chapter 26.1 (Lifecycle Robustness)**: PASSED - Main-thread task safety for hardware unregistration verified.
 
 ---
-*Next Audit: Sep.12.21. (vSep.12.20)*
+*Next Audit: Sep.12.46. (vSep.12.45)*

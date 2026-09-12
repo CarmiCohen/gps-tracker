@@ -34,6 +34,10 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.12.31:
+ * - Signaling Handshake Hardening: Fixed pulse swallowing bug in handleJsonUpdate. 
+ *   Ensured PeerPulse emission for heartbeat types (viewer_pulse, tracker_pulse) 
+ *   to trigger session initialization in Services (R-ID 314).
  * Sep.10.40:
  * - Issue #946 Visibility RESOLVED: Integrated tamperNote propagation in binary 
  *   and JSON handlers for header-level forensic transparency (R-ID 288).
@@ -41,12 +45,6 @@ sealed class ConnectivityEvent {
  * - Issue #941 RESOLVED: Fixed SRV Status Inconsistency. Explicitly reset relay 
  *   status and RTT in stop() to prevent stale GREEN indicators during role 
  *   transitions (R941).
- * Sep.09.11:
- * - Forensic Audit Hardening: Fixed mapping gaps for signal, maxTemp, isGnssThrottled, 
- *   and maxAccuracy in partitioned state reconstruction (R-ID 284).
- * Sep.09.10:
- * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .atmospheric, .integrity)
- *   in LocationUpdate to support bridge removal (R-ID 284). Corrected sub-state mapping logic.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -697,6 +695,10 @@ class ConnectivitySuite @Inject constructor(
             if (!isTrackerMode && !fromViewer) {
                 remoteStatusRepository.setTrackerConnected(true)
             }
+            // R-ID 314 Hardening: Ensure PeerPulse is emitted for light pulses to start tick loops.
+            _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
+            remoteStatusRepository.updatePeerActivity(nowRt)
+            mainRepository.updateRemoteActivity(nowRt)
             return
         }
 

@@ -16,13 +16,14 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.12.45:
+ * - Issue #1015 Hardening: Ensured tick loop initiation on every peer pulse if 
+ *   the job is not active, preventing session stalls when the loop is terminated 
+ *   but the peer remains in the session map (R-ID 314 / #1015).
  * Sep.12.00:
  * - Issue #1007: Simplification Idea #15. Hardware Flag Abstraction.
  *   Refactored LED synchronization to use type-safe LedStatus object, 
  *   eliminating manual bitwise operations (R-ID 263).
- * Sep.11.62:
- * - Issue #1006: Simplification Idea #14. Centralized GNSS Stability Muzzling 
- *   into ForensicAuditor and LocationProcessor (R-ID 262).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -402,9 +403,13 @@ class ViewerService : BaseMonitorService() {
             configManager.deviceId = id; connectivitySuite.updateIdentity(id, configManager.viewerId, false)
             lifecycleScope.launch(Dispatchers.IO) { repository.saveString(TRACKER_ID_KEY, id) }
         }
-        if (sessionManager.onTrackerPulse(id, nowRt)) {
-            val proc = lastProcessedLocation
-            logManager.logServiceEvent(m = "Device connected: $id", lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+        
+        val isNew = sessionManager.onTrackerPulse(id, nowRt)
+        if (isNew || tickJob?.isActive != true) {
+            if (isNew) {
+                val proc = lastProcessedLocation
+                logManager.logServiceEvent(m = "Device connected: $id", lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+            }
             startTickLoop()
         }
     }

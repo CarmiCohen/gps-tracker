@@ -1,20 +1,14 @@
-# Hardening Resolution Archive (Sep.12.20)
+# Hardening Resolution Archive (Sep.12.45)
 
-## 🟢 Resolved in Sep.12.20
-*   **Main-Thread Task Await Regression (#1011)**:
-    *   **Remediation**: Remediated by adding a Main-thread check in `ManagedLocationCallback.unregister` to skip `Tasks.await` if called on the Main thread. This prevents `IllegalStateException` during fallback unregistration while maintaining synchronous behavior on background handler threads. (R-ID 291).
+## 🟢 Resolved in Sep.12.45
+*   **Signaling Resumption Hardening (#1015)**:
+    *   **Remediation**: Hardened `ViewerService` and `TrackerService` to ensure the operational tick loop is initiated on *every* peer pulse if the job is not active. This prevents session stalls that occurred when a service loop was terminated (e.g., via exception or lifecycle) but the peer remained in the `SessionManager` pulse map, causing subsequent pulses to be ignored. (R-ID 314).
+*   **Dual-Device Deployment & Baseline Sync (#1014)**:
+    *   **Remediation**: Successfully synchronized project baseline to version Sep.12.45 and verified build integrity for dual-device deployment.
 
-## 🟢 Resolved in Sep.12.12
-*   **Rapid Display Flickering (#1010)**:
-    *   **Remediation**: Refined `HardwareProvider.displayListener` to ignore volatility between `STATE_DOZE` and `STATE_DOZE_SUSPEND`. These transitions are typical for Samsung AOD (S21FE) during background hydration and do not represent UI performance degradation. Hardened the flickering detector to maintain integrity for active state transitions while suppressing low-power noise. (R-ID 290).
-
-## 🟢 Resolved in Sep.12.02
-*   **HUD Mapping Centralization (#1008)**:
-    *   **Remediation**: Unified HUD and Dashboard state construction logic into a single stateless `UiStateMapper`. Decommissioned `UiStateAggregator` and `DashboardStateProvider` to prevent arity drift and simplify `MainViewModel` flow combinations. (R-ID 286).
-
-## 🟢 Resolved in Sep.12.00
-*   **Hardware Flag Abstraction (#1007)**:
-    *   **Remediation**: Consolidated hardware LED bitmask flags into a type-safe `LedStatus` data class. Refactored `TrackerService` and `ViewerService` to use `JdHardwareManager.syncHardwareState(..., LedStatus)`, eliminating manual bitwise operations and improving arity safety. (R-ID 264).
+## 🟢 Resolved in Sep.12.31
+*   **Viewer Connection Handshake Bug (#1013)**:
+    *   **Remediation**: Fixed a logic error in `ConnectivitySuite.handleJsonUpdate` where heartbeat pulses were consumed without emitting a `PeerPulse` event. (R-ID 314).
 
 ---
-*For older records, see historical git logs. (vSep.12.20)*
+*For older records, see historical git logs. (vSep.12.45)*

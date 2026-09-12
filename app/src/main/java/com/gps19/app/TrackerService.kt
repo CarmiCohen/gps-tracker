@@ -21,13 +21,14 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.12.45:
+ * - Issue #1015 Hardening: Ensured tick loop initiation on every peer pulse if 
+ *   the job is not active, preventing session stalls when the loop is terminated 
+ *   but the peer remains in the session map (R-ID 314 / #1015).
  * Sep.12.00:
  * - Issue #1007: Simplification Idea #15. Hardware Flag Abstraction.
  *   Refactored LED synchronization to use type-safe LedStatus object, 
  *   eliminating manual bitwise operations (R-ID 263).
- * Sep.11.62:
- * - Issue #1006: Simplification Idea #14. Centralized GNSS Stability Muzzling 
- *   into ForensicAuditor and LocationProcessor (R-ID 262).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -367,8 +368,12 @@ class TrackerService : BaseMonitorService() {
             connectivitySuite.updateIdentity(configManager.deviceId, id, true)
             lifecycleScope.launch(Dispatchers.IO) { repository.saveString(VIEWER_ID_KEY, id) } 
         }
-        if (sessionManager.onViewerPulse(id, timeProvider.elapsedRealtime())) { 
-            logManager.logServiceEvent(m = "Viewer connected: $id")
+        
+        val isNew = sessionManager.onViewerPulse(id, timeProvider.elapsedRealtime())
+        if (isNew || tickJob?.isActive != true) {
+            if (isNew) {
+                logManager.logServiceEvent(m = "Viewer connected: $id")
+            }
             startTickLoop() 
         }
     }
