@@ -1,25 +1,21 @@
-# Project Issues & Hardening Tracking (Sep.13.30)
+# Project Issues & Hardening Tracking (Sep.14.00)
 
 ## 🎯 Current Resumption Focus: Signaling Handshake Recovery
-Investigating and resolving the connection failure between Viewer and Tracker roles.
+Investigating and resolving the connection failure between Viewer and Tracker roles using descriptive forensic drop logs.
 
 ## 🔴 Open Issues & Hardening Tasks (Sorted by Implementation Priority)
-1.  **Forensic Log Audit (#1019)**: Use logcat on both devices to differentiate between Transport Failures (Socket.io timeouts) and Validation Filter drops.
-2.  **Identity Alignment Check (#1020)**: Audit `SignalingValidator.kt` to ensure `ownDeviceId` and `ownViewerId` parity during rapid role switches (R-ID 313 synchronization).
-3.  **Identity Sync Loop Verification (#1021)**: Verify `ConnectivitySuite.startIdentitySyncLoop` re-emits correct `join` payloads and `TransmissionId` after network handovers.
-4.  **Relay Connectivity & Stale Socket Audit (#1022)**: Evaluate Simplification Idea #17 to ensure stale socket instances are not blocking new connection attempts during mode transitions.
+1.  **Forensic Drop Analysis (#1020)**: Monitor logcat for `Forensic drop` warnings. Use descriptive reasons from `SignalingValidator.getDropReason` to confirm if legitimate packets are being filtered during role transitions.
+2.  **Identity Sync Loop Verification (#1021)**: Verify `ConnectivitySuite.startIdentitySyncLoop` successfully refreshes relay state after network handovers and role switches.
+3.  **Relay Connectivity & Stale Socket Audit (#1022)**: Evaluate Simplification Idea #17 to ensure stale socket instances are not blocking new connection attempts during mode transitions.
+4.  **IPC Noise Suppression (#1019)**: Continue monitoring `getPackageName` spam. Consider deeper shadowing if framework-level diagnostic logs persist despite cache hits.
 
-## 🟢 Recently Resolved Issues (Sep.13.30)
-*   **Map Component Restoration (#1023)**:
-    *   **Root-Cause Remediation**: Restored the map scale by explicitly adding `ScaleBarOverlay` to the `MapView` overlay stack. Fixed the "missing" settings tool wheel by adjusting `MapSettingsToggle` top padding to 110.dp in portrait mode, preventing occlusion by the header and status bars. Verified all tool functions (Zoom, Centering, Geofence toggles). (R-ID 318).
-*   **Stability Audit & Role Transition Verification (#1017)**:
-    *   **Root-Cause Remediation**: Performed a forensic audit of the role transition logic. Verified mutual exclusivity in `MainActivity`, state sanitation in `SessionUseCase`/`TelemetryRepository`, and hardened resumption in `ViewerService`/`TrackerService`. Implemented **R-ID 316** (Accuracy Window Integrity) and **R-ID 317** (History Manager Continuity).
-*   **Version Centralization (#1018)**:
-    *   **Root-Cause Remediation**: Implemented Gradle Version Catalog (`libs.versions.toml`) to centralize dependency and plugin management across `:app` and `:core:engine` (Simplification Idea #18).
-*   **Connectivity & Telemetry Audit (#1016)**:
-    *   **Root-Cause Remediation**: Verified dual-device handshake stability and tick-loop initiation between S21FE and A15. Forensic audit confirmed that the signaling resumption hardening successfully prevents session stalls. (R-ID 314).
+## 🟢 Recently Resolved Issues (Sep.14.00)
+*   **Build Restoration (#1024)**:
+    *   **Root-Cause Remediation**: Resolved `Unresolved reference` errors in `TrackerService` and `ViewerService` by re-consolidating `ConnectivityEvent` as a top-level sealed class in `ConnectivitySuite.kt`. Restored project to a compiling state. (R-ID 321).
+*   **Forensic Visibility Enhancement (#1019)**:
+    *   **Root-Cause Remediation**: Integrated `SignalingValidator.getDropReason` into `ConnectivitySuite` logs. Rejection warnings now include descriptive reasons (e.g., "Unauthorized Viewer", "Echo suppression") instead of just raw IDs, enabling faster triage of signaling stalls. (R-ID 320).
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 292 (Rules: 63, IDs: 292), Resolved: 1023, Open: 4, Testing: 0, Ideas: 18, QA: 277]**
+- **Current Audit Baseline: [SOT: 293 (Rules: 63, IDs: 321), Resolved: 1024, Open: 4, Testing: 0, Ideas: 18, QA: 277]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.13.30)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.14.00)*

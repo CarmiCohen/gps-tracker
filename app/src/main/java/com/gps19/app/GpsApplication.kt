@@ -1,4 +1,3 @@
-
 package com.gps19.app
 
 import android.app.Application
@@ -10,8 +9,8 @@ import android.content.Context
 import android.content.ComponentCallbacks2
 import android.os.Process
 import androidx.hilt.work.HiltWorkerFactory
-import org.osmdroid.config.Configuration as OsmConfig
 import org.osmdroid.tileprovider.modules.SqlTileWriter
+import org.osmdroid.config.Configuration as OsmConfig
 import timber.log.Timber
 import javax.inject.Inject
 import dagger.hilt.android.HiltAndroidApp
@@ -25,14 +24,9 @@ import com.gps19.core.engine.ShadowCache
 
 /**
  * GpsApplication: Application entry point and global dependency management.
- * Sep.05.12:
- * - Issue #915 Fix: Implemented R915 (Mapnik Budget Optimization). Throttled 
- *   download threads to 2 and expanded disk cache to 600MB to remediate 
- *   tile latency on Samsung A15 budget hardware.
- * Sep.03.132:
- * - Issue #901 Fix: Hardened trimCaches() to preserve "pkg" and "uid" identity 
- *   tokens. Previous implementation cleared these tokens during memory pressure, 
- *   leading to persistent IPC log spam regression (R759).
+ * Sep.14.00:
+ * - Forensic Audit Cleanup: Removed getPackageName PKG_TRACE. Confirmed ShadowCache 
+ *   hits via logcat; remaining logs are framework-level diagnostic noise (R759).
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -45,20 +39,11 @@ class GpsApplication : Application(), Configuration.Provider {
         private val stringCache = ShadowCache<String, String>(100)
         private val intCache = ShadowCache<String, Int>(10)
 
-        /**
-         * R759: Direct shadow-cache authority for high-frequency identifiers.
-         */
         val PACKAGE_NAME: String get() = stringCache.get("pkg") ?: ""
         val MY_UID: Int get() = intCache.get("uid") ?: 0
 
-        /**
-         * Issue #758: Signal for map hydration to start.
-         */
         val isOsmReady = AtomicBoolean(false)
 
-        /**
-         * Generic access for high-frequency string lookups that trigger OS diagnostic logs.
-         */
         fun getCachedString(key: String, provider: () -> String): String {
             return stringCache.getOrPut(key, provider)
         }
@@ -113,7 +98,6 @@ class GpsApplication : Application(), Configuration.Provider {
 
                 osmConfig.load(this@GpsApplication, PreferenceManager.getDefaultSharedPreferences(this@GpsApplication))
                 
-                // Issue #915 Optimization (R915)
                 osmConfig.tileDownloadThreads = 2
                 osmConfig.tileDownloadMaxQueueSize = 40
                 osmConfig.cacheMapTileCount = 64

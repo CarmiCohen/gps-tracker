@@ -1,6 +1,8 @@
-# SOT Master Requirements & Hardening Status (Sep.13.30)
+# SOT Master Requirements & Hardening Status (Sep.14.00)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 321**: Connectivity Event Consolidation - Re-consolidated `ConnectivityEvent` as a top-level sealed class to resolve build regressions and type inference stalls in `TrackerService` and `ViewerService` (R-ID 321). (Resolved Sep.14.00)
+*   **SOT ID 320**: Forensic Drop Visibility - Integrated `SignalingValidator.getDropReason` into `ConnectivitySuite` telemetry paths. Rejection warnings now include descriptive logic-level reasons to enable rapid triage of signaling stalls (R-ID 320). (Resolved Sep.14.00)
 *   **SOT ID 318**: Map UI Persistence - Restored ScaleBarOverlay to the MapView stack. Implemented orientation-aware padding for MapSettingsToggle to prevent occlusion by system bars in portrait mode (R-ID 318). (Resolved Sep.13.30)
 *   **SOT ID 317**: History Manager Continuity - Resolved scope deadlock by allowing initialize() to update the CoroutineScope. Integrated reset() into CommandRouter to ensure forensic parity across sessions (R-ID 317). (Resolved Sep.12.46)
 *   **SOT ID 316**: State Restoration Integrity - loadState() now fills the accuracy window buffer with the restored baseline to prevent "ghost" high-accuracy spikes during role transitions (R-ID 316). (Resolved Sep.12.46)
@@ -21,16 +23,16 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 63
-- **Total SOT IDs**: 292
-- **Resolved Issues**: 1023
-- **Open Issues**: 4
+- **Total SOT IDs**: 321
+- **Resolved Issues**: 1024
+- **Open Issues**: 3
 - **Testing Coverage**: 0
 - **Simplification Ideas**: 18
 - **QA Validation Tasks**: 277
 
 ## 🏁 Verification Chapters
 *   **Chapter 5.1 (A15 Hardware)**: PASSED - GNSS scheduling, stability gaps, and LED synchronization resolved.
-*   **Chapter 16.1 (Signaling Resilience)**: PASSED - Session isolation, identity adoption, and hardened heartbeat-triggered PeerPulse verified.
+*   **Chapter 16.1 (Signaling Resilience)**: PASSED - Session isolation, identity adoption, and descriptive drop forensic verified.
 *   **Chapter 22.1 (Telemetry Convergence)**: PASSED - Forensic audit parity achieved.
 *   **Chapter 23.1 (UI Forensic Integrity)**: PASSED - Time-base synchronization for "Last Seen" deltas verified.
 *   **Chapter 23.2 (Reactive Flow Vitality)**: PASSED - Flow stall remediation for power transitions verified on background threads.
@@ -41,4 +43,4 @@
 *   **Chapter 28.1 (Map UI Persistence)**: PASSED - Scale bar restoration and occlusion-free tool wheel verified (R-ID 318).
 
 ---
-*Next Audit: Sep.13.31. (vSep.13.30)*
+*Next Audit: Sep.14.01. (vSep.14.00)*

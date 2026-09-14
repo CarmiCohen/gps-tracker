@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * SignalingValidator: Pure logic for enforcing role-based message filtering.
+ * Sep.14.00:
+ * - Forensic Visibility (#1019): Added getDropReason to provide detailed 
+ *   explanation for rejected signaling packets (R-ID 320).
  * July.22.12:
  * - Issue #521: Deep Purge of Remote Settings Leftovers. Removed shouldProcessSettingsUpdate.
  * v9.3.22:
@@ -42,6 +45,34 @@ object SignalingValidator {
         if (!isTrackerMode && isFromViewer && SignalingConstants.isViewerMatch(viewerId, ownViewerId)) return false
 
         return true
+    }
+
+    /**
+     * R-ID 320: Forensic drop analysis. Returns a human-readable reason for rejection.
+     */
+    fun getDropReason(
+        incomingId: String,
+        ownDeviceId: String,
+        isFromViewer: Boolean,
+        viewerId: String,
+        ownViewerId: String,
+        isTrackerMode: Boolean
+    ): String? {
+        if (!SignalingConstants.isTrackerMatch(incomingId, ownDeviceId)) {
+            return "ID mismatch: Incoming=$incomingId, Local=$ownDeviceId"
+        }
+
+        if (isTrackerMode) {
+            if (!isFromViewer) return "Tracker dropped packet from another Tracker"
+            if (!SignalingConstants.isViewerMatch(viewerId, ownViewerId) && !isDefault(ownViewerId)) {
+                return "Unauthorized Viewer: Incoming=$viewerId, Authorized=$ownViewerId"
+            }
+        } else {
+            if (isFromViewer && SignalingConstants.isViewerMatch(viewerId, ownViewerId)) {
+                return "Echo suppression: Packet is from self"
+            }
+        }
+        return null
     }
     
     /**

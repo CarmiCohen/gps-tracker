@@ -26,7 +26,7 @@ import javax.inject.Provider
 import javax.inject.Singleton
 
 /**
- * ConnectivityEvent: Reactive event container for peer and network lifecycle changes.
+ * ConnectivityEvent: Internal suite events for coordination.
  */
 sealed class ConnectivityEvent {
     data class PeerPulse(val id: String) : ConnectivityEvent()
@@ -34,17 +34,14 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
- * Sep.12.31:
- * - Signaling Handshake Hardening: Fixed pulse swallowing bug in handleJsonUpdate. 
- *   Ensured PeerPulse emission for heartbeat types (viewer_pulse, tracker_pulse) 
- *   to trigger session initialization in Services (R-ID 314).
- * Sep.10.40:
- * - Issue #946 Visibility RESOLVED: Integrated tamperNote propagation in binary 
- *   and JSON handlers for header-level forensic transparency (R-ID 288).
- * Sep.10.03:
- * - Issue #941 RESOLVED: Fixed SRV Status Inconsistency. Explicitly reset relay 
- *   status and RTT in stop() to prevent stale GREEN indicators during role 
- *   transitions (R941).
+ * Sep.14.00:
+ * - Forensic Visibility (#1019): Integrated SignalingValidator.getDropReason 
+ *   to provide descriptive rejection logs (R-ID 320).
+ * - Build Restoration: Re-consolidated ConnectivityEvent as a top-level sealed 
+ *   class to resolve Unresolved reference errors in services (R-ID 321).
+ * Sep.13.31:
+ * - Forensic Audit (#1019): Added explicit logging for SignalingValidator drops 
+ *   in both JSON and Binary paths (R-ID 320).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -537,7 +534,12 @@ class ConnectivitySuite @Inject constructor(
                     viewerId = statusProto.viewerId,
                     ownViewerId = viewerId,
                     isTrackerMode = isTrackerMode
-            )) return
+            )) {
+                // R-ID 320: Forensic drop logging
+                val reason = SignalingValidator.getDropReason(statusProto.id, deviceId, statusProto.fromViewer, statusProto.viewerId, viewerId, isTrackerMode)
+                Timber.w("Forensic drop [Binary]: reason=$reason id=${statusProto.id} viewerId=${statusProto.viewerId} fromViewer=${statusProto.fromViewer} mode=${if (isTrackerMode) "TRK" else "VWR"} (ownD=$deviceId, ownV=$viewerId)")
+                return
+            }
 
             val now = timeProvider.currentTimeMillis()
             val nowRt = timeProvider.elapsedRealtime()
@@ -644,7 +646,7 @@ class ConnectivitySuite @Inject constructor(
                         this.integrity.isBatterySteepDischarge = updatedStatus.isBatterySteepDischarge; this.integrity.isCoolingModeActive = updatedStatus.isCoolingModeActive
                         this.integrity.isSitDetected = updatedStatus.isSitDetected; this.integrity.lastSitTs = updatedStatus.lastSitTs
                         this.integrity.sitVz = updatedStatus.sitVz; this.integrity.sitVzTs = updatedStatus.sitVzTs; this.integrity.sitVzRt = updatedStatus.sitVzRt; this.integrity.sitDz = updatedStatus.sitDz
-                        this.integrity.sitBaro = updatedStatus.sitBaro; this.integrity.sitTilt = updatedStatus.sitTilt; this.integrity.sitShock = updatedStatus.sitShock
+                        this.integrity.sitBaro = updatedStatus.sitBaro; this.integrity.sitTilt = updatedStatus.tiltDegrees; this.integrity.sitShock = updatedStatus.peakVibrationShock
                         this.integrity.isBatteryLow = updatedStatus.isBatteryLow; this.integrity.isBatteryCritical = updatedStatus.isBatteryCritical
                         this.integrity.violationUptimeMs = updatedStatus.violationUptimeMs
                         this.integrity.gpsHardwareLock = updatedStatus.gpsHardwareLock
@@ -676,6 +678,22 @@ class ConnectivitySuite @Inject constructor(
         val fromId = data.optString("id"); val fromViewerId = data.optString("viewer_id"); val fromViewer = data.optBoolean("from_viewer", false)
         val now = timeProvider.currentTimeMillis(); val nowRt = timeProvider.elapsedRealtime()
         val peerId = if (isTrackerMode) (if (fromViewerId.isNotEmpty()) fromViewerId else fromId) else fromId
+
+        if (!SignalingValidator.shouldProcessLocationUpdate(
+                incomingId = fromId,
+                ownDeviceId = deviceId,
+                isFromViewer = fromViewer,
+                viewerId = fromViewerId,
+                ownViewerId = viewerId,
+                isTrackerMode = isTrackerMode
+        )) {
+            // R-ID 320: Forensic drop logging
+            if (type != "viewer_pulse" && type != "tracker_pulse" && type != "pong_activity") {
+                val reason = SignalingValidator.getDropReason(fromId, deviceId, fromViewer, fromViewerId, viewerId, isTrackerMode)
+                Timber.w("Forensic drop [JSON]: reason=$reason type=$type id=$fromId viewerId=$fromViewerId fromViewer=$fromViewer mode=${if (isTrackerMode) "TRK" else "VWR"} (ownD=$deviceId, ownV=$viewerId)")
+            }
+            return
+        }
 
         if (isTrackerMode && fromViewer && type == "calibrate_chair") {
             locationProcessor.resetChairBaseline()
@@ -844,7 +862,7 @@ class ConnectivitySuite @Inject constructor(
                         this.integrity.isBatterySteepDischarge = updatedStatus.isBatterySteepDischarge; this.integrity.isCoolingModeActive = updatedStatus.isCoolingModeActive
                         this.integrity.isSitDetected = updatedStatus.isSitDetected; this.integrity.lastSitTs = updatedStatus.lastSitTs
                         this.integrity.sitVz = updatedStatus.sitVz; this.integrity.sitVzTs = updatedStatus.sitVzTs; this.integrity.sitVzRt = updatedStatus.sitVzRt; this.integrity.sitDz = updatedStatus.sitDz
-                        this.integrity.sitBaro = updatedStatus.sitBaro; this.integrity.sitTilt = updatedStatus.sitTilt; this.integrity.sitShock = updatedStatus.sitShock
+                        this.integrity.sitBaro = updatedStatus.sitBaro; this.integrity.sitTilt = updatedStatus.tiltDegrees; this.integrity.sitShock = updatedStatus.peakVibrationShock
                         this.integrity.isBatteryLow = updatedStatus.isBatteryLow; this.integrity.isBatteryCritical = updatedStatus.isBatteryCritical
                         this.integrity.violationUptimeMs = updatedStatus.violationUptimeMs
                         this.integrity.gpsHardwareLock = updatedStatus.gpsHardwareLock
