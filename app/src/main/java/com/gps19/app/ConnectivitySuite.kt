@@ -34,18 +34,14 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.14.50:
+ * - Redundant Logic Pruning (#1040): Conducted a deep audit to remove legacy backfill 
+ *   triggers now fully handled by the 60s identity sync loop (R-ID 334).
  * Sep.14.47:
+ * - Signaling Forensic Decoupling (#1039): Migrated signaling drop and RTT spike 
+ *   logging to SignalingForensicLogger to reduce class complexity (R-ID 333).
  * - A15 Compliance (#1038): Implemented 10s throttling for forensic signaling 
- *   drop logs to protect battery curves during high-jitter periods (R-ID 332).
- * Sep.14.46:
- * - Signaling Pipeline Hardening (#1037): Integrated persistent forensic logging 
- *   for signaling drop reasons and high-latency RTT spikes into packet paths (R-ID 331).
- * Sep.14.10:
- * - Forensic Visibility (#1020): Centralized authoritative validation and forensic 
- *   drop logging. Re-integrated log persistence after validation (R-ID 320).
- * Sep.14.00:
- * - Forensic Visibility (#1019): Integrated SignalingValidator.getDropReason 
- *   to provide descriptive rejection logs (R-ID 320).
+ *   drop logs via forensicLogger to protect battery curves (R-ID 332).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -60,7 +56,8 @@ class ConnectivitySuite @Inject constructor(
     private var locationProcessor: LocationProcessor, 
     private val offlineRepository: OfflineRepository,
     private val mainRepository: MainRepository,
-    private val remoteStatusRepository: RemoteStatusRepository
+    private val remoteStatusRepository: RemoteStatusRepository,
+    private val forensicLogger: SignalingForensicLogger
 ) {
     private val _connectivityEvents = MutableSharedFlow<ConnectivityEvent>(
         extraBufferCapacity = 16,
@@ -78,9 +75,6 @@ class ConnectivitySuite @Inject constructor(
     private var viewerId = ""
     private var isTrackerMode = true
     private var lastReconnectTs = 0L 
-    private var lastForceJoinTs = 0L 
-    private var lastConnectionSuccessRt = 0L
-    private var lastDropLogTs = 0L
 
     private val suiteExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped.get()) return@CoroutineExceptionHandler
@@ -143,7 +137,7 @@ class ConnectivitySuite @Inject constructor(
     val trackerBaroAlt get() = trackerStatus.baroAlt
     val trackerLux get() = trackerStatus.lux
     val isTrackerNear get() = trackerStatus.isNear
-    val trackerTiltDegrees get() = trackerStatus.tiltDegrees
+    val tiltDegrees get() = trackerStatus.tiltDegrees
     val trackerAcousticDb get() = trackerStatus.acousticDb
     val trackerPeakVibrationShock get() = trackerStatus.peakVibrationShock
     val trackerPeakVibrationShockTs get() = trackerStatus.peakVibrationShockTs
@@ -209,7 +203,6 @@ class ConnectivitySuite @Inject constructor(
         }
         
         this.relayUrl = url; this.deviceId = dId; this.viewerId = vId; this.isTrackerMode = isTracker
-        this.lastForceJoinTs = 0L
         
         try {
             val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
@@ -304,7 +297,6 @@ class ConnectivitySuite @Inject constructor(
                 deviceId = latestDeviceId; viewerId = latestViewerId; relayUrl = latestRelayUrl; isTrackerMode = latestIsTracker
                 withContext(Dispatchers.Default) {
                     lastReconnectTs = timeProvider.elapsedRealtime()
-                    lastForceJoinTs = 0L 
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                     wakeUpRelay()
                 }
@@ -322,18 +314,7 @@ class ConnectivitySuite @Inject constructor(
             consecutiveHttpFailures.set(0)
 
             val nowRt = timeProvider.elapsedRealtime()
-            if (signalingProvider.isConnected()) {
-                val trafficAge = nowRt - signalingProvider.getLastRelayTrafficTs()
-                val rejoinCooldownPassed = nowRt - lastForceJoinTs > NET_REJOIN_THRESHOLD_MS * 4
-                
-                if (trafficAge > NET_REJOIN_THRESHOLD_MS * 2 && rejoinCooldownPassed) {
-                    withContext(Dispatchers.Default) {
-                        lastForceJoinTs = nowRt
-                        signalingProvider.updateIdentity(deviceId, viewerId, isTrackerMode, force = true)
-                        wakeUpRelay()
-                    }
-                }
-            } else if (!signalingProvider.isConnecting() && nowRt - lastReconnectTs > NET_REJOIN_THRESHOLD_MS) {
+            if (!signalingProvider.isConnected() && !signalingProvider.isConnecting() && nowRt - lastReconnectTs > NET_REJOIN_THRESHOLD_MS) {
                 withContext(Dispatchers.Default) {
                     lastReconnectTs = nowRt
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
@@ -365,7 +346,6 @@ class ConnectivitySuite @Inject constructor(
         syncJob?.cancel()
         syncJob = scope.launch(Dispatchers.IO) {
             var wasConnected = false
-            var lastHighRttLogTs = 0L
             
             while (isActive) {
                 val currentRtt = signalingProvider.getRtt()
@@ -373,7 +353,6 @@ class ConnectivitySuite @Inject constructor(
                 
                 if (isCurrentlyConnected) {
                     if (!wasConnected) {
-                        lastConnectionSuccessRt = timeProvider.elapsedRealtime()
                         delay(500) 
                     }
                     
@@ -381,11 +360,9 @@ class ConnectivitySuite @Inject constructor(
                     try { flushPendingUpdates() } catch (e: Exception) { Timber.e(e, "Sync failure") }
                     finally { _isSyncing.value = false }
 
-                    // Log high-latency spikes with a 10-second throttle to protect buffer pressure
-                    val nowRt = timeProvider.elapsedRealtime()
-                    if (currentRtt > MAX_ALLOWED_RTT_MS / 2 && nowRt - lastHighRttLogTs > 10000L) {
-                        lastHighRttLogTs = nowRt
-                        logManagerProvider.get().submitToLogSink("High latency spike detected: RTT=$currentRtt ms", "high_latency", isImportant = false)
+                    // Log high-latency spikes via decoupled forensic logger (R-ID 333)
+                    if (currentRtt > MAX_ALLOWED_RTT_MS / 2) {
+                        forensicLogger.logHighLatency(currentRtt, MAX_ALLOWED_RTT_MS / 2)
                     }
                 }
                 
@@ -548,16 +525,8 @@ class ConnectivitySuite @Inject constructor(
                     ownViewerId = viewerId,
                     isTrackerMode = isTrackerMode
             )) {
-                // R-ID 320: Forensic drop logging
                 val reason = SignalingValidator.getDropReason(statusProto.id, deviceId, statusProto.fromViewer, statusProto.viewerId, viewerId, isTrackerMode)
-                Timber.w("Forensic drop [Binary]: reason=$reason id=${statusProto.id} viewerId=${statusProto.viewerId} fromViewer=${statusProto.fromViewer} mode=${if (isTrackerMode) "TRK" else "VWR"} (ownD=$deviceId, ownV=$viewerId)")
-                
-                // #1038: Throttle forensic drop logs to 10s for battery compliance
-                val nowRt = timeProvider.elapsedRealtime()
-                if (nowRt - lastDropLogTs > 10000L) {
-                    lastDropLogTs = nowRt
-                    logManagerProvider.get().submitToLogSink("Forensic drop [Binary]: reason=$reason id=${statusProto.id} viewerId=${statusProto.viewerId}", "signaling_drop", isImportant = false)
-                }
+                forensicLogger.logDrop("Binary", reason, statusProto.id, statusProto.viewerId, if (isTrackerMode) "TRK" else "VWR", deviceId, viewerId)
                 return
             }
 
@@ -654,7 +623,7 @@ class ConnectivitySuite @Inject constructor(
                         this.atmospheric.temp = updatedStatus.temp
                         this.atmospheric.maxTemp = updatedStatus.maxTemp
                         this.atmospheric.noiseIdx = updatedStatus.noiseIdx; this.atmospheric.luxIdx = updatedStatus.luxIdx; this.atmospheric.vibeIdx = updatedStatus.vibeIdx; this.atmospheric.liftIdx = updatedStatus.liftIdx
-                        this.atmospheric.tiltIdx = updatedStatus.tiltIdx; this.atmospheric.baroIdx = updatedStatus.baroIdx
+                        this.atmospheric.tiltIdx = updatedStatus.tiltDegrees; this.atmospheric.baroIdx = updatedStatus.baroIdx
                         this.atmospheric.vibration = updatedStatus.vibration
 
                         this.integrity.battery = updatedStatus.battery; this.integrity.isCharging = updatedStatus.isCharging
@@ -697,14 +666,7 @@ class ConnectivitySuite @Inject constructor(
         if (type == "remote_log") {
             if (!SignalingValidator.shouldProcessLogRelay(fromId, deviceId, fromViewerId, viewerId, isTrackerMode)) {
                 val reason = SignalingValidator.getDropReason(fromId, deviceId, fromViewer, fromViewerId, viewerId, isTrackerMode) ?: "Unauthorized Log Relay"
-                Timber.w("Forensic drop [Log]: reason=$reason id=$fromId viewerId=$fromViewerId mode=${if (isTrackerMode) "TRK" else "VWR"}")
-                
-                // #1038: Throttle forensic drop logs to 10s for battery compliance
-                val nowRtDrop = timeProvider.elapsedRealtime()
-                if (nowRtDrop - lastDropLogTs > 10000L) {
-                    lastDropLogTs = nowRtDrop
-                    logManagerProvider.get().submitToLogSink("Forensic drop [Log]: reason=$reason id=$fromId viewerId=$fromViewerId", "signaling_drop", isImportant = false)
-                }
+                forensicLogger.logDrop("Log", reason, fromId, fromViewerId, if (isTrackerMode) "TRK" else "VWR", deviceId, viewerId)
                 return
             }
             handleRemoteLog(LogEntry.fromJSONObject(data))
@@ -719,20 +681,11 @@ class ConnectivitySuite @Inject constructor(
                 ownViewerId = viewerId,
                 isTrackerMode = isTrackerMode
         )) {
-            // R-ID 320: Forensic drop logging
             val isPulse = (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity")
             val reason = SignalingValidator.getDropReason(fromId, deviceId, fromViewer, fromViewerId, viewerId, isTrackerMode)
             
-            // Only log drops for pulses if they have a non-default reason (to avoid spamming echo suppression)
             if (!isPulse || (reason != null && !reason.contains("Echo suppression"))) {
-                Timber.w("Forensic drop [JSON]: reason=$reason type=$type id=$fromId viewerId=$fromViewerId fromViewer=$fromViewer mode=${if (isTrackerMode) "TRK" else "VWR"} (ownD=$deviceId, ownV=$viewerId)")
-                
-                // #1038: Throttle forensic drop logs to 10s for battery compliance
-                val nowRtDrop = timeProvider.elapsedRealtime()
-                if (nowRtDrop - lastDropLogTs > 10000L) {
-                    lastDropLogTs = nowRtDrop
-                    logManagerProvider.get().submitToLogSink("Forensic drop [JSON]: reason=$reason type=$type id=$fromId", "signaling_drop", isImportant = false)
-                }
+                forensicLogger.logDrop("JSON", reason, fromId, fromViewerId, if (isTrackerMode) "TRK" else "VWR", deviceId, viewerId, extra = type)
             }
             return
         }
@@ -755,7 +708,6 @@ class ConnectivitySuite @Inject constructor(
             if (!isTrackerMode && !fromViewer) {
                 remoteStatusRepository.setTrackerConnected(true)
             }
-            // R-ID 314 Hardening: Ensure PeerPulse is emitted for light pulses to start tick loops.
             _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt)
             mainRepository.updateRemoteActivity(nowRt)
@@ -842,7 +794,7 @@ class ConnectivitySuite @Inject constructor(
                     battery = data.optInt("battery", current.battery), temp = data.optDouble("temp", current.temp), maxTemp = data.optDouble("max_temp", current.maxTemp),
                     currentMa = data.optInt("current_ma", current.currentMa), isCharging = data.optBoolean("is_charging", current.isCharging),
                     satsView = data.optInt("sats_view", current.satsView), satsUsed = data.optInt("sats_used", current.satsUsed),
-                    status = trackerStatus, isTamperDetected = isTrackerTamperDetected, isPowerTamper = isTrackerPowerTamper,
+                    status = trackerStatus, isTamperDetected = isTrackerTamperDetected, isPowerTamper = isPowerTamper,
                     isLocationPending = isTrackerLocationPending, locationPendingReason = trackerLocationPendingReason,
                     lastValidFixRt = lastFixRt, isBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false), isCoolingModeActive = data.optBoolean("is_cooling_mode_active", false),
                     isBatteryLow = data.optBoolean("is_battery_low", false), isBatteryCritical = data.optBoolean("is_battery_critical", false),
@@ -892,13 +844,13 @@ class ConnectivitySuite @Inject constructor(
                         this.atmospheric.temp = updatedStatus.temp
                         this.atmospheric.maxTemp = updatedStatus.maxTemp
                         this.atmospheric.noiseIdx = updatedStatus.noiseIdx; this.atmospheric.luxIdx = updatedStatus.luxIdx; this.atmospheric.vibeIdx = updatedStatus.vibeIdx; this.atmospheric.liftIdx = updatedStatus.liftIdx
-                        this.atmospheric.tiltIdx = updatedStatus.tiltDegrees; this.atmospheric.baroIdx = updatedStatus.baroIdx
+                        this.atmospheric.tiltIdx = updatedStatus.tiltIdx; this.atmospheric.baroIdx = updatedStatus.baroIdx
                         this.atmospheric.vibration = updatedStatus.vibration
 
                         this.integrity.battery = updatedStatus.battery; this.integrity.isCharging = updatedStatus.isCharging
                         this.integrity.satsView = updatedStatus.satsView; this.integrity.satsUsed = updatedStatus.satsUsed 
                         this.integrity.snrIdx = updatedStatus.snrIdx
-                        this.integrity.signal = data.optInt("signal", (updatedStatus.snrIdx * 10.0).toInt().coerceIn(0, 10))
+                        this.integrity.signal = (updatedStatus.snrIdx * 10.0).toInt().coerceIn(0, 10)
                         this.integrity.isLocationPending = updatedStatus.isLocationPending 
                         this.integrity.locationPendingReason = updatedStatus.locationPendingReason
                         this.integrity.isBatterySteepDischarge = updatedStatus.isBatterySteepDischarge; this.integrity.isCoolingModeActive = updatedStatus.isCoolingModeActive
@@ -926,7 +878,6 @@ class ConnectivitySuite @Inject constructor(
 
     private fun handleRemoteLog(entry: LogEntry) {
         val nowRt = timeProvider.elapsedRealtime()
-        // Sep.14.10: Authoritative log persistence re-integrated.
         mainRepository.addLog(entry)
         remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt)
     }

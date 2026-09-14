@@ -1,6 +1,10 @@
 # Resolution Archive
 
+## Sep.14.50
+*   **Redundant Logic Pruning & Legacy Backfill Triggers Removal (#1040)**: Conducted a deep audit of `ConnectivitySuite` to remove legacy backfill triggers (traffic age identity synchronization checks inside `performKeepAlive`) now fully handled by the 60s periodic identity sync loop. Pruned all associated leftover variables (`lastForceJoinTs`) to simplify the application architecture in alignment with Idea #3. (R-ID 334).
+
 ## Sep.14.47
+*   **Signaling Forensic Decoupling (#1039)**: Migrated signaling drop and high-latency formatting and throttling from `ConnectivitySuite` to `SignalingForensicLogger`. Reduces class complexity and centralizes signaling audit logic. (R-ID 333).
 *   **A15 Battery Compliance & Signaling Log Throttling (#1038)**: Implemented 10s throttling for forensic signaling drop logs in `ConnectivitySuite`. Protects the Android 15 battery discharge curve by preventing high-frequency logging during signaling jitter or packet rejection (R-ID 332).
 
 ## Sep.14.46
