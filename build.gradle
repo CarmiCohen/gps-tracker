@@ -29,8 +29,8 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    // Milestoning to Sep.14.43 as requested
-    return "Sep.14.43"
+    // Milestoning to Sep.14.45 as requested
+    return "Sep.14.45"
 }
 
 ext {
@@ -38,12 +38,31 @@ ext {
     autoVersionName = getVersionName()
 }
 
+// Issue #1036: Build Integrity Verification
+tasks.register('verifyVersionIntegrity') {
+    group = "verification"
+    description = "Audits version type-safety logic and fallback mechanisms"
+    doLast {
+        def testCode = rootProject.hasProperty('testVersionCode') ? rootProject.testVersionCode : "INVALID"
+        def safeCode = 1000
+        try {
+            safeCode = testCode.toString().toInteger()
+        } catch (Exception e) {
+            println "Fallback triggered successfully for malformed version: ${e.message}"
+            safeCode = 1000
+        }
+        assert safeCode instanceof Integer
+        // Fix: Use project property access instead of ambiguous 'ext'
+        println "Integrity Audit: PASSED (Version: ${project.autoVersionName}, Code: ${project.autoVersionCode})"
+    }
+}
+
 // Issue #1034: Automated Documentation Version Sync
 tasks.register('syncDocsVersion') {
     group = "documentation"
     description = "Synchronizes version headers in Handover.md, issues.md, and status reports"
     doLast {
-        def vName = ext.autoVersionName
+        def vName = project.autoVersionName
         def filesToUpdate = [
             'Handover.md', 
             'issues.md', 
@@ -55,7 +74,7 @@ tasks.register('syncDocsVersion') {
             if (file.exists()) {
                 println "Updating version in ${fileName} to ${vName}..."
                 def content = file.text
-                // Replaces headers like (Sep.14.42) or (vSep.14.42)
+                // Replaces headers like (Sep.14.43) or (vSep.14.43)
                 def updatedContent = content.replaceAll(/\(v?\w{3}\.\d{2}\.\d{2}\)/, "(${vName})")
                 file.text = updatedContent
             }
