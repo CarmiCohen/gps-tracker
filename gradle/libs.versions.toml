@@ -1,4 +1,8 @@
 [versions]
+# Project Versioning
+projectVersionCode = "1004"
+projectVersionName = "Sep.14.30"
+
 agp = "8.5.1"
 kotlin = "1.9.23"
 coreKtx = "1.15.0"

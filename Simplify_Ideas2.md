@@ -1,5 +1,7 @@
 # Project Simplification Ideas
 
-... (previous ideas)
+1. **Signaling State Reduction**: Simplify the sealed class hierarchy in `ConnectivityEvent` by merging redundant state transitions.
+2. **Context Shadowing Automation**: Explore a compiler plugin or KSP processor to automatically apply `@ShadowContext` logic to classes injected with `ApplicationContext`.
+3. **Redundant Logic Pruning**: Conduct a deep audit of `ConnectivitySuite` to remove legacy backfill triggers that are now handled by the optimized 60s sync loop.
 
-18. **Version Management Centralization**: Centralize `versionName` and `versionCode` declarations into `libs.versions.toml` or a shared `build.gradle` script. This would eliminate the manual requirement to update multiple files and documentation during baseline synchronization, reducing the risk of version mismatch (vSep.12.45).
+... (Items 4-17 remain in backlog) ...

@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## Sep.14.30
+*   **Version Management Centralization (#1026)**: Migrated `versionCode` and `versionName` declarations to `gradle/libs.versions.toml`. This ensures single-source-of-truth for project versioning, eliminating manual synchronization overhead and risk of version mismatch across documentation and build artifacts (Idea #18, R-ID 326).
+
 ## Sep.14.20
 *   **Notification IPC Optimization (#1025)**: Implemented state-change caching in `AppNotificationManager.kt`. Suppresses redundant `notify()` calls when pulse content is identical, reducing IPC overhead and framework diagnostic noise on budget hardware (R-ID 325).
 
