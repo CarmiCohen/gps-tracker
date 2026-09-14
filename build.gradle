@@ -13,3 +13,23 @@ plugins {
 tasks.register('clean', Delete) {
     delete rootProject.layout.buildDirectory
 }
+
+def getGitCommitCount() {
+    try {
+        def process = "git rev-list --count HEAD".execute([], project.rootDir)
+        process.waitFor()
+        return process.exitValue() == 0 ? process.text.trim().toInteger() : 1000
+    } catch (Exception ignored) {
+        return 1000
+    }
+}
+
+def getVersionName() {
+    def date = new Date()
+    return date.format("MMM.dd.HH", TimeZone.getTimeZone("UTC"))
+}
+
+ext {
+    autoVersionCode = getGitCommitCount()
+    autoVersionName = getVersionName()
+}

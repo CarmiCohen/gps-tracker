@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## Sep.14.41
+*   **Version Automation (#1033)**: Implemented dynamic versioning in root `build.gradle`. `versionCode` is now derived from the Git commit count (`git rev-list --count HEAD`) and `versionName` is generated from a UTC timestamp (`MMM.dd.HH`). This ensures full compliance with Requirement 6.2.8 and eliminates manual synchronization risks by removing static version entries from `libs.versions.toml` (Idea #18, R-ID 327).
+
 ## Sep.14.30
 *   **Version Management Centralization (#1026)**: Migrated `versionCode` and `versionName` declarations to `gradle/libs.versions.toml`. This ensures single-source-of-truth for project versioning, eliminating manual synchronization overhead and risk of version mismatch across documentation and build artifacts (Idea #18, R-ID 326).
 

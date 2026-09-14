@@ -1,7 +1,5 @@
 [versions]
-# Project Versioning
-projectVersionCode = "1004"
-projectVersionName = "Sep.14.30"
+# Project Versioning is automated in root build.gradle via Git
 
 agp = "8.5.1"
 kotlin = "1.9.23"
