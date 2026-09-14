@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.14.10)
+# SOT Master Requirements & Hardening Status (Sep.14.20)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 325**: Notification IPC Optimization - Implemented state-change caching in `AppNotificationManager.kt`. Suppresses redundant `notify()` calls when pulse content is identical, reducing IPC overhead and framework diagnostic noise on budget hardware (R-ID 325). (Resolved Sep.14.20)
 *   **SOT ID 324**: IPC Shadow Coverage - Migrated all remaining data-path and configuration repositories to `@ShadowContext`. Ensures 100% `ShadowCache` coverage for package name lookups during high-frequency DB and File I/O operations. (Resolved Sep.14.10)
 *   **SOT ID 323**: Signaling Pipeline Refactor - Simplified `CommunicationManager.kt` to a transport-only role. Centralized authoritative validation in `ConnectivitySuite.kt` to ensure full forensic visibility. Rejection warnings now reliably log descriptive reasons (e.g., "Echo suppression", "Unauthorized Viewer") for all signaling packets (R-ID 323). (Resolved Sep.14.10)
 *   **SOT ID 322**: Cleanup Logic Simplification - Converted hardware unregistration in `ManagedHardware.kt` to fire-and-forget asynchronous mode. Removed `CountDownLatch` and `Tasks.await` blocks to ensure rapid teardown and prevent synchronous stalls that delayed signaling disconnects during mode transitions (Idea #17, R-ID 322). (Resolved Sep.14.10)
@@ -26,8 +27,8 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 64
-- **Total SOT IDs**: 324
-- **Resolved Issues**: 1028
+- **Total SOT IDs**: 325
+- **Resolved Issues**: 1031
 - **Open Issues**: 0
 - **Testing Coverage**: 0
 - **Simplification Ideas**: 17
@@ -42,4 +43,4 @@
 *   **Chapter 28.1 (Map UI Persistence)**: PASSED - Scale bar restoration verified.
 
 ---
-*Next Audit: Sep.14.11. (vSep.14.10)*
+*Next Audit: Sep.14.21. (vSep.14.20)*

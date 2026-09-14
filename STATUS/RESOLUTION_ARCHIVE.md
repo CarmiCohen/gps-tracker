@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## Sep.14.20
+*   **Notification IPC Optimization (#1025)**: Implemented state-change caching in `AppNotificationManager.kt`. Suppresses redundant `notify()` calls when pulse content is identical, reducing IPC overhead and framework diagnostic noise on budget hardware (R-ID 325).
+
 ## Sep.14.10
 *   **IPC Shadow Coverage (#1019)**: Migrated all remaining data-path and configuration repositories (`SettingsRepository`, `AppAlarmManager`, `ConfigManager`, `ForensicSpillBuffer`, `HistoryManager`) to `@ShadowContext`. This ensures 100% `ShadowCache` coverage for package name lookups, mitigating high-frequency IPC overhead during system service interactions (R-ID 324).
 *   **Identity Sync Verification (#1021)**: Verified the 60s forced sync loop in `ConnectivitySuite.kt`. Confirmed it successfully manages relay room occupancy during stationary periods by handling server-side socket timeouts through proactive identity re-joining.
@@ -7,7 +10,7 @@
 *   **Cleanup Logic Simplification (#1022)**: Converted hardware unregistration in `ManagedHardware.kt` to fire-and-forget asynchronous mode. Removed `CountDownLatch` and `Tasks.await` blocks to ensure rapid teardown and prevent synchronous stalls that delayed signaling disconnects during mode transitions. (Idea #17, R-ID 322).
 
 ## Sep.14.00
-*   **Build Restoration (#1024)**: Resolved `Unresolved reference` errors in `TrackerService` and `ViewerService` by re-consolidating `ConnectivityEvent` as a top-level sealed class in `ConnectivitySuite.kt`. (R-ID 321).
+*   **Build Restoration (#1024)**: Resolved `Unresolved reference` errors in `TrackerService` and `ViewerService` by re-consolidated `ConnectivityEvent` as a top-level sealed class in `ConnectivitySuite.kt`. (R-ID 321).
 *   **Forensic Visibility Enhancement (#1019)**: Integrated `SignalingValidator.getDropReason` into `ConnectivitySuite` logs. Rejection warnings now include descriptive reasons (e.g., "Unauthorized Viewer", "Echo suppression") to enable faster triage of signaling stalls. (R-ID 320).
 
 ## Sep.13.30

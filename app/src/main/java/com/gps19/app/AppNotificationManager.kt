@@ -18,14 +18,13 @@ import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
+ * Sep.14.20:
+ * - Issue #1025 Optimization: Implemented state-change caching for pulse notifications. 
+ *   Reduced IPC overhead by suppressing redundant notify() calls when content 
+ *   is identical (R-ID 325).
  * Sep.02.70:
  * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
  *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 244).
- * Sep.02.43:
- * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
- *   getPackageName log spam during NotificationManager lookups (R1.14).
- * Aug.29.10:
- * - Concern #765: Added isUltra support to pulse messages for GNSS relaxation transparency.
  */
 @Singleton
 class AppNotificationManager @Inject constructor(
@@ -38,6 +37,7 @@ class AppNotificationManager @Inject constructor(
     private val alarmNotificationId = 1920
     
     private var isTrackerMode = false
+    private var lastPulseMessage: String? = null
 
     init {
         createNotificationChannels()
@@ -46,6 +46,7 @@ class AppNotificationManager @Inject constructor(
     fun setTrackerMode(active: Boolean) {
         if (this.isTrackerMode != active) {
             this.isTrackerMode = active
+            lastPulseMessage = null // Force refresh on mode change
             createNotificationChannels()
         }
     }
@@ -100,6 +101,11 @@ class AppNotificationManager @Inject constructor(
 
     fun updatePulse(sats: Int, battery: Int, isSecure: Boolean, isPowerSave: Boolean, isUltra: Boolean = false) {
         val msg = getPulseMessage(sats, battery, isSecure, isPowerSave, isUltra)
+        
+        // Issue #1025: State-change suppression
+        if (msg == lastPulseMessage) return
+        
+        lastPulseMessage = msg
         val notificationManager = shadowContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(notificationId, buildForegroundNotification(msg))
     }

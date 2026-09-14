@@ -1,10 +1,14 @@
-# Project Issues & Hardening Tracking (Sep.14.10)
+# Project Issues & Hardening Tracking (Sep.14.20)
 
 ## 🎯 Current Resumption Focus: Forensic Integrity & A15 Compliance
 Monitoring signaling pipeline stability and sensor-to-relay latency on budget Samsung hardware.
 
 ## 🔴 Open Issues & Hardening Tasks (Sorted by Implementation Priority)
 *No open issues for this release cycle.*
+
+## 🟢 Recently Resolved Issues (Sep.14.20)
+*   **Notification IPC Optimization (#1025)**:
+    *   **Root-Cause Remediation**: Implemented state-change suppression in `AppNotificationManager.kt` to eliminate redundant `notify()` calls when the pulse status text is identical. This reduces unnecessary IPC overhead and framework diagnostic noise on budget A15 hardware (R-ID 325).
 
 ## 🟢 Recently Resolved Issues (Sep.14.10)
 *   **IPC Shadow Coverage (#1019)**:
@@ -21,6 +25,6 @@ Monitoring signaling pipeline stability and sensor-to-relay latency on budget Sa
     *   **Root-Cause Remediation**: Integrated `SignalingValidator.getDropReason` into `ConnectivitySuite` logs. Rejection warnings now include descriptive reasons (e.g., "Unauthorized Viewer", "Echo suppression") instead of just raw IDs, enabling faster triage of signaling stalls. (R-ID 320).
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 324 (Rules: 64, IDs: 324), Resolved: 1030, Open: 0, Testing: 0, Ideas: 17, QA: 277]**
+- **Current Audit Baseline: [SOT: 325 (Rules: 64, IDs: 325), Resolved: 1031, Open: 0, Testing: 0, Ideas: 17, QA: 277]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.14.10)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.14.20)*

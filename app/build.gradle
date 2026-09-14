@@ -15,8 +15,8 @@ android {
         applicationId "com.gps19.app"
         minSdk 24
         targetSdk 35
-        versionCode 1002
-        versionName "Sep.14.10"
+        versionCode 1003
+        versionName "Sep.14.20"
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {
