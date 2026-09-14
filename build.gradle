@@ -18,7 +18,11 @@ def getGitCommitCount() {
     try {
         def process = "git rev-list --count HEAD".execute([], project.rootDir)
         process.waitFor()
-        return process.exitValue() == 0 ? process.text.trim().toInteger() : 1000
+        if (process.exitValue() == 0) {
+            def count = process.text.trim()
+            return count.isInteger() ? count.toInteger() : 1000
+        }
+        return 1000
     } catch (Exception ignored) {
         return 1000
     }
@@ -26,10 +30,36 @@ def getGitCommitCount() {
 
 def getVersionName() {
     def date = new Date()
-    return date.format("MMM.dd.HH", TimeZone.getTimeZone("UTC"))
+    // Using mm (minutes) to match user requested precision (e.g., Sep.14.42)
+    return date.format("MMM.dd.mm", TimeZone.getTimeZone("UTC"))
 }
 
 ext {
     autoVersionCode = getGitCommitCount()
     autoVersionName = getVersionName()
+}
+
+// Issue #1034: Automated Documentation Version Sync
+tasks.register('syncDocsVersion') {
+    group = "documentation"
+    description = "Synchronizes version headers in Handover.md, issues.md, and status reports"
+    doLast {
+        def vName = ext.autoVersionName
+        def filesToUpdate = [
+            'Handover.md', 
+            'issues.md', 
+            'STATUS/SOT_MASTER_REQUIREMENTS.md',
+            'STATUS/RESOLUTION_ARCHIVE.md'
+        ]
+        filesToUpdate.each { fileName ->
+            def file = new File(project.rootDir, fileName)
+            if (file.exists()) {
+                println "Updating version in ${fileName} to ${vName}..."
+                def content = file.text
+                // Matches patterns like (Sep.14.41) or (vSep.14.41)
+                def updatedContent = content.replaceAll(/\(v?\w{3}\.\d{2}\.\d{2}\)/, "(${vName})")
+                file.text = updatedContent
+            }
+        }
+    }
 }

@@ -1,7 +1,8 @@
-# SOT Master Requirements & Hardening Status (Sep.14.41)
+# SOT Master Requirements & Hardening Status (Sep.14.42)
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 327**: Version Automation - Implemented dynamic versioning in root `build.gradle`. `versionCode` is derived from Git commit count and `versionName` from a UTC timestamp (`MMM.dd.HH`). Satisfies Requirement 6.2.8 and eliminates manual sync risks (Idea #18, R-ID 327). (Resolved Sep.14.41)
+*   **SOT ID 328**: Documentation Sync - Implemented `syncDocsVersion` Gradle task to automate version header synchronization across forensic documentation (Handover.md, issues.md, etc.). (Resolved Sep.14.42)
+*   **SOT ID 327**: Version Automation - Implemented dynamic versioning in root `build.gradle`. `versionCode` is derived from Git commit count and `versionName` from a UTC timestamp (`MMM.dd.mm`). Satisfies Requirement 6.2.8 and eliminates manual sync risks (Idea #18, R-ID 327). (Resolved Sep.14.41)
 *   **SOT ID 326**: Version Management Centralization - Migrated `versionCode` and `versionName` declarations to `gradle/libs.versions.toml`. (Obsoleted by SOT ID 327 dynamic logic). (Resolved Sep.14.30)
 *   **SOT ID 325**: Notification IPC Optimization - Implemented state-change caching in `AppNotificationManager.kt`. Suppresses redundant `notify()` calls when pulse content is identical (R-ID 325). (Resolved Sep.14.20)
 *   **SOT ID 324**: IPC Shadow Coverage - Migrated all remaining data-path and configuration repositories to `@ShadowContext`. (Resolved Sep.14.10)
@@ -29,11 +30,11 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 64
-- **Total SOT IDs**: 327
-- **Resolved Issues**: 1033
-- **Open Issues**: 2
+- **Total SOT IDs**: 328
+- **Resolved Issues**: 1034
+- **Open Issues**: 1
 - **Testing Coverage**: 0
-- **Simplification Ideas**: 18
+- **Simplification Ideas**: 19
 - **QA Validation Tasks**: 277
 
 ## 🏁 Verification Chapters
@@ -44,6 +45,7 @@
 *   **Chapter 27.1 (Build Reproducibility)**: PASSED
 *   **Chapter 28.1 (Map UI Persistence)**: PASSED
 *   **Chapter 29.1 (Version Automation)**: PASSED - Dynamic Git-based versioning verified.
+*   **Chapter 29.2 (Doc Synchronization)**: PASSED - Automated header sync implemented.
 
 ---
-*Next Audit: Sep.14.42. (vSep.14.41)*
+*Next Audit: Sep.14.43. (vSep.14.42)*

@@ -1,15 +1,16 @@
-# Project Issues & Hardening Tracking (Sep.14.41)
+# Project Issues & Hardening Tracking (Sep.14.42)
 
 ## 🎯 Current Resumption Focus: Forensic Integrity & A15 Compliance
 Monitoring signaling pipeline stability and sensor-to-relay latency on budget Samsung hardware.
 
 ## 🔴 Open Issues & Hardening Tasks (Sorted by Implementation Priority)
-*   **Version Documentation Consistency (#1034)**:
-    *   **Concern**: Documentation headers (e.g., in `Handover.md`) are not synchronized with the build version.
-    *   **Risk**: Manual versioning errors and "documentation drift" between code and status reports (violates Requirement 7.2.2).
 *   **Build Fragility: Version Type Safety (#1035)**:
     *   **Concern**: `app/build.gradle` uses `.toInteger()` on a catalog string without validation.
     *   **Risk**: `NumberFormatException` during build if the `.toml` entry is accidentally corrupted or set to a non-numeric string.
+
+## 🟢 Recently Resolved Issues (Sep.14.42)
+*   **Version Documentation Consistency (#1034)**:
+    *   **Root-Cause Remediation**: Implemented a `syncDocsVersion` Gradle task in the root `build.gradle` that uses regex to automatically update version headers in `Handover.md`, `issues.md`, and other status reports. This ensures documentation matches the dynamic build version and eliminates manual synchronization risks (R-ID 328).
 
 ## 🟢 Recently Resolved Issues (Sep.14.41)
 *   **Version Automation (#1033)**:
@@ -19,11 +20,7 @@ Monitoring signaling pipeline stability and sensor-to-relay latency on budget Sa
 *   **Version Management Centralization (#1026)**:
     *   **Root-Cause Remediation**: Migrated `versionCode` and `versionName` to `libs.versions.toml`. (Obsoleted by #1033 dynamic logic).
 
-## 🟢 Recently Resolved Issues (Sep.14.20)
-*   **Notification IPC Optimization (#1025)**:
-    *   **Root-Cause Remediation**: Implemented state-change suppression in `AppNotificationManager.kt` to eliminate redundant `notify()` calls when the pulse status text is identical (R-ID 325).
-
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 327 (Rules: 64, IDs: 327), Resolved: 1033, Open: 2, Testing: 0, Ideas: 18, QA: 277]**
+- **Current Audit Baseline: [SOT: 328 (Rules: 64, IDs: 328), Resolved: 1034, Open: 1, Testing: 0, Ideas: 19, QA: 277]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.14.41)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.14.42)*
