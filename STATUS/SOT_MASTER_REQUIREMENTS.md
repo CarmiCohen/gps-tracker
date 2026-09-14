@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.12.46)
+# SOT Master Requirements & Hardening Status (Sep.13.30)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 318**: Map UI Persistence - Restored ScaleBarOverlay to the MapView stack. Implemented orientation-aware padding for MapSettingsToggle to prevent occlusion by system bars in portrait mode (R-ID 318). (Resolved Sep.13.30)
 *   **SOT ID 317**: History Manager Continuity - Resolved scope deadlock by allowing initialize() to update the CoroutineScope. Integrated reset() into CommandRouter to ensure forensic parity across sessions (R-ID 317). (Resolved Sep.12.46)
 *   **SOT ID 316**: State Restoration Integrity - loadState() now fills the accuracy window buffer with the restored baseline to prevent "ghost" high-accuracy spikes during role transitions (R-ID 316). (Resolved Sep.12.46)
 *   **SOT ID 315**: Centralized Build Logic - Migrated dependency and plugin management to Gradle Version Catalog (`libs.versions.toml`) to ensure build reproducible and eliminate hardcoded volatility (Idea #18). (Resolved Sep.12.46)
@@ -19,13 +20,13 @@
 *   **SOT ID 291**: Main-Thread Task Safety - Remediated `IllegalStateException` during location unregistration by preventing `Tasks.await` from executing on the Main thread during fallback. (Resolved Sep.12.20)
 
 ## 📈 Metric Summary
-- **Rules Verified**: 62
-- **Total SOT IDs**: 291
-- **Resolved Issues**: 1018
-- **Open Issues**: 0
+- **Rules Verified**: 63
+- **Total SOT IDs**: 292
+- **Resolved Issues**: 1023
+- **Open Issues**: 4
 - **Testing Coverage**: 0
 - **Simplification Ideas**: 18
-- **QA Validation Tasks**: 276
+- **QA Validation Tasks**: 277
 
 ## 🏁 Verification Chapters
 *   **Chapter 5.1 (A15 Hardware)**: PASSED - GNSS scheduling, stability gaps, and LED synchronization resolved.
@@ -37,6 +38,7 @@
 *   **Chapter 25.1 (Display Power Hardening)**: PASSED - Suppressed low-power state volatility noise in flickering logs.
 *   **Chapter 26.1 (Lifecycle Robustness)**: PASSED - Main-thread task safety for hardware unregistration verified.
 *   **Chapter 27.1 (Build Reproducibility)**: PASSED - Centralized version management via Version Catalog verified.
+*   **Chapter 28.1 (Map UI Persistence)**: PASSED - Scale bar restoration and occlusion-free tool wheel verified (R-ID 318).
 
 ---
-*Next Audit: Sep.12.47. (vSep.12.46)*
+*Next Audit: Sep.13.31. (vSep.13.30)*

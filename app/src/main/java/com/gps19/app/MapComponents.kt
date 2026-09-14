@@ -40,13 +40,15 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Sep.13.30:
+ * - Issue #1023 Remediation: Restored Map Scale by adding ScaleBarOverlay to 
+ *   MapView overlays list.
+ * - Issue #1023 Visibility: Adjusted MapSettingsToggle top padding in portrait 
+ *   mode (100.dp) to prevent occlusion by HeaderBar and StatusBar (R1023).
  * Sep.10.20:
  * - Rigorous Audit #243: Fully consolidated MapToolsOverlay and marker 
  *   freshness into MapViewState. Eliminated all remaining individual 
  *   parameter passing and UI-side derived state (R-ID 287).
- * Sep.10.12:
- * - Idea #243: Map State Partitioning RESOLVED. Refactored AppMapContainer 
- *   and OsmMap to consume MapViewState (R-ID 287).
  */
 
 @Composable
@@ -58,6 +60,8 @@ fun AppMapContainer(
     onLoadTrail: () -> Unit
 ) {
     val isTrackerMode = state.appMode == "tracker"
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val toggleTopPadding = if (isLandscape) 12.dp else 110.dp
 
     val initialCenter = remember(state.trackerLat, state.viewerLat) {
         when {
@@ -96,7 +100,7 @@ fun AppMapContainer(
             MapSettingsToggle(
                 isMapButtonsVisible = state.isMapButtonsVisible, 
                 onToggle = { onEvent(UiEvent.SetMapButtonsVisible(!state.isMapButtonsVisible)) }, 
-                modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = 12.dp)
+                modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = toggleTopPadding)
             )
         }
         
@@ -260,7 +264,14 @@ fun OsmMap(
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
             val sp = if (initialCenter != null) initialCenter else GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
             controller.setZoom(18.0); controller.setCenter(sp)
-            ScaleBarOverlay(this).apply { setUnitsOfMeasure(ScaleBarOverlay.UnitsOfMeasure.metric) }
+            
+            // Issue #1023: Restore Scale Bar
+            val scaleBar = ScaleBarOverlay(this).apply { 
+                setUnitsOfMeasure(ScaleBarOverlay.UnitsOfMeasure.metric)
+                setScaleBarOffset(20, 20)
+                setCentred(false)
+            }
+            overlays.add(scaleBar)
             
             overlays.add(MapEventsOverlay(object : MapEventsReceiver {
                 override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {

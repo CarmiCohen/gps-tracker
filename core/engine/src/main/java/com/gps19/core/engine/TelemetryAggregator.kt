@@ -4,6 +4,9 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * Sep.13.30:
+ * - Issue #1017 Hardening: Added reset() method to clear forensic counters 
+ *   and transient state during role transitions (R-ID 317).
  * Aug.31.00:
  * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
  *   violationUptimeMs and isUltraLongStationary to aggregation logic (R782).
@@ -11,8 +14,6 @@ import kotlin.math.*
  * - Issue #171: Forensic Jitter Audit. Hardened processPoint with a 
  *   monotonicity guard to prevent "Ghost Spikes" and "Replay Snap-backs" 
  *   when out-of-order packets arrive within the jitter window (R171).
- * Aug.10.28:
- * - Issue #133: Forensic Anomaly Correlation Engine.
  */
 class TelemetryAggregator {
 
@@ -207,6 +208,17 @@ class TelemetryAggregator {
             val p1 = getReasonPriority(r1)
             val p2 = getReasonPriority(r2)
             return if (p2 >= p1) r2 else r1
+        }
+    }
+
+    /**
+     * reset: Clears all accumulators and state (R-ID 317).
+     */
+    fun reset() {
+        for (i in scales.indices) {
+            hasData[i] = false
+            lastEmittedTick[i] = -1
+            lastProcessedTs[i] = 0L
         }
     }
 
