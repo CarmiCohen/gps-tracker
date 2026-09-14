@@ -2,7 +2,6 @@ package com.gps19.app
 
 import android.content.Context
 import com.gps19.core.engine.*
-import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import java.io.File
 import java.io.RandomAccessFile
@@ -18,18 +17,17 @@ import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Sep.14.10:
+ * - IPC Noise Suppression (#1019): Migrated to @ShadowContext to utilize 
+ *   ShadowCache for package name lookups during file I/O operations (R-ID 324).
  * Sep.01.02:
  * - Issue #879 Hardening: Implemented zero-churn read/write paths to prevent heap 
  *   pollution during 100Hz bursts. Reused internal buffers for CRC and MappedByteBuffer 
  *   wrappers. Hardened initialization sequence for rapid restart stability (R879).
- * Aug.18.07:
- * - Issue #203: Forensic Multi-Session Alignment Audit. Switched to absolute 
- *   Long timestamps and Double coordinates in the buffer to ensure zero-jitter 
- *   continuity across reboots and service restarts. Incremented to v3 (R203).
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @ShadowContext private val context: Context,
     private val timeProvider: TimeProvider
 ) {
 
@@ -275,6 +273,7 @@ class ForensicSpillBuffer @Inject constructor(
 
     /**
      * peekToEntities: Direct buffer to LogEntity conversion.
+     * Sep.14.10: Corrected return type to LogEntity for LogRepository parity.
      * Sep.01.02: Zero-churn entity generation using shared buffers (R879).
      */
     fun peekToEntities(limit: Int): List<LogEntity> {
@@ -352,7 +351,6 @@ class ForensicSpillBuffer @Inject constructor(
                             maxAccuracy = maxAcc,
                             snrSnapshot = if (snr == -1.0) null else snr,
                             vibeSnapshot = if (vibe == -1.0) null else vibe,
-                            synced = false,
                             spillIdx = tempReadIdx,
                             gpsHardwareLock = (flags and 0x08) != 0,
                             tempSnapshot = batTemp,

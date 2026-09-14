@@ -34,14 +34,12 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.14.10:
+ * - Forensic Visibility (#1020): Centralized authoritative validation and forensic 
+ *   drop logging. Re-integrated log persistence after validation (R-ID 320).
  * Sep.14.00:
  * - Forensic Visibility (#1019): Integrated SignalingValidator.getDropReason 
  *   to provide descriptive rejection logs (R-ID 320).
- * - Build Restoration: Re-consolidated ConnectivityEvent as a top-level sealed 
- *   class to resolve Unresolved reference errors in services (R-ID 321).
- * Sep.13.31:
- * - Forensic Audit (#1019): Added explicit logging for SignalingValidator drops 
- *   in both JSON and Binary paths (R-ID 320).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -670,14 +668,19 @@ class ConnectivitySuite @Inject constructor(
 
     private fun handleJsonUpdate(data: JSONObject) {
         val type = data.optString("type", "")
-        if (type == "remote_log") {
-            handleRemoteLog(LogEntry.fromJSONObject(data))
-            return
-        }
-
         val fromId = data.optString("id"); val fromViewerId = data.optString("viewer_id"); val fromViewer = data.optBoolean("from_viewer", false)
         val now = timeProvider.currentTimeMillis(); val nowRt = timeProvider.elapsedRealtime()
         val peerId = if (isTrackerMode) (if (fromViewerId.isNotEmpty()) fromViewerId else fromId) else fromId
+
+        if (type == "remote_log") {
+            if (!SignalingValidator.shouldProcessLogRelay(fromId, deviceId, fromViewerId, viewerId, isTrackerMode)) {
+                val reason = SignalingValidator.getDropReason(fromId, deviceId, fromViewer, fromViewerId, viewerId, isTrackerMode) ?: "Unauthorized Log Relay"
+                Timber.w("Forensic drop [Log]: reason=$reason id=$fromId viewerId=$fromViewerId mode=${if (isTrackerMode) "TRK" else "VWR"}")
+                return
+            }
+            handleRemoteLog(LogEntry.fromJSONObject(data))
+            return
+        }
 
         if (!SignalingValidator.shouldProcessLocationUpdate(
                 incomingId = fromId,
@@ -688,8 +691,11 @@ class ConnectivitySuite @Inject constructor(
                 isTrackerMode = isTrackerMode
         )) {
             // R-ID 320: Forensic drop logging
-            if (type != "viewer_pulse" && type != "tracker_pulse" && type != "pong_activity") {
-                val reason = SignalingValidator.getDropReason(fromId, deviceId, fromViewer, fromViewerId, viewerId, isTrackerMode)
+            val isPulse = (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity")
+            val reason = SignalingValidator.getDropReason(fromId, deviceId, fromViewer, fromViewerId, viewerId, isTrackerMode)
+            
+            // Only log drops for pulses if they have a non-default reason (to avoid spamming echo suppression)
+            if (!isPulse || (reason != null && !reason.contains("Echo suppression"))) {
                 Timber.w("Forensic drop [JSON]: reason=$reason type=$type id=$fromId viewerId=$fromViewerId fromViewer=$fromViewer mode=${if (isTrackerMode) "TRK" else "VWR"} (ownD=$deviceId, ownV=$viewerId)")
             }
             return
@@ -884,6 +890,8 @@ class ConnectivitySuite @Inject constructor(
 
     private fun handleRemoteLog(entry: LogEntry) {
         val nowRt = timeProvider.elapsedRealtime()
+        // Sep.14.10: Authoritative log persistence re-integrated.
+        mainRepository.addLog(entry)
         remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt)
     }
 
@@ -891,7 +899,7 @@ class ConnectivitySuite @Inject constructor(
 
     fun resetPeerStats() {
         remoteStatusRepository.reset()
-        mainRepository.updateRemoteActivity(0L) // R975: Explicitly clear singleton timestamp
+        mainRepository.updateRemoteActivity(0L) 
         trackerGpsStallStartTs = 0L
         mainRepository.saveDoubleSync(TRACKER_LUX_BASELINE_KEY, 0.0)
         mainRepository.saveDoubleSync(TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
@@ -903,10 +911,8 @@ class ConnectivitySuite @Inject constructor(
         val stopStartTime = SystemClock.elapsedRealtime()
         Timber.i("ConnectivitySuite: Starting teardown sequence (R-ID 197).")
 
-        // R975: Reset peer status during stop to avoid cross-role ghost activity
         resetPeerStats()
 
-        // Issue #941: Explicitly reset local relay status and RTT to avoid stale GREEN UI badges.
         telemetryRepository.updateRelayStatus(false)
         telemetryRepository.updateLastRtt(0)
         

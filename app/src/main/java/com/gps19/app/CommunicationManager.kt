@@ -23,13 +23,14 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Sep.14.10:
+ * - Forensic Visibility (#1020): Removed pre-emission filtering in relay handlers. 
+ *   Transformed into a pure transport layer to allow ConnectivitySuite to perform 
+ *   authoritative validation and forensic drop logging (R-ID 320).
  * Sep.11.23:
  * - Signaling Session Integrity (R-ID 313): Hardened connect() with session-ID 
  *   checks and queue purging to prevent race conditions during rapid role 
- *   transitions on high-latency networks. Fixed missing CodedOutputStream import.
- * Sep.08.13:
- * - HUD LED Specification Compliance (R975): Updated connect() to recreate 
- *   cancelled coroutine scope and closed channels upon role switch.
+ *   transitions on high-latency networks.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -37,7 +38,6 @@ class CommunicationManager @Inject constructor(
     private val configManager: ConfigManager,
     private val logManager: LogManager,
     private val telemetryRepository: TelemetryRepository,
-    private val logRepository: LogRepository,
     private val timeProvider: TimeProvider
 ) : SignalingProvider {
 
@@ -62,7 +62,6 @@ class CommunicationManager @Inject constructor(
 
     private var onConnectionLost: (() -> Unit)? = null
 
-    // Telemetry Serialization Buffers (Idea #239)
     private val statusBuilder = RealtimeStatus.newBuilder()
     private var serializationBuffer = ByteArray(4096)
     private val MAX_SERIALIZATION_BUFFER_SIZE = 65536
@@ -176,24 +175,19 @@ class CommunicationManager @Inject constructor(
         if (!isTracker && !SignalingConstants.isValidViewerId(this.viewerId)) return
         if (relayUrl.isEmpty()) return
         
-        // R975 Hardening: Recreate scope and channel if previously terminated.
         if (!scope.isActive) {
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
             normalPriorityQueue = Channel(capacity = Channel.UNLIMITED)
             startQueueProcessor()
         }
 
-        // R975: Force fresh connection on role switch or if forced.
-        // R-ID 313: Role change requires queue purging to prevent stale telemetry injection.
         if (!roleChanged && (isConnectingInternal.get() || isConnected())) return
 
-        // Session ID incrementation for callback isolation (R-ID 313)
         val sessionId = currentSessionId.incrementAndGet()
         
         socket?.disconnect(); socket?.off(); socket = null
         isConnectingInternal.set(true)
         
-        // Purge queue on role change (R-ID 313)
         if (roleChanged) {
             normalPriorityQueue.close()
             normalPriorityQueue = Channel(capacity = Channel.UNLIMITED)
@@ -291,15 +285,8 @@ class CommunicationManager @Inject constructor(
     private fun handleLocationRelay(args: Array<Any>) {
         try {
             val data = args[0] as JSONObject
-            if (!SignalingValidator.shouldProcessLocationUpdate(
-                    incomingId = data.optString("id"),
-                    ownDeviceId = deviceId,
-                    isFromViewer = data.optBoolean("from_viewer"),
-                    viewerId = data.optString("viewer_id"),
-                    ownViewerId = viewerId,
-                    isTrackerMode = isTrackerMode
-            )) return
-            
+            // Sep.14.10: Removed pre-emission filtering. Delegation to ConnectivitySuite 
+            // ensures forensic drop visibility (R-ID 320).
             _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(data))
         } catch (e: Exception) { Timber.e("location_relay parse error") }
     }
@@ -307,32 +294,16 @@ class CommunicationManager @Inject constructor(
     private fun handleLocationRelayBinary(args: Array<Any>) {
         try {
             val data = args[0] as ByteArray
-            val status = RealtimeStatus.parseFrom(data)
-            if (!SignalingValidator.shouldProcessLocationUpdate(
-                    incomingId = status.id,
-                    ownDeviceId = deviceId,
-                    isFromViewer = status.fromViewer,
-                    viewerId = status.viewerId,
-                    ownViewerId = viewerId,
-                    isTrackerMode = isTrackerMode
-            )) return
-
+            // Sep.14.10: Removed pre-emission filtering. Delegation to ConnectivitySuite.
             _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(data))
-        } catch (e: Exception) { Timber.e("location_relay_bin validation failure") }
+        } catch (e: Exception) { Timber.e("location_relay_bin parse error") }
     }
 
     private fun handleLogRelay(args: Array<Any>) {
         try {
             val data = args[0] as JSONObject
-            if (!SignalingValidator.shouldProcessLogRelay(
-                    incomingId = data.optString("id"),
-                    ownDeviceId = deviceId,
-                    incomingViewerId = data.optString("viewer_id"),
-                    ownViewerId = viewerId,
-                    isTrackerMode = isTrackerMode
-            )) return
-            
-            logRepository.addLog(LogEntry.fromJSONObject(data))
+            // Sep.14.10: Removed pre-emission filtering. All remote logs must be 
+            // validated by the suite before persistence.
             val wrapped = JSONObject()
             val keys = data.keys()
             while(keys.hasNext()) { val k = keys.next(); wrapped.put(k, data.get(k)) }
@@ -345,6 +316,7 @@ class CommunicationManager @Inject constructor(
         try {
             val data = args[0] as JSONObject
             val incomingViewerId = data.optString("viewer_id")
+            // Light filtering retained for simple pulse events to avoid flow saturation.
             if (isTrackerMode) {
                 if (!SignalingConstants.isViewerMatch(incomingViewerId, viewerId) && !isDefaultViewer(viewerId)) return
             } else {

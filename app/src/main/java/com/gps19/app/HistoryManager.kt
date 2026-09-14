@@ -27,17 +27,16 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.14.10:
+ * - IPC Noise Suppression (#1019): Migrated to @ShadowContext to utilize 
+ *   ShadowCache for package name lookups during file export and cleanup (R-ID 324).
  * Sep.12.47:
  * - Issue #1017 Hardening: Resolved Scope Deadlock during role transitions. 
- *   initialize() now correctly updates the CoroutineScope to prevent binding 
- *   to cancelled service scopes. Added reset() to ensure forensic parity (R-ID 317).
- * Sep.11.43:
- * - Issue #923: Telemetry Backfill Convergence. Synchronized fillRealGap with 
- *   forensic audit counters (backfillAuditCount) for consistency in continuity reporting.
+ *   initialize() now correctly updates the CoroutineScope. Added reset() (R-ID 317).
  */
 @Singleton
 class HistoryManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @ShadowContext private val context: Context,
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
     private val hardwareProvider: HardwareProvider,

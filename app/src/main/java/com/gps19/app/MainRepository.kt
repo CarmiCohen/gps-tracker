@@ -28,16 +28,16 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Sep.14.10:
+ * - IPC Noise Suppression (#1019): Switched to @ShadowContext to utilize 
+ *   ShadowCache for package name lookups during high-frequency DB/Telemetry operations.
  * Sep.06.03:
  * - Issue #924 RESOLVED: Watchdog Safe-Mode. Exposed isSafeMode and 
  *   setSafeMode to coordinate signaling suppression (R-ID 271).
- * Sep.02.66:
- * - Issue #241 RESOLVED: Mode-Selection Activation. Migrated setAppMode to 
- *   suspend to eliminate race conditions during role selection (R-ID 241).
  */
 @Singleton
 class MainRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @ShadowContext private val context: Context,
     private val trailDao: TrailDao,
     private val historyDao: HistoryDao,
     private val violationDao: ViolationDao,

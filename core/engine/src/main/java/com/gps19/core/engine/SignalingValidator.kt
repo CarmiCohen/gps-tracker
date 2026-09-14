@@ -2,15 +2,12 @@ package com.gps19.core.engine
 
 /**
  * SignalingValidator: Pure logic for enforcing role-based message filtering.
+ * Sep.14.10:
+ * - Forensic Visibility (#1020): Refined getDropReason to distinguish between 
+ *   self-echoes and packets from other trackers to prevent misleading triage logs.
  * Sep.14.00:
  * - Forensic Visibility (#1019): Added getDropReason to provide detailed 
  *   explanation for rejected signaling packets (R-ID 320).
- * July.22.12:
- * - Issue #521: Deep Purge of Remote Settings Leftovers. Removed shouldProcessSettingsUpdate.
- * v9.3.22:
- * - Legacy Compatibility: Support both "viewer" and "client" labels.
- * - Alias-Aware Matching: Integrated SignalingConstants.isTrackerMatch and 
- *   isViewerMatch to support cross-version identity mapping (e.g. T vs Trk).
  */
 object SignalingValidator {
 
@@ -63,13 +60,20 @@ object SignalingValidator {
         }
 
         if (isTrackerMode) {
-            if (!isFromViewer) return "Tracker dropped packet from another Tracker"
+            if (!isFromViewer) {
+                // Sep.14.10: Distinguish between echo and foreign tracker
+                return if (SignalingConstants.isTrackerMatch(incomingId, ownDeviceId)) {
+                    "Echo suppression: Tracker received its own reflected packet"
+                } else {
+                    "Tracker dropped packet from another Tracker"
+                }
+            }
             if (!SignalingConstants.isViewerMatch(viewerId, ownViewerId) && !isDefault(ownViewerId)) {
                 return "Unauthorized Viewer: Incoming=$viewerId, Authorized=$ownViewerId"
             }
         } else {
             if (isFromViewer && SignalingConstants.isViewerMatch(viewerId, ownViewerId)) {
-                return "Echo suppression: Packet is from self"
+                return "Echo suppression: Viewer received its own reflected command"
             }
         }
         return null

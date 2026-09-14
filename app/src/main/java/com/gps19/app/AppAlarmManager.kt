@@ -30,23 +30,16 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.14.10:
+ * - IPC Noise Suppression (#1019): Migrated to @ShadowContext to utilize 
+ *   ShadowCache for package name lookups during health evaluation (R-ID 324).
  * Sep.11.22:
  * - Issue #133 Audit: Fixed plumbing gap for isTamperDetected to ensure 
  *   proper Silent Failure suppression (R-ID 312).
- * Sep.11.21:
- * - Issue #946 Visibility: Integrated tamperNote propagation in evaluateAlarms 
- *   for role-agnostic forensic transparency (R-ID 288).
- * Sep.09.11:
- * - Siren Hardening: Refactored resetEvaluation to preserve lastSirenStopTs 
- *   during role transitions, preventing cooldown bypass (R-ID 301).
- * Sep.09.00:
- * - Idea #3 RESOLVED: AppAlarmManager Cleanup (Part B). Refactored evaluateAlarms 
- *   to utilize specialized state-mapping and report-processing functions, 
- *   reducing monolithic complexity (R-ID 301).
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @ShadowContext private val context: Context,
     private val repository: MainRepository,
     private val sessionManager: SessionManager,
     private val notificationManager: AppNotificationManager,
@@ -282,9 +275,9 @@ class AppAlarmManager @Inject constructor(
             trackerSpeed = trackerSpeed, jumpTier = jumpTier, isAdaptiveJump = isAdaptiveJump, 
             trackerBattery = trackerBattery, trackerTemp = trackerTemp,
             wasDistanceViolated = wasDistanceViolated, distanceViolationCounter = distanceViolationCounter,
-            firstViolationTs = firstViolationTs, firstViolationRt = firstViolationRt,
-            firstViolationWasJump = firstViolationWasJump, maxDistance = 60.0, // Authority from repository
-            distToHomeAuthority = null, isGpsGap = false, trackerBaroAltEma = trackerBaroAltEma, 
+            firstViolationTs = evaluationState.firstViolationTs, firstViolationRt = evaluationState.firstViolationRt,
+            firstViolationWasJump = evaluationState.firstViolationWasJump, maxDistance = 60.0, // Authority from repository
+            distToHomeAuthority = null, isGpsGap = false, trackerBaroAltEma = evaluationState.trackerBaroAltEma,
             isTrackerMode = isTrackerMode, capabilities = capabilities,
             vibrationSensitivity = currentSettings.vibrationSensitivity,
             tiltSensitivity = currentSettings.tiltSensitivity

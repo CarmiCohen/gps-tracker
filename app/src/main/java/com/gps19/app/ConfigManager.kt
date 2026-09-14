@@ -12,25 +12,24 @@ import javax.inject.Singleton
 
 /**
  * ConfigManager: Manages identity and core configuration settings.
+ * Sep.14.10:
+ * - IPC Noise Suppression (#1019): Migrated to @ShadowContext to utilize 
+ *   ShadowCache for package name lookups during config hydration (R-ID 324).
  * Aug.01.00:
- * - Issue #664: Forensic Audit: Startup Davey Stalls. Consolidated multiple 
- *   Main.immediate collectors into a single background observation to reduce 
- *   main-thread pressure during startup.
- * July.28.24:
- * - Issue #618: Forensic UI State Collection Audit.
+ * - Issue #664: Forensic Audit: Startup Davey Stalls. Consolidated collectors 
+ *   into a single background observation to reduce main-thread pressure.
  */
 @Singleton
 class ConfigManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @ShadowContext private val context: Context,
     private val repository: MainRepository
 ) {
     @Volatile var isTrackerMode: Boolean = true
     @Volatile var deviceId: String = ""
     @Volatile var viewerId: String = ""
+    @Volatile var maxDistance: Double = DEFAULT_MAX_DISTANCE
     @Volatile var relayUrl: String = DEFAULT_RELAY_URL
 
-    // Issue #664: Using IO scope for initialization and observations to 
-    // prevent main-thread contention during Hilt injection.
     private val scope = CoroutineScope(Dispatchers.IO)
 
     init {
@@ -43,18 +42,20 @@ class ConfigManager @Inject constructor(
                 repository.appModeFlow,
                 repository.trackerIdFlow,
                 repository.viewerIdFlow,
-                repository.relayUrlFlow
-            ) { mode, tId, vId, url ->
-                // Apply values to volatile fields
+                repository.relayUrlFlow,
+                repository.maxDistanceFlow
+            ) { mode, tId, vId, url, dist ->
                 if (mode != null) isTrackerMode = (mode == "tracker")
                 if (tId.isNotEmpty()) deviceId = tId
                 if (vId.isNotEmpty()) viewerId = vId
                 if (url.isNotEmpty()) relayUrl = url
+                maxDistance = dist
             }.collect { }
         }
     }
 
     companion object {
         const val DEFAULT_RELAY_URL = SettingsRepository.DEFAULT_RELAY_URL
+        const val DEFAULT_MAX_DISTANCE = SettingsRepository.DEFAULT_MAX_DISTANCE
     }
 }

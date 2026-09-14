@@ -26,16 +26,17 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.14.10:
+ * - IPC Noise Suppression (#1019): Switched to @ShadowContext to utilize 
+ *   ShadowCache for package name lookups, eliminating logcat spam during 
+ *   high-frequency health polling (R759).
  * Sep.11.41:
  * - Issue #915 Root-Cause Fix: Decoupled flow vitality from state changes. 
- *   Vitality timestamps (lastUpdateRt) are updated on every emission, while 
- *   state logic now uses .distinctUntilChanged() locally to prevent redundant 
- *   processing of stable hardware states.
- * - Reduced stall detection false-positives on budget hardware (A15).
+ *   Vitality timestamps (lastUpdateRt) are updated on every emission.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @ShadowContext private val context: Context,
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
     private val systemStatusProvider: SystemStatusProvider,

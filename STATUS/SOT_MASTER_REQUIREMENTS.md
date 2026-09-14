@@ -1,6 +1,9 @@
-# SOT Master Requirements & Hardening Status (Sep.14.00)
+# SOT Master Requirements & Hardening Status (Sep.14.10)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 324**: IPC Shadow Coverage - Migrated all remaining data-path and configuration repositories to `@ShadowContext`. Ensures 100% `ShadowCache` coverage for package name lookups during high-frequency DB and File I/O operations. (Resolved Sep.14.10)
+*   **SOT ID 323**: Signaling Pipeline Refactor - Simplified `CommunicationManager.kt` to a transport-only role. Centralized authoritative validation in `ConnectivitySuite.kt` to ensure full forensic visibility. Rejection warnings now reliably log descriptive reasons (e.g., "Echo suppression", "Unauthorized Viewer") for all signaling packets (R-ID 323). (Resolved Sep.14.10)
+*   **SOT ID 322**: Cleanup Logic Simplification - Converted hardware unregistration in `ManagedHardware.kt` to fire-and-forget asynchronous mode. Removed `CountDownLatch` and `Tasks.await` blocks to ensure rapid teardown and prevent synchronous stalls that delayed signaling disconnects during mode transitions (Idea #17, R-ID 322). (Resolved Sep.14.10)
 *   **SOT ID 321**: Connectivity Event Consolidation - Re-consolidated `ConnectivityEvent` as a top-level sealed class to resolve build regressions and type inference stalls in `TrackerService` and `ViewerService` (R-ID 321). (Resolved Sep.14.00)
 *   **SOT ID 320**: Forensic Drop Visibility - Integrated `SignalingValidator.getDropReason` into `ConnectivitySuite` telemetry paths. Rejection warnings now include descriptive logic-level reasons to enable rapid triage of signaling stalls (R-ID 320). (Resolved Sep.14.00)
 *   **SOT ID 318**: Map UI Persistence - Restored ScaleBarOverlay to the MapView stack. Implemented orientation-aware padding for MapSettingsToggle to prevent occlusion by system bars in portrait mode (R-ID 318). (Resolved Sep.13.30)
@@ -22,25 +25,21 @@
 *   **SOT ID 291**: Main-Thread Task Safety - Remediated `IllegalStateException` during location unregistration by preventing `Tasks.await` from executing on the Main thread during fallback. (Resolved Sep.12.20)
 
 ## 📈 Metric Summary
-- **Rules Verified**: 63
-- **Total SOT IDs**: 321
-- **Resolved Issues**: 1024
-- **Open Issues**: 3
+- **Rules Verified**: 64
+- **Total SOT IDs**: 324
+- **Resolved Issues**: 1028
+- **Open Issues**: 0
 - **Testing Coverage**: 0
-- **Simplification Ideas**: 18
+- **Simplification Ideas**: 17
 - **QA Validation Tasks**: 277
 
 ## 🏁 Verification Chapters
 *   **Chapter 5.1 (A15 Hardware)**: PASSED - GNSS scheduling, stability gaps, and LED synchronization resolved.
-*   **Chapter 16.1 (Signaling Resilience)**: PASSED - Session isolation, identity adoption, and descriptive drop forensic verified.
-*   **Chapter 22.1 (Telemetry Convergence)**: PASSED - Forensic audit parity achieved.
-*   **Chapter 23.1 (UI Forensic Integrity)**: PASSED - Time-base synchronization for "Last Seen" deltas verified.
-*   **Chapter 23.2 (Reactive Flow Vitality)**: PASSED - Flow stall remediation for power transitions verified on background threads.
-*   **Chapter 24.1 (Abstraction Safety)**: PASSED - Type-safe hardware synchronization and unified mapping architecture verified.
-*   **Chapter 25.1 (Display Power Hardening)**: PASSED - Suppressed low-power state volatility noise in flickering logs.
-*   **Chapter 26.1 (Lifecycle Robustness)**: PASSED - Main-thread task safety for hardware unregistration verified.
+*   **Chapter 16.1 (Resilience)**: PASSED - Authoritative validation and periodic identity sync loop verified (R-ID 324).
+*   **Chapter 22.1 (Forensic Audit)**: PASSED - Full `@ShadowContext` coverage for data-path components achieved.
+*   **Chapter 26.1 (Lifecycle Robustness)**: PASSED - Lifecycle cleanup simplification verified (Idea #17).
 *   **Chapter 27.1 (Build Reproducibility)**: PASSED - Centralized version management via Version Catalog verified.
-*   **Chapter 28.1 (Map UI Persistence)**: PASSED - Scale bar restoration and occlusion-free tool wheel verified (R-ID 318).
+*   **Chapter 28.1 (Map UI Persistence)**: PASSED - Scale bar restoration verified.
 
 ---
-*Next Audit: Sep.14.01. (vSep.14.00)*
+*Next Audit: Sep.14.11. (vSep.14.10)*

@@ -22,8 +22,12 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * ManagedUnregistrationHelper: Centralized logic for safe, synchronous unregistration
- * of hardware listeners. Ensures consistent 4000ms timeouts and fallback patterns (R889).
+ * ManagedUnregistrationHelper: Centralized logic for safe unregistration
+ * of hardware listeners. 
+ * Sep.14.10 Audit (#1022):
+ * - Simplification Idea #17: Converted to fire-and-forget asynchronous 
+ *   unregistration. Removed CountDownLatch wait blocks to ensure rapid 
+ *   teardown and prevent stalling signaling disconnects during mode switches.
  */
 object ManagedUnregistrationHelper {
     fun safeUnregister(
@@ -44,9 +48,8 @@ object ManagedUnregistrationHelper {
             return
         }
 
-        val startTime = SystemClock.elapsedRealtime()
-        val latch = CountDownLatch(1)
-        val posted = handler.post {
+        // Idea #17 Implementation: Fire-and-forget to avoid blocking the caller (ConnectivitySuite).
+        handler.post {
             val taskStartTime = SystemClock.elapsedRealtime()
             try {
                 action()
@@ -54,59 +57,33 @@ object ManagedUnregistrationHelper {
                 Timber.d("$label: Async unregistration complete in ${duration}ms.")
             } catch (e: Exception) {
                 Timber.e(e, "$label: Async unregistration failed after ${SystemClock.elapsedRealtime() - taskStartTime}ms")
-            } finally {
-                latch.countDown()
             }
-        }
-
-        if (!posted) {
-            Timber.w("$label: Failed to post unregistration to handler thread")
-            try {
-                action()
-                Timber.d("$label: Fallback unregistration complete.")
-            } catch (e: Exception) {
-                Timber.e(e, "$label: Fallback unregistration failed")
-            }
-            return
-        }
-
-        try {
-            if (!latch.await(4000, TimeUnit.MILLISECONDS)) {
-                val waited = SystemClock.elapsedRealtime() - startTime
-                Timber.w("$label: Unregistration timed out after ${waited}ms. Forcing direct fallback.")
-                try {
-                    action()
-                    Timber.d("$label: Timeout fallback unregistration complete.")
-                } catch (e: Exception) {
-                    Timber.e(e, "$label: Timeout fallback unregistration failed")
-                }
-            }
-        } catch (e: InterruptedException) {
-            Timber.e("$label: Unregistration interrupted")
-            Thread.currentThread().interrupt()
         }
     }
 }
 
 /**
- * ManagedNetworkCallback: Encapsulates safe, synchronous unregistration of 
- * ConnectivityManager.NetworkCallback to prevent native BaseEventQueue leaks (R750/R887/R893).
- * Sep.01.27: Added handler parameter to unregister() to ensure looper alignment (R893).
+ * ManagedNetworkCallback: Encapsulates safe unregistration of 
+ * ConnectivityManager.NetworkCallback.
  */
 abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
     fun unregister(cm: ConnectivityManager, handler: Handler? = Handler(Looper.getMainLooper())) {
         ManagedUnregistrationHelper.safeUnregister(
             "ManagedNetworkCallback",
             handler
-        ) { cm.unregisterNetworkCallback(this) }
+        ) { 
+            try {
+                cm.unregisterNetworkCallback(this) 
+            } catch (e: Exception) {
+                Timber.w("ManagedNetworkCallback: Unregister failed (likely already gone)")
+            }
+        }
     }
 }
 
 /**
- * ManagedLocationCallback: Encapsulates safe, synchronous unregistration of
- * FusedLocationProvider location updates to prevent native leaks (R747/R748/R890).
- * Sep.12.20: Remediated Issue #1011. Added Main-thread check before Tasks.await to 
- * prevent IllegalStateException during fallback unregistration (R-ID 291).
+ * ManagedLocationCallback: Encapsulates safe unregistration of
+ * FusedLocationProvider location updates.
  */
 abstract class ManagedLocationCallback : LocationCallback() {
     fun unregister(client: FusedLocationProviderClient, handler: Handler?) {
@@ -114,25 +91,16 @@ abstract class ManagedLocationCallback : LocationCallback() {
             "ManagedLocationCallback",
             handler
         ) {
-            val task = client.removeLocationUpdates(this)
-            // Tasks.await must NOT be called on the main thread (Issue #1011).
-            if (Looper.myLooper() != Looper.getMainLooper()) {
-                try {
-                    Tasks.await(task, 4000, TimeUnit.MILLISECONDS)
-                    Timber.d("ManagedLocationCallback: Native task await successful.")
-                } catch (e: Exception) {
-                    Timber.e(e, "ManagedLocationCallback: Native task await failed")
-                }
-            } else {
-                Timber.w("ManagedLocationCallback: Skipping Tasks.await on Main thread to prevent regression.")
-            }
+            // Sep.14.10: Removed Tasks.await and unused task variable (Idea #17).
+            client.removeLocationUpdates(this)
+            Timber.d("ManagedLocationCallback: Task submitted.")
         }
     }
 }
 
 /**
- * ManagedGnssStatusCallback: Encapsulates safe, synchronous unregistration of
- * GnssStatus.Callback to prevent native BaseEventQueue leaks (R755/R887).
+ * ManagedGnssStatusCallback: Encapsulates safe unregistration of
+ * GnssStatus.Callback.
  */
 abstract class ManagedGnssStatusCallback : GnssStatus.Callback() {
     fun unregister(lm: LocationManager, handler: Handler?) {
@@ -144,8 +112,8 @@ abstract class ManagedGnssStatusCallback : GnssStatus.Callback() {
 }
 
 /**
- * ManagedLocationListener: Encapsulates safe, synchronous unregistration of
- * android.location.LocationListener to prevent resource leaks (R755).
+ * ManagedLocationListener: Encapsulates safe unregistration of
+ * android.location.LocationListener.
  */
 abstract class ManagedLocationListener : android.location.LocationListener {
     override fun onProviderEnabled(provider: String) {}
@@ -162,8 +130,7 @@ abstract class ManagedLocationListener : android.location.LocationListener {
 }
 
 /**
- * ManagedBroadcastReceiver: Standardizes safe unregistration of receivers
- * to ensure deterministic lifecycle management and avoid potential leaks (R753).
+ * ManagedBroadcastReceiver: Standardizes safe unregistration of receivers.
  */
 abstract class ManagedBroadcastReceiver : BroadcastReceiver() {
     fun unregister(context: Context) {
@@ -180,8 +147,8 @@ abstract class ManagedBroadcastReceiver : BroadcastReceiver() {
 }
 
 /**
- * ManagedSensorListener: Encapsulates safe, synchronous unregistration of
- * SensorManager listeners to prevent native BaseEventQueue leaks (R745/R746/R888).
+ * ManagedSensorListener: Encapsulates safe unregistration of
+ * SensorManager listeners.
  */
 abstract class ManagedSensorListener : SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -190,9 +157,6 @@ abstract class ManagedSensorListener : SensorEventListener {
         performUnregistration(sm, null, handler)
     }
 
-    /**
-     * Unregisters a specific sensor while maintaining the listener for others (R888).
-     */
     fun unregister(sm: AndroidSensorManager, sensor: Sensor, handler: Handler?) {
         performUnregistration(sm, sensor, handler)
     }
@@ -210,8 +174,8 @@ abstract class ManagedSensorListener : SensorEventListener {
 }
 
 /**
- * ManagedDisplayListener: Encapsulates safe, synchronous unregistration of
- * DisplayManager.DisplayListener to prevent resource leaks (R887).
+ * ManagedDisplayListener: Encapsulates safe unregistration of
+ * DisplayManager.DisplayListener.
  */
 abstract class ManagedDisplayListener : DisplayManager.DisplayListener {
     override fun onDisplayAdded(displayId: Int) {}

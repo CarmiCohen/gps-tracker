@@ -46,15 +46,16 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Sep.14.10:
+ * - IPC Noise Suppression (#1019): Migrated to @ShadowContext to utilize 
+ *   ShadowCache for package name lookups during DataStore hydration (R-ID 324).
  * Sep.02.66:
  * - Issue #241 RESOLVED: Mode-Selection Activation. Migrated setAppMode to 
  *   suspend to eliminate race conditions during role selection (R-ID 241).
- * July.30.28:
- * - Issue #630: Forensic Recovery Log Aggregation. Added cumulative recovery stats support.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @ShadowContext private val context: Context,
     private val timeProvider: TimeProvider
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
