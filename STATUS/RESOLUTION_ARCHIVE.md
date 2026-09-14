@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## Sep.14.47
+*   **A15 Battery Compliance & Signaling Log Throttling (#1038)**: Implemented 10s throttling for forensic signaling drop logs in `ConnectivitySuite`. Protects the Android 15 battery discharge curve by preventing high-frequency logging during signaling jitter or packet rejection (R-ID 332).
+
 ## Sep.14.46
 *   **Signaling Pipeline Stability & Drop Audit Hardening (#1037)**: Integrated persistent forensic logging for signaling drop reasons and high-latency RTT spikes into `ConnectivitySuite`. This ensures detailed triage visibility on budget Samsung hardware during network or echo suppression events. (R-ID 331).
 

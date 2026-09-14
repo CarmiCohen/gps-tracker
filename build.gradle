@@ -29,8 +29,8 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    // Milestoning to Sep.14.46 as requested
-    return "Sep.14.46"
+    // Milestoning to Sep.14.47 for A15 Compliance Release
+    return "Sep.14.47"
 }
 
 ext {

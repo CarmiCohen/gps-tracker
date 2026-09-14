@@ -34,6 +34,9 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.14.47:
+ * - A15 Compliance (#1038): Implemented 10s throttling for forensic signaling 
+ *   drop logs to protect battery curves during high-jitter periods (R-ID 332).
  * Sep.14.46:
  * - Signaling Pipeline Hardening (#1037): Integrated persistent forensic logging 
  *   for signaling drop reasons and high-latency RTT spikes into packet paths (R-ID 331).
@@ -77,6 +80,7 @@ class ConnectivitySuite @Inject constructor(
     private var lastReconnectTs = 0L 
     private var lastForceJoinTs = 0L 
     private var lastConnectionSuccessRt = 0L
+    private var lastDropLogTs = 0L
 
     private val suiteExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped.get()) return@CoroutineExceptionHandler
@@ -547,7 +551,13 @@ class ConnectivitySuite @Inject constructor(
                 // R-ID 320: Forensic drop logging
                 val reason = SignalingValidator.getDropReason(statusProto.id, deviceId, statusProto.fromViewer, statusProto.viewerId, viewerId, isTrackerMode)
                 Timber.w("Forensic drop [Binary]: reason=$reason id=${statusProto.id} viewerId=${statusProto.viewerId} fromViewer=${statusProto.fromViewer} mode=${if (isTrackerMode) "TRK" else "VWR"} (ownD=$deviceId, ownV=$viewerId)")
-                logManagerProvider.get().submitToLogSink("Forensic drop [Binary]: reason=$reason id=${statusProto.id} viewerId=${statusProto.viewerId}", "signaling_drop", isImportant = false)
+                
+                // #1038: Throttle forensic drop logs to 10s for battery compliance
+                val nowRt = timeProvider.elapsedRealtime()
+                if (nowRt - lastDropLogTs > 10000L) {
+                    lastDropLogTs = nowRt
+                    logManagerProvider.get().submitToLogSink("Forensic drop [Binary]: reason=$reason id=${statusProto.id} viewerId=${statusProto.viewerId}", "signaling_drop", isImportant = false)
+                }
                 return
             }
 
@@ -688,7 +698,13 @@ class ConnectivitySuite @Inject constructor(
             if (!SignalingValidator.shouldProcessLogRelay(fromId, deviceId, fromViewerId, viewerId, isTrackerMode)) {
                 val reason = SignalingValidator.getDropReason(fromId, deviceId, fromViewer, fromViewerId, viewerId, isTrackerMode) ?: "Unauthorized Log Relay"
                 Timber.w("Forensic drop [Log]: reason=$reason id=$fromId viewerId=$fromViewerId mode=${if (isTrackerMode) "TRK" else "VWR"}")
-                logManagerProvider.get().submitToLogSink("Forensic drop [Log]: reason=$reason id=$fromId viewerId=$fromViewerId", "signaling_drop", isImportant = false)
+                
+                // #1038: Throttle forensic drop logs to 10s for battery compliance
+                val nowRtDrop = timeProvider.elapsedRealtime()
+                if (nowRtDrop - lastDropLogTs > 10000L) {
+                    lastDropLogTs = nowRtDrop
+                    logManagerProvider.get().submitToLogSink("Forensic drop [Log]: reason=$reason id=$fromId viewerId=$fromViewerId", "signaling_drop", isImportant = false)
+                }
                 return
             }
             handleRemoteLog(LogEntry.fromJSONObject(data))
@@ -710,7 +726,13 @@ class ConnectivitySuite @Inject constructor(
             // Only log drops for pulses if they have a non-default reason (to avoid spamming echo suppression)
             if (!isPulse || (reason != null && !reason.contains("Echo suppression"))) {
                 Timber.w("Forensic drop [JSON]: reason=$reason type=$type id=$fromId viewerId=$fromViewerId fromViewer=$fromViewer mode=${if (isTrackerMode) "TRK" else "VWR"} (ownD=$deviceId, ownV=$viewerId)")
-                logManagerProvider.get().submitToLogSink("Forensic drop [JSON]: reason=$reason type=$type id=$fromId", "signaling_drop", isImportant = false)
+                
+                // #1038: Throttle forensic drop logs to 10s for battery compliance
+                val nowRtDrop = timeProvider.elapsedRealtime()
+                if (nowRtDrop - lastDropLogTs > 10000L) {
+                    lastDropLogTs = nowRtDrop
+                    logManagerProvider.get().submitToLogSink("Forensic drop [JSON]: reason=$reason type=$type id=$fromId", "signaling_drop", isImportant = false)
+                }
             }
             return
         }

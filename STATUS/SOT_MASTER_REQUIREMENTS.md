@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.14.46)
+# SOT Master Requirements & Hardening Status (Sep.14.47)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 332**: A15 Battery Compliance - Implemented 10s throttling for forensic signaling drop logs in `ConnectivitySuite`. Protects the Android 15 battery discharge curve by preventing high-frequency logging during signaling jitter or packet rejection (R-ID 332). (Resolved Sep.14.47)
 *   **SOT ID 331**: Signaling Pipeline Hardening - Integrated persistent forensic logging for signaling drop reasons and high-latency RTT spikes into `ConnectivitySuite`. Ensures detailed triage visibility for budget hardware jitter and relay-side disconnects. (Resolved Sep.14.46)
 *   **SOT ID 330**: Build Integrity Verification - Implemented `verifyVersionIntegrity` Gradle task to audit type-safety fallbacks and version consistency. Advanced forensic milestone to `Sep.14.45` (R-ID 330). (Resolved Sep.14.45)
 *   **SOT ID 329**: Version Type Safety - Implemented defensive type-checking and property validation in `app/build.gradle` to ensure build stability and prevent `NumberFormatException` during CI/CD (R-ID 329). (Resolved Sep.14.43)
@@ -33,19 +34,20 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 64
-- **Total SOT IDs**: 331
-- **Resolved Issues**: 1037
+- **Total SOT IDs**: 332
+- **Resolved Issues**: 1038
 - **Open Issues**: 0
 - **Testing Coverage**: 0
-- **Simplification Ideas**: 20
+- **Simplification Ideas**: 21
 - **QA Validation Tasks**: 277
 
 ## 🏁 Verification Chapters
-*   **Chapter 29.5 (Signaling Hardening)**: PENDING - Forensic logging of drop reasons and RTT spikes active.
+*   **Chapter 29.6 (A15 Compliance)**: PENDING - Log throttling active for signaling drops.
+*   **Chapter 29.5 (Signaling Hardening)**: PASSED - Forensic logging of drop reasons and RTT spikes active.
 *   **Chapter 29.4 (Integrity Verification)**: PASSED - Gradle `verifyVersionIntegrity` task functional.
 *   **Chapter 29.1 (Version Automation)**: PASSED
 *   **Chapter 29.2 (Doc Synchronization)**: PASSED
 *   **Chapter 29.3 (Type Safety Hardening)**: PASSED
 
 ---
-*Next Audit: Sep.14.47. (vSep.14.46)*
+*Next Audit: Sep.14.48. (Sep.14.47)*
