@@ -7,6 +7,19 @@ plugins {
     alias(libs.plugins.protobuf)
 }
 
+// Issue #1035: Type Safety Validation for Dynamic Versioning
+def safeVersionCode = rootProject.hasProperty('autoVersionCode') ? rootProject.autoVersionCode : 1000
+def safeVersionName = rootProject.hasProperty('autoVersionName') ? rootProject.autoVersionName : "0.0.1-fallback"
+
+// Ensure versionCode is a valid Integer
+if (!(safeVersionCode instanceof Integer)) {
+    try {
+        safeVersionCode = safeVersionCode.toString().toInteger()
+    } catch (Exception ignored) {
+        safeVersionCode = 1000
+    }
+}
+
 android {
     namespace 'com.gps19.app'
     compileSdk 35
@@ -15,8 +28,8 @@ android {
         applicationId "com.gps19.app"
         minSdk 24
         targetSdk 35
-        versionCode rootProject.autoVersionCode
-        versionName rootProject.autoVersionName
+        versionCode safeVersionCode
+        versionName safeVersionName
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {

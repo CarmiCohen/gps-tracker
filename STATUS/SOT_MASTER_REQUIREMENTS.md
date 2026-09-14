@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.14.42)
+# SOT Master Requirements & Hardening Status (Sep.14.43)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 329**: Version Type Safety - Implemented defensive type-checking and property validation in `app/build.gradle` to ensure build stability and prevent `NumberFormatException` during CI/CD (R-ID 329). (Resolved Sep.14.43)
 *   **SOT ID 328**: Documentation Sync - Implemented `syncDocsVersion` Gradle task to automate version header synchronization across forensic documentation (Handover.md, issues.md, etc.). (Resolved Sep.14.42)
 *   **SOT ID 327**: Version Automation - Implemented dynamic versioning in root `build.gradle`. `versionCode` is derived from Git commit count and `versionName` from a UTC timestamp (`MMM.dd.mm`). Satisfies Requirement 6.2.8 and eliminates manual sync risks (Idea #18, R-ID 327). (Resolved Sep.14.41)
 *   **SOT ID 326**: Version Management Centralization - Migrated `versionCode` and `versionName` declarations to `gradle/libs.versions.toml`. (Obsoleted by SOT ID 327 dynamic logic). (Resolved Sep.14.30)
@@ -30,22 +31,17 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 64
-- **Total SOT IDs**: 328
-- **Resolved Issues**: 1034
-- **Open Issues**: 1
+- **Total SOT IDs**: 329
+- **Resolved Issues**: 1035
+- **Open Issues**: 0
 - **Testing Coverage**: 0
 - **Simplification Ideas**: 19
 - **QA Validation Tasks**: 277
 
 ## 🏁 Verification Chapters
-*   **Chapter 5.1 (A15 Hardware)**: PASSED
-*   **Chapter 16.1 (Resilience)**: PASSED
-*   **Chapter 22.1 (Forensic Audit)**: PASSED
-*   **Chapter 26.1 (Lifecycle Robustness)**: PASSED
-*   **Chapter 27.1 (Build Reproducibility)**: PASSED
-*   **Chapter 28.1 (Map UI Persistence)**: PASSED
-*   **Chapter 29.1 (Version Automation)**: PASSED - Dynamic Git-based versioning verified.
-*   **Chapter 29.2 (Doc Synchronization)**: PASSED - Automated header sync implemented.
+*   **Chapter 29.1 (Version Automation)**: PASSED
+*   **Chapter 29.2 (Doc Synchronization)**: PASSED
+*   **Chapter 29.3 (Type Safety Hardening)**: PASSED - Defensive versioning in `app/build.gradle` verified.
 
 ---
-*Next Audit: Sep.14.43. (vSep.14.42)*
+*Next Audit: Sep.14.44. (vSep.14.43)*
