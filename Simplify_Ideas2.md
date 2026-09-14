@@ -7,5 +7,6 @@
 20. **Automated Build Integrity Verification**: Link the `verifyVersionIntegrity` task to the standard `check` or `preBuild` lifecycle to ensure version safety is audited automatically on every build.
 *(Idea #21 resolved in Sep.14.47: Decoupled signaling forensics into dedicated logger)*
 *(Idea #3 resolved in Sep.14.50: Pruned redundant legacy keepalive identity sync logic)*
+*(Idea #1 resolved in Sep.14.52: Simplified reactive signaling hierarchy and pruned redundant pulse events)*
 
 ... (Items 4-17 remain in backlog) ...

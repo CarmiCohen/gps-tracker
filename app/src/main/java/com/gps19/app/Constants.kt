@@ -4,6 +4,8 @@ import com.gps19.core.engine.*
 
 /**
  * Constants: Centralized configuration values and system thresholds.
+ * Sep.14.52:
+ * - Signaling State Reduction (#1041): Removed redundant ACTION_RELAY_STATUS.
  * v9.3.40:
  * - Issue #092 Hardening: Increased PERMISSION_REFRESH_INTERVAL_FAST_MS to 2000ms 
  *   to prevent IPC-induced ANRs on low-end devices like Samsung A15.
@@ -15,7 +17,6 @@ const val DEFAULT_RELAY_URL = "https://gps-survival-relay.onrender.com"
 // Modernized Actions & Extras
 const val ACTION_NAVIGATE_TO_MAP = "com.gps19.app.ACTION_NAVIGATE_TO_MAP"
 const val ACTION_ALARM_WAKEUP = "com.gps19.app.ACTION_ALARM_WAKEUP"
-const val ACTION_RELAY_STATUS = "com.gps19.app.ACTION_RELAY_STATUS"
 const val ACTION_SUSPICIOUS_STATE_CHANGE = "com.gps19.app.ACTION_SUSPICIOUS_STATE_CHANGE"
 const val EXTRA_MODE = "com.gps19.app.EXTRA_MODE"
 

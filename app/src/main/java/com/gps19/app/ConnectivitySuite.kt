@@ -34,14 +34,12 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.14.52:
+ * - Signaling State Reduction (#1041): Pruned unused onRelayLost() branch and 
+ *   consolidated event coordination (R-ID 335).
  * Sep.14.50:
  * - Redundant Logic Pruning (#1040): Conducted a deep audit to remove legacy backfill 
  *   triggers now fully handled by the 60s identity sync loop (R-ID 334).
- * Sep.14.47:
- * - Signaling Forensic Decoupling (#1039): Migrated signaling drop and RTT spike 
- *   logging to SignalingForensicLogger to reduce class complexity (R-ID 333).
- * - A15 Compliance (#1038): Implemented 10s throttling for forensic signaling 
- *   drop logs via forensicLogger to protect battery curves (R-ID 332).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -881,8 +879,6 @@ class ConnectivitySuite @Inject constructor(
         mainRepository.addLog(entry)
         remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt)
     }
-
-    fun onRelayLost() { remoteStatusRepository.setTrackerConnected(false) }
 
     fun resetPeerStats() {
         remoteStatusRepository.reset()

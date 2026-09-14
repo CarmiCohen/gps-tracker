@@ -16,15 +16,16 @@ import javax.inject.Singleton
 
 /**
  * CommandEvent: Reactive event container for system and UI commands.
+ * Sep.14.52:
+ * - Signaling State Reduction (#1041): Removed redundant ViewerPulse and 
+ *   TransientDrop (legacy relay status) events (R-ID 335).
  * Aug.22.05:
  * - Audit Chapter 12.3: Added SimulateStoragePressure support (R197).
  */
 sealed class CommandEvent {
-    data class ViewerPulse(val id: String) : CommandEvent()
     object WatchdogTrigger : CommandEvent()
     object UiPulse : CommandEvent()
     data class UiVisibilityChanged(val visible: Boolean) : CommandEvent()
-    data class TransientDrop(val drop: Boolean) : CommandEvent()
     object ResetTimers : CommandEvent()
     object SyncSensors : CommandEvent()
     object ExecuteStressTest : CommandEvent()
@@ -91,11 +92,6 @@ class CommandRouter @Inject constructor(
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 ACTION_ALARM_WAKEUP -> _commandEvents.tryEmit(CommandEvent.WatchdogTrigger)
-                ACTION_RELAY_STATUS -> {
-                    if (intent.getBooleanExtra("connected", false) == false) {
-                        _commandEvents.tryEmit(CommandEvent.TransientDrop(true))
-                    }
-                }
             }
         }
     }
@@ -195,7 +191,7 @@ class CommandRouter @Inject constructor(
         if (isRegistered.getAndSet(true)) return
 
         val legacyFilter = IntentFilter().apply {
-            addAction(ACTION_ALARM_WAKEUP); addAction(ACTION_RELAY_STATUS)
+            addAction(ACTION_ALARM_WAKEUP)
         }
         val powerFilter = IntentFilter().apply {
             addAction(Intent.ACTION_POWER_CONNECTED); addAction(Intent.ACTION_POWER_DISCONNECTED)

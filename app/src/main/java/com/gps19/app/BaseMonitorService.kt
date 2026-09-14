@@ -19,12 +19,12 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Sep.14.52:
+ * - Signaling State Reduction (#1041): Removed redundant transientDropDetected 
+ *   latch now that signaling stability is managed via ConnectivitySuite (R-ID 335).
  * Sep.08.11:
  * - Issue #936: Forensic Auditor Consolidation (Idea #3). Injected ForensicAuditor 
  *   to allow shared hardware auditing across roles (R-ID 280).
- * Sep.05.12:
- * - Issue #910 Forensic Hardening: Enhanced serviceExceptionHandler with full 
- *   stack trace capture to identify internal stopSelf() triggers (R910).
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -68,8 +68,6 @@ abstract class BaseMonitorService : LifecycleService() {
     protected var heartbeatJob: Job? = null
     protected var fgsUpdateJob: Job? = null
     
-    protected val transientDropDetected = AtomicBoolean(false)
-
     private var lastFgsUpdateRealtime = 0L
     private val FGS_UPDATE_THROTTLE_MS = 5000L
 

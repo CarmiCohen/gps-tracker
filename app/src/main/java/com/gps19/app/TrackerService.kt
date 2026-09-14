@@ -21,14 +21,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.14.52:
+ * - Signaling State Reduction (#1041): Simplified pulse handling by unifying 
+ *   around ConnectivityEvent.PeerPulse and removing redundant CommandEvent 
+ *   ViewerPulse/TransientDrop branches (R-ID 335).
  * Sep.12.45:
  * - Issue #1015 Hardening: Ensured tick loop initiation on every peer pulse if 
- *   the job is not active, preventing session stalls when the loop is terminated 
- *   but the peer remains in the session map (R-ID 314 / #1015).
- * Sep.12.00:
- * - Issue #1007: Simplification Idea #15. Hardware Flag Abstraction.
- *   Refactored LED synchronization to use type-safe LedStatus object, 
- *   eliminating manual bitwise operations (R-ID 263).
+ *   the job is not active (R-ID 314 / #1015).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -317,11 +316,9 @@ class TrackerService : BaseMonitorService() {
         lifecycleScope.launch(Dispatchers.Default) {
             commandRouter.commandEvents.collect { event ->
                 when (event) {
-                    is CommandEvent.ViewerPulse -> handleViewerPulse(event.id)
                     is CommandEvent.WatchdogTrigger -> { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
                     is CommandEvent.UiPulse -> { lastUiPulseTs = timeProvider.currentTimeMillis(); updateForegroundServiceType() }
                     is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
-                    is CommandEvent.TransientDrop -> transientDropDetected.set(event.drop)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { 
                         refreshCapabilitiesInternal()
@@ -417,8 +414,8 @@ class TrackerService : BaseMonitorService() {
                 val type = getAvailableForegroundServiceType()
                 val health = integrityMonitor.currentHealth
                 val msg = notificationManager.getPulseMessage(
-                    sats = hardwareProvider.satellitesUsed,
-                    battery = health.batteryLevel,
+                    hardwareProvider.satellitesUsed,
+                    health.batteryLevel,
                     isSecure = !alarmManager.hasUnresolvedAlarms(),
                     isPowerSave = isPowerSaveActive || health.isPowerSaveMode
                 )
