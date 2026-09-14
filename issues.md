@@ -1,4 +1,7 @@
-# Project Issues & Hardening Tracking (Sep.14.45)
+git add .
+git commit -m "Forensic: Signaling Pipeline Stability & Drop Audit Hardening (Sep.14.46) [R-ID 331]"
+git tag -a Sep.14.46 -m "Release Sep.14.46: Signaling pipeline forensic visibility hardening."
+git push origin main --tags# Project Issues & Hardening Tracking (Sep.14.46)
 
 ## 🎯 Current Resumption Focus: Forensic Integrity & A15 Compliance
 Monitoring signaling pipeline stability and sensor-to-relay latency on budget Samsung hardware.
@@ -6,19 +9,19 @@ Monitoring signaling pipeline stability and sensor-to-relay latency on budget Sa
 ## 🔴 Open Issues & Hardening Tasks (Sorted by Implementation Priority)
 *   *(No high-priority open issues)*
 
+## 🟢 Recently Resolved Issues (Sep.14.46)
+*   **Signaling Pipeline Stability & Drop Audit Hardening (#1037)**:
+    *   **Root-Cause Remediation**: Integrated persistent forensic logging for signaling drop reasons and high-latency RTT spikes into `ConnectivitySuite`. This ensures detailed triage visibility for Samsung budget hardware jitter and relay-side disconnects. (R-ID 331).
+
 ## 🟢 Recently Resolved Issues (Sep.14.45)
 *   **Build Integrity Verification & Version Advancement (#1036)**:
-    *   **Root-Cause Remediation**: Implemented `verifyVersionIntegrity` Gradle task to audit type-safety fallbacks. Advanced project forensic milestone to `Sep.14.45`. Verified that malformed version properties trigger defensive fallbacks without breaking the build (R-ID 330).
+    *   **Root-Cause Remediation**: Implemented `verifyVersionIntegrity` Gradle task to audit type-safety fallbacks. Advanced project forensic milestone to `Sep.14.45`. (R-ID 330).
 
 ## 🟢 Recently Resolved Issues (Sep.14.43)
 *   **Build Fragility: Version Type Safety (#1035)**:
-    *   **Root-Cause Remediation**: Implemented defensive checks in `app/build.gradle` using `rootProject.hasProperty` and `instanceof Integer` validation with explicit string-to-int conversion fallbacks (R-ID 329).
-
-## 🟢 Recently Resolved Issues (Sep.14.42)
-*   **Version Documentation Consistency (#1034)**:
-    *   **Root-Cause Remediation**: Implemented the `syncDocsVersion` Gradle task in the root `build.gradle` to automatically synchronize version headers across forensic documentation (R-ID 328).
+    *   **Root-Cause Remediation**: Implemented defensive checks in `app/build.gradle` using `rootProject.hasProperty` and `instanceof Integer` validation. (R-ID 329).
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 330 (Rules: 64, IDs: 330), Resolved: 1036, Open: 0, Testing: 0, Ideas: 20, QA: 277]**
+- **Current Audit Baseline: [SOT: 331 (Rules: 64, IDs: 331), Resolved: 1037, Open: 0, Testing: 0, Ideas: 20, QA: 277]**
 
-*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.14.45)*
+*For older resolutions, see [RESOLUTION_ARCHIVE.md](STATUS/RESOLUTION_ARCHIVE.md). (vSep.14.46)*

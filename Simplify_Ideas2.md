@@ -5,5 +5,6 @@
 3. **Redundant Logic Pruning**: Conduct a deep audit of `ConnectivitySuite` to remove legacy backfill triggers that are now handled by the optimized 60s sync loop.
 19. **Lifecycle-integrated version sync**: Integrate the `syncDocsVersion` task into the standard `assemble` or `preBuild` lifecycle to ensure documentation is always updated during the build process without manual invocation.
 20. **Automated Build Integrity Verification**: Link the `verifyVersionIntegrity` task to the standard `check` or `preBuild` lifecycle to ensure version safety is audited automatically on every build.
+21. **Signaling Forensic Decoupling**: Extract signaling drop and latency formatting logic from `ConnectivitySuite` into a dedicated `SignalingForensicLogger` to reduce class complexity.
 
 ... (Items 4-17 remain in backlog) ...

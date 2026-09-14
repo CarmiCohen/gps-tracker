@@ -1,5 +1,8 @@
 # Resolution Archive
 
+## Sep.14.46
+*   **Signaling Pipeline Stability & Drop Audit Hardening (#1037)**: Integrated persistent forensic logging for signaling drop reasons and high-latency RTT spikes into `ConnectivitySuite`. This ensures detailed triage visibility on budget Samsung hardware during network or echo suppression events. (R-ID 331).
+
 ## Sep.14.45
 *   **Build Integrity Verification & Version Advancement (#1036)**: Implemented `verifyVersionIntegrity` Gradle task to audit type-safety fallbacks. Advanced project forensic milestone to `Sep.14.45`. Verified that malformed version properties trigger defensive fallbacks without breaking the build (R-ID 330).
 

@@ -34,6 +34,9 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.14.46:
+ * - Signaling Pipeline Hardening (#1037): Integrated persistent forensic logging 
+ *   for signaling drop reasons and high-latency RTT spikes into packet paths (R-ID 331).
  * Sep.14.10:
  * - Forensic Visibility (#1020): Centralized authoritative validation and forensic 
  *   drop logging. Re-integrated log persistence after validation (R-ID 320).
@@ -358,6 +361,7 @@ class ConnectivitySuite @Inject constructor(
         syncJob?.cancel()
         syncJob = scope.launch(Dispatchers.IO) {
             var wasConnected = false
+            var lastHighRttLogTs = 0L
             
             while (isActive) {
                 val currentRtt = signalingProvider.getRtt()
@@ -372,6 +376,13 @@ class ConnectivitySuite @Inject constructor(
                     _isSyncing.value = true
                     try { flushPendingUpdates() } catch (e: Exception) { Timber.e(e, "Sync failure") }
                     finally { _isSyncing.value = false }
+
+                    // Log high-latency spikes with a 10-second throttle to protect buffer pressure
+                    val nowRt = timeProvider.elapsedRealtime()
+                    if (currentRtt > MAX_ALLOWED_RTT_MS / 2 && nowRt - lastHighRttLogTs > 10000L) {
+                        lastHighRttLogTs = nowRt
+                        logManagerProvider.get().submitToLogSink("High latency spike detected: RTT=$currentRtt ms", "high_latency", isImportant = false)
+                    }
                 }
                 
                 wasConnected = isCurrentlyConnected
@@ -536,6 +547,7 @@ class ConnectivitySuite @Inject constructor(
                 // R-ID 320: Forensic drop logging
                 val reason = SignalingValidator.getDropReason(statusProto.id, deviceId, statusProto.fromViewer, statusProto.viewerId, viewerId, isTrackerMode)
                 Timber.w("Forensic drop [Binary]: reason=$reason id=${statusProto.id} viewerId=${statusProto.viewerId} fromViewer=${statusProto.fromViewer} mode=${if (isTrackerMode) "TRK" else "VWR"} (ownD=$deviceId, ownV=$viewerId)")
+                logManagerProvider.get().submitToLogSink("Forensic drop [Binary]: reason=$reason id=${statusProto.id} viewerId=${statusProto.viewerId}", "signaling_drop", isImportant = false)
                 return
             }
 
@@ -676,6 +688,7 @@ class ConnectivitySuite @Inject constructor(
             if (!SignalingValidator.shouldProcessLogRelay(fromId, deviceId, fromViewerId, viewerId, isTrackerMode)) {
                 val reason = SignalingValidator.getDropReason(fromId, deviceId, fromViewer, fromViewerId, viewerId, isTrackerMode) ?: "Unauthorized Log Relay"
                 Timber.w("Forensic drop [Log]: reason=$reason id=$fromId viewerId=$fromViewerId mode=${if (isTrackerMode) "TRK" else "VWR"}")
+                logManagerProvider.get().submitToLogSink("Forensic drop [Log]: reason=$reason id=$fromId viewerId=$fromViewerId", "signaling_drop", isImportant = false)
                 return
             }
             handleRemoteLog(LogEntry.fromJSONObject(data))
@@ -697,6 +710,7 @@ class ConnectivitySuite @Inject constructor(
             // Only log drops for pulses if they have a non-default reason (to avoid spamming echo suppression)
             if (!isPulse || (reason != null && !reason.contains("Echo suppression"))) {
                 Timber.w("Forensic drop [JSON]: reason=$reason type=$type id=$fromId viewerId=$fromViewerId fromViewer=$fromViewer mode=${if (isTrackerMode) "TRK" else "VWR"} (ownD=$deviceId, ownV=$viewerId)")
+                logManagerProvider.get().submitToLogSink("Forensic drop [JSON]: reason=$reason type=$type id=$fromId", "signaling_drop", isImportant = false)
             }
             return
         }
@@ -774,7 +788,7 @@ class ConnectivitySuite @Inject constructor(
                         bearing = data.optDouble("bearing", 0.0), snr = 0.0,
                         satsUsed = data.optInt("sats_used", current.satsUsed), isViewerTrail = false, lastGpsTs = current.gpsTs,
                         providedMaxAccuracy = data.optDouble("max_accuracy", 0.0), providedJumpTier = data.optInt("jump_tier", 0), providedIsJammer = data.optBoolean("is_jammer", false),
-                        providedIsStalled = data.optBoolean("is_stalled", false), providedIsTamper = isTrackerTamperDetected || isTrackerLocationPending || trackerStatus == SentinelStatus.TAMPER,
+                        providedIsStalled = data.optDouble("is_stalled", 0.0) != 0.0 || data.optBoolean("is_stalled", false), providedIsTamper = isTrackerTamperDetected || isTrackerLocationPending || trackerStatus == SentinelStatus.TAMPER,
                         providedKineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy),
                         nowWall = now, nowRt = nowRt
                     )
@@ -856,7 +870,7 @@ class ConnectivitySuite @Inject constructor(
                         this.atmospheric.temp = updatedStatus.temp
                         this.atmospheric.maxTemp = updatedStatus.maxTemp
                         this.atmospheric.noiseIdx = updatedStatus.noiseIdx; this.atmospheric.luxIdx = updatedStatus.luxIdx; this.atmospheric.vibeIdx = updatedStatus.vibeIdx; this.atmospheric.liftIdx = updatedStatus.liftIdx
-                        this.atmospheric.tiltIdx = updatedStatus.tiltIdx; this.atmospheric.baroIdx = updatedStatus.baroIdx
+                        this.atmospheric.tiltIdx = updatedStatus.tiltDegrees; this.atmospheric.baroIdx = updatedStatus.baroIdx
                         this.atmospheric.vibration = updatedStatus.vibration
 
                         this.integrity.battery = updatedStatus.battery; this.integrity.isCharging = updatedStatus.isCharging
