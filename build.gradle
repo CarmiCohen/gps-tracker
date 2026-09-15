@@ -29,8 +29,8 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    // Milestoning to Sep.14.54 for Build Lifecycle Integration Release
-    return "Sep.14.54"
+    // Milestoning to Sep.15.00 for Loop Integrity and Android 15 Power Profile Hardening
+    return "Sep.15.00"
 }
 
 ext {
