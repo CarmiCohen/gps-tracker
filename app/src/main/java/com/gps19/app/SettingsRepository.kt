@@ -46,6 +46,9 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Sep.15.04:
+ * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
+ *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  * Sep.14.10:
  * - IPC Noise Suppression (#1019): Migrated to @ShadowContext to utilize 
  *   ShadowCache for package name lookups during DataStore hydration (R-ID 324).
@@ -55,7 +58,7 @@ data class CommitResult(
  */
 @Singleton
 class SettingsRepository @Inject constructor(
-    @ShadowContext private val context: Context,
+    @ApplicationContext private val context: Context,
     private val timeProvider: TimeProvider
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)

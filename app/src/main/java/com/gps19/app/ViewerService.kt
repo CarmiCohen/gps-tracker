@@ -17,6 +17,10 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.15.03:
+ * - QA Validation (R339): Fixed signaling deferral inconsistency by passing 
+ *   active alarm state to SessionManager, ensuring critical signaling is not 
+ *   deferred during Doze.
  * Sep.15.02:
  * - Unified Power Policy (#1045): Migrated hardware poke logic to A15PowerPolicy 
  *   to ensure centralized Android 15 compliance.
@@ -495,7 +499,9 @@ class ViewerService : BaseMonitorService() {
         connectivitySuite.updateRelayStatus(isSocketConnected)
         
         val isTrackerActive = connectivitySuite.lastPeerActivityTs > 0 && (nowRt - connectivitySuite.lastPeerActivityTs < WATCH_TIMEOUT_MS)
-        sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isTrackerActive, false)
+        
+        // Unified Power Policy (R-ID 339 / #1045): Ensure active alarms prevent signaling deferral.
+        sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isTrackerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
 
         // Unified A15 Power Policy: Centralized poke logic (R-ID 338 / #1045)
         if (capabilities.isA15Device) {

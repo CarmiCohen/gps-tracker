@@ -23,6 +23,9 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Sep.15.04:
+ * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
+ *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  * Sep.14.10:
  * - Forensic Visibility (#1020): Removed pre-emission filtering in relay handlers. 
  *   Transformed into a pure transport layer to allow ConnectivitySuite to perform 
@@ -34,7 +37,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class CommunicationManager @Inject constructor(
-    @ShadowContext private val shadowContext: Context,
+    @ApplicationContext private val context: Context,
     private val configManager: ConfigManager,
     private val logManager: LogManager,
     private val telemetryRepository: TelemetryRepository,

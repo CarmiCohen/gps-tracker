@@ -21,14 +21,6 @@ import javax.inject.Singleton
 @Retention(AnnotationRetention.BINARY)
 annotation class ApplicationScope
 
-/**
- * ShadowContext: Qualifier for the ContextShadow wrapper used to optimize 
- * system service interactions (R894).
- */
-@Qualifier
-@Retention(AnnotationRetention.BINARY)
-annotation class ShadowContext
-
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class AppModule {
@@ -55,17 +47,6 @@ abstract class AppModule {
         @ApplicationScope
         fun provideApplicationScope(): CoroutineScope {
             return CoroutineScope(SupervisorJob() + Dispatchers.Main)
-        }
-
-        /**
-         * provideContextShadow: Automates the creation of the shadowed context (Idea #240).
-         * This ensures all system service callers use the IPC-optimized wrapper by default.
-         */
-        @Provides
-        @Singleton
-        @ShadowContext
-        fun provideContextShadow(@ApplicationContext context: Context): Context {
-            return ContextShadow(context)
         }
 
         @Provides

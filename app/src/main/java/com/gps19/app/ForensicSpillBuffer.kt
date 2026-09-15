@@ -2,6 +2,7 @@ package com.gps19.app
 
 import android.content.Context
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import java.io.File
 import java.io.RandomAccessFile
@@ -17,9 +18,12 @@ import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Sep.15.04:
+ * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
+ *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  * Sep.14.10:
- * - IPC Noise Suppression (#1019): Migrated to @ShadowContext to utilize 
- *   ShadowCache for package name lookups during file I/O operations (R-ID 324).
+ * - IPC Noise Suppression (#1019): Migrated to ShadowCache for package 
+ *   name lookups during file I/O operations (R-ID 324).
  * Sep.01.02:
  * - Issue #879 Hardening: Implemented zero-churn read/write paths to prevent heap 
  *   pollution during 100Hz bursts. Reused internal buffers for CRC and MappedByteBuffer 
@@ -27,7 +31,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
-    @ShadowContext private val context: Context,
+    @ApplicationContext private val context: Context,
     private val timeProvider: TimeProvider
 ) {
 

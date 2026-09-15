@@ -30,6 +30,9 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.15.04:
+ * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
+ *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  * Sep.14.10:
  * - IPC Noise Suppression (#1019): Migrated to @ShadowContext to utilize 
  *   ShadowCache for package name lookups during health evaluation (R-ID 324).
@@ -39,7 +42,7 @@ sealed class AlarmEvent {
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
-    @ShadowContext private val context: Context,
+    @ApplicationContext private val context: Context,
     private val repository: MainRepository,
     private val sessionManager: SessionManager,
     private val notificationManager: AppNotificationManager,

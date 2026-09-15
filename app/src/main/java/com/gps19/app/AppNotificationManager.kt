@@ -18,17 +18,17 @@ import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
+ * Sep.15.04:
+ * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
+ *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  * Sep.14.20:
  * - Issue #1025 Optimization: Implemented state-change caching for pulse notifications. 
  *   Reduced IPC overhead by suppressing redundant notify() calls when content 
  *   is identical (R-ID 325).
- * Sep.02.70:
- * - Idea #240: ContextShadow Automation. Integrated @ShadowContext injection to 
- *   eliminate manual wrapper instantiation and unify IPC optimization (R-ID 244).
  */
 @Singleton
 class AppNotificationManager @Inject constructor(
-    @ShadowContext private val shadowContext: Context
+    @ApplicationContext private val context: Context
 ) {
 
     private val channelId = "location_service_channel"
@@ -53,7 +53,7 @@ class AppNotificationManager @Inject constructor(
 
     private fun createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val manager = shadowContext.getSystemService(NotificationManager::class.java) ?: return
+            val manager = context.getSystemService(NotificationManager::class.java) ?: return
             
             manager.createNotificationChannel(
                 NotificationChannel(channelId, "Service", NotificationManager.IMPORTANCE_LOW)
@@ -70,15 +70,15 @@ class AppNotificationManager @Inject constructor(
     }
 
     fun buildForegroundNotification(contentText: String = "Monitoring system active."): Notification {
-        val intent = Intent(shadowContext, MainActivity::class.java).apply {
+        val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
         val pendingIntent = PendingIntent.getActivity(
-            shadowContext, 0, intent,
+            context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        return NotificationCompat.Builder(shadowContext, channelId)
+        return NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_jd_logo)
             .setContentTitle("GPS Tracker Active")
             .setContentText(contentText)
@@ -106,24 +106,24 @@ class AppNotificationManager @Inject constructor(
         if (msg == lastPulseMessage) return
         
         lastPulseMessage = msg
-        val notificationManager = shadowContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(notificationId, buildForegroundNotification(msg))
     }
 
     fun updateAlarmNotification(causes: String, showPermissionAction: Boolean = false) {
         if (isTrackerMode) return
 
-        val intent = Intent(shadowContext, AlarmActivity::class.java).apply {
+        val intent = Intent(context, AlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             putExtra("causes", causes)
         }
         
         val pendingIntent = PendingIntent.getActivity(
-            shadowContext, 0, intent,
+            context, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val builder = NotificationCompat.Builder(shadowContext, alarmChannelId)
+        val builder = NotificationCompat.Builder(context, alarmChannelId)
             .setSmallIcon(R.drawable.ic_jd_logo)
             .setContentTitle("CRITICAL ALARM")
             .setContentText(causes)
@@ -141,19 +141,19 @@ class AppNotificationManager @Inject constructor(
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             val settingsPendingIntent = PendingIntent.getActivity(
-                shadowContext, 1, settingsIntent,
+                context, 1, settingsIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             builder.addAction(0, "FIX BACKGROUND RESTRICTION", settingsPendingIntent)
             builder.setContentText("$causes (Overlay Hidden - Tap to fix)")
         }
 
-        val notificationManager = shadowContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(alarmNotificationId, builder.build())
     }
 
     fun cancelAlarm() {
-        val notificationManager = shadowContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(alarmNotificationId)
     }
 

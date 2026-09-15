@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.PowerManager
 import com.gps19.core.engine.NET_REJOIN_THRESHOLD_MS
 import com.gps19.core.engine.TimeProvider
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.min
@@ -14,10 +15,13 @@ import kotlin.math.pow
  * A15PowerPolicy: Central authority for Android 15 power-awareness and signaling backoff.
  * Consolidates Doze deferral, exponential backoff, and hardware pokes to ensure 
  * consistent behavior across background service modules.
+ * Sep.15.04:
+ * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
+ *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  */
 @Singleton
 class A15PowerPolicy @Inject constructor(
-    @ShadowContext private val context: Context,
+    @ApplicationContext private val context: Context,
     private val timeProvider: TimeProvider
 ) {
     private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager

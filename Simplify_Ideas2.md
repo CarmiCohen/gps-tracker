@@ -12,3 +12,4 @@
 *(Idea #1 resolved in Sep.14.52: Simplified reactive signaling hierarchy and pruned redundant pulse events)*
 *(Idea #19 & #20 resolved in Sep.14.54: Lifecycle-integrated version and documentation sync)*
 *(Idea #4 resolved in Sep.15.02: Unified power policy consolidation into A15PowerPolicy component)*
+*(Idea #2 resolved in Sep.15.04: Context shadowing automated via GpsApplication override)*

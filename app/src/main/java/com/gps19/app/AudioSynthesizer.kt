@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
@@ -21,6 +22,9 @@ import kotlin.math.exp
 
 /**
  * AudioSynthesizer: Procedural audio generator for sirens and alerts.
+ * Sep.15.04:
+ * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
+ *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  * Sep.03.25:
  * - Idea #240: ContextShadow Automation. Migrated to @Singleton class with 
  *   @ShadowContext injection to eliminate manual wrapper logic (R-ID 240).
@@ -30,7 +34,7 @@ import kotlin.math.exp
  */
 @Singleton
 class AudioSynthesizer @Inject constructor(
-    @ShadowContext private val shadowContext: Context
+    @ApplicationContext private val context: Context
 ) {
     private val isLooping = AtomicBoolean(false)
     private val isForced = AtomicBoolean(false)
@@ -82,7 +86,7 @@ class AudioSynthesizer @Inject constructor(
         if (!force && timeProvider.elapsedRealtime() < silencedUntilRt.get()) return
         
         if (!overrideSilence) {
-            val am = shadowContext.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+            val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
             if (am.ringerMode != AudioManager.RINGER_MODE_NORMAL) {
                 Timber.d("Siren suppressed by silence setting")
                 return
@@ -99,7 +103,7 @@ class AudioSynthesizer @Inject constructor(
             try {
                 Timber.d("Siren loop started: $type (force=$force, loop=$loop)")
                 val startRt = timeProvider.elapsedRealtime()
-                val vibrator = if (vibrate) shadowContext.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator else null
+                val vibrator = if (vibrate) context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator else null
 
                 while (isActive) {
                     val nowRt = timeProvider.elapsedRealtime()

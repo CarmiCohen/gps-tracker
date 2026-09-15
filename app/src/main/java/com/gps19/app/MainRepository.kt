@@ -28,8 +28,11 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Sep.15.04:
+ * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
+ *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  * Sep.14.10:
- * - IPC Noise Suppression (#1019): Switched to @ShadowContext to utilize 
+ * - IPC Noise Suppression (#1019): Switched to @ApplicationContext to utilize
  *   ShadowCache for package name lookups during high-frequency DB/Telemetry operations.
  * Sep.06.03:
  * - Issue #924 RESOLVED: Watchdog Safe-Mode. Exposed isSafeMode and 
@@ -37,7 +40,7 @@ private class RepositoryMetrics {
  */
 @Singleton
 class MainRepository @Inject constructor(
-    @ShadowContext private val context: Context,
+    @ApplicationContext private val context: Context,
     private val trailDao: TrailDao,
     private val historyDao: HistoryDao,
     private val violationDao: ViolationDao,

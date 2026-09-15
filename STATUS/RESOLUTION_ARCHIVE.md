@@ -1,5 +1,11 @@
 # Resolution Archive (Sep.15.00)
 
+## 🟢 Sep.15.04
+*   **Context Shadowing Automation (#1047)**: Automated IPC optimization for package name lookups by overriding `getOpPackageName` directly in `GpsApplication`. Migrated all system service consumers from `@ShadowContext` to `@ApplicationContext` and removed the obsolete `ContextShadow` wrapper and its associated Dagger/Hilt qualifier. This simplifies the dependency injection architecture while maintaining full forensic optimization. (R-ID 340).
+
+## 🟢 Sep.15.03
+*   **QA Validation: Signaling Deferral Parity (#1046)**: Fixed a signaling inconsistency in `ViewerService` where critical telemetry was incorrectly deferred during Android 15 Doze mode due to a hardcoded violation state. Synchronized logic with `TrackerService` to ensure active alarms prevent deferral. (R-ID 339).
+
 ## 🟢 Sep.15.02
 *   **Unified Power Policy Consolidation (#1045)**: Consolidated fragmented Android 15 power-awareness logic, exponential backoff calculations, and Doze-state deferral policies into a unified `A15PowerPolicy` component. Ensured behavioral consistency across `ConnectivitySuite`, `TrackerService`, and `ViewerService`. (R-ID 339).
 

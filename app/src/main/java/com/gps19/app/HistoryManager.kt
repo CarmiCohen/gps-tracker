@@ -27,6 +27,9 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.15.04:
+ * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
+ *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  * Sep.14.10:
  * - IPC Noise Suppression (#1019): Migrated to @ShadowContext to utilize 
  *   ShadowCache for package name lookups during file export and cleanup (R-ID 324).
@@ -36,7 +39,7 @@ sealed class HistoryEvent {
  */
 @Singleton
 class HistoryManager @Inject constructor(
-    @ShadowContext private val context: Context,
+    @ApplicationContext private val context: Context,
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
     private val hardwareProvider: HardwareProvider,

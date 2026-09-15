@@ -12,6 +12,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
+ * Sep.15.04:
+ * - Context Shadowing Automation (#1047): Callers now pass @ApplicationContext 
+ *   as IPC optimization is handled globally in GpsApplication (R-ID 240).
  * Sep.03.25:
  * - Idea #240: ContextShadow Automation. Removed redundant manual ContextShadow 
  *   wrapping in permission checks; callers are now expected to pass the 
@@ -60,7 +63,7 @@ fun isA15Device(): Boolean = HardwareSot.isA15(Build.MANUFACTURER, Build.BRAND, 
 
 /**
  * v9.3.11: Now requires non-null pkgName to prevent logcat spillage.
- * R-ID 240: Callers should pass @ShadowContext.
+ * R-ID 240: Callers should pass @ApplicationContext.
  */
 fun isXiaomiSpecialPermissionGranted(context: Context, pkgName: String): XiaomiPermissionStatus {
     if (!isXiaomiDevice()) return XiaomiPermissionStatus.UNKNOWN

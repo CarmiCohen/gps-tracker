@@ -34,6 +34,9 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.15.04:
+ * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
+ *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  * Sep.12.12:
  * - Issue #1010 Hardening: Refined display flickering detection to ignore volatility 
  *   between DOZE and DOZE_SUSPEND states, typical for Samsung AOD (R-ID 290).
@@ -46,7 +49,7 @@ import kotlin.math.*
  */
 @Singleton
 class HardwareProvider @Inject constructor(
-    @ShadowContext private val shadowContext: Context,
+    @ApplicationContext private val context: Context,
     @ApplicationScope private val scope: CoroutineScope,
     private val timeProvider: TimeProvider,
     private val systemMonitor: SystemMonitor,
@@ -54,10 +57,10 @@ class HardwareProvider @Inject constructor(
     private val forensicAuditor: ForensicAuditor
 ) : ManagedSensorListener() {
 
-    private val locationManager by lazy { shadowContext.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
-    private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(shadowContext) }
-    private val sensorManager by lazy { shadowContext.getSystemService(Context.SENSOR_SERVICE) as android.hardware.SensorManager }
-    private val displayManager by lazy { shadowContext.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager }
+    private val locationManager by lazy { context.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
+    private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(context) }
+    private val sensorManager by lazy { context.getSystemService(Context.SENSOR_SERVICE) as android.hardware.SensorManager }
+    private val displayManager by lazy { context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager }
 
     private var hardwareThread: HandlerThread? = null
     private var hardwareHandler: Handler? = null
@@ -370,7 +373,7 @@ class HardwareProvider @Inject constructor(
             
             val handler = hardwareHandler
             val gHandler = gnssHandler
-            if (gHandler != null && ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            if (gHandler != null && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 try {
                     locationManager.registerGnssStatusCallback(gnssStatusCallback, gHandler)
                     Timber.d("HardwareProvider: GNSS callback registered on GNSSThread.")
@@ -483,7 +486,7 @@ class HardwareProvider @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(shadowContext, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
         
         revivalPulseJob?.cancel()
         revivalPulseJob = scope.launch(Dispatchers.Default) {

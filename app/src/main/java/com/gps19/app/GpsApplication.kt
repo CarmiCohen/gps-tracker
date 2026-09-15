@@ -8,6 +8,7 @@ import androidx.work.WorkManager
 import android.content.Context
 import android.content.ComponentCallbacks2
 import android.os.Process
+import android.os.Build
 import androidx.hilt.work.HiltWorkerFactory
 import org.osmdroid.tileprovider.modules.SqlTileWriter
 import org.osmdroid.config.Configuration as OsmConfig
@@ -24,6 +25,11 @@ import com.gps19.core.engine.ShadowCache
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Sep.15.04:
+ * - Context Shadowing Automation (#1047): Integrated getOpPackageName shadowing 
+ *   directly into the application lifecycle. This automates IPC optimization 
+ *   for all @ApplicationContext consumers, eliminating the need for 
+ *   manual @ShadowContext qualifiers (R-ID 240).
  * Sep.14.00:
  * - Forensic Audit Cleanup: Removed getPackageName PKG_TRACE. Confirmed ShadowCache 
  *   hits via logcat; remaining logs are framework-level diagnostic noise (R759).
@@ -56,6 +62,16 @@ class GpsApplication : Application(), Configuration.Provider {
 
     override fun getPackageName(): String {
         return stringCache.get("pkg") ?: super.getPackageName()
+    }
+
+    override fun getOpPackageName(): String {
+        val cached = stringCache.get("pkg")
+        if (cached != null) return cached
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            super.getOpPackageName()
+        } else {
+            packageName
+        }
     }
 
     override fun onCreate() {

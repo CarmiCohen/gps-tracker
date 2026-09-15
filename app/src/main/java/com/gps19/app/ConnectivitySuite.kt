@@ -36,6 +36,9 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.15.04:
+ * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
+ *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  * Sep.15.02:
  * - Unified Power Policy (#1045): Consolidated A15 power-awareness and signaling 
  *   backoff logic into A15PowerPolicy for forensic architectural consistency.
@@ -45,7 +48,7 @@ sealed class ConnectivityEvent {
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
-    @ShadowContext private val shadowContext: Context,
+    @ApplicationContext private val context: Context,
     private val settingsRepository: SettingsRepository,
     private val telemetryRepository: TelemetryRepository,
     private val logManagerProvider: Provider<LogManager>,
@@ -66,7 +69,7 @@ class ConnectivitySuite @Inject constructor(
     )
     val connectivityEvents: SharedFlow<ConnectivityEvent> = _connectivityEvents.asSharedFlow()
 
-    private val connectivityManager = shadowContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val isStarted = AtomicBoolean(false)
     private val isStopped = AtomicBoolean(false)
     private val consecutiveHttpFailures = AtomicInteger(0)
@@ -720,7 +723,7 @@ class ConnectivitySuite @Inject constructor(
                 type = "event",
                 isImportant = true
             ))
-            Handler(Looper.getMainLooper()).post { Toast.makeText(shadowContext, "REMOTE: Chair Baseline Zeroed", Toast.LENGTH_SHORT).show() }
+            Handler(Looper.getMainLooper()).post { Toast.makeText(context, "REMOTE: Chair Baseline Zeroed", Toast.LENGTH_SHORT).show() }
             _connectivityEvents.tryEmit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt)
             return
