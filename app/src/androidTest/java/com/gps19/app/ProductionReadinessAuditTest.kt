@@ -14,6 +14,9 @@ import javax.inject.Inject
 /**
  * ProductionReadinessAuditTest: Verifies end-to-end telemetry stream constraints 
  * and Doze-deferral consistency across role transitions (R339).
+ * Sep.15.14:
+ * - Forensic Certification Final Validation (#1052): Implemented forensic stress 
+ *   test simulating 4 hours of high-throughput telemetry (R-ID 343).
  * Sep.15.12:
  * - Production Readiness Audit (#1050): Validated telemetry session update metrics, 
  *   role pulse handling, and active alarm override continuity under Doze state (R-ID 342).
@@ -65,5 +68,40 @@ class ProductionReadinessAuditTest {
 
         assertTrue("SessionManager must sustain active violation state", sessionManager.isInViolation)
         assertEquals("Violation uptime percentage should match 100%", 100.0, sessionManager.getViolationPercentage(), 0.01)
+    }
+
+    /**
+     * R343: Forensic Certification Stress Test
+     * Verifies that the system maintains telemetry integrity and violation metrics
+     * under high-frequency simulated throughput (simulating multi-hour load).
+     */
+    @Test
+    fun verifyForensicThroughputUnderViolation() {
+        sessionManager.reset()
+        val startRt = timeProvider.elapsedRealtime()
+        var currentRt = startRt
+
+        // Simulate 4 hours of high-frequency forensic telemetry (2s ticks)
+        val simulationDurationMs = 4 * 3600 * 1000L
+        val tickStepMs = 2000L // SYNC_INTERVAL_VIOLATION_MS
+
+        val steps = (simulationDurationMs / tickStepMs).toInt()
+        
+        for (i in 1..steps) {
+            val lastRt = currentRt
+            currentRt += tickStepMs
+            sessionManager.updateTick(
+                nowRt = currentRt,
+                lastTickRt = lastRt,
+                isPeerAvailable = true,
+                isInViolation = true
+            )
+        }
+
+        assertTrue("Session should remain in violation", sessionManager.isInViolation)
+        assertEquals("Violation percentage should be 100% after sustained stress", 100.0, sessionManager.getViolationPercentage(), 0.001)
+        
+        val expectedViolationMs = simulationDurationMs
+        assertEquals("Violation uptime should match simulation duration", expectedViolationMs, sessionManager.violationUptimeMs)
     }
 }

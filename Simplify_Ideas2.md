@@ -1,16 +1,19 @@
-# Project Simplification Ideas
+# Simplicity Ideas 2 (Hardening Phase)
 
-1. **Signaling State Reduction**: Simplify the sealed class hierarchy in `ConnectivityEvent` by merging redundant state transitions.
-2. **Context Shadowing Automation**: Explore a compiler plugin or KSP processor to automatically apply `@ShadowContext` logic to classes injected with `ApplicationContext`.
-3. **Redundant Logic Pruning**: Conduct a deep audit of `ConnectivitySuite` to remove legacy backfill triggers that are now handled by the optimized 60s sync loop.
-4. **Unified Power Policy**: Consolidate Android 15 power-awareness logic (Doze deferral, backoff) into a reusable `A15PowerPolicy` component.
-5. **Signaling Policy Consolidation**: Centralize dynamic signaling configurations (delays, batch sizes, conflation windows) into a dedicated `SignalingPolicy` component to reduce logic fragmentation in transport layers. (Added Sep.15.13)
-
-... (Items 6-18 remain in backlog) ...
-
-*(Idea #21 resolved in Sep.14.47: Decoupled signaling forensics into dedicated logger)*
-*(Idea #3 resolved in Sep.14.50: Pruned redundant legacy keepalive identity sync logic)*
-*(Idea #1 resolved in Sep.14.52: Simplified reactive signaling hierarchy and pruned redundant pulse events)*
-*(Idea #19 & #20 resolved in Sep.14.54: Lifecycle-integrated version and documentation sync)*
-*(Idea #4 resolved in Sep.15.02: Unified power policy consolidation into A15PowerPolicy component)*
-*(Idea #2 resolved in Sep.15.04: Context shadowing automated via GpsApplication override)*
+1.  **Peer Mapping**: Simplify ID matching logic by using a unified `SignalingIdentity` object instead of separate tracker/viewer ID checks.
+2.  **State Consolidation**: Move `trackerGpsStallStartTs` and similar transient peer states from `ConnectivitySuite` to `RemoteStatusRepository`.
+3.  **Heartbeat Uniformity**: Standardize `TICK_INTERVAL_MS` across all service loops to reduce timing drift in uptime calculations.
+4.  **Log Throttling**: Implement a generic `ThrottledForensicLogger` to replace manual timestamp checks for signaling drops.
+5.  **Status Atomic Updates**: Flatten the `TrackerStatus` copy chain to reduce allocation pressure during high-frequency updates.
+6.  **A15 Power Consolidation**: Move Doze-state listeners from services into `A15PowerPolicy`.
+7.  **Signaling Interface**: Remove legacy JSON emit methods in favor of the unified `transmit(TrackerStatus)` for all telemetry.
+8.  **Offline Buffer Chunking**: Unify pruning logic across all Room-backed repositories.
+9.  **Jitter Logic**: Centralize random jitter calculation to ensure uniform distribution across all backoff implementations.
+10. **Context Shadowing**: Remove remaining manual package name references now that application-level shadowing is active.
+11. **Signaling Priority**: Simplify `SignalingPriority` to a boolean `isCritical` to reduce branching logic.
+12. **Telemetry Mapping**: Automate `PendingStatusEntity` mapping using a lightweight reflection-free transformer.
+13. **Doze awareness**: Integrate `PowerManager.isDeviceIdleMode()` directly into the `SignalingProvider` transmission gate.
+14. **Metric Aggregation**: Simplify `SessionManager.updateTick` by using a dedicated `UptimeTracker` component.
+15. **Batch Sizing**: Move dynamic batch size calculations from `ConnectivitySuite` to `EngineConstants`.
+16. **Forensic Aggression**: Simplify signaling delay scaling by using a linear interpolation based on violation intensity.
+17. **Forensic Audit Provider**: Decouple violation uptime tracking into a dedicated component to reduce SessionManager complexity.
