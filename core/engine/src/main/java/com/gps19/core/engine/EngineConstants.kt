@@ -2,25 +2,13 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.15.13:
+ * - Performance Tuning (#1051): Added SYNC_INTERVAL_VIOLATION_MS (2s) and 
+ *   SIGNALING_EMIT_DELAY_VIOLATION_MS (20ms) to optimize forensic data 
+ *   latency during active violations (R-ID 343).
  * Sep.11.58:
  * - Issue #950 Hardening: Relaxed GNSS stability thresholds to accommodate A15 
  *   hardware jitter (Jitter: 500ms -> 3000ms, Gap: 200ms -> 1000ms).
- * Sep.06.33:
- * - Issue #929 Hardening: Added GNSS_THROTTLING_HYSTERESIS_MS (10s) to prevent 
- *   sampling jitter during rapid anomaly state transitions (R-ID 274).
- * Sep.06.20:
- * - Issue #924 (Part B): Added GNSS_SAMPLING_INTERVAL_THROTTLED_MS (5000ms) 
- *   for A15 resource throttling during high load or MaliAnomaly.
- * Sep.05.15:
- * - Issue #917 RESOLVED: Exact Actual Colors. Updated stale thresholds 
- *   to 35s to match HUD LED Specifications (R338/R972).
- * Sep.04.45:
- * - Issue #905 Hardening: Reduced GPS_GAP_THRESHOLD_MS to 15s and 
- *   GPS_REVIVAL_RETRY_INTERVAL_MS to 30s to ensure high-assurance recovery 
- *   on budget hardware (R905).
- * Sep.02.72:
- * - Issue #247: Added BUDGET_HARDWARE_SIGNAL_GRACE_MS (5s) to mitigate false-positive 
- *   Signal Loss alerts on Samsung A15/S21FE during telemetry gaps (R247).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -362,6 +350,7 @@ const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 30000L
 const val MAX_BACKFILL_POINTS = 1000
 
 const val SIGNALING_EMIT_DELAY_MS = 50L
+const val SIGNALING_EMIT_DELAY_VIOLATION_MS = 20L
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
 const val COMM_RTT_SCALING_FACTOR = 2000.0
@@ -369,6 +358,8 @@ const val NETWORK_TIMEOUT_MS = 60000
 const val NET_REJOIN_THRESHOLD_MS = 15000L
 const val NET_HEAL_THRESHOLD_MS = 45000L
 const val PING_INTERVAL_MS = 10000L
+const val SYNC_INTERVAL_VIOLATION_MS = 2000L
+const val SYNC_BATCH_SIZE_VIOLATION = 250
 const val SOCKET_TIMEOUT_MS = 60000
 const val RTT_WINDOW_SIZE = 5
 

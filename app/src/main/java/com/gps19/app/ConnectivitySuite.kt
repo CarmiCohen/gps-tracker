@@ -36,15 +36,13 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.15.13:
+ * - Performance Tuning (#1051): Implemented dynamic SYNC_INTERVAL_VIOLATION_MS 
+ *   and adaptive batching (SYNC_BATCH_SIZE_VIOLATION) to optimize forensic 
+ *   telemetry throughput during critical events (R-ID 343).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
- * Sep.15.02:
- * - Unified Power Policy (#1045): Consolidated A15 power-awareness and signaling 
- *   backoff logic into A15PowerPolicy for forensic architectural consistency.
- * Sep.15.01:
- * - Forensic Signaling Pipeline Hardening (#1044): Implemented exponential backoff 
- *   with randomized jitter and PowerManager Doze awareness (R-ID 338).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -373,6 +371,7 @@ class ConnectivitySuite @Inject constructor(
             while (isActive) {
                 val currentRtt = signalingProvider.getRtt()
                 val isCurrentlyConnected = isConnected()
+                val inViolation = sessionManager.isInViolation
                 
                 if (isCurrentlyConnected) {
                     if (!wasConnected) {
@@ -380,7 +379,10 @@ class ConnectivitySuite @Inject constructor(
                     }
                     
                     _isSyncing.value = true
-                    try { flushPendingUpdates() } catch (e: Exception) { Timber.e(e, "Sync failure") }
+                    try { 
+                        val batchSize = if (inViolation) SYNC_BATCH_SIZE_VIOLATION else LOG_BATCH_SIZE
+                        flushPendingUpdates(batchSize) 
+                    } catch (e: Exception) { Timber.e(e, "Sync failure") }
                     finally { _isSyncing.value = false }
 
                     // Log high-latency spikes via decoupled forensic logger (R-ID 333)
@@ -392,6 +394,7 @@ class ConnectivitySuite @Inject constructor(
                 wasConnected = isCurrentlyConnected
 
                 val dynamicDelay = when {
+                    inViolation -> SYNC_INTERVAL_VIOLATION_MS
                     currentRtt > MAX_ALLOWED_RTT_MS -> PING_INTERVAL_MS * 3
                     currentRtt > MAX_ALLOWED_RTT_MS / 2 -> (PING_INTERVAL_MS * (1.0 + (currentRtt.toDouble() / MAX_ALLOWED_RTT_MS))).toLong()
                     else -> PING_INTERVAL_MS
@@ -401,8 +404,8 @@ class ConnectivitySuite @Inject constructor(
         }
     }
 
-    private suspend fun flushPendingUpdates() {
-        val pending = offlineRepository.getPendingStatusUpdates(100)
+    private suspend fun flushPendingUpdates(limit: Int = LOG_BATCH_SIZE) {
+        val pending = offlineRepository.getPendingStatusUpdates(limit)
         if (pending.isEmpty()) return
         pending.forEach { entity ->
             val statusTemplate = TrackerStatus(

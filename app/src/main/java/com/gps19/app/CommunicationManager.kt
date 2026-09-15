@@ -19,21 +19,18 @@ import java.util.Random
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Sep.15.13:
+ * - Performance Tuning (#1051): Optimized signaling emission latency by 
+ *   integrating SessionManager to apply SIGNALING_EMIT_DELAY_VIOLATION_MS (20ms) 
+ *   during active violations (R-ID 343).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
- * Sep.14.10:
- * - Forensic Visibility (#1020): Removed pre-emission filtering in relay handlers. 
- *   Transformed into a pure transport layer to allow ConnectivitySuite to perform 
- *   authoritative validation and forensic drop logging (R-ID 320).
- * Sep.11.23:
- * - Signaling Session Integrity (R-ID 313): Hardened connect() with session-ID 
- *   checks and queue purging to prevent race conditions during rapid role 
- *   transitions on high-latency networks.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -41,7 +38,8 @@ class CommunicationManager @Inject constructor(
     private val configManager: ConfigManager,
     private val logManager: LogManager,
     private val telemetryRepository: TelemetryRepository,
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val sessionManager: SessionManager
 ) : SignalingProvider {
 
     private sealed class SignalingCommand {
@@ -103,7 +101,10 @@ class CommunicationManager @Inject constructor(
                     is SignalingCommand.Emit -> socket?.emit(command.event, command.data)
                     is SignalingCommand.EmitBinary -> socket?.emit(command.event, command.routingId, command.data)
                 }
-                delay(SIGNALING_EMIT_DELAY_MS)
+                
+                // R-ID 343: Optimize emission latency during active violations
+                val delayMs = if (sessionManager.isInViolation) SIGNALING_EMIT_DELAY_VIOLATION_MS else SIGNALING_EMIT_DELAY_MS
+                delay(delayMs)
             }
         }
     }
@@ -432,7 +433,9 @@ class CommunicationManager @Inject constructor(
         pendingLocationMap = SignalingMessageConflator.conflate(pendingLocationMap, incoming).toMutableMap()
         if (conflationJob == null || !conflationJob!!.isActive) {
             conflationJob = scope.launch {
-                delay(100)
+                // R-ID 343: Reduce conflation delay during violations
+                val conflationDelay = if (sessionManager.isInViolation) 20L else 100L
+                delay(conflationDelay)
                 val mapToSend = pendingLocationMap
                 if (mapToSend != null && isConnected() && !isStopped) { 
                     normalPriorityQueue.trySend(SignalingCommand.Emit("location_update", JSONObject(mapToSend as Map<*, *>)))
