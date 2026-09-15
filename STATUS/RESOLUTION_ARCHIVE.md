@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.15.00)
+# Resolution Archive (Sep.15.10)
+
+## 🟢 Sep.15.10
+*   **Legacy Cleanup (#1048)**: Manually cleared the obsolete `ContextShadow.kt` file which became redundant after context shadowing automation moved into the `GpsApplication` lifecycle level. This completes the technical debt removal for the IPC optimization project. (R-ID 340).
 
 ## 🟢 Sep.15.04
 *   **Context Shadowing Automation (#1047)**: Automated IPC optimization for package name lookups by overriding `getOpPackageName` directly in `GpsApplication`. Migrated all system service consumers from `@ShadowContext` to `@ApplicationContext` and removed the obsolete `ContextShadow` wrapper and its associated Dagger/Hilt qualifier. This simplifies the dependency injection architecture while maintaining full forensic optimization. (R-ID 340).

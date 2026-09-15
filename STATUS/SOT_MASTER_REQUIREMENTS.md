@@ -1,7 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.15.00)
+# SOT Master Requirements & Hardening Status (Sep.15.10)
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 340**: Context Shadowing Automation - Automated IPC optimization by integrating `getOpPackageName` shadowing directly into the `GpsApplication` lifecycle. Eliminated manual `@ShadowContext` qualifiers across the project to reduce boilerplate and ensure global optimization for all `@ApplicationContext` consumers. (Resolved Sep.15.04)
+*   **SOT ID 340**: Context Shadowing Automation & Legacy Cleanup - Automated IPC optimization by integrating `getOpPackageName` shadowing directly into the `GpsApplication` lifecycle. Removed manual qualifiers and completed cleanup by removing the obsolete `ContextShadow.kt` file. (Resolved Sep.15.10)
 *   **SOT ID 339**: Unified Power Policy Consolidation & QA Validation - Consolidated fragmented Android 15 power-awareness logic into a unified `A15PowerPolicy` component. Fixed signaling deferral inconsistency in `ViewerService` to ensure active alarms prevent incorrect Doze-mode deferral. (Resolved Sep.15.03)
 *   **SOT ID 338**: Forensic Signaling Pipeline Hardening - Implemented exponential backoff with randomized jitter and PowerManager Doze awareness in `ConnectivitySuite`. Guaranteed signaling resilience and battery optimization under Android 15 power restrictions. (Resolved Sep.15.01)
 *   **SOT ID 337**: Continuous Loop Integrity & Android 15 Power Profile Hardening - Validated background loops, adaptive power-saving profiles, and state continuity under Android 15 power management restrictions. (Resolved Sep.15.00)
@@ -16,7 +16,7 @@
 ## 📈 Metric Summary
 - **Rules Verified**: 65
 - **Total SOT IDs**: 340
-- **Resolved Issues**: 1047
+- **Resolved Issues**: 1048
 - **Open Issues**: 0
 - **Testing Coverage**: 0
 - **Simplification Ideas**: 16
@@ -31,4 +31,4 @@
 *   **Chapter 29.9 (Signaling State Reduction)**: PASSED - CommandRouter sealed class pruned of redundant events.
 
 ---
-*Next Audit: Sep.15.05. (Sep.15.00)*
+*Next Audit: Sep.15.11. (Sep.15.10)*
