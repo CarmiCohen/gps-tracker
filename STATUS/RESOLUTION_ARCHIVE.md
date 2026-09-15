@@ -1,5 +1,8 @@
 # Resolution Archive (Sep.15.00)
 
+## 🟢 Sep.15.02
+*   **Unified Power Policy Consolidation (#1045)**: Consolidated fragmented Android 15 power-awareness logic, exponential backoff calculations, and Doze-state deferral policies into a unified `A15PowerPolicy` component. Ensured behavioral consistency across `ConnectivitySuite`, `TrackerService`, and `ViewerService`. (R-ID 339).
+
 ## 🟢 Sep.15.01
 *   **Forensic Signaling Pipeline Hardening (#1044)**: Implemented exponential backoff with randomized jitter and PowerManager Doze awareness in `ConnectivitySuite`. Guaranteed signaling resilience and battery optimization under Android 15 power restrictions by deferring non-critical telemetry during deep sleep while ensuring immediate reconnection during active violations. (R-ID 338).
 

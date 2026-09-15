@@ -17,20 +17,22 @@ import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.util.*
+import javax.inject.Inject
 import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.15.02:
+ * - Unified Power Policy (#1045): Migrated hardware poke logic to A15PowerPolicy 
+ *   to ensure centralized Android 15 compliance.
  * Sep.14.54:
  * - Build Stability (#1042): Removed stale reference to pruned transientDropDetected 
- *   variable in processTick (R-ID 336).
- * Sep.14.52:
- * - Signaling State Reduction (#1041): Simplified pulse handling by unifying 
- *   around ConnectivityEvent.PeerPulse and removing redundant CommandEvent 
- *   ViewerPulse/TransientDrop branches (R-ID 335).
+ *   variable (R-ID 336).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
+
+    @Inject lateinit var powerPolicy: A15PowerPolicy
 
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
@@ -484,6 +486,7 @@ class TrackerService : BaseMonitorService() {
         val isViewerActive = sessionManager.getViewerCount() > 0 || isRecentUiPulse()
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isViewerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
 
+        // Unified A15 Power Policy: Centralized poke logic (R-ID 338 / #1045)
         if (capabilities.isA15Device) {
             if (JdHardwareManager.isAvailable()) {
                 val gpsAge = nowRt - locationProcessor.getLastValidFixRt()
@@ -498,7 +501,7 @@ class TrackerService : BaseMonitorService() {
                         isPeerStale = !isViewerActive
                     )
                 )
-            } else if (nowRt - lastA15PokeRt > A15_POKE_INTERVAL_MS) {
+            } else if (powerPolicy.shouldPokeHardware(true, lastA15PokeRt, A15_POKE_INTERVAL_MS)) {
                 lastA15PokeRt = nowRt
                 systemMonitor.acquireWakeLock(force = true)
             }

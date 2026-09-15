@@ -1,26 +1,28 @@
-# QA Validation Status (Sep.12.45)
+# QA Validation Status (Sep.15.02)
 
 This document tracks the verification status of all high-assurance logic and forensic refinements.
 
 ## 🏁 Validation Dashboard
 | Category | Passed | Pending | Failed |
 | :--- | :--- | :--- | :--- |
-| **Logic Refinement** | 178 | 0 | 0 |
+| **Logic Refinement** | 180 | 1 | 0 |
 | **Hardware Compatibility** | 50 | 0 | 0 |
 | **Stability / Long-Run** | 30 | 0 | 0 |
 | **UI / UX** | 18 | 0 | 0 |
-| **Total Validated** | **276** | **0** | **0** |
+| **Total Validated** | **278** | **1** | **0** |
 
 ---
 
 ## 🟡 Pending Validation
-*   [NONE] All current hardening items are validated.
+*   **R339**: **Unified Power Policy** - Verify centralized backoff and Doze-deferral consistency across role transitions (Sep.15.02).
 
 ---
 
 ## 🟢 Validated & Resolved (Core Record)
 | ID | Feature | Status | Notes |
 | :--- | :--- | :--- | :--- |
+| **R338** | **Signaling Backoff Hardening** | **Passed** | Verified exponential backoff with randomized jitter and PowerManager Doze awareness in ConnectivitySuite (Sep.15.01). |
+| **R337** | **A15 Loop Integrity** | **Passed** | Verified loop continuity and signaling resilience under Android 15 power management (Sep.15.00). |
 | **R317** | **History Manager Continuity** | **Passed** | Verified scope update during role transitions to prevent background task stalls (Sep.12.45). |
 | **R316** | **State Restoration Integrity** | **Passed** | Verified accuracy window buffer filling during loadState() to prevent stale data leakage (Sep.12.45). |
 | **R315** | **Build Centralization** | **Passed** | Verified Gradle Version Catalog implementation and build reproducibility (Sep.12.45). |

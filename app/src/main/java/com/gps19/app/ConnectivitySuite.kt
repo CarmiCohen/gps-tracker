@@ -36,13 +36,12 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.15.02:
+ * - Unified Power Policy (#1045): Consolidated A15 power-awareness and signaling 
+ *   backoff logic into A15PowerPolicy for forensic architectural consistency.
  * Sep.15.01:
  * - Forensic Signaling Pipeline Hardening (#1044): Implemented exponential backoff 
- *   with randomized jitter and PowerManager Doze awareness to ensure signaling 
- *   resilience under Android 15 power restrictions (R-ID 338).
- * Sep.14.54:
- * - Build Stability (#1042): Fixed RTT type mismatch, corrected isPowerTamper 
- *   mapping, and added missing IntegrityState fields (R-ID 336).
+ *   with randomized jitter and PowerManager Doze awareness (R-ID 338).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -58,7 +57,8 @@ class ConnectivitySuite @Inject constructor(
     private val offlineRepository: OfflineRepository,
     private val mainRepository: MainRepository,
     private val remoteStatusRepository: RemoteStatusRepository,
-    private val forensicLogger: SignalingForensicLogger
+    private val forensicLogger: SignalingForensicLogger,
+    private val powerPolicy: A15PowerPolicy
 ) {
     private val _connectivityEvents = MutableSharedFlow<ConnectivityEvent>(
         extraBufferCapacity = 16,
@@ -67,7 +67,6 @@ class ConnectivitySuite @Inject constructor(
     val connectivityEvents: SharedFlow<ConnectivityEvent> = _connectivityEvents.asSharedFlow()
 
     private val connectivityManager = shadowContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-    private val powerManager = shadowContext.getSystemService(Context.POWER_SERVICE) as PowerManager
     private val isStarted = AtomicBoolean(false)
     private val isStopped = AtomicBoolean(false)
     private val consecutiveHttpFailures = AtomicInteger(0)
@@ -78,7 +77,6 @@ class ConnectivitySuite @Inject constructor(
     private var isTrackerMode = true
     private var lastReconnectTs = 0L 
     private var reconnectAttempt = 0
-    private val random = Random()
 
     private val suiteExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped.get()) return@CoroutineExceptionHandler
@@ -280,18 +278,8 @@ class ConnectivitySuite @Inject constructor(
     }
 
     private fun calculateNextRejoinDelay(): Long {
-        if (signalingProvider.isConnected()) {
-            reconnectAttempt = 0
-            return NET_REJOIN_THRESHOLD_MS
-        }
-        
-        // Exponential Backoff with Jitter (Issue #1044)
-        val baseDelay = NET_REJOIN_THRESHOLD_MS
-        val factor = Math.pow(2.0, Math.min(reconnectAttempt.toDouble(), 6.0)).toLong()
-        val backoff = baseDelay * factor
-        val jitter = random.nextInt(5000)
-        
-        return Math.min(backoff + jitter, 300000L) // Cap at 5 minutes
+        if (signalingProvider.isConnected()) reconnectAttempt = 0
+        return powerPolicy.calculateNextBackoff(reconnectAttempt, signalingProvider.isConnected())
     }
 
     private fun startIdentitySyncLoop() {
@@ -308,11 +296,9 @@ class ConnectivitySuite @Inject constructor(
     }
 
     private suspend fun performKeepAlive() = withContext(Dispatchers.IO) {
-        // A15 Doze Awareness: Defer non-critical signaling during deep Doze
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (powerManager.isDeviceIdleMode && !sessionManager.isInViolation) {
-                return@withContext
-            }
+        // A15 Power Policy: Defer non-critical signaling during deep Doze (R-ID 338)
+        if (powerPolicy.shouldDeferSignaling(sessionManager.isInViolation)) {
+            return@withContext
         }
 
         val latestMode = settingsRepository.getAppMode() ?: (if (isTrackerMode) "tracker" else "viewer")
