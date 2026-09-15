@@ -30,7 +30,7 @@ private data class HudUiParts(
     val viewerId: String,
     val isSystemActive: Boolean,
     val isSafeMode: Boolean,
-    val isA15: Boolean
+    val useStaggered: Boolean
 )
 
 /**
@@ -57,17 +57,17 @@ private data class MapUiParts(
 /**
  * Map Base State: Helper for complex combine (Issue #243).
  */
-private data class MapBase(val ui: MapUiParts, val kin: KinematicState, val p: Long, val prt: Long)
+private data class MapBase(val ui: MapUiParts, val kinematic: KinematicState, val p: Long, val prt: Long)
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.15.200:
+ * - Issue #1056 Unified Performance Muzzle: Harmonized S21FE and A15 detection. 
+ *   Switched to useStaggeredHydration for all telemetry sampling and 
+ *   initialization delays to eliminate frame skips (R-ID 346).
  * Sep.12.00:
  * - Idea #13: HUD Mapping Centralization. Replaced UiStateAggregator with 
  *   stateless UiStateMapper to unify HUD and Dashboard construction (R-ID 286).
- * Sep.11.48:
- * - Issue #946: Vitality Pulse Standardization. Included systemPulseRt 
- *   in all segmented dashboard and HUD flow combinations to ensure 
- *   freshness despite distinctUntilChanged (R-ID 289).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -185,12 +185,12 @@ class MainViewModel @Inject constructor(
         DashboardState(conn, tel, health)
     }
     .distinctUntilChanged()
-    .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
+    .sample(if (_uiState.value.permissions.useStaggeredHydration) 5000L else 1000L)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
 
     // Segmented HUD Flows
     private val hudUiConnectivityFlow = _uiState.map { 
-        HudUiParts(it.appMode, it.deviceId, it.viewerId, it.isSystemActive, it.isSafeMode, it.permissions.isA15Device) 
+        HudUiParts(it.appMode, it.deviceId, it.viewerId, it.isSystemActive, it.isSafeMode, it.permissions.useStaggeredHydration) 
     }.distinctUntilChanged()
 
     val hudConnectivityState: StateFlow<HudConnectivityState> = combine(
@@ -200,7 +200,7 @@ class MainViewModel @Inject constructor(
         _remoteSignal,
         _systemPulseRt
     ) { ui, diag, rtt, sig, pulseRt ->
-        uiStateMapper.mapHudConnectivity(ui.appMode, ui.deviceId, ui.viewerId, ui.isSystemActive, ui.isSafeMode, ui.isA15, diag, rtt, sig, pulseRt)
+        uiStateMapper.mapHudConnectivity(ui.appMode, ui.deviceId, ui.viewerId, ui.isSystemActive, ui.isSafeMode, ui.useStaggered, diag, rtt, sig, pulseRt)
     }
     .flowOn(Dispatchers.Default)
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudConnectivityState())
@@ -242,13 +242,13 @@ class MainViewModel @Inject constructor(
     val trackerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
         .flatMapLatest { mode -> if (mode != null) repository.trackerTrailFlow else flowOf(emptyList()) }
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
+        .sample(if (_uiState.value.permissions.useStaggeredHydration) 5000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val viewerTrailFlow: StateFlow<List<TrailPoint>> = _uiState.map { it.appMode }.distinctUntilChanged()
         .flatMapLatest { mode -> if (mode != null) repository.viewerTrailFlow else flowOf(emptyList()) }
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L)
+        .sample(if (_uiState.value.permissions.useStaggeredHydration) 5000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val trackerTrailSegments: StateFlow<List<MapTrailSegment>> = trackerTrailFlow
@@ -264,32 +264,32 @@ class MainViewModel @Inject constructor(
     // Forensic Ribbon Flows (Restored from truncation)
     val history4MFlow = repository.getHistoryFlow("4M")
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .sample(if (_uiState.value.permissions.useStaggeredHydration) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
         
     val history16MFlow = repository.getHistoryFlow("16M")
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .sample(if (_uiState.value.permissions.useStaggeredHydration) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
         
     val history1HFlow = repository.getHistoryFlow("1H")
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .sample(if (_uiState.value.permissions.useStaggeredHydration) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
         
     val history4HFlow = repository.getHistoryFlow("4H")
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .sample(if (_uiState.value.permissions.useStaggeredHydration) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
         
     val history24HFlow = repository.getHistoryFlow("24H")
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .sample(if (_uiState.value.permissions.useStaggeredHydration) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
         
     val history7DFlow = repository.getHistoryFlow("7D")
         .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
-        .sample(if (_uiState.value.permissions.isA15Device) 3000L else 1000L)
+        .sample(if (_uiState.value.permissions.useStaggeredHydration) 3000L else 1000L)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Segmented Map UI Flow (R-ID 287 Hardening)
@@ -301,7 +301,7 @@ class MainViewModel @Inject constructor(
         viewerTrailSegments,
         repository.violationsFlow.distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
     ) { base, trkSegs, vwrSegs, vios ->
-        val ui = base.ui; val kin = base.kin; val pulse = base.p; val pulseRt = base.prt; val isTracker = ui.appMode == "tracker"
+        val ui = base.ui; val kin = base.kinematic; val pulse = base.p; val pulseRt = base.prt; val isTracker = ui.appMode == "tracker"
         val tLat = if (isTracker) kin.localLocation.kinetic.lat else kin.trackerLocation.kinetic.lat
         val tLng = if (isTracker) kin.localLocation.kinetic.lng else kin.trackerLocation.kinetic.lng
         val tTs = if (isTracker) kin.localLocation.kinetic.gpsTs else kin.trackerLocation.kinetic.gpsTs
@@ -335,19 +335,19 @@ class MainViewModel @Inject constructor(
             trackerMaxAccuracy = if (isTracker) kin.localLocation.kinetic.maxAccuracy else kin.trackerLocation.kinetic.maxAccuracy, trackerGpsTs = tTs, trackerTelemetryTs = tTel,
             trackerLocPending = if (isTracker) kin.localHealth.isLocationPending else kin.trackerHealth.isLocationPending, trackerLocPendingReason = if (isTracker) kin.localHealth.locationPendingReason else kin.trackerHealth.locationPendingReason,
             trackerLastValidFixRt = if (isTracker) kin.localHealth.lastValidFixRt else kin.trackerHealth.lastValidFixRt, viewerLat = vLat, viewerLng = vLng, viewerSpeed = if (isTracker) 0.0 else kin.localLocation.kinetic.speed,
-            viewerAccuracy = if (isTracker) 0.0 else kin.localLocation.kinetic.accuracy, viewerMaxAcc = if (isTracker) 0.0 else kin.localLocation.kinetic.maxAccuracy, viewerGpsTs = vTs, viewerTelemetryTs = vTel,
+            viewerAccuracy = if (isTracker) 0.0 else kinematicState.localLocation.kinetic.accuracy, viewerMaxAcc = if (isTracker) 0.0 else kinematicState.localLocation.kinetic.maxAccuracy, viewerGpsTs = vTs, viewerTelemetryTs = vTel,
             viewerLocPending = if (isTracker) false else kin.localHealth.isLocationPending, viewerLocPendingReason = if (isTracker) LocationPendingReason.NONE else kin.localHealth.locationPendingReason,
             viewerLastValidFixRt = if (isTracker) 0L else kin.localHealth.lastValidFixRt, replayCursorPos = kin.replayCursorPos, systemPulse = pulse, systemPulseRt = pulseRt,
             trackerSegments = trkSegs, viewerSegments = vwrSegs, violations = vios, showAccuracyBadge = true, showSettingsButton = true, showToolsOverlay = true,
             isTrackerFresh = isTrkFresh, isViewerFresh = isVwrFresh, isTrackerValid = isTrkValid, isViewerValid = isVwrValid,
             smoothedTrackerLat = sTrkLat, smoothedTrackerLng = sTrkLng, smoothedViewerLat = sVwrLat, smoothedViewerLng = sVwrLng
         )
-    }.flowOn(Dispatchers.Default).sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MapViewState())
+    }.flowOn(Dispatchers.Default).sample(if (_uiState.value.permissions.useStaggeredHydration) 5000L else 1000L).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MapViewState())
 
     // Logic and Event Handlers
     val eventLogsFlow: StateFlow<List<LogEntry>> = combine(_uiState.map { it.appMode }.distinctUntilChanged(), _uiState.map { it.navigation.isStrictMode }.distinctUntilChanged(), _uiState.map { it.navigation.isLogVisible }.distinctUntilChanged()) { m, s, v -> Triple(m, s, v) }
         .flatMapLatest { (m, s, v) -> if (m != null && v) repository.eventLogsFlow(if (s) LOG_LIMIT_STRICT else LOG_LIMIT_STANDARD) else flowOf(emptyList()) }
-        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }.sample(if (_uiState.value.permissions.isA15Device) 5000L else 1000L).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }.sample(if (_uiState.value.permissions.useStaggeredHydration) 5000L else 1000L).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     /**
      * activeGnssDetail: GNSS Detail publication flow.
@@ -365,6 +365,8 @@ class MainViewModel @Inject constructor(
             val initialSettings = settingsUseCase.loadAllSettings()
             appStartTime = initialSettings.appStartTime
             
+            val initialPerms = systemStatusProvider.getPermissionState()
+            
             withContext(Dispatchers.Main.immediate) {
                 applyInitialSettings(initialSettings)
                 
@@ -372,7 +374,7 @@ class MainViewModel @Inject constructor(
                     updateState { it.copy(hydrationLevel = level) }
                 }.launchIn(viewModelScope)
 
-                hydrationManager.startHydration(viewModelScope, systemStatusProvider.isA15Hardware()) {
+                hydrationManager.startHydration(viewModelScope, initialPerms.useStaggeredHydration) {
                     updateState { it.copy(isInitialized = true) }
                 }
             }
@@ -389,7 +391,7 @@ class MainViewModel @Inject constructor(
             
             launch(Dispatchers.Main.immediate) {
                 _uiState.filter { it.isFullyHydrated && it.appMode != null }.first()
-                if (systemStatusProvider.isA15Hardware()) delay(1000)
+                if (_uiState.value.permissions.useStaggeredHydration) delay(1000)
                 startHeavyObservations()
             }
 
@@ -442,9 +444,8 @@ class MainViewModel @Inject constructor(
             while(true) { 
                 val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
                 val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
-                val isA15 = systemStatusProvider.isA15Hardware()
                 withContext(Dispatchers.Main.immediate) { 
-                    updateState { it.copy(permissions = newState.copy(isA15Device = isA15)) } 
+                    updateState { it.copy(permissions = newState) } 
                 }
                 delay(if (refreshFast) 5000L else 30000L) 
             } 
@@ -564,7 +565,7 @@ class MainViewModel @Inject constructor(
             is UiEvent.SetAppMode -> {
                 if (event.mode != null) {
                     viewModelScope.launch(Dispatchers.Main.immediate) {
-                        if (systemStatusProvider.isA15Hardware()) delay(500)
+                        if (_uiState.value.permissions.useStaggeredHydration) delay(500)
                         startHeavyObservations()
                     }
                 }
@@ -672,7 +673,7 @@ class MainViewModel @Inject constructor(
                     _systemPulseRt.value = nowRt
                     repository.sendCommand(UiCommand.SyncRequest)
                 }
-                delay(if (_uiState.value.permissions.isA15Device) 5000L else 2000L)
+                delay(if (_uiState.value.permissions.useStaggeredHydration) 5000L else 2000L)
             }
         }
     }

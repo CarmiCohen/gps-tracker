@@ -5,6 +5,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Sep.15.200:
+ * - Issue #1056: Unified Staggered Hydration. Added useStaggeredHydration 
+ *   to PermissionState to harmonize initialization logic for A15 and S21FE hardware (R-ID 286).
  * Sep.10.20:
  * - Idea #243 Rigorous Audit: Consolidated smoothed coordinates into MapViewState 
  *   to eliminate all derivation from the UI layer (R-ID 287).
@@ -317,7 +320,8 @@ data class PermissionState(
     val requiresExtraTopPadding: Boolean = false,
     val requiresAdaptationMuzzle: Boolean = false,
     val isA15Device: Boolean = false,
-    val isSamsungDevice: Boolean = false
+    val isSamsungDevice: Boolean = false,
+    val useStaggeredHydration: Boolean = false
 )
 
 data class NavigationState(

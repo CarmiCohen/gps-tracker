@@ -12,15 +12,11 @@ import javax.inject.Singleton
 /**
  * LifecycleHydrationManager (Issue #318/323/739/758/874/880/882/885):
  * Centralizes and staggers the app hydration sequence to prevent Davey stalls
- * on budget hardware (SM-A155F).
- * Sep.01.12:
- * - Issue #885 Remediation: Decomposed Level 8 into 4 distinct phases (8-11). 
- *   Each heavy overlay (Settings, Log, Ribbons, GNSS) is now assigned its own 
- *   hydration level to eliminate the 885ms JIT spike on A15 hardware (R2.1).
- * Sep.01.04:
- * - Issue #880 Remediation: Refined staggered hydration strategy. Increased 
- *   map hydration delays from 300ms to 600ms for A15 hardware to eliminate 
- *   the residual 751ms Davey stall (R880).
+ * on budget hardware (SM-A155F) and performance-sensitive flagship variants (S21FE).
+ * Sep.15.200:
+ * - Issue #1056 Unified Performance Muzzle: Replaced isA15 check with 
+ *   useStaggeredHydration to harmonized initialization logic for all 
+ *   congestion-prone hardware (R-ID 346).
  */
 @Singleton
 class LifecycleHydrationManager @Inject constructor() {
@@ -30,24 +26,24 @@ class LifecycleHydrationManager @Inject constructor() {
 
     private var hydrationJob: Job? = null
 
-    fun startHydration(scope: CoroutineScope, isA15: Boolean, onComplete: () -> Unit) {
+    fun startHydration(scope: CoroutineScope, useStaggered: Boolean, onComplete: () -> Unit) {
         if (hydrationJob?.isActive == true) return
         
         hydrationJob = scope.launch(Dispatchers.Main.immediate) {
-            Timber.d("Hydration: Starting sequence (A15=$isA15)")
+            Timber.d("Hydration: Starting sequence (staggered=$useStaggered)")
             
             // Level 1: Surface (Basic UI shell ready)
-            delay(if (isA15) 500 else 200)
+            delay(if (useStaggered) 500 else 200)
             _hydrationLevel.value = 1
             Timber.d("Hydration: Level 1 (Surface)")
 
             // Level 2: Core/Nav (Navigation and basic data)
-            delay(if (isA15) 750 else 300)
+            delay(if (useStaggered) 750 else 300)
             _hydrationLevel.value = 2
             Timber.d("Hydration: Level 2 (Core)")
 
             // Level 3: Full (Heavy observations started, UI functional)
-            delay(if (isA15) 1000 else 400)
+            delay(if (useStaggered) 1000 else 400)
             _hydrationLevel.value = 3
             Timber.d("Hydration: Level 3 (Full)")
             
@@ -70,7 +66,7 @@ class LifecycleHydrationManager @Inject constructor() {
                     _hydrationLevel.value = 4
                     Timber.d("Hydration: Level 4 (Map Engine Base)")
                     
-                    val mapDelay = if (isA15) 600L else 100L
+                    val mapDelay = if (useStaggered) 600L else 100L
                     
                     delay(mapDelay)
                     _hydrationLevel.value = 5
@@ -85,8 +81,7 @@ class LifecycleHydrationManager @Inject constructor() {
                     Timber.d("Hydration: Level 7 (Map Violations)")
 
                     // Phase 3: Overlay Hydration (Levels 8-11)
-                    // Issue #885: Further split to distribute JIT load of heavy composables.
-                    val overlayDelay = if (isA15) 800L else 150L
+                    val overlayDelay = if (useStaggered) 800L else 150L
                     
                     delay(overlayDelay)
                     _hydrationLevel.value = 8

@@ -61,19 +61,13 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Sep.15.200:
+ * - Issue #1056 Unified Performance Muzzle: Harmonized S21FE and A15 detection. 
+ *   Introduced useStaggeredHydration to bridge hardware tiers and eliminate 
+ *   initialization frame skips (R-ID 286).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
- * Sep.11.56:
- * - Issue #949 Hardening: Directed all shared observation flows to execute on Dispatchers.IO 
- *   using .flowOn(Dispatchers.IO) to eliminate reactive flow stalls caused by main thread contention 
- *   on budget hardware (A15).
- * Sep.11.42:
- * - Issue #915 Hardening: Added periodic polling (60s) to observeInternetStatus 
- *   and observeBatteryStatus to ensure "vitality pulses" are emitted even during 
- *   stable hardware states.
- * - Removed .distinctUntilChanged() from all shared flows to support heartbeat 
- *   monitoring in IntegrityMonitor.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -253,7 +247,8 @@ class SystemStatusProviderImpl @Inject constructor(
                                 requiresExtraTopPadding = isXiaomi,
                                 requiresAdaptationMuzzle = isS21FE,
                                 isA15Device = isA15,
-                                isSamsungDevice = isSamsung
+                                isSamsungDevice = isSamsung,
+                                useStaggeredHydration = isA15 || isS21FE
                             )
                             cachedState.set(newState)
                         }
