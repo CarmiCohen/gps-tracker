@@ -34,6 +34,9 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.14.54:
+ * - Build Stability (#1042): Fixed RTT type mismatch, corrected isPowerTamper 
+ *   mapping, and added missing IntegrityState fields (R-ID 336).
  * Sep.14.52:
  * - Signaling State Reduction (#1041): Pruned unused onRelayLost() branch and 
  *   consolidated event coordination (R-ID 335).
@@ -360,7 +363,7 @@ class ConnectivitySuite @Inject constructor(
 
                     // Log high-latency spikes via decoupled forensic logger (R-ID 333)
                     if (currentRtt > MAX_ALLOWED_RTT_MS / 2) {
-                        forensicLogger.logHighLatency(currentRtt, MAX_ALLOWED_RTT_MS / 2)
+                        forensicLogger.logHighLatency(currentRtt.toLong(), MAX_ALLOWED_RTT_MS / 2)
                     }
                 }
                 
@@ -601,6 +604,7 @@ class ConnectivitySuite @Inject constructor(
                     isJammer = statusProto.isJammer,
                     isStalled = statusProto.isStalled,
                     isTamperDetected = statusProto.isTamperDetected,
+                    isPowerTamper = statusProto.isPowerTamper,
                     jumpTier = statusProto.jumpTier,
                     kineticEnergy = statusProto.kineticEnergy,
                     isAdaptiveJump = statusProto.isAdaptiveJump,
@@ -627,6 +631,7 @@ class ConnectivitySuite @Inject constructor(
                         this.integrity.battery = updatedStatus.battery; this.integrity.isCharging = updatedStatus.isCharging
                         this.integrity.satsView = updatedStatus.satsView; this.integrity.satsUsed = updatedStatus.satsUsed 
                         this.integrity.snrIdx = updatedStatus.snrIdx
+                        this.integrity.isPowerTamper = updatedStatus.isPowerTamper
                         this.integrity.signal = (updatedStatus.snrIdx * 10.0).toInt().coerceIn(0, 10)
                         this.integrity.isLocationPending = updatedStatus.isLocationPending 
                         this.integrity.locationPendingReason = updatedStatus.locationPendingReason
@@ -792,7 +797,7 @@ class ConnectivitySuite @Inject constructor(
                     battery = data.optInt("battery", current.battery), temp = data.optDouble("temp", current.temp), maxTemp = data.optDouble("max_temp", current.maxTemp),
                     currentMa = data.optInt("current_ma", current.currentMa), isCharging = data.optBoolean("is_charging", current.isCharging),
                     satsView = data.optInt("sats_view", current.satsView), satsUsed = data.optInt("sats_used", current.satsUsed),
-                    status = trackerStatus, isTamperDetected = isTrackerTamperDetected, isPowerTamper = isPowerTamper,
+                    status = trackerStatus, isTamperDetected = isTrackerTamperDetected, isPowerTamper = isTrackerPowerTamper,
                     isLocationPending = isTrackerLocationPending, locationPendingReason = trackerLocationPendingReason,
                     lastValidFixRt = lastFixRt, isBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false), isCoolingModeActive = data.optBoolean("is_cooling_mode_active", false),
                     isBatteryLow = data.optBoolean("is_battery_low", false), isBatteryCritical = data.optBoolean("is_battery_critical", false),
@@ -848,6 +853,7 @@ class ConnectivitySuite @Inject constructor(
                         this.integrity.battery = updatedStatus.battery; this.integrity.isCharging = updatedStatus.isCharging
                         this.integrity.satsView = updatedStatus.satsView; this.integrity.satsUsed = updatedStatus.satsUsed 
                         this.integrity.snrIdx = updatedStatus.snrIdx
+                        this.integrity.isPowerTamper = updatedStatus.isPowerTamper
                         this.integrity.signal = (updatedStatus.snrIdx * 10.0).toInt().coerceIn(0, 10)
                         this.integrity.isLocationPending = updatedStatus.isLocationPending 
                         this.integrity.locationPendingReason = updatedStatus.locationPendingReason

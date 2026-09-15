@@ -29,8 +29,8 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    // Milestoning to Sep.14.52 for Signaling State Reduction Release
-    return "Sep.14.52"
+    // Milestoning to Sep.14.54 for Build Lifecycle Integration Release
+    return "Sep.14.54"
 }
 
 ext {
@@ -52,7 +52,6 @@ tasks.register('verifyVersionIntegrity') {
             safeCode = 1000
         }
         assert safeCode instanceof Integer
-        // Fix: Use project property access instead of ambiguous 'ext'
         println "Integrity Audit: PASSED (Version: ${project.autoVersionName}, Code: ${project.autoVersionCode})"
     }
 }
@@ -74,9 +73,20 @@ tasks.register('syncDocsVersion') {
             if (file.exists()) {
                 println "Updating version in ${fileName} to ${vName}..."
                 def content = file.text
-                // Replaces headers like (Sep.14.43) or (vSep.14.43)
                 def updatedContent = content.replaceAll(/\(v?\w{3}\.\d{2}\.\d{2}\)/, "(${vName})")
                 file.text = updatedContent
+            }
+        }
+    }
+}
+
+// Idea #19 & #20: Lifecycle Integration (R-ID 336)
+subprojects {
+    afterEvaluate { subproject ->
+        if (subproject.plugins.hasPlugin('com.android.application') || subproject.plugins.hasPlugin('com.android.library')) {
+            subproject.tasks.matching { it.name == "preBuild" }.all {
+                dependsOn rootProject.tasks.verifyVersionIntegrity
+                dependsOn rootProject.tasks.syncDocsVersion
             }
         }
     }

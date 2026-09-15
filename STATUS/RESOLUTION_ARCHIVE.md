@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.14.52)
+# Resolution Archive (Sep.14.54)
+
+## 🟢 Sep.14.54
+*   **Lifecycle-integrated Version & Doc Sync (#1042)**: Integrated `syncDocsVersion` and `verifyVersionIntegrity` tasks into the `preBuild` lifecycle for all Android modules. Ensures forensic documentation and version type-safety are automatically audited on every build, preventing version drift and ensuring A15-compliant release safety. (R-ID 336).
 
 ## 🟢 Sep.14.52
 *   **Signaling State Reduction (#1041)**: Simplified the sealed class hierarchy in `CommandRouter` by removing redundant `ViewerPulse` and `TransientDrop` events. Unified peer vitality detection around `ConnectivityEvent.PeerPulse` and removed legacy `ACTION_RELAY_STATUS` broadcast leftovers. (R-ID 335).

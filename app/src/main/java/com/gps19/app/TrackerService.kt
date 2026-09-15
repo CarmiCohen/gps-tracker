@@ -21,13 +21,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.14.54:
+ * - Build Stability (#1042): Removed stale reference to pruned transientDropDetected 
+ *   variable in processTick (R-ID 336).
  * Sep.14.52:
  * - Signaling State Reduction (#1041): Simplified pulse handling by unifying 
  *   around ConnectivityEvent.PeerPulse and removing redundant CommandEvent 
  *   ViewerPulse/TransientDrop branches (R-ID 335).
- * Sep.12.45:
- * - Issue #1015 Hardening: Ensured tick loop initiation on every peer pulse if 
- *   the job is not active (R-ID 314 / #1015).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -478,7 +478,7 @@ class TrackerService : BaseMonitorService() {
         
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
 
-        val isSocketConnected = connectivitySuite.isConnected() && !transientDropDetected.getAndSet(false)
+        val isSocketConnected = connectivitySuite.isConnected()
         connectivitySuite.updateRelayStatus(isSocketConnected)
         
         val isViewerActive = sessionManager.getViewerCount() > 0 || isRecentUiPulse()
