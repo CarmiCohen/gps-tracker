@@ -3,8 +3,9 @@
 1. **Signaling State Reduction**: Simplify the sealed class hierarchy in `ConnectivityEvent` by merging redundant state transitions.
 2. **Context Shadowing Automation**: Explore a compiler plugin or KSP processor to automatically apply `@ShadowContext` logic to classes injected with `ApplicationContext`.
 3. **Redundant Logic Pruning**: Conduct a deep audit of `ConnectivitySuite` to remove legacy backfill triggers that are now handled by the optimized 60s sync loop.
+4. **Unified Power Policy**: Consolidate Android 15 power-awareness logic (Doze deferral, backoff) into a reusable `A15PowerPolicy` component to reduce duplication across background service modules.
 
-... (Items 4-17 remain in backlog) ...
+... (Items 5-18 remain in backlog) ...
 
 *(Idea #21 resolved in Sep.14.47: Decoupled signaling forensics into dedicated logger)*
 *(Idea #3 resolved in Sep.14.50: Pruned redundant legacy keepalive identity sync logic)*

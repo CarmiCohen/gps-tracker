@@ -4,17 +4,12 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Sep.15.01:
+ * - Forensic Hardening: Added isPowerTamper mapping to support A15-compliant 
+ *   signaling resilience (R-ID 338).
  * Sep.10.40:
  * - Issue #946 Visibility RESOLVED: Added tamperNote mapping for forensic 
  *   transparency in both Realtime (binary) and Persistence builders (R-ID 288).
- * Sep.08.12:
- * - Issue #924 Visibility: Mapped isGnssThrottled for A15 Hysteresis 
- *   transparency in remote HUDs (R-ID 267).
- * - R-ID 259: Mapped structured Energy Footprint verdicts (deltaMa, deltaTemp, 
- *   durationMs) for structured auditing parity.
- * Sep.08.10:
- * - Issue #935 RESOLVED: Monotonic Signaling Hardening. Added rt field 
- *   mapping to RealtimeStatus to eliminate heuristic drift in remote HUDs.
  */
 object TelemetryProtobufMapper {
 
@@ -64,6 +59,7 @@ object TelemetryProtobufMapper {
         builder.setLastValidFixRt(status.lastValidFixRt)
         builder.setIsBatterySteepDischarge(status.isBatterySteepDischarge)
         builder.setIsCoolingModeActive(status.isCoolingModeActive)
+        builder.setIsPowerTamper(status.isPowerTamper)
         
         // Forensic Indices
         builder.setSnrIdx(status.snrIdx)

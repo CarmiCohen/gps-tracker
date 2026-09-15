@@ -1,5 +1,8 @@
 # Resolution Archive (Sep.15.00)
 
+## 🟢 Sep.15.01
+*   **Forensic Signaling Pipeline Hardening (#1044)**: Implemented exponential backoff with randomized jitter and PowerManager Doze awareness in `ConnectivitySuite`. Guaranteed signaling resilience and battery optimization under Android 15 power restrictions by deferring non-critical telemetry during deep sleep while ensuring immediate reconnection during active violations. (R-ID 338).
+
 ## 🟢 Sep.15.00
 *   **Continuous Loop Integrity & Android 15 Power Profile Hardening (#1043)**: Conducted a comprehensive code audit and validation of background signaling loops, adaptive power-saving profiles, and state continuity under Android 15 power management restrictions to guarantee absolute forensic release safety. (R-ID 337).
 

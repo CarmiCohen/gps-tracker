@@ -1,19 +1,19 @@
-# Forensic Handover (Sep.15.00)
+# Forensic Handover (Sep.15.01)
 
 ## 🎯 Current System State
-*   **Version**: Sep.15.00 | **Build**: Dynamic (Git rev-list)
+*   **Version**: Sep.15.01 | **Build**: Dynamic (Git rev-list)
 *   **Active Device**: Samsung SM-A155F (Android 14/15 context)
 *   **Relay Target**: `https://gps-survival-relay.onrender.com`
 
 ## 🛡️ Forensic Hardening (Current Implementation)
-*   **Continuous Loop Integrity (#1043)**: Successfully completed comprehensive code audit and validation of background signaling loops, adaptive power-saving profiles, and state continuity under Android 15 power management restrictions to guarantee absolute release safety. (R-ID 337).
-*   **Lifecycle Integration (#1042)**: Integrated `syncDocsVersion` and `verifyVersionIntegrity` tasks into the `preBuild` lifecycle for all modules. This ensures documentation headers and version type-safety are audited automatically on every build. (R-ID 336).
-*   **Build Stability (#1042)**: Resolved RTT type mismatch in `ConnectivitySuite` sync loop and pruned stale `transientDropDetected` references in `TrackerService` to align with the simplified signaling architecture. (R-ID 336).
+*   **Signaling Pipeline Hardening (#1044)**: Implemented exponential backoff with randomized jitter and PowerManager Doze awareness in `ConnectivitySuite`. This guarantees signaling resilience and battery optimization under Android 15 power restrictions by deferring non-critical telemetry during deep sleep while ensuring immediate reconnection during active violations. (R-ID 338).
+*   **Continuous Loop Integrity (#1043)**: Validated background signaling loops, adaptive power-saving profiles, and state continuity under Android 15 power management restrictions. (R-ID 337).
+*   **Lifecycle Integration (#1042)**: Integrated `syncDocsVersion` and `verifyVersionIntegrity` tasks into the `preBuild` lifecycle. (R-ID 336).
 
 ## 🔴 Resumption focus (Immediate Actions)
-1.  **Continuous Monitoring**: Monitor the hardened signal pipeline and loop integrity under Android 15 power profiles on target budget Samsung hardware.
+1.  **QA Validation**: Monitor the hardened signaling pipeline and battery consumption profiles under deep Doze on target budget Samsung hardware.
 
 ## 📊 Audit Baseline
-*   **Current Audit Baseline: [SOT: 337 (Rules: 64, IDs: 337), Resolved: 1043, Open: 0, Testing: 0, Ideas: 17, QA: 277]**
+*   **Current Audit Baseline: [SOT: 338 (Rules: 64, IDs: 338), Resolved: 1044, Open: 0, Testing: 0, Ideas: 18, QA: 277]**
 
-**Context**: Loop integrity and Android 15 power profile hardening for Sep.15.00 is complete.
+**Context**: Signaling pipeline hardening for Android 15 resilience (Sep.15.01) is complete.

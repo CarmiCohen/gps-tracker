@@ -8,6 +8,7 @@ import android.net.NetworkRequest
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.os.SystemClock
 import android.widget.Toast
 import com.gps19.core.engine.*
@@ -19,6 +20,7 @@ import org.json.JSONObject
 import timber.log.Timber
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.Random
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
@@ -34,15 +36,13 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.15.01:
+ * - Forensic Signaling Pipeline Hardening (#1044): Implemented exponential backoff 
+ *   with randomized jitter and PowerManager Doze awareness to ensure signaling 
+ *   resilience under Android 15 power restrictions (R-ID 338).
  * Sep.14.54:
  * - Build Stability (#1042): Fixed RTT type mismatch, corrected isPowerTamper 
  *   mapping, and added missing IntegrityState fields (R-ID 336).
- * Sep.14.52:
- * - Signaling State Reduction (#1041): Pruned unused onRelayLost() branch and 
- *   consolidated event coordination (R-ID 335).
- * Sep.14.50:
- * - Redundant Logic Pruning (#1040): Conducted a deep audit to remove legacy backfill 
- *   triggers now fully handled by the 60s identity sync loop (R-ID 334).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -67,6 +67,7 @@ class ConnectivitySuite @Inject constructor(
     val connectivityEvents: SharedFlow<ConnectivityEvent> = _connectivityEvents.asSharedFlow()
 
     private val connectivityManager = shadowContext.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private val powerManager = shadowContext.getSystemService(Context.POWER_SERVICE) as PowerManager
     private val isStarted = AtomicBoolean(false)
     private val isStopped = AtomicBoolean(false)
     private val consecutiveHttpFailures = AtomicInteger(0)
@@ -76,6 +77,8 @@ class ConnectivitySuite @Inject constructor(
     private var viewerId = ""
     private var isTrackerMode = true
     private var lastReconnectTs = 0L 
+    private var reconnectAttempt = 0
+    private val random = Random()
 
     private val suiteExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped.get()) return@CoroutineExceptionHandler
@@ -174,6 +177,7 @@ class ConnectivitySuite @Inject constructor(
 
                 logManagerProvider.get().logServiceEvent("Network Handover: Available. Reconnecting.", false)
                 lastReconnectTs = nowRt
+                reconnectAttempt = 0 // Reset on network restore
                 signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                 wakeUpRelay()
             }
@@ -268,9 +272,26 @@ class ConnectivitySuite @Inject constructor(
                 if (relayUrl.isNotEmpty()) {
                     try { performKeepAlive() } catch (e: Exception) { if (e is CancellationException) throw e }
                 }
-                delay(NET_REJOIN_THRESHOLD_MS)
+                
+                val delayMs = calculateNextRejoinDelay()
+                delay(delayMs)
             }
         }
+    }
+
+    private fun calculateNextRejoinDelay(): Long {
+        if (signalingProvider.isConnected()) {
+            reconnectAttempt = 0
+            return NET_REJOIN_THRESHOLD_MS
+        }
+        
+        // Exponential Backoff with Jitter (Issue #1044)
+        val baseDelay = NET_REJOIN_THRESHOLD_MS
+        val factor = Math.pow(2.0, Math.min(reconnectAttempt.toDouble(), 6.0)).toLong()
+        val backoff = baseDelay * factor
+        val jitter = random.nextInt(5000)
+        
+        return Math.min(backoff + jitter, 300000L) // Cap at 5 minutes
     }
 
     private fun startIdentitySyncLoop() {
@@ -287,6 +308,13 @@ class ConnectivitySuite @Inject constructor(
     }
 
     private suspend fun performKeepAlive() = withContext(Dispatchers.IO) {
+        // A15 Doze Awareness: Defer non-critical signaling during deep Doze
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            if (powerManager.isDeviceIdleMode && !sessionManager.isInViolation) {
+                return@withContext
+            }
+        }
+
         val latestMode = settingsRepository.getAppMode() ?: (if (isTrackerMode) "tracker" else "viewer")
         val latestDeviceId = settingsRepository.getString(TRACKER_ID_KEY, deviceId)
         val latestViewerId = settingsRepository.getString(VIEWER_ID_KEY, viewerId)
@@ -298,6 +326,7 @@ class ConnectivitySuite @Inject constructor(
                 deviceId = latestDeviceId; viewerId = latestViewerId; relayUrl = latestRelayUrl; isTrackerMode = latestIsTracker
                 withContext(Dispatchers.Default) {
                     lastReconnectTs = timeProvider.elapsedRealtime()
+                    reconnectAttempt = 0
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                     wakeUpRelay()
                 }
@@ -315,11 +344,15 @@ class ConnectivitySuite @Inject constructor(
             consecutiveHttpFailures.set(0)
 
             val nowRt = timeProvider.elapsedRealtime()
-            if (!signalingProvider.isConnected() && !signalingProvider.isConnecting() && nowRt - lastReconnectTs > NET_REJOIN_THRESHOLD_MS) {
-                withContext(Dispatchers.Default) {
-                    lastReconnectTs = nowRt
-                    signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
-                    wakeUpRelay()
+            if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
+                val delay = calculateNextRejoinDelay()
+                if (nowRt - lastReconnectTs > delay) {
+                    withContext(Dispatchers.Default) {
+                        lastReconnectTs = nowRt
+                        reconnectAttempt++
+                        signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
+                        wakeUpRelay()
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -949,6 +982,7 @@ class ConnectivitySuite @Inject constructor(
         this.relayUrl = url; this.lastReconnectTs = timeProvider.elapsedRealtime()
         if (SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
             if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
+                reconnectAttempt = 0
                 signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                 wakeUpRelay()
             }
