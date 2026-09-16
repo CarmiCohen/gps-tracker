@@ -4,16 +4,18 @@
 Abstraction of the signaling pipeline to ensure deterministic testability of network lifecycles.
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
+*   **Asynchronous Unregistration Race Condition in AndroidNetworkProvider (#20)**: In `AndroidNetworkProvider.kt`, `networkCallback.unregister(connectivityManager)` executes unregistration asynchronously on the main thread via `ManagedUnregistrationHelper.safeUnregister`. However, `isRegistered` is immediately set to `false` synchronously before the platform callback is detached. Rapid call sequences of `unregisterListener` and `registerListener` across threads can result in race conditions or redundant callback registrations.
 
 ---
 
 ## 🟢 Recently Evaluated Issues & Status
-*   **Signaling Pipeline Abstraction (#20)**: Decoupled `ConnectivitySuite` from Android's `ConnectivityManager` and direct HTTP calls by introducing `NetworkProvider` and `SignalingTransport` interfaces. This enables deterministic testing of network handovers and out-of-band keep-alive logic without system side effects (R-ID 349).
-*   **PowerStateProvider Process Death Resilience (#1071)**: Validated that the Hilt-injected `PowerStateProvider` (via `FakePowerStateProvider` with static state) maintains consistency across component re-instantiation, ensuring no telemetry gaps during simulated process death (R-ID 348).
-*   **Documentation & Traceability Hardening (#1060)**: Completed a comprehensive sweep of header comments across 20+ components. Explicitly linked all historical references of `R-ID 347` to the consolidated `R-ID 348` authority, ensuring architectural continuity and audit clarity (R-ID 348).
-*   **Edge Cases and Environment Risks in Test Suite (#1050/1052)**: Eliminated flaky shell-based Doze simulation in `ProductionReadinessAuditTest.kt` by introducing `PowerStateProvider`. The test suite now uses a deterministic Hilt-injected `FakePowerStateProvider`, ensuring stability across all CI/CD environments (R-ID 348).
-*   **Legacy File Physical Deletion (#1057/1060)**: Physically deleted `A15PowerPolicy.kt`, `A15PowerPolicyProfileTest.kt`, and `A15PowerPolicyTest.kt` from the repository, completely removing obsolete paths and closing out legacy technical debt.
-*   **Capability Consolidation & Symmetry (#1060)**: Successfully eliminated redundant properties (`isStaggeredTier`, `requiresAdaptationMuzzle`, `useStaggeredHydration`) from `HardwareCapabilities` and `PermissionState`. Background services, screens, and tests now inspect the `PerformanceTier` enum directly (R-ID 348).
+*   **Signaling Pipeline Hardening (#20)**: Enforced HTTP 2xx check for keep-alive probes in `ConnectivitySuite` to prevent premature failure counter resets during server-side errors (R-ID 349).
+*   **Signaling Pipeline Abstraction (#20)**: Decoupled `ConnectivitySuite` from Android's `ConnectivityManager` and direct HTTP calls by introducing `NetworkProvider` and `SignalingTransport` interfaces. (R-ID 349).
+*   **Legacy File Physical Deletion (#1057/1060)**: Verified physical removal of `A15PowerPolicy.kt`, `A15PowerPolicyProfileTest.kt`, and `A15PowerPolicyTest.kt`. Obsolete shells no longer exist in the filesystem.
+*   **Logic Inconsistency & Broken Symmetry (#1060)**: Fully restored symmetry between `TrackerService` and `ViewerService`. Eliminated literal flags and ensured both roles use the unified `PerformanceTier` authority for hardware pokes and polling baselines (R-ID 348).
+*   **Capability Consolidation (#1060)**: Successfully eliminated redundant properties (`isStaggeredTier`, `requiresAdaptationMuzzle`, `useStaggeredHydration`) from `HardwareCapabilities` and `PermissionState` (R-ID 348).
+*   **PowerStateProvider Process Death Resilience (#1071)**: Validated that `FakePowerStateProvider` maintains consistency across component re-instantiation (R-ID 348).
+*   **Test Suite Hardening (#1050/1052)**: Eliminated flaky shell-based Doze simulation in `ProductionReadinessAuditTest.kt` via `PowerStateProvider` abstraction (R-ID 348).
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 349 (Rules: 70, IDs: 349), Resolved: 1072, Open: 0, Testing: 1 (Sub-items: 0), Ideas: 17, QA: 280]**
+- **Current Audit Baseline: [SOT: 349 (Rules: 70, IDs: 349), Resolved: 1073, Open: 1, Testing: 1 (Sub-items: 0), Ideas: 17, QA: 280]**

@@ -28,12 +28,13 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.16.10:
+ * - Signaling Pipeline Hardening (#20): Enforced HTTP 2xx check for keep-alive 
+ *   to prevent premature failure counter resets during server-side errors (R-ID 349).
  * Sep.16.09:
  * - Signaling Pipeline Abstraction (#20): Decoupled from ConnectivityManager 
  *   and direct HTTP calls using NetworkProvider and SignalingTransport interfaces 
  *   to enable deterministic signaling testing (R-ID 348).
- * Sep.16.05:
- * - Issue #1060 Capability Consolidation: Checked performanceTier directly via provider (R-ID 348).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -306,8 +307,12 @@ class ConnectivitySuite @Inject constructor(
         }
 
         try {
-            signalingTransport.performKeepAlive(relayUrl)
-            consecutiveHttpFailures.set(0)
+            val responseCode = signalingTransport.performKeepAlive(relayUrl)
+            if (responseCode in 200..299) {
+                consecutiveHttpFailures.set(0)
+            } else {
+                if (consecutiveHttpFailures.incrementAndGet() > 3) wakeUpRelay()
+            }
 
             val nowRt = timeProvider.elapsedRealtime()
             if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
