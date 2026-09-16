@@ -10,15 +10,15 @@ import org.junit.runner.RunWith
 
 /**
  * UnifiedPowerPolicyProfileTest: Automated profiling study for the staggered performance tier.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Updated shouldPokeHardware call to match 
+ *   renamed parameter and unified schema (R-ID 348).
  * Sep.16.03:
  * - Legacy Cleanup (#1057): Removed historical references to deprecated A15 
  *   power policy components (R-ID 348).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Broadened to validate remediation 
- *   across both A15 and S21FE (R-ID 347).
- * Sep.15.11:
- * - A15 Power Profiling (#1049): Validated exponential backoff convergence, jitter bounds, 
- *   and simulated power-drain policy safety for forensic certification (R-ID 341).
+ *   across both A15 and S21FE (R-ID 348, formerly R-ID 347).
  */
 @RunWith(AndroidJUnit4::class)
 class UnifiedPowerPolicyProfileTest {
@@ -61,7 +61,7 @@ class UnifiedPowerPolicyProfileTest {
         
         // Tick 2: Should require poke as mockTimeProvider advances 30s per invocation
         // Validating for the unified staggered tier (A15/S21FE)
-        val shouldPoke = policy.shouldPokeHardware(isStaggeredTier = true, lastPokeRt = lastPoke, intervalMs = intervalMs)
+        val shouldPoke = policy.shouldPokeHardware(isStaggered = true, lastPokeRt = lastPoke, intervalMs = intervalMs)
         assertTrue("Should poke when interval matches or exceeds threshold on staggered tier", shouldPoke)
     }
 }

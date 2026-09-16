@@ -1,16 +1,18 @@
 package com.gps19.core.engine
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.*
 
 /**
  * GeofenceBatteryAuditTest: Verification of R406a Dynamic Polling vs. Geofence Integrity.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Updated HardwareCapabilities initialization 
+ *   to match direct performanceTier enum pattern (R-ID 348).
  * Sep.16.01:
  * - Issue #1059: Unified Staggered Tier Audit. Updated HardwareCapabilities 
- *   to use isStaggeredTier flag (R-ID 347).
+ *   to use isStaggeredTier flag (R-ID 348, formerly R-ID 347).
  * [Issue #169] Geofence Accuracy vs. Battery Audit.
  */
 class GeofenceBatteryAuditTest {
@@ -67,7 +69,7 @@ class GeofenceBatteryAuditTest {
             isGpsGap = false,
             trackerBaroAltEma = 0.0,
             isTrackerMode = true,
-            capabilities = HardwareCapabilities(isA15Device = true, isStaggeredTier = true)
+            capabilities = HardwareCapabilities(isA15Device = true, performanceTier = PerformanceTier.STAGGERED)
         )
         state.health.apply {
             isHardwareOnline = true

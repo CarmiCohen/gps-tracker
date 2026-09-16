@@ -21,7 +21,7 @@ import javax.inject.Singleton
  * Sep.15.210:
  * - Issue #1055: Forensic Write Latency Spike. Relaxed audit thresholds to 10ms 
  *   to accommodate budget hardware scheduling jitter. Moved UTF-8 encoding 
- *   outside the measured scope to eliminate non-I/O overhead (R-ID 347).
+ *   outside the measured scope to eliminate non-I/O overhead (R-ID 348, formerly R-ID 347).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
@@ -146,7 +146,7 @@ class ForensicSpillBuffer @Inject constructor(
     fun writeTrace(entry: LogEntry): Boolean {
         val buffer = mappedBuffer ?: return false
 
-        // Issue #1055: Encoding moved outside the measured block (R-ID 347)
+        // Issue #1055: Encoding moved outside the measured block (R-ID 348)
         val rawBytes = entry.message.toByteArray(Charsets.UTF_8)
         val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE - 48 - CHECKSUM_SIZE
         var msgLen = rawBytes.size.coerceAtMost(maxMsgLen)

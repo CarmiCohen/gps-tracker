@@ -61,12 +61,15 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Added getPerformanceTier() to return 
+ *   PerformanceTier enum directly (R-ID 348).
  * Sep.16.02:
  * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
  *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 348).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Broadened staggered performance detection 
- *   to harmonize remediation for both A15 and S21FE (R-ID 347).
+ *   to harmonize remediation for both A15 and S21FE (R-ID 348, formerly R-ID 347).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -82,6 +85,7 @@ interface SystemStatusProvider {
     suspend fun isLocalOnline(): Boolean
     suspend fun getNetworkInterface(): String
     fun isStaggeredPerformanceTier(): Boolean
+    fun getPerformanceTier(): PerformanceTier
     
     suspend fun getPermissionState(forceRefresh: Boolean = false): PermissionState
     
@@ -158,6 +162,7 @@ class SystemStatusProviderImpl @Inject constructor(
     override suspend fun isActivityRecognitionGranted(): Boolean = getPermissionState().isActivityRecognitionGranted
     override suspend fun isFineLocationGranted(): Boolean = getPermissionState().isFineLocationGranted
     override fun isStaggeredPerformanceTier(): Boolean = isStaggeredTier
+    override fun getPerformanceTier(): PerformanceTier = if (isStaggeredTier) PerformanceTier.STAGGERED else PerformanceTier.STANDARD
 
     override suspend fun isLocalOnline(): Boolean = internetMutex.withLock {
         val now = SystemClock.elapsedRealtime()

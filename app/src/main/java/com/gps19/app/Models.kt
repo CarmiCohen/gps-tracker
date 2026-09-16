@@ -10,9 +10,11 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Harmonized data structures with R-ID 348.
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Renamed isA15 to isStaggered 
- *   in HudConnectivityState to harmonize A15 and S21FE remediation (R-ID 347).
+ *   in HudConnectivityState to harmonize A15 and S21FE remediation (R-ID 348, formerly R-ID 347).
  * Sep.11.48:
  * - Issue #946: Vitality Pulse Standardization. Added systemPulse to all 
  *   segmented UI states to bypass distinctUntilChanged stalls (R-ID 289).
@@ -380,7 +382,7 @@ data class TrackerStatus(
         put("last_conn_ts", lastConnTs); put("last_disc_ts", lastDiscTs)
         put("total_drop_ms", totalDropMs); put("max_drop_ms", maxDropMs); put("max_drop_ts", maxDropTs)
         put("total_connected_ms", totalConnectedMs); put("session_connected_ms", sessionConnectedMs); put("battery", battery)
-        put("temp", temp); put("max_temp", maxTemp); put("is_charging", isCharging); put("current_ma", currentMa)
+        put("temp", temp); put("max_temp", maxTemp); put("is_charging", isCharging); put("current_ma", this@TrackerStatus.currentMa)
         put("sats_view", satsView); put("sats_used", satsUsed); put("peak_vibration_shock", peakVibrationShock)
         put("peak_shock_ts", peakVibrationShockTs); put("is_power_tamper", isPowerTamper)
         put("violation_uptime_ms", violationUptimeMs); put("violation_percentage", violationPercentage)
@@ -389,7 +391,7 @@ data class TrackerStatus(
         put("acoustic_db", acousticDb); put("baro_alt", baroAlt); put("lux", lux); put("is_near", isNear)
         put("lux_baseline", luxBaseline); put("acoustic_floor_db", acousticFloorDb); put("adaptiveVibrationFloor", adaptiveVibrationFloor)
         put("prox_idx", proxIdx); put("proximity_cm", proximityCm); put("proximity_debounce_ms", proximityDebounceMs)
-        put("vibration_rolling_sum", vibrationRollingSum); put("is_clock_regression", isClockRegression)
+        put("vibration_rolling_sum", this@TrackerStatus.vibrationRollingSum); put("is_clock_regression", isClockRegression)
         put("jump_tier", jumpTier); put("is_location_pending", isLocationPending); put("location_pending_reason", locationPendingReason.name)
         put("last_valid_fix_rt", lastValidFixRt); put("is_power_save_mode", isPowerSaveMode)
         put("standby_bucket", standbyBucket)
@@ -609,6 +611,7 @@ data class DashboardState(
     val lastEnergyDeltaMa get() = health.lastEnergyDeltaMa
     val lastEnergyDeltaTemp get() = health.lastEnergyDeltaTemp
     val lastEnergyDurationMs get() = health.lastEnergyDurationMs
+    val systemPulse get() = health.systemPulse
 }
 
 class StatsState(

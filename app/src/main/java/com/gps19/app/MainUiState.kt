@@ -5,13 +5,15 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Cleaned up deprecated compatibility properties (R-ID 348).
  * Sep.16.02:
  * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
  *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 348).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Harmonized PermissionState to 
  *   support both unified isStaggeredTier and legacy isA15Device for 
- *   vendor-specific JNI gating (R-ID 347).
+ *   vendor-specific JNI gating (R-ID 348, formerly R-ID 347).
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -321,11 +323,7 @@ data class PermissionState(
     val isA15Device: Boolean = false,
     val isSamsungDevice: Boolean = false,
     val performanceTier: PerformanceTier = PerformanceTier.STANDARD
-) {
-    val isStaggeredTier: Boolean get() = performanceTier == PerformanceTier.STAGGERED
-    val requiresAdaptationMuzzle: Boolean get() = isStaggeredTier
-    val useStaggeredHydration: Boolean get() = isStaggeredTier
-}
+)
 
 data class NavigationState(
     val isMapVisible: Boolean = false, val isLogVisible: Boolean = false, val isSettingsOpen: Boolean = false,

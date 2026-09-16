@@ -6,10 +6,13 @@ import javax.inject.Singleton
 
 /**
  * ServiceBehaviorUseCase: Encapsulates high-level logic for service-level state transitions.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Transitioned from requiresAdaptationMuzzle 
+ *   to direct performanceTier enum comparison (R-ID 348).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Broadened background polling baseline 
- *   to all staggered performance devices (A15, S21FE) via requiresAdaptationMuzzle 
- *   to ensure telemetry continuity during I/O contention (R-ID 347).
+ *   to all staggered performance devices (A15, S21FE) to ensure telemetry 
+ *   continuity during I/O contention (R-ID 348, formerly R-ID 347).
  * Sep.03.111:
  * - Issue #898 RESOLVED: A15 Connectivity Hardening. Forced SUSPICIOUS_GPS_POLLING_MS (10s) 
  *   as the baseline for A15 devices when the screen is off to prevent 90s staleness 
@@ -52,6 +55,8 @@ class ServiceBehaviorUseCase @Inject constructor(
         val isStationaryState = isStationary && (stationaryDuration > MOVING_HOLD_DURATION_MS)
         val isUltraLongStationary = isStationaryState && (stationaryDuration > ULTRA_LONG_STATIONARY_DURATION_MS)
 
+        val isStaggered = capabilities.performanceTier == PerformanceTier.STAGGERED
+
         return when {
             isCoolingMode -> COOLING_GPS_POLLING_MS
             isSuspiciousMode -> SUSPICIOUS_GPS_POLLING_MS
@@ -60,9 +65,9 @@ class ServiceBehaviorUseCase @Inject constructor(
             // Issue #898 / #1055: On staggered tier hardware, never drop to 45s when moving 
             // (even with screen off) to ensure we stay well within the 90s staleness window.
             !isScreenOn && !isGeofenceActive -> {
-                if (capabilities.requiresAdaptationMuzzle) SUSPICIOUS_GPS_POLLING_MS else SCREEN_OFF_GPS_POLLING_MS
+                if (isStaggered) SUSPICIOUS_GPS_POLLING_MS else SCREEN_OFF_GPS_POLLING_MS
             }
-            capabilities.requiresAdaptationMuzzle || capabilities.requiresExtraTopPadding -> HIGH_FREQUENCY_GPS_POLLING_MS
+            isStaggered || capabilities.requiresExtraTopPadding -> HIGH_FREQUENCY_GPS_POLLING_MS
             else -> MOVING_GPS_POLLING_MS
         }
     }

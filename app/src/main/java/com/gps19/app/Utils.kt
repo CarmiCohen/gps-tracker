@@ -14,7 +14,7 @@ import org.osmdroid.util.GeoPoint
  * Utils: Android-specific helper functions.
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Added isStaggeredTier() and harmonized 
- *   hardware-specific descriptions for A15 and S21FE (R-ID 347).
+ *   hardware-specific descriptions for A15 and S21FE (R-ID 348, formerly R-ID 347).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Callers now pass @ApplicationContext 
  *   as IPC optimization is handled globally in GpsApplication (R-ID 240).

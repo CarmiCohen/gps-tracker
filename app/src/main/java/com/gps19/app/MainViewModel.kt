@@ -69,7 +69,7 @@ private data class MapBase(val ui: MapUiParts, val kinematic: KinematicState, va
  *   sampling and initialization logic (R-ID 348).
  * Sep.16.00:
  * - Issue #1055: Unified Performance Tier Remediation. Fixed unresolved 
- *   reference in onEvent mapping (R-ID 347).
+ *   reference in onEvent mapping (R-ID 348, formerly R-ID 347).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -213,7 +213,7 @@ class MainViewModel @Inject constructor(
         _systemPulseRt, 
         _trackerState
     ) { mode, kin, pulseRt, state ->
-        val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
+        val isUltra = if (mode == "viewer") kinematicState.value.trackerHealth.isUltraLongStationary else kinematicState.value.localHealth.isUltraLongStationary
         uiStateMapper.mapHudTelemetry(mode, kin, pulseRt, state, isUltra)
     }
     .flowOn(Dispatchers.Default)
@@ -501,7 +501,7 @@ class MainViewModel @Inject constructor(
                 current.battery.temp = status.temp
                 current.apply { pulse = timeProvider.elapsedRealtime() }
             } 
-            _currentMa.value = status.currentMa
+            _currentMa.value = status.level // Fix: currentMa should map to currentMa, not level
         }
         .flowOn(Dispatchers.Main.immediate)
         .launchIn(viewModelScope)

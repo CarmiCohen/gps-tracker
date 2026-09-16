@@ -8,7 +8,7 @@ import org.junit.Test
  * AdaptationMuzzleTest: Validating A15-specific polling stabilization logic.
  * Sep.16.01:
  * - Issue #1059: Test Logic Alignment. Updated to correctly trigger internal muzzling 
- *   by establishing an initial interval before transition (R-ID 347).
+ *   by establishing an initial interval before transition (R-ID 348, formerly R-ID 347).
  * Aug.04.50:
  * - Issue #715: Build Hardening. Updated to reactive flow collection to match 
  *   zero-churn ProcessorEvent migration.

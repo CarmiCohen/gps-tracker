@@ -6,9 +6,12 @@ import org.junit.Test
 
 /**
  * ServiceBehaviorAuditTest: Audit of R406a Dynamic Polling Intervals.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Updated HardwareCapabilities initialization 
+ *   to match direct performanceTier enum pattern (R-ID 348).
  * Sep.16.01:
  * - Issue #1059: Unified Staggered Tier Audit. Updated HardwareCapabilities 
- *   to use isStaggeredTier flag (R-ID 347).
+ *   to use isStaggeredTier flag (R-ID 348, formerly R-ID 347).
  * Sep.03.111:
  * - Issue #898 RESOLVED: A15 Background Hardening. Added audit for 10s 
  *   forced baseline on A15 devices when moving with screen off (R898).
@@ -23,7 +26,7 @@ class ServiceBehaviorAuditTest {
     @Test
     fun `Audit Polling Interval - Cooling Mode Override`() {
         val behavior = ServiceBehaviorUseCase(mockTimeProvider)
-        val stdCaps = HardwareCapabilities(requiresAdaptationMuzzle = false, requiresExtraTopPadding = false)
+        val stdCaps = HardwareCapabilities(requiresExtraTopPadding = false, performanceTier = PerformanceTier.STANDARD)
         
         // SCENARIO: Moving, Geofence Active, Screen On (Normally 5s or 2s)
         // BUT: Cooling Mode is ACTIVE.
@@ -47,10 +50,10 @@ class ServiceBehaviorAuditTest {
         val behavior = ServiceBehaviorUseCase(mockTimeProvider)
         
         // --- SCENARIO 1: Staggered Tier Hardware (A15/S21FE Unified) ---
-        val stgCaps = HardwareCapabilities(isStaggeredTier = true, requiresAdaptationMuzzle = true)
+        val stgCaps = HardwareCapabilities(performanceTier = PerformanceTier.STAGGERED)
         
         // 1a. Moving, Screen OFF, Geofence INACTIVE -> MUST be 10s (SUSPICIOUS_GPS_POLLING_MS)
-        // R-ID 347: Prevents 45s drop to stay within 90s UI staleness window for staggered tier.
+        // R-ID 348: Prevents 45s drop to stay within 90s UI staleness window for staggered tier.
         val intervalOffNoGeoStg = behavior.calculateGpsInterval(
             isCoolingMode = false, isSuspiciousMode = false, isStationary = false, isScreenOn = false,
             isGeofenceActive = false, nowRt = 100000L, capabilities = stgCaps
@@ -66,7 +69,7 @@ class ServiceBehaviorAuditTest {
         assertEquals(2000L, intervalOffWithGeoStg)
 
         // --- SCENARIO 2: Standard Hardware ---
-        val stdCaps = HardwareCapabilities(isStaggeredTier = false, requiresAdaptationMuzzle = false)
+        val stdCaps = HardwareCapabilities(performanceTier = PerformanceTier.STANDARD)
 
         // 2a. Moving, Screen OFF, Geofence INACTIVE -> 45s (SCREEN_OFF_GPS_POLLING_MS)
         val intervalOffNoGeoStd = behavior.calculateGpsInterval(

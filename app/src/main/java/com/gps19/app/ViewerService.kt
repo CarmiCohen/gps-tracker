@@ -17,13 +17,17 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Checked performanceTier directly, fixed 
+ *   hardcoded poke symmetry literal (R-ID 348).
  * Sep.16.02:
  * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
  *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 348).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Broadened heuristic recovery thresholds 
  *   to all staggered performance devices (A15, S21FE) to ensure consistent 
- *   remediation of forensic latency spikes (R-ID 347). Migrated to UnifiedPowerPolicy.
+ *   remediation of forensic latency spikes (R-ID 348, formerly R-ID 347). 
+ *   Migrated to UnifiedPowerPolicy.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -499,7 +503,8 @@ class ViewerService : BaseMonitorService() {
         
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isTrackerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
 
-        if (capabilities.requiresAdaptationMuzzle) {
+        val isStaggered = capabilities.performanceTier == PerformanceTier.STAGGERED
+        if (isStaggered) {
             if (capabilities.isA15Device && JdHardwareManager.isAvailable()) {
                 val gpsAge = nowRt - selfProcessor.getLastValidFixRt()
                 JdHardwareManager.syncHardwareState(
@@ -513,7 +518,7 @@ class ViewerService : BaseMonitorService() {
                         isPeerStale = !isTrackerActive
                     )
                 )
-            } else if (powerPolicy.shouldPokeHardware(true, lastStaggeredPokeRt, STAGGERED_POKE_INTERVAL_MS)) {
+            } else if (powerPolicy.shouldPokeHardware(isStaggered, lastStaggeredPokeRt, STAGGERED_POKE_INTERVAL_MS)) {
                 lastStaggeredPokeRt = nowRt
                 systemMonitor.acquireWakeLock(force = true)
             }
@@ -535,7 +540,7 @@ class ViewerService : BaseMonitorService() {
         var recoveryFlagged = false
         if (lastServiceTickRealtime > 0) {
             val tickGap = nowRt - lastServiceTickRealtime
-            val recoveryThreshold = if (capabilities.requiresAdaptationMuzzle) 10000L else HARDWARE_SUPPRESSION_THRESHOLD_MS
+            val recoveryThreshold = if (isStaggered) 10000L else HARDWARE_SUPPRESSION_THRESHOLD_MS
             
             if (tickGap > recoveryThreshold && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
                 lastHardwareRecoveryTs = nowRt

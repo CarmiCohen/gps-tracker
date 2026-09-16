@@ -26,17 +26,16 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Transitioned signal integrity 
+ *   and performance audits to inspect PerformanceTier directly via provider (R-ID 348).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Harmonized signal integrity and 
  *   performance audit thresholds across A15 and S21FE using the unified 
- *   isStaggeredPerformanceTier flag (R-ID 347).
+ *   isStaggeredPerformanceTier flag (R-ID 348, formerly R-ID 347).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
- * Sep.14.10:
- * - IPC Noise Suppression (#1019): Switched to @ShadowContext to utilize 
- *   ShadowCache for package name lookups, eliminating logcat spam during 
- *   high-frequency health polling (R759).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -236,7 +235,7 @@ class IntegrityMonitor @Inject constructor(
         }
 
         var maliAnomaly = false
-        // Issue #1055: Broadened to all staggered performance devices (A15, S21FE)
+        // Issue #1060: Transitioned to unified PerformanceTier inspection via provider
         if (systemStatusProvider.isStaggeredPerformanceTier() || isMaliAnomalySimulated.get()) {
             if (maxIo > LATENCY_THRESHOLD_DB_WRITE_MS) {
                 val msg = "PERFORMANCE WARNING: Critical I/O Spike detected on budget hardware (%dms). System stress: [CPU: %.1f, IOW: %.1f]".format(maxIo, cpu, iow)
@@ -584,10 +583,9 @@ class IntegrityMonitor @Inject constructor(
 
     /**
      * checkSignalIntegrity: Enhanced Signal Loss auditing with forensic grace periods.
+     * Issue #1060: Transitioned to unified PerformanceTier inspection via provider (R-ID 348).
      * Issue #247: Mitigates false positives on budget hardware (A15) by injecting 
      * a hardware-specific grace period (5s) for telemetry gaps.
-     * Sep.16.00: Broadened to all staggered performance devices (A15, S21FE) 
-     * for consistent remediation (Issue #1055).
      */
     fun checkSignalIntegrity(nowRt: Long, silenceDelta: Long, isTracker: Boolean): Boolean {
         var threshold = if (isTracker) {
@@ -596,8 +594,7 @@ class IntegrityMonitor @Inject constructor(
             TRACKER_SIGNAL_LOSS_THRESHOLD_MS
         }
 
-        // Issue #247: Budget hardware adaptation grace
-        // Sep.16.00: Broadened to S21FE via unified performance tier
+        // Issue #1060: Budget hardware adaptation grace via PerformanceTier inspection
         if (systemStatusProvider.isStaggeredPerformanceTier()) {
             threshold += BUDGET_HARDWARE_SIGNAL_GRACE_MS
         }
@@ -633,6 +630,8 @@ class IntegrityMonitor @Inject constructor(
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Device power restored on this device", false))
         }
     }
+
+    fun onPowerRestored() { onPowerConnected() }
 
     fun clearPowerTamper() {
         updateHealth { it.isPowerTamper = false }

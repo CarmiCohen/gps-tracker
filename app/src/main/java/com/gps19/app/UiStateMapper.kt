@@ -6,9 +6,11 @@ import javax.inject.Singleton
 
 /**
  * UiStateMapper: Unified stateless mapper for transforming raw domain states into UI-ready models.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Harmonized mapping logic with R-ID 348.
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Renamed isA15 to isStaggered 
- *   in mapHudConnectivity to harmonize UI across budget and sensitive hardware (R-ID 347).
+ *   in mapHudConnectivity to harmonize UI across budget and sensitive hardware (R-ID 348, formerly R-ID 347).
  * Sep.12.00:
  * - Centralized HUD and Dashboard state construction (R-ID 286).
  */

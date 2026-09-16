@@ -50,9 +50,11 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Harmonized status indicators to R-ID 348.
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Renamed isA15 badge to isStaggered 
- *   to harmonize UI indicators across budget and sensitive hardware (R-ID 347).
+ *   to harmonize UI indicators across budget and sensitive hardware (R-ID 348, formerly R-ID 347).
  * Sep.10.12:
  * - Idea #242: Unified Termination Logic. Implemented SessionTerminationButton 
  *   to centralize exit flows and ensure visual consistency (R-ID 285).

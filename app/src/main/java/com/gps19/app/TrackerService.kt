@@ -22,13 +22,16 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Checked performanceTier directly (R-ID 348).
  * Sep.16.02:
  * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
  *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 348).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Broadened heuristic recovery thresholds 
  *   to all staggered performance devices (A15, S21FE) to ensure consistent 
- *   remediation of forensic latency spikes (R-ID 347). Migrated to UnifiedPowerPolicy.
+ *   remediation of forensic latency spikes (R-ID 348, formerly R-ID 347). 
+ *   Migrated to UnifiedPowerPolicy.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -488,8 +491,8 @@ class TrackerService : BaseMonitorService() {
         val isViewerActive = sessionManager.getViewerCount() > 0 || isRecentUiPulse()
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isViewerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
 
-        // Unified Performance Tier: Centralized poke logic (R-ID 338 / #1055)
-        if (capabilities.requiresAdaptationMuzzle) {
+        val isStaggered = capabilities.performanceTier == PerformanceTier.STAGGERED
+        if (isStaggered) {
             if (capabilities.isA15Device && JdHardwareManager.isAvailable()) {
                 val gpsAge = nowRt - locationProcessor.getLastValidFixRt()
                 JdHardwareManager.syncHardwareState(
@@ -503,7 +506,7 @@ class TrackerService : BaseMonitorService() {
                         isPeerStale = !isViewerActive
                     )
                 )
-            } else if (powerPolicy.shouldPokeHardware(capabilities.isStaggeredTier, lastStaggeredPokeRt, STAGGERED_POKE_INTERVAL_MS)) {
+            } else if (powerPolicy.shouldPokeHardware(isStaggered, lastStaggeredPokeRt, STAGGERED_POKE_INTERVAL_MS)) {
                 lastStaggeredPokeRt = nowRt
                 systemMonitor.acquireWakeLock(force = true)
             }
@@ -513,7 +516,7 @@ class TrackerService : BaseMonitorService() {
         if (lastServiceTickRealtime > 0) {
             val tickGap = nowRt - lastServiceTickRealtime
             // Issue #1055: Broadened recovery threshold to all staggered devices (A15, S21FE)
-            val recoveryThreshold = if (capabilities.requiresAdaptationMuzzle) 10000L else HARDWARE_SUPPRESSION_THRESHOLD_MS
+            val recoveryThreshold = if (isStaggered) 10000L else HARDWARE_SUPPRESSION_THRESHOLD_MS
             
             if (tickGap > recoveryThreshold && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
                 lastHardwareRecoveryTs = nowRt

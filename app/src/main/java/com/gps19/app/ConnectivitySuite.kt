@@ -36,9 +36,11 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Checked performanceTier directly via provider (R-ID 348).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Migrated to UnifiedPowerPolicy 
- *   to ensure consistent signaling deferral across A15 and S21FE (R-ID 347).
+ *   to ensure consistent signaling deferral across A15 and S21FE (R-ID 348, formerly R-ID 347).
  * Sep.15.13:
  * - Performance Tuning (#1051): Implemented dynamic SYNC_INTERVAL_VIOLATION_MS 
  *   and adaptive batching (SYNC_BATCH_SIZE_VIOLATION) to optimize forensic 

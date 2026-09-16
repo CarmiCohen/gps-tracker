@@ -1,5 +1,8 @@
 # Resolution Archive (Sep.15.101)
 
+## 🟢 Sep.16.05
+*   **Capability Consolidation & Symmetry (#1060)**: Finalized the transition from redundant hardware flags to direct `PerformanceTier` enum inspection. Eliminated `isStaggeredTier`, `requiresAdaptationMuzzle`, and `useStaggeredHydration` from `HardwareCapabilities` and `PermissionState`. Refactored `ViewerService.kt` to restore hardware poke symmetry and implemented missing `onHeartbeat` callback. Updated all associated screens, services, and audit tests to the unified schema. (R-ID 348).
+
 ## 🟢 Sep.16.04
 *   **Audit Suite Refinement (#1050/1052)**: Integrated real-world saturation routines (CPU/IO burst) and implemented actual Doze state simulation via shell commands in `ProductionReadinessAuditTest.kt`. This ensures the audit suite accurately validates `UnifiedPowerPolicy` and Doze-deferral consistency under physical hardware stress (R-ID 348).
 *   **Metadata Synchronization (#1052)**: Updated `ProductionReadinessAuditTest.kt` metadata and versioning to reflect `Sep.16.04` and R-ID 348.

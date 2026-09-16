@@ -16,12 +16,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.gps19.core.engine.CapabilityStatus
+import com.gps19.core.engine.PerformanceTier
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Sep.16.05:
+ * - Issue #1060 Capability Consolidation: Checked performanceTier enum directly (R-ID 348).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Broadened GNSS status visibility 
- *   to all staggered performance devices (A15, S21FE) via isStaggeredTier (R-ID 347).
+ *   to all staggered performance devices (A15, S21FE) (R-ID 348, formerly R-ID 347).
  * Sep.08.12:
  * - Issue #924 Visibility: Added GNSS Throttling (THR) status to the hardware 
  *   capabilities section for A15 Hysteresis transparency (R-ID 267).
@@ -141,7 +144,7 @@ fun DiagnosticsScreen(
                 fontWeight = FontWeight.Bold
             )
 
-            if (permissions.isStaggeredTier) {
+            if (permissions.performanceTier == PerformanceTier.STAGGERED) {
                 DiagnosticItem(
                     title = "GNSS Sampling Status",
                     status = if (isGnssThrottled) "THROTTLED (5s)" else "STANDARD (2s)",
