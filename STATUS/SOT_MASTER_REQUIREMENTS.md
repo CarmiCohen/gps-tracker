@@ -2,7 +2,7 @@
 
 ## 🛡️ Core Hardening Baseline
 *   **SOT ID 348**: Hardware Capability Consolidation & Test Hardening - Merged redundant performance flags into a unified `PerformanceTier` enum. Refined audit suite by abstracting Doze state into `PowerStateProvider`, eliminating flaky shell commands in `ProductionReadinessAuditTest.kt` and enabling deterministic testing across environments. (Resolved Sep.16.06)
-*   **SOT ID 347**: Unified Performance Tier - Harmonized A15 and S21FE remediation. Relaxed forensic write thresholds to 10ms globally to eliminate budget hardware jitter and moved non-I/O overhead outside the measured scope. Unified background polling, heuristic recovery, and power policies under a single hardware-agnostic capability flag. Verified long-term stability and geofence integrity via instrumented audit. (Resolved Sep.16.01)
+*   **SOT ID 347**: Unified Performance Tier - Harmonized A15 and S21FE remediation (Consolidated into R-ID 348). Relaxed forensic write thresholds to 10ms globally to eliminate budget hardware jitter and moved non-I/O overhead outside the measured scope. Unified background polling, heuristic recovery, and power policies under a single hardware-agnostic capability flag. Verified long-term stability and geofence integrity via instrumented audit. (Resolved Sep.16.01)
 *   **SOT ID 346**: Unified Performance Muzzle - Harmonized S21FE and A15 detection logic. Introduced useStaggeredHydration to bridge hardware performance tiers and eliminate main-thread congestion during initialization. (Resolved Sep.15.200)
 *   **SOT ID 345**: Deployment Readiness Verification - Performed final production build audit and updated versioning to `Sep.15.16`. Verified build integrity and artifact generation consistency following the Forensic Certification stress tests. (Resolved Sep.15.16)
 *   **SOT ID 344**: Forensic Certification - Conducted final end-to-end stress test in `ProductionReadinessAuditTest.kt` simulating 4 hours of high-throughput telemetry to certify performance gains and violation persistence. (Resolved Sep.15.15)
@@ -15,8 +15,8 @@
 ## 📈 Metric Summary
 - **Rules Verified**: 69
 - **Total SOT IDs**: 348
-- **Resolved Issues**: 1069
-- **Open Issues**: 1
+- **Resolved Issues**: 1070
+- **Open Issues**: 0
 - **Testing Coverage**: 1
 - **Simplification Ideas**: 18
 - **QA Validation Tasks**: 279

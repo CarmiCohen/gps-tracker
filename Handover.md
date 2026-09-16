@@ -1,26 +1,21 @@
-# Forensic Handover (Sep.15.101)
+# Forensic Handover (Sep.16.07)
 
 ## 🎯 Current System State
-*   **Version**: Sep.16.05 | **Build**: Capability Consolidation COMPLETED
+*   **Version**: Sep.16.07 | **Build**: Traceability Hardening COMPLETED
 *   **Active Devices**: Samsung A15 & S21FE (Unified via PerformanceTier)
-*   **SOT Baseline**: SOT-348 (Capability Consolidation)
+*   **SOT Baseline**: SOT-348 (Documentation & Traceability)
 
 ## 🛡️ Forensic Hardening (Session Summary)
 
-### 1. Capability Consolidation (#1060)
-*   **Redundant Property Elimination**: Removed `isStaggeredTier`, `requiresAdaptationMuzzle`, and `useStaggeredHydration` from `HardwareCapabilities` and `PermissionState`.
-*   **Unified Enum**: Services (`TrackerService`, `ViewerService`, `ServiceBehaviorUseCase`) and UI components (`MainViewModel`, `DiagnosticsScreen`) now inspect the `PerformanceTier` enum directly for `STAGGERED` or `HIGH_PERFORMANCE` branching.
-*   **Viewer Symmetry**: Restored hardware poke symmetry in `ViewerService.kt` and implemented the missing `onHeartbeat` callback to ensure consistent power management behavior with the tracker role.
+### 1. Documentation & Traceability (#1060)
+*   **Legacy ID Linking**: Completed the project-wide sweep to link `R-ID 347` to `R-ID 348`. Affected components include `TrackerService`, `ViewerService`, `ConnectivitySuite`, `SystemStatusProvider`, and `UiStateMapper`.
+*   **Status Synchronization**: Updated `SOT_MASTER_REQUIREMENTS.md` and `RESOLUTION_ARCHIVE.md` to formally close the loop on the hardware schema consolidation.
 
 ### 2. Integrity & Stability
-*   **Traceability**: Updated all header comments and metadata to R-ID 348 and version `Sep.16.05`.
-*   **Test Alignment**: Verified that `ServiceBehaviorAuditTest` and `UnifiedPowerPolicyProfileTest` correctly target the consolidated schema.
-
-### 3. Simplicity Audit
-*   **Issue #1060 COMPLETED**: The hardware capability schema is now unified, reducing architectural complexity and eliminating redundant flags.
-*   **Recommendation**: Future work should continue with the physical deletion of legacy shells (#1057) once environment tooling allows.
+*   **Versioning**: Advanced system version to `Sep.16.07`.
+*   **Dashboard Alignment**: Updated `issues.md` dashboard to reflect zero open issues in the current audit chapter.
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 348 (Rules: 69, IDs: 348), Resolved: 1067, Open: 0, Testing: 1, Ideas: 18, QA: 279]**
+- **Current Audit Baseline: [SOT: 348 (Rules: 69, IDs: 348), Resolved: 1070, Open: 0, Testing: 1 (Sub-items: 0), Ideas: 18, QA: 279]**
 
-**Resumption Context**: Capability consolidation is complete. The system is versioned at Sep.16.05. Next steps involve addressing the remaining edge case risks in Doze simulation tests and final physical file removal.
+**Resumption Context**: Documentation hardening is complete. The system is in a stable, fully-traced state. Next steps should focus on QA validation of the abstracted `PowerStateProvider` under low-memory conditions to ensure the Hilt-injected fakes behave correctly during process death.
