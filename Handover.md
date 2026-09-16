@@ -1,22 +1,21 @@
-# Forensic Handover (Sep.16.10)
+# Forensic Handover (Sep.16.11)
 
 ## 🎯 Current System State
-*   **Version**: Sep.16.10 | **Build**: Signaling Pipeline Hardening COMPLETED
+*   **Version**: Sep.16.11 | **Build**: Network Provider Hardening COMPLETED
 *   **Active Devices**: Samsung A15 & S21FE (Unified via PerformanceTier)
-*   **SOT Baseline**: SOT-349 (Signaling & Network Hardening)
+*   **SOT Baseline**: SOT-349 (Signaling & Provider Hardening)
 
 ## 🛡️ Forensic Hardening (Session Summary)
 
-### 1. Signaling Pipeline Hardening (#20)
-*   **Keep-Alive Validation**: Updated `ConnectivitySuite.performKeepAlive()` to explicitly check for HTTP 2xx status codes returned by `SignalingTransport`. 
-*   **Failure Resilience**: Prevents `consecutiveHttpFailures` from being reset to zero when the server returns 5xx errors, ensuring the `wakeUpRelay` logic triggers correctly after 3 persistent failures.
-*   **Consistency**: Maintained the architectural boundary established in Sep.16.09 by consuming the status code through the `SignalingTransport` interface.
+### 1. AndroidNetworkProvider Hardening (#20)
+*   **Race Condition Resolution**: Serialized all registration state transitions on the Main Looper. This ensures that platform calls (`registerNetworkCallback` and `unregisterNetworkCallback`) are executed in the correct sequence, preventing overlaps during rapid listener toggling across multiple threads.
+*   **Consistency**: Maintained the fire-and-forget asynchronous unregistration pattern while ensuring the internal `isRegistered` state remains synchronized with the actual platform status.
 
 ### 2. Versioning & Documentation
-*   **SOT ID 349**: Updated to reflect the completion of both Abstraction and Hardening for the signaling pipeline.
-*   **Metric Synchronization**: Resolved issues count adjusted to 1073.
+*   **SOT ID 349**: Updated to reflect the resolution of the provider race condition alongside the previously completed pipeline hardening.
+*   **Metric Synchronization**: Resolved issues count adjusted to 1074. Open issues in this chapter reduced to 0.
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 349 (Rules: 70, IDs: 349), Resolved: 1073, Open: 1, Testing: 1 (Sub-items: 0), Ideas: 17, QA: 280]**
+- **Current Audit Baseline: [SOT: 349 (Rules: 70, IDs: 349), Resolved: 1074, Open: 0, Testing: 1 (Sub-items: 0), Ideas: 17, QA: 280]**
 
-**Resumption Context**: The signaling pipeline is now both abstracted and hardened against silent server-side failures. The next priority is the **Asynchronous Unregistration Race Condition** in `AndroidNetworkProvider.kt` (#20), or **State Consolidation** (Idea #2) to migrate transient peer states to `RemoteStatusRepository`.
+**Resumption Context**: The signaling pipeline and its underlying Android network provider are now fully hardened against race conditions and silent failures. The next priority is **State Consolidation** (Idea #2) to migrate transient peer states to `RemoteStatusRepository`.

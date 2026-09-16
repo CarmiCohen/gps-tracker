@@ -18,6 +18,10 @@ import javax.inject.Singleton
 /**
  * AndroidNetworkProvider: Production implementation of NetworkProvider 
  * using ConnectivityManager.NetworkCallback.
+ * 
+ * Sep.16.11 Fix (#20): Resolved race condition in asynchronous unregistration.
+ * All registration state transitions are now serialized on the Main Looper
+ * to prevent overlapping platform calls during rapid listener toggling.
  */
 @Singleton
 class AndroidNetworkProvider @Inject constructor(
@@ -26,6 +30,7 @@ class AndroidNetworkProvider @Inject constructor(
 
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val listeners = mutableSetOf<NetworkListener>()
+    private val mainHandler = Handler(Looper.getMainLooper())
     
     private val networkCallback = object : ManagedNetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -46,36 +51,62 @@ class AndroidNetworkProvider @Inject constructor(
     override fun registerListener(listener: NetworkListener) {
         synchronized(listeners) {
             listeners.add(listener)
-            if (!isRegistered) {
-                try {
-                    val request = NetworkRequest.Builder()
-                        .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                        .build()
-                    
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        connectivityManager.registerNetworkCallback(
-                            request, 
-                            networkCallback, 
-                            Handler(Looper.getMainLooper())
-                        )
-                    } else {
-                        connectivityManager.registerNetworkCallback(request, networkCallback)
-                    }
-                    isRegistered = true
-                } catch (e: Exception) {
-                    Timber.e(e, "Failed to register network callback")
-                }
-            }
+            ensureCorrectRegistrationState()
         }
     }
 
     override fun unregisterListener(listener: NetworkListener) {
         synchronized(listeners) {
             listeners.remove(listener)
-            if (listeners.isEmpty() && isRegistered) {
-                networkCallback.unregister(connectivityManager)
-                isRegistered = false
+            ensureCorrectRegistrationState()
+        }
+    }
+
+    private fun ensureCorrectRegistrationState() {
+        if (Looper.myLooper() == mainHandler.looper) {
+            updateRegistrationState()
+        } else {
+            mainHandler.post { updateRegistrationState() }
+        }
+    }
+
+    private fun updateRegistrationState() {
+        synchronized(listeners) {
+            val shouldBeRegistered = listeners.isNotEmpty()
+            if (shouldBeRegistered && !isRegistered) {
+                performRegistration()
+            } else if (!shouldBeRegistered && isRegistered) {
+                performUnregistration()
             }
         }
+    }
+
+    private fun performRegistration() {
+        try {
+            val request = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+            
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                connectivityManager.registerNetworkCallback(
+                    request, 
+                    networkCallback, 
+                    mainHandler
+                )
+            } else {
+                connectivityManager.registerNetworkCallback(request, networkCallback)
+            }
+            isRegistered = true
+            Timber.d("AndroidNetworkProvider: Registered callback")
+        } catch (e: Exception) {
+            Timber.e(e, "Failed to register network callback")
+        }
+    }
+
+    private fun performUnregistration() {
+        // ManagedNetworkCallback.unregister executes synchronously if already on mainHandler's looper.
+        networkCallback.unregister(connectivityManager, mainHandler)
+        isRegistered = false
+        Timber.d("AndroidNetworkProvider: Unregistered callback")
     }
 }
