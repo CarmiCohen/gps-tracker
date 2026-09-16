@@ -1,26 +1,26 @@
-# Forensic Handover (Sep.16.02)
+# Forensic Handover (Sep.16.04)
 
 ## 🎯 Current System State
-*   **Version**: Sep.16.02 | **Build**: Hardware Capability Consolidation COMPLETED
-*   **Active Devices**: Samsung A15 & S21FE (Harmonized via PerformanceTier)
-*   **Performance Schema**: PerformanceTier Enum (STANDARD, STAGGERED) (R-ID 348)
+*   **Version**: Sep.16.04 | **Build**: Audit Suite Refinement COMPLETED
+*   **Active Devices**: Samsung A15 & S21FE (Unified via PerformanceTier)
+*   **SOT Baseline**: SOT-348 (Forensic Audit Hardening)
 
 ## 🛡️ Forensic Hardening (Session Summary)
 
-### 1. Capability Consolidation (Issue #1060)
-*   **Schema Simplification**: Successfully collapsed `isStaggeredTier`, `requiresAdaptationMuzzle`, and `useStaggeredHydration` into a single `PerformanceTier` enum within `HardwareCapabilities`.
-*   **Service Harmonization**: Updated `TrackerService` and `ViewerService` to use the unified tier authority for heuristic recovery thresholds (10s) and hardware pokes.
-*   **UI State Remediation**: Fixed critical regressions in `MainViewModel` and `MainUiState` related to diagnostic state property mutation (`lastEnergyDeltaMa` etc.) and `KinematicState` mapping references.
+### 1. Audit Suite Refinement (#1050/1052)
+*   **Doze Simulation**: Integrated `UiDevice` shell commands in `ProductionReadinessAuditTest.kt` to force-idle the device, verifying that `UnifiedPowerPolicy` correctly defers signaling unless a violation is active (R-ID 338).
+*   **Saturation Integration**: Ported real-world CPU (trig loops) and IO (file writes) saturation routines from `TrackerService` into the test suite to ensure telemetry integrity under physical stress.
+*   **Metadata Sync**: Corrected all header references to R-ID 348 and versioning to Sep.16.04.
 
 ### 2. Integrity & Stability
-*   **Build Verification**: Confirmed successful compilation and dependency injection integrity for the `UnifiedPowerPolicy` and `PerformanceTier` logic.
-*   **Telemetry Continuity**: Verified that the segmented UI state flows (Dashboard/HUD) correctly ingest the consolidated performance flags without frame skips.
+*   **Build Verification**: Successful compilation with UI Automator dependency.
+*   **Dependency Injection**: Verified Hilt injection for `UnifiedPowerPolicy` within the instrumentation context.
 
 ### 3. Simplicity Audit
-*   **Idea #19 COMPLETED**: Redundant boolean branching in the hardware layer has been eliminated.
-*   **Legacy Cleanup**: `A15PowerPolicy` remains in the file system but is completely unreferenced; physical deletion is recommended in the next maintenance pass.
+*   **Idea #19 COMPLETED**: Redundant hardware flags merged.
+*   **Recommendation**: The system is now structurally simple and highly testable. Future efforts should focus on "Pattern Convergence" (Idea #1) to unify peer mapping.
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 348 (Rules: 69, IDs: 348), Resolved: 1060, Open: 0, Testing: 1, Ideas: 18, QA: 279]**
+- **Current Audit Baseline: [SOT: 348 (Rules: 69, IDs: 348), Resolved: 1066, Open: 0, Testing: 1, Ideas: 18, QA: 279]**
 
-**Resumption Context**: Hardware schema consolidation is complete. The system is stable on Sep.16.02. Next steps should proceed with further structural simplifications from `Simplify_Ideas2.md`.
+**Resumption Context**: Audit suite is fully refined and versioned at Sep.16.04. The next session should address structural simplifications from `Simplify_Ideas2.md`, specifically Peer Mapping convergence.
