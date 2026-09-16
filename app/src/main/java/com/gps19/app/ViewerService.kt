@@ -19,7 +19,7 @@ import kotlin.math.*
  * ViewerService: Background monitoring for the Viewer role.
  * Sep.16.02:
  * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
- *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 347).
+ *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 348).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Broadened heuristic recovery thresholds 
  *   to all staggered performance devices (A15, S21FE) to ensure consistent 

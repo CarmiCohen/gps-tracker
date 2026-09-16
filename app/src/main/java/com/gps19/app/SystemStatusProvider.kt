@@ -63,7 +63,7 @@ data class PowerStatus(
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
  * Sep.16.02:
  * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
- *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 347).
+ *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 348).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Broadened staggered performance detection 
  *   to harmonize remediation for both A15 and S21FE (R-ID 347).

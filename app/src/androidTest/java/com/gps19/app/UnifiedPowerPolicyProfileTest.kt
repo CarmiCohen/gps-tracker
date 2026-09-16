@@ -10,9 +10,12 @@ import org.junit.runner.RunWith
 
 /**
  * UnifiedPowerPolicyProfileTest: Automated profiling study for the staggered performance tier.
+ * Sep.16.03:
+ * - Legacy Cleanup (#1057): Removed historical references to deprecated A15 
+ *   power policy components (R-ID 348).
  * Sep.16.00:
- * - Issue #1055 Unified Performance Tier: Renamed from A15PowerPolicyProfileTest 
- *   and broadened to validate remediation across both A15 and S21FE (R-ID 347).
+ * - Issue #1055 Unified Performance Tier: Broadened to validate remediation 
+ *   across both A15 and S21FE (R-ID 347).
  * Sep.15.11:
  * - A15 Power Profiling (#1049): Validated exponential backoff convergence, jitter bounds, 
  *   and simulated power-drain policy safety for forensic certification (R-ID 341).

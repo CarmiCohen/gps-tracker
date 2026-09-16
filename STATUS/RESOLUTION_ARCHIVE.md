@@ -1,4 +1,9 @@
-# Resolution Archive (Sep.16.02)
+# Resolution Archive (Sep.16.03)
+
+## 🟢 Sep.16.03
+*   **Legacy Cleanup (#1057/1060)**: Logically removed and deprecated obsolete `A15PowerPolicy`, `A15PowerPolicyProfileTest`, and `A15PowerPolicyTest` components. These have been fully superseded by the `UnifiedPowerPolicy` framework. (R-ID 348).
+*   **Metadata Synchronization (#1060)**: Synchronized header comments in `MainViewModel`, `MainUiState`, `TrackerService`, `ViewerService`, and `SystemStatusProvider` to correctly reference R-ID 348.
+*   **UI Refresh Optimization (#1060)**: Transitioned `MainViewModel` sampling logic from `useStaggeredHydration` to direct `PerformanceTier` enum comparison for architectural consistency.
 
 ## 🟢 Sep.16.02
 *   **Hardware Capability Consolidation (#1060)**: Merged redundant performance flags (`isStaggeredTier`, `requiresAdaptationMuzzle`, `useStaggeredHydration`) into a unified `PerformanceTier` enum. Simplified behavioral branching across data models, UI state mappers, and background services. Verified telemetry continuity through downstream remediation of `MainViewModel` and `MainUiState`. (R-ID 348).

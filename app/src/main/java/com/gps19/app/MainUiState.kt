@@ -7,7 +7,7 @@ import org.osmdroid.util.GeoPoint
  * MainUiState: Persistent and slow-changing state for the UI structure.
  * Sep.16.02:
  * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
- *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 347).
+ *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 348).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Harmonized PermissionState to 
  *   support both unified isStaggeredTier and legacy isA15Device for 

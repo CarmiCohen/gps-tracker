@@ -14,9 +14,11 @@ import javax.inject.Inject
 /**
  * ProductionReadinessAuditTest: Verifies end-to-end telemetry stream constraints 
  * and Doze-deferral consistency across role transitions (R339).
- * Sep.15.14:
+ * Sep.16.03:
+ * - Metadata Inconsistency (#1052): Corrected legacy header references to R-ID 344 (R-ID 348).
+ * Sep.15.15:
  * - Forensic Certification Final Validation (#1052): Implemented forensic stress 
- *   test simulating 4 hours of high-throughput telemetry (R-ID 343).
+ *   test simulating 4 hours of high-throughput telemetry (R-ID 344).
  * Sep.15.12:
  * - Production Readiness Audit (#1050): Validated telemetry session update metrics, 
  *   role pulse handling, and active alarm override continuity under Doze state (R-ID 342).

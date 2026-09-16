@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.16.02)
+# SOT Master Requirements & Hardening Status (Sep.16.03)
 
 ## 🛡️ Core Hardening Baseline
 *   **SOT ID 348**: Hardware Capability Consolidation - Merged redundant performance flags (`isStaggeredTier`, `requiresAdaptationMuzzle`, `useStaggeredHydration`) into a unified `PerformanceTier` enum. Simplified behavioral branching across data models, UI state mappers, and background services. Verified telemetry continuity through downstream remediation of `MainViewModel` and `MainUiState`. (Resolved Sep.16.02)
@@ -15,18 +15,18 @@
 ## 📈 Metric Summary
 - **Rules Verified**: 69
 - **Total SOT IDs**: 348
-- **Resolved Issues**: 1060
-- **Open Issues**: 0
+- **Resolved Issues**: 1064
+- **Open Issues**: 2
 - **Testing Coverage**: 1
 - **Simplification Ideas**: 18
 - **QA Validation Tasks**: 279
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.04 (Legacy Cleanup)**: PASSED - Obsolete A15PowerPolicy components logically removed and deprecated.
 *   **Chapter 31.03 (Capability Consolidation)**: PASSED - Successfully collapsed hardware schema into PerformanceTier enum.
 *   **Chapter 31.02 (Staggered Tier Stability)**: PASSED - Verified battery and geofence integrity baselines for the unified performance tier (A15/S21FE). Fixed regression in AdaptationMuzzleTest.
 *   **Chapter 31.01 (Unified Performance Tier)**: PASSED - Harmonized S21FE/A15 write thresholds (10ms) and background behaviors. Isolated I/O measurement from encoding overhead.
 *   **Chapter 30.07 (Unified Performance)**: PASSED - Staggered hydration and adaptive sampling verified on S21FE and A15.
-*   **Chapter 30.06 (Deployment Readiness)**: PASSED - Final production build verified and versioned for release.
 
 ---
-*Next Audit: Sep.16.03. (Sep.16.02)*
+*Next Audit: Sep.16.04. (Sep.16.03)*

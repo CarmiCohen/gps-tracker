@@ -16,9 +16,12 @@ import kotlin.math.pow
  * Consolidates Doze deferral, exponential backoff, and hardware pokes to ensure 
  * consistent behavior across background service modules for the unified 
  * "staggered performance" tier (A15, S21FE).
+ * Sep.16.03:
+ * - Legacy Cleanup (#1057): Removed historical references to deprecated A15 
+ *   power policy components (R-ID 348).
  * Sep.16.00:
- * - Issue #1055 Unified Performance Tier: Renamed from A15PowerPolicy and 
- *   broadened to support all staggered performance hardware (R-ID 347).
+ * - Issue #1055 Unified Performance Tier: Broadened to support all staggered 
+ *   performance hardware (R-ID 347).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
