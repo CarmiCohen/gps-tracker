@@ -5,7 +5,7 @@
 3.  **Heartbeat Uniformity**: Standardize `TICK_INTERVAL_MS` across all service loops to reduce timing drift in uptime calculations.
 4.  **Log Throttling**: Implement a generic `ThrottledForensicLogger` to replace manual timestamp checks for signaling drops.
 5.  **Status Atomic Updates**: Flatten the `TrackerStatus` copy chain to reduce allocation pressure during high-frequency updates.
-6.  **A15 Power Consolidation**: Move Doze-state listeners from services into `A15PowerPolicy`.
+6.  **Unified Power Consolidation**: Move Doze-state listeners from services into `UnifiedPowerPolicy`.
 7.  **Signaling Interface**: Remove legacy JSON emit methods in favor of the unified `transmit(TrackerStatus)` for all telemetry.
 8.  **Offline Buffer Chunking**: Unify pruning logic across all Room-backed repositories.
 9.  **Jitter Logic**: Centralize random jitter calculation to ensure uniform distribution across all backoff implementations.
@@ -18,3 +18,4 @@
 16. **Forensic Aggression**: Simplify signaling delay scaling by using a linear interpolation based on violation intensity.
 17. **Forensic Audit Provider**: Decouple violation uptime tracking into a dedicated component to reduce SessionManager complexity.
 18. **Version Management**: Move `safeVersionName` and `safeVersionCode` logic from `app/build.gradle` to a separate `versioning.gradle` plugin to simplify the primary build script.
+19. **Capability Consolidation**: Merge redundant `HardwareCapabilities` booleans (`isStaggeredTier`, `requiresAdaptationMuzzle`, `useStaggeredHydration`) into a single `PerformanceTier` enum to simplify behavioral branching logic.

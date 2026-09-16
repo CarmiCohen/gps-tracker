@@ -6,12 +6,12 @@ import org.junit.Test
 
 /**
  * ServiceBehaviorAuditTest: Audit of R406a Dynamic Polling Intervals.
+ * Sep.16.01:
+ * - Issue #1059: Unified Staggered Tier Audit. Updated HardwareCapabilities 
+ *   to use isStaggeredTier flag (R-ID 347).
  * Sep.03.111:
  * - Issue #898 RESOLVED: A15 Background Hardening. Added audit for 10s 
  *   forced baseline on A15 devices when moving with screen off (R898).
- * Aug.29.09:
- * - Concern #764 Simplification: Refactored tests to use HardwareCapabilities 
- *   instead of redundant DeviceSpecialFlags.
  */
 class ServiceBehaviorAuditTest {
 
@@ -46,29 +46,27 @@ class ServiceBehaviorAuditTest {
     fun `Audit Polling Interval - Moving with Screen Off and Geofence`() {
         val behavior = ServiceBehaviorUseCase(mockTimeProvider)
         
-        // --- SCENARIO 1: A15 Hardware (R898 Hardening) ---
-        val a15Caps = HardwareCapabilities(isA15Device = true)
+        // --- SCENARIO 1: Staggered Tier Hardware (A15/S21FE Unified) ---
+        val stgCaps = HardwareCapabilities(isStaggeredTier = true, requiresAdaptationMuzzle = true)
         
         // 1a. Moving, Screen OFF, Geofence INACTIVE -> MUST be 10s (SUSPICIOUS_GPS_POLLING_MS)
-        // R898: Prevents 45s drop to stay within 90s UI staleness window.
-        val intervalOffNoGeoA15 = behavior.calculateGpsInterval(
+        // R-ID 347: Prevents 45s drop to stay within 90s UI staleness window for staggered tier.
+        val intervalOffNoGeoStg = behavior.calculateGpsInterval(
             isCoolingMode = false, isSuspiciousMode = false, isStationary = false, isScreenOn = false,
-            isGeofenceActive = false, nowRt = 100000L, capabilities = a15Caps
+            isGeofenceActive = false, nowRt = 100000L, capabilities = stgCaps
         )
-        assertEquals(SUSPICIOUS_GPS_POLLING_MS, intervalOffNoGeoA15)
-        assertEquals(10000L, intervalOffNoGeoA15)
+        assertEquals(SUSPICIOUS_GPS_POLLING_MS, intervalOffNoGeoStg)
+        assertEquals(10000L, intervalOffNoGeoStg)
 
         // 1b. Moving, Screen OFF, Geofence ACTIVE -> 2s (HIGH_FREQUENCY_GPS_POLLING_MS)
-        // (A15 typically has requiresAdaptationMuzzle=true which triggers HF)
-        val a15CapsHF = HardwareCapabilities(isA15Device = true, requiresAdaptationMuzzle = true)
-        val intervalOffWithGeoA15 = behavior.calculateGpsInterval(
+        val intervalOffWithGeoStg = behavior.calculateGpsInterval(
             isCoolingMode = false, isSuspiciousMode = false, isStationary = false, isScreenOn = false,
-            isGeofenceActive = true, nowRt = 100000L, capabilities = a15CapsHF
+            isGeofenceActive = true, nowRt = 100000L, capabilities = stgCaps
         )
-        assertEquals(2000L, intervalOffWithGeoA15)
+        assertEquals(2000L, intervalOffWithGeoStg)
 
         // --- SCENARIO 2: Standard Hardware ---
-        val stdCaps = HardwareCapabilities(isA15Device = false)
+        val stdCaps = HardwareCapabilities(isStaggeredTier = false, requiresAdaptationMuzzle = false)
 
         // 2a. Moving, Screen OFF, Geofence INACTIVE -> 45s (SCREEN_OFF_GPS_POLLING_MS)
         val intervalOffNoGeoStd = behavior.calculateGpsInterval(

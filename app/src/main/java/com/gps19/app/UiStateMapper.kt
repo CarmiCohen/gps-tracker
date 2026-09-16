@@ -6,7 +6,9 @@ import javax.inject.Singleton
 
 /**
  * UiStateMapper: Unified stateless mapper for transforming raw domain states into UI-ready models.
- * Consolidates logic previously split between UiStateAggregator and DashboardStateProvider (Idea #13).
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Renamed isA15 to isStaggered 
+ *   in mapHudConnectivity to harmonize UI across budget and sensitive hardware (R-ID 347).
  * Sep.12.00:
  * - Centralized HUD and Dashboard state construction (R-ID 286).
  */
@@ -40,7 +42,7 @@ interface UiStateMapper {
         viewerId: String,
         isSystemActive: Boolean,
         isSafeMode: Boolean,
-        isA15: Boolean,
+        isStaggered: Boolean,
         diag: DiagnosticState,
         rtt: Int,
         remoteSignal: Int,
@@ -205,7 +207,7 @@ class UiStateMapperImpl @Inject constructor() : UiStateMapper {
         viewerId: String,
         isSystemActive: Boolean,
         isSafeMode: Boolean,
-        isA15: Boolean,
+        isStaggered: Boolean,
         diag: DiagnosticState,
         rtt: Int,
         remoteSignal: Int,
@@ -249,7 +251,7 @@ class UiStateMapperImpl @Inject constructor() : UiStateMapper {
             remoteSignal = remoteSignal,
             isSystemActive = isSystemActive,
             isSafeMode = isSafeMode,
-            isA15 = isA15,
+            isStaggered = isStaggered,
             isGnssThrottled = throttled,
             systemPulse = nowRt
         )

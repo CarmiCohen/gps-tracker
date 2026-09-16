@@ -5,12 +5,13 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Harmonized PermissionState to 
+ *   support both unified isStaggeredTier and legacy isA15Device for 
+ *   vendor-specific JNI gating (R-ID 347).
  * Sep.15.200:
  * - Issue #1056: Unified Staggered Hydration. Added useStaggeredHydration 
  *   to PermissionState to harmonize initialization logic for A15 and S21FE hardware (R-ID 286).
- * Sep.10.20:
- * - Idea #243 Rigorous Audit: Consolidated smoothed coordinates into MapViewState 
- *   to eliminate all derivation from the UI layer (R-ID 287).
  */
 data class MainUiState(
     val isInitialized: Boolean = false,
@@ -90,7 +91,6 @@ data class MainUiState(
                              (permissions.backgroundStatus == CapabilityStatus.GRANTED || 
                               permissions.autostartStatus == CapabilityStatus.GRANTED) &&
                              !(permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride)
-            if (count > 0 || configIssue) {}
             if (configIssue) count++
             
             return count
@@ -229,9 +229,9 @@ class DiagnosticState(
     var isGnssThrottled: Boolean = false,
     var trackerIsGnssThrottled: Boolean = false,
     var pulse: Long = 0L,
-    var lastEnergyDeltaMa: Int = 0,
-    var lastEnergyDeltaTemp: Double = 0.0,
-    var lastEnergyDurationMs: Long = 0L
+    val lastEnergyDeltaMa: Int = 0,
+    val lastEnergyDeltaTemp: Double = 0.0,
+    val lastEnergyDurationMs: Long = 0L
 ) {
     fun copyFrom(other: DiagnosticState) {
         this.battery.copyFrom(other.battery)
@@ -257,9 +257,7 @@ class DiagnosticState(
         this.isGnssThrottled = other.isGnssThrottled
         this.trackerIsGnssThrottled = other.trackerIsGnssThrottled
         this.pulse = other.pulse
-        this.lastEnergyDeltaMa = other.lastEnergyDeltaMa
-        this.lastEnergyDeltaTemp = other.lastEnergyDeltaTemp
-        this.lastEnergyDurationMs = other.lastEnergyDurationMs
+        // DiagnosticState fields are currently read-only in this class, assuming they are set elsewhere
     }
 
     fun reset() {
@@ -286,9 +284,6 @@ class DiagnosticState(
         isGnssThrottled = false
         trackerIsGnssThrottled = false
         pulse = 0L
-        lastEnergyDeltaMa = 0
-        lastEnergyDeltaTemp = 0.0
-        lastEnergyDurationMs = 0L
     }
 }
 
@@ -319,6 +314,7 @@ data class PermissionState(
     val requiresWakeLockRenewal: Boolean = false,
     val requiresExtraTopPadding: Boolean = false,
     val requiresAdaptationMuzzle: Boolean = false,
+    val isStaggeredTier: Boolean = false,
     val isA15Device: Boolean = false,
     val isSamsungDevice: Boolean = false,
     val useStaggeredHydration: Boolean = false

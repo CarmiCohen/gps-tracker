@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * HardwareSot: Core engine authority for hardware identification and capability gating.
+ * Sep.16.00:
+ * - Issue #1055: Unified Performance Tier. Added isStaggeredPerformanceTier
+ *   to harmonize A15 and S21FE remediation (R-ID 347).
  * Aug.25.05:
  * - Issue #317: Architectural Decoupling. Migrated detection logic from :app layer 
  *   to core:engine to allow standalone hardware awareness (R313/R212).
@@ -44,5 +47,13 @@ object HardwareSot {
         val p = product.uppercase()
         val d = device.uppercase()
         return m.contains("A15") || p.contains("A15") || d.contains("A15")
+    }
+
+    /**
+     * Identifies devices in the "staggered performance" tier (A15, S21FE) 
+     * that require relaxed latency thresholds and throttled telemetry (R-ID 347).
+     */
+    fun isStaggeredPerformanceTier(manufacturer: String, brand: String, model: String, product: String, device: String): Boolean {
+        return isA15(manufacturer, brand, model, product, device) || isS21FE(manufacturer, brand, model)
     }
 }

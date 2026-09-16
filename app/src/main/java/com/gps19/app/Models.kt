@@ -10,12 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Renamed isA15 to isStaggered 
+ *   in HudConnectivityState to harmonize A15 and S21FE remediation (R-ID 347).
  * Sep.11.48:
  * - Issue #946: Vitality Pulse Standardization. Added systemPulse to all 
  *   segmented UI states to bypass distinctUntilChanged stalls (R-ID 289).
- * Sep.10.40:
- * - Issue #946 Visibility: Added tamperNote to TrackerStatus for 
- *   role-appropriate forensic transparency (R-ID 288).
  */
 
 sealed class AppSensorEvent {
@@ -697,7 +697,7 @@ data class HudConnectivityState(
     val remoteSignal: Int = 0,
     val isSystemActive: Boolean = false,
     val isSafeMode: Boolean = false,
-    val isA15: Boolean = false,
+    val isStaggered: Boolean = false,
     val isGnssThrottled: Boolean = false,
     val systemPulse: Long = 0L
 )

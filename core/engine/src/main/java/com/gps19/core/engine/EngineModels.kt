@@ -4,16 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Added isStaggeredTier to 
+ *   HardwareCapabilities to harmonize A15 and S21FE remediation (R-ID 347).
  * Sep.11.54:
  * - Issue #948 RESOLVED: Removed redundant HUD state definitions. These are 
  *   now managed exclusively in the app module to prevent type ambiguity (R-ID 286).
- * Sep.10.08:
- * - Idea #241: HudState Aggregator Refactoring. Removed monolithic HudState 
- *   facade. UI components now subscribe directly to segmented sub-states 
- *   to optimize performance (R-ID 286).
- * Sep.08.12:
- * - Issue #924 Visibility: Added isGnssThrottled to HudConnectivityState 
- *   for visual confirmation of A15 Hysteresis (R-ID 267).
  */
 
 @Serializable
@@ -56,7 +52,8 @@ data class HardwareCapabilities(
     val isManualOverrideActive: Boolean = false,
     val isA15Device: Boolean = false,
     val isMicrophoneGranted: Boolean = false,
-    val requiresAdaptationMuzzle: Boolean = false
+    val requiresAdaptationMuzzle: Boolean = false,
+    val isStaggeredTier: Boolean = false
 )
 
 enum class LocationPendingReason {

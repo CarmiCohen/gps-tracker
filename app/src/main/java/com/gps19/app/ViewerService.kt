@@ -17,22 +17,19 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Broadened heuristic recovery thresholds 
+ *   to all staggered performance devices (A15, S21FE) to ensure consistent 
+ *   remediation of forensic latency spikes (R-ID 347). Migrated to UnifiedPowerPolicy.
  * Sep.15.03:
  * - QA Validation (R339): Fixed signaling deferral inconsistency by passing 
  *   active alarm state to SessionManager, ensuring critical signaling is not 
  *   deferred during Doze.
- * Sep.15.02:
- * - Unified Power Policy (#1045): Migrated hardware poke logic to A15PowerPolicy 
- *   to ensure centralized Android 15 compliance.
- * Sep.14.52:
- * - Signaling State Reduction (#1041): Simplified pulse handling by unifying 
- *   around ConnectivityEvent.PeerPulse and removing redundant CommandEvent 
- *   ViewerPulse/TransientDrop branches (R-ID 335).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
 
-    @Inject lateinit var powerPolicy: A15PowerPolicy
+    @Inject lateinit var powerPolicy: UnifiedPowerPolicy
 
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
@@ -55,8 +52,8 @@ class ViewerService : BaseMonitorService() {
     private var lastPowerSaveCheckRt = 0L
 
     private var currentIntervalMs = TICK_INTERVAL_MS
-    private var lastA15PokeRt = 0L
-    private val A15_POKE_INTERVAL_MS = 30_000L
+    private var lastStaggeredPokeRt = 0L
+    private val STAGGERED_POKE_INTERVAL_MS = 30_000L
 
     private lateinit var selfProcessor: LocationProcessor
     private lateinit var remoteProcessor: LocationProcessor
@@ -83,6 +80,7 @@ class ViewerService : BaseMonitorService() {
 
         refreshCapabilitiesInternal()
         
+        // JdHardwareManager is vendor-specific to SM-A155/156 variants (R405).
         if (capabilities.isA15Device) {
             val success = JdHardwareManager.initialize(timeProvider, configManager.deviceId)
             if (success) {
@@ -503,9 +501,9 @@ class ViewerService : BaseMonitorService() {
         // Unified Power Policy (R-ID 339 / #1045): Ensure active alarms prevent signaling deferral.
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isTrackerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
 
-        // Unified A15 Power Policy: Centralized poke logic (R-ID 338 / #1045)
-        if (capabilities.isA15Device) {
-            if (JdHardwareManager.isAvailable()) {
+        // Unified Performance Tier: Centralized poke logic (R-ID 338 / #1055)
+        if (capabilities.requiresAdaptationMuzzle) {
+            if (capabilities.isA15Device && JdHardwareManager.isAvailable()) {
                 val gpsAge = nowRt - selfProcessor.getLastValidFixRt()
                 JdHardwareManager.syncHardwareState(
                     timeProvider = timeProvider,
@@ -518,8 +516,8 @@ class ViewerService : BaseMonitorService() {
                         isPeerStale = !isTrackerActive
                     )
                 )
-            } else if (powerPolicy.shouldPokeHardware(true, lastA15PokeRt, A15_POKE_INTERVAL_MS)) {
-                lastA15PokeRt = nowRt
+            } else if (powerPolicy.shouldPokeHardware(true, lastStaggeredPokeRt, STAGGERED_POKE_INTERVAL_MS)) {
+                lastStaggeredPokeRt = nowRt
                 systemMonitor.acquireWakeLock(force = true)
             }
         }
@@ -535,6 +533,22 @@ class ViewerService : BaseMonitorService() {
                 lng = proc?.optimizedPoint?.lng ?: 0.0,
                 accuracy = lastGpsAccuracy
             )
+        }
+
+        var recoveryFlagged = false
+        if (lastServiceTickRealtime > 0) {
+            val tickGap = nowRt - lastServiceTickRealtime
+            // Issue #1055: Broadened recovery threshold to all staggered devices (A15, S21FE)
+            val recoveryThreshold = if (capabilities.requiresAdaptationMuzzle) 10000L else HARDWARE_SUPPRESSION_THRESHOLD_MS
+            
+            if (tickGap > recoveryThreshold && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
+                lastHardwareRecoveryTs = nowRt
+                recoveryFlagged = true
+                val proc = lastProcessedLocation
+                logManager.logServiceEvent(m = "HEURISTIC RECOVERY (V): Heartbeat gap detected (${tickGap}ms). Reviving connection.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+                systemMonitor.acquireWakeLock()
+                connectivitySuite.connect(configManager.relayUrl)
+            }
         }
 
         if (nowRt - lastPowerSaveCheckRt > 5000L) {
@@ -556,7 +570,7 @@ class ViewerService : BaseMonitorService() {
         val liftIdx = (snapshot.baroAlt - selfProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS
 
         historyManager.updateRibbons(
-            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = 10, peerAvail = isSocketConnected && isTrackerActive, hasGps = (lastProcessedLocation?.timestamp ?: 0L) > 0, isTrackerMode = false, accuracy = lastGpsAccuracy, maxAccuracy = selfProcessor.getMaxTrackerAccuracy(), noiseIdx = noiseIdx, luxIdx = log10(snapshot.lux + 1.0) / RIBBON_LUX_LOG_SCALE, vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = (hardwareProvider.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0), tiltIdx = abs(snapshot.tiltDegrees - selfProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG, baroIdx = (snapshot.baroAlt - selfProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = lastGpsBearing, isSitDetected = false, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = snapshot.kineticEnergy, isRecoveryEvent = false
+            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = 10, peerAvail = isSocketConnected && isTrackerActive, hasGps = (lastProcessedLocation?.timestamp ?: 0L) > 0, isTrackerMode = false, accuracy = lastGpsAccuracy, maxAccuracy = selfProcessor.getMaxTrackerAccuracy(), noiseIdx = noiseIdx, luxIdx = log10(snapshot.lux + 1.0) / RIBBON_LUX_LOG_SCALE, vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = (hardwareProvider.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0), tiltIdx = abs(snapshot.tiltDegrees - selfProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG, baroIdx = (snapshot.baroAlt - selfProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = lastGpsBearing, isSitDetected = false, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = snapshot.kineticEnergy, isRecoveryEvent = recoveryFlagged
         )
 
         evaluateAlarmsInternal(now, nowRt, health.signalLoss, false, false, false, isTrackerActive)

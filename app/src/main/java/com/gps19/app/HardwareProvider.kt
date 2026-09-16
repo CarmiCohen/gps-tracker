@@ -34,6 +34,10 @@ import kotlin.math.*
 
 /**
  * HardwareProvider: Unified authority for all device hardware (GNSS, Location, Sensors, Audio, Display).
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Broadened GNSS throttling to all 
+ *   staggered performance devices (A15, S21FE) to ensure consistent 
+ *   remediation of forensic latency spikes (R-ID 347).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
@@ -43,9 +47,6 @@ import kotlin.math.*
  * Sep.11.52:
  * - Issue #945 Hardening: Elevated GNSSThread priority to THREAD_PRIORITY_URGENT_DISPLAY 
  *   to eliminate 9000ms jitter caused by background scheduling starvation on A15 hardware.
- * Sep.11.42:
- * - Issue #916 Hardening: Decoupled GNSS Status callbacks into a dedicated HandlerThread 
- *   (GNSSThread) to eliminate 9000ms jitter caused by sensor processing contention on A15 hardware.
  */
 @Singleton
 class HardwareProvider @Inject constructor(
@@ -271,7 +272,8 @@ class HardwareProvider @Inject constructor(
             }
             
             if (isHighLoad || maliAnomaly) lastAnomalyActiveRt = nowRt
-            val shouldThrottle = systemStatusProvider.isA15Hardware() && 
+            // Issue #1055: Broadened to all staggered performance devices (A15, S21FE)
+            val shouldThrottle = systemStatusProvider.isStaggeredPerformanceTier() &&
                     (isHighLoad || maliAnomaly || (nowRt - lastAnomalyActiveRt < GNSS_THROTTLING_HYSTERESIS_MS))
             
             isGnssThrottled = shouldThrottle

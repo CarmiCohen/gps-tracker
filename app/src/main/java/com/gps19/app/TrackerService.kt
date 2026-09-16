@@ -22,17 +22,18 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Broadened heuristic recovery thresholds 
+ *   to all staggered performance devices (A15, S21FE) to ensure consistent 
+ *   remediation of forensic latency spikes (R-ID 347). Migrated to UnifiedPowerPolicy.
  * Sep.15.02:
- * - Unified Power Policy (#1045): Migrated hardware poke logic to A15PowerPolicy 
- *   to ensure centralized Android 15 compliance.
- * Sep.14.54:
- * - Build Stability (#1042): Removed stale reference to pruned transientDropDetected 
- *   variable (R-ID 336).
+ * - Unified Power Policy (#1045): Migrated hardware poke logic to UnifiedPowerPolicy 
+ *   to ensure centralized compliance across the staggered performance tier.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
 
-    @Inject lateinit var powerPolicy: A15PowerPolicy
+    @Inject lateinit var powerPolicy: UnifiedPowerPolicy
 
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
@@ -60,8 +61,8 @@ class TrackerService : BaseMonitorService() {
     private var isSuspiciousMode = false
     private var currentIntervalMs = TICK_INTERVAL_MS
 
-    private var lastA15PokeRt = 0L
-    private val A15_POKE_INTERVAL_MS = 30_000L
+    private var lastStaggeredPokeRt = 0L
+    private val STAGGERED_POKE_INTERVAL_MS = 30_000L
 
     private var lastForensicLat = 0.0
     private var lastForensicLng = 0.0
@@ -88,6 +89,7 @@ class TrackerService : BaseMonitorService() {
         
         refreshCapabilitiesInternal()
 
+        // JdHardwareManager is vendor-specific to SM-A155/156 variants (R405).
         if (capabilities.isA15Device) {
             val success = JdHardwareManager.initialize(timeProvider, configManager.deviceId)
             if (success) {
@@ -486,9 +488,9 @@ class TrackerService : BaseMonitorService() {
         val isViewerActive = sessionManager.getViewerCount() > 0 || isRecentUiPulse()
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isViewerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
 
-        // Unified A15 Power Policy: Centralized poke logic (R-ID 338 / #1045)
-        if (capabilities.isA15Device) {
-            if (JdHardwareManager.isAvailable()) {
+        // Unified Performance Tier: Centralized poke logic (R-ID 338 / #1055)
+        if (capabilities.requiresAdaptationMuzzle) {
+            if (capabilities.isA15Device && JdHardwareManager.isAvailable()) {
                 val gpsAge = nowRt - locationProcessor.getLastValidFixRt()
                 JdHardwareManager.syncHardwareState(
                     timeProvider = timeProvider,
@@ -501,8 +503,8 @@ class TrackerService : BaseMonitorService() {
                         isPeerStale = !isViewerActive
                     )
                 )
-            } else if (powerPolicy.shouldPokeHardware(true, lastA15PokeRt, A15_POKE_INTERVAL_MS)) {
-                lastA15PokeRt = nowRt
+            } else if (powerPolicy.shouldPokeHardware(true, lastStaggeredPokeRt, STAGGERED_POKE_INTERVAL_MS)) {
+                lastStaggeredPokeRt = nowRt
                 systemMonitor.acquireWakeLock(force = true)
             }
         }
@@ -510,7 +512,8 @@ class TrackerService : BaseMonitorService() {
         var recoveryFlagged = false
         if (lastServiceTickRealtime > 0) {
             val tickGap = nowRt - lastServiceTickRealtime
-            val recoveryThreshold = if (capabilities.isA15Device) 10000L else HARDWARE_SUPPRESSION_THRESHOLD_MS
+            // Issue #1055: Broadened recovery threshold to all staggered devices (A15, S21FE)
+            val recoveryThreshold = if (capabilities.requiresAdaptationMuzzle) 10000L else HARDWARE_SUPPRESSION_THRESHOLD_MS
             
             if (tickGap > recoveryThreshold && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
                 lastHardwareRecoveryTs = nowRt

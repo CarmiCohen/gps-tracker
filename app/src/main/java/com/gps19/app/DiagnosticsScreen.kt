@@ -19,15 +19,12 @@ import com.gps19.core.engine.CapabilityStatus
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Broadened GNSS status visibility 
+ *   to all staggered performance devices (A15, S21FE) via isStaggeredTier (R-ID 347).
  * Sep.08.12:
  * - Issue #924 Visibility: Added GNSS Throttling (THR) status to the hardware 
  *   capabilities section for A15 Hysteresis transparency (R-ID 267).
- * Aug.26.12:
- * - Issue #735 Hardening: Added Setup Overlay Bypass toggle to Validation Hooks 
- *   to allow automated soak tests to skip manual permission flows (R735).
- * Aug.22.05:
- * - Audit Chapter 12.3: Added Storage Pressure simulation toggles to verify 
- *   PersistencePolicy prioritization (R197).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +46,7 @@ fun DiagnosticsScreen(
     onRequestBatteryExemption: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
     onRequestAppInfo: () -> Unit,
+    onRequestAppInfoForStaggered: () -> Unit = onRequestAppInfo,
     onRequestExactAlarm: () -> Unit,
     onRequestHardwarePermission: () -> Unit
 ) {
@@ -143,13 +141,13 @@ fun DiagnosticsScreen(
                 fontWeight = FontWeight.Bold
             )
 
-            if (permissions.isA15Device) {
+            if (permissions.isStaggeredTier) {
                 DiagnosticItem(
                     title = "GNSS Sampling Status",
                     status = if (isGnssThrottled) "THROTTLED (5s)" else "STANDARD (2s)",
                     isOk = !isGnssThrottled,
                     icon = Icons.Default.Speed,
-                    onClick = {}
+                    onClick = onRequestAppInfoForStaggered
                 )
             }
 

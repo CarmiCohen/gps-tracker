@@ -6,13 +6,14 @@ import javax.inject.Singleton
 
 /**
  * ServiceBehaviorUseCase: Encapsulates high-level logic for service-level state transitions.
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Broadened background polling baseline 
+ *   to all staggered performance devices (A15, S21FE) via requiresAdaptationMuzzle 
+ *   to ensure telemetry continuity during I/O contention (R-ID 347).
  * Sep.03.111:
  * - Issue #898 RESOLVED: A15 Connectivity Hardening. Forced SUSPICIOUS_GPS_POLLING_MS (10s) 
  *   as the baseline for A15 devices when the screen is off to prevent 90s staleness 
  *   timeouts during aggressive background suppression (R898).
- * Aug.29.09:
- * - Concern #764 Simplification: Refactored calculateGpsInterval to use 
- *   HardwareCapabilities directly, removing redundant DeviceSpecialFlags.
  */
 @Singleton
 class ServiceBehaviorUseCase @Inject constructor(
@@ -33,7 +34,7 @@ class ServiceBehaviorUseCase @Inject constructor(
      * Calculates the target GPS polling interval based on device state and forensic triggers.
      * R406a: Dynamic Polling.
      * R763: Ultra-long Stationary Relaxation.
-     * R898: A15 Background Hardening.
+     * R898: Unified Background Hardening.
      */
     fun calculateGpsInterval(
         isCoolingMode: Boolean,
@@ -56,10 +57,10 @@ class ServiceBehaviorUseCase @Inject constructor(
             isSuspiciousMode -> SUSPICIOUS_GPS_POLLING_MS
             isUltraLongStationary -> ULTRA_LONG_STATIONARY_GPS_POLLING_MS
             isStationaryState -> STATIONARY_GPS_POLLING_MS
-            // Issue #898: On A15, never drop to 45s when moving (even with screen off) 
-            // to ensure we stay well within the 90s staleness window.
+            // Issue #898 / #1055: On staggered tier hardware, never drop to 45s when moving 
+            // (even with screen off) to ensure we stay well within the 90s staleness window.
             !isScreenOn && !isGeofenceActive -> {
-                if (capabilities.isA15Device) SUSPICIOUS_GPS_POLLING_MS else SCREEN_OFF_GPS_POLLING_MS
+                if (capabilities.requiresAdaptationMuzzle) SUSPICIOUS_GPS_POLLING_MS else SCREEN_OFF_GPS_POLLING_MS
             }
             capabilities.requiresAdaptationMuzzle || capabilities.requiresExtraTopPadding -> HIGH_FREQUENCY_GPS_POLLING_MS
             else -> MOVING_GPS_POLLING_MS

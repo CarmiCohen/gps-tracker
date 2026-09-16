@@ -61,13 +61,13 @@ private data class MapBase(val ui: MapUiParts, val kinematic: KinematicState, va
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.16.00:
+ * - Issue #1055: Unified Performance Tier Remediation. Fixed unresolved 
+ *   reference in onEvent mapping (R-ID 347).
  * Sep.15.200:
  * - Issue #1056 Unified Performance Muzzle: Harmonized S21FE and A15 detection. 
  *   Switched to useStaggeredHydration for all telemetry sampling and 
  *   initialization delays to eliminate frame skips (R-ID 346).
- * Sep.12.00:
- * - Idea #13: HUD Mapping Centralization. Replaced UiStateAggregator with 
- *   stateless UiStateMapper to unify HUD and Dashboard construction (R-ID 286).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel

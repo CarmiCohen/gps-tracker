@@ -50,17 +50,12 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Renamed isA15 badge to isStaggered 
+ *   to harmonize UI indicators across budget and sensitive hardware (R-ID 347).
  * Sep.10.12:
  * - Idea #242: Unified Termination Logic. Implemented SessionTerminationButton 
  *   to centralize exit flows and ensure visual consistency (R-ID 285).
- * Sep.10.08:
- * - Idea #241: HudState Aggregator Refactoring. Segmented GlobalStatusBar and 
- *   StatusBar to use HudConnectivityState, HudTelemetryState, and 
- *   HudHealthState directly, reducing recomposition scope (R-ID 286).
- * Sep.09.16:
- * - Issue #942 RESOLVED: Fixed Identity Color Confusion in StatusBar. Peer role 
- *   badge (VWR/TRK) now uses role-appropriate colors (ViewerCyan/BrandJd). Local 
- *   progress indicators and badges now respect local role identity (R942).
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -652,10 +647,10 @@ fun StatusBar(
                         // Issue #924: Watchdog Safe-Mode Indicator
                         if (connectivity.isSafeMode) StatusBadge(label = "SAF", active = false, isBold = true)
 
-                        // Issue #932: A15 Hardware Adaptation Indicator
-                        if (connectivity.isA15) StatusBadge(label = "A15", active = true, activeColor = localColor, isBold = true)
+                        // Issue #932 / #1055: Unified Staggered Performance Indicator
+                        if (connectivity.isStaggered) StatusBadge(label = "STG", active = true, activeColor = localColor, isBold = true)
 
-                        // Issue #924: GNSS Throttling Indicator (A15 Hysteresis)
+                        // Issue #924: GNSS Throttling Indicator (Hysteresis)
                         if (connectivity.isGnssThrottled) StatusBadge(label = "THR", active = true, activeColor = Amber500, isBold = true)
 
                         // Issue #266: Mali Anomaly Indicator

@@ -26,6 +26,10 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Harmonized signal integrity and 
+ *   performance audit thresholds across A15 and S21FE using the unified 
+ *   isStaggeredPerformanceTier flag (R-ID 347).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
@@ -33,9 +37,6 @@ sealed class IntegrityEvent {
  * - IPC Noise Suppression (#1019): Switched to @ShadowContext to utilize 
  *   ShadowCache for package name lookups, eliminating logcat spam during 
  *   high-frequency health polling (R759).
- * Sep.11.41:
- * - Issue #915 Root-Cause Fix: Decoupled flow vitality from state changes. 
- *   Vitality timestamps (lastUpdateRt) are updated on every emission.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -235,7 +236,8 @@ class IntegrityMonitor @Inject constructor(
         }
 
         var maliAnomaly = false
-        if (systemStatusProvider.isA15Hardware() || isMaliAnomalySimulated.get()) {
+        // Issue #1055: Broadened to all staggered performance devices (A15, S21FE)
+        if (systemStatusProvider.isStaggeredPerformanceTier() || isMaliAnomalySimulated.get()) {
             if (maxIo > LATENCY_THRESHOLD_DB_WRITE_MS) {
                 val msg = "PERFORMANCE WARNING: Critical I/O Spike detected on budget hardware (%dms). System stress: [CPU: %.1f, IOW: %.1f]".format(maxIo, cpu, iow)
                 _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
@@ -584,6 +586,8 @@ class IntegrityMonitor @Inject constructor(
      * checkSignalIntegrity: Enhanced Signal Loss auditing with forensic grace periods.
      * Issue #247: Mitigates false positives on budget hardware (A15) by injecting 
      * a hardware-specific grace period (5s) for telemetry gaps.
+     * Sep.16.00: Broadened to all staggered performance devices (A15, S21FE) 
+     * for consistent remediation (Issue #1055).
      */
     fun checkSignalIntegrity(nowRt: Long, silenceDelta: Long, isTracker: Boolean): Boolean {
         var threshold = if (isTracker) {
@@ -593,7 +597,8 @@ class IntegrityMonitor @Inject constructor(
         }
 
         // Issue #247: Budget hardware adaptation grace
-        if (systemStatusProvider.isA15Hardware()) {
+        // Sep.16.00: Broadened to S21FE via unified performance tier
+        if (systemStatusProvider.isStaggeredPerformanceTier()) {
             threshold += BUDGET_HARDWARE_SIGNAL_GRACE_MS
         }
 

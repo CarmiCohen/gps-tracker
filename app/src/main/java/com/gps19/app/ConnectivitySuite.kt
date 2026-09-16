@@ -36,13 +36,13 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Migrated to UnifiedPowerPolicy 
+ *   to ensure consistent signaling deferral across A15 and S21FE (R-ID 347).
  * Sep.15.13:
  * - Performance Tuning (#1051): Implemented dynamic SYNC_INTERVAL_VIOLATION_MS 
  *   and adaptive batching (SYNC_BATCH_SIZE_VIOLATION) to optimize forensic 
  *   telemetry throughput during critical events (R-ID 343).
- * Sep.15.04:
- * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
- *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -59,7 +59,7 @@ class ConnectivitySuite @Inject constructor(
     private val mainRepository: MainRepository,
     private val remoteStatusRepository: RemoteStatusRepository,
     private val forensicLogger: SignalingForensicLogger,
-    private val powerPolicy: A15PowerPolicy
+    private val powerPolicy: UnifiedPowerPolicy
 ) {
     private val _connectivityEvents = MutableSharedFlow<ConnectivityEvent>(
         extraBufferCapacity = 16,
@@ -297,7 +297,7 @@ class ConnectivitySuite @Inject constructor(
     }
 
     private suspend fun performKeepAlive() = withContext(Dispatchers.IO) {
-        // A15 Power Policy: Defer non-critical signaling during deep Doze (R-ID 338)
+        // Unified Power Policy: Defer non-critical signaling during deep Doze (R-ID 338)
         if (powerPolicy.shouldDeferSignaling(sessionManager.isInViolation)) {
             return@withContext
         }

@@ -61,13 +61,13 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Broadened staggered performance detection 
+ *   to harmonize remediation for both A15 and S21FE (R-ID 347).
  * Sep.15.200:
  * - Issue #1056 Unified Performance Muzzle: Harmonized S21FE and A15 detection. 
  *   Introduced useStaggeredHydration to bridge hardware tiers and eliminate 
  *   initialization frame skips (R-ID 286).
- * Sep.15.04:
- * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
- *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -82,7 +82,7 @@ interface SystemStatusProvider {
     suspend fun isFineLocationGranted(): Boolean
     suspend fun isLocalOnline(): Boolean
     suspend fun getNetworkInterface(): String
-    fun isA15Hardware(): Boolean
+    fun isStaggeredPerformanceTier(): Boolean
     
     suspend fun getPermissionState(forceRefresh: Boolean = false): PermissionState
     
@@ -129,8 +129,9 @@ class SystemStatusProviderImpl @Inject constructor(
     
     private val isXiaomi by lazy { HardwareSot.isXiaomi(Build.MANUFACTURER) }
     private val isSamsung by lazy { HardwareSot.isSamsung(Build.MANUFACTURER, Build.BRAND) }
-    private val isS21FE by lazy { HardwareSot.isS21FE(Build.MANUFACTURER, Build.BRAND, Build.MODEL) }
-    private val isA15 by lazy { HardwareSot.isA15(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.PRODUCT, Build.DEVICE) }
+    private val isStaggeredTier by lazy { 
+        HardwareSot.isStaggeredPerformanceTier(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.PRODUCT, Build.DEVICE) 
+    }
     
     private val PERMISSION_TTL_MS = 30000L 
     private val FORCED_REFRESH_COOLDOWN_MS = 1000L 
@@ -157,7 +158,7 @@ class SystemStatusProviderImpl @Inject constructor(
     override suspend fun isBackgroundLocationState(): Boolean = isBackgroundLocationGranted()
     override suspend fun isActivityRecognitionGranted(): Boolean = getPermissionState().isActivityRecognitionGranted
     override suspend fun isFineLocationGranted(): Boolean = getPermissionState().isFineLocationGranted
-    override fun isA15Hardware(): Boolean = isA15
+    override fun isStaggeredPerformanceTier(): Boolean = isStaggeredTier
 
     override suspend fun isLocalOnline(): Boolean = internetMutex.withLock {
         val now = SystemClock.elapsedRealtime()
@@ -245,10 +246,10 @@ class SystemStatusProviderImpl @Inject constructor(
                                 isManualOverride = current.isManualOverride,
                                 requiresWakeLockRenewal = isSamsung,
                                 requiresExtraTopPadding = isXiaomi,
-                                requiresAdaptationMuzzle = isS21FE,
-                                isA15Device = isA15,
+                                requiresAdaptationMuzzle = isStaggeredTier,
+                                isStaggeredTier = isStaggeredTier,
                                 isSamsungDevice = isSamsung,
-                                useStaggeredHydration = isA15 || isS21FE
+                                useStaggeredHydration = isStaggeredTier
                             )
                             cachedState.set(newState)
                         }

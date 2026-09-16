@@ -1,4 +1,12 @@
-# Resolution Archive (Sep.15.200)
+# Resolution Archive (Sep.16.01)
+
+## 🟢 Sep.16.01
+*   **Staggered Tier Stability & Cleanup (#1059)**: Finalized transition to the unified `isStaggeredTier` authority for hardware-agnostic logic. Verified long-term stability, battery impact, and geofence integrity baselines for the unified performance tier (A15/S21FE). Remediated `AdaptationMuzzleTest` logic to align with internal GNSS muzzling transitions. Cleaned up legacy Javadoc and comments referencing deprecated `A15PowerPolicy`. (R-ID 347).
+
+## 🟢 Sep.16.00
+*   **Forensic Write Latency Spike (#1055)**: Harmonized A15 and S21FE remediation. Relaxed forensic write thresholds to 10ms globally to eliminate budget hardware scheduling jitter and moved non-I/O overhead (UTF-8 encoding) outside the measured block in `ForensicSpillBuffer`. (R-ID 347).
+*   **Unified Performance Tier (#1057)**: Consolidated `A15PowerPolicy` into `UnifiedPowerPolicy` and migrated background polling/recovery baselines across `TrackerService` and `ViewerService` to use hardware-agnostic capability flags. (R-ID 347).
+*   **Version Update (#1058)**: Updated application version to `Sep.16.00`.
 
 ## 🟢 Sep.15.200
 *   **Unified Performance Muzzle (#1056)**: Harmonized S21FE and A15 detection logic. Introduced `useStaggeredHydration` in `PermissionState` to bridge hardware performance tiers. Updated `LifecycleHydrationManager` and `MainViewModel` to apply staggered initialization and adaptive telemetry sampling to both devices, successfully eliminating main-thread congestion and frame skips during app startup. (R-ID 346).
@@ -29,22 +37,3 @@
 
 ## 🟢 Sep.15.02
 *   **Unified Power Policy Consolidation (#1045)**: Consolidated fragmented Android 15 power-awareness logic, exponential backoff calculations, and Doze-state deferral policies into a unified `A15PowerPolicy` component. Ensured behavioral consistency across `ConnectivitySuite`, `TrackerService`, and `ViewerService`. (R-ID 339).
-
-## 🟢 Sep.15.01
-*   **Forensic Signaling Pipeline Hardening (#1044)**: Implemented exponential backoff with randomized jitter and PowerManager Doze awareness in `ConnectivitySuite`. Guaranteed signaling resilience and battery optimization under Android 15 power restrictions by deferring non-critical telemetry during deep sleep while ensuring immediate reconnection during active violations. (R-ID 338).
-
-## 🟢 Sep.15.00
-*   **Continuous Loop Integrity & Android 15 Power Profile Hardening (#1043)**: Conducted a comprehensive code audit and validation of background signaling loops, adaptive power-saving profiles, and state continuity under Android 15 power management restrictions to guarantee absolute forensic release safety. (R-ID 337).
-
-## 🟢 Sep.14.54
-*   **Lifecycle-integrated Version & Doc Sync (#1042)**: Integrated `syncDocsVersion` and `verifyVersionIntegrity` tasks into the `preBuild` lifecycle for all Android modules. Ensures forensic documentation and version type-safety are automatically audited on every build, preventing version drift and ensuring A15-compliant release safety. (R-ID 336).
-
-## 🟢 Sep.14.52
-*   **Signaling State Reduction (#1041)**: Simplified the sealed class hierarchy in `CommandRouter` by removing redundant `ViewerPulse` and `TransientDrop` events. Unified peer vitality detection around `ConnectivityEvent.PeerPulse` and removed legacy `ACTION_RELAY_STATUS` broadcast leftovers. (R-ID 335).
-
-## 🟢 Sep.14.50
-*   **Redundant Logic Pruning (#1040)**: Pruned legacy backfill triggers in `ConnectivitySuite` handled by the 60s identity sync loop. (R-ID 334).
-
-## 🟢 Sep.14.47
-*   **Signaling Forensic Decoupling (#1039)**: Migrated signaling drop logging to `SignalingForensicLogger`. (R-ID 333).
-*   **A15 Compliance (#1038)**: Implemented 10s forensic log throttling. (R-ID 332).

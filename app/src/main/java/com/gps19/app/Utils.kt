@@ -12,19 +12,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * Utils: Android-specific helper functions.
+ * Sep.16.00:
+ * - Issue #1055 Unified Performance Tier: Added isStaggeredTier() and harmonized 
+ *   hardware-specific descriptions for A15 and S21FE (R-ID 347).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Callers now pass @ApplicationContext 
  *   as IPC optimization is handled globally in GpsApplication (R-ID 240).
- * Sep.03.25:
- * - Idea #240: ContextShadow Automation. Removed redundant manual ContextShadow 
- *   wrapping in permission checks; callers are now expected to pass the 
- *   injected shadowed context (R-ID 240).
- * Sep.02.43:
- * - Issue #894 Enforcement: Integrated ContextShadow delegate to eliminate 
- *   getPackageName log spam during AppOpsManager lookups (R1.14).
- * Aug.29.13:
- * - Issue #759 Hardening: Switched Process.myUid() to GpsApplication.MY_UID 
- *   shadow-cache to eliminate redundant system calls (R759).
  */
 
 enum class XiaomiPermissionStatus {
@@ -60,6 +53,8 @@ fun isSamsungDevice(): Boolean = HardwareSot.isSamsung(Build.MANUFACTURER, Build
 fun isS21FEDevice(): Boolean = HardwareSot.isS21FE(Build.MANUFACTURER, Build.BRAND, Build.MODEL)
 
 fun isA15Device(): Boolean = HardwareSot.isA15(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.PRODUCT, Build.DEVICE)
+
+fun isStaggeredTier(): Boolean = HardwareSot.isStaggeredPerformanceTier(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.PRODUCT, Build.DEVICE)
 
 /**
  * v9.3.11: Now requires non-null pkgName to prevent logcat spillage.
@@ -177,8 +172,7 @@ fun getAutoStartDescription(): String {
     return when {
         isSamsungDevice() -> {
             val hardwareNote = when {
-                isA15Device() -> "\n\u2022 NOTE: A15 virtual proximity requires 'Unrestricted' for reliable debounce."
-                isS21FEDevice() -> "\n\u2022 NOTE: S21FE G990B/E requires background activity for 10Hz GPS polling."
+                isStaggeredTier() -> "\n\u2022 NOTE: Staggered tier hardware requires 'Unrestricted' for background stability."
                 else -> ""
             }
             "Ensure persistent background execution:\n\u2022 App Info \u2192 Battery \u2192 select 'Unrestricted'.\n\u2022 App Info \u2192 ensure 'Allow background activity' is ON.\n\u2022 Disable 'Pause app activity if unused'.$hardwareNote"

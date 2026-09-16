@@ -8,6 +8,9 @@ import kotlin.math.*
 
 /**
  * GeofenceBatteryAuditTest: Verification of R406a Dynamic Polling vs. Geofence Integrity.
+ * Sep.16.01:
+ * - Issue #1059: Unified Staggered Tier Audit. Updated HardwareCapabilities 
+ *   to use isStaggeredTier flag (R-ID 347).
  * [Issue #169] Geofence Accuracy vs. Battery Audit.
  */
 class GeofenceBatteryAuditTest {
@@ -64,7 +67,7 @@ class GeofenceBatteryAuditTest {
             isGpsGap = false,
             trackerBaroAltEma = 0.0,
             isTrackerMode = true,
-            capabilities = HardwareCapabilities(isA15Device = true)
+            capabilities = HardwareCapabilities(isA15Device = true, isStaggeredTier = true)
         )
         state.health.apply {
             isHardwareOnline = true
