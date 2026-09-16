@@ -2,9 +2,7 @@ package com.gps19.app
 
 import android.content.Context
 import androidx.room.Room
-import com.gps19.core.engine.LocationProcessor
-import com.gps19.core.engine.TimeProvider
-import com.gps19.core.engine.ViolationProcessor
+import com.gps19.core.engine.*
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -36,6 +34,14 @@ abstract class AppModule {
     @Binds
     @Singleton
     abstract fun bindSignalingProvider(impl: CommunicationManager): SignalingProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindNetworkProvider(impl: AndroidNetworkProvider): NetworkProvider
+
+    @Binds
+    @Singleton
+    abstract fun bindSignalingTransport(impl: HttpSignalingTransport): SignalingTransport
 
     @Binds
     @Singleton

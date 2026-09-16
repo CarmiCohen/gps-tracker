@@ -1,14 +1,9 @@
 package com.gps19.app
 
 import android.content.Context
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.os.PowerManager
 import android.os.SystemClock
 import android.widget.Toast
 import com.gps19.core.engine.*
@@ -18,9 +13,6 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
 import org.json.JSONObject
 import timber.log.Timber
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.Random
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
@@ -36,15 +28,12 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.16.09:
+ * - Signaling Pipeline Abstraction (#20): Decoupled from ConnectivityManager 
+ *   and direct HTTP calls using NetworkProvider and SignalingTransport interfaces 
+ *   to enable deterministic signaling testing (R-ID 348).
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Checked performanceTier directly via provider (R-ID 348).
- * Sep.16.00:
- * - Issue #1055 Unified Performance Tier: Migrated to UnifiedPowerPolicy 
- *   to ensure consistent signaling deferral across A15 and S21FE (R-ID 348, formerly R-ID 347).
- * Sep.15.13:
- * - Performance Tuning (#1051): Implemented dynamic SYNC_INTERVAL_VIOLATION_MS 
- *   and adaptive batching (SYNC_BATCH_SIZE_VIOLATION) to optimize forensic 
- *   telemetry throughput during critical events (R-ID 343).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -61,7 +50,9 @@ class ConnectivitySuite @Inject constructor(
     private val mainRepository: MainRepository,
     private val remoteStatusRepository: RemoteStatusRepository,
     private val forensicLogger: SignalingForensicLogger,
-    private val powerPolicy: UnifiedPowerPolicy
+    private val powerPolicy: UnifiedPowerPolicy,
+    private val networkProvider: NetworkProvider,
+    private val signalingTransport: SignalingTransport
 ) {
     private val _connectivityEvents = MutableSharedFlow<ConnectivityEvent>(
         extraBufferCapacity = 16,
@@ -69,7 +60,6 @@ class ConnectivitySuite @Inject constructor(
     )
     val connectivityEvents: SharedFlow<ConnectivityEvent> = _connectivityEvents.asSharedFlow()
 
-    private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val isStarted = AtomicBoolean(false)
     private val isStopped = AtomicBoolean(false)
     private val consecutiveHttpFailures = AtomicInteger(0)
@@ -167,8 +157,8 @@ class ConnectivitySuite @Inject constructor(
     val isTrackerGpsHardwareLock get() = trackerStatus.gpsHardwareLock
     val trackerTamperNote get() = trackerStatus.tamperNote
 
-    private val networkCallback = object : ManagedNetworkCallback() {
-        override fun onAvailable(network: Network) {
+    private val networkListener = object : NetworkListener {
+        override fun onNetworkAvailable() {
             if (isStopped.get() || relayUrl.isEmpty()) return
             scope.launch {
                 val nowRt = timeProvider.elapsedRealtime()
@@ -178,12 +168,12 @@ class ConnectivitySuite @Inject constructor(
 
                 logManagerProvider.get().logServiceEvent("Network Handover: Available. Reconnecting.", false)
                 lastReconnectTs = nowRt
-                reconnectAttempt = 0 // Reset on network restore
+                reconnectAttempt = 0
                 signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                 wakeUpRelay()
             }
         }
-        override fun onLost(network: Network) {
+        override fun onNetworkLost() {
             if (isStopped.get()) return
             logManagerProvider.get().logServiceEvent("Network Handover: Interface Lost.", false)
             telemetryRepository.updateRelayStatus(false)
@@ -210,14 +200,7 @@ class ConnectivitySuite @Inject constructor(
         
         this.relayUrl = url; this.deviceId = dId; this.viewerId = vId; this.isTrackerMode = isTracker
         
-        try {
-            val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                connectivityManager.registerNetworkCallback(request, networkCallback, Handler(Looper.getMainLooper()))
-            } else {
-                connectivityManager.registerNetworkCallback(request, networkCallback)
-            }
-        } catch (e: Exception) { Timber.e("Failed to register network callback") }
+        networkProvider.registerListener(networkListener)
 
         signalingProvider.setConnectionLostCallback {
             if (!isStopped.get() && relayUrl.isNotEmpty()) {
@@ -299,7 +282,6 @@ class ConnectivitySuite @Inject constructor(
     }
 
     private suspend fun performKeepAlive() = withContext(Dispatchers.IO) {
-        // Unified Power Policy: Defer non-critical signaling during deep Doze (R-ID 338)
         if (powerPolicy.shouldDeferSignaling(sessionManager.isInViolation)) {
             return@withContext
         }
@@ -324,12 +306,7 @@ class ConnectivitySuite @Inject constructor(
         }
 
         try {
-            val conn = (URL(relayUrl).openConnection() as HttpURLConnection).apply {
-                connectTimeout = 30000; readTimeout = 30000
-                setRequestProperty("User-Agent", "GPS19-Monitor")
-            }
-            conn.responseCode
-            conn.disconnect()
+            signalingTransport.performKeepAlive(relayUrl)
             consecutiveHttpFailures.set(0)
 
             val nowRt = timeProvider.elapsedRealtime()
@@ -352,16 +329,7 @@ class ConnectivitySuite @Inject constructor(
     private fun wakeUpRelay() {
         if (relayUrl.isEmpty() || isStopped.get()) return
         scope.launch(Dispatchers.IO) {
-            repeat(4) {
-                try {
-                    val conn = URL(relayUrl).openConnection() as HttpURLConnection
-                    conn.connectTimeout = 30000; conn.readTimeout = 30000
-                    conn.setRequestProperty("User-Agent", "GPS19-Wakeup")
-                    conn.responseCode
-                    conn.disconnect()
-                    return@launch
-                } catch (e: Exception) { delay(6000) }
-            }
+            signalingTransport.wakeUpRelay(relayUrl)
         }
     }
 
@@ -387,7 +355,6 @@ class ConnectivitySuite @Inject constructor(
                     } catch (e: Exception) { Timber.e(e, "Sync failure") }
                     finally { _isSyncing.value = false }
 
-                    // Log high-latency spikes via decoupled forensic logger (R-ID 333)
                     if (currentRtt > MAX_ALLOWED_RTT_MS / 2) {
                         forensicLogger.logHighLatency(currentRtt.toLong(), MAX_ALLOWED_RTT_MS / 2)
                     }
@@ -938,9 +905,7 @@ class ConnectivitySuite @Inject constructor(
         identitySyncJob?.cancel(); identitySyncJob = null
         scope.cancel()
         
-        val unregStart = SystemClock.elapsedRealtime()
-        networkCallback.unregister(connectivityManager, Handler(Looper.getMainLooper()))
-        val unregDuration = SystemClock.elapsedRealtime() - unregStart
+        networkProvider.unregisterListener(networkListener)
         
         val sigStart = SystemClock.elapsedRealtime()
         signalingProvider.disconnect() 
@@ -950,7 +915,6 @@ class ConnectivitySuite @Inject constructor(
         Timber.i("""
             ConnectivitySuite: Teardown Summary (Issue #197 Verification):
             - Total Teardown Time: ${totalDuration}ms
-            - Network Unreg Duration: ${unregDuration}ms
             - Signaling Disconnect Duration: ${sigDuration}ms
             - Status: Clean Teardown Completed.
         """.trimIndent())

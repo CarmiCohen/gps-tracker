@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.16.08)
+# Resolution Archive (Sep.16.09)
+
+## 🟢 Sep.16.09
+*   **Signaling Pipeline Abstraction (#20)**: Decoupled `ConnectivitySuite` from Android's `ConnectivityManager` and direct `HttpURLConnection` calls by introducing `NetworkProvider` and `SignalingTransport` interfaces. This enables deterministic testing of network handovers and out-of-band keep-alive logic without relying on system state or external network side effects. (R-ID 349).
 
 ## 🟢 Sep.16.08
 *   **PowerStateProvider Process Death Resilience (#1071)**: Hardened `FakePowerStateProvider` with static state simulation to validate resilience against Hilt component re-instantiation. Verified that Doze-mode signaling deferral remains consistent across simulated process death or service restarts, preventing telemetry gaps in high-assurance background operations. (R-ID 348).
