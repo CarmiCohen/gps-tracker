@@ -61,13 +61,12 @@ private data class MapBase(val ui: MapUiParts, val kinematic: KinematicState, va
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.16.02:
+ * - Issue #1060 Capability Consolidation: Harmonized performance tier 
+ *   sampling and initialization logic (R-ID 347).
  * Sep.16.00:
  * - Issue #1055: Unified Performance Tier Remediation. Fixed unresolved 
  *   reference in onEvent mapping (R-ID 347).
- * Sep.15.200:
- * - Issue #1056 Unified Performance Muzzle: Harmonized S21FE and A15 detection. 
- *   Switched to useStaggeredHydration for all telemetry sampling and 
- *   initialization delays to eliminate frame skips (R-ID 346).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -335,7 +334,7 @@ class MainViewModel @Inject constructor(
             trackerMaxAccuracy = if (isTracker) kin.localLocation.kinetic.maxAccuracy else kin.trackerLocation.kinetic.maxAccuracy, trackerGpsTs = tTs, trackerTelemetryTs = tTel,
             trackerLocPending = if (isTracker) kin.localHealth.isLocationPending else kin.trackerHealth.isLocationPending, trackerLocPendingReason = if (isTracker) kin.localHealth.locationPendingReason else kin.trackerHealth.locationPendingReason,
             trackerLastValidFixRt = if (isTracker) kin.localHealth.lastValidFixRt else kin.trackerHealth.lastValidFixRt, viewerLat = vLat, viewerLng = vLng, viewerSpeed = if (isTracker) 0.0 else kin.localLocation.kinetic.speed,
-            viewerAccuracy = if (isTracker) 0.0 else kinematicState.localLocation.kinetic.accuracy, viewerMaxAcc = if (isTracker) 0.0 else kinematicState.localLocation.kinetic.maxAccuracy, viewerGpsTs = vTs, viewerTelemetryTs = vTel,
+            viewerAccuracy = if (isTracker) 0.0 else kin.localLocation.kinetic.accuracy, viewerMaxAcc = if (isTracker) 0.0 else kin.localLocation.kinetic.maxAccuracy, viewerGpsTs = vTs, viewerTelemetryTs = vTel,
             viewerLocPending = if (isTracker) false else kin.localHealth.isLocationPending, viewerLocPendingReason = if (isTracker) LocationPendingReason.NONE else kin.localHealth.locationPendingReason,
             viewerLastValidFixRt = if (isTracker) 0L else kin.localHealth.lastValidFixRt, replayCursorPos = kin.replayCursorPos, systemPulse = pulse, systemPulseRt = pulseRt,
             trackerSegments = trkSegs, viewerSegments = vwrSegs, violations = vios, showAccuracyBadge = true, showSettingsButton = true, showToolsOverlay = true,

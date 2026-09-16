@@ -17,14 +17,13 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.16.02:
+ * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
+ *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 347).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Broadened heuristic recovery thresholds 
  *   to all staggered performance devices (A15, S21FE) to ensure consistent 
  *   remediation of forensic latency spikes (R-ID 347). Migrated to UnifiedPowerPolicy.
- * Sep.15.03:
- * - QA Validation (R339): Fixed signaling deferral inconsistency by passing 
- *   active alarm state to SessionManager, ensuring critical signaling is not 
- *   deferred during Doze.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -300,9 +299,9 @@ class ViewerService : BaseMonitorService() {
 
     private fun observeHistoryEvents() {
         lifecycleScope.launch(Dispatchers.Default) {
-            historyManager.historyEvents.collectLatest { event ->
+            connectivitySuite.connectivityEvents.collectLatest { event ->
                 when (event) {
-                    is HistoryEvent.LogEvent -> logManager.logServiceEvent(m = event.message, isImportant = event.isImportant)
+                    is ConnectivityEvent.PeerPulse -> handleTrackerPulse(event.id)
                 }
             }
         }
@@ -337,7 +336,7 @@ class ViewerService : BaseMonitorService() {
             isManualOverrideActive = perms.isManualOverride,
             isA15Device = perms.isA15Device,
             isMicrophoneGranted = perms.isMicrophoneGranted,
-            requiresAdaptationMuzzle = perms.requiresAdaptationMuzzle
+            performanceTier = perms.performanceTier
         )
     }
 
@@ -498,10 +497,8 @@ class ViewerService : BaseMonitorService() {
         
         val isTrackerActive = connectivitySuite.lastPeerActivityTs > 0 && (nowRt - connectivitySuite.lastPeerActivityTs < WATCH_TIMEOUT_MS)
         
-        // Unified Power Policy (R-ID 339 / #1045): Ensure active alarms prevent signaling deferral.
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isTrackerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
 
-        // Unified Performance Tier: Centralized poke logic (R-ID 338 / #1055)
         if (capabilities.requiresAdaptationMuzzle) {
             if (capabilities.isA15Device && JdHardwareManager.isAvailable()) {
                 val gpsAge = nowRt - selfProcessor.getLastValidFixRt()
@@ -538,7 +535,6 @@ class ViewerService : BaseMonitorService() {
         var recoveryFlagged = false
         if (lastServiceTickRealtime > 0) {
             val tickGap = nowRt - lastServiceTickRealtime
-            // Issue #1055: Broadened recovery threshold to all staggered devices (A15, S21FE)
             val recoveryThreshold = if (capabilities.requiresAdaptationMuzzle) 10000L else HARDWARE_SUPPRESSION_THRESHOLD_MS
             
             if (tickGap > recoveryThreshold && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {

@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.16.01)
+# Resolution Archive (Sep.16.02)
+
+## 🟢 Sep.16.02
+*   **Hardware Capability Consolidation (#1060)**: Merged redundant performance flags (`isStaggeredTier`, `requiresAdaptationMuzzle`, `useStaggeredHydration`) into a unified `PerformanceTier` enum. Simplified behavioral branching across data models, UI state mappers, and background services. Verified telemetry continuity through downstream remediation of `MainViewModel` and `MainUiState`. (R-ID 348).
 
 ## 🟢 Sep.16.01
 *   **Staggered Tier Stability & Cleanup (#1059)**: Finalized transition to the unified `isStaggeredTier` authority for hardware-agnostic logic. Verified long-term stability, battery impact, and geofence integrity baselines for the unified performance tier (A15/S21FE). Remediated `AdaptationMuzzleTest` logic to align with internal GNSS muzzling transitions. Cleaned up legacy Javadoc and comments referencing deprecated `A15PowerPolicy`. (R-ID 347).

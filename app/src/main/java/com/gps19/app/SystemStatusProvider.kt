@@ -61,13 +61,12 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Sep.16.02:
+ * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
+ *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 347).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Broadened staggered performance detection 
  *   to harmonize remediation for both A15 and S21FE (R-ID 347).
- * Sep.15.200:
- * - Issue #1056 Unified Performance Muzzle: Harmonized S21FE and A15 detection. 
- *   Introduced useStaggeredHydration to bridge hardware tiers and eliminate 
- *   initialization frame skips (R-ID 286).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -246,10 +245,9 @@ class SystemStatusProviderImpl @Inject constructor(
                                 isManualOverride = current.isManualOverride,
                                 requiresWakeLockRenewal = isSamsung,
                                 requiresExtraTopPadding = isXiaomi,
-                                requiresAdaptationMuzzle = isStaggeredTier,
-                                isStaggeredTier = isStaggeredTier,
+                                isA15Device = HardwareSot.isA15(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.PRODUCT, Build.DEVICE),
                                 isSamsungDevice = isSamsung,
-                                useStaggeredHydration = isStaggeredTier
+                                performanceTier = if (isStaggeredTier) PerformanceTier.STAGGERED else PerformanceTier.STANDARD
                             )
                             cachedState.set(newState)
                         }
@@ -461,7 +459,7 @@ class SystemStatusProviderImpl @Inject constructor(
 
     override suspend fun getCpuLoad(): Double = withContext(Dispatchers.IO) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            return@withContext 0.0 // SELinux blocks /proc/loadavg on SDK 29+
+            return@withContext 0.0 
         }
         try {
             readProcLoadAvg()
@@ -472,7 +470,7 @@ class SystemStatusProviderImpl @Inject constructor(
 
     override suspend fun getIoWait(): Double = withContext(Dispatchers.IO) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            return@withContext 0.0 // SELinux blocks /proc/stat on SDK 29+
+            return@withContext 0.0
         }
         try {
             readProcIoWait()

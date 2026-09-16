@@ -22,13 +22,13 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.16.02:
+ * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
+ *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 347).
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Broadened heuristic recovery thresholds 
  *   to all staggered performance devices (A15, S21FE) to ensure consistent 
  *   remediation of forensic latency spikes (R-ID 347). Migrated to UnifiedPowerPolicy.
- * Sep.15.02:
- * - Unified Power Policy (#1045): Migrated hardware poke logic to UnifiedPowerPolicy 
- *   to ensure centralized compliance across the staggered performance tier.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -346,7 +346,7 @@ class TrackerService : BaseMonitorService() {
             isManualOverrideActive = perms.isManualOverride,
             isA15Device = perms.isA15Device,
             isMicrophoneGranted = perms.isMicrophoneGranted,
-            requiresAdaptationMuzzle = perms.requiresAdaptationMuzzle
+            performanceTier = perms.performanceTier
         )
     }
 

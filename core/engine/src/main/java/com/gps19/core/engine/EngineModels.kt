@@ -4,12 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.16.02:
+ * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
+ *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum.
  * Sep.16.00:
  * - Issue #1055 Unified Performance Tier: Added isStaggeredTier to 
  *   HardwareCapabilities to harmonize A15 and S21FE remediation (R-ID 347).
- * Sep.11.54:
- * - Issue #948 RESOLVED: Removed redundant HUD state definitions. These are 
- *   now managed exclusively in the app module to prevent type ambiguity (R-ID 286).
  */
 
 @Serializable
@@ -42,6 +42,15 @@ enum class CapabilityStatus {
     GRANTED, DENIED, UNKNOWN
 }
 
+/**
+ * PerformanceTier: Defines hardware performance characteristics for remediation gating.
+ */
+@Serializable
+enum class PerformanceTier {
+    STANDARD,
+    STAGGERED
+}
+
 @Serializable
 data class HardwareCapabilities(
     val hasBackgroundRestriction: Boolean = false,
@@ -52,9 +61,13 @@ data class HardwareCapabilities(
     val isManualOverrideActive: Boolean = false,
     val isA15Device: Boolean = false,
     val isMicrophoneGranted: Boolean = false,
-    val requiresAdaptationMuzzle: Boolean = false,
-    val isStaggeredTier: Boolean = false
-)
+    val performanceTier: PerformanceTier = PerformanceTier.STANDARD
+) {
+    // Helper properties to maintain compatibility and readability
+    val isStaggeredTier: Boolean get() = performanceTier == PerformanceTier.STAGGERED
+    val requiresAdaptationMuzzle: Boolean get() = isStaggeredTier
+    val useStaggeredHydration: Boolean get() = isStaggeredTier
+}
 
 enum class LocationPendingReason {
     NONE,
