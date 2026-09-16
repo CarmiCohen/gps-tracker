@@ -25,6 +25,9 @@ import kotlin.math.*
 /**
  * ProductionReadinessAuditTest: Verifies end-to-end telemetry stream constraints 
  * and Doze-deferral consistency across role transitions (R339).
+ * Sep.16.12:
+ * - Issue #1072 Static State Leakage: Implemented reset mechanism in @Before to 
+ *   ensure test atomicity and prevent state leakage between runs.
  * Sep.16.08:
  * - Issue #1071 Process Death Resilience: Hardened FakePowerStateProvider with 
  *   static state to simulate persistence across component recreation (R-ID 348).
@@ -72,6 +75,8 @@ class ProductionReadinessAuditTest {
     @Before
     fun init() {
         hiltRule.inject()
+        // Issue #1072: Reset static state before every test to ensure atomicity
+        FakePowerStateProvider.isIdle = false
     }
 
     @Test

@@ -26,3 +26,4 @@
 
 ## 🛠️ Cleanup Tasks
 22. **Obsolete UiAutomator Dependency**: Once all shell-based environment simulations are removed, we can consider removing the `uiautomator` dependency from `app/build.gradle` to reduce test binary size. (COMPLETED - Sep.16.08)
+23. **Test State Management**: Centralize static fake resets into a `TestResetRule` or similar JUnit rule to avoid manual resets in every `@Before` block (New - Sep.16.12).

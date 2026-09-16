@@ -1,5 +1,8 @@
 # Resolution Archive (Sep.15.101)
 
+## 🟢 Sep.16.12
+*   **Static State Leakage in Test Fakes (#1072)**: Implemented a reset mechanism in `ProductionReadinessAuditTest.kt`'s `@Before` block to clear `FakePowerStateProvider.isIdle` before every test case. This ensures test atomicity and prevents non-deterministic failures caused by state leakage between test runs. (R-ID 350).
+
 ## 🟢 Sep.16.11
 *   **AndroidNetworkProvider Race Condition (#20)**: Resolved race condition in asynchronous unregistration by serializing all platform state transitions on the Main Looper. This ensures that `registerNetworkCallback` and `unregisterNetworkCallback` are never invoked out of sequence, even during rapid toggling or multi-threaded listener updates. (R-ID 349).
 
