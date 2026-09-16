@@ -3,6 +3,7 @@ package com.gps19.app
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.gps19.core.engine.NET_REJOIN_THRESHOLD_MS
+import com.gps19.core.engine.PowerStateProvider
 import com.gps19.core.engine.TimeProvider
 import org.junit.Assert.*
 import org.junit.Test
@@ -10,15 +11,11 @@ import org.junit.runner.RunWith
 
 /**
  * UnifiedPowerPolicyProfileTest: Automated profiling study for the staggered performance tier.
+ * Sep.16.06:
+ * - Issue #1050/1052 Test Suite Hardening: Updated constructor to include PowerStateProvider.
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Updated shouldPokeHardware call to match 
  *   renamed parameter and unified schema (R-ID 348).
- * Sep.16.03:
- * - Legacy Cleanup (#1057): Removed historical references to deprecated A15 
- *   power policy components (R-ID 348).
- * Sep.16.00:
- * - Issue #1055 Unified Performance Tier: Broadened to validate remediation 
- *   across both A15 and S21FE (R-ID 348, formerly R-ID 347).
  */
 @RunWith(AndroidJUnit4::class)
 class UnifiedPowerPolicyProfileTest {
@@ -33,10 +30,15 @@ class UnifiedPowerPolicyProfileTest {
         override fun currentTimeMillis(): Long = 1700000000000L
     }
 
+    private val fakePowerStateProvider = object : PowerStateProvider {
+        var isIdle = false
+        override fun isDeviceIdleMode(): Boolean = isIdle
+    }
+
     @Test
     fun verifyBackoffConvergenceAndJitterBounds() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val policy = UnifiedPowerPolicy(context, mockTimeProvider)
+        val policy = UnifiedPowerPolicy(context, mockTimeProvider, fakePowerStateProvider)
 
         // Profile progression across 20 successive reconnect attempts
         for (attempt in 0..20) {
@@ -53,7 +55,7 @@ class UnifiedPowerPolicyProfileTest {
     @Test
     fun verifyStaggeredTierHardwarePokeConstraints() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val policy = UnifiedPowerPolicy(context, mockTimeProvider)
+        val policy = UnifiedPowerPolicy(context, mockTimeProvider, fakePowerStateProvider)
         val intervalMs = 30000L
 
         // Tick 1: Initial state

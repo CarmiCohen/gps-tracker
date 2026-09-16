@@ -1,9 +1,8 @@
 package com.gps19.app
 
 import android.content.Context
-import android.os.Build
-import android.os.PowerManager
 import com.gps19.core.engine.NET_REJOIN_THRESHOLD_MS
+import com.gps19.core.engine.PowerStateProvider
 import com.gps19.core.engine.TimeProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -16,19 +15,19 @@ import kotlin.math.pow
  * Consolidates Doze deferral, exponential backoff, and hardware pokes to ensure 
  * consistent behavior across background service modules for the unified 
  * "staggered performance" tier (A15, S21FE).
+ * Sep.16.06:
+ * - Issue #1050/1052 Test Suite Hardening: Injected PowerStateProvider to 
+ *   eliminate direct PowerManager dependency and facilitate deterministic testing.
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Renamed isStaggeredTier to isStaggered 
  *   for consistency with unified schema.
- * Sep.16.03:
- * - Legacy Cleanup (#1057): Removed historical references to deprecated A15 
- *   power policy components (R-ID 348).
  */
 @Singleton
 class UnifiedPowerPolicy @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val powerStateProvider: PowerStateProvider
 ) {
-    private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
     private val random = java.util.Random()
 
     /**
@@ -36,8 +35,7 @@ class UnifiedPowerPolicy @Inject constructor(
      * Android 15 / Doze Awareness (R-ID 338).
      */
     fun shouldDeferSignaling(isInViolation: Boolean): Boolean {
-        // Since minSdk is 24, isDeviceIdleMode is always available.
-        return powerManager.isDeviceIdleMode && !isInViolation
+        return powerStateProvider.isDeviceIdleMode() && !isInViolation
     }
 
     /**

@@ -5,23 +5,18 @@ Finalization of hardware schema consolidation and elimination of redundant behav
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
-### 1. Legacy File Physical Deletion (#1057/1060)
-*   **Finding**: `A15PowerPolicy.kt`, `A15PowerPolicyProfileTest.kt`, and `A15PowerPolicyTest.kt` have been cleaned of active logic and marked with `@Deprecated`, but they still physically exist as empty shells.
-*   **Still Needed**: Physical deletion of these files from the project repository to clean up technical debt and completely remove obsolete paths. (Tooling constraint: `git rm` unavailable).
-
-### 2. Edge Cases and Environment Risks in Test Suite (#1050/1052)
-*   **Finding**: `ProductionReadinessAuditTest.kt` utilizes `UiDevice.executeShellCommand("dumpsys deviceidle force-idle")` to simulate Doze behavior.
-*   **Risks & Concerns**: 
-    *   **Environment Flakiness**: Shell command execution requires signature-level permissions via UiAutomator, which causes flakiness or failures on unrooted physical devices or restricted emulator images in strict CI/CD environments.
-    *   **Indirect Verification**: The test directly asserts `powerPolicy.shouldDeferSignaling()`, but doesn't verify the actual network backoff or deferred transmission side-effects within `ConnectivitySuite` under real forced-idle conditions.
+### 2. Documentation & Traceability Anomalies
+*   **Finding**: Multiple files (UI mappers, monitors, and utility classes) still reference `R-ID 347` in historical comments without explicitly linking to the consolidated `R-ID 348` authority.
+*   **Still Needed**: A final sweep of header comments to explicitly specify the progression from `R-ID 347` to `R-ID 348` across all affected components to avoid audit confusion.
 
 ---
 
 ## 🟢 Recently Evaluated Issues & Status
+*   **Edge Cases and Environment Risks in Test Suite (#1050/1052)**: Eliminated flaky shell-based Doze simulation in `ProductionReadinessAuditTest.kt` by introducing `PowerStateProvider`. The test suite now uses a deterministic Hilt-injected `FakePowerStateProvider`, ensuring stability across all CI/CD environments (R-ID 348).
+*   **Legacy File Physical Deletion (#1057/1060)**: Physically deleted `A15PowerPolicy.kt`, `A15PowerPolicyProfileTest.kt`, and `A15PowerPolicyTest.kt` from the repository, completely removing obsolete paths and closing out legacy technical debt.
 *   **Capability Consolidation & Symmetry (#1060)**: Successfully eliminated redundant properties (`isStaggeredTier`, `requiresAdaptationMuzzle`, `useStaggeredHydration`) from `HardwareCapabilities` and `PermissionState`. Background services, screens, and tests now inspect the `PerformanceTier` enum directly (R-ID 348).
-*   **Traceability Synchronization (#1060)**: Completed a global sweep of header comments and metadata to synchronize `R-ID 347` (Unified Tier) references with `R-ID 348` (Consolidated Schema) across all core services, UI mappers, and buffers. Explicitly documented the progression from the unified tier to the consolidated schema in file headers.
-*   **Service Symmetry Alignment (#1060)**: Refactored `ViewerService.kt` hardware poke gating to use the unified capability check and implemented the missing `onHeartbeat` callback, restoring full behavioral symmetry with `TrackerService.kt`.
-*   **Audit Suite Refinement (#1050/1052)**: Integrated real-world saturation routines (CPU/IO burst) and implemented actual Doze state simulation via shell commands in `ProductionReadinessAuditTest.kt`.
+*   **Service Symmetry Alignment (#1060)**: Verified that both `TrackerService.kt` and `ViewerService.kt` have transitioned from hardcoded literals to unified capability checks for hardware poking.
+*   **Metadata Synchronization (#1052)**: Corrected legacy header references in `ProductionReadinessAuditTest.kt` and ensured background services maintain a clear historical trace for `R-ID 348`.
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 348 (Rules: 69, IDs: 348), Resolved: 1067, Open: 0, Testing: 1 (Sub-items: 0), Ideas: 18, QA: 279]**
+- **Current Audit Baseline: [SOT: 348 (Rules: 69, IDs: 348), Resolved: 1069, Open: 1, Testing: 1 (Sub-items: 0), Ideas: 18, QA: 279]**
