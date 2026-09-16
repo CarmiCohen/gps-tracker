@@ -1,21 +1,22 @@
-# Forensic Handover (Sep.16.12)
+# Forensic Handover (Sep.16.13)
 
 ## 🎯 Current System State
-*   **Version**: Sep.16.12 | **Build**: Test Atomicity Hardening COMPLETED
+*   **Version**: Sep.16.13 | **Build**: Doze Integration & Telemetry Gating COMPLETED
 *   **Active Devices**: Samsung A15 & S21FE (Unified via PerformanceTier)
-*   **SOT Baseline**: SOT-350 (Test Atomicity & Reset Logic)
+*   **SOT Baseline**: SOT-351 (Doze Awareness & Platform Integration)
 
 ## 🛡️ Forensic Hardening (Session Summary)
 
-### 1. Test Atomicity Hardening (#1072)
-*   **Static State Leakage**: Resolved state leakage in `ProductionReadinessAuditTest.kt` by implementing a reset mechanism for `FakePowerStateProvider.isIdle` in the `@Before` block. This ensures that every test case starts with a clean, deterministic state, preventing cross-test interference.
-*   **Resilience**: Verified that process death simulation still works correctly while maintaining isolation for individual test executions.
+### 1. High-Fidelity Doze Integration (#1050/1052)
+*   **Platform Gating**: Patched `ConnectivitySuite` to respect `UnifiedPowerPolicy.shouldDeferSignaling()`. Telemetry sync, identity sync, and outbound transmissions are now deferred during Doze to prevent platform-level process termination, unless `SessionManager.isInViolation` is true.
+*   **Integration Verification**: Implemented `PowerIntegrationAuditTest.kt` using `UiDevice` shell commands to verify that the `AndroidPowerStateProvider` correctly maps OS `PowerManager` states to the application's internal gating logic.
+*   **Dependency Hardening**: Integrated `uiautomator` into the build system to support forensic system-level testing.
 
 ### 2. Versioning & Documentation
-*   **SOT ID 350**: Created to track test atomicity improvements.
-*   **Metric Synchronization**: Resolved issues count adjusted to 1077. Open issues reduced to 1 (Issue #1050/1052).
+*   **SOT ID 351**: Created to track high-fidelity Doze integration.
+*   **Metric Synchronization**: Resolved issues count adjusted to 1078. Open issues reduced to 0.
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 350 (Rules: 70, IDs: 350), Resolved: 1077, Open: 1, Testing: 1 (Sub-items: 0), Ideas: 18, QA: 280]**
+- **Current Audit Baseline: [SOT: 351 (Rules: 70, IDs: 351), Resolved: 1078, Open: 0, Testing: 0 (Sub-items: 0), Ideas: 18, QA: 280]**
 
-**Resumption Context**: Test suite atomicity is now guaranteed for power-awareness audits. The next priority is **Issue #1050/1052**: High-Fidelity Doze Integration to close the gap between deterministic fakes and actual platform behavior.
+**Resumption Context**: The system now has full platform-level Doze awareness validated by integration tests. All identified critical gaps in the telemetry pipeline have been closed. Next focus should be on architectural simplification (refer to `Simplify_Ideas2.md`) or new feature audits.

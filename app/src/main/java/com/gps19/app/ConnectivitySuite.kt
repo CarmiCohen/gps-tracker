@@ -28,13 +28,13 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.16.13:
+ * - Issue #1050/1052 Doze Integration: Patched startSyncLoop, startIdentitySyncLoop, 
+ *   and sendTelemetry to respect UnifiedPowerPolicy.shouldDeferSignaling() to 
+ *   prevent platform-level process termination during Doze (R-ID 351).
  * Sep.16.10:
  * - Signaling Pipeline Hardening (#20): Enforced HTTP 2xx check for keep-alive 
  *   to prevent premature failure counter resets during server-side errors (R-ID 349).
- * Sep.16.09:
- * - Signaling Pipeline Abstraction (#20): Decoupled from ConnectivityManager 
- *   and direct HTTP calls using NetworkProvider and SignalingTransport interfaces 
- *   to enable deterministic signaling testing (R-ID 348).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -275,6 +275,10 @@ class ConnectivitySuite @Inject constructor(
             while (isActive) {
                 delay(60000) 
                 if (isConnected() && !isStopped.get()) {
+                    if (powerPolicy.shouldDeferSignaling(sessionManager.isInViolation)) {
+                        Timber.d("ConnectivitySuite: Identity sync deferred (Doze active)")
+                        continue
+                    }
                     Timber.d("ConnectivitySuite: Periodic identity sync (R254)")
                     signalingProvider.updateIdentity(deviceId, viewerId, isTrackerMode, force = true)
                 }
@@ -353,12 +357,16 @@ class ConnectivitySuite @Inject constructor(
                         delay(500) 
                     }
                     
-                    _isSyncing.value = true
-                    try { 
-                        val batchSize = if (inViolation) SYNC_BATCH_SIZE_VIOLATION else LOG_BATCH_SIZE
-                        flushPendingUpdates(batchSize) 
-                    } catch (e: Exception) { Timber.e(e, "Sync failure") }
-                    finally { _isSyncing.value = false }
+                    if (powerPolicy.shouldDeferSignaling(inViolation)) {
+                        Timber.v("ConnectivitySuite: Telemetry sync deferred (Doze active)")
+                    } else {
+                        _isSyncing.value = true
+                        try { 
+                            val batchSize = if (inViolation) SYNC_BATCH_SIZE_VIOLATION else LOG_BATCH_SIZE
+                            flushPendingUpdates(batchSize) 
+                        } catch (e: Exception) { Timber.e(e, "Sync failure") }
+                        finally { _isSyncing.value = false }
+                    }
 
                     if (currentRtt > MAX_ALLOWED_RTT_MS / 2) {
                         forensicLogger.logHighLatency(currentRtt.toLong(), MAX_ALLOWED_RTT_MS / 2)
@@ -433,6 +441,7 @@ class ConnectivitySuite @Inject constructor(
 
     private fun sendTelemetryInternal(status: TrackerStatus, priority: SignalingPriority): Boolean {
         if (!isConnected()) return false
+        if (powerPolicy.shouldDeferSignaling(sessionManager.isInViolation)) return false
         signalingProvider.transmit(status, priority, fromViewer = !isTrackerMode)
         return true
     }
