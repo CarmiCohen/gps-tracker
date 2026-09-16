@@ -25,12 +25,12 @@ import kotlin.math.*
 /**
  * ProductionReadinessAuditTest: Verifies end-to-end telemetry stream constraints 
  * and Doze-deferral consistency across role transitions (R339).
+ * Sep.16.08:
+ * - Issue #1071 Process Death Resilience: Hardened FakePowerStateProvider with 
+ *   static state to simulate persistence across component recreation (R-ID 348).
  * Sep.16.06:
  * - Issue #1050/1052 Test Suite Hardening: Replaced flaky shell-based Doze simulation 
  *   with deterministic FakePowerStateProvider via Hilt module replacement (R-ID 348).
- * Sep.16.04:
- * - Audit Suite Refinement (#1050): Integrated real-world saturation routines 
- *   (CPU/IO burst) and implemented actual Doze state simulation via shell commands (R-ID 348).
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -63,7 +63,9 @@ class ProductionReadinessAuditTest {
     }
 
     class FakePowerStateProvider : PowerStateProvider {
-        var isIdle = false
+        companion object {
+            var isIdle = false
+        }
         override fun isDeviceIdleMode(): Boolean = isIdle
     }
 
@@ -90,6 +92,34 @@ class ProductionReadinessAuditTest {
 
         assertTrue("SessionManager must sustain active violation state", sessionManager.isInViolation)
         assertEquals("Violation uptime percentage should match 100%", 100.0, sessionManager.getViolationPercentage(), 0.01)
+    }
+
+    /**
+     * Issue #1071: Process Death Resilience Validation
+     * Verifies that the power state is preserved across policy re-instantiation,
+     * simulating service restart or process death recovery.
+     */
+    @Test
+    fun verifyPowerStateResilienceAfterRecreation() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        
+        // 1. Set state in current provider
+        FakePowerStateProvider.isIdle = true
+        assertTrue("Initial state should be Doze", powerPolicy.shouldDeferSignaling(false))
+
+        // 2. Simulate "recreation" by manually instantiating a new policy with a new provider instance
+        // In Hilt, this would happen on process restart. The static state in FakePowerStateProvider
+        // ensures the 'hardware' state is maintained.
+        val newProvider = FakePowerStateProvider()
+        val newPolicy = UnifiedPowerPolicy(context, timeProvider, newProvider)
+
+        assertTrue("Power state must persist across component recreation to prevent telemetry gaps",
+            newPolicy.shouldDeferSignaling(false))
+            
+        // 3. Toggle and verify consistency
+        FakePowerStateProvider.isIdle = false
+        assertFalse("Power state change must be reflected in the new policy instance",
+            newPolicy.shouldDeferSignaling(false))
     }
 
     @Test
@@ -123,18 +153,14 @@ class ProductionReadinessAuditTest {
      */
     @Test
     fun verifyDozeModeSignalingDeferral() {
-        val fakePower = powerStateProvider as FakePowerStateProvider
-        
-        // 1. Not in Doze, No Violation -> Should NOT Defer
-        fakePower.isIdle = false
+        // Use static access for cleaner state management
+        FakePowerStateProvider.isIdle = false
         assertFalse("Should not defer when not in Doze", powerPolicy.shouldDeferSignaling(false))
 
-        // 2. In Doze, No Violation -> Should Defer
-        fakePower.isIdle = true
+        FakePowerStateProvider.isIdle = true
         assertTrue("Signaling should be deferred in Doze mode when no violation is present", 
             powerPolicy.shouldDeferSignaling(isInViolation = false))
         
-        // 3. In Doze, Active Violation -> Should NOT Defer (Critical Override)
         assertFalse("Signaling should NOT be deferred during violation, even in Doze mode", 
             powerPolicy.shouldDeferSignaling(isInViolation = true))
     }

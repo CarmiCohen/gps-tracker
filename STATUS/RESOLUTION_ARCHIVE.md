@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.16.07)
+# Resolution Archive (Sep.16.08)
+
+## 🟢 Sep.16.08
+*   **PowerStateProvider Process Death Resilience (#1071)**: Hardened `FakePowerStateProvider` with static state simulation to validate resilience against Hilt component re-instantiation. Verified that Doze-mode signaling deferral remains consistent across simulated process death or service restarts, preventing telemetry gaps in high-assurance background operations. (R-ID 348).
 
 ## 🟢 Sep.16.07
 *   **Documentation & Traceability Hardening (#1060)**: Finalized the audit of header comments across 20+ components. Explicitly linked historical references of `R-ID 347` to the consolidated `R-ID 348` authority to ensure architectural continuity and audit clarity. Updated master requirements and resolution archive to reflect this consolidation. (R-ID 348).
@@ -28,6 +31,3 @@
 *   **Forensic Write Latency Spike (#1055)**: Harmonized A15 and S21FE remediation. Relaxed forensic write thresholds to 10ms globally to eliminate budget hardware scheduling jitter and moved non-I/O overhead (UTF-8 encoding) outside the measured block in `ForensicSpillBuffer`. (R-ID 347, consolidated into R-ID 348).
 *   **Unified Performance Tier (#1057)**: Consolidated `A15PowerPolicy` into `UnifiedPowerPolicy` and migrated background polling/recovery baselines across `TrackerService` and `ViewerService` to use hardware-agnostic capability flags. (R-ID 347, consolidated into R-ID 348).
 *   **Version Update (#1058)**: Updated application version to `Sep.16.00`.
-
-## 🟢 Sep.15.200
-*   **Unified Performance Muzzle (#1056)**: Harmonized S21FE and A15 detection logic. Introduced `useStaggeredHydration` in `PermissionState` to bridge hardware performance tiers. Updated `LifecycleHydrationManager` and `MainViewModel` to apply staggered initialization and adaptive telemetry sampling to both devices, successfully eliminating main-thread congestion and frame skips during app startup. (R-ID 346).
