@@ -34,9 +34,14 @@ import kotlin.math.*
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
- * and signaling backoff logic (Convergence of HardwareProvider & UnifiedPowerPolicy).
+ * and signaling backoff logic.
+ * Sep.17.07:
+ * - Issue #1093 Cleanup: Restored missing LocationStatus and ForensicSnapshot definitions
+ *   to resolve compilation errors after legacy provider purge.
+ * Sep.17.05:
+ * - Issue #1093 Cleanup: Final purge of legacy provider references in documentation.
  * Sep.17.02:
- * - Issue #1093: Power & Hardware Provider Convergence. Merged UnifiedPowerPolicy 
+ * - Issue #1093: Power & Hardware Provider Convergence. Merged legacy authorities 
  *   into HardwareSuite to reduce dependency overhead and consolidate platform 
  *   state monitoring (R-ID 353).
  */
@@ -50,6 +55,51 @@ class HardwareSuite @Inject constructor(
     private val powerStateProvider: PowerStateProvider,
     private val forensicAuditor: ForensicAuditor
 ) : ManagedSensorListener() {
+
+    /**
+     * LocationStatus: Represents the current health and pending state of the GNSS subsystem.
+     */
+    data class LocationStatus(
+        val isPending: Boolean = false,
+        val reason: LocationPendingReason = LocationPendingReason.NONE,
+        val lastFixRt: Long = 0L,
+        val lastPendingDurationMs: Long = 0L,
+        val recoveryConfirmed: Boolean = false
+    )
+
+    /**
+     * ForensicSnapshot: Atomic capture of all hardware sensor states for telemetry.
+     */
+    class ForensicSnapshot {
+        var vibration: Double = 0.0
+        var heading: Double = 0.0
+        var baroAlt: Double = 0.0
+        var lux: Double = 0.0
+        var isNear: Boolean = false
+        var tiltDegrees: Double = 0.0
+        var acousticDb: Double = 0.0
+        var peakShock: Double = 0.0
+        var peakVerticalVelocity: Double = 0.0
+        var peakVerticalVelocityTs: Long = 0L
+        var peakVerticalVelocityRt: Long = 0L
+        var peakVerticalDisplacement: Double = 0.0
+        var plungeMatched: Boolean = false
+        var proximityIdx: Double = 0.0
+        var proximityCm: Double = -1.0
+        var proximityDebounceMs: Long = 0L
+        var vibrationRollingSum: Double = 0.0
+        var acousticPeak: Double = 0.0
+        var acousticPeakMin: Double = -1.0
+        var kineticEnergy: Double = 0.0
+
+        fun reset() {
+            vibration = 0.0; heading = 0.0; baroAlt = 0.0; lux = 0.0; isNear = false
+            tiltDegrees = 0.0; acousticDb = 0.0; peakShock = 0.0; peakVerticalVelocity = 0.0
+            peakVerticalVelocityTs = 0L; peakVerticalVelocityRt = 0L; peakVerticalDisplacement = 0.0
+            plungeMatched = false; proximityIdx = 0.0; proximityCm = -1.0; proximityDebounceMs = 0L
+            vibrationRollingSum = 0.0; acousticPeak = 0.0; acousticPeakMin = -1.0; kineticEnergy = 0.0
+        }
+    }
 
     private val locationManager by lazy { context.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
     private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(context) }
@@ -100,14 +150,6 @@ class HardwareSuite @Inject constructor(
         object RawBurstEnded : RevivalEvent()
         data class Footprint(val deltaMa: Int, val deltaTemp: Double, val durationMs: Long) : RevivalEvent()
     }
-
-    data class LocationStatus(
-        val isPending: Boolean = false,
-        val reason: LocationPendingReason = LocationPendingReason.NONE,
-        val lastFixRt: Long = 0L,
-        val lastPendingDurationMs: Long = 0L,
-        val recoveryConfirmed: Boolean = false
-    )
 
     private val _locationStatus = MutableSharedFlow<LocationStatus>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val locationStatusFlow: SharedFlow<LocationStatus> = _locationStatus.asSharedFlow()
@@ -223,24 +265,6 @@ class HardwareSuite @Inject constructor(
     private val _isUltraLongStationary = MutableSharedFlow<Boolean>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val isUltraLongStationaryFlow: SharedFlow<Boolean> = _isUltraLongStationary.asSharedFlow()
     private var isUltraLongStationary = false
-
-    class ForensicSnapshot {
-        var vibration = 0.0; var heading = 0.0; var baroAlt = 0.0; var lux = 0.0
-        var isNear = true; var tiltDegrees = 0.0; var acousticDb = 0.0; var peakShock = 0.0
-        var peakVerticalVelocity = 0.0; var peakVerticalVelocityTs = 0L; var peakVerticalVelocityRt = 0L
-        var plungeMatched = false; var peakVerticalDisplacement = 0.0; var proximityIdx = 0.0
-        var proximityCm = 0.0; var proximityDebounceMs = 0L; var vibrationRollingSum = 0.0
-        var acousticPeak = 0.0; var acousticPeakMin = 0.0; var kineticEnergy = 0.0
-
-        fun reset() {
-            vibration = 0.0; heading = 0.0; baroAlt = 0.0; lux = 0.0
-            isNear = true; tiltDegrees = 0.0; acousticDb = 0.0; peakShock = 0.0
-            peakVerticalVelocity = 0.0; peakVerticalVelocityTs = 0L; peakVerticalVelocityRt = 0L
-            plungeMatched = false; peakVerticalDisplacement = 0.0; proximityIdx = 0.0
-            proximityCm = 0.0; proximityDebounceMs = 0L; vibrationRollingSum = 0.0
-            acousticPeak = 0.0; acousticPeakMin = 0.0; kineticEnergy = 0.0
-        }
-    }
 
     private val gnssStatusCallback = object : ManagedGnssStatusCallback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) {
@@ -888,7 +912,7 @@ class HardwareSuite @Inject constructor(
         } else { revivalAttemptCount = 0; isHardwareLocked = false }
     }
 
-    // --- Power Policy Logic (Merged from UnifiedPowerPolicy) ---
+    // --- Power Policy Logic ---
 
     /**
      * Determines if non-critical signaling should be deferred based on Doze state.
