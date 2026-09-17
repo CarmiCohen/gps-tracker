@@ -1,21 +1,21 @@
-# Forensic Handover (Sep.17.01)
+# Forensic Handover (Sep.15.101)
 
 ## 🎯 Current System State
-*   **Version**: Sep.17.01 | **Build**: Telemetry Backfill QA Verification Complete
+*   **Version**: Sep.17.04 | **Build**: Forensic Backfill Optimization Complete
 *   **Active Devices**: Samsung A15 & S21FE (Unified via PerformanceTier)
-*   **SOT Baseline**: SOT-352 (Signaling Continuity Validation)
+*   **SOT Baseline**: SOT-354 (Heap Pressure Mitigation)
 
 ## 🛡️ Forensic Hardening (Session Summary)
 
-### 1. Telemetry Backfill QA Task (#1074)
-*   **Root-Cause Remediation**: Implemented strict, explicit verification unit tests within `TelemetryAggregatorTest.kt` to validate the telemetry backfill convergence flow under R-ID 17. 
-*   **Architectural Compliance**: Enforced zero-churn alignment boundaries and bounded loop execution capping via `MAX_BACKFILL_POINTS` to guarantee that extreme system clock drifts or long connectivity gaps do not result in unbounded allocation or memory bloat.
+### 1. Forensic Backfill Buffer Reuse Optimization (#1094)
+*   **Root-Cause Remediation**: `HistoryManager.backfillAnalyticalGaps` was identified as a source of transient heap pressure due to repeated `ArrayList` and `ConnectionPoint` allocations during high-frequency recovery bursts.
+*   **Architectural Compliance**: Implemented `backfillPool` (ConnectionPoint array) and `backfillBuffer` (reusable list) within `HistoryManager` to eliminate GC churn. Added `reset()` to `ConnectionPoint` to ensure flyweight safety (R-ID 353).
 
 ### 2. Versioning & Documentation
-*   **Version Advance**: Incremented application release baseline to `Sep.17.01`.
-*   **Metric Synchronization**: Resolved issues count adjusted to 1092. Open issues reduced to 0.
+*   **Version Advance**: Incremented application release baseline to `Sep.17.04`.
+*   **Metric Synchronization**: Resolved issues count adjusted to 1094. All forensic audit gaps identified in Sep.17.02 are closed.
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 352 (Rules: 71, IDs: 352), Resolved: 1092, Open: 0, Testing: 0, Ideas: 19, QA: 281]**
+- **Current Audit Baseline: [SOT: 354 (Rules: 71, IDs: 354), Resolved: 1094, Open: 0, Testing: 2, Ideas: 18, QA: 281]**
 
-**Resumption Context**: The telemetry pipeline is platform-aware, stable, fully covered by deterministic backfill and stress tests, and has zero open gaps. Ready for any new functional expansion or further optimization requirements.
+**Resumption Context**: The telemetry pipeline is now optimized for zero-allocation gap recovery, ensuring maximum stability on budget hardware during connectivity restoration. No open critical defects remain in the forensic path.

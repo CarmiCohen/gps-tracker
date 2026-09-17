@@ -38,8 +38,6 @@ import kotlin.math.*
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
 
-    @Inject lateinit var hardwareSuite: HardwareSuite
-
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
     private var revivalEventsJob: Job? = null

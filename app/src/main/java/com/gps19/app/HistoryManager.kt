@@ -27,6 +27,9 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.17.04:
+ * - Issue #1094: Forensic Backfill Buffer Reuse Optimization. Implemented 
+ *   backfillPool and backfillBuffer to eliminate transient heap pressure (R-ID 353).
  * Sep.17.02:
  * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.15.04:
@@ -67,6 +70,10 @@ class HistoryManager @Inject constructor(
     private val baseTemplateFlyweight = EngineConnectionPoint()
     
     private val appPointPool = Array(RibbonScale.entries.size) { ConnectionPoint() }
+    
+    // Issue #1094: Backfill flyweight pool to suppress GC churn during recovery bursts.
+    private val backfillPool = Array(MAX_BACKFILL_POINTS) { ConnectionPoint() }
+    private val backfillBuffer = ArrayList<ConnectionPoint>(MAX_BACKFILL_POINTS)
 
     private var backfillAuditCount = 0
     private var hourlyBackfillTotal = 0
@@ -227,10 +234,14 @@ class HistoryManager @Inject constructor(
             this.isUltraLongStationary = isUltraLongStationary
         }
         
-        val backfillBuffer = ArrayList<ConnectionPoint>(60) 
+        backfillBuffer.clear()
+        var poolIdx = 0
         
         aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplateFlyweight) { scale, point ->
-            val appPoint = ConnectionPoint()
+            if (poolIdx >= MAX_BACKFILL_POINTS) return@backfillGaps
+            
+            val appPoint = backfillPool[poolIdx++]
+            appPoint.reset()
             TelemetryMapper.mapEngineToApp(point, appPoint)
             
             if (scale == RibbonScale.FOUR_MIN) { 
@@ -252,18 +263,24 @@ class HistoryManager @Inject constructor(
         val sensorSamples = if (isTrackerMode) hardwareSuite.getSensorSamples(lastTickRt, nowRt) else emptySequence()
         
         RibbonScale.entries.forEach { scale ->
-            val gapPoints = ArrayList<ConnectionPoint>()
+            backfillBuffer.clear()
+            var poolIdx = 0
+            
             aggregator.fillRealGap(scale, lastTickRt, nowRt, lastTickTs, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb()) { point ->
-                val appPoint = ConnectionPoint()
+                if (poolIdx >= MAX_BACKFILL_POINTS) return@fillRealGap
+
+                val appPoint = backfillPool[poolIdx++]
+                appPoint.reset()
                 TelemetryMapper.mapEngineToApp(point, appPoint)
-                gapPoints.add(appPoint)
+                backfillBuffer.add(appPoint)
             }
-            if (gapPoints.isNotEmpty()) { 
-                repository.addHistoryPoints(scale.key, gapPoints)
+            
+            if (backfillBuffer.isNotEmpty()) { 
+                repository.addHistoryPoints(scale.key, backfillBuffer)
                 // Issue #923: Synchronize forensic audit counters for 4M ribbons
                 if (scale == RibbonScale.FOUR_MIN) {
-                    backfillAuditCount += gapPoints.size
-                    hourlyBackfillTotal += gapPoints.size
+                    backfillAuditCount += backfillBuffer.size
+                    hourlyBackfillTotal += backfillBuffer.size
                 }
             }
         }

@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.17.02)
+# Resolution Archive (Sep.15.101)
+
+## 🟢 Sep.17.04
+*   **Forensic Backfill Buffer Reuse Optimization (#1094)**: Implemented flyweight pooling (`backfillPool`) and reusable `ArrayList` (`backfillBuffer`) within `HistoryManager` to eliminate transient heap pressure and GC churn during high-frequency gap recovery. This optimization ensures stability on budget hardware (A15) during connectivity restoration bursts, preventing memory-related stalls in the forensic pipeline (R-ID 353).
 
 ## 🟢 Sep.17.02
 *   **Power & Hardware Provider Convergence (#1093)**: Merged `UnifiedPowerPolicy` and `HardwareProvider` into a unified `HardwareSuite`. This architectural simplification reduces dependency injection complexity across all background services and centralizes platform-aware logic (Doze deferral, GNSS throttling, and hardware polling) into a single, cohesive authority. Updated all dependent modules and tests to maintain signaling integrity and audit traceability (R-ID 353).
@@ -14,6 +17,3 @@
 
 ## 🟢 Sep.16.13
 *   **High-Fidelity Doze Integration (#1050/1052)**: Patched `ConnectivitySuite` to respect `UnifiedPowerPolicy.shouldDeferSignaling()`, ensuring telemetry sync and identity updates are deferred during Doze unless a security violation is active. Implemented `PowerIntegrationAuditTest.kt` using `UiDevice` shell commands to verify the actual bridge between the OS `PowerManager` and the application logic, ensuring reliable platform-level awareness. (R-ID 351).
-
-## 🟢 Sep.16.12
-*   **Static State Leakage in Test Fakes (#1072)**: Implemented a reset mechanism in `ProductionReadinessAuditTest.kt`'s `@Before` block to clear `FakePowerStateProvider.isIdle` before every test case. This ensures test atomicity and prevents non-deterministic failures caused by state leakage between test runs. (R-ID 350).
