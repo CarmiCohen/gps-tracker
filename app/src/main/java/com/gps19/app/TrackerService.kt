@@ -22,6 +22,8 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.17.02:
+ * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Checked performanceTier directly (R-ID 348).
  * Sep.16.02:
@@ -36,7 +38,7 @@ import kotlin.math.*
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
 
-    @Inject lateinit var powerPolicy: UnifiedPowerPolicy
+    @Inject lateinit var hardwareSuite: HardwareSuite
 
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
@@ -127,19 +129,19 @@ class TrackerService : BaseMonitorService() {
 
         historyManager.initialize(lifecycleScope)
         
-        hardwareProvider.start()
+        hardwareSuite.start()
 
         commandRouter.register()
         commandRouter.startObservingCommands(lifecycleScope)
 
-        gpsCollectionJob = lifecycleScope.launch(Dispatchers.Default) { hardwareProvider.getLocationFlow().collectLatest { onLocationChanged(it) } }
-        gnssDetailJob = lifecycleScope.launch(Dispatchers.Default) { hardwareProvider.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
+        gpsCollectionJob = lifecycleScope.launch(Dispatchers.Default) { hardwareSuite.getLocationFlow().collectLatest { onLocationChanged(it) } }
+        gnssDetailJob = lifecycleScope.launch(Dispatchers.Default) { hardwareSuite.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
 
         settingsJob = lifecycleScope.launch(Dispatchers.Default) {
             launch { repository.alertSettingsFlow.collectLatest { settings -> alarmManager.updateSettings(settings) } }
             launch { repository.homePointsFlow.collectLatest { points -> locationProcessor.setHomePoints(points.map { EngineGeoPoint(it.latitude, it.longitude) }) } }
             launch { repository.maxDistanceFlow.collectLatest { dist -> locationProcessor.setMaxDistanceAuthority(dist) } }
-            launch { repository.isSafeMode.collectLatest { safe -> hardwareProvider.setSafeMode(safe) } }
+            launch { repository.isSafeMode.collectLatest { safe -> hardwareSuite.setSafeMode(safe) } }
         }
 
         val recoveredTs = repository.getLong(LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
@@ -222,21 +224,21 @@ class TrackerService : BaseMonitorService() {
     private fun observeRevivalEvents() {
         revivalEventsJob?.cancel()
         revivalEventsJob = lifecycleScope.launch(Dispatchers.Default) {
-            hardwareProvider.revivalEvents.collect { event ->
+            hardwareSuite.revivalEvents.collect { event ->
                 when (event) {
-                    is HardwareProvider.RevivalEvent.Footprint -> {
+                    is HardwareSuite.RevivalEvent.Footprint -> {
                         val msg = "ENERGY AUDIT: Revival Footprint (R-ID 259) - Delta: ${event.deltaMa}mA, Temp Rise: ${event.deltaTemp}°C, Duration: ${event.durationMs}ms"
                         val proc = lastProcessedLocation
                         logManager.submitToLogSink(msg, "system", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                     }
-                    is HardwareProvider.RevivalEvent.HardwareLock -> {
+                    is HardwareSuite.RevivalEvent.HardwareLock -> {
                         val proc = lastProcessedLocation
                         logManager.logServiceEvent(m = "CRITICAL: GPS_HARDWARE_LOCK - All revival attempts failed. Hardware stall confirmed.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                     }
-                    is HardwareProvider.RevivalEvent.Attempt -> {
+                    is HardwareSuite.RevivalEvent.Attempt -> {
                         logManager.logServiceEvent(m = "GPS REVIVAL: Hardware restart attempt ${event.count} triggered.", isImportant = false)
                     }
-                    is HardwareProvider.RevivalEvent.Success -> {
+                    is HardwareSuite.RevivalEvent.Success -> {
                         logManager.logServiceEvent(m = "GPS REVIVAL: Hardware fix restored successfully.", isImportant = true)
                     }
                     else -> {}
@@ -305,7 +307,7 @@ class TrackerService : BaseMonitorService() {
 
     private fun observeSensorEvents() {
         lifecycleScope.launch(Dispatchers.Default) {
-            hardwareProvider.sensorEvents.collect { event ->
+            hardwareSuite.sensorEvents.collect { event ->
                 when (event) {
                     is AppSensorEvent.HardwareFailure -> {
                         val proc = lastProcessedLocation
@@ -329,7 +331,7 @@ class TrackerService : BaseMonitorService() {
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { 
                         refreshCapabilitiesInternal()
-                        launch { hardwareProvider.start() }
+                        launch { hardwareSuite.start() }
                     }
                     is CommandEvent.ExecuteStressTest -> executeAutomatedStressTest()
                     is CommandEvent.SimulateStoragePressure -> {} 
@@ -354,7 +356,7 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun setupPhysicalFastPaths() {
-        hardwareProvider.setAcousticFastPath(
+        hardwareSuite.setAcousticFastPath(
             floor = locationProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0,
             onSpike = {
                 logManager.logServiceEvent(m = "Acoustic Spike Detected (FastPath)", isImportant = false)
@@ -421,7 +423,7 @@ class TrackerService : BaseMonitorService() {
                 val type = getAvailableForegroundServiceType()
                 val health = integrityMonitor.currentHealth
                 val msg = notificationManager.getPulseMessage(
-                    hardwareProvider.satellitesUsed,
+                    hardwareSuite.satellitesUsed,
                     health.batteryLevel,
                     isSecure = !alarmManager.hasUnresolvedAlarms(),
                     isPowerSave = isPowerSaveActive || health.isPowerSaveMode
@@ -439,7 +441,7 @@ class TrackerService : BaseMonitorService() {
             type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val isMicEnabled = hardwareProvider.isAcousticMonitoringEnabled()
+            val isMicEnabled = hardwareSuite.isAcousticMonitoringEnabled()
             val hasPermission = capabilities.isMicrophoneGranted
             if (hasPermission && (isMicEnabled || isRecentUiPulse())) {
                 type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE 
@@ -455,9 +457,9 @@ class TrackerService : BaseMonitorService() {
         integrityMonitor.checkInternetIntegrity(nowRt)
         
         val health = integrityMonitor.currentHealth
-        val snapshot = hardwareProvider.consumeLogicSnapshot()
+        val snapshot = hardwareSuite.consumeLogicSnapshot()
 
-        hardwareProvider.setHighLoad(health.isCoolingModeActive)
+        hardwareSuite.setHighLoad(health.isCoolingModeActive)
         
         isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(
             currentSuspicious = isSuspiciousMode,
@@ -469,8 +471,8 @@ class TrackerService : BaseMonitorService() {
         val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(
             isCoolingMode = health.isCoolingModeActive,
             isSuspiciousMode = isSuspiciousMode,
-            isStationary = hardwareProvider.isStationary(),
-            isScreenOn = hardwareProvider.isScreenOn(),
+            isStationary = hardwareSuite.isStationary(),
+            isScreenOn = hardwareSuite.isScreenOn(),
             isGeofenceActive = locationProcessor.getMaxDistanceAuthority() > 0.0,
             nowRt = nowRt,
             capabilities = capabilities
@@ -480,7 +482,7 @@ class TrackerService : BaseMonitorService() {
             currentIntervalMs = targetGpsInterval
             forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval)
             locationProcessor.updateExpectedInterval(nowRt, targetGpsInterval)
-            hardwareProvider.setPollingInterval(targetGpsInterval)
+            hardwareSuite.setPollingInterval(targetGpsInterval)
         }
         
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
@@ -506,7 +508,7 @@ class TrackerService : BaseMonitorService() {
                         isPeerStale = !isViewerActive
                     )
                 )
-            } else if (powerPolicy.shouldPokeHardware(isStaggered, lastStaggeredPokeRt, STAGGERED_POKE_INTERVAL_MS)) {
+            } else if (hardwareSuite.shouldPokeHardware(isStaggered, lastStaggeredPokeRt, STAGGERED_POKE_INTERVAL_MS)) {
                 lastStaggeredPokeRt = nowRt
                 systemMonitor.acquireWakeLock(force = true)
             }
@@ -559,9 +561,9 @@ class TrackerService : BaseMonitorService() {
 
         if (nowRt - lastPowerSaveCheckRt > 5000L) {
             val hasUnresolved = alarmManager.hasUnresolvedAlarms()
-            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(isStationary = hardwareProvider.isStationary(), isGpsStalled = health.gpsStalled, hasUnresolvedAlarms = hasUnresolved, isUiVisible = isUiVisible())
+            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(isStationary = hardwareSuite.isStationary(), isGpsStalled = health.gpsStalled, hasUnresolvedAlarms = hasUnresolved, isUiVisible = isUiVisible())
             if (shouldBePowerSave != isPowerSaveActive) {
-                isPowerSaveActive = shouldBePowerSave; hardwareProvider.setPowerSaveMode(shouldBePowerSave); logManager.logServiceEvent(m = "POWER SAVER: ${if (shouldBePowerSave) "ENGAGED" else "DISABLED"}", isImportant = false)
+                isPowerSaveActive = shouldBePowerSave; hardwareSuite.setPowerSaveMode(shouldBePowerSave); logManager.logServiceEvent(m = "POWER SAVER: ${if (shouldBePowerSave) "ENGAGED" else "DISABLED"}", isImportant = false)
                 withContext(Dispatchers.Main.immediate) { updateForegroundServiceType() }
             }
             lastPowerSaveCheckRt = nowRt
@@ -620,8 +622,8 @@ class TrackerService : BaseMonitorService() {
             this.integrity.battery = health.batteryLevel
             this.integrity.isCharging = health.isCharging
             this.integrity.currentMa = health.currentMa
-            this.integrity.satsView = hardwareProvider.satellitesInView
-            this.integrity.satsUsed = hardwareProvider.satellitesUsed
+            this.integrity.satsView = hardwareSuite.satellitesInView
+            this.integrity.satsUsed = hardwareSuite.satellitesUsed
             this.integrity.snrIdx = snrIdx
             this.integrity.isPowerTamper = health.isPowerTamper
             this.integrity.isSitDetected = isSuspiciousMode
@@ -681,7 +683,7 @@ class TrackerService : BaseMonitorService() {
             while (isActive) {
                 val health = integrityMonitor.currentHealth
                 val proc = lastProcessedLocation
-                val snapshot = hardwareProvider.consumeForensicSnapshot()
+                val snapshot = hardwareSuite.consumeForensicSnapshot()
                 
                 val lat = proc?.optimizedPoint?.lat ?: 0.0
                 val lng = proc?.optimizedPoint?.lng ?: 0.0
@@ -789,7 +791,7 @@ class TrackerService : BaseMonitorService() {
         if (isSystemActive) {
             val health = integrityMonitor.currentHealth
             notificationManager.updatePulse(
-                sats = hardwareProvider.satellitesUsed, 
+                sats = hardwareSuite.satellitesUsed, 
                 battery = health.batteryLevel, 
                 isSecure = !alarmManager.hasUnresolvedAlarms(), 
                 isPowerSave = isPowerSaveActive || health.isPowerSaveMode
@@ -816,7 +818,7 @@ class TrackerService : BaseMonitorService() {
         }
     }
 
-    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerActive: Boolean, processed: ProcessedLocation, snapshot: HardwareProvider.ForensicSnapshot) {
+    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerActive: Boolean, processed: ProcessedLocation, snapshot: HardwareSuite.ForensicSnapshot) {
         val health = integrityMonitor.currentHealth
         alarmEvalJob?.cancel()
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {

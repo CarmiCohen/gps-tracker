@@ -28,6 +28,8 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.17.02:
+ * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.16.13:
  * - Issue #1050/1052 Doze Integration: Patched startSyncLoop, startIdentitySyncLoop, 
  *   and sendTelemetry to respect UnifiedPowerPolicy.shouldDeferSignaling() to 
@@ -45,13 +47,12 @@ class ConnectivitySuite @Inject constructor(
     private val timeProvider: TimeProvider,
     private val signalingProvider: SignalingProvider,
     private val sessionManager: SessionManager,
-    private val hardwareProvider: HardwareProvider,
+    private val hardwareSuite: HardwareSuite,
     private var locationProcessor: LocationProcessor, 
     private val offlineRepository: OfflineRepository,
     private val mainRepository: MainRepository,
     private val remoteStatusRepository: RemoteStatusRepository,
     private val forensicLogger: SignalingForensicLogger,
-    private val powerPolicy: UnifiedPowerPolicy,
     private val networkProvider: NetworkProvider,
     private val signalingTransport: SignalingTransport
 ) {
@@ -266,7 +267,7 @@ class ConnectivitySuite @Inject constructor(
 
     private fun calculateNextRejoinDelay(): Long {
         if (signalingProvider.isConnected()) reconnectAttempt = 0
-        return powerPolicy.calculateNextBackoff(reconnectAttempt, signalingProvider.isConnected())
+        return hardwareSuite.calculateNextBackoff(reconnectAttempt, signalingProvider.isConnected())
     }
 
     private fun startIdentitySyncLoop() {
@@ -275,7 +276,7 @@ class ConnectivitySuite @Inject constructor(
             while (isActive) {
                 delay(60000) 
                 if (isConnected() && !isStopped.get()) {
-                    if (powerPolicy.shouldDeferSignaling(sessionManager.isInViolation)) {
+                    if (hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) {
                         Timber.d("ConnectivitySuite: Identity sync deferred (Doze active)")
                         continue
                     }
@@ -287,7 +288,7 @@ class ConnectivitySuite @Inject constructor(
     }
 
     private suspend fun performKeepAlive() = withContext(Dispatchers.IO) {
-        if (powerPolicy.shouldDeferSignaling(sessionManager.isInViolation)) {
+        if (hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) {
             return@withContext
         }
 
@@ -357,7 +358,7 @@ class ConnectivitySuite @Inject constructor(
                         delay(500) 
                     }
                     
-                    if (powerPolicy.shouldDeferSignaling(inViolation)) {
+                    if (hardwareSuite.shouldDeferSignaling(inViolation)) {
                         Timber.v("ConnectivitySuite: Telemetry sync deferred (Doze active)")
                     } else {
                         _isSyncing.value = true
@@ -441,7 +442,7 @@ class ConnectivitySuite @Inject constructor(
 
     private fun sendTelemetryInternal(status: TrackerStatus, priority: SignalingPriority): Boolean {
         if (!isConnected()) return false
-        if (powerPolicy.shouldDeferSignaling(sessionManager.isInViolation)) return false
+        if (hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) return false
         signalingProvider.transmit(status, priority, fromViewer = !isTrackerMode)
         return true
     }
@@ -607,8 +608,8 @@ class ConnectivitySuite @Inject constructor(
                     maxDropMs = statusProto.maxDropMs,
                     lastConnTs = statusProto.lastConnTs,
                     lastDiscTs = statusProto.lastDiscTs,
-                    isJump = isVisualJump,
                     isClockRegression = statusProto.isClockRegression,
+                    isJump = isVisualJump,
                     isJammer = statusProto.isJammer,
                     isStalled = statusProto.isStalled,
                     isTamperDetected = statusProto.isTamperDetected,

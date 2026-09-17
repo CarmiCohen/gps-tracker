@@ -19,6 +19,8 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Sep.17.02:
+ * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.14.52:
  * - Signaling State Reduction (#1041): Removed redundant transientDropDetected 
  *   latch now that signaling stability is managed via ConnectivitySuite (R-ID 335).
@@ -40,7 +42,7 @@ abstract class BaseMonitorService : LifecycleService() {
     @Inject lateinit var systemMonitor: SystemMonitor
     @Inject lateinit var notificationManager: AppNotificationManager
 
-    @Inject lateinit var hardwareProvider: HardwareProvider
+    @Inject lateinit var hardwareSuite: HardwareSuite
     @Inject lateinit var forensicAuditor: ForensicAuditor
     @Inject lateinit var sessionManager: SessionManager
     @Inject lateinit var systemStatusProvider: SystemStatusProvider
@@ -197,7 +199,7 @@ abstract class BaseMonitorService : LifecycleService() {
         heartbeatJob?.cancel()
         fgsUpdateJob?.cancel()
         
-        hardwareProvider.stop()
+        hardwareSuite.stop()
 
         if (JdHardwareManager.isAvailable()) {
             try {

@@ -25,15 +25,11 @@ import kotlin.math.*
 /**
  * ProductionReadinessAuditTest: Verifies end-to-end telemetry stream constraints 
  * and Doze-deferral consistency across role transitions (R339).
+ * Sep.17.02:
+ * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.16.12:
  * - Issue #1072 Static State Leakage: Implemented reset mechanism in @Before to 
  *   ensure test atomicity and prevent state leakage between runs.
- * Sep.16.08:
- * - Issue #1071 Process Death Resilience: Hardened FakePowerStateProvider with 
- *   static state to simulate persistence across component recreation (R-ID 348).
- * Sep.16.06:
- * - Issue #1050/1052 Test Suite Hardening: Replaced flaky shell-based Doze simulation 
- *   with deterministic FakePowerStateProvider via Hilt module replacement (R-ID 348).
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -49,7 +45,7 @@ class ProductionReadinessAuditTest {
     lateinit var timeProvider: TimeProvider
 
     @Inject
-    lateinit var powerPolicy: UnifiedPowerPolicy
+    lateinit var hardwareSuite: HardwareSuite
 
     @Inject
     lateinit var powerStateProvider: PowerStateProvider
@@ -101,30 +97,61 @@ class ProductionReadinessAuditTest {
 
     /**
      * Issue #1071: Process Death Resilience Validation
-     * Verifies that the power state is preserved across policy re-instantiation,
+     * Verifies that the power state is preserved across suite re-instantiation,
      * simulating service restart or process death recovery.
      */
     @Test
     fun verifyPowerStateResilienceAfterRecreation() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val externalScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        val systemMonitor = mockSystemMonitor() // Minimal test-specific mock if needed, but suite has real ones injected.
         
         // 1. Set state in current provider
         FakePowerStateProvider.isIdle = true
-        assertTrue("Initial state should be Doze", powerPolicy.shouldDeferSignaling(false))
+        assertTrue("Initial state should be Doze", hardwareSuite.shouldDeferSignaling(false))
 
-        // 2. Simulate "recreation" by manually instantiating a new policy with a new provider instance
-        // In Hilt, this would happen on process restart. The static state in FakePowerStateProvider
-        // ensures the 'hardware' state is maintained.
+        // 2. Simulate "recreation" by manually instantiating a new suite with a new provider instance
         val newProvider = FakePowerStateProvider()
-        val newPolicy = UnifiedPowerPolicy(context, timeProvider, newProvider)
+        // Manual instantiation for resilience testing (mirroring Hilt singleton recreation)
+        val newSuite = HardwareSuite(
+            context = context,
+            scope = externalScope,
+            timeProvider = timeProvider,
+            systemMonitor = hardwareSuite.getSystemMonitorForTest(), // Accessing injected system monitor
+            systemStatusProvider = hardwareSuite.getSystemStatusProviderForTest(),
+            powerStateProvider = newProvider,
+            forensicAuditor = hardwareSuite.getForensicAuditorForTest()
+        )
 
         assertTrue("Power state must persist across component recreation to prevent telemetry gaps",
-            newPolicy.shouldDeferSignaling(false))
+            newSuite.shouldDeferSignaling(false))
             
         // 3. Toggle and verify consistency
         FakePowerStateProvider.isIdle = false
-        assertFalse("Power state change must be reflected in the new policy instance",
-            newPolicy.shouldDeferSignaling(false))
+        assertFalse("Power state change must be reflected in the new suite instance",
+            newSuite.shouldDeferSignaling(false))
+    }
+
+    private fun HardwareSuite.getSystemMonitorForTest(): SystemMonitor {
+        // Reflection or test-only getter could be used here, but for this audit we'll use the injected one
+        return hiltRule.run { ProductionReadinessAuditTest::class.java.getDeclaredField("hardwareSuite").apply { isAccessible = true }.get(this@ProductionReadinessAuditTest) as HardwareSuite }.let {
+            HardwareSuite::class.java.getDeclaredField("systemMonitor").apply { isAccessible = true }.get(it) as SystemMonitor
+        }
+    }
+    
+    private fun HardwareSuite.getSystemStatusProviderForTest(): SystemStatusProvider {
+         return HardwareSuite::class.java.getDeclaredField("systemStatusProvider").apply { isAccessible = true }.get(this) as SystemStatusProvider
+    }
+    
+    private fun HardwareSuite.getForensicAuditorForTest(): ForensicAuditor {
+         return HardwareSuite::class.java.getDeclaredField("forensicAuditor").apply { isAccessible = true }.get(this) as ForensicAuditor
+    }
+
+    private fun mockSystemMonitor(): SystemMonitor {
+        // Dummy implementation for manual instantiation tests
+        return hiltRule.run { ProductionReadinessAuditTest::class.java.getDeclaredField("hardwareSuite").apply { isAccessible = true }.get(this@ProductionReadinessAuditTest) as HardwareSuite }.let {
+            HardwareSuite::class.java.getDeclaredField("systemMonitor").apply { isAccessible = true }.get(it) as SystemMonitor
+        }
     }
 
     @Test
@@ -153,21 +180,20 @@ class ProductionReadinessAuditTest {
 
     /**
      * Issue #1050: Deterministic Doze State Simulation
-     * Verifies that UnifiedPowerPolicy correctly identifies Doze-deferral 
+     * Verifies that HardwareSuite correctly identifies Doze-deferral 
      * requirements using the FakePowerStateProvider (R-ID 338).
      */
     @Test
     fun verifyDozeModeSignalingDeferral() {
-        // Use static access for cleaner state management
         FakePowerStateProvider.isIdle = false
-        assertFalse("Should not defer when not in Doze", powerPolicy.shouldDeferSignaling(false))
+        assertFalse("Should not defer when not in Doze", hardwareSuite.shouldDeferSignaling(false))
 
         FakePowerStateProvider.isIdle = true
         assertTrue("Signaling should be deferred in Doze mode when no violation is present", 
-            powerPolicy.shouldDeferSignaling(isInViolation = false))
+            hardwareSuite.shouldDeferSignaling(isInViolation = false))
         
         assertFalse("Signaling should NOT be deferred during violation, even in Doze mode", 
-            powerPolicy.shouldDeferSignaling(isInViolation = true))
+            hardwareSuite.shouldDeferSignaling(isInViolation = true))
     }
 
     @Test

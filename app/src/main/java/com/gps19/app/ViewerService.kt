@@ -17,6 +17,8 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.17.02:
+ * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Checked performanceTier directly, fixed 
  *   hardcoded poke symmetry literal (R-ID 348).
@@ -32,7 +34,7 @@ import kotlin.math.*
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
 
-    @Inject lateinit var powerPolicy: UnifiedPowerPolicy
+    @Inject lateinit var hardwareSuite: HardwareSuite
 
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
@@ -132,16 +134,16 @@ class ViewerService : BaseMonitorService() {
 
         historyManager.initialize(lifecycleScope)
         
-        hardwareProvider.start()
+        hardwareSuite.start()
         
         currentIntervalMs = if (isUiVisible()) HIGH_FREQUENCY_GPS_POLLING_MS else VIEWER_GPS_POLLING_MS
-        hardwareProvider.setPollingInterval(currentIntervalMs)
+        hardwareSuite.setPollingInterval(currentIntervalMs)
 
         commandRouter.register()
         commandRouter.startObservingCommands(lifecycleScope)
 
-        gpsCollectionJob = lifecycleScope.launch(Dispatchers.Default) { hardwareProvider.getLocationFlow().collectLatest { onLocationChanged(it) } }
-        gnssDetailJob = lifecycleScope.launch(Dispatchers.Default) { hardwareProvider.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
+        gpsCollectionJob = lifecycleScope.launch(Dispatchers.Default) { hardwareSuite.getLocationFlow().collectLatest { onLocationChanged(it) } }
+        gnssDetailJob = lifecycleScope.launch(Dispatchers.Default) { hardwareSuite.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
 
         settingsJob = lifecycleScope.launch(Dispatchers.Default) {
             launch { repository.alertSettingsFlow.collectLatest { settings -> alarmManager.updateSettings(settings) } }
@@ -220,21 +222,21 @@ class ViewerService : BaseMonitorService() {
     private fun observeRevivalEvents() {
         revivalEventsJob?.cancel()
         revivalEventsJob = lifecycleScope.launch(Dispatchers.Default) {
-            hardwareProvider.revivalEvents.collect { event ->
+            hardwareSuite.revivalEvents.collect { event ->
                 when (event) {
-                    is HardwareProvider.RevivalEvent.Footprint -> {
+                    is HardwareSuite.RevivalEvent.Footprint -> {
                         val msg = "ENERGY AUDIT (V): Revival Footprint - Delta: ${event.deltaMa}mA, Temp Rise: ${event.deltaTemp}°C, Duration: ${event.durationMs}ms"
                         val proc = lastProcessedLocation
                         logManager.submitToLogSink(msg, "system", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                     }
-                    is HardwareProvider.RevivalEvent.HardwareLock -> {
+                    is HardwareSuite.RevivalEvent.HardwareLock -> {
                         val proc = lastProcessedLocation
                         logManager.logServiceEvent(m = "CRITICAL (V): GPS_HARDWARE_LOCK - All revival attempts failed. Hardware stall confirmed.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                     }
-                    is HardwareProvider.RevivalEvent.Attempt -> {
+                    is HardwareSuite.RevivalEvent.Attempt -> {
                         logManager.logServiceEvent(m = "GPS REVIVAL (V): Hardware restart attempt ${event.count} triggered.", isImportant = false)
                     }
-                    is HardwareProvider.RevivalEvent.Success -> {
+                    is HardwareSuite.RevivalEvent.Success -> {
                         logManager.logServiceEvent(m = "GPS REVIVAL (V): Hardware fix restored successfully.", isImportant = true)
                     }
                     else -> {}
@@ -321,7 +323,7 @@ class ViewerService : BaseMonitorService() {
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { 
                         refreshCapabilitiesInternal()
-                        launch { hardwareProvider.start() }
+                        launch { hardwareSuite.start() }
                     }
                     else -> {}
                 }
@@ -368,7 +370,7 @@ class ViewerService : BaseMonitorService() {
         val processed = selfProcessor.processGpsPoint(
             lat = lat, lng = lng, alt = alt, androidSpeedMps = lastGpsSpeed, 
             gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing,
-            snr = hardwareProvider.averageSnr, satsUsed = location.extras?.getInt("satellites") ?: hardwareProvider.satellitesUsed, isViewerTrail = true, lastGpsTs = sessionManager.lastGpsTs, isLocal = true, 
+            snr = hardwareSuite.averageSnr, satsUsed = location.extras?.getInt("satellites") ?: hardwareSuite.satellitesUsed, isViewerTrail = true, lastGpsTs = sessionManager.lastGpsTs, isLocal = true, 
             nowRt = nowRt, nowWall = nowWall
         )
 
@@ -388,10 +390,10 @@ class ViewerService : BaseMonitorService() {
 
             this.integrity.battery = health.batteryLevel; 
             this.integrity.isCharging = health.isCharging; 
-            this.integrity.satsView = hardwareProvider.satellitesInView; 
-            this.integrity.satsUsed = location.extras?.getInt("satellites") ?: hardwareProvider.satellitesUsed; 
+            this.integrity.satsView = hardwareSuite.satellitesInView; 
+            this.integrity.satsUsed = location.extras?.getInt("satellites") ?: hardwareSuite.satellitesUsed; 
             this.integrity.currentMa = health.currentMa; 
-            this.integrity.snrIdx = (hardwareProvider.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
+            this.integrity.snrIdx = (hardwareSuite.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
 
             this.ts = nowWall; 
             this.isMe = true; 
@@ -459,7 +461,7 @@ class ViewerService : BaseMonitorService() {
                     val type = getAvailableForegroundServiceType()
                     val health = integrityMonitor.currentHealth
                     val msg = notificationManager.getPulseMessage(
-                        hardwareProvider.satellitesUsed,
+                        hardwareSuite.satellitesUsed,
                         health.batteryLevel,
                         !alarmManager.hasUnresolvedAlarms(),
                         isPowerSaveActive || health.isPowerSaveMode
@@ -484,14 +486,14 @@ class ViewerService : BaseMonitorService() {
 
     override suspend fun processTick(now: Long, nowRt: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRt); integrityMonitor.checkInternetIntegrity(nowRt)
-        val health = integrityMonitor.currentHealth; val snapshot = hardwareProvider.consumeLogicSnapshot()
+        val health = integrityMonitor.currentHealth; val snapshot = hardwareSuite.consumeLogicSnapshot()
         
         val targetGpsInterval = if (isUiVisible()) HIGH_FREQUENCY_GPS_POLLING_MS else VIEWER_GPS_POLLING_MS
         if (targetGpsInterval != currentIntervalMs) {
             currentIntervalMs = targetGpsInterval
             forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval)
             selfProcessor.updateExpectedInterval(nowRt, targetGpsInterval)
-            hardwareProvider.setPollingInterval(targetGpsInterval)
+            hardwareSuite.setPollingInterval(targetGpsInterval)
         }
 
         if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
@@ -518,7 +520,7 @@ class ViewerService : BaseMonitorService() {
                         isPeerStale = !isTrackerActive
                     )
                 )
-            } else if (powerPolicy.shouldPokeHardware(isStaggered, lastStaggeredPokeRt, STAGGERED_POKE_INTERVAL_MS)) {
+            } else if (hardwareSuite.shouldPokeHardware(isStaggered, lastStaggeredPokeRt, STAGGERED_POKE_INTERVAL_MS)) {
                 lastStaggeredPokeRt = nowRt
                 systemMonitor.acquireWakeLock(force = true)
             }
@@ -554,9 +556,9 @@ class ViewerService : BaseMonitorService() {
 
         if (nowRt - lastPowerSaveCheckRt > 5000L) {
             val hasUnresolved = alarmManager.hasUnresolvedAlarms()
-            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(hardwareProvider.isStationary(), health.gpsStalled, hasUnresolved, isUiVisible())
+            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(hardwareSuite.isStationary(), health.gpsStalled, hasUnresolved, isUiVisible())
             if (shouldBePowerSave != isPowerSaveActive) {
-                isPowerSaveActive = shouldBePowerSave; hardwareProvider.setPowerSaveMode(shouldBePowerSave)
+                isPowerSaveActive = shouldBePowerSave; hardwareSuite.setPowerSaveMode(shouldBePowerSave)
                 withContext(Dispatchers.Main.immediate) { updateForegroundServiceType() }
             }
             lastPowerSaveCheckRt = nowRt
@@ -571,7 +573,7 @@ class ViewerService : BaseMonitorService() {
         val liftIdx = (snapshot.baroAlt - selfProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS
 
         historyManager.updateRibbons(
-            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = 10, peerAvail = isSocketConnected && isTrackerActive, hasGps = (lastProcessedLocation?.timestamp ?: 0L) > 0, isTrackerMode = false, accuracy = lastGpsAccuracy, maxAccuracy = selfProcessor.getMaxTrackerAccuracy(), noiseIdx = noiseIdx, luxIdx = log10(snapshot.lux + 1.0) / RIBBON_LUX_LOG_SCALE, vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = (hardwareProvider.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0), tiltIdx = abs(snapshot.tiltDegrees - selfProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG, baroIdx = (snapshot.baroAlt - selfProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = lastGpsBearing, isSitDetected = false, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = snapshot.kineticEnergy, isRecoveryEvent = recoveryFlagged
+            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = 10, peerAvail = isSocketConnected && isTrackerActive, hasGps = (lastProcessedLocation?.timestamp ?: 0L) > 0, isTrackerMode = false, accuracy = lastGpsAccuracy, maxAccuracy = selfProcessor.getMaxTrackerAccuracy(), noiseIdx = noiseIdx, luxIdx = log10(snapshot.lux + 1.0) / RIBBON_LUX_LOG_SCALE, vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = (hardwareSuite.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0), tiltIdx = abs(snapshot.tiltDegrees - selfProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG, baroIdx = (snapshot.baroAlt - selfProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = lastGpsBearing, isSitDetected = false, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = snapshot.kineticEnergy, isRecoveryEvent = recoveryFlagged
         )
 
         evaluateAlarmsInternal(now, nowRt, health.signalLoss, false, false, false, isTrackerActive)
@@ -586,7 +588,7 @@ class ViewerService : BaseMonitorService() {
         if (isSystemActive) {
             val health = integrityMonitor.currentHealth
             notificationManager.updatePulse(
-                sats = hardwareProvider.satellitesUsed, 
+                sats = hardwareSuite.satellitesUsed, 
                 battery = health.batteryLevel, 
                 isSecure = !alarmManager.hasUnresolvedAlarms(), 
                 isPowerSave = isPowerSaveActive || health.isPowerSaveMode
@@ -605,7 +607,7 @@ class ViewerService : BaseMonitorService() {
             alarmManager.evaluateAlarms(
                 now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = false, isRelayConnected = isSocketConnected, isTrackerConnected = isTrackerActive, status = status.status, isJammer = isTrackerJammerSuspicion, jumpTier = status.jumpTier,
                 isAdaptiveJump = status.isAdaptiveJump,
-                trackerLat = status.lat, trackerLng = status.lng, trackerAccuracy = status.accuracy, maxTrackerAccuracy = status.maxAccuracy, trackerLastGpsTs = status.gpsTs, trackerLastGpsRt = 0L, trackerLastValidFixTs = 0L, trackerLastValidFixRt = status.lastValidFixRt, trackerSpeed = status.speed, trackerBattery = status.battery, trackerTemp = status.temp, isHardwareOnline = localHealth.isHardwareOnline, isLocalInternetLoss = localHealth.localInternetLoss, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(), distToHomeAuthority = distToHome, maxDistanceAuthority = remoteProcessor.getMaxDistanceAuthority(), isGpsGap = distToHome != null && isTrackerGap, isTamperDetected = status.isTamperDetected, isPowerTamper = status.isPowerTamper, trackerTiltDegrees = status.tiltDegrees, trackerAcousticDb = status.acousticDb, trackerBaroAlt = status.baroAlt, trackerBaroAltEma = status.sitBaro, trackerLux = status.lux, isNear = status.isNear, luxBaseline = status.luxBaseline, acousticFloorDb = status.acousticFloorDb, adaptiveVibrationFloor = status.adaptiveVibrationFloor, peakVibrationShock = status.peakVibrationShock, trackerCurrentMa = status.currentMa, isPowerSaveMode = status.isPowerSaveMode, standbyBucket = status.standbyBucket, netInterface = status.netInterface, isStorageLow = status.isStorageLow, isStorageCritical = status.isStorageCritical, isBatterySteepDischarge = status.isBatterySteepDischarge, isCoolingModeActive = status.isCoolingModeActive, capabilities = capabilities, isLocationPending = status.isLocationPending, locationPendingReason = status.locationPendingReason, snrSnapshot = hardwareProvider.averageSnr, vibeSnapshot = 0.0, isGpsHardwareLock = status.gpsHardwareLock,
+                trackerLat = status.lat, trackerLng = status.lng, trackerAccuracy = status.accuracy, maxTrackerAccuracy = status.maxAccuracy, trackerLastGpsTs = status.gpsTs, trackerLastGpsRt = 0L, trackerLastValidFixTs = 0L, trackerLastValidFixRt = status.lastValidFixRt, trackerLastValidFixTsLong = 0L, trackerSpeed = status.speed, trackerBattery = status.battery, trackerTemp = status.temp, isHardwareOnline = localHealth.isHardwareOnline, isLocalInternetLoss = localHealth.localInternetLoss, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(), distToHomeAuthority = distToHome, maxDistanceAuthority = remoteProcessor.getMaxDistanceAuthority(), isGpsGap = distToHome != null && isTrackerGap, isTamperDetected = status.isTamperDetected, isPowerTamper = status.isPowerTamper, trackerTiltDegrees = status.tiltDegrees, trackerAcousticDb = status.acousticDb, trackerBaroAlt = status.baroAlt, trackerBaroAltEma = status.sitBaro, trackerLux = status.lux, isNear = status.isNear, luxBaseline = status.luxBaseline, acousticFloorDb = status.acousticFloorDb, adaptiveVibrationFloor = status.adaptiveVibrationFloor, peakVibrationShock = status.peakVibrationShock, trackerCurrentMa = status.currentMa, isPowerSaveMode = status.isPowerSaveMode, standbyBucket = status.standbyBucket, netInterface = status.netInterface, isStorageLow = status.isStorageLow, isStorageCritical = status.isStorageCritical, isBatterySteepDischarge = status.isBatterySteepDischarge, isCoolingModeActive = status.isCoolingModeActive, capabilities = capabilities, isLocationPending = status.isLocationPending, locationPendingReason = status.locationPendingReason, snrSnapshot = hardwareSuite.averageSnr, vibeSnapshot = 0.0, isGpsHardwareLock = status.gpsHardwareLock,
                 tamperNote = status.tamperNote
             )
         }

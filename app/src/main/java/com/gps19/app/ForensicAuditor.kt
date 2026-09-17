@@ -9,6 +9,8 @@ import kotlin.math.round
 
 /**
  * ForensicAuditor: Encapsulates high-assurance hardware audits (Stability, Jitter, Sensor Rates, Energy).
+ * Sep.17.02:
+ * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.11.60:
  * - Issue #1006: Simplification Idea #14. Centralized GNSS Stability Muzzling. 
  *   ForensicAuditor now tracks interval history to automatically suppress 
@@ -187,7 +189,7 @@ class ForensicAuditor @Inject constructor(
         }
     }
 
-    fun computeEnergyFootprint(nowRt: Long): HardwareProvider.RevivalEvent.Footprint? {
+    fun computeEnergyFootprint(nowRt: Long): HardwareSuite.RevivalEvent.Footprint? {
         val start = revivalStartBattery ?: return null
         val startRt = revivalStartRtForFootprint
         val current = systemStatusProvider.getBatteryStatus()
@@ -201,7 +203,7 @@ class ForensicAuditor @Inject constructor(
         revivalStartBattery = null
         revivalStartRtForFootprint = 0L
         
-        return HardwareProvider.RevivalEvent.Footprint(deltaMa, deltaTemp, durationMs)
+        return HardwareSuite.RevivalEvent.Footprint(deltaMa, deltaTemp, durationMs)
     }
 
     fun clearRevivalState() {

@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.17.01)
+# SOT Master Requirements & Hardening Status (Sep.17.02)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 353**: Power & Hardware Provider Convergence - Merged `UnifiedPowerPolicy` and `HardwareProvider` into a unified `HardwareSuite`. This consolidation reduces dependency injection overhead and centralizes platform-level state monitoring (Doze, GNSS, Sensors) into a single, cohesive authority (R-ID 353). (Resolved Sep.17.02)
 *   **SOT ID 352**: Signaling Conflation Traceability - Migrated hardcoded conflation delays in `CommunicationManager.kt` to `SIGNALING_CONFLATION_DELAY_MS` and `SIGNALING_CONFLATION_DELAY_VIOLATION_MS` in `EngineConstants.kt` to ensure architectural traceability and unified performance control (R-ID 312). (Resolved Sep.16.14)
 *   **SOT ID 351**: High-Fidelity Doze Integration - Patched `ConnectivitySuite` to respect `UnifiedPowerPolicy.shouldDeferSignaling()`, ensuring telemetry sync and identity updates are deferred during Doze unless a security violation is active. Implemented `PowerIntegrationAuditTest.kt` using `UiDevice` shell commands to verify the actual bridge between the OS `PowerManager` and the application logic. (Resolved Sep.16.13)
 *   **SOT ID 350**: Test Atomicity Hardening - Implemented reset mechanism for static test fakes in `ProductionReadinessAuditTest.kt` to prevent state leakage between test cases. Ensured deterministic provider state initialization in `@Before` blocks. (Resolved Sep.16.12)
@@ -10,14 +11,15 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 71
-- **Total SOT IDs**: 352
-- **Resolved Issues**: 1092
+- **Total SOT IDs**: 353
+- **Resolved Issues**: 1093
 - **Open Issues**: 0
-- **Testing Coverage**: 1
-- **Simplification Ideas**: 19
+- **Testing Coverage**: 2
+- **Simplification Ideas**: 18
 - **QA Validation Tasks**: 281
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.16 (Provider Convergence)**: PASSED - Successfully merged power and hardware authorities into `HardwareSuite` and verified through existing audit tests (R-ID 353). (Sep.17.02)
 *   **Chapter 31.15 (Telemetry Backfill Convergence)**: PASSED - Added comprehensive QA verification unit tests within `TelemetryAggregatorTest.kt` to validate zero-churn telemetry alignment, gap processing bounds, and `MAX_BACKFILL_POINTS` cap validation (R-ID 17). (Sep.17.01)
 *   **Chapter 31.14 (Event Log Erasure)**: PASSED - Added missing event handler for UiEvent.ClearLogs in MainViewModel to clear log persistence (Sep.17.00)
 *   **Chapter 31.13 (Signaling Traceability)**: PASSED - Migrated hardcoded conflation delays to unified constants in EngineConstants. (Sep.16.14)
@@ -28,4 +30,4 @@
 *   **Chapter 31.08 (Signaling Abstraction)**: PASSED - Abstracted network monitoring and transport layers to ensure deterministic testability of the signaling pipeline. (Sep.15.101)
 
 ---
-*Next Audit: Sep.17.02. (Sep.17.01)*
+*Next Audit: Sep.17.03. (Sep.17.02)*

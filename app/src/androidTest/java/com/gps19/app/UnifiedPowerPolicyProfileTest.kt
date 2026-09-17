@@ -2,20 +2,20 @@ package com.gps19.app
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.gps19.core.engine.NET_REJOIN_THRESHOLD_MS
-import com.gps19.core.engine.PowerStateProvider
-import com.gps19.core.engine.TimeProvider
+import com.gps19.core.engine.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
  * UnifiedPowerPolicyProfileTest: Automated profiling study for the staggered performance tier.
+ * Sep.17.02:
+ * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.16.06:
  * - Issue #1050/1052 Test Suite Hardening: Updated constructor to include PowerStateProvider.
- * Sep.16.05:
- * - Issue #1060 Capability Consolidation: Updated shouldPokeHardware call to match 
- *   renamed parameter and unified schema (R-ID 348).
  */
 @RunWith(AndroidJUnit4::class)
 class UnifiedPowerPolicyProfileTest {
@@ -35,35 +35,64 @@ class UnifiedPowerPolicyProfileTest {
         override fun isDeviceIdleMode(): Boolean = isIdle
     }
 
+    private val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
     @Test
     fun verifyBackoffConvergenceAndJitterBounds() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val policy = UnifiedPowerPolicy(context, mockTimeProvider, fakePowerStateProvider)
+        val suite = HardwareSuite(
+            context = context,
+            scope = testScope,
+            timeProvider = mockTimeProvider,
+            systemMonitor = mockSystemMonitor(),
+            systemStatusProvider = mockSystemStatusProvider(),
+            powerStateProvider = fakePowerStateProvider,
+            forensicAuditor = mockForensicAuditor()
+        )
 
         // Profile progression across 20 successive reconnect attempts
         for (attempt in 0..20) {
-            val delay = policy.calculateNextBackoff(attempt, isConnected = false)
+            val delay = suite.calculateNextBackoff(attempt, isConnected = false)
             assertTrue("Delay must respect base threshold", delay >= NET_REJOIN_THRESHOLD_MS)
             assertTrue("Delay must be capped at 5 minutes", delay <= 300000L)
         }
 
         // Ensure maximum cap convergence is reached stable and reliably
-        val capDelay = policy.calculateNextBackoff(10, isConnected = false)
+        val capDelay = suite.calculateNextBackoff(10, isConnected = false)
         assertEquals("Should stay bounded at exactly 5 mins", 300000L, capDelay)
     }
 
     @Test
     fun verifyStaggeredTierHardwarePokeConstraints() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        val policy = UnifiedPowerPolicy(context, mockTimeProvider, fakePowerStateProvider)
+        val suite = HardwareSuite(
+            context = context,
+            scope = testScope,
+            timeProvider = mockTimeProvider,
+            systemMonitor = mockSystemMonitor(),
+            systemStatusProvider = mockSystemStatusProvider(),
+            powerStateProvider = fakePowerStateProvider,
+            forensicAuditor = mockForensicAuditor()
+        )
         val intervalMs = 30000L
 
         // Tick 1: Initial state
         val lastPoke = mockTimeProvider.elapsedRealtime()
         
         // Tick 2: Should require poke as mockTimeProvider advances 30s per invocation
-        // Validating for the unified staggered tier (A15/S21FE)
-        val shouldPoke = policy.shouldPokeHardware(isStaggered = true, lastPokeRt = lastPoke, intervalMs = intervalMs)
+        val shouldPoke = suite.shouldPokeHardware(isStaggered = true, lastPokeRt = lastPoke, intervalMs = intervalMs)
         assertTrue("Should poke when interval matches or exceeds threshold on staggered tier", shouldPoke)
+    }
+
+    private fun mockSystemMonitor(): SystemMonitor {
+        return SystemMonitor(ApplicationProvider.getApplicationContext(), mockTimeProvider)
+    }
+
+    private fun mockSystemStatusProvider(): SystemStatusProvider {
+        return SystemStatusProviderImpl(ApplicationProvider.getApplicationContext(), testScope)
+    }
+
+    private fun mockForensicAuditor(): ForensicAuditor {
+        return ForensicAuditor(mockTimeProvider, mockSystemStatusProvider())
     }
 }

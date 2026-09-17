@@ -27,6 +27,8 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.17.02:
+ * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
@@ -42,7 +44,7 @@ class HistoryManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
-    private val hardwareProvider: HardwareProvider,
+    private val hardwareSuite: HardwareSuite,
     private val locationProcessor: LocationProcessor
 ) {
     private val _historyEvents = MutableSharedFlow<HistoryEvent>(
@@ -205,8 +207,8 @@ class HistoryManager @Inject constructor(
         isSilentFailure: Boolean, isBatteryLow: Boolean, isBatteryCritical: Boolean,
         isUltraLongStationary: Boolean
     ) {
-        val snrSamples = if (isTrackerMode) hardwareProvider.getSnrSamples(lastTickRt + 1, nowRt) else emptySequence()
-        val sensorSamples = if (isTrackerMode) hardwareProvider.getSensorSamples(lastTickRt + 1, nowRt) else emptySequence()
+        val snrSamples = if (isTrackerMode) hardwareSuite.getSnrSamples(lastTickRt + 1, nowRt) else emptySequence()
+        val sensorSamples = if (isTrackerMode) hardwareSuite.getSensorSamples(lastTickRt + 1, nowRt) else emptySequence()
         
         baseTemplateFlyweight.apply {
             ts = 0L; rt = 0L; this.rtt = rtt; remoteSig = peerSignal; isConnected = peerAvail; this.hasGps = hasGps
@@ -246,8 +248,8 @@ class HistoryManager @Inject constructor(
     }
 
     private fun fillRealGap(lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, isTrackerMode: Boolean) {
-        val snrSamples = if (isTrackerMode) hardwareProvider.getSnrSamples(lastTickRt, nowRt) else emptySequence()
-        val sensorSamples = if (isTrackerMode) hardwareProvider.getSensorSamples(lastTickRt, nowRt) else emptySequence()
+        val snrSamples = if (isTrackerMode) hardwareSuite.getSnrSamples(lastTickRt, nowRt) else emptySequence()
+        val sensorSamples = if (isTrackerMode) hardwareSuite.getSensorSamples(lastTickRt, nowRt) else emptySequence()
         
         RibbonScale.entries.forEach { scale ->
             val gapPoints = ArrayList<ConnectionPoint>()

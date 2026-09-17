@@ -26,6 +26,8 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.17.02:
+ * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Transitioned signal integrity 
  *   and performance audits to inspect PerformanceTier directly via provider (R-ID 348).
@@ -33,9 +35,6 @@ sealed class IntegrityEvent {
  * - Issue #1055 Unified Performance Tier: Harmonized signal integrity and 
  *   performance audit thresholds across A15 and S21FE using the unified 
  *   isStaggeredPerformanceTier flag (R-ID 348, formerly R-ID 347).
- * Sep.15.04:
- * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
- *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -43,7 +42,7 @@ class IntegrityMonitor @Inject constructor(
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
     private val systemStatusProvider: SystemStatusProvider,
-    private val hardwareProvider: HardwareProvider,
+    private val hardwareSuite: HardwareSuite,
     @ApplicationScope private val scope: CoroutineScope
 ) {
     private var lastFullPollTs = 0L
@@ -123,7 +122,7 @@ class IntegrityMonitor @Inject constructor(
         }
 
         scope.launch {
-            hardwareProvider.locationStatusFlow
+            hardwareSuite.locationStatusFlow
                 .onEach { lastLocationStatusUpdateRt = timeProvider.elapsedRealtime() }
                 .distinctUntilChanged()
                 .onEach { status -> 
@@ -133,14 +132,14 @@ class IntegrityMonitor @Inject constructor(
         }
 
         scope.launch {
-            hardwareProvider.revivalEvents
+            hardwareSuite.revivalEvents
                 .onEach { event -> handleRevivalEvent(event) }
                 .collect()
         }
 
         // Issue #762: Local transparency for [ULTRA] relaxation state
         scope.launch {
-            hardwareProvider.isUltraLongStationaryFlow
+            hardwareSuite.isUltraLongStationaryFlow
                 .distinctUntilChanged()
                 .onEach { isUltra -> updateHealth { it.isUltraLongStationary = isUltra } }
                 .collect()
@@ -148,7 +147,7 @@ class IntegrityMonitor @Inject constructor(
 
         // Issue #924: Local transparency for GNSS Throttling (A15 Hysteresis)
         scope.launch {
-            hardwareProvider.isGnssThrottledFlow
+            hardwareSuite.isGnssThrottledFlow
                 .distinctUntilChanged()
                 .onEach { throttled -> updateHealth { it.isGnssThrottled = throttled } }
                 .collect()
@@ -157,32 +156,32 @@ class IntegrityMonitor @Inject constructor(
         startHeartbeat()
     }
 
-    private fun handleRevivalEvent(event: HardwareProvider.RevivalEvent) {
+    private fun handleRevivalEvent(event: HardwareSuite.RevivalEvent) {
         when (event) {
-            is HardwareProvider.RevivalEvent.Attempt -> {
+            is HardwareSuite.RevivalEvent.Attempt -> {
                 _integrityEvents.tryEmit(IntegrityEvent.LogEvent("GPS REVIVAL: Hardware restart attempt ${event.count} on this device.", false))
             }
-            is HardwareProvider.RevivalEvent.HardwareLock -> {
+            is HardwareSuite.RevivalEvent.HardwareLock -> {
                 _integrityEvents.tryEmit(IntegrityEvent.LogEvent("CRITICAL: GPS_HARDWARE_LOCK - All revival attempts failed on this device. Manual intervention required.", true))
                 _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_GPS_HARDWARE_LOCK))
                 updateHealth { it.gpsHardwareLock = true }
             }
-            is HardwareProvider.RevivalEvent.Success -> {
+            is HardwareSuite.RevivalEvent.Success -> {
                 if (currentHealth.gpsHardwareLock) {
                     _integrityEvents.tryEmit(IntegrityEvent.LogEvent("GPS REVIVAL: Hardware fix restored on this device.", false))
                     _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_GPS_HARDWARE_LOCK))
                     updateHealth { it.gpsHardwareLock = false }
                 }
             }
-            is HardwareProvider.RevivalEvent.RawBurstStarted -> {
+            is HardwareSuite.RevivalEvent.RawBurstStarted -> {
                 val h = currentHealth
                 _integrityEvents.tryEmit(IntegrityEvent.LogEvent("AUDIT: Raw GNSS Burst STARTED. [Batt: ${h.batteryLevel}%, Current: ${h.currentMa}mA, Temp: ${h.batteryTemp}°C]", false))
             }
-            is HardwareProvider.RevivalEvent.RawBurstEnded -> {
+            is HardwareSuite.RevivalEvent.RawBurstEnded -> {
                 val h = currentHealth
                 _integrityEvents.tryEmit(IntegrityEvent.LogEvent("AUDIT: Raw GNSS Burst ENDED. [Batt: ${h.batteryLevel}%, Current: ${h.currentMa}mA, Temp: ${h.batteryTemp}°C]", false))
             }
-            is HardwareProvider.RevivalEvent.Footprint -> {
+            is HardwareSuite.RevivalEvent.Footprint -> {
                 val msg = "ENERGY AUDIT: Revival Footprint (R-ID 259) - Delta: ${event.deltaMa}mA, Temp Rise: ${event.deltaTemp}°C, Duration: ${event.durationMs}ms"
                 _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, true))
                 Timber.i("IntegrityMonitor: $msg")
@@ -235,7 +234,6 @@ class IntegrityMonitor @Inject constructor(
         }
 
         var maliAnomaly = false
-        // Issue #1060: Transitioned to unified PerformanceTier inspection via provider
         if (systemStatusProvider.isStaggeredPerformanceTier() || isMaliAnomalySimulated.get()) {
             if (maxIo > LATENCY_THRESHOLD_DB_WRITE_MS) {
                 val msg = "PERFORMANCE WARNING: Critical I/O Spike detected on budget hardware (%dms). System stress: [CPU: %.1f, IOW: %.1f]".format(maxIo, cpu, iow)
@@ -246,8 +244,7 @@ class IntegrityMonitor @Inject constructor(
             maliAnomaly = checkMaliDriverAnomaly(maxIo, cpu, iow)
         }
 
-        // Issue #924: Propagate MaliAnomaly to HardwareProvider for source throttling
-        hardwareProvider.setMaliAnomaly(maliAnomaly)
+        hardwareSuite.setMaliAnomaly(maliAnomaly)
 
         updateHealth { h ->
             h.lastIntegrityHeartbeatRt = nowRt
@@ -297,7 +294,7 @@ class IntegrityMonitor @Inject constructor(
         }
     }
 
-    private fun handleLocationStatusUpdate(status: HardwareProvider.LocationStatus) {
+    private fun handleLocationStatusUpdate(status: HardwareSuite.LocationStatus) {
         val workingHealth = currentHealth
         if (status.isPending && !workingHealth.isLocationPending) {
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent("Location fix pending: ${status.reason.name.replace("_", " ")} on this device", false))
@@ -594,7 +591,6 @@ class IntegrityMonitor @Inject constructor(
             TRACKER_SIGNAL_LOSS_THRESHOLD_MS
         }
 
-        // Issue #1060: Budget hardware adaptation grace via PerformanceTier inspection
         if (systemStatusProvider.isStaggeredPerformanceTier()) {
             threshold += BUDGET_HARDWARE_SIGNAL_GRACE_MS
         }
