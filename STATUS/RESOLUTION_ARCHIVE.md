@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.16.13)
+# Resolution Archive (Sep.16.14)
+
+## 🟢 Sep.16.14
+*   **Signaling Conflation Traceability (#1051)**: Migrated hardcoded conflation delays in `CommunicationManager.kt` (100ms/20ms) to `SIGNALING_CONFLATION_DELAY_MS` and `SIGNALING_CONFLATION_DELAY_VIOLATION_MS` in `EngineConstants.kt`. This ensures architectural traceability and unified performance control for forensic signaling (R-ID 312).
 
 ## 🟢 Sep.16.13
 *   **High-Fidelity Doze Integration (#1050/1052)**: Patched `ConnectivitySuite` to respect `UnifiedPowerPolicy.shouldDeferSignaling()`, ensuring telemetry sync and identity updates are deferred during Doze unless a security violation is active. Implemented `PowerIntegrationAuditTest.kt` using `UiDevice` shell commands to verify the actual bridge between the OS `PowerManager` and the application logic, ensuring reliable platform-level awareness. (R-ID 351).

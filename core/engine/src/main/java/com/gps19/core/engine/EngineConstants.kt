@@ -2,6 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.16.14:
+ * - Signaling Conflation Traceability (#1051): Migrated hardcoded conflation 
+ *   delays to SIGNALING_CONFLATION_DELAY_MS (100ms) and 
+ *   SIGNALING_CONFLATION_DELAY_VIOLATION_MS (20ms) (R-ID 312).
  * Sep.15.13:
  * - Performance Tuning (#1051): Added SYNC_INTERVAL_VIOLATION_MS (2s) and 
  *   SIGNALING_EMIT_DELAY_VIOLATION_MS (20ms) to optimize forensic data 
@@ -351,6 +355,8 @@ const val MAX_BACKFILL_POINTS = 1000
 
 const val SIGNALING_EMIT_DELAY_MS = 50L
 const val SIGNALING_EMIT_DELAY_VIOLATION_MS = 20L
+const val SIGNALING_CONFLATION_DELAY_MS = 100L
+const val SIGNALING_CONFLATION_DELAY_VIOLATION_MS = 20L
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
 const val COMM_RTT_SCALING_FACTOR = 2000.0

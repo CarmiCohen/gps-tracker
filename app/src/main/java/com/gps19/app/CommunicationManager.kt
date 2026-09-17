@@ -24,6 +24,10 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Sep.16.14:
+ * - Signaling Conflation Traceability (#1051): Migrated hardcoded conflation 
+ *   delays to SIGNALING_CONFLATION_DELAY_MS (100ms) and 
+ *   SIGNALING_CONFLATION_DELAY_VIOLATION_MS (20ms) (R-ID 312).
  * Sep.15.13:
  * - Performance Tuning (#1051): Optimized signaling emission latency by 
  *   integrating SessionManager to apply SIGNALING_EMIT_DELAY_VIOLATION_MS (20ms) 
@@ -433,8 +437,8 @@ class CommunicationManager @Inject constructor(
         pendingLocationMap = SignalingMessageConflator.conflate(pendingLocationMap, incoming).toMutableMap()
         if (conflationJob == null || !conflationJob!!.isActive) {
             conflationJob = scope.launch {
-                // R-ID 343: Reduce conflation delay during violations
-                val conflationDelay = if (sessionManager.isInViolation) 20L else 100L
+                // R-ID 343/312: Use unified conflation delays
+                val conflationDelay = if (sessionManager.isInViolation) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
                 delay(conflationDelay)
                 val mapToSend = pendingLocationMap
                 if (mapToSend != null && isConnected() && !isStopped) { 

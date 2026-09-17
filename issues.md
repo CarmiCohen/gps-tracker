@@ -1,33 +1,42 @@
 # Project Issues & Hardening Tracking (Rigorous Audit)
 
 ## 🎯 Current Resumption Focus: Structural Simplicity & Pattern Convergence
-Abstraction of the signaling pipeline to ensure deterministic testability of network lifecycles.
+Finalizing the audit of signaling performance under physical stress and ensuring no side-effects remain from the Performance Tier unification.
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
-*(No critical open gaps identified in the current hardening baseline)*
-
 ---
 
-## 🟢 Recently Evaluated Issues & Status
+## 🟢 Resolved Traceability & Metadata Issues (Audit: Sep.16.14)
 
-1. **Issue #1050/1052: High-Fidelity Doze Integration & Telemetry Gating Gap**
-    *   *Status*: Resolved. Patched `ConnectivitySuite` (sync loops and telemetry emission) to respect `UnifiedPowerPolicy.shouldDeferSignaling()`. Implemented `PowerIntegrationAuditTest.kt` to verify the `PowerManager` bridge via `adb shell` Doze simulation. Ensured violation-triggered bypass for real-time responsiveness (Resolved Sep.16.13 / R-ID 351).
+1. **Issue #1051: Signaling Conflation Traceability**
+    *   *Finding*: `CommunicationManager.kt` utilized hardcoded literals (100ms/20ms) in `emitLocationConflated`.
+    *   *Action*: Migrated these to `SIGNALING_CONFLATION_DELAY_MS` and `SIGNALING_CONFLATION_DELAY_VIOLATION_MS` in `EngineConstants.kt` to comply with R312.
+    *   *Status*: **Resolved**.
 
-2. **Issue #1072: Static State Leakage in Test Fakes**
-    *   *Status*: Resolved. Implemented a reset mechanism in `ProductionReadinessAuditTest.kt`'s `@Before` block to ensure `FakePowerStateProvider.isIdle` is cleared before every test case (Resolved Sep.16.12 / R-ID 350).
+2. **Issue #1060: Metadata & Traceability Consolidation**
+    *   *Audit Findings*: RIGOROUSLY VERIFIED. Header comments across all core services and providers are aligned with **R-ID 348**. 
+    *   *Status*: **Resolved**.
 
-3. **Issue #1060: UI Sampling Refinement**
-    *   *Status*: Confirmed that `MainViewModel.kt` has been fully transitioned to use direct `PerformanceTier` enum comparisons for all `.sample()` intervals.
+3. **Issue #1052: ProductionReadinessAuditTest.kt Reference Inconsistency**
+    *   *Audit Findings*: RIGOROUSLY VERIFIED. Incorrect references to R-ID 343 and Sep.15.14 removed. Test suite correctly cites **R-ID 348**.
+    *   *Status*: **Resolved**.
 
-4. **Issue #20: AndroidNetworkProvider Race Condition**
-    *   *Status*: Resolved race condition in asynchronous unregistration by serializing all platform state transitions on the Main Looper (Resolved Sep.16.11 / R-ID 349).
+4. **Issue #1072: Static State Leakage in Test Fakes**
+    *   *Audit Findings*: Verified reset mechanism in `@Before` block of `ProductionReadinessAuditTest.kt`.
+    *   *Status*: **Resolved**.
 
-5. **Issue #20: Signaling Pipeline Hardening**
-    *   *Status*: Enforced HTTP 2xx check for keep-alive probes in `ConnectivitySuite` (R-ID 349).
+5. **Issue #1050: Deterministic Doze State Simulation**
+    *   *Audit Findings*: Verified `PowerStateProvider` abstraction and Hilt module replacement in audit tests.
+    *   *Status*: **Resolved**.
 
-6. **Issue #20: Signaling Pipeline Abstraction**
-    *   *Status*: Decoupled `ConnectivitySuite` from Android's `ConnectivityManager` and direct HTTP calls (R-ID 349).
+6. **Issue #1055/1056: Unified Performance Tier & Hydration**
+    *   *Audit Findings*: Broadened throttling and staggered hydration now correctly leverage the `PerformanceTier` enum for both A15 and S21FE devices.
+    *   *Status*: **Resolved**.
+
+7. **Issue #1071: Process Death Resilience Validation**
+    *   *Audit Findings*: Verified that `FakePowerStateProvider` maintains state across policy re-instantiation in tests via static companion variables.
+    *   *Status*: **Resolved**.
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 351 (Rules: 70, IDs: 351), Resolved: 1078, Open: 0, Testing: 0 (Sub-items: 0), Ideas: 18, QA: 280]**
+- **Current Audit Baseline: [SOT: 352 (Rules: 71, IDs: 352), Resolved: 1090, Open: 0, Testing: 0, Ideas: 18, QA: 280]**
