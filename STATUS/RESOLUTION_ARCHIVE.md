@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.17.00)
+# Resolution Archive (Sep.17.01)
+
+## 🟢 Sep.17.01
+*   **Telemetry Backfill QA Task (#1074)**: Added explicit verification unit tests within `TelemetryAggregatorTest.kt` to validate telemetry backfill convergence, zero-churn ribbon alignment, gap processing bounds, and `MAX_BACKFILL_POINTS` cap validation to prevent memory bloat under extreme clock drifts or service gaps, fully satisfying signaling continuity constraints (R-ID 17).
 
 ## 🟢 Sep.17.00
 *   **Event Log Erasure Defect (#1073)**: Handled `UiEvent.ClearLogs` explicitly inside `MainViewModel.kt` to trigger `repository.clearLogs()`. This fixes the defect where clicking the clear logs option in the UI failed to invoke the database erasure mechanism, satisfying architectural requirements for reliable event tracking and user management of forensic telemetry (R-ID 312).

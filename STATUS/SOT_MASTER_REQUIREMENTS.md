@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.17.00)
+# SOT Master Requirements & Hardening Status (Sep.17.01)
 
 ## 🛡️ Core Hardening Baseline
 *   **SOT ID 352**: Signaling Conflation Traceability - Migrated hardcoded conflation delays in `CommunicationManager.kt` to `SIGNALING_CONFLATION_DELAY_MS` and `SIGNALING_CONFLATION_DELAY_VIOLATION_MS` in `EngineConstants.kt` to ensure architectural traceability and unified performance control (R-ID 312). (Resolved Sep.16.14)
@@ -11,13 +11,14 @@
 ## 📈 Metric Summary
 - **Rules Verified**: 71
 - **Total SOT IDs**: 352
-- **Resolved Issues**: 1091
-- **Open Issues**: 1
+- **Resolved Issues**: 1092
+- **Open Issues**: 0
 - **Testing Coverage**: 1
-- **Simplification Ideas**: 18
+- **Simplification Ideas**: 19
 - **QA Validation Tasks**: 281
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.15 (Telemetry Backfill Convergence)**: PASSED - Added comprehensive QA verification unit tests within `TelemetryAggregatorTest.kt` to validate zero-churn telemetry alignment, gap processing bounds, and `MAX_BACKFILL_POINTS` cap validation (R-ID 17). (Sep.17.01)
 *   **Chapter 31.14 (Event Log Erasure)**: PASSED - Added missing event handler for UiEvent.ClearLogs in MainViewModel to clear log persistence (Sep.17.00)
 *   **Chapter 31.13 (Signaling Traceability)**: PASSED - Migrated hardcoded conflation delays to unified constants in EngineConstants. (Sep.16.14)
 *   **Chapter 31.12 (Doze Integration)**: PASSED - Verified signaling deferral gates in ConnectivitySuite and integration with PowerManager via instrumented test. (Sep.16.13)
@@ -27,4 +28,4 @@
 *   **Chapter 31.08 (Signaling Abstraction)**: PASSED - Abstracted network monitoring and transport layers to ensure deterministic testability of the signaling pipeline. (Sep.15.101)
 
 ---
-*Next Audit: Sep.17.00. (Sep.17.00)*
+*Next Audit: Sep.17.02. (Sep.17.01)*
