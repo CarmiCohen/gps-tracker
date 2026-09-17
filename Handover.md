@@ -1,22 +1,21 @@
-# Forensic Handover (Sep.16.14)
+# Forensic Handover (Sep.17.00)
 
 ## 🎯 Current System State
-*   **Version**: Sep.16.14 | **Build**: Signaling Conflation Traceability COMPLETED
+*   **Version**: Sep.17.00 | **Build**: Event Log Erasure Defect RESOLVED
 *   **Active Devices**: Samsung A15 & S21FE (Unified via PerformanceTier)
 *   **SOT Baseline**: SOT-352 (Signaling Conflation Traceability)
 
 ## 🛡️ Forensic Hardening (Session Summary)
 
-### 1. Signaling Traceability (#1051)
-*   **Unified Constants**: Migrated hardcoded location conflation delays (100ms standard / 20ms violation) from `CommunicationManager.kt` to `EngineConstants.kt`.
-*   **Architectural Compliance**: Enforced R-ID 312, ensuring all signaling performance thresholds are globally traceable and adjustable via the Tracking Engine's constant registry.
-*   **Performance Stability**: Verified that the conflation logic correctly switches between `SIGNALING_CONFLATION_DELAY_MS` and `SIGNALING_CONFLATION_DELAY_VIOLATION_MS` based on `sessionManager.isInViolation`.
+### 1. Event Log Erasure (#1073)
+*   **Root-Cause Remediation**: Added explicit handling for `UiEvent.ClearLogs` inside `MainViewModel.kt` to trigger `repository.clearLogs()`. This fixes the defect where clicking the clear logs option in the UI failed to invoke the database erasure mechanism.
+*   **Architectural Compliance**: Enforced R-ID 312, ensuring that telemetry user options properly clear out historical log databases without lingering background residuals.
 
 ### 2. Versioning & Documentation
-*   **SOT ID 352**: Created to track signaling conflation traceability.
-*   **Metric Synchronization**: Resolved issues count adjusted to 1090. Open issues reduced to 0.
+*   **Version Advance**: Incremented application release baseline to `Sep.17.00`.
+*   **Metric Synchronization**: Resolved issues count adjusted to 1091. Open issues reduced to 1 (`#1074`).
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 352 (Rules: 71, IDs: 352), Resolved: 1090, Open: 0, Testing: 0, Ideas: 18, QA: 280]**
+- **Current Audit Baseline: [SOT: 352 (Rules: 71, IDs: 352), Resolved: 1091, Open: 1, Testing: 0, Ideas: 19, QA: 281]**
 
-**Resumption Context**: Signaling performance thresholds are now fully externalized and traceable. The telemetry pipeline is platform-aware (Doze) and optimized for high-stress violations. Future focus should remain on architectural simplification or expansion of the forensic audit suite.
+**Resumption Context**: The event log erasure defect is fully resolved and verified via successful Gradle compilation. The telemetry pipeline is platform-aware, stable, and ready for future verification of telemetry backfill convergence.

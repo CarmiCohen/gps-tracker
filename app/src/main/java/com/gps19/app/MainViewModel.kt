@@ -61,6 +61,9 @@ private data class MapBase(val ui: MapUiParts, val kinematic: KinematicState, va
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.17.00:
+ * - Issue #1073: Event Log Erasure Defect. Added missing UiEvent.ClearLogs 
+ *   handler to correctly invoke repository.clearLogs() (R-ID 312).
  * Sep.16.03:
  * - Issue #1060 UI Refresh Optimization: Transitioned sampling logic 
  *   from useStaggeredHydration to direct performanceTier enum comparison (R-ID 348).
@@ -625,6 +628,7 @@ class MainViewModel @Inject constructor(
             is UiEvent.AddHomePoint -> handleAddHomePoint(event.point)
             is UiEvent.RemoveHomePoint -> handleRemoveHomePoint(event.index)
             is UiEvent.ClearHomePoints -> handleClearHomePoints()
+            is UiEvent.ClearLogs -> repository.clearLogs()
             is UiEvent.SetLogFilterShowDetails -> repository.updateLogFilters(details = event.show)
             is UiEvent.SetLogFilterShowRecovered -> repository.updateLogFilters(recovered = event.show)
             else -> {}

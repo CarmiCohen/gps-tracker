@@ -1,4 +1,7 @@
-# Resolution Archive (Sep.16.14)
+# Resolution Archive (Sep.17.00)
+
+## 🟢 Sep.17.00
+*   **Event Log Erasure Defect (#1073)**: Handled `UiEvent.ClearLogs` explicitly inside `MainViewModel.kt` to trigger `repository.clearLogs()`. This fixes the defect where clicking the clear logs option in the UI failed to invoke the database erasure mechanism, satisfying architectural requirements for reliable event tracking and user management of forensic telemetry (R-ID 312).
 
 ## 🟢 Sep.16.14
 *   **Signaling Conflation Traceability (#1051)**: Migrated hardcoded conflation delays in `CommunicationManager.kt` (100ms/20ms) to `SIGNALING_CONFLATION_DELAY_MS` and `SIGNALING_CONFLATION_DELAY_VIOLATION_MS` in `EngineConstants.kt`. This ensures architectural traceability and unified performance control for forensic signaling (R-ID 312).
