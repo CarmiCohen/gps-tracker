@@ -10,6 +10,8 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.*
@@ -27,6 +29,8 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.17.05:
+ * - Issue #1094: Mutex-based serialization for updateRibbons to prevent multi-service pool collision.
  * Sep.17.04:
  * - Issue #1094: Forensic Backfill Buffer Reuse Optimization. Implemented 
  *   backfillPool and backfillBuffer to eliminate transient heap pressure (R-ID 353).
@@ -80,6 +84,8 @@ class HistoryManager @Inject constructor(
     private var lastAuditTs = 0L
     private var lastTimeTriggerTs = 0L
     private var lastSitDetectedRt = 0L
+
+    private val ribbonMutex = Mutex()
 
     /**
      * initialize: Binds the manager to an active service scope.
@@ -140,7 +146,7 @@ class HistoryManager @Inject constructor(
         isBatteryLow: Boolean = false,
         isBatteryCritical: Boolean = false,
         isUltraLongStationary: Boolean = false
-    ) {
+    ) = ribbonMutex.withLock {
         detectClockTampering(now)
         val deltaRt = if (lastTickRt > 0) nowRt - lastTickRt else 0L
         

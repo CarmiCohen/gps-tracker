@@ -28,11 +28,14 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.17.05:
+ * - Issue #1093: Dead Code Elimination. Restored handleJsonUpdate logic 
+ *   after incorrect Protobuf logic overwrite. Purged legacy references.
  * Sep.17.02:
  * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.16.13:
  * - Issue #1050/1052 Doze Integration: Patched startSyncLoop, startIdentitySyncLoop, 
- *   and sendTelemetry to respect UnifiedPowerPolicy.shouldDeferSignaling() to 
+ *   and sendTelemetry to respect HardwareSuite.shouldDeferSignaling() to 
  *   prevent platform-level process termination during Doze (R-ID 351).
  * Sep.16.10:
  * - Signaling Pipeline Hardening (#20): Enforced HTTP 2xx check for keep-alive 

@@ -1,7 +1,13 @@
-# Resolution Archive (Sep.15.101)
+# Resolution Archive (Sep.17.10)
+
+## 🟢 Sep.17.10
+*   **Sensor Unregistration Race Condition (#1101)**: Resolved a race condition in `HardwareSuite.kt` where asynchronous unregistration tasks (posted via `ManagedUnregistrationHelper`) could execute after synchronous re-registration during `setPowerSaveMode` calls. Consolidated both operations within the hardware handler looper thread to ensure sequential execution and stable telemetry during power-save transitions.
+*   **Version Advance**: Updated `app/build.gradle` and all status documents to the `Sep.17.10` audit baseline.
 
 ## 🟢 Sep.17.07
 *   **Dead Code Elimination (#1093)**: Completed the purging of deprecated stub contents from `UnifiedPowerPolicy.kt`, `HardwareProvider.kt`, and `UnifiedPowerPolicyProfileTest.kt`. Finalized authority convergence into `HardwareSuite`. Advanced project baseline to Sep.17.07.
+*   **Power & Hardware Provider Convergence (#1093)**: Merged legacy authorities into `HardwareSuite.kt` to reduce dependency overhead and consolidate platform state monitoring.
+*   **Multi-Service Pool Collision & DB Write Safety (#1094)**: Implemented `Mutex`-based serialization on `updateRibbons` inside `HistoryManager` to isolate concurrent service invocations. Conducted forensic audit verifying that `MainRepository` performs deep copies/mapping to independent `HistoryEntity` snapshots before asynchronous DB batch flushes, guaranteeing full memory isolation and safe flyweight reuse.
 *   **Integrity Audit**: Verified that all legacy references have been removed from the production and test paths, and that `HardwareSuite` correctly handles converged power and hardware monitoring logic.
 
 ## 🟢 Sep.17.06

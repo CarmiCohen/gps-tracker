@@ -1,1 +1,1 @@
-// DEPRECATED: Consolidated into HardwareProvider.kt (Aug.29.03)
+// DEPRECATED: Consolidated into HardwareSuite.kt (Sep.17.05)

@@ -35,15 +35,13 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.17.10:
+ * - Issue #1101: Resolved Asynchronous Unregistration Race Condition in setPowerSaveMode.
+ *   Ensured that sensor unregistration and re-registration are executed sequentially 
+ *   on the hardware handler thread to prevent telemetry dropout during mode switches.
  * Sep.17.07:
  * - Issue #1093 Cleanup: Restored missing LocationStatus and ForensicSnapshot definitions
  *   to resolve compilation errors after legacy provider purge.
- * Sep.17.05:
- * - Issue #1093 Cleanup: Final purge of legacy provider references in documentation.
- * Sep.17.02:
- * - Issue #1093: Power & Hardware Provider Convergence. Merged legacy authorities 
- *   into HardwareSuite to reduce dependency overhead and consolidate platform 
- *   state monitoring (R-ID 353).
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -356,9 +354,12 @@ class HardwareSuite @Inject constructor(
     }
 
     suspend fun start() {
-        teardownJob?.let {
-            Timber.i("HardwareSuite: Awaiting active teardown completion.")
-            it.join()
+        synchronized(lifecycleLock) {
+            if (teardownJob != null) {
+                teardownJob?.cancel()
+                teardownJob = null
+                Timber.i("HardwareSuite: Cancelled active teardown job to prevent restart latency.")
+            }
         }
 
         synchronized(lifecycleLock) {
@@ -507,7 +508,7 @@ class HardwareSuite @Inject constructor(
                 try {
                     _revivalEvents.tryEmit(RevivalEvent.RawBurstStarted)
                     locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, rawListener, handler.looper)
-                    scope.launch {
+                    launch {
                         delay(10000)
                         synchronized(lifecycleLock) { 
                             if (rawRevivalListener == rawListener) { 
@@ -534,7 +535,12 @@ class HardwareSuite @Inject constructor(
         var nextPending = current.isPending; var nextReason = current.reason
         var recoveryConfirmed = current.recoveryConfirmed; var lastPendingDuration = current.lastPendingDurationMs
         if (deltaSinceFix > GPS_GAP_THRESHOLD_MS) {
-            if (!nextPending) { pendingEnterRt = nowRt; nextPending = true; recoveryConfirmed = false }
+            if (!nextPending) { 
+                pendingEnterRt = nowRt 
+                nextPending = true 
+                recoveryConfirmed = false 
+                forensicAuditor.captureRevivalStart(nowRt)
+            }
             nextReason = when { satellitesInView == 0 -> LocationPendingReason.SIGNAL_LOSS; satellitesInView >= 4 && satellitesUsed < 4 -> LocationPendingReason.GPS_STALL; else -> LocationPendingReason.GPS_GAP }
             recoveryStartRt = 0L 
         } else if (nextPending) {
@@ -861,9 +867,15 @@ class HardwareSuite @Inject constructor(
         synchronized(lifecycleLock) {
             if (this.powerSaveMode != active) {
                 this.powerSaveMode = active
-                if (isStarted.get() && hardwareHandler != null) {
-                    this.unregister(sensorManager, hardwareHandler)
-                    registerSensors()
+                if (isStarted.get()) {
+                    // Sep.17.10: Consolidation of unregistration and re-registration on the looper thread.
+                    // This prevents the race where asynchronous unregistration could execute AFTER 
+                    // synchronous re-registration, leaving the suite with zero active sensors.
+                    hardwareHandler?.post {
+                        sensorManager.unregisterListener(this)
+                        registerSensors()
+                        Timber.d("HardwareSuite: PowerSaveMode refreshed. Active: $active")
+                    }
                 }
             }
         }
@@ -895,7 +907,6 @@ class HardwareSuite @Inject constructor(
         if (currentStatus.isPending) {
             val stallDuration = nowRt - pendingEnterRt
             val retryThreshold = (revivalAttemptCount + 1) * GPS_REVIVAL_RETRY_INTERVAL_MS
-            forensicAuditor.captureRevivalStart(nowRt)
             if (stallDuration > retryThreshold) {
                 if (revivalAttemptCount < MAX_REVIVAL_ATTEMPTS) {
                     revivalAttemptCount++

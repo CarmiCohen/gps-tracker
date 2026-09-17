@@ -17,6 +17,8 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.17.05:
+ * - Issue #1093: Dead Code Elimination. Purged UnifiedPowerPolicy and HardwareProvider.
  * Sep.17.02:
  * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.16.05:
@@ -29,7 +31,7 @@ import kotlin.math.*
  * - Issue #1055 Unified Performance Tier: Broadened heuristic recovery thresholds 
  *   to all staggered performance devices (A15, S21FE) to ensure consistent 
  *   remediation of forensic latency spikes (R-ID 348, formerly R-ID 347). 
- *   Migrated to UnifiedPowerPolicy.
+ *   Migrated to HardwareSuite.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
