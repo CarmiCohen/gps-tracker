@@ -35,6 +35,10 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.18.00:
+ * - Issue #1103: Resolved Leaked Coroutines in GNSS Revival Burst Timer.
+ *   Tracked the 10-second raw burst timeout via revivalBurstJob to ensure immediate 
+ *   cancellation during suite teardown, preventing structured concurrency leaks.
  * Sep.17.11:
  * - Issue #1102: Resolved Blocked Thread Restart Latency during Polling Interval Changes.
  *   Moved physical unregistration to the 800ms teardown grace period, allowing start() 
@@ -43,9 +47,6 @@ import kotlin.math.*
  * - Issue #1101: Resolved Asynchronous Unregistration Race Condition in setPowerSaveMode.
  *   Ensured that sensor unregistration and re-registration are executed sequentially 
  *   on the hardware handler thread to prevent telemetry dropout during mode switches.
- * Sep.17.07:
- * - Issue #1093 Cleanup: Restored missing LocationStatus and ForensicSnapshot definitions
- *   to resolve compilation errors after legacy provider purge.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -184,6 +185,7 @@ class HardwareSuite @Inject constructor(
     private var registrationJob: Job? = null
     private var teardownJob: Job? = null
     private var revivalPulseJob: Job? = null
+    private var revivalBurstJob: Job? = null
     private var lastDisplayState = Display.STATE_UNKNOWN
     private var lastDisplayTransitionRt = 0L
     private val isDisplayFlickering = AtomicBoolean(false)
@@ -427,6 +429,7 @@ class HardwareSuite @Inject constructor(
             registrationJob?.cancel(); registrationJob = null
             proximityJob?.cancel(); proximityJob = null
             revivalPulseJob?.cancel(); revivalPulseJob = null
+            revivalBurstJob?.cancel(); revivalBurstJob = null
             
             stopAcousticMonitoring()
 
@@ -507,7 +510,9 @@ class HardwareSuite @Inject constructor(
                 try {
                     _revivalEvents.tryEmit(RevivalEvent.RawBurstStarted)
                     locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, rawListener, handler.looper)
-                    launch {
+                    
+                    revivalBurstJob?.cancel()
+                    revivalBurstJob = launch {
                         delay(10000)
                         synchronized(lifecycleLock) { 
                             if (rawRevivalListener == rawListener) { 
@@ -858,6 +863,8 @@ class HardwareSuite @Inject constructor(
         if (active) {
             revivalPulseJob?.cancel()
             revivalPulseJob = null
+            revivalBurstJob?.cancel()
+            revivalBurstJob = null
             Timber.i("HardwareSuite: Safe Mode active. Revival pulses suppressed.")
         }
     }

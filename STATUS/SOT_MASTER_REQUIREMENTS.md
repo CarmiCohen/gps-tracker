@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.15.101)
+# SOT Master Requirements & Hardening Status (Sep.18.00)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 357**: Structured Concurrency Burst Hardening - Resolved a coroutine leak in `HardwareSuite.kt` by tracking the 10-second raw GPS revival timeout via `revivalBurstJob`. Ensured immediate cancellation during suite teardown and safe mode transitions (R-ID 357). (Resolved Sep.18.00)
 *   **SOT ID 356**: Blocked Thread Restart Latency Remediation - Resolved a performance bottleneck in `HardwareSuite.kt` caused by immediate hardware unregistration during polling interval changes. Moved unregistration to the 800ms deferred teardown grace period, enabling registration "rescue" during rapid lifecycle rotations. (Resolved Sep.17.11)
 *   **SOT ID 355**: Sensor Unregistration Race Condition Remediation - Resolved a race condition in `HardwareSuite.kt` where asynchronous unregistration could conflict with synchronous re-registration during power-save mode transitions. Consolidated lifecycle operations on the hardware handler thread to ensure signaling integrity (R-ID 355). (Resolved Sep.17.10)
 *   **SOT ID 354**: Multi-Service Pool Collision & Backfill Buffer Reuse Optimization - Hardened `HistoryManager` with `Mutex`-based synchronization around `updateRibbons` to eliminate pool collision risks from concurrent `TrackerService` and `ViewerService` instances. Implemented flyweight pooling (`backfillPool`) and reusable `ArrayList` (`backfillBuffer`) within `HistoryManager` (R-ID 353). (Resolved Sep.17.05)
@@ -9,17 +10,17 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 72
-- **Total SOT IDs**: 356
-- **Resolved Issues**: 1100
-- **Open Issues**: 2
+- **Total SOT IDs**: 357
+- **Resolved Issues**: 1101
+- **Open Issues**: 1
 - **Testing Coverage**: 2 (Sub-items: 10)
 - **Simplification Ideas**: 18
 - **QA Validation Tasks**: 281
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.21 (Structured Concurrency Hardening)**: PASSED - Verified that revival burst timeouts are explicitly tracked and cancelled during HardwareSuite teardown (Sep.18.00)
 *   **Chapter 31.20 (Restart Latency Optimization)**: PASSED - Verified that deferred unregistration eliminates the 800ms stall during flatMapLatest polling adaptations (Sep.15.101)
 *   **Chapter 31.19 (Race Condition Remediation)**: PASSED - Consolidated sensor lifecycle management in HardwareSuite to prevent asynchronous registration collisions during power-save transitions (Sep.15.101)
-*   **Chapter 31.18 (Dead Code Purge)**: PASSED - Eliminated `UnifiedPowerPolicy` and `HardwareProvider` stubs, finalizing the provider convergence audit (Sep.15.101)
 
 ---
-*Next Audit: Sep.18.01. (Sep.15.101)*
+*Next Audit: Sep.18.01. (Sep.18.00)*
