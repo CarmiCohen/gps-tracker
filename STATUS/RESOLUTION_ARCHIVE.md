@@ -1,8 +1,11 @@
-# Resolution Archive (Sep.17.10)
+# Resolution Archive (Sep.15.101)
+
+## 🟢 Sep.17.11
+*   **Blocked Thread Restart Latency (#1102)**: Resolved a performance bottleneck in `HardwareSuite.kt` where rapid lifecycle rotations (e.g., during polling interval adaptations via `flatMapLatest`) were suffering from artificial latency. Moved physical hardware unregistration (GNSS, sensors, and display listeners) into the 800ms deferred teardown grace period. This allows `start()` to cancel any pending teardown and "rescue" existing registrations, eliminating redundant binder calls to system services and removing the restart stall.
+*   **Version Advance**: Updated `app/build.gradle` and all status documents to the `Sep.17.11` audit baseline.
 
 ## 🟢 Sep.17.10
 *   **Sensor Unregistration Race Condition (#1101)**: Resolved a race condition in `HardwareSuite.kt` where asynchronous unregistration tasks (posted via `ManagedUnregistrationHelper`) could execute after synchronous re-registration during `setPowerSaveMode` calls. Consolidated both operations within the hardware handler looper thread to ensure sequential execution and stable telemetry during power-save transitions.
-*   **Version Advance**: Updated `app/build.gradle` and all status documents to the `Sep.17.10` audit baseline.
 
 ## 🟢 Sep.17.07
 *   **Dead Code Elimination (#1093)**: Completed the purging of deprecated stub contents from `UnifiedPowerPolicy.kt`, `HardwareProvider.kt`, and `UnifiedPowerPolicyProfileTest.kt`. Finalized authority convergence into `HardwareSuite`. Advanced project baseline to Sep.17.07.

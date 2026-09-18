@@ -35,6 +35,10 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.17.11:
+ * - Issue #1102: Resolved Blocked Thread Restart Latency during Polling Interval Changes.
+ *   Moved physical unregistration to the 800ms teardown grace period, allowing start() 
+ *   to rescue existing registrations during rapid lifecycle rotations.
  * Sep.17.10:
  * - Issue #1101: Resolved Asynchronous Unregistration Race Condition in setPowerSaveMode.
  *   Ensured that sensor unregistration and re-registration are executed sequentially 
@@ -417,8 +421,7 @@ class HardwareSuite @Inject constructor(
             
             forensicAuditor.clearRevivalState()
             
-            val stopStartTime = SystemClock.elapsedRealtime()
-            Timber.i("HardwareSuite: Starting teardown sequence.")
+            Timber.i("HardwareSuite: Starting deferred teardown sequence.")
             
             recoveryJob?.cancel(); recoveryJob = null
             registrationJob?.cancel(); registrationJob = null
@@ -432,30 +435,24 @@ class HardwareSuite @Inject constructor(
             val threadToQuit = hardwareThread
             val gThreadToQuit = gnssThread
             
-            val gnssStart = SystemClock.elapsedRealtime()
-            try { gnssStatusCallback.unregister(locationManager, gHandler) } catch (e: Exception) { Timber.e(e, "GNSS status unregistration failed") }
-            val gnssDuration = SystemClock.elapsedRealtime() - gnssStart
-            
-            val locStart = SystemClock.elapsedRealtime()
-            activeLocationCallback?.unregister(fusedLocationClient, handler); activeLocationCallback = null
-            revivalCallback?.unregister(fusedLocationClient, handler); revivalCallback = null
-            rawRevivalListener?.unregister(locationManager, handler); rawRevivalListener = null
-            val locDuration = SystemClock.elapsedRealtime() - locStart
-            
-            val sensorStart = SystemClock.elapsedRealtime()
-            this.unregister(sensorManager, handler)
-            val sensorDuration = SystemClock.elapsedRealtime() - sensorStart
-            
-            val displayStart = SystemClock.elapsedRealtime()
-            displayListener.unregister(displayManager, handler)
-            val displayDuration = SystemClock.elapsedRealtime() - displayStart
-
             teardownJob?.cancel()
             teardownJob = scope.launch(Dispatchers.IO) {
                 delay(800)
 
                 synchronized(lifecycleLock) {
                     if (!isStarted.get() && activeUsers.get() == 0) {
+                        Timber.i("HardwareSuite: Executing deferred hardware unregistration.")
+                        
+                        try { gnssStatusCallback.unregister(locationManager, gHandler) } catch (e: Exception) { Timber.e(e, "GNSS status unregistration failed") }
+                        
+                        activeLocationCallback?.unregister(fusedLocationClient, handler); activeLocationCallback = null
+                        revivalCallback?.unregister(fusedLocationClient, handler); revivalCallback = null
+                        rawRevivalListener?.unregister(locationManager, handler); rawRevivalListener = null
+                        
+                        this@HardwareSuite.unregister(sensorManager, handler)
+                        
+                        displayListener.unregister(displayManager, handler)
+
                         if (hardwareThread == threadToQuit) {
                             threadToQuit?.quitSafely()
                             try { threadToQuit?.join(1000) } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
@@ -466,6 +463,8 @@ class HardwareSuite @Inject constructor(
                             try { gThreadToQuit?.join(1000) } catch (e: InterruptedException) { Thread.currentThread().interrupt() }
                             gnssThread = null; gnssHandler = null
                         }
+                    } else {
+                        Timber.i("HardwareSuite: Deferred unregistration aborted - suite restarted.")
                     }
                     teardownJob = null
                 }
