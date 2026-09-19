@@ -1,11 +1,14 @@
-# Resolution Archive (Sep.18.00)
+# Resolution Archive (Sep.15.101)
+
+## 🟢 Sep.19.00
+*   **Battery Baseline Recapture within Stalled Pending Cycles (#1104)**: Resolved a telemetry inconsistency in `HardwareSuite.kt` where the battery baseline for energy footprint audits was being prematurely recaptured during sustained GNSS stalls. Introduced the `revivalBaselineCaptured` flag to ensure that `ForensicAuditor.captureRevivalStart()` is invoked exactly once per pending cycle, even if intermediate audit events (such as `HardwareLock` triggers) consume and reset the internal baseline before the cycle completes. This ensures high-assurance energy metrics for the full duration of hardware recovery attempts.
+*   **Version Advance**: Updated `app/build.gradle` and all status documents to the `Sep.19.00` audit baseline.
 
 ## 🟢 Sep.18.00
 *   **Leaked Coroutines in GNSS Revival Burst Timer (#1103)**: Resolved a coroutine leak in `HardwareSuite.kt` where the 10-second raw GPS unregistration timeout was launched as an un-tracked child of a fire-and-forget registration task. Implemented explicit job tracking via `revivalBurstJob` and ensured immediate cancellation during suite teardown and safe-mode transitions, enforcing structured concurrency across the hardware revival pipeline.
 
 ## 🟢 Sep.17.11
 *   **Blocked Thread Restart Latency (#1102)**: Resolved a performance bottleneck in `HardwareSuite.kt` where rapid lifecycle rotations (e.g., during polling interval adaptations via `flatMapLatest`) were suffering from artificial latency. Moved physical hardware unregistration (GNSS, sensors, and display listeners) into the 800ms deferred teardown grace period. This allows `start()` to cancel any pending teardown and "rescue" existing registrations, eliminating redundant binder calls to system services and removing the restart stall.
-*   **Version Advance**: Updated `app/build.gradle` and all status documents to the `Sep.17.11` audit baseline.
 
 ## 🟢 Sep.17.10
 *   **Sensor Unregistration Race Condition (#1101)**: Resolved a race condition in `HardwareSuite.kt` where asynchronous unregistration tasks (posted via `ManagedUnregistrationHelper`) could execute after synchronous re-registration during `setPowerSaveMode` calls. Consolidated both operations within the hardware handler looper thread to ensure sequential execution and stable telemetry during power-save transitions.

@@ -35,6 +35,11 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.19.00:
+ * - Issue #1104: Resolved Battery Baseline Recapture within Stalled Pending Cycles.
+ *   Implemented revivalBaselineCaptured flag to ensure a single battery baseline 
+ *   capture per GNSS pending cycle, preventing premature recapture if intermediate 
+ *   audits (like HardwareLock) consume the baseline.
  * Sep.18.00:
  * - Issue #1103: Resolved Leaked Coroutines in GNSS Revival Burst Timer.
  *   Tracked the 10-second raw burst timeout via revivalBurstJob to ensure immediate 
@@ -135,6 +140,7 @@ class HardwareSuite @Inject constructor(
     private val pollingIntervalFlow = MutableStateFlow(TICK_INTERVAL_MS)
     private var revivalAttemptCount = 0
     private var isHardwareLocked = false
+    private var revivalBaselineCaptured = false
 
     private val _isGnssThrottled = MutableSharedFlow<Boolean>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val isGnssThrottledFlow: SharedFlow<Boolean> = _isGnssThrottled.asSharedFlow()
@@ -543,8 +549,14 @@ class HardwareSuite @Inject constructor(
                 pendingEnterRt = nowRt 
                 nextPending = true 
                 recoveryConfirmed = false 
+            }
+            
+            // Issue #1104: Guard battery baseline capture to prevent recapture in stalled cycles.
+            if (!revivalBaselineCaptured) {
+                revivalBaselineCaptured = true
                 forensicAuditor.captureRevivalStart(nowRt)
             }
+            
             nextReason = when { satellitesInView == 0 -> LocationPendingReason.SIGNAL_LOSS; satellitesInView >= 4 && satellitesUsed < 4 -> LocationPendingReason.GPS_STALL; else -> LocationPendingReason.GPS_GAP }
             recoveryStartRt = 0L 
         } else if (nextPending) {
@@ -555,8 +567,12 @@ class HardwareSuite @Inject constructor(
                 nextPending = false; nextReason = LocationPendingReason.NONE; recoveryConfirmed = true; recoveryStartRt = 0L 
                 shouldEmitSuccess = true
                 isHardwareLocked = false
+                revivalBaselineCaptured = false // Reset on successful recovery
             }
-        } else { recoveryConfirmed = false; recoveryStartRt = 0L }
+        } else { 
+            recoveryConfirmed = false; recoveryStartRt = 0L 
+            revivalBaselineCaptured = false // Ensure reset if not in pending state
+        }
         
         currentLocationStatus = current.copy(isPending = nextPending, reason = nextReason, lastFixRt = lastFixRt, lastPendingDurationMs = lastPendingDuration, recoveryConfirmed = recoveryConfirmed)
         _locationStatus.tryEmit(currentLocationStatus)

@@ -5,13 +5,14 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
-1. **Issue #1104: Battery Baseline Recapture within Stalled Pending Cycles**
-    *   *Description*: Inside `checkRevivalLifecycle()`, `forensicAuditor.captureRevivalStart(nowRt)` is executed every 2 seconds while `currentStatus.isPending` is true. When an event like `HardwareLock` clears/computes the footprint and resets `revivalStartBattery` to `null`, the next check tick 2 seconds later immediately snaps a new battery baseline while the hardware is still stalled or locked, instead of waiting for a clean pending cycle.
-    *   *Impact*: Inconsistent metric telemetry under sustained hardware faults.
+*(No critical open gaps at this time).*
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1104: Battery Baseline Recapture within Stalled Pending Cycles** (Resolved Sep.19.00)
+    *   *Remediation*: Implemented `revivalBaselineCaptured` flag in `HardwareSuite.kt` to ensure a single battery baseline capture per GNSS pending cycle. This prevents premature recapture when intermediate audit events (like `HardwareLock`) consume the internal baseline while the system is still in a pending state.
 
 *   **Issue #1103: Leaked Coroutines in GNSS Revival Burst Timer** (Resolved Sep.18.00)
     *   *Remediation*: Introduced `revivalBurstJob` to track the 10-second raw provider timeout coroutine. Ensured explicit cancellation in `stop()` and `setSafeMode()`, enforcing structured concurrency and preventing background leaks during suite teardown.
@@ -25,4 +26,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 356 (Rules: 72, IDs: 356), Resolved: 1101, Open: 1, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 281]**
+- **Current Audit Baseline: [SOT: 358 (Rules: 72, IDs: 358), Resolved: 1102, Open: 0, Testing: 2 (Sub-items: 10), Ideas: 18, QA: 281]**
