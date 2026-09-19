@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.15.102)
+# SOT Master Requirements & Hardening Status (Sep.15.101)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 365**: Proximity Suppression Hysteresis Hardening - Implemented temporal decay for the display flickering suppression logic in `HardwareSuite.kt`. By checking if the last display transition occurred within `DISPLAY_FLICKER_TIMEOUT_MS` (3s), the system now allows proximity "Far" transitions once flickering ceases, even without a further display event. This prevents suppression "lock-in" on stationary devices (R-ID 365). (Resolved Sep.19.06)
 *   **SOT ID 364**: GNSS Initialization Race Remediation - Reordered state initialization in `HardwareSuite.start()` to ensure `sessionStartRt` and `lastFixRt` are populated before the `isStarted` flag is set. This prevents the background audit loop from calculating false GPS gaps against zeroed values during the micro-window of session activation (R-ID 364). (Resolved Sep.19.05)
 *   **SOT ID 363**: Structured Concurrency Burst Hardening - Refactored GNSS revival pulse logic in `HardwareSuite.kt` to use a `try-finally` block within a single coroutine. This guarantees that Raw and Fused location listeners are unregistered upon burst completion or cancellation (e.g., during Safe Mode transition or suite shutdown), eliminating the risk of resource leaks and allowing for the removal of the redundant `revivalBurstJob` state (R-ID 363). (Resolved Sep.19.04)
 *   **SOT ID 362**: GNSS Revival Resource Leak Remediation - Modified `setSafeMode(active)` in `HardwareSuite.kt` to explicitly unregister `rawRevivalListener` and `revivalCallback`. This ensures that raw GPS and high-accuracy updates are immediately terminated when Safe Mode is engaged, preventing resource leaks and unintended battery drain (R-ID 362). (Resolved Sep.19.02)
@@ -12,19 +13,20 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 73
-- **Total SOT IDs**: 364
-- **Resolved Issues**: 1110
+- **Total SOT IDs**: 365
+- **Resolved Issues**: 1111
 - **Open Issues**: 0
 - **Testing Coverage**: 2 (Sub-items: 10)
-- **Simplification Ideas**: 19
+- **Simplification Ideas**: 18
 - **QA Validation Tasks**: 282
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.28 (Initialization Race)**: PASSED - Verified that lastFixRt is initialized before isStarted flag in start() (Sep.15.102)
+*   **Chapter 31.29 (Proximity Hysteresis)**: PASSED - Verified temporal decay logic for flickering suppression (Sep.15.101)
+*   **Chapter 31.28 (Initialization Race)**: PASSED - Verified that lastFixRt is initialized before isStarted flag in start() (Sep.15.101)
 *   **Chapter 31.27 (Structured Burst Cleanup)**: PASSED - Verified that Raw/Fused listeners are unregistered via try-finally on coroutine cancellation (Sep.15.101)
 *   **Chapter 31.26 (Safe Mode Leakage)**: PASSED - Verified that revival listeners are unregistered when Safe Mode is toggled (Sep.15.101)
 *   **Chapter 31.25 (Baseline Capture Gating)**: PASSED - Verified that battery baseline capture is strictly gated by suite active state (Sep.15.101)
 *   **Chapter 31.24 (Stall Timing Leakage)**: PASSED - Verified that revival state resets cleanly on stop and audits are gated by suite lifecycle (Sep.15.101)
 
 ---
-*Next Audit: Sep.20.00. (Sep.15.102)*
+*Next Audit: Sep.20.00. (Sep.15.101)*

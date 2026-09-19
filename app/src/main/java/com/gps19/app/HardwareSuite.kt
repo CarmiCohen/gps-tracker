@@ -35,6 +35,10 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.19.06:
+ * - Issue #1111: Resolved Proximity Suppression Lock-in due to Hysteresis Persistence.
+ *   Implemented temporal decay (DISPLAY_FLICKER_TIMEOUT_MS) for the flickering 
+ *   suppression logic and ensured isDisplayFlickering is reset in stop() and resetBaseline().
  * Sep.19.05:
  * - Issue #1110: Resolved Initialization Race in start() causing False GPS Gap.
  *   Reordered state initialization to ensure sessionStartRt and lastFixRt are 
@@ -357,7 +361,7 @@ class HardwareSuite @Inject constructor(
                         isDisplayFlickering.set(true)
                         Timber.w("Forensic: Rapid Display Flickering detected ($lastDisplayState -> $newState).")
                     }
-                } else if (!isDozeVolatility) {
+                } else if (!isFlickeringInWindow(nowRt)) { // Use window-based reset if not currently in a rapid transition window.
                     isDisplayFlickering.set(false)
                 }
                 
@@ -365,6 +369,10 @@ class HardwareSuite @Inject constructor(
                 lastDisplayTransitionRt = nowRt
             }
         }
+    }
+
+    private fun isFlickeringInWindow(nowRt: Long): Boolean {
+        return isDisplayFlickering.get() && (nowRt - lastDisplayTransitionRt < DISPLAY_FLICKER_TIMEOUT_MS)
     }
 
     init {
@@ -466,6 +474,10 @@ class HardwareSuite @Inject constructor(
             lastFixRt = 0L
             currentLocationStatus = LocationStatus()
             _locationStatus.tryEmit(currentLocationStatus)
+            
+            // Issue #1111: Reset display flickering state.
+            isDisplayFlickering.set(false)
+            lastDisplayTransitionRt = 0L
             
             Timber.i("HardwareSuite: Starting deferred teardown sequence.")
             
@@ -706,7 +718,10 @@ class HardwareSuite @Inject constructor(
                 proximityIdx = (proximityIdx * (1.0 - PROXIMITY_EMA_ALPHA)) + (rawIdx * PROXIMITY_EMA_ALPHA)
                 secSumProxIdx += proximityIdx; secProxCount++
                 if (newValue != rawProximityNear) {
-                    if (!newValue && isDisplayFlickering.get() && isStationary()) return
+                    // Issue #1111: Added temporal decay to flickering suppression to prevent lock-in.
+                    val isFlickering = isFlickeringInWindow(nowRt)
+                    if (!newValue && isFlickering && isStationary()) return
+                    
                     rawProximityNear = newValue; proximityJob?.cancel()
                     var calcDebounceMs = if (isStationary()) PROXIMITY_DEBOUNCE_STATIONARY_MS else PROXIMITY_DEBOUNCE_MOVING_MS
                     if (isStationary() && stationaryStartRt > 0L) calcDebounceMs += (((nowRt - stationaryStartRt) / 3600000.0) * PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR).toLong()
@@ -957,6 +972,8 @@ class HardwareSuite @Inject constructor(
     fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; forensicAuditor.reset(); revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
         // Issue #1107: Reset revival state.
         pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = sessionStartRt; currentLocationStatus = LocationStatus(); _locationStatus.tryEmit(currentLocationStatus)
+        // Issue #1111: Reset display flickering state.
+        isDisplayFlickering.set(false); lastDisplayTransitionRt = 0L
     }
 
     private fun startStepDetectorRecoveryLoop() { recoveryJob?.cancel(); recoveryJob = scope.launch { while (isActive) { delay(300000L); if (!isStepDetectorRegistered) attemptStepRegistration() } } }

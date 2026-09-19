@@ -1,4 +1,8 @@
-# Project Resolution Archive (Sep.15.102)
+# Project Resolution Archive (Sep.15.101)
+
+## 🟢 Sep.19.06
+*   **Proximity Suppression Lock-in due to Hysteresis Persistence (#1111)**: Implemented temporal decay for the display flickering suppression logic in `HardwareSuite.kt`. By checking if the last display transition occurred within `DISPLAY_FLICKER_TIMEOUT_MS` (3s), the system now allows proximity "Far" transitions once flickering ceases, even without a further display event. This prevents suppression "lock-in" on stationary devices. Ensured state reset in `stop()` and `resetBaseline()` (R-ID 365).
+*   **Audit Baseline Advance**: advanced project metrics to [SOT Rules: 73, SOT IDs: 365, Resolved: 1111, QA: 282].
 
 ## 🟢 Sep.19.05
 *   **Initialization Race in HardwareSuite.start() causing False GPS Gap (#1110)**: Reordered the state initialization block in `HardwareSuite.start()`. By initializing `sessionStartRt`, `lastBaroZeroingRt`, and `lastFixRt` before `isStarted` is flipped to `true`, the background audit thread can no longer run an audit update loop with non-initialized/zeroed parameters, avoiding false GPS gaps and incorrect battery baselines on session initialization (R-ID 364).
@@ -9,7 +13,7 @@
 *   **Audit Baseline Advance**: advanced project metrics to [SOT Rules: 72, SOT IDs: 363, Resolved: 1109, QA: 281].
 
 ## 🟢 Sep.19.03
-*   **Redundant Battery Baseline Capture in Background/Idle State (#1108)**: Fully resolved the redundant battery baseline capture logic by initializing `lastFixRt` to `sessionStartRt` inside both `start()` and `resetBaseline()`. This guarantees a proper grace period before any GNSS gap or stall state can be declared, preventing immediate redundant baseline captures upon app activation or reset (R-ID 361).
+*   **Redundant Battery Baseline Capture in Background/Idle State (#1108)**: Fully resolved the redundant battery baseline capture logic by initializing `lastFixRt` to `sessionStartRt` inside both `start()` and `resetBaseline()`. This guarantees a proper grace period before any GNSS gap or stall can be declared, preventing immediate redundant baseline captures upon app activation or reset (R-ID 361).
 *   **Audit Baseline Advance**: advanced project metrics to [SOT Rules: 72, SOT IDs: 362, Resolved: 1108, QA: 281].
 
 ## 🟢 Sep.19.02

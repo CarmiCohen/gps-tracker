@@ -5,11 +5,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
-*   **Issue #1111: Proximity Suppression Lock-in due to Hysteresis Persistence**
-    *   *Detail*: `HardwareSuite` uses `isDisplayFlickering` to suppress proximity "Far" transitions (Line 532). However, `isDisplayFlickering` is only reset to `false` within the `onDisplayChanged` callback when a stable transition is detected (Line 243). If the display stops flickering but remains in a stable state without a further transition event being emitted, the flag persists, potentially blocking all future proximity updates.
-    *   *Risk*: Proximity detection stuck in "Near" state indefinitely while stationary.
-    *   *File*: `HardwareSuite.kt` (Lines 232-243, 532).
-
 *   **Issue #1112: Incomplete Reset in resetServiceTimers (HardwareSuite State Persistence)**
     *   *Detail*: Both `TrackerService` and `ViewerService` reset `ForensicAuditor` during session termination but fail to call `hardwareSuite.resetBaseline()`. This leaves internal `HardwareSuite` states—such as IMU peaks, adaptive vibration floors, and revival flags—in a stale state across session resets.
     *   *Risk*: Corrupted telemetry and inconsistent baseline comparisons after a session reset.
@@ -64,6 +59,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1111: Proximity Suppression Lock-in due to Hysteresis Persistence** (Resolved Sep.19.06)
+    *   *Remediation*: Implemented temporal decay for the display flickering suppression logic in `HardwareSuite.kt`. By checking if the last display transition occurred within `DISPLAY_FLICKER_TIMEOUT_MS` (3s), the system now allows proximity "Far" transitions once flickering ceases, even without a further display event. Ensured state reset in `stop()` and `resetBaseline()`. (R-ID 365)
+
 *   **Issue #1110: Initialization Race in HardwareSuite.start() causing False GPS Gap** (Resolved Sep.19.05)
     *   *Remediation*: Reordered the state initialization block in `HardwareSuite.start()`. By initializing `sessionStartRt`, `lastBaroZeroingRt`, and `lastFixRt` before `isStarted` is flipped to `true`, the background audit thread can no longer run an audit update loop with non-initialized/zeroed parameters, avoiding false GPS gaps and incorrect battery baselines on session initialization. (R-ID 364)
 
@@ -97,4 +95,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 364 (Rules: 73, IDs: 364), Resolved: 1110, Open: 11, Testing: 2 (Sub-items: 10), Ideas: 18, QA: 282]**
+- **Current Audit Baseline: [SOT: 365 (Rules: 73, IDs: 365), Resolved: 1111, Open: 10, Testing: 2 (Sub-items: 10), Ideas: 18, QA: 282]**

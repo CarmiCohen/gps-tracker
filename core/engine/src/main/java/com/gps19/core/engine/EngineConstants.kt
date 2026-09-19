@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.19.06:
+ * - Issue #1111: Added DISPLAY_FLICKER_TIMEOUT_MS (3s) for proximity hysteresis decay.
  * Sep.16.14:
  * - Signaling Conflation Traceability (#1051): Migrated hardcoded conflation 
  *   delays to SIGNALING_CONFLATION_DELAY_MS (100ms) and 
@@ -475,6 +477,7 @@ const val PROXIMITY_STRESS_SCALING_MULTIPLIER = 2.0
 const val PROXIMITY_DEBOUNCE_MAX_MS = 15000L
 const val PROXIMITY_STRESS_THRESHOLD_DB = 80.0
 const val PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR = 2000L
+const val DISPLAY_FLICKER_TIMEOUT_MS = 3000L
 
 // History & Persistence Logic
 const val REAL_TIME_GAP_LIMIT_MS = 10000L
