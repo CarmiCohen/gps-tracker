@@ -35,6 +35,10 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.19.01:
+ * - Issue #1105: Resolved Battery Baseline Capture Persistence across Lifecycle Transitions.
+ *   Ensured revivalBaselineCaptured is properly reset to false within stop() and resetBaseline()
+ *   so that subsequent lifecycle starts or baseline resets correctly allow capturing new battery baselines.
  * Sep.19.00:
  * - Issue #1104: Resolved Battery Baseline Recapture within Stalled Pending Cycles.
  *   Implemented revivalBaselineCaptured flag to ensure a single battery baseline 
@@ -87,7 +91,7 @@ class HardwareSuite @Inject constructor(
         var tiltDegrees: Double = 0.0
         var acousticDb: Double = 0.0
         var peakShock: Double = 0.0
-        var peakVerticalVelocity: Double = 0.0
+        var peakVerticalVelocity = 0.0
         var peakVerticalVelocityTs: Long = 0L
         var peakVerticalVelocityRt: Long = 0L
         var peakVerticalDisplacement: Double = 0.0
@@ -428,6 +432,7 @@ class HardwareSuite @Inject constructor(
             isTeardownActive.set(true)
             
             forensicAuditor.clearRevivalState()
+            revivalBaselineCaptured = false
             
             Timber.i("HardwareSuite: Starting deferred teardown sequence.")
             
@@ -903,7 +908,7 @@ class HardwareSuite @Inject constructor(
         }
     }
 
-    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; forensicAuditor.reset(); synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } }
+    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; forensicAuditor.reset(); revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } }
 
     private fun startStepDetectorRecoveryLoop() { recoveryJob?.cancel(); recoveryJob = scope.launch { while (isActive) { delay(300000L); if (!isStepDetectorRegistered) attemptStepRegistration() } } }
     private fun attemptStepDetectorRegistration() {

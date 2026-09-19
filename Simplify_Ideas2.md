@@ -1,4 +1,4 @@
-# Simplification Ideas (Sep.18.00)
+# Simplification Ideas (Sep.19.01)
 
 ## 💡 Architecture & Code De-cluttering
 1. **Connectivity Event Bus**: `ConnectivitySuite` uses a `SharedFlow` for internal events. As the number of events grows, consider a more structured `EventBus` or specialized observers to keep the suite's main logic focused on signaling.
@@ -8,3 +8,4 @@
 5. **HardwareSuite Decomposition**: Following the convergence in Issue #1093, `HardwareSuite` has become a primary authority for all sensors, GNSS, and power policies. To maintain long-term maintainability, consider decomposing it into specialized internal providers (e.g., `AcousticProvider`, `GnssProvider`) while keeping `HardwareSuite` as the single public-facing facade.
 6. **Hardware Lifecycle Debouncing**: The deferred unregistration logic in `HardwareSuite` could be generalized into a reusable `DebouncedLifecycle` component to prevent similar restart stalls in other system-level suites (e.g., `ConnectivitySuite`) during rapid lifecycle transitions.
 7. **Revival Pulse Job Management**: The revival logic in `HardwareSuite` now tracks multiple jobs (`revivalPulseJob`, `revivalBurstJob`). An internal `RevivalCoordinator` class could encapsulate this state, reducing the member variable footprint of `HardwareSuite` and simplifying the teardown sequence.
+8. **Encapsulation of Telemetry Flags**: Intermediate lifecycle flags like `revivalBaselineCaptured` could be managed inside a distinct `StallLifecycleState` object within `HardwareSuite`, automatically clearing all variables on teardown or reset events to prevent manual omission bugs.

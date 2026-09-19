@@ -1,8 +1,11 @@
-# Resolution Archive (Sep.15.101)
+# Resolution Archive (Sep.19.01)
+
+## 🟢 Sep.19.01
+*   **Battery Baseline Capture Persistence across Lifecycle Transitions (#1105)**: Resolved an issue in `HardwareSuite.kt` where the `revivalBaselineCaptured` flag was not reset to `false` when the suite was stopped or when its baseline was reset. This prevented a new battery baseline from being captured if the hardware suite went through lifecycle transitions (stopped and restarted) or baseline resets while in a GNSS stall state. The fix ensures the flag is properly cleared in `stop()` and `resetBaseline()`, allowing fresh battery baselines to be recorded for subsequent tracking sessions.
+*   **Version Advance**: Updated `app/build.gradle` and all status tracking documents to the `Sep.19.01` audit baseline.
 
 ## 🟢 Sep.19.00
 *   **Battery Baseline Recapture within Stalled Pending Cycles (#1104)**: Resolved a telemetry inconsistency in `HardwareSuite.kt` where the battery baseline for energy footprint audits was being prematurely recaptured during sustained GNSS stalls. Introduced the `revivalBaselineCaptured` flag to ensure that `ForensicAuditor.captureRevivalStart()` is invoked exactly once per pending cycle, even if intermediate audit events (such as `HardwareLock` triggers) consume and reset the internal baseline before the cycle completes. This ensures high-assurance energy metrics for the full duration of hardware recovery attempts.
-*   **Version Advance**: Updated `app/build.gradle` and all status documents to the `Sep.19.00` audit baseline.
 
 ## 🟢 Sep.18.00
 *   **Leaked Coroutines in GNSS Revival Burst Timer (#1103)**: Resolved a coroutine leak in `HardwareSuite.kt` where the 10-second raw GPS unregistration timeout was launched as an un-tracked child of a fire-and-forget registration task. Implemented explicit job tracking via `revivalBurstJob` and ensured immediate cancellation during suite teardown and safe-mode transitions, enforcing structured concurrency across the hardware revival pipeline.
