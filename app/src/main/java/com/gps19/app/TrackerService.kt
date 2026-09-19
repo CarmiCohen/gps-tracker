@@ -22,23 +22,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.19.08:
+ * - Issue #1113: Singleton State Collision. Used roleTag "T" for forensic auditing.
  * Sep.19.07:
  * - Issue #1112: Resolved Incomplete Reset in resetServiceTimers. 
  *   Ensured hardwareSuite.resetBaseline() is called during session termination.
- * Sep.17.05:
- * - Issue #1093: Dead Code Elimination. Purged UnifiedPowerPolicy and HardwareProvider.
- * Sep.17.02:
- * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
- * Sep.16.05:
- * - Issue #1060 Capability Consolidation: Checked performanceTier directly (R-ID 348).
- * Sep.16.02:
- * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
- *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 348).
- * Sep.16.00:
- * - Issue #1055 Unified Performance Tier: Broadened heuristic recovery thresholds 
- *   to all staggered performance devices (A15, S21FE) to ensure consistent 
- *   remediation of forensic latency spikes (R-ID 348, formerly R-ID 347). 
- *   Migrated to HardwareSuite.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -394,7 +382,7 @@ class TrackerService : BaseMonitorService() {
         locationProcessor.resetStats()
         sessionManager.reset()
         integrityMonitor.resetStats()
-        forensicAuditor.reset()
+        forensicAuditor.reset("T")
         hardwareSuite.resetBaseline()
         lastHardwareRecoveryTs = 0L
         logManager.logServiceEvent(m = "Session Terminated", isImportant = false)
@@ -484,7 +472,7 @@ class TrackerService : BaseMonitorService() {
         
         if (targetGpsInterval != currentIntervalMs) {
             currentIntervalMs = targetGpsInterval
-            forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval)
+            forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, "T")
             locationProcessor.updateExpectedInterval(nowRt, targetGpsInterval)
             hardwareSuite.setPollingInterval(targetGpsInterval)
         }
@@ -576,7 +564,7 @@ class TrackerService : BaseMonitorService() {
         val location = lastKnownLocation
         if (location != null) {
             val processed = locationProcessor.processGpsPoint(
-                lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed, gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing, snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = forensicAuditor.lastGpsFixRealtime, isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, nowWall = now, nowRt = nowRt,
+                lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed, gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing, snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = forensicAuditor.getLastGpsFixRealtime("T"), isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, nowWall = now, nowRt = nowRt,
                 providedIsStalled = health.gpsStalled,
                 isSuspicious = isSuspiciousMode
             )
@@ -807,7 +795,7 @@ class TrackerService : BaseMonitorService() {
         val nowRt = timeProvider.elapsedRealtime()
         lastKnownLocation = location; lastGpsSpeed = location.speed.toDouble(); lastGpsAccuracy = location.accuracy.toDouble(); lastGpsBearing = location.bearing.toDouble()
         
-        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs)?.let { gapMsg ->
+        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, "T")?.let { gapMsg ->
             val proc = lastProcessedLocation
             logManager.submitToLogSink(
                 message = "STABILITY GAP (T): $gapMsg",
@@ -829,7 +817,7 @@ class TrackerService : BaseMonitorService() {
             alarmManager.evaluateAlarms(
                 now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = true, isRelayConnected = isSocketConnected, isTrackerConnected = true, status = processed.status, isJammer = processed.jammerDetected, jumpTier = processed.jumpTier,
                 isAdaptiveJump = processed.isAdaptiveJump,
-                trackerLat = processed.optimizedPoint.lat, trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy, maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = lastKnownLocation?.time ?: 0L, trackerLastGpsRt = forensicAuditor.lastGpsFixRealtime, trackerLastValidFixRt = locationProcessor.getLastValidFixRt(), trackerSpeed = processed.filteredSpeed, trackerBattery = health.batteryLevel, trackerTemp = health.batteryTemp, isHardwareOnline = health.isHardwareOnline, isLocalInternetLoss = health.localInternetLoss, isSignalLoss = health.signalLoss, isGpsStalling = health.gpsStalled, isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = health.locationPendingReason == LocationPendingReason.GPS_GAP, isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper, trackerTiltDegrees = snapshot.tiltDegrees, trackerAcousticDb = snapshot.acousticDb, trackerBaroAlt = snapshot.baroAlt, trackerBaroAltEma = locationProcessor.getBaroBaseline(), trackerLux = snapshot.lux, isNear = snapshot.isNear, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = snapshot.peakShock, trackerCurrentMa = health.currentMa, capabilities = capabilities, isGpsHardwareLock = health.gpsHardwareLock, vibeSnapshot = snapshot.vibration,
+                trackerLat = processed.optimizedPoint.lat, trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy, maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = lastKnownLocation?.time ?: 0L, trackerLastGpsRt = forensicAuditor.getLastGpsFixRealtime("T"), trackerLastValidFixRt = locationProcessor.getLastValidFixRt(), trackerSpeed = processed.filteredSpeed, trackerBattery = health.batteryLevel, trackerTemp = health.batteryTemp, isHardwareOnline = health.isHardwareOnline, isLocalInternetLoss = health.localInternetLoss, isSignalLoss = health.signalLoss, isGpsStalling = health.gpsStalled, isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = health.locationPendingReason == LocationPendingReason.GPS_GAP, isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper, trackerTiltDegrees = snapshot.tiltDegrees, trackerAcousticDb = snapshot.acousticDb, trackerBaroAlt = snapshot.baroAlt, trackerBaroAltEma = locationProcessor.getBaroBaseline(), trackerLux = snapshot.lux, isNear = snapshot.isNear, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = snapshot.peakShock, trackerCurrentMa = health.currentMa, capabilities = capabilities, isGpsHardwareLock = health.gpsHardwareLock, vibeSnapshot = snapshot.vibration,
                 cpuLoad = health.cpuLoad, ioWait = health.ioWait, maxIoLatency = health.maxIoLatency,
                 isSilentFailure = health.isSilentFailure, isMaliAnomaly = health.isMaliAnomaly,
                 isUltraLongStationary = health.isUltraLongStationary,

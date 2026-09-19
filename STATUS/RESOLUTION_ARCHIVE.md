@@ -1,4 +1,9 @@
-# Project Resolution Archive (Sep.19.07)
+# Project Resolution Archive (Sep.15.101)
+
+## 🟢 Sep.19.08
+*   **Forensic Multi-Role Integrity Hardening (#1113)**: Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367).
+*   **Shared Sensor Rate Audit Flag Persistence (#1119)**: Decoupled the `isSensorRateAudited` flag in `ForensicAuditor` by moving it into the role-specific `RoleState` objects. This allows both Tracker and Viewer roles to complete their respective sensor rate efficacy audits independently.
+*   **Audit Baseline Advance**: advanced project metrics to [SOT Rules: 75, SOT IDs: 367, Resolved: 1113, QA: 282].
 
 ## 🟢 Sep.19.07
 *   **Incomplete Reset in resetServiceTimers (HardwareSuite State Persistence) (#1112)**: Updated both `TrackerService.kt` and `ViewerService.kt` to call `hardwareSuite.resetBaseline()` within the `resetServiceTimers()` method. This ensures that all internal hardware states, including IMU peak values, adaptive floors, and GNSS revival flags, are properly zeroed when a session is terminated or reset (R-ID 366).

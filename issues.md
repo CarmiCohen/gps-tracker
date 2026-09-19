@@ -5,11 +5,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
-*   **Issue #1113: Singleton State Collision in ForensicAuditor Multi-Role Tick**
-    *   *Detail*: `ForensicAuditor` is a Singleton tracking a single `lastStabilityAuditTs` and audit counters. When both `TrackerService` and `ViewerService` are active (or rapidly alternating), they both invoke `evaluateStability()`. The first service to tick after the audit interval consumes the results and resets the shared counters, leaving the other service with no audit data.
-    *   *Risk*: Erratic and roles-crossed stability logs in history; reliability metrics mangled due to shared state.
-    *   *File*: `ForensicAuditor.kt` (Lines 94-130).
-
 *   **Issue #1114: Thread-Safety and Visibility Vulnerabilities in HardwareSuite Snapshotting**
     *   *Detail*: Multiple non-volatile fields (e.g., `currentLux`, `currentAcousticDb`, `currentTiltDegrees`, `lastAnomalyActiveRt`) are updated on background threads and read in `consumeLogicSnapshot()` or `onSatelliteStatusChanged` on different threads without synchronization or volatile qualifiers. Furthermore, the "read-and-reset" pattern for peaks (e.g., `logicPeakVibration`) uses a different lock (`synchronized(logicSnapshotBuffer)`) than the update path (`synchronized(this)`).
     *   *Risk*: Memory visibility issues (Double/Long tearing) and inconsistent forensic snapshots under high system load.
@@ -35,11 +30,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
     *   *Risk*: Unintended battery drain on devices where specific permissions are withheld.
     *   *File*: `HardwareSuite.kt` (Line 508).
 
-*   **Issue #1119: Shared Sensor Rate Audit Flag Persistence**
-    *   *Detail*: `isSensorRateAudited` is a singleton flag in `ForensicAuditor`. Once one role completes the audit, it is suppressed for the other role indefinitely until a full reset, even if the other role has different sensor constraints.
-    *   *Risk*: Incomplete forensic auditing if roles are toggled or running concurrently.
-    *   *File*: `ForensicAuditor.kt` (Line 158).
-
 *   **Issue #1120: Inconsistent Jitter Audit during Adaptive GNSS Throttling**
     *   *Detail*: `ForensicAuditor.recordGnssStatus` uses a hardcoded `GNSS_EXPECTED_INTERVAL_MS` for jitter calculation, but `HardwareSuite` now adapts the GNSS sampling rate (R-ID 348). This causes false jitter alerts during intentional throttling periods.
     *   *Risk*: Spurious stability alerts in logs during cooling or high-load states.
@@ -54,8 +44,14 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1113: Singleton State Collision in ForensicAuditor Multi-Role Tick** (Resolved Sep.19.08)
+    *   *Remediation*: Refactored `ForensicAuditor.kt` to use role-based state tracking via `ConcurrentHashMap`. Implemented `RoleState` to encapsulate stability counters, GNSS jitter peaks, and sensor rate audit flags. Updated `TrackerService.kt` and `ViewerService.kt` to pass role tags ("T" and "V") to auditing methods, ensuring independent audits when both services are active. (R-ID 367)
+
+*   **Issue #1119: Shared Sensor Rate Audit Flag Persistence** (Resolved Sep.19.08)
+    *   *Remediation*: Decoupled the `isSensorRateAudited` flag in `ForensicAuditor` by moving it into the role-specific `RoleState` objects. This allows both Tracker and Viewer roles to complete their respective sensor rate efficacy audits independently.
+
 *   **Issue #1112: Incomplete Reset in resetServiceTimers (HardwareSuite State Persistence)** (Resolved Sep.19.07)
-    *   *Remediation*: Updated both `TrackerService.kt` and `ViewerService.kt` to call `hardwareSuite.resetBaseline()` within the `resetServiceTimers()` method. This ensures that all internal hardware states, including IMU peak values, adaptive floors, and GNSS revival flags, are properly zeroed when a session is terminated or reset.
+    *   *Remediation*: Updated both `TrackerService.kt` and `ViewerService.kt` to call `hardwareSuite.resetBaseline()` within the `resetServiceTimers()` method. This ensures that all internal hardware states, including IMU peak values, adaptive floors, and GNSS revival flags, are properly zeroed when a session is terminated or reset. (R-ID 366)
 
 *   **Issue #1111: Proximity Suppression Lock-in due to Hysteresis Persistence** (Resolved Sep.19.06)
     *   *Remediation*: Implemented temporal decay for the display flickering suppression logic in `HardwareSuite.kt`. By checking if the last display transition occurred within `DISPLAY_FLICKER_TIMEOUT_MS` (3s), the system now allows proximity "Far" transitions once flickering ceases, even without a further display event. Ensured state reset in `stop()` and `resetBaseline()`. (R-ID 365)
@@ -93,4 +89,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 366 (Rules: 74, IDs: 366), Resolved: 1112, Open: 9, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**
+- **Current Audit Baseline: [SOT: 367 (Rules: 75, IDs: 367), Resolved: 1113, Open: 7, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**

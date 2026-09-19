@@ -2,6 +2,7 @@ package com.gps19.app
 
 import com.gps19.core.engine.*
 import timber.log.Timber
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -9,45 +10,61 @@ import kotlin.math.round
 
 /**
  * ForensicAuditor: Encapsulates high-assurance hardware audits (Stability, Jitter, Sensor Rates, Energy).
- * Sep.19.02:
- * - Issue #1106: Resolved Energy Footprint Data Loss following Intermediate Audit Consumption.
- *   Modified computeEnergyFootprint to accept a 'consume' parameter, allowing
- *   intermediate events (HardwareLock) to peek at the footprint without clearing 
- *   the baseline, ensuring the final Success event retains total cycle data.
- * Sep.17.02:
- * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
- * Sep.11.60:
- * - Issue #1006: Simplification Idea #14. Centralized GNSS Stability Muzzling. 
- *   ForensicAuditor now tracks interval history to automatically suppress 
- *   false-positives during transitions (R-ID 262).
- * - Issue #917 Hardening (Part B): Consolidated stability muzzling logic.
- * Sep.11.58:
- * - Issue #950 Hardening: Implemented transition muzzling in recordGpsFix to 
- *   eliminate false-positive stability gaps during polling interval adaptation.
+ * Sep.19.08:
+ * - Issue #1113: Resolved Singleton State Collision in Multi-Role Tick.
+ *   Implemented role-based state tracking for stability and sensor audits.
+ * - Issue #1119: Resolved Shared Sensor Rate Audit Flag Persistence.
+ *   Each role now maintains its own sensor rate audit state.
  */
 @Singleton
 class ForensicAuditor @Inject constructor(
     private val timeProvider: TimeProvider,
     private val systemStatusProvider: SystemStatusProvider
 ) {
-    // --- GNSS Jitter & Stability Monitoring ---
-    var maxGnssJitterMs = 0L; private set
-    private var lastGnssStatusRt = 0L
-    
-    var lastGpsFixRealtime = 0L; private set
-    private var stabilityAuditFixCount = 0
-    private var stabilityAuditViolationCount = 0
-    private var lastStabilityAuditTs = 0L
+    private class RoleState {
+        var maxGnssJitterMs = 0L
+        var lastGpsFixRealtime = 0L
+        var stabilityAuditFixCount = 0
+        var stabilityAuditViolationCount = 0
+        var lastStabilityAuditTs = 0L
 
-    private var lastExpectedIntervalMs = 0L
-    private var lastIntervalChangeRt = 0L
+        var lastExpectedIntervalMs = 0L
+        var lastIntervalChangeRt = 0L
+        
+        var accelEventCount = 0
+        var accelAuditStartRt = 0L
+        var isSensorRateAudited = false
+
+        fun reset() {
+            maxGnssJitterMs = 0L
+            lastGpsFixRealtime = 0L
+            stabilityAuditFixCount = 0
+            stabilityAuditViolationCount = 0
+            lastStabilityAuditTs = 0L
+            lastExpectedIntervalMs = 0L
+            lastIntervalChangeRt = 0L
+            accelEventCount = 0
+            accelAuditStartRt = 0L
+            isSensorRateAudited = false
+        }
+    }
+
+    private val roleStates = ConcurrentHashMap<String, RoleState>().apply {
+        put("T", RoleState())
+        put("V", RoleState())
+    }
+
+    // Jitter source tracking
+    private var lastGnssStatusRt = 0L
 
     fun recordGnssStatus(nowRt: Long) {
         if (lastGnssStatusRt > 0) {
             val interval = nowRt - lastGnssStatusRt
             val jitter = abs(interval - GNSS_EXPECTED_INTERVAL_MS)
-            if (jitter > maxGnssJitterMs) {
-                maxGnssJitterMs = jitter
+            roleStates.values.forEach { state ->
+                if (jitter > state.maxGnssJitterMs) {
+                    state.maxGnssJitterMs = jitter
+                }
             }
         }
         lastGnssStatusRt = nowRt
@@ -56,46 +73,48 @@ class ForensicAuditor @Inject constructor(
     /**
      * Updates the expected polling interval and tracks transitions for muzzling.
      */
-    fun updateExpectedInterval(nowRt: Long, expectedIntervalMs: Long) {
-        if (expectedIntervalMs != lastExpectedIntervalMs) {
-            if (lastExpectedIntervalMs != 0L) {
-                lastIntervalChangeRt = nowRt
+    fun updateExpectedInterval(nowRt: Long, expectedIntervalMs: Long, roleTag: String) {
+        val state = roleStates[roleTag] ?: return
+        if (expectedIntervalMs != state.lastExpectedIntervalMs) {
+            if (state.lastExpectedIntervalMs != 0L) {
+                state.lastIntervalChangeRt = nowRt
             }
-            lastExpectedIntervalMs = expectedIntervalMs
+            state.lastExpectedIntervalMs = expectedIntervalMs
         }
     }
 
     /**
      * Returns true if the system is currently in a stability muzzling window (adaptation).
      */
-    fun isAdaptationMuzzled(nowRt: Long): Boolean {
-        if (lastIntervalChangeRt == 0L) return false
-        return nowRt - lastIntervalChangeRt < ADAPTATION_SETTLING_MS
+    fun isAdaptationMuzzled(nowRt: Long, roleTag: String): Boolean {
+        val state = roleStates[roleTag] ?: return false
+        if (state.lastIntervalChangeRt == 0L) return false
+        return nowRt - state.lastIntervalChangeRt < ADAPTATION_SETTLING_MS
     }
 
     /**
      * Records a GPS fix and returns a gap message if a stability violation is detected.
-     * Centralized Muzzling: Automatically ignores gaps during polling interval transitions.
      */
-    fun recordGpsFix(nowRt: Long, expectedIntervalMs: Long): String? {
-        updateExpectedInterval(nowRt, expectedIntervalMs)
-        val isMuzzled = isAdaptationMuzzled(nowRt)
+    fun recordGpsFix(nowRt: Long, expectedIntervalMs: Long, roleTag: String): String? {
+        updateExpectedInterval(nowRt, expectedIntervalMs, roleTag)
+        val state = roleStates[roleTag] ?: return null
+        val isMuzzled = isAdaptationMuzzled(nowRt, roleTag)
         
         var gapMessage: String? = null
-        if (lastGpsFixRealtime > 0) {
-            val gap = nowRt - lastGpsFixRealtime
-            stabilityAuditFixCount++
+        if (state.lastGpsFixRealtime > 0) {
+            val gap = nowRt - state.lastGpsFixRealtime
+            state.stabilityAuditFixCount++
             if (gap > expectedIntervalMs + GPS_STABILITY_GAP_THRESHOLD_MS) {
                 if (!isMuzzled) {
-                    stabilityAuditViolationCount++
+                    state.stabilityAuditViolationCount++
                     gapMessage = "${gap}ms detected during logic pulse."
                 } else {
-                    Timber.d("ForensicAuditor: Stability gap of ${gap}ms muzzled (Adaptation).")
+                    Timber.d("ForensicAuditor: Stability gap of ${gap}ms muzzled (Adaptation $roleTag).")
                 }
             }
         }
-        lastGpsFixRealtime = nowRt
-        if (lastStabilityAuditTs == 0L) lastStabilityAuditTs = nowRt
+        state.lastGpsFixRealtime = nowRt
+        if (state.lastStabilityAuditTs == 0L) state.lastStabilityAuditTs = nowRt
         return gapMessage
     }
 
@@ -109,14 +128,15 @@ class ForensicAuditor @Inject constructor(
      * Evaluates stability over the audit interval.
      */
     fun evaluateStability(nowRt: Long, roleTag: String): StabilityVerdict? {
-        if (nowRt - lastStabilityAuditTs <= GPS_STABILITY_AUDIT_INTERVAL_MS) return null
+        val state = roleStates[roleTag] ?: return null
+        if (nowRt - state.lastStabilityAuditTs <= GPS_STABILITY_AUDIT_INTERVAL_MS) return null
         
-        val fixCount = stabilityAuditFixCount
-        val violationCount = stabilityAuditViolationCount
-        val jitter = maxGnssJitterMs
+        val fixCount = state.stabilityAuditFixCount
+        val violationCount = state.stabilityAuditViolationCount
+        val jitter = state.maxGnssJitterMs
         
         if (fixCount == 0 && jitter == 0L) {
-            lastStabilityAuditTs = nowRt
+            state.lastStabilityAuditTs = nowRt
             return null
         }
 
@@ -142,10 +162,10 @@ class ForensicAuditor @Inject constructor(
         }
 
         // Reset for next window
-        stabilityAuditFixCount = 0
-        stabilityAuditViolationCount = 0
-        maxGnssJitterMs = 0L
-        lastStabilityAuditTs = nowRt
+        state.stabilityAuditFixCount = 0
+        state.stabilityAuditViolationCount = 0
+        state.maxGnssJitterMs = 0L
+        state.lastStabilityAuditTs = nowRt
         
         return verdict
     }
@@ -153,34 +173,37 @@ class ForensicAuditor @Inject constructor(
     private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
 
     fun resetGnssJitter() {
-        maxGnssJitterMs = 0L
+        roleStates.values.forEach { it.maxGnssJitterMs = 0L }
         lastGnssStatusRt = 0L
     }
 
-    // --- Sensor Rate Audit (R-ID 256) ---
-    private var accelEventCount = 0
-    private var accelAuditStartRt = 0L
-    private var isSensorRateAudited = false
-
-    fun auditSensorRate(nowRt: Long, isWarming: Boolean): String? {
-        if (isSensorRateAudited || isWarming) return null
+    /**
+     * Audits sensor rate and returns messages for roles that just completed their audit.
+     */
+    fun auditSensorRate(nowRt: Long, isWarming: Boolean): List<Pair<String, String>> {
+        if (isWarming) return emptyList()
+        val results = mutableListOf<Pair<String, String>>()
         
-        if (accelAuditStartRt == 0L) {
-            accelAuditStartRt = nowRt
+        roleStates.forEach { (role, state) ->
+            if (state.isSensorRateAudited) return@forEach
+            
+            if (state.accelAuditStartRt == 0L) {
+                state.accelAuditStartRt = nowRt
+            }
+            
+            state.accelEventCount++
+            
+            if (nowRt - state.accelAuditStartRt >= 1000L) {
+                val durationSec = (nowRt - state.accelAuditStartRt) / 1000.0
+                val hz = state.accelEventCount.toDouble() / durationSec
+                val isEffective = hz > 200.0
+                state.isSensorRateAudited = true
+                val msg = "Sensor Rate Audit (R-ID 256): ${hz.toInt()} Hz. Efficacy: $isEffective"
+                Timber.i("ForensicAuditor: [$role] $msg")
+                results.add(role to msg)
+            }
         }
-        
-        accelEventCount++
-        
-        if (nowRt - accelAuditStartRt >= 1000L) {
-            val durationSec = (nowRt - accelAuditStartRt) / 1000.0
-            val hz = accelEventCount.toDouble() / durationSec
-            val isEffective = hz > 200.0
-            isSensorRateAudited = true
-            val msg = "Sensor Rate Audit (R-ID 256): ${hz.toInt()} Hz. Efficacy: $isEffective"
-            Timber.i("ForensicAuditor: $msg")
-            return msg
-        }
-        return null
+        return results
     }
 
     // --- Energy Footprint Snapshot (R-ID 259) ---
@@ -218,17 +241,17 @@ class ForensicAuditor @Inject constructor(
         revivalStartRtForFootprint = 0L
     }
 
-    fun reset() {
-        resetGnssJitter()
-        lastGpsFixRealtime = 0L
-        stabilityAuditFixCount = 0
-        stabilityAuditViolationCount = 0
-        lastStabilityAuditTs = 0L
-        accelEventCount = 0
-        accelAuditStartRt = 0L
-        isSensorRateAudited = false
-        clearRevivalState()
-        lastExpectedIntervalMs = 0L
-        lastIntervalChangeRt = 0L
+    fun reset(roleTag: String? = null) {
+        if (roleTag == null) {
+            roleStates.values.forEach { it.reset() }
+            resetGnssJitter()
+            clearRevivalState()
+        } else {
+            roleStates[roleTag]?.reset()
+        }
     }
+
+    val maxGnssJitterMs get() = roleStates.values.maxOfOrNull { it.maxGnssJitterMs } ?: 0L
+
+    fun getLastGpsFixRealtime(roleTag: String): Long = roleStates[roleTag]?.lastGpsFixRealtime ?: 0L
 }

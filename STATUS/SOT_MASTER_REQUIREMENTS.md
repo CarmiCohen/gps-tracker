@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.19.07)
+# SOT Master Requirements & Hardening Status (Sep.15.101)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 367**: Forensic Multi-Role Integrity Hardening - Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367). (Resolved Sep.19.08)
 *   **SOT ID 366**: Hardware Reset Integrity Hardening - Ensured `hardwareSuite.resetBaseline()` is invoked during session termination in both `TrackerService` and `ViewerService`. This prevents stale IMU peaks, adaptive vibration floors, and GNSS revival flags from persisting across monitoring sessions, maintaining high forensic integrity between restarts (R-ID 366). (Resolved Sep.19.07)
 *   **SOT ID 365**: Proximity Suppression Hysteresis Hardening - Implemented temporal decay for the display flickering suppression logic in `HardwareSuite.kt`. By checking if the last display transition occurred within `DISPLAY_FLICKER_TIMEOUT_MS` (3s), the system now allows proximity "Far" transitions once flickering ceases, even without a further display event. This prevents suppression "lock-in" on stationary devices (R-ID 365). (Resolved Sep.19.06)
 *   **SOT ID 364**: GNSS Initialization Race Remediation - Reordered state initialization in `HardwareSuite.start()` to ensure `sessionStartRt` and `lastFixRt` are populated before the `isStarted` flag is set. This prevents the background audit loop from calculating false GPS gaps against zeroed values during the micro-window of session activation (R-ID 364). (Resolved Sep.19.05)
@@ -13,16 +14,17 @@
 *   **SOT ID 357**: Structured Concurrency Burst Hardening - Resolved a coroutine leak in `HardwareSuite.kt` by tracking the 10-second raw GPS revival timeout via `revivalBurstJob`. Ensured immediate cancellation during suite teardown and safe mode transitions (R-ID 357). (Resolved Sep.18.00)
 
 ## 📈 Metric Summary
-- **Rules Verified**: 74
-- **Total SOT IDs**: 366
-- **Resolved Issues**: 1112
-- **Open Issues**: 9
+- **Rules Verified**: 75
+- **Total SOT IDs**: 367
+- **Resolved Issues**: 1114
+- **Open Issues**: 7
 - **Testing Coverage**: 2 (Sub-items: 10)
-- **Simplification Ideas**: 18
+- **Simplification Ideas**: 19
 - **QA Validation Tasks**: 282
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.30 (Hardware Reset Integrity)**: PASSED - Verified hardwareSuite.resetBaseline() call in resetServiceTimers (Sep.19.07)
+*   **Chapter 31.31 (Multi-Role Audit)**: PASSED - Verified role-based state separation in ForensicAuditor (Sep.15.101)
+*   **Chapter 31.30 (Hardware Reset Integrity)**: PASSED - Verified hardwareSuite.resetBaseline() call in resetServiceTimers (Sep.15.101)
 *   **Chapter 31.29 (Proximity Hysteresis)**: PASSED - Verified temporal decay logic for flickering suppression (Sep.15.101)
 *   **Chapter 31.28 (Initialization Race)**: PASSED - Verified that lastFixRt is initialized before isStarted flag in start() (Sep.15.101)
 *   **Chapter 31.27 (Structured Burst Cleanup)**: PASSED - Verified that Raw/Fused listeners are unregistered via try-finally on coroutine cancellation (Sep.15.101)
@@ -31,4 +33,4 @@
 *   **Chapter 31.24 (Stall Timing Leakage)**: PASSED - Verified that revival state resets cleanly on stop and audits are gated by suite lifecycle (Sep.15.101)
 
 ---
-*Next Audit: Sep.20.00. (Sep.19.07)*
+*Next Audit: Sep.20.00. (Sep.15.101)*

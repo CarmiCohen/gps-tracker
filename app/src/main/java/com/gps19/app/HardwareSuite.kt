@@ -35,6 +35,9 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.19.08:
+ * - Issue #1113: Singleton State Collision. Adapted sensor rate auditing to 
+ *   handle multi-role forensic results from ForensicAuditor.
  * Sep.19.06:
  * - Issue #1111: Resolved Proximity Suppression Lock-in due to Hysteresis Persistence.
  *   Implemented temporal decay (DISPLAY_FLICKER_TIMEOUT_MS) for the flickering 
@@ -704,8 +707,8 @@ class HardwareSuite @Inject constructor(
                 processVibration(values[0], values[1], values[2]); updateOrientation()
                 if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) { lastStayAliveRt = nowRt; systemMonitor.acquireWakeLock(force = true) }
 
-                forensicAuditor.auditSensorRate(nowRt, isWarming)?.let { msg ->
-                    _sensorEvents.tryEmit(AppSensorEvent.LogEvent(msg, false))
+                forensicAuditor.auditSensorRate(nowRt, isWarming).forEach { (role, msg) ->
+                    _sensorEvents.tryEmit(AppSensorEvent.LogEvent("[$role] $msg", false))
                 }
             }
             Sensor.TYPE_LINEAR_ACCELERATION -> processLinearAcceleration(values[0], values[1], values[2], event.timestamp)

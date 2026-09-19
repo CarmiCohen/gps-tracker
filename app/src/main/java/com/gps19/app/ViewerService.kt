@@ -17,24 +17,11 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.19.08:
+ * - Issue #1113: Singleton State Collision. Used roleTag "V" for forensic auditing.
  * Sep.19.07:
  * - Issue #1112: Resolved Incomplete Reset in resetServiceTimers. 
  *   Ensured hardwareSuite.resetBaseline() is called during session termination.
- * Sep.17.05:
- * - Issue #1093: Dead Code Elimination. Purged UnifiedPowerPolicy and HardwareProvider.
- * Sep.17.02:
- * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
- * Sep.16.05:
- * - Issue #1060 Capability Consolidation: Checked performanceTier directly, fixed 
- *   hardcoded poke symmetry literal (R-ID 348).
- * Sep.16.02:
- * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
- *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 348).
- * Sep.16.00:
- * - Issue #1055 Unified Performance Tier: Broadened heuristic recovery thresholds 
- *   to all staggered performance devices (A15, S21FE) to ensure consistent 
- *   remediation of forensic latency spikes (R-ID 348, formerly R-ID 347). 
- *   Migrated to HardwareSuite.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -356,7 +343,7 @@ class ViewerService : BaseMonitorService() {
         
         lastGpsSpeed = location.speed.toDouble(); lastGpsAccuracy = location.accuracy.toDouble(); lastGpsBearing = location.bearing.toDouble()
 
-        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs)?.let { gapMsg ->
+        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, "V")?.let { gapMsg ->
             val proc = lastProcessedLocation
             logManager.submitToLogSink(
                 message = "STABILITY GAP (V): $gapMsg",
@@ -428,7 +415,7 @@ class ViewerService : BaseMonitorService() {
         val proc = lastProcessedLocation
         serviceStartRealtime = timeProvider.elapsedRealtime(); serviceStartWall = timeProvider.currentTimeMillis()
         alarmManager.resetEvaluation(); sessionManager.reset(); integrityMonitor.resetStats(); forensicUseCase.resetLatches(); 
-        forensicAuditor.reset()
+        forensicAuditor.reset("V")
         hardwareSuite.resetBaseline()
         lastHardwareRecoveryTs = 0L
         
@@ -495,7 +482,7 @@ class ViewerService : BaseMonitorService() {
         val targetGpsInterval = if (isUiVisible()) HIGH_FREQUENCY_GPS_POLLING_MS else VIEWER_GPS_POLLING_MS
         if (targetGpsInterval != currentIntervalMs) {
             currentIntervalMs = targetGpsInterval
-            forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval)
+            forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, "V")
             selfProcessor.updateExpectedInterval(nowRt, targetGpsInterval)
             hardwareSuite.setPollingInterval(targetGpsInterval)
         }
