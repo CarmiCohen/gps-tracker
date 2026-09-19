@@ -5,11 +5,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
-*   **Issue #1108: Redundant Battery Baseline Capture in Background/Idle State**
-    *   *Problem*: The `init` loop triggers `forensicAuditor.captureRevivalStart()` as soon as the app starts (since `lastFixRt` is 0).
-    *   *Effect*: Unnecessary overhead and potential for stale baseline data if tracking starts much later than app initialization.
-    *   *Details*: `HardwareSuite.kt` lines 714-722.
-
 *   **Issue #1109: Resource Leak in GNSS Revival Burst during Safe Mode Transition**
     *   *Problem*: `setSafeMode(true)` cancels `revivalBurstJob` but does not unregister the `rawRevivalListener`.
     *   *Effect*: The raw GPS provider remains active if safe mode is toggled during a 10-second burst, leading to unintended high battery drain.
@@ -18,6 +13,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1108: Redundant Battery Baseline Capture in Background/Idle State** (Resolved Sep.19.03)
+    *   *Remediation*: Fully resolved the redundant battery baseline capture logic by initializing `lastFixRt` to `sessionStartRt` inside both `start()` and `resetBaseline()`. This guarantees a proper grace period before any GNSS gap or stall state can be declared, preventing immediate redundant baseline captures upon app activation or reset. (R-ID 361)
 
 *   **Issue #1107: GNSS Stall Timing Leakage during Suite Inactivity** (Resolved Sep.19.02)
     *   *Remediation*: Implemented explicit reset of revival state variables (`pendingEnterRt`, `revivalAttemptCount`, etc.) in `stop()` and `resetBaseline()`. Guarded the background audit loop in `HardwareSuite.kt` with `isStarted.get()` to prevent `pendingEnterRt` from accumulating stall duration while the suite is inactive, ensuring no immediate hardware locks occur upon activation. (R-ID 360)
@@ -43,4 +41,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 360 (Rules: 72, IDs: 360), Resolved: 1107, Open: 2, Testing: 2 (Sub-items: 10), Ideas: 18, QA: 281]**
+- **Current Audit Baseline: [SOT: 362 (Rules: 72, IDs: 362), Resolved: 1108, Open: 1, Testing: 2 (Sub-items: 10), Ideas: 18, QA: 281]**

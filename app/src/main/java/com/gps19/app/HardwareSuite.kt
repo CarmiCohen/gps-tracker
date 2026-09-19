@@ -35,8 +35,12 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.19.03:
+ * - Issue #1108: Fully Resolved Redundant Battery Baseline Capture in Background/Idle State.
+ *   Initialized lastFixRt to sessionStartRt in start() and resetBaseline() to ensure a proper
+ *   grace period before a GNSS gap or stall is declared, preventing immediate redundant baseline capture.
  * Sep.19.02:
- * - Issue #1109: Resolved Resource Leak in GNSS Revival Burst during Safe Mode.
+ * - Issue #1109: Resolved Resource Leak in GNSS Revival Burst during Safe Mode Transition.
  *   Ensured rawRevivalListener and revivalCallback are explicitly unregistered 
  *   when Safe Mode is toggled on, preventing raw GPS provider persistence.
  * - Issue #1107: Resolved GNSS Stall Timing Leakage during Suite Inactivity.
@@ -395,6 +399,7 @@ class HardwareSuite @Inject constructor(
             
             isTeardownActive.set(false)
             sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt
+            lastFixRt = sessionStartRt // Issue #1108: Initialize to prevent immediate redundant capture
             proximityMaxRange = proximity?.maximumRange ?: 5f
             
             if (hardwareThread == null || !hardwareThread!!.isAlive) {
@@ -933,7 +938,7 @@ class HardwareSuite @Inject constructor(
 
     fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; forensicAuditor.reset(); revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
         // Issue #1107: Reset revival state.
-        pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = 0L; currentLocationStatus = LocationStatus(); _locationStatus.tryEmit(currentLocationStatus)
+        pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = sessionStartRt; currentLocationStatus = LocationStatus(); _locationStatus.tryEmit(currentLocationStatus)
     }
 
     private fun startStepDetectorRecoveryLoop() { recoveryJob?.cancel(); recoveryJob = scope.launch { while (isActive) { delay(300000L); if (!isStepDetectorRegistered) attemptStepRegistration() } } }
