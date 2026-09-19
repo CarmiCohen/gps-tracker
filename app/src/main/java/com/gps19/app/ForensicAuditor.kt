@@ -9,6 +9,11 @@ import kotlin.math.round
 
 /**
  * ForensicAuditor: Encapsulates high-assurance hardware audits (Stability, Jitter, Sensor Rates, Energy).
+ * Sep.19.02:
+ * - Issue #1106: Resolved Energy Footprint Data Loss following Intermediate Audit Consumption.
+ *   Modified computeEnergyFootprint to accept a 'consume' parameter, allowing
+ *   intermediate events (HardwareLock) to peek at the footprint without clearing 
+ *   the baseline, ensuring the final Success event retains total cycle data.
  * Sep.17.02:
  * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.11.60:
@@ -189,7 +194,7 @@ class ForensicAuditor @Inject constructor(
         }
     }
 
-    fun computeEnergyFootprint(nowRt: Long): HardwareSuite.RevivalEvent.Footprint? {
+    fun computeEnergyFootprint(nowRt: Long, consume: Boolean = true): HardwareSuite.RevivalEvent.Footprint? {
         val start = revivalStartBattery ?: return null
         val startRt = revivalStartRtForFootprint
         val current = systemStatusProvider.getBatteryStatus()
@@ -200,8 +205,10 @@ class ForensicAuditor @Inject constructor(
         
         Timber.i("ForensicAuditor: Energy Footprint Verdict (R-ID 259): Delta mA: $deltaMa, Delta Temp: $deltaTemp°C, Duration: ${durationMs}ms")
         
-        revivalStartBattery = null
-        revivalStartRtForFootprint = 0L
+        if (consume) {
+            revivalStartBattery = null
+            revivalStartRtForFootprint = 0L
+        }
         
         return HardwareSuite.RevivalEvent.Footprint(deltaMa, deltaTemp, durationMs)
     }

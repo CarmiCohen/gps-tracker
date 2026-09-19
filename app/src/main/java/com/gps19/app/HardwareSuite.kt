@@ -35,6 +35,21 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.19.02:
+ * - Issue #1109: Resolved Resource Leak in GNSS Revival Burst during Safe Mode.
+ *   Ensured rawRevivalListener and revivalCallback are explicitly unregistered 
+ *   when Safe Mode is toggled on, preventing raw GPS provider persistence.
+ * - Issue #1107: Resolved GNSS Stall Timing Leakage during Suite Inactivity.
+ *   Guarded the background init loop with isStarted.get() to prevent pendingEnterRt 
+ *   from accumulating stall duration while inactive. Ensured explicit reset of 
+ *   revival state variables in stop() and resetBaseline().
+ * - Issue #1108: Resolved Redundant Battery Baseline Capture in Background.
+ *   Guarded updateLocationStatus in the init loop to prevent forensicAuditor.captureRevivalStart 
+ *   from triggering while the suite is stopped.
+ * - Issue #1106: Resolved Energy Footprint Data Loss following Intermediate Audit Consumption.
+ *   Modified the HardwareLock event in checkRevivalLifecycle to peek at the battery 
+ *   footprint without clearing the baseline, ensuring the final recovery Success event 
+ *   retains the total cycle's energy data.
  * Sep.19.01:
  * - Issue #1105: Resolved Battery Baseline Capture Persistence across Lifecycle Transitions.
  *   Ensured revivalBaselineCaptured is properly reset to false within stop() and resetBaseline()
@@ -44,18 +59,6 @@ import kotlin.math.*
  *   Implemented revivalBaselineCaptured flag to ensure a single battery baseline 
  *   capture per GNSS pending cycle, preventing premature recapture if intermediate 
  *   audits (like HardwareLock) consume the baseline.
- * Sep.18.00:
- * - Issue #1103: Resolved Leaked Coroutines in GNSS Revival Burst Timer.
- *   Tracked the 10-second raw burst timeout via revivalBurstJob to ensure immediate 
- *   cancellation during suite teardown, preventing structured concurrency leaks.
- * Sep.17.11:
- * - Issue #1102: Resolved Blocked Thread Restart Latency during Polling Interval Changes.
- *   Moved physical unregistration to the 800ms teardown grace period, allowing start() 
- *   to rescue existing registrations during rapid lifecycle rotations.
- * Sep.17.10:
- * - Issue #1101: Resolved Asynchronous Unregistration Race Condition in setPowerSaveMode.
- *   Ensured that sensor unregistration and re-registration are executed sequentially 
- *   on the hardware handler thread to prevent telemetry dropout during mode switches.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -361,9 +364,12 @@ class HardwareSuite @Inject constructor(
             _isGnssThrottled.tryEmit(isGnssThrottled)
             
             while (isActive) {
-                updateLocationStatus()
-                checkRevivalLifecycle()
-                updateStationaryExposure()
+                // Issue #1107: Guard background audits to prevent stall timing leakage while stopped.
+                if (isStarted.get()) {
+                    updateLocationStatus()
+                    checkRevivalLifecycle()
+                    updateStationaryExposure()
+                }
                 delay(2000L)
             }
         }
@@ -433,6 +439,15 @@ class HardwareSuite @Inject constructor(
             
             forensicAuditor.clearRevivalState()
             revivalBaselineCaptured = false
+            
+            // Issue #1107: Explicit reset of revival state to prevent cross-session stall leakage.
+            pendingEnterRt = 0L
+            recoveryStartRt = 0L
+            revivalAttemptCount = 0
+            isHardwareLocked = false
+            lastFixRt = 0L
+            currentLocationStatus = LocationStatus()
+            _locationStatus.tryEmit(currentLocationStatus)
             
             Timber.i("HardwareSuite: Starting deferred teardown sequence.")
             
@@ -882,10 +897,18 @@ class HardwareSuite @Inject constructor(
     fun setSafeMode(active: Boolean) { 
         this.isSafeMode = active 
         if (active) {
-            revivalPulseJob?.cancel()
-            revivalPulseJob = null
-            revivalBurstJob?.cancel()
-            revivalBurstJob = null
+            synchronized(lifecycleLock) {
+                revivalPulseJob?.cancel()
+                revivalPulseJob = null
+                revivalBurstJob?.cancel()
+                revivalBurstJob = null
+                
+                val handler = hardwareHandler
+                revivalCallback?.unregister(fusedLocationClient, handler)
+                revivalCallback = null
+                rawRevivalListener?.unregister(locationManager, handler)
+                rawRevivalListener = null
+            }
             Timber.i("HardwareSuite: Safe Mode active. Revival pulses suppressed.")
         }
     }
@@ -908,7 +931,10 @@ class HardwareSuite @Inject constructor(
         }
     }
 
-    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; forensicAuditor.reset(); revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } }
+    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; forensicAuditor.reset(); revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
+        // Issue #1107: Reset revival state.
+        pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = 0L; currentLocationStatus = LocationStatus(); _locationStatus.tryEmit(currentLocationStatus)
+    }
 
     private fun startStepDetectorRecoveryLoop() { recoveryJob?.cancel(); recoveryJob = scope.launch { while (isActive) { delay(300000L); if (!isStepDetectorRegistered) attemptStepRegistration() } } }
     private fun attemptStepDetectorRegistration() {
@@ -944,7 +970,8 @@ class HardwareSuite @Inject constructor(
                     isHardwareLocked = true
                     Timber.e("HardwareSuite: MAX REVIVAL ATTEMPTS REACHED. GPS_HARDWARE_LOCK triggered.")
                     _revivalEvents.tryEmit(RevivalEvent.HardwareLock)
-                    forensicAuditor.computeEnergyFootprint(nowRt)?.let { _revivalEvents.tryEmit(it) }
+                    // Issue #1106: Peak at the battery footprint without clearing the baseline.
+                    forensicAuditor.computeEnergyFootprint(nowRt, consume = false)?.let { _revivalEvents.tryEmit(it) }
                 }
             }
         } else { revivalAttemptCount = 0; isHardwareLocked = false }
