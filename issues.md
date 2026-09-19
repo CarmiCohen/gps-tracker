@@ -5,11 +5,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
-*   **Issue #1114: Thread-Safety and Visibility Vulnerabilities in HardwareSuite Snapshotting**
-    *   *Detail*: Multiple non-volatile fields (e.g., `currentLux`, `currentAcousticDb`, `currentTiltDegrees`, `lastAnomalyActiveRt`) are updated on background threads and read in `consumeLogicSnapshot()` or `onSatelliteStatusChanged` on different threads without synchronization or volatile qualifiers. Furthermore, the "read-and-reset" pattern for peaks (e.g., `logicPeakVibration`) uses a different lock (`synchronized(logicSnapshotBuffer)`) than the update path (`synchronized(this)`).
-    *   *Risk*: Memory visibility issues (Double/Long tearing) and inconsistent forensic snapshots under high system load.
-    *   *File*: `HardwareSuite.kt` (Lines 605-625, 218).
-
 *   **Issue #1115: Stale Forensic and SNR Buffers across Suite Lifecycle**
     *   *Detail*: `HardwareSuite` circular buffers (`sensorBuffer`, `snrBuffer`, `logicSnapshotBuffer`, `forensicSnapshotBuffer`) are only cleared in `resetBaseline()`. They are not cleared in `stop()`. If the service is stopped and restarted without a full process termination, the buffers contain data from the previous session.
     *   *Risk*: Corrupted history graphs and delayed GNSS throttling recovery after service restarts.
@@ -43,6 +38,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1114: Thread-Safety and Visibility Vulnerabilities in HardwareSuite Snapshotting** (Resolved Sep.19.09)
+    *   *Remediation*: Applied `@Volatile` to high-frequency state variables (lux, acoustic, tilt, velocity, etc.) to ensure cross-thread visibility. Unified the synchronization strategy by wrapping both the sensor update paths and the forensic snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, ensuring atomic read-and-reset operations. (R-ID 368)
 
 *   **Issue #1113: Singleton State Collision in ForensicAuditor Multi-Role Tick** (Resolved Sep.19.08)
     *   *Remediation*: Refactored `ForensicAuditor.kt` to use role-based state tracking via `ConcurrentHashMap`. Implemented `RoleState` to encapsulate stability counters, GNSS jitter peaks, and sensor rate audit flags. Updated `TrackerService.kt` and `ViewerService.kt` to pass role tags ("T" and "V") to auditing methods, ensuring independent audits when both services are active. (R-ID 367)
@@ -89,4 +87,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 367 (Rules: 75, IDs: 367), Resolved: 1113, Open: 7, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**
+- **Current Audit Baseline: [SOT: 368 (Rules: 76, IDs: 368), Resolved: 1114, Open: 6, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**

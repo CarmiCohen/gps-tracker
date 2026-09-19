@@ -1,5 +1,9 @@
 # Project Resolution Archive (Sep.15.101)
 
+## 🟢 Sep.19.09
+*   **HardwareSuite Thread-Safety and Visibility Vulnerabilities (#1114)**: Resolved memory visibility and race conditions in `HardwareSuite.kt` snapshotting logic. Applied `@Volatile` to high-frequency shared state variables (lux, acousticDb, tilt, velocity, etc.) to ensure correct cross-thread reads during forensic audits. Unified the synchronization strategy by wrapping both the sensor update handlers and the peak-reset snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, guaranteeing atomic "read-and-reset" operations under high system load (R-ID 368).
+*   **Audit Baseline Advance**: advanced project metrics to [SOT Rules: 76, SOT IDs: 368, Resolved: 1114, QA: 282].
+
 ## 🟢 Sep.19.08
 *   **Forensic Multi-Role Integrity Hardening (#1113)**: Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367).
 *   **Shared Sensor Rate Audit Flag Persistence (#1119)**: Decoupled the `isSensorRateAudited` flag in `ForensicAuditor` by moving it into the role-specific `RoleState` objects. This allows both Tracker and Viewer roles to complete their respective sensor rate efficacy audits independently.

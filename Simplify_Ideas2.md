@@ -1,11 +1,15 @@
-# Strategic Simplification & Pattern Convergence (Sep.19.07)
+# Simplicity Audit & Architectural Refactoring Ideas (Sep.19.09)
 
-## 🎯 Resolved Simplifications
-*   **GNSS Start Ordering Race Resolved**: Reordering the fields initialization block before flipping `isStarted` avoids having to introduce additional locks or guard conditions in the background flow.
-*   **Revival Burst State Elimination**: The burst lifecycle is managed by structured concurrency within a single `revivalPulseJob` coroutine, using a `try-finally` block for guaranteed listener unregistration.
+## 🎯 Current Focus: HardwareSuite Pattern Convergence
 
-## 💡 New Simplification Ideas
-1.  **Structured Hardware Pulses**: Apply the `try-finally` pattern used in GNSS revival pulses to other burst-based hardware operations (e.g., potential future acoustic or vibration bursts) to ensure deterministic cleanup without multiple job variables.
-2.  **ManagedListener Callback Unification**: The `ManagedLocationCallback` and `ManagedLocationListener` objects in `restartLocationUpdates` are created as local anonymous objects. Consider a generic `HardwareBurstScope` that automatically handles the registration and unregistration of these listeners to further reduce boilerplate.
-3.  **Removal of Redundant Revival State Variables**: With the shift to structured coroutines, check if `revivalAttemptCount` or `isHardwareLocked` can be moved into the coroutine scope itself, provided they don't need to be observed externally between pulses.
-4.  **Unified Session Reset Interface**: Introduce a `SessionLifecycleManager` or a `UnifiedReset` interface. Both `TrackerService` and `ViewerService` manually call a list of resets (`alarmManager`, `locationProcessor`, `hardwareSuite`, etc.). Centralizing this ensures that new components are automatically included in the termination sequence, preventing state leaks (Issue #1112).
+### 1. HardwareSuite Snapshot Unification
+*   **Problem**: `consumeLogicSnapshot` and `consumeForensicSnapshot` are nearly identical.
+*   **Opportunity**: Refactor into a single `internalConsumeSnapshot(buffer: CircularStateBuffer<ForensicSnapshot>, isForensic: Boolean)` method. This would reduce boilerplate and ensure that thread-safety improvements are always applied to both paths simultaneously.
+
+### 2. Flyweight Sequence Abstraction
+*   **Problem**: `getSnrSamples`, `getSensorSamples`, and `getAcousticSamples` all implement similar filtering/mapping logic with internal flyweight objects.
+*   **Opportunity**: Create a generic utility in `CircularStateBuffer` or a helper extension to handle `Sequence` generation with a provided "reset/copy" lambda, reducing repetitive code in `HardwareSuite`.
+
+### 3. Display Flickering State Consolidation
+*   **Problem**: `isDisplayFlickering` (AtomicBoolean) and `lastDisplayTransitionRt` are tracked separately from other display states.
+*   **Opportunity**: Move these into a `DisplayHealth` data class or similar structure to keep the root `HardwareSuite` namespace cleaner as more display-related forensic checks are added.

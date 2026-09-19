@@ -35,6 +35,10 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.19.09:
+ * - Issue #1114: Resolved Thread-Safety and Visibility Vulnerabilities in Snapshotting.
+ *   Applied @Volatile to shared state variables and unified peak reset logic 
+ *   using synchronized(this) across sensor handlers and forensic snapshot consumption.
  * Sep.19.08:
  * - Issue #1113: Singleton State Collision. Adapted sensor rate auditing to 
  *   handle multi-role forensic results from ForensicAuditor.
@@ -155,10 +159,10 @@ class HardwareSuite @Inject constructor(
     private var revivalCallback: ManagedLocationCallback? = null
     private var rawRevivalListener: ManagedLocationListener? = null
     private var activeLocationCallback: ManagedLocationCallback? = null
-    var satellitesInView = 0; private set
-    var satellitesUsed = 0; private set
-    var averageSnr = 0.0; private set
-    private var lastFixRt = 0L
+    @Volatile var satellitesInView = 0; private set
+    @Volatile var satellitesUsed = 0; private set
+    @Volatile var averageSnr = 0.0; private set
+    @Volatile private var lastFixRt = 0L
     private var lastGnssEmitRt = 0L
     private var pendingEnterRt = 0L
     private var recoveryStartRt = 0L
@@ -232,7 +236,7 @@ class HardwareSuite @Inject constructor(
     private var lastAccelX = 0f; private var lastAccelY = 0f; private var lastAccelZ = 0f
     private val vibrationCircularBuffer = DoubleArray(VIBRATION_WINDOW_SIZE)
     private var vibrationCircularIdx = 0
-    var vibrationRollingSum = 0.0; private set
+    @Volatile var vibrationRollingSum = 0.0; private set
     private var vibrationBufferCount = 0
 
     private var logicPeakDb = 0.0; private var logicMinDb = 100.0; private var logicPeakVibration = 0.0
@@ -240,7 +244,7 @@ class HardwareSuite @Inject constructor(
     private var forensicPeakDb = 0.0; private var forensicMinDb = 100.0; private var forensicPeakVibration = 0.0
     private var forensicPeakVerticalVelocity = 0.0; private var forensicPeakVerticalVelocityTs = 0L; private var forensicPeakVerticalVelocityRt = 0L; private var forensicPeakVerticalDisplacement = 0.0
 
-    private var lastRawVibe = 0.0; private var lastHpfValue = 0.0; var currentKineticEnergy = 0.0; private set
+    private var lastRawVibe = 0.0; private var lastHpfValue = 0.0; @Volatile var currentKineticEnergy = 0.0; private set
 
     @Volatile private var isMonitoring = false
     @Volatile private var isAcousticRunning = false
@@ -249,7 +253,7 @@ class HardwareSuite @Inject constructor(
     @Volatile private var maliAnomaly = false
     @Volatile private var powerSaveMode = false
     @Volatile private var isSafeMode = false
-    private var lastAnomalyActiveRt = 0L
+    @Volatile private var lastAnomalyActiveRt = 0L
 
     private val logicSnapshotBuffer = CircularStateBuffer(2, { ForensicSnapshot() }, { it.reset() })
     private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
@@ -267,29 +271,29 @@ class HardwareSuite @Inject constructor(
     private var fastPathLightBaseline = -1.0; private var fastPathLightSpikeThreshold = LIGHT_THRESHOLD_LUX_JUMP; private var onLightSpike: (() -> Unit)? = null
     private var lastAcousticSpikeRt = 0L; private var lastLightSpikeRt = 0L
 
-    var lastAcousticLockoutRt = 0L; private set
+    @Volatile var lastAcousticLockoutRt = 0L; private set
     private var sessionStartRt = 0L
     val isWarming get() = (timeProvider.elapsedRealtime() - sessionStartRt < SENSOR_WARMING_MS)
 
-    var currentVibrationIndex = 0.0; private set
-    var adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; private set
-    var currentCompassHeading = 0.0; private set
-    var currentPressure = 0.0; private set
-    var absoluteAltitude = 0.0; private set
-    var relativeAltitude = 0.0; private set
+    @Volatile var currentVibrationIndex = 0.0; private set
+    @Volatile var adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; private set
+    @Volatile var currentCompassHeading = 0.0; private set
+    @Volatile var currentPressure = 0.0; private set
+    @Volatile var absoluteAltitude = 0.0; private set
+    @Volatile var relativeAltitude = 0.0; private set
 
     private var proximityJob: Job? = null
     private var rawProximityNear = false; private var proximityMaxRange = 5f
-    var isProximityNear = false; private set
-    var proximityIdx = 0.0; private set
-    var currentProximityCm = -1.0; private set
-    var debouncedProximityCm = -1.0; private set
-    var proximityDebounceMs = 0L; private set
-    var currentLux = 0.0; private set
-    var currentTiltDegrees = 0.0; private set
-    var currentAcousticDb = 0.0; private set
-    var currentVerticalVelocity = 0.0; private set
-    var currentVerticalDisplacement = 0.0; private set
+    @Volatile var isProximityNear = false; private set
+    @Volatile var proximityIdx = 0.0; private set
+    @Volatile var currentProximityCm = -1.0; private set
+    @Volatile var debouncedProximityCm = -1.0; private set
+    @Volatile var proximityDebounceMs = 0L; private set
+    @Volatile var currentLux = 0.0; private set
+    @Volatile var currentTiltDegrees = 0.0; private set
+    @Volatile var currentAcousticDb = 0.0; private set
+    @Volatile var currentVerticalVelocity = 0.0; private set
+    @Volatile var currentVerticalDisplacement = 0.0; private set
 
     private var lastLinearAccelTs = 0L; private var stationaryStartRt = 0L
     private var emaPressure = 0.0; private var lastBaroZeroingRt = 0L
@@ -821,24 +825,28 @@ class HardwareSuite @Inject constructor(
 
     fun consumeLogicSnapshot(): ForensicSnapshot {
         return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeLogicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(m, false)) }) {
-            synchronized(logicSnapshotBuffer) {
-                val snapshot = logicSnapshotBuffer.next()
-                snapshot.apply { 
-                    vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = logicPeakVibration; peakVerticalVelocity = logicPeakVerticalVelocity; peakVerticalVelocityTs = logicPeakVerticalVelocityTs; peakVerticalVelocityRt = logicPeakVerticalVelocityRt; plungeMatched = !isWarming && plungeMatched; peakVerticalDisplacement = logicPeakVerticalDisplacement; proximityIdx = this@HardwareSuite.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareSuite.proximityDebounceMs; vibrationRollingSum = this@HardwareSuite.vibrationRollingSum; acousticPeak = logicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareSuite.currentKineticEnergy 
+            synchronized(this) {
+                synchronized(logicSnapshotBuffer) {
+                    val snapshot = logicSnapshotBuffer.next()
+                    snapshot.apply { 
+                        vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = logicPeakVibration; peakVerticalVelocity = logicPeakVerticalVelocity; peakVerticalVelocityTs = logicPeakVerticalVelocityTs; peakVerticalVelocityRt = logicPeakVerticalVelocityRt; plungeMatched = !isWarming && plungeMatched; peakVerticalDisplacement = logicPeakVerticalDisplacement; proximityIdx = this@HardwareSuite.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareSuite.proximityDebounceMs; vibrationRollingSum = this@HardwareSuite.vibrationRollingSum; acousticPeak = logicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareSuite.currentKineticEnergy 
+                    }
+                    logicPeakVibration = 0.0; logicPeakVerticalVelocity = 0.0; logicPeakVerticalVelocityTs = 0L; logicPeakVerticalVelocityRt = 0L; logicPeakVerticalDisplacement = 0.0; plungeMatched = false; logicPeakDb = 0.0; logicMinDb = 100.0; snapshot
                 }
-                logicPeakVibration = 0.0; logicPeakVerticalVelocity = 0.0; logicPeakVerticalVelocityTs = 0L; logicPeakVerticalVelocityRt = 0L; logicPeakVerticalDisplacement = 0.0; plungeMatched = false; logicPeakDb = 0.0; logicMinDb = 100.0; snapshot
             }
         }
     }
 
     fun consumeForensicSnapshot(): ForensicSnapshot {
         return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeForensicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(m, false)) }) {
-            synchronized(forensicSnapshotBuffer) {
-                val snapshot = forensicSnapshotBuffer.next()
-                snapshot.apply { 
-                    vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = forensicPeakVibration; peakVerticalVelocity = forensicPeakVerticalVelocity; peakVerticalVelocityTs = forensicPeakVerticalVelocityTs; peakVerticalVelocityRt = forensicPeakVerticalVelocityRt; plungeMatched = false; peakVerticalDisplacement = forensicPeakVerticalDisplacement; proximityIdx = this@HardwareSuite.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareSuite.proximityDebounceMs; vibrationRollingSum = this@HardwareSuite.vibrationRollingSum; acousticPeak = forensicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareSuite.currentKineticEnergy 
+            synchronized(this) {
+                synchronized(forensicSnapshotBuffer) {
+                    val snapshot = forensicSnapshotBuffer.next()
+                    snapshot.apply { 
+                        vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = forensicPeakVibration; peakVerticalVelocity = forensicPeakVerticalVelocity; peakVerticalVelocityTs = forensicPeakVerticalVelocityTs; peakVerticalVelocityRt = forensicPeakVerticalVelocityRt; plungeMatched = false; peakVerticalDisplacement = forensicPeakVerticalDisplacement; proximityIdx = this@HardwareSuite.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareSuite.proximityDebounceMs; vibrationRollingSum = this@HardwareSuite.vibrationRollingSum; acousticPeak = forensicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareSuite.currentKineticEnergy 
+                    }
+                    forensicPeakVibration = 0.0; forensicPeakVerticalVelocity = 0.0; forensicPeakVerticalVelocityTs = 0L; forensicPeakVerticalVelocityRt = 0L; forensicPeakVerticalDisplacement = 0.0; forensicPeakDb = 0.0; forensicMinDb = 100.0; snapshot
                 }
-                forensicPeakVibration = 0.0; forensicPeakVerticalVelocity = 0.0; forensicPeakVerticalVelocityTs = 0L; forensicPeakVerticalVelocityRt = 0L; forensicPeakVerticalDisplacement = 0.0; forensicPeakDb = 0.0; forensicMinDb = 100.0; snapshot
             }
         }
     }
@@ -972,11 +980,14 @@ class HardwareSuite @Inject constructor(
         }
     }
 
-    fun resetBaseline() { emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; forensicAuditor.reset(); revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
-        // Issue #1107: Reset revival state.
-        pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = sessionStartRt; currentLocationStatus = LocationStatus(); _locationStatus.tryEmit(currentLocationStatus)
-        // Issue #1111: Reset display flickering state.
-        isDisplayFlickering.set(false); lastDisplayTransitionRt = 0L
+    fun resetBaseline() { 
+        synchronized(this) {
+            emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; forensicAuditor.reset(); revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
+            // Issue #1107: Reset revival state.
+            pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = sessionStartRt; currentLocationStatus = LocationStatus(); _locationStatus.tryEmit(currentLocationStatus)
+            // Issue #1111: Reset display flickering state.
+            isDisplayFlickering.set(false); lastDisplayTransitionRt = 0L
+        }
     }
 
     private fun startStepDetectorRecoveryLoop() { recoveryJob?.cancel(); recoveryJob = scope.launch { while (isActive) { delay(300000L); if (!isStepDetectorRegistered) attemptStepRegistration() } } }
