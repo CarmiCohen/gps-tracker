@@ -1,4 +1,4 @@
-# Strategic Simplification & Pattern Convergence (Sep.19.05)
+# Strategic Simplification & Pattern Convergence (Sep.19.07)
 
 ## 🎯 Resolved Simplifications
 *   **GNSS Start Ordering Race Resolved**: Reordering the fields initialization block before flipping `isStarted` avoids having to introduce additional locks or guard conditions in the background flow.
@@ -8,3 +8,4 @@
 1.  **Structured Hardware Pulses**: Apply the `try-finally` pattern used in GNSS revival pulses to other burst-based hardware operations (e.g., potential future acoustic or vibration bursts) to ensure deterministic cleanup without multiple job variables.
 2.  **ManagedListener Callback Unification**: The `ManagedLocationCallback` and `ManagedLocationListener` objects in `restartLocationUpdates` are created as local anonymous objects. Consider a generic `HardwareBurstScope` that automatically handles the registration and unregistration of these listeners to further reduce boilerplate.
 3.  **Removal of Redundant Revival State Variables**: With the shift to structured coroutines, check if `revivalAttemptCount` or `isHardwareLocked` can be moved into the coroutine scope itself, provided they don't need to be observed externally between pulses.
+4.  **Unified Session Reset Interface**: Introduce a `SessionLifecycleManager` or a `UnifiedReset` interface. Both `TrackerService` and `ViewerService` manually call a list of resets (`alarmManager`, `locationProcessor`, `hardwareSuite`, etc.). Centralizing this ensures that new components are automatically included in the termination sequence, preventing state leaks (Issue #1112).

@@ -22,6 +22,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.19.07:
+ * - Issue #1112: Resolved Incomplete Reset in resetServiceTimers. 
+ *   Ensured hardwareSuite.resetBaseline() is called during session termination.
  * Sep.17.05:
  * - Issue #1093: Dead Code Elimination. Purged UnifiedPowerPolicy and HardwareProvider.
  * Sep.17.02:
@@ -392,6 +395,7 @@ class TrackerService : BaseMonitorService() {
         sessionManager.reset()
         integrityMonitor.resetStats()
         forensicAuditor.reset()
+        hardwareSuite.resetBaseline()
         lastHardwareRecoveryTs = 0L
         logManager.logServiceEvent(m = "Session Terminated", isImportant = false)
     }

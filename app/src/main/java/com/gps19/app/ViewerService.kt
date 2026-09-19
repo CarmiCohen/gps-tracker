@@ -17,6 +17,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.19.07:
+ * - Issue #1112: Resolved Incomplete Reset in resetServiceTimers. 
+ *   Ensured hardwareSuite.resetBaseline() is called during session termination.
  * Sep.17.05:
  * - Issue #1093: Dead Code Elimination. Purged UnifiedPowerPolicy and HardwareProvider.
  * Sep.17.02:
@@ -426,6 +429,7 @@ class ViewerService : BaseMonitorService() {
         serviceStartRealtime = timeProvider.elapsedRealtime(); serviceStartWall = timeProvider.currentTimeMillis()
         alarmManager.resetEvaluation(); sessionManager.reset(); integrityMonitor.resetStats(); forensicUseCase.resetLatches(); 
         forensicAuditor.reset()
+        hardwareSuite.resetBaseline()
         lastHardwareRecoveryTs = 0L
         
         selfProcessor.resetStats()

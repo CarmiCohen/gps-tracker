@@ -1,4 +1,8 @@
-# Project Resolution Archive (Sep.15.101)
+# Project Resolution Archive (Sep.19.07)
+
+## 🟢 Sep.19.07
+*   **Incomplete Reset in resetServiceTimers (HardwareSuite State Persistence) (#1112)**: Updated both `TrackerService.kt` and `ViewerService.kt` to call `hardwareSuite.resetBaseline()` within the `resetServiceTimers()` method. This ensures that all internal hardware states, including IMU peak values, adaptive floors, and GNSS revival flags, are properly zeroed when a session is terminated or reset (R-ID 366).
+*   **Audit Baseline Advance**: advanced project metrics to [SOT Rules: 74, SOT IDs: 366, Resolved: 1112, QA: 282].
 
 ## 🟢 Sep.19.06
 *   **Proximity Suppression Lock-in due to Hysteresis Persistence (#1111)**: Implemented temporal decay for the display flickering suppression logic in `HardwareSuite.kt`. By checking if the last display transition occurred within `DISPLAY_FLICKER_TIMEOUT_MS` (3s), the system now allows proximity "Far" transitions once flickering ceases, even without a further display event. This prevents suppression "lock-in" on stationary devices. Ensured state reset in `stop()` and `resetBaseline()` (R-ID 365).

@@ -5,11 +5,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
-*   **Issue #1112: Incomplete Reset in resetServiceTimers (HardwareSuite State Persistence)**
-    *   *Detail*: Both `TrackerService` and `ViewerService` reset `ForensicAuditor` during session termination but fail to call `hardwareSuite.resetBaseline()`. This leaves internal `HardwareSuite` states—such as IMU peaks, adaptive vibration floors, and revival flags—in a stale state across session resets.
-    *   *Risk*: Corrupted telemetry and inconsistent baseline comparisons after a session reset.
-    *   *Files*: `TrackerService.kt` (Line 427), `ViewerService.kt` (Line 389).
-
 *   **Issue #1113: Singleton State Collision in ForensicAuditor Multi-Role Tick**
     *   *Detail*: `ForensicAuditor` is a Singleton tracking a single `lastStabilityAuditTs` and audit counters. When both `TrackerService` and `ViewerService` are active (or rapidly alternating), they both invoke `evaluateStability()`. The first service to tick after the audit interval consumes the results and resets the shared counters, leaving the other service with no audit data.
     *   *Risk*: Erratic and roles-crossed stability logs in history; reliability metrics mangled due to shared state.
@@ -59,6 +54,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1112: Incomplete Reset in resetServiceTimers (HardwareSuite State Persistence)** (Resolved Sep.19.07)
+    *   *Remediation*: Updated both `TrackerService.kt` and `ViewerService.kt` to call `hardwareSuite.resetBaseline()` within the `resetServiceTimers()` method. This ensures that all internal hardware states, including IMU peak values, adaptive floors, and GNSS revival flags, are properly zeroed when a session is terminated or reset.
+
 *   **Issue #1111: Proximity Suppression Lock-in due to Hysteresis Persistence** (Resolved Sep.19.06)
     *   *Remediation*: Implemented temporal decay for the display flickering suppression logic in `HardwareSuite.kt`. By checking if the last display transition occurred within `DISPLAY_FLICKER_TIMEOUT_MS` (3s), the system now allows proximity "Far" transitions once flickering ceases, even without a further display event. Ensured state reset in `stop()` and `resetBaseline()`. (R-ID 365)
 
@@ -74,7 +72,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *   **Issue #1107: GNSS Stall Timing Leakage during Suite Inactivity** (Resolved Sep.19.02)
     *   *Remediation*: Implemented explicit reset of revival state variables (`pendingEnterRt`, `revivalAttemptCount`, etc.) in `stop()` and `resetBaseline()`. Guarded the background audit loop in `HardwareSuite.kt` with `isStarted.get()` to prevent `pendingEnterRt` from accumulating stall duration while the suite is inactive, ensuring no immediate hardware locks occur upon activation. (R-ID 360)
 
-*   **Issue #1106: Energy Footprint Data Loss following Intermediate Audit Consumption** (Resolved Sep.19.02)
+*   **Issue #1106: Energy Footprint Data loss following Intermediate Audit Consumption** (Resolved Sep.19.02)
     *   *Remediation*: Modified `ForensicAuditor.computeEnergyFootprint()` to support non-destructive peeking via a `consume` parameter. Updated `HardwareSuite.kt` to use `consume = false` during intermediate `HardwareLock` events, ensuring the final `Success` event retains the full battery baseline for accurate total-cycle energy reporting.
 
 *   **Issue #1105: Battery Baseline Capture Persistence across Lifecycle Transitions** (Resolved Sep.19.01)
@@ -95,4 +93,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 365 (Rules: 73, IDs: 365), Resolved: 1111, Open: 10, Testing: 2 (Sub-items: 10), Ideas: 18, QA: 282]**
+- **Current Audit Baseline: [SOT: 366 (Rules: 74, IDs: 366), Resolved: 1112, Open: 9, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**
