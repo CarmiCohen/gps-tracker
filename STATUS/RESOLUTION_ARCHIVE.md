@@ -1,4 +1,8 @@
-# Project Resolution Archive (Sep.15.101)
+# Project Resolution Archive (Sep.15.102)
+
+## 🟢 Sep.19.05
+*   **Initialization Race in HardwareSuite.start() causing False GPS Gap (#1110)**: Reordered the state initialization block in `HardwareSuite.start()`. By initializing `sessionStartRt`, `lastBaroZeroingRt`, and `lastFixRt` before `isStarted` is flipped to `true`, the background audit thread can no longer run an audit update loop with non-initialized/zeroed parameters, avoiding false GPS gaps and incorrect battery baselines on session initialization (R-ID 364).
+*   **Audit Baseline Advance**: advanced project metrics to [SOT Rules: 73, SOT IDs: 364, Resolved: 1110, QA: 282].
 
 ## 🟢 Sep.19.04
 *   **Resource Leak in GNSS Revival Burst during Safe Mode Transition (#1109)**: Refactored GNSS revival pulse logic in `HardwareSuite.kt` to use a `try-finally` block within a single coroutine. This guarantees that Raw and Fused location listeners are always unregistered upon burst completion or cancellation (e.g., during Safe Mode transition or suite shutdown). The refactoring enabled the removal of the redundant `revivalBurstJob` state variable, simplifying the class's resource management (R-ID 363).

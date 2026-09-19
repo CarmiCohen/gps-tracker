@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.15.101)
+# SOT Master Requirements & Hardening Status (Sep.15.102)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 364**: GNSS Initialization Race Remediation - Reordered state initialization in `HardwareSuite.start()` to ensure `sessionStartRt` and `lastFixRt` are populated before the `isStarted` flag is set. This prevents the background audit loop from calculating false GPS gaps against zeroed values during the micro-window of session activation (R-ID 364). (Resolved Sep.19.05)
 *   **SOT ID 363**: Structured Concurrency Burst Hardening - Refactored GNSS revival pulse logic in `HardwareSuite.kt` to use a `try-finally` block within a single coroutine. This guarantees that Raw and Fused location listeners are unregistered upon burst completion or cancellation (e.g., during Safe Mode transition or suite shutdown), eliminating the risk of resource leaks and allowing for the removal of the redundant `revivalBurstJob` state (R-ID 363). (Resolved Sep.19.04)
 *   **SOT ID 362**: GNSS Revival Resource Leak Remediation - Modified `setSafeMode(active)` in `HardwareSuite.kt` to explicitly unregister `rawRevivalListener` and `revivalCallback`. This ensures that raw GPS and high-accuracy updates are immediately terminated when Safe Mode is engaged, preventing resource leaks and unintended battery drain (R-ID 362). (Resolved Sep.19.02)
 *   **SOT ID 361**: Redundant Battery Baseline Capture Remediation - Fully resolved the redundant battery baseline capture logic by initializing `lastFixRt` to `sessionStartRt` inside both `start()` and `resetBaseline()`. This guarantees a proper grace period before any GNSS gap or stall state can be declared, preventing immediate redundant baseline captures upon app activation or reset (R-ID 361). (Resolved Sep.19.03)
@@ -10,19 +11,20 @@
 *   **SOT ID 357**: Structured Concurrency Burst Hardening - Resolved a coroutine leak in `HardwareSuite.kt` by tracking the 10-second raw GPS revival timeout via `revivalBurstJob`. Ensured immediate cancellation during suite teardown and safe mode transitions (R-ID 357). (Resolved Sep.18.00)
 
 ## 📈 Metric Summary
-- **Rules Verified**: 72
-- **Total SOT IDs**: 363
-- **Resolved Issues**: 1109
+- **Rules Verified**: 73
+- **Total SOT IDs**: 364
+- **Resolved Issues**: 1110
 - **Open Issues**: 0
 - **Testing Coverage**: 2 (Sub-items: 10)
 - **Simplification Ideas**: 19
-- **QA Validation Tasks**: 281
+- **QA Validation Tasks**: 282
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.28 (Initialization Race)**: PASSED - Verified that lastFixRt is initialized before isStarted flag in start() (Sep.15.102)
 *   **Chapter 31.27 (Structured Burst Cleanup)**: PASSED - Verified that Raw/Fused listeners are unregistered via try-finally on coroutine cancellation (Sep.15.101)
 *   **Chapter 31.26 (Safe Mode Leakage)**: PASSED - Verified that revival listeners are unregistered when Safe Mode is toggled (Sep.15.101)
 *   **Chapter 31.25 (Baseline Capture Gating)**: PASSED - Verified that battery baseline capture is strictly gated by suite active state (Sep.15.101)
 *   **Chapter 31.24 (Stall Timing Leakage)**: PASSED - Verified that revival state resets cleanly on stop and audits are gated by suite lifecycle (Sep.15.101)
 
 ---
-*Next Audit: Sep.20.00. (Sep.15.101)*
+*Next Audit: Sep.20.00. (Sep.15.102)*

@@ -1,7 +1,8 @@
-# Strategic Simplification & Pattern Convergence (Sep.19.04)
+# Strategic Simplification & Pattern Convergence (Sep.19.05)
 
 ## 🎯 Resolved Simplifications
-*   **Revival Burst State Elimination**: Successfully removed `revivalBurstJob` from `HardwareSuite.kt`. The burst lifecycle is now managed by structured concurrency within a single `revivalPulseJob` coroutine, using a `try-finally` block for guaranteed listener unregistration.
+*   **GNSS Start Ordering Race Resolved**: Reordering the fields initialization block before flipping `isStarted` avoids having to introduce additional locks or guard conditions in the background flow.
+*   **Revival Burst State Elimination**: The burst lifecycle is managed by structured concurrency within a single `revivalPulseJob` coroutine, using a `try-finally` block for guaranteed listener unregistration.
 
 ## 💡 New Simplification Ideas
 1.  **Structured Hardware Pulses**: Apply the `try-finally` pattern used in GNSS revival pulses to other burst-based hardware operations (e.g., potential future acoustic or vibration bursts) to ensure deterministic cleanup without multiple job variables.

@@ -35,6 +35,11 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.19.05:
+ * - Issue #1110: Resolved Initialization Race in start() causing False GPS Gap.
+ *   Reordered state initialization to ensure sessionStartRt and lastFixRt are 
+ *   populated before the isStarted flag is set, preventing the background audit 
+ *   loop from calculating gaps against a zeroed lastFixRt.
  * Sep.19.04:
  * - Issue #1109: Resolved Resource Leak in GNSS Revival Burst during Safe Mode Transition.
  *   Refactored revival pulse logic to use structured concurrency with a try-finally block.
@@ -393,15 +398,22 @@ class HardwareSuite @Inject constructor(
             val count = activeUsers.incrementAndGet()
             Timber.d("HardwareSuite: start() called. Active users: $count")
 
+            // Issue #1110: Initialize critical state variables BEFORE setting isStarted=true 
+            // to prevent the background loop from calculating gaps against zeroed values.
+            val nowRt = timeProvider.elapsedRealtime()
+            if (!isStarted.get()) {
+                sessionStartRt = nowRt
+                lastBaroZeroingRt = nowRt
+                lastFixRt = nowRt
+                proximityMaxRange = proximity?.maximumRange ?: 5f
+            }
+
             if (isStarted.getAndSet(true)) {
                 isTeardownActive.set(false)
                 return
             }
             
             isTeardownActive.set(false)
-            sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt
-            lastFixRt = sessionStartRt // Issue #1108: Initialize to prevent immediate redundant capture
-            proximityMaxRange = proximity?.maximumRange ?: 5f
             
             if (hardwareThread == null || !hardwareThread!!.isAlive) {
                 hardwareThread = HandlerThread("HardwareSuiteThread").apply { start() }
