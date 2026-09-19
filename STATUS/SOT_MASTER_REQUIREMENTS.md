@@ -1,6 +1,7 @@
 # SOT Master Requirements & Hardening Status (Sep.15.101)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 363**: Structured Concurrency Burst Hardening - Refactored GNSS revival pulse logic in `HardwareSuite.kt` to use a `try-finally` block within a single coroutine. This guarantees that Raw and Fused location listeners are unregistered upon burst completion or cancellation (e.g., during Safe Mode transition or suite shutdown), eliminating the risk of resource leaks and allowing for the removal of the redundant `revivalBurstJob` state (R-ID 363). (Resolved Sep.19.04)
 *   **SOT ID 362**: GNSS Revival Resource Leak Remediation - Modified `setSafeMode(active)` in `HardwareSuite.kt` to explicitly unregister `rawRevivalListener` and `revivalCallback`. This ensures that raw GPS and high-accuracy updates are immediately terminated when Safe Mode is engaged, preventing resource leaks and unintended battery drain (R-ID 362). (Resolved Sep.19.02)
 *   **SOT ID 361**: Redundant Battery Baseline Capture Remediation - Fully resolved the redundant battery baseline capture logic by initializing `lastFixRt` to `sessionStartRt` inside both `start()` and `resetBaseline()`. This guarantees a proper grace period before any GNSS gap or stall state can be declared, preventing immediate redundant baseline captures upon app activation or reset (R-ID 361). (Resolved Sep.19.03)
 *   **SOT ID 360**: GNSS Stall Timing Leakage Remediation - Implemented explicit reset of revival state variables and guarded the background audit loop in `HardwareSuite.kt` with `isStarted.get()`. This prevents `pendingEnterRt` from accumulating stall duration while the suite is inactive, ensuring no immediate hardware locks occur upon activation (R-ID 360). (Resolved Sep.19.02)
@@ -10,14 +11,15 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 72
-- **Total SOT IDs**: 362
-- **Resolved Issues**: 1108
-- **Open Issues**: 1
+- **Total SOT IDs**: 363
+- **Resolved Issues**: 1109
+- **Open Issues**: 0
 - **Testing Coverage**: 2 (Sub-items: 10)
-- **Simplification Ideas**: 18
+- **Simplification Ideas**: 19
 - **QA Validation Tasks**: 281
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.27 (Structured Burst Cleanup)**: PASSED - Verified that Raw/Fused listeners are unregistered via try-finally on coroutine cancellation (Sep.15.101)
 *   **Chapter 31.26 (Safe Mode Leakage)**: PASSED - Verified that revival listeners are unregistered when Safe Mode is toggled (Sep.15.101)
 *   **Chapter 31.25 (Baseline Capture Gating)**: PASSED - Verified that battery baseline capture is strictly gated by suite active state (Sep.15.101)
 *   **Chapter 31.24 (Stall Timing Leakage)**: PASSED - Verified that revival state resets cleanly on stop and audits are gated by suite lifecycle (Sep.15.101)

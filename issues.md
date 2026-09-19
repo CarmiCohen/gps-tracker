@@ -5,14 +5,14 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
-*   **Issue #1109: Resource Leak in GNSS Revival Burst during Safe Mode Transition**
-    *   *Problem*: `setSafeMode(true)` cancels `revivalBurstJob` but does not unregister the `rawRevivalListener`.
-    *   *Effect*: The raw GPS provider remains active if safe mode is toggled during a 10-second burst, leading to unintended high battery drain.
-    *   *Details*: `HardwareSuite.kt` lines 739-745, 689-705.
+*(No critical open gaps identified at this time).*
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1109: Resource Leak in GNSS Revival Burst during Safe Mode Transition** (Resolved Sep.19.04)
+    *   *Remediation*: Refactored the GNSS revival pulse logic in `HardwareSuite.kt` to use structured concurrency. By wrapping the burst lifecycle in a `try-finally` block within a single coroutine, Raw and Fused listeners are guaranteed to be unregistered upon completion or cancellation (e.g., during Safe Mode transition). Eliminated the redundant `revivalBurstJob` variable. (R-ID 363)
 
 *   **Issue #1108: Redundant Battery Baseline Capture in Background/Idle State** (Resolved Sep.19.03)
     *   *Remediation*: Fully resolved the redundant battery baseline capture logic by initializing `lastFixRt` to `sessionStartRt` inside both `start()` and `resetBaseline()`. This guarantees a proper grace period before any GNSS gap or stall state can be declared, preventing immediate redundant baseline captures upon app activation or reset. (R-ID 361)
@@ -41,4 +41,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 362 (Rules: 72, IDs: 362), Resolved: 1108, Open: 1, Testing: 2 (Sub-items: 10), Ideas: 18, QA: 281]**
+- **Current Audit Baseline: [SOT: 363 (Rules: 72, IDs: 363), Resolved: 1109, Open: 0, Testing: 2 (Sub-items: 10), Ideas: 18, QA: 281]**

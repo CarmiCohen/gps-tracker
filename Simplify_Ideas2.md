@@ -1,11 +1,9 @@
-# Simplification Ideas (Sep.19.01)
+# Strategic Simplification & Pattern Convergence (Sep.19.04)
 
-## 💡 Architecture & Code De-cluttering
-1. **Connectivity Event Bus**: `ConnectivitySuite` uses a `SharedFlow` for internal events. As the number of events grows, consider a more structured `EventBus` or specialized observers to keep the suite's main logic focused on signaling.
-2. **Telemetry Mapping**: The telemetry mapping between `TrackerStatus`, `PendingStatusEntity`, and Protobuf models is becoming verbose. Centralizing this into a single, highly-optimized transformer could simplify the `ConnectivitySuite` flush logic.
-3. **Event Flow Routing Convergence**: The event mapping inside `MainViewModel.onEvent` has unified many domain event streams, but it contains a long `when` condition. Separating individual module controllers or use case pipelines would prevent future file growth and bloat.
-4. **HistoryManager Serialization**: The introduction of a `Mutex` solves multi-service concurrency but could be further optimized by using thread-confined actors or dedicated background channels for processing telemetry updates asynchronously.
-5. **HardwareSuite Decomposition**: Following the convergence in Issue #1093, `HardwareSuite` has become a primary authority for all sensors, GNSS, and power policies. To maintain long-term maintainability, consider decomposing it into specialized internal providers (e.g., `AcousticProvider`, `GnssProvider`) while keeping `HardwareSuite` as the single public-facing facade.
-6. **Hardware Lifecycle Debouncing**: The deferred unregistration logic in `HardwareSuite` could be generalized into a reusable `DebouncedLifecycle` component to prevent similar restart stalls in other system-level suites (e.g., `ConnectivitySuite`) during rapid lifecycle transitions.
-7. **Revival Pulse Job Management**: The revival logic in `HardwareSuite` now tracks multiple jobs (`revivalPulseJob`, `revivalBurstJob`). An internal `RevivalCoordinator` class could encapsulate this state, reducing the member variable footprint of `HardwareSuite` and simplifying the teardown sequence.
-8. **Encapsulation of Telemetry Flags**: Intermediate lifecycle flags like `revivalBaselineCaptured` could be managed inside a distinct `StallLifecycleState` object within `HardwareSuite`, automatically clearing all variables on teardown or reset events to prevent manual omission bugs.
+## 🎯 Resolved Simplifications
+*   **Revival Burst State Elimination**: Successfully removed `revivalBurstJob` from `HardwareSuite.kt`. The burst lifecycle is now managed by structured concurrency within a single `revivalPulseJob` coroutine, using a `try-finally` block for guaranteed listener unregistration.
+
+## 💡 New Simplification Ideas
+1.  **Structured Hardware Pulses**: Apply the `try-finally` pattern used in GNSS revival pulses to other burst-based hardware operations (e.g., potential future acoustic or vibration bursts) to ensure deterministic cleanup without multiple job variables.
+2.  **ManagedListener Callback Unification**: The `ManagedLocationCallback` and `ManagedLocationListener` objects in `restartLocationUpdates` are created as local anonymous objects. Consider a generic `HardwareBurstScope` that automatically handles the registration and unregistration of these listeners to further reduce boilerplate.
+3.  **Removal of Redundant Revival State Variables**: With the shift to structured coroutines, check if `revivalAttemptCount` or `isHardwareLocked` can be moved into the coroutine scope itself, provided they don't need to be observed externally between pulses.

@@ -1,5 +1,9 @@
 # Project Resolution Archive (Sep.15.101)
 
+## 🟢 Sep.19.04
+*   **Resource Leak in GNSS Revival Burst during Safe Mode Transition (#1109)**: Refactored GNSS revival pulse logic in `HardwareSuite.kt` to use a `try-finally` block within a single coroutine. This guarantees that Raw and Fused location listeners are always unregistered upon burst completion or cancellation (e.g., during Safe Mode transition or suite shutdown). The refactoring enabled the removal of the redundant `revivalBurstJob` state variable, simplifying the class's resource management (R-ID 363).
+*   **Audit Baseline Advance**: advanced project metrics to [SOT Rules: 72, SOT IDs: 363, Resolved: 1109, QA: 281].
+
 ## 🟢 Sep.19.03
 *   **Redundant Battery Baseline Capture in Background/Idle State (#1108)**: Fully resolved the redundant battery baseline capture logic by initializing `lastFixRt` to `sessionStartRt` inside both `start()` and `resetBaseline()`. This guarantees a proper grace period before any GNSS gap or stall state can be declared, preventing immediate redundant baseline captures upon app activation or reset (R-ID 361).
 *   **Audit Baseline Advance**: advanced project metrics to [SOT Rules: 72, SOT IDs: 362, Resolved: 1108, QA: 281].

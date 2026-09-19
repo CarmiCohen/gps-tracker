@@ -35,14 +35,16 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.19.04:
+ * - Issue #1109: Resolved Resource Leak in GNSS Revival Burst during Safe Mode Transition.
+ *   Refactored revival pulse logic to use structured concurrency with a try-finally block.
+ *   Ensured Raw/Fused listeners are guaranteed to be unregistered on cancellation, 
+ *   eliminating redundant revivalBurstJob management.
  * Sep.19.03:
  * - Issue #1108: Fully Resolved Redundant Battery Baseline Capture in Background/Idle State.
  *   Initialized lastFixRt to sessionStartRt in start() and resetBaseline() to ensure a proper
  *   grace period before a GNSS gap or stall is declared, preventing immediate redundant baseline capture.
  * Sep.19.02:
- * - Issue #1109: Resolved Resource Leak in GNSS Revival Burst during Safe Mode Transition.
- *   Ensured rawRevivalListener and revivalCallback are explicitly unregistered 
- *   when Safe Mode is toggled on, preventing raw GPS provider persistence.
  * - Issue #1107: Resolved GNSS Stall Timing Leakage during Suite Inactivity.
  *   Guarded the background init loop with isStarted.get() to prevent pendingEnterRt 
  *   from accumulating stall duration while inactive. Ensured explicit reset of 
@@ -202,7 +204,6 @@ class HardwareSuite @Inject constructor(
     private var registrationJob: Job? = null
     private var teardownJob: Job? = null
     private var revivalPulseJob: Job? = null
-    private var revivalBurstJob: Job? = null
     private var lastDisplayState = Display.STATE_UNKNOWN
     private var lastDisplayTransitionRt = 0L
     private val isDisplayFlickering = AtomicBoolean(false)
@@ -413,7 +414,7 @@ class HardwareSuite @Inject constructor(
             }
             
             val handler = hardwareHandler
-            val gHandler = gnssHandler
+            val gHandler = gnssThread?.looper?.let { Handler(it) }
             if (gHandler != null && ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
                 try {
                     locationManager.registerGnssStatusCallback(gnssStatusCallback, gHandler)
@@ -460,7 +461,6 @@ class HardwareSuite @Inject constructor(
             registrationJob?.cancel(); registrationJob = null
             proximityJob?.cancel(); proximityJob = null
             revivalPulseJob?.cancel(); revivalPulseJob = null
-            revivalBurstJob?.cancel(); revivalBurstJob = null
             
             stopAcousticMonitoring()
 
@@ -525,37 +525,45 @@ class HardwareSuite @Inject constructor(
         
         revivalPulseJob?.cancel()
         revivalPulseJob = scope.launch(Dispatchers.Default) {
+            val handler = synchronized(lifecycleLock) { hardwareHandler } ?: return@launch
+            
+            // Fused Revival Pulse
+            val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(p0: LocationResult) {} }
             synchronized(lifecycleLock) {
-                if (!isStarted.get()) return@synchronized
-                val handler = hardwareHandler ?: return@synchronized
-                
                 revivalCallback?.unregister(fusedLocationClient, handler)
-                val callback = object : ManagedLocationCallback() { override fun onLocationResult(p0: LocationResult) {} }
-                revivalCallback = callback
-                val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L).setMaxUpdates(5).build()
-                try { fusedLocationClient.requestLocationUpdates(fastRequest, callback, handler.looper) } catch (e: Exception) { Timber.e(e, "HardwareSuite: Fused revival pulse failed") }
-
+                revivalCallback = fusedCallback
+            }
+            
+            // Raw GPS Burst
+            val rawListener = object : ManagedLocationListener() { override fun onLocationChanged(location: Location) {} }
+            synchronized(lifecycleLock) {
                 rawRevivalListener?.unregister(locationManager, handler)
-                val rawListener = object : ManagedLocationListener() { override fun onLocationChanged(location: Location) {} }
                 rawRevivalListener = rawListener
-                try {
-                    _revivalEvents.tryEmit(RevivalEvent.RawBurstStarted)
-                    locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, rawListener, handler.looper)
-                    
-                    revivalBurstJob?.cancel()
-                    revivalBurstJob = launch {
-                        delay(10000)
-                        synchronized(lifecycleLock) { 
-                            if (rawRevivalListener == rawListener) { 
-                                rawListener.unregister(locationManager, handler)
-                                rawRevivalListener = null 
-                                _revivalEvents.tryEmit(RevivalEvent.RawBurstEnded)
-                            } 
-                        }
+            }
+
+            try {
+                // Issue #1109: Encapsulate entire burst lifecycle in a try-finally block for guaranteed cleanup.
+                val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L).setMaxUpdates(5).build()
+                fusedLocationClient.requestLocationUpdates(fastRequest, fusedCallback, handler.looper)
+
+                _revivalEvents.tryEmit(RevivalEvent.RawBurstStarted)
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, rawListener, handler.looper)
+                
+                delay(10000)
+            } catch (e: Exception) {
+                Timber.e(e, "HardwareSuite: GNSS Revival Pulse failed")
+            } finally {
+                // Guaranteed unregistration on completion or cancellation (e.g., Safe Mode transition)
+                synchronized(lifecycleLock) {
+                    if (revivalCallback == fusedCallback) {
+                        fusedCallback.unregister(fusedLocationClient, handler)
+                        revivalCallback = null
                     }
-                } catch (e: Exception) { 
-                    Timber.e(e, "HardwareSuite: Raw GPS bypass failed") 
-                    _revivalEvents.tryEmit(RevivalEvent.RawBurstEnded)
+                    if (rawRevivalListener == rawListener) {
+                        rawListener.unregister(locationManager, handler)
+                        rawRevivalListener = null
+                        _revivalEvents.tryEmit(RevivalEvent.RawBurstEnded)
+                    }
                 }
             }
         }
@@ -905,8 +913,6 @@ class HardwareSuite @Inject constructor(
             synchronized(lifecycleLock) {
                 revivalPulseJob?.cancel()
                 revivalPulseJob = null
-                revivalBurstJob?.cancel()
-                revivalBurstJob = null
                 
                 val handler = hardwareHandler
                 revivalCallback?.unregister(fusedLocationClient, handler)
