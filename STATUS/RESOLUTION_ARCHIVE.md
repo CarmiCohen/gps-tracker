@@ -1,4 +1,7 @@
-# Project Resolution Archive (Sep.15.101)
+# Project Resolution Archive (Sep.20.02)
+
+## 🟢 Sep.20.02
+*   **ViewerService Local Hardware Leak into Remote Alarm Evaluation (#1121)**: Resolved a hardware leak in `ViewerService.evaluateAlarmsInternal` where the Viewer's local SNR and vibration snapshots were used to evaluate remote Tracker alarms. Telemetry evaluation now strictly uses `snrIdx` and `vibeIdx` from the remote `TrackerStatus`, ensuring accurate Jammer and Stall detection for tracked devices (R-ID 374).
 
 ## 🟢 Sep.20.00
 *   **Inconsistent Jitter Audit during Adaptive GNSS Throttling (#1120)**: Resolved inconsistent jitter calculation in `ForensicAuditor.kt` by replacing the hardcoded 1000ms expected interval with a dynamic parameter. Updated `HardwareSuite.gnssStatusCallback` to calculate the active sampling interval (2s/5s) during GNSS status updates, ensuring that intentional performance throttling no longer triggers false hardware instability alerts (R-ID 373).

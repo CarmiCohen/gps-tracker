@@ -5,14 +5,14 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
-*   **Issue #1121: ViewerService Local Hardware Leak into Remote Alarm Evaluation**
-    *   *Detail*: In `ViewerService.evaluateAlarmsInternal`, the alarm manager is passed `snrSnapshot = hardwareSuite.averageSnr`. This uses the Viewer's local SNR to evaluate the remote Tracker's GNSS integrity.
-    *   *Risk*: Failure to trigger GNSS-related alarms (Jammer/Stall) for the remote tracker in the Viewer role.
-    *   *File*: `ViewerService.kt` (Line 458).
+*   (No open critical gaps identified in current audit cycle).
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1121: ViewerService Local Hardware Leak into Remote Alarm Evaluation** (Resolved Sep.20.02)
+    *   *Remediation*: Refactored `ViewerService.evaluateAlarmsInternal` to use remote telemetry (`snrIdx`, `vibeIdx`) from `connectivitySuite.trackerStatus` instead of local `hardwareSuite` snapshots. Corrected propagation of `isJammer`, `isStalled`, and `isGpsGap` flags in the evaluation loop, ensuring the Viewer role accurately reflects the remote Tracker's GNSS integrity. (R-ID 374)
 
 *   **Issue #1120: Inconsistent Jitter Audit during Adaptive GNSS Throttling** (Resolved Sep.20.00)
     *   *Remediation*: Updated `ForensicAuditor.recordGnssStatus` to accept a dynamic `expectedIntervalMs` parameter. Modified `HardwareSuite.gnssStatusCallback` to calculate the active interval (accounting for Performance Tier throttling) and pass it to the auditor, eliminating false jitter alerts during intentional thermal/load cooling cycles. (R-ID 373)
@@ -47,7 +47,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *   **Issue #1110: Initialization Race in HardwareSuite.start() causing False GPS Gap** (Resolved Sep.19.05)
     *   *Remediation*: Reordered the state initialization block in `HardwareSuite.start()`. By initializing `sessionStartRt`, `lastBaroZeroingRt`, and `lastFixRt` before `isStarted` is flipped to `true`, the background audit thread can no longer run an audit update loop with non-initialized/zeroed parameters, avoiding false GPS gaps and incorrect battery baselines on session initialization. (R-ID 364)
 
-*   **Issue #1109: Resource Leak in GNSS Revival Burst during Safe Mode Transition** (Resolved Sep.19.04)
+*   **Issue #1109: Resource Leak in GNSS Revival Burst during Safe Mode transition** (Resolved Sep.19.04)
     *   *Remediation*: Refactored the GNSS revival pulse logic in `HardwareSuite.kt` to use structured concurrency. By wrapping the burst lifecycle in a `try-finally` block within a single coroutine, Raw and Fused listeners are guaranteed to be unregistered upon completion or cancellation (e.g., during Safe Mode transition). Eliminated the redundant `revivalBurstJob` variable. (R-ID 363)
 
 *   **Issue #1108: Redundant Battery Baseline Capture in Background/Idle State** (Resolved Sep.19.03)
@@ -77,4 +77,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 373 (Rules: 76, IDs: 373), Resolved: 1120, Open: 1, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**
+- **Current Audit Baseline: [SOT: 374 (Rules: 78, IDs: 374), Resolved: 1121, Open: 0, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**

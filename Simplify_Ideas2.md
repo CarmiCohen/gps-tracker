@@ -1,4 +1,4 @@
-# Simplicity Audit & Architectural Refactoring Ideas (Sep.20.00)
+# Simplicity Audit & Architectural Refactoring Ideas (Sep.20.02)
 
 ## 🎯 Current Focus: HardwareSuite Pattern Convergence
 
@@ -17,3 +17,7 @@
 ### 4. ForensicAuditor Role Synchronization
 *   **Problem**: `recordGnssStatus` updates all roles at once because jitter is a global hardware property, but `recordGpsFix` and `evaluateStability` are role-tagged.
 *   **Opportunity**: Consider if role-specific jitter counters are necessary or if a unified "Hardware Health" state should be shared by roles to avoid redundant peak tracking in `RoleState`.
+
+### 5. Telemetry Source Abstraction (#1121)
+*   **Problem**: `ViewerService` manually extracts fields from `connectivitySuite.trackerStatus` for alarm evaluation, creating a mantenimiento burden if the model changes.
+*   **Opportunity**: Implement a `TrackerStatus.toAlarmEvaluationParams()` or a dedicated `RemoteTelemetrySnapshot` class to encapsulate the mapping from network status to alarm inputs, ensuring consistent isolation between local hardware and remote telemetry.
