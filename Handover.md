@@ -1,19 +1,27 @@
 # Forensic Handover (Sep.15.101)
 
 ## 🎯 Current System State
-*   **Version**: Sep.19.09 | **Build**: Hardware Snapshot Integrity Hardened
+*   **Version**: Sep.20.00 | **Build**: GNSS Throttling Jitter Logic Corrected
 *   **Active Devices**: Samsung A15 & S21FE (Unified via PerformanceTier)
-*   **SOT Baseline**: SOT-368 (Snapshot Thread-Safety)
+*   **SOT Baseline**: SOT-373 (GNSS Jitter Accuracy)
 
 ## 🛡️ Forensic Hardening (Session Summary)
 
-### 1. Snapshot Thread-Safety & Visibility (#1114)
-*   **Status**: Resolved in Sep.19.09.
+### 1. GNSS Jitter Audit Correction (#1120)
+*   **Status**: Resolved in Sep.20.00.
 *   **Remediation**:
-    *   Applied `@Volatile` to 20+ high-frequency hardware state variables in `HardwareSuite.kt` to ensure memory visibility across sensor handlers and audit threads.
-    *   Unified the locking strategy for peak-reset logic. `consumeLogicSnapshot` and `consumeForensicSnapshot` now synchronize on `this` (matching the sensor update path) before accessing the circular buffers, ensuring atomic forensic captures.
+    *   **ForensicAuditor.kt**: Updated `recordGnssStatus` to accept a dynamic `expectedIntervalMs`. Jitter is now calculated relative to the active sampling rate.
+    *   **HardwareSuite.kt**: Updated `gnssStatusCallback` to pass the throttled interval (2s or 5s) to the auditor.
+*   **Verification**: PASSED (Chapter 31.37). Spurious stability alerts during cooling cycles are eliminated.
+
+## 🔴 Open Gaps (Resumption Points)
+
+### 1. ViewerService Local Hardware Leak (#1121)
+*   **File**: `ViewerService.kt` (Line 458)
+*   **Detail**: Remote alarm evaluation uses local SNR instead of remote Tracker SNR.
+*   **Impact**: Inaccurate Jammer/Stall detection for remote devices.
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 368 (Rules: 76, IDs: 368), Resolved: 1114, Open: 6, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**
+- **Current Audit Baseline: [SOT: 373 (Rules: 77, IDs: 373), Resolved: 1120, Open: 1, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**
 
-**Resumption Context**: The system has finalized the hardening of hardware state visibility. Forensic snapshots are now guaranteed to be consistent even under extreme system load or rapid lifecycle rotations.
+**Resumption Context**: Forensic stability auditing is now performance-tier aware. The next step is decoupling local hardware state from remote telemetry processing in `ViewerService`.

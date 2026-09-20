@@ -1,4 +1,7 @@
-# Project Resolution Archive (Sep.19.13)
+# Project Resolution Archive (Sep.15.101)
+
+## 🟢 Sep.20.00
+*   **Inconsistent Jitter Audit during Adaptive GNSS Throttling (#1120)**: Resolved inconsistent jitter calculation in `ForensicAuditor.kt` by replacing the hardcoded 1000ms expected interval with a dynamic parameter. Updated `HardwareSuite.gnssStatusCallback` to calculate the active sampling interval (2s/5s) during GNSS status updates, ensuring that intentional performance throttling no longer triggers false hardware instability alerts (R-ID 373).
 
 ## 🟢 Sep.19.13
 *   **Excessive WakeLock Acquisition in Activity-Denied Scenarios (#1118)**: Resolved excessive battery drain in `HardwareSuite.kt` where the system would poke a WakeLock every 10 seconds if Step Detector registration failed, even if the failure was due to user-denied permissions. Implemented a permission check for `ACTIVITY_RECOGNITION` before poking the WakeLock, ensuring the fallback is suppressed when explicitly restricted by the user (R-ID 372).
@@ -13,7 +16,7 @@
 *   **Stale Forensic and SNR Buffers across Suite Lifecycle (#1115)**: Resolved an issue in `HardwareSuite.kt` where circular buffers (`sensorBuffer`, `snrBuffer`, `logicSnapshotBuffer`, `forensicSnapshotBuffer`) and the `lastBufferRecordRt` timestamp were not cleared during suite termination. By explicitly resetting these structures in `stop()`, the system now guarantees a clean forensic state for every service session restart, preventing stale data from polluting new monitoring cycles (R-ID 369).
 
 ## 🟢 Sep.19.09
-*   **HardwareSuite Thread-Safety and Visibility Vulnerabilities (#1114)**: Resolved memory visibility and race conditions in `HardwareSuite.kt` snapshotting logic. Applied `@Volatile` to high-frequency shared state variables (lux, acousticDb, tilt, velocity, etc.) to ensure correct cross-thread reads during forensic audits. Unified the synchronization strategy by wrapping both the sensor update handlers and the peak-reset snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, guaranteeing atomic "read-and-reset" operations under high system load (R-ID 368).
+*   **HardwareSuite Thread-Safety and Visibility Vulnerabilities (#1114)**: Resolved memory visibility and race conditions in `HardwareSuite.kt snapshotting logic. Applied `@Volatile` to high-frequency shared state variables (lux, acousticDb, tilt, velocity, etc.) to ensure correct cross-thread reads during forensic audits. Unified the synchronization strategy by wrapping both the sensor update handlers and the peak-reset snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, guaranteeing atomic "read-and-reset" operations under high system load (R-ID 368).
 
 ## 🟢 Sep.19.08
 *   **Forensic Multi-Role Integrity Hardening (#1113)**: Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367).

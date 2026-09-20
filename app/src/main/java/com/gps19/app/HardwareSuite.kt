@@ -35,6 +35,9 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.20.00:
+ * - Issue #1120: Resolved Inconsistent Jitter Audit during Adaptive GNSS Throttling.
+ *   Updated gnssStatusCallback to pass dynamic expected interval to ForensicAuditor.
  * Sep.19.13:
  * - Issue #1118: Resolved Excessive WakeLock Acquisition in Activity-Denied Scenarios.
  *   Modified the accelerometer-based stay-alive mechanism to check for Activity 
@@ -328,7 +331,6 @@ class HardwareSuite @Inject constructor(
         override fun onSatelliteStatusChanged(status: GnssStatus) {
             if (isTeardownActive.get()) return
             val nowRt = timeProvider.elapsedRealtime()
-            forensicAuditor.recordGnssStatus(nowRt)
             
             satellitesInView = status.satelliteCount
             var used = 0; var snrSum = 0.0; var snrCount = 0
@@ -360,6 +362,9 @@ class HardwareSuite @Inject constructor(
             } else {
                 GNSS_SAMPLING_INTERVAL_MS
             }
+
+            // Issue #1120: Pass dynamic expected interval for accurate jitter audit.
+            forensicAuditor.recordGnssStatus(nowRt, currentInterval)
 
             if (nowRt - lastGnssEmitRt >= currentInterval) {
                 lastGnssEmitRt = nowRt

@@ -5,11 +5,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
-*   **Issue #1120: Inconsistent Jitter Audit during Adaptive GNSS Throttling**
-    *   *Detail*: `ForensicAuditor.recordGnssStatus` uses a hardcoded `GNSS_EXPECTED_INTERVAL_MS` for jitter calculation, but `HardwareSuite` now adapts the GNSS sampling rate (R-ID 348). This causes false jitter alerts during intentional throttling periods.
-    *   *Risk*: Spurious stability alerts in logs during cooling or high-load states.
-    *   *File*: `ForensicAuditor.kt` (Line 41).
-
 *   **Issue #1121: ViewerService Local Hardware Leak into Remote Alarm Evaluation**
     *   *Detail*: In `ViewerService.evaluateAlarmsInternal`, the alarm manager is passed `snrSnapshot = hardwareSuite.averageSnr`. This uses the Viewer's local SNR to evaluate the remote Tracker's GNSS integrity.
     *   *Risk*: Failure to trigger GNSS-related alarms (Jammer/Stall) for the remote tracker in the Viewer role.
@@ -18,6 +13,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1120: Inconsistent Jitter Audit during Adaptive GNSS Throttling** (Resolved Sep.20.00)
+    *   *Remediation*: Updated `ForensicAuditor.recordGnssStatus` to accept a dynamic `expectedIntervalMs` parameter. Modified `HardwareSuite.gnssStatusCallback` to calculate the active interval (accounting for Performance Tier throttling) and pass it to the auditor, eliminating false jitter alerts during intentional thermal/load cooling cycles. (R-ID 373)
 
 *   **Issue #1118: Excessive WakeLock Acquisition in Activity-Denied Scenarios** (Resolved Sep.19.13)
     *   *Remediation*: Modified the accelerometer-based stay-alive mechanism in `HardwareSuite.kt` to check for `ACTIVITY_RECOGNITION` permission before poking the system WakeLock. This prevents unintended battery drain on devices where the user has withheld tracking permissions, shifting the system to a passive monitoring state. (R-ID 372)
@@ -79,4 +77,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 372 (Rules: 76, IDs: 372), Resolved: 1118, Open: 2, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**
+- **Current Audit Baseline: [SOT: 373 (Rules: 76, IDs: 373), Resolved: 1120, Open: 1, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**

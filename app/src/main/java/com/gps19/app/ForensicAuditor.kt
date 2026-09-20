@@ -10,6 +10,9 @@ import kotlin.math.round
 
 /**
  * ForensicAuditor: Encapsulates high-assurance hardware audits (Stability, Jitter, Sensor Rates, Energy).
+ * Sep.20.00:
+ * - Issue #1120: Resolved Inconsistent Jitter Audit during Adaptive GNSS Throttling.
+ *   Updated recordGnssStatus to accept dynamic expected interval to prevent false jitter alerts.
  * Sep.19.08:
  * - Issue #1113: Resolved Singleton State Collision in Multi-Role Tick.
  *   Implemented role-based state tracking for stability and sensor audits.
@@ -57,10 +60,14 @@ class ForensicAuditor @Inject constructor(
     // Jitter source tracking
     private var lastGnssStatusRt = 0L
 
-    fun recordGnssStatus(nowRt: Long) {
+    /**
+     * Records GNSS status and tracks jitter relative to the expected interval.
+     * Issue #1120: Updated to accept dynamic expectedIntervalMs to handle throttling.
+     */
+    fun recordGnssStatus(nowRt: Long, expectedIntervalMs: Long) {
         if (lastGnssStatusRt > 0) {
             val interval = nowRt - lastGnssStatusRt
-            val jitter = abs(interval - GNSS_EXPECTED_INTERVAL_MS)
+            val jitter = abs(interval - expectedIntervalMs)
             roleStates.values.forEach { state ->
                 if (jitter > state.maxGnssJitterMs) {
                     state.maxGnssJitterMs = jitter

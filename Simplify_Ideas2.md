@@ -1,15 +1,19 @@
-# Simplicity Audit & Architectural Refactoring Ideas (Sep.19.09)
+# Simplicity Audit & Architectural Refactoring Ideas (Sep.20.00)
 
 ## 🎯 Current Focus: HardwareSuite Pattern Convergence
 
 ### 1. HardwareSuite Snapshot Unification
-*   **Problem**: `consumeLogicSnapshot` and `consumeForensicSnapshot` are nearly identical.
+*   **Problem**: `consumeLogicSnapshot` and `consumeForensicSnapshot` are nearly identical, differing only in which buffer they read and which peaks they reset.
 *   **Opportunity**: Refactor into a single `internalConsumeSnapshot(buffer: CircularStateBuffer<ForensicSnapshot>, isForensic: Boolean)` method. This would reduce boilerplate and ensure that thread-safety improvements are always applied to both paths simultaneously.
 
 ### 2. Flyweight Sequence Abstraction
 *   **Problem**: `getSnrSamples`, `getSensorSamples`, and `getAcousticSamples` all implement similar filtering/mapping logic with internal flyweight objects.
 *   **Opportunity**: Create a generic utility in `CircularStateBuffer` or a helper extension to handle `Sequence` generation with a provided "reset/copy" lambda, reducing repetitive code in `HardwareSuite`.
 
-### 3. Display Flickering State Consolidation
-*   **Problem**: `isDisplayFlickering` (AtomicBoolean) and `lastDisplayTransitionRt` are tracked separately from other display states.
-*   **Opportunity**: Move these into a `DisplayHealth` data class or similar structure to keep the root `HardwareSuite` namespace cleaner as more display-related forensic checks are added.
+### 3. GNSS Sampling Logic Consolidation
+*   **Problem**: The calculation of GNSS sampling intervals (standard vs throttled) and the subsequent emission of detail updates is split between `gnssStatusCallback` and the auditor.
+*   **Opportunity**: Encapsulate GNSS policy in a small `GnssPolicyEngine` or similar helper to decouple the hardware callback from the throttling and auditing rules.
+
+### 4. ForensicAuditor Role Synchronization
+*   **Problem**: `recordGnssStatus` updates all roles at once because jitter is a global hardware property, but `recordGpsFix` and `evaluateStability` are role-tagged.
+*   **Opportunity**: Consider if role-specific jitter counters are necessary or if a unified "Hardware Health" state should be shared by roles to avoid redundant peak tracking in `RoleState`.
