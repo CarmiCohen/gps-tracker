@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.20.02)
+# SOT Master Requirements & Hardening Status (Sep.20.10)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 375**: Light Fast-Path Integration Hardening - Initialized the light sensor fast-path (`setLightFastPath`) in `TrackerService.setupPhysicalFastPaths()` using the baseline from `LocationProcessor` and the `LIGHT_THRESHOLD_LUX_JUMP` threshold. This ensures the specialized light-spike logic in `HardwareSuite` is alive and active for light-based tampering detection. (Resolved Sep.20.10)
 *   **SOT ID 374**: Viewer Hardware Isolation Hardening - Resolved a hardware leak in `ViewerService.evaluateAlarmsInternal` where the Viewer's local SNR and vibration snapshots were used to evaluate remote Tracker alarms. Telemetry evaluation now strictly uses `snrIdx` and `vibeIdx` from the remote `TrackerStatus`, ensuring accurate Jammer and Stall detection for tracked devices (R-ID 374). (Resolved Sep.20.02)
 *   **SOT ID 373**: GNSS Jitter Audit Correction - Resolved inconsistent jitter calculation in `ForensicAuditor.kt` by replacing the hardcoded 1000ms expected interval with a dynamic parameter. Updated `HardwareSuite.kt` to pass the active sampling interval (2s/5s) during GNSS status updates, ensuring that intentional performance throttling no longer triggers false hardware instability alerts (R-ID 373). (Resolved Sep.20.00)
 *   **SOT ID 372**: Activity-Denied WakeLock Fallback Hardening - Resolved excessive battery drain in `HardwareSuite.kt` where the system would poke a WakeLock every 10 seconds if Step Detector registration failed, even if the failure was due to user-denied permissions. Implemented a permission check for `ACTIVITY_RECOGNITION` before poking the WakeLock, ensuring the fallback is suppressed when explicitly restricted by the user (R-ID 372). (Resolved Sep.19.13)
@@ -22,29 +23,30 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 78
-- **Total SOT IDs**: 374
-- **Resolved Issues**: 1121
+- **Total SOT IDs**: 375
+- **Resolved Issues**: 1122
 - **Open Issues**: 0
 - **Testing Coverage**: 2 (Sub-items: 10)
 - **Simplification Ideas**: 19
 - **QA Validation Tasks**: 282
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.38 (Viewer Hardware Isolation)**: PASSED - Verified that evaluateAlarmsInternal uses remote SNR/Vibe telemetry (Sep.20.02)
-*   **Chapter 31.37 (GNSS Jitter Accuracy)**: PASSED - Verified dynamic jitter audit during throttling in HardwareSuite (Sep.20.00)
-*   **Chapter 31.36 (Activity-Denied Fallback)**: PASSED - Verified permission-gated WakeLock fallback in HardwareSuite (Sep.19.13)
-*   **Chapter 31.35 (Async Registration)**: PASSED - Verified isStarted check in setPowerSaveMode task (Sep.19.12)
-*   **Chapter 31.34 (Acoustic Lifecycle)**: PASSED - Verified acousticLock and definitive thread joining in startAcousticMonitoring (Sep.19.11)
-*   **Chapter 31.33 (Buffer Integrity)**: PASSED - Verified circular buffer reset in stop() lifecycle (Sep.19.10)
-*   **Chapter 31.32 (Snapshot Integrity)**: PASSED - Verified Volatile visibility and synchronized peak resets (Sep.19.09)
-*   **Chapter 31.31 (Multi-Role Audit)**: PASSED - Verified role-based state separation in ForensicAuditor (Sep.19.08)
-*   **Chapter 31.30 (Hardware Reset Integrity)**: PASSED - Verified hardwareSuite.resetBaseline() call in resetServiceTimers (Sep.19.07)
-*   **Chapter 31.29 (Proximity Hysteresis)**: PASSED - Verified temporal decay logic for flickering suppression (Sep.19.06)
-*   **Chapter 31.28 (Initialization Race)**: PASSED - Verified that lastFixRt is initialized before isStarted flag in start() (Sep.19.05)
-*   **Chapter 31.27 (Structured Burst Cleanup)**: PASSED - Verified that Raw/Fused listeners are unregistered via try-finally on coroutine cancellation (Sep.19.04)
-*   **Chapter 31.26 (Safe Mode Leakage)**: PASSED - Verified that revival listeners are unregistered when Safe Mode is toggled (Sep.19.02)
-*   **Chapter 31.25 (Baseline Capture Gating)**: PASSED - Verified that battery baseline capture is strictly gated by suite active state (Sep.19.03)
-*   **Chapter 31.24 (Stall Timing Leakage)**: PASSED - Verified that revival state resets cleanly on stop and audits are gated by suite lifecycle (Sep.19.02)
+*   **Chapter 31.39 (Light Fast-Path Integration)**: PASSED - Verified that TrackerService initializes the light sensor fast path (Sep.20.10)
+*   **Chapter 31.38 (Viewer Hardware Isolation)**: PASSED - Verified that evaluateAlarmsInternal uses remote SNR/Vibe telemetry (Sep.15.101)
+*   **Chapter 31.37 (GNSS Jitter Accuracy)**: PASSED - Verified dynamic jitter audit during throttling in HardwareSuite (Sep.15.101)
+*   **Chapter 31.36 (Activity-Denied Fallback)**: PASSED - Verified permission-gated WakeLock fallback in HardwareSuite (Sep.15.101)
+*   **Chapter 31.35 (Async Registration)**: PASSED - Verified isStarted check in setPowerSaveMode task (Sep.15.101)
+*   **Chapter 31.34 (Acoustic Lifecycle)**: PASSED - Verified acousticLock and definitive thread joining in startAcousticMonitoring (Sep.15.101)
+*   **Chapter 31.33 (Buffer Integrity)**: PASSED - Verified circular buffer reset in stop() lifecycle (Sep.15.101)
+*   **Chapter 31.32 (Snapshot Integrity)**: PASSED - Verified Volatile visibility and synchronized peak resets (Sep.15.101)
+*   **Chapter 31.31 (Multi-Role Audit)**: PASSED - Verified role-based state separation in ForensicAuditor (Sep.15.101)
+*   **Chapter 31.30 (Hardware Reset Integrity)**: PASSED - Verified hardwareSuite.resetBaseline() call in resetServiceTimers (Sep.15.101)
+*   **Chapter 31.29 (Proximity Hysteresis)**: PASSED - Verified temporal decay logic for flickering suppression (Sep.15.101)
+*   **Chapter 31.28 (Initialization Race)**: PASSED - Verified that lastFixRt is initialized before isStarted flag in start() (Sep.15.101)
+*   **Chapter 31.27 (Structured Burst Cleanup)**: PASSED - Verified that Raw/Fused listeners are unregistered via try-finally on coroutine cancellation (Sep.15.101)
+*   **Chapter 31.26 (Safe Mode Leakage)**: PASSED - Verified that revival listeners are unregistered when Safe Mode is toggled (Sep.15.101)
+*   **Chapter 31.25 (Baseline Capture Gating)**: PASSED - Verified that battery baseline capture is strictly gated by suite active state (Sep.15.101)
+*   **Chapter 31.24 (Stall Timing Leakage)**: PASSED - Verified that revival state resets cleanly on stop and audits are gated by suite lifecycle (Sep.15.101)
 
 ---
-*Next Audit: Sep.21.00. (Sep.20.02)*
+*Next Audit: Sep.21.00. (Sep.20.10)*

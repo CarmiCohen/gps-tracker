@@ -1,4 +1,7 @@
-# Project Resolution Archive (Sep.20.02)
+# Project Resolution Archive (Sep.20.10)
+
+## 🟢 Sep.20.10
+*   **Missing Light Fast-Path Integration in TrackerService (#1130)**: Initialized the light sensor fast-path (`setLightFastPath`) in `TrackerService.setupPhysicalFastPaths()` using the baseline from `LocationProcessor` and the `LIGHT_THRESHOLD_LUX_JUMP` threshold. This ensures the specialized light-spike logic in `HardwareSuite` is alive and active for light-based tampering detection (R-ID 375).
 
 ## 🟢 Sep.20.02
 *   **ViewerService Local Hardware Leak into Remote Alarm Evaluation (#1121)**: Resolved a hardware leak in `ViewerService.evaluateAlarmsInternal` where the Viewer's local SNR and vibration snapshots were used to evaluate remote Tracker alarms. Telemetry evaluation now strictly uses `snrIdx` and `vibeIdx` from the remote `TrackerStatus`, ensuring accurate Jammer and Stall detection for tracked devices (R-ID 374).
@@ -19,7 +22,7 @@
 *   **Stale Forensic and SNR Buffers across Suite Lifecycle (#1115)**: Resolved an issue in `HardwareSuite.kt` where circular buffers (`sensorBuffer`, `snrBuffer`, `logicSnapshotBuffer`, `forensicSnapshotBuffer`) and the `lastBufferRecordRt` timestamp were not cleared during suite termination. By explicitly resetting these structures in `stop()`, the system now guarantees a clean forensic state for every service session restart, preventing stale data from polluting new monitoring cycles (R-ID 369).
 
 ## 🟢 Sep.19.09
-*   **HardwareSuite Thread-Safety and Visibility Vulnerabilities (#1114)**: Resolved memory visibility and race conditions in `HardwareSuite.kt snapshotting logic. Applied `@Volatile` to high-frequency shared state variables (lux, acousticDb, tilt, velocity, etc.) to ensure correct cross-thread reads during forensic audits. Unified the synchronization strategy by wrapping both the sensor update handlers and the peak-reset snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, guaranteeing atomic "read-and-reset" operations under high system load (R-ID 368).
+*   **HardwareSuite Thread-Safety and Visibility Vulnerabilities (#1114)**: Resolved memory visibility and race conditions in `HardwareSuite.kt` snapshotting logic. Applied `@Volatile` to high-frequency shared state variables (lux, acousticDb, tilt, velocity, etc.) to ensure correct cross-thread reads during forensic audits. Unified the synchronization strategy by wrapping both the sensor update handlers and the peak-reset snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, guaranteeing atomic "read-and-reset" operations under high system load (R-ID 368).
 
 ## 🟢 Sep.19.08
 *   **Forensic Multi-Role Integrity Hardening (#1113)**: Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367).
@@ -38,7 +41,7 @@
 *   **Resource Leak in GNSS Revival Burst during Safe Mode Transition (#1109)**: Refactored GNSS revival pulse logic in `HardwareSuite.kt` to use a `try-finally` block within a single coroutine. This guarantees that Raw and Fused location listeners are always unregistered upon burst completion or cancellation (e.g., during Safe Mode transition or suite shutdown). The refactoring enabled the removal of the redundant `revivalBurstJob` state variable, simplifying the class's resource management (R-ID 363).
 
 ## 🟢 Sep.19.03
-*   **Redundant Battery Baseline Capture in Background/Idle State (#1108)**: Fully resolved the redundant battery baseline capture logic by initializing `lastFixRt` to `sessionStartRt` inside both `start()` and `resetBaseline()`. This guarantees a proper grace period before any GNSS gap or stall can be declared, preventing immediate redundant baseline captures upon app activation or reset (R-ID 361).
+*   **Redundant Battery Baseline Capture in Background/Idle State (#1108)**: Fully resolved the redundant battery baseline capture logic by initializing `lastFixRt` to `sessionStartRt` inside both `start()` and `resetBaseline()`. This guarantees a proper grace period before any GNSS gap or stall state can be declared, preventing immediate redundant baseline captures upon app activation or reset (R-ID 361).
 
 ## 🟢 Sep.19.02
 *   **GNSS Stall Timing Leakage during Suite Inactivity (#1107)**: Resolved a critical logic flaw in `HardwareSuite.kt` where the background audit loop was accumulating GNSS stall duration (`pendingEnterRt`) even while the suite was inactive. Guarded the background coroutine with `isStarted.get()` and implemented an explicit reset of revival state variables in `stop()` and `resetBaseline()`. This prevents immediate `HardwareLock` triggers upon app activation after prolonged indoor idle periods (R-ID 360).

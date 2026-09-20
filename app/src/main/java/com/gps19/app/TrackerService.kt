@@ -22,6 +22,10 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.20.10:
+ * - Issue #1130: Missing Light Fast-Path Integration in TrackerService.
+ *   Initialized the light sensor fast-path (setLightFastPath) using the baseline
+ *   from locationProcessor and LIGHT_THRESHOLD_LUX_JUMP threshold.
  * Sep.19.08:
  * - Issue #1113: Singleton State Collision. Used roleTag "T" for forensic auditing.
  * Sep.19.07:
@@ -352,6 +356,12 @@ class TrackerService : BaseMonitorService() {
             onSpike = {
                 logManager.logServiceEvent(m = "Acoustic Spike Detected (FastPath)", isImportant = false)
                 lastFastPathAcousticSpikeTs = timeProvider.elapsedRealtime()
+            }
+        )
+        hardwareSuite.setLightFastPath(
+            baseline = locationProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP,
+            onSpike = {
+                logManager.logServiceEvent(m = "Light Spike Detected (FastPath)", isImportant = false)
             }
         )
     }
