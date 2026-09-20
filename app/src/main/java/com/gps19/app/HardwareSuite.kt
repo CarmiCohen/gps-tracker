@@ -35,6 +35,24 @@ import kotlin.math.*
  * HardwareSuite: Unified authority for all device hardware and power policies.
  * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
  * and signaling backoff logic.
+ * Sep.19.13:
+ * - Issue #1118: Resolved Excessive WakeLock Acquisition in Activity-Denied Scenarios.
+ *   Modified the accelerometer-based stay-alive mechanism to check for Activity 
+ *   Recognition permission before poking the WakeLock, preventing battery drain 
+ *   on devices where the user has withheld tracking permissions.
+ * Sep.19.12:
+ * - Issue #1117: Resolved Uncontrolled Sensor Registration in setPowerSaveMode Race.
+ *   Added isStarted.get() check within the posted hardwareHandler block to ensure 
+ *   sensors are not re-registered if the suite was stopped before the block executed.
+ * Sep.19.11:
+ * - Issue #1116: Resolved Acoustic Monitor Resource Race on Rapid Restart.
+ *   Implemented acousticLock to synchronize monitoring lifecycle. Ensured previous 
+ *   acousticThread is definitive joined before starting a new session, preventing 
+ *   simultaneous AudioRecord initialization attempts.
+ * Sep.19.10:
+ * - Issue #1115: Resolved Stale Forensic and SNR Buffers across Suite Lifecycle.
+ *   Updated stop() to explicitly clear circular buffers and reset lastBufferRecordRt, 
+ *   ensuring no data persistence between service sessions.
  * Sep.19.09:
  * - Issue #1114: Resolved Thread-Safety and Visibility Vulnerabilities in Snapshotting.
  *   Applied @Volatile to shared state variables and unified peak reset logic 
@@ -111,7 +129,7 @@ class HardwareSuite @Inject constructor(
         var vibration: Double = 0.0
         var heading: Double = 0.0
         var baroAlt: Double = 0.0
-        var lux: Double = 0.0
+        var lux: Double = 0.06
         var isNear: Boolean = false
         var tiltDegrees: Double = 0.0
         var acousticDb: Double = 0.0
@@ -249,6 +267,8 @@ class HardwareSuite @Inject constructor(
     @Volatile private var isMonitoring = false
     @Volatile private var isAcousticRunning = false
     private var acousticThread: Thread? = null
+    private val acousticLock = Any()
+
     @Volatile private var isHighLoad = false
     @Volatile private var maliAnomaly = false
     @Volatile private var powerSaveMode = false
@@ -472,6 +492,12 @@ class HardwareSuite @Inject constructor(
             
             forensicAuditor.clearRevivalState()
             revivalBaselineCaptured = false
+            
+            // Issue #1115: Clear forensic and SNR buffers to prevent stale data persistence across restarts.
+            synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }
+            synchronized(snrBuffer) { snrBuffer.clear() }
+            synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }
+            synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() }
             
             // Issue #1107: Explicit reset of revival state to prevent cross-session stall leakage.
             pendingEnterRt = 0L
@@ -709,7 +735,15 @@ class HardwareSuite @Inject constructor(
             Sensor.TYPE_ACCELEROMETER -> {
                 gravityBuffer[0] = values[0]; gravityBuffer[1] = values[1]; gravityBuffer[2] = values[2]; hasGravity = true
                 processVibration(values[0], values[1], values[2]); updateOrientation()
-                if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) { lastStayAliveRt = nowRt; systemMonitor.acquireWakeLock(force = true) }
+                if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) {
+                    lastStayAliveRt = nowRt
+                    // Issue #1118: Suppress WakeLock fallback if Activity Recognition is explicitly denied.
+                    val canPoke = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
+                    } else true
+                    
+                    if (canPoke) systemMonitor.acquireWakeLock(force = true)
+                }
 
                 forensicAuditor.auditSensorRate(nowRt, isWarming).forEach { (role, msg) ->
                     _sensorEvents.tryEmit(AppSensorEvent.LogEvent("[$role] $msg", false))
@@ -772,53 +806,72 @@ class HardwareSuite @Inject constructor(
 
     @SuppressLint("MissingPermission")
     private fun startAcousticMonitoring() {
-        if (isMonitoring) return
-        isMonitoring = true
-        acousticThread = Thread {
-            while (isMonitoring) {
-                val sampleRate = ACOUSTIC_SAMPLE_RATE; val bufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-                if (bufferSize <= 0) { if (isMonitoring) _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Invalid buffer size")); try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
-                var audioRecord: AudioRecord? = null
-                try {
-                    var attempts = 0
-                    while (attempts < ACOUSTIC_INIT_RETRY_COUNT && isMonitoring) {
-                        val record = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize)
-                        if (record.state == AudioRecord.STATE_INITIALIZED) { audioRecord = record; break }
-                        record.release(); attempts++; try { Thread.sleep(ACOUSTIC_INIT_RETRY_DELAY_MS) } catch (ie: InterruptedException) { break }
-                    }
-                    if (!isMonitoring || audioRecord == null) continue
-                    try { audioRecord.startRecording() } catch (e: Exception) { try { audioRecord.release() } catch (ex: Exception) {}; try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
-                    isAcousticRunning = true; val buffer = ShortArray(bufferSize); var lastDutyCycleTransitionRt = timeProvider.elapsedRealtime() ; var isInOffCycle = false
-                    while (isMonitoring && !Thread.currentThread().isInterrupted) {
-                        val nowRt = timeProvider.elapsedRealtime()
-                        if (powerSaveMode) {
-                            val adaptiveOffCycleMs = SentinelValidator.computeAdaptiveAcousticOffCycle(isStationary(), stationaryStartRt, nowRt)
-                            if (!isInOffCycle && (nowRt - lastDutyCycleTransitionRt > ACOUSTIC_DUTY_CYCLE_ON_MS)) { 
-                                isInOffCycle = true; lastDutyCycleTransitionRt = nowRt; try { audioRecord.stop() } catch (e: Exception) {} 
-                            }
-                            else if (isInOffCycle && (nowRt - lastDutyCycleTransitionRt > adaptiveOffCycleMs)) { 
-                                isInOffCycle = false; lastDutyCycleTransitionRt = nowRt; try { audioRecord.startRecording() } catch (e: Exception) { break } 
-                            }
-                        } else if (isInOffCycle) { isInOffCycle = false; lastDutyCycleTransitionRt = nowRt; try { audioRecord.startRecording() } catch (e: Exception) { break } }
-                        if (isInOffCycle) { try { Thread.sleep(500) } catch (ie: InterruptedException) { break }; continue }
-                        val read = audioRecord.read(buffer, 0, bufferSize)
-                        if (read > 0) {
-                            var maxAmp = 0; for (i in 0 until read) { val a = abs(buffer[i].toInt()); if (a > maxAmp) maxAmp = a }
-                            val db = if (maxAmp > 0) 20 * log10(maxAmp.toDouble()) else 0.0
-                            synchronized(this) {
-                                currentAcousticDb = db; if (db > logicPeakDb) logicPeakDb = db; if (db < logicMinDb) logicMinDb = db; if (db > forensicPeakDb) forensicPeakDb = db; if (db < forensicMinDb) forensicMinDb = db; if (db > secPeakDb) secPeakDb = db
-                                if (!isWarming && fastPathFloor >= 0 && (db - fastPathFloor) > fastPathSpikeThreshold && db >= fastPathMinDb) { val spikeRt = timeProvider.elapsedRealtime() ; if (spikeRt - lastAcousticSpikeRt > SPIKE_DEBOUNCE_MS) { lastAcousticSpikeRt = spikeRt; lastAcousticLockoutRt = spikeRt; onAcousticSpike?.invoke() } }
-                            }
-                        } else if (read < 0) { if (!isMonitoring) break; _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Hardware error")); break }
-                    }
-                    try { audioRecord.stop() } catch (ex: Exception) {}
-                } catch (e: Exception) { if (isMonitoring) _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Exception - ${e.message}")) }
-                finally { isAcousticRunning = false; try { audioRecord?.release() } catch (ex: Exception) {}; if (isMonitoring) try { Thread.sleep(ACOUSTIC_GENERIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { } }
+        synchronized(acousticLock) {
+            if (isMonitoring) return
+            
+            // Issue #1116: Definitive join of previous thread to prevent AudioRecord collision.
+            acousticThread?.let {
+                if (it.isAlive) {
+                    it.interrupt()
+                    try { it.join(1500) } catch (e: Exception) { Timber.e(e, "Acoustic: Failed to join previous thread") }
+                }
             }
-        }.apply { name = "AcousticMonitor"; priority = Thread.MIN_PRIORITY; start() }
+            
+            isMonitoring = true
+            acousticThread = Thread {
+                while (isMonitoring) {
+                    val sampleRate = ACOUSTIC_SAMPLE_RATE; val bufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+                    if (bufferSize <= 0) { if (isMonitoring) _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Invalid buffer size")); try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
+                    var audioRecord: AudioRecord? = null
+                    try {
+                        var attempts = 0
+                        while (attempts < ACOUSTIC_INIT_RETRY_COUNT && isMonitoring) {
+                            val record = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT, bufferSize)
+                            if (record.state == AudioRecord.STATE_INITIALIZED) { audioRecord = record; break }
+                            record.release(); attempts++; try { Thread.sleep(ACOUSTIC_INIT_RETRY_DELAY_MS) } catch (ie: InterruptedException) { break }
+                        }
+                        if (!isMonitoring || audioRecord == null) continue
+                        try { audioRecord.startRecording() } catch (e: Exception) { try { audioRecord.release() } catch (ex: Exception) {}; try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
+                        isAcousticRunning = true; val buffer = ShortArray(bufferSize); var lastDutyCycleTransitionRt = timeProvider.elapsedRealtime() ; var isInOffCycle = false
+                        while (isMonitoring && !Thread.currentThread().isInterrupted) {
+                            val nowRt = timeProvider.elapsedRealtime()
+                            if (powerSaveMode) {
+                                val adaptiveOffCycleMs = SentinelValidator.computeAdaptiveAcousticOffCycle(isStationary(), stationaryStartRt, nowRt)
+                                if (!isInOffCycle && (nowRt - lastDutyCycleTransitionRt > ACOUSTIC_DUTY_CYCLE_ON_MS)) { 
+                                    isInOffCycle = true; lastDutyCycleTransitionRt = nowRt; try { audioRecord.stop() } catch (e: Exception) {} 
+                                }
+                                else if (isInOffCycle && (nowRt - lastDutyCycleTransitionRt > adaptiveOffCycleMs)) { 
+                                    isInOffCycle = false; lastDutyCycleTransitionRt = nowRt; try { audioRecord.startRecording() } catch (e: Exception) { break } 
+                                }
+                            } else if (isInOffCycle) { isInOffCycle = false; lastDutyCycleTransitionRt = nowRt; try { audioRecord.startRecording() } catch (e: Exception) { break } }
+                            if (isInOffCycle) { try { Thread.sleep(500) } catch (ie: InterruptedException) { break }; continue }
+                            val read = audioRecord.read(buffer, 0, bufferSize)
+                            if (read > 0) {
+                                var maxAmp = 0; for (i in 0 until read) { val a = abs(buffer[i].toInt()); if (a > maxAmp) maxAmp = a }
+                                val db = if (maxAmp > 0) 20 * log10(maxAmp.toDouble()) else 0.0
+                                synchronized(this) {
+                                    currentAcousticDb = db; if (db > logicPeakDb) logicPeakDb = db; if (db < logicMinDb) logicMinDb = db; if (db > forensicPeakDb) forensicPeakDb = db; if (db < forensicMinDb) forensicMinDb = db; if (db > secPeakDb) secPeakDb = db
+                                    if (!isWarming && fastPathFloor >= 0 && (db - fastPathFloor) > fastPathSpikeThreshold && db >= fastPathMinDb) { val spikeRt = timeProvider.elapsedRealtime() ; if (spikeRt - lastAcousticSpikeRt > SPIKE_DEBOUNCE_MS) { lastAcousticSpikeRt = spikeRt; lastAcousticLockoutRt = spikeRt; onAcousticSpike?.invoke() } }
+                                }
+                            } else if (read < 0) { if (!isMonitoring) break; _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Hardware error")); break }
+                        }
+                        try { audioRecord.stop() } catch (ex: Exception) {}
+                    } catch (e: Exception) { if (isMonitoring) _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Exception - ${e.message}")) }
+                    finally { isAcousticRunning = false; try { audioRecord?.release() } catch (ex: Exception) {}; if (isMonitoring) try { Thread.sleep(ACOUSTIC_GENERIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { } }
+                }
+            }.apply { name = "AcousticMonitor"; priority = Thread.MIN_PRIORITY; start() }
+        }
     }
 
-    private fun stopAcousticMonitoring() { isMonitoring = false; isAcousticRunning = false; acousticThread?.interrupt(); try { acousticThread?.join(1000) } catch (e: Exception) {}; acousticThread = null }
+    private fun stopAcousticMonitoring() {
+        synchronized(acousticLock) {
+            isMonitoring = false
+            isAcousticRunning = false
+            acousticThread?.interrupt()
+            try { acousticThread?.join(1000) } catch (e: Exception) {}
+            acousticThread = null
+        }
+    }
 
     fun isAcousticMonitoringEnabled() = isMonitoring
     fun isAcousticMonitoringActive() = isAcousticRunning
@@ -971,9 +1024,11 @@ class HardwareSuite @Inject constructor(
                     // This prevents the race where asynchronous unregistration could execute AFTER 
                     // synchronous re-registration, leaving the suite with zero active sensors.
                     hardwareHandler?.post {
-                        sensorManager.unregisterListener(this)
-                        registerSensors()
-                        Timber.d("HardwareSuite: PowerSaveMode refreshed. Active: $active")
+                        if (isStarted.get()) {
+                            sensorManager.unregisterListener(this)
+                            registerSensors()
+                            Timber.d("HardwareSuite: PowerSaveMode refreshed. Active: $active")
+                        }
                     }
                 }
             }

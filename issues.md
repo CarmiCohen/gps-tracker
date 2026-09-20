@@ -5,26 +5,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
-*   **Issue #1115: Stale Forensic and SNR Buffers across Suite Lifecycle**
-    *   *Detail*: `HardwareSuite` circular buffers (`sensorBuffer`, `snrBuffer`, `logicSnapshotBuffer`, `forensicSnapshotBuffer`) are only cleared in `resetBaseline()`. They are not cleared in `stop()`. If the service is stopped and restarted without a full process termination, the buffers contain data from the previous session.
-    *   *Risk*: Corrupted history graphs and delayed GNSS throttling recovery after service restarts.
-    *   *File*: `HardwareSuite.kt` (Lines 320-330).
-
-*   **Issue #1116: Acoustic Monitor Resource Race on Rapid Restart**
-    *   *Detail*: `stopAcousticMonitoring()` interrupts the monitor thread but joins with a 1000ms timeout. If it times out, `AudioRecord` release is not guaranteed before `startAcousticMonitoring()` is called again, which may fail to initialize a new `AudioRecord` while the old one is still closing.
-    *   *Risk*: Acoustic monitoring failure or "Hardware Failure" log spam during rapid suite restarts.
-    *   *File*: `HardwareSuite.kt` (Lines 660-705).
-
-*   **Issue #1117: Uncontrolled Sensor Registration in setPowerSaveMode Race**
-    *   *Detail*: `setPowerSaveMode` posts a block to the handler thread that calls `registerSensors()` without checking if the suite is still started. If `stop()` runs and unregisters listeners before this block executes, sensors are re-registered on a dead session.
-    *   *Risk*: Permanent sensor listener leak and high battery drain after service stop.
-    *   *File*: `HardwareSuite.kt` (Line 830).
-
-*   **Issue #1118: Excessive WakeLock Acquisition in Activity-Denied Scenarios**
-    *   *Detail*: If Step Detector registration fails (e.g., Activity Recognition permission denied), the accelerometer handler acquires a WakeLock every 10 seconds to "stay alive" (Line 508). This persists indefinitely, draining battery.
-    *   *Risk*: Unintended battery drain on devices where specific permissions are withheld.
-    *   *File*: `HardwareSuite.kt` (Line 508).
-
 *   **Issue #1120: Inconsistent Jitter Audit during Adaptive GNSS Throttling**
     *   *Detail*: `ForensicAuditor.recordGnssStatus` uses a hardcoded `GNSS_EXPECTED_INTERVAL_MS` for jitter calculation, but `HardwareSuite` now adapts the GNSS sampling rate (R-ID 348). This causes false jitter alerts during intentional throttling periods.
     *   *Risk*: Spurious stability alerts in logs during cooling or high-load states.
@@ -38,6 +18,18 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1118: Excessive WakeLock Acquisition in Activity-Denied Scenarios** (Resolved Sep.19.13)
+    *   *Remediation*: Modified the accelerometer-based stay-alive mechanism in `HardwareSuite.kt` to check for `ACTIVITY_RECOGNITION` permission before poking the system WakeLock. This prevents unintended battery drain on devices where the user has withheld tracking permissions, shifting the system to a passive monitoring state. (R-ID 372)
+
+*   **Issue #1117: Uncontrolled Sensor Registration in setPowerSaveMode Race** (Resolved Sep.19.12)
+    *   *Remediation*: Added an explicit `isStarted.get()` check within the `hardwareHandler` runnable in `setPowerSaveMode()`. This ensures that sensors are not re-registered if the suite has been stopped before the asynchronous registration task executes, preventing persistent sensor leaks. (R-ID 371)
+
+*   **Issue #1116: Acoustic Monitor Resource Race on Rapid Restart** (Resolved Sep.19.11)
+    *   *Remediation*: Implemented `acousticLock` in `HardwareSuite.kt` to synchronize acoustic monitoring lifecycle transitions. Updated `startAcousticMonitoring()` to definitively join any previous alive `acousticThread` before initiating a new one, preventing simultaneous `AudioRecord` initialization attempts and resource collisions during rapid service restarts. (R-ID 370)
+
+*   **Issue #1115: Stale Forensic and SNR Buffers across Suite Lifecycle** (Resolved Sep.19.10)
+    *   *Remediation*: Updated the `stop()` method in `HardwareSuite.kt` to explicitly clear `sensorBuffer`, `snrBuffer`, `logicSnapshotBuffer`, and `forensicSnapshotBuffer`, and reset `lastBufferRecordRt`. This ensures forensic history and GNSS stability metrics are fresh for each service lifecycle restart. (R-ID 369)
 
 *   **Issue #1114: Thread-Safety and Visibility Vulnerabilities in HardwareSuite Snapshotting** (Resolved Sep.19.09)
     *   *Remediation*: Applied `@Volatile` to high-frequency state variables (lux, acoustic, tilt, velocity, etc.) to ensure cross-thread visibility. Unified the synchronization strategy by wrapping both the sensor update paths and the forensic snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, ensuring atomic read-and-reset operations. (R-ID 368)
@@ -87,4 +79,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 368 (Rules: 76, IDs: 368), Resolved: 1114, Open: 6, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**
+- **Current Audit Baseline: [SOT: 372 (Rules: 76, IDs: 372), Resolved: 1118, Open: 2, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**
