@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.21.121)
+# SOT Master Requirements & Hardening Status (Sep.21.122)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 389**: HardwareSuite Snapshot Unification - Unified `consumeLogicSnapshot` and `consumeForensicSnapshot` into a single private `privateConsumeSnapshot` method. This eliminates duplicate sensing snapshot extraction code, ensures thread-safety gates, peak resets, and acoustic/vibration floor snapshots are symmetrically maintained (R-ID 389). (Resolved Sep.21.122)
 *   **SOT ID 388**: Unified Vibration Authority - Consolidated the `adaptiveVibrationFloor` calculation in `HardwareSuite.kt`. The high-frequency floor is now snapshotted and propagated to `LocationSentinel` via `TrackerService.processTick()`, ensuring that both the hardware layer and the validation engine operate on a single source of truth for stationary detection (R-ID 388). (Resolved Sep.21.121)
 *   **SOT ID 387**: Non-Blocking Acoustic Teardown - Removed the synchronous `acousticThread.join(1000)` from `HardwareSuite.stopAcousticMonitoring()`. Resource exclusivity is now maintained via the join-before-start pattern in `startAcousticMonitoring()`, which waits for any lingering thread to exit before initializing a new one. This eliminates service lifecycle stalls and potential ANRs during service termination (R-ID 387). (Resolved Sep.21.121)
 *   **SOT ID 386**: GPS Telemetry Conflation Hardening - Replaced single-point location variable in `TrackerService.kt` with a thread-safe `ConcurrentLinkedQueue` buffer. The logic tick now drains and processes all intermediate fixes accumulated between 2-second pulses, preventing the loss of high-resolution trail points and maintaining forensic jitter audit precision (R-ID 386). (Resolved Sep.21.120)
@@ -21,19 +22,20 @@
 *   **SOT ID 371**: Asynchronous Sensor Registration Hardening - Resolved a race condition in `HardwareSuite.kt` where `setPowerSaveMode` could re-register sensors on a stopped suite. Added an explicit `isStarted.get()` check within the posted handler block to ensure sequential lifecycle integrity during rapid mode transitions (R-ID 371). (Resolved Sep.19.12)
 *   **SOT ID 370**: Acoustic Monitor Lifecycle Hardening - Resolved a resource race condition in `HardwareSuite.kt` where rapid restarts could cause multiple threads to compete for the `AudioRecord` resource. Implemented `acousticLock` and mandatory thread joining in `startAcousticMonitoring()`, ensuring that any previous monitor session is definitively terminated before a new one initializes (R-ID 370). (Resolved Sep.19.11)
 *   **SOT ID 369**: Stale Forensic Buffer Lifecycle Hardening - Resolved an issue in `HardwareSuite.kt` where circular buffers (`sensorBuffer`, `snrBuffer`, `logicSnapshotBuffer`, `forensicSnapshotBuffer`) and the `lastBufferRecordRt` timestamp were not cleared during suite termination. By explicitly resetting these structures in `stop()`, the system now guarantees a clean forensic state for every service session restart, preventing stale data from polluting new monitoring cycles (R-ID 369). (Resolved Sep.19.10)
-*   **SOT ID 368**: Snapshot Thread-Safety Hardening - Resolved memory visibility and race conditions in `HardwareSuite.kt snapshotting logic. Applied `@Volatile` to high-frequency shared state variables (lux, acousticDb, tilt, velocity, etc.) to ensure correct cross-thread reads during forensic audits. Unified the synchronization strategy by wrapping both the sensor update handlers and the peak-reset snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, guaranteeing atomic "read-and-reset" operations under high system load (R-ID 368). (Resolved Sep.19.09)
+*   **SOT ID 368**: Snapshot Thread-Safety Hardening - Resolved memory visibility and race conditions in `HardwareSuite.kt` snapshotting logic. Applied `@Volatile` to high-frequency shared state variables (lux, acousticDb, tilt, velocity, etc.) to ensure correct cross-thread reads during forensic audits. Unified the synchronization strategy by wrapping both the sensor update handlers and the peak-reset snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, guaranteeing atomic "read-and-reset" operations under high system load (R-ID 368). (Resolved Sep.19.09)
 *   **SOT ID 367**: Forensic Multi-Role Integrity Hardening - Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367). (Resolved Sep.19.08)
 
 ## 📈 Metric Summary
 - **Rules Verified**: 80
-- **Total SOT IDs**: 388
-- **Resolved Issues**: 1140
+- **Total SOT IDs**: 389
+- **Resolved Issues**: 1141
 - **Open Issues**: 0
 - **Testing Coverage**: 2 (Sub-items: 10)
-- **Simplification Ideas**: 19
+- **Simplification Ideas**: 18
 - **QA Validation Tasks**: 282
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.53 (Snapshot Unification)**: PASSED - Verified unified snapshot ingestion path in HardwareSuite (Sep.21.122)
 *   **Chapter 31.52 (Vibration Authority)**: PASSED - Verified unified floor propagation in HardwareSuite/Sentinel (Sep.21.121)
 *   **Chapter 31.51 (Acoustic Teardown)**: PASSED - Verified removal of synchronous join in stopAcousticMonitoring (Sep.21.121)
 *   **Chapter 31.50 (Telemetry Conflation)**: PASSED - Verified location buffer drainage in TrackerService (Sep.21.120)
@@ -50,4 +52,4 @@
 *   **Chapter 31.39 (Light Fast-Path Integration)**: PASSED - Verified that TrackerService initializes the light sensor fast path (Sep.15.101)
 
 ---
-*Next Audit: Sep.21.200. (Sep.21.121)*
+*Next Audit: Sep.21.200. (Sep.21.122)*

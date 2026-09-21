@@ -33,6 +33,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.21.122:
+ * - Idea 1 Cleanup: Unified consumeLogicSnapshot and consumeForensicSnapshot into a private 
+ *   privateConsumeSnapshot method to remove boilerplate and ensure perfectly symmetrical state management.
  * Sep.21.121:
  * - Issue #1123 Hardening: Removed synchronous join() from stopAcousticMonitoring 
  *   to eliminate lifecycle stalls. Resource exclusivity is maintained via 
@@ -809,31 +812,66 @@ class HardwareSuite @Inject constructor(
     fun isAcousticMonitoringEnabled() = isMonitoring
     fun isAcousticMonitoringActive() = isAcousticRunning
 
+    private fun privateConsumeSnapshot(buffer: CircularStateBuffer<ForensicSnapshot>, isForensic: Boolean): ForensicSnapshot {
+        synchronized(this) {
+            synchronized(buffer) {
+                val snapshot = buffer.next()
+                snapshot.apply {
+                    vibration = currentVibrationIndex
+                    heading = currentCompassHeading
+                    baroAlt = absoluteAltitude
+                    lux = currentLux
+                    isNear = isProximityNear
+                    tiltDegrees = currentTiltDegrees
+                    acousticDb = currentAcousticDb
+                    peakShock = if (isForensic) forensicPeakVibration else logicPeakVibration
+                    peakVerticalVelocity = if (isForensic) forensicPeakVerticalVelocity else logicPeakVerticalVelocity
+                    peakVerticalVelocityTs = if (isForensic) forensicPeakVerticalVelocityTs else logicPeakVerticalVelocityTs
+                    peakVerticalVelocityRt = if (isForensic) forensicPeakVerticalVelocityRt else logicPeakVerticalVelocityRt
+                    plungeMatched = !isForensic && !isWarming && plungeMatched
+                    peakVerticalDisplacement = if (isForensic) forensicPeakVerticalDisplacement else logicPeakVerticalDisplacement
+                    proximityIdx = this@HardwareSuite.proximityIdx
+                    proximityCm = currentProximityCm
+                    proximityDebounceMs = this@HardwareSuite.proximityDebounceMs
+                    vibrationRollingSum = this@HardwareSuite.vibrationRollingSum
+                    acousticPeak = if (isForensic) forensicPeakDb else logicPeakDb
+                    val minDb = if (isForensic) forensicMinDb else logicMinDb
+                    acousticPeakMin = if (minDb >= 100.0) -1.0 else minDb
+                    kineticEnergy = this@HardwareSuite.currentKineticEnergy
+                    adaptiveVibrationFloor = this@HardwareSuite.adaptiveVibrationFloor
+                }
+                if (isForensic) {
+                    forensicPeakVibration = 0.0
+                    forensicPeakVerticalVelocity = 0.0
+                    forensicPeakVerticalVelocityTs = 0L
+                    forensicPeakVerticalVelocityRt = 0L
+                    forensicPeakVerticalDisplacement = 0.0
+                    forensicPeakDb = 0.0
+                    forensicMinDb = 100.0
+                } else {
+                    logicPeakVibration = 0.0
+                    logicPeakVerticalVelocity = 0.0
+                    logicPeakVerticalVelocityTs = 0L
+                    logicPeakVerticalVelocityRt = 0L
+                    logicPeakVerticalDisplacement = 0.0
+                    plungeMatched = false
+                    logicPeakDb = 0.0
+                    logicMinDb = 100.0
+                }
+                return snapshot
+            }
+        }
+    }
+
     fun consumeLogicSnapshot(): ForensicSnapshot {
         return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeLogicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(m, false)) }) {
-            synchronized(this) {
-                synchronized(logicSnapshotBuffer) {
-                    val snapshot = logicSnapshotBuffer.next()
-                    snapshot.apply { 
-                        vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = logicPeakVibration; peakVerticalVelocity = logicPeakVerticalVelocity; peakVerticalVelocityTs = logicPeakVerticalVelocityTs; peakVerticalVelocityRt = logicPeakVerticalVelocityRt; plungeMatched = !isWarming && plungeMatched; peakVerticalDisplacement = logicPeakVerticalDisplacement; proximityIdx = this@HardwareSuite.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareSuite.proximityDebounceMs; vibrationRollingSum = this@HardwareSuite.vibrationRollingSum; acousticPeak = logicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareSuite.currentKineticEnergy; adaptiveVibrationFloor = this@HardwareSuite.adaptiveVibrationFloor 
-                    }
-                    logicPeakVibration = 0.0; logicPeakVerticalVelocity = 0.0; logicPeakVerticalVelocityTs = 0L; logicPeakVerticalVelocityRt = 0L; logicPeakVerticalDisplacement = 0.0; plungeMatched = false; logicPeakDb = 0.0; logicMinDb = 100.0; snapshot
-                }
-            }
+            privateConsumeSnapshot(logicSnapshotBuffer, isForensic = false)
         }
     }
 
     fun consumeForensicSnapshot(): ForensicSnapshot {
         return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeForensicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(m, false)) }) {
-            synchronized(this) {
-                synchronized(forensicSnapshotBuffer) {
-                    val snapshot = forensicSnapshotBuffer.next()
-                    snapshot.apply { 
-                        vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = forensicPeakVibration; peakVerticalVelocity = forensicPeakVerticalVelocity; peakVerticalVelocityTs = forensicPeakVerticalVelocityTs; peakVerticalVelocityRt = forensicPeakVerticalVelocityRt; plungeMatched = false; peakVerticalDisplacement = forensicPeakVerticalDisplacement; proximityIdx = this@HardwareSuite.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareSuite.proximityDebounceMs; vibrationRollingSum = this@HardwareSuite.vibrationRollingSum; acousticPeak = forensicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareSuite.currentKineticEnergy; adaptiveVibrationFloor = this@HardwareSuite.adaptiveVibrationFloor
-                    }
-                    forensicPeakVibration = 0.0; forensicPeakVerticalVelocity = 0.0; forensicPeakVerticalVelocityTs = 0L; forensicPeakVerticalVelocityRt = 0L; forensicPeakVerticalDisplacement = 0.0; forensicPeakDb = 0.0; forensicMinDb = 100.0; snapshot
-                }
-            }
+            privateConsumeSnapshot(forensicSnapshotBuffer, isForensic = true)
         }
     }
 

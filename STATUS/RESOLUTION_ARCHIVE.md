@@ -1,4 +1,7 @@
-# Project Resolution Archive (Sep.21.121)
+# Project Resolution Archive (Sep.21.122)
+
+## 🟢 Sep.21.122
+*   **HardwareSuite Snapshot Unification (#1151)**: Unified `consumeLogicSnapshot` and `consumeForensicSnapshot` into a single private `privateConsumeSnapshot` method. This eliminates duplicate sensing snapshot extraction code, ensures thread-safety gates, peak resets, and acoustic/vibration floor snapshots are symmetrically maintained (R-ID 389).
 
 ## 🟢 Sep.21.121
 *   **Unified Vibration Authority (#1143)**: Consolidated the `adaptiveVibrationFloor` calculation in `HardwareSuite.kt`. The high-frequency floor is now snapshotted and propagated to `LocationSentinel` via `TrackerService.processTick()`, ensuring that both the hardware layer and the validation engine operate on a single source of truth for stationary detection (R-ID 388).
