@@ -26,15 +26,11 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.20.20:
+ * - Issue #1142 Hardening: Reset all vitality timestamps in resetStats() to 
+ *   prevent false "Flow Stall" alerts on session restart (R-ID 383).
  * Sep.17.02:
  * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
- * Sep.16.05:
- * - Issue #1060 Capability Consolidation: Transitioned signal integrity 
- *   and performance audits to inspect PerformanceTier directly via provider (R-ID 348).
- * Sep.16.00:
- * - Issue #1055 Unified Performance Tier: Harmonized signal integrity and 
- *   performance audit thresholds across A15 and S21FE using the unified 
- *   isStaggeredPerformanceTier flag (R-ID 348, formerly R-ID 347).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -646,6 +642,14 @@ class IntegrityMonitor @Inject constructor(
         batterySamples.clear()
         lastFullPollTs = 0L
         lastInternetCheckRt = 0L
+        
+        // Issue #1142: Reset vitality timestamps to prevent spurious "Flow Stall" alerts.
+        lastInternetUpdateRt = 0L
+        lastBatteryUpdateRt = 0L
+        lastStorageUpdateRt = 0L
+        lastPowerUpdateRt = 0L
+        lastLocationStatusUpdateRt = 0L
+
         isStorageSimulated.set(false)
         isStorageCriticalSimulated.set(false)
         isMaliAnomalySimulated.set(false)

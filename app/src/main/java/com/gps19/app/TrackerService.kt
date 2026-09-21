@@ -22,15 +22,17 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * Sep.20.10:
- * - Issue #1130: Missing Light Fast-Path Integration in TrackerService.
- *   Initialized the light sensor fast-path (setLightFastPath) using the baseline
- *   from locationProcessor and LIGHT_THRESHOLD_LUX_JUMP threshold.
- * Sep.19.08:
- * - Issue #1113: Singleton State Collision. Used roleTag "T" for forensic auditing.
- * Sep.19.07:
- * - Issue #1112: Resolved Incomplete Reset in resetServiceTimers. 
- *   Ensured hardwareSuite.resetBaseline() is called during session termination.
+ * Sep.20.18:
+ * - Issue #1137 Hardening: Ensured all forensic sampling state (spatial gates, 
+ *   thermal recovery timers) is zeroed in resetServiceTimers() (R-ID 384).
+ * - Issue #1149: Completed Fast-Path Light Spike Integration. Captured 
+ *   lastFastPathLightSpikeTs in hardware callbacks and propagated to 
+ *   LocationProcessor for immediate tamper response (R-ID 380).
+ * - Issue #1150: Harmonized Light Baseline. Re-synchronized fast-path 
+ *   baseline in processTick to prevent logic/fast-path divergence (R-ID 381).
+ * Sep.20.15:
+ * - Issue #1124: Selective Baseline Reset. Updated resetServiceTimers to pass 
+ *   roleTag "T" to HardwareSuite, preventing data loss in multi-role sessions (R-ID 376).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -54,6 +56,7 @@ class TrackerService : BaseMonitorService() {
     private var capabilities = HardwareCapabilities()
 
     private var lastFastPathAcousticSpikeTs = 0L
+    private var lastFastPathLightSpikeTs = 0L
 
     private var isPowerSaveActive = false
     private var lastPowerSaveCheckRt = 0L
@@ -89,7 +92,6 @@ class TrackerService : BaseMonitorService() {
         
         refreshCapabilitiesInternal()
 
-        // JdHardwareManager is vendor-specific to SM-A155/156 variants (R405).
         if (capabilities.isA15Device) {
             val success = JdHardwareManager.initialize(timeProvider, configManager.deviceId)
             if (success) {
@@ -362,6 +364,8 @@ class TrackerService : BaseMonitorService() {
             baseline = locationProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP,
             onSpike = {
                 logManager.logServiceEvent(m = "Light Spike Detected (FastPath)", isImportant = false)
+                // Issue #1149: Captured spike timestamp for validation engine propagation.
+                lastFastPathLightSpikeTs = timeProvider.elapsedRealtime()
             }
         )
     }
@@ -393,8 +397,22 @@ class TrackerService : BaseMonitorService() {
         sessionManager.reset()
         integrityMonitor.resetStats()
         forensicAuditor.reset("T")
-        hardwareSuite.resetBaseline()
+        
+        // Issue #1124: Pass "T" to reset only tracker-specific audits.
+        hardwareSuite.resetBaseline("T")
+        
+        // Issue #1137: Reset all forensic sampling state
+        lastForensicLat = 0.0
+        lastForensicLng = 0.0
+        lastForensicVibe = 0.0
+        lastForensicTilt = 0.0
+        lastWasCooling = false
+        recoveryTriggerRt = 0L
+        
         lastHardwareRecoveryTs = 0L
+        lastFastPathAcousticSpikeTs = 0L
+        lastFastPathLightSpikeTs = 0L
+        setupPhysicalFastPaths()
         logManager.logServiceEvent(m = "Session Terminated", isImportant = false)
     }
 
@@ -461,6 +479,16 @@ class TrackerService : BaseMonitorService() {
         val health = integrityMonitor.currentHealth
         val snapshot = hardwareSuite.consumeLogicSnapshot()
 
+        // Issue #1150: Dynamic Baseline Synchronization for Light Fast-Path
+        hardwareSuite.setLightFastPath(
+            baseline = locationProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP,
+            onSpike = {
+                logManager.logServiceEvent(m = "Light Spike Detected (FastPath)", isImportant = false)
+                // Issue #1149: Captured spike timestamp for validation engine propagation.
+                lastFastPathLightSpikeTs = timeProvider.elapsedRealtime()
+            }
+        )
+
         hardwareSuite.setHighLoad(health.isCoolingModeActive)
         
         isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(
@@ -519,7 +547,6 @@ class TrackerService : BaseMonitorService() {
         var recoveryFlagged = false
         if (lastServiceTickRealtime > 0) {
             val tickGap = nowRt - lastServiceTickRealtime
-            // Issue #1055: Broadened recovery threshold to all staggered devices (A15, S21FE)
             val recoveryThreshold = if (isStaggered) 10000L else HARDWARE_SUPPRESSION_THRESHOLD_MS
             
             if (tickGap > recoveryThreshold && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
@@ -546,7 +573,11 @@ class TrackerService : BaseMonitorService() {
         }
         
         locationProcessor.updateSensorData(
-            vibration = snapshot.vibration, heading = snapshot.heading, baroAlt = snapshot.baroAlt, lux = snapshot.lux, isNear = snapshot.isNear, powerTamper = health.isPowerTamper, tiltDegrees = snapshot.tiltDegrees, acousticDb = snapshot.acousticDb, peakShock = snapshot.peakShock, peakVerticalVelocity = snapshot.peakVerticalVelocity, peakVerticalVelocityTs = snapshot.peakVerticalVelocityTs, peakVerticalVelocityRt = snapshot.peakVerticalVelocityRt, plungeMatched = snapshot.plungeMatched, peakVerticalDisplacement = snapshot.peakVerticalDisplacement, nowRt = nowRt, nowWall = now
+            vibration = snapshot.vibration, heading = snapshot.heading, baroAlt = snapshot.baroAlt, lux = snapshot.lux, isNear = snapshot.isNear, powerTamper = health.isPowerTamper, tiltDegrees = snapshot.tiltDegrees, acousticDb = snapshot.acousticDb, peakShock = snapshot.peakShock, peakVerticalVelocity = snapshot.peakVerticalVelocity, peakVerticalVelocityTs = snapshot.peakVerticalVelocityTs, peakVerticalVelocityRt = snapshot.peakVerticalVelocityRt, plungeMatched = snapshot.plungeMatched, peakVerticalDisplacement = snapshot.peakVerticalDisplacement, nowRt = nowRt, nowWall = now,
+            
+            // Issue #1149: Propagated light fast-path state.
+            lightSpikeRt = lastFastPathLightSpikeTs,
+            acousticLockoutRt = lastFastPathAcousticSpikeTs
         )
 
         val noiseIdx = (snapshot.acousticDb - locationProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB
@@ -574,7 +605,7 @@ class TrackerService : BaseMonitorService() {
         val location = lastKnownLocation
         if (location != null) {
             val processed = locationProcessor.processGpsPoint(
-                lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed, gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing, snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = forensicAuditor.getLastGpsFixRealtime("T"), isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, nowWall = now, nowRt = nowRt,
+                lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed, gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing, snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = forensicAuditor.getLastGpsFixRealtime("T"), isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, providedLightSpikeRt = lastFastPathLightSpikeTs, nowWall = now, nowRt = nowRt,
                 providedIsStalled = health.gpsStalled,
                 isSuspicious = isSuspiciousMode
             )

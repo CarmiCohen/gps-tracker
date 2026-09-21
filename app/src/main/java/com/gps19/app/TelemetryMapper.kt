@@ -4,6 +4,9 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Sep.20.15:
+ * - Issue #1138/1147 Hardening: Added gpsHardwareLock and isGnssThrottled 
+ *   to all mapping layers for forensic parity (R-ID 378).
  * Aug.31.00:
  * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
  *   violationUptimeMs mapping for full parity in binary telemetry (R782).
@@ -26,6 +29,7 @@ object TelemetryMapper {
             locationPendingReason = p.locationPendingReason
             isUltraLongStationary = p.isUltraLongStationary
             violationUptimeMs = p.violationUptimeMs
+            gpsHardwareLock = p.gpsHardwareLock
 
             // Forensic Parity
             snrIdx = p.snrIdx
@@ -88,6 +92,7 @@ object TelemetryMapper {
             isBatteryCritical = entity.isBatteryCritical
             isUltraLongStationary = entity.isUltraLongStationary
             violationUptimeMs = entity.violationUptimeMs
+            gpsHardwareLock = entity.gpsHardwareLock
         }
     }
 
@@ -129,7 +134,8 @@ object TelemetryMapper {
             sitTilt = point.sitTilt,
             sitShock = point.sitShock,
             isUltraLongStationary = point.isUltraLongStationary,
-            violationUptimeMs = point.violationUptimeMs
+            violationUptimeMs = point.violationUptimeMs,
+            gpsHardwareLock = point.gpsHardwareLock
         )
     }
 
@@ -160,7 +166,9 @@ object TelemetryMapper {
             isBatteryLow = status.isBatteryLow,
             isBatteryCritical = status.isBatteryCritical,
             isUltraLongStationary = status.isUltraLongStationary,
-            violationUptimeMs = status.violationUptimeMs
+            violationUptimeMs = status.violationUptimeMs,
+            gpsHardwareLock = status.gpsHardwareLock,
+            isGnssThrottled = status.isGnssThrottled
         )
     }
 
@@ -191,7 +199,9 @@ object TelemetryMapper {
             isBatteryLow = entity.isBatteryLow,
             isBatteryCritical = entity.isBatteryCritical,
             isUltraLongStationary = entity.isUltraLongStationary,
-            violationUptimeMs = entity.violationUptimeMs
+            violationUptimeMs = entity.violationUptimeMs,
+            gpsHardwareLock = entity.gpsHardwareLock,
+            isGnssThrottled = entity.isGnssThrottled
         )
     }
 }

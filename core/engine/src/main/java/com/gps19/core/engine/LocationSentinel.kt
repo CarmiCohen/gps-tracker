@@ -5,12 +5,8 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
- * Aug.18.05:
- * - Issue #201: Urban Edge Case Multipath Mitigation. Dampened stationaryProb 
- *   decay when physically stationary in low-SNR environments (R201).
- * Aug.14.06:
- * - Issue #172: Viewer-Side State Audit. Finalized forensic parity by adding 
- *   Vz timestamps (sitVzTs, sitVzRt) to loadForensicState (R172).
+ * Sep.20.12:
+ * - Issue #1149: Propagated Fast-Path Light Spike for high-frequency tamper detection.
  */
 class LocationSentinel {
 
@@ -51,6 +47,7 @@ class LocationSentinel {
     var currentAcousticDb: Double = 0.0
         private set
     private var lastFastPathAcousticSpikeRt: Long = 0L
+    private var lastFastPathLightSpikeRt: Long = 0L
 
     // Issue #601: Kinetic Energy
     var kineticEnergy: Double = 0.0
@@ -134,8 +131,6 @@ class LocationSentinel {
             val prob = if (estimatedSpeedMps < STATIONARY_SPEED_THRESHOLD_MPS) 1.0 else 0.0
             
             // Issue #201: Urban Canyon Dampening.
-            // If physically stationary but GPS speed suggests motion in a low-SNR environment,
-            // we dampen the probability decay to avoid rapid anchor release.
             val isLowSnr = lastSnr > 0 && lastSnr < JUMP_GATE_LOW_SNR_THRESHOLD
             val alpha = if (isStationary() && isLowSnr && prob < stationaryProb) {
                 POSITION_EMA_ALPHA_STATIONARY * 0.2 // 5x slower decay
@@ -167,6 +162,7 @@ class LocationSentinel {
         isWarming: Boolean = false,
         manualAdaptiveFloor: Double = -1.0,
         acousticLockoutRt: Long = 0L,
+        lightSpikeRt: Long = 0L,
         isMuzzled: Boolean = false,
         kineticEnergy: Double = 0.0,
         nowRt: Long,
@@ -175,8 +171,9 @@ class LocationSentinel {
         var baselineChanged = false
         
         this.lastCompassHeading = this.currentCompassHeading
-        this.currentVibrationIndex = safeDouble(vibration)
-        this.lastFastPathAcousticSpikeRt = acousticLockoutRt
+        if (vibration >= 0.0) this.currentVibrationIndex = safeDouble(vibration)
+        if (acousticLockoutRt > 0) this.lastFastPathAcousticSpikeRt = acousticLockoutRt
+        if (lightSpikeRt > 0) this.lastFastPathLightSpikeRt = lightSpikeRt
         this.kineticEnergy = safeDouble(kineticEnergy)
         
         if (peakShock > this.peakVibrationShock && !peakShock.isNaN()) {
@@ -226,13 +223,13 @@ class LocationSentinel {
             stationaryStartRt = 0L
         }
 
-        this.currentCompassHeading = safeDouble(heading)
-        this.currentBaroAlt = safeDouble(baroAlt)
-        this.currentLux = safeDouble(lux)
+        if (heading >= 0.0) this.currentCompassHeading = safeDouble(heading)
+        if (baroAlt > -999.0) this.currentBaroAlt = safeDouble(baroAlt)
+        if (lux >= 0.0) this.currentLux = safeDouble(lux)
         this.isNear = isNear
         this.isPowerTamper = powerTamper
         this.currentTiltDegrees = currentTilt
-        this.currentAcousticDb = safeDouble(acousticDb)
+        if (acousticDb >= 0.0) this.currentAcousticDb = safeDouble(acousticDb)
 
         this.luxBaseline = SentinelValidator.updateLuxBaseline(this.luxBaseline, lux, isStationary(), isWarming)
         this.baroBaseline = SentinelValidator.updateBaroBaseline(this.baroBaseline, baroAlt, isWarming)
@@ -455,6 +452,12 @@ class LocationSentinel {
             return SentinelStatus.TAMPER
         }
 
+        val isLightSpikeRecently = (lastFastPathLightSpikeRt > 0 && (nowRt - lastFastPathLightSpikeRt < LIGHT_LOCKOUT_MS))
+        if (isLightSpikeRecently) {
+            resultFlyweight.reason = "Light jump (FastPath)"
+            return SentinelStatus.TAMPER
+        }
+
         val isAcousticLockedOut = (lastFastPathAcousticSpikeRt > 0 && (nowRt - lastFastPathAcousticSpikeRt < ACOUSTIC_LOCKOUT_MS))
         
         if (!isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb)) {
@@ -501,6 +504,7 @@ class LocationSentinel {
         lastSitVz = 0.0; lastSitVzTs = 0L; lastSitVzRt = 0L; lastSitDz = 0.0; lastSitBaro = 0.0; lastSitTilt = 0.0; lastSitShock = 0.0
         gpsMotionStartRt = 0L
         lastFastPathAcousticSpikeRt = 0L
+        lastFastPathLightSpikeRt = 0L
         estimatedSpeedMps = 0.0
         estimatedBearing = 0.0
         stationaryProb = 1.0

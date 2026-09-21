@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.20.12:
+ * - Issue #1149: Added LIGHT_LOCKOUT_MS (5s) for fast-path tamper persistence.
  * Sep.19.06:
  * - Issue #1111: Added DISPLAY_FLICKER_TIMEOUT_MS (3s) for proximity hysteresis decay.
  * Sep.16.14:
@@ -166,6 +168,7 @@ const val ACOUSTIC_DUTY_CYCLE_OFF_MS = 8000L
 
 // Physical Security Sentinel
 const val LIGHT_THRESHOLD_LUX_JUMP = 150.0
+const val LIGHT_LOCKOUT_MS = 5000L
 const val TILT_THRESHOLD_DEGREES = 15.0
 const val BARO_LIFT_THRESHOLD_METERS = 0.8
 const val VIBRATION_SUSPICIOUS_THRESHOLD_G = 0.25

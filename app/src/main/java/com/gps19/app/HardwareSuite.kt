@@ -33,75 +33,15 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
- * Consolidates GNSS, Sensors, Audio, and Display monitoring with Doze-awareness 
- * and signaling backoff logic.
- * Sep.20.00:
- * - Issue #1120: Resolved Inconsistent Jitter Audit during Adaptive GNSS Throttling.
- *   Updated gnssStatusCallback to pass dynamic expected interval to ForensicAuditor.
- * Sep.19.13:
- * - Issue #1118: Resolved Excessive WakeLock Acquisition in Activity-Denied Scenarios.
- *   Modified the accelerometer-based stay-alive mechanism to check for Activity 
- *   Recognition permission before poking the WakeLock, preventing battery drain 
- *   on devices where the user has withheld tracking permissions.
- * Sep.19.12:
- * - Issue #1117: Resolved Uncontrolled Sensor Registration in setPowerSaveMode Race.
- *   Added isStarted.get() check within the posted hardwareHandler block to ensure 
- *   sensors are not re-registered if the suite was stopped before the block executed.
- * Sep.19.11:
- * - Issue #1116: Resolved Acoustic Monitor Resource Race on Rapid Restart.
- *   Implemented acousticLock to synchronize monitoring lifecycle. Ensured previous 
- *   acousticThread is definitive joined before starting a new session, preventing 
- *   simultaneous AudioRecord initialization attempts.
- * Sep.19.10:
- * - Issue #1115: Resolved Stale Forensic and SNR Buffers across Suite Lifecycle.
- *   Updated stop() to explicitly clear circular buffers and reset lastBufferRecordRt, 
- *   ensuring no data persistence between service sessions.
- * Sep.19.09:
- * - Issue #1114: Resolved Thread-Safety and Visibility Vulnerabilities in Snapshotting.
- *   Applied @Volatile to shared state variables and unified peak reset logic 
- *   using synchronized(this) across sensor handlers and forensic snapshot consumption.
- * Sep.19.08:
- * - Issue #1113: Singleton State Collision. Adapted sensor rate auditing to 
- *   handle multi-role forensic results from ForensicAuditor.
- * Sep.19.06:
- * - Issue #1111: Resolved Proximity Suppression Lock-in due to Hysteresis Persistence.
- *   Implemented temporal decay (DISPLAY_FLICKER_TIMEOUT_MS) for the flickering 
- *   suppression logic and ensured isDisplayFlickering is reset in stop() and resetBaseline().
- * Sep.19.05:
- * - Issue #1110: Resolved Initialization Race in start() causing False GPS Gap.
- *   Reordered state initialization to ensure sessionStartRt and lastFixRt are 
- *   populated before the isStarted flag is set, preventing the background audit 
- *   loop from calculating gaps against a zeroed lastFixRt.
- * Sep.19.04:
- * - Issue #1109: Resolved Resource Leak in GNSS Revival Burst during Safe Mode Transition.
- *   Refactored revival pulse logic to use structured concurrency with a try-finally block.
- *   Ensured Raw/Fused listeners are guaranteed to be unregistered on cancellation, 
- *   eliminating redundant revivalBurstJob management.
- * Sep.19.03:
- * - Issue #1108: Fully Resolved Redundant Battery Baseline Capture in Background/Idle State.
- *   Initialized lastFixRt to sessionStartRt in start() and resetBaseline() to ensure a proper
- *   grace period before a GNSS gap or stall is declared, preventing immediate redundant baseline capture.
- * Sep.19.02:
- * - Issue #1107: Resolved GNSS Stall Timing Leakage during Suite Inactivity.
- *   Guarded the background init loop with isStarted.get() to prevent pendingEnterRt 
- *   from accumulating stall duration while inactive. Ensured explicit reset of 
- *   revival state variables in stop() and resetBaseline().
- * - Issue #1108: Resolved Redundant Battery Baseline Capture in Background.
- *   Guarded updateLocationStatus in the init loop to prevent forensicAuditor.captureRevivalStart 
- *   from triggering while the suite is stopped.
- * - Issue #1106: Resolved Energy Footprint Data Loss following Intermediate Audit Consumption.
- *   Modified the HardwareLock event in checkRevivalLifecycle to peek at the battery 
- *   footprint without clearing the baseline, ensuring the final recovery Success event 
- *   retains the total cycle's energy data.
- * Sep.19.01:
- * - Issue #1105: Resolved Battery Baseline Capture Persistence across Lifecycle Transitions.
- *   Ensured revivalBaselineCaptured is properly reset to false within stop() and resetBaseline()
- *   so that subsequent lifecycle starts or baseline resets correctly allow capturing new battery baselines.
- * Sep.19.00:
- * - Issue #1104: Resolved Battery Baseline Recapture within Stalled Pending Cycles.
- *   Implemented revivalBaselineCaptured flag to ensure a single battery baseline 
- *   capture per GNSS pending cycle, preventing premature recapture if intermediate 
- *   audits (like HardwareLock) consume the baseline.
+ * Sep.20.12:
+ * - Issue #1148: Resolved stale light fast-path baseline persistence.
+ *   Explicitly reset fastPathLightBaseline and lastLightSpikeRt in resetBaseline().
+ * Sep.20.15:
+ * - Issue #1124: Selective Baseline Reset. Updated resetBaseline(roleTag) to 
+ *   target specific role audits in ForensicAuditor (R-ID 376).
+ * - Issue #1127/1128/1133/1135 Hardening: Ensured resetBaseline zero-fills all 
+ *   transient peak accumulators, lockout timestamps, and stationary markers 
+ *   to prevent cross-session pollution (R-ID 377).
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -114,9 +54,6 @@ class HardwareSuite @Inject constructor(
     private val forensicAuditor: ForensicAuditor
 ) : ManagedSensorListener() {
 
-    /**
-     * LocationStatus: Represents the current health and pending state of the GNSS subsystem.
-     */
     data class LocationStatus(
         val isPending: Boolean = false,
         val reason: LocationPendingReason = LocationPendingReason.NONE,
@@ -125,9 +62,6 @@ class HardwareSuite @Inject constructor(
         val recoveryConfirmed: Boolean = false
     )
 
-    /**
-     * ForensicSnapshot: Atomic capture of all hardware sensor states for telemetry.
-     */
     class ForensicSnapshot {
         var vibration: Double = 0.0
         var heading: Double = 0.0
@@ -242,9 +176,9 @@ class HardwareSuite @Inject constructor(
     private var teardownJob: Job? = null
     private var revivalPulseJob: Job? = null
     private var lastDisplayState = Display.STATE_UNKNOWN
-    private var lastDisplayTransitionRt = 0L
+    @Volatile private var lastDisplayTransitionRt = 0L
     private val isDisplayFlickering = AtomicBoolean(false)
-    private var lastStayAliveRt = 0L
+    @Volatile private var lastStayAliveRt = 0L
 
     private val gravityBuffer = FloatArray(3)
     private val geomagneticBuffer = FloatArray(3)
@@ -284,7 +218,7 @@ class HardwareSuite @Inject constructor(
     private val sensorBuffer = CircularStateBuffer(256, { EngineSensorSnapshot() }, {
         it.ts = 0L; it.rt = 0L; it.lux = 0.0; it.vibe = 0.0; it.proxIdx = 0.0; it.lift = 0.0; it.tilt = 0.0; it.acoustic = 0.0; it.isSitDetected = false; it.sitVzTs = 0L; it.sitVzRt = 0L; it.sitShock = 0.0; it.kineticEnergy = 0.0
     })
-    private var lastBufferRecordRt = 0L
+    @Volatile private var lastBufferRecordRt = 0L
 
     private var secPeakLux = 0.0; private var secPeakVibe = 0.0; private var secSumProxIdx = 0.0; private var secProxCount = 0
     private var secPeakTilt = 0.0; private var secPeakLift = 0.0; private var secPeakDb = 0.0; private var secSitDetected = false; private var secPeakKinetic = 0.0
@@ -292,7 +226,7 @@ class HardwareSuite @Inject constructor(
     private var fastPathFloor = -1.0; private var fastPathSpikeThreshold = ACOUSTIC_THRESHOLD_DB_JUMP
     private var fastPathMinDb = ACOUSTIC_MIN_THRESHOLD_DB; private var onAcousticSpike: (() -> Unit)? = null
     private var fastPathLightBaseline = -1.0; private var fastPathLightSpikeThreshold = LIGHT_THRESHOLD_LUX_JUMP; private var onLightSpike: (() -> Unit)? = null
-    private var lastAcousticSpikeRt = 0L; private var lastLightSpikeRt = 0L
+    @Volatile private var lastAcousticSpikeRt = 0L; @Volatile private var lastLightSpikeRt = 0L
 
     @Volatile var lastAcousticLockoutRt = 0L; private set
     private var sessionStartRt = 0L
@@ -306,7 +240,7 @@ class HardwareSuite @Inject constructor(
     @Volatile var relativeAltitude = 0.0; private set
 
     private var proximityJob: Job? = null
-    private var rawProximityNear = false; private var proximityMaxRange = 5f
+    @Volatile private var rawProximityNear = false; private var proximityMaxRange = 5f
     @Volatile var isProximityNear = false; private set
     @Volatile var proximityIdx = 0.0; private set
     @Volatile var currentProximityCm = -1.0; private set
@@ -318,10 +252,10 @@ class HardwareSuite @Inject constructor(
     @Volatile var currentVerticalVelocity = 0.0; private set
     @Volatile var currentVerticalDisplacement = 0.0; private set
 
-    private var lastLinearAccelTs = 0L; private var stationaryStartRt = 0L
-    private var emaPressure = 0.0; private var lastBaroZeroingRt = 0L
+    @Volatile private var lastLinearAccelTs = 0L; @Volatile private var stationaryStartRt = 0L
+    @Volatile private var emaPressure = 0.0; @Volatile private var lastBaroZeroingRt = 0L
     private var initialRotationMatrix = FloatArray(9); private var hasInitialRotation = false
-    private var plungePhase = 0; private var plungeMatched = false; private var lastPlungePhaseRt = 0L
+    @Volatile private var plungePhase = 0; @Volatile private var plungeMatched = false; @Volatile private var lastPlungePhaseRt = 0L
 
     private val _isUltraLongStationary = MutableSharedFlow<Boolean>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val isUltraLongStationaryFlow: SharedFlow<Boolean> = _isUltraLongStationary.asSharedFlow()
@@ -363,7 +297,6 @@ class HardwareSuite @Inject constructor(
                 GNSS_SAMPLING_INTERVAL_MS
             }
 
-            // Issue #1120: Pass dynamic expected interval for accurate jitter audit.
             forensicAuditor.recordGnssStatus(nowRt, currentInterval)
 
             if (nowRt - lastGnssEmitRt >= currentInterval) {
@@ -393,7 +326,7 @@ class HardwareSuite @Inject constructor(
                         isDisplayFlickering.set(true)
                         Timber.w("Forensic: Rapid Display Flickering detected ($lastDisplayState -> $newState).")
                     }
-                } else if (!isFlickeringInWindow(nowRt)) { // Use window-based reset if not currently in a rapid transition window.
+                } else if (!isFlickeringInWindow(nowRt)) {
                     isDisplayFlickering.set(false)
                 }
                 
@@ -414,7 +347,6 @@ class HardwareSuite @Inject constructor(
             _isGnssThrottled.tryEmit(isGnssThrottled)
             
             while (isActive) {
-                // Issue #1107: Guard background audits to prevent stall timing leakage while stopped.
                 if (isStarted.get()) {
                     updateLocationStatus()
                     checkRevivalLifecycle()
@@ -438,8 +370,6 @@ class HardwareSuite @Inject constructor(
             val count = activeUsers.incrementAndGet()
             Timber.d("HardwareSuite: start() called. Active users: $count")
 
-            // Issue #1110: Initialize critical state variables BEFORE setting isStarted=true 
-            // to prevent the background loop from calculating gaps against zeroed values.
             val nowRt = timeProvider.elapsedRealtime()
             if (!isStarted.get()) {
                 sessionStartRt = nowRt
@@ -498,13 +428,11 @@ class HardwareSuite @Inject constructor(
             forensicAuditor.clearRevivalState()
             revivalBaselineCaptured = false
             
-            // Issue #1115: Clear forensic and SNR buffers to prevent stale data persistence across restarts.
             synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }
             synchronized(snrBuffer) { snrBuffer.clear() }
             synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }
             synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() }
             
-            // Issue #1107: Explicit reset of revival state to prevent cross-session stall leakage.
             pendingEnterRt = 0L
             recoveryStartRt = 0L
             revivalAttemptCount = 0
@@ -513,10 +441,12 @@ class HardwareSuite @Inject constructor(
             currentLocationStatus = LocationStatus()
             _locationStatus.tryEmit(currentLocationStatus)
             
-            // Issue #1111: Reset display flickering state.
             isDisplayFlickering.set(false)
             lastDisplayTransitionRt = 0L
             
+            // Issue #1127/1128/1133/1135: Clear lifecycle leftovers on stop
+            clearLifecycleLeftovers()
+
             Timber.i("HardwareSuite: Starting deferred teardown sequence.")
             
             recoveryJob?.cancel(); recoveryJob = null
@@ -589,14 +519,12 @@ class HardwareSuite @Inject constructor(
         revivalPulseJob = scope.launch(Dispatchers.Default) {
             val handler = synchronized(lifecycleLock) { hardwareHandler } ?: return@launch
             
-            // Fused Revival Pulse
             val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(p0: LocationResult) {} }
             synchronized(lifecycleLock) {
                 revivalCallback?.unregister(fusedLocationClient, handler)
                 revivalCallback = fusedCallback
             }
             
-            // Raw GPS Burst
             val rawListener = object : ManagedLocationListener() { override fun onLocationChanged(location: Location) {} }
             synchronized(lifecycleLock) {
                 rawRevivalListener?.unregister(locationManager, handler)
@@ -604,7 +532,6 @@ class HardwareSuite @Inject constructor(
             }
 
             try {
-                // Issue #1109: Encapsulate entire burst lifecycle in a try-finally block for guaranteed cleanup.
                 val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L).setMaxUpdates(5).build()
                 fusedLocationClient.requestLocationUpdates(fastRequest, fusedCallback, handler.looper)
 
@@ -615,7 +542,6 @@ class HardwareSuite @Inject constructor(
             } catch (e: Exception) {
                 Timber.e(e, "HardwareSuite: GNSS Revival Pulse failed")
             } finally {
-                // Guaranteed unregistration on completion or cancellation (e.g., Safe Mode transition)
                 synchronized(lifecycleLock) {
                     if (revivalCallback == fusedCallback) {
                         fusedCallback.unregister(fusedLocationClient, handler)
@@ -646,7 +572,6 @@ class HardwareSuite @Inject constructor(
                 recoveryConfirmed = false 
             }
             
-            // Issue #1104: Guard battery baseline capture to prevent recapture in stalled cycles.
             if (!revivalBaselineCaptured) {
                 revivalBaselineCaptured = true
                 forensicAuditor.captureRevivalStart(nowRt)
@@ -662,11 +587,11 @@ class HardwareSuite @Inject constructor(
                 nextPending = false; nextReason = LocationPendingReason.NONE; recoveryConfirmed = true; recoveryStartRt = 0L 
                 shouldEmitSuccess = true
                 isHardwareLocked = false
-                revivalBaselineCaptured = false // Reset on successful recovery
+                revivalBaselineCaptured = false 
             }
         } else { 
             recoveryConfirmed = false; recoveryStartRt = 0L 
-            revivalBaselineCaptured = false // Ensure reset if not in pending state
+            revivalBaselineCaptured = false 
         }
         
         currentLocationStatus = current.copy(isPending = nextPending, reason = nextReason, lastFixRt = lastFixRt, lastPendingDurationMs = lastPendingDuration, recoveryConfirmed = recoveryConfirmed)
@@ -742,7 +667,6 @@ class HardwareSuite @Inject constructor(
                 processVibration(values[0], values[1], values[2]); updateOrientation()
                 if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) {
                     lastStayAliveRt = nowRt
-                    // Issue #1118: Suppress WakeLock fallback if Activity Recognition is explicitly denied.
                     val canPoke = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
                     } else true
@@ -764,7 +688,6 @@ class HardwareSuite @Inject constructor(
                 proximityIdx = (proximityIdx * (1.0 - PROXIMITY_EMA_ALPHA)) + (rawIdx * PROXIMITY_EMA_ALPHA)
                 secSumProxIdx += proximityIdx; secProxCount++
                 if (newValue != rawProximityNear) {
-                    // Issue #1111: Added temporal decay to flickering suppression to prevent lock-in.
                     val isFlickering = isFlickeringInWindow(nowRt)
                     if (!newValue && isFlickering && isStationary()) return
                     
@@ -814,7 +737,6 @@ class HardwareSuite @Inject constructor(
         synchronized(acousticLock) {
             if (isMonitoring) return
             
-            // Issue #1116: Definitive join of previous thread to prevent AudioRecord collision.
             acousticThread?.let {
                 if (it.isAlive) {
                     it.interrupt()
@@ -1025,9 +947,6 @@ class HardwareSuite @Inject constructor(
             if (this.powerSaveMode != active) {
                 this.powerSaveMode = active
                 if (isStarted.get()) {
-                    // Sep.17.10: Consolidation of unregistration and re-registration on the looper thread.
-                    // This prevents the race where asynchronous unregistration could execute AFTER 
-                    // synchronous re-registration, leaving the suite with zero active sensors.
                     hardwareHandler?.post {
                         if (isStarted.get()) {
                             sensorManager.unregisterListener(this)
@@ -1040,13 +959,54 @@ class HardwareSuite @Inject constructor(
         }
     }
 
-    fun resetBaseline() { 
+    private fun clearLifecycleLeftovers() {
         synchronized(this) {
-            emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; forensicAuditor.reset(); revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
-            // Issue #1107: Reset revival state.
+            lastAnomalyActiveRt = 0L
+            lastAcousticLockoutRt = 0L
+            lastAcousticSpikeRt = 0L
+            lastLightSpikeRt = 0L
+            rawProximityNear = false
+            stationaryStartRt = 0L
+            emaPressure = 0.0
+            lastBaroZeroingRt = 0L
+            lastLinearAccelTs = 0L
+            lastStayAliveRt = 0L
+            lastDisplayTransitionRt = 0L
+            
+            secPeakLux = 0.0
+            secPeakVibe = 0.0
+            secSumProxIdx = 0.0
+            secProxCount = 0
+            secPeakTilt = 0.0
+            secPeakLift = 0.0
+            secPeakDb = 0.0
+            secSitDetected = false
+            secPeakKinetic = 0.0
+            
+            plungePhase = 0
+            plungeMatched = false
+            lastPlungePhaseRt = 0L
+        }
+    }
+
+    /**
+     * resetBaseline: Targeted or global reset of hardware temporal markers and baselines.
+     * Issue #1124: Supported roleTag for selective ForensicAuditor reset.
+     */
+    fun resetBaseline(roleTag: String? = null) { 
+        synchronized(this) {
+            emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; 
+            
+            // Issue #1124: Selective Forensic Reset
+            forensicAuditor.reset(roleTag)
+            
+            revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
             pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = sessionStartRt; currentLocationStatus = LocationStatus(); _locationStatus.tryEmit(currentLocationStatus)
-            // Issue #1111: Reset display flickering state.
             isDisplayFlickering.set(false); lastDisplayTransitionRt = 0L
+            fastPathLightBaseline = -1.0; lastLightSpikeRt = 0L
+            
+            // Issue #1127/1128/1133/1135: Clear lifecycle leftovers on reset
+            clearLifecycleLeftovers()
         }
     }
 
@@ -1084,25 +1044,16 @@ class HardwareSuite @Inject constructor(
                     isHardwareLocked = true
                     Timber.e("HardwareSuite: MAX REVIVAL ATTEMPTS REACHED. GPS_HARDWARE_LOCK triggered.")
                     _revivalEvents.tryEmit(RevivalEvent.HardwareLock)
-                    // Issue #1106: Peak at the battery footprint without clearing the baseline.
                     forensicAuditor.computeEnergyFootprint(nowRt, consume = false)?.let { _revivalEvents.tryEmit(it) }
                 }
             }
         } else { revivalAttemptCount = 0; isHardwareLocked = false }
     }
 
-    // --- Power Policy Logic ---
-
-    /**
-     * Determines if non-critical signaling should be deferred based on Doze state.
-     */
     fun shouldDeferSignaling(isInViolation: Boolean): Boolean {
         return powerStateProvider.isDeviceIdleMode() && !isInViolation
     }
 
-    /**
-     * Calculates exponential backoff with randomized jitter for reconnection attempts.
-     */
     fun calculateNextBackoff(attempt: Int, isConnected: Boolean): Long {
         if (isConnected) return NET_REJOIN_THRESHOLD_MS
         
@@ -1111,12 +1062,9 @@ class HardwareSuite @Inject constructor(
         val backoff = baseDelay * factor
         val jitter = random.nextInt(5000)
         
-        return min(backoff + jitter, 300000L) // Cap at 5 minutes
+        return min(backoff + jitter, 300000L) 
     }
 
-    /**
-     * Determines if a hardware "poke" (WakeLock renewal) is required for background stability.
-     */
     fun shouldPokeHardware(isStaggered: Boolean, lastPokeRt: Long, intervalMs: Long): Boolean {
         if (!isStaggered) return false
         return timeProvider.elapsedRealtime() - lastPokeRt > intervalMs

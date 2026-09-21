@@ -1,4 +1,4 @@
-# Simplicity Audit & Architectural Refactoring Ideas (Sep.20.02)
+# Simplicity Audit & Architectural Refactoring Ideas (Sep.21.00)
 
 ## 🎯 Current Focus: HardwareSuite Pattern Convergence
 
@@ -19,5 +19,13 @@
 *   **Opportunity**: Consider if role-specific jitter counters are necessary or if a unified "Hardware Health" state should be shared by roles to avoid redundant peak tracking in `RoleState`.
 
 ### 5. Telemetry Source Abstraction (#1121)
-*   **Problem**: `ViewerService` manually extracts fields from `connectivitySuite.trackerStatus` for alarm evaluation, creating a mantenimiento burden if the model changes.
+*   **Problem**: `ViewerService` manually extracts fields from `connectivitySuite.trackerStatus` for alarm evaluation, creating a maintenance burden if the model changes.
 *   **Opportunity**: Implement a `TrackerStatus.toAlarmEvaluationParams()` or a dedicated `RemoteTelemetrySnapshot` class to encapsulate the mapping from network status to alarm inputs, ensuring consistent isolation between local hardware and remote telemetry.
+
+### 6. Unified Session Lifecycle Management
+*   **Problem**: `HardwareSuite.resetBaseline`, `TrackerService.resetServiceTimers`, and `IntegrityMonitor.resetStats` all manually clear different parts of the transient state.
+*   **Opportunity**: Centralize session state management in a `SessionLifecycleCoordinator`. This component would ensure that all hardware peaks, temporal lockouts, and vitality markers are zeroed atomically upon session restart, eliminating the risk of stale state leakage.
+
+### 7. Fast-Path Configuration Convergence
+*   **Problem**: Both Acoustic and Light fast-paths require manual baseline synchronization in the service tick to avoid divergence with the main validation engine.
+*   **Opportunity**: Unify the fast-path implementation in `HardwareSuite` using a generic `HardwareFastPath<T>` delegate that automatically handles its own baseline decay or synchronization when the main engine updates.

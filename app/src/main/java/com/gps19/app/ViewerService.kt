@@ -17,11 +17,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * Sep.20.02:
- * - Issue #1121: Resolved Local Hardware Leak in remote alarm evaluation. 
- *   Ensured TrackerStatus snrIdx/vibeIdx are used for remote evaluations. (R-ID 374)
- * Sep.19.08:
- * - Issue #1113: Singleton State Collision. Used roleTag "V" for forensic auditing.
+ * Sep.20.22:
+ * - Issue #1137 Hardening: Ensured all forensic state and spatial gates 
+ *   are zeroed in resetServiceTimers() (R-ID 384).
+ * Sep.20.15:
+ * - Issue #1124: Selective Baseline Reset. Updated resetServiceTimers to pass 
+ *   roleTag "V" to HardwareSuite (R-ID 376).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -75,7 +76,6 @@ class ViewerService : BaseMonitorService() {
 
         refreshCapabilitiesInternal()
         
-        // JdHardwareManager is vendor-specific to SM-A155/156 variants (R405).
         if (capabilities.isA15Device) {
             val success = JdHardwareManager.initialize(timeProvider, configManager.deviceId)
             if (success) {
@@ -416,7 +416,10 @@ class ViewerService : BaseMonitorService() {
         serviceStartRealtime = timeProvider.elapsedRealtime(); serviceStartWall = timeProvider.currentTimeMillis()
         alarmManager.resetEvaluation(); sessionManager.reset(); integrityMonitor.resetStats(); forensicUseCase.resetLatches(); 
         forensicAuditor.reset("V")
-        hardwareSuite.resetBaseline()
+        
+        // Issue #1124: Pass "V" to reset only viewer-specific audits.
+        hardwareSuite.resetBaseline("V")
+        
         lastHardwareRecoveryTs = 0L
         
         selfProcessor.resetStats()

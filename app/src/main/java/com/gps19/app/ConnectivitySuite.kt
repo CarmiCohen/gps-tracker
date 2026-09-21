@@ -28,18 +28,12 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.20.15:
+ * - Issue #1138/1147 Hardening: Restored gpsHardwareLock from offline storage 
+ *   in flushPendingUpdates and added isGnssThrottled to pushCurrentStatus (R-ID 378).
  * Sep.17.05:
  * - Issue #1093: Dead Code Elimination. Restored handleJsonUpdate logic 
  *   after incorrect Protobuf logic overwrite. Purged legacy references.
- * Sep.17.02:
- * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
- * Sep.16.13:
- * - Issue #1050/1052 Doze Integration: Patched startSyncLoop, startIdentitySyncLoop, 
- *   and sendTelemetry to respect HardwareSuite.shouldDeferSignaling() to 
- *   prevent platform-level process termination during Doze (R-ID 351).
- * Sep.16.10:
- * - Signaling Pipeline Hardening (#20): Enforced HTTP 2xx check for keep-alive 
- *   to prevent premature failure counter resets during server-side errors (R-ID 349).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -408,7 +402,11 @@ class ConnectivitySuite @Inject constructor(
                 isPowerSaveMode = entity.isPowerSaveMode, standbyBucket = entity.standbyBucket, netInterface = entity.netInterface,
                 kineticEnergy = 0.0, isBatteryLow = entity.isBatteryLow, isBatteryCritical = entity.isBatteryCritical,
                 verticalVelocity = entity.verticalVelocity, violationUptimeMs = entity.violationUptimeMs,
-                isUltraLongStationary = entity.isUltraLongStationary, gpsHardwareLock = false
+                isUltraLongStationary = entity.isUltraLongStationary, 
+                
+                // Issue #1147: Restored from offline persistence.
+                gpsHardwareLock = entity.gpsHardwareLock,
+                isGnssThrottled = entity.isGnssThrottled
             )
             val status = TelemetryMapper.mapPendingToStatus(entity, statusTemplate)
 
@@ -434,7 +432,11 @@ class ConnectivitySuite @Inject constructor(
                     locationPendingReason = status.locationPendingReason.name, trackerState = status.trackerState.name, status = status.status.name,
                     isBatteryLow = status.isBatteryLow, isBatteryCritical = status.isBatteryCritical,
                     verticalVelocity = status.verticalVelocity, violationUptimeMs = status.violationUptimeMs,
-                    isUltraLongStationary = status.isUltraLongStationary
+                    isUltraLongStationary = status.isUltraLongStationary,
+                    
+                    // Issue #1147: Persisted during offline drops.
+                    gpsHardwareLock = status.gpsHardwareLock,
+                    isGnssThrottled = status.isGnssThrottled
                 )
                 val entity = TelemetryMapper.mapStatusToPending(status, entityTemplate)
                 offlineRepository.addPendingStatusUpdate(entity)
@@ -486,6 +488,7 @@ class ConnectivitySuite @Inject constructor(
         isBatteryCritical: Boolean = false,
         isUltraLongStationary: Boolean = false,
         gpsHardwareLock: Boolean = false,
+        isGnssThrottled: Boolean = false,
         tamperNote: String? = null
     ) {
         val trackerStatus = TrackerStatus(
@@ -514,6 +517,7 @@ class ConnectivitySuite @Inject constructor(
             kineticEnergy = kineticEnergy, isAdaptiveJump = if (isTrackerMode) isAdaptiveJump else false,
             isBatteryLow = if (isTrackerMode) isBatteryLow else false, isBatteryCritical = if (isTrackerMode) isBatteryCritical else false,
             isUltraLongStationary = isUltraLongStationary, gpsHardwareLock = gpsHardwareLock,
+            isGnssThrottled = isGnssThrottled,
             tamperNote = tamperNote
         )
         sendTelemetry(trackerStatus)
@@ -623,6 +627,7 @@ class ConnectivitySuite @Inject constructor(
                     violationUptimeMs = statusProto.violationUptimeMs,
                     isUltraLongStationary = statusProto.isUltraLongStationary,
                     gpsHardwareLock = statusProto.gpsHardwareLock,
+                    isGnssThrottled = statusProto.isGnssThrottled,
                     tamperNote = if (statusProto.hasTamperNote()) statusProto.tamperNote else null
                 )
 
@@ -670,6 +675,12 @@ class ConnectivitySuite @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Protobuf direct parse error")
         }
+    }
+
+    private fun handleRemoteLog(entry: LogEntry) {
+        val nowRt = timeProvider.elapsedRealtime()
+        mainRepository.addLog(entry)
+        remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt)
     }
 
     private fun handleJsonUpdate(data: JSONObject) {
@@ -845,7 +856,7 @@ class ConnectivitySuite @Inject constructor(
                     isUltraLongStationary = data.optBoolean("is_ultra_long_stationary", current.isUltraLongStationary),
                     gpsHardwareLock = data.optBoolean("gps_hw_lock", current.gpsHardwareLock),
                     isGnssThrottled = data.optBoolean("is_gnss_throttled", current.isGnssThrottled),
-                    tamperNote = data.optString("tamper_note", current.tamperNote)
+                    tamperNote = if (data.has("tamper_note")) data.getString("tamper_note") else null
                 )
 
                 scope.launch {
@@ -859,7 +870,7 @@ class ConnectivitySuite @Inject constructor(
                         this.atmospheric.temp = updatedStatus.temp
                         this.atmospheric.maxTemp = updatedStatus.maxTemp
                         this.atmospheric.noiseIdx = updatedStatus.noiseIdx; this.atmospheric.luxIdx = updatedStatus.luxIdx; this.atmospheric.vibeIdx = updatedStatus.vibeIdx; this.atmospheric.liftIdx = updatedStatus.liftIdx
-                        this.atmospheric.tiltIdx = updatedStatus.tiltIdx; this.atmospheric.baroIdx = updatedStatus.baroIdx
+                        this.atmospheric.tiltIdx = updatedStatus.tiltDegrees; this.atmospheric.baroIdx = updatedStatus.baroIdx
                         this.atmospheric.vibration = updatedStatus.vibration
 
                         this.integrity.battery = updatedStatus.battery; this.integrity.isCharging = updatedStatus.isCharging
@@ -884,18 +895,12 @@ class ConnectivitySuite @Inject constructor(
                         this.ts = now 
                         this.isMe = false
                         this.isClockRegression = updatedStatus.isClockRegression
-                        this.lastValidFixRt = updatedStatus.lastValidFixRt
+                        this.lastValidFixRt = updatedStatus.lastValidFixRt 
                     })
                 }
                 updatedStatus
             }
         }
-    }
-
-    private fun handleRemoteLog(entry: LogEntry) {
-        val nowRt = timeProvider.elapsedRealtime()
-        mainRepository.addLog(entry)
-        remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt)
     }
 
     fun resetPeerStats() {
