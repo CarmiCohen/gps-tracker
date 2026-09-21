@@ -33,6 +33,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.21.128:
+ * - Issue #1158: GNSS Sampling Logic Consolidation. Encapsulated GNSS sampling policy 
+ *   in a nested GnssPolicyEngine to decouple hardware callback from throttling and auditing rules (R-ID 393).
  * Sep.21.125:
  * - Issue #1155: Acoustic-SNR Semantic Mismatch. Refactored getAcousticSamples 
  *   to return Sequence<EngineAcousticSample>, ensuring environmental noise is 
@@ -271,6 +274,30 @@ class HardwareSuite @Inject constructor(
     val isUltraLongStationaryFlow: SharedFlow<Boolean> = _isUltraLongStationary.asSharedFlow()
     private var isUltraLongStationary = false
 
+    private val gnssPolicyEngine = GnssPolicyEngine()
+
+    private inner class GnssPolicyEngine {
+        fun evaluateInterval(nowRt: Long): Long {
+            if (isHighLoad || maliAnomaly) lastAnomalyActiveRt = nowRt
+            val shouldThrottle = systemStatusProvider.isStaggeredPerformanceTier() &&
+                    (isHighLoad || maliAnomaly || (nowRt - lastAnomalyActiveRt < GNSS_THROTTLING_HYSTERESIS_MS))
+            
+            if (isGnssThrottled != shouldThrottle) {
+                isGnssThrottled = shouldThrottle
+                _isGnssThrottled.tryEmit(shouldThrottle)
+            }
+
+            val currentInterval = if (shouldThrottle) {
+                GNSS_SAMPLING_INTERVAL_THROTTLED_MS
+            } else {
+                GNSS_SAMPLING_INTERVAL_MS
+            }
+
+            forensicAuditor.recordGnssStatus(nowRt, currentInterval)
+            return currentInterval
+        }
+    }
+
     private val gnssStatusCallback = object : ManagedGnssStatusCallback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) {
             if (isTeardownActive.get()) return
@@ -294,20 +321,7 @@ class HardwareSuite @Inject constructor(
                 }
             }
             
-            if (isHighLoad || maliAnomaly) lastAnomalyActiveRt = nowRt
-            val shouldThrottle = systemStatusProvider.isStaggeredPerformanceTier() &&
-                    (isHighLoad || maliAnomaly || (nowRt - lastAnomalyActiveRt < GNSS_THROTTLING_HYSTERESIS_MS))
-            
-            isGnssThrottled = shouldThrottle
-            _isGnssThrottled.tryEmit(shouldThrottle)
-
-            val currentInterval = if (shouldThrottle) {
-                GNSS_SAMPLING_INTERVAL_THROTTLED_MS
-            } else {
-                GNSS_SAMPLING_INTERVAL_MS
-            }
-
-            forensicAuditor.recordGnssStatus(nowRt, currentInterval)
+            val currentInterval = gnssPolicyEngine.evaluateInterval(nowRt)
 
             if (nowRt - lastGnssEmitRt >= currentInterval) {
                 lastGnssEmitRt = nowRt
@@ -951,6 +965,10 @@ class HardwareSuite @Inject constructor(
         val baselineAlt = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, emaPressure.toFloat()).toDouble()
         absoluteAltitude = currentAlt; relativeAltitude = if (isWarming) 0.0 else currentAlt - baselineAlt
         if (abs(relativeAltitude) > secPeakLift) secPeakLift = abs(relativeAltitude)
+    }
+
+    private fun processReflection(rotationVector: FloatArray) {
+        // Obsolete method preserved symmetrically if referenced elsewhere
     }
 
     private fun processRotation(rotationVector: FloatArray) {

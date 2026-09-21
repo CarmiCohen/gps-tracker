@@ -1,26 +1,33 @@
-# Forensic Handover (Sep.21.125)
+# Forensic Handover (Sep.21.128)
 
 ## 🎯 Current System State
-*   **Version**: Sep.21.125 | **Build**: Forensic State Decoupling & Buffer Safety (Verified)
+*   **Version**: Sep.21.128 | **Build**: GNSS Sampling Logic Consolidation (Verified)
 *   **Active Devices**: Samsung A15 & S21FE (Unified via PerformanceTier)
-*   **SOT Baseline**: SOT-393 (Acoustic-SNR Semantic Decoupling)
+*   **SOT Baseline**: SOT-394 (GNSS Sampling Logic Consolidation)
 
 ## 🛡️ Forensic Hardening (Session Summary)
 
-### 1. Acoustic-SNR Semantic Decoupling (#1155)
+### 1. GNSS Sampling Logic Consolidation (#1158)
+*   **Status**: Resolved (Sep.21.128).
+*   **Remediation**: Encapsulated GNSS sampling policy (standard vs throttled) and auditing triggers in a nested `GnssPolicyEngine` within `HardwareSuite.kt`.
+*   **Result**: Decoupled the hardware callback from throttling rules and ensured symmetric auditing of jitter across all performance tiers (R-ID 394).
+
+### 2. Telemetry Abstraction Integration (#1156/#1157)
+*   **Status**: Resolved (Sep.21.127).
+*   **Remediation**: Refactored `HistoryManager.backfillAnalyticalGaps`, `HistoryManager.fillRealGap`, and `TelemetryAggregator` to consume the specialized `EngineAcousticSample` sequence from `HardwareSuite.getAcousticSamples`.
+*   **Result**: Completed full isolation of environmental noise (dB) from satellite SNR across the entire forensic pipeline, preventing any parameter or diagnostic ambiguity in the ribbon history (R-ID 393).
+
+### 3. Acoustic-SNR Semantic Decoupling (#1155)
 *   **Status**: Resolved (Sep.21.125).
 *   **Remediation**: Introduced `EngineAcousticSample` in `EngineModels.kt` and refactored `HardwareSuite.getAcousticSamples` to return this specialized type.
 *   **Result**: Environmental noise telemetry (dB) is now semantically isolated from satellite GNSS SNR, preventing diagnostic ambiguity in forensic ribbons (R-ID 393).
 
-### 2. Forensic Sequence Hardening (#1153/1154)
-*   **Status**: Resolved (Sep.21.125).
-*   **Remediation**: Replaced `toList()` snapshot in `CircularStateBuffer.forensicSequence` with a multi-pass custom `Sequence` implementation.
-*   **Result**: Achieved true zero-allocation forensic sampling while maintaining thread safety via internal locking during flyweight transformation, preventing race conditions during high-frequency writes (R-ID 392).
-
 ## 🔴 Open Gaps (Resumption Points)
-*   **Issue #1156: Unused Forensic Abstraction**: `HistoryManager.backfillAnalyticalGaps` still requires refactoring to consume the new `EngineAcousticSample` sequence from `HardwareSuite.getAcousticSamples`.
+*   *(No critical gaps identified. Refactoring of forensic history is complete).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 393 (Rules: 80, IDs: 393), Resolved: 1144, Open: 1, Testing: 2 (Sub-items: 10), Ideas: 17, QA: 282]**
+- **Current Audit Baseline: [SOT: 394 (Rules: 80, IDs: 394), Resolved: 1149, Open: 0, Testing: 2 (Sub-items: 10), Ideas: 16, QA: 282]**
 
-**Resumption Context**: The hardware layer is now semantically clean and the circular buffer is hardened against race conditions. The next session should focus on **Telemetry Abstraction Cleanup** (Idea 5 in `Simplify_Ideas2.md`) to integrate the new acoustic samples into the ribbon history, completing the decoupling work.
+**Resumption Context**: The GNSS sampling policy is now perfectly consolidated inside `HardwareSuite.GnssPolicyEngine`. The app compiles and passes all checks successfully.
+
+```

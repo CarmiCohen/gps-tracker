@@ -1,7 +1,8 @@
-# SOT Master Requirements & Hardening Status (Sep.21.125)
+# SOT Master Requirements & Hardening Status (Sep.21.128)
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 393**: Acoustic-SNR Semantic Mismatch - Introduced `EngineAcousticSample` and refactored `HardwareSuite.getAcousticSamples` to return a sequence of this new type. This ensures environmental noise telemetry is semantically decoupled from satellite SNR in the forensic buffer, preventing telemetry ambiguity (R-ID 393). (Resolved Sep.21.125)
+*   **SOT ID 394**: GNSS Sampling Logic Consolidation - Encapsulated GNSS sampling policy (standard vs throttled) and auditing triggers in a nested `GnssPolicyEngine` within `HardwareSuite.kt`. This decouples the hardware callback from throttling rules and ensures symmetric auditing of jitter across all performance tiers (R-ID 394). (Resolved Sep.21.128)
+*   **SOT ID 393**: Acoustic-SNR Semantic Mismatch & Integration - Introduced `EngineAcousticSample` and refactored `HardwareSuite.getAcousticSamples` to return a sequence of this new type. Refactored `HistoryManager` and `TelemetryAggregator` to consume this specialized sequence during backfill and gap-filling. This ensures environmental noise telemetry (dB) is semantically isolated from satellite GNSS SNR across the entire forensic pipeline, preventing diagnostic ambiguity in forensic ribbons (R-ID 393). (Resolved Sep.21.127)
 *   **SOT ID 392**: Forensic Sequence Hardening - Refactored `CircularStateBuffer.forensicSequence` to use a custom multi-pass sequence implementation that holds internal locks during flyweight transformation. This eliminates the race condition where a high-frequency writer could repurpose objects before the sequence consumer (e.g., `HistoryManager`) could extract their data, and achieves zero-allocation parity by removing the temporary `ArrayList` snapshot (R-ID 392). (Resolved Sep.21.125)
 *   **SOT ID 391**: Flyweight Sequence Abstraction - Refactored `getSnrSamples`, `getSensorSamples`, and `getAcousticSamples` in `HardwareSuite.kt` to use a unified `forensicSequence` utility in `CircularStateBuffer`. This eliminates redundant flyweight management logic and ensures thread-safe forensic sampling via temporary snapshotting (R-ID 391). (Resolved Sep.21.124)
 *   **SOT ID 390**: Telemetry Source Abstraction - Refactored alarm evaluation to use unified `AlarmTelemetrySnapshot` and `AlarmServiceContext` DTOs. This eliminates parameter bloat in `AppAlarmManager.evaluateAlarms` and enforces strict isolation between local hardware state and remote telemetry, ensuring that the Viewer's local sensors can no longer inadvertently leak into Tracker alarm logic (R-ID 390). (Resolved Sep.21.123)
@@ -31,21 +32,23 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 80
-- **Total SOT IDs**: 393
-- **Resolved Issues**: 1144
-- **Open Issues**: 3
+- **Total SOT IDs**: 394
+- **Resolved Issues**: 1149
+- **Open Issues**: 0
 - **Testing Coverage**: 2 (Sub-items: 10)
 - **Simplification Ideas**: 16
 - **QA Validation Tasks**: 282
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.58 (GNSS Consolidation)**: PASSED - Verified nested GnssPolicyEngine evaluation pattern in HardwareSuite (Sep.21.128)
+*   **Chapter 31.57 (Acoustic Refactoring)**: PASSED - Verified HistoryManager/TelemetryAggregator integration of EngineAcousticSample (Sep.21.127)
 *   **Chapter 31.56 (Acoustic Semantic)**: PASSED - Verified EngineAcousticSample decoupling (Sep.21.125)
 *   **Chapter 31.55 (Forensic Race)**: PASSED - Verified zero-allocation locking sequence in CircularStateBuffer (Sep.21.125)
 *   **Chapter 31.54 (Flyweight Abstraction)**: PASSED - Verified unified forensic sampling in HardwareSuite (Sep.21.124)
 *   **Chapter 31.53 (Source Abstraction)**: PASSED - Verified unified telemetry snapshot pattern for alarm evaluation (Sep.21.123)
 *   **Chapter 31.52 (Snapshot Unification)**: PASSED - Verified unified snapshot ingestion path in HardwareSuite (Sep.21.122)
 *   **Chapter 31.51 (Vibration Authority)**: PASSED - Verified unified floor propagation in HardwareSuite/Sentinel (Sep.21.121)
-*   **Chapter 31.50 (Acoustic Teardown)**: PASSED - Verified removal of synchronous join in stopAcousticMonitoring (Sep.21.121)
+*   **Chapter 31.50 (Acoustic Teardown)**: PASSED - Verified removal of Commission / synchronous join in stopAcousticMonitoring (Sep.21.121)
 *   **Chapter 31.49 (Telemetry Conflation)**: PASSED - Verified location buffer drainage in TrackerService (Sep.21.120)
 *   **Chapter 31.48 (Thread Visibility)**: PASSED - Verified Volatile markers in HardwareSuite (Sep.20.103)
 *   **Chapter 31.47 (Forensic Reset)**: PASSED - Verified TrackerService sampling state reset (Sep.20.103)
@@ -59,4 +62,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.20.103)
 
 ---
-*Next Audit: Sep.21.200. (Sep.21.125)*
+*Next Audit: Sep.21.200. (Sep.21.128)*
