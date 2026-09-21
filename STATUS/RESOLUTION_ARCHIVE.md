@@ -1,4 +1,7 @@
-# Project Resolution Archive (Sep.21.122)
+# Project Resolution Archive (Sep.21.123)
+
+## 🟢 Sep.21.123
+*   **Telemetry Source Abstraction (#1121)**: Refactored alarm evaluation to use unified `AlarmTelemetrySnapshot` and `AlarmServiceContext` DTOs. This eliminates parameter bloat in `AppAlarmManager.evaluateAlarms` and enforces strict isolation between local device state and remote telemetry, ensuring that the Viewer's local sensors can no longer inadvertently leak into Tracker alarm logic (R-ID 390).
 
 ## 🟢 Sep.21.122
 *   **HardwareSuite Snapshot Unification (#1151)**: Unified `consumeLogicSnapshot` and `consumeForensicSnapshot` into a single private `privateConsumeSnapshot` method. This eliminates duplicate sensing snapshot extraction code, ensures thread-safety gates, peak resets, and acoustic/vibration floor snapshots are symmetrically maintained (R-ID 389).

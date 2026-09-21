@@ -15,17 +15,20 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1121: Telemetry Source Abstraction** (Resolved Sep.21.123)
+    *   *Remediation*: Introduced `AlarmTelemetrySnapshot` and `AlarmServiceContext` DTOs to encapsulate telemetry inputs for the alarm engine. Refactored `AppAlarmManager.evaluateAlarms` and both monitoring services to use this pattern, ensuring strict isolation between local hardware state and remote telemetry (R-ID 390).
+
 *   **Issue #1151: HardwareSuite Snapshot Unification** (Resolved Sep.21.122)
     *   *Remediation*: Unified `consumeLogicSnapshot` and `consumeForensicSnapshot` into a single private `privateConsumeSnapshot` method to eliminate duplicate state extraction boilerplate and guarantee symmetrical peak resets (R-ID 389).
 
 *   **Issue #1123: Synchronous Thread Join in HardwareSuite Lifecycle** (Resolved Sep.21.121)
-    *   *Remediation*: Removed synchronous `acousticThread.join(1000)` from `stopAcousticMonitoring` while holding `acousticLock`. Resource exclusivity is now maintained via the join-before-start pattern in `startAcousticMonitoring`, eliminating service lifecycle stalls. (R-ID 387)
+    *   *Remediation*: Removed synchronous `acousticThread.join(1000)` from `stopAcousticMonitoring()`. Resource exclusivity is now maintained via the join-before-start pattern in `startAcousticMonitoring()` (R-ID 387).
 
 *   **Issue #1143: Divergent Vibration Floor Calculation (Dual-State Logic)** (Resolved Sep.21.121)
-    *   *Remediation*: Unified the vibration floor authority in `HardwareSuite.kt`. The high-frequency `adaptiveVibrationFloor` is now snapshotted and propagated to `LocationSentinel` via `TrackerService`. preventing logic divergence in stationary detection. (R-ID 388)
+    *   *Remediation*: Unified the vibration floor authority in `HardwareSuite.kt`. The high-frequency `adaptiveVibrationFloor` is now snapshotted and propagated to `LocationSentinel` via `TrackerService` (R-ID 388).
 
 *   **Issue #1146: GPS Data Loss in TrackerService Tick Conflation** (Resolved Sep.21.120)
-    *   *Remediation*: Replaced single-point GPS conflation with `ConcurrentLinkedQueue` buffer in `TrackerService.kt`. `processTick` now drains and processes all intermediate fixes to prevent telemetry data loss and maintain forensic precision. (R-ID 386)
+    *   *Remediation*: Replaced single-point GPS conflation with `ConcurrentLinkedQueue` buffer in `TrackerService.kt` (R-ID 386).
 
 *   **Issue #1126: Thread Visibility Hardening in HardwareSuite** (Resolved Sep.20.25)
     *   *Remediation*: Applied `@Volatile` markers to all critical timing and state variables in `HardwareSuite.kt`. (R-ID 385)
@@ -60,4 +63,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 389 (Rules: 80, IDs: 389), Resolved: 1141, Open: 0, Testing: 2 (Sub-items: 10), Ideas: 18, QA: 282]**
+- **Current Audit Baseline: [SOT: 390 (Rules: 80, IDs: 390), Resolved: 1142, Open: 0, Testing: 2 (Sub-items: 10), Ideas: 17, QA: 282]**

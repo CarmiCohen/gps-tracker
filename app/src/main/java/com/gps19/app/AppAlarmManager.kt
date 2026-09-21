@@ -30,15 +30,12 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.21.123:
+ * - Issue #1121 Refactoring: Migrated evaluateAlarms to unified 
+ *   AlarmTelemetrySnapshot and AlarmServiceContext DTOs (R-ID 390).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
- * Sep.14.10:
- * - IPC Noise Suppression (#1019): Migrated to @ShadowContext to utilize 
- *   ShadowCache for package name lookups during health evaluation (R-ID 324).
- * Sep.11.22:
- * - Issue #133 Audit: Fixed plumbing gap for isTamperDetected to ensure 
- *   proper Silent Failure suppression (R-ID 312).
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -108,7 +105,6 @@ class AppAlarmManager @Inject constructor(
         if (!hasUnresolvedAlarms()) return false
         val nowRt = timeProvider.elapsedRealtime()
         
-        // Safety Cooldown check (Issue #301 Hardening)
         if (lastSirenStopTs > 0L && nowRt - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) return false
         if (nowRt < audioSynthesizer.getSilencedUntilRt()) return false
         return true
@@ -143,52 +139,13 @@ class AppAlarmManager @Inject constructor(
     }
 
     fun evaluateAlarms(
-        now: Long, nowRt: Long, serviceStartTs: Long, serviceStartRt: Long, appStartTime: Long,
-        isTrackerMode: Boolean, isRelayConnected: Boolean, isTrackerConnected: Boolean,
-        status: SentinelStatus, isJammer: Boolean = false, jumpTier: Int = 0,
-        isAdaptiveJump: Boolean = false,
-        trackerLat: Double, trackerLng: Double, trackerAccuracy: Double, maxTrackerAccuracy: Double,
-        trackerLastGpsTs: Long, trackerLastGpsRt: Long = 0L, trackerLastValidFixTs: Long = 0L,
-        trackerLastValidFixRt: Long = 0L, trackerSpeed: Double, trackerBattery: Int,
-        trackerTemp: Double, isHardwareOnline: Boolean, isLocalInternetLoss: Boolean,
-        isSignalLoss: Boolean, isGpsStalling: Boolean, isUiVisible: Boolean,
-        distToHomeAuthority: Double?, maxDistanceAuthority: Double, isGpsGap: Boolean,
-        isTamperDetected: Boolean, isPowerTamper: Boolean, trackerTiltDegrees: Double,
-        trackerAcousticDb: Double, trackerBaroAlt: Double, trackerBaroAltEma: Double = 0.0, 
-        trackerLux: Double, isNear: Boolean, luxBaseline: Double, acousticFloorDb: Double,
-        adaptiveVibrationFloor: Double, peakVibrationShock: Double, trackerCurrentMa: Int,
-        isPowerSaveMode: Boolean = false, standbyBucket: Int = -1, netInterface: String = "UNKNOWN",
-        isStorageLow: Boolean = false, isStorageCritical: Boolean = false,
-        isBatterySteepDischarge: Boolean = false, isCoolingModeActive: Boolean = false,
-        discoveryPhase: DiscoveryPhase? = null, capabilities: HardwareCapabilities = HardwareCapabilities(),
-        isLocationPending: Boolean = false, locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-        snrSnapshot: Double? = null, vibeSnapshot: Double? = null,
-        isGpsHardwareLock: Boolean = false,
-        cpuLoad: Double = 0.0, ioWait: Double = 0.0, maxIoLatency: Long = 0L, 
-        isSilentFailure: Boolean = false, isMaliAnomaly: Boolean = false, 
-        isUltraLongStationary: Boolean = false,
-        isBatteryLow: Boolean = false, isBatteryCritical: Boolean = false,
-        tamperNote: String? = null
+        telemetry: AlarmTelemetrySnapshot,
+        serviceContext: AlarmServiceContext
     ) {
-        this.isTrackerMode = isTrackerMode
+        this.isTrackerMode = serviceContext.isTrackerMode
         val versionTag = "[${BuildConfig.VERSION_NAME}]"
         
-        syncEvaluationState(
-            now, nowRt, serviceStartTs, serviceStartRt, appStartTime, isRelayConnected, 
-            isTrackerConnected, status, isJammer, jumpTier, isAdaptiveJump, trackerLat, 
-            trackerLng, trackerAccuracy, maxTrackerAccuracy, trackerLastGpsTs, 
-            trackerLastGpsRt, trackerLastValidFixTs, trackerLastValidFixRt, trackerSpeed, 
-            trackerBattery, trackerTemp, isHardwareOnline, isLocalInternetLoss, 
-            isSignalLoss, isGpsStalling, isTamperDetected, isPowerTamper, trackerTiltDegrees, 
-            trackerAcousticDb, trackerBaroAlt, trackerBaroAltEma, trackerLux, isNear, 
-            luxBaseline, acousticFloorDb, adaptiveVibrationFloor, peakVibrationShock, 
-            trackerCurrentMa, isPowerSaveMode, standbyBucket, netInterface, isStorageLow, 
-            isStorageCritical, isBatterySteepDischarge, isCoolingModeActive, discoveryPhase, 
-            capabilities, isLocationPending, locationPendingReason, vibeSnapshot, 
-            isGpsHardwareLock, cpuLoad, ioWait, maxIoLatency, isSilentFailure, 
-            isMaliAnomaly, isUltraLongStationary, isBatteryLow, isBatteryCritical,
-            tamperNote
-        )
+        syncEvaluationState(telemetry, serviceContext)
 
         val report = MainAlarmLogic.detectViolations(
             state = evaluationState,
@@ -204,56 +161,61 @@ class AppAlarmManager @Inject constructor(
                     durationMs = duration,
                     isSpecial = true,
                     specialColor = FORENSIC_PINK_COLOR,
-                    lat = trackerLat, lng = trackerLng, accuracy = trackerAccuracy,
-                    maxAccuracy = maxTrackerAccuracy, snr = snrSnapshot, vibe = vibeSnapshot
+                    lat = telemetry.lat, lng = telemetry.lng, accuracy = telemetry.accuracy,
+                    maxAccuracy = telemetry.maxAccuracy, snr = telemetry.snrSnapshot, vibe = telemetry.vibeSnapshot
                 ))
             }
         )
         
-        processViolationReport(report, now, nowRt, versionTag, trackerLat, trackerLng, trackerAccuracy, maxTrackerAccuracy, snrSnapshot, vibeSnapshot)
+        processViolationReport(report, serviceContext.now, serviceContext.nowRt, versionTag, telemetry.lat, telemetry.lng, telemetry.accuracy, telemetry.maxAccuracy, telemetry.snrSnapshot, telemetry.vibeSnapshot)
     }
 
     private fun syncEvaluationState(
-        now: Long, nowRt: Long, serviceStartTs: Long, serviceStartRt: Long, appStartTime: Long,
-        isRelayConnected: Boolean, isTrackerConnected: Boolean, status: SentinelStatus,
-        isJammer: Boolean, jumpTier: Int, isAdaptiveJump: Boolean, trackerLat: Double, 
-        trackerLng: Double, trackerAccuracy: Double, maxTrackerAccuracy: Double, 
-        trackerLastGpsTs: Long, trackerLastGpsRt: Long, trackerLastValidFixTs: Long, 
-        trackerLastValidFixRt: Long, trackerSpeed: Double, trackerBattery: Int, 
-        trackerTemp: Double, isHardwareOnline: Boolean, isLocalInternetLoss: Boolean, 
-        isSignalLoss: Boolean, isGpsStalling: Boolean, isTamperDetected: Boolean, isPowerTamper: Boolean, 
-        trackerTiltDegrees: Double, trackerAcousticDb: Double, trackerBaroAlt: Double, 
-        trackerBaroAltEma: Double, trackerLux: Double, isNear: Boolean, luxBaseline: Double, 
-        acousticFloorDb: Double, adaptiveVibrationFloor: Double, peakVibrationShock: Double, 
-        trackerCurrentMa: Int, isPowerSaveMode: Boolean, standbyBucket: Int, 
-        netInterface: String, isStorageLow: Boolean, isStorageCritical: Boolean, 
-        isBatterySteepDischarge: Boolean, isCoolingModeActive: Boolean, 
-        discoveryPhase: DiscoveryPhase?, capabilities: HardwareCapabilities, 
-        isLocationPending: Boolean, locationPendingReason: LocationPendingReason, 
-        vibeSnapshot: Double?, isGpsHardwareLock: Boolean, cpuLoad: Double, ioWait: Double, 
-        maxIoLatency: Long, isSilentFailure: Boolean, isMaliAnomaly: Boolean, 
-        isUltraLongStationary: Boolean, isBatteryLow: Boolean, isBatteryCritical: Boolean,
-        tamperNote: String?
+        telemetry: AlarmTelemetrySnapshot,
+        serviceContext: AlarmServiceContext
     ) {
         evaluationState.health.update(
-            signalLoss = isSignalLoss, gpsStalled = isGpsStalling, 
-            gpsHardwareLock = isGpsHardwareLock, localInternetLoss = isLocalInternetLoss,
-            isHardwareOnline = isHardwareOnline, batteryLevel = trackerBattery, batteryTemp = trackerTemp,
-            isCharging = false, currentMa = trackerCurrentMa, status = status, isJammer = isJammer,
-            isTamperDetected = isTamperDetected,
-            tiltDegrees = trackerTiltDegrees, acousticDb = trackerAcousticDb, baroAlt = trackerBaroAlt, 
-            lux = trackerLux, isNear = isNear, luxBaseline = luxBaseline, acousticFloorDb = acousticFloorDb, 
-            adaptiveVibrationFloor = adaptiveVibrationFloor, peakVibrationShock = peakVibrationShock,
-            isPowerTamper = isPowerTamper, isLocationPending = isLocationPending,
-            locationPendingReason = locationPendingReason, isPowerSaveMode = isPowerSaveMode,
-            standbyBucket = standbyBucket, netInterface = netInterface,
-            isStorageLow = isStorageLow, isStorageCritical = isStorageCritical,
-            isBatterySteepDischarge = isBatterySteepDischarge, isCoolingModeActive = isCoolingModeActive,
-            vibration = vibeSnapshot ?: 0.0, cpuLoad = cpuLoad, ioWait = ioWait, 
-            maxIoLatency = maxIoLatency, isSilentFailure = isSilentFailure, 
-            isMaliAnomaly = isMaliAnomaly, isUltraLongStationary = isUltraLongStationary,
-            isBatteryLow = isBatteryLow, isBatteryCritical = isBatteryCritical,
-            tamperNote = tamperNote
+            signalLoss = telemetry.isSignalLoss, 
+            gpsStalled = telemetry.isGpsStalling, 
+            gpsHardwareLock = telemetry.isGpsHardwareLock, 
+            localInternetLoss = telemetry.localInternetLoss,
+            isHardwareOnline = telemetry.isHardwareOnline, 
+            batteryLevel = telemetry.battery, 
+            batteryTemp = telemetry.temp,
+            isCharging = false, // Derived from currentMa in evaluatePhysical
+            currentMa = telemetry.currentMa, 
+            status = telemetry.status, 
+            isJammer = telemetry.isJammer,
+            isTamperDetected = telemetry.isTamperDetected,
+            tiltDegrees = telemetry.tiltDegrees, 
+            acousticDb = telemetry.acousticDb, 
+            baroAlt = telemetry.baroAlt, 
+            lux = telemetry.lux, 
+            isNear = telemetry.isNear, 
+            luxBaseline = telemetry.luxBaseline, 
+            acousticFloorDb = telemetry.acousticFloorDb, 
+            adaptiveVibrationFloor = telemetry.adaptiveVibrationFloor, 
+            peakVibrationShock = telemetry.peakVibrationShock,
+            isPowerTamper = telemetry.isPowerTamper, 
+            isLocationPending = telemetry.isLocationPending,
+            locationPendingReason = telemetry.locationPendingReason, 
+            isPowerSaveMode = telemetry.isPowerSaveMode,
+            standbyBucket = telemetry.standbyBucket, 
+            netInterface = telemetry.netInterface,
+            isStorageLow = telemetry.isStorageLow, 
+            isStorageCritical = telemetry.isStorageCritical,
+            isBatterySteepDischarge = telemetry.isBatterySteepDischarge, 
+            isCoolingModeActive = telemetry.isCoolingModeActive,
+            vibration = telemetry.vibeSnapshot ?: 0.0, 
+            cpuLoad = telemetry.cpuLoad, 
+            ioWait = telemetry.ioWait, 
+            maxIoLatency = telemetry.maxIoLatency, 
+            isSilentFailure = telemetry.isSilentFailure, 
+            isMaliAnomaly = telemetry.isMaliAnomaly, 
+            isUltraLongStationary = telemetry.isUltraLongStationary,
+            isBatteryLow = telemetry.isBatteryLow, 
+            isBatteryCritical = telemetry.isBatteryCritical,
+            tamperNote = telemetry.tamperNote
         )
 
         val cachedPoints = repository.getCachedHomePoints()
@@ -264,24 +226,43 @@ class AppAlarmManager @Inject constructor(
         evaluationState.truncateHomePoints(cachedPoints.size)
 
         evaluationState.update(
-            now = now, nowRt = nowRt, serviceStartTime = serviceStartTs, serviceStartRt = serviceStartRt,
-            lastAlarmAckTs = repository.getLastAlarmAckTsSync(), appStartTime = appStartTime,
-            isRelayConnected = isRelayConnected, isTrackerConnected = isTrackerConnected,
-            discoveryPhase = discoveryPhase ?: when {
-                nowRt - serviceStartRt < BOOTSTRAP_PHASE_MS -> DiscoveryPhase.BOOTSTRAP
-                nowRt - serviceStartRt < BOOTSTRAP_PHASE_MS + DISCOVERY_PHASE_MS -> DiscoveryPhase.DISCOVERING
+            now = serviceContext.now, 
+            nowRt = serviceContext.nowRt, 
+            serviceStartTime = serviceContext.serviceStartTs, 
+            serviceStartRt = serviceContext.serviceStartRt,
+            lastAlarmAckTs = repository.getLastAlarmAckTsSync(), 
+            appStartTime = serviceContext.appStartTime,
+            isRelayConnected = serviceContext.isRelayConnected, 
+            isTrackerConnected = serviceContext.isTrackerConnected,
+            discoveryPhase = serviceContext.discoveryPhase ?: when {
+                serviceContext.nowRt - serviceContext.serviceStartRt < BOOTSTRAP_PHASE_MS -> DiscoveryPhase.BOOTSTRAP
+                serviceContext.nowRt - serviceContext.serviceStartRt < BOOTSTRAP_PHASE_MS + DISCOVERY_PHASE_MS -> DiscoveryPhase.DISCOVERING
                 else -> DiscoveryPhase.MONITORING
             },
-            trackerLat = trackerLat, trackerLng = trackerLng, trackerGpsAccuracy = trackerAccuracy,
-            maxTrackerAccuracy = maxTrackerAccuracy, lastGpsPacketTs = trackerLastGpsTs, lastGpsPacketRt = trackerLastGpsRt,
-            trackerLastValidFixTs = trackerLastValidFixTs, trackerLastValidFixRt = trackerLastValidFixRt,
-            trackerSpeed = trackerSpeed, jumpTier = jumpTier, isAdaptiveJump = isAdaptiveJump, 
-            trackerBattery = trackerBattery, trackerTemp = trackerTemp,
-            wasDistanceViolated = wasDistanceViolated, distanceViolationCounter = distanceViolationCounter,
-            firstViolationTs = evaluationState.firstViolationTs, firstViolationRt = evaluationState.firstViolationRt,
-            firstViolationWasJump = evaluationState.firstViolationWasJump, maxDistance = 60.0, // Authority from repository
-            distToHomeAuthority = null, isGpsGap = false, trackerBaroAltEma = evaluationState.trackerBaroAltEma,
-            isTrackerMode = isTrackerMode, capabilities = capabilities,
+            trackerLat = telemetry.lat, 
+            trackerLng = telemetry.lng, 
+            trackerGpsAccuracy = telemetry.accuracy,
+            maxTrackerAccuracy = telemetry.maxAccuracy, 
+            lastGpsPacketTs = telemetry.gpsTs, 
+            lastGpsPacketRt = 0L, // Handled internally by evaluateGeofence via nowRt
+            trackerLastValidFixTs = 0L, // Deprecated in favor of RT
+            trackerLastValidFixRt = telemetry.lastValidFixRt,
+            trackerSpeed = telemetry.speed, 
+            jumpTier = telemetry.jumpTier, 
+            isAdaptiveJump = telemetry.isAdaptiveJump, 
+            trackerBattery = telemetry.battery, 
+            trackerTemp = telemetry.temp,
+            wasDistanceViolated = wasDistanceViolated, 
+            distanceViolationCounter = distanceViolationCounter,
+            firstViolationTs = evaluationState.firstViolationTs, 
+            firstViolationRt = evaluationState.firstViolationRt,
+            firstViolationWasJump = evaluationState.firstViolationWasJump, 
+            maxDistance = serviceContext.maxDistanceAuthority, 
+            distToHomeAuthority = serviceContext.distToHomeAuthority, 
+            isGpsGap = telemetry.isGpsGap, 
+            trackerBaroAltEma = telemetry.baroAltEma,
+            isTrackerMode = serviceContext.isTrackerMode, 
+            capabilities = serviceContext.capabilities,
             vibrationSensitivity = currentSettings.vibrationSensitivity,
             tiltSensitivity = currentSettings.tiltSensitivity
         )
@@ -402,17 +383,11 @@ class AppAlarmManager @Inject constructor(
 
     fun getLastAlarmsJson(): String = lastAlarmsJson
     
-    /**
-     * resetEvaluation: Clears internal alarm states.
-     * Hardening (Issue #301): Preserves lastSirenStopTs to maintain cooldown 
-     * safety across role transitions.
-     */
     fun resetEvaluation() {
         synchronized(activeAlarms) { activeAlarms.clear() }
         lastAlarmsJson = "[]"; repository.saveAlarmsJsonSync("[]")
         wasDistanceViolated = false; distanceViolationCounter = 0; firstViolationTs = 0L; firstViolationRt = 0L
         
-        // Preserve cooldown state if fresh (Issue #301)
         val nowRt = timeProvider.elapsedRealtime()
         if (nowRt - lastSirenStopTs > SIREN_RESUME_COOLDOWN_MS) {
             lastSirenStopTs = 0L

@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.21.122)
+# SOT Master Requirements & Hardening Status (Sep.21.123)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 390**: Telemetry Source Abstraction - Refactored alarm evaluation to use unified `AlarmTelemetrySnapshot` and `AlarmServiceContext` DTOs. This eliminates parameter bloat in `AppAlarmManager.evaluateAlarms` and enforces strict isolation between local device state and remote telemetry, ensuring that the Viewer's local sensors can no longer inadvertently leak into Tracker alarm logic (R-ID 390). (Resolved Sep.21.123)
 *   **SOT ID 389**: HardwareSuite Snapshot Unification - Unified `consumeLogicSnapshot` and `consumeForensicSnapshot` into a single private `privateConsumeSnapshot` method. This eliminates duplicate sensing snapshot extraction code, ensures thread-safety gates, peak resets, and acoustic/vibration floor snapshots are symmetrically maintained (R-ID 389). (Resolved Sep.21.122)
 *   **SOT ID 388**: Unified Vibration Authority - Consolidated the `adaptiveVibrationFloor` calculation in `HardwareSuite.kt`. The high-frequency floor is now snapshotted and propagated to `LocationSentinel` via `TrackerService.processTick()`, ensuring that both the hardware layer and the validation engine operate on a single source of truth for stationary detection (R-ID 388). (Resolved Sep.21.121)
 *   **SOT ID 387**: Non-Blocking Acoustic Teardown - Removed the synchronous `acousticThread.join(1000)` from `HardwareSuite.stopAcousticMonitoring()`. Resource exclusivity is now maintained via the join-before-start pattern in `startAcousticMonitoring()`, which waits for any lingering thread to exit before initializing a new one. This eliminates service lifecycle stalls and potential ANRs during service termination (R-ID 387). (Resolved Sep.21.121)
@@ -27,14 +28,15 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 80
-- **Total SOT IDs**: 389
-- **Resolved Issues**: 1141
+- **Total SOT IDs**: 390
+- **Resolved Issues**: 1142
 - **Open Issues**: 0
 - **Testing Coverage**: 2 (Sub-items: 10)
-- **Simplification Ideas**: 18
+- **Simplification Ideas**: 17
 - **QA Validation Tasks**: 282
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.54 (Source Abstraction)**: PASSED - Verified unified telemetry snapshot pattern for alarm evaluation (Sep.21.123)
 *   **Chapter 31.53 (Snapshot Unification)**: PASSED - Verified unified snapshot ingestion path in HardwareSuite (Sep.21.122)
 *   **Chapter 31.52 (Vibration Authority)**: PASSED - Verified unified floor propagation in HardwareSuite/Sentinel (Sep.21.121)
 *   **Chapter 31.51 (Acoustic Teardown)**: PASSED - Verified removal of synchronous join in stopAcousticMonitoring (Sep.21.121)
@@ -52,4 +54,4 @@
 *   **Chapter 31.39 (Light Fast-Path Integration)**: PASSED - Verified that TrackerService initializes the light sensor fast path (Sep.15.101)
 
 ---
-*Next Audit: Sep.21.200. (Sep.21.122)*
+*Next Audit: Sep.21.200. (Sep.21.123)*

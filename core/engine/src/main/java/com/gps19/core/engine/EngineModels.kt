@@ -4,15 +4,13 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.21.123:
+ * - Issue #1121 Refactoring: Introduced AlarmTelemetrySnapshot and 
+ *   AlarmServiceContext to unify telemetry propagation and decouple 
+ *   ViewerService from internal model details (R-ID 390).
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Removed redundant properties 
  *   isStaggeredTier, requiresAdaptationMuzzle, and useStaggeredHydration from HardwareCapabilities. (R-ID 348).
- * Sep.16.02:
- * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
- *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum.
- * Sep.16.00:
- * - Issue #1055 Unified Performance Tier: Added isStaggeredTier to 
- *   HardwareCapabilities to harmonize A15 and S21FE remediation (R-ID 348, formerly R-ID 347).
  */
 
 @Serializable
@@ -144,6 +142,85 @@ class EngineConnectionPoint(
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
     }
 }
+
+/**
+ * AlarmTelemetrySnapshot: Unified DTO for telemetry propagation to the alarm engine.
+ */
+@Serializable
+data class AlarmTelemetrySnapshot(
+    val status: SentinelStatus = SentinelStatus.VALID,
+    val isJammer: Boolean = false,
+    val jumpTier: Int = 0,
+    val isAdaptiveJump: Boolean = false,
+    val lat: Double = 0.0,
+    val lng: Double = 0.0,
+    val accuracy: Double = 0.0,
+    val maxAccuracy: Double = 0.0,
+    val gpsTs: Long = 0L,
+    val lastValidFixRt: Long = 0L,
+    val speed: Double = 0.0,
+    val battery: Int = 100,
+    val temp: Double = 0.0,
+    val currentMa: Int = 0,
+    val isLocationPending: Boolean = false,
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    val isTamperDetected: Boolean = false,
+    val isPowerTamper: Boolean = false,
+    val tiltDegrees: Double = 0.0,
+    val acousticDb: Double = 0.0,
+    val baroAlt: Double = 0.0,
+    val baroAltEma: Double = -1000.0,
+    val lux: Double = 0.0,
+    val isNear: Boolean = true,
+    val luxBaseline: Double = 0.0,
+    val acousticFloorDb: Double = 0.0,
+    val adaptiveVibrationFloor: Double = 0.12,
+    val peakVibrationShock: Double = 0.0,
+    val isPowerSaveMode: Boolean = false,
+    val standbyBucket: Int = -1,
+    val netInterface: String = "UNKNOWN",
+    val isStorageLow: Boolean = false,
+    val isStorageCritical: Boolean = false,
+    val isBatterySteepDischarge: Boolean = false,
+    val isCoolingModeActive: Boolean = false,
+    val snrSnapshot: Double? = null,
+    val vibeSnapshot: Double? = null,
+    val isGpsHardwareLock: Boolean = false,
+    val cpuLoad: Double = 0.0,
+    val ioWait: Double = 0.0,
+    val maxIoLatency: Long = 0L,
+    val isSilentFailure: Boolean = false,
+    val isMaliAnomaly: Boolean = false,
+    val isUltraLongStationary: Boolean = false,
+    val isBatteryLow: Boolean = false,
+    val isBatteryCritical: Boolean = false,
+    val tamperNote: String? = null,
+    val isSignalLoss: Boolean = false,
+    val isGpsStalling: Boolean = false,
+    val isGpsGap: Boolean = false,
+    val localInternetLoss: Boolean = false,
+    val isHardwareOnline: Boolean = true
+)
+
+/**
+ * AlarmServiceContext: Unified DTO for service-level context in alarm evaluation.
+ */
+@Serializable
+data class AlarmServiceContext(
+    val now: Long,
+    val nowRt: Long,
+    val serviceStartTs: Long,
+    val serviceStartRt: Long,
+    val appStartTime: Long,
+    val isTrackerMode: Boolean,
+    val isRelayConnected: Boolean,
+    val isTrackerConnected: Boolean,
+    val isUiVisible: Boolean,
+    val distToHomeAuthority: Double?,
+    val maxDistanceAuthority: Double,
+    val discoveryPhase: DiscoveryPhase? = null,
+    val capabilities: HardwareCapabilities = HardwareCapabilities()
+)
 
 /**
  * SpatialAnchor: Polymorphic base for coordinate-aware telemetry.

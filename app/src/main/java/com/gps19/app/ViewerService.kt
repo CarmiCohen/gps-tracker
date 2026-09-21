@@ -17,12 +17,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.21.123:
+ * - Issue #1121 Refactoring: Migrated evaluateAlarms to unified 
+ *   AlarmTelemetrySnapshot and AlarmServiceContext DTOs (R-ID 390).
  * Sep.20.22:
  * - Issue #1137 Hardening: Ensured all forensic state and spatial gates 
  *   are zeroed in resetServiceTimers() (R-ID 384).
- * Sep.20.15:
- * - Issue #1124: Selective Baseline Reset. Updated resetServiceTimers to pass 
- *   roleTag "V" to HardwareSuite (R-ID 376).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -416,8 +416,6 @@ class ViewerService : BaseMonitorService() {
         serviceStartRealtime = timeProvider.elapsedRealtime(); serviceStartWall = timeProvider.currentTimeMillis()
         alarmManager.resetEvaluation(); sessionManager.reset(); integrityMonitor.resetStats(); forensicUseCase.resetLatches(); 
         forensicAuditor.reset("V")
-        
-        // Issue #1124: Pass "V" to reset only viewer-specific audits.
         hardwareSuite.resetBaseline("V")
         
         lastHardwareRecoveryTs = 0L
@@ -570,15 +568,7 @@ class ViewerService : BaseMonitorService() {
             now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = 10, peerAvail = isSocketConnected && isTrackerActive, hasGps = (lastProcessedLocation?.timestamp ?: 0L) > 0, isTrackerMode = false, accuracy = lastGpsAccuracy, maxAccuracy = selfProcessor.getMaxTrackerAccuracy(), noiseIdx = noiseIdx, luxIdx = log10(snapshot.lux + 1.0) / RIBBON_LUX_LOG_SCALE, vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = (hardwareSuite.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0), tiltIdx = abs(snapshot.tiltDegrees - selfProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG, baroIdx = (snapshot.baroAlt - selfProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = lastGpsBearing, isSitDetected = false, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = snapshot.kineticEnergy, isRecoveryEvent = recoveryFlagged
         )
 
-        evaluateAlarmsInternal(
-            now = now, 
-            nowRt = nowRt, 
-            isSignalLoss = health.signalLoss, 
-            isTrackerJammerSuspicion = connectivitySuite.isTrackerJammerSuspicion, 
-            isTrackerStalled = connectivitySuite.trackerStatus.isStalled, 
-            isTrackerGap = connectivitySuite.trackerStatus.isClockRegression || (nowRt - connectivitySuite.trackerLastValidFixRt > GPS_GAP_THRESHOLD_MS), 
-            isTrackerActive = isTrackerActive
-        )
+        evaluateAlarmsInternal(now, nowRt, health, isSocketConnected, isTrackerActive)
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
         repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, now)
@@ -598,23 +588,76 @@ class ViewerService : BaseMonitorService() {
         }
     }
 
-    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSignalLoss: Boolean, isTrackerJammerSuspicion: Boolean, isTrackerStalled: Boolean, isTrackerGap: Boolean, isTrackerActive: Boolean) {
-        val isSocketConnected = connectivitySuite.isConnected(); val localHealth = integrityMonitor.currentHealth
+    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, health: SystemHealthState, isSocketConnected: Boolean, isTrackerActive: Boolean) {
         val status = connectivitySuite.trackerStatus
         val home = repository.getCachedHomePoints().firstOrNull()
         val distToHome = if (status.lat != 0.0 && home != null) PhysicsUtils.calculateDistance(status.lat, status.lng, home.latitude, home.longitude) else null
 
+        val telemetry = AlarmTelemetrySnapshot(
+            status = status.status,
+            isJammer = status.isJammer,
+            jumpTier = status.jumpTier,
+            isAdaptiveJump = status.isAdaptiveJump,
+            lat = status.lat,
+            lng = status.lng,
+            accuracy = status.accuracy,
+            maxAccuracy = status.maxAccuracy,
+            gpsTs = status.gpsTs,
+            lastValidFixRt = status.lastValidFixRt,
+            speed = status.speed,
+            battery = status.battery,
+            temp = status.temp,
+            currentMa = status.currentMa,
+            isLocationPending = status.isLocationPending,
+            locationPendingReason = status.locationPendingReason,
+            isTamperDetected = status.isTamperDetected,
+            isPowerTamper = status.isPowerTamper,
+            tiltDegrees = status.tiltDegrees,
+            acousticDb = status.acousticDb,
+            baroAlt = status.baroAlt,
+            baroAltEma = status.sitBaro,
+            lux = status.lux,
+            isNear = status.isNear,
+            luxBaseline = status.luxBaseline,
+            acousticFloorDb = status.acousticFloorDb,
+            adaptiveVibrationFloor = status.adaptiveVibrationFloor,
+            peakVibrationShock = status.peakVibrationShock,
+            isPowerSaveMode = status.isPowerSaveMode,
+            standbyBucket = status.standbyBucket,
+            netInterface = status.netInterface,
+            isStorageLow = status.isStorageLow,
+            isStorageCritical = status.isStorageCritical,
+            isBatterySteepDischarge = status.isBatterySteepDischarge,
+            isCoolingModeActive = status.isCoolingModeActive,
+            snrSnapshot = status.snrIdx * RIBBON_SNR_SCALE_DB,
+            vibeSnapshot = status.vibeIdx * RIBBON_VIBRATION_SCALE_G,
+            isGpsHardwareLock = status.gpsHardwareLock,
+            tamperNote = status.tamperNote,
+            isSignalLoss = health.signalLoss,
+            isGpsStalling = status.isStalled,
+            isGpsGap = status.isClockRegression || (nowRt - status.lastValidFixRt > GPS_GAP_THRESHOLD_MS),
+            localInternetLoss = health.localInternetLoss,
+            isHardwareOnline = health.isHardwareOnline
+        )
+
+        val serviceContext = AlarmServiceContext(
+            now = now,
+            nowRt = nowRt,
+            serviceStartTs = serviceStartWall,
+            serviceStartRt = serviceStartRealtime,
+            appStartTime = sessionManager.appStartTime,
+            isTrackerMode = false,
+            isRelayConnected = isSocketConnected,
+            isTrackerConnected = isTrackerActive,
+            isUiVisible = isUiVisible(),
+            distToHomeAuthority = distToHome,
+            maxDistanceAuthority = remoteProcessor.getMaxDistanceAuthority(),
+            capabilities = capabilities
+        )
+
         alarmEvalJob?.cancel()
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
-            alarmManager.evaluateAlarms(
-                now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = false, isRelayConnected = isSocketConnected, isTrackerConnected = isTrackerActive, status = status.status, isJammer = isTrackerJammerSuspicion, jumpTier = status.jumpTier,
-                isAdaptiveJump = status.isAdaptiveJump,
-                trackerLat = status.lat, trackerLng = status.lng, trackerAccuracy = status.accuracy, maxTrackerAccuracy = status.maxAccuracy, trackerLastGpsTs = status.gpsTs, trackerLastGpsRt = 0L, trackerLastValidFixRt = status.lastValidFixRt, trackerSpeed = status.speed, trackerBattery = status.battery, trackerTemp = status.temp, isHardwareOnline = localHealth.isHardwareOnline, isLocalInternetLoss = localHealth.localInternetLoss, isSignalLoss = isSignalLoss, isGpsStalling = isTrackerStalled, isUiVisible = isUiVisible(), distToHomeAuthority = distToHome, maxDistanceAuthority = remoteProcessor.getMaxDistanceAuthority(), isGpsGap = distToHome != null && isTrackerGap, isTamperDetected = status.isTamperDetected, isPowerTamper = status.isPowerTamper, trackerTiltDegrees = status.tiltDegrees, trackerAcousticDb = status.acousticDb, trackerBaroAlt = status.baroAlt, trackerBaroAltEma = status.sitBaro, trackerLux = status.lux, isNear = status.isNear, luxBaseline = status.luxBaseline, acousticFloorDb = status.acousticFloorDb, adaptiveVibrationFloor = status.adaptiveVibrationFloor, peakVibrationShock = status.peakVibrationShock, trackerCurrentMa = status.currentMa, isPowerSaveMode = status.isPowerSaveMode, standbyBucket = status.standbyBucket, netInterface = status.netInterface, isStorageLow = status.isStorageLow, isStorageCritical = status.isStorageCritical, isBatterySteepDischarge = status.isBatterySteepDischarge, isCoolingModeActive = status.isCoolingModeActive, capabilities = capabilities, isLocationPending = status.isLocationPending, locationPendingReason = status.locationPendingReason, 
-                snrSnapshot = status.snrIdx * RIBBON_SNR_SCALE_DB, 
-                vibeSnapshot = status.vibeIdx * RIBBON_VIBRATION_SCALE_G, 
-                isGpsHardwareLock = status.gpsHardwareLock,
-                tamperNote = status.tamperNote
-            )
+            alarmManager.evaluateAlarms(telemetry, serviceContext)
         }
     }
 
