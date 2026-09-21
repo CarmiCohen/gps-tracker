@@ -1,4 +1,7 @@
-# Project Resolution Archive (Sep.15.101)
+# Project Resolution Archive (Sep.21.120)
+
+## 🟢 Sep.21.120
+*   **GPS Telemetry Conflation Hardening (#1146)**: Replaced single-point location variable in `TrackerService.kt` with a thread-safe `ConcurrentLinkedQueue` buffer. The logic tick now drains and processes all intermediate fixes accumulated between 2-second pulses, preventing the loss of high-resolution trail points and maintaining forensic jitter audit precision (R-ID 386).
 
 ## 🟢 Sep.20.22
 *   **Missing Forensic State Reset in TrackerService (#1137)**: Explicitly zeroed all forensic sampling state variables (`recoveryTriggerRt`, `lastWasCooling`, and spatial/IMU gates like `lastForensicLat`) in `TrackerService.resetServiceTimers()`. This ensures that a session restart provides a clean slate for thermal recovery audits and sampling triggers (R-ID 384).

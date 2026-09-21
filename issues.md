@@ -6,12 +6,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
 ### Missing Functionality & Unfinished Integration
-*   **Issue #1146: GPS Data Loss in TrackerService Tick Conflation**
-    *   *Problem*: `TrackerService` conflates GPS updates in `onLocationChanged` by overwriting `lastKnownLocation`, but only processes the *last* fix during the 2s `processTick`. Intermediate high-resolution updates are discarded.
-    *   *File*: `TrackerService.kt` (line 343)
-    *   *Risk*: Degraded tracking precision and loss of forensic detail.
-
-### Unintended Side Effects & Thread Safety
 *   **Issue #1123: Synchronous Thread Join in HardwareSuite Lifecycle**
     *   *Problem*: `stopAcousticMonitoring` performs a synchronous `acousticThread?.join(1000)` while holding `acousticLock`. This blocks service lifecycle transitions.
     *   *File*: `HardwareSuite.kt` (line 540)
@@ -25,6 +19,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1146: GPS Data Loss in TrackerService Tick Conflation** (Resolved Sep.21.120)
+    *   *Remediation*: Replaced single-point GPS conflation with `ConcurrentLinkedQueue` buffer in `TrackerService.kt`. `processTick` now drains and processes all intermediate fixes to prevent telemetry data loss and maintain forensic precision. (R-ID 386)
 
 *   **Issue #1126: Thread Visibility Hardening in HardwareSuite** (Resolved Sep.20.25)
     *   *Remediation*: Applied `@Volatile` markers to all critical timing and state variables in `HardwareSuite.kt`. (R-ID 385)
@@ -59,4 +56,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 385 (Rules: 80, IDs: 385), Resolved: 1137, Open: 3, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**
+- **Current Audit Baseline: [SOT: 386 (Rules: 80, IDs: 386), Resolved: 1138, Open: 2, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**

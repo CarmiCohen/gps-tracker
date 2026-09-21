@@ -17,11 +17,16 @@ import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
 import java.util.*
+import java.util.concurrent.ConcurrentLinkedQueue
 import javax.inject.Inject
 import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.21.120:
+ * - Issue #1146 Hardening: Replaced single-point GPS conflation with 
+ *   ConcurrentLinkedQueue buffer. processTick now drains and processes all 
+ *   intermediate fixes to prevent telemetry data loss (R-ID 386).
  * Sep.20.18:
  * - Issue #1137 Hardening: Ensured all forensic sampling state (spatial gates, 
  *   thermal recovery timers) is zeroed in resetServiceTimers() (R-ID 384).
@@ -44,7 +49,7 @@ class TrackerService : BaseMonitorService() {
     private var alarmEvalJob: Job? = null
     private var forensicSamplingJob: Job? = null
     
-    private var lastKnownLocation: Location? = null
+    private val locationBuffer = ConcurrentLinkedQueue<Location>()
     private var lastProcessedLocation: ProcessedLocation? = null
     private var latestGnssDetail: GnssDetail? = null
 
@@ -413,6 +418,9 @@ class TrackerService : BaseMonitorService() {
         lastFastPathAcousticSpikeTs = 0L
         lastFastPathLightSpikeTs = 0L
         setupPhysicalFastPaths()
+        
+        locationBuffer.clear()
+        
         logManager.logServiceEvent(m = "Session Terminated", isImportant = false)
     }
 
@@ -602,18 +610,26 @@ class TrackerService : BaseMonitorService() {
             lastPowerSaveCheckRt = nowRt
         }
 
-        val location = lastKnownLocation
-        if (location != null) {
+        var lastLocInBatch: Location? = null
+        while (locationBuffer.isNotEmpty()) {
+            val loc = locationBuffer.poll() ?: break
+            lastLocInBatch = loc
             val processed = locationProcessor.processGpsPoint(
-                lat = location.latitude, lng = location.longitude, alt = location.altitude, androidSpeedMps = lastGpsSpeed, gpsTs = location.time, accuracy = lastGpsAccuracy, bearing = lastGpsBearing, snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = forensicAuditor.getLastGpsFixRealtime("T"), isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, providedLightSpikeRt = lastFastPathLightSpikeTs, nowWall = now, nowRt = nowRt,
+                lat = loc.latitude, lng = loc.longitude, alt = loc.altitude, androidSpeedMps = loc.speed.toDouble(), gpsTs = loc.time, accuracy = loc.accuracy.toDouble(), bearing = loc.bearing.toDouble(), snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = forensicAuditor.getLastGpsFixRealtime("T"), isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, providedLightSpikeRt = lastFastPathLightSpikeTs, nowWall = now, nowRt = nowRt,
                 providedIsStalled = health.gpsStalled,
                 isSuspicious = isSuspiciousMode
             )
             lastProcessedLocation = processed
-            evaluateAlarmsInternal(now, nowRt, isSocketConnected, isViewerActive, processed, snapshot)
         }
 
         val proc = lastProcessedLocation
+        if (proc != null && lastLocInBatch != null) {
+            lastGpsSpeed = lastLocInBatch.speed.toDouble()
+            lastGpsAccuracy = lastLocInBatch.accuracy.toDouble()
+            lastGpsBearing = lastLocInBatch.bearing.toDouble()
+            evaluateAlarmsInternal(now, nowRt, isSocketConnected, isViewerActive, proc, snapshot, lastLocInBatch.time)
+        }
+
         repository.updateLocation(LocationUpdate().apply {
             this.kinetic.lat = proc?.optimizedPoint?.lat ?: 0.0
             this.kinetic.lng = proc?.optimizedPoint?.lng ?: 0.0
@@ -693,13 +709,13 @@ class TrackerService : BaseMonitorService() {
         if (isViewerActive) {
             val procViewer = lastProcessedLocation
             connectivitySuite.pushCurrentStatus(
-                deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true, loc = location, filtered = procViewer?.optimizedPoint, distToTracker = null, distToHome = procViewer?.distToHome, maxAccuracy = procViewer?.maxAccuracy ?: 0.0, filteredSpeed = procViewer?.filteredSpeed ?: 0.0, vibration = snapshot.vibration, heading = snapshot.heading, baroAlt = snapshot.baroAlt, lux = snapshot.lux, isNear = snapshot.isNear, tiltDegrees = snapshot.tiltDegrees, acousticDb = snapshot.acousticDb, jumpTier = procViewer?.jumpTier ?: 0, isJammer = procViewer?.jammerDetected ?: false, isStalled = health.gpsStalled, peakShock = snapshot.peakShock, peakShockTs = now, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = snapshot.proximityIdx, proximityCm = snapshot.proximityCm, proximityDebounceMs = snapshot.proximityDebounceMs, vibrationRollingSum = snapshot.vibrationRollingSum, micPending = false, isTamperDetected = procViewer?.tamperDetected ?: false, isPowerTamper = health.isPowerTamper, isSitDetected = isSuspiciousMode, isSitActive = false, lastSitTs = locationProcessor.getLastSitTs(), receiptRt = nowRt, violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(), verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isClockRegression = procViewer?.isClockRegression ?: false, isLocationPending = health.isLocationPending, locationPendingReason = health.locationPendingReason, lastValidFixRt = health.lastValidFixRt, gnssDetail = latestGnssDetail, snrIdx = snrIdx, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G, liftIdx = liftIdx, tiltIdx = tiltIdx, baroIdx = baroIdx, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, batteryLevel = health.batteryLevel, temp = health.batteryTemp, isCharging = health.isCharging, trackerState = if ((procViewer?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING, status = procViewer?.status ?: SentinelStatus.VALID, isStorageLow = health.isStorageLow, isStorageCritical = health.isStorageCritical, isPowerSaveMode = isPowerSaveActive || health.isPowerSaveMode, standbyBucket = health.standbyBucket, netInterface = health.netInterface, kineticEnergy = snapshot.kineticEnergy, isAdaptiveJump = procViewer?.isAdaptiveJump ?: false, isBatteryLow = health.isBatteryLow, isBatteryCritical = health.isBatteryCritical, isUltraLongStationary = health.isUltraLongStationary, gpsHardwareLock = health.gpsHardwareLock,
+                deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true, loc = lastLocInBatch, filtered = procViewer?.optimizedPoint, distToTracker = null, distToHome = procViewer?.distToHome, maxAccuracy = procViewer?.maxAccuracy ?: 0.0, filteredSpeed = procViewer?.filteredSpeed ?: 0.0, vibration = snapshot.vibration, heading = snapshot.heading, baroAlt = snapshot.baroAlt, lux = snapshot.lux, isNear = snapshot.isNear, tiltDegrees = snapshot.tiltDegrees, acousticDb = snapshot.acousticDb, jumpTier = procViewer?.jumpTier ?: 0, isJammer = procViewer?.jammerDetected ?: false, isStalled = health.gpsStalled, peakShock = snapshot.peakShock, peakShockTs = now, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = snapshot.proximityIdx, proximityCm = snapshot.proximityCm, proximityDebounceMs = snapshot.proximityDebounceMs, vibrationRollingSum = snapshot.vibrationRollingSum, micPending = false, isTamperDetected = procViewer?.tamperDetected ?: false, isPowerTamper = health.isPowerTamper, isSitDetected = isSuspiciousMode, isSitActive = false, lastSitTs = locationProcessor.getLastSitTs(), receiptRt = nowRt, violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(), verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isClockRegression = procViewer?.isClockRegression ?: false, isLocationPending = health.isLocationPending, locationPendingReason = health.locationPendingReason, lastValidFixRt = health.lastValidFixRt, gnssDetail = latestGnssDetail, snrIdx = snrIdx, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G, liftIdx = liftIdx, tiltIdx = tiltIdx, baroIdx = baroIdx, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, batteryLevel = health.batteryLevel, temp = health.batteryTemp, isCharging = health.isCharging, trackerState = if ((procViewer?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING, status = procViewer?.status ?: SentinelStatus.VALID, isStorageLow = health.isStorageLow, isStorageCritical = health.isStorageCritical, isPowerSaveMode = isPowerSaveActive || health.isPowerSaveMode, standbyBucket = health.standbyBucket, netInterface = health.netInterface, kineticEnergy = snapshot.kineticEnergy, isAdaptiveJump = procViewer?.isAdaptiveJump ?: false, isBatteryLow = health.isBatteryLow, isBatteryCritical = health.isBatteryCritical, isUltraLongStationary = health.isUltraLongStationary, gpsHardwareLock = health.gpsHardwareLock,
                 tamperNote = procViewer?.suppressionNote
             )
         }
 
         historyManager.updateRibbons(
-            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = if (isViewerActive && location != null) 10 else 0, peerAvail = isSocketConnected && isViewerActive, hasGps = location != null, isTrackerMode = true, accuracy = lastProcessedLocation?.currentAccuracy ?: 0.0, maxAccuracy = lastProcessedLocation?.maxAccuracy ?: 0.0, noiseIdx = noiseIdx, luxIdx = log10(snapshot.lux + 1.0) / RIBBON_LUX_LOG_SCALE, vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = avgCn0 / RIBBON_SNR_SCALE_DB, tiltIdx = abs(snapshot.tiltDegrees - locationProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG, baroIdx = (snapshot.baroAlt - locationProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = location?.bearing?.toDouble() ?: 0.0, isSitDetected = isSuspiciousMode, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = snapshot.kineticEnergy, isRecoveryEvent = recoveryFlagged, cpuLoad = health.cpuLoad, ioWait = health.ioWait, maxIoLatency = health.maxIoLatency, isSilentFailure = health.isSilentFailure, isBatteryLow = health.isBatteryLow, isBatteryCritical = health.isBatteryCritical, isUltraLongStationary = health.isUltraLongStationary
+            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = if (isViewerActive && lastLocInBatch != null) 10 else 0, peerAvail = isSocketConnected && isViewerActive, hasGps = lastLocInBatch != null, isTrackerMode = true, accuracy = lastProcessedLocation?.currentAccuracy ?: 0.0, maxAccuracy = lastProcessedLocation?.maxAccuracy ?: 0.0, noiseIdx = noiseIdx, luxIdx = log10(snapshot.lux + 1.0) / RIBBON_LUX_LOG_SCALE, vibeIdx = snapshot.vibration / RIBBON_VIBRATION_SCALE_G, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = avgCn0 / RIBBON_SNR_SCALE_DB, tiltIdx = abs(snapshot.tiltDegrees - locationProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG, baroIdx = (snapshot.baroAlt - locationProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS, verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.baroAlt, sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = lastLocInBatch?.bearing?.toDouble() ?: 0.0, isSitDetected = isSuspiciousMode, isSitActive = false, currentMa = health.currentMa, locationPendingReason = health.locationPendingReason, kineticEnergy = snapshot.kineticEnergy, isRecoveryEvent = recoveryFlagged, cpuLoad = health.cpuLoad, ioWait = health.ioWait, maxIoLatency = health.maxIoLatency, isSilentFailure = health.isSilentFailure, isBatteryLow = health.isBatteryLow, isBatteryCritical = health.isBatteryCritical, isUltraLongStationary = health.isUltraLongStationary
         )
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
@@ -834,7 +850,7 @@ class TrackerService : BaseMonitorService() {
 
     private fun onLocationChanged(location: Location) {
         val nowRt = timeProvider.elapsedRealtime()
-        lastKnownLocation = location; lastGpsSpeed = location.speed.toDouble(); lastGpsAccuracy = location.accuracy.toDouble(); lastGpsBearing = location.bearing.toDouble()
+        locationBuffer.add(location)
         
         forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, "T")?.let { gapMsg ->
             val proc = lastProcessedLocation
@@ -846,19 +862,19 @@ class TrackerService : BaseMonitorService() {
                 specialColor = FORENSIC_PINK_COLOR,
                 lat = proc?.optimizedPoint?.lat ?: 0.0,
                 lng = proc?.optimizedPoint?.lng ?: 0.0,
-                accuracy = lastGpsAccuracy
+                accuracy = location.accuracy.toDouble()
             )
         }
     }
 
-    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerActive: Boolean, processed: ProcessedLocation, snapshot: HardwareSuite.ForensicSnapshot) {
+    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerActive: Boolean, processed: ProcessedLocation, snapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long) {
         val health = integrityMonitor.currentHealth
         alarmEvalJob?.cancel()
         alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
             alarmManager.evaluateAlarms(
                 now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = true, isRelayConnected = isSocketConnected, isTrackerConnected = true, status = processed.status, isJammer = processed.jammerDetected, jumpTier = processed.jumpTier,
                 isAdaptiveJump = processed.isAdaptiveJump,
-                trackerLat = processed.optimizedPoint.lat, trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy, maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = lastKnownLocation?.time ?: 0L, trackerLastGpsRt = forensicAuditor.getLastGpsFixRealtime("T"), trackerLastValidFixRt = locationProcessor.getLastValidFixRt(), trackerSpeed = processed.filteredSpeed, trackerBattery = health.batteryLevel, trackerTemp = health.batteryTemp, isHardwareOnline = health.isHardwareOnline, isLocalInternetLoss = health.localInternetLoss, isSignalLoss = health.signalLoss, isGpsStalling = health.gpsStalled, isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = health.locationPendingReason == LocationPendingReason.GPS_GAP, isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper, trackerTiltDegrees = snapshot.tiltDegrees, trackerAcousticDb = snapshot.acousticDb, trackerBaroAlt = snapshot.baroAlt, trackerBaroAltEma = locationProcessor.getBaroBaseline(), trackerLux = snapshot.lux, isNear = snapshot.isNear, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = snapshot.peakShock, trackerCurrentMa = health.currentMa, capabilities = capabilities, isGpsHardwareLock = health.gpsHardwareLock, vibeSnapshot = snapshot.vibration,
+                trackerLat = processed.optimizedPoint.lat, trackerLng = processed.optimizedPoint.lng, trackerAccuracy = processed.currentAccuracy, maxTrackerAccuracy = processed.maxAccuracy, trackerLastGpsTs = rawGpsTs, trackerLastGpsRt = forensicAuditor.getLastGpsFixRealtime("T"), trackerLastValidFixRt = locationProcessor.getLastValidFixRt(), trackerSpeed = processed.filteredSpeed, trackerBattery = health.batteryLevel, trackerTemp = health.batteryTemp, isHardwareOnline = health.isHardwareOnline, isLocalInternetLoss = health.localInternetLoss, isSignalLoss = health.signalLoss, isGpsStalling = health.gpsStalled, isUiVisible = isUiVisible(), distToHomeAuthority = processed.distToHome, maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(), isGpsGap = health.locationPendingReason == LocationPendingReason.GPS_GAP, isTamperDetected = processed.tamperDetected, isPowerTamper = health.isPowerTamper, trackerTiltDegrees = snapshot.tiltDegrees, trackerAcousticDb = snapshot.acousticDb, trackerBaroAlt = snapshot.baroAlt, trackerBaroAltEma = locationProcessor.getBaroBaseline(), trackerLux = snapshot.lux, isNear = snapshot.isNear, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), peakVibrationShock = snapshot.peakShock, trackerCurrentMa = health.currentMa, capabilities = capabilities, isGpsHardwareLock = health.gpsHardwareLock, vibeSnapshot = snapshot.vibration,
                 cpuLoad = health.cpuLoad, ioWait = health.ioWait, maxIoLatency = health.maxIoLatency,
                 isSilentFailure = health.isSilentFailure, isMaliAnomaly = health.isMaliAnomaly,
                 isUltraLongStationary = health.isUltraLongStationary,

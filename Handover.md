@@ -1,36 +1,28 @@
-# Forensic Handover (Sep.21.104)
+# Forensic Handover (Sep.21.120)
 
 ## 🎯 Current System State
-*   **Version**: Sep.21.00 | **Build**: Forensic State Integrity & Lifecycle Hardening (Verified)
+*   **Version**: Sep.21.120 | **Build**: GPS Telemetry Buffering & Forensic Hardening (Verified)
 *   **Active Devices**: Samsung A15 & S21FE (Unified via PerformanceTier)
-*   **SOT Baseline**: SOT-385 (Multi-Role Audit Isolation)
+*   **SOT Baseline**: SOT-386 (GPS Telemetry Conflation Hardening)
 
 ## 🛡️ Forensic Hardening (Session Summary)
 
-### 1. Multi-Role Reset Isolation & Synchronization (#1124, #1132)
-*   **Status**: Resolved.
+### 1. GPS Telemetry Conflation Hardening (#1146)
+*   **Status**: Resolved (Sep.21.120).
 *   **Remediation**:
-    *   **ForensicAuditor.kt**: Implemented role-based state tracking via `ConcurrentHashMap<String, RoleState>`. Added `synchronized(state)` blocks to all update and evaluation methods to ensure atomic jitter peak tracking and stability audits (R-ID 382).
-    *   **HardwareSuite.kt**: Refactored `resetBaseline(roleTag)` to selectively clear auditor state for the active role ("T" or "V") only (R-ID 376).
-    *   **Services**: Updated `TrackerService` and `ViewerService` to pass their respective role tags during session resets.
+    *   **TrackerService.kt**: Replaced single `lastKnownLocation` with `ConcurrentLinkedQueue<Location>`. 
+    *   **Logic Tick**: `processTick` now drains the entire buffer and processes each point through `locationProcessor.processGpsPoint()` chronologically.
+    *   **Result**: Zero data loss for high-frequency fixes (e.g., 1Hz fixes during 2s logic ticks), ensuring trail precision and forensic jitter accuracy (R-ID 386).
 
-### 2. Deep Lifecycle Hardening (#1127, #1128, #1133, #1135, #1137, #1142)
+### 2. Multi-Role Reset Isolation & Synchronization (#1124, #1132)
 *   **Status**: Resolved.
-*   **Remediation**:
-    *   **HardwareSuite.kt**: Implemented `clearLifecycleLeftovers()` to zero peak accumulators (`secPeakLux`, etc.), proximity state (`rawProximityNear`), and plunge phases. Applied `@Volatile` to 30+ timing/state variables to ensure thread visibility (R-ID 385, 377).
-    *   **TrackerService.kt**: Zeroed all forensic sampling gates (`lastForensicLat`, etc.) and recovery timers in `resetServiceTimers()` (R-ID 384).
-    *   **IntegrityMonitor.kt**: Reset all vitality update timestamps (`lastInternetUpdateRt`, etc.) in `resetStats()` to suppress spurious flow stall alerts (R-ID 383).
+*   **Remediation**: Role-based state tracking in `ForensicAuditor` and selective baseline resets in `HardwareSuite`. (R-ID 382, 376).
 
-### 3. Diagnostic Telemetry Persistence (#1138, #1147)
+### 3. Lifecycle & Visibility Hardening (#1127, #1128, #1133, #1135, #1137, #1142)
 *   **Status**: Resolved.
-*   **Remediation**:
-    *   **Database.kt**: Migration **v76**. Added `gpsHardwareLock` and `isGnssThrottled` to `PendingStatusEntity` and `HistoryEntity` to ensure these diagnostic flags survive connection drops.
-    *   **ConnectivitySuite.kt**: Updated `flushPendingUpdates` to restore hardware lock status from offline storage. (R-ID 378)
+*   **Remediation**: `@Volatile` state markers, forensic sampling gate resets, and vitality timestamp zeroing. (R-ID 385, 384, 383, 377).
 
 ## 🔴 Open Gaps (Resumption Points)
-*   **Issue #1146: GPS Data Loss in TrackerService Tick Conflation**
-    *   *Problem*: `TrackerService` conflates GPS updates in `onLocationChanged` but only processes the *last* one during the 2s `processTick`.
-    *   *File*: `TrackerService.kt` (lines 530-545)
 *   **Issue #1123: Synchronous Thread Join in HardwareSuite Lifecycle**
     *   *Problem*: `stopAcousticMonitoring` performs a synchronous `acousticThread?.join(1000)` while holding `acousticLock`.
     *   *File*: `HardwareSuite.kt` (line 540)
@@ -39,6 +31,6 @@
     *   *File*: `HardwareSuite.kt` (line 650), `LocationSentinel.kt` (line 198)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 385 (Rules: 80, IDs: 385), Resolved: 1137, Open: 3, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**
+- **Current Audit Baseline: [SOT: 386 (Rules: 80, IDs: 386), Resolved: 1138, Open: 2, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**
 
-**Resumption Context**: The system has achieved full multi-role state isolation. The next audit cycle should focus on the `TrackerService` conflation gap (#1146) to ensure no high-resolution telemetry is lost during the 2s logic pulse.
+**Resumption Context**: Telemetry precision is now secured via location buffering. The next audit should target the synchronous thread join in `HardwareSuite` (#1123) to eliminate potential service lifecycle stalls.

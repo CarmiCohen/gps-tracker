@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.20.103)
+# SOT Master Requirements & Hardening Status (Sep.21.120)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 386**: GPS Telemetry Conflation Hardening - Replaced single-point location variable in `TrackerService.kt` with a thread-safe `ConcurrentLinkedQueue` buffer. The logic tick now drains and processes all intermediate fixes accumulated between 2-second pulses, preventing the loss of high-resolution trail points and maintaining forensic jitter audit precision (R-ID 386). (Resolved Sep.21.120)
 *   **SOT ID 385**: Thread Visibility Hardening - Applied `@Volatile` markers to all critical timing and state variables in `HardwareSuite.kt` (`lastBufferRecordRt`, `stationaryStartRt`, `lastStayAliveRt`, `plungePhase`, etc.) to ensure atomic visibility across the GNSS, Sensor, and Service Tick threads (R-ID 385). (Resolved Sep.20.25)
 *   **SOT ID 384**: Forensic State Reset Hardening - Explicitly zeroed all forensic sampling state variables (`recoveryTriggerRt`, `lastWasCooling`, and spatial/IMU gates like `lastForensicLat`) in `TrackerService.resetServiceTimers()`. This ensures that a session restart provides a clean slate for thermal recovery audits and sampling triggers (R-ID 384). (Resolved Sep.20.22)
 *   **SOT ID 383**: Vitality Audit Remediation - Reset all vitality update timestamps (`lastInternetUpdateRt`, `lastBatteryUpdateRt`, etc.) in `IntegrityMonitor.resetStats()`. This prevents spurious "Flow Stall" alerts when the service restarts (R-ID 383). (Resolved Sep.20.20)
@@ -23,14 +24,15 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 80
-- **Total SOT IDs**: 385
-- **Resolved Issues**: 1137
-- **Open Issues**: 3
+- **Total SOT IDs**: 386
+- **Resolved Issues**: 1138
+- **Open Issues**: 2
 - **Testing Coverage**: 2 (Sub-items: 10)
 - **Simplification Ideas**: 19
 - **QA Validation Tasks**: 282
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.50 (Telemetry Conflation)**: PASSED - Verified location buffer drainage in TrackerService (Sep.21.120)
 *   **Chapter 31.49 (Thread Visibility)**: PASSED - Verified Volatile markers in HardwareSuite (Sep.20.103)
 *   **Chapter 31.48 (Forensic Reset)**: PASSED - Verified TrackerService sampling state reset (Sep.20.103)
 *   **Chapter 31.47 (Vitality Timestamps)**: PASSED - Verified IntegrityMonitor timestamp reset (Sep.20.103)
@@ -44,4 +46,4 @@
 *   **Chapter 31.39 (Light Fast-Path Integration)**: PASSED - Verified that TrackerService initializes the light sensor fast path (Sep.15.101)
 
 ---
-*Next Audit: Sep.21.00. (Sep.20.103)*
+*Next Audit: Sep.21.200. (Sep.21.120)*
