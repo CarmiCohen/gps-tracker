@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.21.125:
+ * - Issue #1155: Acoustic-SNR Semantic Mismatch. Introduced EngineAcousticSample 
+ *   to decouple environmental noise telemetry from satellite SNR (R-ID 393).
  * Sep.21.123:
  * - Issue #1121 Refactoring: Introduced AlarmTelemetrySnapshot and 
  *   AlarmServiceContext to unify telemetry propagation and decouple 
@@ -433,6 +436,12 @@ enum class RibbonScale(val key: String, val intervalSeconds: Int) {
 }
 
 class EngineSnrSample(var ts: Long = 0L, var rt: Long = 0L, var snr: Double = 0.0)
+
+/**
+ * EngineAcousticSample: Represents a forensic acoustic measurement.
+ * R-ID 393: Decoupled from satellite SNR to prevent telemetry ambiguity.
+ */
+class EngineAcousticSample(var ts: Long = 0L, var rt: Long = 0L, var db: Double = 0.0)
 
 class EngineSensorSnapshot(
     var ts: Long = 0L, var rt: Long = 0L, var acoustic: Double = 0.0, var lux: Double = 0.0,

@@ -33,6 +33,10 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.21.125:
+ * - Issue #1155: Acoustic-SNR Semantic Mismatch. Refactored getAcousticSamples 
+ *   to return Sequence<EngineAcousticSample>, ensuring environmental noise is 
+ *   decoupled from satellite SNR (R-ID 393).
  * Sep.21.124:
  * - Issue #1152: Flyweight Sequence Abstraction. Refactored getSnrSamples, 
  *   getSensorSamples, and getAcousticSamples to use CircularStateBuffer.forensicSequence 
@@ -222,7 +226,7 @@ class HardwareSuite @Inject constructor(
     private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
 
     private val sensorBuffer = CircularStateBuffer(256, { EngineSensorSnapshot() }, {
-        it.ts = 0L; it.rt = 0L; it.lux = 0.0; it.vibe = 0.0; it.proxIdx = 0.0; it.lift = 0.0; it.tilt = 0.0; it.acoustic = 0.0; it.isSitDetected = false; it.sitVzTs = 0L; it.sitVzRt = 0L; it.sitShock = 0.0; it.kineticEnergy = 0.0
+        it.ts = 0L; it.rt = 0L; it.acoustic = 0.0; it.lux = 0.0; it.vibe = 0.0; it.proxIdx = 0.0; it.lift = 0.0; it.tilt = 0.0; it.isSitDetected = false; it.sitVzTs = 0L; it.sitVzRt = 0L; it.sitShock = 0.0; it.kineticEnergy = 0.0
     })
     @Volatile private var lastBufferRecordRt = 0L
 
@@ -888,16 +892,16 @@ class HardwareSuite @Inject constructor(
 
     /**
      * getAcousticSamples: Refactored to use forensicSequence abstraction.
-     * Issue #1152: Flyweight Sequence Abstraction.
+     * Issue #1155: Acoustic-SNR Semantic Mismatch.
      */
-    fun getAcousticSamples(fromRt: Long, toRt: Long): Sequence<EngineSnrSample> =
+    fun getAcousticSamples(fromRt: Long, toRt: Long): Sequence<EngineAcousticSample> =
         sensorBuffer.forensicSequence(
-            flyweight = EngineSnrSample(),
+            flyweight = EngineAcousticSample(),
             predicate = { it.rt in fromRt..toRt },
             transform = { source, target -> 
                 target.ts = source.ts
                 target.rt = source.rt
-                target.snr = source.acoustic
+                target.db = source.acoustic
             }
         )
 

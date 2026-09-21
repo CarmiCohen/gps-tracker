@@ -1,4 +1,4 @@
-# Simplicity Audit & Architectural Refactoring Ideas (Sep.21.124)
+# Simplicity Audit & Architectural Refactoring Ideas (Sep.21.125)
 
 ## 🎯 Current Focus: HardwareSuite Pattern Convergence
 
@@ -17,3 +17,7 @@
 ### 4. Fast-Path Configuration Convergence
 *   **Problem**: Both Acoustic and Light fast-paths require manual baseline synchronization in the service tick to avoid divergence with the main validation engine.
 *   **Opportunity**: Unify the fast-path implementation in `HardwareSuite` using a generic `HardwareFastPath<T>` delegate that automatically handles its own baseline decay or synchronization when the main engine updates.
+
+### 5. Telemetry Abstraction Cleanup
+*   **Problem**: `HardwareSuite.getAcousticSamples` returns a specialized `EngineAcousticSample` sequence, but `HistoryManager` is not yet updated to consume it, leaving the semantic decoupling incomplete in the telemetry ribbon.
+*   **Opportunity**: Refactor `HistoryManager.backfillAnalyticalGaps` to consume acoustic samples directly, ensuring the forensic ribbon accurately reflects environmental noise without SNR ambiguity.

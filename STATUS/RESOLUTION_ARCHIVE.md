@@ -1,4 +1,8 @@
-# Project Resolution Archive (Sep.21.124)
+# Project Resolution Archive (Sep.21.125)
+
+## 🟢 Sep.21.125
+*   **Acoustic-SNR Semantic Mismatch (#1155)**: Introduced `EngineAcousticSample` and refactored `HardwareSuite.getAcousticSamples` to return a sequence of this new type. This ensures environmental noise telemetry is semantically decoupled from satellite SNR in the forensic buffer, preventing telemetry ambiguity (R-ID 393).
+*   **Forensic Sequence Hardening (#1153/1154)**: Refactored `CircularStateBuffer.forensicSequence` to use a custom multi-pass sequence implementation that holds internal locks during flyweight transformation. This eliminates the race condition where a high-frequency writer could repurpose objects before the sequence consumer could extract their data, and achieves zero-allocation parity by removing the temporary `ArrayList` snapshot (R-ID 392).
 
 ## 🟢 Sep.21.124
 *   **Flyweight Sequence Abstraction (#1152)**: Refactored `getSnrSamples`, `getSensorSamples`, and `getAcousticSamples` in `HardwareSuite.kt` to use a unified `forensicSequence` utility in `CircularStateBuffer`. This eliminated redundant flyweight management and boilerplate code, ensuring thread-safe forensic sampling via temporary snapshotting (R-ID 391).
