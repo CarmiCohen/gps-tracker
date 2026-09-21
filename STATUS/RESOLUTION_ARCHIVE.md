@@ -1,4 +1,7 @@
-# Project Resolution Archive (Sep.21.123)
+# Project Resolution Archive (Sep.21.124)
+
+## 🟢 Sep.21.124
+*   **Flyweight Sequence Abstraction (#1152)**: Refactored `getSnrSamples`, `getSensorSamples`, and `getAcousticSamples` in `HardwareSuite.kt` to use a unified `forensicSequence` utility in `CircularStateBuffer`. This eliminated redundant flyweight management and boilerplate code, ensuring thread-safe forensic sampling via temporary snapshotting (R-ID 391).
 
 ## 🟢 Sep.21.123
 *   **Telemetry Source Abstraction (#1121)**: Refactored alarm evaluation to use unified `AlarmTelemetrySnapshot` and `AlarmServiceContext` DTOs. This eliminates parameter bloat in `AppAlarmManager.evaluateAlarms` and enforces strict isolation between local device state and remote telemetry, ensuring that the Viewer's local sensors can no longer inadvertently leak into Tracker alarm logic (R-ID 390).

@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.21.123)
+# SOT Master Requirements & Hardening Status (Sep.21.124)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 391**: Flyweight Sequence Abstraction - Refactored `getSnrSamples`, `getSensorSamples`, and `getAcousticSamples` in `HardwareSuite.kt` to use a unified `forensicSequence` utility in `CircularStateBuffer`. This eliminates redundant flyweight management logic and ensures thread-safe forensic sampling via temporary snapshotting (R-ID 391). (Resolved Sep.21.124)
 *   **SOT ID 390**: Telemetry Source Abstraction - Refactored alarm evaluation to use unified `AlarmTelemetrySnapshot` and `AlarmServiceContext` DTOs. This eliminates parameter bloat in `AppAlarmManager.evaluateAlarms` and enforces strict isolation between local device state and remote telemetry, ensuring that the Viewer's local sensors can no longer inadvertently leak into Tracker alarm logic (R-ID 390). (Resolved Sep.21.123)
 *   **SOT ID 389**: HardwareSuite Snapshot Unification - Unified `consumeLogicSnapshot` and `consumeForensicSnapshot` into a single private `privateConsumeSnapshot` method. This eliminates duplicate sensing snapshot extraction code, ensures thread-safety gates, peak resets, and acoustic/vibration floor snapshots are symmetrically maintained (R-ID 389). (Resolved Sep.21.122)
 *   **SOT ID 388**: Unified Vibration Authority - Consolidated the `adaptiveVibrationFloor` calculation in `HardwareSuite.kt`. The high-frequency floor is now snapshotted and propagated to `LocationSentinel` via `TrackerService.processTick()`, ensuring that both the hardware layer and the validation engine operate on a single source of truth for stationary detection (R-ID 388). (Resolved Sep.21.121)
@@ -28,14 +29,15 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 80
-- **Total SOT IDs**: 390
-- **Resolved Issues**: 1142
+- **Total SOT IDs**: 391
+- **Resolved Issues**: 1143
 - **Open Issues**: 0
 - **Testing Coverage**: 2 (Sub-items: 10)
-- **Simplification Ideas**: 17
+- **Simplification Ideas**: 16
 - **QA Validation Tasks**: 282
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.55 (Flyweight Abstraction)**: PASSED - Verified unified forensic sampling in HardwareSuite (Sep.21.124)
 *   **Chapter 31.54 (Source Abstraction)**: PASSED - Verified unified telemetry snapshot pattern for alarm evaluation (Sep.21.123)
 *   **Chapter 31.53 (Snapshot Unification)**: PASSED - Verified unified snapshot ingestion path in HardwareSuite (Sep.21.122)
 *   **Chapter 31.52 (Vibration Authority)**: PASSED - Verified unified floor propagation in HardwareSuite/Sentinel (Sep.21.121)
@@ -54,4 +56,4 @@
 *   **Chapter 31.39 (Light Fast-Path Integration)**: PASSED - Verified that TrackerService initializes the light sensor fast path (Sep.15.101)
 
 ---
-*Next Audit: Sep.21.200. (Sep.21.123)*
+*Next Audit: Sep.21.200. (Sep.21.124)*

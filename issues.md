@@ -15,6 +15,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1152: Flyweight Sequence Abstraction** (Resolved Sep.21.124)
+    *   *Remediation*: Refactored `getSnrSamples`, `getSensorSamples`, and `getAcousticSamples` in `HardwareSuite` to use a unified `forensicSequence` utility in `CircularStateBuffer`. This eliminated redundant flyweight management and boilerplate code, ensuring thread-safe forensic sampling via temporary snapshotting (R-ID 391).
+
 *   **Issue #1121: Telemetry Source Abstraction** (Resolved Sep.21.123)
     *   *Remediation*: Introduced `AlarmTelemetrySnapshot` and `AlarmServiceContext` DTOs to encapsulate telemetry inputs for the alarm engine. Refactored `AppAlarmManager.evaluateAlarms` and both monitoring services to use this pattern, ensuring strict isolation between local hardware state and remote telemetry (R-ID 390).
 
@@ -63,4 +66,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 390 (Rules: 80, IDs: 390), Resolved: 1142, Open: 0, Testing: 2 (Sub-items: 10), Ideas: 17, QA: 282]**
+- **Current Audit Baseline: [SOT: 391 (Rules: 80, IDs: 391), Resolved: 1143, Open: 0, Testing: 2 (Sub-items: 10), Ideas: 16, QA: 282]**

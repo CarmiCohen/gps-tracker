@@ -3,6 +3,8 @@ package com.gps19.app
 /**
  * CircularStateBuffer: A high-performance, zero-allocation circular buffer for forensic state snapshots.
  * Standardizes indexing around elapsedRealtime (RT) to prevent clock-drift issues.
+ * Sep.21.124:
+ * - Added forensicSequence utility to support flyweight-based sampling across HardwareSuite.
  * Sep.06.17:
  * - Issue #922: Initial implementation for Forensic Buffering and Clock Parity.
  */
@@ -47,6 +49,26 @@ class CircularStateBuffer<T>(
         for (i in 0 until currentCount) {
             val idx = (startIdx + i) % capacity
             yield(buffer[idx] as T)
+        }
+    }
+
+    /**
+     * Forensic sampling utility: Extracts a filtered sequence into a flyweight object.
+     * This avoids continuous allocations by reusing the provided flyweight.
+     * Note: Creates a temporary list snapshot to maintain thread safety without long-held locks.
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun <R> forensicSequence(
+        flyweight: R,
+        predicate: (T) -> Boolean,
+        transform: (T, R) -> Unit
+    ): Sequence<R> = sequence {
+        val snapshot = synchronized(this@CircularStateBuffer) { asSequence().toList() }
+        for (item in snapshot) {
+            if (predicate(item)) {
+                transform(item, flyweight)
+                yield(flyweight)
+            }
         }
     }
 

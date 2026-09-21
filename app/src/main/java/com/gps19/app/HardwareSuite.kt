@@ -33,6 +33,10 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.21.124:
+ * - Issue #1152: Flyweight Sequence Abstraction. Refactored getSnrSamples, 
+ *   getSensorSamples, and getAcousticSamples to use CircularStateBuffer.forensicSequence 
+ *   to eliminate redundant flyweight management logic (R-ID 391).
  * Sep.21.122:
  * - Idea 1 Cleanup: Unified consumeLogicSnapshot and consumeForensicSnapshot into a private 
  *   privateConsumeSnapshot method to remove boilerplate and ensure perfectly symmetrical state management.
@@ -42,12 +46,6 @@ import kotlin.math.*
  *   startAcousticMonitoring join-before-start pattern (R-ID 387).
  * - Issue #1143: Unified Vibration Authority. Propagated adaptiveVibrationFloor 
  *   via ForensicSnapshot to prevent logic divergence (R-ID 388).
- * Sep.20.15:
- * - Issue #1124: Selective Baseline Reset. Updated resetBaseline(roleTag) to 
- *   target specific role audits in ForensicAuditor (R-ID 376).
- * - Issue #1127/1128/1133/1135 Hardening: Ensured resetBaseline zero-fills all 
- *   transient peak accumulators, lockout timestamps, and stationary markers 
- *   to prevent cross-session pollution (R-ID 377).
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -644,18 +642,20 @@ class HardwareSuite @Inject constructor(
     fun setPollingInterval(intervalMs: Long) { if (pollingIntervalFlow.value != intervalMs) pollingIntervalFlow.value = intervalMs }
     fun resetGnssJitter() { forensicAuditor.resetGnssJitter() }
 
-    fun getSnrSamples(fromRt: Long, toRt: Long): Sequence<EngineSnrSample> = sequence {
-        val flyweight = EngineSnrSample()
-        val snapshot = synchronized(snrBuffer) { snrBuffer.asSequence().toList() }
-        for (sample in snapshot) {
-            if (sample.rt in fromRt..toRt) {
-                flyweight.ts = sample.ts
-                flyweight.rt = sample.rt
-                flyweight.snr = sample.snr
-                yield(flyweight)
+    /**
+     * getSnrSamples: Refactored to use forensicSequence abstraction.
+     * Issue #1152: Flyweight Sequence Abstraction.
+     */
+    fun getSnrSamples(fromRt: Long, toRt: Long): Sequence<EngineSnrSample> = 
+        snrBuffer.forensicSequence(
+            flyweight = EngineSnrSample(),
+            predicate = { it.rt in fromRt..toRt },
+            transform = { source, target -> 
+                target.ts = source.ts
+                target.rt = source.rt
+                target.snr = source.snr
             }
-        }
-    }
+        )
 
     fun isScreenOn(): Boolean {
         if (lastDisplayState == Display.STATE_UNKNOWN) {
@@ -875,27 +875,31 @@ class HardwareSuite @Inject constructor(
         }
     }
 
-    fun getSensorSamples(fromRt: Long, toRt: Long): Sequence<EngineSensorSnapshot> = sequence {
-        val flyweight = EngineSensorSnapshot()
-        val snapshot = synchronized(sensorBuffer) { sensorBuffer.asSequence().toList() }
-        for (sample in snapshot) {
-            if (sample.rt in fromRt..toRt) {
-                flyweight.copyFrom(sample)
-                yield(flyweight)
-            }
-        }
-    }
+    /**
+     * getSensorSamples: Refactored to use forensicSequence abstraction.
+     * Issue #1152: Flyweight Sequence Abstraction.
+     */
+    fun getSensorSamples(fromRt: Long, toRt: Long): Sequence<EngineSensorSnapshot> =
+        sensorBuffer.forensicSequence(
+            flyweight = EngineSensorSnapshot(),
+            predicate = { it.rt in fromRt..toRt },
+            transform = { source, target -> target.copyFrom(source) }
+        )
 
-    fun getAcousticSamples(fromRt: Long, toRt: Long): Sequence<EngineSnrSample> = sequence {
-        val flyweight = EngineSnrSample()
-        val snapshot = synchronized(sensorBuffer) { sensorBuffer.asSequence().toList() }
-        for (sample in snapshot) {
-            if (sample.rt in fromRt..toRt) {
-                flyweight.apply { this.ts = sample.ts; this.rt = sample.rt; this.snr = sample.acoustic }
-                yield(flyweight)
+    /**
+     * getAcousticSamples: Refactored to use forensicSequence abstraction.
+     * Issue #1152: Flyweight Sequence Abstraction.
+     */
+    fun getAcousticSamples(fromRt: Long, toRt: Long): Sequence<EngineSnrSample> =
+        sensorBuffer.forensicSequence(
+            flyweight = EngineSnrSample(),
+            predicate = { it.rt in fromRt..toRt },
+            transform = { source, target -> 
+                target.ts = source.ts
+                target.rt = source.rt
+                target.snr = source.acoustic
             }
-        }
-    }
+        )
 
     private fun processVibration(x: Float, y: Float, z: Float) {
         val dx = x.toDouble() - lastAccelX.toDouble(); val dy = y.toDouble() - lastAccelY.toDouble(); val dz = z.toDouble() - lastAccelZ.toDouble()
