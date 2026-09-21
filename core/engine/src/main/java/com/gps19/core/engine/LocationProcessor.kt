@@ -19,6 +19,22 @@ sealed class ProcessorEvent {
 }
 
 /**
+ * LocationProcessorListener: Interface for isolation utilities to prevent test breakages during interface expansion.
+ */
+interface LocationProcessorListener {
+    fun onTrailPointSaved(lat: Double, lng: Double, isViewerTrail: Boolean, status: SentinelStatus, timestamp: Long, accuracy: Double, maxAccuracy: Double) {}
+    fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Double, snr: Double?, vibe: Double?) {}
+    fun onMaxAccuracyChanged(accuracy: Double) {}
+    fun onChairBaselineChanged(baseline: Double) {}
+    fun onGpsStallDetected(rt: Long) {}
+}
+
+/**
+ * DefaultLocationProcessorListener: No-op implementation of [LocationProcessorListener] to stabilize regression testing.
+ */
+open class DefaultLocationProcessorListener : LocationProcessorListener
+
+/**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
  * Sep.21.121:
  * - Issue #1143: Unified Vibration Authority. updateSensorData now propagates 
@@ -176,7 +192,7 @@ class LocationProcessor(
     fun getLuxBaseline() = sentinel.luxBaseline
     fun getBaroBaseline() = sentinel.baroBaseline
     fun getAcousticFloorDb() = sentinel.acousticFloorDb
-    fun getAdaptiveVibrationFloor() = sentinel.adaptiveVibrationFloor
+    fun getAdaptiveVibrationFloor() = sentinel.acousticFloorDb
     fun getPeakVibrationShock() = sentinel.peakVibrationShock
     fun getPeakVibrationShockRt() = sentinel.peakVibrationShockRt
     

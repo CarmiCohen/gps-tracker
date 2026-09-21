@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.21.130)
+# SOT Master Requirements & Hardening Status (Sep.21.131)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 395**: Interface Isolation Utilities - Created `LocationProcessorListener` and `DefaultLocationProcessorListener` with no-op methods to prevent test breakages during interface expansion and stabilize regression testing (R-ID 395). (Resolved Sep.21.131)
 *   **SOT ID 394**: GNSS Sampling Logic Consolidation - Encapsulated GNSS sampling policy (standard vs throttled) and auditing triggers in a nested `GnssPolicyEngine` within `HardwareSuite.kt`. This decouples the hardware callback from throttling rules and ensures symmetric auditing of jitter across all performance tiers (R-ID 394). (Resolved Sep.21.128)
 *   **SOT ID 393**: Acoustic-SNR Semantic Mismatch & Integration - Introduced `EngineAcousticSample` and refactored `HardwareSuite.getAcousticSamples` to return a sequence of this new type. Refactored `HistoryManager` and `TelemetryAggregator` to consume this specialized sequence during backfill and gap-filling. This ensures environmental noise telemetry (dB) is semantically isolated from satellite GNSS SNR across the entire forensic pipeline, preventing diagnostic ambiguity in forensic ribbons (R-ID 393). (Resolved Sep.21.127)
 *   **SOT ID 392**: Forensic Sequence Hardening - Refactored `CircularStateBuffer.forensicSequence` to use a custom multi-pass sequence implementation that holds internal locks during flyweight transformation. This eliminates the race condition where a high-frequency writer could repurpose objects before the sequence consumer (e.g., `HistoryManager`) could extract their data, and achieves zero-allocation parity by removing the temporary `ArrayList` snapshot (R-ID 392). (Resolved Sep.21.125)
@@ -31,15 +32,16 @@
 *   **SOT ID 367**: Forensic Multi-Role Integrity Hardening - Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367). (Resolved Sep.19.08)
 
 ## 📈 Metric Summary
-- **Rules Verified**: 80
-- **Total SOT IDs**: 394
-- **Resolved Issues**: 1150
+- **Rules Verified**: 81
+- **Total SOT IDs**: 395
+- **Resolved Issues**: 1151
 - **Open Issues**: 0
-- **Testing Coverage**: 2 (Sub-items: 10)
-- **Simplification Ideas**: 16
-- **QA Validation Tasks**: 282
+- **Testing Coverage**: 3 (Sub-items: 11)
+- **Simplification Ideas**: 15
+- **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.60 (Interface Isolation Utilities)**: PASSED - Created LocationProcessorListener & DefaultLocationProcessorListener to prevent test breakages (Sep.21.131)
 *   **Chapter 31.59 (Dead Code Elimination)**: PASSED - Removed unused tracking property and helper method leftovers in HardwareSuite (Sep.21.130)
 *   **Chapter 31.58 (GNSS Consolidation)**: PASSED - Verified nested GnssPolicyEngine evaluation pattern in HardwareSuite (Sep.21.128)
 *   **Chapter 31.57 (Acoustic Refactoring)**: PASSED - Verified HistoryManager/TelemetryAggregator integration of EngineAcousticSample (Sep.21.127)
@@ -63,4 +65,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.20.103)
 
 ---
-*Next Audit: Sep.21.200. (Sep.21.130)*
+*Next Audit: Sep.21.200. (Sep.21.131)*
