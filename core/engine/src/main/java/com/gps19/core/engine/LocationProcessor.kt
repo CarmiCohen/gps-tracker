@@ -20,6 +20,9 @@ sealed class ProcessorEvent {
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.21.121:
+ * - Issue #1143: Unified Vibration Authority. updateSensorData now propagates 
+ *   providedAdaptiveFloor to Sentinel for consistent stationary detection (R-ID 388).
  * Sep.20.12:
  * - Issue #1149: Propagated providedLightSpikeRt to sentinel for immediate lockout.
  * - Issue #1150: Updated updateSensorData to accept lightSpikeRt.
@@ -214,6 +217,7 @@ class LocationProcessor(
         lightSpikeRt: Long = 0L,
         isMuzzled: Boolean = false,
         kineticEnergy: Double = 0.0,
+        providedAdaptiveFloor: Double = -1.0,
         nowRt: Long = timeProvider.elapsedRealtime(),
         nowWall: Long = timeProvider.currentTimeMillis()
     ): Boolean {
@@ -229,7 +233,7 @@ class LocationProcessor(
             val baselineChanged = sentinel.updateSensorState(
                 vibration, heading, baroAlt, lux, isNear, powerTamper, tiltDegrees, 
                 acousticDb, peakShock, acousticMinDb, peakVerticalVelocity, peakVerticalVelocityTs, peakVerticalVelocityRt, plungeMatched, peakVerticalDisplacement,
-                isSirenActive, isWarming, manualAdaptiveFloor, acousticLockoutRt, lightSpikeRt, isMuzzled, kineticEnergy, nowRt, nowWall
+                isSirenActive, isWarming, manualAdaptiveFloor, acousticLockoutRt, lightSpikeRt, isMuzzled, kineticEnergy, providedAdaptiveFloor, nowRt, nowWall
             )
             if (baselineChanged) {
                 _processorEvents.tryEmit(ProcessorEvent.ChairBaselineChanged(sentinel.baselineSitTilt))
@@ -360,7 +364,7 @@ class LocationProcessor(
                         this.distToHome = lastNearestHomeDistance
                         this.isSpatiallyValid = false
                         this.tamperDetected = providedIsTamper
-                        this.jammerDetected = providedIsTamper
+                        this.jammerDetected = providedIsJammer
                         this.kineticEnergy = providedKineticEnergy
                     }
                 }
@@ -368,13 +372,13 @@ class LocationProcessor(
             
             if (accuracy <= HIGH_ACCURACY_THRESHOLD_METERS) { lastHighAccLat = lat; lastHighAccLng = lng; lastHighAccTs = nowWall; lastHighAccRt = nowRt }
             if (isLocal) updateWindowedAccuracy(accuracy) else if (providedMaxAccuracy > 0.0) maxAccuracy = providedMaxAccuracy
-            if (providedAdaptiveVibrationFloor >= 0.0) sentinel.adaptiveVibrationFloor = providedAdaptiveVibrationFloor
             
-            if (providedAcousticLockoutRt > 0 || providedLightSpikeRt > 0) {
+            if (providedAcousticLockoutRt > 0 || providedLightSpikeRt > 0 || providedAdaptiveVibrationFloor >= 0.0) {
                 sentinel.updateSensorState(
                     vibration = -1.0, heading = -1.0, baroAlt = -1000.0, 
                     acousticLockoutRt = providedAcousticLockoutRt, 
                     lightSpikeRt = providedLightSpikeRt,
+                    providedAdaptiveFloor = providedAdaptiveVibrationFloor,
                     isMuzzled = isMuzzled, nowRt = nowRt, nowTs = nowWall
                 )
             }

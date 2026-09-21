@@ -5,6 +5,10 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Sep.21.121:
+ * - Issue #1143: Unified Vibration Authority. updateSensorState now accepts 
+ *   providedAdaptiveFloor from HardwareSuite, preventing logic divergence 
+ *   in stationary detection (R-ID 388).
  * Sep.20.12:
  * - Issue #1149: Propagated Fast-Path Light Spike for high-frequency tamper detection.
  */
@@ -165,6 +169,7 @@ class LocationSentinel {
         lightSpikeRt: Long = 0L,
         isMuzzled: Boolean = false,
         kineticEnergy: Double = 0.0,
+        providedAdaptiveFloor: Double = -1.0,
         nowRt: Long,
         nowTs: Long
     ): Boolean {
@@ -253,6 +258,9 @@ class LocationSentinel {
         
         if (manualAdaptiveFloor >= 0.0) {
             this.adaptiveVibrationFloor = manualAdaptiveFloor
+        } else if (providedAdaptiveFloor >= 0.0) {
+            // Issue #1143: Use floor provided by HardwareSuite (Unified Authority)
+            this.adaptiveVibrationFloor = providedAdaptiveFloor
         } else { 
             this.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(this.adaptiveVibrationFloor, currentVibrationIndex, isWarming)
         }

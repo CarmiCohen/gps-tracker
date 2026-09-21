@@ -6,19 +6,20 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
 ### Missing Functionality & Unfinished Integration
-*   **Issue #1123: Synchronous Thread Join in HardwareSuite Lifecycle**
-    *   *Problem*: `stopAcousticMonitoring` performs a synchronous `acousticThread?.join(1000)` while holding `acousticLock`. This blocks service lifecycle transitions.
-    *   *File*: `HardwareSuite.kt` (line 540)
-    *   *Risk*: Service start/stop latency and potential ANRs.
+*(No critical logic gaps identified in current audit path).*
 
-*   **Issue #1143: Divergent Vibration Floor Calculation (Dual-State Logic)**
-    *   *Problem*: `HardwareSuite` and `LocationSentinel` independently calculate `adaptiveVibrationFloor`, leading to potential divergence in stationary detection.
-    *   *File*: `HardwareSuite.kt`, `LocationSentinel.kt`
-    *   *Risk*: Inconsistent polling intervals or anchor locking.
+### Unintended Side Effects & Thread Safety
+*(No critical side-effects identified in current audit path).*
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1123: Synchronous Thread Join in HardwareSuite Lifecycle** (Resolved Sep.21.121)
+    *   *Remediation*: Removed synchronous `acousticThread.join(1000)` from `stopAcousticMonitoring` while holding `acousticLock`. Resource exclusivity is now maintained via the join-before-start pattern in `startAcousticMonitoring`, eliminating service lifecycle stalls. (R-ID 387)
+
+*   **Issue #1143: Divergent Vibration Floor Calculation (Dual-State Logic)** (Resolved Sep.21.121)
+    *   *Remediation*: Unified the vibration floor authority in `HardwareSuite.kt`. The high-frequency `adaptiveVibrationFloor` is now snapshotted and propagated to `LocationSentinel` via `TrackerService`, preventing logic divergence in stationary detection. (R-ID 388)
 
 *   **Issue #1146: GPS Data Loss in TrackerService Tick Conflation** (Resolved Sep.21.120)
     *   *Remediation*: Replaced single-point GPS conflation with `ConcurrentLinkedQueue` buffer in `TrackerService.kt`. `processTick` now drains and processes all intermediate fixes to prevent telemetry data loss and maintain forensic precision. (R-ID 386)
@@ -56,4 +57,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 386 (Rules: 80, IDs: 386), Resolved: 1138, Open: 2, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**
+- **Current Audit Baseline: [SOT: 388 (Rules: 80, IDs: 388), Resolved: 1140, Open: 0, Testing: 2 (Sub-items: 10), Ideas: 19, QA: 282]**

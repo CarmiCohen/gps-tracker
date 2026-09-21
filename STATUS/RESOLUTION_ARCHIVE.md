@@ -1,4 +1,8 @@
-# Project Resolution Archive (Sep.21.120)
+# Project Resolution Archive (Sep.21.121)
+
+## 🟢 Sep.21.121
+*   **Unified Vibration Authority (#1143)**: Consolidated the `adaptiveVibrationFloor` calculation in `HardwareSuite.kt`. The high-frequency floor is now snapshotted and propagated to `LocationSentinel` via `TrackerService.processTick()`, ensuring that both the hardware layer and the validation engine operate on a single source of truth for stationary detection (R-ID 388).
+*   **Non-Blocking Acoustic Teardown (#1123)**: Removed the synchronous `acousticThread.join(1000)` from `HardwareSuite.stopAcousticMonitoring()`. Resource exclusivity is now maintained via the join-before-start pattern in `startAcousticMonitoring()`, which waits for any lingering thread to exit before initializing a new one. This eliminates service lifecycle stalls and potential ANRs during service termination (R-ID 387).
 
 ## 🟢 Sep.21.120
 *   **GPS Telemetry Conflation Hardening (#1146)**: Replaced single-point location variable in `TrackerService.kt` with a thread-safe `ConcurrentLinkedQueue` buffer. The logic tick now drains and processes all intermediate fixes accumulated between 2-second pulses, preventing the loss of high-resolution trail points and maintaining forensic jitter audit precision (R-ID 386).

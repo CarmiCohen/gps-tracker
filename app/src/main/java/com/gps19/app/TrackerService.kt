@@ -23,6 +23,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.21.121:
+ * - Issue #1143 Hardening: Propagated adaptiveVibrationFloor from hardware 
+ *   snapshot to LocationProcessor for unified authority (R-ID 388).
  * Sep.21.120:
  * - Issue #1146 Hardening: Replaced single-point GPS conflation with 
  *   ConcurrentLinkedQueue buffer. processTick now drains and processes all 
@@ -585,7 +588,10 @@ class TrackerService : BaseMonitorService() {
             
             // Issue #1149: Propagated light fast-path state.
             lightSpikeRt = lastFastPathLightSpikeTs,
-            acousticLockoutRt = lastFastPathAcousticSpikeTs
+            acousticLockoutRt = lastFastPathAcousticSpikeTs,
+            
+            // Issue #1143: Unified Vibration authority
+            providedAdaptiveFloor = snapshot.adaptiveVibrationFloor
         )
 
         val noiseIdx = (snapshot.acousticDb - locationProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB
@@ -617,7 +623,8 @@ class TrackerService : BaseMonitorService() {
             val processed = locationProcessor.processGpsPoint(
                 lat = loc.latitude, lng = loc.longitude, alt = loc.altitude, androidSpeedMps = loc.speed.toDouble(), gpsTs = loc.time, accuracy = loc.accuracy.toDouble(), bearing = loc.bearing.toDouble(), snr = avgCn0, satsUsed = latestGnssDetail?.satellites?.count { it.usedInFix } ?: 0, isViewerTrail = false, lastGpsTs = forensicAuditor.getLastGpsFixRealtime("T"), isLocal = true, providedAcousticLockoutRt = lastFastPathAcousticSpikeTs, providedLightSpikeRt = lastFastPathLightSpikeTs, nowWall = now, nowRt = nowRt,
                 providedIsStalled = health.gpsStalled,
-                isSuspicious = isSuspiciousMode
+                isSuspicious = isSuspiciousMode,
+                providedAdaptiveVibrationFloor = snapshot.adaptiveVibrationFloor
             )
             lastProcessedLocation = processed
         }

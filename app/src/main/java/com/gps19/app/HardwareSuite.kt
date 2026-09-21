@@ -33,9 +33,12 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
- * Sep.20.12:
- * - Issue #1148: Resolved stale light fast-path baseline persistence.
- *   Explicitly reset fastPathLightBaseline and lastLightSpikeRt in resetBaseline().
+ * Sep.21.121:
+ * - Issue #1123 Hardening: Removed synchronous join() from stopAcousticMonitoring 
+ *   to eliminate lifecycle stalls. Resource exclusivity is maintained via 
+ *   startAcousticMonitoring join-before-start pattern (R-ID 387).
+ * - Issue #1143: Unified Vibration Authority. Propagated adaptiveVibrationFloor 
+ *   via ForensicSnapshot to prevent logic divergence (R-ID 388).
  * Sep.20.15:
  * - Issue #1124: Selective Baseline Reset. Updated resetBaseline(roleTag) to 
  *   target specific role audits in ForensicAuditor (R-ID 376).
@@ -83,6 +86,7 @@ class HardwareSuite @Inject constructor(
         var acousticPeak: Double = 0.0
         var acousticPeakMin: Double = -1.0
         var kineticEnergy: Double = 0.0
+        var adaptiveVibrationFloor: Double = 0.0
 
         fun reset() {
             vibration = 0.0; heading = 0.0; baroAlt = 0.0; lux = 0.0; isNear = false
@@ -90,6 +94,7 @@ class HardwareSuite @Inject constructor(
             peakVerticalVelocityTs = 0L; peakVerticalVelocityRt = 0L; peakVerticalDisplacement = 0.0
             plungeMatched = false; proximityIdx = 0.0; proximityCm = -1.0; proximityDebounceMs = 0L
             vibrationRollingSum = 0.0; acousticPeak = 0.0; acousticPeakMin = -1.0; kineticEnergy = 0.0
+            adaptiveVibrationFloor = 0.0
         }
     }
 
@@ -794,8 +799,9 @@ class HardwareSuite @Inject constructor(
         synchronized(acousticLock) {
             isMonitoring = false
             isAcousticRunning = false
+            // Issue #1123 Hardening: Removed synchronous join() to prevent service stalls.
+            // Resource exclusivity is handled in startAcousticMonitoring.
             acousticThread?.interrupt()
-            try { acousticThread?.join(1000) } catch (e: Exception) {}
             acousticThread = null
         }
     }
@@ -809,7 +815,7 @@ class HardwareSuite @Inject constructor(
                 synchronized(logicSnapshotBuffer) {
                     val snapshot = logicSnapshotBuffer.next()
                     snapshot.apply { 
-                        vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = logicPeakVibration; peakVerticalVelocity = logicPeakVerticalVelocity; peakVerticalVelocityTs = logicPeakVerticalVelocityTs; peakVerticalVelocityRt = logicPeakVerticalVelocityRt; plungeMatched = !isWarming && plungeMatched; peakVerticalDisplacement = logicPeakVerticalDisplacement; proximityIdx = this@HardwareSuite.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareSuite.proximityDebounceMs; vibrationRollingSum = this@HardwareSuite.vibrationRollingSum; acousticPeak = logicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareSuite.currentKineticEnergy 
+                        vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = logicPeakVibration; peakVerticalVelocity = logicPeakVerticalVelocity; peakVerticalVelocityTs = logicPeakVerticalVelocityTs; peakVerticalVelocityRt = logicPeakVerticalVelocityRt; plungeMatched = !isWarming && plungeMatched; peakVerticalDisplacement = logicPeakVerticalDisplacement; proximityIdx = this@HardwareSuite.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareSuite.proximityDebounceMs; vibrationRollingSum = this@HardwareSuite.vibrationRollingSum; acousticPeak = logicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareSuite.currentKineticEnergy; adaptiveVibrationFloor = this@HardwareSuite.adaptiveVibrationFloor 
                     }
                     logicPeakVibration = 0.0; logicPeakVerticalVelocity = 0.0; logicPeakVerticalVelocityTs = 0L; logicPeakVerticalVelocityRt = 0L; logicPeakVerticalDisplacement = 0.0; plungeMatched = false; logicPeakDb = 0.0; logicMinDb = 100.0; snapshot
                 }
@@ -823,7 +829,7 @@ class HardwareSuite @Inject constructor(
                 synchronized(forensicSnapshotBuffer) {
                     val snapshot = forensicSnapshotBuffer.next()
                     snapshot.apply { 
-                        vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = forensicPeakVibration; peakVerticalVelocity = forensicPeakVerticalVelocity; peakVerticalVelocityTs = forensicPeakVerticalVelocityTs; peakVerticalVelocityRt = forensicPeakVerticalVelocityRt; plungeMatched = false; peakVerticalDisplacement = forensicPeakVerticalDisplacement; proximityIdx = this@HardwareSuite.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareSuite.proximityDebounceMs; vibrationRollingSum = this@HardwareSuite.vibrationRollingSum; acousticPeak = forensicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareSuite.currentKineticEnergy 
+                        vibration = currentVibrationIndex; heading = currentCompassHeading; baroAlt = absoluteAltitude; lux = currentLux; isNear = isProximityNear; tiltDegrees = currentTiltDegrees; acousticDb = currentAcousticDb; peakShock = forensicPeakVibration; peakVerticalVelocity = forensicPeakVerticalVelocity; peakVerticalVelocityTs = forensicPeakVerticalVelocityTs; peakVerticalVelocityRt = forensicPeakVerticalVelocityRt; plungeMatched = false; peakVerticalDisplacement = forensicPeakVerticalDisplacement; proximityIdx = this@HardwareSuite.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareSuite.proximityDebounceMs; vibrationRollingSum = this@HardwareSuite.vibrationRollingSum; acousticPeak = forensicPeakDb; acousticPeakMin = if (logicMinDb >= 100.0) -1.0 else logicMinDb; kineticEnergy = this@HardwareSuite.currentKineticEnergy; adaptiveVibrationFloor = this@HardwareSuite.adaptiveVibrationFloor
                     }
                     forensicPeakVibration = 0.0; forensicPeakVerticalVelocity = 0.0; forensicPeakVerticalVelocityTs = 0L; forensicPeakVerticalVelocityRt = 0L; forensicPeakVerticalDisplacement = 0.0; forensicPeakDb = 0.0; forensicMinDb = 100.0; snapshot
                 }
