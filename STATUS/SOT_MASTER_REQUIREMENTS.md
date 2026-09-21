@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.21.128)
+# SOT Master Requirements & Hardening Status (Sep.21.129)
 
 ## 🛡️ Core Hardening Baseline
 *   **SOT ID 394**: GNSS Sampling Logic Consolidation - Encapsulated GNSS sampling policy (standard vs throttled) and auditing triggers in a nested `GnssPolicyEngine` within `HardwareSuite.kt`. This decouples the hardware callback from throttling rules and ensures symmetric auditing of jitter across all performance tiers (R-ID 394). (Resolved Sep.21.128)
@@ -62,4 +62,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.20.103)
 
 ---
-*Next Audit: Sep.21.200. (Sep.21.128)*
+*Next Audit: Sep.21.200. (Sep.21.129)*

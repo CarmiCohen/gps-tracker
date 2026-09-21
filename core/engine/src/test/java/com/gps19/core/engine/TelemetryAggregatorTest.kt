@@ -60,6 +60,7 @@ class TelemetryAggregatorTest {
             nowTs = nowTs,
             snrSamples = emptySequence(),
             sensorSamples = emptySequence(),
+            acousticSamples = emptySequence(),
             acousticFloor = 40.0,
             baseTemplate = baseTemplate
         ) { scale, point ->
@@ -92,6 +93,7 @@ class TelemetryAggregatorTest {
             nowTs = nowTs,
             snrSamples = emptySequence(),
             sensorSamples = emptySequence(),
+            acousticSamples = emptySequence(),
             acousticFloor = 40.0,
             baseTemplate = baseTemplate
         ) { scale, point ->

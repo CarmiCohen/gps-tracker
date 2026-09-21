@@ -4,6 +4,10 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * Sep.21.127:
+ * - Issue #1156/1157: Telemetry Abstraction Integration. Refactored backfillGaps 
+ *   and fillRealGap to consume EngineAcousticSample directly from HardwareSuite, 
+ *   ensuring environmental noise is semantically decoupled from SNR (R-ID 393).
  * Sep.13.30:
  * - Issue #1017 Hardening: Added reset() method to clear forensic counters 
  *   and transient state during role transitions (R-ID 317).
@@ -272,9 +276,15 @@ class TelemetryAggregator {
         }
     }
 
+    /**
+     * backfillGaps: Refactored to consume specialized EngineAcousticSample sequence.
+     * Issue #1156: Unused Forensic Abstraction.
+     */
     fun backfillGaps(
         lastTickRt: Long, nowRt: Long, lastTickTs: Long, nowTs: Long,
-        snrSamples: Sequence<EngineSnrSample>, sensorSamples: Sequence<EngineSensorSnapshot>,
+        snrSamples: Sequence<EngineSnrSample>, 
+        sensorSamples: Sequence<EngineSensorSnapshot>,
+        acousticSamples: Sequence<EngineAcousticSample>,
         acousticFloor: Double, baseTemplate: EngineConnectionPoint,
         onResult: (RibbonScale, EngineConnectionPoint) -> Unit
     ) {
@@ -284,22 +294,27 @@ class TelemetryAggregator {
         var pointsGenerated = 0
         val snrIter = snrSamples.iterator()
         val sensorIter = sensorSamples.iterator()
+        val acousticIter = acousticSamples.iterator()
+        
         var nextSnr = if (snrIter.hasNext()) snrIter.next() else null
         var nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
+        var nextAcoustic = if (acousticIter.hasNext()) acousticIter.next() else null
 
         while (fillRt < nowRt && pointsGenerated < MAX_BACKFILL_POINTS) {
             val windowEndRt = fillRt + TICK_INTERVAL_MS - 1
             while (nextSnr != null && nextSnr.rt < fillRt) nextSnr = if (snrIter.hasNext()) snrIter.next() else null
             while (nextSensor != null && nextSensor.rt < fillRt) nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
+            while (nextAcoustic != null && nextAcoustic.rt < fillRt) nextAcoustic = if (acousticIter.hasNext()) acousticIter.next() else null
 
             val resolvedSnr = if (nextSnr != null && nextSnr.rt <= windowEndRt) (nextSnr.snr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) else baseTemplate.snrIdx
             val snapshot = if (nextSensor != null && nextSensor.rt <= windowEndRt) nextSensor else null
+            val resolvedAcoustic = if (nextAcoustic != null && nextAcoustic.rt <= windowEndRt) nextAcoustic.db else (snapshot?.acoustic ?: baseTemplate.noiseIdx * RIBBON_NOISE_SCALE_DB + acousticFloor)
             
             fillPointFlyweight.apply {
                 copyFrom(baseTemplate)
                 ts = fillTs; rt = fillRt; isGap = false; isRecoveryEvent = false 
                 snrIdx = resolvedSnr
-                noiseIdx = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: baseTemplate.noiseIdx
+                noiseIdx = ((resolvedAcoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB)
                 luxIdx = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: baseTemplate.luxIdx
                 vibeIdx = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) } ?: baseTemplate.vibeIdx
                 proxIdx = snapshot?.proxIdx ?: baseTemplate.proxIdx
@@ -317,9 +332,15 @@ class TelemetryAggregator {
         }
     }
 
+    /**
+     * fillRealGap: Refactored to consume specialized EngineAcousticSample sequence.
+     * Issue #1157: Telemetry Abstraction Integration.
+     */
     fun fillRealGap(
         ribbonScale: RibbonScale, lastTickRt: Long, nowRt: Long, lastTickTs: Long,
-        snrSamples: Sequence<EngineSnrSample>, sensorSamples: Sequence<EngineSensorSnapshot>,
+        snrSamples: Sequence<EngineSnrSample>, 
+        sensorSamples: Sequence<EngineSensorSnapshot>,
+        acousticSamples: Sequence<EngineAcousticSample>,
         acousticFloor: Double, onResult: (EngineConnectionPoint) -> Unit
     ) {
         val intervalMs = ribbonScale.intervalSeconds * TICK_INTERVAL_MS
@@ -333,21 +354,26 @@ class TelemetryAggregator {
         var pointsGenerated = 0
         val snrIter = snrSamples.iterator()
         val sensorIter = sensorSamples.iterator()
+        val acousticIter = acousticSamples.iterator()
+        
         var nextSnr = if (snrIter.hasNext()) snrIter.next() else null
         var nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
+        var nextAcoustic = if (acousticIter.hasNext()) acousticIter.next() else null
         
         while (currentRt < nowRt && pointsGenerated < MAX_BACKFILL_POINTS) {
             val totalSeconds = (currentRt / TICK_INTERVAL_MS).toInt()
             val windowEndRt = currentRt + intervalMs - 1
             while (nextSnr != null && nextSnr.rt < currentRt) nextSnr = if (snrIter.hasNext()) snrIter.next() else null
             while (nextSensor != null && nextSensor.rt < currentRt) nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
+            while (nextAcoustic != null && nextAcoustic.rt < currentRt) nextAcoustic = if (acousticIter.hasNext()) acousticIter.next() else null
 
             flyweight.apply {
                 ts = currentRt + rtToTsOffset; rt = currentRt; rtt = 0; remoteSig = 0; isConnected = false; isGap = true
                 isUltraLongStationary = false; violationUptimeMs = 0L
                 snrIdx = if (nextSnr != null && nextSnr.rt <= windowEndRt) (nextSnr.snr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) else 0.0
                 val snapshot = if (nextSensor != null && nextSensor.rt <= windowEndRt) nextSensor else null
-                noiseIdx = snapshot?.let { ((it.acoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB) } ?: 0.0
+                val resolvedAcoustic = if (nextAcoustic != null && nextAcoustic.rt <= windowEndRt) nextAcoustic.db else (snapshot?.acoustic ?: acousticFloor)
+                noiseIdx = ((resolvedAcoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB)
                 luxIdx = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: 0.0
                 vibeIdx = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) } ?: 0.0
                 proxIdx = snapshot?.proxIdx ?: 0.0

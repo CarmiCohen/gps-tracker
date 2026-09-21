@@ -2,6 +2,9 @@
 
 ## 🟢 Resolved Issues & Refactoring Record
 
+### Sep.21.129
+*   **Version Release Bump**: Bumped application and baseline versioning to `Sep.21.129` in full alignment with development milestones.
+
 ### Sep.21.128
 *   **Issue #1158: GNSS Sampling Logic Consolidation**
     *   *Remediation*: Encapsulated GNSS sampling policy (standard vs throttled) and auditing triggers in a nested `GnssPolicyEngine` within `HardwareSuite.kt`. This decouples the hardware callback from throttling rules and ensures symmetric auditing of jitter across all performance tiers (R-ID 394).

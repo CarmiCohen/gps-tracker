@@ -29,22 +29,16 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.21.127:
+ * - Issue #1156/1157: Telemetry Abstraction Integration. Refactored 
+ *   backfillAnalyticalGaps and fillRealGap to consume EngineAcousticSample 
+ *   sequence from HardwareSuite, ensuring environmental noise is decoupled 
+ *   from satellite SNR in forensic ribbons (R-ID 393).
  * Sep.17.05:
  * - Issue #1094: Mutex-based serialization for updateRibbons to prevent multi-service pool collision.
  * Sep.17.04:
  * - Issue #1094: Forensic Backfill Buffer Reuse Optimization. Implemented 
  *   backfillPool and backfillBuffer to eliminate transient heap pressure (R-ID 353).
- * Sep.17.02:
- * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
- * Sep.15.04:
- * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
- *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
- * Sep.14.10:
- * - IPC Noise Suppression (#1019): Migrated to @ShadowContext to utilize 
- *   ShadowCache for package name lookups during file export and cleanup (R-ID 324).
- * Sep.12.47:
- * - Issue #1017 Hardening: Resolved Scope Deadlock during role transitions. 
- *   initialize() now correctly updates the CoroutineScope. Added reset() (R-ID 317).
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -205,6 +199,10 @@ class HistoryManager @Inject constructor(
         }
     }
 
+    /**
+     * backfillAnalyticalGaps: Refactored to consume specialized EngineAcousticSample sequence.
+     * Issue #1156: Unused Forensic Abstraction.
+     */
     private fun backfillAnalyticalGaps(
         lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, rtt: Int,
         peerSignal: Int, peerAvail: Boolean, hasGps: Boolean, isTrackerMode: Boolean,
@@ -222,6 +220,7 @@ class HistoryManager @Inject constructor(
     ) {
         val snrSamples = if (isTrackerMode) hardwareSuite.getSnrSamples(lastTickRt + 1, nowRt) else emptySequence()
         val sensorSamples = if (isTrackerMode) hardwareSuite.getSensorSamples(lastTickRt + 1, nowRt) else emptySequence()
+        val acousticSamples = if (isTrackerMode) hardwareSuite.getAcousticSamples(lastTickRt + 1, nowRt) else emptySequence()
         
         baseTemplateFlyweight.apply {
             ts = 0L; rt = 0L; this.rtt = rtt; remoteSig = peerSignal; isConnected = peerAvail; this.hasGps = hasGps
@@ -243,7 +242,10 @@ class HistoryManager @Inject constructor(
         backfillBuffer.clear()
         var poolIdx = 0
         
-        aggregator.backfillGaps(lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb(), baseTemplateFlyweight) { scale, point ->
+        aggregator.backfillGaps(
+            lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, acousticSamples,
+            locationProcessor.getAcousticFloorDb(), baseTemplateFlyweight
+        ) { scale, point ->
             if (poolIdx >= MAX_BACKFILL_POINTS) return@backfillGaps
             
             val appPoint = backfillPool[poolIdx++]
@@ -264,15 +266,23 @@ class HistoryManager @Inject constructor(
         }
     }
 
+    /**
+     * fillRealGap: Refactored to consume specialized EngineAcousticSample sequence.
+     * Issue #1157: Telemetry Abstraction Integration.
+     */
     private fun fillRealGap(lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, isTrackerMode: Boolean) {
         val snrSamples = if (isTrackerMode) hardwareSuite.getSnrSamples(lastTickRt, nowRt) else emptySequence()
         val sensorSamples = if (isTrackerMode) hardwareSuite.getSensorSamples(lastTickRt, nowRt) else emptySequence()
+        val acousticSamples = if (isTrackerMode) hardwareSuite.getAcousticSamples(lastTickRt, nowRt) else emptySequence()
         
         RibbonScale.entries.forEach { scale ->
             backfillBuffer.clear()
             var poolIdx = 0
             
-            aggregator.fillRealGap(scale, lastTickRt, nowRt, lastTickTs, snrSamples, sensorSamples, locationProcessor.getAcousticFloorDb()) { point ->
+            aggregator.fillRealGap(
+                scale, lastTickRt, nowRt, lastTickTs, snrSamples, sensorSamples, acousticSamples,
+                locationProcessor.getAcousticFloorDb()
+            ) { point ->
                 if (poolIdx >= MAX_BACKFILL_POINTS) return@fillRealGap
 
                 val appPoint = backfillPool[poolIdx++]
