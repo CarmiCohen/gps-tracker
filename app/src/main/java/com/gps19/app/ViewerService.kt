@@ -17,6 +17,10 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.21.132:
+ * - Issue #1165: Unified Session Lifecycle Management. Migrated reset logic 
+ *   to SessionLifecycleCoordinator to ensure atomic zeroing of hardware peaks 
+ *   and vitality markers (R-ID 396).
  * Sep.21.123:
  * - Issue #1121 Refactoring: Migrated evaluateAlarms to unified 
  *   AlarmTelemetrySnapshot and AlarmServiceContext DTOs (R-ID 390).
@@ -26,6 +30,8 @@ import kotlin.math.*
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
+
+    @Inject lateinit var sessionCoordinator: SessionLifecycleCoordinator
 
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
@@ -412,18 +418,15 @@ class ViewerService : BaseMonitorService() {
     }
 
     private fun resetServiceTimers() {
-        val proc = lastProcessedLocation
-        serviceStartRealtime = timeProvider.elapsedRealtime(); serviceStartWall = timeProvider.currentTimeMillis()
-        alarmManager.resetEvaluation(); sessionManager.reset(); integrityMonitor.resetStats(); forensicUseCase.resetLatches(); 
-        forensicAuditor.reset("V")
-        hardwareSuite.resetBaseline("V")
-        
-        lastHardwareRecoveryTs = 0L
-        
-        selfProcessor.resetStats()
-        remoteProcessor.resetStats()
-        
-        logManager.logServiceEvent(m = "Session Terminated", isImportant = false, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
+        sessionCoordinator.resetSession(
+            roleTag = "V",
+            processors = listOf(selfProcessor, remoteProcessor),
+            onReset = {
+                serviceStartRealtime = timeProvider.elapsedRealtime()
+                serviceStartWall = timeProvider.currentTimeMillis()
+                lastHardwareRecoveryTs = 0L
+            }
+        )
     }
 
     private fun onUiVisibilityChangedInternal(visible: Boolean) {

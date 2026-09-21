@@ -13,7 +13,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 15)
+## 💡 Strategic Simplification Ideas (Ideas: 14)
 
 *   **Issue #1160: Flyweight & Pooling Expansion**
     *   *Description*: Expand flyweight patterns to all entities (Telemetry, Violations, SpatialPoints) and use pre-allocated ring buffers for `EngineConnectionPoint` and a `LogEntry` pool to eliminate GC churn.
@@ -25,8 +25,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
     *   *Description*: Migrate `LocationProcessor` to a functional model using an immutable `ProcessorState` data class passed with each point.
 *   **Issue #1164: Persistence of Logic State**
     *   *Description*: Serialize `AlarmHistory` into the database/DataStore to ensure geofence debounce states and power alarm latches survive process death or deep sleep system kills.
-*   **Issue #1165: Unified Session Lifecycle Management**
-    *   *Description*: Centralize session state management in a `SessionLifecycleCoordinator` to ensure all hardware peaks, temporal lockouts, and vitality markers are zeroed atomically upon session restart.
 *   **Issue #1166: State Partitioning & Slicing**
     *   *Description*: Split `MainUiState` into specialized slices (`MapUiState`, `DashboardUiState`) to minimize recomposition evaluation costs and isolate volatile telemetry.
 *   **Issue #1167: Map Overlay Imperative to Declarative Controller**
@@ -49,6 +47,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1165: Unified Session Lifecycle Management** (Resolved Sep.21.132)
+    *   *Remediation*: Centralized session state management in `SessionLifecycleCoordinator` to ensure all hardware peaks, temporal lockouts, and vitality markers are zeroed atomically upon session restart (R-ID 396).
 
 *   **Issue #1174: Interface Isolation Utilities** (Resolved Sep.21.131)
     *   *Remediation*: Created `LocationProcessorListener` and `DefaultLocationProcessorListener` with no-op methods to prevent test breakages during interface expansion and stabilize regression testing (R-ID 395).
@@ -77,4 +78,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 395 (Rules: 81, IDs: 395), Resolved: 1151, Open: 0, Testing: 3 (Sub-items: 11), Ideas: 15, QA: 283]**
+- **Current Audit Baseline: [SOT: 396 (Rules: 81, IDs: 396), Resolved: 1152, Open: 0, Testing: 3 (Sub-items: 11), Ideas: 14, QA: 283]**

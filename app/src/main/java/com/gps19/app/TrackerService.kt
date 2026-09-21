@@ -23,6 +23,10 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.21.132:
+ * - Issue #1165: Unified Session Lifecycle Management. Migrated reset logic 
+ *   to SessionLifecycleCoordinator to ensure atomic zeroing of hardware peaks 
+ *   and vitality markers (R-ID 396).
  * Sep.21.123:
  * - Issue #1121 Refactoring: Migrated evaluateAlarms to unified 
  *   AlarmTelemetrySnapshot and AlarmServiceContext DTOs (R-ID 390).
@@ -32,6 +36,8 @@ import kotlin.math.*
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
+
+    @Inject lateinit var sessionCoordinator: SessionLifecycleCoordinator
 
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
@@ -385,31 +391,28 @@ class TrackerService : BaseMonitorService() {
     }
 
     private fun resetServiceTimers() { 
-        serviceStartRealtime = timeProvider.elapsedRealtime()
-        serviceStartWall = timeProvider.currentTimeMillis()
-        alarmManager.resetEvaluation()
-        locationProcessor.resetStats()
-        sessionManager.reset()
-        integrityMonitor.resetStats()
-        forensicAuditor.reset("T")
-        
-        hardwareSuite.resetBaseline("T")
-        
-        lastForensicLat = 0.0
-        lastForensicLng = 0.0
-        lastForensicVibe = 0.0
-        lastForensicTilt = 0.0
-        lastWasCooling = false
-        recoveryTriggerRt = 0L
-        
-        lastHardwareRecoveryTs = 0L
-        lastFastPathAcousticSpikeTs = 0L
-        lastFastPathLightSpikeTs = 0L
-        setupPhysicalFastPaths()
-        
-        locationBuffer.clear()
-        
-        logManager.logServiceEvent(m = "Session Terminated", isImportant = false)
+        sessionCoordinator.resetSession(
+            roleTag = "T",
+            processors = listOf(locationProcessor),
+            onReset = {
+                serviceStartRealtime = timeProvider.elapsedRealtime()
+                serviceStartWall = timeProvider.currentTimeMillis()
+                
+                lastForensicLat = 0.0
+                lastForensicLng = 0.0
+                lastForensicVibe = 0.0
+                lastForensicTilt = 0.0
+                lastWasCooling = false
+                recoveryTriggerRt = 0L
+                
+                lastHardwareRecoveryTs = 0L
+                lastFastPathAcousticSpikeTs = 0L
+                lastFastPathLightSpikeTs = 0L
+                setupPhysicalFastPaths()
+                
+                locationBuffer.clear()
+            }
+        )
     }
 
     private fun onUiVisibilityChangedInternal(visible: Boolean) {
