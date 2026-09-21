@@ -33,6 +33,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.21.130:
+ * - Issue #1159: Unused Forensic Auditing Dead Code Elimination. Removed unused 
+ *   maxGnssJitterMs and obsolete processReflection helper.
  * Sep.21.128:
  * - Issue #1158: GNSS Sampling Logic Consolidation. Encapsulated GNSS sampling policy 
  *   in a nested GnssPolicyEngine to decouple hardware callback from throttling and auditing rules (R-ID 393).
@@ -46,7 +49,7 @@ import kotlin.math.*
  *   to eliminate redundant flyweight management logic (R-ID 391).
  * Sep.21.122:
  * - Idea 1 Cleanup: Unified consumeLogicSnapshot and consumeForensicSnapshot into a private 
- *   privateConsumeSnapshot method to remove boilerplate and ensure perfectly symmetrical state management.
+ *   privateConsumeSnapshot method to remove boilerplate and ensure perfectly symmetrically state management.
  * Sep.21.121:
  * - Issue #1123 Hardening: Removed synchronous join() from stopAcousticMonitoring 
  *   to eliminate lifecycle stalls. Resource exclusivity is maintained via 
@@ -142,8 +145,6 @@ class HardwareSuite @Inject constructor(
     private val _isGnssThrottled = MutableSharedFlow<Boolean>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val isGnssThrottledFlow: SharedFlow<Boolean> = _isGnssThrottled.asSharedFlow()
     var isGnssThrottled = false; private set
-
-    val maxGnssJitterMs get() = forensicAuditor.maxGnssJitterMs
 
     private val _revivalEvents = MutableSharedFlow<RevivalEvent>(extraBufferCapacity = 8)
     val revivalEvents = _revivalEvents.asSharedFlow()
@@ -965,10 +966,6 @@ class HardwareSuite @Inject constructor(
         val baselineAlt = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, emaPressure.toFloat()).toDouble()
         absoluteAltitude = currentAlt; relativeAltitude = if (isWarming) 0.0 else currentAlt - baselineAlt
         if (abs(relativeAltitude) > secPeakLift) secPeakLift = abs(relativeAltitude)
-    }
-
-    private fun processReflection(rotationVector: FloatArray) {
-        // Obsolete method preserved symmetrically if referenced elsewhere
     }
 
     private fun processRotation(rotationVector: FloatArray) {

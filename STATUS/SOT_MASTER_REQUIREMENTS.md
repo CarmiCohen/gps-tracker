@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.21.129)
+# SOT Master Requirements & Hardening Status (Sep.21.130)
 
 ## 🛡️ Core Hardening Baseline
 *   **SOT ID 394**: GNSS Sampling Logic Consolidation - Encapsulated GNSS sampling policy (standard vs throttled) and auditing triggers in a nested `GnssPolicyEngine` within `HardwareSuite.kt`. This decouples the hardware callback from throttling rules and ensures symmetric auditing of jitter across all performance tiers (R-ID 394). (Resolved Sep.21.128)
@@ -33,13 +33,14 @@
 ## 📈 Metric Summary
 - **Rules Verified**: 80
 - **Total SOT IDs**: 394
-- **Resolved Issues**: 1149
+- **Resolved Issues**: 1150
 - **Open Issues**: 0
 - **Testing Coverage**: 2 (Sub-items: 10)
 - **Simplification Ideas**: 16
 - **QA Validation Tasks**: 282
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.59 (Dead Code Elimination)**: PASSED - Removed unused tracking property and helper method leftovers in HardwareSuite (Sep.21.130)
 *   **Chapter 31.58 (GNSS Consolidation)**: PASSED - Verified nested GnssPolicyEngine evaluation pattern in HardwareSuite (Sep.21.128)
 *   **Chapter 31.57 (Acoustic Refactoring)**: PASSED - Verified HistoryManager/TelemetryAggregator integration of EngineAcousticSample (Sep.21.127)
 *   **Chapter 31.56 (Acoustic Semantic)**: PASSED - Verified EngineAcousticSample decoupling (Sep.21.125)
@@ -62,4 +63,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.20.103)
 
 ---
-*Next Audit: Sep.21.200. (Sep.21.129)*
+*Next Audit: Sep.21.200. (Sep.21.130)*

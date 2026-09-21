@@ -2,6 +2,10 @@
 
 ## 🟢 Resolved Issues & Refactoring Record
 
+### Sep.21.130
+*   **Issue #1159: Unused Forensic Auditing Dead Code Elimination**
+    *   *Remediation*: Removed the unused `maxGnssJitterMs` property and obsolete `processReflection` function from `HardwareSuite.kt` to simplify code architecture and prune tracking leftovers.
+
 ### Sep.21.129
 *   **Version Release Bump**: Bumped application and baseline versioning to `Sep.21.129` in full alignment with development milestones.
 

@@ -15,6 +15,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1159: Unused Forensic Auditing Dead Code Elimination** (Resolved Sep.21.130)
+    *   *Remediation*: Removed the unused `maxGnssJitterMs` property and obsolete `processReflection` function from `HardwareSuite.kt` to simplify code architecture and prune tracking leftovers.
+
 *   **Issue #1158: GNSS Sampling Logic Consolidation** (Resolved Sep.21.128)
     *   *Remediation*: Encapsulated GNSS sampling policy (standard vs throttled) and auditing triggers in a nested `GnssPolicyEngine` within `HardwareSuite.kt`. This decouples the hardware callback from throttling rules and ensures symmetric auditing of jitter across all performance tiers (R-ID 394).
 
@@ -36,4 +39,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 394 (Rules: 80, IDs: 394), Resolved: 1149, Open: 0, Testing: 2 (Sub-items: 10), Ideas: 16, QA: 282]**
+- **Current Audit Baseline: [SOT: 394 (Rules: 80, IDs: 394), Resolved: 1150, Open: 0, Testing: 2 (Sub-items: 10), Ideas: 16, QA: 282]**
