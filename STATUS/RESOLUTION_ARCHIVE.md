@@ -2,6 +2,10 @@
 
 ## 🟢 Resolved Issues & Refactoring Record
 
+### Sep.22.11
+*   **Issue #1183: Trigger-Based Forensic Sampling**
+    *   *Remediation*: Transitioned from a fixed-interval forensic loop to a "Signal-on-Spike" model where `HardwareFastPath`, location updates, and logic ticks trigger telemetry capture. This drastically reduces background CPU wakeups and GC pressure by eliminating redundant data points during long stationary periods (R-ID 406).
+
 ### Sep.22.08
 *   **Issue #1166: State Partitioning & Slicing**
     *   *Remediation*: Split the monolithic `MainUiState` into specialized slices (`SessionUiState`, `SpatialUiState`, `SettingsUiState`, `MapTriggers`, `SimulationUiState`). Refactored `MainViewModel` and all screen Composables to consume these granular segments, significantly reducing recomposition frequency and isolating volatile triggers (R-ID 405).

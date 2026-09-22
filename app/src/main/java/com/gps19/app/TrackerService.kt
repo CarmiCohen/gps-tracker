@@ -23,6 +23,10 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.22.11:
+ * - Issue #1183: Trigger-Based Forensic Sampling. Transitioned from a fixed-interval
+ *   forensic loop to a "Signal-on-Spike" model triggered by hardware fast-paths,
+ *   location updates, and periodic ticks.
  * Sep.22.07:
  * - Issue #1168: Vendor Adaptation Centralization. Injected DeviceProfileManager 
  *   to encapsulate and centralize all hardware/vendor-dependent behavioral overrides 
@@ -41,6 +45,12 @@ class TrackerService : BaseMonitorService() {
     private var alarmEvalJob: Job? = null
     private var forensicSamplingJob: Job? = null
     
+    private val forensicTriggerChannel = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
+
+    private fun triggerForensicSample() {
+        forensicTriggerChannel.trySend(Unit)
+    }
+
     private val locationBuffer = ConcurrentLinkedQueue<Location>()
     private var lastProcessedLocation: ProcessedLocation? = null
     private var latestGnssDetail: GnssDetail? = null
@@ -344,6 +354,7 @@ class TrackerService : BaseMonitorService() {
             onSpike = {
                 logManager.logServiceEvent(m = "Acoustic Spike Detected (FastPath)", isImportant = false)
                 lastFastPathAcousticSpikeTs = timeProvider.elapsedRealtime()
+                triggerForensicSample()
             }
         )
         hardwareSuite.setLightFastPath(
@@ -351,6 +362,7 @@ class TrackerService : BaseMonitorService() {
             onSpike = {
                 logManager.logServiceEvent(m = "Light Spike Detected (FastPath)", isImportant = false)
                 lastFastPathLightSpikeTs = timeProvider.elapsedRealtime()
+                triggerForensicSample()
             }
         )
     }
@@ -467,6 +479,7 @@ class TrackerService : BaseMonitorService() {
             onSpike = {
                 logManager.logServiceEvent(m = "Light Spike Detected (FastPath)", isImportant = false)
                 lastFastPathLightSpikeTs = timeProvider.elapsedRealtime()
+                triggerForensicSample()
             }
         )
 
@@ -684,6 +697,7 @@ class TrackerService : BaseMonitorService() {
         repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, now)
         repository.saveLongSync(LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
         serviceTickCounter++
+        triggerForensicSample()
     }
 
     private fun startForensicSamplingLoop() {
@@ -691,7 +705,10 @@ class TrackerService : BaseMonitorService() {
         forensicSamplingJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
             delay(STARTUP_SETTLING_DELAY_MS)
 
-            while (isActive) {
+            // Initial trigger to capture baseline state on service startup
+            triggerForensicSample()
+
+            for (unit in forensicTriggerChannel) {
                 val health = integrityMonitor.currentHealth
                 val proc = lastProcessedLocation
                 val snapshot = hardwareSuite.consumeForensicSnapshot()
@@ -823,6 +840,7 @@ class TrackerService : BaseMonitorService() {
                 accuracy = location.accuracy.toDouble()
             )
         }
+        triggerForensicSample()
     }
 
     private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerActive: Boolean, processed: ProcessedLocation, snapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long) {

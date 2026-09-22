@@ -30,6 +30,9 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.gps19.core.engine.STARTUP_SETTLING_DELAY_MS
 import com.gps19.core.engine.CapabilityStatus
 import kotlinx.coroutines.delay

@@ -1,9 +1,7 @@
-# Strategic Architectural Simplification Ideas (Part 2)
+# Strategic Architecture & Simplicity Evaluation - Sep.22.11
 
-## 💡 Idea #1: Generic Fast-Path Snapshotting
-*   **Description**: Group baseline and spike data into the `ForensicSnapshot` itself. This allows the background service to adjust baselines atomically without redundant `synchronized(this)` blocks in `HardwareSuite`.
-*   **Benefit**: Simplifies the parameter flow between `HardwareSuite` and `LocationProcessor` while reducing synchronization overhead on the sensor thread.
+## 🧠 Trigger-Based Forensic Sampling Architecture Simplification Review
+With the successful implementation of the "Signal-on-Spike" architecture for Issue #1183, the background process has completely migrated away from battery-intensive periodic forensic capture loop polling. However, additional simplifications can be introduced to further decouple layers:
 
-## 💡 Idea #2: Trigger-Based Forensic Sampling
-*   **Description**: Transition from a fixed-interval forensic loop to a "Signal-on-Spike" model where `HardwareFastPath` triggers a telemetry capture only when a physical boundary is crossed or a significant delta is detected.
-*   **Benefit**: Reduces background CPU wakeups and GC pressure by eliminating redundant data points during long stationary periods.
+1. **Unified Event Dispatch Pipeline**: Instead of using individual channels or custom interfaces across different background monitors, a single high-cohesion, thread-safe Event bus or shared multiplexed channel can be designed for all sensor fast-paths and hardware anomaly signals.
+2. **Flyweight Payload Reusability**: Pre-allocating specific forensic snap objects and populating them directly within a single zero-allocation state buffer can eliminate cross-thread data defensive cloning and further alleviate GC pressures under continuous physical stress.
