@@ -61,24 +61,12 @@ private data class MapBase(val ui: MapUiParts, val kinematic: KinematicState, va
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.22.08:
+ * - Issue #1166: State Partitioning & Slicing. Refactored MainUiState into 
+ *   specialized slices (Session, Settings, Spatial, Navigation, Simulation, Triggers) 
+ *   to minimize recomposition evaluation costs (R-ID 405).
  * Sep.22.05:
  * - Issue #1181: Consolidated HomePointUseCase and MapUseCase into SpatialLogicUseCase (R-ID 402).
- * Sep.22.03:
- * - Issue #1179 Remediation: Batch Hydration Persistence. Optimized home point 
- *   addition to support rapid sequential entries by persisting geofenceMode 
- *   and forcing fence visibility (R-ID 400).
- * Sep.22.00:
- * - Issue #1177: Static Role Branding. Integrated isPeerActive check into 
- *   global pulse loop to drive selection screen role indicators (R-ID 398).
- * Sep.17.00:
- * - Issue #1073: Event Log Erasure Defect. Added missing UiEvent.ClearLogs 
- *   handler to correctly invoke repository.clearLogs() (R-ID 312).
- * Sep.16.03:
- * - Issue #1060 UI Refresh Optimization: Transitioned sampling logic 
- *   from useStaggeredHydration to direct performanceTier enum comparison (R-ID 348).
- * Sep.16.02:
- * - Issue #1060 Capability Consolidation: Harmonized performance tier 
- *   sampling and initialization logic (R-ID 348).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -109,6 +97,37 @@ class MainViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+
+    // Sliced UI States (Issue #1166)
+    val sessionUiState: StateFlow<SessionUiState> = _uiState
+        .map { it.session }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SessionUiState())
+
+    val settingsUiState: StateFlow<SettingsUiState> = _uiState
+        .map { it.settings }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SettingsUiState())
+
+    val spatialUiState: StateFlow<SpatialUiState> = _uiState
+        .map { it.spatial }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SpatialUiState())
+
+    val navigationState: StateFlow<NavigationState> = _uiState
+        .map { it.navigation }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), NavigationState())
+
+    val simulationUiState: StateFlow<SimulationUiState> = _uiState
+        .map { it.simulation }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SimulationUiState())
+
+    val mapTriggers: StateFlow<MapTriggers> = _uiState
+        .map { it.triggers }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MapTriggers())
 
     private val _kinematicState = MutableStateFlow(KinematicState())
     val kinematicState: StateFlow<KinematicState> = _kinematicState.asStateFlow()
@@ -306,7 +325,7 @@ class MainViewModel @Inject constructor(
     private var sTrkLat = 0.0; private var sTrkLng = 0.0; private var sVwrLat = 0.0; private var sVwrLng = 0.0
 
     val mapViewState: StateFlow<MapViewState> = combine(
-        combine(_uiState.map { MapUiParts(it.appMode, it.hydrationLevel, it.isMapButtonsVisible, it.isFenceVisible, it.geofenceMode, it.isViolationsVisible, it.isGeofenceViolationsVisible, it.maxDistance, it.isMapLocked, it.mapFollowMode, it.centeringTrackerTrigger, it.centeringViewerTrigger, it.zoomInTrigger, it.zoomOutTrigger, it.homePoints) }.distinctUntilChanged(), _kinematicState, _systemPulse, _systemPulseRt) { ui, kin, p, prt -> MapBase(ui, kin, p, prt) },
+        combine(_uiState.map { MapUiParts(it.appMode, it.hydrationLevel, it.isMapButtonsVisible, it.isFenceVisible, it.geofenceMode, it.isViolationsVisible, it.isGeofenceViolationsVisible, it.maxDistance, it.isMapLocked, it.mapFollowMode, it.triggers.centeringTrackerTrigger, it.triggers.centeringViewerTrigger, it.triggers.zoomInTrigger, it.triggers.zoomOutTrigger, it.homePoints) }.distinctUntilChanged(), _kinematicState, _systemPulse, _systemPulseRt) { ui, kin, p, prt -> MapBase(ui, kin, p, prt) },
         trackerTrailSegments,
         viewerTrailSegments,
         repository.violationsFlow.distinctUntilChanged { old, new -> listContentEquals(old, new) { a, b -> a.contentEquals(b) } }
@@ -381,11 +400,11 @@ class MainViewModel @Inject constructor(
                 applyInitialSettings(initialSettings)
                 
                 hydrationManager.hydrationLevel.onEach { level ->
-                    updateState { it.copy(hydrationLevel = level) }
+                    updateState { it.copy(session = it.session.copy(hydrationLevel = level)) }
                 }.launchIn(viewModelScope)
 
                 hydrationManager.startHydration(viewModelScope, initialPerms.performanceTier == PerformanceTier.STAGGERED) {
-                    updateState { it.copy(isInitialized = true) }
+                    updateState { it.copy(session = it.session.copy(isInitialized = true)) }
                 }
             }
             
@@ -428,11 +447,17 @@ class MainViewModel @Inject constructor(
         stateSubscriptionUseCase.observeRepositorySettings()
             .onEach { update ->
                 updateState { it.copy(
-                    deviceId = update.trackerId, viewerId = update.viewerId, relayUrl = update.relayUrl,
-                    maxDistance = update.maxDistance, homePoints = update.homePoints, lastAlarmAckTs = update.lastAlarmAckTs,
-                    appMode = update.appMode, isSystemActive = update.isSystemActive,
-                    permissions = it.permissions.copy(isManualOverride = update.isXiaomiManualOverride),
-                    isIdentitySanitized = update.identitySanitized
+                    settings = it.settings.copy(
+                        deviceId = update.trackerId, viewerId = update.viewerId, relayUrl = update.relayUrl,
+                        lastAlarmAckTs = update.lastAlarmAckTs, isIdentitySanitized = update.identitySanitized
+                    ),
+                    spatial = it.spatial.copy(
+                        maxDistance = update.maxDistance, homePoints = update.homePoints
+                    ),
+                    session = it.session.copy(
+                        appMode = update.appMode, isSystemActive = update.isSystemActive,
+                        permissions = it.permissions.copy(isManualOverride = update.isXiaomiManualOverride)
+                    )
                 )}
             }
             .flowOn(Dispatchers.Main.immediate)
@@ -455,7 +480,7 @@ class MainViewModel @Inject constructor(
                 val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
                 val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
                 withContext(Dispatchers.Main.immediate) { 
-                    updateState { it.copy(permissions = newState) } 
+                    updateState { it.copy(session = it.session.copy(permissions = newState)) } 
                 }
                 delay(if (refreshFast) 5000L else 30000L) 
             } 
@@ -509,7 +534,7 @@ class MainViewModel @Inject constructor(
                 current.battery.temp = status.temp
                 current.apply { pulse = timeProvider.elapsedRealtime() }
             } 
-            _currentMa.value = status.level // Fix: currentMa should map to currentMa, not level
+            _currentMa.value = status.level 
         }
         .flowOn(Dispatchers.Main.immediate)
         .launchIn(viewModelScope)
@@ -517,7 +542,6 @@ class MainViewModel @Inject constructor(
         remoteStatusRepository.remoteStatus.onEach { status ->
             if (_uiState.value.appMode == "viewer") {
                 _remoteSignal.value = remoteStatusRepository.peerSignal.value
-                _trackerState.value = status.trackerState
                 _trackerState.value = status.trackerState
                 _trackerMaxTemp.value = status.maxTemp
                 updateKinematicState { current ->
@@ -556,7 +580,7 @@ class MainViewModel @Inject constructor(
             is UiEvent.ToggleGnssDetail, is UiEvent.SetSubSettings, is UiEvent.ShowStopTrackingConfirmation,
             is UiEvent.NavigateToDiagnostics, is UiEvent.SetPendingMode -> {
                 if (event is UiEvent.ToggleSettings) {
-                    if (event.visible) updateState { it.copy(draftSettings = settingsUseCase.prepareDraft(it)) }
+                    if (event.visible) updateState { it.copy(settings = it.settings.copy(draftSettings = settingsUseCase.prepareDraft(it))) }
                     else commitDraft()
                 }
                 updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
@@ -570,7 +594,7 @@ class MainViewModel @Inject constructor(
                 if (!event.visible && _uiState.value.navigation.isSettingsOpen) commitDraft()
             }
             is UiEvent.SetSystemActive -> { 
-                updateState { it.copy(isSystemActive = event.active) } 
+                updateState { it.copy(session = it.session.copy(isSystemActive = event.active)) } 
                 viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { sessionUseCase.setSystemActive(event.active) }
             }
             is UiEvent.SetAppMode -> {
@@ -583,14 +607,19 @@ class MainViewModel @Inject constructor(
                 viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
                     val newStartTime = sessionUseCase.setAppMode(event.mode)
                     updateState { it.copy(
-                        appMode = event.mode, 
-                        appStartTime = newStartTime ?: it.appStartTime,
-                        isSystemActive = if (event.mode != null) true else it.isSystemActive
+                        session = it.session.copy(
+                            appMode = event.mode, 
+                            appStartTime = newStartTime ?: it.session.appStartTime,
+                            isSystemActive = if (event.mode != null) true else it.session.isSystemActive
+                        )
                     )}
                 }
             }
             is UiEvent.ConfirmStopTracking, UiEvent.ManualExit -> {
-                updateState { it.copy(isSystemActive = false, appMode = null, isSafeMode = false) }
+                updateState { it.copy(
+                    session = it.session.copy(isSystemActive = false, appMode = null),
+                    settings = it.settings.copy(isSafeMode = false)
+                ) }
                 repository.setSafeMode(false)
                 viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
                     sessionUseCase.stopTrackingSession()
@@ -599,28 +628,29 @@ class MainViewModel @Inject constructor(
             is UiEvent.TriggerRecovery -> {
                 if (_uiState.value.isRecoveryPending) {
                     updateNavigation { it.copy(serviceRecoveryTrigger = it.serviceRecoveryTrigger + 1) }
-                    updateState { it.copy(isRecoveryPending = false) }
+                    updateState { it.copy(simulation = it.simulation.copy(isRecoveryPending = false)) }
                 }
             }
-            is UiEvent.SetRecoveryPending -> updateState { it.copy(isRecoveryPending = event.pending) }
+            is UiEvent.SetRecoveryPending -> updateState { it.copy(simulation = it.simulation.copy(isRecoveryPending = event.pending)) }
             is UiEvent.UpdateDraftDeviceId, is UiEvent.UpdateDraftViewerId, is UiEvent.UpdateDraftRelayUrl, 
             is UiEvent.UpdateDraftMaxDistance, is UiEvent.UpdateDraftAlertSettings, is UiEvent.UpdateDraftAlarmVolume, 
             is UiEvent.CommitSettings -> handleDraftEvent(event)
             is UiEvent.SetForensicSimulation -> {
-                updateState { it.copy(isForensicStallSimulated = event.active) }
+                updateState { it.copy(simulation = it.simulation.copy(isForensicStallSimulated = event.active)) }
                 logManager.setForensicStallSimulation(event.active)
             }
             is UiEvent.ExecuteStressTest -> {
                 repository.sendCommand(UiCommand.ExecuteStressTest)
             }
             is UiEvent.SetStorageSimulation -> {
+                updateState { it.copy(simulation = it.simulation.copy(isStorageSimulated = event.active, isStorageCriticalSimulated = event.isCritical)) }
                 repository.sendCommand(UiCommand.SimulateStoragePressure(event.active, event.isCritical))
             }
-            is UiEvent.SetManualSelection -> updateState { it.copy(isManualSelectionInProgress = event.active) }
-            is UiEvent.SetSettlingActive -> updateState { it.copy(isSettlingActive = event.active) }
-            is UiEvent.ToggleSetupBypass -> updateState { it.copy(isSetupBypassActive = event.active) }
+            is UiEvent.SetManualSelection -> updateState { it.copy(spatial = it.spatial.copy(isManualSelectionInProgress = event.active)) }
+            is UiEvent.SetSettlingActive -> updateState { it.copy(session = it.session.copy(isSettlingActive = event.active)) }
+            is UiEvent.ToggleSetupBypass -> updateState { it.copy(session = it.session.copy(isSetupBypassActive = event.active)) }
             is UiEvent.DismissIdentitySanitization -> {
-                updateState { it.copy(isIdentitySanitized = false) }
+                updateState { it.copy(settings = it.settings.copy(isIdentitySanitized = false)) }
                 viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
                     repository.saveBoolean(IDENTITY_SANITIZED_KEY, false)
                 }
@@ -632,7 +662,7 @@ class MainViewModel @Inject constructor(
             }
             is UiEvent.MapTap -> handleMapTap(event.point)
             is UiEvent.AddHomePoint -> handleAddHomePoint(event.point)
-            is UiEvent.RemoveHomePoint -> handleRemoveHomePoint(event.index)
+            is UiEvent.RemoveHomePoint -> handleRemoveHomePoint(index = event.index)
             is UiEvent.ClearHomePoints -> handleClearHomePoints()
             is UiEvent.ClearLogs -> repository.clearLogs()
             is UiEvent.SetLogFilterShowDetails -> repository.updateLogFilters(details = event.show)
@@ -655,19 +685,19 @@ class MainViewModel @Inject constructor(
     }
 
     private fun commitDraft() {
-        val finalDraft = _uiState.value.draftSettings
+        val finalDraft = _uiState.value.settings.draftSettings
         autoSaveJob?.cancel()
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             settingsUseCase.saveDraftToRepo(finalDraft)
             settingsUseCase.commitDraft()
-            updateState { it.copy(draftSettings = DraftSettings()) }
+            updateState { it.copy(settings = it.settings.copy(draftSettings = DraftSettings())) }
         }
     }
 
     private fun updateDraft(update: (DraftSettings) -> DraftSettings) {
-        updateState { it.copy(draftSettings = update(it.draftSettings)) }
+        updateState { it.copy(settings = it.settings.copy(draftSettings = update(it.settings.draftSettings))) }
         autoSaveJob?.cancel()
-        autoSaveJob = viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { delay(300L); settingsUseCase.saveDraftToRepo(_uiState.value.draftSettings) }
+        autoSaveJob = viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { delay(300L); settingsUseCase.saveDraftToRepo(_uiState.value.settings.draftSettings) }
     }
 
     private fun updateState(update: (MainUiState) -> MainUiState) { _uiState.update { current -> update(current) } }
@@ -691,7 +721,7 @@ class MainViewModel @Inject constructor(
                 val lastActivity = repository.lastRemoteActivityTs.value
                 val isPeerActive = lastActivity > 0 && (nowRt - lastActivity) < TELEMETRY_UI_STALE_THRESHOLD_MS
                 if (_uiState.value.isPeerActive != isPeerActive) {
-                    updateState { it.copy(isPeerActive = isPeerActive) }
+                    updateState { it.copy(session = it.session.copy(isPeerActive = isPeerActive)) }
                 }
 
                 delay(if (_uiState.value.permissions.performanceTier == PerformanceTier.STAGGERED) 5000L else 2000L)
@@ -730,10 +760,14 @@ class MainViewModel @Inject constructor(
     private fun applyInitialSettings(initial: InitialSettings) {
         appStartTime = initial.appStartTime
         updateState { it.copy(
-            deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, 
-            appMode = initial.appMode, isSystemActive = initial.isSystemActive,
-            draftSettings = initial.draftSettings ?: it.draftSettings,
-            isIdentitySanitized = initial.identitySanitized
+            settings = it.settings.copy(
+                deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl,
+                isIdentitySanitized = initial.identitySanitized,
+                draftSettings = initial.draftSettings ?: it.settings.draftSettings
+            ),
+            session = it.session.copy(
+                appMode = initial.appMode, isSystemActive = initial.isSystemActive
+            )
         )}
         _localMaxTemp.value = initial.maxTemp
     }
@@ -763,7 +797,7 @@ class MainViewModel @Inject constructor(
     fun fullInitialization(context: Context) {
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             val nextStartTime = settingsUseCase.fullInitialization(context)
-            updateState { it.copy(appStartTime = nextStartTime) }
+            updateState { it.copy(session = it.session.copy(appStartTime = nextStartTime)) }
             addPersistentLog("system", "Full initialization performed", isImportant = true)
         }
     }
@@ -783,7 +817,7 @@ class MainViewModel @Inject constructor(
             val newPoints = spatialLogicUseCase.addHomePoint(point)
             withContext(Dispatchers.Main.immediate) {
                 // Issue #1179: Persist ADD mode and force fence visibility for immediate batch feedback.
-                updateState { it.copy(homePoints = newPoints, isFenceVisible = true) }
+                updateState { it.copy(spatial = it.spatial.copy(homePoints = newPoints, isFenceVisible = true)) }
             }
         }
     }
@@ -793,7 +827,7 @@ class MainViewModel @Inject constructor(
             val newPoints = spatialLogicUseCase.removeHomePoint(index)
             withContext(Dispatchers.Main.immediate) {
                 // Issue #1179: Persist REMOVE mode during batch operations.
-                updateState { it.copy(homePoints = newPoints) }
+                updateState { it.copy(spatial = it.spatial.copy(homePoints = newPoints)) }
             }
         }
     }
@@ -802,7 +836,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             val newPoints = spatialLogicUseCase.clearHomePoints(_uiState.value.maxDistance)
             withContext(Dispatchers.Main.immediate) {
-                updateState { it.copy(homePoints = newPoints) }
+                updateState { it.copy(spatial = it.spatial.copy(homePoints = newPoints)) }
             }
         }
     }

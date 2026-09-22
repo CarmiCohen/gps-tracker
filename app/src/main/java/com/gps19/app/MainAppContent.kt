@@ -30,25 +30,21 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
 import com.gps19.core.engine.STARTUP_SETTLING_DELAY_MS
+import com.gps19.core.engine.CapabilityStatus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Sep.22.08:
+ * - Issue #1166: State Partitioning & Slicing. Refactored to consume specialized 
+ *   UI state slices (Session, Settings, Spatial, Navigation) to minimize 
+ *   recomposition evaluation costs (R-ID 405).
  * Sep.22.00:
  * - Issue #1177: Static Role Branding. Passed isPeerActive from uiState 
  *   to LandingScreen to drive dynamic role indicators (R-ID 398).
- * Sep.11.10:
- * - Integrity Audit #243: Eliminated redundant collections for trails and 
- *   violations; fully delegated to consolidated mapViewState (R-ID 287).
- * Sep.05.10:
- * - Issue #910 Hardening: Protected Landing navigation with isSystemActive 
- *   check to prevent race-driven service termination during hydration (R910).
  */
 @Composable
 fun MainAppContent(
@@ -64,7 +60,12 @@ fun MainAppContent(
     onRequestHardwarePermission: () -> Unit,
     onStopTracking: () -> Unit
 ) {
-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val sessionState by viewModel.sessionUiState.collectAsStateWithLifecycle()
+    val settingsState by viewModel.settingsUiState.collectAsStateWithLifecycle()
+    val spatialState by viewModel.spatialUiState.collectAsStateWithLifecycle()
+    val navigationState by viewModel.navigationState.collectAsStateWithLifecycle()
+    val simulationState by viewModel.simulationUiState.collectAsStateWithLifecycle()
+    
     val kinematicState by viewModel.kinematicState.collectAsStateWithLifecycle()
     val diagnosticState by viewModel.diagnosticState.collectAsStateWithLifecycle()
     
@@ -88,6 +89,24 @@ fun MainAppContent(
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
     val startupTime = remember { System.currentTimeMillis() }
 
+    // Logic Helper for System Readiness (R-ID 405)
+    val isSystemReady = sessionState.isSetupBypassActive || (
+            sessionState.permissions.isFineLocationGranted &&
+            sessionState.permissions.isBatteryWhitelisted && 
+            sessionState.permissions.isAutoStartGranted &&
+            sessionState.permissions.isOverlayGranted &&
+            sessionState.permissions.isMicrophoneGranted &&
+            sessionState.permissions.isExactAlarmGranted && 
+            sessionState.permissions.isPostNotificationsGranted &&
+            sessionState.permissions.isBackgroundLocationGranted &&
+            sessionState.permissions.isActivityRecognitionGranted &&
+            (sessionState.appMode != null) &&
+            (sessionState.appMode != "tracker" || sessionState.permissions.isMicrophoneGranted) &&
+            (sessionState.appMode == "tracker" || spatialState.homePoints.isNotEmpty()) &&
+            (!sessionState.permissions.hasBackgroundRestriction || 
+             (sessionState.permissions.backgroundStatus == CapabilityStatus.GRANTED && sessionState.permissions.autostartStatus == CapabilityStatus.GRANTED) || 
+             (sessionState.permissions.backgroundStatus == CapabilityStatus.UNKNOWN && sessionState.permissions.isManualOverride)))
+
     fun proceedToMode(mode: String) {
         viewModel.onEvent(UiEvent.SetManualSelection(true))
         viewModel.onEvent(UiEvent.SetSettlingActive(false))
@@ -105,14 +124,14 @@ fun MainAppContent(
             onStartService(mode)
         }
         
-        if (!uiState.isSystemReady) {
+        if (!isSystemReady) {
             viewModel.onEvent(UiEvent.TogglePhoneSetup(true))
         }
     }
 
     val backgroundPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (isGranted) {
-            uiState.navigation.pendingMode?.let { mode ->
+            navigationState.pendingMode?.let { mode ->
                 proceedToMode(mode)
                 viewModel.onEvent(UiEvent.SetPendingMode(null))
             }
@@ -124,8 +143,8 @@ fun MainAppContent(
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         viewModel.onEvent(UiEvent.RefreshPermissionStatus)
-        uiState.navigation.pendingMode?.let { mode ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !uiState.permissions.isBackgroundLocationGranted) {
+        navigationState.pendingMode?.let { mode ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !sessionState.permissions.isBackgroundLocationGranted) {
                 showBackgroundDisclosure = true
             } else {
                 proceedToMode(mode)
@@ -151,20 +170,20 @@ fun MainAppContent(
     }
 
     fun hasRequiredPermissions(mode: String): Boolean {
-        val fineLocation = uiState.permissions.isFineLocationGranted
-        val audio = if (mode == "tracker") uiState.permissions.isMicrophoneGranted else true
-        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) uiState.permissions.isPostNotificationsGranted else true
+        val fineLocation = sessionState.permissions.isFineLocationGranted
+        val audio = if (mode == "tracker") sessionState.permissions.isMicrophoneGranted else true
+        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) sessionState.permissions.isPostNotificationsGranted else true
         val activityRec = if (mode == "tracker" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            uiState.permissions.isActivityRecognitionGranted
+            sessionState.permissions.isActivityRecognitionGranted
         } else true
         return fineLocation && audio && notification && activityRec
     }
 
-    LaunchedEffect(uiState.isInitialized, uiState.appMode, uiState.navigation.isDiagnosticsVisible, uiState.isManualSelectionInProgress, uiState.isSettlingActive, uiState.isSystemActive) {
-        if (!uiState.isInitialized) return@LaunchedEffect
+    LaunchedEffect(sessionState.isInitialized, sessionState.appMode, navigationState.isDiagnosticsVisible, spatialState.isManualSelectionInProgress, sessionState.isSettlingActive, sessionState.isSystemActive) {
+        if (!sessionState.isInitialized) return@LaunchedEffect
         
-        val mode = uiState.appMode
-        val isDiagnostics = uiState.navigation.isDiagnosticsVisible
+        val mode = sessionState.appMode
+        val isDiagnostics = navigationState.isDiagnosticsVisible
 
         if (isDiagnostics) {
             if (navController.currentDestination?.route != Screen.Diagnostics.route) {
@@ -173,7 +192,7 @@ fun MainAppContent(
             return@LaunchedEffect
         }
 
-        if (mode != null && uiState.isSettlingActive && !uiState.isManualSelectionInProgress) {
+        if (mode != null && sessionState.isSettlingActive && !spatialState.isManualSelectionInProgress) {
             if (navController.currentDestination?.route == Screen.Landing.route) {
                 delay(STARTUP_SETTLING_DELAY_MS)
                 viewModel.onEvent(UiEvent.SetSettlingActive(false))
@@ -187,7 +206,7 @@ fun MainAppContent(
             }
         }
 
-        if (uiState.isSettlingActive && mode != null) return@LaunchedEffect
+        if (sessionState.isSettlingActive && mode != null) return@LaunchedEffect
 
         when (mode) {
             "tracker" -> {
@@ -207,8 +226,8 @@ fun MainAppContent(
                 }
             }
             null -> {
-                if (uiState.isSystemActive) return@LaunchedEffect
-                if (uiState.navigation.pendingMode == null) viewModel.onEvent(UiEvent.SetManualSelection(false))
+                if (sessionState.isSystemActive) return@LaunchedEffect
+                if (navigationState.pendingMode == null) viewModel.onEvent(UiEvent.SetManualSelection(false))
                 if (navController.currentDestination?.route != Screen.Landing.route) {
                     navController.navigate(Screen.Landing.route) { 
                         popUpTo(Screen.Landing.route) { inclusive = true }
@@ -219,7 +238,7 @@ fun MainAppContent(
         }
     }
 
-    if (uiState.hydrationLevel == 0) {
+    if (sessionState.hydrationLevel == 0) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black))
         return
     }
@@ -255,14 +274,14 @@ fun MainAppContent(
                 Button(onClick = { 
                     showBackgroundDisclosure = false
                     viewModel.onEvent(UiEvent.SetManualSelection(false))
-                    uiState.navigation.pendingMode?.let { proceedToMode(it) }
+                    navigationState.pendingMode?.let { proceedToMode(it) }
                     viewModel.onEvent(UiEvent.SetPendingMode(null))
                 }) { Text(stringResource(R.string.perm_background_btn_reject)) } 
             }
         )
     }
 
-    if (uiState.isIdentitySanitized) {
+    if (settingsState.isIdentitySanitized) {
         AlertDialog(
             onDismissRequest = { viewModel.onEvent(UiEvent.DismissIdentitySanitization) },
             title = { Text(stringResource(R.string.sanitization_title)) },
@@ -274,19 +293,19 @@ fun MainAppContent(
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { MainFileHelper.importConfig(activity, viewModel, uri) } }
     val importTrailLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> MainFileHelper.importTrails(activity, viewModel, uris) }
     
-    GpsTrackerTheme(appMode = uiState.appMode) {
+    GpsTrackerTheme(appMode = sessionState.appMode) {
         Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding(), color = MaterialTheme.colorScheme.background) {
-            BackHandler(enabled = diagnosticState.isRedScreenVisible && uiState.appMode != null) { viewModel.onEvent(UiEvent.DismissAlarms) }
+            BackHandler(enabled = diagnosticState.isRedScreenVisible && sessionState.appMode != null) { viewModel.onEvent(UiEvent.DismissAlarms) }
 
             Box(modifier = Modifier.fillMaxSize()) {
-                if (uiState.hydrationLevel >= 2) {
+                if (sessionState.hydrationLevel >= 2) {
                     NavHost(navController = navController, startDestination = Screen.Landing.route) {
                         composable(Screen.Landing.route) {
                             BackHandler { onCleanupAndExit() }
-                            if (uiState.hydrationLevel >= 3) {
-                                LandingScreen(isPeerActive = uiState.isPeerActive) { mode ->
+                            if (sessionState.hydrationLevel >= 3) {
+                                LandingScreen(isPeerActive = sessionState.isPeerActive) { mode ->
                                     if (hasRequiredPermissions(mode)) { 
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !uiState.permissions.isBackgroundLocationGranted) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !sessionState.permissions.isBackgroundLocationGranted) {
                                             viewModel.onEvent(UiEvent.SetPendingMode(mode)); showBackgroundDisclosure = true
                                         } else proceedToMode(mode)
                                     } else checkAndRequestPermissions(mode)
@@ -295,7 +314,7 @@ fun MainAppContent(
                         }
                         composable(Screen.Tracker.route) {
                             BackHandler {
-                                val nav = uiState.navigation
+                                val nav = navigationState
                                 when {
                                     nav.isDiagnosticsVisible -> viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
                                     nav.isPhoneSetupVisible -> viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
@@ -307,12 +326,13 @@ fun MainAppContent(
                                     else -> onCleanupAndExit()
                                 }
                             }
-                            if (uiState.hydrationLevel >= 3) {
+                            if (sessionState.hydrationLevel >= 3) {
                                 TrackerScreen(
-                                    uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow,
-                                    onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
-                                    onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) }, 
-                                    onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
+                                    sessionState = sessionState, settingsState = settingsState, spatialState = spatialState, navigationState = navigationState,
+                                    kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow,
+                                    onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
+                                    onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) }, 
+                                    onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
                                     onExit = onCleanupAndExit,
                                     onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
                                     onImportConfig = { importLauncher.launch("application/json") }, onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
@@ -322,7 +342,7 @@ fun MainAppContent(
                         }
                         composable(Screen.Viewer.route) {
                             BackHandler {
-                                val nav = uiState.navigation
+                                val nav = navigationState
                                 when {
                                     nav.isDiagnosticsVisible -> viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
                                     nav.isPhoneSetupVisible -> viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
@@ -334,12 +354,13 @@ fun MainAppContent(
                                     else -> onCleanupAndExit()
                                 }
                             }
-                            if (uiState.hydrationLevel >= 3) {
+                            if (sessionState.hydrationLevel >= 3) {
                                 ViewerScreen(
-                                    uiState = uiState, kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, 
-                                    onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!uiState.navigation.isMapVisible)) }, 
-                                    onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!uiState.navigation.isLogVisible)) },
-                                    onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!uiState.navigation.isSettingsOpen)) },
+                                    sessionState = sessionState, settingsState = settingsState, spatialState = spatialState, navigationState = navigationState,
+                                    kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow, 
+                                    onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
+                                    onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) },
+                                    onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
                                     onExit = onCleanupAndExit,
                                     onImportConfig = { importLauncher.launch("application/json") }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) },
                                     onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
@@ -349,15 +370,15 @@ fun MainAppContent(
                         }
                         composable(Screen.Diagnostics.route) {
                             BackHandler { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) }
-                            if (uiState.hydrationLevel >= 3) {
+                            if (sessionState.hydrationLevel >= 3) {
                                 DiagnosticsScreen(
-                                    permissions = uiState.permissions,
+                                    permissions = sessionState.permissions,
                                     recoveryCount = diagnosticState.recoveryCount,
                                     cumulativeRecoveryBlackoutMs = diagnosticState.cumulativeRecoveryBlackoutMs,
-                                    isForensicStallSimulated = uiState.isForensicStallSimulated,
-                                    isStorageSimulated = uiState.isStorageSimulated,
-                                    isStorageCriticalSimulated = uiState.isStorageCriticalSimulated,
-                                    isSetupBypassActive = uiState.isSetupBypassActive,
+                                    isForensicStallSimulated = simulationState.isForensicStallSimulated,
+                                    isStorageSimulated = simulationState.isStorageSimulated,
+                                    isStorageCriticalSimulated = simulationState.isStorageCriticalSimulated,
+                                    isSetupBypassActive = sessionState.isSetupBypassActive,
                                     onBack = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) },
                                     onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) },
                                     onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
@@ -375,7 +396,7 @@ fun MainAppContent(
                     }
                 }
                 
-                if (uiState.navigation.isPhoneSetupVisible && uiState.hydrationLevel >= 3) {
+                if (navigationState.isPhoneSetupVisible && sessionState.hydrationLevel >= 3) {
                     PhoneSetupOverlay(
                         onClose = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)) }, onWhitelist = { onRequestBatteryExemption() },
                         onOverlay = { onRequestOverlayPermission() }, onAppInfo = { onRequestAppInfo() },
@@ -383,16 +404,16 @@ fun MainAppContent(
                         onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                         onTestAlarm = { viewModel.onEvent(UiEvent.RequestTestAlarm) },
                         onNavigateToDiagnostics = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
-                        isSetupBypassActive = uiState.isSetupBypassActive, permissions = uiState.permissions, homePointsCount = uiState.homePoints.size,
-                        isTrackerMode = uiState.appMode == "tracker", onGoToMap = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.ToggleMap(true)) }
+                        isSetupBypassActive = sessionState.isSetupBypassActive, permissions = sessionState.permissions, homePointsCount = spatialState.homePoints.size,
+                        isTrackerMode = sessionState.appMode == "tracker", onGoToMap = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.ToggleMap(true)) }
                     )
                 }
 
-                if (diagnosticState.isRedScreenVisible && uiState.appMode != null && uiState.hydrationLevel >= 3) {
+                if (diagnosticState.isRedScreenVisible && sessionState.appMode != null && sessionState.hydrationLevel >= 3) {
                     AlarmOverlay(
                         alarms = diagnosticState.activeAlarms, isMuted = diagnosticState.isAlarmSilenced,
                         isLocationPending = kinematicState.trackerHealth.isLocationPending,
-                        backgroundStatus = uiState.permissions.backgroundStatus, hasBackgroundRestriction = uiState.permissions.hasBackgroundRestriction,
+                        backgroundStatus = sessionState.permissions.backgroundStatus, hasBackgroundRestriction = sessionState.permissions.hasBackgroundRestriction,
                         onHardwarePermissionClick = { onRequestHardwarePermission() },
                         onMute = { 
                             val currentCauses = diagnosticState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { context.getString(R.string.status_muted) }
@@ -403,7 +424,7 @@ fun MainAppContent(
                     )
                 }
 
-                if (uiState.navigation.isStopTrackingConfirmationVisible && uiState.hydrationLevel >= 3) {
+                if (navigationState.isStopTrackingConfirmationVisible && sessionState.hydrationLevel >= 3) {
                     var timeLeft by remember { mutableStateOf(5) }
                     LaunchedEffect(Unit) { while (timeLeft > 0) { delay(1000); timeLeft-- }; viewModel.onEvent(UiEvent.ShowStopTrackingConfirmation(false)) }
                     AlertDialog(

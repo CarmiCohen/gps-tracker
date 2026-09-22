@@ -1,34 +1,38 @@
-# Forensic Handover (Sep.22.07)
+# Forensic Handover (Sep.22.08)
 
 ## 🎯 Current System State
-*   **Version**: Sep.22.07 | **Build**: Vendor Adaptation Centralization (Verified)
-*   **Active Devices**: Samsung A15 & S21FE (Unified via Profile Controller)
-*   **SOT Baseline**: SOT-403 (Vendor Adaptation Centralization)
-*   **Compilation Status**: Flawless compile parity; build tasks execute without warnings.
+*   **Version**: Sep.22.08 | **Build**: Physical-State Convergence & UI Slicing (Verified)
+*   **Active Devices**: Samsung A15 & S21FE (Unified Fast-Paths)
+*   **SOT Baseline**: SOT-405 (State Partitioning & Slicing)
+*   **Compilation Status**: Flawless compile parity; all UI states verified for recomposition isolation.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
 
-1.  **Centralized Vendor Adaptation (`DeviceProfileManager.kt`)**: Extracted and consolidated vendor-specific adaptations and loop continuity tweaks into a single central domain profile controller named `DeviceProfileManager`. This isolates background monitoring loops from direct OEM-dependent branches.
-2.  **Unified Control Interface**: All hardware initialization paths, continuity tweaks, and release hooks for staggered performance devices (Samsung A15/S21FE variants) are routed atomicity through the unified manager, preserving architecture safety boundaries.
-3.  **Visual and Functional Integrity**: RegressionsSafety fully maintained across background signaling channels, telemetry pipelines, and SI unit standards.
+1.  **State Partitioning (`MainUiState.kt`)**: Split the monolithic `MainUiState` into specialized slices (`SessionUiState`, `SettingsUiState`, `SpatialUiState`, `MapTriggers`, `SimulationUiState`). This allows UI components to observe only the specific data segments they need, eliminating global recompositions on high-frequency telemetry updates.
+2.  **Unified Fast-Path Detection (`HardwareFastPath`)**: Encapsulated Acoustic and Light sensor spike detection into a single generic structure within `HardwareSuite.kt`. This manages baseline tracking, EMA decay, and debouncing symmetrically across sensor types (R-ID 404).
+3.  **ViewModel Refactoring**: `MainViewModel` now exposes sliced flows (`sessionUiState`, `spatialUiState`, etc.) using `distinctUntilChanged` on nested properties to ensure extreme render efficiency on budget hardware (Samsung A15).
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 403 (Rules: 82, IDs: 403), Resolved: 1159, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 12, QA: 283]**
+- **Current Audit Baseline: [SOT: 405 (Rules: 82, IDs: 405), Resolved: 1161, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 10, QA: 283]**
 
 ---
 
 ## 🛡️ Forensic Hardening Summary (Current Session Updates)
 
-### 1. Issue #1168: Vendor Adaptation Centralization
-*   **Status**: Fully Resolved (Sep.22.07).
-*   **Remediation**: Replaced inline hardware behavior conditional hacks with a centralized profile interface component. Injected `DeviceProfileManager` directly into `TrackerService` and `ViewerService` to manage LED signals, wake locks, and hardware pokes reactively without boilerplate bloat (R-ID 403).
+### 1. Issue #1169: Fast-Path Configuration Convergence
+*   **Status**: Fully Resolved (Sep.22.08).
+*   **Remediation**: Unified sensor-specific spike detection into a generic `HardwareFastPath` structure, eliminating logic duplication and ensuring symmetric physical tamper detection.
+
+### 2. Issue #1166: State Partitioning & Slicing
+*   **Status**: Fully Resolved (Sep.22.08).
+*   **Remediation**: Partitioned `MainUiState` and refactored the entire UI layer (ViewModel, AppContent, and Screens) to consume sliced states. This isolates volatile triggers from static identity parameters, reducing JIT load and battery drain during active tracking.
 
 ---
 
 ## 🔴 Open Gaps & Resumption Guidance
-*   **Open Gaps**: None. System architecture is clean, and the build compiles flawlessly.
-*   **Resumption Context**: The next developer should proceed with Chapter 31.69 refactorings or evaluate further pooling/flyweight structures as detailed in `issues.md`.
+*   **Open Gaps**: None. The system architecture is highly optimized for physical sense convergence and UI rendering.
+*   **Resumption Context**: The next developer should proceed with **Issue #1167: Map Overlay Imperative to Declarative Controller** or evaluate the "Signal-on-Spike" forensic model proposed in `Simplify_Ideas2.md`.

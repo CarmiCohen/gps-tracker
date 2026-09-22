@@ -13,7 +13,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 12)
+## 💡 Strategic Simplification Ideas (Ideas: 10)
 
 *   **Issue #1160: Flyweight & Pooling Expansion**
     *   *Description*: Expand flyweight patterns to all entities (Telemetry, Violations, SpatialPoints) and use pre-allocated ring buffers for `EngineConnectionPoint` and a `LogEntry` pool to eliminate GC churn.
@@ -25,12 +25,8 @@ Finalizing the audit of signaling performance under physical stress and ensuring
     *   *Description*: Migrate `LocationProcessor` to a functional model using an immutable `ProcessorState` data class passed with each point.
 *   **Issue #1164: Persistence of Logic State**
     *   *Description*: Serialize `AlarmHistory` into the database/DataStore to ensure geofence debounce states and power alarm latches survive process death or deep sleep system kills.
-*   **Issue #1166: State Partitioning & Slicing**
-    *   *Description*: Split `MainUiState` into specialized slices (`MapUiState`, `DashboardUiState`) to minimize recomposition evaluation costs and isolate volatile telemetry.
 *   **Issue #1167: Map Overlay Imperative to Declarative Controller**
     *   *Description*: Extract imperative osmdroid management into a standalone `MapOverlayController` to keep UI code declarative and implement background coordinate filtering beforehand.
-*   **Issue #1169: Fast-Path Configuration Convergence**
-    *   *Description*: Unify the fast-path implementation in `HardwareSuite` using a generic `HardwareFastPath<T>` delegate that automatically handles its own baseline decay or synchronization.
 *   **Issue #1170: God Object ViewModel Decomposition**
     *   *Description*: Split the monolithic `MainViewModel` into feature-specific ones (`Tracker`, `Viewer`, `Setup`) bound to Jetpack Navigation graph scopes.
 *   **Issue #1171: Service & Worker Consolidation**
@@ -45,6 +41,12 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1166: State Partitioning & Slicing** (Resolved Sep.22.08)
+    *   *Remediation*: Split the monolithic `MainUiState` into specialized slices (`SessionUiState`, `SpatialUiState`, `SettingsUiState`, `MapTriggers`, `SimulationUiState`). Refactored `MainViewModel` and all screen Composables to consume these granular segments, significantly reducing recomposition frequency and isolating volatile triggers (R-ID 405).
+
+*   **Issue #1169: Fast-Path Configuration Convergence** (Resolved Sep.22.08)
+    *   *Remediation*: Unified acoustic and light fast-path implementations in `HardwareSuite` using a generic `HardwareFastPath` structure. This centralizes baseline decay, spike detection, and debouncing logic, ensuring symmetric and race-free processing of high-frequency sensor events (R-ID 404).
 
 *   **Issue #1168: Vendor Adaptation Centralization** (Resolved Sep.22.07)
     *   *Remediation*: Consolidated vendor-specific adaptations and loop continuity tweaks into a central `DeviceProfileManager` to keep hardware-dependent behavioral overrides centralized and decoupled from background services (R-ID 403).
@@ -79,4 +81,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 403 (Rules: 82, IDs: 403), Resolved: 1159, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 12, QA: 283]**
+- **Current Audit Baseline: [SOT: 405 (Rules: 82, IDs: 405), Resolved: 1161, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 10, QA: 283]**

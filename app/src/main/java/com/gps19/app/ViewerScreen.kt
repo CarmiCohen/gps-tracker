@@ -25,25 +25,22 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Pocket-mode UI.
+ * Sep.22.08:
+ * - Issue #1166: State Partitioning & Slicing. Refactored to consume specialized 
+ *   UI state slices (Session, Settings, Spatial, Navigation) to minimize 
+ *   recomposition evaluation costs (R-ID 405).
  * Sep.11.46:
  * - Issue #947 RESOLVED: Synchronized Dashboard time-base by passing 
  *   systemPulseRt (monotonic) instead of wall-clock to ViewerDashboard, 
  *   ensuring correct "Last Seen" delta calculation (R947).
- * Sep.11.12:
- * - Issue #946 Visibility RESOLVED: Added tamperReason to ViewerDashboard and
- *   TelemetryBox for header forensic transparency (R-ID 288).
- * Sep.11.10:
- * - Integrity Audit #243: Removed redundant map tool overlays and individual 
- *   map parameters; fully delegated Map UI to AppMapContainer (R-ID 287).
- * - Fix: Corrected SettingsOverlay parameter mapping to match SettingsComponents.kt.
- * Sep.10.12:
- * - Idea #243: Map State Partitioning RESOLVED. Integrated mapViewState flow 
- *   to reduce parameter surface area in AppMapContainer (R-ID 287).
  */
 
 @Composable
 fun ViewerScreen(
-    uiState: MainUiState,
+    sessionState: SessionUiState,
+    settingsState: SettingsUiState,
+    spatialState: SpatialUiState,
+    navigationState: NavigationState,
     kinematicState: KinematicState,
     diagnosticState: DiagnosticState,
     viewModel: MainViewModel,
@@ -60,7 +57,7 @@ fun ViewerScreen(
     onSaveTrail: () -> Unit = {},
     onLoadTrail: () -> Unit = {}
 ) {
-    val nav = uiState.navigation
+    val nav = navigationState
     val isMapVisible = nav.isMapVisible
     val isLogVisible = nav.isLogVisible
     val isSettingsOpen = nav.isSettingsOpen
@@ -76,12 +73,10 @@ fun ViewerScreen(
     val rtt by viewModel.rtt.collectAsStateWithLifecycle()
     val trackerCurrentMa by viewModel.trackerCurrentMa.collectAsStateWithLifecycle()
     
-    // Idea #241: Segmented HUD State Subscriptions
     val hudConnectivity by viewModel.hudConnectivityState.collectAsStateWithLifecycle()
     val hudTelemetry by viewModel.hudTelemetryState.collectAsStateWithLifecycle()
     val hudHealth by viewModel.hudHealthState.collectAsStateWithLifecycle()
 
-    // Idea #243: Map State Partitioning
     val mapViewState by viewModel.mapViewState.collectAsStateWithLifecycle()
 
     val onDashboard = {
@@ -92,15 +87,54 @@ fun ViewerScreen(
         if (isGnssDetailVisible) viewModel.onEvent(UiEvent.ToggleGnssDetail(false))
     }
 
+    // Helper for system ready check (mirrors MainUiState.isSystemReady)
+    val isSystemReady = sessionState.isSetupBypassActive || (
+            sessionState.permissions.isFineLocationGranted &&
+            sessionState.permissions.isBatteryWhitelisted && 
+            sessionState.permissions.isAutoStartGranted &&
+            sessionState.permissions.isOverlayGranted &&
+            sessionState.permissions.isMicrophoneGranted &&
+            sessionState.permissions.isExactAlarmGranted && 
+            sessionState.permissions.isPostNotificationsGranted &&
+            sessionState.permissions.isBackgroundLocationGranted &&
+            sessionState.permissions.isActivityRecognitionGranted &&
+            (sessionState.appMode != null) &&
+            (sessionState.appMode != "tracker" || sessionState.permissions.isMicrophoneGranted) &&
+            (sessionState.appMode == "tracker" || spatialState.homePoints.isNotEmpty()) &&
+            (!sessionState.permissions.hasBackgroundRestriction || 
+             (sessionState.permissions.backgroundStatus == CapabilityStatus.GRANTED && sessionState.permissions.autostartStatus == CapabilityStatus.GRANTED) || 
+             (sessionState.permissions.backgroundStatus == CapabilityStatus.UNKNOWN && sessionState.permissions.isManualOverride)))
+
+    // Helper for system issues count (mirrors MainUiState.systemIssuesCount)
+    val systemIssuesCount = if (sessionState.isSetupBypassActive) 0 else {
+        var count = 0
+        if (!sessionState.permissions.isFineLocationGranted) count++
+        if (!sessionState.permissions.isBatteryWhitelisted) count++
+        if (!sessionState.permissions.isAutoStartGranted) count++
+        if (!sessionState.permissions.isExactAlarmGranted) count++
+        if (!sessionState.permissions.isOverlayGranted) count++
+        if (!sessionState.permissions.isPostNotificationsGranted) count++
+        if (!sessionState.permissions.isBackgroundLocationGranted) count++
+        if (!sessionState.permissions.isActivityRecognitionGranted) count++
+        if (sessionState.appMode == "tracker" && !sessionState.permissions.isMicrophoneGranted) count++
+        if (sessionState.appMode != "tracker" && spatialState.homePoints.isEmpty()) count++
+        val configIssue = sessionState.permissions.hasBackgroundRestriction && 
+                         (sessionState.permissions.backgroundStatus == CapabilityStatus.GRANTED || 
+                          sessionState.permissions.autostartStatus == CapabilityStatus.GRANTED) &&
+                         !(sessionState.permissions.backgroundStatus == CapabilityStatus.UNKNOWN && sessionState.permissions.isManualOverride)
+        if (configIssue) count++
+        count
+    }
+
     val header = @Composable {
         HeaderBar(
             isLogVisible = nav.isLogVisible,
             isSettingsOpen = nav.isSettingsOpen,
             isRibbonsVisible = nav.isRibbonsVisible,
             isMapVisible = nav.isMapVisible,
-            requiresExtraTopPadding = uiState.permissions.requiresExtraTopPadding,
-            isSystemReady = uiState.isSystemReady,
-            systemIssuesCount = uiState.systemIssuesCount,
+            requiresExtraTopPadding = sessionState.permissions.requiresExtraTopPadding,
+            isSystemReady = isSystemReady,
+            systemIssuesCount = systemIssuesCount,
             onDashboard = onDashboard,
             onS = onToggleSettings,
             onL = onToggleLog,
@@ -122,24 +156,24 @@ fun ViewerScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        if (uiState.hydrationLevel < 3) {
+        if (sessionState.hydrationLevel < 3) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp, modifier = Modifier.size(32.dp))
             }
         } else {
             if (isLandscape) {
                 Row(modifier = Modifier.fillMaxSize()) {
-                    if (uiState.hydrationLevel >= 4) {
+                    if (sessionState.hydrationLevel >= 4) {
                         header()
                     }
                     
                     Column(modifier = Modifier.weight(1f).navigationBarsPadding()) {
-                        if (uiState.hydrationLevel >= 5) {
+                        if (sessionState.hydrationLevel >= 5) {
                             statusBar()
                         }
                         
                         Box(modifier = Modifier.weight(1f)) {
-                            if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen && uiState.hydrationLevel >= 6) {
+                            if (sessionState.hydrationLevel >= 6 && isMapVisible && !isAnyOverlayOpen) {
                                 AppMapContainer(
                                     state = mapViewState,
                                     onEvent = { event -> viewModel.onEvent(event) },
@@ -147,11 +181,11 @@ fun ViewerScreen(
                                     onSaveTrail = onSaveTrail,
                                     onLoadTrail = onLoadTrail
                                 )
-                            } else if (uiState.hydrationLevel >= 4 && !isMapVisible) {
+                            } else if (sessionState.hydrationLevel >= 4 && !isMapVisible) {
                                 ViewerDashboard(
-                                    appMode = uiState.appMode ?: "viewer",
-                                    isDashboardExpanded = uiState.navigation.isDashboardExpanded,
-                                    isBatteryWhitelisted = uiState.permissions.isBatteryWhitelisted,
+                                    appMode = sessionState.appMode ?: "viewer",
+                                    isDashboardExpanded = nav.isDashboardExpanded,
+                                    isBatteryWhitelisted = sessionState.permissions.isBatteryWhitelisted,
                                     isLocalOnline = diagnosticState.connectivity.isLocalOnline,
                                     isRelayConnected = diagnosticState.connectivity.isRelayConnected,
                                     lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
@@ -168,7 +202,7 @@ fun ViewerScreen(
                     }
                 }
             } else {
-                if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen && uiState.hydrationLevel >= 6) {
+                if (sessionState.hydrationLevel >= 6 && isMapVisible && !isAnyOverlayOpen) {
                     AppMapContainer(
                         state = mapViewState,
                         onEvent = { event -> viewModel.onEvent(event) },
@@ -186,21 +220,21 @@ fun ViewerScreen(
                         ) {
                             Column {
                                 Box(Modifier.statusBarsPadding()) {
-                                    if (uiState.hydrationLevel >= 4) {
+                                    if (sessionState.hydrationLevel >= 4) {
                                         header()
                                     }
                                 }
-                                if (uiState.hydrationLevel >= 5) {
+                                if (sessionState.hydrationLevel >= 5) {
                                     statusBar()
                                 }
                             }
                         }
                         
-                        if (uiState.hydrationLevel >= 4 && !isMapVisible) {
+                        if (sessionState.hydrationLevel >= 4 && !isMapVisible) {
                             ViewerDashboard(
-                                appMode = uiState.appMode ?: "viewer",
-                                isDashboardExpanded = uiState.navigation.isDashboardExpanded,
-                                isBatteryWhitelisted = uiState.permissions.isBatteryWhitelisted,
+                                appMode = sessionState.appMode ?: "viewer",
+                                isDashboardExpanded = nav.isDashboardExpanded,
+                                isBatteryWhitelisted = sessionState.permissions.isBatteryWhitelisted,
                                 isLocalOnline = diagnosticState.connectivity.isLocalOnline,
                                 isRelayConnected = diagnosticState.connectivity.isRelayConnected,
                                 lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
@@ -219,15 +253,15 @@ fun ViewerScreen(
         }
 
         // Issue #885: Staggered overlay composition to distribute JIT load.
-        if (isSettingsOpen && uiState.hydrationLevel >= 8) {
+        if (isSettingsOpen && sessionState.hydrationLevel >= 8) {
             SettingsOverlay(
-                activeSubSettings = uiState.navigation.activeSubSettings,
-                draftDeviceId = uiState.draftSettings.deviceId,
-                draftViewerId = uiState.draftSettings.viewerId,
-                draftRelayUrl = uiState.draftSettings.relayUrl,
-                draftMaxDistance = uiState.draftSettings.maxDistance,
-                draftAlertSettings = uiState.draftSettings.alertSettings,
-                selectedSirenType = uiState.selectedSirenType,
+                activeSubSettings = nav.activeSubSettings,
+                draftDeviceId = settingsState.draftSettings.deviceId,
+                draftViewerId = settingsState.draftSettings.viewerId,
+                draftRelayUrl = settingsState.draftSettings.relayUrl,
+                draftMaxDistance = settingsState.draftSettings.maxDistance,
+                draftAlertSettings = settingsState.draftSettings.alertSettings,
+                selectedSirenType = settingsState.selectedSirenType,
                 isSirenPlaying = diagnosticState.isSirenPlaying,
                 onClose = onToggleSettings, 
                 onReset = onResetStats,
@@ -246,10 +280,10 @@ fun ViewerScreen(
                     if (diagnosticState.isSirenPlaying) {
                         viewModel.audioSynthesizer.stopSiren(timeProvider = viewModel.timeProvider)
                     } else {
-                        val s = uiState.draftSettings.alertSettings
+                        val s = settingsState.draftSettings.alertSettings
                         val volume = if (s.useMaxVolume) 1.0f else if (s.useCustomVolume) s.alarmVolume else 1.0f
                         viewModel.audioSynthesizer.playSiren(
-                            uiState.selectedSirenType, force = true, volume = volume, 
+                            settingsState.selectedSirenType, force = true, volume = volume, 
                             overrideSilence = s.overrideSilence,
                             loop = true, vibrate = s.vibrationEnabled,
                             timeProvider = viewModel.timeProvider
@@ -259,7 +293,7 @@ fun ViewerScreen(
                 onShowPhoneSetup = { viewModel.onEvent(UiEvent.TogglePhoneSetup(true)) },
                 onEvent = { event -> viewModel.onEvent(event) }
             )
-        } else if (isLogVisible && uiState.hydrationLevel >= 9) {
+        } else if (isLogVisible && sessionState.hydrationLevel >= 9) {
             val showDetails by viewModel.repository.logFilterDetails.collectAsStateWithLifecycle()
             val showRecovered by viewModel.repository.logFilterRecovered.collectAsStateWithLifecycle()
             LogOverlay(
@@ -267,7 +301,7 @@ fun ViewerScreen(
                 showDetails = showDetails, showRecovered = showRecovered, 
                 onSetShowDetails = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowDetails(show)) }, 
                 onSetShowRecovered = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowRecovered(show)) },
-                appStartTime = uiState.appStartTime,
+                appStartTime = sessionState.appStartTime,
                 systemPulse = mapViewState.systemPulse,
                 isTelemetryFresh = dashboardState.isTelemetryFresh,
                 onHistLink = { ts -> 
@@ -276,10 +310,10 @@ fun ViewerScreen(
                 },
                 onDetailsLink = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) }
             )
-        } else if (isRibbonsVisible && uiState.hydrationLevel >= 10) {
+        } else if (isRibbonsVisible && sessionState.hydrationLevel >= 10) {
             RibbonsOverlay(
-                isStrictMode = uiState.navigation.isStrictMode,
-                replayCursorTs = uiState.navigation.replayCursorTs,
+                isStrictMode = nav.isStrictMode,
+                replayCursorTs = nav.replayCursorTs,
                 history4MFlow = viewModel.history4MFlow,
                 history16MFlow = viewModel.history16MFlow,
                 history1HFlow = viewModel.history1HFlow,
@@ -290,7 +324,7 @@ fun ViewerScreen(
                 onScrub = { ts -> viewModel.onEvent(UiEvent.SetReplayCursor(ts)) },
                 onDismiss = { viewModel.onEvent(UiEvent.ToggleRibbons(false)) }
             )
-        } else if (isGnssDetailVisible && uiState.hydrationLevel >= 11) {
+        } else if (isGnssDetailVisible && sessionState.hydrationLevel >= 11) {
             GnssDetailOverlay(
                 gnssDetailFlow = viewModel.activeGnssDetail,
                 onClose = { viewModel.onEvent(UiEvent.ToggleGnssDetail(false)) }

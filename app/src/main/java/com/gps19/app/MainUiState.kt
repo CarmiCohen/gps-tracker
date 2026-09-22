@@ -4,59 +4,57 @@ import com.gps19.core.engine.*
 import org.osmdroid.util.GeoPoint
 
 /**
- * MainUiState: Persistent and slow-changing state for the UI structure.
+ * MainUiState: Composite UI state partitioned into specialized slices to 
+ * minimize recomposition costs and isolate volatile triggers (Issue #1166).
+ * Sep.22.08:
+ * - Issue #1166: State Partitioning & Slicing. Refactored into SessionUiState, 
+ *   SpatialUiState, SettingsUiState, MapTriggers, and SimulationUiState (R-ID 405).
  * Sep.22.00:
  * - Issue #1177: Static Role Branding. Added isPeerActive to track 
  *   remote device availability on the landing screen (R-ID 398).
- * Sep.16.05:
- * - Issue #1060 Capability Consolidation: Cleaned up deprecated compatibility properties (R-ID 348).
- * Sep.16.02:
- * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
- *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 348).
- * Sep.16.00:
- * - Issue #1055 Unified Performance Tier: Harmonized PermissionState to 
- *   support both unified isStaggeredTier and legacy isA15Device for 
- *   vendor-specific JNI gating (R-ID 348, formerly R-ID 347).
  */
 data class MainUiState(
-    val isInitialized: Boolean = false,
-    val hydrationLevel: Int = 0,
-    val appMode: String? = null,
-    val isSystemActive: Boolean = false,
-    val deviceId: String = MainRepository.DEFAULT_TRACKER_ID,
-    val viewerId: String = MainRepository.DEFAULT_VIEWER_ID,
-    val relayUrl: String = SettingsRepository.DEFAULT_RELAY_URL,
-    val alertSettings: AlertSettings = AlertSettings(),
-    val lastAlarmAckTs: Long = 0L,
-    val selectedSirenType: String = "Siren",
+    val session: SessionUiState = SessionUiState(),
+    val settings: SettingsUiState = SettingsUiState(),
+    val spatial: SpatialUiState = SpatialUiState(),
+    val triggers: MapTriggers = MapTriggers(),
     val navigation: NavigationState = NavigationState(isMapVisible = true),
-    val homePoints: List<GeoPoint> = emptyList(),
-    val geofenceMode: GeofenceMode = GeofenceMode.IDLE,
-    val maxDistance: Double = 60.0,
-    val permissions: PermissionState = PermissionState(),
-    val appStartTime: Long = 0L,
-    val centeringTrackerTrigger: Int = 0,
-    val centeringViewerTrigger: Int = 0,
-    val zoomInTrigger: Int = 0,
-    val zoomOutTrigger: Int = 0,
-    val isFenceVisible: Boolean = false,
-    val isViolationsVisible: Boolean = true,
-    val isGeofenceViolationsVisible: Boolean = true,
-    val isMapButtonsVisible: Boolean = false,
-    val isMapLocked: Boolean = true,
-    val mapFollowMode: MapFollowMode = MapFollowMode.AUTO,
-    val draftSettings: DraftSettings = DraftSettings(),
-    val isIdentitySanitized: Boolean = false,
-    val isRecoveryPending: Boolean = false,
-    val isSafeMode: Boolean = false,
-    val isForensicStallSimulated: Boolean = false,
-    val isStorageSimulated: Boolean = false,
-    val isStorageCriticalSimulated: Boolean = false,
-    val isManualSelectionInProgress: Boolean = false,
-    val isSettlingActive: Boolean = true,
-    val isSetupBypassActive: Boolean = false,
-    val isPeerActive: Boolean = false
+    val simulation: SimulationUiState = SimulationUiState()
 ) {
+    // Top-level property accessors for backward compatibility and simplicity in logic checks
+    val isInitialized: Boolean get() = session.isInitialized
+    val hydrationLevel: Int get() = session.hydrationLevel
+    val appMode: String? get() = session.appMode
+    val isSystemActive: Boolean get() = session.isSystemActive
+    val deviceId: String get() = settings.deviceId
+    val viewerId: String get() = settings.viewerId
+    val relayUrl: String get() = settings.relayUrl
+    val alertSettings: AlertSettings get() = settings.alertSettings
+    val lastAlarmAckTs: Long get() = settings.lastAlarmAckTs
+    val selectedSirenType: String get() = settings.selectedSirenType
+    val homePoints: List<GeoPoint> get() = spatial.homePoints
+    val geofenceMode: GeofenceMode get() = spatial.geofenceMode
+    val maxDistance: Double get() = spatial.maxDistance
+    val permissions: PermissionState get() = session.permissions
+    val appStartTime: Long get() = session.appStartTime
+    val isFenceVisible: Boolean get() = spatial.isFenceVisible
+    val isViolationsVisible: Boolean get() = spatial.isViolationsVisible
+    val isGeofenceViolationsVisible: Boolean get() = spatial.isGeofenceViolationsVisible
+    val isMapButtonsVisible: Boolean get() = spatial.isMapButtonsVisible
+    val isMapLocked: Boolean get() = spatial.isMapLocked
+    val mapFollowMode: MapFollowMode get() = spatial.mapFollowMode
+    val draftSettings: DraftSettings get() = settings.draftSettings
+    val isIdentitySanitized: Boolean get() = settings.isIdentitySanitized
+    val isRecoveryPending: Boolean get() = simulation.isRecoveryPending
+    val isSafeMode: Boolean get() = settings.isSafeMode
+    val isForensicStallSimulated: Boolean get() = simulation.isForensicStallSimulated
+    val isStorageSimulated: Boolean get() = simulation.isStorageSimulated
+    val isStorageCriticalSimulated: Boolean get() = simulation.isStorageCriticalSimulated
+    val isManualSelectionInProgress: Boolean get() = spatial.isManualSelectionInProgress
+    val isSettlingActive: Boolean get() = session.isSettlingActive
+    val isSetupBypassActive: Boolean get() = session.isSetupBypassActive
+    val isPeerActive: Boolean get() = session.isPeerActive
+
     val isFullyHydrated: Boolean get() = hydrationLevel >= 3
     val isMapHydrated: Boolean get() = hydrationLevel >= 4
 
@@ -102,6 +100,72 @@ data class MainUiState(
             return count
         }
 }
+
+/**
+ * SessionUiState: Core application lifecycle and permission states.
+ */
+data class SessionUiState(
+    val isInitialized: Boolean = false,
+    val hydrationLevel: Int = 0,
+    val appMode: String? = null,
+    val isSystemActive: Boolean = false,
+    val appStartTime: Long = 0L,
+    val isSettlingActive: Boolean = true,
+    val isSetupBypassActive: Boolean = false,
+    val isPeerActive: Boolean = false,
+    val permissions: PermissionState = PermissionState()
+)
+
+/**
+ * SettingsUiState: Persistent identity and configuration parameters.
+ */
+data class SettingsUiState(
+    val deviceId: String = MainRepository.DEFAULT_TRACKER_ID,
+    val viewerId: String = MainRepository.DEFAULT_VIEWER_ID,
+    val relayUrl: String = SettingsRepository.DEFAULT_RELAY_URL,
+    val alertSettings: AlertSettings = AlertSettings(),
+    val lastAlarmAckTs: Long = 0L,
+    val selectedSirenType: String = "Siren",
+    val isIdentitySanitized: Boolean = false,
+    val isSafeMode: Boolean = false,
+    val draftSettings: DraftSettings = DraftSettings()
+)
+
+/**
+ * SpatialUiState: Geofencing and map behavior state.
+ */
+data class SpatialUiState(
+    val homePoints: List<GeoPoint> = emptyList(),
+    val geofenceMode: GeofenceMode = GeofenceMode.IDLE,
+    val maxDistance: Double = 60.0,
+    val isFenceVisible: Boolean = false,
+    val isViolationsVisible: Boolean = true,
+    val isGeofenceViolationsVisible: Boolean = true,
+    val isMapButtonsVisible: Boolean = false,
+    val isMapLocked: Boolean = true,
+    val mapFollowMode: MapFollowMode = MapFollowMode.AUTO,
+    val isManualSelectionInProgress: Boolean = false
+)
+
+/**
+ * MapTriggers: One-shot event triggers for map manipulation.
+ */
+data class MapTriggers(
+    val centeringTrackerTrigger: Int = 0,
+    val centeringViewerTrigger: Int = 0,
+    val zoomInTrigger: Int = 0,
+    val zoomOutTrigger: Int = 0
+)
+
+/**
+ * SimulationUiState: Flags for forensic auditing and stress simulations.
+ */
+data class SimulationUiState(
+    val isRecoveryPending: Boolean = false,
+    val isForensicStallSimulated: Boolean = false,
+    val isStorageSimulated: Boolean = false,
+    val isStorageCriticalSimulated: Boolean = false
+)
 
 /**
  * MapViewState: Partitioned state for AppMapContainer (R-ID 287).

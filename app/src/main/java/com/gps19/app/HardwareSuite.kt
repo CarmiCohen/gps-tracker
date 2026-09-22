@@ -33,29 +33,13 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.22.08:
+ * - Issue #1169: Fast-Path Configuration Convergence. Unified acoustic and light 
+ *   fast-path implementations using a generic HardwareFastPath structure to 
+ *   handle baseline decay, spike detection, and debouncing symmetrically (R-ID 404).
  * Sep.21.130:
  * - Issue #1159: Unused Forensic Auditing Dead Code Elimination. Removed unused 
  *   maxGnssJitterMs and obsolete processReflection helper.
- * Sep.21.128:
- * - Issue #1158: GNSS Sampling Logic Consolidation. Encapsulated GNSS sampling policy 
- *   in a nested GnssPolicyEngine to decouple hardware callback from throttling and auditing rules (R-ID 393).
- * Sep.21.125:
- * - Issue #1155: Acoustic-SNR Semantic Mismatch. Refactored getAcousticSamples 
- *   to return Sequence<EngineAcousticSample>, ensuring environmental noise is 
- *   decoupled from satellite SNR (R-ID 393).
- * Sep.21.124:
- * - Issue #1152: Flyweight Sequence Abstraction. Refactored getSnrSamples, 
- *   getSensorSamples, and getAcousticSamples to use CircularStateBuffer.forensicSequence 
- *   to eliminate redundant flyweight management logic (R-ID 391).
- * Sep.21.122:
- * - Idea 1 Cleanup: Unified consumeLogicSnapshot and consumeForensicSnapshot into a private 
- *   privateConsumeSnapshot method to remove boilerplate and ensure perfectly symmetrically state management.
- * Sep.21.121:
- * - Issue #1123 Hardening: Removed synchronous join() from stopAcousticMonitoring 
- *   to eliminate lifecycle stalls. Resource exclusivity is maintained via 
- *   startAcousticMonitoring join-before-start pattern (R-ID 387).
- * - Issue #1143: Unified Vibration Authority. Propagated adaptiveVibrationFloor 
- *   via ForensicSnapshot to prevent logic divergence (R-ID 388).
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -106,6 +90,42 @@ class HardwareSuite @Inject constructor(
             plungeMatched = false; proximityIdx = 0.0; proximityCm = -1.0; proximityDebounceMs = 0L
             vibrationRollingSum = 0.0; acousticPeak = 0.0; acousticPeakMin = -1.0; kineticEnergy = 0.0
             adaptiveVibrationFloor = 0.0
+        }
+    }
+
+    /**
+     * HardwareFastPath: Unified structure for high-frequency sensor spike detection.
+     */
+    private class HardwareFastPath(
+        var baseline: Double = -1.0,
+        var spikeThreshold: Double = 0.0,
+        var minThreshold: Double = -1.0,
+        var onSpike: (() -> Unit)? = null,
+        var lastSpikeRt: Long = 0L
+    ) {
+        fun reset() {
+            baseline = -1.0; spikeThreshold = 0.0; minThreshold = -1.0
+            onSpike = null; lastSpikeRt = 0L
+        }
+
+        fun update(baseline: Double, threshold: Double, min: Double = -1.0, callback: () -> Unit) {
+            this.baseline = baseline; this.spikeThreshold = threshold
+            this.minThreshold = min; this.onSpike = callback
+        }
+
+        fun evaluate(currentValue: Double, nowRt: Long, isWarming: Boolean, debounceMs: Long, alpha: Double = 0.0): Boolean {
+            if (baseline < 0) { baseline = currentValue; return false }
+            if (alpha > 0.0) baseline = (baseline * (1.0 - alpha)) + (currentValue * alpha)
+            if (isWarming || onSpike == null) return false
+
+            if ((currentValue - baseline) > spikeThreshold && currentValue >= minThreshold) {
+                if (nowRt - lastSpikeRt > debounceMs) {
+                    lastSpikeRt = nowRt
+                    onSpike?.invoke()
+                    return true
+                }
+            }
+            return false
         }
     }
 
@@ -237,10 +257,8 @@ class HardwareSuite @Inject constructor(
     private var secPeakLux = 0.0; private var secPeakVibe = 0.0; private var secSumProxIdx = 0.0; private var secProxCount = 0
     private var secPeakTilt = 0.0; private var secPeakLift = 0.0; private var secPeakDb = 0.0; private var secSitDetected = false; private var secPeakKinetic = 0.0
     
-    private var fastPathFloor = -1.0; private var fastPathSpikeThreshold = ACOUSTIC_THRESHOLD_DB_JUMP
-    private var fastPathMinDb = ACOUSTIC_MIN_THRESHOLD_DB; private var onAcousticSpike: (() -> Unit)? = null
-    private var fastPathLightBaseline = -1.0; private var fastPathLightSpikeThreshold = LIGHT_THRESHOLD_LUX_JUMP; private var onLightSpike: (() -> Unit)? = null
-    @Volatile private var lastAcousticSpikeRt = 0L; @Volatile private var lastLightSpikeRt = 0L
+    private val acousticFastPath = HardwareFastPath()
+    private val lightFastPath = HardwareFastPath()
 
     @Volatile var lastAcousticLockoutRt = 0L; private set
     private var sessionStartRt = 0L
@@ -729,12 +747,8 @@ class HardwareSuite @Inject constructor(
             Sensor.TYPE_LIGHT -> {
                 val lux = values[0].toDouble(); currentLux = lux; if (lux > secPeakLux) secPeakLux = lux
                 synchronized(this) {
-                    if (fastPathLightBaseline < 0) { fastPathLightBaseline = lux } else {
-                        val alpha = SentinelValidator.accelerateAlpha(LUX_EMA_FAST, isWarming); fastPathLightBaseline = (fastPathLightBaseline * (1.0 - alpha)) + (lux * alpha)
-                        if (!isWarming && onLightSpike != null && (lux - fastPathLightBaseline) > fastPathLightSpikeThreshold) {
-                            if (nowRt - lastLightSpikeRt > SPIKE_DEBOUNCE_MS) { lastLightSpikeRt = nowRt; onLightSpike?.invoke() }
-                        }
-                    }
+                    val alpha = SentinelValidator.accelerateAlpha(LUX_EMA_FAST, isWarming)
+                    lightFastPath.evaluate(lux, nowRt, isWarming, SPIKE_DEBOUNCE_MS, alpha)
                 }
             }
             Sensor.TYPE_ROTATION_VECTOR -> processRotation(values)
@@ -805,7 +819,9 @@ class HardwareSuite @Inject constructor(
                                 val db = if (maxAmp > 0) 20 * log10(maxAmp.toDouble()) else 0.0
                                 synchronized(this) {
                                     currentAcousticDb = db; if (db > logicPeakDb) logicPeakDb = db; if (db < logicMinDb) logicMinDb = db; if (db > forensicPeakDb) forensicPeakDb = db; if (db < forensicMinDb) forensicMinDb = db; if (db > secPeakDb) secPeakDb = db
-                                    if (!isWarming && fastPathFloor >= 0 && (db - fastPathFloor) > fastPathSpikeThreshold && db >= fastPathMinDb) { val spikeRt = timeProvider.elapsedRealtime() ; if (spikeRt - lastAcousticSpikeRt > SPIKE_DEBOUNCE_MS) { lastAcousticSpikeRt = spikeRt; lastAcousticLockoutRt = spikeRt; onAcousticSpike?.invoke() } }
+                                    if (acousticFastPath.evaluate(db, nowRt, isWarming, SPIKE_DEBOUNCE_MS)) {
+                                        lastAcousticLockoutRt = acousticFastPath.lastSpikeRt
+                                    }
                                 }
                             } else if (read < 0) { if (!isMonitoring) break; _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Hardware error")); break }
                         }
@@ -980,8 +996,13 @@ class HardwareSuite @Inject constructor(
     
     fun isStationary() = SentinelValidator.isStationary(currentVibrationIndex, adaptiveVibrationFloor)
     
-    fun setAcousticFastPath(floor: Double, spikeThreshold: Double, minDb: Double, onSpike: () -> Unit) { synchronized(this) { this.fastPathFloor = floor; this.fastPathSpikeThreshold = spikeThreshold; this.fastPathMinDb = minDb; this.onAcousticSpike = onSpike } }
-    fun setLightFastPath(baseline: Double, spikeThreshold: Double, onSpike: () -> Unit) { synchronized(this) { this.fastPathLightBaseline = baseline; this.fastPathLightSpikeThreshold = spikeThreshold; this.onLightSpike = onSpike } }
+    fun setAcousticFastPath(floor: Double, spikeThreshold: Double, minDb: Double, onSpike: () -> Unit) { 
+        synchronized(this) { acousticFastPath.update(floor, spikeThreshold, minDb, onSpike) } 
+    }
+
+    fun setLightFastPath(baseline: Double, spikeThreshold: Double, onSpike: () -> Unit) { 
+        synchronized(this) { lightFastPath.update(baseline, spikeThreshold, -1.0, onSpike) } 
+    }
     
     fun setHighLoad(high: Boolean) { 
         this.isHighLoad = high 
@@ -1030,8 +1051,8 @@ class HardwareSuite @Inject constructor(
         synchronized(this) {
             lastAnomalyActiveRt = 0L
             lastAcousticLockoutRt = 0L
-            lastAcousticSpikeRt = 0L
-            lastLightSpikeRt = 0L
+            acousticFastPath.reset()
+            lightFastPath.reset()
             rawProximityNear = false
             stationaryStartRt = 0L
             emaPressure = 0.0
@@ -1070,7 +1091,6 @@ class HardwareSuite @Inject constructor(
             revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
             pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = sessionStartRt; currentLocationStatus = LocationStatus(); _locationStatus.tryEmit(currentLocationStatus)
             isDisplayFlickering.set(false); lastDisplayTransitionRt = 0L
-            fastPathLightBaseline = -1.0; lastLightSpikeRt = 0L
             
             // Issue #1127/1128/1133/1135: Clear lifecycle leftovers on reset
             clearLifecycleLeftovers()

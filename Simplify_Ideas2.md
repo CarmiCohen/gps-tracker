@@ -1,5 +1,9 @@
-# Strategic Architectural Simplification Ideas
+# Strategic Architectural Simplification Ideas (Part 2)
 
-## 💡 Idea #1: Encapsulate Vendor Profiles further via Device Profile manager
-* **Description**: Now that `DeviceProfileManager` centralizes behavioral tweaks, we can migrate the remaining `capabilities.isA15Device` conditional gates for Foreground Service types and permissions directly into lazy feature flags within the manager.
-* **Benefit**: Removes OEM/vendor-specific conditionals completely from background lifecycle services, ensuring a clean and generic codebase structure.
+## 💡 Idea #1: Generic Fast-Path Snapshotting
+*   **Description**: Group baseline and spike data into the `ForensicSnapshot` itself. This allows the background service to adjust baselines atomically without redundant `synchronized(this)` blocks in `HardwareSuite`.
+*   **Benefit**: Simplifies the parameter flow between `HardwareSuite` and `LocationProcessor` while reducing synchronization overhead on the sensor thread.
+
+## 💡 Idea #2: Trigger-Based Forensic Sampling
+*   **Description**: Transition from a fixed-interval forensic loop to a "Signal-on-Spike" model where `HardwareFastPath` triggers a telemetry capture only when a physical boundary is crossed or a significant delta is detected.
+*   **Benefit**: Reduces background CPU wakeups and GC pressure by eliminating redundant data points during long stationary periods.

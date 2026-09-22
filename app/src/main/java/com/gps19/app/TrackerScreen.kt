@@ -25,24 +25,22 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Sep.22.08:
+ * - Issue #1166: State Partitioning & Slicing. Refactored to consume specialized 
+ *   UI state slices (Session, Settings, Spatial, Navigation) to minimize 
+ *   recomposition evaluation costs (R-ID 405).
  * Sep.11.46:
  * - Issue #947 RESOLVED: Synchronized Dashboard time-base by passing 
  *   systemPulseRt (monotonic) instead of wall-clock to TrackerDashboard, 
  *   ensuring correct "Last Seen" delta calculation (R947).
- * Sep.11.10:
- * - Fix: Corrected unresolved references in portrait layout (satsUsed/snr) by 
- *   using dashboardState.isSatsIndexWarning.
- * - Integrity Audit #243: Removed redundant map tool overlays and individual 
- *   map parameters; fully delegated Map UI to AppMapContainer (R-ID 287).
- * - Fix: Corrected SettingsOverlay parameter mapping to match SettingsComponents.kt.
- * Sep.10.12:
- * - Idea #243: Map State Partitioning RESOLVED. Integrated mapViewState flow 
- *   to reduce parameter surface area in AppMapContainer (R-ID 287).
  */
 
 @Composable
 fun TrackerScreen(
-    uiState: MainUiState,
+    sessionState: SessionUiState,
+    settingsState: SettingsUiState,
+    spatialState: SpatialUiState,
+    navigationState: NavigationState,
     kinematicState: KinematicState,
     diagnosticState: DiagnosticState,
     viewModel: MainViewModel,
@@ -59,7 +57,7 @@ fun TrackerScreen(
     onSaveTrail: () -> Unit = {},
     onLoadTrail: () -> Unit = {}
 ) {
-    val nav = uiState.navigation
+    val nav = navigationState
     val isMapVisible = nav.isMapVisible
     val isLogVisible = nav.isLogVisible
     val isSettingsOpen = nav.isSettingsOpen
@@ -77,12 +75,10 @@ fun TrackerScreen(
     val rttValue by viewModel.rtt.collectAsStateWithLifecycle()
     val currentMa by viewModel.currentMa.collectAsStateWithLifecycle()
     
-    // Idea #241: Segmented HUD State Subscriptions
     val hudConnectivity by viewModel.hudConnectivityState.collectAsStateWithLifecycle()
     val hudTelemetry by viewModel.hudTelemetryState.collectAsStateWithLifecycle()
     val hudHealth by viewModel.hudHealthState.collectAsStateWithLifecycle()
 
-    // Idea #243: Map State Partitioning
     val mapViewState by viewModel.mapViewState.collectAsStateWithLifecycle()
 
     val onDashboard = {
@@ -94,6 +90,45 @@ fun TrackerScreen(
         if (isPhoneSetupVisible) viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
     }
 
+    // Helper for system ready check (mirrors MainUiState.isSystemReady)
+    val isSystemReady = sessionState.isSetupBypassActive || (
+            sessionState.permissions.isFineLocationGranted &&
+            sessionState.permissions.isBatteryWhitelisted && 
+            sessionState.permissions.isAutoStartGranted &&
+            sessionState.permissions.isOverlayGranted &&
+            sessionState.permissions.isMicrophoneGranted &&
+            sessionState.permissions.isExactAlarmGranted && 
+            sessionState.permissions.isPostNotificationsGranted &&
+            sessionState.permissions.isBackgroundLocationGranted &&
+            sessionState.permissions.isActivityRecognitionGranted &&
+            (sessionState.appMode != null) &&
+            (sessionState.appMode != "tracker" || sessionState.permissions.isMicrophoneGranted) &&
+            (sessionState.appMode == "tracker" || spatialState.homePoints.isNotEmpty()) &&
+            (!sessionState.permissions.hasBackgroundRestriction || 
+             (sessionState.permissions.backgroundStatus == CapabilityStatus.GRANTED && sessionState.permissions.autostartStatus == CapabilityStatus.GRANTED) || 
+             (sessionState.permissions.backgroundStatus == CapabilityStatus.UNKNOWN && sessionState.permissions.isManualOverride)))
+
+    // Helper for system issues count (mirrors MainUiState.systemIssuesCount)
+    val systemIssuesCount = if (sessionState.isSetupBypassActive) 0 else {
+        var count = 0
+        if (!sessionState.permissions.isFineLocationGranted) count++
+        if (!sessionState.permissions.isBatteryWhitelisted) count++
+        if (!sessionState.permissions.isAutoStartGranted) count++
+        if (!sessionState.permissions.isExactAlarmGranted) count++
+        if (!sessionState.permissions.isOverlayGranted) count++
+        if (!sessionState.permissions.isPostNotificationsGranted) count++
+        if (!sessionState.permissions.isBackgroundLocationGranted) count++
+        if (!sessionState.permissions.isActivityRecognitionGranted) count++
+        if (sessionState.appMode == "tracker" && !sessionState.permissions.isMicrophoneGranted) count++
+        if (sessionState.appMode != "tracker" && spatialState.homePoints.isEmpty()) count++
+        val configIssue = sessionState.permissions.hasBackgroundRestriction && 
+                         (sessionState.permissions.backgroundStatus == CapabilityStatus.GRANTED || 
+                          sessionState.permissions.autostartStatus == CapabilityStatus.GRANTED) &&
+                         !(sessionState.permissions.backgroundStatus == CapabilityStatus.UNKNOWN && sessionState.permissions.isManualOverride)
+        if (configIssue) count++
+        count
+    }
+
     val header = @Composable {
         HeaderBar(
             isLogVisible = nav.isLogVisible,
@@ -101,9 +136,9 @@ fun TrackerScreen(
             isRibbonsVisible = nav.isRibbonsVisible,
             isMapVisible = nav.isMapVisible,
             isPhoneSetupVisible = nav.isPhoneSetupVisible, 
-            requiresExtraTopPadding = uiState.permissions.requiresExtraTopPadding,
-            isSystemReady = uiState.isSystemReady,
-            systemIssuesCount = uiState.systemIssuesCount,
+            requiresExtraTopPadding = sessionState.permissions.requiresExtraTopPadding,
+            isSystemReady = isSystemReady,
+            systemIssuesCount = systemIssuesCount,
             onDashboard = onDashboard,
             onS = onToggleSettings,
             onL = onToggleLog,
@@ -125,7 +160,7 @@ fun TrackerScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-        if (uiState.hydrationLevel < 1) {
+        if (sessionState.hydrationLevel < 1) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp, modifier = Modifier.size(32.dp))
             }
@@ -138,7 +173,7 @@ fun TrackerScreen(
                         statusBar()
                         
                         Box(modifier = Modifier.weight(1f)) {
-                            if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen) {
+                            if (sessionState.hydrationLevel >= 4 && isMapVisible && !isAnyOverlayOpen) {
                                 AppMapContainer(
                                     state = mapViewState,
                                     onEvent = { event -> viewModel.onEvent(event) },
@@ -146,12 +181,12 @@ fun TrackerScreen(
                                     onSaveTrail = onSaveTrail,
                                     onLoadTrail = onLoadTrail
                                 )
-                            } else if (uiState.hydrationLevel >= 2 && !isMapVisible) {
+                            } else if (sessionState.hydrationLevel >= 2 && !isMapVisible) {
                                 TrackerDashboard(
-                                    appMode = uiState.appMode ?: "tracker",
-                                    isSystemActive = uiState.isSystemActive,
-                                    isDashboardExpanded = uiState.navigation.isDashboardExpanded,
-                                    isBatteryWhitelisted = uiState.permissions.isBatteryWhitelisted,
+                                    appMode = sessionState.appMode ?: "tracker",
+                                    isSystemActive = sessionState.isSystemActive,
+                                    isDashboardExpanded = nav.isDashboardExpanded,
+                                    isBatteryWhitelisted = sessionState.permissions.isBatteryWhitelisted,
                                     isLocalOnline = diagnosticState.connectivity.isLocalOnline,
                                     isRelayConnected = diagnosticState.connectivity.isRelayConnected,
                                     lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
@@ -229,7 +264,7 @@ fun TrackerScreen(
                     }
                 }
             } else {
-                if (uiState.isMapHydrated && isMapVisible && !isAnyOverlayOpen) {
+                if (sessionState.hydrationLevel >= 4 && isMapVisible && !isAnyOverlayOpen) {
                     AppMapContainer(
                         state = mapViewState,
                         onEvent = { event -> viewModel.onEvent(event) },
@@ -253,12 +288,12 @@ fun TrackerScreen(
                             }
                         }
                         
-                        if (uiState.hydrationLevel >= 2 && !isMapVisible) {
+                        if (sessionState.hydrationLevel >= 2 && !isMapVisible) {
                             TrackerDashboard(
-                                appMode = uiState.appMode ?: "tracker",
-                                isSystemActive = uiState.isSystemActive,
-                                isDashboardExpanded = uiState.navigation.isDashboardExpanded,
-                                isBatteryWhitelisted = uiState.permissions.isBatteryWhitelisted,
+                                appMode = sessionState.appMode ?: "tracker",
+                                isSystemActive = sessionState.isSystemActive,
+                                isDashboardExpanded = nav.isDashboardExpanded,
+                                isBatteryWhitelisted = sessionState.permissions.isBatteryWhitelisted,
                                 isLocalOnline = diagnosticState.connectivity.isLocalOnline,
                                 isRelayConnected = diagnosticState.connectivity.isRelayConnected,
                                 lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
@@ -340,12 +375,12 @@ fun TrackerScreen(
         if (isSettingsOpen) {
             SettingsOverlay(
                 activeSubSettings = nav.activeSubSettings,
-                draftDeviceId = uiState.draftSettings.deviceId,
-                draftViewerId = uiState.draftSettings.viewerId,
-                draftRelayUrl = uiState.draftSettings.relayUrl,
-                draftMaxDistance = uiState.draftSettings.maxDistance,
-                draftAlertSettings = uiState.draftSettings.alertSettings,
-                selectedSirenType = uiState.selectedSirenType,
+                draftDeviceId = settingsState.draftSettings.deviceId,
+                draftViewerId = settingsState.draftSettings.viewerId,
+                draftRelayUrl = settingsState.draftSettings.relayUrl,
+                draftMaxDistance = settingsState.draftSettings.maxDistance,
+                draftAlertSettings = settingsState.draftSettings.alertSettings,
+                selectedSirenType = settingsState.selectedSirenType,
                 isSirenPlaying = diagnosticState.isSirenPlaying,
                 onClose = onToggleSettings, 
                 onReset = onResetStats,
@@ -364,10 +399,10 @@ fun TrackerScreen(
                     if (diagnosticState.isSirenPlaying) {
                         viewModel.audioSynthesizer.stopSiren(timeProvider = viewModel.timeProvider)
                     } else {
-                        val s = uiState.draftSettings.alertSettings
+                        val s = settingsState.draftSettings.alertSettings
                         val volume = if (s.useMaxVolume) 1.0f else if (s.useCustomVolume) s.alarmVolume else 1.0f
                         viewModel.audioSynthesizer.playSiren(
-                            uiState.selectedSirenType, force = true, volume = volume, 
+                            settingsState.selectedSirenType, force = true, volume = volume, 
                             overrideSilence = s.overrideSilence, 
                             loop = true, vibrate = s.vibrationEnabled,
                             timeProvider = viewModel.timeProvider
@@ -385,7 +420,7 @@ fun TrackerScreen(
                 showDetails = showDetails, showRecovered = showRecovered, 
                 onSetShowDetails = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowDetails(show)) }, 
                 onSetShowRecovered = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowRecovered(show)) },
-                appStartTime = uiState.appStartTime,
+                appStartTime = sessionState.appStartTime,
                 systemPulse = mapViewState.systemPulse,
                 isTelemetryFresh = dashboardState.isTelemetryFresh,
                 onHistLink = { ts -> 
@@ -396,8 +431,8 @@ fun TrackerScreen(
             )
         } else if (isRibbonsVisible) {
             RibbonsOverlay(
-                isStrictMode = uiState.navigation.isStrictMode,
-                replayCursorTs = uiState.navigation.replayCursorTs,
+                isStrictMode = nav.isStrictMode,
+                replayCursorTs = nav.replayCursorTs,
                 history4MFlow = viewModel.history4MFlow,
                 history16MFlow = viewModel.history16MFlow,
                 history1HFlow = viewModel.history1HFlow,
@@ -498,9 +533,11 @@ fun TrackerDashboard(
     LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         item {
             if (isDashboardExpanded) {
-                Spacer(Modifier.height(2.dp))
-                Icon(Icons.Default.Agriculture, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
-                Spacer(Modifier.height(4.dp))
+                if (appMode == "tracker") {
+                    Spacer(Modifier.height(2.dp))
+                    Icon(Icons.Default.Agriculture, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp))
+                    Spacer(Modifier.height(4.dp))
+                }
                 TelemetryBox(
                     appMode = appMode,
                     isBatteryWhitelisted = isBatteryWhitelisted,
