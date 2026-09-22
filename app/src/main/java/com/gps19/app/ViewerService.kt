@@ -17,21 +17,16 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
- * Sep.21.132:
- * - Issue #1165: Unified Session Lifecycle Management. Migrated reset logic 
- *   to SessionLifecycleCoordinator to ensure atomic zeroing of hardware peaks 
- *   and vitality markers (R-ID 396).
- * Sep.21.123:
- * - Issue #1121 Refactoring: Migrated evaluateAlarms to unified 
- *   AlarmTelemetrySnapshot and AlarmServiceContext DTOs (R-ID 390).
- * Sep.20.22:
- * - Issue #1137 Hardening: Ensured all forensic state and spatial gates 
- *   are zeroed in resetServiceTimers() (R-ID 384).
+ * Sep.22.07:
+ * - Issue #1168: Vendor Adaptation Centralization. Injected DeviceProfileManager 
+ *   to encapsulate and centralize all hardware/vendor-dependent behavioral overrides 
+ *   and loop tweaks (R-ID 403).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
 
     @Inject lateinit var sessionCoordinator: SessionLifecycleCoordinator
+    @Inject lateinit var deviceProfileManager: DeviceProfileManager
 
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
@@ -54,8 +49,6 @@ class ViewerService : BaseMonitorService() {
     private var lastPowerSaveCheckRt = 0L
 
     private var currentIntervalMs = TICK_INTERVAL_MS
-    private var lastStaggeredPokeRt = 0L
-    private val STAGGERED_POKE_INTERVAL_MS = 30_000L
 
     private lateinit var selfProcessor: LocationProcessor
     private lateinit var remoteProcessor: LocationProcessor
@@ -82,15 +75,7 @@ class ViewerService : BaseMonitorService() {
 
         refreshCapabilitiesInternal()
         
-        if (capabilities.isA15Device) {
-            val success = JdHardwareManager.initialize(timeProvider, configManager.deviceId)
-            if (success) {
-                logManager.logServiceEvent("HARDWARE: libjdHardware initialized successfully.", isImportant = true)
-                delay(500)
-            } else {
-                logManager.logServiceEvent("HARDWARE: libjdHardware initialization failed.", isImportant = true)
-            }
-        }
+        deviceProfileManager.initializeHardwareProfile(capabilities, configManager.deviceId)
 
         observeAlarmEvents()
         observeIntegrityEvents()
@@ -491,8 +476,6 @@ class ViewerService : BaseMonitorService() {
             hardwareSuite.setPollingInterval(targetGpsInterval)
         }
 
-        if (capabilities.requiresWakeLockRenewal) systemMonitor.renewWakeLock()
-
         val isSocketConnected = connectivitySuite.isConnected()
         connectivitySuite.updateRelayStatus(isSocketConnected)
         
@@ -500,26 +483,16 @@ class ViewerService : BaseMonitorService() {
         
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isTrackerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
 
-        val isStaggered = capabilities.performanceTier == PerformanceTier.STAGGERED
-        if (isStaggered) {
-            if (capabilities.isA15Device && JdHardwareManager.isAvailable()) {
-                val gpsAge = nowRt - selfProcessor.getLastValidFixRt()
-                JdHardwareManager.syncHardwareState(
-                    timeProvider = timeProvider,
-                    tick = serviceTickCounter,
-                    status = LedStatus(
-                        isPowerSave = isPowerSaveActive || health.isPowerSaveMode,
-                        isGpsStale = gpsAge > TELEMETRY_UI_STALE_THRESHOLD_MS,
-                        isInternetLoss = health.localInternetLoss,
-                        isRelayLoss = !isSocketConnected,
-                        isPeerStale = !isTrackerActive
-                    )
-                )
-            } else if (hardwareSuite.shouldPokeHardware(isStaggered, lastStaggeredPokeRt, STAGGERED_POKE_INTERVAL_MS)) {
-                lastStaggeredPokeRt = nowRt
-                systemMonitor.acquireWakeLock(force = true)
-            }
-        }
+        deviceProfileManager.executeContinuityTweaks(
+            capabilities = capabilities,
+            nowRt = nowRt,
+            serviceTickCounter = serviceTickCounter,
+            lastValidFixRt = selfProcessor.getLastValidFixRt(),
+            isPowerSaveMode = isPowerSaveActive || health.isPowerSaveMode,
+            localInternetLoss = health.localInternetLoss,
+            isSocketConnected = isSocketConnected,
+            isPeerActive = isTrackerActive
+        )
 
         forensicAuditor.evaluateStability(nowRt, "V")?.let { verdict ->
             val proc = lastProcessedLocation
@@ -537,6 +510,7 @@ class ViewerService : BaseMonitorService() {
         var recoveryFlagged = false
         if (lastServiceTickRealtime > 0) {
             val tickGap = nowRt - lastServiceTickRealtime
+            val isStaggered = capabilities.performanceTier == PerformanceTier.STAGGERED
             val recoveryThreshold = if (isStaggered) 10000L else HARDWARE_SUPPRESSION_THRESHOLD_MS
             
             if (tickGap > recoveryThreshold && nowRt - lastHardwareRecoveryTs > HARDWARE_RECOVERY_COOLDOWN_MS) {
@@ -666,6 +640,7 @@ class ViewerService : BaseMonitorService() {
 
     override fun onDestroy() {
         gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); revivalEventsJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel()
+        deviceProfileManager.teardownHardwareProfile(capabilities)
         super.onDestroy()
     }
 }

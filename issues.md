@@ -13,7 +13,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 13)
+## 💡 Strategic Simplification Ideas (Ideas: 12)
 
 *   **Issue #1160: Flyweight & Pooling Expansion**
     *   *Description*: Expand flyweight patterns to all entities (Telemetry, Violations, SpatialPoints) and use pre-allocated ring buffers for `EngineConnectionPoint` and a `LogEntry` pool to eliminate GC churn.
@@ -29,8 +29,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
     *   *Description*: Split `MainUiState` into specialized slices (`MapUiState`, `DashboardUiState`) to minimize recomposition evaluation costs and isolate volatile telemetry.
 *   **Issue #1167: Map Overlay Imperative to Declarative Controller**
     *   *Description*: Extract imperative osmdroid management into a standalone `MapOverlayController` to keep UI code declarative and implement background coordinate filtering beforehand.
-*   **Issue #1168: Vendor Adaptation Centralization**
-    *   *Description*: Consolidate vendor-specific adaptations and loop continuity tweaks into a central `DeviceProfileManager` or `DeviceHardeningStrategy` (Samsung, A15, S21FE).
 *   **Issue #1169: Fast-Path Configuration Convergence**
     *   *Description*: Unify the fast-path implementation in `HardwareSuite` using a generic `HardwareFastPath<T>` delegate that automatically handles its own baseline decay or synchronization.
 *   **Issue #1170: God Object ViewModel Decomposition**
@@ -48,6 +46,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1168: Vendor Adaptation Centralization** (Resolved Sep.22.07)
+    *   *Remediation*: Consolidated vendor-specific adaptations and loop continuity tweaks into a central `DeviceProfileManager` to keep hardware-dependent behavioral overrides centralized and decoupled from background services (R-ID 403).
+
 *   **Issue #1181: UseCase Functional Consolidation** (Resolved Sep.22.05)
     *   *Remediation*: Consolidated `HomePointUseCase` and `MapUseCase` into a single high-cohesion `SpatialLogicUseCase`, streamlining domain logic boundaries and reducing the ViewModel dependency injection surface area (R-ID 402).
 
@@ -61,7 +62,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
     *   *Remediation*: Set default satellite counts to -1 in `LocationUpdate` and propagated actual values to UI states. This ensures UI can distinguish between zero satellites (e.g. jammer/tunnel) and "no data" states during initialization (R-ID 399).
 
 *   **Issue #1177: Static Role Branding on Selection Screen Cards** (Resolved Sep.22.00)
-    *   *Remediation*: Integrated `isPeerActive` check into `MainViewModel pulse loop and passed to `LandingScreen`. Role card colors now dynamically dim to `Slate500` when no telemetry is detected, preventing visual confusion (R-ID 398).
+    *   *Remediation*: Integrated `isPeerActive` check into `MainViewModel` pulse loop and passed to `LandingScreen`. Role card colors now dynamically dim to `Slate500` when no telemetry is detected, preventing visual confusion (R-ID 398).
 
 *   **Issue #1176: Mismatched Temperature Unit Prefix Layout Ordering** (Resolved Sep.22.00)
     *   *Remediation*: Corrected text component placement in `StatusRowData` to suffix the degree sign (`0°`) instead of prefixing it, ensuring consistent SI unit presentation (R-ID 397).
@@ -78,4 +79,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 402 (Rules: 82, IDs: 402), Resolved: 1158, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 13, QA: 283]**
+- **Current Audit Baseline: [SOT: 403 (Rules: 82, IDs: 403), Resolved: 1159, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 12, QA: 283]**
