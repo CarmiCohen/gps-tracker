@@ -3,6 +3,8 @@
 ## 🟢 Resolved Issues & Refactoring Record
 
 ### Sep.22.08
+*   **Issue #1166: State Partitioning & Slicing**
+    *   *Remediation*: Split the monolithic `MainUiState` into specialized slices (`SessionUiState`, `SpatialUiState`, `SettingsUiState`, `MapTriggers`, `SimulationUiState`). Refactored `MainViewModel` and all screen Composables to consume these granular segments, significantly reducing recomposition frequency and isolating volatile triggers (R-ID 405).
 *   **Issue #1169: Fast-Path Configuration Convergence**
     *   *Remediation*: Unified acoustic and light fast-path implementations in `HardwareSuite` using a generic `HardwareFastPath` structure. This centralizes baseline decay, spike detection, and debouncing logic, ensuring symmetric and race-free processing of high-frequency sensor events (R-ID 404).
 

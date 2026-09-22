@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.22.08)
+# SOT Master Requirements & Hardening Status (Sep.22.10)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 405**: State Partitioning & Slicing - Split the monolithic `MainUiState` into specialized slices (`SessionUiState`, `SpatialUiState`, `SettingsUiState`, `MapTriggers`, `SimulationUiState`). Refactored `MainViewModel` and all screen Composables to consume these granular segments, significantly reducing recomposition frequency and isolating volatile triggers (R-ID 405). (Resolved Sep.22.08)
 *   **SOT ID 404**: Fast-Path Configuration Convergence - Unified acoustic and light fast-path implementations in `HardwareSuite` using a generic `HardwareFastPath` structure. This centralizes baseline decay, spike detection, and debouncing logic, ensuring symmetric and race-free processing of high-frequency sensor events (R-ID 404). (Resolved Sep.22.08)
 *   **SOT ID 403**: Vendor Adaptation Centralization - Consolidated vendor-specific adaptations and loop continuity tweaks into a central `DeviceProfileManager` to keep hardware-dependent behavioral overrides centralized and decoupled from background services (R-ID 403). (Resolved Sep.22.07)
 *   **SOT ID 402**: UseCase Functional Consolidation - Consolidated `HomePointUseCase` and `MapUseCase` into a single, high-cohesion `SpatialLogicUseCase` DTO. This reduces the dependency injection surface area of `MainViewModel` and centralizes all spatial operations and map state transformations within a single domain logic layer (R-ID 402). (Resolved Sep.22.05)
@@ -14,7 +15,6 @@
 *   **SOT ID 394**: GNSS Sampling Logic Consolidation - Encapsulated GNSS sampling policy (standard vs throttled) and auditing triggers in a nested `GnssPolicyEngine` within `HardwareSuite.kt`. This decouples the hardware callback from throttling rules and ensures symmetric auditing of jitter across all performance tiers (R-ID 394). (Resolved Sep.21.128)
 *   **SOT ID 393**: Acoustic-SNR Semantic Mismatch & Integration - Introduced `EngineAcousticSample` and refactored `HardwareSuite.getAcousticSamples` to return a sequence of this new type. Refactored `HistoryManager` and `TelemetryAggregator` to consume this specialized sequence during backfill and gap-filling. This ensures environmental noise telemetry (dB) is semantically isolated from satellite GNSS SNR across the entire forensic pipeline, preventing diagnostic ambiguity in forensic ribbons (R-ID 393). (Resolved Sep.21.127)
 *   **SOT ID 392**: Forensic Sequence Hardening - Refactored `CircularStateBuffer.forensicSequence` to use a custom multi-pass sequence implementation that holds internal locks during flyweight transformation. This eliminates the race condition where a high-frequency writer could repurpose objects before the sequence consumer (e.g., `HistoryManager`) could extract their data, and achieves zero-allocation parity by removing the temporary `ArrayList` snapshot (R-ID 392). (Resolved Sep.21.125)
-*   **SOT ID 391**: Flyweight Sequence Abstraction - Refactored `getSnrSamples`, `getSensorSamples`, and `getAcousticSamples` in `HardwareSuite.kt` to use a unified `forensicSequence` utility in `CircularStateBuffer`. This eliminates redundant flyweight management logic and ensures thread-safe forensic sampling via temporary snapshotting (R-ID 391). (Resolved Sep.21.124)
 *   **SOT ID 390**: Telemetry Source Abstraction - Refactored alarm evaluation to use unified `AlarmTelemetrySnapshot` and `AlarmServiceContext` DTOs. This eliminates parameter bloat in `AppAlarmManager.evaluateAlarms` and enforces strict isolation between local hardware state and remote telemetry, ensuring that the Viewer's local sensors can no longer inadvertently leak into Tracker alarm logic (R-ID 390). (Resolved Sep.21.123)
 *   **SOT ID 389**: HardwareSuite Snapshot Unification - Unified `consumeLogicSnapshot` and `consumeForensicSnapshot` into a single private `privateConsumeSnapshot` method. This eliminates duplicate sensing snapshot extraction code, ensures thread-safety gates, peak resets, and acoustic/vibration floor snapshots are symmetrically maintained (R-ID 389). (Resolved Sep.21.122)
 *   **SOT ID 388**: Unified Vibration Authority - Consolidated the `adaptiveVibrationFloor` calculation in `HardwareSuite.kt`. The high-frequency floor is now snapshotted and propagated to `LocationSentinel` via `TrackerService.processTick()`, ensuring that both the hardware layer and the validation engine operate on a single source of truth for stationary detection (R-ID 388). (Resolved Sep.21.121)
@@ -37,27 +37,28 @@
 *   **SOT ID 371**: Asynchronous Sensor Registration Hardening - Resolved a race condition in `HardwareSuite.kt` where `setPowerSaveMode` could re-register sensors on a stopped suite. Added an explicit `isStarted.get()` check within the posted handler block to ensure sequential lifecycle integrity during rapid mode transitions (R-ID 371). (Resolved Sep.19.12)
 *   **SOT ID 370**: Acoustic Monitor Lifecycle Hardening - Resolved a resource race condition in `HardwareSuite.kt` where rapid restarts could cause multiple threads to compete for the `AudioRecord` resource. Implemented `acousticLock` and mandatory thread joining in `startAcousticMonitoring()`, ensuring that any previous monitor session is definitively terminated before a new one initializes (R-ID 370). (Resolved Sep.19.11)
 *   **SOT ID 369**: Stale Forensic Buffer Lifecycle Hardening - Resolved an issue in `HardwareSuite.kt` where circular buffers (`sensorBuffer`, `snrBuffer`, `logicSnapshotBuffer`, `forensicSnapshotBuffer`) and the `lastBufferRecordRt` timestamp were not cleared during suite termination. By explicitly resetting these structures in `stop()`, the system now guarantees a clean forensic state for every service session restart, preventing stale data from polluting new monitoring cycles (R-ID 369). (Resolved Sep.19.10)
-*   **SOT ID 368**: Snapshot Thread-Safety Hardening - Resolved memory visibility and race conditions in `HardwareSuite.kt` snapshotting logic. Applied `@Volatile` to high-frequency shared state variables (lux, acousticDb, tilt, velocity, etc.) to ensure correct cross-thread reads during forensic audits. Unified the synchronization strategy by wrapping both the sensor update handlers and the peak-reset snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, guaranteeing atomic "read-and-reset" operations under high system load (R-ID 368). (Resolved Sep.19.09)
+*   **SOT ID 368**: Snapshot Thread-Safety Hardening - Resolved memory visibility and race conditions in `HardwareSuite.kt snapshotting logic. Applied `@Volatile` to high-frequency shared state variables (lux, acousticDb, tilt, velocity, etc.) to ensure correct cross-thread reads during forensic audits. Unified the synchronization strategy by wrapping both the sensor update handlers and the peak-reset snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, guaranteeing atomic "read-and-reset" operations under high system load (R-ID 368). (Resolved Sep.19.09)
 *   **SOT ID 367**: Forensic Multi-Role Integrity Hardening - Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367). (Resolved Sep.19.08)
 
 ## 📈 Metric Summary
 - **Rules Verified**: 82
-- **Total SOT IDs**: 404
-- **Resolved Issues**: 1160
+- **Total SOT IDs**: 405
+- **Resolved Issues**: 1161
 - **Open Issues**: 0
 - **Testing Coverage**: 3 (Sub-items: 12)
 - **Simplification Ideas**: 11
 - **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.69 (Fast-Path Unification)**: PASSED - Unified acoustic and light fast-paths in HardwareSuite via generic HardwareFastPath (Sep.22.08)
-*   **Chapter 31.68 (Vendor Centralization)**: PASSED - Centralized hardware adaptations in DeviceProfileManager (Sep.22.07)
-*   **Chapter 31.67 (UseCase Consolidation)**: PASSED - Verified creation of SpatialLogicUseCase and reduction of MainViewModel surface area (Sep.22.05)
-*   **Chapter 31.66 (Persistence Refactoring)**: PASSED - Verified generic mutate extension and unified repository operations (Sep.21.133)
-*   **Chapter 31.65 (Atomic Geofence)**: PASSED - Verified race-free home point updates and persistent ADD mode (Sep.21.133)
-*   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states (Sep.21.133)
-*   **Chapter 31.63 (Role Selection UX)**: PASSED - Dynamic card dimming based on peer activity status (Sep.21.133)
-*   **Chapter 31.62 (Temperature Unit Layout)**: PASSED - Corrected SI unit presentation in StatusRowData (Sep.21.133)
+*   **Chapter 31.70 (State Partitioning)**: PASSED - Split MainUiState into specialized slices to isolate volatile triggers (Sep.22.10)
+*   **Chapter 31.69 (Fast-Path Unification)**: PASSED - Unified acoustic and light fast-paths in HardwareSuite via generic HardwareFastPath (Sep.22.10)
+*   **Chapter 31.68 (Vendor Centralization)**: PASSED - Centralized hardware adaptations in DeviceProfileManager (Sep.22.10)
+*   **Chapter 31.67 (UseCase Consolidation)**: PASSED - Verified creation of SpatialLogicUseCase and reduction of MainViewModel surface area (Sep.22.10)
+*   **Chapter 31.66 (Persistence Refactoring)**: PASSED - Verified generic mutate extension and unified repository operations (Sep.22.10)
+*   **Chapter 31.65 (Atomic Geofence)**: PASSED - Verified race-free home point updates and persistent ADD mode (Sep.22.10)
+*   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states (Sep.22.10)
+*   **Chapter 31.63 (Role Selection UX)**: PASSED - Dynamic card dimming based on peer activity status (Sep.22.10)
+*   **Chapter 31.62 (Temperature Unit Layout)**: PASSED - Corrected SI unit presentation in StatusRowData (Sep.22.10)
 *   **Chapter 31.61 (Session Lifecycle Coordinator)**: PASSED - Unified background session resets atomically across roles (Sep.21.132)
 *   **Chapter 31.60 (Interface Isolation Utilities)**: PASSED - Created LocationProcessorListener & DefaultLocationProcessorListener to prevent test breakages (Sep.21.131)
 *   **Chapter 31.59 (Dead Code Elimination)**: PASSED - Removed unused tracking property and helper method leftovers in HardwareSuite (Sep.21.130)
@@ -71,7 +72,7 @@
 *   **Chapter 31.51 (Vibration Authority)**: PASSED - Verified unified floor propagation in HardwareSuite/Sentinel (Sep.21.121)
 *   **Chapter 31.50 (Acoustic Teardown)**: PASSED - Verified removal of Commission / synchronous join in stopAcousticMonitoring (Sep.21.121)
 *   **Chapter 31.49 (Telemetry Conflation)**: PASSED - Verified location buffer drainage in TrackerService (Sep.21.120)
-*   **Chapter 31.48 (Thread Visibility)**: PASSED - Verified Volatile markers in HardwareSuite (Sep.20.103)
+*   **Company 31.48 (Thread Visibility)**: PASSED - Verified Volatile markers in HardwareSuite (Sep.20.103)
 *   **Chapter 31.47 (Forensic Reset)**: PASSED - Verified TrackerService sampling state reset (Sep.20.103)
 *   **Chapter 31.46 (Vitality Timestamps)**: PASSED - Verified IntegrityMonitor timestamp reset (Sep.20.103)
 *   **Chapter 31.45 (Auditor Sync)**: PASSED - Verified synchronized RoleState in ForensicAuditor (Sep.20.103)
@@ -83,4 +84,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.20.103)
 
 ---
-*Next Audit: Sep.22.100. (Sep.22.08)*
+*Next Audit: Sep.22.100. (Sep.22.10)*
