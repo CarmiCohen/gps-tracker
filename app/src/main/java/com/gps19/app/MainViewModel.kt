@@ -61,6 +61,8 @@ private data class MapBase(val ui: MapUiParts, val kinematic: KinematicState, va
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.22.05:
+ * - Issue #1181: Consolidated HomePointUseCase and MapUseCase into SpatialLogicUseCase (R-ID 402).
  * Sep.22.03:
  * - Issue #1179 Remediation: Batch Hydration Persistence. Optimized home point 
  *   addition to support rapid sequential entries by persisting geofenceMode 
@@ -84,7 +86,7 @@ class MainViewModel @Inject constructor(
     val repository: MainRepository,
     private val logManager: LogManager,
     private val systemStatusProvider: SystemStatusProvider,
-    private val homePointUseCase: HomePointUseCase,
+    private val spatialLogicUseCase: SpatialLogicUseCase,
     private val uiStateMapper: UiStateMapper,
     private val navigationUseCase: NavigationUseCase,
     private val settingsUseCase: SettingsUseCase,
@@ -93,7 +95,6 @@ class MainViewModel @Inject constructor(
     private val sessionUseCase: SessionUseCase,
     private val behaviorUseCase: BehaviorUseCase,
     private val alertUseCase: AlertUseCase,
-    private val mapUseCase: MapUseCase,
     val timeProvider: TimeProvider,
     val audioSynthesizer: AudioSynthesizer,
     private val remoteStatusRepository: RemoteStatusRepository,
@@ -627,7 +628,7 @@ class MainViewModel @Inject constructor(
             is UiEvent.SetFenceVisible, is UiEvent.SetViolationsVisible, is UiEvent.SetGeofenceViolationsVisible,
             is UiEvent.SetMapButtonsVisible, is UiEvent.SetMapLocked, is UiEvent.MapZoomIn, is UiEvent.MapZoomOut,
             is UiEvent.CenterTracker, is UiEvent.CenterViewer, is UiEvent.SetGeofenceMode -> {
-                updateState { mapUseCase.handleMapEvent(event, it) }
+                updateState { spatialLogicUseCase.handleMapEvent(event, it) }
             }
             is UiEvent.MapTap -> handleMapTap(event.point)
             is UiEvent.AddHomePoint -> handleAddHomePoint(event.point)
@@ -772,14 +773,14 @@ class MainViewModel @Inject constructor(
         if (mode == GeofenceMode.ADD) {
             onEvent(UiEvent.AddHomePoint(point))
         } else if (mode == GeofenceMode.REMOVE) {
-            val idx = homePointUseCase.findNearestPointIndex(_uiState.value.homePoints, point)
+            val idx = spatialLogicUseCase.findNearestPointIndex(_uiState.value.homePoints, point)
             if (idx != -1) onEvent(UiEvent.RemoveHomePoint(idx))
         }
     }
 
     private fun handleAddHomePoint(point: GeoPoint) {
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            val newPoints = homePointUseCase.addHomePoint(point)
+            val newPoints = spatialLogicUseCase.addHomePoint(point)
             withContext(Dispatchers.Main.immediate) {
                 // Issue #1179: Persist ADD mode and force fence visibility for immediate batch feedback.
                 updateState { it.copy(homePoints = newPoints, isFenceVisible = true) }
@@ -789,7 +790,7 @@ class MainViewModel @Inject constructor(
 
     private fun handleRemoveHomePoint(index: Int) {
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            val newPoints = homePointUseCase.removeHomePoint(index)
+            val newPoints = spatialLogicUseCase.removeHomePoint(index)
             withContext(Dispatchers.Main.immediate) {
                 // Issue #1179: Persist REMOVE mode during batch operations.
                 updateState { it.copy(homePoints = newPoints) }
@@ -799,7 +800,7 @@ class MainViewModel @Inject constructor(
 
     private fun handleClearHomePoints() {
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            val newPoints = homePointUseCase.clearHomePoints(_uiState.value.maxDistance)
+            val newPoints = spatialLogicUseCase.clearHomePoints(_uiState.value.maxDistance)
             withContext(Dispatchers.Main.immediate) {
                 updateState { it.copy(homePoints = newPoints) }
             }

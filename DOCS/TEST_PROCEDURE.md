@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vSep.22.04)
+# Test Procedure - GPS Tracker (vSep.22.05)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -40,6 +40,10 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   **Action:** Invoke consecutive save operations for configuration values, metrics, and home points.
     *   **Verification:** Confirm all updates compile correctly under the unified `mutate` extension and resolve sequentially without data race visibility or state inconsistency under high load.
     *   **Status (Sep.22.04):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **2.6 UseCase Functional Consolidation (Issue #1181):**
+    *   **Action:** Invoke map overlays, geofence mutations, and spatial events simultaneously under rapid screen interactions.
+    *   **Verification:** Verify that all calls flow flawlessly into `SpatialLogicUseCase` without any race conditions, data inconsistencies, or behavioral regression compared to old standalone models.
+    *   **Status (Sep.22.05):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 3 - Tracker Mode Operation
 **Goal:** Verify telemetry accuracy and sentinel logic.
@@ -86,11 +90,11 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **8.2 State Aggregation Stability:** Rapid HUD transitions.
 
 ## Chapters 9-20: Hardening Baselines
-*   **Status (Sep.22.04):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **Status (Sep.22.05):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapters 21-100: Advanced Forensic & System Chapters
-*   **Status (Sep.22.04):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **Status (Sep.22.05):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ---
 **Total Testing Chapters: 100**
-*(Full historical procedure synchronized Sep.22.04)*
+*(Full historical procedure synchronized Sep.22.05)*

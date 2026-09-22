@@ -2,6 +2,10 @@
 
 ## 🟢 Resolved Issues & Refactoring Record
 
+### Sep.22.05
+*   **Issue #1181: UseCase Functional Consolidation**
+    *   *Remediation*: Consolidated `HomePointUseCase` and `MapUseCase` into a single high-cohesion `SpatialLogicUseCase`, streamlining domain logic boundaries and reducing the ViewModel dependency injection surface area (R-ID 402).
+
 ### Sep.22.04
 *   **Issue #1180: DataStore List Mutation Extension**
     *   *Remediation*: Implemented a generic `mutate` extension function for `DataStore<AppSettings>` to encapsulate atomic, race-free list and field updates. Refactored `SettingsRepository` to use this extension across all persistence methods, streamlining the data layer and eliminating redundant builder/update boilerplate (R-ID 401).

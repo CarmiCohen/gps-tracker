@@ -1,12 +1,13 @@
-# SOT Master Requirements & Hardening Status (Sep.22.04)
+# SOT Master Requirements & Hardening Status (Sep.22.05)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 402**: UseCase Functional Consolidation - Consolidated `HomePointUseCase` and `MapUseCase` into a single, high-cohesion `SpatialLogicUseCase` DTO. This reduces the dependency injection surface area of `MainViewModel` and centralizes all spatial operations and map state transformations within a single domain logic layer (R-ID 402). (Resolved Sep.22.05)
 *   **SOT ID 401**: DataStore List Mutation Extension - Implemented a generic `mutate` extension function for `DataStore<AppSettings>` to encapsulate atomic, race-free list and field updates. Refactored `SettingsRepository` to use this extension across all persistence methods, streamlining the data layer and eliminating redundant builder/update boilerplate (R-ID 401). (Resolved Sep.22.04)
 *   **SOT ID 400**: Atomic Geofence Hydration - Implemented atomic `addHomePoint` and `removeHomePoint` methods in `SettingsRepository` using DataStore's `updateData`. This prevents list corruption and UI stalls during rapid sequential interactive updates. Refactored `MainViewModel` to persist active geofence modes during batch additions, ensuring a friction-less setup experience (R-ID 400). (Resolved Sep.22.03)
 *   **SOT ID 399**: Initial GNSS Satellite Count Blanking Prior to Initial Lock - Set default satellite counts to -1 in `LocationUpdate` and `HudTelemetryState`. Updated `UiStateMapper` and `SharedUiComponents` to distinguish -1 (no data) from 0 (jammed/blocked) by displaying "--" until the first hardware fix is processed (R-ID 399). (Resolved Sep.22.00)
 *   **SOT ID 398**: Static Role Branding on Selection Screen Cards - Integrated `isPeerActive` check into `MainViewModel` and passed it to `LandingScreen`. The Viewer card now dynamically dims when no telemetry is detected, improving role clarity during the initial handshake phase (R-ID 398). (Resolved Sep.22.00)
-*   **SOT ID 397**: Mismatched Temperature Unit Prefix Layout Ordering - Corrected text component placement in `StatusRowData` to suffix the degree sign (`0°`) instead of prefixing it, ensuring consistent SI unit presentation (R-ID 397). (Resolved Sep.22.00)
-*   **SOT ID 396**: Unified Session Lifecycle Management - Centralized session state management in `SessionLifecycleCoordinator` to ensure all hardware peaks, temporal lockouts, and vitality markers are zeroed atomically upon session restart. (Resolved Sep.21.132)
+*   **SOT ID 397**: Mismatched Temperature Unit Prefix Layout Ordering - Corrected text component placement in `StatusRowData` within `SharedUiComponents.kt` to suffix the degree sign (`0°`) instead of prefixing it, ensuring alignment with SI standard presentation (R-ID 397). (Resolved Sep.22.00)
+*   **SOT ID 396**: Unified Session Lifecycle Management - Centralized the zeroing of hardware baseline parameters, temporal lockout registers, forensic latches, and vitality markers into `SessionLifecycleCoordinator`, ensuring atomic integrity upon tracking resets. (Resolved Sep.21.132)
 *   **SOT ID 395**: Interface Isolation Utilities - Created `LocationProcessorListener` and `DefaultLocationProcessorListener` with no-op methods to prevent test breakages during interface expansion and stabilize regression testing (R-ID 395). (Resolved Sep.21.131)
 *   **SOT ID 394**: GNSS Sampling Logic Consolidation - Encapsulated GNSS sampling policy (standard vs throttled) and auditing triggers in a nested `GnssPolicyEngine` within `HardwareSuite.kt`. This decouples the hardware callback from throttling rules and ensures symmetric auditing of jitter across all performance tiers (R-ID 394). (Resolved Sep.21.128)
 *   **SOT ID 393**: Acoustic-SNR Semantic Mismatch & Integration - Introduced `EngineAcousticSample` and refactored `HardwareSuite.getAcousticSamples` to return a sequence of this new type. Refactored `HistoryManager` and `TelemetryAggregator` to consume this specialized sequence during backfill and gap-filling. This ensures environmental noise telemetry (dB) is semantically isolated from satellite GNSS SNR across the entire forensic pipeline, preventing diagnostic ambiguity in forensic ribbons (R-ID 393). (Resolved Sep.21.127)
@@ -34,20 +35,21 @@
 *   **SOT ID 371**: Asynchronous Sensor Registration Hardening - Resolved a race condition in `HardwareSuite.kt` where `setPowerSaveMode` could re-register sensors on a stopped suite. Added an explicit `isStarted.get()` check within the posted handler block to ensure sequential lifecycle integrity during rapid mode transitions (R-ID 371). (Resolved Sep.19.12)
 *   **SOT ID 370**: Acoustic Monitor Lifecycle Hardening - Resolved a resource race condition in `HardwareSuite.kt` where rapid restarts could cause multiple threads to compete for the `AudioRecord` resource. Implemented `acousticLock` and mandatory thread joining in `startAcousticMonitoring()`, ensuring that any previous monitor session is definitively terminated before a new one initializes (R-ID 370). (Resolved Sep.19.11)
 *   **SOT ID 369**: Stale Forensic Buffer Lifecycle Hardening - Resolved an issue in `HardwareSuite.kt` where circular buffers (`sensorBuffer`, `snrBuffer`, `logicSnapshotBuffer`, `forensicSnapshotBuffer`) and the `lastBufferRecordRt` timestamp were not cleared during suite termination. By explicitly resetting these structures in `stop()`, the system now guarantees a clean forensic state for every service session restart, preventing stale data from polluting new monitoring cycles (R-ID 369). (Resolved Sep.19.10)
-*   **SOT ID 368**: Snapshot Thread-Safety Hardening - Resolved memory visibility and race conditions in `HardwareSuite.kt` snapshotting logic. Applied `@Volatile` to high-frequency shared state variables (lux, acousticDb, tilt, velocity, etc.) to ensure correct cross-thread reads during forensic audits. Unified the synchronization strategy by wrapping both the sensor update handlers and the peak-reset snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, guaranteeing atomic "read-and-reset" operations under high system load (R-ID 368). (Resolved Sep.19.09)
+*   **SOT ID 368**: Snapshot Thread-Safety Hardening - Resolved memory visibility and race conditions in `HardwareSuite.kt snapshotting logic. Applied `@Volatile` to high-frequency shared state variables (lux, acousticDb, tilt, velocity, etc.) to ensure correct cross-thread reads during forensic audits. Unified the synchronization strategy by wrapping both the sensor update handlers and the peak-reset snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, guaranteeing atomic "read-and-reset" operations under high system load (R-ID 368). (Resolved Sep.19.09)
 *   **SOT ID 367**: Forensic Multi-Role Integrity Hardening - Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367). (Resolved Sep.19.08)
 
 ## 📈 Metric Summary
 - **Rules Verified**: 82
-- **Total SOT IDs**: 401
-- **Resolved Issues**: 1157
+- **Total SOT IDs**: 402
+- **Resolved Issues**: 1158
 - **Open Issues**: 0
 - **Testing Coverage**: 3 (Sub-items: 11)
 - **Simplification Ideas**: 13
 - **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.66 (Persistence Refactoring)**: PASSED - Verified generic mutate extension and unified repository operations (Sep.22.04)
+*   **Chapter 31.67 (UseCase Consolidation)**: PASSED - Verified creation of SpatialLogicUseCase and reduction of MainViewModel surface area (Sep.22.05)
+*   **Chapter 31.66 (Persistence Refactoring)**: PASSED - Verified generic mutate extension and unified repository operations (Sep.21.133)
 *   **Chapter 31.65 (Atomic Geofence)**: PASSED - Verified race-free home point updates and persistent ADD mode (Sep.21.133)
 *   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states (Sep.21.133)
 *   **Chapter 31.63 (Role Selection UX)**: PASSED - Dynamic card dimming based on peer activity status (Sep.21.133)
@@ -77,4 +79,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.20.103)
 
 ---
-*Next Audit: Sep.22.100. (Sep.22.04)*
+*Next Audit: Sep.22.100. (Sep.22.05)*
