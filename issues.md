@@ -6,7 +6,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
 ### Missing Functionality & Unfinished Integration
-*(No critical open gaps identified in current audit path).*
+*(No critical missing functionality identified in current audit path).*
 
 ### Unintended Side Effects & Thread Safety
 *(No critical side-effects identified in current audit path).*
@@ -48,6 +48,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1179: Corrupted Home Point Addition Logic** (Resolved Sep.22.03)
+    *   *Remediation*: Implemented atomic `addHomePoint` and `removeHomePoint` methods in `SettingsRepository` using DataStore's `updateData` to prevent race conditions. Refactored `MainViewModel` to persist `ADD` mode during batch operations and force fence visibility (R-ID 400).
+
 *   **Issue #1178: Initial GNSS Satellite Count Blanking Prior to Initial Lock** (Resolved Sep.22.00)
     *   *Remediation*: Set default satellite counts to -1 in `LocationUpdate` and propagated actual values to UI states. This ensures UI can distinguish between zero satellites (e.g. jammer/tunnel) and "no data" states during initialization (R-ID 399).
 
@@ -69,4 +72,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 399 (Rules: 81, IDs: 399), Resolved: 1155, Open: 0, Testing: 3 (Sub-items: 11), Ideas: 14, QA: 283]**
+- **Current Audit Baseline: [SOT: 400 (Rules: 82, IDs: 400), Resolved: 1156, Open: 0, Testing: 3 (Sub-items: 11), Ideas: 14, QA: 283]**

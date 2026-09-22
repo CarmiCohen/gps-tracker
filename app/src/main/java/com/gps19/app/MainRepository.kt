@@ -28,6 +28,9 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Sep.22.03:
+ * - Issue #1179: Atomic Hydration. Exposed addHomePoint and removeHomePoint 
+ *   from SettingsRepository to support race-free geofence updates (R-ID 400).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
@@ -204,6 +207,9 @@ class MainRepository @Inject constructor(
         cachedHomePoints = points
         lastHomeRefreshTs = timeProvider.currentTimeMillis()
     }
+
+    suspend fun addHomePoint(lat: Double, lng: Double) = settings.addHomePoint(lat, lng)
+    suspend fun removeHomePoint(index: Int) = settings.removeHomePoint(index)
 
     suspend fun loadAlertSettings() = settings.loadAlertSettings()
     suspend fun saveAlertSettings(s: AlertSettings) = settings.saveAlertSettings(s)

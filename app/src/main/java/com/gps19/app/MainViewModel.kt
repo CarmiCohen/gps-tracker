@@ -61,6 +61,10 @@ private data class MapBase(val ui: MapUiParts, val kinematic: KinematicState, va
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.22.03:
+ * - Issue #1179 Remediation: Batch Hydration Persistence. Optimized home point 
+ *   addition to support rapid sequential entries by persisting geofenceMode 
+ *   and forcing fence visibility (R-ID 400).
  * Sep.22.00:
  * - Issue #1177: Static Role Branding. Integrated isPeerActive check into 
  *   global pulse loop to drive selection screen role indicators (R-ID 398).
@@ -73,9 +77,6 @@ private data class MapBase(val ui: MapUiParts, val kinematic: KinematicState, va
  * Sep.16.02:
  * - Issue #1060 Capability Consolidation: Harmonized performance tier 
  *   sampling and initialization logic (R-ID 348).
- * Sep.16.00:
- * - Issue #1055: Unified Performance Tier Remediation. Fixed unresolved 
- *   reference in onEvent mapping (R-ID 348, formerly R-ID 347).
  */
 @OptIn(FlowPreview::class)
 @HiltViewModel
@@ -778,18 +779,20 @@ class MainViewModel @Inject constructor(
 
     private fun handleAddHomePoint(point: GeoPoint) {
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            val newPoints = homePointUseCase.addHomePoint(_uiState.value.homePoints, point, _uiState.value.maxDistance)
+            val newPoints = homePointUseCase.addHomePoint(point)
             withContext(Dispatchers.Main.immediate) {
-                updateState { it.copy(homePoints = newPoints, geofenceMode = GeofenceMode.IDLE) }
+                // Issue #1179: Persist ADD mode and force fence visibility for immediate batch feedback.
+                updateState { it.copy(homePoints = newPoints, isFenceVisible = true) }
             }
         }
     }
 
     private fun handleRemoveHomePoint(index: Int) {
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            val newPoints = homePointUseCase.removeHomePoint(_uiState.value.homePoints, index, _uiState.value.maxDistance)
+            val newPoints = homePointUseCase.removeHomePoint(index)
             withContext(Dispatchers.Main.immediate) {
-                updateState { it.copy(homePoints = newPoints, geofenceMode = GeofenceMode.IDLE) }
+                // Issue #1179: Persist REMOVE mode during batch operations.
+                updateState { it.copy(homePoints = newPoints) }
             }
         }
     }

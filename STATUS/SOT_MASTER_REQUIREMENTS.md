@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.21.133)
+# SOT Master Requirements & Hardening Status (Sep.22.03)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 400**: Atomic Geofence Hydration - Implemented atomic `addHomePoint` and `removeHomePoint` methods in `SettingsRepository` using DataStore's `updateData`. This prevents list corruption and UI stalls during rapid sequential interactive updates. Refactored `MainViewModel` to persist active geofence modes during batch additions, ensuring a friction-less setup experience (R-ID 400). (Resolved Sep.22.03)
 *   **SOT ID 399**: Initial GNSS Satellite Count Blanking Prior to Initial Lock - Set default satellite counts to -1 in `LocationUpdate` and `HudTelemetryState`. Updated `UiStateMapper` and `SharedUiComponents` to distinguish -1 (no data) from 0 (jammed/blocked) by displaying "--" until the first hardware fix is processed (R-ID 399). (Resolved Sep.22.00)
 *   **SOT ID 398**: Static Role Branding on Selection Screen Cards - Integrated `isPeerActive` check into `MainViewModel` and passed it to `LandingScreen`. The Viewer card now dynamically dims when no telemetry is detected, improving role clarity during the initial handshake phase (R-ID 398). (Resolved Sep.22.00)
 *   **SOT ID 397**: Mismatched Temperature Unit Prefix Layout Ordering - Corrected text component placement in `StatusRowData` to suffix the degree sign (`0°`) instead of prefixing it, ensuring consistent SI unit presentation (R-ID 397). (Resolved Sep.22.00)
@@ -36,18 +37,19 @@
 *   **SOT ID 367**: Forensic Multi-Role Integrity Hardening - Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367). (Resolved Sep.19.08)
 
 ## 📈 Metric Summary
-- **Rules Verified**: 81
-- **Total SOT IDs**: 399
-- **Resolved Issues**: 1155
+- **Rules Verified**: 82
+- **Total SOT IDs**: 400
+- **Resolved Issues**: 1156
 - **Open Issues**: 0
 - **Testing Coverage**: 3 (Sub-items: 11)
 - **Simplification Ideas**: 14
 - **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states (Sep.21.133)
-*   **Chapter 31.63 (Role Selection UX)**: PASSED - Dynamic card dimming based on peer activity status (Sep.21.133)
-*   **Chapter 31.62 (Temperature Unit Layout)**: PASSED - Corrected SI unit presentation in StatusRowData (Sep.21.133)
+*   **Chapter 31.65 (Atomic Geofence)**: PASSED - Verified race-free home point updates and persistent ADD mode (Sep.22.03)
+*   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states (Sep.22.00)
+*   **Chapter 31.63 (Role Selection UX)**: PASSED - Dynamic card dimming based on peer activity status (Sep.22.00)
+*   **Chapter 31.62 (Temperature Unit Layout)**: PASSED - Corrected SI unit presentation in StatusRowData (Sep.22.00)
 *   **Chapter 31.61 (Session Lifecycle Coordinator)**: PASSED - Unified background session resets atomically across roles (Sep.21.132)
 *   **Chapter 31.60 (Interface Isolation Utilities)**: PASSED - Created LocationProcessorListener & DefaultLocationProcessorListener to prevent test breakages (Sep.21.131)
 *   **Chapter 31.59 (Dead Code Elimination)**: PASSED - Removed unused tracking property and helper method leftovers in HardwareSuite (Sep.21.130)
@@ -73,4 +75,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.20.103)
 
 ---
-*Next Audit: Sep.22.100. (Sep.21.133)*
+*Next Audit: Sep.22.100. (Sep.22.03)*

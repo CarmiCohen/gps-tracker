@@ -46,6 +46,10 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Sep.22.03:
+ * - Issue #1179 Remediation: Implemented atomic addHomePoint and removeHomePoint 
+ *   using DataStore updateData to prevent race conditions during rapid 
+ *   interactive updates. (R-ID 400).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
@@ -306,6 +310,36 @@ class SettingsRepository @Inject constructor(
             builder.clearHomePoints().addAllHomePoints(points.map { GeoPointProto.newBuilder().setLat(it.latitude).setLng(it.longitude).build() })
             builder.setHomePointsTs(ts)
             maxDistance?.let { builder.setMaxDistance(it) }
+            builder.build()
+        }
+        return ts
+    }
+
+    /**
+     * Atomic addition of a home point to persistent storage.
+     */
+    suspend fun addHomePoint(lat: Double, lng: Double): Long {
+        val ts = timeProvider.currentTimeMillis()
+        dataStore.updateData { current ->
+            val builder = current.toBuilder()
+            builder.addHomePoints(GeoPointProto.newBuilder().setLat(lat).setLng(lng).build())
+            builder.setHomePointsTs(ts)
+            builder.build()
+        }
+        return ts
+    }
+
+    /**
+     * Atomic removal of a home point from persistent storage by index.
+     */
+    suspend fun removeHomePoint(index: Int): Long {
+        val ts = timeProvider.currentTimeMillis()
+        dataStore.updateData { current ->
+            val builder = current.toBuilder()
+            if (index >= 0 && index < builder.homePointsCount) {
+                builder.removeHomePoints(index)
+                builder.setHomePointsTs(ts)
+            }
             builder.build()
         }
         return ts

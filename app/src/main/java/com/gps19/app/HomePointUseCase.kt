@@ -6,25 +6,24 @@ import javax.inject.Inject
 
 /**
  * HomePointUseCase: Business logic for managing geofence center points.
+ * Sep.22.03:
+ * - Issue #1179: Atomic Hydration. Refactored add/remove to use atomic 
+ *   repository methods, preventing list corruption during rapid interactive 
+ *   updates. (R-ID 400).
  * July.22.00:
  * - Hilt Hardening: Added @Inject constructor.
- * v9.5.0:
- * - Issue #503: Hilt Removal.
  */
 class HomePointUseCase @Inject constructor(
     private val repository: MainRepository
 ) {
-    suspend fun addHomePoint(currentPoints: List<GeoPoint>, newPoint: GeoPoint, maxDistance: Double): List<GeoPoint> {
-        val newList = currentPoints + newPoint
-        repository.saveHomePoints(newList, maxDistance)
-        return newList
+    suspend fun addHomePoint(newPoint: GeoPoint): List<GeoPoint> {
+        repository.addHomePoint(newPoint.latitude, newPoint.longitude)
+        return repository.loadHomePoints()
     }
 
-    suspend fun removeHomePoint(currentPoints: List<GeoPoint>, index: Int, maxDistance: Double): List<GeoPoint> {
-        if (index < 0 || index >= currentPoints.size) return currentPoints
-        val newList = currentPoints.toMutableList().apply { removeAt(index) }
-        repository.saveHomePoints(newList, maxDistance)
-        return newList
+    suspend fun removeHomePoint(index: Int): List<GeoPoint> {
+        repository.removeHomePoint(index)
+        return repository.loadHomePoints()
     }
 
     suspend fun clearHomePoints(maxDistance: Double): List<GeoPoint> {

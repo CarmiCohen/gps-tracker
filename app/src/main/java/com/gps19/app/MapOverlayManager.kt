@@ -6,6 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.Paint
 import android.graphics.drawable.BitmapDrawable
 import android.view.HapticFeedbackConstants
+import android.view.MotionEvent
 import android.widget.Toast
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.applyCanvas
@@ -25,6 +26,10 @@ import kotlin.math.round
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Sep.22.03:
+ * - Issue #1179 Remediation: Fixed Double-Removal bug by removing redundant 
+ *   onTap call in marker click listener. Switched to content equality for 
+ *   home list comparisons to reduce re-render jitter. (R-ID 400).
  * Sep.09.16:
  * - Issue #942 RESOLVED: Fixed Identity Color Confusion. Updated createTrackerBitmap 
  *   to use Style.FILL for the inner circle, ensuring parity with Viewer icon. 
@@ -34,10 +39,6 @@ import kotlin.math.round
  *   circleCache capacity to 600. Refined yielding to dynamic batching (size 5 
  *   for large sets) to reduce rescheduling overhead while maintaining 
  *   zero-Davey status on A15 hardware (R881).
- * Sep.01.04:
- * - Issue #880 Remediation: Increased hydration granularity to "High". Reduced 
- *   yield batch size from 5 to 2 items and added intra-position yields to 
- *   eliminate the residual 751ms frame stall on SM-A155F (R880).
  */
 class MapOverlayManager(
     private val context: Context,
@@ -212,7 +213,9 @@ class MapOverlayManager(
         onTap: (GeoPoint) -> Unit,
         onRemoveMarker: (Int) -> Unit
     ): Boolean {
-        if (lastHomeRendered === home && lastFenceState == isFenceVisible && 
+        // Issue #1179: Switched to content equality (==) for home points to reduce jitter 
+        // when reference changes but coordinates remain identical.
+        if (lastHomeRendered == home && lastFenceState == isFenceVisible && 
             lastIsTrackerMode == isTrackerMode && lastGeofenceMode == geofenceMode) return false
             
         lastHomeRendered = home
@@ -245,7 +248,7 @@ class MapOverlayManager(
                     marker.setOnMarkerClickListener { mk, mv -> 
                         if (!isTrackerMode && geofenceMode == GeofenceMode.REMOVE) { 
                             mv.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                            onTap(p)
+                            // Issue #1179: Removed redundant onTap(p) call to resolve Double-Removal bug.
                             onRemoveMarker(idx)
                             Toast.makeText(context, "Home point removed", Toast.LENGTH_SHORT).show() 
                         }

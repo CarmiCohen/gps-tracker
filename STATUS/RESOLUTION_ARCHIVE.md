@@ -2,6 +2,10 @@
 
 ## 🟢 Resolved Issues & Refactoring Record
 
+### Sep.22.03
+*   **Issue #1179: Corrupted Home Point Addition Logic**
+    *   *Remediation*: Implemented atomic `addHomePoint` and `removeHomePoint` methods in `SettingsRepository` using DataStore's `updateData` to prevent list corruption during rapid sequential updates. Refactored `MainViewModel` to persist the `ADD` geofence mode during batch operations and force `isFenceVisible` to `true` upon entry, ensuring immediate visual confirmation and a friction-less user experience (R-ID 400).
+
 ### Sep.22.00
 *   **Issue #1178: Initial GNSS Satellite Count Blanking Prior to Initial Lock**
     *   *Remediation*: Set default satellite counts to -1 in `LocationUpdate` and `HudTelemetryState`. Updated `UiStateMapper` and `SharedUiComponents` to distinguish -1 (no data) from 0 (jammed/blocked) by displaying "--" until the first hardware fix is processed (R-ID 399).
