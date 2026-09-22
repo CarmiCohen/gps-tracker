@@ -28,6 +28,9 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.22.31:
+ * - Issue #1182: Elimination of Multi-pass Fallbacks. Updated handleJsonUpdate to use 
+ *   SensorStateSnapshot for sentinel.updateSensorState calls.
  * Sep.20.15:
  * - Issue #1138/1147 Hardening: Restored gpsHardwareLock from offline storage 
  *   in flushPendingUpdates and added isGnssThrottled to pushCurrentStatus (R-ID 378).
@@ -804,13 +807,14 @@ class ConnectivitySuite @Inject constructor(
                 val luxBaseline = data.optDouble("lux_baseline", current.luxBaseline)
                 val acousticFloor = data.optDouble("acoustic_floor_db", current.acousticFloorDb)
 
-                locationProcessor.sentinel.updateSensorState(
+                val snapshot = SensorStateSnapshot(
                     vibration = data.optDouble("vibration", current.vibration), heading = data.optDouble("heading", current.heading), 
                     baroAlt = data.optDouble("baro_alt", current.baroAlt), lux = data.optDouble("lux", current.lux), isNear = data.optBoolean("is_near", current.isNear),
                     powerTamper = isTrackerPowerTamper, tiltDegrees = data.optDouble("tilt_degrees", current.tiltDegrees), 
                     acousticDb = data.optDouble("acoustic_db", current.acousticDb), peakShock = data.optDouble("peak_vibration_shock", current.peakVibrationShock),
                     acousticMinDb = -1.0, kineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy), nowRt = nowRt, nowTs = now
                 )
+                locationProcessor.sentinel.updateSensorState(snapshot)
 
                 if (data.optBoolean("is_stalled", false) && trackerGpsStallStartTs == 0L) trackerGpsStallStartTs = nowRt else if (!data.optBoolean("is_stalled", false)) trackerGpsStallStartTs = 0L
 

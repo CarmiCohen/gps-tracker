@@ -36,6 +36,9 @@ open class DefaultLocationProcessorListener : LocationProcessorListener
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.22.31:
+ * - Issue #1182: Elimination of Multi-pass Fallbacks. Updated updateSensorData and processGpsPoint 
+ *   to supply SensorStateSnapshot to sentinel.updateSensorState.
  * Sep.21.121:
  * - Issue #1143: Unified Vibration Authority. updateSensorData now propagates 
  *   providedAdaptiveFloor to Sentinel for consistent stationary detection (R-ID 388).
@@ -246,11 +249,15 @@ class LocationProcessor(
                 _processorEvents.tryEmit(ProcessorEvent.LogAdded(message, "system", false, true, 0.0, 0.0, 0.0, null, vibration))
             }
         ) {
-            val baselineChanged = sentinel.updateSensorState(
-                vibration, heading, baroAlt, lux, isNear, powerTamper, tiltDegrees, 
-                acousticDb, peakShock, acousticMinDb, peakVerticalVelocity, peakVerticalVelocityTs, peakVerticalVelocityRt, plungeMatched, peakVerticalDisplacement,
-                isSirenActive, isWarming, manualAdaptiveFloor, acousticLockoutRt, lightSpikeRt, isMuzzled, kineticEnergy, providedAdaptiveFloor, nowRt, nowWall
+            val snapshot = SensorStateSnapshot(
+                vibration = vibration, heading = heading, baroAlt = baroAlt, lux = lux, isNear = isNear, powerTamper = powerTamper,
+                tiltDegrees = tiltDegrees, acousticDb = acousticDb, peakShock = peakShock, acousticMinDb = acousticMinDb,
+                peakVerticalVelocity = peakVerticalVelocity, peakVerticalVelocityTs = peakVerticalVelocityTs, peakVerticalVelocityRt = peakVerticalVelocityRt,
+                plungeMatched = plungeMatched, peakVerticalDisplacement = peakVerticalDisplacement, isSirenActive = isSirenActive, isWarming = isWarming,
+                manualAdaptiveFloor = manualAdaptiveFloor, acousticLockoutRt = acousticLockoutRt, lightSpikeRt = lightSpikeRt, isMuzzled = isMuzzled,
+                kineticEnergy = kineticEnergy, providedAdaptiveFloor = providedAdaptiveFloor, nowRt = nowRt, nowTs = nowWall
             )
+            val baselineChanged = sentinel.updateSensorState(snapshot)
             if (baselineChanged) {
                 _processorEvents.tryEmit(ProcessorEvent.ChairBaselineChanged(sentinel.baselineSitTilt))
             }
@@ -390,13 +397,14 @@ class LocationProcessor(
             if (isLocal) updateWindowedAccuracy(accuracy) else if (providedMaxAccuracy > 0.0) maxAccuracy = providedMaxAccuracy
             
             if (providedAcousticLockoutRt > 0 || providedLightSpikeRt > 0 || providedAdaptiveVibrationFloor >= 0.0) {
-                sentinel.updateSensorState(
+                val snapshot = SensorStateSnapshot(
                     vibration = -1.0, heading = -1.0, baroAlt = -1000.0, 
                     acousticLockoutRt = providedAcousticLockoutRt, 
                     lightSpikeRt = providedLightSpikeRt,
                     providedAdaptiveFloor = providedAdaptiveVibrationFloor,
                     isMuzzled = isMuzzled, nowRt = nowRt, nowTs = nowWall
                 )
+                sentinel.updateSensorState(snapshot)
             }
 
             val sentinelResult = sentinel.processLocation(

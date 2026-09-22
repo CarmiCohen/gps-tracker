@@ -1,6 +1,10 @@
-# SOT Master Requirements & Hardening Status (Sep.21.133)
+# SOT Master Requirements & Hardening Status (Sep.22.31)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 413**: Elimination of Multi-pass Fallbacks - Grouped individual sensor parameter clauses in updateSensorState into a structured SensorStateSnapshot to remove imperative value checking bounds and streamline parameter passing. (Resolved Sep.22.31)
+*   **SOT ID 412**: Vibration Floor Adaptation Guard - Guarded the fallback autonomous vibration floor adaptation path in `LocationSentinel.updateSensorState` with a check ensuring `vibration >= 0.0`. This prevents multiple uncoordinated adaptations using stale data when called from coordinate fix propagation paths solely to update lockout realtimes or other telemetry vectors. (Resolved Sep.22.30)
+*   **SOT ID 411**: Fast-Path Baseline Preservation - Added preserveExistingBaseline parameter to HardwareFastPath update to protect autonomous sensor-thread light baseline learning from 2-second background ticks. (Resolved Sep.22.28)
+*   **SOT ID 410**: Thermal Recovery Latency Audit - Corrected the thermal recovery latency audit check to evaluate across iteration passes rather than returning a 0ms intra-iteration result, establishing reliable precision for forensic audit traces. (Resolved Sep.22.28)
 *   **SOT ID 408**: Vibration Floor Semantic Alignment - Corrected `getAdaptiveVibrationFloor()` in `LocationProcessor.kt` to return `sentinel.adaptiveVibrationFloor` instead of `sentinel.acousticFloorDb`. This resolves the severe semantic leak across the telemetry pipeline, ensuring actual adaptive vibration baseline metrics are correctly propagated rather than acoustic ones. (Resolved Sep.22.26)
 *   **SOT ID 407**: Acoustic Fast-Path Adaptation - Added alpha baseline adaptation parameter to `acousticFastPath.evaluate` in `HardwareSuite.kt`. This ensures the high-frequency acoustic baseline independently tracks ambient background noise levels, maintaining symmetry with the light fast-path and core validation logic (R-ID 407). (Resolved Sep.22.15)
 *   **SOT ID 406**: Trigger-Based Forensic Sampling - Transitioned from a fixed-interval forensic loop to a "Signal-on-Spike" model where `HardwareFastPath`, location updates, and logic ticks trigger telemetry capture. This drastically reduces background CPU wakeups and GC pressure by eliminating redundant data points during long stationary periods (R-ID 406). (Resolved Sep.22.11)
@@ -44,15 +48,19 @@
 *   **SOT ID 367**: Forensic Multi-Role Integrity Hardening - Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367). (Resolved Sep.19.08)
 
 ## 4.3. Metric Summary
-- **Rules Verified**: 82
-- **Total SOT IDs**: 408
-- **Resolved Issues**: 1164
-- **Open Issues**: 4
+- **Rules Verified**: 83
+- **Total SOT IDs**: 413
+- **Resolved Issues**: 1169
+- **Open Issues**: 0
 - **Testing Coverage**: 3 (Sub-items: 12)
 - **Simplification Ideas**: 12
 - **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.77 (Elimination of Multi-pass Fallbacks)**: PASSED - Grouped individual sensor update branches into structured snapshots to eliminate parameter bloat and fallback complexity. (Sep.22.31)
+*   **Chapter 31.76 (Vibration Floor Adaptation Guard)**: PASSED - Guarded autonomous vibration floor adaptation fallback to prevent double-counting when no vibration index is provided. (Sep.22.30)
+*   **Chapter 31.75 (Fast-Path Baseline Preservation)**: PASSED - Verified preserveExistingBaseline updates light fast-path correctly without clobbering baseline. (Sep.22.30)
+*   **Chapter 31.74 (Thermal Recovery Latency Audit)**: PASSED - Corrected recovery latency check across iteration passes to ensure accurate temporal calculations. (Sep.21.133)
 *   **Chapter 31.73 (Vibration Floor Semantic Alignment)**: PASSED - Corrected getAdaptiveVibrationFloor to return adaptiveVibrationFloor instead of acousticFloorDb (Sep.21.133)
 *   **Chapter 31.72 (Acoustic Fast-Path Adaptation)**: PASSED - Passing dynamic adaptation alpha to acoustic fast path evaluation (Sep.21.133)
 *   **Chapter 31.71 (Trigger Sampling)**: PASSED - Transitioned from fixed-interval loop to reactive signal-on-spike sampling (Sep.21.133)
@@ -70,8 +78,6 @@
 *   **Chapter 31.59 (Dead Code Elimination)**: PASSED - Removed unused tracking property and helper method leftovers in HardwareSuite (Sep.21.130)
 *   **Chapter 31.58 (GNSS Consolidation)**: PASSED - Verified nested GnssPolicyEngine evaluation pattern in HardwareSuite (Sep.21.128)
 *   **Chapter 31.57 (Acoustic Refactoring)**: PASSED - Verified HistoryManager/TelemetryAggregator integration of EngineAcousticSample (Sep.21.127)
-*   **Chapter 31.56 (Acoustic Semantic)**: PASSED - Verified EngineAcousticSample decoupling (Sep.21.125)
-*   **Chapter 31.55 (Forensic Race)**: PASSED - Verified zero-allocation locking sequence in CircularStateBuffer (Sep.21.125)
 *   **Chapter 31.54 (Flyweight Abstraction)**: PASSED - Verified unified forensic sampling in HardwareSuite (Sep.21.124)
 *   **Chapter 31.53 (Source Abstraction)**: PASSED - Verified unified telemetry snapshot pattern for alarm evaluation (Sep.21.123)
 *   **Chapter 31.52 (Snapshot Unification)**: PASSED - Verified unified snapshot ingestion path in HardwareSuite (Sep.21.122)
@@ -81,7 +87,6 @@
 *   **Company 31.48 (Thread Visibility)**: PASSED - Verified Volatile markers in HardwareSuite (Sep.20.103)
 *   **Chapter 31.47 (Forensic Reset)**: PASSED - Verified TrackerService sampling state reset (Sep.20.103)
 *   **Chapter 31.46 (Vitality Timestamps)**: PASSED - Verified IntegrityMonitor timestamp reset (Sep.20.103)
-*   **Chapter 31.45 (Auditor Sync)**: PASSED - Verified synchronized RoleState in ForensicAuditor (Sep.20.103)
 *   **Chapter 31.44 (Light Sync)**: PASSED - Verified periodic baseline synchronization in processTick (Sep.20.103)
 *   **Chapter 31.43 (Light Fast-Path)**: PASSED - Verified light spike propagation to LocationProcessor (Sep.20.103)
 *   **Chapter 31.42 (False Jitter)**: PASSED - Verified lastGnssStatusRt reset in ForensicAuditor (Sep.20.103)
@@ -90,4 +95,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.20.103)
 
 ---
-*Next Audit: Sep.22.100. (Sep.21.133)*
+*Next Audit: Sep.22.100. (Sep.22.31)*

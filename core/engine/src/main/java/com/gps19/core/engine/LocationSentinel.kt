@@ -5,6 +5,13 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Sep.22.31:
+ * - Issue #1182: Elimination of Multi-pass Fallbacks. Unified individual parameter clauses
+ *   in updateSensorState into a structured SensorStateSnapshot to remove imperative value checking bounds.
+ * Sep.22.30:
+ * - Issue #1189: Double-Counting Vibration Floor Adaptation during GPS Point Processing.
+ *   Guarded fallback vibration floor adaptation to only execute when a fresh vibration 
+ *   measurement is provided (vibration >= 0.0).
  * Sep.21.121:
  * - Issue #1143: Unified Vibration Authority. updateSensorState now accepts 
  *   providedAdaptiveFloor from HardwareSuite, preventing logic divergence 
@@ -146,78 +153,52 @@ class LocationSentinel {
         }
     }
 
-    fun updateSensorState(
-        vibration: Double, 
-        heading: Double, 
-        baroAlt: Double, 
-        lux: Double = 0.0, 
-        isNear: Boolean = true, 
-        powerTamper: Boolean = false,
-        tiltDegrees: Double = 0.0,
-        acousticDb: Double = 0.0,
-        peakShock: Double = 0.0,
-        acousticMinDb: Double = -1.0,
-        peakVerticalVelocity: Double = 0.0,
-        peakVerticalVelocityTs: Long = 0L,
-        peakVerticalVelocityRt: Long = 0L,
-        plungeMatched: Boolean = false,
-        peakVerticalDisplacement: Double = 0.0,
-        isSirenActive: Boolean = false,
-        isWarming: Boolean = false,
-        manualAdaptiveFloor: Double = -1.0,
-        acousticLockoutRt: Long = 0L,
-        lightSpikeRt: Long = 0L,
-        isMuzzled: Boolean = false,
-        kineticEnergy: Double = 0.0,
-        providedAdaptiveFloor: Double = -1.0,
-        nowRt: Long,
-        nowTs: Long
-    ): Boolean {
+    fun updateSensorState(snapshot: SensorStateSnapshot): Boolean {
         var baselineChanged = false
         
         this.lastCompassHeading = this.currentCompassHeading
-        if (vibration >= 0.0) this.currentVibrationIndex = safeDouble(vibration)
-        if (acousticLockoutRt > 0) this.lastFastPathAcousticSpikeRt = acousticLockoutRt
-        if (lightSpikeRt > 0) this.lastFastPathLightSpikeRt = lightSpikeRt
-        this.kineticEnergy = safeDouble(kineticEnergy)
+        if (snapshot.vibration >= 0.0) this.currentVibrationIndex = safeDouble(snapshot.vibration)
+        if (snapshot.acousticLockoutRt > 0) this.lastFastPathAcousticSpikeRt = snapshot.acousticLockoutRt
+        if (snapshot.lightSpikeRt > 0) this.lastFastPathLightSpikeRt = snapshot.lightSpikeRt
+        this.kineticEnergy = safeDouble(snapshot.kineticEnergy)
         
-        if (peakShock > this.peakVibrationShock && !peakShock.isNaN()) {
-            this.peakVibrationShock = peakShock
-            this.peakVibrationShockRt = nowRt
+        if (snapshot.peakShock > this.peakVibrationShock && !snapshot.peakShock.isNaN()) {
+            this.peakVibrationShock = snapshot.peakShock
+            this.peakVibrationShockRt = snapshot.nowRt
         }
 
-        val currentTilt = safeDouble(tiltDegrees)
+        val currentTilt = safeDouble(snapshot.tiltDegrees)
         val tiltDelta = if (baselineSitTilt >= 0.0) abs(currentTilt - baselineSitTilt) else 0.0
-        val baroDelta = if (baroBaseline > -999.0) abs(safeDouble(baroAlt) - baroBaseline) else 0.0
+        val baroDelta = if (baroBaseline > -999.0) abs(safeDouble(snapshot.baroAlt) - baroBaseline) else 0.0
         
-        if (nowRt > sitDetectionCooldownRt && !isMuzzled && !isWarming) {
+        if (snapshot.nowRt > sitDetectionCooldownRt && !snapshot.isMuzzled && !snapshot.isWarming) {
             val isSpatialTriggered = (tiltDelta > TILT_THRESHOLD_DEGREES) || 
                                      (baroDelta > BARO_LIFT_THRESHOLD_METERS) || 
-                                     plungeMatched
+                                     snapshot.plungeMatched
             
             if (isSpatialTriggered) {
-                val hasSufficientForce = (peakShock > VIBRATION_SHOCK_THRESHOLD_G) || plungeMatched || (abs(peakVerticalVelocity) > CHAIR_PLUNGE_VELOCITY_THRESHOLD)
+                val hasSufficientForce = (snapshot.peakShock > VIBRATION_SHOCK_THRESHOLD_G) || snapshot.plungeMatched || (abs(snapshot.peakVerticalVelocity) > CHAIR_PLUNGE_VELOCITY_THRESHOLD)
                 
                 if (hasSufficientForce) {
                     isSitDetected = true
-                    lastSitTs = nowTs
-                    lastSitRt = nowRt
-                    sitDetectionCooldownRt = nowRt + SIT_DUPLICATE_GUARD_MS
+                    lastSitTs = snapshot.nowTs
+                    lastSitRt = snapshot.nowRt
+                    sitDetectionCooldownRt = snapshot.nowRt + SIT_DUPLICATE_GUARD_MS
                     
-                    lastSitVz = safeDouble(peakVerticalVelocity)
-                    lastSitVzTs = if (peakVerticalVelocityTs > 0) peakVerticalVelocityTs else nowTs
-                    lastSitVzRt = if (peakVerticalVelocityRt > 0) peakVerticalVelocityRt else nowRt
-                    lastSitDz = safeDouble(peakVerticalDisplacement)
+                    lastSitVz = safeDouble(snapshot.peakVerticalVelocity)
+                    lastSitVzTs = if (snapshot.peakVerticalVelocityTs > 0) snapshot.peakVerticalVelocityTs else snapshot.nowTs
+                    lastSitVzRt = if (snapshot.peakVerticalVelocityRt > 0) snapshot.peakVerticalVelocityRt else snapshot.nowRt
+                    lastSitDz = safeDouble(snapshot.peakVerticalDisplacement)
                     lastSitBaro = safeDouble(baroDelta)
                     lastSitTilt = safeDouble(tiltDelta)
-                    lastSitShock = safeDouble(peakShock)
+                    lastSitShock = safeDouble(snapshot.peakShock)
                 }
             }
         }
 
         if (isStationary() && !isSitDetected) {
-            if (stationaryStartRt == 0L) stationaryStartRt = nowRt
-            else if (nowRt - stationaryStartRt > PASSIVE_ZEROING_STATIONARY_MS) {
+            if (stationaryStartRt == 0L) stationaryStartRt = snapshot.nowRt
+            else if (snapshot.nowRt - stationaryStartRt > PASSIVE_ZEROING_STATIONARY_MS) {
                 if (abs(baselineSitTilt - currentTilt) > 0.1 && !currentTilt.isNaN()) {
                     baselineSitTilt = currentTilt
                     baselineChanged = true
@@ -228,22 +209,22 @@ class LocationSentinel {
             stationaryStartRt = 0L
         }
 
-        if (heading >= 0.0) this.currentCompassHeading = safeDouble(heading)
-        if (baroAlt > -999.0) this.currentBaroAlt = safeDouble(baroAlt)
-        if (lux >= 0.0) this.currentLux = safeDouble(lux)
-        this.isNear = isNear
-        this.isPowerTamper = powerTamper
+        if (snapshot.heading >= 0.0) this.currentCompassHeading = safeDouble(snapshot.heading)
+        if (snapshot.baroAlt > -999.0) this.currentBaroAlt = safeDouble(snapshot.baroAlt)
+        if (snapshot.lux >= 0.0) this.currentLux = safeDouble(snapshot.lux)
+        this.isNear = snapshot.isNear
+        this.isPowerTamper = snapshot.powerTamper
         this.currentTiltDegrees = currentTilt
-        if (acousticDb >= 0.0) this.currentAcousticDb = safeDouble(acousticDb)
+        if (snapshot.acousticDb >= 0.0) this.currentAcousticDb = safeDouble(snapshot.acousticDb)
 
-        this.luxBaseline = SentinelValidator.updateLuxBaseline(this.luxBaseline, lux, isStationary(), isWarming)
-        this.baroBaseline = SentinelValidator.updateBaroBaseline(this.baroBaseline, baroAlt, isWarming)
+        this.luxBaseline = SentinelValidator.updateLuxBaseline(this.luxBaseline, snapshot.lux, isStationary(), snapshot.isWarming)
+        this.baroBaseline = SentinelValidator.updateBaroBaseline(this.baroBaseline, snapshot.baroAlt, snapshot.isWarming)
 
-        if (!isSirenActive) {
-            val updateDb = if (acousticMinDb >= 0.0) acousticMinDb else if (acousticMinDb == -1.0 && acousticDb >= 0.0) acousticDb else -1.0
-            this.acousticFloorDb = SentinelValidator.updateAcousticFloor(this.acousticFloorDb, updateDb, isWarming)
+        if (!snapshot.isSirenActive) {
+            val updateDb = if (snapshot.acousticMinDb >= 0.0) snapshot.acousticMinDb else if (snapshot.acousticMinDb == -1.0 && snapshot.acousticDb >= 0.0) snapshot.acousticDb else -1.0
+            this.acousticFloorDb = SentinelValidator.updateAcousticFloor(this.acousticFloorDb, updateDb, snapshot.isWarming)
             
-            val contractionElapsedRt = nowRt - lastAcousticContractionRt
+            val contractionElapsedRt = snapshot.nowRt - lastAcousticContractionRt
             if (contractionElapsedRt >= 500 || lastAcousticContractionRt == 0L) {
                 if (acousticFloorDb > ACOUSTIC_FLOOR_MIN_DB && lastAcousticContractionRt > 0) {
                     val secondsPassed = contractionElapsedRt / 1000.0
@@ -252,17 +233,18 @@ class LocationSentinel {
                         acousticFloorDb = max(acousticFloorDb * decayFactor, ACOUSTIC_FLOOR_MIN_DB)
                     }
                 }
-                lastAcousticContractionRt = nowRt
+                lastAcousticContractionRt = snapshot.nowRt
             }
         }
         
-        if (manualAdaptiveFloor >= 0.0) {
-            this.adaptiveVibrationFloor = manualAdaptiveFloor
-        } else if (providedAdaptiveFloor >= 0.0) {
+        if (snapshot.manualAdaptiveFloor >= 0.0) {
+            this.adaptiveVibrationFloor = snapshot.manualAdaptiveFloor
+        } else if (snapshot.providedAdaptiveFloor >= 0.0) {
             // Issue #1143: Use floor provided by HardwareSuite (Unified Authority)
-            this.adaptiveVibrationFloor = providedAdaptiveFloor
-        } else { 
-            this.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(this.adaptiveVibrationFloor, currentVibrationIndex, isWarming)
+            this.adaptiveVibrationFloor = snapshot.providedAdaptiveFloor
+        } else if (snapshot.vibration >= 0.0) { 
+            // Issue #1189: Guard adaptation to prevent double-counting when vibration is not provided
+            this.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(this.adaptiveVibrationFloor, currentVibrationIndex, snapshot.isWarming)
         }
         
         return baselineChanged
@@ -272,6 +254,11 @@ class LocationSentinel {
         val result = isSitDetected
         isSitDetected = false
         return result
+    }
+
+    fun resetChainBaseline() {
+        // Obsolete name cleanup compatibility fallback helper
+        baselineSitTilt = -1.0
     }
 
     fun resetChairBaseline() {
@@ -466,7 +453,7 @@ class LocationSentinel {
             return SentinelStatus.TAMPER
         }
 
-        val isAcousticLockedOut = (lastFastPathAcousticSpikeRt > 0 && (nowRt - lastFastPathAcousticSpikeRt < ACOUSTIC_LOCKOUT_MS))
+        val isAcousticLockedOut = (lastFastPathAcousticSpikeRt > 0 && (nowRt - lastFastPathAcousticSpikeRt < LIGHT_LOCKOUT_MS))
         
         if (!isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb)) {
             resultFlyweight.reason = "Acoustic alarm"

@@ -2,6 +2,20 @@
 
 ## 🟢 Resolved Issues & Refactoring Record
 
+### Sep.22.31
+*   **Issue #1182: Elimination of Multi-pass Fallbacks**
+    *   *Remediation*: Grouped individual sensor parameter clauses in updateSensorState into a structured SensorStateSnapshot to remove imperative value checking bounds and streamline parameter passing.
+
+### Sep.22.30
+*   **Issue #1189: Double-Counting Vibration Floor Adaptation during GPS Point Processing**
+    *   *Remediation*: Guarded the fallback autonomous vibration floor adaptation path in `LocationSentinel.updateSensorState` with a check ensuring `vibration >= 0.0`. This prevents multiple uncoordinated adaptations using stale data when called from coordinate fix propagation paths solely to update lockout realtimes or other telemetry vectors.
+
+### Sep.22.28
+*   **Issue #1187: Clobbered Fast-Path Baseline Learning on Sensor Thread**
+    *   *Remediation*: Added a `preserveExistingBaseline` parameter to `HardwareFastPath.update` to prevent the 2-second background process ticks from clobbering and resetting high-frequency autonomous light baseline calibration inside `HardwareSuite.kt`.
+*   **Issue #1184: Broken Thermal Recovery Latency Audit in Trigger-Based Forensic Sampling Loop**
+    *   *Remediation*: Corrected the thermal recovery latency audit check to evaluate across iteration passes rather than returning a 0ms intra-iteration result, establishing reliable precision for forensic audit traces.
+
 ### Sep.22.27
 *   **Issue #1186: Stale Acoustic Fast-Path Baseline and Missing Dynamic Synchronization**
     *   *Remediation*: Added periodic re-synchronization of the acoustic fast-path baseline with `LocationSentinel`'s contracting acoustic floor within `TrackerService.processTick()`. This ensures high-frequency acoustic monitoring stays perfectly dynamically aligned with the core validation layer.

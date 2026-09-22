@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.27
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.31
 
 ## 🎯 Current Resumption Focus: Structural Simplicity & Pattern Convergence
 Finalizing the audit of signaling performance under physical stress and ensuring no side-effects remain from the Performance Tier unification.
@@ -6,23 +6,64 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
 ### Unhandled Edge Cases & Core Logic Bugs
-*   **Issue #1184: Broken Thermal Recovery Latency Audit in Trigger-Based Forensic Sampling Loop**
-    *   *Description*: In `TrackerService.startForensicSamplingLoop()`, `recoveryTriggerRt` tracks the timestamp when thermal cooling mode deactivates. However, the recovery verification block `if (recoveryTriggerRt > 0 && delayMs < FORENSIC_SAMPLING_INTERVAL_COOLING_MS)` executes *within the exact same loop iteration pass* immediately after deactivation. 
-    *   *Risk/Concern*: The audit latency calculation evaluates to 0ms (or sub-millisecond) every time, completely failing to measure the true temporal latency to the next normal sample pass and breaking forensic audit trace precision (Issue #1183).
+*(None)*
 
 ### Unintended Side Effects & Design Inconsistencies
-*   **Issue #1187: Clobbered Fast-Path Baseline Learning on Sensor Thread**
-    *   *Description*: In `HardwareSuite.kt`, `lightFastPath.evaluate()` incorporates an EMA smoothing parameter (`alpha`) to track gradual ambient light fluctuations between background ticks. However, `TrackerService.processTick()` forcefully invokes `hardwareSuite.setLightFastPath(...)` every 2 seconds, overriding `lightFastPath.baseline` with `locationProcessor.getLuxBaseline()`.
-    *   *Risk/Concern*: Wipes out and neutralizes high-frequency autonomous baseline calibration on the sensor thread, causing redundant step overrides (Issue #1169).
-*   **Issue #1189: Double-Counting Vibration Floor Adaptation during GPS Point Processing**
-    *   *Description*: In `LocationProcessor.processGpsPoint`, when a new coordinate fix propagates fast-path tamper timestamps via `sentinel.updateSensorState`, if `providedAdaptiveVibrationFloor` is unprovided or defaulted (`-1.0`), the sentinel executes its fallback `else` branch, re-invoking `SentinelValidator.updateVibrationFloor(...)` with the stale `currentVibrationIndex`.
-    *   *Risk/Concern*: Causes the vibration floor to adapt multiple times per single tick interval, accelerating baseline decay/growth artificially and distorting stationary detection thresholds (Issue #1143).
+*(None)*
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 12)
+## 💡 Strategic Simplification Ideas (Ideas: 11)
+
+*   **Issue #1164: Persistence of Logic State**
+    *   *Description*: Serialize `AlarmHistory` into the database/DataStore to ensure geofence debounce states and power alarm latches survive process death or deep sleep system kills.
+    *   *Significance*: **High (Reliability)**: Prevents state loss and incorrect alarm re-triggers when the OS terminates background components under memory pressure.
+*   **Issue #1170: God Object ViewModel Decomposition**
+    *   *Description*: Split the monolithic `MainViewModel` into feature-specific ones (`Tracker`, `Viewer`, `Setup`) bound to Jetpack Navigation graph scopes.
+    *   *Significance*: **High (Architecture & Maintainability)**: Deconstructs the core UI controller, reducing memory footprint, isolating screen states, and improving testability.
+*   **Issue #1162: Forensic & Sensor Efficiency Optimization**
+    *   *Description*: Group related telemetry fields into a unified `EvaluationSnapshot` to allow single-pass atomic consumption of hardware snapshots within the background tick loop.
+    *   *Significance*: **High (Performance)**: Optimizes the background tracking loop by ensuring single-pass atomic data reads, minimizing locking overhead.
+*   **Issue #1161: Unified Trajectory & Buffer Management**
+    *   *Description*: Merge `GtoEngine` windows and `LocationSentinel` hindsight buffers into a single optimized `TrajectoryBuffer` and consolidate "Parking Anchor" and "Home Point" logic.
+    *   *Significance*: **Medium-High (Memory Efficiency)**: Consolidates duplicate caching layers and location window structures into a single unified high-performance buffer.
+*   **Issue #1172: Smart Signaling Dispatcher**
+    *   *Description*: Merge conflation and throttling logic into a single "Smart Dispatcher" that handles inter-frame delays and connection freshness flow controls reactively.
+    *   *Significance*: **Medium (Network Efficiency)**: Optimizes server telemetry traffic and handles varying network quality gracefully via adaptive flow controls.
+*   **Issue #1160: Flyweight & Pooling Expansion**
+    *   *Description*: Expand flyweight patterns to all entities (Telemetry, Violations, SpatialPoints) and use pre-allocated ring buffers for `EngineConnectionPoint` and a `LogEntry` pool to eliminate GC churn.
+    *   *Significance*: **Medium (GC Tuning)**: Minimizes memory fragmentation and prevents periodic UI stutters or service drops due to frequent garbage collection cycles.
+*   **Issue #1163: Stateless & Functional Logic Refactoring**
+    *   *Description*: Migrate `LocationProcessor` to a functional model using an immutable `ProcessorState` data class passed with each point.
+    *   *Significance*: **Medium (Robustness)**: Eliminates side-effects and concurrency issues in the core point processing pipeline by using functional immutability.
+*   **Issue #1173: Protobuf-First Persistence**
+    *   *Description*: Deprecate verbose JSON mapping boilerplate and parse routines by implementing pure Protobuf binary pipelines straight into Room BLOB objects (`HistoryEntity`).
+    *   *Significance*: **Medium (Disk I/O & Clean Code)**: Speeds up database writes and simplifies parsing boilerplate by substituting JSON strings with fast Protobuf serialization.
+*   **Issue #1167: Map Overlay Imperative to Declarative Controller**
+    *   *Description*: Extract imperative osmdroid management into a standalone `MapOverlayController` to keep UI code declarative and implement background coordinate filtering beforehand.
+    *   *Significance*: **Low-Medium (UI Decoupling)**: Keeps Composable functions clean and isolated from map rendering lifecycles, enabling independent background coordinate processing.
+*   **Issue #1171: Service & Worker Consolidation**
+    *   *Description*: Consider merging `TrackerService` and `ViewerService` into a single `MonitorService` that reactively changes behavior based on the active `appMode`.
+    *   *Significance*: **Low (Lifecycle Simplification)**: Unifies background services, reducing Manifest overhead and centralizing OS foreground service notifications.
+*   **Issue #1175: Real-time Only Path (Pivot Option)**
+    *   *Description*: Consider a strategic option to remove the backlog sync (`PendingStatusDao`) and forensic backfilling (gap interpolation) entirely to reduce long-term maintenance.
+    *   *Significance*: **Strategic (Maintenance Tradeoff)**: Reduces codebase complexity dramatically but at the expense of offline history features; depends heavily on product direction.
+
+---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1182: Generic Fast-Path Snapshotting / Elimination of Multi-pass Fallbacks** (Resolved Sep.22.31)
+    *   *Remediation*: Grouped individual sensor parameter updates in `updateSensorState` into a structured `SensorStateSnapshot` to eliminate individual fallback clauses, reducing parameter passing complexity and streamlining validation gates.
+
+*   **Issue #1189: Double-Counting Vibration Floor Adaptation during GPS Point Processing** (Resolved Sep.22.30)
+    *   *Remediation*: Guarded the autonomous vibration floor adaptation fallback path inside `LocationSentinel.updateSensorState` with a check ensuring `vibration >= 0.0`. This prevents multiple uncoordinated adaptations using stale data when called solely to update lockout realtimes or other telemetry vectors.
+
+*   **Issue #1187: Clobbered Fast-Path Baseline Learning on Sensor Thread** (Resolved Sep.22.28)
+    *   *Remediation*: Added a `preserveExistingBaseline` parameter to `HardwareFastPath.update` to prevent the 2-second background process ticks from clobbering and resetting high-frequency autonomous light baseline calibration inside `HardwareSuite.kt`.
+
+*   **Issue #1184: Broken Thermal Recovery Latency Audit in Trigger-Based Forensic Sampling Loop** (Resolved Sep.22.28)
+    *   *Remediation*: Corrected the thermal recovery latency audit check to evaluate across iteration passes rather than returning a 0ms intra-iteration result, establishing reliable precision for forensic audit traces.
 
 *   **Issue #1186: Stale Acoustic Fast-Path Baseline and Missing Dynamic Synchronization** (Resolved Sep.22.27)
     *   *Remediation*: Added periodic re-synchronization of the acoustic fast-path baseline with `LocationSentinel`'s contracting acoustic floor within `TrackerService.processTick()`. This ensures high-frequency acoustic monitoring stays perfectly dynamically aligned with the core validation layer.
@@ -75,4 +116,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 409 (Rules: 82, IDs: 409), Resolved: 1165, Open: 3, Testing: 3 (Sub-items: 12), Ideas: 12, QA: 283]**
+- **Current Audit Baseline: [SOT: 413 (Rules: 83, IDs: 413), Resolved: 1169, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 11, QA: 283]**

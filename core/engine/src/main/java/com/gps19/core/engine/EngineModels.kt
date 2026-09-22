@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.22.31:
+ * - Issue #1182: Elimination of Multi-pass Fallbacks. Introduced SensorStateSnapshot 
+ *   to group sensor data into a standard container, removing imperative value checking bounds.
  * Sep.21.125:
  * - Issue #1155: Acoustic-SNR Semantic Mismatch. Introduced EngineAcousticSample 
  *   to decouple environmental noise telemetry from satellite SNR (R-ID 393).
@@ -510,3 +513,32 @@ class SystemHealthReport(val reports: MutableList<ViolationReport> = mutableList
 
 @Serializable
 data class AlarmInfo(val title: String, val subtitle: String, val type: String = "", val isResolved: Boolean = false, val isSirenDisabled: Boolean = false)
+
+@Serializable
+data class SensorStateSnapshot(
+    val vibration: Double = -1.0,
+    val heading: Double = -1.0,
+    val baroAlt: Double = -1000.0,
+    val lux: Double = 0.0,
+    val isNear: Boolean = true,
+    val powerTamper: Boolean = false,
+    val tiltDegrees: Double = 0.0,
+    val acousticDb: Double = 0.0,
+    val peakShock: Double = 0.0,
+    val acousticMinDb: Double = -1.0,
+    val peakVerticalVelocity: Double = 0.0,
+    val peakVerticalVelocityTs: Long = 0L,
+    val peakVerticalVelocityRt: Long = 0L,
+    val plungeMatched: Boolean = false,
+    val peakVerticalDisplacement: Double = 0.0,
+    val isSirenActive: Boolean = false,
+    val isWarming: Boolean = false,
+    val manualAdaptiveFloor: Double = -1.0,
+    val acousticLockoutRt: Long = 0L,
+    val lightSpikeRt: Long = 0L,
+    val isMuzzled: Boolean = false,
+    val kineticEnergy: Double = 0.0,
+    val providedAdaptiveFloor: Double = -1.0,
+    val nowRt: Long = 0L,
+    val nowTs: Long = 0L
+)

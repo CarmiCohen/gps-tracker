@@ -23,6 +23,10 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.22.28:
+ * - Issue #1184: Broken Thermal Recovery Latency Audit in Trigger-Based Forensic Sampling Loop.
+ *   Moved the latency audit check to the beginning of the subsequent iteration pass to correctly
+ *   measure true temporal latency instead of a 0ms intra-iteration result.
  * Sep.22.27:
  * - Issue #1186: Acoustic Fast-Path Baseline Dynamic Synchronization. Added periodic
  *   re-synchronization of acoustic fast-path baseline with LocationSentinel's contracting
@@ -723,6 +727,20 @@ class TrackerService : BaseMonitorService() {
 
             for (unit in forensicTriggerChannel) {
                 val health = integrityMonitor.currentHealth
+
+                val delayMs = when {
+                    health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS
+                    logManager.isForensicBufferUnderPressure() -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS
+                    health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS
+                    else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS
+                }
+
+                if (recoveryTriggerRt > 0 && delayMs < FORENSIC_SAMPLING_INTERVAL_COOLING_MS) {
+                    val latency = timeProvider.elapsedRealtime() - recoveryTriggerRt
+                    logManager.logServiceEvent(m = "Forensic Performance Audit: Thermal Recovery Latency: ${latency}ms", isImportant = true)
+                    recoveryTriggerRt = 0L
+                }
+
                 val proc = lastProcessedLocation
                 val snapshot = hardwareSuite.consumeForensicSnapshot()
                 
@@ -758,19 +776,6 @@ class TrackerService : BaseMonitorService() {
                         isCharging = health.isCharging,
                         batteryTemp = health.batteryTemp
                     )
-                }
-                
-                val delayMs = when {
-                    health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS
-                    logManager.isForensicBufferUnderPressure() -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS
-                    health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS
-                    else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS
-                }
-
-                if (recoveryTriggerRt > 0 && delayMs < FORENSIC_SAMPLING_INTERVAL_COOLING_MS) {
-                    val latency = timeProvider.elapsedRealtime() - recoveryTriggerRt
-                    logManager.logServiceEvent(m = "Forensic Performance Audit: Thermal Recovery Latency: ${latency}ms", isImportant = true)
-                    recoveryTriggerRt = 0L
                 }
 
                 lastWasCooling = health.isCoolingModeActive

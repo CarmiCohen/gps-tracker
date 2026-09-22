@@ -1,36 +1,34 @@
-# Forensic Handover (Sep.21.133)
+# Forensic Handover (Sep.22.31)
 
 ## 🎯 Current System State
-*   **Version**: Sep.22.26 | **Build**: Vibration Floor Semantic Alignment (Verified)
+*   **Version**: Sep.22.31 | **Build**: Sensor API Harmonized (Verified)
 *   **Active Devices**: Samsung A15 & S21FE (Unified Fast-Paths)
-*   **SOT Baseline**: SOT: 408 (Rules: 82, IDs: 408)
-*   **Compilation Status**: Flawless. Core semantic leak resolved; verified clean Kotlin/Java compile.
+*   **SOT Baseline**: SOT: 413 (Rules: 83, IDs: 413)
+*   **Compilation Status**: Flawless. Full project compilation and core engine tests verified clean.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
 
-1.  **Vibration Floor Semantic Alignment (#1185)**: Corrected `getAdaptiveVibrationFloor()` in `LocationProcessor.kt` to explicitly return `sentinel.adaptiveVibrationFloor` rather than `sentinel.acousticFloorDb`. This enforces clear semantic separation across the telemetry pipeline.
-2.  **Acoustic Fast-Path Adaptation (#1188)**: The acoustic recording thread in `HardwareSuite` passes an adaptation alpha (`ACOUSTIC_EMA_UP_FAST`) to the fast-path evaluation. This allows the high-frequency baseline to track ambient noise levels autonomously.
-3.  **Fast-Path Symmetry**: Both light and acoustic tamper detection use the generic `HardwareFastPath` structure with independent baseline adaptation and unified spike debouncing.
+1.  **Elimination of Multi-pass Fallbacks (#1182)**: Refactored `LocationSentinel.updateSensorState` and the corresponding `LocationProcessor` methods to use a unified `SensorStateSnapshot` DTO. This eliminates the imperative "parameter explosion" and redundant fallback clauses, ensuring that sensor metrics, lockouts, and timestamps are propagated as an atomic, immutable package.
+2.  **Vibration Floor Adaptation Guard (#1189)**: Maintained the guard check (`vibration >= 0.0`) within the new snapshot ingestion path to prevent stale baseline adaptation during GPS-only updates.
+3.  **Unified Fast-Path Preservation (#1187)**: Continued support for `preserveExistingBaseline` to protect high-frequency sensor calibration from low-frequency process ticks.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 408 (Rules: 82, IDs: 408), Resolved: 1164, Open: 4, Testing: 3 (Sub-items: 12), Ideas: 12, QA: 283]**
+- **Current Audit Baseline: [SOT: 413 (Rules: 83, IDs: 413), Resolved: 1169, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 11, QA: 283]**
 
 ---
 
 ## 🛡️ Forensic Hardening Summary (Current Session Updates)
 
-### 1. Issue #1185: Semantic Type Mismatch in LocationProcessor.getAdaptiveVibrationFloor
-*   **Status**: Fully Resolved (Sep.21.133).
-*   **Remediation**: Corrected `getAdaptiveVibrationFloor()` in `LocationProcessor.kt` to return `sentinel.adaptiveVibrationFloor` instead of `sentinel.acousticFloorDb`. This resolves the severe semantic leak across the telemetry pipeline, ensuring actual adaptive vibration baseline metrics are correctly propagated rather than acoustic ones.
+### 1. Issue #1182: Elimination of Multi-pass Fallbacks / Sensor API Harmonization
+*   **Status**: Fully Resolved (Sep.22.31).
+*   **Remediation**: Grouped 20+ individual parameters into `SensorStateSnapshot`. Removed imperative value-checking logic in `LocationSentinel` that previously handled "missing" metrics. The engine now consumes a structured snapshot provided by `LocationProcessor`, streamlining the boundary between the hardware-aware service layer and the coordinate-validation logic.
 
 ---
 
 ## 🔴 Open Gaps & Resumption Guidance
-*   **Open Gaps**: 
-    *   **Issue #1186**: Acoustic fast-path baseline dynamic synchronization with `LocationSentinel`.
-    *   **Issue #1184**: Thermal recovery latency audit bug in `TrackerService`.
-*   **Resumption Context**: The next session should address **Issue #1186** to ensure periodic cross-layer baseline synchronization or **Issue #1184** to audit thermal recovery latency behavior in `TrackerService`.
+*   **Open Gaps**: None.
+*   **Resumption Context**: The sensor data boundary is now clean and type-safe. Future session can address **Issue #1162 (Forensic & Sensor Efficiency Optimization)** to further optimize the background tick loop by grouping remaining telemetry fields into a unified `EvaluationSnapshot`.
