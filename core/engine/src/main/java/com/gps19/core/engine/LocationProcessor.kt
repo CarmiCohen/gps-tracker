@@ -36,6 +36,9 @@ open class DefaultLocationProcessorListener : LocationProcessorListener
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.22.32:
+ * - Issue #1162: Forensic & Sensor Efficiency Optimization. Added updateSensorData overload 
+ *   accepting SensorStateSnapshot directly for atomic single-pass consumption.
  * Sep.22.31:
  * - Issue #1182: Elimination of Multi-pass Fallbacks. Updated updateSensorData and processGpsPoint 
  *   to supply SensorStateSnapshot to sentinel.updateSensorState.
@@ -222,6 +225,24 @@ class LocationProcessor(
         return nowRt - lastIntervalChangeRt < ADAPTATION_SETTLING_MS
     }
 
+    fun updateSensorData(snapshot: SensorStateSnapshot): Boolean {
+        return LatencyMonitor.measureAndAudit<Boolean>(
+            timeProvider,
+            LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
+            "updateSensorData",
+            LatencyMonitor.AuditType.PERFORMANCE,
+            { message, _ ->
+                _processorEvents.tryEmit(ProcessorEvent.LogAdded(message, "system", false, true, 0.0, 0.0, 0.0, null, snapshot.vibration))
+            }
+        ) {
+            val baselineChanged = sentinel.updateSensorState(snapshot)
+            if (baselineChanged) {
+                _processorEvents.tryEmit(ProcessorEvent.ChairBaselineChanged(sentinel.baselineSitTilt))
+            }
+            baselineChanged
+        }
+    }
+
     fun updateSensorData(
         vibration: Double, heading: Double, baroAlt: Double, 
         lux: Double = 0.0, isNear: Boolean = true, powerTamper: Boolean = false,
@@ -240,29 +261,15 @@ class LocationProcessor(
         nowRt: Long = timeProvider.elapsedRealtime(),
         nowWall: Long = timeProvider.currentTimeMillis()
     ): Boolean {
-        return LatencyMonitor.measureAndAudit<Boolean>(
-            timeProvider,
-            LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
-            "updateSensorData",
-            LatencyMonitor.AuditType.PERFORMANCE,
-            { message, _ ->
-                _processorEvents.tryEmit(ProcessorEvent.LogAdded(message, "system", false, true, 0.0, 0.0, 0.0, null, vibration))
-            }
-        ) {
-            val snapshot = SensorStateSnapshot(
-                vibration = vibration, heading = heading, baroAlt = baroAlt, lux = lux, isNear = isNear, powerTamper = powerTamper,
-                tiltDegrees = tiltDegrees, acousticDb = acousticDb, peakShock = peakShock, acousticMinDb = acousticMinDb,
-                peakVerticalVelocity = peakVerticalVelocity, peakVerticalVelocityTs = peakVerticalVelocityTs, peakVerticalVelocityRt = peakVerticalVelocityRt,
-                plungeMatched = plungeMatched, peakVerticalDisplacement = peakVerticalDisplacement, isSirenActive = isSirenActive, isWarming = isWarming,
-                manualAdaptiveFloor = manualAdaptiveFloor, acousticLockoutRt = acousticLockoutRt, lightSpikeRt = lightSpikeRt, isMuzzled = isMuzzled,
-                kineticEnergy = kineticEnergy, providedAdaptiveFloor = providedAdaptiveFloor, nowRt = nowRt, nowTs = nowWall
-            )
-            val baselineChanged = sentinel.updateSensorState(snapshot)
-            if (baselineChanged) {
-                _processorEvents.tryEmit(ProcessorEvent.ChairBaselineChanged(sentinel.baselineSitTilt))
-            }
-            baselineChanged
-        }
+        val snapshot = SensorStateSnapshot(
+            vibration = vibration, heading = heading, baroAlt = baroAlt, lux = lux, isNear = isNear, powerTamper = powerTamper,
+            tiltDegrees = tiltDegrees, acousticDb = acousticDb, peakShock = peakShock, acousticMinDb = acousticMinDb,
+            peakVerticalVelocity = peakVerticalVelocity, peakVerticalVelocityTs = peakVerticalVelocityTs, peakVerticalVelocityRt = peakVerticalVelocityRt,
+            plungeMatched = plungeMatched, peakVerticalDisplacement = peakVerticalDisplacement, isSirenActive = isSirenActive, isWarming = isWarming,
+            manualAdaptiveFloor = manualAdaptiveFloor, acousticLockoutRt = acousticLockoutRt, lightSpikeRt = lightSpikeRt, isMuzzled = isMuzzled,
+            kineticEnergy = kineticEnergy, providedAdaptiveFloor = providedAdaptiveFloor, nowRt = nowRt, nowTs = nowWall
+        )
+        return updateSensorData(snapshot)
     }
 
     fun resetChairBaseline() {
@@ -367,6 +374,7 @@ class LocationProcessor(
                 }
             }
 
+            val PRIVACY_METERS = 60.0
             val TRAJECTORY_PROMOTION_WINDOW_MS = 60000L
             if (accuracy > HIGH_ACCURACY_THRESHOLD_METERS * TRAJECTORY_REJECTION_ACCURACY_MULT && lastHighAccRt > 0 && nowRt - lastHighAccRt < TRAJECTORY_PROMOTION_WINDOW_MS) {
                 if (PhysicsUtils.calculateDistance(lat, lng, lastHighAccLat, lastHighAccLng) > accuracy) {

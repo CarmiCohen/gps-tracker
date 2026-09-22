@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.31
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.32
 
 ## 🎯 Current Resumption Focus: Structural Simplicity & Pattern Convergence
 Finalizing the audit of signaling performance under physical stress and ensuring no side-effects remain from the Performance Tier unification.
@@ -13,7 +13,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 11)
+## 💡 Strategic Simplification Ideas (Ideas: 10)
 
 *   **Issue #1164: Persistence of Logic State**
     *   *Description*: Serialize `AlarmHistory` into the database/DataStore to ensure geofence debounce states and power alarm latches survive process death or deep sleep system kills.
@@ -21,9 +21,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *   **Issue #1170: God Object ViewModel Decomposition**
     *   *Description*: Split the monolithic `MainViewModel` into feature-specific ones (`Tracker`, `Viewer`, `Setup`) bound to Jetpack Navigation graph scopes.
     *   *Significance*: **High (Architecture & Maintainability)**: Deconstructs the core UI controller, reducing memory footprint, isolating screen states, and improving testability.
-*   **Issue #1162: Forensic & Sensor Efficiency Optimization**
-    *   *Description*: Group related telemetry fields into a unified `EvaluationSnapshot` to allow single-pass atomic consumption of hardware snapshots within the background tick loop.
-    *   *Significance*: **High (Performance)**: Optimizes the background tracking loop by ensuring single-pass atomic data reads, minimizing locking overhead.
 *   **Issue #1161: Unified Trajectory & Buffer Management**
     *   *Description*: Merge `GtoEngine` windows and `LocationSentinel` hindsight buffers into a single optimized `TrajectoryBuffer` and consolidate "Parking Anchor" and "Home Point" logic.
     *   *Significance*: **Medium-High (Memory Efficiency)**: Consolidates duplicate caching layers and location window structures into a single unified high-performance buffer.
@@ -52,6 +49,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1162: Forensic & Sensor Efficiency Optimization** (Resolved Sep.22.32)
+    *   *Remediation*: Refactored the background tick loops in `TrackerService` and `ViewerService` to group system health and sensor metrics into an atomic `EvaluationSnapshot`. This ensures single-pass telemetry processing and minimizes the parameter surface area between the service and engine layers.
 
 *   **Issue #1182: Generic Fast-Path Snapshotting / Elimination of Multi-pass Fallbacks** (Resolved Sep.22.31)
     *   *Remediation*: Grouped individual sensor parameter updates in `updateSensorState` into a structured `SensorStateSnapshot` to eliminate individual fallback clauses, reducing parameter passing complexity and streamlining validation gates.
@@ -116,4 +116,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 413 (Rules: 83, IDs: 413), Resolved: 1169, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 11, QA: 283]**
+- **Current Audit Baseline: [SOT: 414 (Rules: 83, IDs: 414), Resolved: 1170, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 10, QA: 283]**

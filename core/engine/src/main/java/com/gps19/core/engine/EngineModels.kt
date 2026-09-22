@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.22.32:
+ * - Issue #1162: Forensic & Sensor Efficiency Optimization. Introduced EvaluationSnapshot
+ *   to group remaining telemetry fields for single-pass atomic consumption.
  * Sep.22.31:
  * - Issue #1182: Elimination of Multi-pass Fallbacks. Introduced SensorStateSnapshot 
  *   to group sensor data into a standard container, removing imperative value checking bounds.
@@ -541,4 +544,14 @@ data class SensorStateSnapshot(
     val providedAdaptiveFloor: Double = -1.0,
     val nowRt: Long = 0L,
     val nowTs: Long = 0L
+)
+
+/**
+ * EvaluationSnapshot: Atomic container for all telemetry and health metrics 
+ * consumed during a background tick. (Issue #1162)
+ */
+@Serializable
+data class EvaluationSnapshot(
+    val health: SystemHealthState,
+    val sensor: SensorStateSnapshot
 )
