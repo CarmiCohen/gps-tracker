@@ -1,14 +1,9 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.26
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.27
 
 ## 🎯 Current Resumption Focus: Structural Simplicity & Pattern Convergence
 Finalizing the audit of signaling performance under physical stress and ensuring no side-effects remain from the Performance Tier unification.
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
-
-### Missing Functionality & Unfinished Integration
-*   **Issue #1186: Stale Acoustic Fast-Path Baseline and Missing Dynamic Synchronization**
-    *   *Description*: While the light fast-path baseline is periodically re-synchronized with `LocationSentinel`'s baseline inside `TrackerService.processTick()`, the acoustic fast-path baseline is completely neglected after initial setup. Because `LocationSentinel`'s `acousticFloorDb` contracts and adapts dynamically over time, the high-frequency fast path in `HardwareSuite` quickly becomes stale and diverges from the validation engine.
-    *   *Risk/Concern*: Causes severe baseline divergence, resulting in either a flood of false-positive forensic triggers or total failure to detect rapid environmental audio changes.
 
 ### Unhandled Edge Cases & Core Logic Bugs
 *   **Issue #1184: Broken Thermal Recovery Latency Audit in Trigger-Based Forensic Sampling Loop**
@@ -28,6 +23,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ## 💡 Strategic Simplification Ideas (Ideas: 12)
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1186: Stale Acoustic Fast-Path Baseline and Missing Dynamic Synchronization** (Resolved Sep.22.27)
+    *   *Remediation*: Added periodic re-synchronization of the acoustic fast-path baseline with `LocationSentinel`'s contracting acoustic floor within `TrackerService.processTick()`. This ensures high-frequency acoustic monitoring stays perfectly dynamically aligned with the core validation layer.
 
 *   **Issue #1185: Semantic Type Mismatch in LocationProcessor.getAdaptiveVibrationFloor** (Resolved Sep.22.26)
     *   *Remediation*: Corrected `getAdaptiveVibrationFloor()` in `LocationProcessor.kt` to return `sentinel.adaptiveVibrationFloor` instead of `sentinel.acousticFloorDb`. This resolves the severe semantic leak across the telemetry pipeline, ensuring actual adaptive vibration baseline metrics are correctly propagated rather than acoustic ones.
@@ -77,4 +75,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 407 (Rules: 82, IDs: 407), Resolved: 1164, Open: 4, Testing: 3 (Sub-items: 12), Ideas: 12, QA: 283]**
+- **Current Audit Baseline: [SOT: 409 (Rules: 82, IDs: 409), Resolved: 1165, Open: 3, Testing: 3 (Sub-items: 12), Ideas: 12, QA: 283]**

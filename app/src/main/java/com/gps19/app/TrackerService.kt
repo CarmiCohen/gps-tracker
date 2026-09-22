@@ -23,6 +23,10 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.22.27:
+ * - Issue #1186: Acoustic Fast-Path Baseline Dynamic Synchronization. Added periodic
+ *   re-synchronization of acoustic fast-path baseline with LocationSentinel's contracting
+ *   acoustic floor within processTick loop.
  * Sep.22.11:
  * - Issue #1183: Trigger-Based Forensic Sampling. Transitioned from a fixed-interval
  *   forensic loop to a "Signal-on-Spike" model triggered by hardware fast-paths,
@@ -479,6 +483,15 @@ class TrackerService : BaseMonitorService() {
             onSpike = {
                 logManager.logServiceEvent(m = "Light Spike Detected (FastPath)", isImportant = false)
                 lastFastPathLightSpikeTs = timeProvider.elapsedRealtime()
+                triggerForensicSample()
+            }
+        )
+
+        hardwareSuite.setAcousticFastPath(
+            floor = locationProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0,
+            onSpike = {
+                logManager.logServiceEvent(m = "Acoustic Spike Detected (FastPath)", isImportant = false)
+                lastFastPathAcousticSpikeTs = timeProvider.elapsedRealtime()
                 triggerForensicSample()
             }
         )

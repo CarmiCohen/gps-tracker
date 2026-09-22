@@ -1,7 +1,4 @@
-# Strategic Architecture & Simplicity Evaluation - Sep.22.11
+# Simplicity Audit Ideas - Sep.22.27
 
-## 🧠 Trigger-Based Forensic Sampling Architecture Simplification Review
-With the successful implementation of the "Signal-on-Spike" architecture for Issue #1183, the background process has completely migrated away from battery-intensive periodic forensic capture loop polling. However, additional simplifications can be introduced to further decouple layers:
-
-1. **Unified Event Dispatch Pipeline**: Instead of using individual channels or custom interfaces across different background monitors, a single high-cohesion, thread-safe Event bus or shared multiplexed channel can be designed for all sensor fast-paths and hardware anomaly signals.
-2. **Flyweight Payload Reusability**: Pre-allocating specific forensic snap objects and populating them directly within a single zero-allocation state buffer can eliminate cross-thread data defensive cloning and further alleviate GC pressures under continuous physical stress.
+1. **Fast-Path Parametrization Consolidation**: Acoustic and Light fast-paths now share a unified generic structure (`HardwareFastPath`). The initialization parameters and debouncing limits could be encapsulated into an immutable configuration group inside `DeviceProfileManager`, removing explicit constants mapping from `TrackerService`.
+2. **Buffer Pooling Optimization**: The telemetry buffers use structural circular arrays (`CircularStateBuffer`). Reusing snapshot allocations instead of triggering separate flyweight state updates could further eliminate background micro-allocations.

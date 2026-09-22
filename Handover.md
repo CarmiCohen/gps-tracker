@@ -1,4 +1,4 @@
-# Forensic Handover (Sep.22.26)
+# Forensic Handover (Sep.21.133)
 
 ## 🎯 Current System State
 *   **Version**: Sep.22.26 | **Build**: Vibration Floor Semantic Alignment (Verified)
@@ -24,7 +24,7 @@
 ## 🛡️ Forensic Hardening Summary (Current Session Updates)
 
 ### 1. Issue #1185: Semantic Type Mismatch in LocationProcessor.getAdaptiveVibrationFloor
-*   **Status**: Fully Resolved (Sep.22.26).
+*   **Status**: Fully Resolved (Sep.21.133).
 *   **Remediation**: Corrected `getAdaptiveVibrationFloor()` in `LocationProcessor.kt` to return `sentinel.adaptiveVibrationFloor` instead of `sentinel.acousticFloorDb`. This resolves the severe semantic leak across the telemetry pipeline, ensuring actual adaptive vibration baseline metrics are correctly propagated rather than acoustic ones.
 
 ---
