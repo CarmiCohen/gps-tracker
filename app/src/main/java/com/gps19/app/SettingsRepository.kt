@@ -32,6 +32,20 @@ private val Context.settingsDataStore: DataStore<AppSettings> by dataStore(
 )
 
 /**
+ * Generic extension function to mutate DataStore<AppSettings> atomically and race-free.
+ * Consolidates repeated builder boilerplate for list and field mutations.
+ */
+private suspend inline fun DataStore<AppSettings>.mutate(
+    crossinline block: AppSettings.Builder.() -> Unit
+): AppSettings {
+    return updateData { current ->
+        val builder = current.toBuilder()
+        builder.block()
+        builder.build()
+    }
+}
+
+/**
  * CommitResult: Result of an atomic draft commit to primary settings.
  */
 data class CommitResult(
@@ -46,6 +60,9 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Sep.22.04:
+ * - Idea #1 Integration: Extracted atomic list mutation pattern into a generic 
+ *   DataStore<AppSettings>.mutate extension to streamline data layer operations.
  * Sep.22.03:
  * - Issue #1179 Remediation: Implemented atomic addHomePoint and removeHomePoint 
  *   using DataStore updateData to prevent race conditions during rapid 
@@ -121,93 +138,83 @@ class SettingsRepository @Inject constructor(
     suspend fun getSettingsSnapshot(): AppSettings = dataStore.data.first()
 
     suspend fun saveString(keyName: String, value: String) {
-        dataStore.updateData { current ->
-            val builder = current.toBuilder()
+        dataStore.mutate {
             when (keyName) {
-                APP_MODE_KEY -> builder.setAppMode(value)
-                TRACKER_ID_KEY -> builder.setTrackerId(value)
-                VIEWER_ID_KEY -> builder.setViewerId(value)
-                RELAY_URL_KEY -> builder.setRelayUrl(value)
-                SELECTED_SIREN_KEY -> builder.setSelectedSiren(value)
-                DRAFT_TRACKER_ID -> builder.setDraftTrackerId(value)
-                DRAFT_VIEWER_ID -> builder.setDraftViewerId(value)
-                DRAFT_RELAY_URL -> builder.setDraftRelayUrl(value)
-                LAST_DAILY_ARCHIVE_DATE_KEY -> builder.setLastDailyArchiveDate(value)
-                LAST_DAILY_CLEANUP_DATE_KEY -> builder.setLastDailyCleanupDate(value)
-                LAST_ALARMS_JSON_KEY -> builder.setLastAlarmsJson(value)
+                APP_MODE_KEY -> setAppMode(value)
+                TRACKER_ID_KEY -> setTrackerId(value)
+                VIEWER_ID_KEY -> setViewerId(value)
+                RELAY_URL_KEY -> setRelayUrl(value)
+                SELECTED_SIREN_KEY -> setSelectedSiren(value)
+                DRAFT_TRACKER_ID -> setDraftTrackerId(value)
+                DRAFT_VIEWER_ID -> setDraftViewerId(value)
+                DRAFT_RELAY_URL -> setDraftRelayUrl(value)
+                LAST_DAILY_ARCHIVE_DATE_KEY -> setLastDailyArchiveDate(value)
+                LAST_DAILY_CLEANUP_DATE_KEY -> setLastDailyCleanupDate(value)
+                LAST_ALARMS_JSON_KEY -> setLastAlarmsJson(value)
             }
-            builder.build()
         }
     }
 
     suspend fun saveLong(keyName: String, value: Long) {
-        dataStore.updateData { current ->
-            val builder = current.toBuilder()
+        dataStore.mutate {
             when (keyName) {
-                LAST_ALARM_ACK_TS_KEY -> builder.setLastAlarmAckTs(value)
-                HOME_POINTS_TS_KEY -> builder.setHomePointsTs(value)
-                LAST_SERVICE_TICK_TS_KEY -> builder.setLastServiceTickTs(value)
-                APP_START_TIME_KEY -> builder.setAppStartTime(value)
-                TOTAL_CONNECTED_KEY -> builder.setTotalConnected(value)
-                UPTIME_KEY -> builder.setUptime(value)
-                LAST_CONNECTION_TS_KEY -> builder.setLastConnectionTs(value)
-                LAST_DISCONNECTION_TS_KEY -> builder.setLastDisconnectionTs(value)
-                TOTAL_DROP_KEY -> builder.setTotalDrop(value)
-                MAX_DROP_KEY -> builder.setMaxDrop(value)
-                MAX_DROP_TS_KEY -> builder.setMaxDropTs(value)
-                LAST_GPS_TS_KEY -> builder.setLastGpsTs(value)
-                VIOLATION_UPTIME_MS_KEY -> builder.setViolationUptimeMs(value)
-                LAST_SERVICE_TICK_REALTIME_KEY -> builder.setLastServiceTickRt(value)
-                CLOCK_DRIFT_REF_KEY -> builder.setClockDriftRef(value)
-                LAST_SIT_TS_KEY -> builder.setLastSitTs(value)
-                LAST_HISTORY_SIT_TS_KEY -> builder.setLastHistorySitTs(value)
-                RECOVERY_BLOCKED_TS_KEY -> builder.setRecoveryBlockedTs(value)
-                CUMULATIVE_RECOVERY_BLACKOUT_MS_KEY -> builder.setCumulativeRecoveryBlackoutMs(value)
+                LAST_ALARM_ACK_TS_KEY -> setLastAlarmAckTs(value)
+                HOME_POINTS_TS_KEY -> setHomePointsTs(value)
+                LAST_SERVICE_TICK_TS_KEY -> setLastServiceTickTs(value)
+                APP_START_TIME_KEY -> setAppStartTime(value)
+                TOTAL_CONNECTED_KEY -> setTotalConnected(value)
+                UPTIME_KEY -> setUptime(value)
+                LAST_CONNECTION_TS_KEY -> setLastConnectionTs(value)
+                LAST_DISCONNECTION_TS_KEY -> setLastDisconnectionTs(value)
+                TOTAL_DROP_KEY -> setTotalDrop(value)
+                MAX_DROP_KEY -> setMaxDrop(value)
+                MAX_DROP_TS_KEY -> setMaxDropTs(value)
+                LAST_GPS_TS_KEY -> setLastGpsTs(value)
+                VIOLATION_UPTIME_MS_KEY -> setViolationUptimeMs(value)
+                LAST_SERVICE_TICK_REALTIME_KEY -> setLastServiceTickRt(value)
+                CLOCK_DRIFT_REF_KEY -> setClockDriftRef(value)
+                LAST_SIT_TS_KEY -> setLastSitTs(value)
+                LAST_HISTORY_SIT_TS_KEY -> setLastHistorySitTs(value)
+                RECOVERY_BLOCKED_TS_KEY -> setRecoveryBlockedTs(value)
+                CUMULATIVE_RECOVERY_BLACKOUT_MS_KEY -> setCumulativeRecoveryBlackoutMs(value)
             }
-            builder.build()
         }
     }
 
     suspend fun saveDouble(keyName: String, value: Double) {
-        dataStore.updateData { current ->
-            val builder = current.toBuilder()
+        dataStore.mutate {
             when (keyName) {
-                MAX_DISTANCE_STORAGE_KEY -> builder.setMaxDistance(value)
-                MAX_ACCURACY_KEY -> builder.setMaxAccuracy(value)
-                MAX_TEMP_KEY -> builder.setMaxTemp(value)
-                TRACKER_LUX_BASELINE_KEY -> builder.setTrackerLuxBaseline(value)
-                TRACKER_ACOUSTIC_FLOOR_KEY -> builder.setTrackerAcousticFloor(value)
-                DRAFT_MAX_DISTANCE -> builder.setDraftMaxDistance(value)
-                CHAIR_BASELINE_TILT_KEY -> builder.setChairBaselineTilt(value)
+                MAX_DISTANCE_STORAGE_KEY -> setMaxDistance(value)
+                MAX_ACCURACY_KEY -> setMaxAccuracy(value)
+                MAX_TEMP_KEY -> setMaxTemp(value)
+                TRACKER_LUX_BASELINE_KEY -> setTrackerLuxBaseline(value)
+                TRACKER_ACOUSTIC_FLOOR_KEY -> setTrackerAcousticFloor(value)
+                DRAFT_MAX_DISTANCE -> setDraftMaxDistance(value)
+                CHAIR_BASELINE_TILT_KEY -> setChairBaselineTilt(value)
             }
-            builder.build()
         }
     }
 
     suspend fun saveBoolean(keyName: String, value: Boolean) {
-        dataStore.updateData { current ->
-            val builder = current.toBuilder()
+        dataStore.mutate {
             when (keyName) {
-                IS_MANUAL_EXIT_KEY -> builder.setIsManualExit(value)
-                IS_MIC_TYPE_STARTED_KEY -> builder.setIsMicTypeStarted(value)
-                IS_XIAOMI_MANUAL_OVERRIDE_KEY -> builder.setIsXiaomiManualOverride(value)
-                IDENTITY_SANITIZED_KEY -> builder.setIdentitySanitized(value)
-                IS_SYSTEM_ACTIVE_KEY -> builder.setIsSystemActive(value)
-                IS_RECOVERY_PENDING_KEY -> builder.setIsRecoveryPending(value)
+                IS_MANUAL_EXIT_KEY -> setIsManualExit(value)
+                IS_MIC_TYPE_STARTED_KEY -> setIsMicTypeStarted(value)
+                IS_XIAOMI_MANUAL_OVERRIDE_KEY -> setIsXiaomiManualOverride(value)
+                IDENTITY_SANITIZED_KEY -> setIdentitySanitized(value)
+                IS_SYSTEM_ACTIVE_KEY -> setIsSystemActive(value)
+                IS_RECOVERY_PENDING_KEY -> setIsRecoveryPending(value)
             }
-            builder.build()
         }
     }
 
     suspend fun saveInt(keyName: String, value: Int) {
-        dataStore.updateData { current ->
-            val builder = current.toBuilder()
+        dataStore.mutate {
             when (keyName) {
-                LAST_AUTO_SAVE_HOUR_KEY -> builder.setLastAutoSaveHour(value)
-                LAST_VERSION_CODE_KEY -> builder.setLastVersionCode(value)
-                RECOVERY_COUNT_KEY -> builder.setRecoveryCount(value)
+                LAST_AUTO_SAVE_HOUR_KEY -> setLastAutoSaveHour(value)
+                LAST_VERSION_CODE_KEY -> setLastVersionCode(value)
+                RECOVERY_COUNT_KEY -> setRecoveryCount(value)
             }
-            builder.build()
         }
     }
 
@@ -298,49 +305,43 @@ class SettingsRepository @Inject constructor(
     suspend fun getAppMode(): String? = dataStore.data.first().appMode.ifEmpty { null }
     
     suspend fun setAppMode(mode: String?) {
-        dataStore.updateData { it.toBuilder().setAppMode(mode ?: "").build() }
+        dataStore.mutate { setAppMode(mode ?: "") }
     }
 
     suspend fun loadHomePoints(): List<GeoPoint> = dataStore.data.first().homePointsList.map { GeoPoint(it.lat, it.lng) }
 
     suspend fun saveHomePoints(points: List<GeoPoint>, maxDistance: Double? = null, timestamp: Long? = null): Long {
         val ts = timestamp ?: timeProvider.currentTimeMillis()
-        dataStore.updateData { current ->
-            val builder = current.toBuilder()
-            builder.clearHomePoints().addAllHomePoints(points.map { GeoPointProto.newBuilder().setLat(it.latitude).setLng(it.longitude).build() })
-            builder.setHomePointsTs(ts)
-            maxDistance?.let { builder.setMaxDistance(it) }
-            builder.build()
+        dataStore.mutate {
+            clearHomePoints().addAllHomePoints(points.map { GeoPointProto.newBuilder().setLat(it.latitude).setLng(it.longitude).build() })
+            setHomePointsTs(ts)
+            maxDistance?.let { setMaxDistance(it) }
         }
         return ts
     }
 
     /**
-     * Atomic addition of a home point to persistent storage.
+     * Atomic addition of a home point to persistent storage using generic mutation extension.
      */
     suspend fun addHomePoint(lat: Double, lng: Double): Long {
         val ts = timeProvider.currentTimeMillis()
-        dataStore.updateData { current ->
-            val builder = current.toBuilder()
-            builder.addHomePoints(GeoPointProto.newBuilder().setLat(lat).setLng(lng).build())
-            builder.setHomePointsTs(ts)
-            builder.build()
+        dataStore.mutate {
+            addHomePoints(GeoPointProto.newBuilder().setLat(lat).setLng(lng).build())
+            setHomePointsTs(ts)
         }
         return ts
     }
 
     /**
-     * Atomic removal of a home point from persistent storage by index.
+     * Atomic removal of a home point from persistent storage by index using generic mutation extension.
      */
     suspend fun removeHomePoint(index: Int): Long {
         val ts = timeProvider.currentTimeMillis()
-        dataStore.updateData { current ->
-            val builder = current.toBuilder()
-            if (index >= 0 && index < builder.homePointsCount) {
-                builder.removeHomePoints(index)
-                builder.setHomePointsTs(ts)
+        dataStore.mutate {
+            if (index >= 0 && index < homePointsCount) {
+                removeHomePoints(index)
+                setHomePointsTs(ts)
             }
-            builder.build()
         }
         return ts
     }
@@ -351,17 +352,15 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun saveAlertSettings(s: AlertSettings) {
-        dataStore.updateData { current ->
-            current.toBuilder().setAlertSettings(SettingsMapper.alertSettingsToProto(s)).build()
+        dataStore.mutate {
+            setAlertSettings(SettingsMapper.alertSettingsToProto(s))
         }
     }
 
     fun saveTrackerState(status: TrackerStatus) {
         scope.launch {
-            dataStore.updateData { current ->
-                val builder = current.toBuilder()
-                builder.setTrackerState(SettingsMapper.mapTrackerStatusToProto(status))
-                builder.build()
+            dataStore.mutate {
+                setTrackerState(SettingsMapper.mapTrackerStatusToProto(status))
             }
         }
     }
@@ -373,15 +372,15 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun saveDraftAlertSettings(alertSettings: AlertSettings) {
-        dataStore.updateData { current ->
-            current.toBuilder().setDraftAlertSettings(SettingsMapper.alertSettingsToProto(alertSettings)).build()
+        dataStore.mutate {
+            setDraftAlertSettings(SettingsMapper.alertSettingsToProto(alertSettings))
         }
     }
 
     fun saveTrackerStatus(status: TrackerStatus) {
         scope.launch {
-            dataStore.updateData { current ->
-                current.toBuilder().setTrackerState(SettingsMapper.mapTrackerStatusToProto(status)).build()
+            dataStore.mutate {
+                setTrackerState(SettingsMapper.mapTrackerStatusToProto(status))
             }
         }
     }
@@ -392,14 +391,12 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun clearDraftSettings() {
-        dataStore.updateData { current ->
-            current.toBuilder()
-                .clearDraftTrackerId()
+        dataStore.mutate {
+            clearDraftTrackerId()
                 .clearDraftViewerId()
                 .clearDraftRelayUrl()
                 .clearDraftMaxDistance()
                 .clearDraftAlertSettings()
-                .build()
         }
     }
 
@@ -419,14 +416,12 @@ class SettingsRepository @Inject constructor(
         maxDistance: Double,
         alertSettings: AlertSettings
     ) {
-        dataStore.updateData { current ->
-            current.toBuilder()
-                .setDraftTrackerId(deviceId)
+        dataStore.mutate {
+            setDraftTrackerId(deviceId)
                 .setDraftViewerId(viewerId)
                 .setDraftRelayUrl(relayUrl)
                 .setDraftMaxDistance(maxDistance)
                 .setDraftAlertSettings(SettingsMapper.alertSettingsToProto(alertSettings))
-                .build()
         }
     }
 
@@ -490,18 +485,16 @@ class SettingsRepository @Inject constructor(
         alertSettings: AlertSettings? = null,
         homePoints: List<GeoPoint>? = null
     ) {
-        dataStore.updateData { current ->
-            val builder = current.toBuilder()
-            deviceId?.let { if (SignalingConstants.isValidTrackerId(it)) builder.setTrackerId(it) }
-            viewerId?.let { if (SignalingConstants.isValidViewerId(it)) builder.setViewerId(it) }
-            relayUrl?.let { builder.setRelayUrl(it) }
-            maxDistance?.let { builder.setMaxDistance(it) }
-            alertSettings?.let { builder.setAlertSettings(SettingsMapper.alertSettingsToProto(it)) }
+        dataStore.mutate {
+            deviceId?.let { if (SignalingConstants.isValidTrackerId(it)) setTrackerId(it) }
+            viewerId?.let { if (SignalingConstants.isValidViewerId(it)) setViewerId(it) }
+            relayUrl?.let { setRelayUrl(it) }
+            maxDistance?.let { setMaxDistance(it) }
+            alertSettings?.let { setAlertSettings(SettingsMapper.alertSettingsToProto(it)) }
             homePoints?.let { pts ->
-                builder.clearHomePoints().addAllHomePoints(pts.map { GeoPointProto.newBuilder().setLat(it.latitude).setLng(it.longitude).build() })
-                builder.setHomePointsTs(timeProvider.currentTimeMillis())
+                clearHomePoints().addAllHomePoints(pts.map { GeoPointProto.newBuilder().setLat(it.latitude).setLng(it.longitude).build() })
+                setHomePointsTs(timeProvider.currentTimeMillis())
             }
-            builder.build()
         }
     }
 
@@ -514,23 +507,20 @@ class SettingsRepository @Inject constructor(
         lastGpsTs: Long,
         violationUptimeMs: Long
     ) {
-        dataStore.updateData { current ->
-            current.toBuilder()
-                .setTotalConnected(totalConnected)
+        dataStore.mutate {
+            setTotalConnected(totalConnected)
                 .setUptime(uptime)
                 .setTotalDrop(totalDrop)
                 .setMaxDrop(maxDrop)
                 .setMaxDropTs(maxDropTs)
                 .setLastGpsTs(lastGpsTs)
                 .setViolationUptimeMs(violationUptimeMs)
-                .build()
         }
     }
 
     suspend fun resetStatsBulk() {
-        dataStore.updateData { current ->
-            current.toBuilder()
-                .setMaxAccuracy(0.0)
+        dataStore.mutate {
+            setMaxAccuracy(0.0)
                 .setMaxTemp(0.0)
                 .setTotalConnected(0L)
                 .setUptime(0L)
@@ -539,16 +529,13 @@ class SettingsRepository @Inject constructor(
                 .setMaxDropTs(0L)
                 .setLastGpsTs(0L)
                 .setViolationUptimeMs(0L)
-                .build()
         }
     }
 
     suspend fun incrementRecoveryStats(blackoutMs: Long) {
-        dataStore.updateData { current ->
-            current.toBuilder()
-                .setCumulativeRecoveryBlackoutMs(current.cumulativeRecoveryBlackoutMs + blackoutMs)
-                .setRecoveryCount(current.recoveryCount + 1)
-                .build()
+        dataStore.mutate {
+            setCumulativeRecoveryBlackoutMs(cumulativeRecoveryBlackoutMs + blackoutMs)
+                .setRecoveryCount(recoveryCount + 1)
         }
     }
 }

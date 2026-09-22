@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.22.03)
+# SOT Master Requirements & Hardening Status (Sep.22.04)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 401**: DataStore List Mutation Extension - Implemented a generic `mutate` extension function for `DataStore<AppSettings>` to encapsulate atomic, race-free list and field updates. Refactored `SettingsRepository` to use this extension across all persistence methods, streamlining the data layer and eliminating redundant builder/update boilerplate (R-ID 401). (Resolved Sep.22.04)
 *   **SOT ID 400**: Atomic Geofence Hydration - Implemented atomic `addHomePoint` and `removeHomePoint` methods in `SettingsRepository` using DataStore's `updateData`. This prevents list corruption and UI stalls during rapid sequential interactive updates. Refactored `MainViewModel` to persist active geofence modes during batch additions, ensuring a friction-less setup experience (R-ID 400). (Resolved Sep.22.03)
 *   **SOT ID 399**: Initial GNSS Satellite Count Blanking Prior to Initial Lock - Set default satellite counts to -1 in `LocationUpdate` and `HudTelemetryState`. Updated `UiStateMapper` and `SharedUiComponents` to distinguish -1 (no data) from 0 (jammed/blocked) by displaying "--" until the first hardware fix is processed (R-ID 399). (Resolved Sep.22.00)
 *   **SOT ID 398**: Static Role Branding on Selection Screen Cards - Integrated `isPeerActive` check into `MainViewModel` and passed it to `LandingScreen`. The Viewer card now dynamically dims when no telemetry is detected, improving role clarity during the initial handshake phase (R-ID 398). (Resolved Sep.22.00)
@@ -38,18 +39,19 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 82
-- **Total SOT IDs**: 400
-- **Resolved Issues**: 1156
+- **Total SOT IDs**: 401
+- **Resolved Issues**: 1157
 - **Open Issues**: 0
 - **Testing Coverage**: 3 (Sub-items: 11)
-- **Simplification Ideas**: 14
+- **Simplification Ideas**: 13
 - **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.65 (Atomic Geofence)**: PASSED - Verified race-free home point updates and persistent ADD mode (Sep.22.03)
-*   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states (Sep.22.00)
-*   **Chapter 31.63 (Role Selection UX)**: PASSED - Dynamic card dimming based on peer activity status (Sep.22.00)
-*   **Chapter 31.62 (Temperature Unit Layout)**: PASSED - Corrected SI unit presentation in StatusRowData (Sep.22.00)
+*   **Chapter 31.66 (Persistence Refactoring)**: PASSED - Verified generic mutate extension and unified repository operations (Sep.22.04)
+*   **Chapter 31.65 (Atomic Geofence)**: PASSED - Verified race-free home point updates and persistent ADD mode (Sep.21.133)
+*   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states (Sep.21.133)
+*   **Chapter 31.63 (Role Selection UX)**: PASSED - Dynamic card dimming based on peer activity status (Sep.21.133)
+*   **Chapter 31.62 (Temperature Unit Layout)**: PASSED - Corrected SI unit presentation in StatusRowData (Sep.21.133)
 *   **Chapter 31.61 (Session Lifecycle Coordinator)**: PASSED - Unified background session resets atomically across roles (Sep.21.132)
 *   **Chapter 31.60 (Interface Isolation Utilities)**: PASSED - Created LocationProcessorListener & DefaultLocationProcessorListener to prevent test breakages (Sep.21.131)
 *   **Chapter 31.59 (Dead Code Elimination)**: PASSED - Removed unused tracking property and helper method leftovers in HardwareSuite (Sep.21.130)
@@ -75,4 +77,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.20.103)
 
 ---
-*Next Audit: Sep.22.100. (Sep.22.03)*
+*Next Audit: Sep.22.100. (Sep.22.04)*

@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vSep.22.00)
+# Test Procedure - GPS Tracker (vSep.22.04)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -32,6 +32,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   Verify System Diagnostics (Red/Green state update).
 *   **2.3 Sensor Calibration:**
     *   Adjust sensitivity sliders for Vibration/Tilt.
+*   **2.4 Geofence & Home Point Management (Issue #1179):**
+    *   **Action:** Enter geofence addition/removal mode and execute high-frequency rapid updates/taps to add and remove multiple home points.
+    *   **Verification:** Verify that `geofenceMode` persists (does not reset to `IDLE`) during batch operations, enabling friction-less batch updates. Confirm `isFenceVisible` is forced to `true` upon entry for immediate visual feedback. Ensure atomic DataStore mutations prevent any list mutation corruption or race conditions.
+    *   **Status (Sep.22.03):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **2.5 DataStore Mutation Extension (Issue #1180):**
+    *   **Action:** Invoke consecutive save operations for configuration values, metrics, and home points.
+    *   **Verification:** Confirm all updates compile correctly under the unified `mutate` extension and resolve sequentially without data race visibility or state inconsistency under high load.
+    *   **Status (Sep.22.04):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 3 - Tracker Mode Operation
 **Goal:** Verify telemetry accuracy and sentinel logic.
@@ -78,11 +86,11 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **8.2 State Aggregation Stability:** Rapid HUD transitions.
 
 ## Chapters 9-20: Hardening Baselines
-*   **Status (Sep.22.00):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **Status (Sep.22.04):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapters 21-100: Advanced Forensic & System Chapters
-*   **Status (Sep.22.00):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **Status (Sep.22.04):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ---
 **Total Testing Chapters: 100**
-*(Full historical procedure synchronized Sep.22.00)*
+*(Full historical procedure synchronized Sep.22.04)*

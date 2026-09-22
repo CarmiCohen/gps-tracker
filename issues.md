@@ -13,7 +13,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 14)
+## 💡 Strategic Simplification Ideas (Ideas: 13)
 
 *   **Issue #1160: Flyweight & Pooling Expansion**
     *   *Description*: Expand flyweight patterns to all entities (Telemetry, Violations, SpatialPoints) and use pre-allocated ring buffers for `EngineConnectionPoint` and a `LogEntry` pool to eliminate GC churn.
@@ -48,6 +48,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1180: DataStore List Mutation Extension** (Resolved Sep.22.04)
+    *   *Remediation*: Implemented generic `DataStore<AppSettings>.mutate` extension to encapsulate atomic, race-free list and field mutations. Refactored `SettingsRepository` methods (`addHomePoint`, `removeHomePoint`, and bulk save operations) to use this extension, eliminating redundant builder/update boilerplate (R-ID 401).
+
 *   **Issue #1179: Corrupted Home Point Addition Logic** (Resolved Sep.22.03)
     *   *Remediation*: Implemented atomic `addHomePoint` and `removeHomePoint` methods in `SettingsRepository` using DataStore's `updateData` to prevent race conditions. Refactored `MainViewModel` to persist `ADD` mode during batch operations and force fence visibility (R-ID 400).
 
@@ -72,4 +75,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 400 (Rules: 82, IDs: 400), Resolved: 1156, Open: 0, Testing: 3 (Sub-items: 11), Ideas: 14, QA: 283]**
+- **Current Audit Baseline: [SOT: 401 (Rules: 82, IDs: 401), Resolved: 1157, Open: 0, Testing: 3 (Sub-items: 11), Ideas: 13, QA: 283]**

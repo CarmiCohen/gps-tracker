@@ -2,6 +2,10 @@
 
 ## 🟢 Resolved Issues & Refactoring Record
 
+### Sep.22.04
+*   **Issue #1180: DataStore List Mutation Extension**
+    *   *Remediation*: Implemented a generic `mutate` extension function for `DataStore<AppSettings>` to encapsulate atomic, race-free list and field updates. Refactored `SettingsRepository` to use this extension across all persistence methods, streamlining the data layer and eliminating redundant builder/update boilerplate (R-ID 401).
+
 ### Sep.22.03
 *   **Issue #1179: Corrupted Home Point Addition Logic**
     *   *Remediation*: Implemented atomic `addHomePoint` and `removeHomePoint` methods in `SettingsRepository` using DataStore's `updateData` to prevent list corruption during rapid sequential updates. Refactored `MainViewModel` to persist the `ADD` geofence mode during batch operations and force `isFenceVisible` to `true` upon entry, ensuring immediate visual confirmation and a friction-less user experience (R-ID 400).

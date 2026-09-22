@@ -1,35 +1,34 @@
-# Forensic Handover (Sep.22.03)
+# Forensic Handover (Sep.22.04)
 
 ## 🎯 Current System State
-*   **Version**: Sep.22.03 | **Build**: Atomic Geofence Hydration & Persistence (Verified)
+*   **Version**: Sep.22.04 | **Build**: DataStore List Mutation Extension (Verified)
 *   **Active Devices**: Samsung A15 & S21FE (Unified)
-*   **SOT Baseline**: SOT-400 (Atomic Geofence Hydration)
+*   **SOT Baseline**: SOT-401 (Generic DataStore Mutation Abstraction)
 *   **Compilation Status**: Flawless compile parity; all components synchronized.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
 
-1.  **Atomic Persistence (`SettingsRepository.kt`)**: Implemented `addHomePoint` and `removeHomePoint` using DataStore's `updateData` to perform direct list mutations. This ensures that rapid interactive taps on the map do not result in race conditions or list corruption, as mutations are now handled serially by the DataStore actor.
-2.  **Geofence Mode Persistence (`MainViewModel.kt`)**: Refactored the `AddHomePoint` and `RemoveHomePoint` event handlers to stop resetting `geofenceMode` to `IDLE` after a single action. This allows for friction-less batch addition/removal of home points.
-3.  **Visual Feedback Loop**: Forced `isFenceVisible = true` upon adding a home point to ensure immediate visual confirmation of the new coordinate and its radius.
-4.  **UseCase Atomicity**: `HomePointUseCase` now leverages the atomic repository methods, reducing its complexity and eliminating local list manipulation before save.
+1.  **Generic DataStore Mutation Abstraction (`SettingsRepository.kt`)**: Extracted the atomic list mutation logic into a private, high-performance inline extension function `DataStore<AppSettings>.mutate`. This consolidates the repeated builder instantiation and `updateData` routines into a single reusable block.
+2.  **Unified Persistence Operations**: Refactored `addHomePoint`, `removeHomePoint`, bulk configuration saves, metrics accumulation, and statistical resets to pass behavior via lambda blocks inside the new `.mutate` extension. This removes data layer boilerplate and protects repeated proto lists from multi-threaded corruption or inconsistent reads.
+3.  **Visual and Functional Integrity**: Preserved absolute behavioral compatibility with Level 8 geofence batch insertions and visual tracking requirements.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 400 (Rules: 82, IDs: 400), Resolved: 1156, Open: 0, Testing: 3 (Sub-items: 11), Ideas: 14, QA: 283]**
+- **Current Audit Baseline: [SOT: 401 (Rules: 82, IDs: 401), Resolved: 1157, Open: 0, Testing: 3 (Sub-items: 11), Ideas: 13, QA: 283]**
 
 ---
 
 ## 🛡️ Forensic Hardening Summary (Current Session Updates)
 
-### 1. Issue #1179: Corrupted Home Point Addition Logic
-*   **Status**: Fully Resolved (Sep.22.03).
-*   **Remediation**: Replaced the "load-modify-save" anti-pattern with atomic DataStore mutations. Fixed UI resistance by maintaining `geofenceMode` during batch operations.
+### 1. Issue #1180: DataStore List Mutation Extension
+*   **Status**: Fully Resolved (Sep.22.04).
+*   **Remediation**: Replaced structural boilerplate with a generic inline `mutate` extension for `DataStore<AppSettings>`, unifying data layer mutation atomicity and ensuring race-free sequence consistency.
 
 ---
 
 ## 🔴 Open Gaps & Resumption Guidance
-*   **Open Gaps**: None. The geofence management system is now robust and supports high-frequency interactive updates.
-*   **Resumption Context**: The next developer should proceed with Level 8 hydration optimizations or explore the generic DataStore list mutation extension proposed in `Simplify_Ideas2.md` to further clean up the data layer.
+*   **Open Gaps**: None. All components are robust and follow hardened architectural guidelines.
+*   **Resumption Context**: The next developer should proceed with Chapter 31.67 refactorings or target UseCase functional consolidation as proposed in `Simplify_Ideas2.md`.
