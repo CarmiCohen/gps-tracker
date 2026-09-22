@@ -23,18 +23,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gps19.core.engine.*
 import kotlinx.coroutines.flow.StateFlow
 
-/**
- * ViewerScreen: Pocket-mode UI.
- * Sep.22.08:
- * - Issue #1166: State Partitioning & Slicing. Refactored to consume specialized 
- *   UI state slices (Session, Settings, Spatial, Navigation) to minimize 
- *   recomposition evaluation costs (R-ID 405).
- * Sep.11.46:
- * - Issue #947 RESOLVED: Synchronized Dashboard time-base by passing 
- *   systemPulseRt (monotonic) instead of wall-clock to ViewerDashboard, 
- *   ensuring correct "Last Seen" delta calculation (R947).
- */
-
 @Composable
 fun ViewerScreen(
     sessionState: SessionUiState,
@@ -43,7 +31,7 @@ fun ViewerScreen(
     navigationState: NavigationState,
     kinematicState: KinematicState,
     diagnosticState: DiagnosticState,
-    viewModel: MainViewModel,
+    viewModel: ViewerViewModel,
     logsFlow: StateFlow<List<LogEntry>>,
     onToggleMap: () -> Unit,
     onToggleLog: () -> Unit,
@@ -87,7 +75,6 @@ fun ViewerScreen(
         if (isGnssDetailVisible) viewModel.onEvent(UiEvent.ToggleGnssDetail(false))
     }
 
-    // Helper for system ready check (mirrors MainUiState.isSystemReady)
     val isSystemReady = sessionState.isSetupBypassActive || (
             sessionState.permissions.isFineLocationGranted &&
             sessionState.permissions.isBatteryWhitelisted && 
@@ -105,7 +92,6 @@ fun ViewerScreen(
              (sessionState.permissions.backgroundStatus == CapabilityStatus.GRANTED && sessionState.permissions.autostartStatus == CapabilityStatus.GRANTED) || 
              (sessionState.permissions.backgroundStatus == CapabilityStatus.UNKNOWN && sessionState.permissions.isManualOverride)))
 
-    // Helper for system issues count (mirrors MainUiState.systemIssuesCount)
     val systemIssuesCount = if (sessionState.isSetupBypassActive) 0 else {
         var count = 0
         if (!sessionState.permissions.isFineLocationGranted) count++
@@ -252,7 +238,6 @@ fun ViewerScreen(
             }
         }
 
-        // Issue #885: Staggered overlay composition to distribute JIT load.
         if (isSettingsOpen && sessionState.hydrationLevel >= 8) {
             SettingsOverlay(
                 activeSubSettings = nav.activeSubSettings,

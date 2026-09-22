@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Environment
 import android.widget.Toast
 import com.gps19.core.engine.TimeProvider
+import com.gps19.core.engine.LOG_LIMIT_STANDARD
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.*
@@ -14,18 +15,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.first
 import org.osmdroid.util.GeoPoint
 import timber.log.Timber
 
 /**
  * MainFileHelper: Handles importing and exporting configuration and telemetry data.
- * Sep.02.50:
- * - Issue #005 Hardening: Replaced all android.util.Log calls with Timber to 
- *   ensure log spillage protection on Samsung A15/G990 hardware (R759).
- * Aug.30.13:
- * - Issue #779 Hardening: Integrated ForensicSanitizer to scrub internal absolute 
- *   paths from error messages and log exports (R779).
+ * Sep.22.40:
+ * - Refactored to use MainRepository directly for telemetry access to support
+ *   ViewModel decomposition (R-ID 408).
  */
 object MainFileHelper {
 
@@ -189,7 +187,7 @@ object MainFileHelper {
                 
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Restored $totalPoints points from $filesSuccess files", Toast.LENGTH_SHORT).show()
-                    viewModel.addPersistentLog("user", "USER ACTION: Imported $filesSuccess trail files ($totalPoints points accumulated)", true)
+                    viewModel.onEvent(UiEvent.LogAction("user", "USER ACTION: Imported $filesSuccess trail files ($totalPoints points accumulated)", true))
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -219,7 +217,7 @@ object MainFileHelper {
                     })
                 }
 
-                val logs = (viewModel.eventLogsFlow as StateFlow<List<LogEntry>>).value
+                val logs = viewModel.repository.eventLogsFlow(LOG_LIMIT_STANDARD).first()
                 val root = JSONObject().apply {
                     put("exported_at", timeProvider.currentTimeMillis())
                     put("role", appMode)
@@ -313,8 +311,8 @@ object MainFileHelper {
             try {
                 val state = viewModel.uiState.value
                 val deviceId = state.deviceId
-                val trackerTrail = viewModel.trackerTrailFlow.value
-                val viewerTrail = viewModel.viewerTrailFlow.value
+                val trackerTrail = viewModel.repository.trackerTrailFlow.first()
+                val viewerTrail = viewModel.repository.viewerTrailFlow.first()
                 val appMode = state.appMode
 
                 if (trackerTrail.isEmpty() && viewerTrail.isEmpty()) {

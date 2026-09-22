@@ -43,7 +43,7 @@ fun TrackerScreen(
     navigationState: NavigationState,
     kinematicState: KinematicState,
     diagnosticState: DiagnosticState,
-    viewModel: MainViewModel,
+    viewModel: TrackerViewModel,
     logsFlow: StateFlow<List<LogEntry>>,
     onToggleMap: () -> Unit,
     onToggleLog: () -> Unit,

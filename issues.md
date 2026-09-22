@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.32
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.40
 
 ## 🎯 Current Resumption Focus: Structural Simplicity & Pattern Convergence
 Finalizing the audit of signaling performance under physical stress and ensuring no side-effects remain from the Performance Tier unification.
@@ -13,14 +13,11 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 10)
+## 💡 Strategic Simplification Ideas (Ideas: 9)
 
 *   **Issue #1164: Persistence of Logic State**
     *   *Description*: Serialize `AlarmHistory` into the database/DataStore to ensure geofence debounce states and power alarm latches survive process death or deep sleep system kills.
     *   *Significance*: **High (Reliability)**: Prevents state loss and incorrect alarm re-triggers when the OS terminates background components under memory pressure.
-*   **Issue #1170: God Object ViewModel Decomposition**
-    *   *Description*: Split the monolithic `MainViewModel` into feature-specific ones (`Tracker`, `Viewer`, `Setup`) bound to Jetpack Navigation graph scopes.
-    *   *Significance*: **High (Architecture & Maintainability)**: Deconstructs the core UI controller, reducing memory footprint, isolating screen states, and improving testability.
 *   **Issue #1161: Unified Trajectory & Buffer Management**
     *   *Description*: Merge `GtoEngine` windows and `LocationSentinel` hindsight buffers into a single optimized `TrajectoryBuffer` and consolidate "Parking Anchor" and "Home Point" logic.
     *   *Significance*: **Medium-High (Memory Efficiency)**: Consolidates duplicate caching layers and location window structures into a single unified high-performance buffer.
@@ -49,6 +46,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1170: God Object ViewModel Decomposition** (Resolved Sep.22.40)
+    *   *Remediation*: Decomposed the monolithic `MainViewModel` into feature-specific ViewModels (`TrackerViewModel`, `ViewerViewModel`, `SetupViewModel`) bound to their respective navigation scopes. Refactored `MainViewModel` into a lightweight coordinator for app-level state and global overlays. This significantly improves memory isolation and isolates recomposition triggers between functional roles (R-ID 408).
 
 *   **Issue #1162: Forensic & Sensor Efficiency Optimization** (Resolved Sep.22.32)
     *   *Remediation*: Refactored the background tick loops in `TrackerService` and `ViewerService` to group system health and sensor metrics into an atomic `EvaluationSnapshot`. This ensures single-pass telemetry processing and minimizes the parameter surface area between the service and engine layers.
@@ -116,4 +116,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 414 (Rules: 83, IDs: 414), Resolved: 1170, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 10, QA: 283]**
+- **Current Audit Baseline: [SOT: 414 (Rules: 83, IDs: 414), Resolved: 1171, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 9, QA: 283]**
