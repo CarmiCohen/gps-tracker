@@ -1,4 +1,4 @@
-# Forensic Handover (Sep.22.00)
+# Forensic Handover (Sep.21.133)
 
 ## 🎯 Current System State
 *   **Version**: Sep.22.00 | **Build**: UI Standardization & Handshake Hardening (Verified)
@@ -26,15 +26,15 @@
 ## 🛡️ Forensic Hardening Summary (Current Session Updates)
 
 ### 1. Issue #1178: GNSS Initialization Hardening
-*   **Status**: Fully Resolved (Sep.22.00).
+*   **Status**: Fully Resolved (Sep.21.133).
 *   **Remediation**: Set default satellite counts to -1 across the engine and UI layers. Implemented explicit "--" display logic in `StatusRowData` to prevent false "0/0" readings before hardware warm-up.
 
 ### 2. Issue #1177: Selection Screen Dynamic Branding
-*   **Status**: Fully Resolved (Sep.22.00).
+*   **Status**: Fully Resolved (Sep.21.133).
 *   **Remediation**: Bound the Viewer card color to `isPeerActive`. Cards now dim to `Slate500` when inactive, providing immediate feedback on whether a tracker is currently reporting to the relay.
 
 ### 3. Issue #1176: SI Unit Standardization
-*   **Status**: Fully Resolved (Sep.22.00).
+*   **Status**: Fully Resolved (Sep.21.133).
 *   **Remediation**: Swapped text component placement to suffix the degree sign (`0°`), correcting the prefix layout defect.
 
 ---

@@ -785,8 +785,6 @@ fun StatusRowData(state: StatusRowState) {
                 Box(contentAlignment = Alignment.CenterEnd, modifier = Modifier.width(62.dp)) {
                     val animatedDistance by animateFloatAsState(if (state.distance == null || state.distance.isNaN()) 0f else state.distance.toFloat(), if (state.isThrottled) snap() else tween(1200), label = "DistAnim")
                     val distStr = when { state.distance == null || state.distance.isNaN() -> "--"; animatedDistance >= 9000 -> String.format(Locale.getDefault(), "%.0fkm", animatedDistance / 1000.0); animatedDistance >= 1000 -> String.format(Locale.getDefault(), "%.1fkm", animatedDistance / 1000.0); else -> "${animatedDistance.toInt()}m" }
-                    val animatedDistance by animateFloatAsState(if (state.distance == null || state.distance.isNaN()) 0f else state.distance.toFloat(), if (state.isThrottled) snap() else tween(1200), label = "DistAnim")
-                    val distStr = when { state.distance == null || state.distance.isNaN() -> "--"; animatedDistance >= 9000 -> String.format(Locale.getDefault(), "%.0fkm", animatedDistance / 1000.0); animatedDistance >= 1000 -> String.format(Locale.getDefault(), "%.1fkm", animatedDistance / 1000.0); else -> "${animatedDistance.toInt()}m" }
                     Text(text = distStr, color = distColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1, style = compactStyle, textAlign = TextAlign.End)
                 }
             }

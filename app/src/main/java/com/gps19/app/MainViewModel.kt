@@ -219,7 +219,7 @@ class MainViewModel @Inject constructor(
         _systemPulseRt, 
         _trackerState
     ) { mode, kin, pulseRt, state ->
-        val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
+        val isUltra = if (mode == "viewer") kinematicState.value.trackerHealth.isUltraLongStationary else kinematicState.value.localHealth.isUltraLongStationary
         uiStateMapper.mapHudTelemetry(mode, kin, pulseRt, state, isUltra)
     }
     .flowOn(Dispatchers.Default)
