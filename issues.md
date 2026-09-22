@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.40
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.41
 
 ## 🎯 Current Resumption Focus: Structural Simplicity & Pattern Convergence
 Finalizing the audit of signaling performance under physical stress and ensuring no side-effects remain from the Performance Tier unification.
@@ -47,8 +47,8 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
-*   **Issue #1170: God Object ViewModel Decomposition** (Resolved Sep.22.40)
-    *   *Remediation*: Decomposed the monolithic `MainViewModel` into feature-specific ViewModels (`TrackerViewModel`, `ViewerViewModel`, `SetupViewModel`) bound to their respective navigation scopes. Refactored `MainViewModel` into a lightweight coordinator for app-level state and global overlays. This significantly improves memory isolation and isolates recomposition triggers between functional roles (R-ID 408).
+*   **Issue #1170: God Object ViewModel Decomposition** (Resolved Sep.22.41)
+    *   *Remediation*: Decomposed the monolithic `MainViewModel` into feature-specific ViewModels (`TrackerViewModel`, `ViewerViewModel`, `SetupViewModel`) bound to their respective navigation scopes. Refactored `MainViewModel` into a lightweight coordinator for app-level state and global overlays. This significantly improves memory isolation and isolates recomposition triggers between functional roles (R-ID 415).
 
 *   **Issue #1162: Forensic & Sensor Efficiency Optimization** (Resolved Sep.22.32)
     *   *Remediation*: Refactored the background tick loops in `TrackerService` and `ViewerService` to group system health and sensor metrics into an atomic `EvaluationSnapshot`. This ensures single-pass telemetry processing and minimizes the parameter surface area between the service and engine layers.
@@ -116,4 +116,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 414 (Rules: 83, IDs: 414), Resolved: 1171, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 9, QA: 283]**
+- **Current Audit Baseline: [SOT: 415 (Rules: 84, IDs: 415), Resolved: 1171, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 9, QA: 283]**
