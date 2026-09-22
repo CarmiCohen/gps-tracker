@@ -50,6 +50,10 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Sep.22.00:
+ * - Issue #1178: Initial GNSS satellite count blanking. Set default satellite 
+ *   counts to -1 in StatusRowState and added display logic to show "--" 
+ *   for unitialized satellite telemetry (R-ID 399).
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Harmonized status indicators to R-ID 348.
  * Sep.16.00:
@@ -74,8 +78,8 @@ data class StatusRowState(
     val isCharging: Boolean = false,
     val accuracy: Float = 0f,
     val maxAccuracy: Float = 0f,
-    val satsView: Int = 0,
-    val satsUsed: Int = 0,
+    val satsView: Int = -1,
+    val satsUsed: Int = -1,
     val gpsAgeMs: Long = -1L,
     val temp: Float = 0f,
     val distance: Double? = null,
@@ -744,12 +748,16 @@ fun StatusRowData(state: StatusRowState) {
                     Spacer(modifier = Modifier.width(2.dp)); Text(text = if(state.battery >= 0) "$animatedBattery%" else "--%", color = telemetryColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
                 }
                 Row(modifier = Modifier.width(22.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "°", color = telemetryColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = (-2).dp), style = compactStyle)
                     Text(text = String.format(Locale.getDefault(), "%.0f", state.temp), color = telemetryColor, fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
+                    Text(text = "°", color = telemetryColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = (-2).dp), style = compactStyle)
                 }
                 Box(contentAlignment = Alignment.Center, modifier = Modifier.width(20.dp)) { CommBar(index = state.commIndex, color = if (state.isTelemetryFresh) contentColor else Slate500) }
                 Spacer(modifier = Modifier.width(4.dp))
-                Box(modifier = Modifier.width(34.dp)) { Text(text = "${state.satsUsed}/${state.satsView}", color = telemetryColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle) }
+                Box(modifier = Modifier.width(34.dp)) { 
+                    val usedStr = if (state.satsUsed == -1) "--" else state.satsUsed.toString()
+                    val viewStr = if (state.satsView == -1) "--" else state.satsView.toString()
+                    Text(text = "$usedStr/$viewStr", color = telemetryColor, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle) 
+                }
                 Box(modifier = Modifier.width(26.dp)) {
                     val ageStr = if (state.gpsAgeMs != -1L) { val ageSec = (maxOf(0L, state.gpsAgeMs) / 1000).toInt(); when { ageSec < 100 -> "${ageSec}s"; ageSec < 3600 -> "${ageSec/60}m"; else -> ">1h" } } else "--s"
                     Text(text = ageStr, color = if (!state.isGpsFresh) Slate500 else state.color, fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
@@ -775,6 +783,8 @@ fun StatusRowData(state: StatusRowState) {
                 }
                 Spacer(modifier = Modifier.width(6.dp))
                 Box(contentAlignment = Alignment.CenterEnd, modifier = Modifier.width(62.dp)) {
+                    val animatedDistance by animateFloatAsState(if (state.distance == null || state.distance.isNaN()) 0f else state.distance.toFloat(), if (state.isThrottled) snap() else tween(1200), label = "DistAnim")
+                    val distStr = when { state.distance == null || state.distance.isNaN() -> "--"; animatedDistance >= 9000 -> String.format(Locale.getDefault(), "%.0fkm", animatedDistance / 1000.0); animatedDistance >= 1000 -> String.format(Locale.getDefault(), "%.1fkm", animatedDistance / 1000.0); else -> "${animatedDistance.toInt()}m" }
                     val animatedDistance by animateFloatAsState(if (state.distance == null || state.distance.isNaN()) 0f else state.distance.toFloat(), if (state.isThrottled) snap() else tween(1200), label = "DistAnim")
                     val distStr = when { state.distance == null || state.distance.isNaN() -> "--"; animatedDistance >= 9000 -> String.format(Locale.getDefault(), "%.0fkm", animatedDistance / 1000.0); animatedDistance >= 1000 -> String.format(Locale.getDefault(), "%.1fkm", animatedDistance / 1000.0); else -> "${animatedDistance.toInt()}m" }
                     Text(text = distStr, color = distColor, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1, style = compactStyle, textAlign = TextAlign.End)

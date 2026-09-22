@@ -6,6 +6,9 @@ import javax.inject.Singleton
 
 /**
  * UiStateMapper: Unified stateless mapper for transforming raw domain states into UI-ready models.
+ * Sep.22.00:
+ * - Issue #1178: Initial GNSS satellite count blanking. Propagated actual 
+ *   satsUsed and satsView from domain state to UI state models (R-ID 399).
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Harmonized mapping logic with R-ID 348.
  * Sep.16.00:
@@ -127,8 +130,8 @@ class UiStateMapperImpl @Inject constructor() : UiStateMapper {
             trackerMaxAcc = if (loc.kinetic.maxAccuracy > 0) loc.kinetic.maxAccuracy else loc.kinetic.accuracy,
             viewerAccuracy = if (appMode == "tracker") 0.0 else kinematicState.localLocation.kinetic.accuracy,
             viewerMaxAcc = if (appMode == "tracker") 0.0 else (if(kinematicState.localLocation.kinetic.maxAccuracy > 0) kinematicState.localLocation.kinetic.maxAccuracy else kinematicState.localLocation.kinetic.accuracy),
-            satsUsed = 0,
-            satsView = 0,
+            satsUsed = loc.integrity.satsUsed,
+            satsView = loc.integrity.satsView,
             snr = avgCn0,
             distToHome = kinematicState.distanceTrackerToHome,
             distToViewer = kinematicState.distanceTrackerToViewer,
@@ -277,7 +280,10 @@ class UiStateMapperImpl @Inject constructor() : UiStateMapper {
             maxTrackerAccuracy = kinematicState.trackerLocation.kinetic.maxAccuracy.toFloat(),
             viewerAccuracy = (if (kinematicState.localLocation.kinetic.lat != 0.0) kinematicState.localLocation.kinetic.accuracy.toFloat() else 0f),
             maxViewerAccuracy = kinematicState.localLocation.kinetic.maxAccuracy.toFloat(),
-            satsUsed = 0,
+            satsUsed = kinematicState.trackerLocation.integrity.satsUsed,
+            satsView = kinematicState.trackerLocation.integrity.satsView,
+            viewerSatsUsed = kinematicState.localLocation.integrity.satsUsed,
+            viewerSatsView = kinematicState.localLocation.integrity.satsView,
             distToHome = kinematicState.distanceTrackerToHome,
             distToViewer = kinematicState.distanceTrackerToViewer,
             lastGpsTs = loc.kinetic.gpsTs,

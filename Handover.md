@@ -1,45 +1,44 @@
-# Forensic Handover (Sep.21.132)
+# Forensic Handover (Sep.22.00)
 
 ## 🎯 Current System State
-*   **Version**: Sep.21.132 | **Build**: Complete Lifecycle & Structural Alignment (Verified)
-*   **Active Devices**: Samsung A15 & S21FE (Unified via PerformanceTier optimization matrix)
-*   **SOT Baseline**: SOT-396 (Simplicity Hardening & Unified Session Lifecycle)
-*   **Compilation Status**: Flawless compile parity; all unit tests passing (`42 passed, 0 failed` in engine)
+*   **Version**: Sep.22.00 | **Build**: UI Standardization & Handshake Hardening (Verified)
+*   **Active Devices**: Samsung A15 & S21FE (Unified)
+*   **SOT Baseline**: SOT-399 (GNSS Init & Role Card Dynamics)
+*   **Compilation Status**: Flawless compile parity; all components synchronized.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
 
-The system is split into two modules (`:app` and `:core:engine`) governing high-assurance background telemetry extraction and algorithmic verification gates:
-
-1.  **HardwareSuite.kt (`:app`)**: Unified hardware provider and lifecycle manager. Controls high-frequency background sampling loops for GNSS, linear acceleration, barometric pressure, light sensor, proximity, and low-priority acoustic microphone auditing (`AudioRecord`). 
-    *   *GnssPolicyEngine*: Embedded private strategy processor that switches tracking between `GNSS_SAMPLING_INTERVAL_MS` (standard) and `GNSS_SAMPLING_INTERVAL_THROTTLED_MS` (throttled) based on processor stress tiers or `maliAnomaly` flags without leaking temporal noise into validation.
-    *   *Fast-Path Authorities*: Hardened callbacks for immediate tamper detection during light/acoustic spikes, anchoring thresholds to `SentinelValidator` calculations via lookahead buffers.
-2.  **ForensicAuditor.kt (`:app`)**: Centralized multi-role (`T` for Tracker, `V` for Viewer) stability, sensor rate, and energy tracker utilizing an internal `ConcurrentHashMap` of atomic `RoleState` structs. Calculates real-time temporal deviation (GNSS Jitter) and records asynchronous battery temperature and current discharge footings (`RevivalEvent.Footprint`).
-3.  **SessionLifecycleCoordinator.kt (`:app`)**: Centralized session state management coordinator ensuring that hardware peaks, temporal lockouts, forensic latches, and vitality markers are reset atomically upon session restart.
-4.  **TrackerService.kt & ViewerService.kt (`:app`)**: Coordinated foreground background worker services implementing the `BaseMonitorService` model. Handles logic pulse ticks (`processTick`) on a strict timing grid, evaluates state machines, and interfaces with the `SessionLifecycleCoordinator` for atomic session updates.
-5.  **LocationProcessor.kt (`:core:engine`)**: Core algorithmic state machine evaluating incoming spatial updates against the `LocationSentinel` anomaly gate. Tracks zero-allocation velocity buffers, passive zeroing baselines for tilt profiles, clock regression hazards, and multi-tier spatial jump alarms.
+1.  **StatusRowData (`SharedUiComponents.kt`)**: Refactored to handle SI unit standardization (degree suffix) and tri-state satellite counts.
+    *   *Satellite Logic*: Now distinguishes between uninitialized (`-1` -> `--`), zero/jammed (`0` -> `0`), and active fixes.
+2.  **LandingScreen (`LandingComponents.kt`)**: Hardened with dynamic card dimming. Consumes `isPeerActive` from the ViewModel to visually suppress the Viewer role when no remote telemetry has been seen within `TELEMETRY_UI_STALE_THRESHOLD_MS`.
+3.  **MainViewModel Pulse Loop**: Integrated a background check for peer activity that updates `MainUiState.isPeerActive` every 2 seconds, providing reactive feedback to the selection screen.
+4.  **Telemetry Data Models**: Standardized `LocationUpdate` and `HudTelemetryState` to use `-1` as the baseline for satellite telemetry, preventing "zero-flicker" on startup.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 396 (Rules: 81, IDs: 396), Resolved: 1152, Open: 0, Testing: 3 (Sub-items: 11), Ideas: 14, QA: 283]**
+- **Current Audit Baseline: [SOT: 399 (Rules: 81, IDs: 399), Resolved: 1155, Open: 0, Testing: 3 (Sub-items: 11), Ideas: 14, QA: 283]**
 
 ---
 
 ## 🛡️ Forensic Hardening Summary (Current Session Updates)
 
-### 1. Issue #1165: Unified Session Lifecycle Management
-*   **Status**: Fully Resolved & Hardened (Sep.21.132).
-*   **Remediation**: Developed and fully integrated `SessionLifecycleCoordinator` into both `TrackerService` and `ViewerService`. Centralized the zeroing of hardware baseline parameters, temporal lockout registers, forensic latches (`ServiceForensicUseCase`), and system vitality indicators into a single atomic action, ensuring absolute integrity upon tracking resets across roles.
-*   **Result**: Eliminated diagnostic bleedover and transient race hazards on tracking environment initialization.
+### 1. Issue #1178: GNSS Initialization Hardening
+*   **Status**: Fully Resolved (Sep.22.00).
+*   **Remediation**: Set default satellite counts to -1 across the engine and UI layers. Implemented explicit "--" display logic in `StatusRowData` to prevent false "0/0" readings before hardware warm-up.
 
-### 2. Application Version Advancement
-*   **Status**: Complete (Sep.21.132).
-*   **Remediation**: Advanced global `versionName` within `app/build.gradle` to `Sep.21.132` and synchronized progress matrices inside master backlog layers.
+### 2. Issue #1177: Selection Screen Dynamic Branding
+*   **Status**: Fully Resolved (Sep.22.00).
+*   **Remediation**: Bound the Viewer card color to `isPeerActive`. Cards now dim to `Slate500` when inactive, providing immediate feedback on whether a tracker is currently reporting to the relay.
+
+### 3. Issue #1176: SI Unit Standardization
+*   **Status**: Fully Resolved (Sep.22.00).
+*   **Remediation**: Swapped text component placement to suffix the degree sign (`0°`), correcting the prefix layout defect.
 
 ---
 
 ## 🔴 Open Gaps & Resumption Guidance
-*   **Open Gaps**: None. The system architecture is completely stable, synchronized, and optimized for physical stress resilience.
-*   **Resumption Context**: When spinning up a fresh chat session, the next developer must proceed directly with the next prioritized architectural optimization or validation chapter outlined in the master backlog files (starting with `STATUS/SOT_MASTER_REQUIREMENTS.md` or `Simplify_Ideas2.md` under version `Sep.21.132`). Never introduce temporary mitigations or skip the completion sequence requirements.
+*   **Open Gaps**: None. The UI handshake and telemetry initialization states are now robust and semantically clear.
+*   **Resumption Context**: The next developer should proceed with **Issue #1160 (Flyweight & Pooling Expansion)** or **Issue #1166 (State Partitioning)** as outlined in `issues.md` to continue the Level 8 hydration optimization.

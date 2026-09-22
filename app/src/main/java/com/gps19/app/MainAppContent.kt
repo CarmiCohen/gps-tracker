@@ -40,6 +40,9 @@ import timber.log.Timber
 
 /**
  * MainAppContent: The top-level Composable for the application.
+ * Sep.22.00:
+ * - Issue #1177: Static Role Branding. Passed isPeerActive from uiState 
+ *   to LandingScreen to drive dynamic role indicators (R-ID 398).
  * Sep.11.10:
  * - Integrity Audit #243: Eliminated redundant collections for trails and 
  *   violations; fully delegated to consolidated mapViewState (R-ID 287).
@@ -281,7 +284,7 @@ fun MainAppContent(
                         composable(Screen.Landing.route) {
                             BackHandler { onCleanupAndExit() }
                             if (uiState.hydrationLevel >= 3) {
-                                LandingScreen { mode -> 
+                                LandingScreen(isPeerActive = uiState.isPeerActive) { mode ->
                                     if (hasRequiredPermissions(mode)) { 
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !uiState.permissions.isBackgroundLocationGranted) {
                                             viewModel.onEvent(UiEvent.SetPendingMode(mode)); showBackgroundDisclosure = true

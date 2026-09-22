@@ -6,7 +6,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
 ### Missing Functionality & Unfinished Integration
-*(No critical gaps identified. Refactoring of forensic history is complete).*
+*(No critical open gaps identified in current audit path).*
 
 ### Unintended Side Effects & Thread Safety
 *(No critical side-effects identified in current audit path).*
@@ -48,6 +48,15 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1178: Initial GNSS Satellite Count Blanking Prior to Initial Lock** (Resolved Sep.22.00)
+    *   *Remediation*: Set default satellite counts to -1 in `LocationUpdate` and propagated actual values to UI states. This ensures UI can distinguish between zero satellites (e.g. jammer/tunnel) and "no data" states during initialization (R-ID 399).
+
+*   **Issue #1177: Static Role Branding on Selection Screen Cards** (Resolved Sep.22.00)
+    *   *Remediation*: Integrated `isPeerActive` check into `MainViewModel` pulse loop and passed to `LandingScreen`. Role card colors now dynamically dim to `Slate500` when no telemetry is detected, preventing visual confusion (R-ID 398).
+
+*   **Issue #1176: Mismatched Temperature Unit Prefix Layout Ordering** (Resolved Sep.22.00)
+    *   *Remediation*: Corrected text component placement in `StatusRowData` to suffix the degree sign (`0°`) instead of prefixing it, ensuring consistent SI unit presentation (R-ID 397).
+
 *   **Issue #1165: Unified Session Lifecycle Management** (Resolved Sep.21.132)
     *   *Remediation*: Centralized session state management in `SessionLifecycleCoordinator` to ensure all hardware peaks, temporal lockouts, and vitality markers are zeroed atomically upon session restart (R-ID 396).
 
@@ -57,25 +66,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *   **Issue #1159: Unused Forensic Auditing Dead Code Elimination** (Resolved Sep.21.130)
     *   *Remediation*: Removed the unused `maxGnssJitterMs` property and obsolete `processReflection` function from `HardwareSuite.kt` to simplify code architecture and prune tracking leftovers.
 
-*   **Issue #1158: GNSS Sampling Logic Consolidation** (Resolved Sep.21.128)
-    *   *Remediation*: Encapsulated GNSS sampling policy (standard vs throttled) and auditing triggers in a nested `GnssPolicyEngine` within `HardwareSuite.kt`. This decouples the hardware callback from throttling rules and ensures symmetric auditing of jitter across all performance tiers (R-ID 394).
-
-*   **Issue #1156: Unused Forensic Abstraction** (Resolved Sep.21.127)
-    *   *Remediation*: Refactored `HistoryManager.backfillAnalyticalGaps` to consume the specialized `EngineAcousticSample` sequence from `HardwareSuite.getAcousticSamples`, eliminating dead code and ensuring environmental noise is captured with semantic precision (R-ID 393).
-
-*   **Issue #1157: Telemetry Abstraction Integration (Idea 5)** (Resolved Sep.21.127)
-    *   *Remediation*: Refactored `HistoryManager.fillRealGap` and `TelemetryAggregator` to consume `EngineAcousticSample` directly. This completes the decoupling of environmental noise (dB) from satellite SNR in the forensic ribbon history (R-ID 393).
-
-*   **Issue #1155: Acoustic-SNR Semantic Mismatch** (Resolved Sep.21.125)
-    *   *Remediation*: Introduced `EngineAcousticSample` and refactored `HardwareSuite.getAcousticSamples` to return a sequence of this new type (R-ID 393).
-
-*   **Issue #1153: Forensic Sequence Race Condition** (Resolved Sep.21.125)
-    *   *Remediation*: Refactored `CircularStateBuffer.forensicSequence` to use a multi-pass custom Sequence implementation with locking (R-ID 392).
-
-*   **Issue #1154: Forensic Allocation Spike** (Resolved Sep.21.125)
-    *   *Remediation*: Replaced `toList()` snapshot with a lazy, zero-allocation sequence iteration (R-ID 392).
-
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 396 (Rules: 81, IDs: 396), Resolved: 1152, Open: 0, Testing: 3 (Sub-items: 11), Ideas: 14, QA: 283]**
+- **Current Audit Baseline: [SOT: 399 (Rules: 81, IDs: 399), Resolved: 1155, Open: 0, Testing: 3 (Sub-items: 11), Ideas: 14, QA: 283]**

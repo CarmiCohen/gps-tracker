@@ -1,6 +1,9 @@
-# SOT Master Requirements & Hardening Status (Sep.21.132)
+# SOT Master Requirements & Hardening Status (Sep.22.00)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 399**: Initial GNSS Satellite Count Blanking Prior to Initial Lock - Set default satellite counts to -1 in `LocationUpdate` and `HudTelemetryState`. Updated `UiStateMapper` and `SharedUiComponents` to distinguish -1 (no data) from 0 (jammed/blocked) by displaying "--" until the first hardware fix is processed (R-ID 399). (Resolved Sep.22.00)
+*   **SOT ID 398**: Static Role Branding on Selection Screen Cards - Integrated `isPeerActive` check into `MainViewModel` and passed it to `LandingScreen`. The Viewer card now dynamically dims when no telemetry is detected, improving role clarity during the initial handshake phase (R-ID 398). (Resolved Sep.22.00)
+*   **SOT ID 397**: Mismatched Temperature Unit Prefix Layout Ordering - Corrected text component placement in `StatusRowData` to suffix the degree sign (`0°`) instead of prefixing it, ensuring consistent SI unit presentation (R-ID 397). (Resolved Sep.22.00)
 *   **SOT ID 396**: Unified Session Lifecycle Management - Centralized session state management in `SessionLifecycleCoordinator` to ensure all hardware peaks, temporal lockouts, and vitality markers are zeroed atomically upon session restart. (Resolved Sep.21.132)
 *   **SOT ID 395**: Interface Isolation Utilities - Created `LocationProcessorListener` and `DefaultLocationProcessorListener` with no-op methods to prevent test breakages during interface expansion and stabilize regression testing (R-ID 395). (Resolved Sep.21.131)
 *   **SOT ID 394**: GNSS Sampling Logic Consolidation - Encapsulated GNSS sampling policy (standard vs throttled) and auditing triggers in a nested `GnssPolicyEngine` within `HardwareSuite.kt`. This decouples the hardware callback from throttling rules and ensures symmetric auditing of jitter across all performance tiers (R-ID 394). (Resolved Sep.21.128)
@@ -34,14 +37,17 @@
 
 ## 📈 Metric Summary
 - **Rules Verified**: 81
-- **Total SOT IDs**: 396
-- **Resolved Issues**: 1152
+- **Total SOT IDs**: 399
+- **Resolved Issues**: 1155
 - **Open Issues**: 0
 - **Testing Coverage**: 3 (Sub-items: 11)
 - **Simplification Ideas**: 14
 - **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states (Sep.22.00)
+*   **Chapter 31.63 (Role Selection UX)**: PASSED - Dynamic card dimming based on peer activity status (Sep.22.00)
+*   **Chapter 31.62 (Temperature Unit Layout)**: PASSED - Corrected SI unit presentation in StatusRowData (Sep.22.00)
 *   **Chapter 31.61 (Session Lifecycle Coordinator)**: PASSED - Unified background session resets atomically across roles (Sep.21.132)
 *   **Chapter 31.60 (Interface Isolation Utilities)**: PASSED - Created LocationProcessorListener & DefaultLocationProcessorListener to prevent test breakages (Sep.21.131)
 *   **Chapter 31.59 (Dead Code Elimination)**: PASSED - Removed unused tracking property and helper method leftovers in HardwareSuite (Sep.21.130)
@@ -67,4 +73,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.20.103)
 
 ---
-*Next Audit: Sep.21.200. (Sep.21.132)*
+*Next Audit: Sep.22.100. (Sep.22.00)*

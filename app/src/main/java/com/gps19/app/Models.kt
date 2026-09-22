@@ -10,6 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.22.00:
+ * - Issue #1178: Initial GNSS satellite count blanking. Set default 
+ *   satellite counts to -1 in HudTelemetryState (R-ID 399).
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Harmonized data structures with R-ID 348.
  * Sep.16.00:
@@ -336,7 +339,7 @@ data class TrackerStatus(
     val totalDropMs: Long = 0L, val maxDropMs: Long = 0L, val maxDropTs: Long = 0L,
     val totalConnectedMs: Long = 0L, val sessionConnectedMs: Long = 0L, val battery: Int = 100,
     val temp: Double = 0.0, val maxTemp: Double = 0.0, val isCharging: Boolean = false,
-    val currentMa: Int = 0, val satsView: Int = 0, val satsUsed: Int = 0,
+    val currentMa: Int = 0, val satsView: Int = -1, val satsUsed: Int = -1,
     val peakVibrationShock: Double = 0.0, val peakVibrationShockTs: Long = 0L, val isPowerTamper: Boolean = false,
     val violationUptimeMs: Long = 0L, val violationPercentage: Double = 0.0, val status: SentinelStatus = SentinelStatus.VALID,
     val isJammer: Boolean = false, val isStalled: Boolean = false, val isTamperDetected: Boolean = false,
@@ -460,8 +463,8 @@ data class DashboardTelemetryState(
     val trackerMaxAcc: Double = 0.0,
     val viewerAccuracy: Double = 0.0,
     val viewerMaxAcc: Double = 0.0,
-    val satsUsed: Int = 0,
-    val satsView: Int = 0,
+    val satsUsed: Int = -1,
+    val satsView: Int = -1,
     val isSatsIndexWarning: Boolean = false,
     val snr: Double = 0.0,
     val distToHome: Double? = null,
@@ -714,10 +717,10 @@ data class HudTelemetryState(
     val maxTrackerAccuracy: Float = 0f,
     val viewerAccuracy: Float = 0f,
     val maxViewerAccuracy: Float = 0f,
-    val satsUsed: Int = 0,
-    val satsView: Int = 0,
-    val viewerSatsUsed: Int = 0,
-    val viewerSatsView: Int = 0,
+    val satsUsed: Int = -1,
+    val satsView: Int = -1,
+    val viewerSatsUsed: Int = -1,
+    val viewerSatsView: Int = -1,
     val distToHome: Double? = null,
     val distToViewer: Double? = null,
     val lastGpsTs: Long = 0L,

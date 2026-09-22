@@ -2,6 +2,18 @@
 
 ## 🟢 Resolved Issues & Refactoring Record
 
+### Sep.22.00
+*   **Issue #1178: Initial GNSS Satellite Count Blanking Prior to Initial Lock**
+    *   *Remediation*: Set default satellite counts to -1 in `LocationUpdate` and `HudTelemetryState`. Updated `UiStateMapper` and `SharedUiComponents` to distinguish -1 (no data) from 0 (jammed/blocked) by displaying "--" until the first hardware fix is processed (R-ID 399).
+*   **Issue #1177: Static Role Branding on Selection Screen Cards**
+    *   *Remediation*: Integrated `isPeerActive` check into `MainViewModel` and passed it to `LandingScreen`. The Viewer card now dynamically dims when no telemetry is detected, improving role clarity during the initial handshake phase (R-ID 398).
+*   **Issue #1176: Mismatched Temperature Unit Prefix Layout Ordering**
+    *   *Remediation*: Corrected text component placement in `StatusRowData` within `SharedUiComponents.kt` to suffix the degree sign (`0°`) instead of prefixing it, ensuring alignment with SI standard presentation (R-ID 397).
+
+### Sep.21.132
+*   **Issue #1165: Unified Session Lifecycle Management**
+    *   *Remediation*: Centralized the zeroing of hardware baseline parameters, temporal lockout registers, forensic latches, and vitality markers into `SessionLifecycleCoordinator`, ensuring atomic integrity upon tracking resets (R-ID 396).
+
 ### Sep.21.131
 *   **Issue #1174: Interface Isolation Utilities**
     *   *Remediation*: Created `LocationProcessorListener` and `DefaultLocationProcessorListener` with no-op methods to prevent test breakages during interface expansion and stabilize regression testing (R-ID 395).

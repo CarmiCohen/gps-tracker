@@ -65,8 +65,8 @@ data class IntegrityState(
     var battery: Int = -1,
     var isCharging: Boolean = false,
     var currentMa: Int = 0,
-    var satsView: Int = 0,
-    var satsUsed: Int = 0,
+    var satsView: Int = -1,
+    var satsUsed: Int = -1,
     var snrIdx: Double = 0.0,
     var isTamperDetected: Boolean = false,
     var isPowerTamper: Boolean = false,
@@ -119,6 +119,10 @@ data class IntegrityState(
 
 /**
  * LocationUpdate: Aggregated telemetry container.
+ * Sep.22.00:
+ * - Issue #1178: Initial GNSS satellite count blanking. Set default 
+ *   satsView and satsUsed to -1 to allow UI to distinguish between 
+ *   zero satellites and "no data" states (R-ID 399).
  * Sep.10.40:
  * - Issue #946 Visibility: Added tamperNote to IntegrityState for 
  *   role-agnostic forensic transparency (R-ID 288).

@@ -5,6 +5,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Persistent and slow-changing state for the UI structure.
+ * Sep.22.00:
+ * - Issue #1177: Static Role Branding. Added isPeerActive to track 
+ *   remote device availability on the landing screen (R-ID 398).
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Cleaned up deprecated compatibility properties (R-ID 348).
  * Sep.16.02:
@@ -51,7 +54,8 @@ data class MainUiState(
     val isStorageCriticalSimulated: Boolean = false,
     val isManualSelectionInProgress: Boolean = false,
     val isSettlingActive: Boolean = true,
-    val isSetupBypassActive: Boolean = false
+    val isSetupBypassActive: Boolean = false,
+    val isPeerActive: Boolean = false
 ) {
     val isFullyHydrated: Boolean get() = hydrationLevel >= 3
     val isMapHydrated: Boolean get() = hydrationLevel >= 4
@@ -165,7 +169,7 @@ data class MapViewState(
 /**
  * KinematicState: High-frequency transient state.
  */
-class KinematicState(
+data class KinematicState(
     var localLocation: LocationUpdate = LocationUpdate(),
     var trackerLocation: LocationUpdate = LocationUpdate(),
     var localHealth: SystemHealthState = SystemHealthState(),
@@ -210,12 +214,12 @@ class KinematicState(
 class DiagnosticState(
     var battery: BatteryState = BatteryState(),
     var stats: StatsState = StatsState(),
-    var viewerSatsView: Int = 0,
-    var viewerSatsUsed: Int = 0,
+    var viewerSatsView: Int = -1,
+    var viewerSatsUsed: Int = -1,
     var trackerStats: StatsState = StatsState(),
     var trackerBattery: BatteryState = BatteryState(),
-    var trackerSatsView: Int = 0,
-    var trackerSatsUsed: Int = 0,
+    var trackerSatsView: Int = -1,
+    var trackerSatsUsed: Int = -1,
     var connectivity: ConnectivityState = ConnectivityState(),
     var activeAlarms: List<AlarmInfo> = emptyList(),
     var isNewViolationDetected: Boolean = false,
@@ -267,12 +271,12 @@ class DiagnosticState(
     fun reset() {
         battery.reset()
         stats.reset()
-        viewerSatsView = 0
-        viewerSatsUsed = 0
+        viewerSatsView = -1
+        viewerSatsUsed = -1
         trackerStats.reset()
         trackerBattery.reset()
-        trackerSatsView = 0
-        trackerSatsUsed = 0
+        trackerSatsView = -1
+        trackerSatsUsed = -1
         connectivity.reset()
         activeAlarms = emptyList()
         isNewViolationDetected = false

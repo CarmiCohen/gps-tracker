@@ -61,6 +61,9 @@ private data class MapBase(val ui: MapUiParts, val kinematic: KinematicState, va
 
 /**
  * MainViewModel: Manages UI state and orchestrates data flow.
+ * Sep.22.00:
+ * - Issue #1177: Static Role Branding. Integrated isPeerActive check into 
+ *   global pulse loop to drive selection screen role indicators (R-ID 398).
  * Sep.17.00:
  * - Issue #1073: Event Log Erasure Defect. Added missing UiEvent.ClearLogs 
  *   handler to correctly invoke repository.clearLogs() (R-ID 312).
@@ -216,7 +219,7 @@ class MainViewModel @Inject constructor(
         _systemPulseRt, 
         _trackerState
     ) { mode, kin, pulseRt, state ->
-        val isUltra = if (mode == "viewer") kinematicState.value.trackerHealth.isUltraLongStationary else kinematicState.value.localHealth.isUltraLongStationary
+        val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
         uiStateMapper.mapHudTelemetry(mode, kin, pulseRt, state, isUltra)
     }
     .flowOn(Dispatchers.Default)
@@ -340,7 +343,7 @@ class MainViewModel @Inject constructor(
             trackerMaxAccuracy = if (isTracker) kin.localLocation.kinetic.maxAccuracy else kin.trackerLocation.kinetic.maxAccuracy, trackerGpsTs = tTs, trackerTelemetryTs = tTel,
             trackerLocPending = if (isTracker) kin.localHealth.isLocationPending else kin.trackerHealth.isLocationPending, trackerLocPendingReason = if (isTracker) kin.localHealth.locationPendingReason else kin.trackerHealth.locationPendingReason,
             trackerLastValidFixRt = if (isTracker) kin.localHealth.lastValidFixRt else kin.trackerHealth.lastValidFixRt, viewerLat = vLat, viewerLng = vLng, viewerSpeed = if (isTracker) 0.0 else kin.localLocation.kinetic.speed,
-            viewerAccuracy = if (isTracker) 0.0 else kin.localLocation.kinetic.accuracy, viewerMaxAcc = if (isTracker) 0.0 else kin.localLocation.kinetic.maxAccuracy, viewerGpsTs = vTs, viewerTelemetryTs = vTel,
+            viewerAccuracy = if (isTracker) 0.0 else kin.localLocation.kinetic.accuracy, viewerMaxAcc = if (isTracker) 0.0 else (if(kin.localLocation.kinetic.maxAccuracy > 0) kin.localLocation.kinetic.maxAccuracy else kin.localLocation.kinetic.accuracy), viewerGpsTs = vTs, viewerTelemetryTs = vTel,
             viewerLocPending = if (isTracker) false else kin.localHealth.isLocationPending, viewerLocPendingReason = if (isTracker) LocationPendingReason.NONE else kin.localHealth.locationPendingReason,
             viewerLastValidFixRt = if (isTracker) 0L else kin.localHealth.lastValidFixRt, replayCursorPos = kin.replayCursorPos, systemPulse = pulse, systemPulseRt = pulseRt,
             trackerSegments = trkSegs, viewerSegments = vwrSegs, violations = vios, showAccuracyBadge = true, showSettingsButton = true, showToolsOverlay = true,
@@ -513,6 +516,7 @@ class MainViewModel @Inject constructor(
             if (_uiState.value.appMode == "viewer") {
                 _remoteSignal.value = remoteStatusRepository.peerSignal.value
                 _trackerState.value = status.trackerState
+                _trackerState.value = status.trackerState
                 _trackerMaxTemp.value = status.maxTemp
                 updateKinematicState { current ->
                     telemetryUseCase.mapTrackerLocationFromStatus(status, current.trackerLocation)
@@ -672,13 +676,22 @@ class MainViewModel @Inject constructor(
     private fun startGlobalTimer() {
         viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
             while (true) {
+                val now = timeProvider.currentTimeMillis()
+                val nowRt = timeProvider.elapsedRealtime()
+
                 if (_uiState.value.isInitialized && _uiState.value.appMode != null) {
-                    val now = timeProvider.currentTimeMillis()
-                    val nowRt = timeProvider.elapsedRealtime()
                     _systemPulse.value = now
                     _systemPulseRt.value = nowRt
                     repository.sendCommand(UiCommand.SyncRequest)
                 }
+                
+                // Issue #1177: Update peer activity status for selection screen
+                val lastActivity = repository.lastRemoteActivityTs.value
+                val isPeerActive = lastActivity > 0 && (nowRt - lastActivity) < TELEMETRY_UI_STALE_THRESHOLD_MS
+                if (_uiState.value.isPeerActive != isPeerActive) {
+                    updateState { it.copy(isPeerActive = isPeerActive) }
+                }
+
                 delay(if (_uiState.value.permissions.performanceTier == PerformanceTier.STAGGERED) 5000L else 2000L)
             }
         }
@@ -696,14 +709,14 @@ class MainViewModel @Inject constructor(
 
                 if (_uiState.value.appMode == "tracker") {
                     telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime)
-                    telemetryUseCase.mapHealthFromUpdate(update, current.trackerHealth)
+                    telemetryUseCase.mapHealthFromUpdate(update, current.localHealth)
                     _trackerMaxTemp.value = update.atmospheric.maxTemp
                     _trackerState.value = update.trackerState
                     _trackerCurrentMa.value = update.integrity.currentMa
                 }
             } else {
                 telemetryUseCase.mapTrackerLocation(update, current.trackerLocation, nowMs, appStartTime)
-                telemetryUseCase.mapHealthFromUpdate(update, current.trackerHealth)
+                telemetryUseCase.mapHealthFromUpdate(update, current.localHealth)
                 _trackerMaxTemp.value = update.atmospheric.maxTemp
                 _trackerState.value = update.trackerState
                 _trackerCurrentMa.value = update.integrity.currentMa
