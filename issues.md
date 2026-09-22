@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.11
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.15
 
 ## 🎯 Current Resumption Focus: Structural Simplicity & Pattern Convergence
 Finalizing the audit of signaling performance under physical stress and ensuring no side-effects remain from the Performance Tier unification.
@@ -6,10 +6,25 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
 ### Missing Functionality & Unfinished Integration
-*(No critical missing functionality identified in current audit path).*
+*   **Issue #1186: Stale Acoustic Fast-Path Baseline and Missing Dynamic Synchronization**
+    *   *Description*: While the light fast-path baseline is periodically re-synchronized with `LocationSentinel`'s baseline inside `TrackerService.processTick()`, the acoustic fast-path baseline is completely neglected after initial setup. Because `LocationSentinel`'s `acousticFloorDb` contracts and adapts dynamically over time, the high-frequency fast path in `HardwareSuite` quickly becomes stale and diverges from the validation engine.
+    *   *Risk/Concern*: Causes severe baseline divergence, resulting in either a flood of false-positive forensic triggers or total failure to detect rapid environmental audio changes.
 
-### Unintended Side Effects & Thread Safety
-*(No critical side-effects identified in current audit path).*
+### Unhandled Edge Cases & Core Logic Bugs
+*   **Issue #1184: Broken Thermal Recovery Latency Audit in Trigger-Based Forensic Sampling Loop**
+    *   *Description*: In `TrackerService.startForensicSamplingLoop()`, `recoveryTriggerRt` tracks the timestamp when thermal cooling mode deactivates. However, the recovery verification block `if (recoveryTriggerRt > 0 && delayMs < FORENSIC_SAMPLING_INTERVAL_COOLING_MS)` executes *within the exact same loop iteration pass* immediately after deactivation. 
+    *   *Risk/Concern*: The audit latency calculation evaluates to 0ms (or sub-millisecond) every time, completely failing to measure the true temporal latency to the next normal sample pass and breaking forensic audit trace precision (Issue #1183).
+*   **Issue #1185: Semantic Type Mismatch in LocationProcessor.getAdaptiveVibrationFloor**
+    *   *Description*: In `LocationProcessor.kt`, the method `getAdaptiveVibrationFloor()` returns `sentinel.acousticFloorDb` instead of `sentinel.adaptiveVibrationFloor`. 
+    *   *Risk/Concern*: Severe semantic leak across the telemetry pipeline. Both `acousticFloorDb` and `adaptiveVibrationFloor` fields in the `LocationUpdate` entity and remote peer socket status streams receive identical acoustic decibel indices, completely blinding the architecture to actual high-frequency adaptive vibration baselines (Issues #1143, #1157).
+
+### Unintended Side Effects & Design Inconsistencies
+*   **Issue #1187: Clobbered Fast-Path Baseline Learning on Sensor Thread**
+    *   *Description*: In `HardwareSuite.kt`, `lightFastPath.evaluate()` incorporates an EMA smoothing parameter (`alpha`) to track gradual ambient light fluctuations between background ticks. However, `TrackerService.processTick()` forcefully invokes `hardwareSuite.setLightFastPath(...)` every 2 seconds, overriding `lightFastPath.baseline` with `locationProcessor.getLuxBaseline()`.
+    *   *Risk/Concern*: Wipes out and neutralizes high-frequency autonomous baseline calibration on the sensor thread, causing redundant step overrides (Issue #1169).
+*   **Issue #1189: Double-Counting Vibration Floor Adaptation during GPS Point Processing**
+    *   *Description*: In `LocationProcessor.processGpsPoint`, when a new coordinate fix propagates fast-path tamper timestamps via `sentinel.updateSensorState`, if `providedAdaptiveVibrationFloor` is unprovided or defaulted (`-1.0`), the sentinel executes its fallback `else` branch, re-invoking `SentinelValidator.updateVibrationFloor(...)` with the stale `currentVibrationIndex`.
+    *   *Risk/Concern*: Causes the vibration floor to adapt multiple times per single tick interval, accelerating baseline decay/growth artificially and distorting stationary detection thresholds (Issue #1143).
 
 ---
 
@@ -54,9 +69,10 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 11)
-
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1188: Lack of Baseline Adaptation alpha for Acoustic Fast Path** (Resolved Sep.22.15)
+    *   *Remediation*: Added alpha baseline adaptation parameter to `acousticFastPath.evaluate` in `HardwareSuite.kt`. This ensures the high-frequency acoustic baseline independently tracks ambient background noise levels, maintaining symmetry with the light fast-path and core validation logic (R-ID 407).
 
 *   **Issue #1183: Trigger-Based Forensic Sampling** (Resolved Sep.22.11)
     *   *Remediation*: Transitioned from a fixed-interval forensic loop to a "Signal-on-Spike" model where `HardwareFastPath`, location updates, and logic ticks trigger telemetry capture. This drastically reduces background CPU wakeups and GC pressure by eliminating redundant data points during long stationary periods (R-ID 406).
@@ -77,7 +93,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
     *   *Remediation*: Implemented generic `DataStore<AppSettings>.mutate` extension to encapsulate atomic, race-free list and field mutations. Refactored `SettingsRepository` methods (`addHomePoint`, `removeHomePoint`, and bulk save operations) to use this extension, eliminating redundant builder/update boilerplate (R-ID 401).
 
 *   **Issue #1179: Corrupted Home Point Addition Logic** (Resolved Sep.22.03)
-    *   *Remediation*: Implemented atomic `addHomePoint` and `removeHomePoint` methods in `SettingsRepository` using DataStore's `updateData` to prevent race conditions. Refactored `MainViewModel` to persist `ADD` mode during batch operations and force fence visibility (R-ID 400).
+    *   *Remediation*: Implemented atomic `addHomePoint` and `removeHomePoint` methods in SettingsRepository using DataStore's updateData to prevent race conditions. Refactored `MainViewModel` to persist `ADD` mode during batch operations and force fence visibility (R-ID 400).
 
 *   **Issue #1178: Initial GNSS Satellite Count Blanking Prior to Initial Lock** (Resolved Sep.22.00)
     *   *Remediation*: Set default satellite counts to -1 in `LocationUpdate` and propagated actual values to UI states. This ensures UI can distinguish between zero satellites (e.g. jammer/tunnel) and "no data" states during initialization (R-ID 399).
@@ -100,4 +116,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 406 (Rules: 82, IDs: 406), Resolved: 1162, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 12, QA: 283]**
+- **Current Audit Baseline: [SOT: 407 (Rules: 82, IDs: 407), Resolved: 1163, Open: 5, Testing: 3 (Sub-items: 12), Ideas: 12, QA: 283]**

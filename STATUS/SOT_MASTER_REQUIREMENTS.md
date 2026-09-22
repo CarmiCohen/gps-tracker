@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.21.133)
+# SOT Master Requirements & Hardening Status (Sep.22.15)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 407**: Acoustic Fast-Path Adaptation - Added alpha baseline adaptation parameter to `acousticFastPath.evaluate` in `HardwareSuite.kt`. This ensures the high-frequency acoustic baseline independently tracks ambient background noise levels, maintaining symmetry with the light fast-path and core validation logic (R-ID 407). (Resolved Sep.22.15)
 *   **SOT ID 406**: Trigger-Based Forensic Sampling - Transitioned from a fixed-interval forensic loop to a "Signal-on-Spike" model where `HardwareFastPath`, location updates, and logic ticks trigger telemetry capture. This drastically reduces background CPU wakeups and GC pressure by eliminating redundant data points during long stationary periods (R-ID 406). (Resolved Sep.22.11)
 *   **SOT ID 405**: State Partitioning & Slicing - Split the monolithic `MainUiState` into specialized slices (`SessionUiState`, `SpatialUiState`, `SettingsUiState`, `MapTriggers`, `SimulationUiState`). Refactored `MainViewModel` and all screen Composables to consume these granular segments, significantly reducing recomposition frequency and isolating volatile triggers (R-ID 405). (Resolved Sep.22.08)
 *   **SOT ID 404**: Fast-Path Configuration Convergence - Unified acoustic and light fast-path implementations in `HardwareSuite` using a generic `HardwareFastPath` structure. This centralizes baseline decay, spike detection, and debouncing logic, ensuring symmetric and race-free processing of high-frequency sensor events (R-ID 404). (Resolved Sep.22.08)
@@ -43,14 +44,15 @@
 
 ## 4.3. Metric Summary
 - **Rules Verified**: 82
-- **Total SOT IDs**: 406
-- **Resolved Issues**: 1162
-- **Open Issues**: 0
+- **Total SOT IDs**: 407
+- **Resolved Issues**: 1163
+- **Open Issues**: 5
 - **Testing Coverage**: 3 (Sub-items: 12)
 - **Simplification Ideas**: 12
 - **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.72 (Acoustic Fast-Path Adaptation)**: PASSED - Passing dynamic adaptation alpha to acoustic fast path evaluation (Sep.22.15)
 *   **Chapter 31.71 (Trigger Sampling)**: PASSED - Transitioned from fixed-interval loop to reactive signal-on-spike sampling (Sep.21.133)
 *   **Chapter 31.70 (State Partitioning)**: PASSED - Split MainUiState into specialized slices to isolate volatile triggers (Sep.21.133)
 *   **Chapter 31.69 (Fast-Path Unification)**: PASSED - Unified acoustic and light fast-paths in HardwareSuite via generic HardwareFastPath (Sep.21.133)
@@ -86,4 +88,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.20.103)
 
 ---
-*Next Audit: Sep.22.100. (Sep.21.133)*
+*Next Audit: Sep.22.100. (Sep.22.15)*

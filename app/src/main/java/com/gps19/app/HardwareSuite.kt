@@ -33,6 +33,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.22.15:
+ * - Issue #1188: Acoustic Fast-Path Adaptation. Added alpha baseline adaptation 
+ *   parameter to acousticFastPath.evaluate to ensure ambient noise tracking (R-ID 407).
  * Sep.22.08:
  * - Issue #1169: Fast-Path Configuration Convergence. Unified acoustic and light 
  *   fast-path implementations using a generic HardwareFastPath structure to 
@@ -819,7 +822,9 @@ class HardwareSuite @Inject constructor(
                                 val db = if (maxAmp > 0) 20 * log10(maxAmp.toDouble()) else 0.0
                                 synchronized(this) {
                                     currentAcousticDb = db; if (db > logicPeakDb) logicPeakDb = db; if (db < logicMinDb) logicMinDb = db; if (db > forensicPeakDb) forensicPeakDb = db; if (db < forensicMinDb) forensicMinDb = db; if (db > secPeakDb) secPeakDb = db
-                                    if (acousticFastPath.evaluate(db, nowRt, isWarming, SPIKE_DEBOUNCE_MS)) {
+                                    
+                                    val alpha = SentinelValidator.accelerateAlpha(ACOUSTIC_EMA_UP_FAST, isWarming)
+                                    if (acousticFastPath.evaluate(db, nowRt, isWarming, SPIKE_DEBOUNCE_MS, alpha)) {
                                         lastAcousticLockoutRt = acousticFastPath.lastSpikeRt
                                     }
                                 }
