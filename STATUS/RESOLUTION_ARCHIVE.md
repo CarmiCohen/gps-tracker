@@ -2,6 +2,10 @@
 
 ## 🟢 Resolved Issues & Refactoring Record
 
+### Sep.22.26
+*   **Issue #1185: Semantic Type Mismatch in LocationProcessor.getAdaptiveVibrationFloor**
+    *   *Remediation*: Corrected `getAdaptiveVibrationFloor()` in `LocationProcessor.kt` to return `sentinel.adaptiveVibrationFloor` instead of `sentinel.acousticFloorDb`. This resolves the severe semantic leak across the telemetry pipeline, ensuring actual adaptive vibration baseline metrics are correctly propagated rather than acoustic ones.
+
 ### Sep.22.15
 *   **Issue #1188: Lack of Baseline Adaptation alpha for Acoustic Fast Path**
     *   *Remediation*: Added alpha baseline adaptation parameter to `acousticFastPath.evaluate` in `HardwareSuite.kt`. This ensures the high-frequency acoustic baseline independently tracks ambient background noise levels, maintaining symmetry with the light fast-path and core validation logic (R-ID 407).

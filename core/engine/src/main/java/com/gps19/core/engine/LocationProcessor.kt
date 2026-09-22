@@ -192,7 +192,7 @@ class LocationProcessor(
     fun getLuxBaseline() = sentinel.luxBaseline
     fun getBaroBaseline() = sentinel.baroBaseline
     fun getAcousticFloorDb() = sentinel.acousticFloorDb
-    fun getAdaptiveVibrationFloor() = sentinel.acousticFloorDb
+    fun getAdaptiveVibrationFloor() = sentinel.adaptiveVibrationFloor
     fun getPeakVibrationShock() = sentinel.peakVibrationShock
     fun getPeakVibrationShockRt() = sentinel.peakVibrationShockRt
     
