@@ -19,6 +19,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Sep.22.50:
+ * - Issue #1191 RESOLVED: Added support for UiEvent.BulkUpdateSettings and UiEvent.LogAction
+ *   to ensure configuration and trail import operations succeed flawlessly (R-ID 416).
  * Sep.22.40:
  * - Issue #1170 RESOLVED: Decomposed monolithic ViewModel. Moved feature-specific 
  *   logic to TrackerViewModel, ViewerViewModel, and SetupViewModel. MainViewModel 
@@ -111,7 +114,8 @@ class MainViewModel @Inject constructor(
                 updateState { it.copy(
                     settings = it.settings.copy(
                         deviceId = update.trackerId, viewerId = update.viewerId, relayUrl = update.relayUrl,
-                        lastAlarmAckTs = update.lastAlarmAckTs, isIdentitySanitized = update.identitySanitized
+                        lastAlarmAckTs = update.lastAlarmAckTs, isIdentitySanitized = update.identitySanitized,
+                        alertSettings = update.alertSettings
                     ),
                     spatial = it.spatial.copy(
                         maxDistance = update.maxDistance, homePoints = update.homePoints
@@ -250,6 +254,33 @@ class MainViewModel @Inject constructor(
             is UiEvent.RequestTestAlarm -> {
                 repository.sendCommand(UiCommand.ExecuteTestAlarm)
             }
+            is UiEvent.BulkUpdateSettings -> {
+                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+                    settingsUseCase.bulkUpdateSettings(
+                        deviceId = event.deviceId,
+                        viewerId = event.viewerId,
+                        relayUrl = event.relayUrl,
+                        maxDistance = event.maxDistance,
+                        alertSettings = event.alertSettings,
+                        homePoints = event.homePoints
+                    )
+                }
+            }
+            is UiEvent.LogAction -> {
+                repository.addLog(
+                    LogEntry(
+                        localId = UUID.randomUUID().toString(),
+                        timestamp = timeProvider.currentTimeMillis(),
+                        message = event.message,
+                        type = event.type.uppercase(),
+                        isImportant = event.isImportant,
+                        id = _uiState.value.settings.deviceId,
+                        viewerId = _uiState.value.settings.viewerId,
+                        isSpecial = event.isSpecial,
+                        specialColor = event.specialColor
+                    )
+                )
+            }
             else -> {}
         }
     }
@@ -282,7 +313,7 @@ class MainViewModel @Inject constructor(
         updateState { it.copy(
             settings = it.settings.copy(
                 deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl,
-                isIdentitySanitized = initial.identitySanitized
+                isIdentitySanitized = initial.identitySanitized, alertSettings = initial.alertSettings
             ),
             session = it.session.copy(
                 appMode = initial.appMode, isSystemActive = initial.isSystemActive,

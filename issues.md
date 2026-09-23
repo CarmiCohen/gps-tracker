@@ -1,19 +1,21 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.41
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.22.50
 
 ## 🎯 Current Resumption Focus: Structural Simplicity & Pattern Convergence
 Finalizing the audit of signaling performance under physical stress and ensuring no side-effects remain from the Performance Tier unification.
 
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
-### Unhandled Edge Cases & Core Logic Bugs
-*(None)*
-
 ### Unintended Side Effects & Design Inconsistencies
-*(None)*
+*   **Issue #1192: Disconnected Settings Input State Flow**
+    *   *Description*: `MainAppContent` passes `settingsState` derived from `MainViewModel` down to `TrackerScreen` and `ViewerScreen`. However, the settings text input fields and controls dispatch draft updates (e.g., `UpdateDraftDeviceId`, `UpdateDraftRelayUrl`) to the feature-specific `TrackerViewModel` or `ViewerViewModel`. Since the screen components observe `MainViewModel` for the draft settings values, the text inputs remain visually frozen and do not reflect user entry.
+    *   *Significance*: **Critical (UI Input Lock)**: Completely prevents modifying or saving any application configuration parameters within active role states.
+*   **Issue #1193: Asymmetric Audio Control and Siren State Dispersion**
+    *   *Description*: `SettingsOverlay` triggers `SetSirenType` and siren playback controls via the feature-specific ViewModels, but reads audio playback feedback state from `MainViewModel`'s `diagnosticState`. This creates an asymmetric state loop where audio synthesis state tracking diverges across different roles.
+    *   *Significance*: **Medium (State Divergence)**: Leads to race conditions or incorrect playback indication in the UI settings panel.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 9)
+## 💡 Strategic Simplification Ideas (Ideas: 10)
 
 *   **Issue #1164: Persistence of Logic State**
     *   *Description*: Serialize `AlarmHistory` into the database/DataStore to ensure geofence debounce states and power alarm latches survive process death or deep sleep system kills.
@@ -42,10 +44,16 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *   **Issue #1175: Real-time Only Path (Pivot Option)**
     *   *Description*: Consider a strategic option to remove the backlog sync (`PendingStatusDao`) and forensic backfilling (gap interpolation) entirely to reduce long-term maintenance.
     *   *Significance*: **Strategic (Maintenance Tradeoff)**: Reduces codebase complexity dramatically but at the expense of offline history features; depends heavily on product direction.
+*   **Issue #1194: Unified Event Logging and Action Handling**
+    *   *Description*: Consolidate global event logging and administrative actions into a dedicated `AppEventCoordinator` or similar domain utility. This reduces the `onEvent` surface area in `MainViewModel` and ensures consistent cross-feature audit logs.
+    *   *Significance*: **Low (Refactoring)**: Centralizes cross-cutting logging concerns and simplifies ViewModel event loops.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1191: Broken Import Operations Due to Handled Event Omissions** (Resolved Sep.22.50)
+    *   *Remediation*: Added robust handling loops for `UiEvent.BulkUpdateSettings` and `UiEvent.LogAction` within `MainViewModel.onEvent`. Integrated `alertSettingsFlow` into `StateSubscriptionUseCase` to ensure state changes propagate to the presentation layer without omissions, restoring seamless config/trail restoration pipelines (R-ID 416).
 
 *   **Issue #1170: God Object ViewModel Decomposition** (Resolved Sep.22.41)
     *   *Remediation*: Decomposed the monolithic `MainViewModel` into feature-specific ViewModels (`TrackerViewModel`, `ViewerViewModel`, `SetupViewModel`) bound to their respective navigation scopes. Refactored `MainViewModel` into a lightweight coordinator for app-level state and global overlays. This significantly improves memory isolation and isolates recomposition triggers between functional roles (R-ID 415).
@@ -116,4 +124,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 415 (Rules: 84, IDs: 415), Resolved: 1171, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 9, QA: 283]**
+- **Current Audit Baseline: [SOT: 416 (Rules: 84, IDs: 416), Resolved: 1172, Open: 2, Testing: 3 (Sub-items: 12), Ideas: 10, QA: 283]**

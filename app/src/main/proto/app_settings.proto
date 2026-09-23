@@ -93,6 +93,17 @@ message AppSettings {
     // Issue #630: Forensic Recovery Log Aggregation
     optional int64 cumulative_recovery_blackout_ms = 71;
     optional int32 recovery_count = 72;
+
+    // Issue #1164: Logic State Persistence (Geofence Debounce & Power Latches)
+    optional int64 first_violation_ts = 73;
+    optional int64 first_violation_rt = 74;
+    optional bool first_violation_was_jump = 75;
+    optional int32 distance_violation_counter = 76;
+    optional bool was_distance_violated = 77;
+    optional bool power_alarm_pending = 78;
+    optional int64 last_siren_stop_rt = 79;
+    optional int64 last_global_trigger_rt = 80;
+    optional int64 forensic_reliability_degradation_start_rt = 81;
 }
 
 enum TrackerStateProto {
@@ -343,7 +354,7 @@ message TrackerStatusProto {
     bool is_clock_regression = 83;
     int32 jump_tier = 84;
     bool is_location_pending = 85;
-    LocationPendingReasonProto location_pending_reason = 86;
+    Location_pendingReasonProto location_pending_reason = 86;
     int64 last_valid_fix_rt = 87;
     double snr_idx = 88;
     double noise_idx = 89;

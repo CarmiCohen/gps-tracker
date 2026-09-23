@@ -3,10 +3,13 @@ package com.gps19.app
 import android.content.Context
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
@@ -30,12 +33,12 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.22.50:
+ * - Issue #1164 RESOLVED: Implemented persistence for logic state (geofence debounce,
+ *   power latches, and siren timers) to ensure reliability across process restarts (R-ID 417).
  * Sep.21.123:
  * - Issue #1121 Refactoring: Migrated evaluateAlarms to unified 
  *   AlarmTelemetrySnapshot and AlarmServiceContext DTOs (R-ID 390).
- * Sep.15.04:
- * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
- *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -46,6 +49,8 @@ class AppAlarmManager @Inject constructor(
     private val timeProvider: TimeProvider,
     private val audioSynthesizer: AudioSynthesizer
 ) {
+    private val scope = CoroutineScope(Dispatchers.IO)
+    
     private val _alarmEvents = MutableSharedFlow<AlarmEvent>(
         extraBufferCapacity = 64,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
@@ -67,8 +72,8 @@ class AppAlarmManager @Inject constructor(
     private var wasDistanceViolated: Boolean = false
     private var powerAlarmPending: Boolean = false
     
-    private var lastSirenStopTs: Long = 0L
-    private var lastGlobalTriggerTs: Long = 0L
+    private var lastSirenStopRt: Long = 0L
+    private var lastGlobalTriggerRt: Long = 0L
     private var isTrackerMode: Boolean = false
 
     fun updateSettings(settings: AlertSettings) {
@@ -78,7 +83,10 @@ class AppAlarmManager @Inject constructor(
     fun getSettings(): AlertSettings = currentSettings
 
     fun setPowerAlarmPending(pending: Boolean) {
-        this.powerAlarmPending = pending
+        if (this.powerAlarmPending != pending) {
+            this.powerAlarmPending = pending
+            saveLogicState()
+        }
     }
 
     fun hasUnresolvedAlarms(): Boolean {
@@ -105,13 +113,14 @@ class AppAlarmManager @Inject constructor(
         if (!hasUnresolvedAlarms()) return false
         val nowRt = timeProvider.elapsedRealtime()
         
-        if (lastSirenStopTs > 0L && nowRt - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) return false
+        if (lastSirenStopRt > 0L && nowRt - lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS) return false
         if (nowRt < audioSynthesizer.getSilencedUntilRt()) return false
         return true
     }
     
     fun notifySirenManualStop() {
-        lastSirenStopTs = timeProvider.elapsedRealtime()
+        lastSirenStopRt = timeProvider.elapsedRealtime()
+        saveLogicState()
     }
 
     fun restoreState(json: String) {
@@ -135,6 +144,46 @@ class AppAlarmManager @Inject constructor(
             lastAlarmsJson = json
         } catch (e: Exception) {
             Timber.e(e, "Siren Persistence: Failed to restore alarm state")
+        }
+    }
+
+    /**
+     * restoreLogicState: Restores geofence debounce and power latches from AppSettings.
+     * v9.3.5 (Issue #1164): Ensures logic stability across process restarts.
+     */
+    fun restoreLogicState(s: AppSettings) {
+        firstViolationTs = s.firstViolationTs
+        firstViolationRt = s.firstViolationRt
+        firstViolationWasJump = s.firstViolationWasJump
+        distanceViolationCounter = s.distanceViolationCounter
+        wasDistanceViolated = s.wasDistanceViolated
+        powerAlarmPending = s.powerAlarmPending
+        lastSirenStopRt = s.lastSirenStopRt
+        lastGlobalTriggerRt = s.lastGlobalTriggerRt
+        
+        evaluationState.firstViolationTs = firstViolationTs
+        evaluationState.firstViolationRt = firstViolationRt
+        evaluationState.firstViolationWasJump = firstViolationWasJump
+        evaluationState.wasDistanceViolated = wasDistanceViolated
+        evaluationState.distanceViolationCounter = distanceViolationCounter
+        evaluationState.forensicReliabilityDegradationStartRt = s.forensicReliabilityDegradationStartRt
+        
+        Timber.i("Logic State Restored: GeoCounter: $distanceViolationCounter, WasViolated: $wasDistanceViolated")
+    }
+
+    private fun saveLogicState() {
+        scope.launch {
+            repository.saveLogicState(
+                firstViolationTs = firstViolationTs,
+                firstViolationRt = firstViolationRt,
+                firstViolationWasJump = firstViolationWasJump,
+                distanceViolationCounter = distanceViolationCounter,
+                wasDistanceViolated = wasDistanceViolated,
+                powerAlarmPending = powerAlarmPending,
+                lastSirenStopRt = lastSirenStopRt,
+                lastGlobalTriggerRt = lastGlobalTriggerRt,
+                forensicReliabilityDegradationStartRt = evaluationState.forensicReliabilityDegradationStartRt
+            )
         }
     }
 
@@ -254,9 +303,9 @@ class AppAlarmManager @Inject constructor(
             trackerTemp = telemetry.temp,
             wasDistanceViolated = wasDistanceViolated, 
             distanceViolationCounter = distanceViolationCounter,
-            firstViolationTs = evaluationState.firstViolationTs, 
-            firstViolationRt = evaluationState.firstViolationRt,
-            firstViolationWasJump = evaluationState.firstViolationWasJump, 
+            firstViolationTs = firstViolationTs, 
+            firstViolationRt = firstViolationRt,
+            firstViolationWasJump = firstViolationWasJump, 
             maxDistance = serviceContext.maxDistanceAuthority, 
             distToHomeAuthority = serviceContext.distToHomeAuthority, 
             isGpsGap = telemetry.isGpsGap, 
@@ -280,6 +329,11 @@ class AppAlarmManager @Inject constructor(
         snr: Double?,
         vibe: Double?
     ) {
+        val oldWasViolated = wasDistanceViolated
+        val oldCounter = distanceViolationCounter
+        val oldRt = firstViolationRt
+        val oldStallRt = evaluationState.forensicReliabilityDegradationStartRt
+        
         wasDistanceViolated = evaluationState.wasDistanceViolated
         distanceViolationCounter = evaluationState.distanceViolationCounter
         firstViolationTs = evaluationState.firstViolationTs
@@ -298,11 +352,11 @@ class AppAlarmManager @Inject constructor(
             
             if (violation.conditionMet && enabled) {
                 if (!eval.isTriggered || eval.isResolved) {
-                    if ((nowRt - lastGlobalTriggerTs) >= ALERT_TRIGGER_GRACE_PERIOD_MS) {
+                    if ((nowRt - lastGlobalTriggerRt) >= ALERT_TRIGGER_GRACE_PERIOD_MS) {
                         eval.isTriggered = true; eval.firstTriggerTs = now; eval.firstTriggerRt = nowRt; eval.isResolved = false
                         triggerOccurredInThisCycle = true
                         _alarmEvents.tryEmit(AlarmEvent.LogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor, lat, lng, accuracy, maxAccuracy, snr, vibe))
-                        if (nowRt - lastSirenStopTs < SIREN_RESUME_COOLDOWN_MS) lastSirenStopTs = 0L 
+                        if (nowRt - lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS) lastSirenStopRt = 0L 
                     }
                 }
                 eval.lastLogTs = now; eval.lastLogRt = nowRt; eval.title = violation.title; eval.subtitle = violation.subtitle
@@ -317,9 +371,17 @@ class AppAlarmManager @Inject constructor(
             }
         }
 
-        if (triggerOccurredInThisCycle) lastGlobalTriggerTs = nowRt
+        if (triggerOccurredInThisCycle) {
+            lastGlobalTriggerRt = nowRt
+        }
+        
         synchronized(activeAlarms) { activeAlarms.clear(); activeAlarms.putAll(newAlarms) }
         updateAlarmsJson()
+        
+        val stateChanged = wasDistanceViolated != oldWasViolated || distanceViolationCounter != oldCounter || firstViolationRt != oldRt || triggerOccurredInThisCycle || evaluationState.forensicReliabilityDegradationStartRt != oldStallRt
+        if (stateChanged) {
+            saveLogicState()
+        }
     }
 
     fun dismissResolvedAlarms() {
@@ -387,13 +449,15 @@ class AppAlarmManager @Inject constructor(
         synchronized(activeAlarms) { activeAlarms.clear() }
         lastAlarmsJson = "[]"; repository.saveAlarmsJsonSync("[]")
         wasDistanceViolated = false; distanceViolationCounter = 0; firstViolationTs = 0L; firstViolationRt = 0L
+        evaluationState.firstViolationTs = 0L; evaluationState.firstViolationRt = 0L; evaluationState.wasDistanceViolated = false; evaluationState.distanceViolationCounter = 0
         
         val nowRt = timeProvider.elapsedRealtime()
-        if (nowRt - lastSirenStopTs > SIREN_RESUME_COOLDOWN_MS) {
-            lastSirenStopTs = 0L
+        if (nowRt - lastSirenStopRt > SIREN_RESUME_COOLDOWN_MS) {
+            lastSirenStopRt = 0L
         }
         
-        lastGlobalTriggerTs = 0L
+        lastGlobalTriggerRt = 0L
+        saveLogicState()
     }
 
     private data class AlarmEvaluation(

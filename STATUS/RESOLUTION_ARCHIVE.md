@@ -2,6 +2,10 @@
 
 ## 🟢 Resolved Issues & Refactoring Record
 
+### Sep.22.50
+*   **Issue #1191: Broken Import Operations Due to Handled Event Omissions**
+    *   *Remediation*: Added robust handling loops for `UiEvent.BulkUpdateSettings` and `UiEvent.LogAction` within `MainViewModel.onEvent`. Integrated `alertSettingsFlow` into `StateSubscriptionUseCase` to ensure state changes propagate to the presentation layer without omissions, restoring seamless config/trail restoration pipelines (R-ID 416).
+
 ### Sep.22.40
 *   **Issue #1170: God Object ViewModel Decomposition**
     *   *Remediation*: Decomposed the monolithic `MainViewModel` into feature-specific ViewModels (`TrackerViewModel`, `ViewerViewModel`, `SetupViewModel`) bound to their respective navigation scopes. Refactored `MainViewModel` into a lightweight coordinator for app-level state and global overlays. This improves memory isolation and isolates recomposition triggers between functional roles. (SOT ID 415)

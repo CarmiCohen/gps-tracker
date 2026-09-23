@@ -60,22 +60,12 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Sep.22.50:
+ * - Issue #1164 REMEDIATION: Implemented persistence for logic state fields 
+ *   (Geofence Debounce, Power Latches, Siren Timers) to survive process death (R-ID 417).
  * Sep.22.04:
  * - Idea #1 Integration: Extracted atomic list mutation pattern into a generic 
  *   DataStore<AppSettings>.mutate extension to streamline data layer operations.
- * Sep.22.03:
- * - Issue #1179 Remediation: Implemented atomic addHomePoint and removeHomePoint 
- *   using DataStore updateData to prevent race conditions during rapid 
- *   interactive updates. (R-ID 400).
- * Sep.15.04:
- * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
- *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
- * Sep.14.10:
- * - IPC Noise Suppression (#1019): Migrated to @ShadowContext to utilize 
- *   ShadowCache for package name lookups during DataStore hydration (R-ID 324).
- * Sep.02.66:
- * - Issue #241 RESOLVED: Mode-Selection Activation. Migrated setAppMode to 
- *   suspend to eliminate race conditions during role selection (R-ID 241).
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -177,6 +167,11 @@ class SettingsRepository @Inject constructor(
                 LAST_HISTORY_SIT_TS_KEY -> setLastHistorySitTs(value)
                 RECOVERY_BLOCKED_TS_KEY -> setRecoveryBlockedTs(value)
                 CUMULATIVE_RECOVERY_BLACKOUT_MS_KEY -> setCumulativeRecoveryBlackoutMs(value)
+                FIRST_VIOLATION_TS_KEY -> setFirstViolationTs(value)
+                FIRST_VIOLATION_RT_KEY -> setFirstViolationRt(value)
+                LAST_SIREN_STOP_RT_KEY -> setLastSirenStopRt(value)
+                LAST_GLOBAL_TRIGGER_RT_KEY -> setLastGlobalTriggerRt(value)
+                FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY -> setForensicReliabilityDegradationStartRt(value)
             }
         }
     }
@@ -204,6 +199,9 @@ class SettingsRepository @Inject constructor(
                 IDENTITY_SANITIZED_KEY -> setIdentitySanitized(value)
                 IS_SYSTEM_ACTIVE_KEY -> setIsSystemActive(value)
                 IS_RECOVERY_PENDING_KEY -> setIsRecoveryPending(value)
+                FIRST_VIOLATION_WAS_JUMP_KEY -> setFirstViolationWasJump(value)
+                WAS_DISTANCE_VIOLATED_KEY -> setWasDistanceViolated(value)
+                POWER_ALARM_PENDING_KEY -> setPowerAlarmPending(value)
             }
         }
     }
@@ -214,6 +212,7 @@ class SettingsRepository @Inject constructor(
                 LAST_AUTO_SAVE_HOUR_KEY -> setLastAutoSaveHour(value)
                 LAST_VERSION_CODE_KEY -> setLastVersionCode(value)
                 RECOVERY_COUNT_KEY -> setRecoveryCount(value)
+                DISTANCE_VIOLATION_COUNTER_KEY -> setDistanceViolationCounter(value)
             }
         }
     }
@@ -258,6 +257,11 @@ class SettingsRepository @Inject constructor(
             LAST_HISTORY_SIT_TS_KEY -> if (settings.hasLastHistorySitTs()) settings.lastHistorySitTs else 0L
             RECOVERY_BLOCKED_TS_KEY -> settings.recoveryBlockedTs
             CUMULATIVE_RECOVERY_BLACKOUT_MS_KEY -> settings.cumulativeRecoveryBlackoutMs
+            FIRST_VIOLATION_TS_KEY -> settings.firstViolationTs
+            FIRST_VIOLATION_RT_KEY -> settings.firstViolationRt
+            LAST_SIREN_STOP_RT_KEY -> settings.lastSirenStopRt
+            LAST_GLOBAL_TRIGGER_RT_KEY -> settings.lastGlobalTriggerRt
+            FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY -> settings.forensicReliabilityDegradationStartRt
             else -> 0L
         }
         return if (value == 0L) default else value
@@ -287,6 +291,9 @@ class SettingsRepository @Inject constructor(
             IDENTITY_SANITIZED_KEY -> settings.identitySanitized
             IS_SYSTEM_ACTIVE_KEY -> settings.isSystemActive
             IS_RECOVERY_PENDING_KEY -> settings.isRecoveryPending
+            FIRST_VIOLATION_WAS_JUMP_KEY -> settings.firstViolationWasJump
+            WAS_DISTANCE_VIOLATED_KEY -> settings.wasDistanceViolated
+            POWER_ALARM_PENDING_KEY -> settings.powerAlarmPending
             else -> default
         }
     }
@@ -297,6 +304,7 @@ class SettingsRepository @Inject constructor(
             LAST_AUTO_SAVE_HOUR_KEY -> settings.lastAutoSaveHour
             LAST_VERSION_CODE_KEY -> settings.lastVersionCode
             RECOVERY_COUNT_KEY -> settings.recoveryCount
+            DISTANCE_VIOLATION_COUNTER_KEY -> settings.distanceViolationCounter
             else -> -1
         }
         return if (value == -1) default else value
@@ -536,6 +544,30 @@ class SettingsRepository @Inject constructor(
         dataStore.mutate {
             setCumulativeRecoveryBlackoutMs(cumulativeRecoveryBlackoutMs + blackoutMs)
                 .setRecoveryCount(recoveryCount + 1)
+        }
+    }
+
+    suspend fun saveLogicState(
+        firstViolationTs: Long,
+        firstViolationRt: Long,
+        firstViolationWasJump: Boolean,
+        distanceViolationCounter: Int,
+        wasDistanceViolated: Boolean,
+        powerAlarmPending: Boolean,
+        lastSirenStopRt: Long,
+        lastGlobalTriggerRt: Long,
+        forensicReliabilityDegradationStartRt: Long
+    ) {
+        dataStore.mutate {
+            setFirstViolationTs(firstViolationTs)
+                .setFirstViolationRt(firstViolationRt)
+                .setFirstViolationWasJump(firstViolationWasJump)
+                .setDistanceViolationCounter(distanceViolationCounter)
+                .setWasDistanceViolated(wasDistanceViolated)
+                .setPowerAlarmPending(powerAlarmPending)
+                .setLastSirenStopRt(lastSirenStopRt)
+                .setLastGlobalTriggerRt(lastGlobalTriggerRt)
+                .setForensicReliabilityDegradationStartRt(forensicReliabilityDegradationStartRt)
         }
     }
 }

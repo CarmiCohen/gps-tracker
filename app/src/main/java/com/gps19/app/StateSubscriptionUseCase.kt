@@ -11,6 +11,9 @@ import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * Sep.22.50:
+ * - Issue #1191 REMEDIATION: Integrated alertSettingsFlow into observeRepositorySettings
+ *   to ensure UI consistency after bulk configuration imports (R-ID 416).
  * Aug.26.13:
  * - Concern #737 Remediation: Integrated identitySanitizedFlow into 
  *   observeRepositorySettings to support persistent dismissal of sanitization 
@@ -130,7 +133,8 @@ class StateSubscriptionUseCase @Inject constructor(
             repository.lastAlarmAckTsFlow,
             repository.appModeFlow,
             repository.isSystemActiveFlow,
-            repository.identitySanitizedFlow
+            repository.identitySanitizedFlow,
+            repository.alertSettingsFlow
         ) { args: Array<Any?> ->
             SettingsUpdate(
                 trackerId = args[0] as String,
@@ -142,7 +146,8 @@ class StateSubscriptionUseCase @Inject constructor(
                 lastAlarmAckTs = args[6] as Long,
                 appMode = args[7] as String?,
                 isSystemActive = args[8] as Boolean,
-                identitySanitized = args[9] as Boolean
+                identitySanitized = args[9] as Boolean,
+                alertSettings = args[10] as AlertSettings
             )
         }
         .distinctUntilChanged()
@@ -208,7 +213,8 @@ class StateSubscriptionUseCase @Inject constructor(
         val maxDistance: Double, val homePoints: List<GeoPoint>,
         val isXiaomiManualOverride: Boolean, val lastAlarmAckTs: Long,
         val appMode: String?, val isSystemActive: Boolean,
-        val identitySanitized: Boolean
+        val identitySanitized: Boolean,
+        val alertSettings: AlertSettings
     )
 
     data class ConnectivityUpdate(

@@ -28,18 +28,12 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Sep.22.50:
+ * - Issue #1164 REMEDIATION: Exposed saveLogicState to support geofence debounce 
+ *   and power latch persistence (R-ID 417).
  * Sep.22.03:
  * - Issue #1179: Atomic Hydration. Exposed addHomePoint and removeHomePoint 
  *   from SettingsRepository to support race-free geofence updates (R-ID 400).
- * Sep.15.04:
- * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
- *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
- * Sep.14.10:
- * - IPC Noise Suppression (#1019): Switched to @ApplicationContext to utilize
- *   ShadowCache for package name lookups during high-frequency DB/Telemetry operations.
- * Sep.06.03:
- * - Issue #924 RESOLVED: Watchdog Safe-Mode. Exposed isSafeMode and 
- *   setSafeMode to coordinate signaling suppression (R-ID 271).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -533,4 +527,20 @@ class MainRepository @Inject constructor(
     fun setForensicStallSimulation(active: Boolean) {
         logRepository.setForensicStallSimulation(active)
     }
+
+    suspend fun saveLogicState(
+        firstViolationTs: Long,
+        firstViolationRt: Long,
+        firstViolationWasJump: Boolean,
+        distanceViolationCounter: Int,
+        wasDistanceViolated: Boolean,
+        powerAlarmPending: Boolean,
+        lastSirenStopRt: Long,
+        lastGlobalTriggerRt: Long,
+        forensicReliabilityDegradationStartRt: Long
+    ) = settings.saveLogicState(
+        firstViolationTs, firstViolationRt, firstViolationWasJump, 
+        distanceViolationCounter, wasDistanceViolated, powerAlarmPending, 
+        lastSirenStopRt, lastGlobalTriggerRt, forensicReliabilityDegradationStartRt
+    )
 }

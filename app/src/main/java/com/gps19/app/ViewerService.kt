@@ -17,13 +17,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.22.50:
+ * - Issue #1164 REMEDIATION: Restored logic state (geofence debounce, power latches)
+ *   from DataStore during initialization to survive process death (R-ID 417).
  * Sep.22.32:
  * - Issue #1162: Forensic & Sensor Efficiency Optimization. Refactored processTick loop 
  *   to use EvaluationSnapshot for atomic telemetry and health metrics consumption.
- * Sep.22.07:
- * - Issue #1168: Vendor Adaptation Centralization. Injected DeviceProfileManager 
- *   to encapsulate and centralize all hardware/vendor-dependent behavioral overrides 
- *   and loop tweaks (R-ID 403).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -91,6 +90,8 @@ class ViewerService : BaseMonitorService() {
         connectivitySuite.updateRemoteProcessor(remoteProcessor)
         connectivitySuite.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, false)
         
+        val settingsSnapshot = repository.getSettingsSnapshot()
+
         val savedMaxAcc = repository.getDouble(MAX_ACCURACY_KEY, 0.0)
         val savedLastSitTs = repository.getLong(LAST_SIT_TS_KEY, 0L)
         val savedBaseline = repository.getDouble(CHAIR_BASELINE_TILT_KEY, -1000.0)
@@ -115,6 +116,10 @@ class ViewerService : BaseMonitorService() {
         )
         
         selfProcessor.loadState(0.0, 0L, -1000.0, null, homePoints, maxDist)
+
+        val savedAlarms = repository.getLastAlarmsJson()
+        alarmManager.restoreState(savedAlarms)
+        alarmManager.restoreLogicState(settingsSnapshot)
 
         historyManager.initialize(lifecycleScope)
         

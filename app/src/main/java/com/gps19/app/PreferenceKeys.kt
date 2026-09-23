@@ -68,3 +68,14 @@ const val RECOVERY_BLOCKED_TS_KEY = "recovery_blocked_ts"
 // Issue #630: Forensic Recovery Log Aggregation
 const val CUMULATIVE_RECOVERY_BLACKOUT_MS_KEY = "cumulative_recovery_blackout_ms"
 const val RECOVERY_COUNT_KEY = "recovery_count"
+
+// Issue #1164: Logic State Persistence Keys
+const val FIRST_VIOLATION_TS_KEY = "first_violation_ts"
+const val FIRST_VIOLATION_RT_KEY = "first_violation_rt"
+const val FIRST_VIOLATION_WAS_JUMP_KEY = "first_violation_was_jump"
+const val DISTANCE_VIOLATION_COUNTER_KEY = "distance_violation_counter"
+const val WAS_DISTANCE_VIOLATED_KEY = "was_distance_violated"
+const val POWER_ALARM_PENDING_KEY = "power_alarm_pending"
+const val LAST_SIREN_STOP_RT_KEY = "last_siren_stop_rt"
+const val LAST_GLOBAL_TRIGGER_RT_KEY = "last_global_trigger_rt"
+const val FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY = "forensic_reliability_degradation_start_rt"
