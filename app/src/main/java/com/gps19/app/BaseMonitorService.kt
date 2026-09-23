@@ -19,6 +19,9 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Sep.23.70:
+ * - Issue #1236: Race Condition Remediation. Introduced initializationDeferred to 
+ *   guarantee service state is fully hydrated before tick/heartbeat loops start (R-ID 452).
  * Sep.17.02:
  * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  * Sep.14.52:
@@ -76,6 +79,8 @@ abstract class BaseMonitorService : LifecycleService() {
     protected var isSystemActive = false
         private set
 
+    protected val initializationDeferred = CompletableDeferred<Unit>()
+
     protected val serviceExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException) return@CoroutineExceptionHandler
         
@@ -104,6 +109,7 @@ abstract class BaseMonitorService : LifecycleService() {
             }
             
             onServiceInitialize()
+            initializationDeferred.complete(Unit)
 
             launch(Dispatchers.IO) {
                 systemMonitor.acquireWakeLock()
@@ -132,6 +138,7 @@ abstract class BaseMonitorService : LifecycleService() {
     protected fun startTickLoop() {
         tickJob?.cancel()
         tickJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
+            initializationDeferred.await()
             while (isActive) { 
                 val startTime = timeProvider.elapsedRealtime()
                 val now = timeProvider.currentTimeMillis()
@@ -151,6 +158,7 @@ abstract class BaseMonitorService : LifecycleService() {
     protected fun startHeartbeatLoop() {
         heartbeatJob?.cancel()
         heartbeatJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
+            initializationDeferred.await()
             while (isActive) {
                 val now = timeProvider.currentTimeMillis()
                 val nowRt = timeProvider.elapsedRealtime()

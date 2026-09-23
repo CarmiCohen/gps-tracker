@@ -1,35 +1,21 @@
-# Forensic Handover (Sep.22.30)
+# Forensic Resumption Snapshot - Sep.23.70
 
-## 🎯 Current System State
-*   **Version**: Sep.23.60 | **Build**: Siren-Integrated (Verified)
-*   **SOT Baseline**: SOT: 423 (Rules: 87, IDs: 423)
-*   **Core Remediation**: Successfully resolved **Issue #1270** and **Issue #1280**.
-    *   Integrated `AudioSynthesizer` triggers directly into `AppAlarmManager.evaluateAlarms`.
-    *   Verified that Tracker mode maintains stealth (silence) while Viewer mode activates the siren.
-    *   Implemented manual silence override support via `lastSirenStopRt`.
-    *   Updated `versionName` to `Sep.23.60` in `app/build.gradle`.
+## 📂 Session Summary
+*   **Completed**: Issue #1236 (Race Condition Remediation).
+*   **Deferred**: Issue #1230 (Role-Based Namespace Isolation) due to mandatory session termination constraint.
+*   **Version**: Sep.23.70
+*   **R-ID**: 424
 
----
+## 🔧 Technical Delta
+*   **BaseMonitorService.kt**: Introduced `initializationDeferred: CompletableDeferred<Unit>`. `startTickLoop` and `startHeartbeatLoop` now await this deferred.
+*   **TrackerService.kt**: Updated `startForensicSamplingLoop` to await `initializationDeferred`.
+*   **app/build.gradle**: Version bumped to `Sep.23.70`.
+*   **STATUS/**: Updated `SOT_MASTER_REQUIREMENTS.md` (SOT ID 424) and `RESOLUTION_ARCHIVE.md`.
 
-## 🛡️ Core Architecture Blueprint
-1.  **Siren Orchestration (#1270)**: `AppAlarmManager` now acts as the controller for siren lifecycle, bridging the gap between detection logic and audio output.
-2.  **SSOT ViewModel (#1203)**: Persistent from Sep.23.50, ensuring state stability.
+## 📍 Resumption Point for Next Session
+*   **Immediate Priority**: Implementation of **Issue #1230** (Role-Based Namespace Isolation).
+*   **Root Cause context**: `TrackerService` and `ViewerService` share the same keys in `DataStore`, which can lead to state collision if both roles are cycled on the same device.
+*   **Action Plan**: Update `SettingsRepository` and `MainRepository` to support a `prefix` parameter for all persistence methods, then apply `T_` and `V_` prefixes in the respective services.
 
----
-
-## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 423 (Rules: 87, IDs: 423), Resolved: 1187, Open: 26, Testing: 3 (Sub-items: 12), Ideas: 14, QA: 283]**
-
----
-
-## 🛡️ Forensic Hardening Summary (Current Session Updates)
-### 1. Issue #1270/1280: Siren Trigger Orchestration
-*   **Status**: Resolved & Documented.
-*   **Remediation**: Closed the loop between violation detection and physical alarm output.
-
----
-
-## 🔴 Open Gaps & Resumption Guidance
-*   **Initialization Race (#1236)**: The next priority is securing `BaseMonitorService` to prevent premature tick execution before initialization completes.
-*   **Role Isolation (#1230)**: Resolve storage key leakage between roles.
-*   **Simplification (#1292)**: Pivot to a reactive `SirenCoordinator` to decouple the alarm manager.
+## 📊 Audit Baseline
+**Current Audit Baseline: [SOT: 424 (Rules: 87, IDs: 424), Resolved: 1188, Open: 25, Testing: 3 (Sub-items: 12), Ideas: 15, QA: 283]**

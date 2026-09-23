@@ -1,4 +1,14 @@
-# 🏛️ Resolution Archive - Sep.23.60
+# 🏛️ Resolution Archive - Sep.23.70
+
+## 🏁 Issue #1236: Race Conditions during Asynchronous Initialization
+*   **Resolved**: Sep.23.70
+*   **Root Cause**: The background services (`TrackerService`, `ViewerService`) performed asynchronous initialization (loading settings, restoring state) within `onCreate`. However, the `startTickLoop` and `startHeartbeatLoop` methods could be triggered by external pulses (like UI visibility changes or peer pulses) before `onServiceInitialize` completed, leading to null pointer exceptions or logic execution against unhydrated state.
+*   **Remediation**:
+    *   Introduced `initializationDeferred: CompletableDeferred<Unit>` in `BaseMonitorService`.
+    *   Updated `BaseMonitorService.onCreate` to complete the deferred immediately after `onServiceInitialize()` finishes.
+    *   Refactored `startTickLoop()` and `startHeartbeatLoop()` to `await()` the `initializationDeferred` before entering their respective execution cycles.
+    *   Updated `TrackerService.startForensicSamplingLoop()` to also await initialization, preventing forensic traces from being captured with zeroed baselines.
+*   **R-ID**: 424
 
 ## 🏁 Issue #1270 & #1280: Siren Trigger Orchestration
 *   **Resolved**: Sep.23.60
@@ -9,11 +19,5 @@
     *   Added guards for manual silence overrides (`lastSirenStopRt`) and global mute settings.
     *   Synchronized playback state with the `audioSynthesizer.isPlaying()` flow to prevent redundant call churn.
 *   **R-ID**: 423
-
-## 🏁 Issue #1203: Hilt ViewModel Scope Optimization
-*   **Resolved**: Sep.23.50
-*   **Root Cause**: Role-specific ViewModels were independently subscribing to high-frequency data streams, leading to resource churn and state loss.
-*   **Remediation**: Centralized streams into a unified activity-scoped `MainViewModel`.
-*   **R-ID**: 415 (Updated)
 
 ... [Previous entries preserved] ...

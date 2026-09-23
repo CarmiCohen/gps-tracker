@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.23.60
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.23.70
 
 ## 🎯 Current Resumption Focus: Structural Simplicity & Pattern Convergence
 Finalizing the audit of signaling performance under physical stress and ensuring no side-effects remain from the Performance Tier unification.
@@ -30,10 +30,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *   **Issue #1235: Synchronous Main-Thread runBlocking Invocation in Service Shutdown**
     *   *Description*: Blocks service teardown during termination.
     *   *Significance*: **Medium (Lifecycle Reliability)**.
-
-*   **Issue #1236: Race Conditions and Premature Tick Execution during Asynchronous Initialization**
-    *   *Description*: Heartbeat packets can trigger processing before service initialization completes.
-    *   *Significance*: **High (State Initialization Safety)**.
 
 *   **Issue #1255: Unreliable Monotonic Clock Recovery Across Reboots**
     *   *Description*: Monotonic drift reference is invalid across reboots.
@@ -98,6 +94,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1236: Race Conditions and Premature Tick Execution during Asynchronous Initialization** (Resolved Sep.23.70)
 *   **Issue #1270: Disconnected Siren Trigger Mechanism** (Resolved Sep.23.60)
 *   **Issue #1280: Integrate Siren Trigger into Alarm Evaluation Loop** (Resolved Sep.23.60)
 *   **Issue #1203: Hilt ViewModel Scope Optimization** (Resolved Sep.23.50)
@@ -109,4 +106,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *   **Issue #1193: Asymmetric Audio Control and Siren State Dispersion** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 423 (Rules: 87, IDs: 423), Resolved: 1187, Open: 26, Testing: 3 (Sub-items: 12), Ideas: 14, QA: 283]**
+- **Current Audit Baseline: [SOT: 424 (Rules: 87, IDs: 424), Resolved: 1188, Open: 25, Testing: 3 (Sub-items: 12), Ideas: 14, QA: 283]**

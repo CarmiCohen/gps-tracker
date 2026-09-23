@@ -17,6 +17,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.23.70:
+ * - Issue #1236: Race Condition Remediation. Tick and Heartbeat loops now 
+ *   wait for initializationDeferred (R-ID 452).
  * Sep.23.08:
  * - Issue #1204: Unified Hardware Lifecycle. Updated refreshCapabilitiesInternal 
  *   to map Samsung and Huawei vendor flags into HardwareCapabilities (R-ID 348).

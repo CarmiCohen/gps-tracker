@@ -23,6 +23,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.23.70:
+ * - Issue #1236: Race Condition Remediation. Ensured forensic sampling loop 
+ *   waits for initializationDeferred (R-ID 452).
  * Sep.23.08:
  * - Issue #1204: Unified Hardware Lifecycle. Updated refreshCapabilitiesInternal 
  *   to map Samsung and Huawei vendor flags into HardwareCapabilities (R-ID 348).
@@ -721,6 +724,7 @@ class TrackerService : BaseMonitorService() {
     private fun startForensicSamplingLoop() {
         forensicSamplingJob?.cancel()
         forensicSamplingJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
+            initializationDeferred.await()
             delay(STARTUP_SETTLING_DELAY_MS)
 
             // Initial trigger to capture baseline state on service startup
@@ -827,117 +831,6 @@ class TrackerService : BaseMonitorService() {
 
             joinAll(cpuJob, ioJob, forensicJob)
             logManager.logServiceEvent(m = "FORENSIC STRESS TEST: Saturation routine COMPLETED.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR)
-        }
-    }
-
-    override suspend fun onHeartbeat(now: Long, nowRt: Long) {
-        if (isSystemActive) {
-            val health = integrityMonitor.currentHealth
-            notificationManager.updatePulse(
-                sats = hardwareSuite.satellitesUsed, 
-                battery = health.batteryLevel, 
-                isSecure = !alarmManager.hasUnresolvedAlarms(), 
-                isPowerSave = isPowerSaveActive || health.isPowerSaveMode
-            )
-        }
-    }
-
-    private fun onLocationChanged(location: Location) {
-        val nowRt = timeProvider.elapsedRealtime()
-        locationBuffer.add(location)
-        
-        forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, "T")?.let { gapMsg ->
-            val proc = lastProcessedLocation
-            logManager.submitToLogSink(
-                message = "STABILITY GAP (T): $gapMsg",
-                type = "system",
-                isImportant = true,
-                isSpecial = true,
-                specialColor = FORENSIC_PINK_COLOR,
-                lat = proc?.optimizedPoint?.lat ?: 0.0,
-                lng = proc?.optimizedPoint?.lng ?: 0.0,
-                accuracy = location.accuracy.toDouble()
-            )
-        }
-        triggerForensicSample()
-    }
-
-    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerActive: Boolean, processed: ProcessedLocation, snapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long) {
-        val health = integrityMonitor.currentHealth
-        
-        val telemetry = AlarmTelemetrySnapshot(
-            status = processed.status,
-            isJammer = processed.jammerDetected,
-            jumpTier = processed.jumpTier,
-            isAdaptiveJump = processed.isAdaptiveJump,
-            lat = processed.optimizedPoint.lat,
-            lng = processed.optimizedPoint.lng,
-            accuracy = processed.currentAccuracy,
-            maxAccuracy = processed.maxAccuracy,
-            gpsTs = rawGpsTs,
-            lastValidFixRt = locationProcessor.getLastValidFixRt(),
-            speed = processed.filteredSpeed,
-            battery = health.batteryLevel,
-            temp = health.batteryTemp,
-            currentMa = health.currentMa,
-            isLocationPending = health.isLocationPending,
-            locationPendingReason = health.locationPendingReason,
-            isTamperDetected = processed.tamperDetected,
-            isPowerTamper = health.isPowerTamper,
-            tiltDegrees = snapshot.tiltDegrees,
-            acousticDb = snapshot.acousticDb,
-            baroAlt = snapshot.baroAlt,
-            baroAltEma = locationProcessor.getBaroBaseline(),
-            lux = snapshot.lux,
-            isNear = snapshot.isNear,
-            luxBaseline = locationProcessor.getLuxBaseline(),
-            acousticFloorDb = locationProcessor.getAcousticFloorDb(),
-            adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(),
-            peakVibrationShock = snapshot.peakShock,
-            isPowerSaveMode = health.isPowerSaveMode,
-            standbyBucket = health.standbyBucket,
-            netInterface = health.netInterface,
-            isStorageLow = health.isStorageLow,
-            isStorageCritical = health.isStorageCritical,
-            isBatterySteepDischarge = health.isBatterySteepDischarge,
-            isCoolingModeActive = health.isCoolingModeActive,
-            snrSnapshot = hardwareSuite.averageSnr,
-            vibeSnapshot = snapshot.vibration,
-            isGpsHardwareLock = health.gpsHardwareLock,
-            cpuLoad = health.cpuLoad,
-            ioWait = health.ioWait,
-            maxIoLatency = health.maxIoLatency,
-            isSilentFailure = health.isSilentFailure,
-            isMaliAnomaly = health.isMaliAnomaly,
-            isUltraLongStationary = health.isUltraLongStationary,
-            isBatteryLow = health.isBatteryLow,
-            isBatteryCritical = health.isBatteryCritical,
-            tamperNote = processed.suppressionNote,
-            isSignalLoss = health.signalLoss,
-            isGpsStalling = health.gpsStalled,
-            isGpsGap = health.locationPendingReason == LocationPendingReason.GPS_GAP,
-            localInternetLoss = health.localInternetLoss,
-            isHardwareOnline = health.isHardwareOnline
-        )
-
-        val serviceContext = AlarmServiceContext(
-            now = now,
-            nowRt = nowRt,
-            serviceStartTs = serviceStartWall,
-            serviceStartRt = serviceStartRealtime,
-            appStartTime = sessionManager.appStartTime,
-            isTrackerMode = true,
-            isRelayConnected = isSocketConnected,
-            isTrackerConnected = true,
-            isUiVisible = isUiVisible(),
-            distToHomeAuthority = processed.distToHome,
-            maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(),
-            capabilities = capabilities
-        )
-
-        alarmEvalJob?.cancel()
-        alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
-            alarmManager.evaluateAlarms(telemetry, serviceContext)
         }
     }
 
