@@ -1,6 +1,7 @@
 package com.gps19.app
 
 import android.content.Context
+import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.gps19.core.engine.*
@@ -13,19 +14,17 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.osmdroid.util.GeoPoint
 import timber.log.Timber
 import java.util.UUID
 import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
- * Sep.23.04:
- * - Shared Overlay Scope: Centralized shared overlays (Settings, Log, Ribbons, 
- *   GNSS Detail) by exposing global flows and handling action events (R-ID 419).
- * Sep.23.03:
- * - Issue #1192 RESOLVED: Unified draft settings state flow. Moved draft handling 
- *   logic from feature ViewModels to MainViewModel to ensure visual consistency 
- *   during configuration updates (R-ID 419).
+ * Sep.23.50:
+ * - Issue #1203 RESOLVED: Optimized Hilt ViewModel scoping and eliminated 
+ *   redundant stream resource churn, state loss, and misrouted kinematic state.
+ *   Consolidated Tracker/Viewer/Setup states into a single source of truth.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -36,6 +35,9 @@ class MainViewModel @Inject constructor(
     private val spatialLogicUseCase: SpatialLogicUseCase,
     private val stateSubscriptionUseCase: StateSubscriptionUseCase,
     private val sessionUseCase: SessionUseCase,
+    private val telemetryUseCase: TelemetryUseCase,
+    private val remoteStatusRepository: RemoteStatusRepository,
+    private val uiStateMapper: UiStateMapper,
     val timeProvider: TimeProvider,
     val audioSynthesizer: AudioSynthesizer,
     private val hydrationManager: LifecycleHydrationManager,
@@ -80,6 +82,27 @@ class MainViewModel @Inject constructor(
     private val _diagnosticState = MutableStateFlow(DiagnosticState())
     val diagnosticState: StateFlow<DiagnosticState> = _diagnosticState.asStateFlow()
 
+    private val _systemPulseRt = MutableStateFlow(timeProvider.elapsedRealtime())
+    val systemPulseRt: StateFlow<Long> = _systemPulseRt.asStateFlow()
+
+    private val _rtt = MutableStateFlow(0)
+    val rtt: StateFlow<Int> = _rtt.asStateFlow()
+
+    private val _remoteSignal = MutableStateFlow(0)
+    val remoteSignal: StateFlow<Int> = _remoteSignal.asStateFlow()
+
+    private val _currentMa = MutableStateFlow(0)
+    val currentMa: StateFlow<Int> = _currentMa.asStateFlow()
+
+    private val _trackerState = MutableStateFlow(TrackerState.UNKNOWN)
+    val trackerState: StateFlow<TrackerState> = _trackerState.asStateFlow()
+
+    private val _trackerMaxTemp = MutableStateFlow(0.0)
+    val trackerMaxTemp: StateFlow<Double> = _trackerMaxTemp.asStateFlow()
+
+    private val _gpsIndexData = MutableStateFlow(GpsIndexData(0.0, 0.0, 0.0, 0.0))
+    val gpsIndexData: StateFlow<GpsIndexData> = _gpsIndexData.asStateFlow()
+
     val eventLogsFlow: StateFlow<List<LogEntry>> = combine(
         _uiState.map { it.session.appMode }.distinctUntilChanged(),
         _uiState.map { it.navigation.isStrictMode }.distinctUntilChanged(),
@@ -105,6 +128,130 @@ class MainViewModel @Inject constructor(
     val trackerTrailFlow: StateFlow<List<TrailPoint>> = repository.trackerTrailFlow
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val viewerTrailFlow: StateFlow<List<TrailPoint>> = repository.viewerTrailFlow
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val trackerTrailSegments: StateFlow<List<MapTrailSegment>> = trackerTrailFlow
+        .map { trail -> computeTrailSegments(trail, BrandJd.toArgb()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val viewerTrailSegments: StateFlow<List<MapTrailSegment>> = viewerTrailFlow
+        .map { trail -> computeTrailSegments(trail, ViewerCyan.toArgb()) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val dashboardState: StateFlow<DashboardState> = combine(
+        combine(
+            _uiState.map { it.session.appMode }.distinctUntilChanged(),
+            _kinematicState,
+            _diagnosticState
+        ) { mode, kin, diag -> Triple(mode ?: "tracker", kin, diag) },
+        _systemPulseRt,
+        _trackerState,
+        _trackerMaxTemp
+    ) { (mode, kin, diag), pulseRt, state, tMax ->
+        val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
+        val conn = uiStateMapper.mapDashboardConnectivity(mode, diag, pulseRt)
+        val tel = uiStateMapper.mapDashboardTelemetry(mode, kin, pulseRt, state, isUltra)
+        val health = uiStateMapper.mapDashboardHealth(mode, kin, diag, diag.battery.temp, tMax, pulseRt)
+        DashboardState(conn, tel, health)
+    }
+    .distinctUntilChanged()
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
+
+    val hudConnectivityState: StateFlow<HudConnectivityState> = combine(
+        combine(
+            _uiState.map { it.session }.distinctUntilChanged(),
+            _uiState.map { it.settings }.distinctUntilChanged()
+        ) { session, settings -> session to settings },
+        _diagnosticState,
+        _rtt,
+        _remoteSignal,
+        _systemPulseRt
+    ) { (session, settings), diag, rtt, sig, pulseRt ->
+        uiStateMapper.mapHudConnectivity(
+            session.appMode, 
+            settings.deviceId, 
+            settings.viewerId, 
+            session.isSystemActive, 
+            settings.isSafeMode, 
+            session.permissions.performanceTier == PerformanceTier.STAGGERED, 
+            diag, rtt, sig, pulseRt
+        )
+    }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudConnectivityState())
+
+    val hudTelemetryState: StateFlow<HudTelemetryState> = combine(
+        _uiState.map { it.session.appMode }.distinctUntilChanged(),
+        _kinematicState,
+        _systemPulseRt, 
+        _trackerState
+    ) { mode, kin, pulseRt, state ->
+        val m = mode ?: "tracker"
+        val isUltra = if (m == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
+        uiStateMapper.mapHudTelemetry(m, kin, pulseRt, state, isUltra)
+    }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudTelemetryState())
+
+    val hudHealthState: StateFlow<HudHealthState> = combine(
+        _diagnosticState,
+        _systemPulseRt, 
+        _kinematicState.map { it.localHealth.isMaliAnomaly }.distinctUntilChanged()
+    ) { diag, pulseRt, isMali ->
+        uiStateMapper.mapHudHealth(diag, pulseRt, isMali)
+    }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudHealthState())
+
+    private var sTrkLat = 0.0; private var sTrkLng = 0.0; private var sVwrLat = 0.0; private var sVwrLng = 0.0
+
+    val mapViewState: StateFlow<MapViewState> = combine(
+        combine(
+            _uiState.map { it.session.appMode }.distinctUntilChanged(),
+            _uiState.map { it.session.hydrationLevel }.distinctUntilChanged(),
+            _uiState.map { it.spatial }.distinctUntilChanged(),
+            _uiState.map { it.triggers }.distinctUntilChanged(),
+            _kinematicState
+        ) { mode, hydration, spatial, triggers, kin ->
+            FiveParts(mode, hydration, spatial, triggers, kin)
+        },
+        _systemPulseRt,
+        trackerTrailSegments,
+        viewerTrailSegments,
+        repository.violationsFlow.distinctUntilChanged()
+    ) { parts, pulseRt, trkSegs, vwrSegs, vios ->
+        val m = parts.mode ?: "tracker"
+        val pulse = timeProvider.currentTimeMillis()
+        val tLat = if (m == "tracker") parts.kin.localLocation.kinetic.lat else parts.kin.trackerLocation.kinetic.lat
+        val tLng = if (m == "tracker") parts.kin.localLocation.kinetic.lng else parts.kin.trackerLocation.kinetic.lng
+        val tTs = if (m == "tracker") parts.kin.localLocation.kinetic.gpsTs else parts.kin.trackerLocation.kinetic.gpsTs
+        val tTel = if (m == "tracker") parts.kin.localLocation.ts else parts.kin.trackerLocation.ts
+        val vLat = if (m == "viewer") parts.kin.localLocation.kinetic.lat else 0.0
+        val vLng = if (m == "viewer") parts.kin.localLocation.kinetic.lng else 0.0
+        
+        if (PhysicsUtils.isValidLocation(tLat, tLng)) {
+            val alpha = if (parts.kin.localLocation.kinetic.speed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
+            if (sTrkLat == 0.0 || PhysicsUtils.calculateDistance(sTrkLat, sTrkLng, tLat, tLng) > 100.0) { sTrkLat = tLat; sTrkLng = tLng }
+            else { sTrkLat = PhysicsUtils.smoothCoordinate(sTrkLat, tLat, alpha); sTrkLng = PhysicsUtils.smoothCoordinate(sTrkLng, tLng, alpha) }
+        }
+        
+        MapViewState(
+            appMode = m, hydrationLevel = parts.hydration, isMapButtonsVisible = parts.spatial.isMapButtonsVisible, isFenceVisible = parts.spatial.isFenceVisible, 
+            geofenceMode = parts.spatial.geofenceMode, isViolationsVisible = parts.spatial.isViolationsVisible, isGeofenceViolationsVisible = parts.spatial.isGeofenceViolationsVisible, 
+            maxDistance = parts.spatial.maxDistance, isMapLocked = parts.spatial.isMapLocked, mapFollowMode = parts.spatial.mapFollowMode,
+            centeringTrackerTrigger = parts.triggers.centeringTrackerTrigger, centeringViewerTrigger = parts.triggers.centeringViewerTrigger, 
+            zoomInTrigger = parts.triggers.zoomInTrigger, zoomOutTrigger = parts.triggers.zoomOutTrigger, homePoints = parts.spatial.homePoints,
+            trackerLat = tLat, trackerLng = tLng, trackerGpsTs = tTs, trackerTelemetryTs = tTel,
+            viewerLat = vLat, viewerLng = vLng, systemPulse = pulse, systemPulseRt = pulseRt,
+            trackerSegments = trkSegs, viewerSegments = vwrSegs, violations = vios,
+            isTrackerFresh = tTs > 0 && (pulse - tTel + kotlin.math.max(0L, tTel - tTs)) < GPS_UI_FAIL_THRESHOLD_MS,
+            isTrackerValid = PhysicsUtils.isValidLocation(tLat, tLng),
+            smoothedTrackerLat = sTrkLat, smoothedTrackerLng = sTrkLng
+        )
+    }
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MapViewState())
+
+    private data class FiveParts(val mode: String?, val hydration: Int, val spatial: SpatialUiState, val triggers: MapTriggers, val kin: KinematicState)
 
     private val replayCursorRequest = MutableStateFlow<Long?>(null)
     private var autoSaveJob: Job? = null
@@ -187,6 +334,22 @@ class MainViewModel @Inject constructor(
             .flowOn(Dispatchers.Main.immediate)
             .launchIn(viewModelScope)
 
+        stateSubscriptionUseCase.observeConnectivityBasics()
+            .onEach { update ->
+                _rtt.value = update.lastRtt
+                updateDiagnosticState { current -> 
+                    current.apply {
+                        connectivity.isRelayConnected = update.isRelayConnected
+                        connectivity.lastRemoteActivityTs = update.lastRemoteActivityTs
+                        recoveryCount = update.recoveryCount
+                        cumulativeRecoveryBlackoutMs = update.cumulativeRecoveryBlackoutMs
+                        pulse = timeProvider.elapsedRealtime()
+                    }
+                }
+            }
+            .flowOn(Dispatchers.Main.immediate)
+            .launchIn(viewModelScope)
+
         stateSubscriptionUseCase.observeIntegrityUpdates()
             .onEach { update ->
                 updateDiagnosticState { current -> 
@@ -197,6 +360,50 @@ class MainViewModel @Inject constructor(
             }
             .flowOn(Dispatchers.Main.immediate)
             .launchIn(viewModelScope)
+
+        stateSubscriptionUseCase.observeBatteryStatus().onEach { status -> 
+            updateDiagnosticState { current -> 
+                current.battery.level = status.level
+                current.battery.temp = status.temp
+                current.apply { pulse = timeProvider.elapsedRealtime() }
+            } 
+            _currentMa.value = status.level
+        }
+        .flowOn(Dispatchers.Main.immediate)
+        .launchIn(viewModelScope)
+
+        repository.localLocation.onEach { update ->
+            val nowMs = timeProvider.currentTimeMillis()
+            val nowRt = timeProvider.elapsedRealtime()
+            updateKinematicState { current ->
+                telemetryUseCase.mapLocalLocation(update, current.localLocation, nowMs, _uiState.value.session.appStartTime)
+                telemetryUseCase.mapHealthFromUpdate(update, current.localHealth)
+                current.apply { pulse = nowRt }
+            }
+            _gpsIndexData.value = GpsIndexData(update.integrity.snrIdx, update.integrity.satsUsed.toDouble(), update.integrity.satsView.toDouble(), 0.0)
+        }
+        .flowOn(Dispatchers.Main.immediate)
+        .launchIn(viewModelScope)
+
+        remoteStatusRepository.remoteStatus.onEach { status ->
+            _remoteSignal.value = remoteStatusRepository.peerSignal.value
+            _trackerState.value = status.trackerState
+            _trackerMaxTemp.value = status.maxTemp
+            updateKinematicState { current ->
+                telemetryUseCase.mapTrackerLocationFromStatus(status, current.trackerLocation)
+                telemetryUseCase.mapHealthFromStatus(status, current.trackerHealth)
+                current.apply { pulse = timeProvider.elapsedRealtime() }
+            }
+            updateDiagnosticState { current ->
+                current.trackerBattery.level = status.battery
+                current.trackerBattery.temp = status.temp
+                current.trackerIsGnssThrottled = status.isGnssThrottled
+                current.pulse = timeProvider.elapsedRealtime()
+                current
+            }
+        }
+        .flowOn(Dispatchers.Main.immediate)
+        .launchIn(viewModelScope)
 
         audioSynthesizer.isSirenPlaying
             .onEach { playing ->
@@ -239,6 +446,8 @@ class MainViewModel @Inject constructor(
             }
             is UiEvent.SetAppMode -> {
                 viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
+                    _kinematicState.update { current -> current.apply { reset() } }
+                    _diagnosticState.update { current -> current.apply { reset() } }
                     val newStartTime = sessionUseCase.setAppMode(event.mode)
                     updateState { it.copy(
                         session = it.session.copy(
@@ -250,6 +459,8 @@ class MainViewModel @Inject constructor(
                 }
             }
             is UiEvent.ConfirmStopTracking, UiEvent.ManualExit -> {
+                _kinematicState.update { current -> current.apply { reset() } }
+                _diagnosticState.update { current -> current.apply { reset() } }
                 updateState { it.copy(
                     session = it.session.copy(isSystemActive = false, appMode = null),
                     settings = it.settings.copy(isSafeMode = false)
@@ -260,7 +471,7 @@ class MainViewModel @Inject constructor(
                 }
             }
             is UiEvent.TriggerRecovery -> {
-                if (_uiState.value.isRecoveryPending) {
+                if (_uiState.value.simulation.isRecoveryPending) {
                     updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
                     updateState { it.copy(simulation = it.simulation.copy(isRecoveryPending = false)) }
                 }
@@ -344,7 +555,7 @@ class MainViewModel @Inject constructor(
             }
             is UiEvent.ClearLogs -> repository.clearLogs()
             is UiEvent.ClearHomePoints -> viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-                val newPoints = spatialLogicUseCase.clearHomePoints(_uiState.value.maxDistance)
+                val newPoints = spatialLogicUseCase.clearHomePoints(_uiState.value.spatial.maxDistance)
                 withContext(Dispatchers.Main.immediate) {
                     updateState { it.copy(spatial = it.spatial.copy(homePoints = newPoints)) }
                 }
@@ -372,6 +583,14 @@ class MainViewModel @Inject constructor(
                     )
                 }
             }
+            is UiEvent.SetFenceVisible, is UiEvent.SetViolationsVisible, is UiEvent.SetGeofenceViolationsVisible,
+            is UiEvent.SetMapButtonsVisible, is UiEvent.SetMapLocked, is UiEvent.MapZoomIn, is UiEvent.MapZoomOut,
+            is UiEvent.CenterTracker, is UiEvent.CenterViewer, is UiEvent.SetGeofenceMode -> {
+                updateState { spatialLogicUseCase.handleMapEvent(event, it) }
+            }
+            is UiEvent.MapTap -> handleMapTap(event.point)
+            is UiEvent.AddHomePoint -> handleAddHomePoint(event.point)
+            is UiEvent.RemoveHomePoint -> handleRemoveHomePoint(index = event.index)
             else -> {}
         }
     }
@@ -415,17 +634,18 @@ class MainViewModel @Inject constructor(
             while (true) {
                 val nowRt = timeProvider.elapsedRealtime()
 
-                if (_uiState.value.isInitialized && _uiState.value.appMode != null) {
+                if (_uiState.value.isInitialized && _uiState.value.session.appMode != null) {
                     repository.sendCommand(UiCommand.SyncRequest)
                 }
                 
                 val lastActivity = repository.lastRemoteActivityTs.value
                 val isPeerActive = lastActivity > 0 && (nowRt - lastActivity) < TELEMETRY_UI_STALE_THRESHOLD_MS
-                if (_uiState.value.isPeerActive != isPeerActive) {
+                if (_uiState.value.session.isPeerActive != isPeerActive) {
                     updateState { it.copy(session = it.session.copy(isPeerActive = isPeerActive)) }
                 }
 
-                delay(if (_uiState.value.permissions.performanceTier == PerformanceTier.STAGGERED) 5000L else 2000L)
+                _systemPulseRt.value = nowRt
+                delay(if (_uiState.value.session.permissions.performanceTier == PerformanceTier.STAGGERED) 5000L else 2000L)
             }
         }
     }
@@ -448,6 +668,56 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             val nextStartTime = settingsUseCase.fullInitialization(context)
             updateState { it.copy(session = it.session.copy(appStartTime = nextStartTime)) }
+        }
+    }
+
+    private fun computeTrailSegments(trailPoints: List<TrailPoint>, color: Int): List<MapTrailSegment> {
+        if (trailPoints.isEmpty()) return emptyList()
+        val geoPoints = trailPoints.map { it.toGeoPoint() }
+        return listOf(MapTrailSegment(geoPoints, color, geoPoints.hashCode()))
+    }
+
+    fun clearTrails() {
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            repository.clearTrails()
+            addPersistentLog("system", "Trails cleared by user", isImportant = true)
+        }
+    }
+
+    fun addPersistentLog(type: String, message: String, isImportant: Boolean = false, isSpecial: Boolean = false, specialColor: Int? = null) {
+        val entry = LogEntry(
+            localId = UUID.randomUUID().toString(), timestamp = timeProvider.currentTimeMillis(),
+            message = message, type = type.uppercase(), isImportant = isImportant,
+            isSpecial = isSpecial, specialColor = specialColor, role = _uiState.value.session.appMode ?: "system"
+        )
+        repository.addLog(entry)
+    }
+
+    private fun handleMapTap(point: GeoPoint) {
+        val mode = _uiState.value.spatial.geofenceMode
+        if (mode == GeofenceMode.ADD) {
+            onEvent(UiEvent.AddHomePoint(point))
+        } else if (mode == GeofenceMode.REMOVE) {
+            val idx = spatialLogicUseCase.findNearestPointIndex(_uiState.value.spatial.homePoints, point)
+            if (idx != -1) onEvent(UiEvent.RemoveHomePoint(idx))
+        }
+    }
+
+    private fun handleAddHomePoint(point: GeoPoint) {
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            val newPoints = spatialLogicUseCase.addHomePoint(point)
+            withContext(Dispatchers.Main.immediate) {
+                updateState { it.copy(spatial = it.spatial.copy(homePoints = newPoints, isFenceVisible = true)) }
+            }
+        }
+    }
+
+    private fun handleRemoveHomePoint(index: Int) {
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            val newPoints = spatialLogicUseCase.removeHomePoint(index)
+            withContext(Dispatchers.Main.immediate) {
+                updateState { it.copy(spatial = it.spatial.copy(homePoints = newPoints)) }
+            }
         }
     }
 }

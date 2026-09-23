@@ -1,39 +1,40 @@
-# Forensic Handover (Sep.23.08)
+# Forensic Handover (Sep.22.30)
 
 ## 🎯 Current System State
-*   **Version**: Sep.23.08 | **Build**: Hardware Lifecycle Unification (Verified)
-*   **SOT Baseline**: SOT: 421 (Rules: 85, IDs: 421)
-*   **Core Remediation**: Successfully resolved **Issue #1204**. 
-    *   Introduced `DeviceHardeningStrategy` to centralize OEM-specific power management overrides and WakeLock renewals.
-    *   Introduced `ProcessPriorityMonitor` to handle periodic stay-alive pulses, decoupling priority retention from service business logic.
-    *   Unified Huawei, Samsung, and Xiaomi detection and mitigation patterns.
+*   **Version**: Sep.23.50 | **Build**: Centralized SSOT ViewModel (Verified)
+*   **SOT Baseline**: SOT: 422 (Rules: 86, IDs: 422)
+*   **Core Remediation**: Successfully resolved **Issue #1203**. 
+    *   Unified all role-specific logic (Tracker/Viewer/Setup) into `MainViewModel`.
+    *   Eliminated redundant coroutine allocation churn by centralizing high-frequency data streams.
+    *   Ensured Map ViewState and configuration drafts survive role transitions.
+    *   Resolved kinematic state misrouting where screens were receiving empty location updates.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
 
-1.  **Unified Hardware Strategy (#1204)**:
-    *   `DeviceProfileManager` now delegates lifecycle tweaks to `DeviceHardeningStrategy`.
-    *   `HardwareCapabilities` and `PermissionState` now explicitly track `isHuaweiDevice`.
-    *   `SystemStatusProvider` automatically maps Huawei background restrictions and WakeLock requirements.
-2.  **Logic State Persistence (#1164)**:
-    *   Alarms maintain temporal context across process restarts using enhanced JSON serialization.
+1.  **Unified SSOT (#1203)**:
+    *   `MainViewModel` acts as the single point of entry for all telemetry and user events.
+    *   `TrackerScreen` and `ViewerScreen` are now stateless consumers of activity-scoped data.
+    *   `DiagnosticState` and `KinematicState` are reset atomically during role switches via `UiEvent.SetAppMode`.
+2.  **Hardware Strategy (#1204)**:
+    *   OEM-specific power management centralized in `DeviceHardeningStrategy`.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 421 (Rules: 85, IDs: 421), Resolved: 1177, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 12, QA: 283]**
+- **Current Audit Baseline: [SOT: 422 (Rules: 86, IDs: 422), Resolved: 1185, Open: 28, Testing: 3 (Sub-items: 12), Ideas: 13, QA: 283]**
 
 ---
 
 ## 🛡️ Forensic Hardening Summary (Current Session Updates)
 
-### 1. Issue #1204: Unified Hardware Lifecycle & Vendor Hardening
-*   **Status**: Fully Resolved & Verified (Sep.23.08).
-*   **Remediation**: Eliminated dispersed vendor hacks by centralizing them into a strategy pattern, ensuring consistent background stability across major OEMs.
+### 1. Issue #1203: Hilt ViewModel Scope Optimization
+*   **Status**: Fully Resolved & Verified (Sep.22.30).
+*   **Remediation**: Eliminated state fragmentation and multi-subscription resource churn by refactoring the app back to a centralized ViewModel model, significantly improving memory efficiency and UX consistency.
 
 ---
 
 ## 🔴 Open Gaps & Resumption Guidance
-*   **ViewModel Scoping**: The next priority is **Issue #1203: Hilt ViewModel Scope Optimization**, focusing on navigation-scoped ViewModel lifetimes to ensure clean state resets during role switching.
-*   **Strategic Simplification**: Evaluate Issue #1161 for unifying trajectory buffers to further reduce memory footprint.
+*   **Service Consolidation**: The next priority is **Issue #1261: Refactor Tracker/Viewer Services into MonitorService**, merging the redundant background service implementations into a single role-reactive component.
+*   **Siren Integration**: Resolve **Issue #1280** to ensure the siren trigger logic in `AppAlarmManager` is actually consumed by the background service loop.

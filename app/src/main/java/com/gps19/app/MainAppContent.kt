@@ -36,17 +36,14 @@ import com.gps19.core.engine.STARTUP_SETTLING_DELAY_MS
 import com.gps19.core.engine.CapabilityStatus
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import androidx.hilt.navigation.compose.hiltViewModel
 import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
- * Sep.23.04:
- * - Issue #1200 RESOLVED: Implemented OverlayHost to handle all shared overlays 
- *   centrally from MainViewModel, eliminating callback overhead in feature screens.
- * Sep.23.03:
- * - Issue #1192 RESOLVED: Connected settings input state flow by routing screen 
- *   events to MainViewModel via onMainEvent and onFullInitialization (R-ID 419).
+ * Sep.23.50:
+ * - Issue #1203 RESOLVED: Eliminated SetupViewModel redundancy (Issue #1215).
+ *   Consolidated all diagnostic and setup events into MainViewModel.
+ *   Screens now consume activity-scoped MainViewModel directly.
  */
 @Composable
 fun MainAppContent(
@@ -313,7 +310,6 @@ fun MainAppContent(
                             }
                         }
                         composable(Screen.Tracker.route) {
-                            val trackerViewModel: TrackerViewModel = hiltViewModel()
                             BackHandler {
                                 val nav = navigationState
                                 when {
@@ -330,7 +326,7 @@ fun MainAppContent(
                             if (sessionState.hydrationLevel >= 3) {
                                 TrackerScreen(
                                     sessionState = sessionState, settingsState = settingsState, spatialState = spatialState, navigationState = navigationState,
-                                    kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = trackerViewModel, logsFlow = trackerViewModel.eventLogsFlow,
+                                    kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow,
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) }, 
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
@@ -342,7 +338,6 @@ fun MainAppContent(
                             }
                         }
                         composable(Screen.Viewer.route) {
-                            val viewerViewModel: ViewerViewModel = hiltViewModel()
                             BackHandler {
                                 val nav = navigationState
                                 when {
@@ -359,7 +354,7 @@ fun MainAppContent(
                             if (sessionState.hydrationLevel >= 3) {
                                 ViewerScreen(
                                     sessionState = sessionState, settingsState = settingsState, spatialState = spatialState, navigationState = navigationState,
-                                    kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewerViewModel, logsFlow = viewerViewModel.eventLogsFlow, 
+                                    kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow,
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) },
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
@@ -371,7 +366,6 @@ fun MainAppContent(
                             }
                         }
                         composable(Screen.Diagnostics.route) {
-                            val setupViewModel: SetupViewModel = hiltViewModel()
                             val simulationState by viewModel.simulationUiState.collectAsStateWithLifecycle()
                             BackHandler { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) }
                             if (sessionState.hydrationLevel >= 3) {
@@ -384,11 +378,11 @@ fun MainAppContent(
                                     isStorageCriticalSimulated = simulationState.isStorageCriticalSimulated,
                                     isSetupBypassActive = sessionState.isSetupBypassActive,
                                     onBack = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) },
-                                    onRefresh = { setupViewModel.onEvent(UiEvent.RefreshPermissionStatus) },
-                                    onToggleManualOverride = { setupViewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
+                                    onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) },
+                                    onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                                     onToggleForensicSimulation = { active -> viewModel.onEvent(UiEvent.SetForensicSimulation(active)) },
                                     onToggleStorageSimulation = { active, critical -> viewModel.onEvent(UiEvent.SetStorageSimulation(active, critical)) },
-                                    onToggleSetupBypass = { active -> setupViewModel.onEvent(UiEvent.ToggleSetupBypass(active)) },
+                                    onToggleSetupBypass = { active -> viewModel.onEvent(UiEvent.ToggleSetupBypass(active)) },
                                     onRequestBatteryExemption = onRequestBatteryExemption,
                                     onRequestOverlayPermission = onRequestOverlayPermission,
                                     onRequestAppInfo = onRequestAppInfo,
@@ -401,13 +395,12 @@ fun MainAppContent(
                 }
                 
                 if (navigationState.isPhoneSetupVisible && sessionState.hydrationLevel >= 3) {
-                    val setupViewModel: SetupViewModel = hiltViewModel()
                     PhoneSetupOverlay(
                         onClose = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)) }, onWhitelist = { onRequestBatteryExemption() },
                         onOverlay = { onRequestOverlayPermission() }, onAppInfo = { onRequestAppInfo() },
                         onExactAlarm = { onRequestExactAlarm() }, onHardwarePermission = { onRequestHardwarePermission() },
-                        onRefresh = { setupViewModel.onEvent(UiEvent.RefreshPermissionStatus) }, onToggleManualOverride = { setupViewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
-                        onTestAlarm = { setupViewModel.onEvent(UiEvent.RequestTestAlarm) },
+                        onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
+                        onTestAlarm = { viewModel.onEvent(UiEvent.RequestTestAlarm) },
                         onNavigateToDiagnostics = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
                         isSetupBypassActive = sessionState.isSetupBypassActive, permissions = sessionState.permissions, homePointsCount = spatialState.homePoints.size,
                         isTrackerMode = sessionState.appMode == "tracker", onGoToMap = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.ToggleMap(true)) }

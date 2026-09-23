@@ -6,12 +6,11 @@ import org.osmdroid.util.GeoPoint
 /**
  * MainUiState: Composite UI state partitioned into specialized slices to 
  * minimize recomposition costs and isolate volatile triggers (Issue #1166).
+ * Sep.23.50:
+ * - Issue #1203: Consistently unified DiagnosticState for SSOT.
  * Sep.23.08:
  * - Issue #1204: Unified Hardware Lifecycle. Added isHuaweiDevice to 
  *   PermissionState for vendor-specific hardening visibility.
- * Sep.22.08:
- * - Issue #1166: State Partitioning & Slicing. Refactored into SessionUiState, 
- *   SpatialUiState, SettingsUiState, MapTriggers, and SimulationUiState (R-ID 405).
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -301,7 +300,9 @@ class DiagnosticState(
     var pulse: Long = 0L,
     var lastEnergyDeltaMa: Int = 0,
     var lastEnergyDeltaTemp: Double = 0.0,
-    var lastEnergyDurationMs: Long = 0L
+    var lastEnergyDurationMs: Long = 0L,
+    var localMaxTemp: Double = 0.0,
+    var trackerMaxTemp: Double = 0.0
 ) {
     fun copyFrom(other: DiagnosticState) {
         this.battery.copyFrom(other.battery)
@@ -330,6 +331,8 @@ class DiagnosticState(
         this.lastEnergyDeltaMa = other.lastEnergyDeltaMa
         this.lastEnergyDeltaTemp = other.lastEnergyDeltaTemp
         this.lastEnergyDurationMs = other.lastEnergyDurationMs
+        this.localMaxTemp = other.localMaxTemp
+        this.trackerMaxTemp = other.trackerMaxTemp
     }
 
     fun reset() {
@@ -359,6 +362,8 @@ class DiagnosticState(
         lastEnergyDeltaMa = 0
         lastEnergyDeltaTemp = 0.0
         lastEnergyDurationMs = 0L
+        localMaxTemp = 0.0
+        trackerMaxTemp = 0.0
     }
 }
 

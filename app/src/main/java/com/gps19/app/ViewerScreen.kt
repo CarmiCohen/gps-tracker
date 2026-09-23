@@ -25,9 +25,9 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Viewer-mode UI.
- * Sep.23.04:
- * - Issue #1200: Shared Overlay Scope. Removed local overlay rendering logic as 
- *   all shared overlays are now hosted centrally in MainAppContent (R-ID 419).
+ * Sep.23.50:
+ * - Issue #1203 RESOLVED: Unified ViewModel scope. Using MainViewModel directly 
+ *   to eliminate resource churn and state fragmentation (R-ID 419).
  */
 
 @Composable
@@ -38,7 +38,7 @@ fun ViewerScreen(
     navigationState: NavigationState,
     kinematicState: KinematicState,
     diagnosticState: DiagnosticState,
-    viewModel: ViewerViewModel,
+    viewModel: MainViewModel,
     logsFlow: StateFlow<List<LogEntry>>,
     onToggleMap: () -> Unit,
     onToggleLog: () -> Unit,
@@ -68,7 +68,7 @@ fun ViewerScreen(
     val dashboardState by viewModel.dashboardState.collectAsStateWithLifecycle()
     val gpsIndexData by viewModel.gpsIndexData.collectAsStateWithLifecycle()
     val rtt by viewModel.rtt.collectAsStateWithLifecycle()
-    val trackerCurrentMa by viewModel.trackerCurrentMa.collectAsStateWithLifecycle()
+    val currentMa by viewModel.currentMa.collectAsStateWithLifecycle()
     
     val hudConnectivity by viewModel.hudConnectivityState.collectAsStateWithLifecycle()
     val hudTelemetry by viewModel.hudTelemetryState.collectAsStateWithLifecycle()
@@ -188,7 +188,7 @@ fun ViewerScreen(
                                     dashboardState = dashboardState,
                                     gpsIdx = gpsIndexData,
                                     rttValue = rtt,
-                                    trackerCurrentMa = trackerCurrentMa,
+                                    trackerCurrentMa = currentMa,
                                     systemPulse = mapViewState.systemPulseRt,
                                     onEvent = { event -> onMainEvent(event) }
                                 )
@@ -237,7 +237,7 @@ fun ViewerScreen(
                                 dashboardState = dashboardState,
                                 gpsIdx = gpsIndexData,
                                 rttValue = rtt,
-                                trackerCurrentMa = trackerCurrentMa,
+                                trackerCurrentMa = currentMa,
                                 systemPulse = mapViewState.systemPulseRt,
                                 onEvent = { event -> onMainEvent(event) }
                             )
