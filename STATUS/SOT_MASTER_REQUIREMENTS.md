@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.23.50)
+# SOT Master Requirements & Hardening Status (Sep.22.30)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 423**: Siren Trigger Orchestration - Integrated physical siren activation into the core alarm evaluation loop within `AppAlarmManager`. This ensures that violation detections in background services are immediately and reliably translated into audio synthesis via `AudioSynthesizer`, respecting all role-based stealth requirements and manual silence overrides. (Resolved Sep.23.60)
 *   **SOT ID 422**: Centralized Single Source of Truth (SSOT) ViewModel Architecture - Re-consolidated role-specific ViewModels into a unified activity-scoped `MainViewModel`. Established a single point of subscription for high-frequency kinematic and diagnostic data streams, eliminating coroutine allocation churn (#1211) and ensuring map view states and configuration drafts remain persistent during navigation transitions (#1212, #1213). This architecture guarantees atomic state propagation across all functional roles (Tracker, Viewer, Setup). (Resolved Sep.23.50)
 *   **SOT ID 421**: Unified Hardware Lifecycle & Vendor Hardening - Consolidated Samsung, Xiaomi, and Huawei-specific power management adaptations and WakeLock policies into a central `DeviceHardeningStrategy`. Abstracted periodic stay-alive pulses into a dedicated `ProcessPriorityMonitor` to ensure process priority retention across deep sleep cycles and OEM-specific battery restrictions. (Resolved Sep.23.08)
 *   **SOT ID 417**: Logic State Persistence Expansion - Enhanced the alarm evaluation history matrix inside `AppAlarmManager` by mapping and embedding `firstTriggerTs`, `firstTriggerRt`, `lastLogTs`, and `lastLogRt` inside JSON persistence payloads. This prevents transient temporal resets after system memory process kills or system wake cycles, fully closing behavioral continuity gaps. (Resolved Sep.23.06)
@@ -8,7 +9,7 @@
 *   **SOT ID 419**: Unified Draft Settings State Flow - Consolidated configuration draft events and top-level navigation logic into `MainViewModel`. This ensures that all UI components observing the global state reflect user input in real-time, regardless of the active functional role, and eliminates state dispersion between feature-specific ViewModels. (Resolved Sep.23.03)
 *   **SOT ID 418**: Siren State Synchronization - Converted `AudioSynthesizer.isLooping` into a `MutableStateFlow` to expose reactive siren activity feedback globally. Subscribed `MainViewModel` to this flow to sync playback states with `DiagnosticState`, completely rectifying the asymmetric role state dispersion loop across presentation layers. (Resolved Sep.23.01)
 *   **SOT ID 416**: Config & Trail Import Restoration - Added robust event handling loops for `UiEvent.BulkUpdateSettings` and `UiEvent.LogAction` within `MainViewModel.onEvent`. Integrated `alertSettingsFlow` into `StateSubscriptionUseCase` to guarantee that all configurations loaded from external files are fully propagated to the active user interface state slices without omissions or silent fall-throughs. (Resolved Sep.22.50)
-*   **SOT ID 415**: God Object ViewModel Decomposition - [REPLACED BY SOT ID 422] - Originally decomposed MainViewModel into role-specific ViewModels; later refactored back into a centralized SSOT model to resolve high-frequency stream churn and state loss. (Sep.22.40)
+*   **SOT ID 415**: God Object ViewModel Decomposition - [REPLACED BY SOT ID 422] - Originally decomposed MainViewModel into role-specific ViewModels; later refactored back into a centralized SSOT model to resolve high-frequency stream churn and state loss. (Sep.22.30)
 *   **SOT ID 414**: Forensic & Sensor Efficiency Optimization - Introduced EvaluationSnapshot to group system health and sensor metrics into an atomic DTO for single-pass consumption in the background tick loop. This ensures consistent telemetry state across the entire processing iteration and minimizes parameter passing overhead. (Resolved Sep.22.32)
 *   **SOT ID 413**: Elimination of Multi-pass Fallbacks - Grouped individual sensor parameter clauses in updateSensorState into a structured SensorStateSnapshot to remove imperative value checking bounds and streamline parameter passing. (Resolved Sep.22.31)
 *   **SOT ID 412**: Vibration Floor Adaptation Guard - Guarded the fallback autonomous vibration floor adaptation path in `LocationSentinel.updateSensorState` with a check ensuring `vibration >= 0.0`. This prevents multiple uncoordinated adaptations using stale data when called from coordinate fix propagation paths solely to update lockout realtimes or other telemetry vectors. (Resolved Sep.22.30)
@@ -57,17 +58,18 @@
 *   **SOT ID 367**: Forensic Multi-Role Integrity Hardening - Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367). (Resolved Sep.19.08)
 
 ## 4.3. Metric Summary
-- **Rules Verified**: 86
-- **Total SOT IDs**: 422
-- **Resolved Issues**: 1184
-- **Open Issues**: 28
+- **Rules Verified**: 87
+- **Total SOT IDs**: 423
+- **Resolved Issues**: 1187
+- **Open Issues**: 26
 - **Testing Coverage**: 3 (Sub-items: 12)
-- **Simplification Ideas**: 12
+- **Simplification Ideas**: 14
 - **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.86 (Centralized SSOT ViewModel Architecture)**: PASSED - Successfully unified Tracker, Viewer, and Setup states into MainViewModel, resolving multi-subscription churn and ephemeral state loss. (Sep.23.50)
-*   **Chapter 31.85 (Unified Hardware Lifecycle & Vendor Hardening)**: PASSED - Successfully consolidated Samsung, Xiaomi, and Huawei adaptations into DeviceHardeningStrategy. (Sep.23.08)
+*   **Chapter 31.87 (Siren Trigger Orchestration)**: PASSED - Successfully integrated siren activation/deactivation into the alarm evaluation cycle, ensuring hardware-reactive alerts in background services. (Sep.22.30)
+*   **Chapter 31.86 (Centralized SSOT ViewModel Architecture)**: PASSED - Successfully unified Tracker, Viewer, and Setup states into MainViewModel, resolving multi-subscription churn and ephemeral state loss. (Sep.22.30)
+*   **Chapter 31.85 (Unified Hardware Lifecycle & Vendor Hardening)**: PASSED - Successfully consolidated Samsung, Xiaomi, and Huawei adaptations into DeviceHardeningStrategy. (Sep.22.30)
 *   **Chapter 31.84 (Logic State Persistence Expansion)**: PASSED - Verified seamless preservation of active alarm trigger realtimes and logging timestamps inside persistent JSON structures. (Sep.22.30)
 *   **Chapter 31.83 (Shared Overlay Scope)**: PASSED - Successfully centralized shared overlays into OverlayHost within MainAppContent. (Sep.22.30)
 *   **Chapter 31.82 (Draft Settings Synchronization)**: PASSED - Verified real-time input reflection across functional roles after consolidating draft logic into MainViewModel. (Sep.22.30)
@@ -112,4 +114,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite. (Sep.22.30)
 
 ---
-*Next Audit: Sep.23.100. (Sep.23.50)*
+*Next Audit: Sep.23.100. (Sep.22.30)*

@@ -33,6 +33,10 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.23.60:
+ * - Issue #1270/1280 RESOLVED: Integrated siren trigger orchestration into the 
+ *   alarm evaluation loop. Background services now physically activate the 
+ *   AudioSynthesizer when violations are active and stealth rules allow (R-ID 418).
  * Sep.23.06:
  * - Issue #1164 RESOLVED: Enhanced alarm history serialization by embedding firstTriggerTs,
  *   firstTriggerRt, lastLogTs, and lastLogRt inside JSON persistence to preserve alarm duration
@@ -222,6 +226,24 @@ class AppAlarmManager @Inject constructor(
         )
         
         processViolationReport(report, serviceContext.now, serviceContext.nowRt, versionTag, telemetry.lat, telemetry.lng, telemetry.accuracy, telemetry.maxAccuracy, telemetry.snrSnapshot, telemetry.vibeSnapshot)
+
+        // Issue #1270/1280: Integrated Siren Orchestration
+        val needsSiren = shouldPlaySiren()
+        val isCurrentlyPlaying = audioSynthesizer.isPlaying()
+
+        if (needsSiren && !isCurrentlyPlaying) {
+            audioSynthesizer.playSiren(
+                timeProvider = timeProvider,
+                isTrackerMode = isTrackerMode,
+                vibrate = true,
+                force = true
+            )
+        } else if (!needsSiren && isCurrentlyPlaying) {
+            // Stop if no alarms or if stealth/mute rules apply
+            if (!hasUnresolvedAlarms() || isTrackerMode || currentSettings.globalMute) {
+                audioSynthesizer.stopSiren(timeProvider = timeProvider)
+            }
+        }
     }
 
     private fun syncEvaluationState(

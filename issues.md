@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.23.50
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.23.60
 
 ## 🎯 Current Resumption Focus: Structural Simplicity & Pattern Convergence
 Finalizing the audit of signaling performance under physical stress and ensuring no side-effects remain from the Performance Tier unification.
@@ -45,10 +45,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ### Missing Functionality & Core Integration Gaps (Identified Resolved Item Failures)
 
-*   **Issue #1270: Disconnected Siren Trigger Mechanism**
-    *   *Description*: No consumer for siren logic in background services.
-    *   *Significance*: **Blocker (Core Functional Failure)**.
-
 *   **Issue #1271: Missing Persistence for Adaptive Vibration Floor**
     *   *Description*: Vibration floor resets to default on service restart.
     *   *Significance*: **High (False Positive Risk)**.
@@ -75,15 +71,15 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *   **Issue #1261: Refactor Tracker/Viewer Services into Role-Reactive MonitorService** (Medium)
 
 #### For Alarm & Siren Reliability (Core System Restoration)
-*   **Issue #1280: Integrate Siren Trigger into Alarm Evaluation Loop** (Blocker)
 *   **Issue #1281: Implementation of Persistent Adaptive Vibration Floor** (High)
 *   **Issue #1282: Atomic Guard for HardwareSuite User Counter** (Medium)
 *   **Issue #1265: Unified Event Orchestration via AppEventCoordinator** (Medium)
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 13)
+## 💡 Strategic Simplification Ideas (Ideas: 14)
 
+*   **Issue #1292: Reactive Siren State Binding** (High): Move siren lifecycle orchestration into a dedicated `SirenService` or `SirenCoordinator` to remove the imperative `audioSynthesizer.play/stop` calls from the evaluation manager.
 *   **Issue #1291: Domain Event Bus Integration** (High): Centralize dispersed logging, telemetry capture triggers, and command routing into a single `AppEventCoordinator` to eliminate cross-component coupling.
 *   **Issue #1161: Unified Trajectory & Buffer Management** (Medium-High)
 *   **Issue #1290: UI State Mapper Consolidation** (Medium): Merge `UiStateMapper` logic directly into `MainViewModel` now that it is the sole activity-scoped consumer, reducing DI surface area.
@@ -102,6 +98,8 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1270: Disconnected Siren Trigger Mechanism** (Resolved Sep.23.60)
+*   **Issue #1280: Integrate Siren Trigger into Alarm Evaluation Loop** (Resolved Sep.23.60)
 *   **Issue #1203: Hilt ViewModel Scope Optimization** (Resolved Sep.23.50)
     *   *Sub-issues Resolved*: #1210 (Fragmented State), #1211 (Stream Churn), #1212 (Map State Loss), #1213 (Swallowed Events), #1214 (Hydration Races), #1215 (Scope Overlap), #1257 (Misrouted Kinematic State).
 *   **Issue #1204: Unified Hardware Lifecycle & Vendor Hardening** (Resolved Sep.23.08)
@@ -111,4 +109,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *   **Issue #1193: Asymmetric Audio Control and Siren State Dispersion** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 422 (Rules: 86, IDs: 422), Resolved: 1185, Open: 28, Testing: 3 (Sub-items: 12), Ideas: 13, QA: 283]**
+- **Current Audit Baseline: [SOT: 423 (Rules: 87, IDs: 423), Resolved: 1187, Open: 26, Testing: 3 (Sub-items: 12), Ideas: 14, QA: 283]**

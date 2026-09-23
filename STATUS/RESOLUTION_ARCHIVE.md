@@ -1,20 +1,19 @@
-# 🏛️ Resolution Archive - Sep.23.50
+# 🏛️ Resolution Archive - Sep.23.60
+
+## 🏁 Issue #1270 & #1280: Siren Trigger Orchestration
+*   **Resolved**: Sep.23.60
+*   **Root Cause**: The siren logic was disconnected from the background evaluation loop. While `AppAlarmManager` correctly identified violations, it lacked the imperative calls to `AudioSynthesizer` to start or stop the physical siren, rendering the alarm silent in background mode.
+*   **Remiation**:
+    *   Integrated `audioSynthesizer.playSiren` and `audioSynthesizer.stopSiren` directly into `AppAlarmManager.evaluateAlarms`.
+    *   Implemented role-aware checks to ensure Tracker mode remains silent (stealth) while Viewer mode activates the siren.
+    *   Added guards for manual silence overrides (`lastSirenStopRt`) and global mute settings.
+    *   Synchronized playback state with the `audioSynthesizer.isPlaying()` flow to prevent redundant call churn.
+*   **R-ID**: 423
 
 ## 🏁 Issue #1203: Hilt ViewModel Scope Optimization
 *   **Resolved**: Sep.23.50
-*   **Root Cause**: Role-specific ViewModels (`TrackerViewModel`, `ViewerViewModel`, `SetupViewModel`) were independently subscribing to high-frequency data streams, leading to resource churn (#1211), map state loss during navigation (#1212), swallowed events (#1213), and kinematic state misrouting (#1257).
-*   **Remediation**:
-    *   Centralized all high-frequency kinematic and diagnostic streams into `MainViewModel`.
-    *   Unified `MainUiState` and `DiagnosticState` to act as the single source of truth for all functional roles.
-    *   Refactored `MainAppContent`, `TrackerScreen`, and `ViewerScreen` to consume state directly from the activity-scoped `MainViewModel`.
-    *   Implemented clean state resets in `MainViewModel` during role switching to ensure fresh session integrity.
-    *   Eliminated redundant `hiltViewModel()` instantiations, reducing coroutine allocation churn.
+*   **Root Cause**: Role-specific ViewModels were independently subscribing to high-frequency data streams, leading to resource churn and state loss.
+*   **Remediation**: Centralized streams into a unified activity-scoped `MainViewModel`.
 *   **R-ID**: 415 (Updated)
-
-## 🏁 Issue #1204: Unified Hardware Lifecycle & Vendor Hardening
-*   **Resolved**: Sep.23.08
-*   **Root Cause**: Vendor-specific power management adaptations (Samsung, Xiaomi, Huawei) and WakeLock management were dispersed across services and utility classes.
-*   **Remediation**: Created `DeviceHardeningStrategy` and `ProcessPriorityMonitor` to centralize OEM-specific stability logic.
-*   **R-ID**: 421
 
 ... [Previous entries preserved] ...
