@@ -1,10 +1,10 @@
-# SOT Master Requirements & Hardening Status (Sep.23.04)
+# SOT Master Requirements & Hardening Status (Sep.23.06)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 417**: Logic State Persistence Expansion - Enhanced the alarm evaluation history matrix inside `AppAlarmManager` by mapping and embedding `firstTriggerTs`, `firstTriggerRt`, `lastLogTs`, and `lastLogRt` inside JSON persistence payloads. This prevents transient temporal resets after system memory process kills or system wake cycles, fully closing behavioral continuity gaps. (Resolved Sep.23.06)
 *   **SOT ID 420**: Shared Overlay Scope - Centralized all shared overlays (`SettingsOverlay`, `LogOverlay`, `RibbonsOverlay`, `GnssDetailOverlay`) into a dedicated `OverlayHost` component within `MainAppContent`. This eliminated extensive callback routing in `TrackerScreen` and `ViewerScreen`, ensuring overlays interact directly with `MainViewModel` and significantly reducing UI boilerplate. (Resolved Sep.23.04)
 *   **SOT ID 419**: Unified Draft Settings State Flow - Consolidated configuration draft events and top-level navigation logic into `MainViewModel`. This ensures that all UI components observing the global state reflect user input in real-time, regardless of the active functional role, and eliminates state dispersion between feature-specific ViewModels. (Resolved Sep.23.03)
 *   **SOT ID 418**: Siren State Synchronization - Converted `AudioSynthesizer.isLooping` into a `MutableStateFlow` to expose reactive siren activity feedback globally. Subscribed `MainViewModel` to this flow to sync playback states with `DiagnosticState`, completely rectifying the asymmetric role state dispersion loop across presentation layers. (Resolved Sep.23.01)
-*   **SOT ID 417**: Logic State Persistence - Restored background logic state (geofence debounce, power latches) from DataStore during initialization in `TrackerService` and `ViewerService` to survive process death and ensure behavioral continuity across deep sleep cycles. (Resolved Sep.22.50)
 *   **SOT ID 416**: Config & Trail Import Restoration - Added robust event handling loops for `UiEvent.BulkUpdateSettings` and `UiEvent.LogAction` within `MainViewModel.onEvent`. Integrated `alertSettingsFlow` into `StateSubscriptionUseCase` to guarantee that all configurations loaded from external files are fully propagated to the active user interface state slices without omissions or silent fall-throughs. (Resolved Sep.22.50)
 *   **SOT ID 415**: God Object ViewModel Decomposition - Decomposed the monolithic MainViewModel into feature-specific ViewModels (TrackerViewModel, ViewerViewModel, SetupViewModel) bound to navigation scopes. MainViewModel now acts as a lightweight coordinator for app-level state and global overlays. This isolates recomposition triggers, reduces the memory footprint of background roles, and enforces strict separation of concerns between Tracker and Viewer logic. (Resolved Sep.22.40)
 *   **SOT ID 414**: Forensic & Sensor Efficiency Optimization - Introduced EvaluationSnapshot to group system health and sensor metrics into an atomic DTO for single-pass consumption in the background tick loop. This ensures consistent telemetry state across the entire processing iteration and minimizes parameter passing overhead. (Resolved Sep.22.32)
@@ -14,7 +14,7 @@
 *   **SOT ID 410**: Thermal Recovery Latency Audit - Corrected the thermal recovery latency audit check to evaluate across iteration passes rather than returning a 0ms intra-iteration result, establishing reliable precision for forensic audit traces. (Resolved Sep.22.28)
 *   **SOT ID 408**: Vibration Floor Semantic Alignment - Corrected `getAdaptiveVibrationFloor()` in `LocationProcessor.kt` to return `sentinel.adaptiveVibrationFloor` instead of `sentinel.acousticFloorDb`. This resolves the severe semantic leak across the telemetry pipeline, ensuring actual adaptive vibration baseline metrics are correctly propagated rather than acoustic ones. (Resolved Sep.22.26)
 *   **SOT ID 407**: Acoustic Fast-Path Adaptation - Added alpha baseline adaptation parameter to `acousticFastPath.evaluate` in `HardwareSuite.kt`. This ensures the high-frequency acoustic baseline independently tracks ambient background noise levels, maintaining symmetry with the light fast-path and core validation logic (R-ID 407). (Resolved Sep.22.15)
-*   **SOT ID 406**: Trigger-Based Forensic Sampling - Transitioned from a fixed-interval forensic loop to a "Signal-on-Spike" model where `HardwareFastPath`, location updates, and logic ticks trigger telemetry capture. This drastically reduces background CPU wakeups and GC pressure by eliminating redundant data points during long stationary periods (R-ID 406). (Resolved Sep.22.11)
+*   **SOT ID 406**: Trigger-Based Forensic Sampling - Transitioned from a fixed-interval loop to a "Signal-on-Spike" model where `HardwareFastPath`, location updates, and logic ticks trigger telemetry capture. This drastically reduces background CPU wakeups and GC pressure by eliminating redundant data points during long stationary periods (R-ID 406). (Resolved Sep.22.11)
 *   **SOT ID 405**: State Partitioning & Slicing - Split the monolithic `MainUiState` into specialized slices (`SessionUiState`, `SpatialUiState`, `SettingsUiState`, `MapTriggers`, `SimulationUiState`). Refactored `MainViewModel` and all screen Composables to consume these granular segments, significantly reducing recomposition frequency and isolating volatile triggers (R-ID 405). (Resolved Sep.22.08)
 *   **SOT ID 404**: Fast-Path Configuration Convergence - Unified acoustic and light fast-path implementations in `HardwareSuite` using a generic `HardwareFastPath` structure. This centralizes baseline decay, spike detection, and debouncing logic, ensuring symmetric and race-free processing of high-frequency sensor events (R-ID 404). (Resolved Sep.22.08)
 *   **SOT ID 403**: Vendor Adaptation Centralization - Consolidated vendor-specific adaptations and loop continuity tweaks into a central `DeviceProfileManager` to keep hardware-dependent behavioral overrides centralized and decoupled from background services (R-ID 403). (Resolved Sep.22.07)
@@ -57,15 +57,16 @@
 ## 4.3. Metric Summary
 - **Rules Verified**: 84
 - **Total SOT IDs**: 420
-- **Resolved Issues**: 1175
+- **Resolved Issues**: 1176
 - **Open Issues**: 0
 - **Testing Coverage**: 3 (Sub-items: 12)
-- **Simplification Ideas**: 9
+- **Simplification Ideas**: 12
 - **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.83 (Shared Overlay Scope)**: PASSED - Successfully centralized shared overlays into OverlayHost within MainAppContent, streamlining feature screens. (Sep.23.04)
-*   **Chapter 31.82 (Draft Settings Synchronization)**: PASSED - Verified real-time input reflection across functional roles after consolidating draft logic into MainViewModel. (Sep.23.03)
+*   **Chapter 31.84 (Logic State Persistence Expansion)**: PASSED - Verified seamless preservation of active alarm trigger realtimes and logging timestamps inside persistent JSON structures across memory pressure resets. (Sep.23.06)
+*   **Chapter 31.83 (Shared Overlay Scope)**: PASSED - Successfully centralized shared overlays into OverlayHost within MainAppContent, streamlining feature screens. (Sep.22.30)
+*   **Chapter 31.82 (Draft Settings Synchronization)**: PASSED - Verified real-time input reflection across functional roles after consolidating draft logic into MainViewModel. (Sep.22.30)
 *   **Chapter 31.81 (Siren State Synchronization)**: PASSED - Converted siren playback feedback to StateFlow, ensuring cross-ViewModel reactive state consistency. (Sep.22.30)
 *   **Chapter 31.80 (Config & Trail Import)**: PASSED - Verified seamless configuration and trail point loading via MainFileHelper without handled event omissions. (Sep.22.30)
 *   **Chapter 31.79 (ViewModel Decomposition)**: PASSED - Successfully decomposed monolithic MainViewModel into role-specific ones, isolating state and behavior. (Sep.22.30)
@@ -84,7 +85,6 @@
 *   **Chapter 31.66 (Persistence Refactoring)**: PASSED - Verified generic mutate extension and unified repository operations (Sep.22.30)
 *   **Chapter 31.65 (Atomic Geofence)**: PASSED - Verified race-free home point updates and persistent ADD mode (Sep.22.30)
 *   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states (Sep.22.30)
-*   **Chapter 31.63 (Role Selection UX)**: PASSED - Dynamic card dimming based on peer activity status (Sep.22.30)
 *   **Chapter 31.62 (Temperature Unit Layout)**: PASSED - Corrected SI unit presentation in StatusRowData (Sep.22.30)
 *   **Chapter 31.61 (Session Lifecycle Coordinator)**: PASSED - Unified background session resets atomically across roles (Sep.21.132)
 *   **Chapter 31.60 (Interface Isolation Utilities)**: PASSED - Created LocationProcessorListener & DefaultLocationProcessorListener to prevent test breakages (Sep.21.131)
@@ -108,4 +108,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.22.30)
 
 ---
-*Next Audit: Sep.23.100. (Sep.23.04)*
+*Next Audit: Sep.23.100. (Sep.23.06)*

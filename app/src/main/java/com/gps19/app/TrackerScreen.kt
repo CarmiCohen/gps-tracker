@@ -172,7 +172,7 @@ fun TrackerScreen(
                                 AppMapContainer(
                                     state = mapViewState,
                                     onEvent = { event -> viewModel.onEvent(event) },
-                                    onClearTrails = { viewModel.clearTrails(context) },
+                                    onClearTrails = { viewModel.clearTrails() },
                                     onSaveTrail = onSaveTrail,
                                     onLoadTrail = onLoadTrail
                                 )
@@ -263,7 +263,7 @@ fun TrackerScreen(
                     AppMapContainer(
                         state = mapViewState,
                         onEvent = { event -> viewModel.onEvent(event) },
-                        onClearTrails = { viewModel.clearTrails(context) },
+                        onClearTrails = { viewModel.clearTrails() },
                         onSaveTrail = onSaveTrail,
                         onLoadTrail = onLoadTrail
                     )

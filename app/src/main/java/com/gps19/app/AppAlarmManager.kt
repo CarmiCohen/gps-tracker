@@ -33,12 +33,13 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.23.06:
+ * - Issue #1164 RESOLVED: Enhanced alarm history serialization by embedding firstTriggerTs,
+ *   firstTriggerRt, lastLogTs, and lastLogRt inside JSON persistence to preserve alarm duration
+ *   and debounce tracking across process lifetimes.
  * Sep.22.50:
  * - Issue #1164 RESOLVED: Implemented persistence for logic state (geofence debounce,
  *   power latches, and siren timers) to ensure reliability across process restarts (R-ID 417).
- * Sep.21.123:
- * - Issue #1121 Refactoring: Migrated evaluateAlarms to unified 
- *   AlarmTelemetrySnapshot and AlarmServiceContext DTOs (R-ID 390).
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -137,6 +138,10 @@ class AppAlarmManager @Inject constructor(
                         title = obj.optString("title", "Violation"),
                         subtitle = obj.optString("subtitle", ""),
                         isTriggered = obj.optBoolean("isTriggered", false),
+                        firstTriggerTs = obj.optLong("firstTriggerTs", 0L),
+                        firstTriggerRt = obj.optLong("firstTriggerRt", 0L),
+                        lastLogTs = obj.optLong("lastLogTs", 0L),
+                        lastLogRt = obj.optLong("lastLogRt", 0L),
                         isResolved = obj.optBoolean("isResolved", true)
                     )
                 }
@@ -399,6 +404,10 @@ class AppAlarmManager @Inject constructor(
                 val obj = JSONObject()
                 obj.put("type", eval.type); obj.put("isTriggered", eval.isTriggered); obj.put("isResolved", eval.isResolved)
                 obj.put("title", eval.title); obj.put("subtitle", eval.subtitle); obj.put("isSirenDisabled", currentSettings.globalMute)
+                obj.put("firstTriggerTs", eval.firstTriggerTs)
+                obj.put("firstTriggerRt", eval.firstTriggerRt)
+                obj.put("lastLogTs", eval.lastLogTs)
+                obj.put("lastLogRt", eval.lastLogRt)
                 jsonArray.put(obj)
             }
         }

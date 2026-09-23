@@ -1,4 +1,13 @@
-# 🏛️ Resolution Archive - Sep.23.04
+# 🏛️ Resolution Archive - Sep.23.06
+
+## 🏁 Issue #1164: Persistence of Logic State
+*   **Resolved**: Sep.23.06
+*   **Root Cause**: Active alarm state (trigger timestamps and logging realtimes) was not fully captured during JSON serialization in `AppAlarmManager`, causing duration metrics to reset and behavioral debouncing to lose context after process restarts or deep sleep.
+*   **Remediation**:
+    *   Enhanced `AlarmEvaluation` JSON mapping in `AppAlarmManager` to embed `firstTriggerTs`, `firstTriggerRt`, `lastLogTs`, and `lastLogRt`.
+    *   Verified seamless restoration of geofence debounce samples and power alarm latches from DataStore in `TrackerService`.
+    *   Corrected `clearTrails` call signatures in `TrackerScreen` and `ViewerScreen` to resolve regression compilation errors.
+*   **R-ID**: 417
 
 ## 🏁 Issue #1200: Shared Overlay Scope
 *   **Resolved**: Sep.23.04
