@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.23.06)
+# SOT Master Requirements & Hardening Status (Sep.23.08)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 421**: Unified Hardware Lifecycle & Vendor Hardening - Consolidated Samsung, Xiaomi, and Huawei-specific power management adaptations and WakeLock policies into a central `DeviceHardeningStrategy`. Abstracted periodic stay-alive pulses into a dedicated `ProcessPriorityMonitor` to ensure process priority retention across deep sleep cycles and OEM-specific battery restrictions. (Resolved Sep.23.08)
 *   **SOT ID 417**: Logic State Persistence Expansion - Enhanced the alarm evaluation history matrix inside `AppAlarmManager` by mapping and embedding `firstTriggerTs`, `firstTriggerRt`, `lastLogTs`, and `lastLogRt` inside JSON persistence payloads. This prevents transient temporal resets after system memory process kills or system wake cycles, fully closing behavioral continuity gaps. (Resolved Sep.23.06)
 *   **SOT ID 420**: Shared Overlay Scope - Centralized all shared overlays (`SettingsOverlay`, `LogOverlay`, `RibbonsOverlay`, `GnssDetailOverlay`) into a dedicated `OverlayHost` component within `MainAppContent`. This eliminated extensive callback routing in `TrackerScreen` and `ViewerScreen`, ensuring overlays interact directly with `MainViewModel` and significantly reducing UI boilerplate. (Resolved Sep.23.04)
 *   **SOT ID 419**: Unified Draft Settings State Flow - Consolidated configuration draft events and top-level navigation logic into `MainViewModel`. This ensures that all UI components observing the global state reflect user input in real-time, regardless of the active functional role, and eliminates state dispersion between feature-specific ViewModels. (Resolved Sep.23.03)
@@ -55,16 +56,17 @@
 *   **SOT ID 367**: Forensic Multi-Role Integrity Hardening - Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367). (Resolved Sep.19.08)
 
 ## 4.3. Metric Summary
-- **Rules Verified**: 84
-- **Total SOT IDs**: 420
-- **Resolved Issues**: 1176
+- **Rules Verified**: 85
+- **Total SOT IDs**: 421
+- **Resolved Issues**: 1177
 - **Open Issues**: 0
 - **Testing Coverage**: 3 (Sub-items: 12)
 - **Simplification Ideas**: 12
 - **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.84 (Logic State Persistence Expansion)**: PASSED - Verified seamless preservation of active alarm trigger realtimes and logging timestamps inside persistent JSON structures across memory pressure resets. (Sep.23.06)
+*   **Chapter 31.85 (Unified Hardware Lifecycle & Vendor Hardening)**: PASSED - Successfully consolidated Samsung, Xiaomi, and Huawei adaptations into DeviceHardeningStrategy and abstracted stay-alive pulses into ProcessPriorityMonitor. (Sep.23.08)
+*   **Chapter 31.84 (Logic State Persistence Expansion)**: PASSED - Verified seamless preservation of active alarm trigger realtimes and logging timestamps inside persistent JSON structures across memory pressure resets. (Sep.22.30)
 *   **Chapter 31.83 (Shared Overlay Scope)**: PASSED - Successfully centralized shared overlays into OverlayHost within MainAppContent, streamlining feature screens. (Sep.22.30)
 *   **Chapter 31.82 (Draft Settings Synchronization)**: PASSED - Verified real-time input reflection across functional roles after consolidating draft logic into MainViewModel. (Sep.22.30)
 *   **Chapter 31.81 (Siren State Synchronization)**: PASSED - Converted siren playback feedback to StateFlow, ensuring cross-ViewModel reactive state consistency. (Sep.22.30)
@@ -108,4 +110,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.22.30)
 
 ---
-*Next Audit: Sep.23.100. (Sep.23.06)*
+*Next Audit: Sep.23.100. (Sep.23.08)*

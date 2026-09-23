@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.23.06
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.23.08
 
 ## 🎯 Current Resumption Focus: Structural Simplicity & Pattern Convergence
 Finalizing the audit of signaling performance under physical stress and ensuring no side-effects remain from the Performance Tier unification.
@@ -10,11 +10,8 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 13)
+## 💡 Strategic Simplification Ideas (Ideas: 12)
 
-*   **Issue #1204: Unified Hardware Lifecycle & Vendor Hardening**
-    *   *Description*: Consolidate vendor-specific adaptations (Samsung/Xiaomi/Huawei) and unify WakeLock management into a central `DeviceHardeningStrategy`. Abstract stay-alive pulses into a dedicated `ProcessPriorityMonitor`.
-    *   *Significance*: **High (Reliability)**: Critical for preventing background service termination by OEM-specific power managers, ensuring consistent GPS tracking.
 *   **Issue #1161: Unified Trajectory & Buffer Management**
     *   *Description*: Merge `GtoEngine` windows and `LocationSentinel` hindsight buffers into a single optimized `TrajectoryBuffer` and consolidate "Parking Anchor" and "Home Point" logic.
     *   *Significance*: **Medium-High (Memory Efficiency)**: Consolidates duplicate caching layers and location window structures into a single unified high-performance buffer.
@@ -56,6 +53,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1204: Unified Hardware Lifecycle & Vendor Hardening** (Resolved Sep.23.08)
+    *   *Remediation*: Consolidated vendor-specific adaptations (Samsung/Xiaomi/Huawei) and WakeLock management into a central `DeviceHardeningStrategy`. Abstracted stay-alive pulses into a dedicated `ProcessPriorityMonitor`.
+
 *   **Issue #1164: Persistence of Logic State** (Resolved Sep.23.06)
     *   *Remediation*: Enhanced the JSON serialization matrix of active alarms inside `AppAlarmManager` to capture explicit state markers including trigger realtimes (`firstTriggerRt`) and wall timestamps, preventing duration reset loops after process death.
 
@@ -74,4 +74,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 420 (Rules: 84, IDs: 420), Resolved: 1176, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 13, QA: 283]**
+- **Current Audit Baseline: [SOT: 421 (Rules: 85, IDs: 421), Resolved: 1177, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 12, QA: 283]**

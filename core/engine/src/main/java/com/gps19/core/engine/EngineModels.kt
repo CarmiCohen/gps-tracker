@@ -4,22 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.23.08:
+ * - Issue #1204: Unified Hardware Lifecycle. Added isHuaweiDevice to 
+ *   HardwareCapabilities for vendor-specific hardening.
  * Sep.22.32:
  * - Issue #1162: Forensic & Sensor Efficiency Optimization. Introduced EvaluationSnapshot
  *   to group remaining telemetry fields for single-pass atomic consumption.
- * Sep.22.31:
- * - Issue #1182: Elimination of Multi-pass Fallbacks. Introduced SensorStateSnapshot 
- *   to group sensor data into a standard container, removing imperative value checking bounds.
- * Sep.21.125:
- * - Issue #1155: Acoustic-SNR Semantic Mismatch. Introduced EngineAcousticSample 
- *   to decouple environmental noise telemetry from satellite SNR (R-ID 393).
- * Sep.21.123:
- * - Issue #1121 Refactoring: Introduced AlarmTelemetrySnapshot and 
- *   AlarmServiceContext to unify telemetry propagation and decouple 
- *   ViewerService from internal model details (R-ID 390).
- * Sep.16.05:
- * - Issue #1060 Capability Consolidation: Removed redundant properties 
- *   isStaggeredTier, requiresAdaptationMuzzle, and useStaggeredHydration from HardwareCapabilities. (R-ID 348).
  */
 
 @Serializable
@@ -70,6 +60,8 @@ data class HardwareCapabilities(
     val requiresExtraTopPadding: Boolean = false,
     val isManualOverrideActive: Boolean = false,
     val isA15Device: Boolean = false,
+    val isSamsungDevice: Boolean = false,
+    val isHuaweiDevice: Boolean = false,
     val isMicrophoneGranted: Boolean = false,
     val performanceTier: PerformanceTier = PerformanceTier.STANDARD
 )

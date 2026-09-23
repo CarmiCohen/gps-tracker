@@ -61,15 +61,12 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Sep.23.08:
+ * - Issue #1204: Unified Hardware Lifecycle. Added Huawei device detection 
+ *   and integrated it into the unified PermissionState (R-ID 348).
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Added getPerformanceTier() to return 
  *   PerformanceTier enum directly (R-ID 348).
- * Sep.16.02:
- * - Issue #1060 Capability Consolidation: Merged isStaggeredTier, 
- *   requiresAdaptationMuzzle, and useStaggeredHydration into PerformanceTier enum (R-ID 348).
- * Sep.16.00:
- * - Issue #1055 Unified Performance Tier: Broadened staggered performance detection 
- *   to harmonize remediation for both A15 and S21FE (R-ID 348, formerly R-ID 347).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -132,6 +129,7 @@ class SystemStatusProviderImpl @Inject constructor(
     
     private val isXiaomi by lazy { HardwareSot.isXiaomi(Build.MANUFACTURER) }
     private val isSamsung by lazy { HardwareSot.isSamsung(Build.MANUFACTURER, Build.BRAND) }
+    private val isHuawei by lazy { HardwareSot.isHuawei(Build.MANUFACTURER, Build.BRAND) }
     private val isStaggeredTier by lazy { 
         HardwareSot.isStaggeredPerformanceTier(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.PRODUCT, Build.DEVICE) 
     }
@@ -244,14 +242,15 @@ class SystemStatusProviderImpl @Inject constructor(
                                 isBackgroundLocationGranted = bgLocGranted,
                                 isActivityRecognitionGranted = actRecogGranted,
                                 
-                                hasBackgroundRestriction = isXiaomi,
+                                hasBackgroundRestriction = isXiaomi || isHuawei,
                                 backgroundStatus = toCapabilityStatus(xiaomiStatus),
                                 autostartStatus = toCapabilityStatus(xiaomiAutostart),
                                 isManualOverride = current.isManualOverride,
-                                requiresWakeLockRenewal = isSamsung,
+                                requiresWakeLockRenewal = isSamsung || isHuawei,
                                 requiresExtraTopPadding = isXiaomi,
                                 isA15Device = HardwareSot.isA15(Build.MANUFACTURER, Build.BRAND, Build.MODEL, Build.PRODUCT, Build.DEVICE),
                                 isSamsungDevice = isSamsung,
+                                isHuaweiDevice = isHuawei,
                                 performanceTier = if (isStaggeredTier) PerformanceTier.STAGGERED else PerformanceTier.STANDARD
                             )
                             cachedState.set(newState)

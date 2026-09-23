@@ -1,35 +1,39 @@
-# Forensic Handover (Sep.23.06)
+# Forensic Handover (Sep.23.08)
 
 ## 🎯 Current System State
-*   **Version**: Sep.23.06 | **Build**: Logic Persistence Expansion (Verified)
-*   **SOT Baseline**: SOT: 420 (Rules: 84, IDs: 420)
-*   **Core Remediation**: Successfully resolved **Issue #1164**. Alarm state serialization in `AppAlarmManager` now includes `firstTriggerTs`, `firstTriggerRt`, `lastLogTs`, and `lastLogRt`. This ensures that alarm durations and debouncing logic remain consistent after process restarts or deep sleep system kills.
+*   **Version**: Sep.23.08 | **Build**: Hardware Lifecycle Unification (Verified)
+*   **SOT Baseline**: SOT: 421 (Rules: 85, IDs: 421)
+*   **Core Remediation**: Successfully resolved **Issue #1204**. 
+    *   Introduced `DeviceHardeningStrategy` to centralize OEM-specific power management overrides and WakeLock renewals.
+    *   Introduced `ProcessPriorityMonitor` to handle periodic stay-alive pulses, decoupling priority retention from service business logic.
+    *   Unified Huawei, Samsung, and Xiaomi detection and mitigation patterns.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
 
-1.  **Logic State Persistence (#1164)**:
-    *   Updated `AlarmEvaluation` JSON mapping to preserve temporal state.
-    *   Verified `TrackerService` correctly restores geofence debounce and power latches from DataStore.
-    *   Fixed regression compilation errors in `TrackerScreen.kt` and `ViewerScreen.kt` regarding `clearTrails` method signatures.
-2.  **Unified State Routing**: Maintained the centralized navigation and configuration routing established in previous versions.
+1.  **Unified Hardware Strategy (#1204)**:
+    *   `DeviceProfileManager` now delegates lifecycle tweaks to `DeviceHardeningStrategy`.
+    *   `HardwareCapabilities` and `PermissionState` now explicitly track `isHuaweiDevice`.
+    *   `SystemStatusProvider` automatically maps Huawei background restrictions and WakeLock requirements.
+2.  **Logic State Persistence (#1164)**:
+    *   Alarms maintain temporal context across process restarts using enhanced JSON serialization.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 420 (Rules: 84, IDs: 420), Resolved: 1176, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 13, QA: 283]**
+- **Current Audit Baseline: [SOT: 421 (Rules: 85, IDs: 421), Resolved: 1177, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 12, QA: 283]**
 
 ---
 
 ## 🛡️ Forensic Hardening Summary (Current Session Updates)
 
-### 1. Issue #1164: Persistence of Logic State
-*   **Status**: Fully Resolved & Verified (Sep.23.06).
-*   **Remediation**: Closed the behavioral continuity gap where background components losing memory state would reset alarm timers.
+### 1. Issue #1204: Unified Hardware Lifecycle & Vendor Hardening
+*   **Status**: Fully Resolved & Verified (Sep.23.08).
+*   **Remediation**: Eliminated dispersed vendor hacks by centralizing them into a strategy pattern, ensuring consistent background stability across major OEMs.
 
 ---
 
 ## 🔴 Open Gaps & Resumption Guidance
-*   **Strategic Simplification**: The next priority is **Issue #1204: Unified Hardware Lifecycle & Vendor Hardening**, focusing on consolidating OEM-specific power management overrides.
-*   **ViewModel Scoping**: Evaluate Issue #1203 for navigation-scoped ViewModel resets to further harden the role-switching lifecycle.
+*   **ViewModel Scoping**: The next priority is **Issue #1203: Hilt ViewModel Scope Optimization**, focusing on navigation-scoped ViewModel lifetimes to ensure clean state resets during role switching.
+*   **Strategic Simplification**: Evaluate Issue #1161 for unifying trajectory buffers to further reduce memory footprint.

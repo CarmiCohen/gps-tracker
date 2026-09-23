@@ -8,13 +8,18 @@ import javax.inject.Singleton
 /**
  * DeviceProfileManager: Central controller for vendor-specific adaptations and loop continuity tweaks.
  * Centrally manages hardware hooks for Samsung, A15, and S21FE variants.
+ * Sep.23.08:
+ * - Issue #1204: Unified Hardware Lifecycle & Vendor Hardening. Integrated 
+ *   DeviceHardeningStrategy and ProcessPriorityMonitor to consolidate WakeLock policies and stay-alive pulses.
  */
 @Singleton
 class DeviceProfileManager @Inject constructor(
     private val timeProvider: TimeProvider,
     private val logManager: LogManager,
     private val systemMonitor: SystemMonitor,
-    private val hardwareSuite: HardwareSuite
+    private val hardwareSuite: HardwareSuite,
+    private val hardeningStrategy: DeviceHardeningStrategy,
+    private val priorityMonitor: ProcessPriorityMonitor
 ) {
     private var lastStaggeredPokeRt = 0L
     private val STAGGERED_POKE_INTERVAL_MS = 30_000L
@@ -46,9 +51,9 @@ class DeviceProfileManager @Inject constructor(
         isSocketConnected: Boolean,
         isPeerActive: Boolean
     ) {
-        if (capabilities.requiresWakeLockRenewal) {
-            systemMonitor.renewWakeLock()
-        }
+        hardeningStrategy.applyVendorWakeLockPolicy(capabilities, force = false)
+        hardeningStrategy.executeVendorContinuity(capabilities, nowRt, isPowerSaveMode)
+        priorityMonitor.sendStayAlivePulse(forceWakeLock = false)
 
         val isStaggered = capabilities.performanceTier == PerformanceTier.STAGGERED
         if (isStaggered) {

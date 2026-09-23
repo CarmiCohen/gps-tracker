@@ -17,12 +17,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.23.08:
+ * - Issue #1204: Unified Hardware Lifecycle. Updated refreshCapabilitiesInternal 
+ *   to map Samsung and Huawei vendor flags into HardwareCapabilities (R-ID 348).
  * Sep.22.50:
  * - Issue #1164 REMEDIATION: Restored logic state (geofence debounce, power latches)
  *   from DataStore during initialization to survive process death (R-ID 417).
- * Sep.22.32:
- * - Issue #1162: Forensic & Sensor Efficiency Optimization. Refactored processTick loop 
- *   to use EvaluationSnapshot for atomic telemetry and health metrics consumption.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -330,6 +330,8 @@ class ViewerService : BaseMonitorService() {
             requiresExtraTopPadding = perms.requiresExtraTopPadding,
             isManualOverrideActive = perms.isManualOverride,
             isA15Device = perms.isA15Device,
+            isSamsungDevice = perms.isSamsungDevice,
+            isHuaweiDevice = perms.isHuaweiDevice,
             isMicrophoneGranted = perms.isMicrophoneGranted,
             performanceTier = perms.performanceTier
         )

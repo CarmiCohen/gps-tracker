@@ -23,13 +23,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.23.08:
+ * - Issue #1204: Unified Hardware Lifecycle. Updated refreshCapabilitiesInternal 
+ *   to map Samsung and Huawei vendor flags into HardwareCapabilities (R-ID 348).
  * Sep.22.50:
  * - Issue #1164 REMEDIATION: Restored logic state (geofence debounce, power latches)
  *   from DataStore during initialization to survive process death (R-ID 417).
- * Sep.22.32:
- * - Issue #1162: Forensic & Sensor Efficiency Optimization. Refactored processTick loop 
- *   to group system health and sensor metrics into an atomic EvaluationSnapshot for 
- *   single-pass telemetry processing.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -345,6 +344,8 @@ class TrackerService : BaseMonitorService() {
             requiresExtraTopPadding = perms.requiresExtraTopPadding,
             isManualOverrideActive = perms.isManualOverride,
             isA15Device = perms.isA15Device,
+            isSamsungDevice = perms.isSamsungDevice,
+            isHuaweiDevice = perms.isHuaweiDevice,
             isMicrophoneGranted = perms.isMicrophoneGranted,
             performanceTier = perms.performanceTier
         )

@@ -1,4 +1,14 @@
-# 🏛️ Resolution Archive - Sep.23.06
+# 🏛️ Resolution Archive - Sep.23.08
+
+## 🏁 Issue #1204: Unified Hardware Lifecycle & Vendor Hardening
+*   **Resolved**: Sep.23.08
+*   **Root Cause**: Vendor-specific power management adaptations (Samsung, Xiaomi, Huawei) and WakeLock management were dispersed across services and utility classes, leading to inconsistent background behavior and maintenance complexity.
+*   **Remediation**:
+    *   Created `DeviceHardeningStrategy` to centralize vendor-specific adaptations and WakeLock management.
+    *   Implemented `ProcessPriorityMonitor` to abstract periodic stay-alive pulses.
+    *   Integrated both components into `DeviceProfileManager` for a unified hardware lifecycle.
+    *   Expanded `HardwareSot` and `SystemStatusProvider` to support Huawei device detection and associated background restriction mitigations.
+*   **R-ID**: 421
 
 ## 🏁 Issue #1164: Persistence of Logic State
 *   **Resolved**: Sep.23.06

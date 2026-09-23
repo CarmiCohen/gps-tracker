@@ -6,12 +6,12 @@ import org.osmdroid.util.GeoPoint
 /**
  * MainUiState: Composite UI state partitioned into specialized slices to 
  * minimize recomposition costs and isolate volatile triggers (Issue #1166).
+ * Sep.23.08:
+ * - Issue #1204: Unified Hardware Lifecycle. Added isHuaweiDevice to 
+ *   PermissionState for vendor-specific hardening visibility.
  * Sep.22.08:
  * - Issue #1166: State Partitioning & Slicing. Refactored into SessionUiState, 
  *   SpatialUiState, SettingsUiState, MapTriggers, and SimulationUiState (R-ID 405).
- * Sep.22.00:
- * - Issue #1177: Static Role Branding. Added isPeerActive to track 
- *   remote device availability on the landing screen (R-ID 398).
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -390,6 +390,7 @@ data class PermissionState(
     val requiresExtraTopPadding: Boolean = false,
     val isA15Device: Boolean = false,
     val isSamsungDevice: Boolean = false,
+    val isHuaweiDevice: Boolean = false,
     val performanceTier: PerformanceTier = PerformanceTier.STANDARD
 )
 
