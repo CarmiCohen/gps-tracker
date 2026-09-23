@@ -33,6 +33,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *   **Issue #1173: Protobuf-First Persistence**
     *   *Description*: Deprecate verbose JSON mapping boilerplate and parse routines by implementing pure Protobuf binary pipelines straight into Room BLOB objects (`HistoryEntity`).
     *   *Significance*: **Medium (Disk I/O & Clean Code)**: Speeds up database writes and simplifies parsing boilerplate by substituting JSON strings with fast Protobuf serialization.
+*   **Issue #1205: Context-Aware Power Optimization**
+    *   *Description*: Dynamically adjust sensor polling rates and telemetry frequency based on activity recognition and battery level transitions to extend device life during low-mobility phases.
+    *   *Significance*: **Medium (Power Efficiency)**: Extends battery longevity by muzzling non-essential sensing when the device is confirmed stationary.
 *   **Issue #1201: Reactive Siren Lockout**
     *   *Description*: Move the siren cooldown/lockout logic from `AudioSynthesizer` into a `SirenUseCase`. This keeps the synthesizer focused purely on signal generation.
     *   *Significance*: **Medium (Domain & Responsibility Isolation)**: Cleanly decouples domain rules from infrastructure/audio synthesis logic.
@@ -71,4 +74,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 420 (Rules: 84, IDs: 420), Resolved: 1176, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 12, QA: 283]**
+- **Current Audit Baseline: [SOT: 420 (Rules: 84, IDs: 420), Resolved: 1176, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 13, QA: 283]**
