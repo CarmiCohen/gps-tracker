@@ -1,7 +1,6 @@
-# Simplicity Audit & Architectural Clean-up Ideas (Sep.22.50)
+# 💡 Strategic Simplification Ideas (Batch 2) - Sep.23.01
 
-Following the resolution of Issue #1191, here are evaluated ideas to further optimize code clarity and eliminate complexity:
-
-1. **Acoustic and Light Sensor Baseline Decoupling**: Move high-frequency fast-path state evaluation entirely out of `LocationSentinel` and instead perform a unified, pre-filtered sensor data package submission. This keeps `LocationSentinel` strictly focused on spatial-temporal coordinate validation.
-2. **Unified MonitorService Transition**: Merge `TrackerService` and `ViewerService` into a single `MonitorService` that reactively changes behavior based on the active `appMode`, eliminating redundant boilerplate and FGS management.
-3. **Unified Event Logging and Action Handling**: Consolidate global event logging and administrative actions into a dedicated `AppEventCoordinator` or similar domain utility. This reduces the `onEvent` surface area in `MainViewModel` and ensures consistent cross-feature audit logs for forensic reconstruction.
+## 🏛️ UI & State Architecture
+1.  **Event Forwarding Delegate**: Create an `UiEventDelegate` to handle common navigation and settings draft events. Currently, `TrackerViewModel` and `ViewerViewModel` duplicate significant logic for `ToggleSettings`, `UpdateDraft*`, and `CommitSettings`. Consolidating this would reduce the lines of code in feature ViewModels by ~20%.
+2.  **Shared Overlay Scope**: Move all shared overlays (Settings, Log, Ribbons) into a dedicated `OverlayHost` component that interacts only with `MainViewModel`. This would eliminate the need to pass extensive callback lists down to `TrackerScreen` and `ViewerScreen`.
+3.  **Reactive Siren Lockout**: Move the siren cooldown/lockout logic from `AudioSynthesizer` into a `SirenUseCase`. This keeps the synthesizer focused purely on signal generation and allows the domain layer to manage temporal constraints.

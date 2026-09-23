@@ -1,6 +1,8 @@
-# SOT Master Requirements & Hardening Status (Sep.22.50)
+# SOT Master Requirements & Hardening Status (Sep.23.01)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 418**: Siren State Synchronization - Converted `AudioSynthesizer.isLooping` into a `MutableStateFlow` to expose reactive siren activity feedback globally. Subscribed `MainViewModel` to this flow to sync playback states with `DiagnosticState`, completely rectifying the asymmetric role state dispersion loop across presentation layers. (Resolved Sep.23.01)
+*   **SOT ID 417**: Logic State Persistence - Restored background logic state (geofence debounce, power latches) from DataStore during initialization in `TrackerService` and `ViewerService` to survive process death and ensure behavioral continuity across deep sleep cycles. (Resolved Sep.22.50)
 *   **SOT ID 416**: Config & Trail Import Restoration - Added robust event handling loops for `UiEvent.BulkUpdateSettings` and `UiEvent.LogAction` within `MainViewModel.onEvent`. Integrated `alertSettingsFlow` into `StateSubscriptionUseCase` to guarantee that all configurations loaded from external files are fully propagated to the active user interface state slices without omissions or silent fall-throughs. (Resolved Sep.22.50)
 *   **SOT ID 415**: God Object ViewModel Decomposition - Decomposed the monolithic MainViewModel into feature-specific ViewModels (TrackerViewModel, ViewerViewModel, SetupViewModel) bound to navigation scopes. MainViewModel now acts as a lightweight coordinator for app-level state and global overlays. This isolates recomposition triggers, reduces the memory footprint of background roles, and enforces strict separation of concerns between Tracker and Viewer logic. (Resolved Sep.22.40)
 *   **SOT ID 414**: Forensic & Sensor Efficiency Optimization - Introduced EvaluationSnapshot to group system health and sensor metrics into an atomic DTO for single-pass consumption in the background tick loop. This ensures consistent telemetry state across the entire processing iteration and minimizes parameter passing overhead. (Resolved Sep.22.32)
@@ -52,15 +54,16 @@
 
 ## 4.3. Metric Summary
 - **Rules Verified**: 84
-- **Total SOT IDs**: 416
-- **Resolved Issues**: 1172
-- **Open Issues**: 2
+- **Total SOT IDs**: 418
+- **Resolved Issues**: 1173
+- **Open Issues**: 1
 - **Testing Coverage**: 3 (Sub-items: 12)
-- **Simplification Ideas**: 9
+- **Simplification Ideas**: 10
 - **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.80 (Config & Trail Import)**: PASSED - Verified seamless configuration and trail point loading via MainFileHelper without handled event omissions. (Sep.22.50)
+*   **Chapter 31.81 (Siren State Synchronization)**: PASSED - Converted siren playback feedback to StateFlow, ensuring cross-ViewModel reactive state consistency. (Sep.23.01)
+*   **Chapter 31.80 (Config & Trail Import)**: PASSED - Verified seamless configuration and trail point loading via MainFileHelper without handled event omissions. (Sep.22.30)
 *   **Chapter 31.79 (ViewModel Decomposition)**: PASSED - Successfully decomposed monolithic MainViewModel into role-specific ones, isolating state and behavior. (Sep.22.30)
 *   **Chapter 31.78 (Forensic & Sensor Efficiency Optimization)**: PASSED - Grouped remaining telemetry and health fields into a unified EvaluationSnapshot DTO for atomic, single-pass consumption in the background loop. (Sep.22.30)
 *   **Chapter 31.77 (Elimination of Multi-pass Fallbacks)**: PASSED - Grouped individual sensor update branches into structured snapshots to eliminate parameter bloat and fallback complexity. (Sep.22.30)
@@ -101,4 +104,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.22.30)
 
 ---
-*Next Audit: Sep.22.100. (Sep.22.50)*
+*Next Audit: Sep.22.100. (Sep.23.01)*

@@ -354,7 +354,7 @@ message TrackerStatusProto {
     bool is_clock_regression = 83;
     int32 jump_tier = 84;
     bool is_location_pending = 85;
-    Location_pendingReasonProto location_pending_reason = 86;
+    LocationPendingReasonProto location_pending_reason = 86;
     int64 last_valid_fix_rt = 87;
     double snr_idx = 88;
     double noise_idx = 89;

@@ -19,13 +19,13 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Sep.23.01:
+ * - Issue #1193 Hardening: Synchronized siren playback state by observing 
+ *   AudioSynthesizer.isSirenPlaying, ensuring UI feedback remains consistent 
+ *   across decoupled ViewModel scopes (R-ID 418).
  * Sep.22.50:
  * - Issue #1191 RESOLVED: Added support for UiEvent.BulkUpdateSettings and UiEvent.LogAction
  *   to ensure configuration and trail import operations succeed flawlessly (R-ID 416).
- * Sep.22.40:
- * - Issue #1170 RESOLVED: Decomposed monolithic ViewModel. Moved feature-specific 
- *   logic to TrackerViewModel, ViewerViewModel, and SetupViewModel. MainViewModel 
- *   now acts as a lightweight coordinator for app-level state and shared overlays (R-ID 408).
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -151,6 +151,13 @@ class MainViewModel @Inject constructor(
             }
             .flowOn(Dispatchers.Main.immediate)
             .launchIn(viewModelScope)
+
+        audioSynthesizer.isSirenPlaying
+            .onEach { playing ->
+                updateDiagnosticState { it.apply { isSirenPlaying = playing } }
+            }
+            .flowOn(Dispatchers.Main.immediate)
+            .launchIn(viewModelScope)
         
         viewModelScope.launch(Dispatchers.IO) { 
             while(true) { 
@@ -203,7 +210,7 @@ class MainViewModel @Inject constructor(
             }
             is UiEvent.TriggerRecovery -> {
                 if (_uiState.value.isRecoveryPending) {
-                    updateNavigation { it.copy(serviceRecoveryTrigger = it.serviceRecoveryTrigger + 1) }
+                    updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
                     updateState { it.copy(simulation = it.simulation.copy(isRecoveryPending = false)) }
                 }
             }
@@ -235,7 +242,7 @@ class MainViewModel @Inject constructor(
                 repository.sendCommand(UiCommand.StopSiren(event.causes))
             }
             is UiEvent.ToggleStrictMode -> {
-                updateNavigation { it.copy(isStrictMode = event.visible) }
+                updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
             }
             is UiEvent.RefreshPermissionStatus -> {
                 viewModelScope.launch(Dispatchers.IO) {

@@ -11,6 +11,7 @@ import android.os.Vibrator
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -22,28 +23,28 @@ import kotlin.math.exp
 
 /**
  * AudioSynthesizer: Procedural audio generator for sirens and alerts.
+ * Sep.23.01:
+ * - Issue #1193 Hardening: Converted isLooping to MutableStateFlow to expose 
+ *   isSirenPlaying flow, resolving asymmetric state dispersion between 
+ *   engine and UI layers (R-ID 418).
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
- * Sep.03.25:
- * - Idea #240: ContextShadow Automation. Migrated to @Singleton class with 
- *   @ShadowContext injection to eliminate manual wrapper logic (R-ID 240).
- * Sep.02.50:
- * - Issue #005 Hardening: Replaced all android.util.Log calls with Timber 
- *   to ensure log spillage protection on Samsung A15/G990 hardware (R759).
  */
 @Singleton
 class AudioSynthesizer @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    private val isLooping = AtomicBoolean(false)
+    private val _isSirenPlaying = MutableStateFlow(false)
+    val isSirenPlaying: StateFlow<Boolean> = _isSirenPlaying.asStateFlow()
+
     private val isForced = AtomicBoolean(false)
     private val silencedUntilRt = AtomicLong(0)
     
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var sirenJob: Job? = null
 
-    fun isPlaying(): Boolean = isLooping.get()
+    fun isPlaying(): Boolean = _isSirenPlaying.value
     fun isForced(): Boolean = isForced.get()
     
     fun getSilencedUntilRt(): Long = silencedUntilRt.get()
@@ -93,7 +94,7 @@ class AudioSynthesizer @Inject constructor(
             }
         }
 
-        isLooping.set(true)
+        _isSirenPlaying.value = true
         if (force) isForced.set(true)
         
         sirenJob?.cancel()
@@ -143,7 +144,7 @@ class AudioSynthesizer @Inject constructor(
                 Timber.e(e, "Siren loop error")
             } finally {
                 if (sirenJob == thisJob) {
-                    isLooping.set(false)
+                    _isSirenPlaying.value = false
                     isForced.set(false)
                     if (isAutoStopped) {
                         Timber.d("Siren auto-stopped (${SIREN_AUTO_STOP_MS/1000}s limit reached). Triggering cooldown.")
@@ -204,7 +205,7 @@ class AudioSynthesizer @Inject constructor(
     }
 
     fun stopSiren(silenceDurationMs: Long = 300000, timeProvider: TimeProvider) {
-        isLooping.set(false)
+        _isSirenPlaying.value = false
         isForced.set(false)
         sirenJob?.cancel()
         setSilence(silenceDurationMs, timeProvider)
