@@ -19,14 +19,13 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Sep.23.04:
+ * - Shared Overlay Scope: Centralized shared overlays (Settings, Log, Ribbons, 
+ *   GNSS Detail) by exposing global flows and handling action events (R-ID 419).
  * Sep.23.03:
  * - Issue #1192 RESOLVED: Unified draft settings state flow. Moved draft handling 
  *   logic from feature ViewModels to MainViewModel to ensure visual consistency 
  *   during configuration updates (R-ID 419).
- * Sep.23.01:
- * - Issue #1193 Hardening: Synchronized siren playback state by observing 
- *   AudioSynthesizer.isSirenPlaying, ensuring UI feedback remains consistent 
- *   across decoupled ViewModel scopes (R-ID 418).
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -34,6 +33,7 @@ class MainViewModel @Inject constructor(
     private val systemStatusProvider: SystemStatusProvider,
     private val navigationUseCase: NavigationUseCase,
     private val settingsUseCase: SettingsUseCase,
+    private val spatialLogicUseCase: SpatialLogicUseCase,
     private val stateSubscriptionUseCase: StateSubscriptionUseCase,
     private val sessionUseCase: SessionUseCase,
     val timeProvider: TimeProvider,
@@ -80,6 +80,33 @@ class MainViewModel @Inject constructor(
     private val _diagnosticState = MutableStateFlow(DiagnosticState())
     val diagnosticState: StateFlow<DiagnosticState> = _diagnosticState.asStateFlow()
 
+    val eventLogsFlow: StateFlow<List<LogEntry>> = combine(
+        _uiState.map { it.session.appMode }.distinctUntilChanged(),
+        _uiState.map { it.navigation.isStrictMode }.distinctUntilChanged(),
+        _uiState.map { it.navigation.isLogVisible }.distinctUntilChanged()
+    ) { mode, strict, visible -> Triple(mode ?: "tracker", strict, visible) }
+        .flatMapLatest { (_, strict, visible) -> 
+            if (visible) repository.eventLogsFlow(if (strict) LOG_LIMIT_STRICT else LOG_LIMIT_STANDARD) 
+            else flowOf(emptyList()) 
+        }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val activeGnssDetail: StateFlow<GnssDetail?> = repository.gnssDetail
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    val history4MFlow = repository.getHistoryFlow("4M").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val history16MFlow = repository.getHistoryFlow("16M").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val history1HFlow = repository.getHistoryFlow("1H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val history4HFlow = repository.getHistoryFlow("4H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val history24HFlow = repository.getHistoryFlow("24H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val history7DFlow = repository.getHistoryFlow("7D").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val trackerTrailFlow: StateFlow<List<TrailPoint>> = repository.trackerTrailFlow
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val replayCursorRequest = MutableStateFlow<Long?>(null)
     private var autoSaveJob: Job? = null
 
     init {
@@ -107,6 +134,22 @@ class MainViewModel @Inject constructor(
             withContext(Dispatchers.Main.immediate) {
                 startBaseObservations()
                 startGlobalTimer()
+            }
+
+            launch(Dispatchers.Default) {
+                replayCursorRequest.collectLatest { ts ->
+                    if (ts == null) {
+                        updateKinematicState { it.apply { replayCursorPos = null } }
+                        return@collectLatest
+                    }
+                    val trail = trackerTrailFlow.value
+                    stateSubscriptionUseCase.findClosestTrailPoint(trail, ts)?.let { bp ->
+                        updateKinematicState { it.apply { 
+                            replayCursorPos = bp.toGeoPoint() 
+                            pulse = timeProvider.elapsedRealtime()
+                        }}
+                    }
+                }
             }
         }
     }
@@ -299,6 +342,36 @@ class MainViewModel @Inject constructor(
                     )
                 )
             }
+            is UiEvent.ClearLogs -> repository.clearLogs()
+            is UiEvent.ClearHomePoints -> viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+                val newPoints = spatialLogicUseCase.clearHomePoints(_uiState.value.maxDistance)
+                withContext(Dispatchers.Main.immediate) {
+                    updateState { it.copy(spatial = it.spatial.copy(homePoints = newPoints)) }
+                }
+            }
+            is UiEvent.ResetStats -> viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+                repository.resetStats()
+            }
+            is UiEvent.SetLogFilterShowDetails -> repository.updateLogFilters(details = event.show)
+            is UiEvent.SetLogFilterShowRecovered -> repository.updateLogFilters(recovered = event.show)
+            is UiEvent.SetReplayCursor -> {
+                updateNavigation { it.copy(replayCursorTs = event.ts) }
+                replayCursorRequest.value = event.ts
+            }
+            is UiEvent.ToggleTestSiren -> {
+                if (_diagnosticState.value.isSirenPlaying) {
+                    audioSynthesizer.stopSiren(timeProvider = timeProvider)
+                } else {
+                    val s = _uiState.value.settings.draftSettings.alertSettings
+                    val volume = if (s.useMaxVolume) 1.0f else if (s.useCustomVolume) s.alarmVolume else 1.0f
+                    audioSynthesizer.playSiren(
+                        _uiState.value.settings.selectedSirenType, force = true, volume = volume, 
+                        overrideSilence = s.overrideSilence, 
+                        loop = true, vibrate = s.vibrationEnabled,
+                        timeProvider = timeProvider
+                    )
+                }
+            }
             else -> {}
         }
     }
@@ -333,6 +406,7 @@ class MainViewModel @Inject constructor(
     }
 
     private fun updateState(update: (MainUiState) -> MainUiState) { _uiState.update { current -> update(current) } }
+    private fun updateKinematicState(update: (KinematicState) -> KinematicState) { _kinematicState.update { current -> update(current) } }
     private fun updateDiagnosticState(update: (DiagnosticState) -> DiagnosticState) { _diagnosticState.update { current -> update(current) } }
     private fun updateNavigation(update: (NavigationState) -> NavigationState) { updateState { it.copy(navigation = update(it.navigation)) } }
 

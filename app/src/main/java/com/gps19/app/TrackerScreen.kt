@@ -25,13 +25,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
- * Sep.23.03:
- * - Issue #1192 RESOLVED: Connected settings input state flow by routing configuration 
- *   draft events and top-level navigation events to MainViewModel via onMainEvent (R-ID 419).
- * Sep.22.08:
- * - Issue #1166: State Partitioning & Slicing. Refactored to consume specialized 
- *   UI state slices (Session, Settings, Spatial, Navigation) to minimize 
- *   recomposition evaluation costs (R-ID 405).
+ * Sep.23.04:
+ * - Issue #1200: Shared Overlay Scope. Removed local overlay rendering logic as 
+ *   all shared overlays are now hosted centrally in MainAppContent (R-ID 419).
  */
 
 @Composable
@@ -91,7 +87,6 @@ fun TrackerScreen(
         if (isPhoneSetupVisible) onMainEvent(UiEvent.TogglePhoneSetup(false))
     }
 
-    // Helper for system ready check (mirrors MainUiState.isSystemReady)
     val isSystemReady = sessionState.isSetupBypassActive || (
             sessionState.permissions.isFineLocationGranted &&
             sessionState.permissions.isBatteryWhitelisted && 
@@ -109,7 +104,6 @@ fun TrackerScreen(
              (sessionState.permissions.backgroundStatus == CapabilityStatus.GRANTED && sessionState.permissions.autostartStatus == CapabilityStatus.GRANTED) || 
              (sessionState.permissions.backgroundStatus == CapabilityStatus.UNKNOWN && sessionState.permissions.isManualOverride)))
 
-    // Helper for system issues count (mirrors MainUiState.systemIssuesCount)
     val systemIssuesCount = if (sessionState.isSetupBypassActive) 0 else {
         var count = 0
         if (!sessionState.permissions.isFineLocationGranted) count++
@@ -371,84 +365,6 @@ fun TrackerScreen(
                     }
                 }
             }
-        }
-
-        if (isSettingsOpen) {
-            SettingsOverlay(
-                activeSubSettings = nav.activeSubSettings,
-                draftDeviceId = settingsState.draftSettings.deviceId,
-                draftViewerId = settingsState.draftSettings.viewerId,
-                draftRelayUrl = settingsState.draftSettings.relayUrl,
-                draftMaxDistance = settingsState.draftSettings.maxDistance,
-                draftAlertSettings = settingsState.draftSettings.alertSettings,
-                selectedSirenType = settingsState.selectedSirenType,
-                isSirenPlaying = diagnosticState.isSirenPlaying,
-                onClose = onToggleSettings, 
-                onReset = onResetStats,
-                onExport = onExportLogs, 
-                onClear = onClearHome, 
-                onImportConfig = onImportConfig,
-                onFullInitialization = onFullInitialization,
-                onUpdateDeviceId = { id -> onMainEvent(UiEvent.UpdateDraftDeviceId(id)) },
-                onUpdateViewerId = { id -> onMainEvent(UiEvent.UpdateDraftViewerId(id)) },
-                onUpdateRelayUrl = { url -> onMainEvent(UiEvent.UpdateDraftRelayUrl(url)) },
-                onUpdateMaxDistance = { dist -> onMainEvent(UiEvent.UpdateDraftMaxDistance(dist)) },
-                onUpdateAlertSettings = { settings -> onMainEvent(UiEvent.UpdateDraftAlertSettings(settings)) },
-                onUpdateSirenType = { type -> onMainEvent(UiEvent.SetSirenType(type)) },
-                onUpdateAlarmVolume = { vol -> onMainEvent(UiEvent.UpdateDraftAlarmVolume(vol)) },
-                onTestSiren = { 
-                    if (diagnosticState.isSirenPlaying) {
-                        viewModel.audioSynthesizer.stopSiren(timeProvider = viewModel.timeProvider)
-                    } else {
-                        val s = settingsState.draftSettings.alertSettings
-                        val volume = if (s.useMaxVolume) 1.0f else if (s.useCustomVolume) s.alarmVolume else 1.0f
-                        viewModel.audioSynthesizer.playSiren(
-                            settingsState.selectedSirenType, force = true, volume = volume, 
-                            overrideSilence = s.overrideSilence, 
-                            loop = true, vibrate = s.vibrationEnabled,
-                            timeProvider = viewModel.timeProvider
-                        )
-                    }
-                },
-                onShowPhoneSetup = { onMainEvent(UiEvent.TogglePhoneSetup(true)) },
-                onEvent = { event -> onMainEvent(event) }
-            )
-        } else if (isLogVisible) {
-            val showDetails by viewModel.repository.logFilterDetails.collectAsStateWithLifecycle()
-            val showRecovered by viewModel.repository.logFilterRecovered.collectAsStateWithLifecycle()
-            LogOverlay(
-                logsFlow = logsFlow, onExport = onExportLogs, onToggle = onToggleLog, onClear = onClearLogs,
-                showDetails = showDetails, showRecovered = showRecovered, 
-                onSetShowDetails = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowDetails(show)) }, 
-                onSetShowRecovered = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowRecovered(show)) },
-                appStartTime = sessionState.appStartTime,
-                systemPulse = mapViewState.systemPulse,
-                isTelemetryFresh = dashboardState.isTelemetryFresh,
-                onHistLink = { ts -> 
-                    viewModel.onEvent(UiEvent.SetReplayCursor(ts))
-                    viewModel.onEvent(UiEvent.ToggleRibbons(true))
-                },
-                onDetailsLink = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) }
-            )
-        } else if (isRibbonsVisible) {
-            RibbonsOverlay(
-                isStrictMode = nav.isStrictMode,
-                replayCursorTs = nav.replayCursorTs,
-                history4MFlow = viewModel.history4MFlow,
-                history16MFlow = viewModel.history16MFlow,
-                history1HFlow = viewModel.history1HFlow,
-                history4HFlow = viewModel.history4HFlow,
-                history24HFlow = viewModel.history24HFlow,
-                history7DFlow = viewModel.history7DFlow,
-                onToggleStrictMode = { strict -> viewModel.onEvent(UiEvent.ToggleStrictMode(strict)) },
-                onScrub = { ts -> viewModel.onEvent(UiEvent.SetReplayCursor(ts)) },
-                onDismiss = { viewModel.onEvent(UiEvent.ToggleRibbons(false)) }
-            )
-        } else if (isGnssDetailVisible) {
-            GnssDetailOverlay(
-                gnssDetailFlow = viewModel.activeGnssDetail,
-                onClose = { viewModel.onEvent(UiEvent.ToggleGnssDetail(false)) }
-            )
         }
     }
 }

@@ -1,4 +1,14 @@
-# 🏛️ Resolution Archive - Sep.23.03
+# 🏛️ Resolution Archive - Sep.23.04
+
+## 🏁 Issue #1200: Shared Overlay Scope
+*   **Resolved**: Sep.23.04
+*   **Root Cause**: Feature screens (`TrackerScreen`, `ViewerScreen`) were manually rendering and managing callbacks for shared overlays (Settings, Log, Ribbons, GNSS Detail), leading to significant code duplication and complex callback propogation.
+*   **Remediation**:
+    *   Implemented a centralized `OverlayHost` component in `MainAppContent`.
+    *   Exposed global telemetry and log flows in `MainViewModel`.
+    *   Removed local overlay rendering logic from feature screens.
+    *   Wired all overlay actions directly to `MainViewModel` event handlers.
+*   **R-ID**: 420
 
 ## 🏁 Issue #1192: Disconnected Settings Input State Flow
 *   **Resolved**: Sep.23.03

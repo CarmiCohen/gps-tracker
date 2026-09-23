@@ -41,6 +41,9 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Sep.23.04:
+ * - Issue #1200 RESOLVED: Implemented OverlayHost to handle all shared overlays 
+ *   centrally from MainViewModel, eliminating callback overhead in feature screens.
  * Sep.23.03:
  * - Issue #1192 RESOLVED: Connected settings input state flow by routing screen 
  *   events to MainViewModel via onMainEvent and onFullInitialization (R-ID 419).
@@ -332,8 +335,8 @@ fun MainAppContent(
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) }, 
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
                                     onExit = onCleanupAndExit, onMainEvent = { viewModel.onEvent(it) }, onFullInitialization = { viewModel.fullInitialization(context) },
-                                    onResetStats = { trackerViewModel.onEvent(UiEvent.ResetStats) }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
-                                    onImportConfig = { importLauncher.launch("application/json") }, onClearLogs = { trackerViewModel.onEvent(UiEvent.ClearLogs) }, onClearHome = { trackerViewModel.onEvent(UiEvent.ClearHomePoints) },
+                                    onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
+                                    onImportConfig = { importLauncher.launch("application/json") }, onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
                                     onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, onLoadTrail = { importTrailLauncher.launch("application/json") }
                                 )
                             }
@@ -362,7 +365,7 @@ fun MainAppContent(
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
                                     onExit = onCleanupAndExit, onMainEvent = { viewModel.onEvent(it) }, onFullInitialization = { viewModel.fullInitialization(context) },
                                     onImportConfig = { importLauncher.launch("application/json") }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) },
-                                    onClearLogs = { viewerViewModel.onEvent(UiEvent.ClearLogs) }, onResetStats = { viewerViewModel.onEvent(UiEvent.ResetStats) }, onClearHome = { viewerViewModel.onEvent(UiEvent.ClearHomePoints) },
+                                    onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
                                     onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, onLoadTrail = { importTrailLauncher.launch("application/json") }
                                 )
                             }
@@ -437,7 +440,98 @@ fun MainAppContent(
                         dismissButton = { Button(onClick = { viewModel.onEvent(UiEvent.ShowStopTrackingConfirmation(false)) }) { Text(stringResource(R.string.btn_cancel)) } }
                     )
                 }
+
+                // Centralized OverlayHost for Shared Overlays (Issue #1200)
+                OverlayHost(
+                    viewModel = viewModel,
+                    navigationState = navigationState,
+                    settingsState = settingsState,
+                    sessionState = sessionState,
+                    diagnosticState = diagnosticState,
+                    importLauncher = importLauncher,
+                    activity = activity
+                )
             }
         }
+    }
+}
+
+@Composable
+fun OverlayHost(
+    viewModel: MainViewModel,
+    navigationState: NavigationState,
+    settingsState: SettingsUiState,
+    sessionState: SessionUiState,
+    diagnosticState: DiagnosticState,
+    importLauncher: androidx.activity.result.ActivityResultLauncher<String>,
+    activity: ComponentActivity
+) {
+    if (navigationState.isSettingsOpen) {
+        SettingsOverlay(
+            activeSubSettings = navigationState.activeSubSettings,
+            draftDeviceId = settingsState.draftSettings.deviceId,
+            draftViewerId = settingsState.draftSettings.viewerId,
+            draftRelayUrl = settingsState.draftSettings.relayUrl,
+            draftMaxDistance = settingsState.draftSettings.maxDistance,
+            draftAlertSettings = settingsState.draftSettings.alertSettings,
+            selectedSirenType = settingsState.selectedSirenType,
+            isSirenPlaying = diagnosticState.isSirenPlaying,
+            onClose = { viewModel.onEvent(UiEvent.ToggleSettings(false)) }, 
+            onReset = { viewModel.onEvent(UiEvent.ResetStats) },
+            onExport = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
+            onClear = { viewModel.onEvent(UiEvent.ClearHomePoints) }, 
+            onImportConfig = { importLauncher.launch("application/json") },
+            onFullInitialization = { viewModel.fullInitialization(activity) },
+            onUpdateDeviceId = { id -> viewModel.onEvent(UiEvent.UpdateDraftDeviceId(id)) },
+            onUpdateViewerId = { id -> viewModel.onEvent(UiEvent.UpdateDraftViewerId(id)) },
+            onUpdateRelayUrl = { url -> viewModel.onEvent(UiEvent.UpdateDraftRelayUrl(url)) },
+            onUpdateMaxDistance = { dist -> viewModel.onEvent(UiEvent.UpdateDraftMaxDistance(dist)) },
+            onUpdateAlertSettings = { settings -> viewModel.onEvent(UiEvent.UpdateDraftAlertSettings(settings)) },
+            onUpdateSirenType = { type -> viewModel.onEvent(UiEvent.SetSirenType(type)) },
+            onUpdateAlarmVolume = { vol -> viewModel.onEvent(UiEvent.UpdateDraftAlarmVolume(vol)) },
+            onTestSiren = { viewModel.onEvent(UiEvent.ToggleTestSiren) },
+            onShowPhoneSetup = { viewModel.onEvent(UiEvent.TogglePhoneSetup(true)) },
+            onEvent = { event -> viewModel.onEvent(event) }
+        )
+    } else if (navigationState.isLogVisible) {
+        val showDetails by viewModel.repository.logFilterDetails.collectAsStateWithLifecycle()
+        val showRecovered by viewModel.repository.logFilterRecovered.collectAsStateWithLifecycle()
+        LogOverlay(
+            logsFlow = viewModel.eventLogsFlow, 
+            onExport = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
+            onToggle = { viewModel.onEvent(UiEvent.ToggleLog(false)) }, 
+            onClear = { viewModel.onEvent(UiEvent.ClearLogs) },
+            showDetails = showDetails, 
+            showRecovered = showRecovered, 
+            onSetShowDetails = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowDetails(show)) }, 
+            onSetShowRecovered = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowRecovered(show)) },
+            appStartTime = sessionState.appStartTime,
+            systemPulse = viewModel.timeProvider.currentTimeMillis(),
+            isTelemetryFresh = true,
+            onHistLink = { ts -> 
+                viewModel.onEvent(UiEvent.SetReplayCursor(ts))
+                viewModel.onEvent(UiEvent.ToggleRibbons(true))
+            },
+            onDetailsLink = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) }
+        )
+    } else if (navigationState.isRibbonsVisible) {
+        RibbonsOverlay(
+            isStrictMode = navigationState.isStrictMode,
+            replayCursorTs = navigationState.replayCursorTs,
+            history4MFlow = viewModel.history4MFlow,
+            history16MFlow = viewModel.history16MFlow,
+            history1HFlow = viewModel.history1HFlow,
+            history4HFlow = viewModel.history4HFlow,
+            history24HFlow = viewModel.history24HFlow,
+            history7DFlow = viewModel.history7DFlow,
+            onToggleStrictMode = { strict -> viewModel.onEvent(UiEvent.ToggleStrictMode(strict)) },
+            onScrub = { ts -> viewModel.onEvent(UiEvent.SetReplayCursor(ts)) },
+            onDismiss = { viewModel.onEvent(UiEvent.ToggleRibbons(false)) }
+        )
+    } else if (navigationState.isGnssDetailVisible) {
+        GnssDetailOverlay(
+            gnssDetailFlow = viewModel.activeGnssDetail,
+            onClose = { viewModel.onEvent(UiEvent.ToggleGnssDetail(false)) }
+        )
     }
 }

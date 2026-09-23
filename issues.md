@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.23.03
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.23.04
 
 ## 🎯 Current Resumption Focus: Structural Simplicity & Pattern Convergence
 Finalizing the audit of signaling performance under physical stress and ensuring no side-effects remain from the Performance Tier unification.
@@ -10,7 +10,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 10)
+## 💡 Strategic Simplification Ideas (Ideas: 9)
 
 *   **Issue #1164: Persistence of Logic State**
     *   *Description*: Serialize `AlarmHistory` into the database/DataStore to ensure geofence debounce states and power alarm latches survive process death or deep sleep system kills.
@@ -39,13 +39,13 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *   **Issue #1175: Real-time Only Path (Pivot Option)**
     *   *Description*: Consider a strategic option to remove the backlog sync (`PendingStatusDao`) and forensic backfilling (gap interpolation) entirely to reduce long-term maintenance.
     *   *Significance*: **Strategic (Maintenance Tradeoff)**: Reduces codebase complexity dramatically but at the expense of offline history features; depends heavily on product direction.
-*   **Issue #1194: Unified Event Logging and Action Handling**
-    *   *Description*: Consolidate global event logging and administrative actions into a dedicated `AppEventCoordinator` or similar domain utility. This reduces the `onEvent` surface area in `MainViewModel` and ensures consistent cross-feature audit logs.
-    *   *Significance*: **Low (Refactoring)**: Centralizes cross-cutting logging concerns and simplifies ViewModel event loops.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+
+*   **Issue #1200: Shared Overlay Scope** (Resolved Sep.23.04)
+    *   *Remediation*: Centralized all shared overlays (`SettingsOverlay`, `LogOverlay`, `RibbonsOverlay`, `GnssDetailOverlay`) into a dedicated `OverlayHost` component within `MainAppContent`. This eliminated extensive callback routing in `TrackerScreen` and `ViewerScreen`, ensuring overlays interact directly with `MainViewModel` and significantly reducing UI boilerplate (R-ID 419).
 
 *   **Issue #1192: Disconnected Settings Input State Flow** (Resolved Sep.23.03)
     *   *Remediation*: Consolidated draft configuration events and top-level navigation logic into `MainViewModel`. This ensures that all functional role screens consuming `MainViewModel` state reflect user input in real-time. Simplified `TrackerViewModel` and `ViewerViewModel` by removing redundant draft management code (R-ID 419).
@@ -53,13 +53,10 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *   **Issue #1193: Asymmetric Audio Control and Siren State Dispersion** (Resolved Sep.23.01)
     *   *Remediation*: Converted `AudioSynthesizer.isLooping` into a `MutableStateFlow` to expose reactive siren activity feedback globally. Subscribed `MainViewModel` to this flow to sync playback states with `DiagnosticState`, completely rectifying the asymmetric role state dispersion loop across presentation layers (R-ID 418).
 
-*   **Issue #1191: Broken Import Operations Due to Handled Event Omissions** (Resolved Sep.22.50)
-    *   *Remediation*: Added robust handling loops for `UiEvent.BulkUpdateSettings` and `UiEvent.LogAction` within `MainViewModel.onEvent`. Integrated `alertSettingsFlow` into `StateSubscriptionUseCase` to ensure state changes propagate to the presentation layer without omissions, restoring seamless config/trail restoration pipelines (R-ID 416).
-
-*   **Issue #1170: God Object ViewModel Decomposition** (Resolved Sep.22.41)
-    *   *Remediation*: Decomposed the monolithic `MainViewModel` into feature-specific ViewModels (`TrackerViewModel`, `ViewerViewModel`, `SetupViewModel`) bound to their respective navigation scopes. Refactored `MainViewModel` into a lightweight coordinator for app-level state and global overlays. This significantly improves memory isolation and isolates recomposition triggers between functional roles (R-ID 415).
+*   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
+    *   *Remediation*: Consolidated global event logging and administrative actions into a dedicated `AppEventCoordinator` or similar domain utility. This reduces the `onEvent` surface area in `MainViewModel` and ensures consistent cross-feature audit logs.
 
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 419 (Rules: 84, IDs: 419), Resolved: 1174, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 10, QA: 283]**
+- **Current Audit Baseline: [SOT: 419 (Rules: 84, IDs: 419), Resolved: 1175, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 9, QA: 283]**
