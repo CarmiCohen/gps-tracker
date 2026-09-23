@@ -23,6 +23,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gps19.core.engine.*
 import kotlinx.coroutines.flow.StateFlow
 
+/**
+ * ViewerScreen: Viewer-mode UI.
+ * Sep.23.03:
+ * - Issue #1192 RESOLVED: Connected settings input state flow by routing configuration 
+ *   draft events and top-level navigation events to MainViewModel via onMainEvent (R-ID 419).
+ */
+
 @Composable
 fun ViewerScreen(
     sessionState: SessionUiState,
@@ -40,6 +47,8 @@ fun ViewerScreen(
     onImportConfig: () -> Unit,
     onExportLogs: () -> Unit,
     onClearLogs: () -> Unit,
+    onMainEvent: (UiEvent) -> Unit,
+    onFullInitialization: () -> Unit,
     onResetStats: () -> Unit = {},
     onClearHome: () -> Unit = {},
     onSaveTrail: () -> Unit = {},
@@ -71,8 +80,8 @@ fun ViewerScreen(
         if (isMapVisible) onToggleMap()
         if (isLogVisible) onToggleLog()
         if (isSettingsOpen) onToggleSettings()
-        if (isRibbonsVisible) viewModel.onEvent(UiEvent.ToggleRibbons(false))
-        if (isGnssDetailVisible) viewModel.onEvent(UiEvent.ToggleGnssDetail(false))
+        if (isRibbonsVisible) onMainEvent(UiEvent.ToggleRibbons(false))
+        if (isGnssDetailVisible) onMainEvent(UiEvent.ToggleGnssDetail(false))
     }
 
     val isSystemReady = sessionState.isSetupBypassActive || (
@@ -125,8 +134,8 @@ fun ViewerScreen(
             onS = onToggleSettings,
             onL = onToggleLog,
             onM = onToggleMap,
-            onR = { viewModel.onEvent(UiEvent.ToggleRibbons(!isRibbonsVisible)) },
-            onEvent = { event -> viewModel.onEvent(event) }
+            onR = { onMainEvent(UiEvent.ToggleRibbons(!isRibbonsVisible)) },
+            onEvent = { event -> onMainEvent(event) }
         )
     }
 
@@ -136,7 +145,7 @@ fun ViewerScreen(
             telemetry = hudTelemetry,
             health = hudHealth,
             modifier = Modifier.pointerInput(Unit) {
-                detectTapGestures(onTap = { viewModel.onEvent(UiEvent.SetRedScreenVisible(true)) })
+                detectTapGestures(onTap = { onMainEvent(UiEvent.SetRedScreenVisible(true)) })
             }
         )
     }
@@ -181,7 +190,7 @@ fun ViewerScreen(
                                     rttValue = rtt,
                                     trackerCurrentMa = trackerCurrentMa,
                                     systemPulse = mapViewState.systemPulseRt,
-                                    onEvent = { event -> viewModel.onEvent(event) }
+                                    onEvent = { event -> onMainEvent(event) }
                                 )
                             }
                         }
@@ -230,7 +239,7 @@ fun ViewerScreen(
                                 rttValue = rtt,
                                 trackerCurrentMa = trackerCurrentMa,
                                 systemPulse = mapViewState.systemPulseRt,
-                                onEvent = { event -> viewModel.onEvent(event) }
+                                onEvent = { event -> onMainEvent(event) }
                             )
                         }
                     }
@@ -253,14 +262,14 @@ fun ViewerScreen(
                 onExport = onExportLogs, 
                 onClear = onClearHome, 
                 onImportConfig = onImportConfig,
-                onFullInitialization = { viewModel.fullInitialization(context) },
-                onUpdateDeviceId = { id -> viewModel.onEvent(UiEvent.UpdateDraftDeviceId(id)) },
-                onUpdateViewerId = { id -> viewModel.onEvent(UiEvent.UpdateDraftViewerId(id)) },
-                onUpdateRelayUrl = { url -> viewModel.onEvent(UiEvent.UpdateDraftRelayUrl(url)) },
-                onUpdateMaxDistance = { dist -> viewModel.onEvent(UiEvent.UpdateDraftMaxDistance(dist)) },
-                onUpdateAlertSettings = { settings -> viewModel.onEvent(UiEvent.UpdateDraftAlertSettings(settings)) },
-                onUpdateSirenType = { type -> viewModel.onEvent(UiEvent.SetSirenType(type)) },
-                onUpdateAlarmVolume = { vol -> viewModel.onEvent(UiEvent.UpdateDraftAlarmVolume(vol)) },
+                onFullInitialization = onFullInitialization,
+                onUpdateDeviceId = { id -> onMainEvent(UiEvent.UpdateDraftDeviceId(id)) },
+                onUpdateViewerId = { id -> onMainEvent(UiEvent.UpdateDraftViewerId(id)) },
+                onUpdateRelayUrl = { url -> onMainEvent(UiEvent.UpdateDraftRelayUrl(url)) },
+                onUpdateMaxDistance = { dist -> onMainEvent(UiEvent.UpdateDraftMaxDistance(dist)) },
+                onUpdateAlertSettings = { settings -> onMainEvent(UiEvent.UpdateDraftAlertSettings(settings)) },
+                onUpdateSirenType = { type -> onMainEvent(UiEvent.SetSirenType(type)) },
+                onUpdateAlarmVolume = { vol -> onMainEvent(UiEvent.UpdateDraftAlarmVolume(vol)) },
                 onTestSiren = { 
                     if (diagnosticState.isSirenPlaying) {
                         viewModel.audioSynthesizer.stopSiren(timeProvider = viewModel.timeProvider)
@@ -275,8 +284,8 @@ fun ViewerScreen(
                         )
                     }
                 },
-                onShowPhoneSetup = { viewModel.onEvent(UiEvent.TogglePhoneSetup(true)) },
-                onEvent = { event -> viewModel.onEvent(event) }
+                onShowPhoneSetup = { onMainEvent(UiEvent.TogglePhoneSetup(true)) },
+                onEvent = { event -> onMainEvent(event) }
             )
         } else if (isLogVisible && sessionState.hydrationLevel >= 9) {
             val showDetails by viewModel.repository.logFilterDetails.collectAsStateWithLifecycle()

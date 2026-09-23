@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.22.30)
+# SOT Master Requirements & Hardening Status (Sep.23.03)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 419**: Unified Draft Settings State Flow - Consolidated configuration draft events and top-level navigation logic into `MainViewModel`. This ensures that all UI components observing the global state reflect user input in real-time, regardless of the active functional role, and eliminates state dispersion between feature-specific ViewModels. (Resolved Sep.23.03)
 *   **SOT ID 418**: Siren State Synchronization - Converted `AudioSynthesizer.isLooping` into a `MutableStateFlow` to expose reactive siren activity feedback globally. Subscribed `MainViewModel` to this flow to sync playback states with `DiagnosticState`, completely rectifying the asymmetric role state dispersion loop across presentation layers. (Resolved Sep.23.01)
 *   **SOT ID 417**: Logic State Persistence - Restored background logic state (geofence debounce, power latches) from DataStore during initialization in `TrackerService` and `ViewerService` to survive process death and ensure behavioral continuity across deep sleep cycles. (Resolved Sep.22.50)
 *   **SOT ID 416**: Config & Trail Import Restoration - Added robust event handling loops for `UiEvent.BulkUpdateSettings` and `UiEvent.LogAction` within `MainViewModel.onEvent`. Integrated `alertSettingsFlow` into `StateSubscriptionUseCase` to guarantee that all configurations loaded from external files are fully propagated to the active user interface state slices without omissions or silent fall-throughs. (Resolved Sep.22.50)
@@ -54,14 +55,15 @@
 
 ## 4.3. Metric Summary
 - **Rules Verified**: 84
-- **Total SOT IDs**: 418
-- **Resolved Issues**: 1173
-- **Open Issues**: 1
+- **Total SOT IDs**: 419
+- **Resolved Issues**: 1174
+- **Open Issues**: 0
 - **Testing Coverage**: 3 (Sub-items: 12)
 - **Simplification Ideas**: 10
 - **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.82 (Draft Settings Synchronization)**: PASSED - Verified real-time input reflection across functional roles after consolidating draft logic into MainViewModel. (Sep.23.03)
 *   **Chapter 31.81 (Siren State Synchronization)**: PASSED - Converted siren playback feedback to StateFlow, ensuring cross-ViewModel reactive state consistency. (Sep.22.30)
 *   **Chapter 31.80 (Config & Trail Import)**: PASSED - Verified seamless configuration and trail point loading via MainFileHelper without handled event omissions. (Sep.22.30)
 *   **Chapter 31.79 (ViewModel Decomposition)**: PASSED - Successfully decomposed monolithic MainViewModel into role-specific ones, isolating state and behavior. (Sep.22.30)
@@ -104,4 +106,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite (Sep.22.30)
 
 ---
-*Next Audit: Sep.22.100. (Sep.22.30)*
+*Next Audit: Sep.23.100. (Sep.23.03)*

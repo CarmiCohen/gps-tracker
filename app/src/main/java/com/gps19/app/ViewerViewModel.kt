@@ -337,8 +337,6 @@ class ViewerViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     var appStartTime: Long = 0L
-    private var autoSaveJob: Job? = null
-    private val replayCursorRequest = MutableStateFlow<Long?>(null)
 
     init {
         viewModelScope.launch(Dispatchers.Default + uiExceptionHandler) {
@@ -450,19 +448,8 @@ class ViewerViewModel @Inject constructor(
             is UiEvent.TogglePhoneSetup, is UiEvent.ToggleRibbons, is UiEvent.SetDashboardExpanded,
             is UiEvent.ToggleGnssDetail, is UiEvent.SetSubSettings, is UiEvent.ShowStopTrackingConfirmation,
             is UiEvent.NavigateToDiagnostics, is UiEvent.SetPendingMode -> {
-                if (event is UiEvent.ToggleSettings) {
-                    if (event.visible) updateState { it.copy(settings = it.settings.copy(draftSettings = settingsUseCase.prepareDraft(it))) }
-                    else commitDraft()
-                }
                 updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
             }
-            is UiEvent.SetUiVisible -> {
-                repository.sendCommand(UiCommand.UiVisibilityChanged(event.visible))
-                if (!event.visible && _uiState.value.navigation.isSettingsOpen) commitDraft()
-            }
-            is UiEvent.UpdateDraftDeviceId, is UiEvent.UpdateDraftViewerId, is UiEvent.UpdateDraftRelayUrl, 
-            is UiEvent.UpdateDraftMaxDistance, is UiEvent.UpdateDraftAlertSettings, is UiEvent.UpdateDraftAlarmVolume, 
-            is UiEvent.CommitSettings -> handleDraftEvent(event)
             is UiEvent.SetFenceVisible, is UiEvent.SetViolationsVisible, is UiEvent.SetGeofenceViolationsVisible,
             is UiEvent.SetMapButtonsVisible, is UiEvent.SetMapLocked, is UiEvent.MapZoomIn, is UiEvent.MapZoomOut,
             is UiEvent.CenterTracker, is UiEvent.CenterViewer, is UiEvent.SetGeofenceMode -> {
@@ -473,35 +460,6 @@ class ViewerViewModel @Inject constructor(
             is UiEvent.SetLogFilterShowRecovered -> repository.updateLogFilters(recovered = event.show)
             else -> {}
         }
-    }
-
-    private fun handleDraftEvent(event: UiEvent) {
-        when (event) {
-            is UiEvent.UpdateDraftDeviceId -> updateDraft { it.copy(deviceId = event.id) }
-            is UiEvent.UpdateDraftViewerId -> updateDraft { it.copy(viewerId = event.id) }
-            is UiEvent.UpdateDraftRelayUrl -> updateDraft { it.copy(relayUrl = event.url) }
-            is UiEvent.UpdateDraftMaxDistance -> updateDraft { it.copy(maxDistance = event.distance) }
-            is UiEvent.UpdateDraftAlertSettings -> updateDraft { it.copy(alertSettings = event.settings) }
-            is UiEvent.UpdateDraftAlarmVolume -> updateDraft { it.alertSettings.copy(alarmVolume = event.volume).let { s -> it.copy(alertSettings = s) } }
-            is UiEvent.CommitSettings -> commitDraft()
-            else -> {}
-        }
-    }
-
-    private fun commitDraft() {
-        val finalDraft = _uiState.value.settings.draftSettings
-        autoSaveJob?.cancel()
-        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            settingsUseCase.saveDraftToRepo(finalDraft)
-            settingsUseCase.commitDraft()
-            updateState { it.copy(settings = it.settings.copy(draftSettings = DraftSettings())) }
-        }
-    }
-
-    private fun updateDraft(update: (DraftSettings) -> DraftSettings) {
-        updateState { it.copy(settings = it.settings.copy(draftSettings = update(it.settings.draftSettings))) }
-        autoSaveJob?.cancel()
-        autoSaveJob = viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { delay(300L); settingsUseCase.saveDraftToRepo(_uiState.value.settings.draftSettings) }
     }
 
     private fun updateState(update: (MainUiState) -> MainUiState) { _uiState.update { current -> update(current) } }
@@ -537,7 +495,6 @@ class ViewerViewModel @Inject constructor(
                 appMode = "viewer", isSystemActive = initial.isSystemActive
             )
         )}
-        _localMaxTemp.value = initial.maxTemp
     }
 
     fun addPersistentLog(type: String, message: String, isImportant: Boolean = false, isSpecial: Boolean = false, specialColor: Int? = null) {
@@ -555,18 +512,10 @@ class ViewerViewModel @Inject constructor(
         return listOf(MapTrailSegment(geoPoints, color, geoPoints.hashCode()))
     }
 
-    fun clearTrails(context: Context) {
+    fun clearTrails() {
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             repository.clearTrails()
             addPersistentLog("system", "Trails cleared by user", isImportant = true)
-        }
-    }
-
-    fun fullInitialization(context: Context) {
-        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            val nextStartTime = settingsUseCase.fullInitialization(context)
-            updateState { it.copy(session = it.session.copy(appStartTime = nextStartTime)) }
-            addPersistentLog("system", "Full initialization performed", isImportant = true)
         }
     }
 }

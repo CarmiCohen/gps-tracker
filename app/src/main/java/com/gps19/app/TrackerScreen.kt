@@ -25,14 +25,13 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Sep.23.03:
+ * - Issue #1192 RESOLVED: Connected settings input state flow by routing configuration 
+ *   draft events and top-level navigation events to MainViewModel via onMainEvent (R-ID 419).
  * Sep.22.08:
  * - Issue #1166: State Partitioning & Slicing. Refactored to consume specialized 
  *   UI state slices (Session, Settings, Spatial, Navigation) to minimize 
  *   recomposition evaluation costs (R-ID 405).
- * Sep.11.46:
- * - Issue #947 RESOLVED: Synchronized Dashboard time-base by passing 
- *   systemPulseRt (monotonic) instead of wall-clock to TrackerDashboard, 
- *   ensuring correct "Last Seen" delta calculation (R947).
  */
 
 @Composable
@@ -52,6 +51,8 @@ fun TrackerScreen(
     onImportConfig: () -> Unit,
     onExportLogs: () -> Unit,
     onClearLogs: () -> Unit,
+    onMainEvent: (UiEvent) -> Unit,
+    onFullInitialization: () -> Unit,
     onResetStats: () -> Unit = {},
     onClearHome: () -> Unit = {},
     onSaveTrail: () -> Unit = {},
@@ -85,9 +86,9 @@ fun TrackerScreen(
         if (isMapVisible) onToggleMap()
         if (isLogVisible) onToggleLog()
         if (isSettingsOpen) onToggleSettings()
-        if (isRibbonsVisible) viewModel.onEvent(UiEvent.ToggleRibbons(false))
-        if (isGnssDetailVisible) viewModel.onEvent(UiEvent.ToggleGnssDetail(false))
-        if (isPhoneSetupVisible) viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
+        if (isRibbonsVisible) onMainEvent(UiEvent.ToggleRibbons(false))
+        if (isGnssDetailVisible) onMainEvent(UiEvent.ToggleGnssDetail(false))
+        if (isPhoneSetupVisible) onMainEvent(UiEvent.TogglePhoneSetup(false))
     }
 
     // Helper for system ready check (mirrors MainUiState.isSystemReady)
@@ -143,8 +144,8 @@ fun TrackerScreen(
             onS = onToggleSettings,
             onL = onToggleLog,
             onM = onToggleMap,
-            onR = { viewModel.onEvent(UiEvent.ToggleRibbons(!isRibbonsVisible)) },
-            onEvent = { event -> viewModel.onEvent(event) }
+            onR = { onMainEvent(UiEvent.ToggleRibbons(!isRibbonsVisible)) },
+            onEvent = { event -> onMainEvent(event) }
         )
     }
 
@@ -154,7 +155,7 @@ fun TrackerScreen(
             telemetry = hudTelemetry,
             health = hudHealth,
             modifier = Modifier.pointerInput(Unit) {
-                detectTapGestures(onTap = { viewModel.onEvent(UiEvent.SetRedScreenVisible(true)) })
+                detectTapGestures(onTap = { onMainEvent(UiEvent.SetRedScreenVisible(true)) })
             }
         )
     }
@@ -257,7 +258,7 @@ fun TrackerScreen(
                                     ioWait = dashboardState.ioWait,
                                     maxIoLatency = dashboardState.maxIoLatency,
                                     isUltraLongStationary = dashboardState.isUltraLongStationary,
-                                    onEvent = { event -> viewModel.onEvent(event) }
+                                    onEvent = { event -> onMainEvent(event) }
                                 )
                             }
                         }
@@ -364,7 +365,7 @@ fun TrackerScreen(
                                 ioWait = dashboardState.ioWait,
                                 maxIoLatency = dashboardState.maxIoLatency,
                                 isUltraLongStationary = dashboardState.isUltraLongStationary,
-                                onEvent = { event -> viewModel.onEvent(event) }
+                                onEvent = { event -> onMainEvent(event) }
                             )
                         }
                     }
@@ -387,14 +388,14 @@ fun TrackerScreen(
                 onExport = onExportLogs, 
                 onClear = onClearHome, 
                 onImportConfig = onImportConfig,
-                onFullInitialization = { viewModel.fullInitialization(context) },
-                onUpdateDeviceId = { id -> viewModel.onEvent(UiEvent.UpdateDraftDeviceId(id)) },
-                onUpdateViewerId = { id -> viewModel.onEvent(UiEvent.UpdateDraftViewerId(id)) },
-                onUpdateRelayUrl = { url -> viewModel.onEvent(UiEvent.UpdateDraftRelayUrl(url)) },
-                onUpdateMaxDistance = { dist -> viewModel.onEvent(UiEvent.UpdateDraftMaxDistance(dist)) },
-                onUpdateAlertSettings = { settings -> viewModel.onEvent(UiEvent.UpdateDraftAlertSettings(settings)) },
-                onUpdateSirenType = { type -> viewModel.onEvent(UiEvent.SetSirenType(type)) },
-                onUpdateAlarmVolume = { vol -> viewModel.onEvent(UiEvent.UpdateDraftAlarmVolume(vol)) },
+                onFullInitialization = onFullInitialization,
+                onUpdateDeviceId = { id -> onMainEvent(UiEvent.UpdateDraftDeviceId(id)) },
+                onUpdateViewerId = { id -> onMainEvent(UiEvent.UpdateDraftViewerId(id)) },
+                onUpdateRelayUrl = { url -> onMainEvent(UiEvent.UpdateDraftRelayUrl(url)) },
+                onUpdateMaxDistance = { dist -> onMainEvent(UiEvent.UpdateDraftMaxDistance(dist)) },
+                onUpdateAlertSettings = { settings -> onMainEvent(UiEvent.UpdateDraftAlertSettings(settings)) },
+                onUpdateSirenType = { type -> onMainEvent(UiEvent.SetSirenType(type)) },
+                onUpdateAlarmVolume = { vol -> onMainEvent(UiEvent.UpdateDraftAlarmVolume(vol)) },
                 onTestSiren = { 
                     if (diagnosticState.isSirenPlaying) {
                         viewModel.audioSynthesizer.stopSiren(timeProvider = viewModel.timeProvider)
@@ -409,8 +410,8 @@ fun TrackerScreen(
                         )
                     }
                 },
-                onShowPhoneSetup = { viewModel.onEvent(UiEvent.TogglePhoneSetup(true)) },
-                onEvent = { event -> viewModel.onEvent(event) }
+                onShowPhoneSetup = { onMainEvent(UiEvent.TogglePhoneSetup(true)) },
+                onEvent = { event -> onMainEvent(event) }
             )
         } else if (isLogVisible) {
             val showDetails by viewModel.repository.logFilterDetails.collectAsStateWithLifecycle()

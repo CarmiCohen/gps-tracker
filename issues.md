@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.23.01
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.23.03
 
 ## 🎯 Current Resumption Focus: Structural Simplicity & Pattern Convergence
 Finalizing the audit of signaling performance under physical stress and ensuring no side-effects remain from the Performance Tier unification.
@@ -6,9 +6,7 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ## 🔴 Open Gaps & Unfinished Integration Points (Identified from Rigorous Audit)
 
 ### Unintended Side Effects & Design Inconsistencies
-*   **Issue #1192: Disconnected Settings Input State Flow**
-    *   *Description*: `MainAppContent` passes `settingsState` derived from `MainViewModel` down to `TrackerScreen` and `ViewerScreen`. However, the settings text input fields and controls dispatch draft updates (e.g., `UpdateDraftDeviceId`, `UpdateDraftRelayUrl`) to the feature-specific `TrackerViewModel` or `ViewerViewModel`. Since the screen components observe `MainViewModel` for the draft settings values, the text inputs remain visually frozen and do not reflect user entry.
-    *   *Significance*: **Critical (UI Input Lock)**: Completely prevents modifying or saving any application configuration parameters within active role states.
+*(No active open gaps identified. All critical synchronization issues have been resolved.)*
 
 ---
 
@@ -49,6 +47,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1192: Disconnected Settings Input State Flow** (Resolved Sep.23.03)
+    *   *Remediation*: Consolidated draft configuration events and top-level navigation logic into `MainViewModel`. This ensures that all functional role screens consuming `MainViewModel` state reflect user input in real-time. Simplified `TrackerViewModel` and `ViewerViewModel` by removing redundant draft management code (R-ID 419).
+
 *   **Issue #1193: Asymmetric Audio Control and Siren State Dispersion** (Resolved Sep.23.01)
     *   *Remediation*: Converted `AudioSynthesizer.isLooping` into a `MutableStateFlow` to expose reactive siren activity feedback globally. Subscribed `MainViewModel` to this flow to sync playback states with `DiagnosticState`, completely rectifying the asymmetric role state dispersion loop across presentation layers (R-ID 418).
 
@@ -61,4 +62,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *(All other resolved issues have been successfully moved to the Resolution Archive file).*
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 418 (Rules: 84, IDs: 418), Resolved: 1173, Open: 1, Testing: 3 (Sub-items: 12), Ideas: 10, QA: 283]**
+- **Current Audit Baseline: [SOT: 419 (Rules: 84, IDs: 419), Resolved: 1174, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 10, QA: 283]**

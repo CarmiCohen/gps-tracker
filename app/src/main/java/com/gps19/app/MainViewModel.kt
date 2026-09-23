@@ -19,13 +19,14 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Sep.23.03:
+ * - Issue #1192 RESOLVED: Unified draft settings state flow. Moved draft handling 
+ *   logic from feature ViewModels to MainViewModel to ensure visual consistency 
+ *   during configuration updates (R-ID 419).
  * Sep.23.01:
  * - Issue #1193 Hardening: Synchronized siren playback state by observing 
  *   AudioSynthesizer.isSirenPlaying, ensuring UI feedback remains consistent 
  *   across decoupled ViewModel scopes (R-ID 418).
- * Sep.22.50:
- * - Issue #1191 RESOLVED: Added support for UiEvent.BulkUpdateSettings and UiEvent.LogAction
- *   to ensure configuration and trail import operations succeed flawlessly (R-ID 416).
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -78,6 +79,8 @@ class MainViewModel @Inject constructor(
 
     private val _diagnosticState = MutableStateFlow(DiagnosticState())
     val diagnosticState: StateFlow<DiagnosticState> = _diagnosticState.asStateFlow()
+
+    private var autoSaveJob: Job? = null
 
     init {
         viewModelScope.launch(Dispatchers.Default + uiExceptionHandler) {
@@ -177,10 +180,15 @@ class MainViewModel @Inject constructor(
             is UiEvent.TogglePhoneSetup, is UiEvent.ToggleRibbons, is UiEvent.SetDashboardExpanded,
             is UiEvent.ToggleGnssDetail, is UiEvent.SetSubSettings, is UiEvent.ShowStopTrackingConfirmation,
             is UiEvent.NavigateToDiagnostics, is UiEvent.SetPendingMode -> {
+                if (event is UiEvent.ToggleSettings) {
+                    if (event.visible) updateState { it.copy(settings = it.settings.copy(draftSettings = settingsUseCase.prepareDraft(it))) }
+                    else commitDraft()
+                }
                 updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
             }
             is UiEvent.SetUiVisible -> {
                 repository.sendCommand(UiCommand.UiVisibilityChanged(event.visible))
+                if (!event.visible && _uiState.value.navigation.isSettingsOpen) commitDraft()
             }
             is UiEvent.SetSystemActive -> { 
                 updateState { it.copy(session = it.session.copy(isSystemActive = event.active)) } 
@@ -261,6 +269,9 @@ class MainViewModel @Inject constructor(
             is UiEvent.RequestTestAlarm -> {
                 repository.sendCommand(UiCommand.ExecuteTestAlarm)
             }
+            is UiEvent.UpdateDraftDeviceId, is UiEvent.UpdateDraftViewerId, is UiEvent.UpdateDraftRelayUrl, 
+            is UiEvent.UpdateDraftMaxDistance, is UiEvent.UpdateDraftAlertSettings, is UiEvent.UpdateDraftAlarmVolume, 
+            is UiEvent.CommitSettings -> handleDraftEvent(event)
             is UiEvent.BulkUpdateSettings -> {
                 viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
                     settingsUseCase.bulkUpdateSettings(
@@ -292,6 +303,35 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    private fun handleDraftEvent(event: UiEvent) {
+        when (event) {
+            is UiEvent.UpdateDraftDeviceId -> updateDraft { it.copy(deviceId = event.id) }
+            is UiEvent.UpdateDraftViewerId -> updateDraft { it.copy(viewerId = event.id) }
+            is UiEvent.UpdateDraftRelayUrl -> updateDraft { it.copy(relayUrl = event.url) }
+            is UiEvent.UpdateDraftMaxDistance -> updateDraft { it.copy(maxDistance = event.distance) }
+            is UiEvent.UpdateDraftAlertSettings -> updateDraft { it.copy(alertSettings = event.settings) }
+            is UiEvent.UpdateDraftAlarmVolume -> updateDraft { it.alertSettings.copy(alarmVolume = event.volume).let { s -> it.copy(alertSettings = s) } }
+            is UiEvent.CommitSettings -> commitDraft()
+            else -> {}
+        }
+    }
+
+    private fun commitDraft() {
+        val finalDraft = _uiState.value.settings.draftSettings
+        autoSaveJob?.cancel()
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            settingsUseCase.saveDraftToRepo(finalDraft)
+            settingsUseCase.commitDraft()
+            updateState { it.copy(settings = it.settings.copy(draftSettings = DraftSettings())) }
+        }
+    }
+
+    private fun updateDraft(update: (DraftSettings) -> DraftSettings) {
+        updateState { it.copy(settings = it.settings.copy(draftSettings = update(it.settings.draftSettings))) }
+        autoSaveJob?.cancel()
+        autoSaveJob = viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { delay(300L); settingsUseCase.saveDraftToRepo(_uiState.value.settings.draftSettings) }
+    }
+
     private fun updateState(update: (MainUiState) -> MainUiState) { _uiState.update { current -> update(current) } }
     private fun updateDiagnosticState(update: (DiagnosticState) -> DiagnosticState) { _diagnosticState.update { current -> update(current) } }
     private fun updateNavigation(update: (NavigationState) -> NavigationState) { updateState { it.copy(navigation = update(it.navigation)) } }
@@ -320,12 +360,20 @@ class MainViewModel @Inject constructor(
         updateState { it.copy(
             settings = it.settings.copy(
                 deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl,
-                isIdentitySanitized = initial.identitySanitized, alertSettings = initial.alertSettings
+                isIdentitySanitized = initial.identitySanitized, alertSettings = initial.alertSettings,
+                draftSettings = initial.draftSettings ?: it.settings.draftSettings
             ),
             session = it.session.copy(
                 appMode = initial.appMode, isSystemActive = initial.isSystemActive,
                 appStartTime = initial.appStartTime
             )
         )}
+    }
+
+    fun fullInitialization(context: Context) {
+        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+            val nextStartTime = settingsUseCase.fullInitialization(context)
+            updateState { it.copy(session = it.session.copy(appStartTime = nextStartTime)) }
+        }
     }
 }

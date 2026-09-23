@@ -39,6 +39,12 @@ import kotlinx.coroutines.launch
 import androidx.hilt.navigation.compose.hiltViewModel
 import timber.log.Timber
 
+/**
+ * MainAppContent: Root UI composition.
+ * Sep.23.03:
+ * - Issue #1192 RESOLVED: Connected settings input state flow by routing screen 
+ *   events to MainViewModel via onMainEvent and onFullInitialization (R-ID 419).
+ */
 @Composable
 fun MainAppContent(
     activity: ComponentActivity,
@@ -311,7 +317,7 @@ fun MainAppContent(
                                     nav.isDiagnosticsVisible -> viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
                                     nav.isPhoneSetupVisible -> viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
                                     nav.activeSubSettings != null -> viewModel.onEvent(UiEvent.SetSubSettings(null))
-                                    nav.isSettingsOpen -> { trackerViewModel.onEvent(UiEvent.CommitSettings); viewModel.onEvent(UiEvent.ToggleSettings(false)) }
+                                    nav.isSettingsOpen -> { viewModel.onEvent(UiEvent.CommitSettings); viewModel.onEvent(UiEvent.ToggleSettings(false)) }
                                     nav.isLogVisible -> viewModel.onEvent(UiEvent.ToggleLog(false))
                                     nav.isRibbonsVisible -> viewModel.onEvent(UiEvent.ToggleRibbons(false))
                                     !nav.isMapVisible -> viewModel.onEvent(UiEvent.ToggleMap(true))
@@ -325,7 +331,7 @@ fun MainAppContent(
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) }, 
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
-                                    onExit = onCleanupAndExit,
+                                    onExit = onCleanupAndExit, onMainEvent = { viewModel.onEvent(it) }, onFullInitialization = { viewModel.fullInitialization(context) },
                                     onResetStats = { trackerViewModel.onEvent(UiEvent.ResetStats) }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
                                     onImportConfig = { importLauncher.launch("application/json") }, onClearLogs = { trackerViewModel.onEvent(UiEvent.ClearLogs) }, onClearHome = { trackerViewModel.onEvent(UiEvent.ClearHomePoints) },
                                     onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, onLoadTrail = { importTrailLauncher.launch("application/json") }
@@ -340,7 +346,7 @@ fun MainAppContent(
                                     nav.isDiagnosticsVisible -> viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
                                     nav.isPhoneSetupVisible -> viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
                                     nav.activeSubSettings != null -> viewModel.onEvent(UiEvent.SetSubSettings(null))
-                                    nav.isSettingsOpen -> { viewerViewModel.onEvent(UiEvent.CommitSettings); viewModel.onEvent(UiEvent.ToggleSettings(false)) }
+                                    nav.isSettingsOpen -> { viewModel.onEvent(UiEvent.CommitSettings); viewModel.onEvent(UiEvent.ToggleSettings(false)) }
                                     nav.isLogVisible -> viewModel.onEvent(UiEvent.ToggleLog(false))
                                     nav.isRibbonsVisible -> viewModel.onEvent(UiEvent.ToggleRibbons(false))
                                     !nav.isMapVisible -> viewModel.onEvent(UiEvent.ToggleMap(true))
@@ -354,7 +360,7 @@ fun MainAppContent(
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) },
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
-                                    onExit = onCleanupAndExit,
+                                    onExit = onCleanupAndExit, onMainEvent = { viewModel.onEvent(it) }, onFullInitialization = { viewModel.fullInitialization(context) },
                                     onImportConfig = { importLauncher.launch("application/json") }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) },
                                     onClearLogs = { viewerViewModel.onEvent(UiEvent.ClearLogs) }, onResetStats = { viewerViewModel.onEvent(UiEvent.ResetStats) }, onClearHome = { viewerViewModel.onEvent(UiEvent.ClearHomePoints) },
                                     onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, onLoadTrail = { importTrailLauncher.launch("application/json") }
