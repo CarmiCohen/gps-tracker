@@ -369,6 +369,10 @@ class TrackerService : BaseMonitorService() {
         )
     }
 
+    private fun onLocationChanged(location: Location) {
+        locationBuffer.add(location)
+    }
+
     private fun handleViewerPulse(id: String) {
         if (!SignalingConstants.isValidViewerId(id)) return
         repository.updateRemoteActivity(timeProvider.elapsedRealtime())
@@ -717,6 +721,18 @@ class TrackerService : BaseMonitorService() {
         triggerForensicSample()
     }
 
+    override suspend fun onHeartbeat(now: Long, nowRt: Long) {
+        if (isSystemActive) {
+            val health = integrityMonitor.currentHealth
+            notificationManager.updatePulse(
+                sats = hardwareSuite.satellitesUsed, 
+                battery = health.batteryLevel, 
+                isSecure = !alarmManager.hasUnresolvedAlarms(), 
+                isPowerSave = isPowerSaveActive || health.isPowerSaveMode
+            )
+        }
+    }
+
     private fun startForensicSamplingLoop() {
         forensicSamplingJob?.cancel()
         forensicSamplingJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
@@ -836,7 +852,7 @@ class TrackerService : BaseMonitorService() {
         super.onDestroy()
     }
 
-    override fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerActive: Boolean, processed: ProcessedLocation, snapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long) {
+    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerActive: Boolean, processed: ProcessedLocation, snapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long) {
         val health = integrityMonitor.currentHealth
         
         val telemetry = AlarmTelemetrySnapshot(

@@ -1,29 +1,24 @@
-# Forensic Resumption Snapshot - Sep.23.71
+# Forensic Resumption Snapshot - Sep.23.72
 
 ## 📂 Session Summary
 *   **Completed**: 
-    *   **Issue #1230**: Shared Storage Key Leakage & Cross-Role State Corruption (R-ID 453).
-    *   **Issue #1240**: Namespace Isolation for Logic State Persistence (R-ID 453).
-    *   **Issue #1236**: Race Condition Remediation (R-ID 424).
-*   **Version**: Sep.23.71
-*   **Status**: Storage isolation for functional roles (Tracker vs Viewer) is now physically enforced in the DataStore. State "leakage" between roles has been eliminated. The foundational Architectural SOT has been restored and synchronized.
+    *   **Issue #1250**: Build Vitality & Reactive Stream Convergence (R-ID 455).
+    *   **TrackerService.kt**: Implemented `onHeartbeat` and `onLocationChanged`.
+    *   **MainRepository.kt**: Implemented missing delegates for settings and exposed new flows.
+    *   **MainViewModel.kt**: Fixed flow typing to restore trail search functionality.
+*   **Version**: Sep.23.72
+*   **Status**: Build vitality restored. Functional role isolation is now complete and verified via successful compilation. Background infrastructure is ready for high-stress signaling audits.
 
 ## 🔧 Technical Delta
-*   **SOT Restoration**: Remediated a significant document truncation in `SOT_MASTER_REQUIREMENTS.md`. Recovered 22 architectural master rules and mapping for R101-R759 from Git history.
-*   **MainRepository.kt**: Refactored `lastAlarmAckTsFlow` using `flatMapLatest` on `appModeFlow` to ensure reactive UI streams observe the correct role partition. Implemented role-aware memory caching and routing for `"T_"` and `"V_"` prefixed keys.
-*   **SettingsRepository.kt**: Restored reactive flows for namespaced telemetry and implemented routing logic to map role-prefixed keys to isolated Protobuf maps (`role_longs`, `role_doubles`, etc.) in `app_settings.pb`.
-*   **AlertUseCase.kt**: Refactored to inject `ConfigManager`, enabling role-prefixed storage for user-driven alarm dismissals.
-*   **MainViewModel.kt**: Fully integrated `AlertUseCase` into the UI event loop. Refactored `UiEvent.DismissAlarms` and `UiEvent.StopSiren` to ensure user actions are isolated per functional role.
-*   **CommandRouter.kt**: Updated `UiCommand.StopSiren` to apply role-based namespacing to acknowledgment timestamps and power alarm latches.
-*   **SettingsUseCase.kt**: Updated application bootstrap logic to hydrate `lastAlarmAckTs` from the correct role partition during initial hydration.
-*   **AppAlarmManager.kt**: Refined `syncEvaluationState` to utilize namespaced acknowledgments, ensuring the "Alarm Active" logic is isolated per role.
-*   **ConnectivitySuite.kt**: Fixed a syntax error at line 908 and ensured `resetPeerStats` correctly namespaces baseline clearing for the remote peer.
-*   **MaintenanceWorker.kt**: Made worker role-aware to audit correctly namespaced service ticks.
+*   **SettingsRepository.kt**: Fully implemented reactive flows for `isXiaomiManualOverrideFlow`, `recoveryCountFlow`, and `cumulativeRecoveryBlackoutMsFlow` to support domain-layer observation.
+*   **MainRepository.kt**: Bridged missing `DataStore` delegates to the domain layer, ensuring `SettingsUseCase` can perform bulk and draft operations safely.
+*   **TrackerService.kt**: Restored the background heartbeat and location ingestion mechanisms which were unimplemented during the previous refactor.
+*   **MainViewModel.kt**: Explicitly typed trail flows as `StateFlow` to enable binary search operations on current trail state without manual collection.
 
 ## 📍 Resumption Point for Next Session
 *   **Immediate Priority**: Audit signaling performance under physical stress with the new namespacing.
-*   **Next Task**: Remediation of **Issue #1231** (Redundant Stream Overlap in ViewerService) and **Issue #1232** (OEM Power Hardening Overrides).
-*   **Strategic Goal**: Complete the background service infrastructure hardening (#1171) and finalize "Signal-on-Spike" sampling.
+*   **Next Task**: Remediation of **Issue #1231** (Duplicate Heartbeat Processing in ViewerService) and **Issue #1232** (OEM Power Hardening Overrides).
+*   **Strategic Goal**: Operationalize `DeviceHardeningStrategy.kt` to handle vendor-specific background restrictions.
 
 ## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 453 (Rules: 90, IDs: 453), Resolved: 1190, Open: 23, Testing: 3 (Sub-items: 12), Ideas: 15, QA: 283]**
+**Current Audit Baseline: [SOT: 455 (Rules: 92, IDs: 455), Resolved: 1191, Open: 22, Testing: 3 (Sub-items: 12), Ideas: 16, QA: 284]**

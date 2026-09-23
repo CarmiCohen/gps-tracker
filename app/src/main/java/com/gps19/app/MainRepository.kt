@@ -28,15 +28,6 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
- * Sep.23.70:
- * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation to prevent 
- *   cross-role state corruption during persistence (R-ID 453).
- * Sep.22.50:
- * - Issue #1164 REMEDIATION: Exposed saveLogicState to support geofence debounce 
- *   and power latch persistence (R-ID 417).
- * Sep.22.03:
- * - Issue #1179: Atomic Hydration. Exposed addHomePoint and removeHomePoint 
- *   from SettingsRepository to support race-free geofence updates (R-ID 400).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -141,6 +132,9 @@ class MainRepository @Inject constructor(
     val viewerIdFlow = settings.viewerIdFlow
     val relayUrlFlow = settings.relayUrlFlow
     val isManualExitFlow = settings.isManualExitFlow
+    val isXiaomiManualOverrideFlow = settings.isXiaomiManualOverrideFlow
+    val recoveryCountFlow = settings.recoveryCountFlow
+    val cumulativeRecoveryBlackoutMsFlow = settings.cumulativeRecoveryBlackoutMsFlow
     
     val trackerAlarmAckTsFlow = settings.trackerAlarmAckTsFlow
     val viewerAlarmAckTsFlow = settings.viewerAlarmAckTsFlow
@@ -158,18 +152,10 @@ class MainRepository @Inject constructor(
     val lastAlarmsJsonFlow = settings.lastAlarmsJsonFlow
 
     init {
-        scope.launch {
-            lastAlarmAckTsFlow.collect { lastAlarmAckTs = it }
-        }
-        scope.launch {
-            trackerAlarmAckTsFlow.collect { trackerAlarmAckTs = it }
-        }
-        scope.launch {
-            viewerAlarmAckTsFlow.collect { viewerAlarmAckTs = it }
-        }
-        scope.launch {
-            homePointsFlow.collect { cachedHomePoints = it }
-        }
+        scope.launch { lastAlarmAckTsFlow.collect { lastAlarmAckTs = it } }
+        scope.launch { trackerAlarmAckTsFlow.collect { trackerAlarmAckTs = it } }
+        scope.launch { viewerAlarmAckTsFlow.collect { viewerAlarmAckTs = it } }
+        scope.launch { homePointsFlow.collect { cachedHomePoints = it } }
         startUiHistoryEmitter()
     }
 
@@ -239,22 +225,14 @@ class MainRepository @Inject constructor(
     suspend fun saveAlertSettings(s: AlertSettings) = settings.saveAlertSettings(s)
     
     suspend fun saveSettingsBulk(
-        deviceId: String? = null, 
-        viewerId: String? = null, 
-        relayUrl: String? = null, 
-        maxDistance: Double? = null, 
-        alertSettings: AlertSettings? = null, 
-        homePoints: List<GeoPoint>? = null
+        deviceId: String? = null, viewerId: String? = null, relayUrl: String? = null, 
+        maxDistance: Double? = null, alertSettings: AlertSettings? = null, homePoints: List<GeoPoint>? = null
     ) {
         val currentTracker = deviceId ?: settings.getString(TRACKER_ID_KEY, DEFAULT_TRACKER_ID)
         val currentViewer = viewerId ?: settings.getString(VIEWER_ID_KEY, DEFAULT_VIEWER_ID)
-        
         if (!SignalingConstants.areIdsUnique(currentTracker, currentViewer)) {
-            val err = "Identity Collision: IDs must be unique and alphanumeric (T:$currentTracker, V:$currentViewer)"
-            Timber.e(err)
             throw IllegalArgumentException("IDs must be unique and alphanumeric")
         }
-        
         settings.saveSettingsBulk(deviceId, viewerId, relayUrl, maxDistance, alertSettings, homePoints)
     }
 
@@ -263,54 +241,26 @@ class MainRepository @Inject constructor(
         maxDrop: Long, maxDropTs: Long, lastGpsTs: Long, violationUptimeMs: Long
     ) = settings.saveSessionMetricsBulk(totalConnected, uptime, totalDrop, maxDrop, maxDropTs, lastGpsTs, violationUptimeMs)
 
-    fun addLog(entry: LogEntry, initiallySynced: Boolean = false) {
-        logRepository.addLog(entry, initiallySynced)
-    }
-
+    fun addLog(entry: LogEntry, initiallySynced: Boolean = false) { logRepository.addLog(entry, initiallySynced) }
     fun clearLogs() { logRepository.clearLogs() }
     suspend fun loadAllLogsStatic(limit: Int = LOG_LIMIT_STANDARD): List<LogEntry> = logRepository.loadAllLogsStatic(limit)
-
     suspend fun proactivePruning() = logRepository.proactivePruning()
 
     fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, status: SentinelStatus = SentinelStatus.VALID, timestamp: Long? = null, force: Boolean = false, accuracy: Double = 0.0, maxAccuracy: Double = 0.0) {
         if (lat == 0.0 || lng == 0.0) return
-        
         val health = telemetry.systemHealth.value
-        if (!PersistencePolicy.shouldSaveTrailPoint(
-            health = health,
-            status = status
-        )) return
-
+        if (!PersistencePolicy.shouldSaveTrailPoint(health, status)) return
         scope.launch {
-            LatencyMonitor.measureAndAudit<Unit>(
-                timeProvider = timeProvider,
-                thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS,
-                operation = "Trail Write",
-                type = LatencyMonitor.AuditType.IO,
-                onSpike = { message, _ -> logLatencySpike(message) }
-            ) {
-                val wallTs = timestamp ?: timeProvider.currentTimeMillis()
-                trailDao.insert(TrailEntity(
-                    lat = lat, lng = lng, timestamp = wallTs, 
-                    isViewerTrail = isViewer, status = status.name, 
-                    accuracy = accuracy,
-                    maxAccuracy = maxAccuracy
-                ))
-                
-                if (force || metrics.trailWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
-                    metrics.trailWriteCount.set(0)
-                    triggerBackgroundPruning()
-                }
+            val wallTs = timestamp ?: timeProvider.currentTimeMillis()
+            trailDao.insert(TrailEntity(lat = lat, lng = lng, timestamp = wallTs, isViewerTrail = isViewer, status = status.name, accuracy = accuracy, maxAccuracy = maxAccuracy))
+            if (force || metrics.trailWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
+                metrics.trailWriteCount.set(0); triggerBackgroundPruning()
             }
         }
     }
 
     suspend fun clearTrails() = withContext(Dispatchers.IO) {
-        trailDao.clearTrail(false)
-        trailDao.clearTrail(true)
-        violationDao.clearAll()
-        trackerPointCache.clear()
-        viewerPointCache.clear()
+        trailDao.clearTrail(false); trailDao.clearTrail(true); violationDao.clearAll(); trackerPointCache.clear(); viewerPointCache.clear()
     }
 
     suspend fun loadTrailStatic(isViewer: Boolean): List<TrailPoint> = trailDao.getTrailStatic(isViewer).map { 
@@ -318,95 +268,56 @@ class MainRepository @Inject constructor(
     }
 
     suspend fun resetStats() = withContext(Dispatchers.IO) {
-        settings.resetStatsBulk()
-        clearTrails()
-        historyDao.clearAll()
-        logRepository.clearLogs()
-        offlineRepository.clear()
+        settings.resetStatsBulk(); clearTrails(); historyDao.clearAll(); logRepository.clearLogs(); offlineRepository.clear()
     }
 
     fun addViolation(lat: Double, lng: Double, type: String, accuracy: Double = 0.0, maxAccuracy: Double = 0.0, adaptiveRadius: Double = 0.0, timestamp: Long? = null) {
         if (!violationProcessor.shouldRecordViolation(lat, lng, type, accuracy, maxAccuracy)) return
-
         val wallTs = timestamp ?: timeProvider.currentTimeMillis()
         scope.launch { 
-            LatencyMonitor.measureAndAudit<Unit>(
-                timeProvider = timeProvider,
-                thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS,
-                operation = "Violation Write",
-                type = LatencyMonitor.AuditType.IO,
-                onSpike = { message, _ -> logLatencySpike(message) }
-            ) {
-                violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
-                
-                if (metrics.violationWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
-                    metrics.violationWriteCount.set(0)
-                    triggerBackgroundPruning()
-                }
+            violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
+            if (metrics.violationWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
+                metrics.violationWriteCount.set(0); triggerBackgroundPruning()
             }
         }
     }
 
-    fun getHistoryFlow(ribbonKey: String): Flow<List<ConnectionPoint>> = historyDao.getHistoryFlow(ribbonKey).map { l: List<HistoryEntity> -> 
+    fun getHistoryFlow(ribbonKey: String): Flow<List<ConnectionPoint>> = historyDao.getHistoryFlow(ribbonKey).map { l -> 
         l.map { entity ->
-            val cp = ConnectionPoint()
-            cp.apply {
+            ConnectionPoint().apply {
                 ts = entity.ts; rt = entity.rt; rtt = entity.rtt; localSig = 10; remoteSig = entity.remoteSig
                 isConnected = entity.isConnected; isGap = entity.isGap; isRecoveryEvent = entity.isRecoveryEvent
                 gpsAccuracy = entity.accuracy; maxAccuracy = entity.maxAccuracy; isTick = entity.isTick 
-                hasGps = entity.hasGps
-                speed = entity.speed; bearing = entity.bearing
-                currentMa = entity.currentMa
+                hasGps = entity.hasGps; speed = entity.speed; bearing = entity.bearing; currentMa = entity.currentMa
                 locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE }
-                
                 TelemetryMapper.mapEntityToApp(entity, this)
             }
-            cp
         }
     }.flowOn(Dispatchers.Default)
 
     private var lastBatchWriteRealtime = 0L
     private val historyBuffer = ConcurrentLinkedQueue<HistoryEntity>()
-
-    private val _liveHistoryFlow = MutableSharedFlow<Pair<String, List<ConnectionPoint>>>(
-        extraBufferCapacity = 64,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
+    private val _liveHistoryFlow = MutableSharedFlow<Pair<String, List<ConnectionPoint>>>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val liveHistoryFlow = _liveHistoryFlow.asSharedFlow()
-    
     private val liveHistoryBuffer = ConcurrentLinkedQueue<Pair<String, ConnectionPoint>>()
 
     fun addHistoryPoint(ribbonKey: String, point: ConnectionPoint) {
         val health = telemetry.systemHealth.value
-        val uiCopy = ConnectionPoint().apply { copyFrom(point) }
-        liveHistoryBuffer.add(ribbonKey to uiCopy)
-
+        liveHistoryBuffer.add(ribbonKey to ConnectionPoint().apply { copyFrom(point) })
         if (!PersistencePolicy.shouldSaveHistoryPoint(health)) return
         historyBuffer.add(TelemetryMapper.mapAppToEntity(point, ribbonKey))
-
         val nowRt = timeProvider.elapsedRealtime()
-        val shouldWrite = (nowRt - lastBatchWriteRealtime > HISTORY_BATCH_WRITE_INTERVAL_MS) || (historyBuffer.size >= HISTORY_BUFFER_MAX_SIZE)
-        
-        if (shouldWrite) {
+        if ((nowRt - lastBatchWriteRealtime > HISTORY_BATCH_WRITE_INTERVAL_MS) || (historyBuffer.size >= HISTORY_BUFFER_MAX_SIZE)) {
             scope.launch { flushHistoryBufferInternal(nowRt) }
         }
     }
 
     fun addHistoryPoints(ribbonKey: String, points: List<ConnectionPoint>) {
-        val uiCopies = points.map { p -> ConnectionPoint().apply { copyFrom(p) } }
-        scope.launch { _liveHistoryFlow.emit(ribbonKey to uiCopies) }
-        
-        val health = telemetry.systemHealth.value
-        if (!PersistencePolicy.shouldSaveHistoryPoint(health)) return
-
-        points.forEach { point ->
-            historyBuffer.add(TelemetryMapper.mapAppToEntity(point, ribbonKey))
-        }
-
+        scope.launch { _liveHistoryFlow.emit(ribbonKey to points.map { p -> ConnectionPoint().apply { copyFrom(p) } }) }
+        if (!PersistencePolicy.shouldSaveHistoryPoint(telemetry.systemHealth.value)) return
+        points.forEach { historyBuffer.add(TelemetryMapper.mapAppToEntity(it, ribbonKey)) }
         val nowRt = timeProvider.elapsedRealtime()
-        val shouldWrite = (nowRt - lastBatchWriteRealtime > HISTORY_BATCH_WRITE_INTERVAL_MS) || (historyBuffer.size >= HISTORY_BUFFER_MAX_SIZE)
-        
-        if (shouldWrite) {
+        if ((nowRt - lastBatchWriteRealtime > HISTORY_BATCH_WRITE_INTERVAL_MS) || (historyBuffer.size >= HISTORY_BUFFER_MAX_SIZE)) {
             scope.launch { flushHistoryBufferInternal(nowRt) }
         }
     }
@@ -416,44 +327,26 @@ class MainRepository @Inject constructor(
             while (isActive) {
                 delay(UI_HISTORY_EMIT_INTERVAL_MS)
                 if (liveHistoryBuffer.isEmpty()) continue
-                
                 val batches = mutableMapOf<String, MutableList<ConnectionPoint>>()
                 while (liveHistoryBuffer.isNotEmpty()) {
-                    liveHistoryBuffer.poll()?.let { (key, point) ->
-                        batches.getOrPut(key) { mutableListOf() }.add(point)
-                    }
+                    liveHistoryBuffer.poll()?.let { (key, point) -> batches.getOrPut(key) { mutableListOf() }.add(point) }
                 }
-                
-                batches.forEach { (key, list) ->
-                    _liveHistoryFlow.emit(key to list)
-                }
+                batches.forEach { (key, list) -> _liveHistoryFlow.emit(key to list) }
             }
         }
     }
 
-    suspend fun flushHistory() {
-        flushHistoryBufferInternal(timeProvider.elapsedRealtime())
-    }
+    suspend fun flushHistory() { flushHistoryBufferInternal(timeProvider.elapsedRealtime()) }
 
     private suspend fun flushHistoryBufferInternal(nowRt: Long) = withContext(Dispatchers.IO) {
         val dbPoints = mutableListOf<HistoryEntity>()
         while (historyBuffer.isNotEmpty()) historyBuffer.poll()?.let { dbPoints.add(it) }
-        
         if (dbPoints.isNotEmpty()) {
             lastBatchWriteRealtime = nowRt
-            LatencyMonitor.measureAndAudit<Unit>(
-                timeProvider = timeProvider,
-                thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS,
-                operation = "History Batch Write (${dbPoints.size} pts)",
-                type = LatencyMonitor.AuditType.IO,
-                onSpike = { message, _ -> logLatencySpike(message) }
-            ) {
-                database.withTransaction {
-                    historyDao.insertAll(dbPoints)
-                    if (metrics.historyWriteCount.addAndGet(dbPoints.size) >= DB_PRUNE_THRESHOLD_HISTORY) {
-                        metrics.historyWriteCount.set(0)
-                        triggerBackgroundPruning()
-                    }
+            database.withTransaction {
+                historyDao.insertAll(dbPoints)
+                if (metrics.historyWriteCount.addAndGet(dbPoints.size) >= DB_PRUNE_THRESHOLD_HISTORY) {
+                    metrics.historyWriteCount.set(0); triggerBackgroundPruning()
                 }
             }
         }
@@ -461,80 +354,35 @@ class MainRepository @Inject constructor(
 
     private fun triggerBackgroundPruning() {
         if (metrics.isPruningActive.getAndSet(true)) return
-        
-        val health = telemetry.systemHealth.value
-        if (health.isBatteryCritical) {
-            metrics.isPruningActive.set(false)
-            return
-        }
-
+        if (telemetry.systemHealth.value.isBatteryCritical) { metrics.isPruningActive.set(false); return }
         scope.launch {
             try {
-                LatencyMonitor.measureAndAudit<Unit>(
-                    timeProvider = timeProvider,
-                    thresholdMs = LATENCY_THRESHOLD_DB_WRITE_MS * 4,
-                    operation = "Background Pruning",
-                    type = LatencyMonitor.AuditType.IO,
-                    onSpike = { message, _ -> logLatencySpike(message) }
-                ) {
-                    database.withTransaction {
-                        listOf("4M", "16M", "1H", "4H", "24H", "7D").forEach { key ->
-                            val threshold = historyDao.getPruneThreshold(key, PRUNE_LIMIT_HISTORY)
-                            threshold?.let { historyDao.pruneByThreshold(key, it, PRUNE_CHUNK_SIZE) }
-                        }
-                        
-                        listOf(false, true).forEach { isViewer ->
-                            val threshold = trailDao.getPruneThreshold(isViewer, PRUNE_LIMIT_TRAIL)
-                            threshold?.let { trailDao.pruneByThreshold(isViewer, it, PRUNE_CHUNK_SIZE) }
-                        }
-                        
-                        val vThreshold = violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)
-                        vThreshold?.let { violationDao.pruneByThreshold(it, PRUNE_CHUNK_SIZE) }
+                database.withTransaction {
+                    listOf("4M", "16M", "1H", "4H", "24H", "7D").forEach { key ->
+                        historyDao.getPruneThreshold(key, PRUNE_LIMIT_HISTORY)?.let { historyDao.pruneByThreshold(key, it, PRUNE_CHUNK_SIZE) }
                     }
+                    listOf(false, true).forEach { isViewer ->
+                        trailDao.getPruneThreshold(isViewer, PRUNE_LIMIT_TRAIL)?.let { trailDao.pruneByThreshold(isViewer, it, PRUNE_CHUNK_SIZE) }
+                    }
+                    violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)?.let { violationDao.pruneByThreshold(it, PRUNE_CHUNK_SIZE) }
                 }
-            } catch (e: Exception) {
-                Timber.e(e, "Background pruning failed")
-            } finally {
-                metrics.isPruningActive.set(false)
-            }
+            } catch (e: Exception) { Timber.e(e, "Background pruning failed") } finally { metrics.isPruningActive.set(false) }
         }
-    }
-
-    private fun logLatencySpike(message: String) {
-        Timber.w(message)
-        addLog(LogEntry(
-            localId = UUID.randomUUID().toString(),
-            timestamp = timeProvider.currentTimeMillis(),
-            message = message,
-            type = "SYSTEM",
-            isImportant = false,
-            id = "SYSTEM",
-            viewerId = "SYSTEM",
-            isSpecial = true,
-            specialColor = FORENSIC_PINK_COLOR
-        ), initiallySynced = true)
     }
 
     fun saveTrackerState(status: TrackerStatus, rolePrefix: String? = null) = settings.saveTrackerState(status, rolePrefix)
     suspend fun loadTrackerState(rolePrefix: String? = null) = settings.loadTrackerState(rolePrefix)
     suspend fun getLastAlarmAckTs(): Long = settings.getLong(LAST_ALARM_ACK_TS_KEY, 0L)
-
-    suspend fun addPendingStatusUpdate(update: PendingStatusEntity) {
-        offlineRepository.addPendingStatusUpdate(update)
-    }
-
+    suspend fun addPendingStatusUpdate(update: PendingStatusEntity) { offlineRepository.addPendingStatusUpdate(update) }
     suspend fun getPendingStatusUpdates(limit: Int): List<PendingStatusEntity> = offlineRepository.getPendingStatusUpdates(limit)
     suspend fun deletePendingStatusUpdate(id: Long) = offlineRepository.deletePendingStatusUpdate(id)
-    
     suspend fun getLastAlarmsJson(rolePrefix: String? = null): String = settings.getString((rolePrefix ?: "") + LAST_ALARMS_JSON_KEY, "[]")
     fun saveAlarmsJsonSync(json: String, rolePrefix: String? = null) { scope.launch { settings.saveString((rolePrefix ?: "") + LAST_ALARMS_JSON_KEY, json) } }
 
     private val _logFilterDetails = MutableStateFlow(false)
     val logFilterDetails = _logFilterDetails.asStateFlow()
-    
     private val _logFilterRecovered = MutableStateFlow(false)
     val logFilterRecovered = _logFilterRecovered.asStateFlow()
-    
     fun updateLogFilters(details: Boolean? = null, recovered: Boolean? = null) {
         details?.let { _logFilterDetails.value = it } 
         recovered?.let { _logFilterRecovered.value = it }
@@ -542,36 +390,23 @@ class MainRepository @Inject constructor(
 
     suspend fun incrementRecoveryStats(blackoutMs: Long) = settings.incrementRecoveryStats(blackoutMs)
     suspend fun getSettingsSnapshot() = settings.getSettingsSnapshot()
-
-    suspend fun checkDatabaseIntegrity(): String = withContext(Dispatchers.IO) {
-        database.checkIntegrity()
-    }
-
-    fun setForensicStallSimulation(active: Boolean) {
-        logRepository.setForensicStallSimulation(active)
-    }
+    suspend fun checkDatabaseIntegrity(): String = withContext(Dispatchers.IO) { database.checkIntegrity() }
+    fun setForensicStallSimulation(active: Boolean) { logRepository.setForensicStallSimulation(active) }
+    suspend fun saveDraftSettings(deviceId: String, viewerId: String, relayUrl: String, maxDistance: Double, alertSettings: AlertSettings) { settings.saveDraftSettings(deviceId, viewerId, relayUrl, maxDistance, alertSettings) }
+    suspend fun commitDraftSettings(): CommitResult { return settings.commitDraftSettings() }
+    suspend fun clearDraftSettings() { settings.clearDraftSettings() }
 
     suspend fun saveLogicState(
-        firstViolationTs: Long,
-        firstViolationRt: Long,
-        firstViolationWasJump: Boolean,
-        distanceViolationCounter: Int,
-        wasDistanceViolated: Boolean,
-        powerAlarmPending: Boolean,
-        lastSirenStopRt: Long,
-        lastGlobalTriggerRt: Long,
-        forensicReliabilityDegradationStartRt: Long,
+        firstViolationTs: Long, firstViolationRt: Long, firstViolationWasJump: Boolean,
+        distanceViolationCounter: Int, wasDistanceViolated: Boolean, powerAlarmPending: Boolean,
+        lastSirenStopRt: Long, lastGlobalTriggerRt: Long, forensicReliabilityDegradationStartRt: Long,
         rolePrefix: String? = null
     ) {
         val p = rolePrefix ?: ""
-        saveLong(p + FIRST_VIOLATION_TS_KEY, firstViolationTs)
-        saveLong(p + FIRST_VIOLATION_RT_KEY, firstViolationRt)
-        saveBoolean(p + FIRST_VIOLATION_WAS_JUMP_KEY, firstViolationWasJump)
-        saveInt(p + DISTANCE_VIOLATION_COUNTER_KEY, distanceViolationCounter)
-        saveBoolean(p + WAS_DISTANCE_VIOLATED_KEY, wasDistanceViolated)
-        saveBoolean(p + POWER_ALARM_PENDING_KEY, powerAlarmPending)
-        saveLong(p + LAST_SIREN_STOP_RT_KEY, lastSirenStopRt)
-        saveLong(p + LAST_GLOBAL_TRIGGER_RT_KEY, lastGlobalTriggerRt)
+        saveLong(p + FIRST_VIOLATION_TS_KEY, firstViolationTs); saveLong(p + FIRST_VIOLATION_RT_KEY, firstViolationRt)
+        saveBoolean(p + FIRST_VIOLATION_WAS_JUMP_KEY, firstViolationWasJump); saveInt(p + DISTANCE_VIOLATION_COUNTER_KEY, distanceViolationCounter)
+        saveBoolean(p + WAS_DISTANCE_VIOLATED_KEY, wasDistanceViolated); saveBoolean(p + POWER_ALARM_PENDING_KEY, powerAlarmPending)
+        saveLong(p + LAST_SIREN_STOP_RT_KEY, lastSirenStopRt); saveLong(p + LAST_GLOBAL_TRIGGER_RT_KEY, lastGlobalTriggerRt)
         saveLong(p + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, forensicReliabilityDegradationStartRt)
     }
 }

@@ -129,11 +129,11 @@ class MainViewModel @Inject constructor(
     val history24HFlow = repository.getHistoryFlow("24H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val history7DFlow = repository.getHistoryFlow("7D").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val trackerTrailFlow: Flow<List<TrailPoint>> = repository.trackerTrailFlow
+    val trackerTrailFlow: StateFlow<List<TrailPoint>> = repository.trackerTrailFlow
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val viewerTrailFlow: Flow<List<TrailPoint>> = repository.viewerTrailFlow
+    val viewerTrailFlow: StateFlow<List<TrailPoint>> = repository.viewerTrailFlow
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
