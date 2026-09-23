@@ -34,13 +34,13 @@ sealed class CommandEvent {
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Sep.23.70:
+ * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation for 
+ *   alarm acknowledgment latches using ConfigManager context (R-ID 453).
  * Sep.12.47:
  * - Issue #1017 Hardening: Integrated integrityMonitor.resetStats() into reset 
  *   commands to ensure forensic parity and clear hardware health counters 
  *   during session transitions (R-ID 317).
- * Sep.03.25:
- * - Idea #240: ContextShadow Automation. Migrated AudioSynthesizer dependency 
- *   to injection (R-ID 240).
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -106,8 +106,9 @@ class CommandRouter @Inject constructor(
                         is UiCommand.SyncRequest -> _commandEvents.emit(CommandEvent.UiPulse)
                         is UiCommand.UiVisibilityChanged -> _commandEvents.emit(CommandEvent.UiVisibilityChanged(command.visible))
                         is UiCommand.StopSiren -> {
-                            repository.saveLongSync(LAST_ALARM_ACK_TS_KEY, timeProvider.currentTimeMillis())
-                            alarmManager.setPowerAlarmPending(false)
+                            val prefix = if (configManager.isTrackerMode) "T_" else "V_"
+                            repository.saveLongSync(prefix + LAST_ALARM_ACK_TS_KEY, timeProvider.currentTimeMillis())
+                            alarmManager.setPowerAlarmPending(false, prefix)
                             alarmManager.notifySirenManualStop() 
                             alarmManager.dismissResolvedAlarms()
                             integrityMonitor.clearPowerTamper()

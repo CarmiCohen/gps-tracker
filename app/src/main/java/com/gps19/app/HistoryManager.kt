@@ -29,16 +29,9 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * Sep.21.127:
- * - Issue #1156/1157: Telemetry Abstraction Integration. Refactored 
- *   backfillAnalyticalGaps and fillRealGap to consume EngineAcousticSample 
- *   sequence from HardwareSuite, ensuring environmental noise is decoupled 
- *   from satellite SNR in forensic ribbons (R-ID 393).
- * Sep.17.05:
- * - Issue #1094: Mutex-based serialization for updateRibbons to prevent multi-service pool collision.
- * Sep.17.04:
- * - Issue #1094: Forensic Backfill Buffer Reuse Optimization. Implemented 
- *   backfillPool and backfillBuffer to eliminate transient heap pressure (R-ID 353).
+ * Sep.23.70:
+ * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation (prefix support)
+ *   for forensic logic state to prevent cross-role state corruption (R-ID 453).
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -69,7 +62,6 @@ class HistoryManager @Inject constructor(
     
     private val appPointPool = Array(RibbonScale.entries.size) { ConnectionPoint() }
     
-    // Issue #1094: Backfill flyweight pool to suppress GC churn during recovery bursts.
     private val backfillPool = Array(MAX_BACKFILL_POINTS) { ConnectionPoint() }
     private val backfillBuffer = ArrayList<ConnectionPoint>(MAX_BACKFILL_POINTS)
 
@@ -78,24 +70,29 @@ class HistoryManager @Inject constructor(
     private var lastAuditTs = 0L
     private var lastTimeTriggerTs = 0L
     private var lastSitDetectedRt = 0L
+    private var currentRolePrefix: String = ""
 
     private val ribbonMutex = Mutex()
 
     /**
-     * initialize: Binds the manager to an active service scope.
-     * Sep.12.47: Removed AtomicBoolean guard to allow scope migration during transitions.
+     * initialize: Binds the manager to an active service scope and hydrates role-prefixed state.
+     * Sep.23.70 (Issue #1230): Added rolePrefix parameter for namespaced isolation.
      */
-    suspend fun initialize(scope: CoroutineScope) {
+    suspend fun initialize(scope: CoroutineScope, rolePrefix: String = "") {
         this.scope = scope
-        if (isInitialized.getAndSet(true)) return
+        this.currentRolePrefix = rolePrefix
         
         withContext(Dispatchers.IO) {
-            val lastSitTs = repository.getLong(LAST_HISTORY_SIT_TS_KEY, 0L)
+            val lastSitTs = repository.getLong(rolePrefix + LAST_HISTORY_SIT_TS_KEY, 0L)
             if (lastSitTs > 0) {
                  lastSitDetectedRt = timeProvider.elapsedRealtime() - (timeProvider.currentTimeMillis() - lastSitTs)
             }
-            clockDriftRef = repository.getLong(CLOCK_DRIFT_REF_KEY, 0L)
+            clockDriftRef = repository.getLong(rolePrefix + CLOCK_DRIFT_REF_KEY, 0L)
+            
+            // Only ProcessedHour/Cleanup/Archive dates are shared across roles to maintain system-level integrity
+            lastProcessedHour = repository.getInt(LAST_AUTO_SAVE_HOUR_KEY, -1)
         }
+        isInitialized.set(true)
     }
 
     /**
@@ -199,10 +196,6 @@ class HistoryManager @Inject constructor(
         }
     }
 
-    /**
-     * backfillAnalyticalGaps: Refactored to consume specialized EngineAcousticSample sequence.
-     * Issue #1156: Unused Forensic Abstraction.
-     */
     private fun backfillAnalyticalGaps(
         lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, rtt: Int,
         peerSignal: Int, peerAvail: Boolean, hasGps: Boolean, isTrackerMode: Boolean,
@@ -266,10 +259,6 @@ class HistoryManager @Inject constructor(
         }
     }
 
-    /**
-     * fillRealGap: Refactored to consume specialized EngineAcousticSample sequence.
-     * Issue #1157: Telemetry Abstraction Integration.
-     */
     private fun fillRealGap(lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, isTrackerMode: Boolean) {
         val snrSamples = if (isTrackerMode) hardwareSuite.getSnrSamples(lastTickRt, nowRt) else emptySequence()
         val sensorSamples = if (isTrackerMode) hardwareSuite.getSensorSamples(lastTickRt, nowRt) else emptySequence()
@@ -293,7 +282,6 @@ class HistoryManager @Inject constructor(
             
             if (backfillBuffer.isNotEmpty()) { 
                 repository.addHistoryPoints(scale.key, backfillBuffer)
-                // Issue #923: Synchronize forensic audit counters for 4M ribbons
                 if (scale == RibbonScale.FOUR_MIN) {
                     backfillAuditCount += backfillBuffer.size
                     hourlyBackfillTotal += backfillBuffer.size
@@ -307,7 +295,7 @@ class HistoryManager @Inject constructor(
         val currentDrift = nowWall - monotonic
         if (clockDriftRef == 0L) {
             clockDriftRef = currentDrift
-            scope?.launch { repository.saveLong(CLOCK_DRIFT_REF_KEY, currentDrift) }
+            scope?.launch { repository.saveLong(currentRolePrefix + CLOCK_DRIFT_REF_KEY, currentDrift) }
             return
         }
         val delta = abs(currentDrift - clockDriftRef)
@@ -315,7 +303,7 @@ class HistoryManager @Inject constructor(
             val direction = if (currentDrift > clockDriftRef) "forward" else "backward"
             emitSanitizedLog("FORENSIC ALERT: System clock jump detected ($direction ${delta / 1000}s).", true)
             clockDriftRef = currentDrift
-            scope?.launch { repository.saveLong(CLOCK_DRIFT_REF_KEY, currentDrift) }
+            scope?.launch { repository.saveLong(currentRolePrefix + CLOCK_DRIFT_REF_KEY, currentDrift) }
         }
     }
 
@@ -323,7 +311,7 @@ class HistoryManager @Inject constructor(
         if (!isDetected) return false
         if (abs(rt - lastSitDetectedRt) < SIT_DUPLICATE_GUARD_MS) return false
         lastSitDetectedRt = rt
-        scope?.launch { repository.saveLong(LAST_HISTORY_SIT_TS_KEY, ts) }
+        scope?.launch { repository.saveLong(currentRolePrefix + LAST_HISTORY_SIT_TS_KEY, ts) }
         return true
     }
 

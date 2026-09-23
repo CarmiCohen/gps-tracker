@@ -104,6 +104,14 @@ message AppSettings {
     optional int64 last_siren_stop_rt = 79;
     optional int64 last_global_trigger_rt = 80;
     optional int64 forensic_reliability_degradation_start_rt = 81;
+
+    // Namespaced property maps for role-based isolation (Issue #1230, R-ID 453)
+    map<string, int64> role_longs = 100;
+    map<string, double> role_doubles = 101;
+    map<string, bool> role_bools = 102;
+    map<string, int32> role_ints = 103;
+    map<string, string> role_strings = 104;
+    map<string, TrackerStatusProto> role_states = 105;
 }
 
 enum TrackerStateProto {

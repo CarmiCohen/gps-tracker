@@ -18,14 +18,10 @@ import kotlin.math.*
 /**
  * ViewerService: Background monitoring for the Viewer role.
  * Sep.23.70:
+ * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation (prefix "V_")
+ *   to prevent logic state corruption when switching between roles (R-ID 453).
  * - Issue #1236: Race Condition Remediation. Tick and Heartbeat loops now 
  *   wait for initializationDeferred (R-ID 452).
- * Sep.23.08:
- * - Issue #1204: Unified Hardware Lifecycle. Updated refreshCapabilitiesInternal 
- *   to map Samsung and Huawei vendor flags into HardwareCapabilities (R-ID 348).
- * Sep.22.50:
- * - Issue #1164 REMEDIATION: Restored logic state (geofence debounce, power latches)
- *   from DataStore during initialization to survive process death (R-ID 417).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -67,8 +63,9 @@ class ViewerService : BaseMonitorService() {
     }
 
     override suspend fun onServiceInitialize() {
-        repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
-        repository.saveLongSync(LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime())
+        // R-ID 453: Use role-based prefix for logic state isolation
+        repository.saveLongSync("V_" + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        repository.saveLongSync("V_" + LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime())
 
         val trackerId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
         val viewerId = repository.getString(VIEWER_ID_KEY, SettingsRepository.DEFAULT_VIEWER_ID)
@@ -95,10 +92,11 @@ class ViewerService : BaseMonitorService() {
         
         val settingsSnapshot = repository.getSettingsSnapshot()
 
-        val savedMaxAcc = repository.getDouble(MAX_ACCURACY_KEY, 0.0)
-        val savedLastSitTs = repository.getLong(LAST_SIT_TS_KEY, 0L)
-        val savedBaseline = repository.getDouble(CHAIR_BASELINE_TILT_KEY, -1000.0)
-        val trackerState = repository.loadTrackerState()
+        // R-ID 453: Apply namespace prefixes to all role-sensitive logic states
+        val savedMaxAcc = repository.getDouble("V_" + MAX_ACCURACY_KEY, 0.0)
+        val savedLastSitTs = repository.getLong("V_" + LAST_SIT_TS_KEY, 0L)
+        val savedBaseline = repository.getDouble("V_" + CHAIR_BASELINE_TILT_KEY, -1000.0)
+        val trackerState = repository.loadTrackerState("V_")
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
         val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
         
@@ -120,9 +118,9 @@ class ViewerService : BaseMonitorService() {
         
         selfProcessor.loadState(0.0, 0L, -1000.0, null, homePoints, maxDist)
 
-        val savedAlarms = repository.getLastAlarmsJson()
+        val savedAlarms = repository.getLastAlarmsJson("V_")
         alarmManager.restoreState(savedAlarms)
-        alarmManager.restoreLogicState(settingsSnapshot)
+        alarmManager.restoreLogicState(settingsSnapshot, "V_")
 
         historyManager.initialize(lifecycleScope)
         
@@ -154,7 +152,7 @@ class ViewerService : BaseMonitorService() {
             }
         }
 
-        val recoveredTs = repository.getLong(LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        val recoveredTs = repository.getLong("V_" + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
         val recoveredDrift = repository.getLong(CLOCK_DRIFT_REF_KEY, 0L)
         
         lastServiceTickTs = recoveredTs
@@ -265,7 +263,7 @@ class ViewerService : BaseMonitorService() {
                 )
             }
             is ProcessorEvent.MaxAccuracyChanged -> {
-                if (!isSelf) repository.saveDoubleSync(MAX_ACCURACY_KEY, event.accuracy)
+                if (!isSelf) repository.saveDoubleSync("V_" + MAX_ACCURACY_KEY, event.accuracy)
             }
             is ProcessorEvent.ChairBaselineChanged -> {
                 val (lat, lng, maxAcc) = if (isSelf) {
@@ -571,9 +569,11 @@ class ViewerService : BaseMonitorService() {
 
         evaluateAlarmsInternal(now, nowRt, evalSnapshot, isSocketConnected, isTrackerActive)
 
+        // R-ID 453: Isolated service ticks via prefix
+        repository.saveLongSync("V_" + LAST_SERVICE_TICK_TS_KEY, now)
+        repository.saveLongSync("V_" + LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
+        
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
-        repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, now)
-        repository.saveLongSync(LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
         serviceTickCounter++
     }
 
@@ -653,7 +653,8 @@ class ViewerService : BaseMonitorService() {
             isUiVisible = isUiVisible(),
             distToHomeAuthority = distToHome,
             maxDistanceAuthority = remoteProcessor.getMaxDistanceAuthority(),
-            capabilities = capabilities
+            capabilities = capabilities,
+            rolePrefix = "V_"
         )
 
         alarmEvalJob?.cancel()

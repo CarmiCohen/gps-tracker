@@ -9,6 +9,9 @@ import javax.inject.Inject
 
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
+ * Sep.23.70:
+ * - Issue #1230 REMEDIATION: Implemented role-aware initial hydration for 
+ *   alarm acknowledgment timestamps to prevent cross-role state leakage (R-ID 453).
  * July.27.00:
  * - Architecture Audit: Updated to use centralized PreferenceKeys and removed redundant repository prefixes.
  */
@@ -73,7 +76,15 @@ class SettingsUseCase @Inject constructor(
         val aSettings = SettingsMapper.protoToAlertSettings(s.alertSettings)
         val mMode = s.appMode.ifEmpty { null }
         val sSiren = s.selectedSiren.ifEmpty { "Siren" }
-        val lAlarmAck = s.lastAlarmAckTs
+        
+        // R-ID 453: Hydrate lastAlarmAckTs using the namespaced role prefix if mode is set
+        val rolePrefix = if (mMode == "tracker") "T_" else if (mMode == "viewer") "V_" else null
+        val lAlarmAck = if (rolePrefix != null) {
+            s.roleLongsMap.getOrDefault(rolePrefix + LAST_ALARM_ACK_TS_KEY, 0L)
+        } else {
+            s.lastAlarmAckTs
+        }
+
         val lMaxTemp = s.maxTemp
         val sanitized = s.identitySanitized
         val isActive = s.isSystemActive

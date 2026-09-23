@@ -24,14 +24,10 @@ import kotlin.math.*
 /**
  * TrackerService: The "Black Box" background process.
  * Sep.23.70:
+ * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation (prefix "T_")
+ *   to prevent logic state corruption when switching between roles (R-ID 453).
  * - Issue #1236: Race Condition Remediation. Ensured forensic sampling loop 
  *   waits for initializationDeferred (R-ID 452).
- * Sep.23.08:
- * - Issue #1204: Unified Hardware Lifecycle. Updated refreshCapabilitiesInternal 
- *   to map Samsung and Huawei vendor flags into HardwareCapabilities (R-ID 348).
- * Sep.22.50:
- * - Issue #1164 REMEDIATION: Restored logic state (geofence debounce, power latches)
- *   from DataStore during initialization to survive process death (R-ID 417).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -87,8 +83,8 @@ class TrackerService : BaseMonitorService() {
     }
 
     override suspend fun onServiceInitialize() {
-        repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
-        repository.saveLongSync(LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime())
+        repository.saveLongSync("T_" + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        repository.saveLongSync("T_" + LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime())
 
         configManager.deviceId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
         configManager.viewerId = repository.getString(VIEWER_ID_KEY, SettingsRepository.DEFAULT_VIEWER_ID)
@@ -112,17 +108,17 @@ class TrackerService : BaseMonitorService() {
         
         val settingsSnapshot = repository.getSettingsSnapshot()
         
-        val savedMaxAcc = repository.getDouble(MAX_ACCURACY_KEY, 0.0)
-        val savedLastSitTs = repository.getLong(LAST_SIT_TS_KEY, 0L)
-        val savedBaseline = repository.getDouble(CHAIR_BASELINE_TILT_KEY, -1000.0)
-        val trackerState = repository.loadTrackerState()
+        val savedMaxAcc = repository.getDouble("T_" + MAX_ACCURACY_KEY, 0.0)
+        val savedLastSitTs = repository.getLong("T_" + LAST_SIT_TS_KEY, 0L)
+        val savedBaseline = repository.getDouble("T_" + CHAIR_BASELINE_TILT_KEY, -1000.0)
+        val trackerState = repository.loadTrackerState("T_")
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
         val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
         locationProcessor.loadState(savedMaxAcc, savedLastSitTs, savedBaseline, trackerState, homePoints, maxDist)
 
-        val savedAlarms = repository.getLastAlarmsJson()
+        val savedAlarms = repository.getLastAlarmsJson("T_")
         alarmManager.restoreState(savedAlarms)
-        alarmManager.restoreLogicState(settingsSnapshot)
+        alarmManager.restoreLogicState(settingsSnapshot, "T_")
 
         historyManager.initialize(lifecycleScope)
         
@@ -141,7 +137,7 @@ class TrackerService : BaseMonitorService() {
             launch { repository.isSafeMode.collectLatest { safe -> hardwareSuite.setSafeMode(safe) } }
         }
 
-        val recoveredTs = repository.getLong(LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        val recoveredTs = repository.getLong("T_" + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
         val recoveredDrift = repository.getLong(CLOCK_DRIFT_REF_KEY, 0L)
         
         lastServiceTickTs = recoveredTs
@@ -194,7 +190,7 @@ class TrackerService : BaseMonitorService() {
                 when (event) {
                     is IntegrityEvent.ViolationSustained -> {
                         when (event.type) {
-                            ALERT_ID_TRACKER_POWER -> alarmManager.setPowerAlarmPending(true)
+                            ALERT_ID_TRACKER_POWER -> alarmManager.setPowerAlarmPending(true, "T_")
                             ALERT_ID_GPS_HARDWARE_LOCK, ALERT_ID_SILENT_FAILURE, 
                             ALERT_ID_PERFORMANCE_SPIKE, ALERT_ID_SYSTEM_STORAGE_LOW, 
                             ALERT_ID_SYSTEM_STORAGE_CRITICAL, ALERT_ID_BATTERY_STEEP_DISCHARGE -> {
@@ -202,7 +198,7 @@ class TrackerService : BaseMonitorService() {
                         }
                     }
                     is IntegrityEvent.ViolationResolved -> {
-                        if (event.type == ALERT_ID_TRACKER_POWER) alarmManager.setPowerAlarmPending(false)
+                        if (event.type == ALERT_ID_TRACKER_POWER) alarmManager.setPowerAlarmPending(false, "T_")
                     }
                     is IntegrityEvent.LogEvent -> {
                         val isSpecial = event.message.contains("tamper", ignoreCase = true) || 
@@ -268,13 +264,13 @@ class TrackerService : BaseMonitorService() {
                         )
                     }
                     is ProcessorEvent.MaxAccuracyChanged -> {
-                        repository.saveDoubleSync(MAX_ACCURACY_KEY, event.accuracy)
+                        repository.saveDoubleSync("T_" + MAX_ACCURACY_KEY, event.accuracy)
                     }
                     is ProcessorEvent.ChairBaselineChanged -> {
                         val proc = lastProcessedLocation
                         logManager.logServiceEvent(m = "Passive Zeroing: Chair baseline calibrated to ${event.baseline.roundToOneDecimal()}°",
                             lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-                        repository.saveDouble(CHAIR_BASELINE_TILT_KEY, event.baseline)
+                        repository.saveDouble("T_" + CHAIR_BASELINE_TILT_KEY, event.baseline)
                     }
                     else -> {}
                 }
@@ -715,8 +711,8 @@ class TrackerService : BaseMonitorService() {
         )
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
-        repository.saveLongSync(LAST_SERVICE_TICK_TS_KEY, now)
-        repository.saveLongSync(LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
+        repository.saveLongSync("T_" + LAST_SERVICE_TICK_TS_KEY, now)
+        repository.saveLongSync("T_" + LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
         serviceTickCounter++
         triggerForensicSample()
     }
@@ -838,5 +834,85 @@ class TrackerService : BaseMonitorService() {
         gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); revivalEventsJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel()
         deviceProfileManager.teardownHardwareProfile(capabilities)
         super.onDestroy()
+    }
+
+    override fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isViewerActive: Boolean, processed: ProcessedLocation, snapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long) {
+        val health = integrityMonitor.currentHealth
+        
+        val telemetry = AlarmTelemetrySnapshot(
+            status = processed.status,
+            isJammer = processed.jammerDetected,
+            jumpTier = processed.jumpTier,
+            isAdaptiveJump = processed.isAdaptiveJump,
+            lat = processed.optimizedPoint.lat,
+            lng = processed.optimizedPoint.lng,
+            accuracy = processed.currentAccuracy,
+            maxAccuracy = processed.maxAccuracy,
+            gpsTs = rawGpsTs,
+            lastValidFixRt = locationProcessor.getLastValidFixRt(),
+            speed = processed.filteredSpeed,
+            battery = health.batteryLevel,
+            temp = health.batteryTemp,
+            currentMa = health.currentMa,
+            isLocationPending = health.isLocationPending,
+            locationPendingReason = health.locationPendingReason,
+            isTamperDetected = processed.tamperDetected,
+            isPowerTamper = health.isPowerTamper,
+            tiltDegrees = snapshot.tiltDegrees,
+            acousticDb = snapshot.acousticDb,
+            baroAlt = snapshot.baroAlt,
+            baroAltEma = locationProcessor.getBaroBaseline(),
+            lux = snapshot.lux,
+            isNear = snapshot.isNear,
+            luxBaseline = locationProcessor.getLuxBaseline(),
+            acousticFloorDb = locationProcessor.getAcousticFloorDb(),
+            adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(),
+            peakVibrationShock = snapshot.peakShock,
+            isPowerSaveMode = health.isPowerSaveMode,
+            standbyBucket = health.standbyBucket,
+            netInterface = health.netInterface,
+            isStorageLow = health.isStorageLow,
+            isStorageCritical = health.isStorageCritical,
+            isBatterySteepDischarge = health.isBatterySteepDischarge,
+            isCoolingModeActive = health.isCoolingModeActive,
+            snrSnapshot = hardwareSuite.averageSnr,
+            vibeSnapshot = snapshot.vibration,
+            isGpsHardwareLock = health.gpsHardwareLock,
+            cpuLoad = health.cpuLoad,
+            ioWait = health.ioWait,
+            maxIoLatency = health.maxIoLatency,
+            isSilentFailure = health.isSilentFailure,
+            isMaliAnomaly = health.isMaliAnomaly,
+            isUltraLongStationary = health.isUltraLongStationary,
+            isBatteryLow = health.isBatteryLow,
+            isBatteryCritical = health.isBatteryCritical,
+            tamperNote = processed.suppressionNote,
+            isSignalLoss = health.signalLoss,
+            isGpsStalling = health.gpsStalled,
+            isGpsGap = health.locationPendingReason == LocationPendingReason.GPS_GAP,
+            localInternetLoss = health.localInternetLoss,
+            isHardwareOnline = health.isHardwareOnline
+        )
+
+        val serviceContext = AlarmServiceContext(
+            now = now,
+            nowRt = nowRt,
+            serviceStartTs = serviceStartWall,
+            serviceStartRt = serviceStartRealtime,
+            appStartTime = sessionManager.appStartTime,
+            isTrackerMode = true,
+            isRelayConnected = isSocketConnected,
+            isTrackerConnected = true,
+            isUiVisible = isUiVisible(),
+            distToHomeAuthority = processed.distToHome,
+            maxDistanceAuthority = locationProcessor.getMaxDistanceAuthority(),
+            capabilities = capabilities,
+            rolePrefix = "T_"
+        )
+
+        alarmEvalJob?.cancel()
+        alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) {
+            alarmManager.evaluateAlarms(telemetry, serviceContext)
+        }
     }
 }

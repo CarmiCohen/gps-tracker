@@ -28,6 +28,9 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Sep.23.70:
+ * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation to prevent 
+ *   cross-role state corruption during persistence (R-ID 453).
  * Sep.22.50:
  * - Issue #1164 REMEDIATION: Exposed saveLogicState to support geofence debounce 
  *   and power latch persistence (R-ID 417).
@@ -57,6 +60,8 @@ class MainRepository @Inject constructor(
     private var cachedHomePoints: List<GeoPoint>? = null
     private var lastHomeRefreshTs = 0L
     private var lastAlarmAckTs: Long = 0L
+    private var trackerAlarmAckTs: Long = 0L
+    private var viewerAlarmAckTs: Long = 0L
 
     private val violationProcessor = ViolationProcessor(timeProvider)
     private val metrics = RepositoryMetrics()
@@ -136,21 +141,31 @@ class MainRepository @Inject constructor(
     val viewerIdFlow = settings.viewerIdFlow
     val relayUrlFlow = settings.relayUrlFlow
     val isManualExitFlow = settings.isManualExitFlow
-    val lastAlarmAckTsFlow = settings.lastAlarmAckTsFlow
+    
+    val trackerAlarmAckTsFlow = settings.trackerAlarmAckTsFlow
+    val viewerAlarmAckTsFlow = settings.viewerAlarmAckTsFlow
+    
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val lastAlarmAckTsFlow = appModeFlow.flatMapLatest { mode ->
+        if (mode == "tracker") trackerAlarmAckTsFlow else viewerAlarmAckTsFlow
+    }.distinctUntilChanged()
+
     val homePointsFlow = settings.homePointsFlow
     val maxDistanceFlow = settings.maxDistanceFlow
     val alertSettingsFlow = settings.alertSettingsFlow
-    val isXiaomiManualOverrideFlow = settings.isXiaomiManualOverrideFlow
     val identitySanitizedFlow = settings.identitySanitizedFlow
     val isSystemActiveFlow = settings.isSystemActiveFlow
     val lastAlarmsJsonFlow = settings.lastAlarmsJsonFlow
-    val isRecoveryPendingFlow = settings.isRecoveryPendingFlow
-    val cumulativeRecoveryBlackoutMsFlow = settings.cumulativeRecoveryBlackoutMsFlow
-    val recoveryCountFlow = settings.recoveryCountFlow
 
     init {
         scope.launch {
             lastAlarmAckTsFlow.collect { lastAlarmAckTs = it }
+        }
+        scope.launch {
+            trackerAlarmAckTsFlow.collect { trackerAlarmAckTs = it }
+        }
+        scope.launch {
+            viewerAlarmAckTsFlow.collect { viewerAlarmAckTs = it }
         }
         scope.launch {
             homePointsFlow.collect { cachedHomePoints = it }
@@ -161,11 +176,19 @@ class MainRepository @Inject constructor(
     suspend fun saveString(key: String, value: String) = settings.saveString(key, value)
     fun saveStringSync(key: String, value: String) { scope.launch { settings.saveString(key, value) } }
     suspend fun saveLong(key: String, value: Long) {
-        if (key == LAST_ALARM_ACK_TS_KEY) lastAlarmAckTs = value
+        when (key) {
+            LAST_ALARM_ACK_TS_KEY -> lastAlarmAckTs = value
+            "T_$LAST_ALARM_ACK_TS_KEY" -> trackerAlarmAckTs = value
+            "V_$LAST_ALARM_ACK_TS_KEY" -> viewerAlarmAckTs = value
+        }
         settings.saveLong(key, value)
     }
     fun saveLongSync(key: String, value: Long) {
-        if (key == LAST_ALARM_ACK_TS_KEY) lastAlarmAckTs = value
+        when (key) {
+            LAST_ALARM_ACK_TS_KEY -> lastAlarmAckTs = value
+            "T_$LAST_ALARM_ACK_TS_KEY" -> trackerAlarmAckTs = value
+            "V_$LAST_ALARM_ACK_TS_KEY" -> viewerAlarmAckTs = value
+        }
         scope.launch { settings.saveLong(key, value) }
     }
     suspend fun saveDouble(key: String, value: Double) = settings.saveDouble(key, value)
@@ -194,7 +217,14 @@ class MainRepository @Inject constructor(
     }
     
     fun getCachedHomePoints(): List<GeoPoint> = cachedHomePoints ?: emptyList()
-    fun getLastAlarmAckTsSync(): Long = lastAlarmAckTs
+
+    fun getLastAlarmAckTsSync(rolePrefix: String? = null): Long {
+        return when (rolePrefix) {
+            "T_" -> trackerAlarmAckTs
+            "V_" -> viewerAlarmAckTs
+            else -> lastAlarmAckTs
+        }
+    }
 
     suspend fun saveHomePoints(points: List<GeoPoint>, maxDist: Double? = null, ts: Long? = null) {
         settings.saveHomePoints(points, maxDist, ts)
@@ -207,14 +237,7 @@ class MainRepository @Inject constructor(
 
     suspend fun loadAlertSettings() = settings.loadAlertSettings()
     suspend fun saveAlertSettings(s: AlertSettings) = settings.saveAlertSettings(s)
-    suspend fun saveDraftAlertSettings(s: AlertSettings) = settings.saveAlertSettings(s)
-    suspend fun loadDraftAlertSettings() = settings.loadDraftAlertSettings()
-    fun clearDraftSettings() { scope.launch { settings.clearDraftSettings() } }
     
-    suspend fun saveDraftSettings(deviceId: String, viewerId: String, relayUrl: String, maxDistance: Double, alertSettings: AlertSettings) = settings.saveDraftSettings(deviceId, viewerId, relayUrl, maxDistance, alertSettings)
-    suspend fun commitDraftSettings() = settings.commitDraftSettings()
-    suspend fun hasPendingDrafts(): Boolean = settings.hasPendingDrafts()
-
     suspend fun saveSettingsBulk(
         deviceId: String? = null, 
         viewerId: String? = null, 
@@ -492,8 +515,8 @@ class MainRepository @Inject constructor(
         ), initiallySynced = true)
     }
 
-    fun saveTrackerState(status: TrackerStatus) = settings.saveTrackerState(status)
-    suspend fun loadTrackerState() = settings.loadTrackerState()
+    fun saveTrackerState(status: TrackerStatus, rolePrefix: String? = null) = settings.saveTrackerState(status, rolePrefix)
+    suspend fun loadTrackerState(rolePrefix: String? = null) = settings.loadTrackerState(rolePrefix)
     suspend fun getLastAlarmAckTs(): Long = settings.getLong(LAST_ALARM_ACK_TS_KEY, 0L)
 
     suspend fun addPendingStatusUpdate(update: PendingStatusEntity) {
@@ -503,8 +526,8 @@ class MainRepository @Inject constructor(
     suspend fun getPendingStatusUpdates(limit: Int): List<PendingStatusEntity> = offlineRepository.getPendingStatusUpdates(limit)
     suspend fun deletePendingStatusUpdate(id: Long) = offlineRepository.deletePendingStatusUpdate(id)
     
-    suspend fun getLastAlarmsJson(): String = settings.getString(LAST_ALARMS_JSON_KEY, "[]")
-    fun saveAlarmsJsonSync(json: String) { scope.launch { settings.saveString(LAST_ALARMS_JSON_KEY, json) } }
+    suspend fun getLastAlarmsJson(rolePrefix: String? = null): String = settings.getString((rolePrefix ?: "") + LAST_ALARMS_JSON_KEY, "[]")
+    fun saveAlarmsJsonSync(json: String, rolePrefix: String? = null) { scope.launch { settings.saveString((rolePrefix ?: "") + LAST_ALARMS_JSON_KEY, json) } }
 
     private val _logFilterDetails = MutableStateFlow(false)
     val logFilterDetails = _logFilterDetails.asStateFlow()
@@ -537,10 +560,18 @@ class MainRepository @Inject constructor(
         powerAlarmPending: Boolean,
         lastSirenStopRt: Long,
         lastGlobalTriggerRt: Long,
-        forensicReliabilityDegradationStartRt: Long
-    ) = settings.saveLogicState(
-        firstViolationTs, firstViolationRt, firstViolationWasJump, 
-        distanceViolationCounter, wasDistanceViolated, powerAlarmPending, 
-        lastSirenStopRt, lastGlobalTriggerRt, forensicReliabilityDegradationStartRt
-    )
+        forensicReliabilityDegradationStartRt: Long,
+        rolePrefix: String? = null
+    ) {
+        val p = rolePrefix ?: ""
+        saveLong(p + FIRST_VIOLATION_TS_KEY, firstViolationTs)
+        saveLong(p + FIRST_VIOLATION_RT_KEY, firstViolationRt)
+        saveBoolean(p + FIRST_VIOLATION_WAS_JUMP_KEY, firstViolationWasJump)
+        saveInt(p + DISTANCE_VIOLATION_COUNTER_KEY, distanceViolationCounter)
+        saveBoolean(p + WAS_DISTANCE_VIOLATED_KEY, wasDistanceViolated)
+        saveBoolean(p + POWER_ALARM_PENDING_KEY, powerAlarmPending)
+        saveLong(p + LAST_SIREN_STOP_RT_KEY, lastSirenStopRt)
+        saveLong(p + LAST_GLOBAL_TRIGGER_RT_KEY, lastGlobalTriggerRt)
+        saveLong(p + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, forensicReliabilityDegradationStartRt)
+    }
 }

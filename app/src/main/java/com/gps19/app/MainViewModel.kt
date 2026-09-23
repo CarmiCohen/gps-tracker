@@ -21,6 +21,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Sep.23.71:
+ * - Issue #1230 REMEDIATION: Integrated AlertUseCase to ensure role-based 
+ *   namespacing for alarm acknowledgments and siren dismissal (R-ID 453).
  * Sep.23.50:
  * - Issue #1203 RESOLVED: Optimized Hilt ViewModel scoping and eliminated 
  *   redundant stream resource churn, state loss, and misrouted kinematic state.
@@ -38,6 +41,7 @@ class MainViewModel @Inject constructor(
     private val telemetryUseCase: TelemetryUseCase,
     private val remoteStatusRepository: RemoteStatusRepository,
     private val uiStateMapper: UiStateMapper,
+    private val alertUseCase: AlertUseCase,
     val timeProvider: TimeProvider,
     val audioSynthesizer: AudioSynthesizer,
     private val hydrationManager: LifecycleHydrationManager,
@@ -125,11 +129,11 @@ class MainViewModel @Inject constructor(
     val history24HFlow = repository.getHistoryFlow("24H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     val history7DFlow = repository.getHistoryFlow("7D").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val trackerTrailFlow: StateFlow<List<TrailPoint>> = repository.trackerTrailFlow
+    val trackerTrailFlow: Flow<List<TrailPoint>> = repository.trackerTrailFlow
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val viewerTrailFlow: StateFlow<List<TrailPoint>> = repository.viewerTrailFlow
+    val viewerTrailFlow: Flow<List<TrailPoint>> = repository.viewerTrailFlow
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -488,20 +492,25 @@ class MainViewModel @Inject constructor(
             is UiEvent.SetManualSelection -> updateState { it.copy(spatial = it.spatial.copy(isManualSelectionInProgress = event.active)) }
             is UiEvent.SetSettlingActive -> updateState { it.copy(session = it.session.copy(isSettlingActive = event.active)) }
             is UiEvent.ToggleSetupBypass -> updateState { it.copy(session = it.session.copy(isSetupBypassActive = event.active)) }
+            is UiEvent.DismissAlarms -> {
+                updateDiagnosticState { it.apply { isRedScreenVisible = false } }
+                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+                    alertUseCase.dismissAlarms()
+                }
+            }
             is UiEvent.DismissIdentitySanitization -> {
                 updateState { it.copy(settings = it.settings.copy(isIdentitySanitized = false)) }
                 viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
                     repository.saveBoolean(IDENTITY_SANITIZED_KEY, false)
                 }
             }
-            is UiEvent.DismissAlarms -> {
-                updateDiagnosticState { it.apply { isRedScreenVisible = false } }
-            }
             is UiEvent.SetRedScreenVisible -> {
                 updateDiagnosticState { it.apply { isRedScreenVisible = event.visible } }
             }
             is UiEvent.StopSiren -> {
-                repository.sendCommand(UiCommand.StopSiren(event.causes))
+                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
+                    alertUseCase.stopSiren(event.causes)
+                }
             }
             is UiEvent.ToggleStrictMode -> {
                 updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
@@ -655,7 +664,8 @@ class MainViewModel @Inject constructor(
             settings = it.settings.copy(
                 deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl,
                 isIdentitySanitized = initial.identitySanitized, alertSettings = initial.alertSettings,
-                draftSettings = initial.draftSettings ?: it.settings.draftSettings
+                draftSettings = initial.draftSettings ?: it.settings.draftSettings,
+                lastAlarmAckTs = initial.lastAlarmAckTs
             ),
             session = it.session.copy(
                 appMode = initial.appMode, isSystemActive = initial.isSystemActive,

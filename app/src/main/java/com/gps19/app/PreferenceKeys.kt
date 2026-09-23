@@ -2,7 +2,8 @@ package com.gps19.app
 
 /**
  * PreferenceKeys: Centralized keys for DataStore and SharedPreferences.
- * Cleaned up in July.26.04 audit.
+ * Sep.23.70:
+ * - Issue #1230: Added missing keys for logic state and background auditing (R-ID 453).
  */
 
 const val APP_MODE_KEY = "app_mode"
@@ -79,3 +80,6 @@ const val POWER_ALARM_PENDING_KEY = "power_alarm_pending"
 const val LAST_SIREN_STOP_RT_KEY = "last_siren_stop_rt"
 const val LAST_GLOBAL_TRIGGER_RT_KEY = "last_global_trigger_rt"
 const val FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY = "forensic_reliability_degradation_start_rt"
+
+// Background Audit Keys
+const val LAST_INTEGRITY_CHECK_TS_KEY = "last_integrity_check_ts"

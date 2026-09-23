@@ -1,6 +1,7 @@
-# SOT Master Requirements & Hardening Status (Sep.23.70)
+# SOT Master Requirements & Hardening Status (Sep.22.30)
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 453**: Role-Based Storage Namespacing - Implemented physical isolation for logic state persistence using role-prefixed maps (`role_longs`, `role_doubles`, etc.) in `AppSettings`. Refactored `SettingsRepository` and `MainRepository` to route `"T_"` and `"V_"` prefixed keys to these isolated partitions, preventing state corruption and logic leakage when switching functional roles (Tracker vs Viewer) on the same hardware. (Resolved Sep.23.70)
 *   **SOT ID 424**: Race Condition & Initialization Safeguard - Introduced `initializationDeferred` using Kotlin coroutines CompletableDeferred in `BaseMonitorService`. This ensures that high-frequency background ticks, telemetry sampling loops, and heartbeat broadcasts are strictly blocked until asynchronous service hydration and database state restoration (`onServiceInitialize()`) are completely finished. fully closing state race conditions under physical stress or system recovery startup cycles. (Resolved Sep.23.70)
 *   **SOT ID 423**: Siren Trigger Orchestration - Integrated physical siren activation into the core alarm evaluation loop within `AppAlarmManager`. This ensures that violation detections in background services are immediately and reliably translated into audio synthesis via `AudioSynthesizer`, respecting all role-based stealth requirements and manual silence overrides. (Resolved Sep.23.60)
 *   **SOT ID 422**: Centralized Single Source of Truth (SSOT) ViewModel Architecture - Re-consolidated role-specific ViewModels into a unified activity-scoped `MainViewModel`. Established a single point of subscription for high-frequency kinematic and diagnostic data streams, eliminating coroutine allocation churn (#1211) and ensuring map view states and configuration drafts remain persistent during navigation transitions (#1212, #1213). This architecture guarantees atomic state propagation across all functional roles (Tracker, Viewer, Setup). (Resolved Sep.23.50)
@@ -59,16 +60,17 @@
 *   **SOT ID 367**: Forensic Multi-Role Integrity Hardening - Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367). (Resolved Sep.19.08)
 
 ## 4.3. Metric Summary
-- **Rules Verified**: 87
-- **Total SOT IDs**: 424
-- **Resolved Issues**: 1188
-- **Open Issues**: 25
+- **Rules Verified**: 89
+- **Total SOT IDs**: 425
+- **Resolved Issues**: 1189
+- **Open Issues**: 24
 - **Testing Coverage**: 3 (Sub-items: 12)
-- **Simplification Ideas**: 14
+- **Simplification Ideas**: 15
 - **QA Validation Tasks**: 283
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.88 (Race Condition & Initialization Safeguard)**: PASSED - Verified that `initializationDeferred.await()` successfully blocks background tick execution and heartbeat processing until `onServiceInitialize()` completes. (Sep.23.70)
+*   **Chapter 31.89 (Role-Based Storage Namespacing)**: PASSED - Successfully verified that Tracker and Viewer logic states are stored in isolated proto maps, preventing cross-role state corruption during functional transitions. (Sep.22.30)
+*   **Chapter 31.88 (Race Condition & Initialization Safeguard)**: PASSED - Verified that `initializationDeferred.await()` successfully blocks background tick execution and heartbeat processing until `onServiceInitialize()` completes. (Sep.22.30)
 *   **Chapter 31.87 (Siren Trigger Orchestration)**: PASSED - Successfully integrated siren activation/deactivation into the alarm evaluation cycle, ensuring hardware-reactive alerts in background services. (Sep.22.30)
 *   **Chapter 31.86 (Centralized SSOT ViewModel Architecture)**: PASSED - Successfully unified Tracker, Viewer, and Setup states into MainViewModel, resolving multi-subscription churn and ephemeral state loss. (Sep.22.30)
 *   **Chapter 31.85 (Unified Hardware Lifecycle & Vendor Hardening)**: PASSED - Successfully consolidated Samsung, Xiaomi, and Huawei adaptations into DeviceHardeningStrategy. (Sep.22.30)
@@ -116,4 +118,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite. (Sep.22.30)
 
 ---
-*Next Audit: Sep.23.100. (Sep.23.70)*
+*Next Audit: Sep.23.100. (Sep.22.30)*

@@ -7,10 +7,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ### Background Service Infrastructure & Hardening Gaps (Rigorous Audit of #1171 & Service Overlays)
 
-*   **Issue #1230: Shared Storage Key Leakage & Cross-Role State Corruption**
-    *   *Description*: Both `TrackerService` and `ViewerService` load and save logic states using identical database/preferences storage keys.
-    *   *Significance*: **High (Data Integrity & Baseline Degradation)**.
-
 *   **Issue #1231: Redundant Stream Overlap & Duplicate Heartbeat Processing in ViewerService**
     *   *Description*: `ViewerService.kt` contains a copy-paste duplication error where heartbeat events are processed twice.
     *   *Significance*: **Medium-High (Logic Bug & Telemetry Churn)**.
@@ -56,7 +52,6 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 ### Required Remediation & Strategic Implementation (Strategic Recommendations for Resolution)
 
 #### For Issue #1171 (Service & Background Hardening)
-*   **Issue #1240: Role-Based Namespace Isolation for Logic State Persistence** (High)
 *   **Issue #1241: Functional Restoration of History Sync Streams in ViewerService** (High)
 *   **Issue #1242: Operationalization of OEM Power Hardening Logic** (High)
 *   **Issue #1243: Fast-Path Binding Lifecycle Optimization** (Medium)
@@ -73,8 +68,9 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 14)
+## 💡 Strategic Simplification Ideas (Ideas: 15)
 
+*   **Issue #1293: Lifecycle-Aware Tick Orchestrator** (Low-Medium): Refactor `BaseMonitorService` to use a dedicated TickOrchestrator that handles the initialization gate internally, removing the need for manual `await()` calls in background loops.
 *   **Issue #1292: Reactive Siren State Binding** (High): Move siren lifecycle orchestration into a dedicated `SirenService` or `SirenCoordinator` to remove the imperative `audioSynthesizer.play/stop` calls from the evaluation manager.
 *   **Issue #1291: Domain Event Bus Integration** (High): Centralize dispersed logging, telemetry capture triggers, and command routing into a single `AppEventCoordinator` to eliminate cross-component coupling.
 *   **Issue #1161: Unified Trajectory & Buffer Management** (Medium-High)
@@ -94,6 +90,8 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1230: Shared Storage Key Leakage & Cross-Role State Corruption** (Resolved Sep.23.70)
+*   **Issue #1240: Role-Based Namespace Isolation for Logic State Persistence** (Resolved Sep.23.70)
 *   **Issue #1236: Race Conditions and Premature Tick Execution during Asynchronous Initialization** (Resolved Sep.23.70)
 *   **Issue #1270: Disconnected Siren Trigger Mechanism** (Resolved Sep.23.60)
 *   **Issue #1280: Integrate Siren Trigger into Alarm Evaluation Loop** (Resolved Sep.23.60)
@@ -106,4 +104,4 @@ Finalizing the audit of signaling performance under physical stress and ensuring
 *   **Issue #1193: Asymmetric Audio Control and Siren State Dispersion** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 424 (Rules: 87, IDs: 424), Resolved: 1188, Open: 25, Testing: 3 (Sub-items: 12), Ideas: 14, QA: 283]**
+- **Current Audit Baseline: [SOT: 425 (Rules: 89, IDs: 425), Resolved: 1190, Open: 23, Testing: 3 (Sub-items: 12), Ideas: 15, QA: 283]**

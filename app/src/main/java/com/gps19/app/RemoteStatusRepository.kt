@@ -11,12 +11,13 @@ import javax.inject.Singleton
 
 /**
  * RemoteStatusRepository: Single Source of Truth for Remote Peer Telemetry.
+ * Sep.23.70:
+ * - Issue #1230 REMEDIATION: Applied "V_" role prefix to state persistence 
+ *   to ensure remote telemetry isolation (R-ID 453).
  * Aug.14.03:
  * - Issue #171: Forensic Jitter Audit. Relaxed shouldProcessPacket to allow 
  *   out-of-order packets within MONOTONIC_JITTER_TOLERANCE_MS (2s) to prevent 
  *   forensic data loss during multi-viewer jitter (R171).
- * July.26.02:
- * - Issue #545b: Lifecycle Idempotency.
  */
 @Singleton
 class RemoteStatusRepository @Inject constructor(
@@ -42,7 +43,8 @@ class RemoteStatusRepository @Inject constructor(
         if (isInitialized.getAndSet(true)) return
 
         try {
-            mainRepository.loadTrackerState()?.let { savedStatus ->
+            // R-ID 453: Use Viewer prefix to isolate remote status persistence
+            mainRepository.loadTrackerState("V_")?.let { savedStatus ->
                 _remoteStatus.value = savedStatus
             }
         } catch (e: Exception) {
@@ -52,13 +54,13 @@ class RemoteStatusRepository @Inject constructor(
 
     fun updateStatus(status: TrackerStatus) {
         _remoteStatus.value = status
-        mainRepository.saveTrackerState(status)
+        mainRepository.saveTrackerState(status, "V_")
     }
 
     fun updateStatusAtomic(action: (TrackerStatus) -> TrackerStatus) {
         _remoteStatus.update { current ->
             val next = action(current)
-            mainRepository.saveTrackerState(next)
+            mainRepository.saveTrackerState(next, "V_")
             next
         }
     }

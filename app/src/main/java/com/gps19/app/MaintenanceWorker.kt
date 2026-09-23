@@ -3,6 +3,7 @@ package com.gps19.app
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.location.Location
 import android.os.Build
 import androidx.core.content.ContextCompat
 import androidx.work.*
@@ -17,13 +18,9 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
- * Sep.03.16:
- * - Issue #897 RESOLVED: Target SDK 35 FGS Compatibility. Explicitly passing 
- *   FOREGROUND_SERVICE_TYPE_SPECIAL_USE in getForegroundInfo() to prevent 
- *   InvalidForegroundServiceTypeException during recovery (R897).
- * Sep.02.50:
- * - Issue #005 Hardening: Replaced all android.util.Log calls with Timber to 
- *   ensure log spillage protection on Samsung A15/G990 hardware (R759).
+ * Sep.23.70:
+ * - Issue #1230 REMEDIATION: Made worker role-aware to correctly audit namespaced 
+ *   service ticks ("T_" or "V_" prefixes) (R-ID 453).
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -71,8 +68,11 @@ class MaintenanceWorker @AssistedInject constructor(
         val now = timeProvider.currentTimeMillis()
         val nowRt = timeProvider.elapsedRealtime()
         
-        val lastTick = repository.getLong(LAST_SERVICE_TICK_TS_KEY, 0L)
-        val lastTickRt = repository.getLong(LAST_SERVICE_TICK_REALTIME_KEY, 0L)
+        // R-ID 453: Use role-based prefix to audit the correct logic state
+        val prefix = if (savedMode == "tracker") "T_" else "V_"
+        
+        val lastTick = repository.getLong(prefix + LAST_SERVICE_TICK_TS_KEY, 0L)
+        val lastTickRt = repository.getLong(prefix + LAST_SERVICE_TICK_REALTIME_KEY, 0L)
         val appStartTime = repository.getLong(APP_START_TIME_KEY, 0L)
         
         val silenceDurationMs = when {

@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.23.70:
+ * - Issue #1230 REMEDIATION: Added rolePrefix to AlarmServiceContext to support 
+ *   role-based namespace isolation during logic state persistence (R-ID 453).
  * Sep.23.08:
  * - Issue #1204: Unified Hardware Lifecycle. Added isHuaweiDevice to 
  *   HardwareCapabilities for vendor-specific hardening.
@@ -220,7 +223,8 @@ data class AlarmServiceContext(
     val distToHomeAuthority: Double?,
     val maxDistanceAuthority: Double,
     val discoveryPhase: DiscoveryPhase? = null,
-    val capabilities: HardwareCapabilities = HardwareCapabilities()
+    val capabilities: HardwareCapabilities = HardwareCapabilities(),
+    val rolePrefix: String = ""
 )
 
 /**

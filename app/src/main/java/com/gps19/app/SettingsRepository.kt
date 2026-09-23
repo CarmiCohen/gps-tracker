@@ -18,7 +18,6 @@ import javax.inject.Singleton
 
 /**
  * Extension property to ensure a single instance of DataStore per process.
- * Resolved Issue #511: DataStore Singleton Violation.
  */
 private val Context.settingsDataStore: DataStore<AppSettings> by dataStore(
     fileName = "app_settings.pb",
@@ -33,7 +32,6 @@ private val Context.settingsDataStore: DataStore<AppSettings> by dataStore(
 
 /**
  * Generic extension function to mutate DataStore<AppSettings> atomically and race-free.
- * Consolidates repeated builder boilerplate for list and field mutations.
  */
 private suspend inline fun DataStore<AppSettings>.mutate(
     crossinline block: AppSettings.Builder.() -> Unit
@@ -45,9 +43,6 @@ private suspend inline fun DataStore<AppSettings>.mutate(
     }
 }
 
-/**
- * CommitResult: Result of an atomic draft commit to primary settings.
- */
 data class CommitResult(
     val trackerIdChanged: Boolean = false,
     val viewerIdChanged: Boolean = false,
@@ -60,12 +55,12 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Sep.23.70:
+ * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation using 
+ *   proto maps to prevent state corruption between Tracker and Viewer roles (R-ID 453).
  * Sep.22.50:
  * - Issue #1164 REMEDIATION: Implemented persistence for logic state fields 
  *   (Geofence Debounce, Power Latches, Siren Timers) to survive process death (R-ID 417).
- * Sep.22.04:
- * - Idea #1 Integration: Extracted atomic list mutation pattern into a generic 
- *   DataStore<AppSettings>.mutate extension to streamline data layer operations.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -85,9 +80,8 @@ class SettingsRepository @Inject constructor(
             override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
                 val t = currentData.trackerId
                 val v = currentData.viewerId
-                val isTrackerInvalid = t.isNotEmpty() && !SignalingConstants.isValidTrackerId(t)
-                val isViewerInvalid = v.isNotEmpty() && !SignalingConstants.isValidViewerId(v)
-                return isTrackerInvalid || isViewerInvalid
+                return (t.isNotEmpty() && !SignalingConstants.isValidTrackerId(t)) ||
+                       (v.isNotEmpty() && !SignalingConstants.isValidViewerId(v))
             }
 
             override suspend fun migrate(currentData: AppSettings): AppSettings {
@@ -113,122 +107,126 @@ class SettingsRepository @Inject constructor(
     val relayUrlFlow: Flow<String> = dataStore.data.map { it.relayUrl.ifEmpty { DEFAULT_RELAY_URL } }
     val isManualExitFlow: Flow<Boolean> = dataStore.data.map { it.isManualExit }
     val lastAlarmAckTsFlow: Flow<Long> = dataStore.data.map { it.lastAlarmAckTs }
+    val trackerAlarmAckTsFlow: Flow<Long> = dataStore.data.map { it.roleLongsMap.getOrDefault("T_$LAST_ALARM_ACK_TS_KEY", 0L) }
+    val viewerAlarmAckTsFlow: Flow<Long> = dataStore.data.map { it.roleLongsMap.getOrDefault("V_$LAST_ALARM_ACK_TS_KEY", 0L) }
     val homePointsFlow: Flow<List<GeoPoint>> = dataStore.data.map { it.homePointsList.map { p -> GeoPoint(p.lat, p.lng) } }
     val maxDistanceFlow: Flow<Double> = dataStore.data.map { if (it.maxDistance > 0.0) it.maxDistance else DEFAULT_MAX_DISTANCE }
     val alertSettingsFlow: Flow<AlertSettings> = dataStore.data.map { SettingsMapper.protoToAlertSettings(it.alertSettings) }
-    val isXiaomiManualOverrideFlow: Flow<Boolean> = dataStore.data.map { it.isXiaomiManualOverride }
     val identitySanitizedFlow: Flow<Boolean> = dataStore.data.map { it.identitySanitized }
     val isSystemActiveFlow: Flow<Boolean> = dataStore.data.map { it.isSystemActive }
     val lastAlarmsJsonFlow: Flow<String> = dataStore.data.map { it.lastAlarmsJson }
-    val isRecoveryPendingFlow: Flow<Boolean> = dataStore.data.map { it.isRecoveryPending }
-    val recoveryBlockedTsFlow: Flow<Long> = dataStore.data.map { it.recoveryBlockedTs }
-    val cumulativeRecoveryBlackoutMsFlow: Flow<Long> = dataStore.data.map { it.cumulativeRecoveryBlackoutMs }
-    val recoveryCountFlow: Flow<Int> = dataStore.data.map { it.recoveryCount }
 
     suspend fun getSettingsSnapshot(): AppSettings = dataStore.data.first()
 
     suspend fun saveString(keyName: String, value: String) {
         dataStore.mutate {
-            when (keyName) {
-                APP_MODE_KEY -> setAppMode(value)
-                TRACKER_ID_KEY -> setTrackerId(value)
-                VIEWER_ID_KEY -> setViewerId(value)
-                RELAY_URL_KEY -> setRelayUrl(value)
-                SELECTED_SIREN_KEY -> setSelectedSiren(value)
-                DRAFT_TRACKER_ID -> setDraftTrackerId(value)
-                DRAFT_VIEWER_ID -> setDraftViewerId(value)
-                DRAFT_RELAY_URL -> setDraftRelayUrl(value)
-                LAST_DAILY_ARCHIVE_DATE_KEY -> setLastDailyArchiveDate(value)
-                LAST_DAILY_CLEANUP_DATE_KEY -> setLastDailyCleanupDate(value)
-                LAST_ALARMS_JSON_KEY -> setLastAlarmsJson(value)
+            if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+                this.putRoleStrings(keyName, value)
+            } else {
+                when (keyName) {
+                    APP_MODE_KEY -> setAppMode(value)
+                    TRACKER_ID_KEY -> setTrackerId(value)
+                    VIEWER_ID_KEY -> setViewerId(value)
+                    RELAY_URL_KEY -> setRelayUrl(value)
+                    SELECTED_SIREN_KEY -> setSelectedSiren(value)
+                    LAST_ALARMS_JSON_KEY -> setLastAlarmsJson(value)
+                }
             }
         }
     }
 
     suspend fun saveLong(keyName: String, value: Long) {
         dataStore.mutate {
-            when (keyName) {
-                LAST_ALARM_ACK_TS_KEY -> setLastAlarmAckTs(value)
-                HOME_POINTS_TS_KEY -> setHomePointsTs(value)
-                LAST_SERVICE_TICK_TS_KEY -> setLastServiceTickTs(value)
-                APP_START_TIME_KEY -> setAppStartTime(value)
-                TOTAL_CONNECTED_KEY -> setTotalConnected(value)
-                UPTIME_KEY -> setUptime(value)
-                LAST_CONNECTION_TS_KEY -> setLastConnectionTs(value)
-                LAST_DISCONNECTION_TS_KEY -> setLastDisconnectionTs(value)
-                TOTAL_DROP_KEY -> setTotalDrop(value)
-                MAX_DROP_KEY -> setMaxDrop(value)
-                MAX_DROP_TS_KEY -> setMaxDropTs(value)
-                LAST_GPS_TS_KEY -> setLastGpsTs(value)
-                VIOLATION_UPTIME_MS_KEY -> setViolationUptimeMs(value)
-                LAST_SERVICE_TICK_REALTIME_KEY -> setLastServiceTickRt(value)
-                CLOCK_DRIFT_REF_KEY -> setClockDriftRef(value)
-                LAST_SIT_TS_KEY -> setLastSitTs(value)
-                LAST_HISTORY_SIT_TS_KEY -> setLastHistorySitTs(value)
-                RECOVERY_BLOCKED_TS_KEY -> setRecoveryBlockedTs(value)
-                CUMULATIVE_RECOVERY_BLACKOUT_MS_KEY -> setCumulativeRecoveryBlackoutMs(value)
-                FIRST_VIOLATION_TS_KEY -> setFirstViolationTs(value)
-                FIRST_VIOLATION_RT_KEY -> setFirstViolationRt(value)
-                LAST_SIREN_STOP_RT_KEY -> setLastSirenStopRt(value)
-                LAST_GLOBAL_TRIGGER_RT_KEY -> setLastGlobalTriggerRt(value)
-                FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY -> setForensicReliabilityDegradationStartRt(value)
+            if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+                this.putRoleLongs(keyName, value)
+            } else {
+                when (keyName) {
+                    LAST_ALARM_ACK_TS_KEY -> setLastAlarmAckTs(value)
+                    HOME_POINTS_TS_KEY -> setHomePointsTs(value)
+                    LAST_SERVICE_TICK_TS_KEY -> setLastServiceTickTs(value)
+                    APP_START_TIME_KEY -> setAppStartTime(value)
+                    TOTAL_CONNECTED_KEY -> setTotalConnected(value)
+                    UPTIME_KEY -> setUptime(value)
+                    LAST_CONNECTION_TS_KEY -> setLastConnectionTs(value)
+                    LAST_DISCONNECTION_TS_KEY -> setLastDisconnectionTs(value)
+                    TOTAL_DROP_KEY -> setTotalDrop(value)
+                    MAX_DROP_KEY -> setMaxDrop(value)
+                    MAX_DROP_TS_KEY -> setMaxDropTs(value)
+                    LAST_GPS_TS_KEY -> setLastGpsTs(value)
+                    VIOLATION_UPTIME_MS_KEY -> setViolationUptimeMs(value)
+                    LAST_SERVICE_TICK_REALTIME_KEY -> setLastServiceTickRt(value)
+                    CLOCK_DRIFT_REF_KEY -> setClockDriftRef(value)
+                    LAST_SIT_TS_KEY -> setLastSitTs(value)
+                    FIRST_VIOLATION_TS_KEY -> setFirstViolationTs(value)
+                    FIRST_VIOLATION_RT_KEY -> setFirstViolationRt(value)
+                    LAST_SIREN_STOP_RT_KEY -> setLastSirenStopRt(value)
+                    LAST_GLOBAL_TRIGGER_RT_KEY -> setLastGlobalTriggerRt(value)
+                    FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY -> setForensicReliabilityDegradationStartRt(value)
+                }
             }
         }
     }
 
     suspend fun saveDouble(keyName: String, value: Double) {
         dataStore.mutate {
-            when (keyName) {
-                MAX_DISTANCE_STORAGE_KEY -> setMaxDistance(value)
-                MAX_ACCURACY_KEY -> setMaxAccuracy(value)
-                MAX_TEMP_KEY -> setMaxTemp(value)
-                TRACKER_LUX_BASELINE_KEY -> setTrackerLuxBaseline(value)
-                TRACKER_ACOUSTIC_FLOOR_KEY -> setTrackerAcousticFloor(value)
-                DRAFT_MAX_DISTANCE -> setDraftMaxDistance(value)
-                CHAIR_BASELINE_TILT_KEY -> setChairBaselineTilt(value)
+            if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+                this.putRoleDoubles(keyName, value)
+            } else {
+                when (keyName) {
+                    MAX_DISTANCE_STORAGE_KEY -> setMaxDistance(value)
+                    MAX_ACCURACY_KEY -> setMaxAccuracy(value)
+                    MAX_TEMP_KEY -> setMaxTemp(value)
+                    TRACKER_LUX_BASELINE_KEY -> setTrackerLuxBaseline(value)
+                    TRACKER_ACOUSTIC_FLOOR_KEY -> setTrackerAcousticFloor(value)
+                    CHAIR_BASELINE_TILT_KEY -> setChairBaselineTilt(value)
+                }
             }
         }
     }
 
     suspend fun saveBoolean(keyName: String, value: Boolean) {
         dataStore.mutate {
-            when (keyName) {
-                IS_MANUAL_EXIT_KEY -> setIsManualExit(value)
-                IS_MIC_TYPE_STARTED_KEY -> setIsMicTypeStarted(value)
-                IS_XIAOMI_MANUAL_OVERRIDE_KEY -> setIsXiaomiManualOverride(value)
-                IDENTITY_SANITIZED_KEY -> setIdentitySanitized(value)
-                IS_SYSTEM_ACTIVE_KEY -> setIsSystemActive(value)
-                IS_RECOVERY_PENDING_KEY -> setIsRecoveryPending(value)
-                FIRST_VIOLATION_WAS_JUMP_KEY -> setFirstViolationWasJump(value)
-                WAS_DISTANCE_VIOLATED_KEY -> setWasDistanceViolated(value)
-                POWER_ALARM_PENDING_KEY -> setPowerAlarmPending(value)
+            if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+                this.putRoleBools(keyName, value)
+            } else {
+                when (keyName) {
+                    IS_MANUAL_EXIT_KEY -> setIsManualExit(value)
+                    IS_MIC_TYPE_STARTED_KEY -> setIsMicTypeStarted(value)
+                    IS_XIAOMI_MANUAL_OVERRIDE_KEY -> setIsXiaomiManualOverride(value)
+                    IDENTITY_SANITIZED_KEY -> setIdentitySanitized(value)
+                    IS_SYSTEM_ACTIVE_KEY -> setIsSystemActive(value)
+                    FIRST_VIOLATION_WAS_JUMP_KEY -> setFirstViolationWasJump(value)
+                    WAS_DISTANCE_VIOLATED_KEY -> setWasDistanceViolated(value)
+                    POWER_ALARM_PENDING_KEY -> setPowerAlarmPending(value)
+                }
             }
         }
     }
 
     suspend fun saveInt(keyName: String, value: Int) {
         dataStore.mutate {
-            when (keyName) {
-                LAST_AUTO_SAVE_HOUR_KEY -> setLastAutoSaveHour(value)
-                LAST_VERSION_CODE_KEY -> setLastVersionCode(value)
-                RECOVERY_COUNT_KEY -> setRecoveryCount(value)
-                DISTANCE_VIOLATION_COUNTER_KEY -> setDistanceViolationCounter(value)
+            if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+                this.putRoleInts(keyName, value)
+            } else {
+                when (keyName) {
+                    LAST_AUTO_SAVE_HOUR_KEY -> setLastAutoSaveHour(value)
+                    LAST_VERSION_CODE_KEY -> setLastVersionCode(value)
+                    RECOVERY_COUNT_KEY -> setRecoveryCount(value)
+                    DISTANCE_VIOLATION_COUNTER_KEY -> setDistanceViolationCounter(value)
+                }
             }
         }
     }
 
     suspend fun getString(keyName: String, default: String): String {
         val settings = dataStore.data.first()
+        if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+            return settings.roleStringsMap.getOrDefault(keyName, default)
+        }
         val value = when (keyName) {
             TRACKER_ID_KEY -> settings.trackerId
             VIEWER_ID_KEY -> settings.viewerId
             RELAY_URL_KEY -> settings.relayUrl
-            SELECTED_SIREN_KEY -> settings.selectedSiren
-            DRAFT_TRACKER_ID -> settings.draftTrackerId
-            DRAFT_VIEWER_ID -> settings.draftViewerId
-            DRAFT_RELAY_URL -> settings.draftRelayUrl
-            LAST_DAILY_ARCHIVE_DATE_KEY -> settings.lastDailyArchiveDate
-            LAST_DAILY_CLEANUP_DATE_KEY -> settings.lastDailyCleanupDate
             LAST_ALARMS_JSON_KEY -> settings.lastAlarmsJson
             else -> ""
         }
@@ -237,6 +235,9 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getLong(keyName: String, default: Long): Long {
         val settings = dataStore.data.first()
+        if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+            return settings.roleLongsMap.getOrDefault(keyName, default)
+        }
         val value = when (keyName) {
             LAST_ALARM_ACK_TS_KEY -> settings.lastAlarmAckTs
             HOME_POINTS_TS_KEY -> settings.homePointsTs
@@ -254,9 +255,6 @@ class SettingsRepository @Inject constructor(
             LAST_SERVICE_TICK_REALTIME_KEY -> settings.lastServiceTickRt
             CLOCK_DRIFT_REF_KEY -> if (settings.hasClockDriftRef()) settings.clockDriftRef else 0L
             LAST_SIT_TS_KEY -> if (settings.hasLastSitTs()) settings.lastSitTs else 0L
-            LAST_HISTORY_SIT_TS_KEY -> if (settings.hasLastHistorySitTs()) settings.lastHistorySitTs else 0L
-            RECOVERY_BLOCKED_TS_KEY -> settings.recoveryBlockedTs
-            CUMULATIVE_RECOVERY_BLACKOUT_MS_KEY -> settings.cumulativeRecoveryBlackoutMs
             FIRST_VIOLATION_TS_KEY -> settings.firstViolationTs
             FIRST_VIOLATION_RT_KEY -> settings.firstViolationRt
             LAST_SIREN_STOP_RT_KEY -> settings.lastSirenStopRt
@@ -269,13 +267,15 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getDouble(keyName: String, default: Double): Double {
         val settings = dataStore.data.first()
+        if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+            return settings.roleDoublesMap.getOrDefault(keyName, default)
+        }
         val value = when (keyName) {
             MAX_DISTANCE_STORAGE_KEY -> settings.maxDistance
             MAX_ACCURACY_KEY -> settings.maxAccuracy
             MAX_TEMP_KEY -> settings.maxTemp
             TRACKER_LUX_BASELINE_KEY -> settings.trackerLuxBaseline
             TRACKER_ACOUSTIC_FLOOR_KEY -> settings.trackerAcousticFloor
-            DRAFT_MAX_DISTANCE -> settings.draftMaxDistance
             CHAIR_BASELINE_TILT_KEY -> settings.chairBaselineTilt
             else -> 0.0
         }
@@ -284,13 +284,15 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getBoolean(keyName: String, default: Boolean): Boolean {
         val settings = dataStore.data.first()
+        if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+            return settings.roleBoolsMap.getOrDefault(keyName, default)
+        }
         return when (keyName) {
             IS_MANUAL_EXIT_KEY -> settings.isManualExit
             IS_MIC_TYPE_STARTED_KEY -> settings.isMicTypeStarted
             IS_XIAOMI_MANUAL_OVERRIDE_KEY -> settings.isXiaomiManualOverride
             IDENTITY_SANITIZED_KEY -> settings.identitySanitized
             IS_SYSTEM_ACTIVE_KEY -> settings.isSystemActive
-            IS_RECOVERY_PENDING_KEY -> settings.isRecoveryPending
             FIRST_VIOLATION_WAS_JUMP_KEY -> settings.firstViolationWasJump
             WAS_DISTANCE_VIOLATED_KEY -> settings.wasDistanceViolated
             POWER_ALARM_PENDING_KEY -> settings.powerAlarmPending
@@ -300,6 +302,9 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getInt(keyName: String, default: Int): Int {
         val settings = dataStore.data.first()
+        if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+            return settings.roleIntsMap.getOrDefault(keyName, default)
+        }
         val value = when (keyName) {
             LAST_AUTO_SAVE_HOUR_KEY -> settings.lastAutoSaveHour
             LAST_VERSION_CODE_KEY -> settings.lastVersionCode
@@ -310,8 +315,30 @@ class SettingsRepository @Inject constructor(
         return if (value == -1) default else value
     }
 
-    suspend fun getAppMode(): String? = dataStore.data.first().appMode.ifEmpty { null }
-    
+    /**
+     * Role-based reset of all namespaced property maps to prevent stale logic states.
+     */
+    suspend fun resetRoleState(prefix: String) {
+        dataStore.mutate {
+            val longKeys = roleLongsMap.keys.filter { it.startsWith(prefix) }
+            longKeys.forEach { removeRoleLongs(it) }
+
+            val doubleKeys = roleDoublesMap.keys.filter { it.startsWith(prefix) }
+            doubleKeys.forEach { removeRoleDoubles(it) }
+
+            val boolKeys = roleBoolsMap.keys.filter { it.startsWith(prefix) }
+            boolKeys.forEach { removeRoleBools(it) }
+
+            val intKeys = roleIntsMap.keys.filter { it.startsWith(prefix) }
+            intKeys.forEach { removeRoleInts(it) }
+
+            val stringKeys = roleStringsMap.keys.filter { it.startsWith(prefix) }
+            stringKeys.forEach { removeRoleStrings(it) }
+            
+            removeRoleStates(prefix)
+        }
+    }
+
     suspend fun setAppMode(mode: String?) {
         dataStore.mutate { setAppMode(mode ?: "") }
     }
@@ -328,9 +355,6 @@ class SettingsRepository @Inject constructor(
         return ts
     }
 
-    /**
-     * Atomic addition of a home point to persistent storage using generic mutation extension.
-     */
     suspend fun addHomePoint(lat: Double, lng: Double): Long {
         val ts = timeProvider.currentTimeMillis()
         dataStore.mutate {
@@ -340,9 +364,6 @@ class SettingsRepository @Inject constructor(
         return ts
     }
 
-    /**
-     * Atomic removal of a home point from persistent storage by index using generic mutation extension.
-     */
     suspend fun removeHomePoint(index: Int): Long {
         val ts = timeProvider.currentTimeMillis()
         dataStore.mutate {
@@ -365,188 +386,33 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    fun saveTrackerState(status: TrackerStatus) {
+    fun saveTrackerState(status: TrackerStatus, rolePrefix: String? = null) {
         scope.launch {
             dataStore.mutate {
-                setTrackerState(SettingsMapper.mapTrackerStatusToProto(status))
+                val proto = SettingsMapper.mapTrackerStatusToProto(status)
+                if (rolePrefix != null) {
+                    putRoleStates(rolePrefix, proto)
+                } else {
+                    setTrackerState(proto)
+                }
             }
         }
     }
 
-    suspend fun loadTrackerState(): TrackerStatus? {
+    suspend fun loadTrackerState(rolePrefix: String? = null): TrackerStatus? {
         val settings = dataStore.data.first()
+        if (rolePrefix != null) {
+            val proto = settings.roleStatesMap[rolePrefix] ?: return null
+            return SettingsMapper.mapTrackerStatusFromProto(proto)
+        }
         if (!settings.hasTrackerState()) return null
         return SettingsMapper.mapTrackerStatusFromProto(settings.trackerState)
     }
 
-    suspend fun saveDraftAlertSettings(alertSettings: AlertSettings) {
-        dataStore.mutate {
-            setDraftAlertSettings(SettingsMapper.alertSettingsToProto(alertSettings))
-        }
-    }
-
-    fun saveTrackerStatus(status: TrackerStatus) {
-        scope.launch {
-            dataStore.mutate {
-                setTrackerState(SettingsMapper.mapTrackerStatusToProto(status))
-            }
-        }
-    }
-
-    suspend fun loadDraftAlertSettings(): AlertSettings? {
-        val s = dataStore.data.first()
-        return if (s.hasDraftAlertSettings()) SettingsMapper.protoToAlertSettings(s.draftAlertSettings) else null
-    }
-
-    suspend fun clearDraftSettings() {
-        dataStore.mutate {
-            clearDraftTrackerId()
-                .clearDraftViewerId()
-                .clearDraftRelayUrl()
-                .clearDraftMaxDistance()
-                .clearDraftAlertSettings()
-        }
-    }
-
-    suspend fun hasPendingDrafts(): Boolean {
-        val current = dataStore.data.first()
-        return current.hasDraftTrackerId() || 
-               current.hasDraftViewerId() || 
-               current.hasDraftRelayUrl() || 
-               current.hasDraftMaxDistance() || 
-               current.hasDraftAlertSettings()
-    }
-
-    suspend fun saveDraftSettings(
-        deviceId: String,
-        viewerId: String,
-        relayUrl: String,
-        maxDistance: Double,
-        alertSettings: AlertSettings
-    ) {
-        dataStore.mutate {
-            setDraftTrackerId(deviceId)
-                .setDraftViewerId(viewerId)
-                .setDraftRelayUrl(relayUrl)
-                .setDraftMaxDistance(maxDistance)
-                .setDraftAlertSettings(SettingsMapper.alertSettingsToProto(alertSettings))
-        }
-    }
-
-    suspend fun commitDraftSettings(): CommitResult {
-        var res = CommitResult()
-        dataStore.updateData { current ->
-            val builder = current.toBuilder()
-            
-            val currentTrackerId = current.trackerId.ifEmpty { DEFAULT_TRACKER_ID }
-            val currentViewerId = current.viewerId.ifEmpty { DEFAULT_VIEWER_ID }
-            val currentRelayUrl = current.relayUrl.ifEmpty { DEFAULT_RELAY_URL }
-
-            val newTrackerId = if (current.hasDraftTrackerId()) current.draftTrackerId else currentTrackerId
-            val newViewerId = if (current.hasDraftViewerId()) current.draftViewerId else currentViewerId
-            val newRelayUrl = if (current.hasDraftRelayUrl()) current.draftRelayUrl else currentRelayUrl
-            val newMaxDistance = if (current.hasDraftMaxDistance()) current.draftMaxDistance else current.maxDistance
-            val newAlertsProto = if (current.hasDraftAlertSettings()) current.draftAlertSettings else current.alertSettings
-
-            if (!SignalingConstants.areIdsUnique(newTrackerId, newViewerId)) {
-                res = CommitResult(error = "Identity Conflict: Some IDs (e.g., 'viewer', 'Trk') are reserved for cross-version compatibility. Please choose unique IDs.")
-                return@updateData current
-            }
-
-            val tChanged = newTrackerId != currentTrackerId
-            val vChanged = newViewerId != currentViewerId
-            val rChanged = newRelayUrl != currentRelayUrl
-            val mChanged = newMaxDistance != current.maxDistance
-            val aChanged = newAlertsProto != current.alertSettings
-
-            if (tChanged) builder.setTrackerId(newTrackerId)
-            if (vChanged) builder.setViewerId(newViewerId)
-            if (rChanged) builder.setRelayUrl(newRelayUrl)
-            if (mChanged) builder.setMaxDistance(newMaxDistance)
-            if (aChanged) builder.setAlertSettings(newAlertsProto)
-            
-            builder.clearDraftTrackerId()
-                   .clearDraftViewerId()
-                   .clearDraftRelayUrl()
-                   .clearDraftMaxDistance()
-                   .clearDraftAlertSettings()
-            
-            res = CommitResult(
-                trackerIdChanged = tChanged,
-                viewerIdChanged = vChanged,
-                relayUrlChanged = rChanged,
-                maxDistanceChanged = mChanged,
-                alertsChanged = aChanged,
-                anyChanged = tChanged || vChanged || rChanged || mChanged || aChanged
-            )
-            
-            builder.build()
-        }
-        return res
-    }
-
-    suspend fun saveSettingsBulk(
-        deviceId: String? = null,
-        viewerId: String? = null,
-        relayUrl: String? = null,
-        maxDistance: Double? = null,
-        alertSettings: AlertSettings? = null,
-        homePoints: List<GeoPoint>? = null
-    ) {
-        dataStore.mutate {
-            deviceId?.let { if (SignalingConstants.isValidTrackerId(it)) setTrackerId(it) }
-            viewerId?.let { if (SignalingConstants.isValidViewerId(it)) setViewerId(it) }
-            relayUrl?.let { setRelayUrl(it) }
-            maxDistance?.let { setMaxDistance(it) }
-            alertSettings?.let { setAlertSettings(SettingsMapper.alertSettingsToProto(it)) }
-            homePoints?.let { pts ->
-                clearHomePoints().addAllHomePoints(pts.map { GeoPointProto.newBuilder().setLat(it.latitude).setLng(it.longitude).build() })
-                setHomePointsTs(timeProvider.currentTimeMillis())
-            }
-        }
-    }
-
-    suspend fun saveSessionMetricsBulk(
-        totalConnected: Long,
-        uptime: Long,
-        totalDrop: Long,
-        maxDrop: Long,
-        maxDropTs: Long,
-        lastGpsTs: Long,
-        violationUptimeMs: Long
-    ) {
-        dataStore.mutate {
-            setTotalConnected(totalConnected)
-                .setUptime(uptime)
-                .setTotalDrop(totalDrop)
-                .setMaxDrop(maxDrop)
-                .setMaxDropTs(maxDropTs)
-                .setLastGpsTs(lastGpsTs)
-                .setViolationUptimeMs(violationUptimeMs)
-        }
-    }
-
-    suspend fun resetStatsBulk() {
-        dataStore.mutate {
-            setMaxAccuracy(0.0)
-                .setMaxTemp(0.0)
-                .setTotalConnected(0L)
-                .setUptime(0L)
-                .setTotalDrop(0L)
-                .setMaxDrop(0L)
-                .setMaxDropTs(0L)
-                .setLastGpsTs(0L)
-                .setViolationUptimeMs(0L)
-        }
-    }
-
-    suspend fun incrementRecoveryStats(blackoutMs: Long) {
-        dataStore.mutate {
-            setCumulativeRecoveryBlackoutMs(cumulativeRecoveryBlackoutMs + blackoutMs)
-                .setRecoveryCount(recoveryCount + 1)
-        }
-    }
-
+    /**
+     * saveLogicState: Atomically persists role-based logic state fields.
+     * R-ID 453: Uses namespaced maps to prevent cross-role corruption.
+     */
     suspend fun saveLogicState(
         firstViolationTs: Long,
         firstViolationRt: Long,
@@ -556,18 +422,31 @@ class SettingsRepository @Inject constructor(
         powerAlarmPending: Boolean,
         lastSirenStopRt: Long,
         lastGlobalTriggerRt: Long,
-        forensicReliabilityDegradationStartRt: Long
+        forensicReliabilityDegradationStartRt: Long,
+        rolePrefix: String? = null
     ) {
         dataStore.mutate {
-            setFirstViolationTs(firstViolationTs)
-                .setFirstViolationRt(firstViolationRt)
-                .setFirstViolationWasJump(firstViolationWasJump)
-                .setDistanceViolationCounter(distanceViolationCounter)
-                .setWasDistanceViolated(wasDistanceViolated)
-                .setPowerAlarmPending(powerAlarmPending)
-                .setLastSirenStopRt(lastSirenStopRt)
-                .setLastGlobalTriggerRt(lastGlobalTriggerRt)
-                .setForensicReliabilityDegradationStartRt(forensicReliabilityDegradationStartRt)
+            if (rolePrefix != null) {
+                putRoleLongs(rolePrefix + FIRST_VIOLATION_TS_KEY, firstViolationTs)
+                putRoleLongs(rolePrefix + FIRST_VIOLATION_RT_KEY, firstViolationRt)
+                putRoleBools(rolePrefix + FIRST_VIOLATION_WAS_JUMP_KEY, firstViolationWasJump)
+                putRoleInts(rolePrefix + DISTANCE_VIOLATION_COUNTER_KEY, distanceViolationCounter)
+                putRoleBools(rolePrefix + WAS_DISTANCE_VIOLATED_KEY, wasDistanceViolated)
+                putRoleBools(rolePrefix + POWER_ALARM_PENDING_KEY, powerAlarmPending)
+                putRoleLongs(rolePrefix + LAST_SIREN_STOP_RT_KEY, lastSirenStopRt)
+                putRoleLongs(rolePrefix + LAST_GLOBAL_TRIGGER_RT_KEY, lastGlobalTriggerRt)
+                putRoleLongs(rolePrefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, forensicReliabilityDegradationStartRt)
+            } else {
+                setFirstViolationTs(firstViolationTs)
+                    .setFirstViolationRt(firstViolationRt)
+                    .setFirstViolationWasJump(firstViolationWasJump)
+                    .setDistanceViolationCounter(distanceViolationCounter)
+                    .setWasDistanceViolated(wasDistanceViolated)
+                    .setPowerAlarmPending(powerAlarmPending)
+                    .setLastSirenStopRt(lastSirenStopRt)
+                    .setLastGlobalTriggerRt(lastGlobalTriggerRt)
+                    .setForensicReliabilityDegradationStartRt(forensicReliabilityDegradationStartRt)
+            }
         }
     }
 }
