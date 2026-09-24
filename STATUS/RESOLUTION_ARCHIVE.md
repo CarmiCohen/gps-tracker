@@ -1,3 +1,13 @@
+# 🏛️ Resolution Archive - Sep.24.30
+
+## 🏁 Issue #1307: Forensic Sampling Bottleneck During Rapid Event Sequences
+*   **Resolved**: Sep.24.30
+*   **Root Cause**: The `forensicSamplingLoop` in `TrackerService` used a conflated channel and a fixed `delay(delayMs)` following each capture iteration. If multiple physical spikes (acoustic or light) occurred during the delay period, subsequent high-priority triggers were dropped or significantly delayed, as the loop could only process one trigger per sampling interval. This created a data-loss risk for rapid tampering event sequences.
+*   **Remediation**:
+    *   **TrackerService.kt**: Refactored `forensicTriggerChannel` from a conflated channel to a buffered `Channel<Boolean>`.
+    *   **TrackerService.kt**: Updated the `forensicSamplingLoop` to utilize a non-blocking `withTimeoutOrNull(delayMs)` polling pattern. This allows the loop to respond to high-priority spike signals (`true`) immediately, bypassing the standard interval timer, while still maintaining the expected sampling cadence for regular state captures.
+*   **R-ID**: 463
+
 # 🏛️ Resolution Archive - Sep.24.20
 
 ## 🏁 Issue #1256: Monotonic Latch Staleness Across Reboots

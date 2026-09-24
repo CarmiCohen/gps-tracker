@@ -25,9 +25,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
- * Sep.24.20:
+ * Sep.24.30:
  * - Issue #1307 REMEDIATION: Decoupled spike-triggered forensic captures from the sampling 
- *   rate delay by launching immediate captures for acoustic/light spikes.
+ *   rate delay by transitioning to a buffered channel with non-blocking timeout polling.
+ * Sep.24.20:
+ * - Issue #1256: Monotonic Latch Staleness Across Reboots (R-ID 462).
+ * - Issue #1260: Boot-ID Validation for Persistent Monotonic Latches.
  * - Issue #1234 / #1244 REMEDIATION: Corrected Thermal Recovery Latency logic to measure 
  *   total duration from entry to exit of cooling mode.
  * Sep.24.10:
@@ -53,15 +56,10 @@ class TrackerService : BaseMonitorService() {
     private var alarmEvalJob: Job? = null
     private var forensicSamplingJob: Job? = null
     
-    private val forensicTriggerChannel = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
+    private val forensicTriggerChannel = kotlinx.coroutines.channels.Channel<Boolean>(kotlinx.coroutines.channels.Channel.BUFFERED)
 
     private fun triggerForensicSample(isSpike: Boolean = false) {
-        if (isSpike) {
-            // Issue #1307: Decouple high-priority spike captures from the sampling rate delay
-            lifecycleScope.launch(Dispatchers.Default) { performForensicCapture(true) }
-        } else {
-            forensicTriggerChannel.trySend(Unit)
-        }
+        forensicTriggerChannel.trySend(isSpike)
     }
 
     private val locationBuffer = ConcurrentLinkedQueue<Location>()
@@ -814,7 +812,7 @@ class TrackerService : BaseMonitorService() {
             // Initial trigger to capture baseline state on service startup
             triggerForensicSample()
 
-            for (unit in forensicTriggerChannel) {
+            while (isActive) {
                 val health = integrityMonitor.currentHealth
 
                 // Issue #1244 Fix: Thermal Recovery Latency Audit
@@ -828,15 +826,18 @@ class TrackerService : BaseMonitorService() {
                 }
                 lastWasCooling = health.isCoolingModeActive
 
-                performForensicCapture(isSpike = false)
-
                 val delayMs = when {
                     health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS
                     logManager.isForensicBufferUnderPressure() -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS
                     health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS
                     else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS
                 }
-                delay(delayMs)
+
+                val trigger = withTimeoutOrNull(delayMs) {
+                    forensicTriggerChannel.receive()
+                }
+
+                performForensicCapture(isSpike = (trigger == true))
             }
         }
     }

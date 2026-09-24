@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.20
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.30
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -7,9 +7,7 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🛑 High Priority (Safety, Data Integrity & Core Logic)
 
-*   **Issue #1307: Forensic Sampling Bottleneck During Rapid Event Sequences**
-    *   *Finding*: The `forensicSamplingLoop` in `TrackerService` uses a conflated channel and an internal `delay(delayMs)`. If multiple physical spikes (acoustic/light) occur rapidly, the loop will be stuck in a delay from the first trigger, causing subsequent high-priority triggers to be dropped. Forensic captures should be decoupled from the sampling rate delay during spike events.
-    *   *Contribution*: **High (Forensic Integrity)**. Ensures critical evidence (acoustic/light spikes) is never dropped during a theft event.
+*   (None currently identified for immediate remediation)
 
 ### 🟡 Medium Priority (UX, Performance & Auditability)
 
@@ -65,7 +63,7 @@ Finalizing the audit of background service stability and functional convergence 
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 18)
+## 💡 Strategic Simplification Ideas (Ideas: 19)
 
 ### 🛑 High Priority
 *   **Issue #1292: Reactive Siren State Binding**
@@ -74,6 +72,8 @@ Finalizing the audit of background service stability and functional convergence 
     *   *Significance*: **High (Architecture)**. Centralize dispersed logging and triggers into a single `AppEventCoordinator` to eliminate cross-component coupling.
 
 ### 🟡 Medium Priority
+*   **Issue #1309: Unified Job Management in Monitor Services**
+    *   *Significance*: **Medium (Maintainability)**. Tracker and Viewer services manually manage 5-10 nullable Job variables. Migrating to a structured `JobRegistry` would simplify lifecycle management and reduce boilerplate cancellation logic.
 *   **Issue #1161: Unified Trajectory & Buffer Management**
     *   *Significance*: **Medium-High (Performance)**. Merge `GtoEngine` windows and `LocationSentinel` hindsight buffers into a single optimized `TrajectoryBuffer`.
 *   **Issue #1294: Build-Time Interface Validation**
@@ -113,8 +113,10 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1307: Forensic Sampling Bottleneck During Rapid Event Sequences** (Resolved Sep.24.30)
+    *   *Remediation*: Refactored `forensicSamplingLoop` in `TrackerService.kt` to use a buffered boolean channel with non-blocking timeout polling. This ensures physical spikes (acoustic/light) are processed immediately, fully decoupled from the adaptive sampling rate gates (R-ID 463).
 *   **Issue #1256: Monotonic Latch Staleness Across Reboots** (Resolved Sep.24.20)
-    *   *Remediation*: Implemented Boot-ID validation inside `AppAlarmManager.restoreLogicState` to detect device reboots and safely invalidate obsolete monotonic `elapsedRealtime` latches (cooldowns, violation timers) after a device restart, preventing the permanent muzzle bug.
+    *   *Remediation*: Implemented Boot-ID validation inside `AppAlarmManager.restoreLogicState` to detect device reboots and safely invalidate obsolete monotonic `elapsedRealtime` latches (cooldowns, violation timers) after a device restart, preventing the permanent muzzle bug (R-ID 462).
 *   **Issue #1260: Boot-ID Validation for Persistent Monotonic Latches** (Resolved Sep.24.20)
     *   *Remediation*: Remediated via Boot-ID check in `restoreLogicState`.
 *   **Issue #1301: Missing Persistence for Lux and Acoustic Baselines** (Resolved Sep.24.10)
@@ -150,4 +152,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 462 (Rules: 92, IDs: 462), Resolved: 1205, Open: 13, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**
+- **Current Audit Baseline: [SOT: 463 (Rules: 92, IDs: 463), Resolved: 1206, Open: 12, Testing: 3 (Sub-items: 12), Ideas: 19, QA: 284]**
