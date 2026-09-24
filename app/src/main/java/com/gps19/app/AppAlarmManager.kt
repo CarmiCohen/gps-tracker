@@ -31,6 +31,9 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.24.96:
+ * - Issue #1312 REMEDIATION: Migrated evaluateAlarms to consume unified 
+ *   SystemEvaluationSnapshot, ensuring data consistency across evaluation domains.
  * Sep.24.94:
  * - Issue #1311 REMEDIATION: Fully transitioned to a stateless evaluation model 
  *   by removing duplicate instance state variables and intermediate maps, unifying 
@@ -198,14 +201,14 @@ class AppAlarmManager @Inject constructor(
     }
 
     fun evaluateAlarms(
-        telemetry: AlarmTelemetrySnapshot,
+        snapshot: SystemEvaluationSnapshot,
         serviceContext: AlarmServiceContext
     ) {
         this.isTrackerMode = serviceContext.isTrackerMode
         this.currentRolePrefix = serviceContext.rolePrefix
         val versionTag = "[${BuildConfig.VERSION_NAME}]"
         
-        syncEvaluationState(telemetry, serviceContext)
+        syncEvaluationState(snapshot, serviceContext)
 
         val oldWasViolated = evaluationState.wasDistanceViolated
         val oldCounter = evaluationState.distanceViolationCounter
@@ -228,8 +231,8 @@ class AppAlarmManager @Inject constructor(
                     durationMs = duration,
                     isSpecial = true,
                     specialColor = FORENSIC_PINK_COLOR,
-                    lat = telemetry.lat, lng = telemetry.lng, accuracy = telemetry.accuracy,
-                    maxAccuracy = telemetry.maxAccuracy, snr = telemetry.snrSnapshot, vibe = telemetry.vibeSnapshot
+                    lat = snapshot.lat, lng = snapshot.lng, accuracy = snapshot.accuracy,
+                    maxAccuracy = snapshot.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
                 ))
             },
             onTrigger = { eval ->
@@ -244,8 +247,8 @@ class AppAlarmManager @Inject constructor(
                     durationMs = 0L,
                     isSpecial = isSpecial,
                     specialColor = specialColor,
-                    lat = telemetry.lat, lng = telemetry.lng, accuracy = telemetry.accuracy,
-                    maxAccuracy = telemetry.maxAccuracy, snr = telemetry.snrSnapshot, vibe = telemetry.vibeSnapshot
+                    lat = snapshot.lat, lng = snapshot.lng, accuracy = snapshot.accuracy,
+                    maxAccuracy = snapshot.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
                 ))
             },
             onResolve = { eval, durationMs ->
@@ -260,8 +263,8 @@ class AppAlarmManager @Inject constructor(
                     durationMs = durationMs,
                     isSpecial = isSpecial,
                     specialColor = specialColor,
-                    lat = telemetry.lat, lng = telemetry.lng, accuracy = telemetry.accuracy,
-                    maxAccuracy = telemetry.maxAccuracy, snr = telemetry.snrSnapshot, vibe = telemetry.vibeSnapshot
+                    lat = snapshot.lat, lng = snapshot.lng, accuracy = snapshot.accuracy,
+                    maxAccuracy = snapshot.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
                 ))
             }
         )
@@ -285,51 +288,51 @@ class AppAlarmManager @Inject constructor(
     }
 
     private fun syncEvaluationState(
-        telemetry: AlarmTelemetrySnapshot,
+        snapshot: SystemEvaluationSnapshot,
         serviceContext: AlarmServiceContext
     ) {
         evaluationState.health.update(
-            signalLoss = telemetry.isSignalLoss, 
-            gpsStalled = telemetry.isGpsStalling, 
-            gpsHardwareLock = telemetry.isGpsHardwareLock, 
-            localInternetLoss = telemetry.localInternetLoss,
-            isHardwareOnline = telemetry.isHardwareOnline, 
-            batteryLevel = telemetry.battery, 
-            batteryTemp = telemetry.temp,
-            isCharging = false, 
-            currentMa = telemetry.currentMa, 
-            status = telemetry.status, 
-            isJammer = telemetry.isJammer,
-            isTamperDetected = telemetry.isTamperDetected,
-            tiltDegrees = telemetry.tiltDegrees, 
-            acousticDb = telemetry.acousticDb, 
-            baroAlt = telemetry.baroAlt, 
-            lux = telemetry.lux, 
-            isNear = telemetry.isNear, 
-            luxBaseline = telemetry.luxBaseline, 
-            acousticFloorDb = telemetry.acousticFloorDb, 
-            adaptiveVibrationFloor = telemetry.adaptiveVibrationFloor, 
-            peakVibrationShock = telemetry.peakVibrationShock,
-            isPowerSaveMode = telemetry.isPowerSaveMode, 
-            standbyBucket = telemetry.standbyBucket, 
-            netInterface = telemetry.netInterface,
-            isStorageLow = telemetry.isStorageLow, 
-            isStorageCritical = telemetry.isStorageCritical,
-            isBatterySteepDischarge = telemetry.isBatterySteepDischarge, 
-            isCoolingModeActive = telemetry.isCoolingModeActive,
-            vibration = telemetry.vibeSnapshot ?: 0.0, 
-            cpuLoad = telemetry.cpuLoad, 
-            ioWait = telemetry.ioWait, 
-            maxIoLatency = telemetry.maxIoLatency, 
-            isSilentFailure = telemetry.isSilentFailure, 
-            isMaliAnomaly = telemetry.isMaliAnomaly, 
-            isUltraLongStationary = telemetry.isUltraLongStationary,
-            isBatteryLow = telemetry.isBatteryLow, 
-            isBatteryCritical = telemetry.isBatteryCritical,
-            tamperNote = telemetry.tamperNote,
-            isPowerTamper = telemetry.isPowerTamper,
-            isLocationPending = telemetry.isLocationPending,
-            locationPendingReason = telemetry.locationPendingReason
+            signalLoss = snapshot.isSignalLoss, 
+            gpsStalled = snapshot.isGpsStalling, 
+            gpsHardwareLock = snapshot.isGpsHardwareLock, 
+            localInternetLoss = snapshot.localInternetLoss,
+            isHardwareOnline = snapshot.isHardwareOnline, 
+            batteryLevel = snapshot.batteryLevel, 
+            batteryTemp = snapshot.batteryTemp,
+            isCharging = snapshot.isCharging, 
+            currentMa = snapshot.currentMa, 
+            status = snapshot.status, 
+            isJammer = snapshot.isJammer,
+            isTamperDetected = snapshot.tamperDetected,
+            tiltDegrees = snapshot.tiltDegrees, 
+            acousticDb = snapshot.acousticDb, 
+            baroAlt = snapshot.baroAlt, 
+            lux = snapshot.lux, 
+            isNear = snapshot.isNear, 
+            luxBaseline = snapshot.luxBaseline, 
+            acousticFloorDb = snapshot.acousticFloorDb, 
+            adaptiveVibrationFloor = snapshot.adaptiveVibrationFloor, 
+            peakVibrationShock = snapshot.peakShock,
+            isPowerSaveMode = snapshot.isPowerSaveMode, 
+            standbyBucket = snapshot.standbyBucket, 
+            netInterface = snapshot.netInterface,
+            isStorageLow = snapshot.isStorageLow, 
+            isStorageCritical = snapshot.isStorageCritical,
+            isBatterySteepDischarge = snapshot.isBatterySteepDischarge, 
+            isCoolingModeActive = snapshot.isCoolingModeActive,
+            vibration = snapshot.vibeSnapshot ?: snapshot.vibration, 
+            cpuLoad = snapshot.cpuLoad, 
+            ioWait = snapshot.ioWait, 
+            maxIoLatency = snapshot.maxIoLatency, 
+            isSilentFailure = snapshot.isSilentFailure, 
+            isMaliAnomaly = snapshot.isMaliAnomaly, 
+            isUltraLongStationary = snapshot.isUltraLongStationary,
+            isBatteryLow = snapshot.isBatteryLow, 
+            isBatteryCritical = snapshot.isBatteryCritical,
+            tamperNote = snapshot.suppressionNote,
+            isPowerTamper = snapshot.isPowerTamper,
+            isLocationPending = snapshot.isLocationPending,
+            locationPendingReason = snapshot.locationPendingReason
         )
 
         val cachedPoints = repository.getCachedHomePoints()
@@ -353,19 +356,19 @@ class AppAlarmManager @Inject constructor(
                 serviceContext.nowRt - serviceContext.serviceStartRt < BOOTSTRAP_PHASE_MS + DISCOVERY_PHASE_MS -> DiscoveryPhase.DISCOVERING
                 else -> DiscoveryPhase.MONITORING
             },
-            trackerLat = telemetry.lat, 
-            trackerLng = telemetry.lng, 
-            trackerGpsAccuracy = telemetry.accuracy,
-            maxTrackerAccuracy = telemetry.maxAccuracy, 
-            lastGpsPacketTs = telemetry.gpsTs, 
+            trackerLat = snapshot.lat, 
+            trackerLng = snapshot.lng, 
+            trackerGpsAccuracy = snapshot.accuracy,
+            maxTrackerAccuracy = snapshot.maxAccuracy, 
+            lastGpsPacketTs = snapshot.gpsTs, 
             lastGpsPacketRt = 0L, 
             trackerLastValidFixTs = 0L,
-            trackerLastValidFixRt = telemetry.lastValidFixRt,
-            trackerSpeed = telemetry.speed, 
-            jumpTier = telemetry.jumpTier, 
-            isAdaptiveJump = telemetry.isAdaptiveJump, 
-            trackerBattery = telemetry.battery, 
-            trackerTemp = telemetry.temp,
+            trackerLastValidFixRt = snapshot.lastValidFixRt,
+            trackerSpeed = snapshot.speed, 
+            jumpTier = snapshot.jumpTier, 
+            isAdaptiveJump = snapshot.isAdaptiveJump, 
+            trackerBattery = snapshot.batteryLevel, 
+            trackerTemp = snapshot.batteryTemp,
             wasDistanceViolated = evaluationState.wasDistanceViolated, 
             distanceViolationCounter = evaluationState.distanceViolationCounter,
             firstViolationTs = evaluationState.firstViolationTs, 
@@ -373,8 +376,8 @@ class AppAlarmManager @Inject constructor(
             firstViolationWasJump = evaluationState.firstViolationWasJump, 
             maxDistance = serviceContext.maxDistanceAuthority, 
             distToHomeAuthority = serviceContext.distToHomeAuthority, 
-            isGpsGap = telemetry.isGpsGap, 
-            trackerBaroAltEma = telemetry.baroAltEma,
+            isGpsGap = snapshot.isGpsGap, 
+            trackerBaroAltEma = snapshot.baroAltEma,
             isTrackerMode = serviceContext.isTrackerMode, 
             capabilities = serviceContext.capabilities,
             vibrationSensitivity = currentSettings.vibrationSensitivity,

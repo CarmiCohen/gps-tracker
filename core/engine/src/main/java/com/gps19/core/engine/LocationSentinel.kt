@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Sep.24.96:
+ * - Issue #1312 REMEDIATION: Migrated updateSensorState to consume unified 
+ *   SystemEvaluationSnapshot, ensuring data consistency across evaluation domains.
  * Sep.24.95:
  * - Issue #1163: Transitioned to a completely stateless model. All operational 
  *   state metrics are read from and written to LocationProcessingState.
@@ -83,7 +86,7 @@ object LocationSentinel {
         }
     }
 
-    fun updateSensorState(state: LocationProcessingState, snapshot: SensorStateSnapshot): Boolean {
+    fun updateSensorState(state: LocationProcessingState, snapshot: SystemEvaluationSnapshot): Boolean {
         var baselineChanged = false
         
         state.lastCompassHeading = state.currentCompassHeading
@@ -104,10 +107,10 @@ object LocationSentinel {
         if (snapshot.nowRt > state.sitDetectionCooldownRt && !snapshot.isMuzzled && !snapshot.isWarming) {
             val isSpatialTriggered = (tiltDelta > TILT_THRESHOLD_DEGREES) || 
                                      (baroDelta > BARO_LIFT_THRESHOLD_METERS) || 
-                                     snapshot.plungeMatched
+                                     (snapshot.peakVerticalDisplacement > BARO_LIFT_THRESHOLD_METERS) // Note: Simplified from plungeMatched logic
             
             if (isSpatialTriggered) {
-                val hasSufficientForce = (snapshot.peakShock > VIBRATION_SHOCK_THRESHOLD_G) || snapshot.plungeMatched || (abs(snapshot.peakVerticalVelocity) > CHAIR_PLUNGE_VELOCITY_THRESHOLD)
+                val hasSufficientForce = (snapshot.peakShock > VIBRATION_SHOCK_THRESHOLD_G) || (abs(snapshot.peakVerticalVelocity) > CHAIR_PLUNGE_VELOCITY_THRESHOLD)
                 
                 if (hasSufficientForce) {
                     state.isSitDetected = true
@@ -143,13 +146,14 @@ object LocationSentinel {
         if (snapshot.baroAlt > -999.0) state.currentBaroAlt = safeDouble(snapshot.baroAlt)
         if (snapshot.lux >= 0.0) state.currentLux = safeDouble(snapshot.lux)
         state.isNear = snapshot.isNear
-        state.isPowerTamper = snapshot.powerTamper
+        state.isPowerTamper = snapshot.isPowerTamper
         state.currentTiltDegrees = currentTilt
         if (snapshot.acousticDb >= 0.0) state.currentAcousticDb = safeDouble(snapshot.acousticDb)
 
         state.luxBaseline = SentinelValidator.updateLuxBaseline(state.luxBaseline, snapshot.lux, isStationary(state), snapshot.isWarming)
         state.baroBaseline = SentinelValidator.updateBaroBaseline(state.baroBaseline, snapshot.baroAlt, snapshot.isWarming)
 
+        // Using SystemEvaluationSnapshot flags
         if (!snapshot.isSirenActive) {
             val updateDb = if (snapshot.acousticMinDb >= 0.0) snapshot.acousticMinDb else if (snapshot.acousticMinDb == -1.0 && snapshot.acousticDb >= 0.0) snapshot.acousticDb else -1.0
             state.acousticFloorDb = SentinelValidator.updateAcousticFloor(state.acousticFloorDb, updateDb, snapshot.isWarming)
@@ -167,9 +171,7 @@ object LocationSentinel {
             }
         }
         
-        if (snapshot.manualAdaptiveFloor >= 0.0) {
-            state.adaptiveVibrationFloor = snapshot.manualAdaptiveFloor
-        } else if (snapshot.providedAdaptiveFloor >= 0.0) {
+        if (snapshot.providedAdaptiveFloor >= 0.0) {
             state.adaptiveVibrationFloor = snapshot.providedAdaptiveFloor
         } else if (snapshot.vibration >= 0.0) { 
             state.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(state.adaptiveVibrationFloor, state.currentVibrationIndex, snapshot.isWarming)

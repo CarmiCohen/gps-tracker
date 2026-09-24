@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.95
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.96
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -42,8 +42,8 @@ Finalizing the audit of background service stability and functional convergence 
     *   *Significance*: **High (Architecture)**. Centralize dispersed logging and triggers into a single `AppEventCoordinator` to eliminate cross-component coupling.
 
 ### 🟡 Medium Priority
-*   **Issue #1312: Unified Evaluation Logic Snapshot**
-    *   *Significance*: **Medium (Architecture)**. Consolidate `AlarmTelemetrySnapshot` and `SensorStateSnapshot` into a single `SystemEvaluationSnapshot` to ensure absolute temporal parity between kinematic and environmental logic.
+*   **Issue #1314: TrackerStatus & Evaluation Snapshot Convergence**
+    *   *Significance*: **Medium (Architecture)**. Evaluate if `TrackerStatus` DTO can be merged into `SystemEvaluationSnapshot` to eliminate the mapping layer in `ConnectivitySuite`.
 *   **Issue #1161: Unified Trajectory & Buffer Management**
     *   *Significance*: **Medium-High (Performance)**. Merge `GtoEngine` windows and `LocationSentinel` hindsight buffers into a single optimized `TrajectoryBuffer`.
 *   **Issue #1294: Build-Time Interface Validation**
@@ -79,6 +79,10 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1312: Unified Evaluation Logic Snapshot** (Resolved Sep.24.96)
+    *   *Remediation*: Consolidated `AlarmTelemetrySnapshot` and `SensorStateSnapshot` into a single `SystemEvaluationSnapshot`. Refactored `MonitorService`, `LocationProcessor`, and `AppAlarmManager` to consume this unified DTO, ensuring absolute temporal parity between kinematic, environmental, and health logic during background evaluation ticks. Aligned property names with `SystemHealthState` for architectural consistency.
+*   **Issue #1313: Role-Switching Atomic State Reset** (Resolved Sep.24.96)
+    *   *Remediation*: Hardened `MonitorService` to handle runtime role transitions by introducing a reactive `appModeFlow` observer. Implemented `handleRoleTransition` to atomically reset processing state, clear jobs, and reload logic anchors using `SessionLifecycleCoordinator`, preventing state leakage during Tracker <-> Viewer switches.
 *   **Issue #1163: Stateless & Functional Logic Refactoring for LocationProcessor** (Resolved Sep.24.95)
     *   *Remediation*: Migrated `LocationProcessor`, `LocationSentinel`, and `GtoEngine` to a stateless evaluation model. Introduced `LocationProcessingState` to encapsulate all mutable tracking data. Converted core logic engines into pure `object` implementations, ensuring that location validation and anchor management are deterministic functions of their state and inputs.
 *   **Issue #1311: AppAlarmManager Stateless Evaluation Model** (Resolved Sep.24.94)
@@ -124,7 +128,7 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1233: High Allocation Churn via Fast-Path Re-registration** (Resolved Sep.24.01)
     *   *Remediation*: Refactored `HardwareFastPath` to allow optional callback assignment. Updated `TrackerService.kt` to omit callbacks inside the periodic tick loop (R-ID 457).
 *   **Issue #1232: Empty Stub Implementation of OEM Power Hardening Overrides** (Resolved Sep.24.00)
-*   **Issue #1231: Redundant Stream Overlap & Duplicate Heartbeat Processing in ViewerService** (Resolved Sep.23.80)
+*   **Issue #1231: Redundant Stream Observer Audit** (Resolved Sep.23.80)
 *   **Issue #1250: Build Vitality & Reactive Stream Convergence** (Resolved Sep.23.72)
 *   **Issue #1230: Shared Storage Key Leakage & Cross-Role State Corruption** (Resolved Sep.23.70)
 *   **Issue #1240: Role-Based Namespace Isolation for Logic State Persistence** (Resolved Sep.23.70)
@@ -140,4 +144,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 474 (Rules: 94, IDs: 474), Resolved: 1217, Open: 2, Testing: 3 (Sub-items: 12), Ideas: 16, QA: 284]**
+- **Current Audit Baseline: [SOT: 476 (Rules: 24, IDs: 476), Resolved: 1219, Open: 1, Testing: 3 (Sub-items: 12), Ideas: 16, QA: 284]**

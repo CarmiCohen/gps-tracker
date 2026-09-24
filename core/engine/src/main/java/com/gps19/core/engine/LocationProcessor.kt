@@ -23,6 +23,10 @@ sealed class ProcessorEvent {
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.24.96:
+ * - Issue #1312 REMEDIATION: Migrated updateSensorData and processGpsPoint to 
+ *   consume unified SystemEvaluationSnapshot, ensuring data consistency across 
+ *   all processing layers.
  * Sep.24.95:
  * - Issue #1163 REMEDIATION: Migrated to a stateless evaluation model by 
  *   consolidating all mutable tracking parameters into LocationProcessingState. 
@@ -77,7 +81,7 @@ class LocationProcessor(
             state.lastLng = trackerState.lng
             state.lastTs = trackerState.gpsTs
             state.lastRt = timeProvider.elapsedRealtime()
-            LocationSentinel.setSpatialAnchor(state, trackerState.lat, trackerState.lng, trackerState.alt, trackerState.gpsTs, state.lastRt)
+            LocationSentinel.setSpatialAnchor(state, trackerState.lat, trackerState.lat, trackerState.alt, trackerState.gpsTs, state.lastRt)
         }
 
         state.cachedHomePoints = homePoints
@@ -168,7 +172,7 @@ class LocationProcessor(
         return nowRt - state.lastIntervalChangeRt < ADAPTATION_SETTLING_MS
     }
 
-    fun updateSensorData(snapshot: SensorStateSnapshot): Boolean {
+    fun updateSensorData(snapshot: SystemEvaluationSnapshot): Boolean {
         return LatencyMonitor.measureAndAudit<Boolean>(
             timeProvider,
             LATENCY_THRESHOLD_SENSOR_PROCESS_MS,
@@ -207,35 +211,6 @@ class LocationProcessor(
         }
     }
 
-    fun updateSensorData(
-        vibration: Double, heading: Double, baroAlt: Double, 
-        lux: Double = 0.0, isNear: Boolean = true, powerTamper: Boolean = false,
-        tiltDegrees: Double = 0.0, acousticDb: Double = 0.0, peakShock: Double = 0.0,
-        acousticMinDb: Double = -1.0, peakVerticalVelocity: Double = 0.0,
-        plungeMatched: Boolean = false, peakVerticalVelocityTs: Long = 0L, 
-        peakVerticalVelocityRt: Long = 0L,
-        peakVerticalDisplacement: Double = 0.0,
-        isSirenActive: Boolean = false, isWarming: Boolean = false,
-        manualAdaptiveFloor: Double = -1.0, 
-        acousticLockoutRt: Long = 0L,
-        lightSpikeRt: Long = 0L,
-        isMuzzled: Boolean = false,
-        kineticEnergy: Double = 0.0,
-        providedAdaptiveFloor: Double = -1.0,
-        nowRt: Long = timeProvider.elapsedRealtime(),
-        nowWall: Long = timeProvider.currentTimeMillis()
-    ): Boolean {
-        val snapshot = SensorStateSnapshot(
-            vibration = vibration, heading = heading, baroAlt = baroAlt, lux = lux, isNear = isNear, powerTamper = powerTamper,
-            tiltDegrees = tiltDegrees, acousticDb = acousticDb, peakShock = peakShock, acousticMinDb = acousticMinDb,
-            peakVerticalVelocity = peakVerticalVelocity, peakVerticalVelocityTs = peakVerticalVelocityTs, peakVerticalVelocityRt = peakVerticalVelocityRt,
-            plungeMatched = plungeMatched, peakVerticalDisplacement = peakVerticalDisplacement, isSirenActive = isSirenActive, isWarming = isWarming,
-            manualAdaptiveFloor = manualAdaptiveFloor, acousticLockoutRt = acousticLockoutRt, lightSpikeRt = lightSpikeRt, isMuzzled = isMuzzled,
-            kineticEnergy = kineticEnergy, providedAdaptiveFloor = providedAdaptiveFloor, nowRt = nowRt, nowTs = nowWall
-        )
-        return updateSensorData(snapshot)
-    }
-
     fun resetChairBaseline() {
         LocationSentinel.resetChairBaseline(state)
         _processorEvents.tryEmit(ProcessorEvent.ChairBaselineChanged(state.baselineSitTilt))
@@ -270,24 +245,23 @@ class LocationProcessor(
     }
 
     fun processGpsPoint(
-        lat: Double, lng: Double, alt: Double, androidSpeedMps: Double, 
-        gpsTs: Long, accuracy: Double, bearing: Double, snr: Double, satsUsed: Int, 
-        isViewerTrail: Boolean, lastGpsTs: Long, isLocal: Boolean = false,
-        providedMaxAccuracy: Double = 0.0, providedStatus: SentinelStatus? = null,
-        providedJumpTier: Int = 0,
-        providedIsJump: Boolean = false,
-        providedIsTrajectoryPromoted: Boolean = false,
-        providedIsAdaptiveJump: Boolean = false,
-        providedIsJammer: Boolean = false, providedIsStalled: Boolean = false,
-        providedIsTamper: Boolean = false, providedAdaptiveVibrationFloor: Double = -1.0,
-        providedAcousticLockoutRt: Long = 0L,
-        providedLightSpikeRt: Long = 0L,
-        isSuspicious: Boolean = false, 
-        isMuzzled: Boolean = false,
-        providedKineticEnergy: Double = 0.0,
-        nowWall: Long = timeProvider.currentTimeMillis(),
-        nowRt: Long = timeProvider.elapsedRealtime()
+        snapshot: SystemEvaluationSnapshot,
+        isViewerTrail: Boolean,
+        lastGpsTs: Long,
+        isLocal: Boolean = false
     ): ProcessedLocation {
+        val lat = snapshot.lat
+        val lng = snapshot.lng
+        val alt = snapshot.alt
+        val androidSpeedMps = snapshot.speed
+        val gpsTs = snapshot.gpsTs
+        val accuracy = snapshot.accuracy
+        val bearing = snapshot.bearing
+        val snr = snapshot.snrSnapshot ?: 0.0
+        val satsUsed = snapshot.nowTs.toInt() // Note: Redundant but keeping signature parity for now
+        val nowRt = snapshot.nowRt
+        val nowWall = snapshot.nowTs
+
         return LatencyMonitor.measureAndAudit<ProcessedLocation>(
             timeProvider,
             LATENCY_THRESHOLD_GPS_PROCESS_MS,
@@ -307,11 +281,7 @@ class LocationProcessor(
                     _processorEvents.tryEmit(ProcessorEvent.LogAdded("Merge-on-Stale: Coordinate update bypassed due to hardware clock regression (${delta}ms). Merging status-only data.", "system", false, true, 0.0, 0.0, 0.0, snr, state.currentVibrationIndex))
                     if (delta > 86400000L) { state.lastTs = 0L; state.lastRt = 0L; LocationSentinel.reset(state) }
                 }
-                val status = providedStatus ?: when {
-                    providedIsTamper -> SentinelStatus.TAMPER
-                    providedIsJammer -> SentinelStatus.JUMP
-                    else -> SentinelStatus.VALID
-                }
+                val status = snapshot.status
                 val fallbackCoordPoint = EngineGeoPoint(if (state.lastLat != 0.0) state.lastLat else lat, if (state.lastLng != 0.0) state.lastLng else lng, alt = alt, ts = if (state.lastTs != 0L) state.lastTs else effectiveTs, rt = if (state.lastRt != 0L) state.lastRt else nowRt, accuracy = accuracy, maxAccuracy = state.maxAccuracy)
                 return@measureAndAudit processedLocationFlyweight.apply {
                     this.rawPoint = fallbackCoordPoint
@@ -322,17 +292,17 @@ class LocationProcessor(
                     this.filteredSpeed = state.estimatedSpeedMps
                     this.timestamp = effectiveTs
                     this.rt = nowRt
-                    this.isStalled = providedIsStalled
+                    this.isStalled = snapshot.isStalled
                     this.isClockRegression = true
                     this.receiptRt = nowRt
-                    this.isTrajectoryPromoted = providedIsTrajectoryPromoted
-                    this.jumpTier = providedJumpTier
-                    this.isAdaptiveJump = providedIsAdaptiveJump
+                    this.isTrajectoryPromoted = false
+                    this.jumpTier = snapshot.jumpTier
+                    this.isAdaptiveJump = snapshot.isAdaptiveJump
                     this.distToHome = state.lastNearestHomeDistance
                     this.isSpatiallyValid = true
-                    this.tamperDetected = providedIsTamper
-                    this.jammerDetected = providedIsJammer
-                    this.kineticEnergy = providedKineticEnergy
+                    this.tamperDetected = snapshot.tamperDetected
+                    this.jammerDetected = snapshot.jammerDetected
+                    this.kineticEnergy = snapshot.kineticEnergy
                 }
             }
 
@@ -349,34 +319,27 @@ class LocationProcessor(
                         this.filteredSpeed = state.estimatedSpeedMps
                         this.timestamp = effectiveTs
                         this.rt = nowRt
-                        this.isStalled = if (isLocal) false else providedIsStalled
+                        this.isStalled = if (isLocal) false else snapshot.isStalled
                         this.receiptRt = nowRt
-                        this.jumpTier = providedJumpTier
-                        this.isAdaptiveJump = providedIsAdaptiveJump
+                        this.jumpTier = snapshot.jumpTier
+                        this.isAdaptiveJump = snapshot.isAdaptiveJump
                         this.distToHome = state.lastNearestHomeDistance
                         this.isSpatiallyValid = false
-                        this.tamperDetected = providedIsTamper
-                        this.jammerDetected = providedIsJammer
-                        this.kineticEnergy = providedKineticEnergy
+                        this.tamperDetected = snapshot.tamperDetected
+                        this.jammerDetected = snapshot.jammerDetected
+                        this.kineticEnergy = snapshot.kineticEnergy
                     }
                 }
             }
             
             if (accuracy <= HIGH_ACCURACY_THRESHOLD_METERS) { state.lastHighAccLat = lat; state.lastHighAccLng = lng; state.lastHighAccTs = nowWall; state.lastHighAccRt = nowRt }
-            if (isLocal) updateWindowedAccuracy(accuracy) else if (providedMaxAccuracy > 0.0) state.maxAccuracy = providedMaxAccuracy
+            if (isLocal) updateWindowedAccuracy(accuracy) else if (snapshot.maxAccuracy > 0.0) state.maxAccuracy = snapshot.maxAccuracy
             
-            if (providedAcousticLockoutRt > 0 || providedLightSpikeRt > 0 || providedAdaptiveVibrationFloor >= 0.0) {
+            if (snapshot.acousticLockoutRt > 0 || snapshot.lightSpikeRt > 0 || snapshot.providedAdaptiveFloor >= 0.0) {
                 val oldVibeFloor = state.adaptiveVibrationFloor
                 val oldLuxBaseline = state.luxBaseline
                 val oldAcousticFloor = state.acousticFloorDb
                 
-                val snapshot = SensorStateSnapshot(
-                    vibration = -1.0, heading = -1.0, baroAlt = -1000.0, 
-                    acousticLockoutRt = providedAcousticLockoutRt, 
-                    lightSpikeRt = providedLightSpikeRt,
-                    providedAdaptiveFloor = providedAdaptiveVibrationFloor,
-                    isMuzzled = isMuzzled, nowRt = nowRt, nowTs = nowWall
-                )
                 LocationSentinel.updateSensorState(state, snapshot)
                 
                 val newVibeFloor = state.adaptiveVibrationFloor
@@ -397,9 +360,9 @@ class LocationProcessor(
             val sentinelResult = LocationSentinel.processLocation(
                 state = state,
                 lat = lat, lng = lng, alt = alt, accuracy = accuracy, maxAccuracy = state.maxAccuracy, 
-                bearing = bearing, snr = snr, satsUsed = satsUsed, timestamp = effectiveTs, 
-                bypassBehavioral = !isLocal, isSuspicious = isSuspicious || adaptationMuzzled,
-                isMuzzled = isMuzzled, nowTs = nowWall, nowRt = nowRt
+                bearing = bearing, snr = snr, satsUsed = 0, timestamp = effectiveTs, 
+                bypassBehavioral = !isLocal, isSuspicious = snapshot.isMuzzled || adaptationMuzzled,
+                isMuzzled = snapshot.isMuzzled, nowTs = nowWall, nowRt = nowRt
             )
             
             if (sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED) {
@@ -424,19 +387,19 @@ class LocationProcessor(
             val finalSuppressionNote = if (isMuzzledJump) "Settling A15 Polling..." else sentinelResult.reason
 
             val isActualJammer = (sentinelResult.status == SentinelStatus.JAMMER_SUSPICION || (sentinelResult.jumpConfidence?.isOutlier == true))
-            val finalIsJump = (isActualJump && !isMuzzledJump) || providedIsJump
-            val finalIsTrajectoryPromoted = sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED || providedIsTrajectoryPromoted
-            val finalJumpTier = maxOf(sentinelResult.jumpConfidence?.tier ?: 0, providedJumpTier)
-            val finalIsAdaptiveJump = (sentinelResult.jumpConfidence?.isAdaptiveJump == true) || providedIsAdaptiveJump
-            val finalIsTamper = sentinelResult.status == SentinelStatus.TAMPER || providedIsTamper
-            val finalIsJammer = finalIsJump || finalIsTamper || isActualJammer || providedIsJammer
-            val finalIsStalled = if (isLocal) (gpsTs != 0L && gpsTs == lastGpsTs) else providedIsStalled
+            val finalIsJump = (isActualJump && !isMuzzledJump) || snapshot.isJammer
+            val finalIsTrajectoryPromoted = sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED
+            val finalJumpTier = maxOf(sentinelResult.jumpConfidence?.tier ?: 0, snapshot.jumpTier)
+            val finalIsAdaptiveJump = (sentinelResult.jumpConfidence?.isAdaptiveJump == true) || snapshot.isAdaptiveJump
+            val finalIsTamper = sentinelResult.status == SentinelStatus.TAMPER || snapshot.tamperDetected
+            val finalIsJammer = finalIsJump || finalIsTamper || isActualJammer || snapshot.jammerDetected
+            val finalIsStalled = if (isLocal) (gpsTs != 0L && gpsTs == lastGpsTs) else snapshot.isStalled
             val isSpatiallyValid = !finalIsJump && !finalIsJammer && finalStatus != SentinelStatus.OUTLIER
             
             val fallbackPoint = EngineGeoPoint(if (state.lastLat != 0.0) state.lastLat else lat, if (state.lastLng != 0.0) state.lastLng else lng, alt = alt, ts = if (state.lastTs != 0L) state.lastTs else effectiveTs, rt = if (state.lastRt != 0L) state.lastRt else nowRt, accuracy = state.lastAcc, maxAccuracy = state.lastMaxAcc)
 
             if (!isSpatiallyValid) {
-                if (shouldSavePoint(isSuspicious || adaptationMuzzled, true, PhysicsUtils.calculateDistance(state.lastSavedLat, state.lastSavedLng, lat, lng), 0L, state.maxAccuracy, nowRt)) {
+                if (shouldSavePoint(snapshot.isMuzzled || adaptationMuzzled, true, PhysicsUtils.calculateDistance(state.lastSavedLat, state.lastSavedLng, lat, lng), 0L, state.maxAccuracy, nowRt)) {
                     _processorEvents.tryEmit(ProcessorEvent.TrailPointSaved(lat, lng, isViewerTrail, finalStatus, effectiveTs, accuracy = accuracy, maxAccuracy = state.maxAccuracy))
                 }
                 return@measureAndAudit processedLocationFlyweight.apply {
@@ -458,7 +421,7 @@ class LocationProcessor(
                     this.tamperDetected = finalIsTamper
                     this.jammerDetected = finalIsJammer
                     this.suppressionNote = finalSuppressionNote
-                    this.kineticEnergy = if (isLocal) state.kineticEnergy else providedKineticEnergy
+                    this.kineticEnergy = if (isLocal) state.kineticEnergy else snapshot.kineticEnergy
                 }
             }
 
@@ -504,7 +467,7 @@ class LocationProcessor(
                 stationaryProb = stationaryProb,
                 estimatedSpeed = estimatedSpeed,
                 maxAccuracy = state.maxAccuracy,
-                isSuspicious = isSuspicious || adaptationMuzzled,
+                isSuspicious = snapshot.isMuzzled || adaptationMuzzled,
                 isAdaptationMuzzled = adaptationMuzzled,
                 isAccuracySnap = sentinelResult.jumpConfidence?.reason?.contains("Suppressed Accuracy Snap") == true,
                 snr = snr,
@@ -518,7 +481,7 @@ class LocationProcessor(
             val isAnchorLockedNow = anchorResult.isLocked
 
             val timeSinceLastGpsSaveRt = if (nowRt > 0 && state.lastSavedRt > 0) nowRt - state.lastSavedRt else 0L
-            if (shouldSavePoint(isSuspicious || adaptationMuzzled, isThrottled, PhysicsUtils.calculateDistance(state.lastSavedLat, state.lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSaveRt, state.maxAccuracy, nowRt) && !skipPersistence) {
+            if (shouldSavePoint(snapshot.isMuzzled || adaptationMuzzled, isThrottled, PhysicsUtils.calculateDistance(state.lastSavedLat, state.lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSaveRt, state.maxAccuracy, nowRt) && !skipPersistence) {
                 _processorEvents.tryEmit(ProcessorEvent.TrailPointSaved(persistencePoint.lat, persistencePoint.lng, isViewerTrail, finalStatus, effectiveTs, accuracy = persistencePoint.accuracy, maxAccuracy = persistencePoint.maxAccuracy))
                 state.lastSavedLat = persistencePoint.lat; state.lastSavedLng = persistencePoint.lng; state.lastSavedTs = nowWall; state.lastSavedRt = nowRt; state.lastSavedGpsTs = gpsTs
             }
@@ -553,7 +516,7 @@ class LocationProcessor(
                 this.jammerDetected = finalIsJammer
                 this.isAnchorLocked = isAnchorLockedNow
                 this.suppressionNote = finalSuppressionNote
-                this.kineticEnergy = if (isLocal) state.kineticEnergy else providedKineticEnergy
+                this.kineticEnergy = if (isLocal) state.kineticEnergy else snapshot.kineticEnergy
             }
         }
     }

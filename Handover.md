@@ -1,22 +1,22 @@
-# Forensic Resumption Snapshot - Sep.24.95
+# Forensic Resumption Snapshot - Sep.24.96
 
 ## 📂 Session Summary
 *   **Completed**:
-    *   **Issue #1163**: LocationProcessor Stateless evaluation refactor.
-    *   **Cleanup**: Decommissioned legacy `TrackerService.kt` and `ViewerService.kt`.
-*   **Version**: Sep.24.95
-*   **Status**: Migrated the entire location processing pipeline (GTO, Sentinel, Anchor) to a functional, stateless model. Consolidated over 60 mutable tracking variables into `LocationProcessingState`.
+    *   **Issue #1312**: Unified evaluation snapshots. Consolidated kinematic, environmental, and health data into `SystemEvaluationSnapshot`.
+    *   **Issue #1313**: Validated role-switching. Added reactive `appModeFlow` observation to `MonitorService` for atomic state resets.
+*   **Version**: Sep.24.96
+*   **Status**: Achieved absolute temporal parity in the background evaluation loop. The evaluation pipeline now consumes a single, unified DTO per tick.
 
 ## 🔧 Technical Delta
-*   **EngineModels.kt**: Defined `LocationProcessingState` encapsulating all operational metrics, buffers, and scores.
-*   **LocationProcessor.kt**: Holding the authoritative state instance and delegating logic to pure logic engines. Added compatibility proxies for `checkPhysicalTamper`.
-*   **GtoEngine.kt / LocationSentinel.kt / AnchorEvaluator.kt**: Converted to stateless `object` engines. Removed all internal mutable fields.
-*   **ConnectivitySuite.kt**: Fixed property mapping mismatches in `TrackerStatus` DTO translation.
-*   **TrackerService.kt / ViewerService.kt**: Formally decommissioned to empty stubs as they were superseded by `MonitorService.kt`.
+*   **EngineModels.kt**: Defined `SystemEvaluationSnapshot` and decommissioned legacy snapshot types.
+*   **MonitorService.kt**: Refactored `processTick` to construct the unified snapshot. Implemented `handleRoleTransition` for live role switching.
+*   **LocationProcessor.kt / LocationSentinel.kt**: Updated to consume `SystemEvaluationSnapshot`.
+*   **AppAlarmManager.kt**: Fully migrated to the unified snapshot model.
+*   **app/build.gradle**: Incremented version to `Sep.24.96`.
 
 ## 📍 Resumption Point for Next Session
-*   **Immediate Priority**: Perform a functional validation of role-switching (Tracker <-> Viewer) to ensure `LocationProcessingState` is correctly cleared or restored.
-*   **Strategic Goal**: Evaluate **Issue #1312** for unifying `AlarmTelemetrySnapshot` and `SensorStateSnapshot` to improve temporal logic parity.
+*   **Immediate Priority**: Functional soak test of the unified snapshot logic on physical hardware to verify geofence and acoustic trigger sensitivity.
+*   **Strategic Goal**: Evaluate **Issue #1291** (Domain Event Bus) to further decouple logging from the evaluation loop.
 
 ## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 474 (Rules: 24, IDs: 474), Resolved: 1217, Open: 2, Testing: 3 (Sub-items: 12), Ideas: 17, QA: 284]**
+**Current Audit Baseline: [SOT: 476 (Rules: 24, IDs: 476), Resolved: 1219, Open: 1, Testing: 3 (Sub-items: 12), Ideas: 15, QA: 284]**

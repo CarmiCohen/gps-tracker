@@ -5,12 +5,13 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.24.96:
+ * - Issue #1312 REMEDIATION: Unified AlarmTelemetrySnapshot and SensorStateSnapshot 
+ *   into SystemEvaluationSnapshot to ensure temporal parity across all logic engines.
+ *   Aligned property names with SystemHealthState for consistency.
  * Sep.24.95:
  * - Issue #1163: Introduced LocationProcessingState to support stateless 
  *   location and sentinel evaluation. Expanded to include AnchorEvaluator state.
- * Sep.24.94:
- * - Issue #1311: Expanded AlarmEvaluationState to include active alarms and siren 
- *   metadata for stateless evaluation.
  */
 
 @Serializable
@@ -48,9 +49,6 @@ enum class CapabilityStatus {
     GRANTED, DENIED, UNKNOWN
 }
 
-/**
- * PerformanceTier: Defines hardware performance characteristics for remediation gating.
- */
 @Serializable
 enum class PerformanceTier {
     STANDARD,
@@ -151,38 +149,63 @@ class EngineConnectionPoint(
 }
 
 /**
- * AlarmTelemetrySnapshot: Unified DTO for telemetry propagation to the alarm engine.
+ * SystemEvaluationSnapshot: Unified DTO for all telemetry, health metrics, and sensor data 
+ * consumed during a background tick or alarm evaluation. (Issue #1312)
  */
 @Serializable
-data class AlarmTelemetrySnapshot(
+data class SystemEvaluationSnapshot(
+    // Kinematic & Location State
     val status: SentinelStatus = SentinelStatus.VALID,
+    val lat: Double = 0.0,
+    val lng: Double = 0.0,
+    val alt: Double = 0.0,
+    val accuracy: Double = 0.0,
+    val maxAccuracy: Double = 0.0,
+    val speed: Double = 0.0,
+    val bearing: Double = 0.0,
+    val gpsTs: Long = 0L,
+    val lastValidFixRt: Long = 0L,
+    val distToHome: Double? = null,
+    val isStalled: Boolean = false,
+    val isClockRegression: Boolean = false,
+
+    // Sentinel & Anomaly State
     val isJammer: Boolean = false,
     val jumpTier: Int = 0,
     val isAdaptiveJump: Boolean = false,
-    val lat: Double = 0.0,
-    val lng: Double = 0.0,
-    val accuracy: Double = 0.0,
-    val maxAccuracy: Double = 0.0,
-    val gpsTs: Long = 0L,
-    val lastValidFixRt: Long = 0L,
-    val speed: Double = 0.0,
-    val battery: Int = 100,
-    val temp: Double = 0.0,
-    val currentMa: Int = 0,
-    val isLocationPending: Boolean = false,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val isTamperDetected: Boolean = false,
-    val isPowerTamper: Boolean = false,
-    val tiltDegrees: Double = 0.0,
-    val acousticDb: Double = 0.0,
-    val baroAlt: Double = 0.0,
+    val tamperDetected: Boolean = false,
+    val jammerDetected: Boolean = false,
+    val isAnchorLocked: Boolean = false,
+    val suppressionNote: String? = null,
+
+    // Environmental & Sensor State
+    val vibration: Double = -1.0,
+    val heading: Double = -1.0,
+    val baroAlt: Double = -1000.0,
     val baroAltEma: Double = -1000.0,
     val lux: Double = 0.0,
     val isNear: Boolean = true,
+    val tiltDegrees: Double = 0.0,
+    val acousticDb: Double = 0.0,
+    val peakShock: Double = 0.0,
+    val acousticMinDb: Double = -1.0,
     val luxBaseline: Double = 0.0,
     val acousticFloorDb: Double = 0.0,
     val adaptiveVibrationFloor: Double = 0.12,
-    val peakVibrationShock: Double = 0.0,
+    val kineticEnergy: Double = 0.0,
+    val peakVerticalVelocity: Double = 0.0,
+    val peakVerticalVelocityTs: Long = 0L,
+    val peakVerticalVelocityRt: Long = 0L,
+    val peakVerticalDisplacement: Double = 0.0,
+
+    // Health & System State
+    val batteryLevel: Int = 100,
+    val batteryTemp: Double = 0.0,
+    val currentMa: Int = 0,
+    val isCharging: Boolean = false,
+    val isPowerTamper: Boolean = false,
+    val isLocationPending: Boolean = false,
+    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val isPowerSaveMode: Boolean = false,
     val standbyBucket: Int = -1,
     val netInterface: String = "UNKNOWN",
@@ -190,8 +213,6 @@ data class AlarmTelemetrySnapshot(
     val isStorageCritical: Boolean = false,
     val isBatterySteepDischarge: Boolean = false,
     val isCoolingModeActive: Boolean = false,
-    val snrSnapshot: Double? = null,
-    val vibeSnapshot: Double? = null,
     val isGpsHardwareLock: Boolean = false,
     val cpuLoad: Double = 0.0,
     val ioWait: Double = 0.0,
@@ -201,12 +222,21 @@ data class AlarmTelemetrySnapshot(
     val isUltraLongStationary: Boolean = false,
     val isBatteryLow: Boolean = false,
     val isBatteryCritical: Boolean = false,
-    val tamperNote: String? = null,
-    val isSignalLoss: Boolean = false,
-    val isGpsStalling: Boolean = false,
+    val signalLoss: Boolean = false,
+    val gpsStalled: Boolean = false,
     val isGpsGap: Boolean = false,
     val localInternetLoss: Boolean = false,
-    val isHardwareOnline: Boolean = true
+    val isHardwareOnline: Boolean = true,
+    
+    // Temporal Gating & Fast-Paths
+    val acousticLockoutRt: Long = 0L,
+    val lightSpikeRt: Long = 0L,
+    val isMuzzled: Boolean = false,
+    val providedAdaptiveFloor: Double = -1.0,
+    val nowRt: Long = 0L,
+    val nowTs: Long = 0L,
+    val snrSnapshot: Double? = null,
+    val vibeSnapshot: Double? = null
 )
 
 /**
@@ -654,42 +684,3 @@ class SystemHealthReport(val reports: MutableList<ViolationReport> = mutableList
 
 @Serializable
 data class AlarmInfo(val title: String, val subtitle: String, val type: String = "", val isResolved: Boolean = false, val isSirenDisabled: Boolean = false)
-
-@Serializable
-data class SensorStateSnapshot(
-    val vibration: Double = -1.0,
-    val heading: Double = -1.0,
-    val baroAlt: Double = -1000.0,
-    val lux: Double = 0.0,
-    val isNear: Boolean = true,
-    val powerTamper: Boolean = false,
-    val tiltDegrees: Double = 0.0,
-    val acousticDb: Double = 0.0,
-    val peakShock: Double = 0.0,
-    val acousticMinDb: Double = -1.0,
-    val peakVerticalVelocity: Double = 0.0,
-    val peakVerticalVelocityTs: Long = 0L,
-    val peakVerticalVelocityRt: Long = 0L,
-    val plungeMatched: Boolean = false,
-    val peakVerticalDisplacement: Double = 0.0,
-    val isSirenActive: Boolean = false,
-    val isWarming: Boolean = false,
-    val manualAdaptiveFloor: Double = -1.0,
-    val acousticLockoutRt: Long = 0L,
-    val lightSpikeRt: Long = 0L,
-    val isMuzzled: Boolean = false,
-    val kineticEnergy: Double = 0.0,
-    val providedAdaptiveFloor: Double = -1.0,
-    val nowRt: Long = 0L,
-    val nowTs: Long = 0L
-)
-
-/**
- * EvaluationSnapshot: Atomic container for all telemetry and health metrics 
- * consumed during a background tick. (Issue #1162)
- */
-@Serializable
-data class EvaluationSnapshot(
-    val health: SystemHealthState,
-    val sensor: SensorStateSnapshot
-)

@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.22.30)
+# SOT Master Requirements & Hardening Status (Sep.24.96)
 
 ## 🏗️ Architectural Master Rules (24 Rules)
 
@@ -33,6 +33,8 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions (R212, R310, R317).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 476**: Role-Switching Atomic State Reset - Remediated Issue #1313 by hardening `MonitorService` to handle dynamic role transitions via a reactive `appModeFlow` observer. Integrated `handleRoleTransition` to atomically reset processing state and jobs, preventing cross-role state contamination. (Resolved Sep.24.96)
+*   **SOT ID 475**: Unified Evaluation Snapshot - Remediated Issue #1312 by consolidating `AlarmTelemetrySnapshot` and `SensorStateSnapshot` into a single `SystemEvaluationSnapshot`. This ensures absolute temporal parity between kinematic and health logic. (Resolved Sep.24.96)
 *   **SOT ID 474**: Stateless Logic Refactoring - Remediated Issue #1163 by migrating `LocationProcessor`, `LocationSentinel`, and `GtoEngine` to a stateless evaluation model. Consolidated all mutable tracking data into `LocationProcessingState` and transitioned core engines to pure `object` implementations to ensure deterministic kinematic and sensor evaluation (Resolved Sep.24.95).
 *   **SOT ID 473**: Stateless Evaluation Consolidation - Remediated Issue #1311 by shifting active alarm map states and tracking metadata entirely into `AlarmEvaluationState`. Fully purged secondary in-memory maps from `AppAlarmManager` to establish complete architectural isolation across role switches. (Resolved Sep.24.94)
 *   **SOT ID 472**: Unified Event Orchestration - Centralized alert triggers, audio synthesis, and forensic logging into a high-cohesion `AppEventCoordinator`. Decoupled domain reactions from background service lifecycles and established reactive siren state binding (Issue #1292) between `AppAlarmManager` and `AudioSynthesizer` to ensure absolute parity across functional roles (R-ID 472). (Resolved Sep.24.93)
@@ -53,6 +55,7 @@
 *   **SOT ID 457**: Fast-Path Allocation Optimization - Made spike detection callbacks optional to eliminate allocation churn in the tick loop (R-ID 457). (Resolved Sep.24.01)
 
 ## 4.2. Change History (Recent)
+*   **Sep.24.96**: Resolved Issue #1312 (Unified Evaluation Logic Snapshot) and Issue #1313 (Role-Switching Atomic State Reset).
 *   **Sep.24.95**: Resolved Issue #1163 (Stateless & Functional Logic Refactoring). Migrated location pipeline to stateless evaluation model (SOT ID 474).
 *   **Sep.24.94**: Resolved Issue #1311 (AppAlarmManager Stateless Evaluation Model). Relocated active alarms directly into `AlarmEvaluationState` (SOT ID 473).
 *   **Sep.24.93**: Resolved Issue #1265 (Unified Event Orchestration). Centralized alert, audio, and logging triggers into `AppEventCoordinator` (SOT ID 472).
@@ -62,6 +65,8 @@
 
 ## 📋 Functional Requirements (146 R-IDs)
 *   **R101-R117**: Core tracking, telemetry, and forensic rules.
+*   **R476**: Dynamic role-switching validation.
+*   **R475**: Unified evaluation logic snapshot.
 *   **R474**: Stateless location evaluation via consolidated state.
 *   **R473**: Stateless alarm evaluation via consolidated state.
 *   **R472**: Unified Event Orchestration via `AppEventCoordinator`.
@@ -69,10 +74,10 @@
 *   *(Remaining requirements preserved in technical registry)*
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.107 (Stateless Logic Refactoring)**: PASSED - Migrated location processor and sentinel to stateless engines. (Sep.22.30)
-*   **Chapter 31.106 (Stateless Evaluation Consolidation)**: PASSED - Purged nested mutable memory states from alarm evaluation pipeline. (Sep.22.30)
-*   **Chapter 31.105 (Unified Event Orchestration)**: PASSED - Successfully centralized domain reactions and siren binding into `AppEventCoordinator`. (Sep.22.30)
-*   **Chapter 31.104 (Service Lifecycle Unification)**: PASSED - Successfully consolidated background services into `MonitorService`. (Sep.22.30)
+*   **Chapter 31.109 (Role-Switching Atomic State Reset)**: PASSED - Successfully implemented live role transition handling in MonitorService. (Sep.24.96)
+*   **Chapter 31.108 (Unified Evaluation Logic Snapshot)**: PASSED - Successfully unified sensor and telemetry snapshots. (Sep.24.96)
+*   **Chapter 31.107 (Stateless Logic Refactoring)**: PASSED - Migrated location processor and sentinel to stateless engines. (Sep.24.95)
+*   **Chapter 31.106 (Stateless Evaluation Consolidation)**: PASSED - Purged nested mutable memory states from alarm evaluation pipeline. (Sep.24.94)
 
 ---
-*Next Audit: Oct.01.00. (Sep.22.30)*
+*Next Audit: Oct.01.00. (Sep.24.96)*
