@@ -1,3 +1,15 @@
+# 🏛️ Resolution Archive - Sep.24.92
+
+## 🏁 Issue #1261: Refactor Tracker/Viewer Services into Role-Reactive MonitorService
+*   **Resolved**: Sep.24.92
+*   **Root Cause**: `TrackerService` and `ViewerService` shared significant redundant boilerplate for coroutine management, stream observation, lifecycle events, and forensic sampling. This duplication increased maintainability overhead and created risks of logic divergence between roles.
+*   **Remediation**:
+    *   **MonitorService.kt**: Created a unified, role-reactive background service that dynamically configures its logic based on the active `appModeFlow`.
+    *   **Architecture**: Consolidated independent stream observation methods and job management into a shared engine. Implemented a dual-processor model for the Viewer role (local and remote) while maintaining single-processor efficiency for Trackers.
+    *   **Manifest & Callers**: Updated `AndroidManifest.xml`, `MainActivity`, `WatchdogReceiver`, `BootReceiver`, and `MaintenanceWorker` to utilize the unified service.
+    *   **Forensic Parity**: Merged the `forensicSamplingLoop` logic, ensuring identical audit precision and spike-trigger responsiveness for both monitor and tracking roles.
+*   **R-ID**: 471
+
 # 🏛️ Resolution Archive - Sep.24.91
 
 ## 🏁 Issue #1234 / #1244: Heuristic Correction for Thermal Recovery Audits
@@ -41,7 +53,7 @@
 *   **Root Cause**: `AppAlarmManager.restoreState` returned early if the input JSON was empty, failing to clear the in-memory `activeAlarms` map. When switching from Tracker to Viewer role, stale alarm state from the previous role persisted until the next evaluation cycle. Since `shouldPlaySiren` is gated by `isTrackerMode`, the siren was suppressed in Tracker mode but triggered immediately upon switching to Viewer mode before a fresh evaluation could occur.
 *   **Remediation**:
     *   **AppAlarmManager.kt**: Hardened `restoreState` to ensure the `activeAlarms` map is cleared before any conditional early-return.
-    *   **AppAlarmManager.kt**: Updated `restoreLogicState` to explicitly sync and reset the `isTrackerMode` gating flag during role transitions.
+    *   **AppAlarmManager.kt**: Updated `restoreLogicState` to explicitly sync and reset the `isTrackerMode` flag during role transitions.
     *   **AppAlarmManager.kt**: Ensured that `evaluateAlarms` correctly updates the `isTrackerMode` flag from the `AlarmServiceContext` to prevent role-based state leakage.
 *   **R-ID**: 467
 

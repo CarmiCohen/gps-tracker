@@ -64,21 +64,12 @@
             android:turnScreenOn="true"/>
 
         <service
-            android:name=".TrackerService"
+            android:name=".MonitorService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="location|microphone|specialUse">
             <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_TYPE"
-                android:value="This service maintains background signaling continuity and system state synchronization for high-uptime GPS monitoring." />
-        </service>
-
-        <service
-            android:name=".ViewerService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="location|specialUse">
-            <property android:name="android.app.PROPERTY_SPECIAL_USE_FGS_TYPE"
-                android:value="Maintains high-precision local coordinate state and peer telemetry synchronization on budget hardware." />
+                android:value="Maintains background signaling continuity and system state synchronization for high-uptime GPS monitoring and peer telemetry synchronization." />
         </service>
 
         <service

@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.91
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.92
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -27,9 +27,6 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🟡 Medium Priority
 
-*   **Issue #1261: Refactor Tracker/Viewer Services into Role-Reactive MonitorService**
-    *   *Description*: Merge TrackerService and ViewerService redundant boilerplate into a unified, lightweight, role-reactive background service driven by active mode flow changes.
-    *   *Contribution*: **Medium (Maintainability)**. Consolidates 400+ lines of redundant boilerplate.
 *   **Issue #1265: Unified Event Orchestration via AppEventCoordinator**
     *   *Description*: Centralize independent alert triggers, audio synthesizer calls, and forensic logs into a single high-cohesion coordinator to eliminate cross-component lifecycle dependencies.
     *   *Contribution*: **Medium (Architecture)**. Decouples domain logic from service lifecycles.
@@ -40,7 +37,7 @@ Finalizing the audit of background service stability and functional convergence 
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 21)
+## 💡 Strategic Simplification Ideas (Ideas: 19)
 
 ### 🛑 High Priority
 *   **Issue #1292: Reactive Siren State Binding**
@@ -51,10 +48,6 @@ Finalizing the audit of background service stability and functional convergence 
 ### 🟡 Medium Priority
 *   **Issue #1311: AppAlarmManager Stateless Evaluation Model**
     *   *Significance*: **Medium (Architecture)**. Transition `AppAlarmManager` away from intermediate memory state persistence maps towards purely stateless snapshot calculations, further mitigating multi-role transition leakage vectors.
-*   **Issue #1310: Stream Orchestration Boilerplate Reduction**
-    *   *Significance*: **Medium (Maintainability)**. Tracker and Viewer services share identical patterns for observing alarm, integrity, processor, connectivity, and history event streams. Consolidating these into a shared `ServiceObservationDelegate` or a unified event handler would eliminate 100+ lines of boilerplate.
-*   **Issue #1309: Unified Job Management in Monitor Services**
-    *   *Significance*: **Medium (Maintainability)**. Tracker and Viewer services manually manage 5-10 nullable Job variables. Migrating to a structured `JobRegistry` would simplify lifecycle management and reduce boilerplate cancellation logic.
 *   **Issue #1161: Unified Trajectory & Buffer Management**
     *   *Significance*: **Medium-High (Performance)**. Merge `GtoEngine` windows and `LocationSentinel` hindsight buffers into a single optimized `TrajectoryBuffer`.
 *   **Issue #1294: Build-Time Interface Validation**
@@ -84,8 +77,8 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1296: Centralized Boot Lifecycle Authority**
     *   *Significance*: **Low (Testability)**. Move monotonic clock recovery logic to a dedicated authority to simplify background service testing.
 *   **Issue #1295: Redundant Stream Observer Audit**
-    *   *Significance*: **Low (CPU)**. Systematically audit all service descendants to ensure no redundant reactive streams are active.
-*   **Issue #1171: Service & Worker Consolidation**
+    *   *Significance*: **Low (CPU)**. Systematically audit all service descendants to ensure no reactive streams are active.
+*   **Issue #1171: Service & Worker Consolidation** (Partially resolved by #1261)
     *   *Significance*: **Low (Maintenance)**. Merge role-specific services into a single monitor service to reduce manifest overhead.
 *   **Issue #1175: Real-time Only Path (Pivot Option)**
     *   *Significance*: **Strategic (Maintenance Tradeoff)**. Consider removing backlog sync and forensic backfilling to dramatically reduce codebase complexity.
@@ -94,6 +87,8 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1261: Refactor Tracker/Viewer Services into Role-Reactive MonitorService** (Resolved Sep.24.92)
+    *   *Remediation*: Consolidated TrackerService and ViewerService redundant boilerplate into a unified, lightweight, role-reactive background service. Consolidated stream observation (#1310) and job management (#1309) into a shared lifecycle (R-ID 471).
 *   **Issue #1234 / #1244: Heuristic Correction for Thermal Recovery Audits** (Resolved Sep.24.91)
     *   *Remediation*: Refactored `startForensicSamplingLoop` in `TrackerService` and `ViewerService` to calculate Thermal Recovery Latency using an authoritative `coolingEnteredRt` monotonic timestamp populated precisely inside `SystemHealthState` by `IntegrityMonitor` when entering cooling mode, eliminating loop latency measurement errors (SOT ID 470).
 *   **Issue #1306: Namespace Collision Risk for Viewer's Self-Tracking** (Resolved Sep.24.90)
@@ -147,4 +142,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 470 (Rules: 92, IDs: 470), Resolved: 1213, Open: 5, Testing: 3 (Sub-items: 12), Ideas: 21, QA: 284]**
+- **Current Audit Baseline: [SOT: 471 (Rules: 93, IDs: 471), Resolved: 1214, Open: 4, Testing: 3 (Sub-items: 12), Ideas: 19, QA: 284]**

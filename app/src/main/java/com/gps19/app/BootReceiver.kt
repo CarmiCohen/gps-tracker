@@ -39,6 +39,8 @@ class BootReceiver : BroadcastReceiver() {
 
 /**
  * Worker that bridges the boot broadcast to the Foreground Service.
+ * Sep.24.92:
+ * - Issue #1261: Service Unification. Migrated to MonitorService for boot revival (R-ID 471).
  * Sep.03.101:
  * - Issue #897 Enforcement: Fixed InvalidForegroundServiceTypeException on 
  *   Target SDK 35 by explicitly declaring FOREGROUND_SERVICE_TYPE_SPECIAL_USE (R897).
@@ -81,8 +83,8 @@ class BootServiceStartWorker @AssistedInject constructor(
             
             repository.setAppStartTime(timeProvider.currentTimeMillis())
 
-            val serviceClass = if (appMode == "tracker") TrackerService::class.java else ViewerService::class.java
-            val serviceIntent = Intent(applicationContext, serviceClass)
+            // Issue #1261: Unified MonitorService manages role transitions internally
+            val serviceIntent = Intent(applicationContext, MonitorService::class.java)
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                     applicationContext.startForegroundService(serviceIntent)

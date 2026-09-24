@@ -86,7 +86,7 @@ class HardeningAuditTest {
 
     @Test
     fun verifyRecoveryLatencyAuditR192() = runBlocking {
-        // This requirement is instrumented in TrackerService.startForensicSamplingLoop.
+        // Issue #1261: Refactored requirement instrumented in MonitorService.startForensicSamplingLoop.
         // We verify that the logic exists to track recoveryTriggerRt.
         
         // In a real test, we would observe logs, but here we ensure the constants 

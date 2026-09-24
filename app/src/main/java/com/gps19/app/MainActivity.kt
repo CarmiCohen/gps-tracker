@@ -19,13 +19,13 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * Sep.24.92:
+ * - Issue #1261: Service Unification. Migrated to unified MonitorService for 
+ *   all background operations (R-ID 471).
  * Sep.07.70:
  * - Service Mutual Exclusivity: Enforced service termination of the opposite 
  *   role during mode transitions to prevent "ghost" telemetry in single-device 
  *   testing (R-ID 975).
- * Sep.05.11:
- * - Issue #910 Forensic Instrumentation: Added logging to onStopTracking to 
- *   identify the source of service termination (R910).
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -50,12 +50,8 @@ class MainActivity : ComponentActivity() {
                 onStartService = { mode ->
                     try {
                         if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                            // R-ID 975: Ensure mutual exclusivity of services
-                            val stopIntent = Intent(this, if (mode == "tracker") ViewerService::class.java else TrackerService::class.java)
-                            stopService(stopIntent)
-
-                            val serviceClass = if (mode == "tracker") TrackerService::class.java else ViewerService::class.java
-                            val intent = Intent(this, serviceClass)
+                            // Issue #1261: Unified MonitorService manages role transitions internally
+                            val intent = Intent(this, MonitorService::class.java)
                             ContextCompat.startForegroundService(this, intent)
                         } else {
                             Timber.w("Issue #661: Deferred service start for $mode (Activity not RESUMED)")
@@ -69,8 +65,7 @@ class MainActivity : ComponentActivity() {
                 onCleanupAndExit = {
                     val trace = Thread.currentThread().stackTrace.take(15).joinToString("\n")
                     Timber.w("Issue #910: onCleanupAndExit invoked. Trace:\n$trace")
-                    stopService(Intent(this, TrackerService::class.java))
-                    stopService(Intent(this, ViewerService::class.java))
+                    stopService(Intent(this, MonitorService::class.java))
                     finishAffinity()
                 },
                 onRequestBatteryExemption = { launchBatteryExemptionSetting() },
@@ -119,8 +114,7 @@ class MainActivity : ComponentActivity() {
                 onStopTracking = {
                     val trace = Thread.currentThread().stackTrace.take(15).joinToString("\n")
                     Timber.w("Issue #910: onStopTracking invoked. Trace:\n$trace")
-                    stopService(Intent(this, TrackerService::class.java))
-                    stopService(Intent(this, ViewerService::class.java))
+                    stopService(Intent(this, MonitorService::class.java))
                 }
             )
         }
@@ -145,7 +139,6 @@ class MainActivity : ComponentActivity() {
                 Timber.e(e2, "Issue #896: Fallback optimization intent failed. Navigating to App Info.")
                 try {
                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                        data = android.net.Uri.fromParts("package", pkg, null)
                         addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     }
                     startActivity(intent)

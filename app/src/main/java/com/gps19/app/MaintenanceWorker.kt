@@ -18,6 +18,9 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
+ * Sep.24.92:
+ * - Issue #1261: Service Unification. Migrated to MonitorService for system 
+ *   maintenance recovery (R-ID 471).
  * Sep.23.70:
  * - Issue #1230 REMEDIATION: Made worker role-aware to correctly audit namespaced 
  *   service ticks ("T_" or "V_" prefixes) (R-ID 453).
@@ -133,8 +136,8 @@ class MaintenanceWorker @AssistedInject constructor(
                     specialColor = FORENSIC_PINK_COLOR
                 ))
 
-                val serviceClass = if (savedMode == "tracker") TrackerService::class.java else ViewerService::class.java
-                val serviceIntent = Intent(applicationContext, serviceClass).apply {
+                // Issue #1261: Unified MonitorService manages role transitions internally
+                val serviceIntent = Intent(applicationContext, MonitorService::class.java).apply {
                     setPackage(GpsApplication.PACKAGE_NAME)
                 }
                 

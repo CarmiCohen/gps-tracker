@@ -13,6 +13,9 @@ import javax.inject.Inject
 
 /**
  * WatchdogReceiver: Responds to watchdog alarms to ensure the service stays active.
+ * Sep.24.92:
+ * - Issue #1261: Service Unification. Migrated to MonitorService for system 
+ *   recovery operations (R-ID 471).
  * July.30.27:
  * - Issue #629: Deferred Recovery Latency Audit. Added recoveryBlockedTs recording.
  * July.30.26:
@@ -49,8 +52,8 @@ class WatchdogReceiver : BroadcastReceiver() {
                         specialColor = 0xFFF472B6.toInt()
                     ))
 
-                    val serviceClass = if (appMode == "tracker") TrackerService::class.java else ViewerService::class.java
-                    val serviceIntent = Intent(context, serviceClass).apply {
+                    // Issue #1261: Unified MonitorService manages role transitions internally
+                    val serviceIntent = Intent(context, MonitorService::class.java).apply {
                         this.action = "WATCHDOG_WAKEUP"
                         putExtra("WAKEUP_RT", nowRt)
                     }
