@@ -31,12 +31,10 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
- * Sep.24.93:
- * - Issue #1265 REMEDIATION: Converted siren state into a reactive flow 
- *   (isSirenRequired) to support centralized orchestration via AppEventCoordinator.
- *   Removed direct AudioSynthesizer calls from the evaluation loop (R-ID 472).
- * Sep.24.70:
- * - Issue #1272 REMEDIATION: Fixed state leak during role transitions.
+ * Sep.24.94:
+ * - Issue #1311 REMEDIATION: Fully transitioned to a stateless evaluation model 
+ *   by removing duplicate instance state variables and intermediate maps, unifying 
+ *   all variables inside AlarmEvaluationState.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -57,22 +55,12 @@ class AppAlarmManager @Inject constructor(
     private val _isSirenRequired = MutableStateFlow(false)
     val isSirenRequired: StateFlow<Boolean> = _isSirenRequired.asStateFlow()
 
-    private val activeAlarms = mutableMapOf<String, AlarmEvaluation>()
     private var lastAlarmsJson = "[]"
     private var currentSettings = AlertSettings()
 
     private val evaluationReport = SystemHealthReport()
     private val evaluationState = AlarmEvaluationState()
-
-    private var firstViolationTs: Long = 0L
-    private var firstViolationRt: Long = 0L
-    private var firstViolationWasJump: Boolean = false
-    private var distanceViolationCounter: Int = 0
-    private var wasDistanceViolated: Boolean = false
-    private var powerAlarmPending: Boolean = false
     
-    private var lastSirenStopRt: Long = 0L
-    private var lastGlobalTriggerRt: Long = 0L
     private var isTrackerMode: Boolean = false
     private var currentRolePrefix: String = ""
 
@@ -84,8 +72,8 @@ class AppAlarmManager @Inject constructor(
     fun getSettings(): AlertSettings = currentSettings
 
     fun setPowerAlarmPending(pending: Boolean, rolePrefix: String = "") {
-        if (this.powerAlarmPending != pending || this.currentRolePrefix != rolePrefix) {
-            this.powerAlarmPending = pending
+        if (evaluationState.powerAlarmPending != pending || this.currentRolePrefix != rolePrefix) {
+            evaluationState.powerAlarmPending = pending
             this.currentRolePrefix = rolePrefix
             saveLogicState()
             updateSirenRequirement()
@@ -93,8 +81,8 @@ class AppAlarmManager @Inject constructor(
     }
 
     fun hasUnresolvedAlarms(): Boolean {
-        synchronized(activeAlarms) {
-            return activeAlarms.values.any { !it.isResolved }
+        synchronized(evaluationState.activeAlarms) {
+            return evaluationState.activeAlarms.values.any { !it.isResolved }
         }
     }
 
@@ -104,20 +92,20 @@ class AppAlarmManager @Inject constructor(
         if (!hasUnresolvedAlarms()) return false
         val nowRt = timeProvider.elapsedRealtime()
         
-        if (lastSirenStopRt > 0L && nowRt - lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS) return false
+        if (evaluationState.lastSirenStopRt > 0L && nowRt - evaluationState.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS) return false
         if (nowRt < silencedUntilRt) return false
         return true
     }
     
     fun notifySirenManualStop() {
-        lastSirenStopRt = timeProvider.elapsedRealtime()
+        evaluationState.lastSirenStopRt = timeProvider.elapsedRealtime()
         saveLogicState()
         updateSirenRequirement()
     }
 
     fun restoreState(json: String) {
-        synchronized(activeAlarms) {
-            activeAlarms.clear()
+        synchronized(evaluationState.activeAlarms) {
+            evaluationState.activeAlarms.clear()
         }
         if (json.isEmpty() || json == "[]") {
             lastAlarmsJson = "[]"
@@ -126,11 +114,11 @@ class AppAlarmManager @Inject constructor(
         }
         try {
             val array = JSONArray(json)
-            synchronized(activeAlarms) {
+            synchronized(evaluationState.activeAlarms) {
                 for (i in 0 until array.length()) {
                     val obj = array.getJSONObject(i)
                     val type = obj.getString("type")
-                    activeAlarms[type] = AlarmEvaluation(
+                    evaluationState.activeAlarms[type] = AlarmEvaluationState.ActiveAlarm(
                         type = type,
                         title = obj.optString("title", "Violation"),
                         subtitle = obj.optString("subtitle", ""),
@@ -155,44 +143,38 @@ class AppAlarmManager @Inject constructor(
         this.isTrackerMode = (rolePrefix == "T_")
         
         if (rolePrefix.isEmpty()) {
-            firstViolationTs = s.firstViolationTs
-            firstViolationRt = s.firstViolationRt
-            firstViolationWasJump = s.firstViolationWasJump
-            distanceViolationCounter = s.distanceViolationCounter
-            wasDistanceViolated = s.wasDistanceViolated
-            powerAlarmPending = s.powerAlarmPending
-            lastSirenStopRt = s.lastSirenStopRt
-            lastGlobalTriggerRt = s.lastGlobalTriggerRt
+            evaluationState.firstViolationTs = s.firstViolationTs
+            evaluationState.firstViolationRt = s.firstViolationRt
+            evaluationState.firstViolationWasJump = s.firstViolationWasJump
+            evaluationState.distanceViolationCounter = s.distanceViolationCounter
+            evaluationState.wasDistanceViolated = s.wasDistanceViolated
+            evaluationState.powerAlarmPending = s.powerAlarmPending
+            evaluationState.lastSirenStopRt = s.lastSirenStopRt
+            evaluationState.lastGlobalTriggerRt = s.lastGlobalTriggerRt
             evaluationState.forensicReliabilityDegradationStartRt = s.forensicReliabilityDegradationStartRt
         } else {
-            firstViolationTs = s.roleLongsMap.getOrDefault(rolePrefix + FIRST_VIOLATION_TS_KEY, 0L)
-            firstViolationRt = s.roleLongsMap.getOrDefault(rolePrefix + FIRST_VIOLATION_RT_KEY, 0L)
-            firstViolationWasJump = s.roleBoolsMap.getOrDefault(rolePrefix + FIRST_VIOLATION_WAS_JUMP_KEY, false)
-            distanceViolationCounter = s.roleIntsMap.getOrDefault(rolePrefix + DISTANCE_VIOLATION_COUNTER_KEY, 0)
-            wasDistanceViolated = s.roleBoolsMap.getOrDefault(rolePrefix + WAS_DISTANCE_VIOLATED_KEY, false)
-            powerAlarmPending = s.roleBoolsMap.getOrDefault(rolePrefix + POWER_ALARM_PENDING_KEY, false)
-            lastSirenStopRt = s.roleLongsMap.getOrDefault(rolePrefix + LAST_SIREN_STOP_RT_KEY, 0L)
-            lastGlobalTriggerRt = s.roleLongsMap.getOrDefault(rolePrefix + LAST_GLOBAL_TRIGGER_RT_KEY, 0L)
+            evaluationState.firstViolationTs = s.roleLongsMap.getOrDefault(rolePrefix + FIRST_VIOLATION_TS_KEY, 0L)
+            evaluationState.firstViolationRt = s.roleLongsMap.getOrDefault(rolePrefix + FIRST_VIOLATION_RT_KEY, 0L)
+            evaluationState.firstViolationWasJump = s.roleBoolsMap.getOrDefault(rolePrefix + FIRST_VIOLATION_WAS_JUMP_KEY, false)
+            evaluationState.distanceViolationCounter = s.roleIntsMap.getOrDefault(rolePrefix + DISTANCE_VIOLATION_COUNTER_KEY, 0)
+            evaluationState.wasDistanceViolated = s.roleBoolsMap.getOrDefault(rolePrefix + WAS_DISTANCE_VIOLATED_KEY, false)
+            evaluationState.powerAlarmPending = s.roleBoolsMap.getOrDefault(rolePrefix + POWER_ALARM_PENDING_KEY, false)
+            evaluationState.lastSirenStopRt = s.roleLongsMap.getOrDefault(rolePrefix + LAST_SIREN_STOP_RT_KEY, 0L)
+            evaluationState.lastGlobalTriggerRt = s.roleLongsMap.getOrDefault(rolePrefix + LAST_GLOBAL_TRIGGER_RT_KEY, 0L)
             evaluationState.forensicReliabilityDegradationStartRt = s.roleLongsMap.getOrDefault(rolePrefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, 0L)
         }
 
         val savedBootId = s.roleStringsMap.getOrDefault(rolePrefix + "boot_id", "")
         val currentBootId = timeProvider.getBootId()
         if (savedBootId.isNotEmpty() && savedBootId != currentBootId) {
-            firstViolationRt = 0L
-            lastSirenStopRt = 0L
-            lastGlobalTriggerRt = 0L
+            evaluationState.firstViolationRt = 0L
+            evaluationState.lastSirenStopRt = 0L
+            evaluationState.lastGlobalTriggerRt = 0L
             evaluationState.forensicReliabilityDegradationStartRt = 0L
             saveLogicState()
         } else if (savedBootId.isEmpty()) {
             saveLogicState()
         }
-        
-        evaluationState.firstViolationTs = firstViolationTs
-        evaluationState.firstViolationRt = firstViolationRt
-        evaluationState.firstViolationWasJump = firstViolationWasJump
-        evaluationState.wasDistanceViolated = wasDistanceViolated
-        evaluationState.distanceViolationCounter = distanceViolationCounter
         
         updateSirenRequirement()
     }
@@ -200,14 +182,14 @@ class AppAlarmManager @Inject constructor(
     private fun saveLogicState() {
         scope.launch {
             repository.saveLogicState(
-                firstViolationTs = firstViolationTs,
-                firstViolationRt = firstViolationRt,
-                firstViolationWasJump = firstViolationWasJump,
-                distanceViolationCounter = distanceViolationCounter,
-                wasDistanceViolated = wasDistanceViolated,
-                powerAlarmPending = powerAlarmPending,
-                lastSirenStopRt = lastSirenStopRt,
-                lastGlobalTriggerRt = lastGlobalTriggerRt,
+                firstViolationTs = evaluationState.firstViolationTs,
+                firstViolationRt = evaluationState.firstViolationRt,
+                firstViolationWasJump = evaluationState.firstViolationWasJump,
+                distanceViolationCounter = evaluationState.distanceViolationCounter,
+                wasDistanceViolated = evaluationState.wasDistanceViolated,
+                powerAlarmPending = evaluationState.powerAlarmPending,
+                lastSirenStopRt = evaluationState.lastSirenStopRt,
+                lastGlobalTriggerRt = evaluationState.lastGlobalTriggerRt,
                 forensicReliabilityDegradationStartRt = evaluationState.forensicReliabilityDegradationStartRt,
                 rolePrefix = currentRolePrefix
             )
@@ -225,10 +207,17 @@ class AppAlarmManager @Inject constructor(
         
         syncEvaluationState(telemetry, serviceContext)
 
-        val report = MainAlarmLogic.detectViolations(
+        val oldWasViolated = evaluationState.wasDistanceViolated
+        val oldCounter = evaluationState.distanceViolationCounter
+        val oldRt = evaluationState.firstViolationRt
+        val oldStallRt = evaluationState.forensicReliabilityDegradationStartRt
+        val oldGlobalTriggerRt = evaluationState.lastGlobalTriggerRt
+
+        MainAlarmLogic.detectViolations(
             state = evaluationState,
             timeProvider = timeProvider,
             report = evaluationReport,
+            versionTag = versionTag,
             onSpike = { message, duration ->
                 _alarmEvents.tryEmit(AlarmEvent.LogEvent(
                     type = ALERT_ID_PERFORMANCE_SPIKE,
@@ -242,10 +231,52 @@ class AppAlarmManager @Inject constructor(
                     lat = telemetry.lat, lng = telemetry.lng, accuracy = telemetry.accuracy,
                     maxAccuracy = telemetry.maxAccuracy, snr = telemetry.snrSnapshot, vibe = telemetry.vibeSnapshot
                 ))
+            },
+            onTrigger = { eval ->
+                val isSpecial = isSpecialType(eval.type)
+                val specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
+                _alarmEvents.tryEmit(AlarmEvent.LogEvent(
+                    type = eval.type,
+                    message = "$versionTag ALARM TRIGGERED: ${eval.title}",
+                    isImportant = true,
+                    extremeValue = null,
+                    logId = null,
+                    durationMs = 0L,
+                    isSpecial = isSpecial,
+                    specialColor = specialColor,
+                    lat = telemetry.lat, lng = telemetry.lng, accuracy = telemetry.accuracy,
+                    maxAccuracy = telemetry.maxAccuracy, snr = telemetry.snrSnapshot, vibe = telemetry.vibeSnapshot
+                ))
+            },
+            onResolve = { eval, durationMs ->
+                val isSpecial = isSpecialType(eval.type)
+                val specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
+                _alarmEvents.tryEmit(AlarmEvent.LogEvent(
+                    type = eval.type,
+                    message = "$versionTag ALARM RESOLVED: ${eval.title}",
+                    isImportant = false,
+                    extremeValue = null,
+                    logId = null,
+                    durationMs = durationMs,
+                    isSpecial = isSpecial,
+                    specialColor = specialColor,
+                    lat = telemetry.lat, lng = telemetry.lng, accuracy = telemetry.accuracy,
+                    maxAccuracy = telemetry.maxAccuracy, snr = telemetry.snrSnapshot, vibe = telemetry.vibeSnapshot
+                ))
             }
         )
         
-        processViolationReport(report, serviceContext.now, serviceContext.nowRt, versionTag, telemetry.lat, telemetry.lng, telemetry.accuracy, telemetry.maxAccuracy, telemetry.snrSnapshot, telemetry.vibeSnapshot)
+        updateAlarmsJson()
+        
+        val stateChanged = evaluationState.wasDistanceViolated != oldWasViolated || 
+                           evaluationState.distanceViolationCounter != oldCounter || 
+                           evaluationState.firstViolationRt != oldRt || 
+                           evaluationState.forensicReliabilityDegradationStartRt != oldStallRt ||
+                           evaluationState.lastGlobalTriggerRt != oldGlobalTriggerRt
+        if (stateChanged) {
+            saveLogicState()
+        }
+
         updateSirenRequirement()
     }
 
@@ -335,11 +366,11 @@ class AppAlarmManager @Inject constructor(
             isAdaptiveJump = telemetry.isAdaptiveJump, 
             trackerBattery = telemetry.battery, 
             trackerTemp = telemetry.temp,
-            wasDistanceViolated = wasDistanceViolated, 
-            distanceViolationCounter = distanceViolationCounter,
-            firstViolationTs = firstViolationTs, 
-            firstViolationRt = firstViolationRt,
-            firstViolationWasJump = firstViolationWasJump, 
+            wasDistanceViolated = evaluationState.wasDistanceViolated, 
+            distanceViolationCounter = evaluationState.distanceViolationCounter,
+            firstViolationTs = evaluationState.firstViolationTs, 
+            firstViolationRt = evaluationState.firstViolationRt,
+            firstViolationWasJump = evaluationState.firstViolationWasJump, 
             maxDistance = serviceContext.maxDistanceAuthority, 
             distToHomeAuthority = serviceContext.distToHomeAuthority, 
             isGpsGap = telemetry.isGpsGap, 
@@ -347,80 +378,16 @@ class AppAlarmManager @Inject constructor(
             isTrackerMode = serviceContext.isTrackerMode, 
             capabilities = serviceContext.capabilities,
             vibrationSensitivity = currentSettings.vibrationSensitivity,
-            tiltSensitivity = currentSettings.tiltSensitivity
+            tiltSensitivity = currentSettings.tiltSensitivity,
+            powerAlarmPending = evaluationState.powerAlarmPending,
+            lastSirenStopRt = evaluationState.lastSirenStopRt,
+            lastGlobalTriggerRt = evaluationState.lastGlobalTriggerRt
         )
     }
 
-    private fun processViolationReport(
-        report: SystemHealthReport,
-        now: Long,
-        nowRt: Long,
-        versionTag: String,
-        lat: Double,
-        lng: Double,
-        accuracy: Double,
-        maxAccuracy: Double,
-        snr: Double?,
-        vibe: Double?
-    ) {
-        val oldWasViolated = wasDistanceViolated
-        val oldCounter = distanceViolationCounter
-        val oldRt = firstViolationRt
-        val oldStallRt = evaluationState.forensicReliabilityDegradationStartRt
-        
-        wasDistanceViolated = evaluationState.wasDistanceViolated
-        distanceViolationCounter = evaluationState.distanceViolationCounter
-        firstViolationTs = evaluationState.firstViolationTs
-        firstViolationRt = evaluationState.firstViolationRt
-        firstViolationWasJump = evaluationState.firstViolationWasJump
-
-        val newAlarms = mutableMapOf<String, AlarmEvaluation>()
-        var triggerOccurredInThisCycle = false
-        
-        report.reports.forEach { violation ->
-            val type = violation.type
-            val enabled = isAlarmEnabled(type)
-            val isSpecial = isSpecialType(type)
-            val specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
-            val eval = synchronized(activeAlarms) { activeAlarms[type] } ?: AlarmEvaluation(type, violation.title)
-            
-            if (violation.conditionMet && enabled) {
-                if (!eval.isTriggered || eval.isResolved) {
-                    if ((nowRt - lastGlobalTriggerRt) >= ALERT_TRIGGER_GRACE_PERIOD_MS) {
-                        eval.isTriggered = true; eval.firstTriggerTs = now; eval.firstTriggerRt = nowRt; eval.isResolved = false
-                        triggerOccurredInThisCycle = true
-                        _alarmEvents.tryEmit(AlarmEvent.LogEvent(type, "$versionTag ALARM TRIGGERED: ${violation.title}", true, violation.extremeValue, null, 0L, isSpecial, specialColor, lat, lng, accuracy, maxAccuracy, snr, vibe))
-                        if (nowRt - lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS) lastSirenStopRt = 0L 
-                    }
-                }
-                eval.lastLogTs = now; eval.lastLogRt = nowRt; eval.title = violation.title; eval.subtitle = violation.subtitle
-                newAlarms[type] = eval
-            } else if (eval.isTriggered) {
-                if (!eval.isResolved) {
-                    eval.isResolved = true
-                    val durationMs = if (eval.firstTriggerRt > 0) nowRt - eval.firstTriggerRt else now - eval.firstTriggerTs
-                    _alarmEvents.tryEmit(AlarmEvent.LogEvent(type, "$versionTag ALARM RESOLVED: ${violation.title}", false, violation.extremeValue, null, durationMs, isSpecial, specialColor, lat, lng, accuracy, maxAccuracy, snr, vibe))
-                }
-                newAlarms[type] = eval
-            }
-        }
-
-        if (triggerOccurredInThisCycle) {
-            lastGlobalTriggerRt = nowRt
-        }
-        
-        synchronized(activeAlarms) { activeAlarms.clear(); activeAlarms.putAll(newAlarms) }
-        updateAlarmsJson()
-        
-        val stateChanged = wasDistanceViolated != oldWasViolated || distanceViolationCounter != oldCounter || firstViolationRt != oldRt || triggerOccurredInThisCycle || evaluationState.forensicReliabilityDegradationStartRt != oldStallRt
-        if (stateChanged) {
-            saveLogicState()
-        }
-    }
-
     fun dismissResolvedAlarms() {
-        synchronized(activeAlarms) {
-            val iterator = activeAlarms.entries.iterator()
+        synchronized(evaluationState.activeAlarms) {
+            val iterator = evaluationState.activeAlarms.entries.iterator()
             while (iterator.hasNext()) { if (iterator.next().value.isResolved) iterator.remove() }
         }
         updateAlarmsJson()
@@ -429,8 +396,8 @@ class AppAlarmManager @Inject constructor(
 
     private fun updateAlarmsJson() {
         val jsonArray = JSONArray()
-        synchronized(activeAlarms) {
-            activeAlarms.values.forEach { eval ->
+        synchronized(evaluationState.activeAlarms) {
+            evaluationState.activeAlarms.values.forEach { eval ->
                 val obj = JSONObject()
                 obj.put("type", eval.type); obj.put("isTriggered", eval.isTriggered); obj.put("isResolved", eval.isResolved)
                 obj.put("title", eval.title); obj.put("subtitle", eval.subtitle); obj.put("isSirenDisabled", currentSettings.globalMute)
@@ -443,31 +410,6 @@ class AppAlarmManager @Inject constructor(
         }
         val newJson = jsonArray.toString()
         if (newJson != lastAlarmsJson) { lastAlarmsJson = newJson; repository.saveAlarmsJsonSync(newJson, currentRolePrefix) }
-    }
-
-    private fun isAlarmEnabled(type: String): Boolean {
-        return when (type) {
-            ALERT_ID_LOCAL_INTERNET -> currentSettings.localInternet
-            ALERT_ID_RELAY_OFFLINE -> currentSettings.relayConnection
-            ALERT_ID_TRACKER_OFFLINE -> currentSettings.serverConnection
-            ALERT_ID_SIGNAL_LOSS -> currentSettings.signalLoss
-            ALERT_ID_JUMP_ALERT -> currentSettings.jammerDetection
-            ALERT_ID_TRACKER_GEOFENCE -> currentSettings.distance
-            ALERT_ID_GPS_STALL -> currentSettings.gpsStalling
-            ALERT_ID_TRACKER_GAP -> currentSettings.longTimeGap
-            ALERT_ID_TRACKER_POWER -> currentSettings.power
-            ALERT_ID_TRACKER_BATTERY -> currentSettings.lowBattery
-            ALERT_ID_BATTERY_STEEP_DISCHARGE -> currentSettings.batteryHealth
-            ALERT_ID_TRACKER_TEMP -> currentSettings.highTemperature
-            ALERT_ID_TRACKER_TAMPER -> currentSettings.tamperAlert
-            ALERT_ID_TRACKER_TILT -> currentSettings.tiltAlert
-            ALERT_ID_TRACKER_ACOUSTIC -> currentSettings.acousticAlert
-            ALERT_ID_TRACKER_LIFT -> currentSettings.liftAlert
-            ALERT_ID_SYSTEM_STORAGE_LOW -> currentSettings.systemStorageLow
-            ALERT_ID_SYSTEM_STORAGE_CRITICAL -> true
-            ALERT_ID_HARDWARE_CONFIGURATION -> true
-            else -> true
-        }
     }
 
     private fun isSpecialType(type: String): Boolean {
@@ -485,24 +427,17 @@ class AppAlarmManager @Inject constructor(
     fun getLastAlarmsJson(): String = lastAlarmsJson
     
     fun resetEvaluation() {
-        synchronized(activeAlarms) { activeAlarms.clear() }
+        synchronized(evaluationState.activeAlarms) { evaluationState.activeAlarms.clear() }
         lastAlarmsJson = "[]"; repository.saveAlarmsJsonSync("[]", currentRolePrefix)
-        wasDistanceViolated = false; distanceViolationCounter = 0; firstViolationTs = 0L; firstViolationRt = 0L
         evaluationState.firstViolationTs = 0L; evaluationState.firstViolationRt = 0L; evaluationState.wasDistanceViolated = false; evaluationState.distanceViolationCounter = 0
         
         val nowRt = timeProvider.elapsedRealtime()
-        if (nowRt - lastSirenStopRt > SIREN_RESUME_COOLDOWN_MS) {
-            lastSirenStopRt = 0L
+        if (nowRt - evaluationState.lastSirenStopRt > SIREN_RESUME_COOLDOWN_MS) {
+            evaluationState.lastSirenStopRt = 0L
         }
         
-        lastGlobalTriggerRt = 0L
+        evaluationState.lastGlobalTriggerRt = 0L
         saveLogicState()
         updateSirenRequirement()
     }
-
-    private data class AlarmEvaluation(
-        val type: String, var title: String, var subtitle: String = "",
-        var isTriggered: Boolean = false, var firstTriggerTs: Long = 0L, var firstTriggerRt: Long = 0L,
-        var lastLogTs: Long = 0L, var lastLogRt: Long = 0L, var isResolved: Boolean = true
-    )
 }

@@ -5,16 +5,12 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Sep.24.94:
+ * - Issue #1311: Refactored detectViolations to manage ActiveAlarm lifecycle 
+ *   directly within AlarmEvaluationState for a stateless evaluation model.
  * Sep.11.22:
  * - Issue #133 Audit: Updated evaluatePhysical to sync isTamperDetected 
  *   flag into health state for Silent Failure suppression (R-ID 312).
- * Sep.11.21:
- * - Issue #946 Visibility: Prioritized tamperNote in evaluatePhysical for 
- *   role-agnostic forensic transparency (R-ID 288).
- * Sep.09.00:
- * - Idea #3 RESOLVED: Alarm Logic Partitioning. Refactored detectViolations 
- *   into specialized evaluators (Connectivity, Physical, Geofence, System) 
- *   to reduce cyclomatic complexity and improve forensic maintainability (R-ID 301).
  */
 object MainAlarmLogic {
 
@@ -30,7 +26,10 @@ object MainAlarmLogic {
         timeProvider: TimeProvider,
         report: SystemHealthReport,
         onSpike: (message: String, duration: Long) -> Unit,
-        isWarmup: Boolean = false
+        onTrigger: (AlarmEvaluationState.ActiveAlarm) -> Unit,
+        onResolve: (AlarmEvaluationState.ActiveAlarm, durationMs: Long) -> Unit,
+        isWarmup: Boolean = false,
+        versionTag: String = ""
     ): SystemHealthReport {
         return LatencyMonitor.measureAndAudit<SystemHealthReport>(
             timeProvider = timeProvider,
@@ -40,7 +39,7 @@ object MainAlarmLogic {
             onSpike = onSpike
         ) {
             val nowRt = state.nowRt
-            val health = state.health
+            val nowTs = state.now
             val isTracker = state.isTrackerMode
             val uptimeRt = nowRt - state.serviceStartRt
             val isGpsWarmupActive = uptimeRt < GPS_WARMUP_GRACE_MS || isWarmup
@@ -60,8 +59,66 @@ object MainAlarmLogic {
             reportIdx = evaluateSystem(state, report, reportIdx, isTracker, nowRt)
 
             report.truncate(reportIdx)
+
+            // Process Active Alarms State
+            processActiveAlarms(state, report, nowTs, nowRt, onTrigger, onResolve)
+
             report
         }
+    }
+
+    private fun processActiveAlarms(
+        state: AlarmEvaluationState,
+        report: SystemHealthReport,
+        now: Long,
+        nowRt: Long,
+        onTrigger: (AlarmEvaluationState.ActiveAlarm) -> Unit,
+        onResolve: (AlarmEvaluationState.ActiveAlarm, durationMs: Long) -> Unit
+    ) {
+        val newActiveAlarms = mutableMapOf<String, AlarmEvaluationState.ActiveAlarm>()
+        var triggerOccurred = false
+
+        report.reports.forEach { violation ->
+            val type = violation.type
+            // Note: Enabled check should be done by the caller or passed in. 
+            // Assuming for now the report only contains relevant conditions.
+            val eval = state.activeAlarms[type] ?: AlarmEvaluationState.ActiveAlarm(type, violation.title)
+
+            if (violation.conditionMet) {
+                if (!eval.isTriggered || eval.isResolved) {
+                    if ((nowRt - state.lastGlobalTriggerRt) >= ALERT_TRIGGER_GRACE_PERIOD_MS) {
+                        eval.isTriggered = true
+                        eval.firstTriggerTs = now
+                        eval.firstTriggerRt = nowRt
+                        eval.isResolved = false
+                        triggerOccurred = true
+                        onTrigger(eval)
+                        if (nowRt - state.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS) {
+                            state.lastSirenStopRt = 0L 
+                        }
+                    }
+                }
+                eval.lastLogTs = now
+                eval.lastLogRt = nowRt
+                eval.title = violation.title
+                eval.subtitle = violation.subtitle
+                newActiveAlarms[type] = eval
+            } else if (eval.isTriggered) {
+                if (!eval.isResolved) {
+                    eval.isResolved = true
+                    val durationMs = if (eval.firstTriggerRt > 0) nowRt - eval.firstTriggerRt else now - eval.firstTriggerTs
+                    onResolve(eval, durationMs)
+                }
+                newActiveAlarms[type] = eval
+            }
+        }
+
+        if (triggerOccurred) {
+            state.lastGlobalTriggerRt = nowRt
+        }
+        
+        state.activeAlarms.clear()
+        state.activeAlarms.putAll(newActiveAlarms)
     }
 
     private fun evaluateConnectivity(

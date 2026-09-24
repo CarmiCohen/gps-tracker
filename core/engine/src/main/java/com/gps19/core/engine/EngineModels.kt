@@ -4,15 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.24.94:
+ * - Issue #1311: Expanded AlarmEvaluationState to include active alarms and siren 
+ *   metadata for stateless evaluation.
  * Sep.23.70:
  * - Issue #1230 REMEDIATION: Added rolePrefix to AlarmServiceContext to support 
  *   role-based namespace isolation during logic state persistence (R-ID 453).
- * Sep.23.08:
- * - Issue #1204: Unified Hardware Lifecycle. Added isHuaweiDevice to 
- *   HardwareCapabilities for vendor-specific hardening.
- * Sep.22.32:
- * - Issue #1162: Forensic & Sensor Efficiency Optimization. Introduced EvaluationSnapshot
- *   to group remaining telemetry fields for single-pass atomic consumption.
  */
 
 @Serializable
@@ -335,6 +332,25 @@ class AlarmEvaluationState {
     var appStartTime: Long = 0L
     var capabilities: HardwareCapabilities = HardwareCapabilities()
     var forensicReliabilityDegradationStartRt: Long = 0L
+
+    // Issue #1311: Stateless Evaluation consolidation
+    var powerAlarmPending: Boolean = false
+    var lastSirenStopRt: Long = 0L
+    var lastGlobalTriggerRt: Long = 0L
+    var activeAlarms: MutableMap<String, ActiveAlarm> = mutableMapOf()
+
+    @Serializable
+    data class ActiveAlarm(
+        val type: String,
+        var title: String,
+        var subtitle: String = "",
+        var isTriggered: Boolean = false,
+        var firstTriggerTs: Long = 0L,
+        var firstTriggerRt: Long = 0L,
+        var lastLogTs: Long = 0L,
+        var lastLogRt: Long = 0L,
+        var isResolved: Boolean = true
+    )
     
     var homePoints: MutableList<EngineGeoPoint> = mutableListOf()
     var maxDistance: Double = 0.0
@@ -392,7 +408,10 @@ class AlarmEvaluationState {
         isTrackerMode: Boolean,
         capabilities: HardwareCapabilities,
         vibrationSensitivity: Float = 0.5f,
-        tiltSensitivity: Float = 0.5f
+        tiltSensitivity: Float = 0.5f,
+        powerAlarmPending: Boolean = false,
+        lastSirenStopRt: Long = 0L,
+        lastGlobalTriggerRt: Long = 0L
     ) {
         this.now = now
         this.nowRt = nowRt
@@ -429,6 +448,9 @@ class AlarmEvaluationState {
         this.capabilities = capabilities
         this.vibrationSensitivity = vibrationSensitivity
         this.tiltSensitivity = tiltSensitivity
+        this.powerAlarmPending = powerAlarmPending
+        this.lastSirenStopRt = lastSirenStopRt
+        this.lastGlobalTriggerRt = lastGlobalTriggerRt
     }
 }
 

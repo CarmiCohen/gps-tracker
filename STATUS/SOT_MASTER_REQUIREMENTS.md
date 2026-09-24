@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.24.93)
+# SOT Master Requirements & Hardening Status (Sep.24.94)
 
 ## 🏗️ Architectural Master Rules (22 Rules)
 
@@ -33,6 +33,7 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions (R212, R310, R317).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 473**: Stateless Evaluation Consolidation - Remediated Issue #1311 by shifting active alarm map states and tracking metadata entirely into `AlarmEvaluationState`. Fully purged secondary in-memory maps from `AppAlarmManager` to establish complete architectural isolation across role switches. (Resolved Sep.24.94)
 *   **SOT ID 472**: Unified Event Orchestration - Centralized alert triggers, audio synthesis, and forensic logging into a high-cohesion `AppEventCoordinator`. Decoupled domain reactions from background service lifecycles and established reactive siren state binding (Issue #1292) between `AppAlarmManager` and `AudioSynthesizer` to ensure absolute parity across functional roles (R-ID 472). (Resolved Sep.24.93)
 *   **SOT ID 471**: Service Lifecycle Unification - Consolidated `TrackerService` and `ViewerService` redundant boilerplate into a unified, role-reactive `MonitorService`. (Resolved Sep.24.92)
 *   **SOT ID 470**: Thermal Recovery Latency Audit Correction - Refactored forensic loop sampling metrics in background services to eliminate loop iteration delay errors using authoritative `coolingEnteredRt` (R-ID 470). (Resolved Sep.24.91)
@@ -51,30 +52,23 @@
 *   **SOT ID 457**: Fast-Path Allocation Optimization - Made spike detection callbacks optional to eliminate allocation churn in the tick loop (R-ID 457). (Resolved Sep.24.01)
 
 ## 4.2. Change History (Recent)
+*   **Sep.24.94**: Resolved Issue #1311 (AppAlarmManager Stateless Evaluation Model). Relocated active alarms directly into `AlarmEvaluationState` (SOT ID 473).
 *   **Sep.24.93**: Resolved Issue #1265 (Unified Event Orchestration). Centralized alert, audio, and logging triggers into `AppEventCoordinator` (SOT ID 472).
 *   **Sep.24.92**: Resolved Issue #1261 (Service Lifecycle Unification). Consolidated services into a unified `MonitorService` (SOT ID 471).
 *   **Sep.24.91**: Resolved Issue #1234 / #1244 (Heuristic Correction for Thermal Recovery Audits) (SOT ID 470).
 *   **Sep.24.90**: Resolved Issue #1306 (Namespace Collision Risk). Introduced `"VR_"` prefix for remote state segregation (SOT ID 469).
-*   **Sep.24.80**: Resolved Issue #1305 (Debounced Baseline Persistence). Eliminated tick-loop jitter (SOT ID 468).
-*   **Sep.24.70**: Resolved Issue #1272 (Alarm Role Transition Hardening) (SOT ID 467).
-*   **Sep.24.60**: Resolved Issue #1308 (Viewer Forensic Sampling Loop) (SOT ID 466).
-*   **Sep.24.50**: Resolved Issue #1245 (Non-Blocking History Flush) (SOT ID 465).
-*   **Sep.24.40**: Resolved Issue #1241 (History Sync Restoration) (SOT ID 464).
-*   **Sep.24.30**: Resolved Issue #1307 (Decoupled Forensic Spike Sampling) (SOT ID 463).
-*   **Sep.24.20**: Resolved Issue #1256 (Boot-ID Latch Validation) (SOT ID 462).
 
 ## 📋 Functional Requirements (145 R-IDs)
 *   **R101-R117**: Core tracking, telemetry, and forensic rules.
+*   **R473**: Stateless evaluation via consolidated state.
 *   **R472**: Unified Event Orchestration via `AppEventCoordinator`.
 *   **R471**: Service Lifecycle Unification via `MonitorService`.
-*   **R469**: Remote Namespace Isolation via `"VR_"` prefix.
-*   **R468**: Debounced Baseline Persistence.
 *   *(Remaining requirements preserved in technical registry)*
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.106 (Stateless Evaluation Consolidation)**: PASSED - Purged nested mutable memory states from alarm evaluation pipeline. (Sep.24.94)
 *   **Chapter 31.105 (Unified Event Orchestration)**: PASSED - Successfully centralized domain reactions and siren binding into `AppEventCoordinator`. (Sep.24.93)
 *   **Chapter 31.104 (Service Lifecycle Unification)**: PASSED - Successfully consolidated background services into `MonitorService`. (Sep.24.92)
-*   **Chapter 31.103 (Thermal Recovery Latency Audit)**: PASSED - Successfully corrected recovery metrics using authoritative `coolingEnteredRt`. (Sep.24.91)
 
 ---
-*Next Audit: Oct.01.00. (Sep.24.93)*
+*Next Audit: Oct.01.00. (Sep.24.94)*

@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.93
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.94
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -35,15 +35,13 @@ Finalizing the audit of background service stability and functional convergence 
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 18)
+## 💡 Strategic Simplification Ideas (Ideas: 17)
 
 ### 🛑 High Priority
 *   **Issue #1291: Domain Event Bus Integration**
     *   *Significance*: **High (Architecture)**. Centralize dispersed logging and triggers into a single `AppEventCoordinator` to eliminate cross-component coupling.
 
 ### 🟡 Medium Priority
-*   **Issue #1311: AppAlarmManager Stateless Evaluation Model**
-    *   *Significance*: **Medium (Architecture)**. Transition `AppAlarmManager` away from intermediate memory state persistence maps towards purely stateless snapshot calculations, further mitigating multi-role transition leakage vectors.
 *   **Issue #1161: Unified Trajectory & Buffer Management**
     *   *Significance*: **Medium-High (Performance)**. Merge `GtoEngine` windows and `LocationSentinel` hindsight buffers into a single optimized `TrajectoryBuffer`.
 *   **Issue #1294: Build-Time Interface Validation**
@@ -74,8 +72,6 @@ Finalizing the audit of background service stability and functional convergence 
     *   *Significance*: **Low (Testability)**. Move monotonic clock recovery logic to a dedicated authority to simplify background service testing.
 *   **Issue #1295: Redundant Stream Observer Audit**
     *   *Significance*: **Low (CPU)**. Systematically audit all service descendants to ensure no reactive streams are active.
-*   **Issue #1171: Service & Worker Consolidation** (Partially resolved by #1261)
-    *   *Significance*: **Low (Maintenance)**. Merge role-specific services into a single monitor service to reduce manifest overhead.
 *   **Issue #1175: Real-time Only Path (Pivot Option)**
     *   *Significance*: **Strategic (Maintenance Tradeoff)**. Consider removing backlog sync and forensic backfilling to dramatically reduce codebase complexity.
 
@@ -83,6 +79,8 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1311: AppAlarmManager Stateless Evaluation Model** (Resolved Sep.24.94)
+    *   *Remediation*: Fully transitioned `AppAlarmManager` to a stateless evaluation model by moving all operational parameters and active alarm state containers directly into `AlarmEvaluationState`. Eliminated duplicate fields and nested mutable maps to completely preclude cross-role transition state leakage.
 *   **Issue #1265: Unified Event Orchestration via AppEventCoordinator** (Resolved Sep.24.93)
     *   *Remediation*: Centralized alert triggers, audio synthesis, and forensic logging into a high-cohesion `AppEventCoordinator`. Decoupled domain reactions from service lifecycles and established reactive siren state binding (Issue #1292) between `AppAlarmManager` and `AudioSynthesizer` to ensure absolute parity across functional roles (R-ID 472).
 *   **Issue #1261: Refactor Tracker/Viewer Services into Role-Reactive MonitorService** (Resolved Sep.24.92)
@@ -140,4 +138,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 472 (Rules: 94, IDs: 472), Resolved: 1215, Open: 3, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**
+- **Current Audit Baseline: [SOT: 472 (Rules: 94, IDs: 472), Resolved: 1216, Open: 3, Testing: 3 (Sub-items: 12), Ideas: 17, QA: 284]**
