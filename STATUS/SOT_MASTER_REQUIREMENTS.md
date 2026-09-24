@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.22.30)
+# SOT Master Requirements & Hardening Status (Sep.24.03)
 
 ## 🏗️ Architectural Master Rules (22 Rules)
 
@@ -32,6 +32,7 @@
 *   **3.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (R212, R310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (R317).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 459**: Persistent Adaptive Vibration Floor - Implemented persistence for the physical baseline sensitivity anchor. Added `ADAPTIVE_VIBRATION_FLOOR_KEY` to `PreferenceKeys.kt` and updated `LocationProcessor.kt` to emit reactive `VibrationFloorChanged` events upon significant drift detection. Updated `TrackerService.kt` and `ViewerService.kt` to restore this anchor during service initialization and sync changes to DataStore, eliminating sensitivity resets and false-positive tamper alerts after service restarts (R-ID 459). (Resolved Sep.24.03)
 *   **SOT ID 458**: Reboot-Aware Monotonic Clock Recovery - Implemented `recoverLastRealtime` in `HistoryManager.kt` using role-prefixed clock drift references. Updated `TrackerService.kt` and `ViewerService.kt` to utilize this logic during service initialization, ensuring monotonic timing anchors remain valid across device reboots by detecting drift divergence and anchoring to the current boot cycle's reference (R-ID 458). (Resolved Sep.24.02)
 *   **SOT ID 457**: Fast-Path Allocation Optimization - Refactored `HardwareFastPath` in `HardwareSuite.kt` to allow optional callback parameter assignment. Updated `TrackerService.kt` to omit callbacks inside the periodic tick iteration loop, fully mitigating high allocation churn and garbage collection pressure without degrading light or acoustic spike responses (R-ID 457). (Resolved Sep.24.01)
 *   **SOT ID 456**: Redundant Stream & Heartbeat Idempotency - Removed redundant reactive stream subscriptions in `ViewerService.kt`. The `ConnectivityEvent.PeerPulse` is now handled via a single observer, preventing duplicate state updates in `SessionManager` and eliminating redundant heartbeat log entries (R-ID 456). (Resolved Sep.23.80)
@@ -169,14 +170,15 @@
 
 ## 4.3. Metric Summary
 - **Rules Verified**: 92
-- **Total SOT IDs**: 458
-- **Resolved Issues**: 1195
-- **Open Issues**: 18
+- **Total SOT IDs**: 459
+- **Resolved Issues**: 1196
+- **Open Issues**: 17
 - **Testing Coverage**: 3 (Sub-items: 12)
-- **Simplification Ideas**: 17
+- **Simplification Ideas**: 18
 - **QA Validation Tasks**: 284
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.93 (Persistent Adaptive Vibration Floor)**: PASSED - Successfully implemented persistence for the vibration floor anchor in LocationProcessor and registered role-isolated DataStore sync in background services (Sep.24.03).
 *   **Chapter 31.92 (Reboot-Aware Monotonic Clock Recovery)**: PASSED - Successfully implemented reboot detection and synthetic RT anchor recovery in HistoryManager to survive device restarts (Sep.22.30).
 *   **Chapter 31.91 (Fast-Path Allocation Optimization)**: PASSED - Refactored HardwareFastPath and TrackerService tick loop to eliminate allocation churn by making spike detection callbacks optional. (Sep.22.30)
 *   **Chapter 31.85 (Unified Hardware Lifecycle & Vendor Hardening)**: PASSED - Successfully implemented and verified functional background hardening logic in DeviceHardeningStrategy for Samsung, Huawei, and Xiaomi devices. (Sep.22.30)

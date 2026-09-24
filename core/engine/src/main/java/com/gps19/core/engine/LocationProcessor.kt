@@ -15,6 +15,7 @@ sealed class ProcessorEvent {
     data class LogAdded(val message: String, val type: String, val isImportant: Boolean, val isSpecial: Boolean, val lat: Double, val lng: Double, val accuracy: Double, val snr: Double?, val vibe: Double?) : ProcessorEvent()
     data class MaxAccuracyChanged(val accuracy: Double) : ProcessorEvent()
     data class ChairBaselineChanged(val baseline: Double) : ProcessorEvent()
+    data class VibrationFloorChanged(val floor: Double) : ProcessorEvent()
     data class GpsStallDetected(val rt: Long) : ProcessorEvent()
 }
 
@@ -26,6 +27,7 @@ interface LocationProcessorListener {
     fun onLogAdded(message: String, type: String, isImportant: Boolean, isSpecial: Boolean, lat: Double, lng: Double, accuracy: Double, snr: Double?, vibe: Double?) {}
     fun onMaxAccuracyChanged(accuracy: Double) {}
     fun onChairBaselineChanged(baseline: Double) {}
+    fun onVibrationFloorChanged(floor: Double) {}
     fun onGpsStallDetected(rt: Long) {}
 }
 
@@ -36,18 +38,12 @@ open class DefaultLocationProcessorListener : LocationProcessorListener
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.24.03:
+ * - Issue #1271: Implemented persistence for Adaptive Vibration Floor. Added loadState 
+ *   support and VibrationFloorChanged event emission for storage sync.
  * Sep.22.32:
  * - Issue #1162: Forensic & Sensor Efficiency Optimization. Added updateSensorData overload 
  *   accepting SensorStateSnapshot directly for atomic single-pass consumption.
- * Sep.22.31:
- * - Issue #1182: Elimination of Multi-pass Fallbacks. Updated updateSensorData and processGpsPoint 
- *   to supply SensorStateSnapshot to sentinel.updateSensorState.
- * Sep.21.121:
- * - Issue #1143: Unified Vibration Authority. updateSensorData now propagates 
- *   providedAdaptiveFloor to Sentinel for consistent stationary detection (R-ID 388).
- * Sep.20.12:
- * - Issue #1149: Propagated providedLightSpikeRt to sentinel for immediate lockout.
- * - Issue #1150: Updated updateSensorData to accept lightSpikeRt.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -114,7 +110,8 @@ class LocationProcessor(
         savedSitTilt: Double = 0.0,
         savedSitShock: Double = 0.0,
         savedSitVzTs: Long = 0L,
-        savedSitVzRt: Long = 0L
+        savedSitVzRt: Long = 0L,
+        savedVibrationFloor: Double = -1.0
     ) {
         if (savedMaxAccuracy > 0.0) {
             maxAccuracy = savedMaxAccuracy
@@ -127,7 +124,7 @@ class LocationProcessor(
         sentinel.loadForensicState(
             savedLastSitTs, savedBaseline,
             savedSitVz, savedSitDz, savedSitBaro, savedSitTilt, savedSitShock,
-            savedSitVzTs, savedSitVzRt
+            savedSitVzTs, savedSitVzRt, savedVibrationFloor
         )
         
         if (trackerState != null && trackerState.lat != 0.0) {
@@ -235,7 +232,15 @@ class LocationProcessor(
                 _processorEvents.tryEmit(ProcessorEvent.LogAdded(message, "system", false, true, 0.0, 0.0, 0.0, null, snapshot.vibration))
             }
         ) {
+            val oldFloor = sentinel.adaptiveVibrationFloor
             val baselineChanged = sentinel.updateSensorState(snapshot)
+            val newFloor = sentinel.adaptiveVibrationFloor
+            
+            // Issue #1271: Persist vibration floor if significant change detected (>0.01g)
+            if (abs(newFloor - oldFloor) > 0.01) {
+                _processorEvents.tryEmit(ProcessorEvent.VibrationFloorChanged(newFloor))
+            }
+
             if (baselineChanged) {
                 _processorEvents.tryEmit(ProcessorEvent.ChairBaselineChanged(sentinel.baselineSitTilt))
             }
@@ -405,6 +410,7 @@ class LocationProcessor(
             if (isLocal) updateWindowedAccuracy(accuracy) else if (providedMaxAccuracy > 0.0) maxAccuracy = providedMaxAccuracy
             
             if (providedAcousticLockoutRt > 0 || providedLightSpikeRt > 0 || providedAdaptiveVibrationFloor >= 0.0) {
+                val oldFloor = sentinel.adaptiveVibrationFloor
                 val snapshot = SensorStateSnapshot(
                     vibration = -1.0, heading = -1.0, baroAlt = -1000.0, 
                     acousticLockoutRt = providedAcousticLockoutRt, 
@@ -413,6 +419,10 @@ class LocationProcessor(
                     isMuzzled = isMuzzled, nowRt = nowRt, nowTs = nowWall
                 )
                 sentinel.updateSensorState(snapshot)
+                val newFloor = sentinel.adaptiveVibrationFloor
+                if (abs(newFloor - oldFloor) > 0.01) {
+                    _processorEvents.tryEmit(ProcessorEvent.VibrationFloorChanged(newFloor))
+                }
             }
 
             val sentinelResult = sentinel.processLocation(

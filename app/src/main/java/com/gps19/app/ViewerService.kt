@@ -17,12 +17,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.24.03:
+ * - Issue #1271: Implemented persistence for Adaptive Vibration Floor. Restored floor anchor 
+ *   during remoteProcessor initialization and registered persistent observer for floor updates.
  * Sep.24.02:
  * - Issue #1255 REMEDIATION: Implemented reboot-aware monotonic clock recovery via 
  *   HistoryManager.recoverLastRealtime using role-isolated clock drift reference.
- * Sep.23.80:
- * - Issue #1231 REMEDIATION: Removed redundant observeHistoryEvents which caused 
- *   duplicate heartbeat processing from ConnectivitySuite (R-ID 456).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -96,6 +96,7 @@ class ViewerService : BaseMonitorService() {
         val savedMaxAcc = repository.getDouble("V_" + MAX_ACCURACY_KEY, 0.0)
         val savedLastSitTs = repository.getLong("V_" + LAST_SIT_TS_KEY, 0L)
         val savedBaseline = repository.getDouble("V_" + CHAIR_BASELINE_TILT_KEY, -1000.0)
+        val savedVibeFloor = repository.getDouble("V_" + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0)
         val trackerState = repository.loadTrackerState("V_")
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
         val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
@@ -113,7 +114,8 @@ class ViewerService : BaseMonitorService() {
             savedSitTilt = trackerState?.sitTilt ?: 0.0,
             savedSitShock = trackerState?.sitShock ?: 0.0,
             savedSitVzTs = trackerState?.sitVzTs ?: 0L,
-            savedSitVzRt = trackerState?.sitVzRt ?: 0L
+            savedSitVzRt = trackerState?.sitVzRt ?: 0L,
+            savedVibrationFloor = savedVibeFloor
         )
         
         selfProcessor.loadState(0.0, 0L, -1000.0, null, homePoints, maxDist)
@@ -276,6 +278,9 @@ class ViewerService : BaseMonitorService() {
                 
                 logManager.logServiceEvent(m = "Passive Zeroing - Chair baseline calibrated to ${String.format(Locale.getDefault(), "%.1f", event.baseline)}°",
                     lat = lat, lng = lng, accuracy = maxAcc)
+            }
+            is ProcessorEvent.VibrationFloorChanged -> {
+                if (!isSelf) repository.saveDoubleSync("V_" + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
             }
             is ProcessorEvent.GpsStallDetected -> {
                 if (isSelf) logManager.logServiceEvent(m = "GPS STALL: Fix unchanged for >1s", isImportant = false)

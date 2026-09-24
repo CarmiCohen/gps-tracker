@@ -23,12 +23,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.24.03:
+ * - Issue #1271: Implemented persistence for Adaptive Vibration Floor. Restored floor anchor 
+ *   during initialization and registered persistent observer for floor updates.
  * Sep.24.02:
  * - Issue #1255 REMEDIATION: Implemented reboot-aware monotonic clock recovery via 
  *   HistoryManager.recoverLastRealtime using role-isolated clock drift reference.
- * Sep.24.01:
- * - Issue #1233 REMEDIATION: Omitted fast-path callbacks in processTick to eliminate 
- *   high allocation churn of lambda re-registration on every tick.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -112,10 +112,11 @@ class TrackerService : BaseMonitorService() {
         val savedMaxAcc = repository.getDouble("T_" + MAX_ACCURACY_KEY, 0.0)
         val savedLastSitTs = repository.getLong("T_" + LAST_SIT_TS_KEY, 0L)
         val savedBaseline = repository.getDouble("T_" + CHAIR_BASELINE_TILT_KEY, -1000.0)
+        val savedVibeFloor = repository.getDouble("T_" + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0)
         val trackerState = repository.loadTrackerState("T_")
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
         val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
-        locationProcessor.loadState(savedMaxAcc, savedLastSitTs, savedBaseline, trackerState, homePoints, maxDist)
+        locationProcessor.loadState(savedMaxAcc, savedLastSitTs, savedBaseline, trackerState, homePoints, maxDist, savedVibrationFloor = savedVibeFloor)
 
         val savedAlarms = repository.getLastAlarmsJson("T_")
         alarmManager.restoreState(savedAlarms)
@@ -272,6 +273,9 @@ class TrackerService : BaseMonitorService() {
                         logManager.logServiceEvent(m = "Passive Zeroing: Chair baseline calibrated to ${event.baseline.roundToOneDecimal()}°",
                             lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
                         repository.saveDouble("T_" + CHAIR_BASELINE_TILT_KEY, event.baseline)
+                    }
+                    is ProcessorEvent.VibrationFloorChanged -> {
+                        repository.saveDoubleSync("T_" + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
                     }
                     else -> {}
                 }

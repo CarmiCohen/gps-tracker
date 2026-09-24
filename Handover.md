@@ -1,19 +1,20 @@
-# Forensic Resumption Snapshot - Sep.24.02
+# Forensic Resumption Snapshot - Sep.24.03
 
 ## 📂 Session Summary
 *   **Completed**:
-    *   **Issue #1255**: Unreliable Monotonic Clock Recovery Across Reboots (R-ID 458).
-*   **Version**: Sep.24.02
-*   **Status**: Forensic timing continuity fully hardened. The system now detects reboots by comparing persisted wall-clock drift against the current session, preventing invalid monotonic references.
+    *   **Issue #1271**: Missing Persistence for Adaptive Vibration Floor (R-ID 459).
+*   **Version**: Sep.24.03
+*   **Status**: Physical baseline sensitivity is now persistent across service restarts. The system detects significant floor drift (>0.01g) and syncs the anchor to the role-isolated DataStore partitions.
 
 ## 🔧 Technical Delta
-*   **HistoryManager.kt**: Implemented `recoverLastRealtime` to calculate synthetic RT anchors when drift divergence is detected (>5s).
-*   **TrackerService.kt / ViewerService.kt**: Refactored service initialization to utilize role-prefixed drift references (`T_clock_drift_ref` / `V_clock_drift_ref`).
-*   **TrackerService.kt**: Fixed a minor typo in sitting detection consumption (`locationProcessor.consumeSitDetected()`).
+*   **LocationProcessor.kt**: Implemented `VibrationFloorChanged` event and drift detection logic.
+*   **LocationSentinel.kt**: Expanded `loadForensicState` to restore the `adaptiveVibrationFloor` anchor.
+*   **TrackerService.kt / ViewerService.kt**: Integrated reactive floor sync and restoration during service initialization.
+*   **PreferenceKeys.kt**: Added `ADAPTIVE_VIBRATION_FLOOR_KEY`.
 
 ## 📍 Resumption Point for Next Session
-*   **Immediate Priority**: Proceed with **Issue #1271** (Missing Persistence for Adaptive Vibration Floor).
-*   **Strategic Goal**: Ensure physical baseline sensitivity survives service restarts to eliminate false-positive tamper alerts.
+*   **Immediate Priority**: Address **Issue #1273** (Atomic User Counter Risk in HardwareSuite).
+*   **Strategic Goal**: Prevent resource leaks by ensuring hardware shutdown counters cannot fall into negative values.
 
 ## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 458 (Rules: 92, IDs: 458), Resolved: 1195, Open: 18, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**
+**Current Audit Baseline: [SOT: 459 (Rules: 92, IDs: 459), Resolved: 1196, Open: 17, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**

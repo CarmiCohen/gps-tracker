@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.02
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.03
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -8,10 +8,6 @@ Finalizing the audit of background service stability and functional convergence 
 ### Background Service Infrastructure & Hardening Gaps (Rigorous Audit of #1171)
 
 ### Core Integration Gaps
-
-*   **Issue #1271: Missing Persistence for Adaptive Vibration Floor**
-    *   *Description*: Vibration floor resets on service restart.
-    *   *Significance*: **High (False Positive Risk)**.
 
 *   **Issue #1273: Atomic User Counter Risk in HardwareSuite**
     *   *Description*: Negative counter values prevent hardware shutdown.
@@ -32,6 +28,9 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1271: Missing Persistence for Adaptive Vibration Floor** (Resolved Sep.24.03)
+    *   *Remediation*: Implemented persistence for the adaptive vibration floor anchor. Added `ADAPTIVE_VIBRATION_FLOOR_KEY` to `PreferenceKeys.kt`, updated `LocationProcessor` to emit `VibrationFloorChanged` events upon significant drift (>0.01g), and refactored `TrackerService` and `ViewerService` to restore the floor anchor during initialization. This prevents sensitivity resets on service restart, eliminating false-positive tamper alerts (R-ID 459).
+
 *   **Issue #1255: Unreliable Monotonic Clock Recovery Across Reboots** (Resolved Sep.24.02)
     *   *Remediation*: Implemented `recoverLastRealtime` in `HistoryManager.kt` using role-prefixed clock drift references. Updated `TrackerService.kt` and `ViewerService.kt` to utilize this logic during service initialization, ensuring monotonic timing anchors remain valid across device reboots by detecting drift divergence and anchoring to the current boot cycle's reference (R-ID 458).
 
@@ -49,4 +48,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1236: Race Conditions and Premature Tick Execution** (Resolved Sep.23.70)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 458 (Rules: 92, IDs: 458), Resolved: 1195, Open: 18, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**
+- **Current Audit Baseline: [SOT: 459 (Rules: 92, IDs: 459), Resolved: 1196, Open: 17, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**

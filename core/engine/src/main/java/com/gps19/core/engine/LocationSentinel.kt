@@ -5,19 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Sep.24.03:
+ * - Issue #1271: Implemented persistence for Adaptive Vibration Floor. Updated 
+ *   loadForensicState to restore the vibration floor anchor.
  * Sep.22.31:
  * - Issue #1182: Elimination of Multi-pass Fallbacks. Unified individual parameter clauses
  *   in updateSensorState into a structured SensorStateSnapshot to remove imperative value checking bounds.
- * Sep.22.30:
- * - Issue #1189: Double-Counting Vibration Floor Adaptation during GPS Point Processing.
- *   Guarded fallback vibration floor adaptation to only execute when a fresh vibration 
- *   measurement is provided (vibration >= 0.0).
- * Sep.21.121:
- * - Issue #1143: Unified Vibration Authority. updateSensorState now accepts 
- *   providedAdaptiveFloor from HardwareSuite, preventing logic divergence 
- *   in stationary detection (R-ID 388).
- * Sep.20.12:
- * - Issue #1149: Propagated Fast-Path Light Spike for high-frequency tamper detection.
  */
 class LocationSentinel {
 
@@ -111,7 +104,8 @@ class LocationSentinel {
         savedSitTilt: Double = 0.0,
         savedSitShock: Double = 0.0,
         savedSitVzTs: Long = 0L,
-        savedSitVzRt: Long = 0L
+        savedSitVzRt: Long = 0L,
+        savedVibrationFloor: Double = -1.0
     ) {
         this.lastSitTs = savedLastSitTs
         this.baselineSitTilt = savedBaseline
@@ -122,6 +116,9 @@ class LocationSentinel {
         this.lastSitShock = savedSitShock
         this.lastSitVzTs = savedSitVzTs
         this.lastSitVzRt = savedSitVzRt
+        if (savedVibrationFloor >= 0.0) {
+            this.adaptiveVibrationFloor = savedVibrationFloor
+        }
     }
 
     fun setSpatialAnchor(lat: Double, lng: Double, alt: Double, timestamp: Long, rt: Long, accuracy: Double = 0.0) {

@@ -1,4 +1,14 @@
-# 🏛️ Resolution Archive - Sep.24.02
+# 🏛️ Resolution Archive - Sep.24.03
+
+## 🏁 Issue #1271: Missing Persistence for Adaptive Vibration Floor
+*   **Resolved**: Sep.24.03
+*   **Root Cause**: The adaptive vibration floor (baseline physical sensitivity) was only maintained in memory. Upon background service restarts or system-initiated process kills, the floor would reset to its default initial value (0.05g). This caused increased sensitivity and false-positive tamper alerts until the floor could re-adapt.
+*   **Remediation**:
+    *   **PreferenceKeys.kt**: Added `ADAPTIVE_VIBRATION_FLOOR_KEY` for persistent storage.
+    *   **LocationProcessor.kt**: Implemented detection of significant floor drift (>0.01g) and added `VibrationFloorChanged` to `ProcessorEvent`. Updated `loadState` to accept and propagate the saved floor.
+    *   **LocationSentinel.kt**: Updated `loadForensicState` to anchor the `adaptiveVibrationFloor` from persistent storage if provided.
+    *   **TrackerService.kt / ViewerService.kt**: Integrated DataStore synchronization for the vibration floor, ensuring role-isolated persistence and restoration during service lifecycle transitions.
+*   **R-ID**: 459
 
 ## 🏁 Issue #1255: Unreliable Monotonic Clock Recovery Across Reboots
 *   **Resolved**: Sep.24.02

@@ -57,6 +57,7 @@ const val CLOCK_DRIFT_REF_KEY = "clock_drift_ref"
 const val LAST_SIT_TS_KEY = "last_sit_ts"
 const val CHAIR_BASELINE_TILT_KEY = "chair_baseline_tilt"
 const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
+const val ADAPTIVE_VIBRATION_FLOOR_KEY = "adaptive_vibration_floor"
 
 const val LAST_ALARMS_JSON_KEY = "last_alarms_json"
 
