@@ -20,6 +20,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.24.91:
+ * - Issue #1234 / #1244 REMEDIATION: Corrected Thermal Recovery Latency logic to use 
+ *   authoritative coolingEnteredRt from SystemHealthState for precise auditing.
  * Sep.24.90:
  * - Issue #1306 REMEDIATION: Migrated remote tracker logic state keys to use the "VR_" namespace 
  *   prefix, completely isolating remote telemetry auditing from the Viewer's local session ("V_") state.
@@ -29,26 +32,6 @@ import kotlin.math.*
  * Sep.24.60:
  * - Issue #1308 REMEDIATION: Implemented Forensic Sampling Loop in ViewerService.
  *   Ensures local environment forensic parity with Tracker role (R-ID 466).
- * Sep.24.40:
- * - Issue #1241 REMEDIATION: Restored functional history sync streams by implementing 
- *   legitimate observation of HistoryManager events (R-ID 464).
- * Sep.24.10:
- * - Issue #1301 REMEDIATION: Loaded and persisted remote tracker Lux and Acoustic baselines 
- *   within ViewerService to eliminate baseline learning lag upon restart (R-ID 461).
- * - Issue #1302 REMEDIATION: Aligned selfProcessor with sensor updates in processTick to 
- *   ensure correct local motion awareness.
- * - Issue #1303 REMEDIATION: Removed cross-role HardwareSuite sensitivity contamination by 
- *   decoupling local hardware settings from remote tracker anchors.
- * - Issue #1304 REMEDIATION: Fixed peer stat reset logic to prevent local state corruption.
- * Sep.24.04:
- * - Issue #1271 REMEDIATION: Restored hardwareSuite's adaptive vibration floor during 
- *   initialization using the persisted value to prevent sensitivity resets.
- * Sep.24.03:
- * - Issue #1271: Implemented persistence for Adaptive Vibration Floor. Restored floor anchor 
- *   during remoteProcessor initialization and registered persistent observer for floor updates.
- * Sep.24.02:
- * - Issue #1255 REMEDIATION: Implemented reboot-aware monotonic clock recovery via 
- *   HistoryManager.recoverLastRealtime using role-isolated clock drift reference.
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -95,7 +78,6 @@ class ViewerService : BaseMonitorService() {
     private var lastForensicTilt = 0.0
 
     private var lastWasCooling = false
-    private var coolingEnteredRt = 0L
     private val forensicCaptureMutex = Mutex()
 
     private lateinit var selfProcessor: LocationProcessor
@@ -510,7 +492,6 @@ class ViewerService : BaseMonitorService() {
                 lastForensicVibe = 0.0
                 lastForensicTilt = 0.0
                 lastWasCooling = false
-                coolingEnteredRt = 0L
                 
                 vibrationFloorSaveJob?.cancel(); luxBaselineSaveJob?.cancel(); acousticFloorSaveJob?.cancel()
             }
@@ -731,17 +712,22 @@ class ViewerService : BaseMonitorService() {
             // Initial trigger to capture baseline state on service startup
             triggerForensicSample()
 
+            var cachedCoolingEnteredRt = 0L
+
             while (isActive) {
                 val health = integrityMonitor.currentHealth
 
-                // Issue #1244 Fix: Thermal Recovery Latency Audit
+                // Issue #1244 Fix: Thermal Recovery Latency Audit using authoritative coolingEnteredRt
                 if (lastWasCooling && !health.isCoolingModeActive) {
-                    val latency = timeProvider.elapsedRealtime() - coolingEnteredRt
-                    logManager.logServiceEvent(m = "Forensic Performance Audit (V): Thermal Recovery Latency: ${latency}ms", isImportant = true)
-                    coolingEnteredRt = 0L
+                    val entryRt = if (cachedCoolingEnteredRt > 0) cachedCoolingEnteredRt else health.coolingEnteredRt
+                    if (entryRt > 0) {
+                        val latency = timeProvider.elapsedRealtime() - entryRt
+                        logManager.logServiceEvent(m = "Forensic Performance Audit (V): Thermal Recovery Latency: ${latency}ms", isImportant = true)
+                    }
+                    cachedCoolingEnteredRt = 0L
                 }
                 if (health.isCoolingModeActive && !lastWasCooling) {
-                    coolingEnteredRt = timeProvider.elapsedRealtime()
+                    cachedCoolingEnteredRt = health.coolingEnteredRt
                 }
                 lastWasCooling = health.isCoolingModeActive
 

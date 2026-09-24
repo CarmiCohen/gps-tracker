@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.90
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.91
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -15,9 +15,7 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🔵 Low Priority (Forensic Precision)
 
-*   **Issue #1234: Faulty Latency Calculations inside Thermal Recovery Audits**
-    *   *Description*: The logic inside `TrackerService.kt`'s `startForensicSamplingLoop()` designed to compute the `Thermal Recovery Latency` metric when exiting cooling mode is fundamentally flawed. It captures the timestamp transition correctly but logs the delta on the immediate subsequent loop iteration, measuring only the duration of a single loop iteration delay (`delayMs`) rather than the true elapsed interval required for device sensor stabilization.
-    *   *Contribution*: **Low (Forensic Accuracy)**. Minor fix for performance reporting metrics.
+*   (None currently identified)
 
 ---
 
@@ -38,9 +36,7 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🔵 Low Priority
 
-*   **Issue #1244: Heuristic Correction for Thermal Recovery Audits**
-    *   *Description*: Correct the latency measurement logic in `TrackerService.kt` to measure the true elapsed duration between entering and exiting cooling mode rather than measuring individual loop iteration delays. Resolves audit reliability issues in Issue #1234.
-    *   *Contribution*: **Low (Accuracy)**. Corrects performance audit logs.
+*   (None currently identified)
 
 ---
 
@@ -98,6 +94,8 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1234 / #1244: Heuristic Correction for Thermal Recovery Audits** (Resolved Sep.24.91)
+    *   *Remediation*: Refactored `startForensicSamplingLoop` in `TrackerService` and `ViewerService` to calculate Thermal Recovery Latency using an authoritative `coolingEnteredRt` monotonic timestamp populated precisely inside `SystemHealthState` by `IntegrityMonitor` when entering cooling mode, eliminating loop latency measurement errors (SOT ID 470).
 *   **Issue #1306: Namespace Collision Risk for Viewer's Self-Tracking** (Resolved Sep.24.90)
     *   *Remediation*: Introduced the `"VR_"` (Viewer-Remote) prefix to strictly segregate the remote tracker's logic state (baselines, accuracy anchors, and alarm evaluation history) from the Viewer's local session telemetry. Updated `RemoteStatusRepository`, `SettingsRepository`, and `MainRepository` to support the new namespace, ensuring that remote peer baseline updates can no longer collide with or corrupt local device performance auditing (R-ID 469).
 *   **Issue #1305: Performance Risk: Synchronous Repository Writes on Vibration Floor Jitter** (Resolved Sep.24.80)
@@ -149,4 +147,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 469 (Rules: 92, IDs: 469), Resolved: 1212, Open: 6, Testing: 3 (Sub-items: 12), Ideas: 21, QA: 284]**
+- **Current Audit Baseline: [SOT: 470 (Rules: 92, IDs: 470), Resolved: 1213, Open: 5, Testing: 3 (Sub-items: 12), Ideas: 21, QA: 284]**

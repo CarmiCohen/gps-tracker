@@ -25,6 +25,11 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.24.91:
+ * - Issue #1234 / #1244 REMEDIATION: Corrected Thermal Recovery Latency logic to use 
+ *   authoritative coolingEnteredRt from SystemHealthState for precise auditing.
+ * Sep.24.90:
+ * - Issue #1306 REMEDIATION: Segregated remote tracker logic state under "VR_" prefix.
  * Sep.24.80:
  * - Issue #1305 REMEDIATION: Transitioned high-frequency baseline updates (Vibration, Lux, Acoustic) 
  *   to a non-blocking coroutine debounce model to eliminate synchronous I/O tick loop jitter.
@@ -34,17 +39,6 @@ import kotlin.math.*
  * Sep.24.20:
  * - Issue #1256: Monotonic Latch Staleness Across Reboots (R-ID 462).
  * - Issue #1260: Boot-ID Validation for Persistent Monotonic Latches.
- * - Issue #1234 / #1244 REMEDIATION: Corrected Thermal Recovery Latency logic to measure 
- *   total duration from entry to exit of cooling mode.
- * Sep.24.10:
- * - Issue #1301 REMEDIATION: Loaded and persisted Lux and Acoustic baselines across service
- *   restarts to eliminate the startup baseline learning period (R-ID 461).
- * Sep.24.04:
- * - Issue #1271 REMEDIATION: Restored hardwareSuite's adaptive vibration floor during 
- *   initialization using the persisted value to prevent sensitivity resets.
- * Sep.24.02:
- * - Issue #1255 REMEDIATION: Implemented reboot-aware monotonic clock recovery via 
- *   HistoryManager.recoverLastRealtime using role-isolated clock drift reference.
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -95,7 +89,6 @@ class TrackerService : BaseMonitorService() {
     private var lastForensicTilt = 0.0
 
     private var lastWasCooling = false
-    private var coolingEnteredRt = 0L
     private val forensicCaptureMutex = Mutex()
 
     private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
@@ -466,7 +459,6 @@ class TrackerService : BaseMonitorService() {
                 lastForensicVibe = 0.0
                 lastForensicTilt = 0.0
                 lastWasCooling = false
-                coolingEnteredRt = 0L
                 
                 lastHardwareRecoveryTs = 0L
                 lastFastPathAcousticSpikeTs = 0L
@@ -831,17 +823,22 @@ class TrackerService : BaseMonitorService() {
             // Initial trigger to capture baseline state on service startup
             triggerForensicSample()
 
+            var cachedCoolingEnteredRt = 0L
+
             while (isActive) {
                 val health = integrityMonitor.currentHealth
 
-                // Issue #1244 Fix: Thermal Recovery Latency Audit
+                // Issue #1244 Fix: Thermal Recovery Latency Audit using authoritative coolingEnteredRt
                 if (lastWasCooling && !health.isCoolingModeActive) {
-                    val latency = timeProvider.elapsedRealtime() - coolingEnteredRt
-                    logManager.logServiceEvent(m = "Forensic Performance Audit: Thermal Recovery Latency: ${latency}ms", isImportant = true)
-                    coolingEnteredRt = 0L
+                    val entryRt = if (cachedCoolingEnteredRt > 0) cachedCoolingEnteredRt else health.coolingEnteredRt
+                    if (entryRt > 0) {
+                        val latency = timeProvider.elapsedRealtime() - entryRt
+                        logManager.logServiceEvent(m = "Forensic Performance Audit: Thermal Recovery Latency: ${latency}ms", isImportant = true)
+                    }
+                    cachedCoolingEnteredRt = 0L
                 }
                 if (health.isCoolingModeActive && !lastWasCooling) {
-                    coolingEnteredRt = timeProvider.elapsedRealtime()
+                    cachedCoolingEnteredRt = health.coolingEnteredRt
                 }
                 lastWasCooling = health.isCoolingModeActive
 

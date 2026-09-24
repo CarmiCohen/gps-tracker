@@ -1,3 +1,14 @@
+# 🏛️ Resolution Archive - Sep.24.91
+
+## 🏁 Issue #1234 / #1244: Heuristic Correction for Thermal Recovery Audits
+*   **Resolved**: Sep.24.91
+*   **Root Cause**: The calculation for `Thermal Recovery Latency` in the forensic sampling loop was incorrectly measuring the duration of a single loop iteration delay rather than the actual time spent in cooling mode. This happened because the services were comparing `lastWasCooling` (previous loop state) with `health.isCoolingModeActive` (current loop state) and only logging the delta from a local timestamp recorded on the *previous* loop tick where cooling ended, which was essentially just the loop's own delay.
+*   **Remediation**:
+    *   **SystemHealthState.kt**: Added `coolingEnteredRt` to the authoritative health model to store the exact monotonic timestamp when the device enters cooling mode.
+    *   **IntegrityMonitor.kt**: Updated `handleBatteryUpdate` and `simulateCoolingMode` to populate `coolingEnteredRt` using `timeProvider.elapsedRealtime()` at the exact moment the thermal limit is exceeded.
+    *   **TrackerService.kt / ViewerService.kt**: Refactored the `startForensicSamplingLoop` to use the authoritative `coolingEnteredRt` from `SystemHealthState`. When exiting cooling mode, the services now calculate the true elapsed duration from the precise entry point, ensuring forensic accuracy in performance audit logs.
+*   **R-ID**: 470
+
 # 🏛️ Resolution Archive - Sep.24.90
 
 ## 🏁 Issue #1306: Namespace Collision Risk for Viewer's Self-Tracking

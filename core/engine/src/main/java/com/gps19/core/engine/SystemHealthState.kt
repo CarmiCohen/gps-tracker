@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Sep.24.91:
+ * - Issue #1244 Hardening: Added coolingEnteredRt for precise Thermal Recovery Latency auditing.
  * Sep.10.40:
  * - Issue #946 Visibility: Added tamperNote for header-level forensic 
  *   transparency (R-ID 288).
@@ -43,6 +45,7 @@ class SystemHealthState(
     var storageTotalMb: Long = 0L,
     var isBatterySteepDischarge: Boolean = false,
     var isCoolingModeActive: Boolean = false,
+    var coolingEnteredRt: Long = 0L,
     var gnssDetail: GnssDetail? = null,
     var snrIdx: Double = 0.0,
     var noiseIdx: Double = 0.0,
@@ -151,6 +154,7 @@ class SystemHealthState(
         this.storageTotalMb = other.storageTotalMb
         this.isBatterySteepDischarge = other.isBatterySteepDischarge
         this.isCoolingModeActive = other.isCoolingModeActive
+        this.coolingEnteredRt = other.coolingEnteredRt
         this.gnssDetail = other.gnssDetail
         this.snrIdx = other.snrIdx
         this.noiseIdx = other.noiseIdx
@@ -230,7 +234,7 @@ class SystemHealthState(
         isUltraLongStationary: Boolean = false, isMaliAnomaly: Boolean = false,
         isGnssThrottled: Boolean = false,
         lastEnergyDeltaMa: Int = 0, lastEnergyDeltaTemp: Double = 0.0, lastEnergyDurationMs: Long = 0L,
-        tamperNote: String? = null
+        tamperNote: String? = null, coolingEnteredRt: Long = 0L
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -281,6 +285,7 @@ class SystemHealthState(
         this.lastEnergyDeltaTemp = lastEnergyDeltaTemp
         this.lastEnergyDurationMs = lastEnergyDurationMs
         this.tamperNote = tamperNote
+        this.coolingEnteredRt = coolingEnteredRt
     }
     
     fun reset() {
@@ -314,6 +319,7 @@ class SystemHealthState(
         storageTotalMb = 0L
         isBatterySteepDischarge = false
         isCoolingModeActive = false
+        coolingEnteredRt = 0L
         gnssDetail = null
         snrIdx = 0.0
         noiseIdx = 0.0

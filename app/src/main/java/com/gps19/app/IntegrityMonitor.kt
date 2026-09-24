@@ -26,6 +26,8 @@ sealed class IntegrityEvent {
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.24.91:
+ * - Issue #1244 Hardening: Captured precise coolingEnteredRt timestamp within handleBatteryUpdate.
  * Sep.20.20:
  * - Issue #1142 Hardening: Reset all vitality timestamps in resetStats() to 
  *   prevent false "Flow Stall" alerts on session restart (R-ID 383).
@@ -328,12 +330,16 @@ class IntegrityMonitor @Inject constructor(
         }
 
         var isCooling = workingHealth.isCoolingModeActive
+        var coolingEnteredTimestamp = workingHealth.coolingEnteredRt
+        
         if (!isCooling && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
             isCooling = true
+            coolingEnteredTimestamp = nowRt
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE on this device.", true))
             _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_TRACKER_TEMP))
         } else if (isCooling && batteryTemp < MAX_SAFE_TEMPERATURE_RECOVERY) {
             isCooling = false
+            coolingEnteredTimestamp = 0L
             _integrityEvents.tryEmit(IntegrityEvent.LogEvent("System Info: Thermal limit recovered (${batteryTemp}°C) on this device.", false))
         }
 
@@ -357,6 +363,7 @@ class IntegrityMonitor @Inject constructor(
             h.maxTemp = maxTemp
             h.isCharging = isCharging
             h.isCoolingModeActive = isCooling
+            h.coolingEnteredRt = coolingEnteredTimestamp
             h.isThermalThrottling = isCooling 
             h.isBatterySteepDischarge = isSteepDischarge
             h.currentMa = status.currentMa
@@ -500,11 +507,16 @@ class IntegrityMonitor @Inject constructor(
         val msg = if (active) "SYSTEM EMERGENCY: Simulated Thermal limit reached. Entering forced COOLING MODE." 
                   else "System Info: Simulated Thermal limit recovered."
         _integrityEvents.tryEmit(IntegrityEvent.LogEvent(msg, active))
+        
+        val nowRt = timeProvider.elapsedRealtime()
+        val coolingEnteredTimestamp = if (active) nowRt else 0L
+
         if (active) _integrityEvents.tryEmit(IntegrityEvent.ViolationSustained(ALERT_ID_TRACKER_TEMP))
         else _integrityEvents.tryEmit(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_TEMP))
 
         updateHealth { h ->
             h.isCoolingModeActive = active
+            h.coolingEnteredRt = coolingEnteredTimestamp
             h.isThermalThrottling = active
         }
     }
