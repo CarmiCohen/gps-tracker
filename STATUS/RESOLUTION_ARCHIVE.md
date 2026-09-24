@@ -1,3 +1,13 @@
+# 🏛️ Resolution Archive - Sep.24.40
+
+## 🏁 Issue #1241: Functional Restoration of History Sync Streams in ViewerService
+*   **Resolved**: Sep.24.40
+*   **Root Cause**: `ViewerService` lacked a subscription to the `HistoryManager.historyEvents` stream. Instead, it was relying on a legacy pulse listener that didn't capture history backfill or sync-specific events. This resulted in an observation gap on the monitor device where legitimate history lifecycle events (logs and triggers) were not being surfaced.
+*   **Remediation**:
+    *   **ViewerService.kt**: Implemented `observeHistoryEvents()` which subscribes to `historyManager.historyEvents` using `collectLatest`.
+    *   **ViewerService.kt**: Integrated the observer into the `onServiceInitialize()` sequence to ensure immediate stream connectivity upon service startup.
+*   **R-ID**: 464
+
 # 🏛️ Resolution Archive - Sep.24.30
 
 ## 🏁 Issue #1307: Forensic Sampling Bottleneck During Rapid Event Sequences

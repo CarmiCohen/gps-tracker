@@ -17,6 +17,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.24.40:
+ * - Issue #1241 REMEDIATION: Restored functional history sync streams by implementing 
+ *   legitimate observation of HistoryManager events (R-ID 464).
  * Sep.24.10:
  * - Issue #1301 REMEDIATION: Loaded and persisted remote tracker Lux and Acoustic baselines 
  *   within ViewerService to eliminate baseline learning lag upon restart (R-ID 461).
@@ -95,6 +98,7 @@ class ViewerService : BaseMonitorService() {
         observeIntegrityEvents()
         observeProcessorEvents()
         observeConnectivityEvents()
+        observeHistoryEvents()
         observeCommandEvents()
         observeRevivalEvents()
         
@@ -317,6 +321,16 @@ class ViewerService : BaseMonitorService() {
             connectivitySuite.connectivityEvents.collectLatest { event ->
                 when (event) {
                     is ConnectivityEvent.PeerPulse -> handleTrackerPulse(event.id)
+                }
+            }
+        }
+    }
+
+    private fun observeHistoryEvents() {
+        lifecycleScope.launch(Dispatchers.Default) {
+            historyManager.historyEvents.collect { event ->
+                when (event) {
+                    is HistoryEvent.LogEvent -> logManager.logServiceEvent(m = event.message, isImportant = event.isImportant)
                 }
             }
         }

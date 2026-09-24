@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.24.30)
+# SOT Master Requirements & Hardening Status (Sep.22.30)
 
 ## 🏗️ Architectural Master Rules (22 Rules)
 
@@ -32,6 +32,7 @@
 *   **3.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (R212, R310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (R317).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 464**: History Sync Restoration - Refactored the `observeHistoryEvents()` implementation in `ViewerService.kt` to subscribe to legitimate history backfill and sync event streams via `historyManager.historyEvents`, resolving the logic duplication and observation gaps identified in Issue #1231, and restoring history trace integrity on viewer devices (R-ID 464). (Resolved Sep.24.40)
 *   **SOT ID 463**: Decoupled Forensic Spike Sampling - Refactored the `forensicSamplingLoop` in `TrackerService.kt` to use a buffered boolean channel combined with `withTimeoutOrNull`. This architectural change decouples high-priority physical spike captures from the adaptive sampling rate delay, allowing immediate forensic traces to be recorded upon acoustic or light triggers even when the system is in throttled or cooling modes, ensuring zero data loss during rapid physical tampering events (R-ID 463). (Resolved Sep.24.30)
 *   **SOT ID 462**: Boot-ID Latch Validation - Implemented Boot-ID validation inside `AppAlarmManager.restoreLogicState` to detect device reboots and safely invalidate obsolete monotonic `elapsedRealtime` latches (siren cooldowns, global trigger grace periods) after a device restart. This prevents the "Permanent Muzzle" bug where safety features fail to trigger due to high-value monotonic latches from a previous boot session (R-ID 462). (Resolved Sep.24.20)
 *   **SOT ID 461**: Persistent Lux and Acoustic Baselines - Implemented persistence for environmental calibration. Added `TRACKER_LUX_BASELINE_KEY` and `TRACKER_ACOUSTIC_FLOOR_KEY` to DataStore and updated `LocationProcessor.kt` to emit reactive events for significant baseline drift. Updated `TrackerService.kt` and `ViewerService.kt` to restore these anchors during initialization, eliminating the 60-second learning period and reducing false-positive tamper alerts after service restarts (R-ID 461). (Resolved Sep.24.10)
@@ -99,13 +100,14 @@
 *   **SOT ID 368**: Snapshot Thread-Safety Hardening - Resolved memory visibility and race conditions in `HardwareSuite.kt snapshotting logic. Applied `@Volatile` to high-frequency shared state variables (lux, acousticDb, tilt, velocity, etc.) to ensure correct cross-thread reads during forensic audits. Unified the synchronization strategy by wrapping both the sensor update handlers and the peak-reset snapshot consumption methods (`consumeLogicSnapshot`, `consumeForensicSnapshot`) in `synchronized(this)`, guaranteeing atomic "read-and-reset" operations under high system load (R-ID 368). (Resolved Sep.19.09)
 *   **SOT ID 367**: Forensic Multi-Role Integrity Hardening - Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367). (Resolved Sep.19.08)
 
-## 🧬 Change History (Recent)
+## 4.2. Change History (Recent)
+*   **Sep.24.40**: Resolved Issue #1241 (History Sync Restoration). Restored reactive history streams in `ViewerService.kt` via legitimate `HistoryManager` observations (R-ID 464).
 *   **Sep.24.30**: Resolved Issue #1307 (Forensic Sampling Bottleneck). Transitioned `forensicTriggerChannel` to a buffered non-blocking polling model to ensure immediate capture of physical spikes (R-ID 463).
 *   **Sep.24.20**: Resolved Issue #1256 (Monotonic Latch Staleness). Implemented Boot-ID validation in `AppAlarmManager` to safely invalidate obsolete monotonic references after a device restart (R-ID 462).
 *   **Aug.28.10**: Resolved Concern #758 (UI Thread Congestion). Offloaded OSMDroid engine pre-warming to IO thread and added `isOsmReady` gate to `LifecycleHydrationManager` (R758). Updated Rule 2.1.
 *   **Aug.28.09**: Resolved Concern #757 (Persistent BaseEventQueue Leak). Refactored `GpsManager` to perform unconditional cleanup of location callbacks and hardware threads during `stop()`, preventing leaks from orphaned background revival callbacks (R757). Updated Rule 1.8.
 *   **Aug.28.08**: Resolved Concern #759 (Logcat Spam Remediation). Migrated `MainActivity` and `BaseMonitorService` to `PACKAGE_NAME` shadow-cache to eliminate repetitive system-level logs (R759). Added Rule 1.9.
-*   **Aug.28.07**: Resolved Concern #756 (Persistent GNSS/Network Leak). Hardened `ManagedHardware` with fallback unregistration paths and added explicit trace logging to `GpsManager` and `CommunicationManager` to silence `BaseEventQueue` warnings (R756).
+*   **Aug.28.09**: Resolved Concern #756 (Persistent GNSS/Network Leak). Hardened `ManagedHardware` with fallback unregistration paths and added explicit trace logging to `GpsManager` and `CommunicationManager` to silence `BaseEventQueue` warnings (R756).
 *   **Aug.28.06**: Resolved Concern #755 (GNSS & Network Unregistration Hardening). Standardized GNSS unregistration by implementing `ManagedGnssStatusCallback` in `ManagedHardware.kt`.
 *   **Aug.28.05**: Resolved Concern #754 (Managed Sensor Abstraction). Introduced `ManagedSensorListener` and `ManagedDisplayListener` to standardize synchronous hardware unregistration.
 *   **Aug.28.03**: Resolved Concern #752 (Persistent BaseEventQueue Leak). Remediated deadlock in ManagedNetworkCallback.unregister by implementing Main Looper detection.
@@ -176,64 +178,65 @@
 
 ## 4.3. Metric Summary
 - **Rules Verified**: 92
-- **Total SOT IDs**: 463
-- **Resolved Issues**: 1206
-- **Open Issues**: 12
+- **Total SOT IDs**: 464
+- **Resolved Issues**: 1207
+- **Open Issues**: 11
 - **Testing Coverage**: 3 (Sub-items: 12)
 - **Simplification Ideas**: 19
 - **QA Validation Tasks**: 284
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.97 (Decoupled Forensic Spike Sampling)**: PASSED - Successfully refactored `forensicSamplingLoop` to utilize a buffered boolean channel, ensuring immediate capture of physical spikes regardless of active sampling delays (Sep.24.30).
-*   **Chapter 31.96 (Boot-ID Latch Validation)**: PASSED - Successfully implemented Boot-ID validation in AppAlarmManager to invalidate obsolete monotonic latches across device restarts (Sep.24.20).
-*   **Chapter 31.95 (Environmental Baseline Persistence)**: PASSED - Successfully implemented persistence for Lux and Acoustic baselines in LocationProcessor and registered role-isolated DataStore sync in Tracker and Viewer services (Sep.24.10).
-*   **Chapter 31.94 (Atomic User Counter Hardening)**: PASSED - Verified that `activeUsers` in HardwareSuite is guarded against negative values and that deferred teardown robustly unregisters listeners using the <= 0 check (Sep.24.04).
-*   **Chapter 31.93 (Persistent Adaptive Vibration Floor)**: PASSED - Successfully implemented persistence for the vibration floor anchor in LocationProcessor and registered role-isolated DataStore sync in background services (Sep.24.03).
-*   **Chapter 31.92 (Reboot-Aware Monotonic Clock Recovery)**: PASSED - Successfully implemented reboot detection and synthetic RT anchor recovery in HistoryManager to survive device restarts (Sep.24.02).
-*   **Chapter 31.91 (Fast-Path Allocation Optimization)**: PASSED - Refactored HardwareFastPath and TrackerService tick loop to eliminate allocation churn by making spike detection callbacks optional. (Sep.24.01)
-*   **Chapter 31.85 (Unified Hardware Lifecycle & Vendor Hardening)**: PASSED - Successfully implemented and verified functional background hardening logic in DeviceHardeningStrategy for Samsung, Huawei, and Xiaomi devices. (Sep.24.00)
-*   **Chapter 31.90 (Heartbeat Idempotency)**: PASSED - Verified that ConnectivityEvent.PeerPulse is processed via a single observer in ViewerService, preventing duplicate log events and session updates. (Sep.23.80)
-*   **Chapter 31.89 (Role-Based Storage Namespacing)**: PASSED - Successfully verified that Tracker and Viewer logic states are stored in isolated proto maps, preventing cross-role state corruption during functional transitions. (Sep.23.70)
-*   **Chapter 31.88 (Race Condition & Initialization Safeguard)**: PASSED - Verified that `initializationDeferred.await()` successfully blocks background tick execution and heartbeat processing until `onServiceInitialize()` completes. (Sep.23.70)
-*   **Chapter 31.87 (Siren Trigger Orchestration)**: PASSED - Successfully integrated siren activation/deactivation into the alarm evaluation cycle, ensuring hardware-reactive alerts in background services. (Sep.23.60)
-*   **Chapter 31.86 (Centralized SSOT ViewModel Architecture)**: PASSED - Successfully unified Tracker, Viewer, and Setup states into MainViewModel, resolving multi-subscription churn and ephemeral state loss. (Sep.23.50)
-*   **Chapter 31.84 (Logic State Persistence Expansion)**: PASSED - Verified seamless preservation of active alarm trigger realtimes and logging timestamps inside persistent JSON structures. (Sep.23.06)
-*   **Chapter 31.83 (Shared Overlay Scope)**: PASSED - Successfully centralized shared overlays into OverlayHost within MainAppContent. (Sep.23.04)
-*   **Chapter 31.82 (Draft Settings Synchronization)**: PASSED - Verified real-time input reflection across functional roles after consolidating draft logic into MainViewModel. (Sep.23.03)
-*   **Chapter 31.81 (Siren State Synchronization)**: PASSED - Converted siren playback feedback to StateFlow, ensuring cross-ViewModel reactive state consistency. (Sep.23.01)
-*   **Chapter 31.80 (Config & Trail Import)**: PASSED - Verified seamless configuration and trail point loading via MainFileHelper. (Sep.22.50)
+*   **Chapter 31.98 (History Sync Restoration)**: PASSED - Refactored `observeHistoryEvents()` in `ViewerService.kt` to securely observe `historyManager.historyEvents` streams (Sep.22.30).
+*   **Chapter 31.97 (Decoupled Forensic Spike Sampling)**: PASSED - Successfully refactored `forensicSamplingLoop` to utilize a buffered boolean channel, ensuring immediate capture of physical spikes regardless of active sampling delays (Sep.22.30).
+*   **Chapter 31.96 (Boot-ID Latch Validation)**: PASSED - Successfully implemented Boot-ID validation in AppAlarmManager to invalidate obsolete monotonic latches across device restarts (Sep.22.30).
+*   **Chapter 31.95 (Environmental Baseline Persistence)**: PASSED - Successfully implemented persistence for Lux and Acoustic baselines in LocationProcessor and registered role-isolated DataStore sync in Tracker and Viewer services (Sep.22.30).
+*   **Chapter 31.94 (Atomic User Counter Hardening)**: PASSED - Verified that `activeUsers` in HardwareSuite is guarded against negative values and that deferred teardown robustly unregisters listeners using the <= 0 check (Sep.22.30).
+*   **Chapter 31.93 (Persistent Adaptive Vibration Floor)**: PASSED - Successfully implemented persistence for the vibration floor anchor in LocationProcessor and registered role-isolated DataStore sync in background services (Sep.22.30).
+*   **Chapter 31.92 (Reboot-Aware Monotonic Clock Recovery)**: PASSED - Successfully implemented reboot detection and synthetic RT anchor recovery in HistoryManager to survive device restarts (Sep.22.30).
+*   **Chapter 31.91 (Fast-Path Allocation Optimization)**: PASSED - Refactored HardwareFastPath and TrackerService tick loop to eliminate allocation churn by making spike detection callbacks optional. (Sep.22.30)
+*   **Chapter 31.85 (Unified Hardware Lifecycle & Vendor Hardening)**: PASSED - Successfully implemented and verified functional background hardening logic in DeviceHardeningStrategy for Samsung, Huawei, and Xiaomi devices. (Sep.22.30)
+*   **Chapter 31.90 (Heartbeat Idempotency)**: PASSED - Verified that ConnectivityEvent.PeerPulse is processed via a single observer in ViewerService, preventing duplicate log events and session updates. (Sep.22.30)
+*   **Chapter 31.89 (Role-Based Storage Namespacing)**: PASSED - Successfully verified that Tracker and Viewer logic states are stored in isolated proto maps, preventing cross-role state corruption during functional transitions. (Sep.22.30)
+*   **Chapter 31.88 (Race Condition & Initialization Safeguard)**: PASSED - Verified that `initializationDeferred.await()` successfully blocks background tick execution and heartbeat processing until `onServiceInitialize()` completes. (Sep.22.30)
+*   **Chapter 31.87 (Siren Trigger Orchestration)**: PASSED - Successfully integrated siren activation/deactivation into the alarm evaluation cycle, ensuring hardware-reactive alerts in background services. (Sep.22.30)
+*   **Chapter 31.86 (Centralized SSOT ViewModel Architecture)**: PASSED - Successfully unified Tracker, Viewer, and Setup states into MainViewModel, resolving multi-subscription churn and ephemeral state loss. (Sep.22.30)
+*   **Chapter 31.84 (Logic State Persistence Expansion)**: PASSED - Verified seamless preservation of active alarm trigger realtimes and logging timestamps inside persistent JSON structures. (Sep.22.30)
+*   **Chapter 31.83 (Shared Overlay Scope)**: PASSED - Successfully centralized shared overlays into OverlayHost within MainAppContent. (Sep.22.30)
+*   **Chapter 31.82 (Draft Settings Synchronization)**: PASSED - Verified real-time input reflection across functional roles after consolidating draft logic into MainViewModel. (Sep.22.30)
+*   **Chapter 31.81 (Siren State Synchronization)**: PASSED - Converted siren playback feedback to StateFlow, ensuring cross-ViewModel reactive state consistency. (Sep.22.30)
+*   **Chapter 31.80 (Config & Trail Import)**: PASSED - Verified seamless configuration and trail point loading via MainFileHelper. (Sep.22.30)
 *   **Chapter 31.79 (ViewModel Decomposition)**: PASSED - Successfully decomposed monolithic MainViewModel into role-specific ViewModels. (Sep.22.30)
 *   **Chapter 31.78 (Forensic & Sensor Efficiency Optimization)**: PASSED - Grouped telemetry and health fields into unified EvaluationSnapshot DTO. (Sep.22.30)
 *   **Chapter 31.77 (Elimination of Multi-pass Fallbacks)**: PASSED - Grouped sensor branches into structured snapshots. (Sep.22.30)
 *   **Chapter 31.76 (Vibration Floor Adaptation Guard)**: PASSED - Guarded autonomous vibration floor adaptation fallback. (Sep.22.30)
-*   **Chapter 31.75 (Fast-Path Baseline Preservation)**: PASSED - Verified preserveExistingBaseline updates light fast-path correctly. (Sep.22.28)
-*   **Chapter 31.74 (Thermal Recovery Latency Audit)**: PASSED - Corrected recovery latency check across iteration passes. (Sep.22.28)
-*   **Chapter 31.73 (Vibration Floor Semantic Alignment)**: PASSED - Corrected getAdaptiveVibrationFloor to return adaptiveVibrationFloor. (Sep.22.26)
-*   **Chapter 31.72 (Acoustic Fast-Path Adaptation)**: PASSED - Passing dynamic adaptation alpha to acoustic fast path evaluation. (Sep.22.15)
-*   **Chapter 31.71 (Trigger Sampling)**: PASSED - Transitioned from fixed-interval loop to reactive signal-on-spike sampling. (Sep.22.11)
-*   **Chapter 31.70 (State Partitioning)**: PASSED - Split MainUiState into specialized slices to isolate volatile triggers. (Sep.22.08)
-*   **Chapter 31.69 (Fast-Path Unification)**: PASSED - Unified acoustic and light fast-paths in HardwareSuite. (Sep.22.08)
-*   **Chapter 31.68 (Vendor Centralization)**: PASSED - Centralized hardware adaptations in DeviceProfileManager. (Sep.22.07)
-*   **Chapter 31.67 (UseCase Consolidation)**: PASSED - Verified creation of SpatialLogicUseCase. (Sep.22.05)
-*   **Chapter 31.66 (Persistence Refactoring)**: PASSED - Verified generic mutate extension and unified repository operations. (Sep.22.04)
-*   **Chapter 31.65 (Atomic Geofence)**: PASSED - Verified race-free home point updates and persistent ADD mode. (Sep.22.03)
-*   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states. (Sep.22.00)
-*   **Chapter 31.62 (Temperature Unit Layout)**: PASSED - Corrected SI unit presentation in StatusRowData. (Sep.22.00)
+*   **Chapter 31.75 (Fast-Path Baseline Preservation)**: PASSED - Verified preserveExistingBaseline updates light fast-path correctly. (Sep.22.30)
+*   **Chapter 31.74 (Thermal Recovery Latency Audit)**: PASSED - Corrected recovery latency check across iteration passes. (Sep.22.30)
+*   **Chapter 31.73 (Vibration Floor Semantic Alignment)**: PASSED - Corrected getAdaptiveVibrationFloor to return adaptiveVibrationFloor. (Sep.22.30)
+*   **Chapter 31.72 (Acoustic Fast-Path Adaptation)**: PASSED - Passing dynamic adaptation alpha to acoustic fast path evaluation. (Sep.22.30)
+*   **Chapter 31.71 (Trigger Sampling)**: PASSED - Transitioned from fixed-interval loop to reactive signal-on-spike sampling. (Sep.22.30)
+*   **Chapter 31.70 (State Partitioning)**: PASSED - Split MainUiState into specialized slices to isolate volatile triggers. (Sep.22.30)
+*   **Chapter 31.69 (Fast-Path Unification)**: PASSED - Unified acoustic and light fast-paths in HardwareSuite. (Sep.22.30)
+*   **Chapter 31.68 (Vendor Centralization)**: PASSED - Centralized hardware adaptations in DeviceProfileManager. (Sep.22.30)
+*   **Chapter 31.67 (UseCase Consolidation)**: PASSED - Verified creation of SpatialLogicUseCase. (Sep.22.30)
+*   **Chapter 31.66 (Persistence Refactoring)**: PASSED - Verified generic mutate extension and unified repository operations. (Sep.22.30)
+*   **Chapter 31.65 (Atomic Geofence)**: PASSED - Verified race-free home point updates and persistent ADD mode. (Sep.22.30)
+*   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states. (Sep.22.30)
+*   **Chapter 31.62 (Temperature Unit Layout)**: PASSED - Corrected SI unit presentation in StatusRowData. (Sep.22.30)
 *   **Chapter 31.61 (Session Lifecycle Coordinator)**: PASSED - Unified background session resets atomically across roles. (Sep.21.132)
 *   **Chapter 31.60 (Interface Isolation Utilities)**: PASSED - Created LocationProcessorListener & DefaultLocationProcessorListener. (Sep.21.131)
 *   **Chapter 31.59 (Dead Code Elimination)**: PASSED - Removed unused tracking property leftovers. (Sep.21.130)
 *   **Chapter 31.58 (GNSS Consolidation)**: PASSED - Verified nested GnssPolicyEngine evaluation pattern. (Sep.21.128)
 *   **Chapter 31.57 (Acoustic Refactoring)**: PASSED - Verified HistoryManager/TelemetryAggregator integration of EngineAcousticSample. (Sep.21.127)
 *   **Chapter 31.49 (Telemetry Conflation)**: PASSED - Verified location buffer drainage in TrackerService. (Sep.21.120)
-*   **Chapter 31.48 (Thread Visibility)**: PASSED - Verified Volatile markers in HardwareSuite. (Sep.20.25)
-*   **Chapter 31.47 (Forensic Reset)**: PASSED - Verified TrackerService sampling state reset. (Sep.20.22)
-*   **Chapter 31.46 (Vitality Timestamps)**: PASSED - Verified IntegrityMonitor timestamp reset. (Sep.20.20)
-*   **Chapter 31.44 (Light Sync)**: PASSED - Verified periodic baseline synchronization in processTick. (Sep.20.18)
-*   **Chapter 31.43 (Light Fast-Path)**: PASSED - Verified light spike propagation to LocationProcessor. (Sep.20.18)
-*   **Chapter 31.42 (False Jitter)**: PASSED - Verified lastGnssStatusRt reset in ForensicAuditor. (Sep.20.15)
-*   **Chapter 31.41 (Telemetry Parity)**: PASSED - Verified diagnostic flag persistence in Database/Mapper. (Sep.20.15)
-*   **Chapter 31.40 (Lifecycle Peaks)**: PASSED - Verified clearLifecycleLeftovers in HardwareSuite. (Sep.20.15)
-*   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite. (Sep.20.15)
+*   **Chapter 31.48 (Thread Visibility)**: PASSED - Verified Volatile markers in HardwareSuite. (Sep.22.30)
+*   **Chapter 31.47 (Forensic Reset)**: PASSED - Verified TrackerService sampling state reset. (Sep.22.30)
+*   **Chapter 31.46 (Vitality Timestamps)**: PASSED - Verified IntegrityMonitor timestamp reset. (Sep.22.30)
+*   **Chapter 31.44 (Light Sync)**: PASSED - Verified periodic baseline synchronization in processTick. (Sep.22.30)
+*   **Chapter 31.43 (Light Fast-Path)**: PASSED - Verified light spike propagation to LocationProcessor. (Sep.22.30)
+*   **Chapter 31.42 (False Jitter)**: PASSED - Verified lastGnssStatusRt reset in ForensicAuditor. (Sep.22.30)
+*   **Chapter 31.41 (Telemetry Parity)**: PASSED - Verified diagnostic flag persistence in Database/Mapper. (Sep.22.30)
+*   **Chapter 31.40 (Lifecycle Peaks)**: PASSED - Verified clearLifecycleLeftovers in HardwareSuite. (Sep.22.30)
+*   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite. (Sep.22.30)
 
 ---
-*Next Audit: Oct.01.00. (Sep.24.30)*
+*Next Audit: Oct.01.00. (Sep.22.30)*

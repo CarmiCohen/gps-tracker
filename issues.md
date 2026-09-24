@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.30
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.40
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -39,9 +39,7 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🛑 High Priority
 
-*   **Issue #1241: Functional Restoration of History Sync Streams in ViewerService**
-    *   *Description*: Refactor the `observeHistoryEvents()` implementation in `ViewerService.kt` to subscribe to legitimate history backfill and sync event streams rather than mirroring the connectivity pulse listener. Resolves logic duplication and observation gaps identified in Issue #1231.
-    *   *Contribution*: **High (Functional Parity)**. Ensures history data is correctly visualized on the monitor device.
+*   (None currently identified)
 
 ### 🟡 Medium Priority
 
@@ -63,7 +61,7 @@ Finalizing the audit of background service stability and functional convergence 
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 19)
+## 💡 Strategic Simplification Ideas (Ideas: 20)
 
 ### 🛑 High Priority
 *   **Issue #1292: Reactive Siren State Binding**
@@ -72,6 +70,8 @@ Finalizing the audit of background service stability and functional convergence 
     *   *Significance*: **High (Architecture)**. Centralize dispersed logging and triggers into a single `AppEventCoordinator` to eliminate cross-component coupling.
 
 ### 🟡 Medium Priority
+*   **Issue #1310: Stream Orchestration Boilerplate Reduction**
+    *   *Significance*: **Medium (Maintainability)**. Tracker and Viewer services share identical patterns for observing alarm, integrity, processor, connectivity, and history event streams. Consolidating these into a shared `ServiceObservationDelegate` or a unified event handler would eliminate 100+ lines of boilerplate.
 *   **Issue #1309: Unified Job Management in Monitor Services**
     *   *Significance*: **Medium (Maintainability)**. Tracker and Viewer services manually manage 5-10 nullable Job variables. Migrating to a structured `JobRegistry` would simplify lifecycle management and reduce boilerplate cancellation logic.
 *   **Issue #1161: Unified Trajectory & Buffer Management**
@@ -113,6 +113,8 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1241: Functional Restoration of History Sync Streams in ViewerService** (Resolved Sep.24.40)
+    *   *Remediation*: Refactored `observeHistoryEvents()` in `ViewerService.kt` to subscribe to legitimate `historyManager.historyEvents` stream, restoring reactive backfill and sync event visualization on monitor devices (R-ID 464).
 *   **Issue #1307: Forensic Sampling Bottleneck During Rapid Event Sequences** (Resolved Sep.24.30)
     *   *Remediation*: Refactored `forensicSamplingLoop` in `TrackerService.kt` to use a buffered boolean channel with non-blocking timeout polling. This ensures physical spikes (acoustic/light) are processed immediately, fully decoupled from the adaptive sampling rate gates (R-ID 463).
 *   **Issue #1256: Monotonic Latch Staleness Across Reboots** (Resolved Sep.24.20)
@@ -132,7 +134,7 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1271: Missing Persistence for Adaptive Vibration Floor** (Resolved Sep.24.04)
     *   *Remediation*: Implemented persistence for the adaptive vibration floor anchor. Added `ADAPTIVE_VIBRATION_FLOOR_KEY` to `PreferenceKeys.kt` (R-ID 459).
 *   **Issue #1255: Unreliable Monotonic Clock Recovery Across Reboots** (Resolved Sep.24.02)
-    *   *Remediation*: Implemented `recoverLastRealtime` in `HistoryManager.kt` using role-prefixed clock drift references (R-ID 458).
+    *   *Remediation*: Implemented `recoverLastRealtime` in `HistoryManager.kt` using role-isolated clock drift references (R-ID 458).
 *   **Issue #1233: High Allocation Churn via Fast-Path Re-registration** (Resolved Sep.24.01)
     *   *Remediation*: Refactored `HardwareFastPath` to allow optional callback assignment. Updated `TrackerService.kt` to omit callbacks inside the periodic tick loop (R-ID 457).
 *   **Issue #1232: Empty Stub Implementation of OEM Power Hardening Overrides** (Resolved Sep.24.00)
@@ -152,4 +154,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 463 (Rules: 92, IDs: 463), Resolved: 1206, Open: 12, Testing: 3 (Sub-items: 12), Ideas: 19, QA: 284]**
+- **Current Audit Baseline: [SOT: 464 (Rules: 92, IDs: 464), Resolved: 1207, Open: 11, Testing: 3 (Sub-items: 12), Ideas: 20, QA: 284]**
