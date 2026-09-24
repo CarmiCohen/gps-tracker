@@ -29,6 +29,9 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.24.02:
+ * - Issue #1255 REMEDIATION: Implemented recoverLastRealtime to provide 
+ *   reboot-aware monotonic clock recovery by calculating synthetic RT anchors.
  * Sep.23.70:
  * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation (prefix support)
  *   for forensic logic state to prevent cross-role state corruption (R-ID 453).
@@ -93,6 +96,25 @@ class HistoryManager @Inject constructor(
             lastProcessedHour = repository.getInt(LAST_AUTO_SAVE_HOUR_KEY, -1)
         }
         isInitialized.set(true)
+    }
+
+    /**
+     * recoverLastRealtime: Provides reboot-aware monotonic clock recovery.
+     * If the current drift is significantly different from persisted drift (Issue #1255),
+     * it anchors recovery to the current boot cycle's drift to prevent invalid RT values.
+     */
+    fun recoverLastRealtime(lastTs: Long, recoveredDrift: Long): Long {
+        val now = timeProvider.currentTimeMillis()
+        val nowRt = timeProvider.elapsedRealtime()
+        val currentDrift = now - nowRt
+        
+        val effectiveDrift = if (recoveredDrift != 0L && abs(currentDrift - recoveredDrift) < DRIFT_TOLERANCE_MS) {
+            recoveredDrift
+        } else {
+            currentDrift
+        }
+        
+        return lastTs - effectiveDrift
     }
 
     /**

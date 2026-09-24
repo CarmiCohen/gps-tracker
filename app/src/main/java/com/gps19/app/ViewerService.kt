@@ -17,14 +17,12 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.24.02:
+ * - Issue #1255 REMEDIATION: Implemented reboot-aware monotonic clock recovery via 
+ *   HistoryManager.recoverLastRealtime using role-isolated clock drift reference.
  * Sep.23.80:
  * - Issue #1231 REMEDIATION: Removed redundant observeHistoryEvents which caused 
  *   duplicate heartbeat processing from ConnectivitySuite (R-ID 456).
- * Sep.23.70:
- * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation (prefix "V_")
- *   to prevent logic state corruption when switching between roles (R-ID 453).
- * - Issue #1236: Race Condition Remediation. Tick and Heartbeat loops now 
- *   wait for initializationDeferred (R-ID 452).
  */
 @AndroidEntryPoint
 class ViewerService : BaseMonitorService() {
@@ -124,7 +122,7 @@ class ViewerService : BaseMonitorService() {
         alarmManager.restoreState(savedAlarms)
         alarmManager.restoreLogicState(settingsSnapshot, "V_")
 
-        historyManager.initialize(lifecycleScope)
+        historyManager.initialize(lifecycleScope, "V_")
         
         hardwareSuite.start()
         
@@ -155,10 +153,10 @@ class ViewerService : BaseMonitorService() {
         }
 
         val recoveredTs = repository.getLong("V_" + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
-        val recoveredDrift = repository.getLong(CLOCK_DRIFT_REF_KEY, 0L)
+        val recoveredDrift = repository.getLong("V_" + CLOCK_DRIFT_REF_KEY, 0L)
         
         lastServiceTickTs = recoveredTs
-        lastServiceTickRealtime = if (recoveredDrift != 0L) recoveredTs - recoveredDrift else timeProvider.elapsedRealtime()
+        lastServiceTickRealtime = historyManager.recoverLastRealtime(recoveredTs, recoveredDrift)
         
         remoteProcessor.setLastValidFixRt(timeProvider.elapsedRealtime())
         selfProcessor.setLastValidFixRt(timeProvider.elapsedRealtime())

@@ -1,4 +1,12 @@
-# 🏛️ Resolution Archive - Sep.24.01
+# 🏛️ Resolution Archive - Sep.24.02
+
+## 🏁 Issue #1255: Unreliable Monotonic Clock Recovery Across Reboots
+*   **Resolved**: Sep.24.02
+*   **Root Cause**: Monotonic timing references (`elapsedRealtime`) were being recovered using wall-clock drift references from previous boot sessions. Since `elapsedRealtime` resets to zero on reboot, using a stale drift resulted in invalid/negative monotonic anchors in the new session.
+*   **Remediation**:
+    *   **HistoryManager.kt**: Implemented `recoverLastRealtime(lastTs, recoveredDrift)` which detects if the persisted drift has diverged from the current session's drift (indicating a reboot). It then anchors the recovery to the current boot cycle's drift reference.
+    *   **TrackerService.kt / ViewerService.kt**: Updated initialization to use `historyManager.recoverLastRealtime` and role-prefixed drift keys (`T_clock_drift_ref` / `V_clock_drift_ref`) to ensure forensic timing continuity survives reboots.
+*   **R-ID**: 458
 
 ## 🏁 Issue #1233: High Allocation Churn via Fast-Path Re-registration
 *   **Resolved**: Sep.24.01

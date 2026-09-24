@@ -23,14 +23,12 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.24.02:
+ * - Issue #1255 REMEDIATION: Implemented reboot-aware monotonic clock recovery via 
+ *   HistoryManager.recoverLastRealtime using role-isolated clock drift reference.
  * Sep.24.01:
  * - Issue #1233 REMEDIATION: Omitted fast-path callbacks in processTick to eliminate 
  *   high allocation churn of lambda re-registration on every tick.
- * Sep.23.70:
- * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation (prefix "T_")
- *   to prevent logic state corruption when switching between roles (R-ID 453).
- * - Issue #1236: Race Condition Remediation. Ensured forensic sampling loop 
- *   waits for initializationDeferred (R-ID 452).
  */
 @AndroidEntryPoint
 class TrackerService : BaseMonitorService() {
@@ -123,7 +121,7 @@ class TrackerService : BaseMonitorService() {
         alarmManager.restoreState(savedAlarms)
         alarmManager.restoreLogicState(settingsSnapshot, "T_")
 
-        historyManager.initialize(lifecycleScope)
+        historyManager.initialize(lifecycleScope, "T_")
         
         hardwareSuite.start()
 
@@ -141,10 +139,10 @@ class TrackerService : BaseMonitorService() {
         }
 
         val recoveredTs = repository.getLong("T_" + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
-        val recoveredDrift = repository.getLong(CLOCK_DRIFT_REF_KEY, 0L)
+        val recoveredDrift = repository.getLong("T_" + CLOCK_DRIFT_REF_KEY, 0L)
         
         lastServiceTickTs = recoveredTs
-        lastServiceTickRealtime = if (recoveredDrift != 0L) recoveredTs - recoveredDrift else timeProvider.elapsedRealtime()
+        lastServiceTickRealtime = historyManager.recoverLastRealtime(recoveredTs, recoveredDrift)
         locationProcessor.setLastValidFixRt(timeProvider.elapsedRealtime()) 
         
         serviceStartRealtime = timeProvider.elapsedRealtime()
@@ -508,7 +506,7 @@ class TrackerService : BaseMonitorService() {
         isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(
             currentSuspicious = isSuspiciousMode,
             isPhysicalViolation = locationProcessor.sentinel.checkPhysicalTamper(nowRt, false) == SentinelStatus.TAMPER,
-            isSitDetected = locationProcessor.sentinel.consumeSitDetected(),
+            isSitDetected = locationProcessor.consumeSitDetected(),
             nowRt = nowRt
         )
         

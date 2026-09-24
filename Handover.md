@@ -1,18 +1,19 @@
-# Forensic Resumption Snapshot - Sep.24.01
+# Forensic Resumption Snapshot - Sep.24.02
 
 ## 📂 Session Summary
 *   **Completed**:
-    *   **Issue #1233**: High Allocation Churn via Fast-Path Re-registration (R-ID 457).
-*   **Version**: Sep.24.01
-*   **Status**: High-frequency allocation churn fully resolved by optimizing `HardwareFastPath` updates to support nullable/optional callbacks during background ticks.
+    *   **Issue #1255**: Unreliable Monotonic Clock Recovery Across Reboots (R-ID 458).
+*   **Version**: Sep.24.02
+*   **Status**: Forensic timing continuity fully hardened. The system now detects reboots by comparing persisted wall-clock drift against the current session, preventing invalid monotonic references.
 
 ## 🔧 Technical Delta
-*   **HardwareSuite.kt**: Refactored `HardwareFastPath.update` method signature to support optional/nullable `callback` lambda inputs.
-*   **TrackerService.kt**: Omitted intermediate lambda declarations from `processTick` periodic calibration blocks, completely mitigating JVM memory footprint spikes and GC pressure.
+*   **HistoryManager.kt**: Implemented `recoverLastRealtime` to calculate synthetic RT anchors when drift divergence is detected (>5s).
+*   **TrackerService.kt / ViewerService.kt**: Refactored service initialization to utilize role-prefixed drift references (`T_clock_drift_ref` / `V_clock_drift_ref`).
+*   **TrackerService.kt**: Fixed a minor typo in sitting detection consumption (`locationProcessor.consumeSitDetected()`).
 
 ## 📍 Resumption Point for Next Session
-*   **Immediate Priority**: Proceed with **Issue #1255** (Unreliable Monotonic Clock Recovery Across Reboots).
-*   **Strategic Goal**: Solidify monotonic timing bounds under crash/restart/reboot conditions.
+*   **Immediate Priority**: Proceed with **Issue #1271** (Missing Persistence for Adaptive Vibration Floor).
+*   **Strategic Goal**: Ensure physical baseline sensitivity survives service restarts to eliminate false-positive tamper alerts.
 
 ## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 457 (Rules: 92, IDs: 457), Resolved: 1194, Open: 19, Testing: 3 (Sub-items: 12), Ideas: 17, QA: 284]**
+**Current Audit Baseline: [SOT: 458 (Rules: 92, IDs: 458), Resolved: 1195, Open: 18, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**
