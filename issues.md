@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.80
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.90
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -11,9 +11,7 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🟡 Medium Priority (UX, Performance & Auditability)
 
-*   **Issue #1306: Namespace Collision Risk for Viewer's Self-Tracking** (Inconsistency in #1230)
-    *   *Finding*: In `ViewerService`, the `V_` prefix is used for both the Viewer's session state (ticks) and the remote tracker's logic state (accuracy, baselines). This lack of separation prevents independent auditing of the Viewer's own device performance versus the remote tracker's performance.
-    *   *Contribution*: **Medium (Auditability)**. Segregates local telemetry from remote telemetry for cleaner post-mortem analysis.
+*   (None currently identified)
 
 ### 🔵 Low Priority (Forensic Precision)
 
@@ -100,6 +98,8 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1306: Namespace Collision Risk for Viewer's Self-Tracking** (Resolved Sep.24.90)
+    *   *Remediation*: Introduced the `"VR_"` (Viewer-Remote) prefix to strictly segregate the remote tracker's logic state (baselines, accuracy anchors, and alarm evaluation history) from the Viewer's local session telemetry. Updated `RemoteStatusRepository`, `SettingsRepository`, and `MainRepository` to support the new namespace, ensuring that remote peer baseline updates can no longer collide with or corrupt local device performance auditing (R-ID 469).
 *   **Issue #1305: Performance Risk: Synchronous Repository Writes on Vibration Floor Jitter** (Resolved Sep.24.80)
     *   *Remediation*: Transitioned high-frequency baseline updates (Vibration, Lux, Acoustic) from the service thread to a debounced, non-blocking coroutine model. Introduced persistent-save jobs with a 1000ms debounce window in both `TrackerService.kt` and `ViewerService.kt`, effectively eliminating tick-loop jitter and synchronous I/O stalls during intense physical vibration or environmental transitions (R-ID 468).
 *   **Issue #1272: Alarm Notification Leak in Tracker Mode** (Resolved Sep.24.70)
@@ -149,4 +149,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 468 (Rules: 92, IDs: 468), Resolved: 1211, Open: 7, Testing: 3 (Sub-items: 12), Ideas: 21, QA: 284]**
+- **Current Audit Baseline: [SOT: 469 (Rules: 92, IDs: 469), Resolved: 1212, Open: 6, Testing: 3 (Sub-items: 12), Ideas: 21, QA: 284]**

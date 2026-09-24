@@ -20,6 +20,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.24.90:
+ * - Issue #1306 REMEDIATION: Migrated remote tracker logic state keys to use the "VR_" namespace 
+ *   prefix, completely isolating remote telemetry auditing from the Viewer's local session ("V_") state.
  * Sep.24.80:
  * - Issue #1305 REMEDIATION: Transitioned high-frequency baseline updates (Vibration, Lux, Acoustic) 
  *   to a non-blocking coroutine debounce model to eliminate synchronous I/O tick loop jitter.
@@ -107,7 +110,7 @@ class ViewerService : BaseMonitorService() {
     }
 
     override suspend fun onServiceInitialize() {
-        // R-ID 453: Use role-based prefix for logic state isolation
+        // R-ID 453: Use role-based prefix for local session state isolation
         repository.saveLongSync("V_" + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
         repository.saveLongSync("V_" + LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime())
 
@@ -136,14 +139,14 @@ class ViewerService : BaseMonitorService() {
         
         val settingsSnapshot = repository.getSettingsSnapshot()
 
-        // R-ID 453: Apply namespace prefixes to all role-sensitive logic states
-        val savedMaxAcc = repository.getDouble("V_" + MAX_ACCURACY_KEY, 0.0)
-        val savedLastSitTs = repository.getLong("V_" + LAST_SIT_TS_KEY, 0L)
-        val savedBaseline = repository.getDouble("V_" + CHAIR_BASELINE_TILT_KEY, -1000.0)
-        val savedVibeFloor = repository.getDouble("V_" + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0)
-        val savedLuxBaseline = repository.getDouble("V_" + TRACKER_LUX_BASELINE_KEY, -1.0)
-        val savedAcousticFloor = repository.getDouble("V_" + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
-        val trackerState = repository.loadTrackerState("V_")
+        // Issue #1306: Apply "VR_" namespace prefixes to remote tracker's logic states
+        val savedMaxAcc = repository.getDouble("VR_" + MAX_ACCURACY_KEY, 0.0)
+        val savedLastSitTs = repository.getLong("VR_" + LAST_SIT_TS_KEY, 0L)
+        val savedBaseline = repository.getDouble("VR_" + CHAIR_BASELINE_TILT_KEY, -1000.0)
+        val savedVibeFloor = repository.getDouble("VR_" + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0)
+        val savedLuxBaseline = repository.getDouble("VR_" + TRACKER_LUX_BASELINE_KEY, -1.0)
+        val savedAcousticFloor = repository.getDouble("VR_" + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
+        val trackerState = repository.loadTrackerState("VR_")
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
         val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
         
@@ -168,13 +171,12 @@ class ViewerService : BaseMonitorService() {
         
         selfProcessor.loadState(0.0, 0L, -1000.0, null, homePoints, maxDist)
 
-        // Issue #1303: Decoupled local hardwareSuite from remote tracker sensitivity anchor.
-        // Local floor will re-adapt autonomously for the monitor device.
-
-        val savedAlarms = repository.getLastAlarmsJson("V_")
+        // Issue #1306: Use "VR_" prefix for remote tracker alarm logic tracking
+        val savedAlarms = repository.getLastAlarmsJson("VR_")
         alarmManager.restoreState(savedAlarms)
-        alarmManager.restoreLogicState(settingsSnapshot, "V_")
+        alarmManager.restoreLogicState(settingsSnapshot, "VR_")
 
+        // Viewer's own performance history remains isolated under "V_"
         historyManager.initialize(lifecycleScope, "V_")
         
         hardwareSuite.start()
@@ -317,7 +319,7 @@ class ViewerService : BaseMonitorService() {
                 )
             }
             is ProcessorEvent.MaxAccuracyChanged -> {
-                if (!isSelf) repository.saveDoubleSync("V_" + MAX_ACCURACY_KEY, event.accuracy)
+                if (!isSelf) repository.saveDoubleSync("VR_" + MAX_ACCURACY_KEY, event.accuracy)
             }
             is ProcessorEvent.ChairBaselineChanged -> {
                 val (lat, lng, maxAcc) = if (isSelf) {
@@ -336,7 +338,7 @@ class ViewerService : BaseMonitorService() {
                     vibrationFloorSaveJob?.cancel()
                     vibrationFloorSaveJob = lifecycleScope.launch(Dispatchers.Default) {
                         delay(1000L)
-                        repository.saveDouble("V_" + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
+                        repository.saveDouble("VR_" + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
                     }
                 }
             }
@@ -345,7 +347,7 @@ class ViewerService : BaseMonitorService() {
                     luxBaselineSaveJob?.cancel()
                     luxBaselineSaveJob = lifecycleScope.launch(Dispatchers.Default) {
                         delay(1000L)
-                        repository.saveDouble("V_" + TRACKER_LUX_BASELINE_KEY, event.baseline)
+                        repository.saveDouble("VR_" + TRACKER_LUX_BASELINE_KEY, event.baseline)
                     }
                 }
             }
@@ -354,7 +356,7 @@ class ViewerService : BaseMonitorService() {
                     acousticFloorSaveJob?.cancel()
                     acousticFloorSaveJob = lifecycleScope.launch(Dispatchers.Default) {
                         delay(1000L)
-                        repository.saveDouble("V_" + TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
+                        repository.saveDouble("VR_" + TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
                     }
                 }
             }
@@ -824,7 +826,7 @@ class ViewerService : BaseMonitorService() {
             distToHomeAuthority = distToHome,
             maxDistanceAuthority = remoteProcessor.getMaxDistanceAuthority(),
             capabilities = capabilities,
-            rolePrefix = "V_"
+            rolePrefix = "VR_"
         )
 
         alarmEvalJob?.cancel()

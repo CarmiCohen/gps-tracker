@@ -1,3 +1,15 @@
+# 🏛️ Resolution Archive - Sep.24.90
+
+## 🏁 Issue #1306: Namespace Collision Risk for Viewer's Self-Tracking
+*   **Resolved**: Sep.24.90
+*   **Root Cause**: In `ViewerService`, the `"V_"` prefix was used for both the Viewer's local session state (ticks, performance ribbons) and the remote tracker's logic state (baselines, accuracy anchors, alarm evaluation history). This shared namespace prevented independent auditing of the Viewer's own device performance versus the remote tracker's telemetry and created a risk where remote peer updates could inadvertently clear local tracking data.
+*   **Remediation**:
+    *   **RemoteStatusRepository.kt**: Migrated persistence keys to use the new `"VR_"` (Viewer-Remote) prefix for remote tracker state.
+    *   **SettingsRepository.kt / MainRepository.kt**: Added explicit support for the `"VR_"` prefix to the DataStore and Repository routing logic.
+    *   **ViewerService.kt**: Refactored the service initialization and alarm evaluation cycles to use `"VR_"` for remote telemetry state while maintaining `"V_"` for local session metrics.
+    *   **ConnectivitySuite.kt**: Hardened the `resetPeerStats()` method to clear the `"VR_"` partition when in Viewer mode, protecting the monitor device's autonomous physical baselines.
+*   **R-ID**: 469
+
 # 🏛️ Resolution Archive - Sep.24.80
 
 ## 🏁 Issue #1305: Performance Risk: Synchronous Repository Writes on Vibration Floor Jitter

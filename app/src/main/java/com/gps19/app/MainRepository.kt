@@ -28,6 +28,9 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Sep.24.90:
+ * - Issue #1306 REMEDIATION: Added support for "VR_" (Viewer-Remote) prefix to 
+ *   segregate remote tracker logic state from local viewer telemetry.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -53,6 +56,7 @@ class MainRepository @Inject constructor(
     private var lastAlarmAckTs: Long = 0L
     private var trackerAlarmAckTs: Long = 0L
     private var viewerAlarmAckTs: Long = 0L
+    private var viewerRemoteAlarmAckTs: Long = 0L
 
     private val violationProcessor = ViolationProcessor(timeProvider)
     private val metrics = RepositoryMetrics()
@@ -156,7 +160,6 @@ class MainRepository @Inject constructor(
         scope.launch { trackerAlarmAckTsFlow.collect { trackerAlarmAckTs = it } }
         scope.launch { viewerAlarmAckTsFlow.collect { viewerAlarmAckTs = it } }
         scope.launch { homePointsFlow.collect { cachedHomePoints = it } }
-        startUiHistoryEmitter()
     }
 
     suspend fun saveString(key: String, value: String) = settings.saveString(key, value)
@@ -166,6 +169,7 @@ class MainRepository @Inject constructor(
             LAST_ALARM_ACK_TS_KEY -> lastAlarmAckTs = value
             "T_$LAST_ALARM_ACK_TS_KEY" -> trackerAlarmAckTs = value
             "V_$LAST_ALARM_ACK_TS_KEY" -> viewerAlarmAckTs = value
+            "VR_$LAST_ALARM_ACK_TS_KEY" -> viewerRemoteAlarmAckTs = value
         }
         settings.saveLong(key, value)
     }
@@ -174,6 +178,7 @@ class MainRepository @Inject constructor(
             LAST_ALARM_ACK_TS_KEY -> lastAlarmAckTs = value
             "T_$LAST_ALARM_ACK_TS_KEY" -> trackerAlarmAckTs = value
             "V_$LAST_ALARM_ACK_TS_KEY" -> viewerAlarmAckTs = value
+            "VR_$LAST_ALARM_ACK_TS_KEY" -> viewerRemoteAlarmAckTs = value
         }
         scope.launch { settings.saveLong(key, value) }
     }
@@ -208,6 +213,7 @@ class MainRepository @Inject constructor(
         return when (rolePrefix) {
             "T_" -> trackerAlarmAckTs
             "V_" -> viewerAlarmAckTs
+            "VR_" -> viewerRemoteAlarmAckTs
             else -> lastAlarmAckTs
         }
     }

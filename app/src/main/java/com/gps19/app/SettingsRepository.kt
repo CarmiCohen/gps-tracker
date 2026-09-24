@@ -119,7 +119,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun saveString(keyName: String, value: String) {
         dataStore.mutate {
-            if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+            if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
                 this.putRoleStrings(keyName, value)
             } else {
                 when (keyName) {
@@ -136,7 +136,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun saveLong(keyName: String, value: Long) {
         dataStore.mutate {
-            if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+            if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
                 this.putRoleLongs(keyName, value)
             } else {
                 when (keyName) {
@@ -168,7 +168,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun saveDouble(keyName: String, value: Double) {
         dataStore.mutate {
-            if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+            if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
                 this.putRoleDoubles(keyName, value)
             } else {
                 when (keyName) {
@@ -185,7 +185,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun saveBoolean(keyName: String, value: Boolean) {
         dataStore.mutate {
-            if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+            if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
                 this.putRoleBools(keyName, value)
             } else {
                 when (keyName) {
@@ -204,7 +204,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun saveInt(keyName: String, value: Int) {
         dataStore.mutate {
-            if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+            if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
                 this.putRoleInts(keyName, value)
             } else {
                 when (keyName) {
@@ -219,7 +219,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getString(keyName: String, default: String): String {
         val settings = dataStore.data.first()
-        if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+        if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
             return settings.roleStringsMap.getOrDefault(keyName, default)
         }
         val value = when (keyName) {
@@ -234,7 +234,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getLong(keyName: String, default: Long): Long {
         val settings = dataStore.data.first()
-        if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+        if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
             return settings.roleLongsMap.getOrDefault(keyName, default)
         }
         val value = when (keyName) {
@@ -266,7 +266,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getDouble(keyName: String, default: Double): Double {
         val settings = dataStore.data.first()
-        if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+        if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
             return settings.roleDoublesMap.getOrDefault(keyName, default)
         }
         val value = when (keyName) {
@@ -283,7 +283,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getBoolean(keyName: String, default: Boolean): Boolean {
         val settings = dataStore.data.first()
-        if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+        if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
             return settings.roleBoolsMap.getOrDefault(keyName, default)
         }
         return when (keyName) {
@@ -301,7 +301,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getInt(keyName: String, default: Int): Int {
         val settings = dataStore.data.first()
-        if (keyName.startsWith("T_") || keyName.startsWith("V_")) {
+        if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
             return settings.roleIntsMap.getOrDefault(keyName, default)
         }
         val value = when (keyName) {

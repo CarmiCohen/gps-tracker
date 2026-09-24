@@ -28,6 +28,9 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.24.90:
+ * - Issue #1306 REMEDIATION: Aligned peer stats reset to clear the isolated "VR_" prefix 
+ *   instead of "V_" when running in Viewer mode to protect local self-tracking telemetry.
  * Sep.23.70:
  * - Issue #1230 REMEDIATION: Applied role-based namespace isolation ("T_"/"V_") to 
  *   status persistence and peer stat resets to prevent cross-role leakage (R-ID 453).
@@ -827,7 +830,7 @@ class ConnectivitySuite @Inject constructor(
                     satsView = data.optInt("sats_view", current.satsView), satsUsed = data.optInt("sats_used", current.satsUsed),
                     status = trackerStatus, isTamperDetected = isTrackerTamperDetected, isPowerTamper = isTrackerPowerTamper,
                     isLocationPending = isTrackerLocationPending, locationPendingReason = trackerLocationPendingReason,
-                    lastValidFixRt = lastFixRt, isBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false), isCoolingModeActive = data.optBoolean("is_cooling_mode_active", false),
+                    lastValidFixRt = lastFixRt, isBatterySteepDischarge = data.optBoolean("is_battery_step_discharge", false), isCoolingModeActive = data.optBoolean("is_cooling_mode_active", false),
                     isBatteryLow = data.optBoolean("is_battery_low", false), isBatteryCritical = data.optBoolean("is_battery_critical", false),
                     isPowerSaveMode = data.optBoolean("is_power_save_mode", current.isPowerSaveMode), standbyBucket = data.optInt("standby_bucket", current.standbyBucket), netInterface = data.optString("net_interface", current.netInterface),
                     isStorageLow = data.optBoolean("is_storage_low", current.isStorageLow), isStorageCritical = data.optBoolean("is_storage_critical", current.isStorageCritical), 
@@ -913,9 +916,9 @@ class ConnectivitySuite @Inject constructor(
         mainRepository.updateRemoteActivity(0L) 
         trackerGpsStallStartTs = 0L
         
-        // Issue #1230 REMEDIATION: Peer stats reset must use the "V_" prefix to 
-        // ensure remote baseline isolation (R-ID 453).
-        val prefix = if (isTrackerMode) "T_" else "V_" // Clear peer baselines
+        // Issue #1306 REMEDIATION: Peer stats reset must use the "VR_" prefix when in 
+        // Viewer mode to clear the remote baseline without corrupting local "V_" tracking baselines.
+        val prefix = if (isTrackerMode) "T_" else "VR_"
         mainRepository.saveDoubleSync(prefix + TRACKER_LUX_BASELINE_KEY, 0.0)
         mainRepository.saveDoubleSync(prefix + TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
     }
