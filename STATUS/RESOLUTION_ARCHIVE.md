@@ -1,4 +1,12 @@
-# 🏛️ Resolution Archive - Sep.24.00
+# 🏛️ Resolution Archive - Sep.24.01
+
+## 🏁 Issue #1233: High Allocation Churn via Fast-Path Re-registration
+*   **Resolved**: Sep.24.01
+*   **Root Cause**: Fast-path callbacks were being re-registered on every 2-second service tick, causing massive lambda instantiation overhead and allocation churn in the background thread.
+*   **Remediation**:
+    *   **HardwareSuite.kt**: Refactored `HardwareFastPath` to support nullable/optional callback updates, ensuring that parameters (baseline, thresholds) can be adjusted dynamically without needing to instantiate and pass new callback functions every iteration pass.
+    *   **TrackerService.kt**: Omitted the `onSpike` lambda callbacks during the periodic service tick routine, completely eliminating allocation loop overhead while preserving autonomous sensor thread adaptations.
+*   **R-ID**: 457
 
 ## 🏁 Issue #1232: Empty Stub Implementation of OEM Power Hardening Overrides
 *   **Resolved**: Sep.24.00
@@ -27,5 +35,5 @@
 ## 🏁 Issue #1230: Shared Storage Key Leakage & Cross-Role State Corruption
 *   **Resolved**: Sep.23.70
 *   **Root Cause**: `TrackerService` and `ViewerService` shared the same flat keys in `DataStore` for high-frequency logic state. Switching roles caused state "leakage".
-*   **Remediation**: Implemented type-specific namespaced maps (`role_longs`, `role_doubles`, etc.) in `app_settings.proto` and refactored the repository layer to enforce isolation via role-prefixes.
+*   **Remediation**: Implemented type-safe namespaced maps (`role_longs`, `role_doubles`, etc.) in `app_settings.proto` and refactored the repository layer to enforce isolation via role-prefixes.
 *   **R-ID**: 453

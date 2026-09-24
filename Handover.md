@@ -1,18 +1,18 @@
-# Forensic Resumption Snapshot - Sep.24.00
+# Forensic Resumption Snapshot - Sep.24.01
 
 ## 📂 Session Summary
-*   **Completed**: 
-    *   **Issue #1232**: Empty Stub Implementation of OEM Power Hardening Overrides (R-ID 421).
-    *   **DeviceHardeningStrategy.kt**: Converted cosmetic stubs into functional background continuity rules (Samsung/Huawei/Xiaomi).
-*   **Version**: Sep.24.00
-*   **Status**: Background infrastructure hardening for specialized OEM power saving features successfully completed and verified.
+*   **Completed**:
+    *   **Issue #1233**: High Allocation Churn via Fast-Path Re-registration (R-ID 457).
+*   **Version**: Sep.24.01
+*   **Status**: High-frequency allocation churn fully resolved by optimizing `HardwareFastPath` updates to support nullable/optional callbacks during background ticks.
 
 ## 🔧 Technical Delta
-*   **DeviceHardeningStrategy.kt**: Active WakeLock management and grid-aligned Watchdog scheduling are now fully executed based on vendor-specific hardware capabilities to completely stop OS-level service freezes and background suppression.
+*   **HardwareSuite.kt**: Refactored `HardwareFastPath.update` method signature to support optional/nullable `callback` lambda inputs.
+*   **TrackerService.kt**: Omitted intermediate lambda declarations from `processTick` periodic calibration blocks, completely mitigating JVM memory footprint spikes and GC pressure.
 
 ## 📍 Resumption Point for Next Session
-*   **Immediate Priority**: Proceed with **Issue #1233** (High Allocation Churn via Fast-Path Re-registration).
-*   **Strategic Goal**: Continue the background infrastructure hardening audit and performance tuning gaps.
+*   **Immediate Priority**: Proceed with **Issue #1255** (Unreliable Monotonic Clock Recovery Across Reboots).
+*   **Strategic Goal**: Solidify monotonic timing bounds under crash/restart/reboot conditions.
 
 ## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 456 (Rules: 92, IDs: 456), Resolved: 1193, Open: 20, Testing: 3 (Sub-items: 12), Ideas: 17, QA: 284]**
+**Current Audit Baseline: [SOT: 457 (Rules: 92, IDs: 457), Resolved: 1194, Open: 19, Testing: 3 (Sub-items: 12), Ideas: 17, QA: 284]**

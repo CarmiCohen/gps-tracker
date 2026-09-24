@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.22.30)
+# SOT Master Requirements & Hardening Status (Sep.24.01)
 
 ## 🏗️ Architectural Master Rules (22 Rules)
 
@@ -32,6 +32,7 @@
 *   **3.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (R212, R310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (R317).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 457**: Fast-Path Allocation Optimization - Refactored `HardwareFastPath` in `HardwareSuite.kt` to allow optional callback parameter assignment. Updated `TrackerService.kt` to omit callbacks inside the periodic tick iteration loop, fully mitigating high allocation churn and garbage collection pressure without degrading light or acoustic spike responses (R-ID 457). (Resolved Sep.24.01)
 *   **SOT ID 456**: Redundant Stream & Heartbeat Idempotency - Removed redundant reactive stream subscriptions in `ViewerService.kt`. The `ConnectivityEvent.PeerPulse` is now handled via a single observer, preventing duplicate state updates in `SessionManager` and eliminating redundant heartbeat log entries (R-ID 456). (Resolved Sep.23.80)
 *   **SOT ID 455**: Build Vitality & Reactive Stream Convergence - Implemented missing abstract members in `TrackerService`, fully hydrated `MainRepository` delegates for draft settings, and corrected `MainViewModel` flow typing to restore `.value` access. (Resolved Sep.23.72)
 *   **SOT ID 453**: Role-Based Storage Namespacing - Implemented physical isolation for logic state persistence using role-prefixed maps (`role_longs`, `role_doubles`, etc.) in `AppSettings`. Refactored `SettingsRepository` and `MainRepository` to route `"T_"` and `"V_"` prefixed keys to these isolated partitions, preventing state corruption and logic leakage when switching functional roles (Tracker vs Viewer) on the same hardware. (Resolved Sep.23.71)
@@ -167,14 +168,15 @@
 
 ## 4.3. Metric Summary
 - **Rules Verified**: 92
-- **Total SOT IDs**: 456
-- **Resolved Issues**: 1193
-- **Open Issues**: 20
+- **Total SOT IDs**: 457
+- **Resolved Issues**: 1194
+- **Open Issues**: 19
 - **Testing Coverage**: 3 (Sub-items: 12)
 - **Simplification Ideas**: 17
 - **QA Validation Tasks**: 284
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.91 (Fast-Path Allocation Optimization)**: PASSED - Refactored HardwareFastPath and TrackerService tick loop to eliminate allocation churn by making spike detection callbacks optional. (Sep.24.01)
 *   **Chapter 31.85 (Unified Hardware Lifecycle & Vendor Hardening)**: PASSED - Successfully implemented and verified functional background hardening logic in DeviceHardeningStrategy for Samsung, Huawei, and Xiaomi devices. (Sep.22.30)
 *   **Chapter 31.90 (Heartbeat Idempotency)**: PASSED - Verified that ConnectivityEvent.PeerPulse is processed via a single observer in ViewerService, preventing duplicate log events and session updates. (Sep.22.30)
 *   **Chapter 31.89 (Role-Based Storage Namespacing)**: PASSED - Successfully verified that Tracker and Viewer logic states are stored in isolated proto maps, preventing cross-role state corruption during functional transitions. (Sep.22.30)
@@ -220,4 +222,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite. (Sep.22.30)
 
 ---
-*Next Audit: Sep.24.10. (Sep.22.30)*
+*Next Audit: Sep.24.10. (Sep.24.01)*

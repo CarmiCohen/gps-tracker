@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.00
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.01
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -6,10 +6,6 @@ Finalizing the audit of background service stability and functional convergence 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
 ### Background Service Infrastructure & Hardening Gaps (Rigorous Audit of #1171)
-
-*   **Issue #1233: High Allocation Churn via Fast-Path Re-registration**
-    *   *Description*: Fast-path callbacks are re-registered on every service tick.
-    *   *Significance*: **Medium (CPU Tuning)**.
 
 *   **Issue #1255: Unreliable Monotonic Clock Recovery Across Reboots**
     *   *Description*: Monotonic drift reference is invalid across reboots.
@@ -39,6 +35,9 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1233: High Allocation Churn via Fast-Path Re-registration** (Resolved Sep.24.01)
+    *   *Remediation*: Refactored `HardwareFastPath` in `HardwareSuite.kt` to allow optional callback parameter assignment. Updated `TrackerService.kt` to omit callbacks inside the periodic tick iteration loop, fully mitigating high allocation churn and garbage collection pressure without degrading light or acoustic spike responses (R-ID 457).
+
 *   **Issue #1232: Empty Stub Implementation of OEM Power Hardening Overrides** (Resolved Sep.24.00)
     *   *Remediation*: Converted cosmetic stubs in `DeviceHardeningStrategy.kt` into functional hardening logic. Implemented Samsung and Huawei-specific WakeLock escalation and Watchdog re-alignment to prevent OS-level service termination (R-ID 421).
 *   **Issue #1231: Redundant Stream Overlap & Duplicate Heartbeat Processing in ViewerService** (Resolved Sep.23.80)
@@ -50,4 +49,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1236: Race Conditions and Premature Tick Execution** (Resolved Sep.23.70)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 456 (Rules: 92, IDs: 456), Resolved: 1193, Open: 20, Testing: 3 (Sub-items: 12), Ideas: 17, QA: 284]**
+- **Current Audit Baseline: [SOT: 457 (Rules: 92, IDs: 457), Resolved: 1194, Open: 19, Testing: 3 (Sub-items: 12), Ideas: 17, QA: 284]**
