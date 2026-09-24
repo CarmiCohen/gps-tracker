@@ -25,6 +25,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.24.80:
+ * - Issue #1305 REMEDIATION: Transitioned high-frequency baseline updates (Vibration, Lux, Acoustic) 
+ *   to a non-blocking coroutine debounce model to eliminate synchronous I/O tick loop jitter.
  * Sep.24.30:
  * - Issue #1307 REMEDIATION: Decoupled spike-triggered forensic captures from the sampling 
  *   rate delay by transitioning to a buffered channel with non-blocking timeout polling.
@@ -55,6 +58,10 @@ class TrackerService : BaseMonitorService() {
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
     private var forensicSamplingJob: Job? = null
+    
+    private var vibrationFloorSaveJob: Job? = null
+    private var luxBaselineSaveJob: Job? = null
+    private var acousticFloorSaveJob: Job? = null
     
     private val forensicTriggerChannel = kotlinx.coroutines.channels.Channel<Boolean>(kotlinx.coroutines.channels.Channel.BUFFERED)
 
@@ -306,13 +313,25 @@ class TrackerService : BaseMonitorService() {
                         repository.saveDouble("T_" + CHAIR_BASELINE_TILT_KEY, event.baseline)
                     }
                     is ProcessorEvent.VibrationFloorChanged -> {
-                        repository.saveDoubleSync("T_" + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
+                        vibrationFloorSaveJob?.cancel()
+                        vibrationFloorSaveJob = lifecycleScope.launch(Dispatchers.Default) {
+                            delay(1000L)
+                            repository.saveDouble("T_" + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
+                        }
                     }
                     is ProcessorEvent.LuxBaselineChanged -> {
-                        repository.saveDoubleSync("T_" + TRACKER_LUX_BASELINE_KEY, event.baseline)
+                        luxBaselineSaveJob?.cancel()
+                        luxBaselineSaveJob = lifecycleScope.launch(Dispatchers.Default) {
+                            delay(1000L)
+                            repository.saveDouble("T_" + TRACKER_LUX_BASELINE_KEY, event.baseline)
+                        }
                     }
                     is ProcessorEvent.AcousticFloorChanged -> {
-                        repository.saveDoubleSync("T_" + TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
+                        acousticFloorSaveJob?.cancel()
+                        acousticFloorSaveJob = lifecycleScope.launch(Dispatchers.Default) {
+                            delay(1000L)
+                            repository.saveDouble("T_" + TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
+                        }
                     }
                     else -> {}
                 }
@@ -889,6 +908,7 @@ class TrackerService : BaseMonitorService() {
 
     override fun onDestroy() {
         gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); revivalEventsJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel()
+        vibrationFloorSaveJob?.cancel(); luxBaselineSaveJob?.cancel(); acousticFloorSaveJob?.cancel()
         deviceProfileManager.teardownHardwareProfile(capabilities)
         super.onDestroy()
     }

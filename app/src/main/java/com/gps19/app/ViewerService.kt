@@ -20,6 +20,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.24.80:
+ * - Issue #1305 REMEDIATION: Transitioned high-frequency baseline updates (Vibration, Lux, Acoustic) 
+ *   to a non-blocking coroutine debounce model to eliminate synchronous I/O tick loop jitter.
  * Sep.24.60:
  * - Issue #1308 REMEDIATION: Implemented Forensic Sampling Loop in ViewerService.
  *   Ensures local environment forensic parity with Tracker role (R-ID 466).
@@ -56,6 +59,10 @@ class ViewerService : BaseMonitorService() {
     private var gnssDetailJob: Job? = null
     private var revivalEventsJob: Job? = null
     private var forensicSamplingJob: Job? = null
+    
+    private var vibrationFloorSaveJob: Job? = null
+    private var luxBaselineSaveJob: Job? = null
+    private var acousticFloorSaveJob: Job? = null
     
     private val forensicTriggerChannel = Channel<Boolean>(Channel.BUFFERED)
 
@@ -325,13 +332,31 @@ class ViewerService : BaseMonitorService() {
                     lat = lat, lng = lng, accuracy = maxAcc)
             }
             is ProcessorEvent.VibrationFloorChanged -> {
-                if (!isSelf) repository.saveDoubleSync("V_" + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
+                if (!isSelf) {
+                    vibrationFloorSaveJob?.cancel()
+                    vibrationFloorSaveJob = lifecycleScope.launch(Dispatchers.Default) {
+                        delay(1000L)
+                        repository.saveDouble("V_" + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
+                    }
+                }
             }
             is ProcessorEvent.LuxBaselineChanged -> {
-                if (!isSelf) repository.saveDoubleSync("V_" + TRACKER_LUX_BASELINE_KEY, event.baseline)
+                if (!isSelf) {
+                    luxBaselineSaveJob?.cancel()
+                    luxBaselineSaveJob = lifecycleScope.launch(Dispatchers.Default) {
+                        delay(1000L)
+                        repository.saveDouble("V_" + TRACKER_LUX_BASELINE_KEY, event.baseline)
+                    }
+                }
             }
             is ProcessorEvent.AcousticFloorChanged -> {
-                if (!isSelf) repository.saveDoubleSync("V_" + TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
+                if (!isSelf) {
+                    acousticFloorSaveJob?.cancel()
+                    acousticFloorSaveJob = lifecycleScope.launch(Dispatchers.Default) {
+                        delay(1000L)
+                        repository.saveDouble("V_" + TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
+                    }
+                }
             }
             is ProcessorEvent.GpsStallDetected -> {
                 if (isSelf) logManager.logServiceEvent(m = "GPS STALL: Fix unchanged for >1s", isImportant = false)
@@ -484,6 +509,8 @@ class ViewerService : BaseMonitorService() {
                 lastForensicTilt = 0.0
                 lastWasCooling = false
                 coolingEnteredRt = 0L
+                
+                vibrationFloorSaveJob?.cancel(); luxBaselineSaveJob?.cancel(); acousticFloorSaveJob?.cancel()
             }
         )
     }
@@ -808,6 +835,7 @@ class ViewerService : BaseMonitorService() {
 
     override fun onDestroy() {
         gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); revivalEventsJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel()
+        vibrationFloorSaveJob?.cancel(); luxBaselineSaveJob?.cancel(); acousticFloorSaveJob?.cancel()
         deviceProfileManager.teardownHardwareProfile(capabilities)
         super.onDestroy()
     }

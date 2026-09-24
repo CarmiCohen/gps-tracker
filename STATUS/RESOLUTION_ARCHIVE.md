@@ -1,3 +1,16 @@
+# 🏛️ Resolution Archive - Sep.24.80
+
+## 🏁 Issue #1305: Performance Risk: Synchronous Repository Writes on Vibration Floor Jitter
+*   **Resolved**: Sep.24.80
+*   **Root Cause**: `LocationProcessor` emitted `VibrationFloorChanged`, `LuxBaselineChanged`, and `AcousticFloorChanged` events for minor drifts. Both `TrackerService` and `ViewerService` handled these events by calling `repository.saveDoubleSync`, which performed synchronous I/O on the service thread. In high-vibration or variable light environments, this caused excessive blocking calls, leading to tick-loop jitter and performance degradation.
+*   **Remediation**:
+    *   **TrackerService.kt / ViewerService.kt**: Refactored processor event handling to use a debounced, non-blocking coroutine model.
+    *   **TrackerService.kt / ViewerService.kt**: Introduced `vibrationFloorSaveJob`, `luxBaselineSaveJob`, and `acousticFloorSaveJob` using `lifecycleScope.launch`.
+    *   **TrackerService.kt / ViewerService.kt**: Implemented a 1000ms debounce window for these persistence updates. Subsequent rapid events now cancel the previous job and restart the timer, ensuring only the final stable value is written to DataStore.
+    *   **TrackerService.kt / ViewerService.kt**: Transitioned from `saveDoubleSync` to the non-blocking `saveDouble` suspend function within the launched jobs.
+    *   **TrackerService.kt / ViewerService.kt**: Hardened service teardown and session resets to explicitly cancel these pending save jobs.
+*   **R-ID**: 468
+
 # 🏛️ Resolution Archive - Sep.24.70
 
 ## 🏁 Issue #1272: Alarm Notification Leak in Tracker Mode

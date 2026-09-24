@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.70
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.80
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -11,9 +11,6 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🟡 Medium Priority (UX, Performance & Auditability)
 
-*   **Issue #1305: Performance Risk: Synchronous Repository Writes on Vibration Floor Jitter** (Risk in #1271)
-    *   *Finding*: `LocationProcessor` emits a `VibrationFloorChanged` event for every drift >0.01g, which triggers a `saveDoubleSync` in the repository. On high-vibration environments, this can lead to excessive synchronous I/O on the service thread, potentially causing tick-loop jitter.
-    *   *Contribution*: **Medium (Performance)**. Smooths out CPU usage and prevents "UI stutter" during intense physical monitoring.
 *   **Issue #1306: Namespace Collision Risk for Viewer's Self-Tracking** (Inconsistency in #1230)
     *   *Finding*: In `ViewerService`, the `V_` prefix is used for both the Viewer's session state (ticks) and the remote tracker's logic state (accuracy, baselines). This lack of separation prevents independent auditing of the Viewer's own device performance versus the remote tracker's performance.
     *   *Contribution*: **Medium (Auditability)**. Segregates local telemetry from remote telemetry for cleaner post-mortem analysis.
@@ -103,6 +100,8 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1305: Performance Risk: Synchronous Repository Writes on Vibration Floor Jitter** (Resolved Sep.24.80)
+    *   *Remediation*: Transitioned high-frequency baseline updates (Vibration, Lux, Acoustic) from the service thread to a debounced, non-blocking coroutine model. Introduced persistent-save jobs with a 1000ms debounce window in both `TrackerService.kt` and `ViewerService.kt`, effectively eliminating tick-loop jitter and synchronous I/O stalls during intense physical vibration or environmental transitions (R-ID 468).
 *   **Issue #1272: Alarm Notification Leak in Tracker Mode** (Resolved Sep.24.70)
     *   *Remediation*: Hardened `AppAlarmManager` state cleanup by ensuring `restoreState()` completely flushes in-memory active alarms before early returns. Explicitly updates and resets the `isTrackerMode` role gating flag upon logic state recovery to prevent unexpected "Siren Jumps" during transitions from Tracker to Viewer modes (R-ID 467).
 *   **Issue #1308: Missing Forensics Trace Collection in ViewerService** (Resolved Sep.24.60)
@@ -150,4 +149,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 467 (Rules: 92, IDs: 467), Resolved: 1210, Open: 8, Testing: 3 (Sub-items: 12), Ideas: 21, QA: 284]**
+- **Current Audit Baseline: [SOT: 468 (Rules: 92, IDs: 468), Resolved: 1211, Open: 7, Testing: 3 (Sub-items: 12), Ideas: 21, QA: 284]**
