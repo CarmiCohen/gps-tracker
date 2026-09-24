@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import org.osmdroid.util.GeoPoint
@@ -28,6 +29,9 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Sep.24.93:
+ * - Issue #1265 REMEDIATION: Added getLocalLocationSync, getTrackerLocationSync, 
+ *   and saveDoubleDebounced to support unified event orchestration.
  * Sep.24.90:
  * - Issue #1306 REMEDIATION: Added support for "VR_" (Viewer-Remote) prefix to 
  *   segregate remote tracker logic state from local viewer telemetry.
@@ -64,6 +68,8 @@ class MainRepository @Inject constructor(
     private val trackerPointCache = ShadowCache<Long, TrailPoint>(3000)
     private val viewerPointCache = ShadowCache<Long, TrailPoint>(3000)
 
+    private val debounceJobs = ConcurrentHashMap<String, Job>()
+
     companion object {
         const val DEFAULT_RELAY_URL = SettingsRepository.DEFAULT_RELAY_URL
         const val DEFAULT_TRACKER_ID = SettingsRepository.DEFAULT_TRACKER_ID
@@ -78,6 +84,7 @@ class MainRepository @Inject constructor(
         private const val PRUNE_LIMIT_TRAIL = 2000
         private const val PRUNE_LIMIT_VIOLATIONS = 1000
         private const val PRUNE_CHUNK_SIZE = 500
+        private const val SAVE_DEBOUNCE_MS = 1000L
     }
 
     val isRelayConnected = telemetry.isRelayConnected
@@ -129,6 +136,9 @@ class MainRepository @Inject constructor(
     fun updateRemoteActivity(ts: Long) { telemetry.updateRemoteActivity(ts) }
     fun updateGnssDetail(detail: GnssDetail?) { telemetry.updateGnssDetail(detail) }
 
+    fun getLocalLocationSync(): LocationUpdate = telemetry.localLocation.value
+    fun getTrackerLocationSync(): LocationUpdate = telemetry.trackerLocation.value
+
     fun clear() { telemetry.clear() }
 
     val appModeFlow = settings.appModeFlow
@@ -160,6 +170,7 @@ class MainRepository @Inject constructor(
         scope.launch { trackerAlarmAckTsFlow.collect { trackerAlarmAckTs = it } }
         scope.launch { viewerAlarmAckTsFlow.collect { viewerAlarmAckTs = it } }
         scope.launch { homePointsFlow.collect { cachedHomePoints = it } }
+        startUiHistoryEmitter()
     }
 
     suspend fun saveString(key: String, value: String) = settings.saveString(key, value)
@@ -184,6 +195,16 @@ class MainRepository @Inject constructor(
     }
     suspend fun saveDouble(key: String, value: Double) = settings.saveDouble(key, value)
     fun saveDoubleSync(key: String, value: Double) { scope.launch { settings.saveDouble(key, value) } }
+    
+    fun saveDoubleDebounced(key: String, value: Double) {
+        debounceJobs[key]?.cancel()
+        debounceJobs[key] = scope.launch {
+            delay(SAVE_DEBOUNCE_MS)
+            settings.saveDouble(key, value)
+            debounceJobs.remove(key)
+        }
+    }
+
     suspend fun saveBoolean(key: String, value: Boolean) = settings.saveBoolean(key, value)
     fun saveBooleanSync(key: String, value: Boolean) { scope.launch { settings.saveBoolean(key, value) } }
     suspend fun saveInt(key: String, value: Int) = settings.saveInt(key, value)

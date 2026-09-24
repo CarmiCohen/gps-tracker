@@ -6,9 +6,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -33,16 +31,12 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.24.93:
+ * - Issue #1265 REMEDIATION: Converted siren state into a reactive flow 
+ *   (isSirenRequired) to support centralized orchestration via AppEventCoordinator.
+ *   Removed direct AudioSynthesizer calls from the evaluation loop (R-ID 472).
  * Sep.24.70:
- * - Issue #1272 REMEDIATION: Fixed state leak during role transitions by ensuring 
- *   restoreState always clears in-memory alarms before early returns. Explicitly resets 
- *   isTrackerMode on role restoration to prevent siren jumps (R-ID 467).
- * Sep.24.20:
- * - Issue #1256 / #1260 REMEDIATION: Implemented Boot-ID validation check inside 
- *   restoreLogicState to invalidate obsolete monotonic latches across reboots.
- * Sep.23.70:
- * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation (prefix support)
- *   for logic state persistence to prevent cross-role state corruption (R-ID 453).
+ * - Issue #1272 REMEDIATION: Fixed state leak during role transitions.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -50,8 +44,7 @@ class AppAlarmManager @Inject constructor(
     private val repository: MainRepository,
     private val sessionManager: SessionManager,
     private val notificationManager: AppNotificationManager,
-    private val timeProvider: TimeProvider,
-    private val audioSynthesizer: AudioSynthesizer
+    private val timeProvider: TimeProvider
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     
@@ -60,6 +53,9 @@ class AppAlarmManager @Inject constructor(
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
     val alarmEvents: SharedFlow<AlarmEvent> = _alarmEvents.asSharedFlow()
+
+    private val _isSirenRequired = MutableStateFlow(false)
+    val isSirenRequired: StateFlow<Boolean> = _isSirenRequired.asStateFlow()
 
     private val activeAlarms = mutableMapOf<String, AlarmEvaluation>()
     private var lastAlarmsJson = "[]"
@@ -82,6 +78,7 @@ class AppAlarmManager @Inject constructor(
 
     fun updateSettings(settings: AlertSettings) {
         this.currentSettings = settings
+        updateSirenRequirement()
     }
 
     fun getSettings(): AlertSettings = currentSettings
@@ -91,6 +88,7 @@ class AppAlarmManager @Inject constructor(
             this.powerAlarmPending = pending
             this.currentRolePrefix = rolePrefix
             saveLogicState()
+            updateSirenRequirement()
         }
     }
 
@@ -100,20 +98,21 @@ class AppAlarmManager @Inject constructor(
         }
     }
 
-    fun shouldPlaySiren(): Boolean {
+    fun shouldPlaySiren(silencedUntilRt: Long = 0L): Boolean {
         if (isTrackerMode) return false
         if (currentSettings.globalMute) return false
         if (!hasUnresolvedAlarms()) return false
         val nowRt = timeProvider.elapsedRealtime()
         
         if (lastSirenStopRt > 0L && nowRt - lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS) return false
-        if (nowRt < audioSynthesizer.getSilencedUntilRt()) return false
+        if (nowRt < silencedUntilRt) return false
         return true
     }
     
     fun notifySirenManualStop() {
         lastSirenStopRt = timeProvider.elapsedRealtime()
         saveLogicState()
+        updateSirenRequirement()
     }
 
     fun restoreState(json: String) {
@@ -122,6 +121,7 @@ class AppAlarmManager @Inject constructor(
         }
         if (json.isEmpty() || json == "[]") {
             lastAlarmsJson = "[]"
+            updateSirenRequirement()
             return
         }
         try {
@@ -147,12 +147,9 @@ class AppAlarmManager @Inject constructor(
         } catch (e: Exception) {
             Timber.e(e, "Siren Persistence: Failed to restore alarm state")
         }
+        updateSirenRequirement()
     }
 
-    /**
-     * restoreLogicState: Restores geofence debounce and power latches from AppSettings.
-     * Sep.24.20 (Issue #1256): Validates Boot-ID to prevent stale monotonic latches.
-     */
     fun restoreLogicState(s: AppSettings, rolePrefix: String = "") {
         this.currentRolePrefix = rolePrefix
         this.isTrackerMode = (rolePrefix == "T_")
@@ -179,18 +176,15 @@ class AppAlarmManager @Inject constructor(
             evaluationState.forensicReliabilityDegradationStartRt = s.roleLongsMap.getOrDefault(rolePrefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, 0L)
         }
 
-        // Boot-ID Validation Check
         val savedBootId = s.roleStringsMap.getOrDefault(rolePrefix + "boot_id", "")
         val currentBootId = timeProvider.getBootId()
         if (savedBootId.isNotEmpty() && savedBootId != currentBootId) {
-            Timber.w("Reboot detected for role $rolePrefix! Invalidating obsolete monotonic latches.")
             firstViolationRt = 0L
             lastSirenStopRt = 0L
             lastGlobalTriggerRt = 0L
             evaluationState.forensicReliabilityDegradationStartRt = 0L
             saveLogicState()
         } else if (savedBootId.isEmpty()) {
-            // Seed the boot ID for the first time
             saveLogicState()
         }
         
@@ -200,7 +194,7 @@ class AppAlarmManager @Inject constructor(
         evaluationState.wasDistanceViolated = wasDistanceViolated
         evaluationState.distanceViolationCounter = distanceViolationCounter
         
-        Timber.i("Logic State Restored ($rolePrefix): GeoCounter: $distanceViolationCounter, WasViolated: $wasDistanceViolated")
+        updateSirenRequirement()
     }
 
     private fun saveLogicState() {
@@ -252,22 +246,11 @@ class AppAlarmManager @Inject constructor(
         )
         
         processViolationReport(report, serviceContext.now, serviceContext.nowRt, versionTag, telemetry.lat, telemetry.lng, telemetry.accuracy, telemetry.maxAccuracy, telemetry.snrSnapshot, telemetry.vibeSnapshot)
+        updateSirenRequirement()
+    }
 
-        val needsSiren = shouldPlaySiren()
-        val isCurrentlyPlaying = audioSynthesizer.isPlaying()
-
-        if (needsSiren && !isCurrentlyPlaying) {
-            audioSynthesizer.playSiren(
-                timeProvider = timeProvider,
-                isTrackerMode = isTrackerMode,
-                vibrate = true,
-                force = true
-            )
-        } else if (!needsSiren && isCurrentlyPlaying) {
-            if (!hasUnresolvedAlarms() || isTrackerMode || currentSettings.globalMute) {
-                audioSynthesizer.stopSiren(timeProvider = timeProvider)
-            }
-        }
+    private fun updateSirenRequirement() {
+        _isSirenRequired.value = shouldPlaySiren()
     }
 
     private fun syncEvaluationState(
@@ -441,6 +424,7 @@ class AppAlarmManager @Inject constructor(
             while (iterator.hasNext()) { if (iterator.next().value.isResolved) iterator.remove() }
         }
         updateAlarmsJson()
+        updateSirenRequirement()
     }
 
     private fun updateAlarmsJson() {
@@ -513,6 +497,7 @@ class AppAlarmManager @Inject constructor(
         
         lastGlobalTriggerRt = 0L
         saveLogicState()
+        updateSirenRequirement()
     }
 
     private data class AlarmEvaluation(

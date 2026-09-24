@@ -23,16 +23,20 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.24.93:
+ * - Issue #1265 REMEDIATION: Integrated AppEventCoordinator to offload domain 
+ *   event orchestration. Cleaned up redundant observers for alarms, integrity, 
+ *   and forensics (R-ID 472).
  * Sep.24.92:
- * - Issue #1261 REMEDIATION: Consolidated TrackerService and ViewerService into a single 
- *   reactive engine. Merged redundant boilerplate for stream observation, tick loops, 
- *   and forensic sampling into a unified lifecycle (R-ID 471).
+ * - Issue #1261 REMEDIATION: Consolidated TrackerService and ViewerService into 
+ *   a single reactive engine. Merged redundant boilerplate (R-ID 471).
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
 
     @Inject lateinit var sessionCoordinator: SessionLifecycleCoordinator
     @Inject lateinit var deviceProfileManager: DeviceProfileManager
+    @Inject lateinit var eventCoordinator: AppEventCoordinator
 
     private var activeMode: String? = null
     private var rolePrefix: String = "T_"
@@ -44,10 +48,6 @@ class MonitorService : BaseMonitorService() {
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
     private var forensicSamplingJob: Job? = null
-    
-    private var vibrationFloorSaveJob: Job? = null
-    private var luxBaselineSaveJob: Job? = null
-    private var acousticFloorSaveJob: Job? = null
     
     private val forensicTriggerChannel = Channel<Boolean>(Channel.BUFFERED)
     private val forensicCaptureMutex = Mutex()
@@ -106,7 +106,16 @@ class MonitorService : BaseMonitorService() {
         refreshCapabilitiesInternal()
         deviceProfileManager.initializeHardwareProfile(capabilities, configManager.deviceId)
 
-        setupObservers()
+        eventCoordinator.start(
+            alarmManager = alarmManager,
+            hardwareSuite = hardwareSuite,
+            connectivitySuite = connectivitySuite,
+            commandRouter = commandRouter,
+            primaryProcessor = primaryProcessor,
+            remoteProcessor = remoteProcessor
+        )
+
+        setupServiceObservers()
 
         if (!isTrackerMode) {
             remoteProcessor?.let { connectivitySuite.updateRemoteProcessor(it) }
@@ -193,113 +202,11 @@ class MonitorService : BaseMonitorService() {
         }
     }
 
-    private fun setupObservers() {
+    private fun setupServiceObservers() {
         lifecycleScope.launch(Dispatchers.Default) {
-            launch { observeAlarmEvents() }
-            launch { observeIntegrityEvents() }
-            launch { observeProcessorEvents() }
             launch { observeConnectivityEvents() }
-            launch { observeHistoryEvents() }
-            launch { observeSensorEvents() }
             launch { observeCommandEvents() }
-            launch { observeRevivalEvents() }
             launch { observeSettingsChanges() }
-        }
-    }
-
-    private suspend fun observeAlarmEvents() {
-        alarmManager.alarmEvents.collect { event ->
-            if (event is AlarmEvent.LogEvent) {
-                logManager.submitToLogSink(
-                    message = event.message, type = event.type, isImportant = event.isImportant,
-                    extremeValue = event.extremeValue, localId = event.logId, durationMs = event.durationMs,
-                    isSpecial = event.isSpecial, specialColor = event.specialColor,
-                    lat = event.lat, lng = event.lng, accuracy = event.accuracy,
-                    maxAccuracy = event.maxAccuracy, snr = event.snr, vibe = event.vibe
-                )
-            }
-        }
-    }
-
-    private suspend fun observeIntegrityEvents() {
-        integrityMonitor.integrityEvents.collect { event ->
-            when (event) {
-                is IntegrityEvent.ViolationSustained -> {
-                    if (isTrackerMode && event.type == ALERT_ID_TRACKER_POWER) alarmManager.setPowerAlarmPending(true, "T_")
-                }
-                is IntegrityEvent.ViolationResolved -> {
-                    if (isTrackerMode && event.type == ALERT_ID_TRACKER_POWER) alarmManager.setPowerAlarmPending(false, "T_")
-                }
-                is IntegrityEvent.LogEvent -> {
-                    val isSpecial = event.message.contains("tamper", ignoreCase = true) || 
-                                   event.message.contains("confirmed", ignoreCase = true) || 
-                                   event.message.contains("EMERGENCY", ignoreCase = true) || 
-                                   event.message.contains("ENERGY AUDIT", ignoreCase = true)
-                    logManager.logServiceEvent(m = event.message, isImportant = event.isImportant, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
-                }
-            }
-        }
-    }
-
-    private suspend fun observeProcessorEvents() {
-        coroutineScope {
-            launch { primaryProcessor.processorEvents.collect { handleProcessorEvent(it, true) } }
-            remoteProcessor?.let { launch { it.processorEvents.collect { handleProcessorEvent(it, false) } } }
-        }
-    }
-
-    private suspend fun handleProcessorEvent(event: ProcessorEvent, isPrimary: Boolean) {
-        val prefix = if (isTrackerMode) "T_" else (if (isPrimary) "V_" else "VR_")
-        val logPrefix = if (!isTrackerMode && isPrimary) "[Self] " else ""
-        
-        when (event) {
-            is ProcessorEvent.TrailPointSaved -> {
-                repository.saveTrailPoint(event.lat, event.lng, event.isViewerTrail, event.status, event.timestamp, accuracy = event.accuracy, maxAccuracy = event.maxAccuracy)
-            }
-            is ProcessorEvent.LogAdded -> {
-                val specialColor = if (event.isSpecial || event.message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
-                logManager.submitToLogSink(
-                    message = logPrefix + event.message, type = event.type, isImportant = event.isImportant,
-                    isSpecial = event.isSpecial || event.message.contains("Merge-on-Stale"),
-                    specialColor = specialColor, lat = event.lat, lng = event.lng,
-                    accuracy = event.accuracy, snr = event.snr, vibe = event.vibe
-                )
-            }
-            is ProcessorEvent.MaxAccuracyChanged -> {
-                if (isTrackerMode || !isPrimary) repository.saveDoubleSync(prefix + MAX_ACCURACY_KEY, event.accuracy)
-            }
-            is ProcessorEvent.ChairBaselineChanged -> {
-                val (lat, lng, acc) = if (isTrackerMode || isPrimary) {
-                    val proc = lastProcessedLocation
-                    Triple(proc?.optimizedPoint?.lat ?: 0.0, proc?.optimizedPoint?.lng ?: 0.0, proc?.maxAccuracy ?: 0.0)
-                } else {
-                    val status = connectivitySuite.trackerStatus
-                    Triple(status.lat, status.lng, status.maxAccuracy)
-                }
-                logManager.logServiceEvent(m = "Passive Zeroing: Chair baseline calibrated to ${event.baseline.roundToOneDecimal()}°", lat = lat, lng = lng, accuracy = acc)
-                if (isTrackerMode || !isPrimary) repository.saveDouble(prefix + CHAIR_BASELINE_TILT_KEY, event.baseline)
-            }
-            is ProcessorEvent.VibrationFloorChanged -> {
-                if (isTrackerMode || !isPrimary) {
-                    vibrationFloorSaveJob?.cancel()
-                    vibrationFloorSaveJob = lifecycleScope.launch(Dispatchers.Default) { delay(1000L); repository.saveDouble(prefix + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor) }
-                }
-            }
-            is ProcessorEvent.LuxBaselineChanged -> {
-                if (isTrackerMode || !isPrimary) {
-                    luxBaselineSaveJob?.cancel()
-                    luxBaselineSaveJob = lifecycleScope.launch(Dispatchers.Default) { delay(1000L); repository.saveDouble(prefix + TRACKER_LUX_BASELINE_KEY, event.baseline) }
-                }
-            }
-            is ProcessorEvent.AcousticFloorChanged -> {
-                if (isTrackerMode || !isPrimary) {
-                    acousticFloorSaveJob?.cancel()
-                    acousticFloorSaveJob = lifecycleScope.launch(Dispatchers.Default) { delay(1000L); repository.saveDouble(prefix + TRACKER_ACOUSTIC_FLOOR_KEY, event.floor) }
-                }
-            }
-            is ProcessorEvent.GpsStallDetected -> {
-                if (!isTrackerMode && isPrimary) logManager.logServiceEvent(m = "GPS STALL: Fix unchanged for >1s", isImportant = false)
-            }
         }
     }
 
@@ -307,24 +214,6 @@ class MonitorService : BaseMonitorService() {
         connectivitySuite.connectivityEvents.collect { event ->
             if (event is ConnectivityEvent.PeerPulse) {
                 if (isTrackerMode) handleViewerPulse(event.id) else handleTrackerPulse(event.id)
-            }
-        }
-    }
-
-    private suspend fun observeHistoryEvents() {
-        historyManager.historyEvents.collect { event ->
-            if (event is HistoryEvent.LogEvent) logManager.logServiceEvent(m = event.message, isImportant = event.isImportant)
-        }
-    }
-
-    private suspend fun observeSensorEvents() {
-        hardwareSuite.sensorEvents.collect { event ->
-            when (event) {
-                is AppSensorEvent.HardwareFailure -> {
-                    val proc = lastProcessedLocation
-                    logManager.logServiceEvent(m = "CRITICAL: SENSOR_HARDWARE_FAILURE - ${event.reason}", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-                }
-                is AppSensorEvent.LogEvent -> logManager.logServiceEvent(m = event.message, isImportant = event.isImportant)
             }
         }
     }
@@ -339,27 +228,6 @@ class MonitorService : BaseMonitorService() {
                 is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); lifecycleScope.launch { hardwareSuite.start() } }
                 is CommandEvent.ExecuteStressTest -> if (isTrackerMode) executeAutomatedStressTest()
                 is CommandEvent.SimulateStoragePressure -> {}
-            }
-        }
-    }
-
-    private suspend fun observeRevivalEvents() {
-        hardwareSuite.revivalEvents.collect { event ->
-            val roleTag = if (isTrackerMode) "" else "(V) "
-            when (event) {
-                is HardwareSuite.RevivalEvent.Footprint -> {
-                    val msg = "ENERGY AUDIT ${roleTag}: Revival Footprint - Delta: ${event.deltaMa}mA, Temp Rise: ${event.deltaTemp}°C, Duration: ${event.durationMs}ms"
-                    val proc = lastProcessedLocation
-                    logManager.submitToLogSink(msg, "system", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-                }
-                is HardwareSuite.RevivalEvent.HardwareLock -> {
-                    val proc = lastProcessedLocation
-                    logManager.logServiceEvent(m = "CRITICAL ${roleTag}: GPS_HARDWARE_LOCK - All revival attempts failed. Hardware stall confirmed.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0)
-                }
-                is HardwareSuite.RevivalEvent.Attempt -> logManager.logServiceEvent(m = "GPS REVIVAL ${roleTag}: Hardware restart attempt ${event.count} triggered.", isImportant = false)
-                is HardwareSuite.RevivalEvent.Success -> logManager.logServiceEvent(m = "GPS REVIVAL ${roleTag}: Hardware fix restored successfully.", isImportant = true)
-                is HardwareSuite.RevivalEvent.RawBurstStarted -> {}
-                is HardwareSuite.RevivalEvent.RawBurstEnded -> {}
             }
         }
     }
@@ -465,8 +333,6 @@ class MonitorService : BaseMonitorService() {
                 lastFastPathAcousticSpikeTs = 0L; lastFastPathLightSpikeTs = 0L
                 setupPhysicalFastPaths()
                 locationBuffer.clear()
-            } else {
-                vibrationFloorSaveJob?.cancel(); luxBaselineSaveJob?.cancel(); acousticFloorSaveJob?.cancel()
             }
         })
     }
@@ -678,8 +544,8 @@ class MonitorService : BaseMonitorService() {
     private fun triggerForensicSample(isSpike: Boolean = false) { forensicTriggerChannel.trySend(isSpike) }
 
     private fun setupPhysicalFastPaths() {
-        hardwareSuite.setAcousticFastPath(floor = primaryProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0, onSpike = { logManager.logServiceEvent(m = "Acoustic Spike Detected (FastPath)", isImportant = false); lastFastPathAcousticSpikeTs = timeProvider.elapsedRealtime(); triggerForensicSample(isSpike = true) })
-        hardwareSuite.setLightFastPath(baseline = primaryProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP, onSpike = { logManager.logServiceEvent(m = "Light Spike Detected (FastPath)", isImportant = false); lastFastPathLightSpikeTs = timeProvider.elapsedRealtime(); triggerForensicSample(isSpike = true) })
+        hardwareSuite.setAcousticFastPath(floor = primaryProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0, onSpike = { lastFastPathAcousticSpikeTs = timeProvider.elapsedRealtime(); triggerForensicSample(isSpike = true) })
+        hardwareSuite.setLightFastPath(baseline = primaryProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP, onSpike = { lastFastPathLightSpikeTs = timeProvider.elapsedRealtime(); triggerForensicSample(isSpike = true) })
     }
 
     private suspend fun refreshCapabilitiesInternal() {
@@ -701,7 +567,7 @@ class MonitorService : BaseMonitorService() {
     }
 
     override fun onDestroy() {
-        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); revivalEventsJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel(); vibrationFloorSaveJob?.cancel(); luxBaselineSaveJob?.cancel(); acousticFloorSaveJob?.cancel()
+        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); revivalEventsJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel()
         deviceProfileManager.teardownHardwareProfile(capabilities); super.onDestroy()
     }
 

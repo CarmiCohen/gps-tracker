@@ -1,3 +1,15 @@
+# 🏛️ Resolution Archive - Sep.24.93
+
+## 🏁 Issue #1265: Unified Event Orchestration via AppEventCoordinator
+*   **Resolved**: Sep.24.93
+*   **Root Cause**: Domain reactions (alerts, audio synthesis, forensic logging) were scattered across background services, `CommandRouter`, and `AppAlarmManager`, leading to high coupling and lifecycle dependencies. This made it difficult to ensure functional parity between roles and increased the risk of state leakage.
+*   **Remediation**:
+    *   **AppEventCoordinator.kt**: Created a central coordinator to orchestrate domain events. It observes reactive flows from `AppAlarmManager`, `IntegrityMonitor`, `HardwareSuite`, and `LocationProcessor`.
+    *   **AppAlarmManager.kt**: Refactored to expose a reactive `isSirenRequired` StateFlow, removing imperative `AudioSynthesizer` calls from the evaluation loop.
+    *   **MonitorService.kt**: Integrated `AppEventCoordinator` and removed redundant observation logic, significantly simplifying the background engine.
+    *   **MainRepository.kt**: Added debounced baseline saving and synchronous location getters to support role-agnostic event reactions.
+*   **R-ID**: 472
+
 # 🏛️ Resolution Archive - Sep.24.92
 
 ## 🏁 Issue #1261: Refactor Tracker/Viewer Services into Role-Reactive MonitorService

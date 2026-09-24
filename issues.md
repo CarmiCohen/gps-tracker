@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.92
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.93
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -27,9 +27,7 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🟡 Medium Priority
 
-*   **Issue #1265: Unified Event Orchestration via AppEventCoordinator**
-    *   *Description*: Centralize independent alert triggers, audio synthesizer calls, and forensic logs into a single high-cohesion coordinator to eliminate cross-component lifecycle dependencies.
-    *   *Contribution*: **Medium (Architecture)**. Decouples domain logic from service lifecycles.
+*   (None currently identified)
 
 ### 🔵 Low Priority
 
@@ -37,11 +35,9 @@ Finalizing the audit of background service stability and functional convergence 
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 19)
+## 💡 Strategic Simplification Ideas (Ideas: 18)
 
 ### 🛑 High Priority
-*   **Issue #1292: Reactive Siren State Binding**
-    *   *Significance*: **High (Architecture)**. Move siren lifecycle orchestration into a dedicated coordinator to remove imperative calls from core evaluation logic.
 *   **Issue #1291: Domain Event Bus Integration**
     *   *Significance*: **High (Architecture)**. Centralize dispersed logging and triggers into a single `AppEventCoordinator` to eliminate cross-component coupling.
 
@@ -87,6 +83,8 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1265: Unified Event Orchestration via AppEventCoordinator** (Resolved Sep.24.93)
+    *   *Remediation*: Centralized alert triggers, audio synthesis, and forensic logging into a high-cohesion `AppEventCoordinator`. Decoupled domain reactions from service lifecycles and established reactive siren state binding (Issue #1292) between `AppAlarmManager` and `AudioSynthesizer` to ensure absolute parity across functional roles (R-ID 472).
 *   **Issue #1261: Refactor Tracker/Viewer Services into Role-Reactive MonitorService** (Resolved Sep.24.92)
     *   *Remediation*: Consolidated TrackerService and ViewerService redundant boilerplate into a unified, lightweight, role-reactive background service. Consolidated stream observation (#1310) and job management (#1309) into a shared lifecycle (R-ID 471).
 *   **Issue #1234 / #1244: Heuristic Correction for Thermal Recovery Audits** (Resolved Sep.24.91)
@@ -142,4 +140,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 471 (Rules: 93, IDs: 471), Resolved: 1214, Open: 4, Testing: 3 (Sub-items: 12), Ideas: 19, QA: 284]**
+- **Current Audit Baseline: [SOT: 472 (Rules: 94, IDs: 472), Resolved: 1215, Open: 3, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**
