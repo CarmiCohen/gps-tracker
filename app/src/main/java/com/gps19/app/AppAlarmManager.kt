@@ -31,13 +31,12 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.24.97:
+ * - Issue #1291 Integration: Fixed property name mismatches (isSignalLoss, 
+ *   isGpsStalling) in syncEvaluationState to resolve build errors.
  * Sep.24.96:
  * - Issue #1312 REMEDIATION: Migrated evaluateAlarms to consume unified 
  *   SystemEvaluationSnapshot, ensuring data consistency across evaluation domains.
- * Sep.24.94:
- * - Issue #1311 REMEDIATION: Fully transitioned to a stateless evaluation model 
- *   by removing duplicate instance state variables and intermediate maps, unifying 
- *   all variables inside AlarmEvaluationState.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -332,7 +331,8 @@ class AppAlarmManager @Inject constructor(
             tamperNote = snapshot.suppressionNote,
             isPowerTamper = snapshot.isPowerTamper,
             isLocationPending = snapshot.isLocationPending,
-            locationPendingReason = snapshot.locationPendingReason
+            locationPendingReason = snapshot.locationPendingReason,
+            coolingEnteredRt = snapshot.nowRt // Fallback if explicit entry is missing
         )
 
         val cachedPoints = repository.getCachedHomePoints()

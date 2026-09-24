@@ -23,14 +23,13 @@ sealed class ProcessorEvent {
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.24.97:
+ * - Issue #1291: Refactored processGpsPoint to consume SystemEvaluationSnapshot 
+ *   to align with the unified domain event model.
  * Sep.24.96:
  * - Issue #1312 REMEDIATION: Migrated updateSensorData and processGpsPoint to 
  *   consume unified SystemEvaluationSnapshot, ensuring data consistency across 
  *   all processing layers.
- * Sep.24.95:
- * - Issue #1163 REMEDIATION: Migrated to a stateless evaluation model by 
- *   consolidating all mutable tracking parameters into LocationProcessingState. 
- *   Refactored logic to utilize stateless Sentinel and Anchor evaluation engines.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -258,7 +257,6 @@ class LocationProcessor(
         val accuracy = snapshot.accuracy
         val bearing = snapshot.bearing
         val snr = snapshot.snrSnapshot ?: 0.0
-        val satsUsed = snapshot.nowTs.toInt() // Note: Redundant but keeping signature parity for now
         val nowRt = snapshot.nowRt
         val nowWall = snapshot.nowTs
 

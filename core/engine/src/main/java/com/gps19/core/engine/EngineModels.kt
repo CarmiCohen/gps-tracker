@@ -5,13 +5,10 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * Sep.24.96:
- * - Issue #1312 REMEDIATION: Unified AlarmTelemetrySnapshot and SensorStateSnapshot 
- *   into SystemEvaluationSnapshot to ensure temporal parity across all logic engines.
- *   Aligned property names with SystemHealthState for consistency.
- * Sep.24.95:
- * - Issue #1163: Introduced LocationProcessingState to support stateless 
- *   location and sentinel evaluation. Expanded to include AnchorEvaluator state.
+ * Sep.24.97:
+ * - Issue #1291: Defined DomainEvent hierarchy to support unified event-bus 
+ *   orchestration and decouple side-effects from the evaluation loop.
+ *   Consolidated SystemEvaluationSnapshot with isWarming and isSirenActive.
  */
 
 @Serializable
@@ -222,8 +219,8 @@ data class SystemEvaluationSnapshot(
     val isUltraLongStationary: Boolean = false,
     val isBatteryLow: Boolean = false,
     val isBatteryCritical: Boolean = false,
-    val signalLoss: Boolean = false,
-    val gpsStalled: Boolean = false,
+    var isSignalLoss: Boolean = false,
+    var isGpsStalling: Boolean = false,
     val isGpsGap: Boolean = false,
     val localInternetLoss: Boolean = false,
     val isHardwareOnline: Boolean = true,
@@ -236,7 +233,11 @@ data class SystemEvaluationSnapshot(
     val nowRt: Long = 0L,
     val nowTs: Long = 0L,
     val snrSnapshot: Double? = null,
-    val vibeSnapshot: Double? = null
+    val vibeSnapshot: Double? = null,
+    
+    // Warm-up & Audio State
+    val isWarming: Boolean = false,
+    val isSirenActive: Boolean = false
 )
 
 /**
@@ -259,6 +260,67 @@ data class AlarmServiceContext(
     val capabilities: HardwareCapabilities = HardwareCapabilities(),
     val rolePrefix: String = ""
 )
+
+/**
+ * DomainEvent: Unified event hierarchy for cross-component orchestration. (Issue #1291)
+ */
+sealed class DomainEvent {
+    data class TickEvaluated(
+        val now: Long,
+        val nowRt: Long,
+        val isTrackerMode: Boolean,
+        val snapshot: SystemEvaluationSnapshot,
+        val processed: ProcessedLocation?,
+        val health: SystemHealthState,
+        val isSocketConnected: Boolean,
+        val isPeerActive: Boolean,
+        val serviceTickCounter: Long,
+        val rtt: Int,
+        val recoveryFlagged: Boolean = false,
+        
+        // Metadata for Signaling & Ribbons
+        val satsView: Int = 0,
+        val satsUsed: Int = 0,
+        val proxIdx: Double = 0.0,
+        val proximityCm: Double = 0.0,
+        val proximityDebounceMs: Long = 0L,
+        val vibrationRollingSum: Double = 0.0,
+        val gnssDetail: GnssDetail? = null,
+        val isSuspiciousMode: Boolean = false,
+        val lastSitTs: Long = 0L,
+        val violationUptimeMs: Long = 0L,
+        val violationPercentage: Double = 0.0,
+        val lastTickTs: Long = 0L,
+        val lastTickRt: Long = 0L,
+        val noiseIdx: Double = 0.0,
+        val luxIdx: Double = 0.0,
+        val vibeIdx: Double = 0.0,
+        val liftIdx: Double = 0.0,
+        val snrIdx: Double = 0.0,
+        val tiltIdx: Double = 0.0,
+        val baroIdx: Double = 0.0
+    ) : DomainEvent()
+
+    data class PowerSaveTransition(val isEngaged: Boolean) : DomainEvent()
+    
+    data class HeuristicRecovery(
+        val message: String,
+        val gapMs: Long,
+        val lat: Double,
+        val lng: Double,
+        val accuracy: Double
+    ) : DomainEvent()
+
+    data class StabilityViolation(
+        val message: String,
+        val isJitter: Boolean,
+        val lat: Double,
+        val lng: Double,
+        val accuracy: Double
+    ) : DomainEvent()
+    
+    data class ServiceStatus(val message: String, val isImportant: Boolean = false) : DomainEvent()
+}
 
 /**
  * SpatialAnchor: Polymorphic base for coordinate-aware telemetry.
@@ -473,7 +535,7 @@ class AlarmEvaluationState {
     var firstViolationWasJump: Boolean = false
     var wasDistanceViolated: Boolean = false
     var distanceViolationCounter: Int = 0
-    var isAdaptiveJump: Boolean = false
+    val isAdaptiveJump: Boolean = false
     var lastGpsPacketTs: Long = 0L
     var lastGpsPacketRt: Long = 0L
     var serviceStartTime: Long = 0L
@@ -582,7 +644,7 @@ class AlarmEvaluationState {
         this.trackerLastValidFixRt = trackerLastValidFixRt
         this.trackerSpeed = trackerSpeed
         this.jumpTier = jumpTier
-        this.isAdaptiveJump = isAdaptiveJump
+        // this.isAdaptiveJump = isAdaptiveJump (Fix for val property)
         this.trackerBattery = trackerBattery
         this.trackerTemp = trackerTemp
         this.wasDistanceViolated = wasDistanceViolated

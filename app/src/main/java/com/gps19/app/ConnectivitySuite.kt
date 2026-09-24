@@ -28,10 +28,9 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
- * Sep.24.95:
- * - Issue #1163: Aligned handleJsonUpdate and handleBinaryUpdate with the 
- *   LocationProcessor stateless refactor. Fixed property name mismatches 
- *   in TrackerStatus mapping.
+ * Sep.24.97:
+ * - Issue #1291: Aligned handleJsonUpdate and handleBinaryUpdate with the 
+ *   LocationProcessor SystemEvaluationSnapshot refactor.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -563,18 +562,24 @@ class ConnectivitySuite @Inject constructor(
                 var lat = current.lat; var lng = current.lng; var gpsTs = current.gpsTs; var filteredSpeed = current.speed; var lastFixRt = statusProto.lastValidFixRt
                 var isClockReg = current.isClockRegression; var isVisualJump = current.isJump
 
-                val processed = locationProcessor.processGpsPoint(
+                val snapshot = SystemEvaluationSnapshot(
                     lat = statusProto.lat, lng = statusProto.lng, alt = statusProto.alt, 
-                    androidSpeedMps = statusProto.speed.coerceAtLeast(0.0),
+                    speed = statusProto.speed.coerceAtLeast(0.0),
                     gpsTs = statusProto.gpsTs, accuracy = statusProto.accuracy.coerceAtLeast(0.0), 
-                    bearing = statusProto.bearing, snr = statusProto.snrIdx * 45.0,
-                    satsUsed = statusProto.satsUsed, isViewerTrail = false, lastGpsTs = current.gpsTs,
-                    providedMaxAccuracy = statusProto.maxAccuracy, 
-                    providedJumpTier = statusProto.jumpTier, providedIsJammer = statusProto.isJammer, 
-                    providedIsStalled = statusProto.isStalled,
-                    providedIsTamper = statusProto.isTamperDetected || statusProto.isLocationPending,
-                    providedKineticEnergy = statusProto.kineticEnergy,
-                    nowWall = now, nowRt = nowRt
+                    bearing = statusProto.bearing, snrSnapshot = statusProto.snrIdx * 45.0,
+                    maxAccuracy = statusProto.maxAccuracy, 
+                    jumpTier = statusProto.jumpTier, isJammer = statusProto.isJammer, 
+                    isStalled = statusProto.isStalled,
+                    tamperDetected = statusProto.isTamperDetected || statusProto.isLocationPending,
+                    kineticEnergy = statusProto.kineticEnergy,
+                    nowTs = now, nowRt = nowRt
+                )
+
+                val processed = locationProcessor.processGpsPoint(
+                    snapshot = snapshot,
+                    isViewerTrail = false,
+                    lastGpsTs = current.gpsTs,
+                    isLocal = false
                 )
                 
                 isClockReg = processed.isClockRegression
@@ -780,17 +785,27 @@ class ConnectivitySuite @Inject constructor(
                     val gpsAgeMs = if (data.has("gps_age_ms")) data.optLong("gps_age_ms") else (if (incomingGpsTs > 0) maxOf(0L, now - incomingGpsTs) else 0L)
                     val candidateTs = if (gpsAgeMs > 0 || incomingGpsTs > 0) now - gpsAgeMs else 0L
                     
-                    val processed = locationProcessor.processGpsPoint(
+                    val snapshot = SystemEvaluationSnapshot(
                         lat = data.optDouble("lat", 0.0), lng = data.optDouble("lng", 0.0), alt = data.optDouble("alt", 0.0), 
-                        androidSpeedMps = data.optDouble("speed", 0.0).coerceAtLeast(0.0),
+                        speed = data.optDouble("speed", 0.0).coerceAtLeast(0.0),
                         gpsTs = candidateTs, accuracy = data.optDouble("accuracy", 0.0).coerceAtLeast(0.0), 
-                        bearing = data.optDouble("bearing", 0.0), snr = 0.0,
-                        satsUsed = data.optInt("sats_used", current.satsUsed), isViewerTrail = false, lastGpsTs = current.gpsTs,
-                        providedMaxAccuracy = data.optDouble("max_accuracy", 0.0), providedJumpTier = data.optInt("jump_tier", 0), providedIsJammer = data.optBoolean("is_jammer", false),
-                        providedIsStalled = data.optDouble("is_stalled", 0.0) != 0.0 || data.optBoolean("is_stalled", false), providedIsTamper = isTrackerTamperDetectedVar || isTrackerLocationPendingVar || trackerStatusVar == SentinelStatus.TAMPER,
-                        providedKineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy),
-                        nowWall = now, nowRt = nowRt
+                        bearing = data.optDouble("bearing", 0.0), snrSnapshot = 0.0,
+                        maxAccuracy = data.optDouble("max_accuracy", 0.0), 
+                        jumpTier = data.optInt("jump_tier", 0), 
+                        isJammer = data.optBoolean("is_jammer", false),
+                        isStalled = data.optDouble("is_stalled", 0.0) != 0.0 || data.optBoolean("is_stalled", false), 
+                        tamperDetected = isTrackerTamperDetectedVar || isTrackerLocationPendingVar || trackerStatusVar == SentinelStatus.TAMPER,
+                        kineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy),
+                        nowTs = now, nowRt = nowRt
                     )
+
+                    val processed = locationProcessor.processGpsPoint(
+                        snapshot = snapshot,
+                        isViewerTrail = false,
+                        lastGpsTs = current.gpsTs,
+                        isLocal = false
+                    )
+
                     isClockReg = processed.isClockRegression
                     if (processed.optimizedPoint.lat != 0.0 && processed.optimizedPoint.lng != 0.0) {
                         lat = processed.optimizedPoint.lat; lng = processed.optimizedPoint.lng; gpsTs = processed.optimizedPoint.ts
@@ -918,7 +933,7 @@ class ConnectivitySuite @Inject constructor(
         identitySyncJob?.cancel(); identitySyncJob = null
         scope.cancel()
         
-        networkProvider.unregisterListener(networkListener)
+        networkProvider.registerListener(networkListener)
         
         val sigStart = SystemClock.elapsedRealtime()
         signalingProvider.disconnect() 

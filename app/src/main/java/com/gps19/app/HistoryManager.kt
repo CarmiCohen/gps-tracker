@@ -29,12 +29,12 @@ sealed class HistoryEvent {
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.24.97:
+ * - Issue #1291: Updated updateRibbons signature to accept Long for 
+ *   serviceTickCounter to align with the unified DomainEventBus model.
  * Sep.24.02:
  * - Issue #1255 REMEDIATION: Implemented recoverLastRealtime to provide 
  *   reboot-aware monotonic clock recovery by calculating synthetic RT anchors.
- * Sep.23.70:
- * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation (prefix support)
- *   for forensic logic state to prevent cross-role state corruption (R-ID 453).
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -79,7 +79,6 @@ class HistoryManager @Inject constructor(
 
     /**
      * initialize: Binds the manager to an active service scope and hydrates role-prefixed state.
-     * Sep.23.70 (Issue #1230): Added rolePrefix parameter for namespaced isolation.
      */
     suspend fun initialize(scope: CoroutineScope, rolePrefix: String = "") {
         this.scope = scope
@@ -91,8 +90,6 @@ class HistoryManager @Inject constructor(
                  lastSitDetectedRt = timeProvider.elapsedRealtime() - (timeProvider.currentTimeMillis() - lastSitTs)
             }
             clockDriftRef = repository.getLong(rolePrefix + CLOCK_DRIFT_REF_KEY, 0L)
-            
-            // Only ProcessedHour/Cleanup/Archive dates are shared across roles to maintain system-level integrity
             lastProcessedHour = repository.getInt(LAST_AUTO_SAVE_HOUR_KEY, -1)
         }
         isInitialized.set(true)
@@ -100,8 +97,6 @@ class HistoryManager @Inject constructor(
 
     /**
      * recoverLastRealtime: Provides reboot-aware monotonic clock recovery.
-     * If the current drift is significantly different from persisted drift (Issue #1255),
-     * it anchors recovery to the current boot cycle's drift to prevent invalid RT values.
      */
     fun recoverLastRealtime(lastTs: Long, recoveredDrift: Long): Long {
         val now = timeProvider.currentTimeMillis()
@@ -118,7 +113,7 @@ class HistoryManager @Inject constructor(
     }
 
     /**
-     * reset: Clears all forensic counters and transient state (R-ID 317).
+     * reset: Clears all forensic counters and transient state.
      */
     fun reset() {
         lastProcessedHour = -1
@@ -138,7 +133,7 @@ class HistoryManager @Inject constructor(
 
     suspend fun updateRibbons(
         now: Long, nowRt: Long, lastTickTs: Long, lastTickRt: Long,
-        serviceTickCounter: Int, rtt: Int, peerSignal: Int, peerAvail: Boolean,
+        serviceTickCounter: Long, rtt: Int, peerSignal: Int, peerAvail: Boolean,
         hasGps: Boolean, isTrackerMode: Boolean, accuracy: Double = 0.0,
         maxAccuracy: Double = 0.0, noiseIdx: Double = 0.0, luxIdx: Double = 0.0,
         vibeIdx: Double = 0.0, proxIdx: Double = 1.0, liftIdx: Double = 0.0,

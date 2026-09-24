@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.24.96)
+# SOT Master Requirements & Hardening Status (Sep.24.97)
 
-## 🏗️ Architectural Master Rules (24 Rules)
+## 🏗️ Architectural Master Rules (25 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -15,6 +15,7 @@
 *   **1.10 Dependency Injection**: Hilt is the sole authority for dependency management.
 *   **1.11 Monotonic Time**: Use `elapsedRealtime` for all interval and duration logic (R116).
 *   **1.12 Domain Orchestration (R472)**: Domain events (Alarms, Sensors, Connectivity) must be orchestrated by a central `AppEventCoordinator` to decouple domain logic from background service lifecycles (Added Sep.24.93).
+*   **1.13 Reactive Domain Bus (R477)**: High-frequency state transitions and telemetry summaries must be propagated via a non-blocking `DomainEventBus` to decouple the core evaluation loop from persistence and signaling side-effects (Added Sep.24.97).
 
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318/R323/R739/R758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering (R318, R323, R739, R758).
@@ -33,6 +34,7 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions (R212, R310, R317).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 477**: Domain Event Bus Integration - Remediated Issue #1291 by implementing a unified `DomainEventBus`. Decoupled the `MonitorService` evaluation loop from all persistence, signaling, and ribbon update side-effects. Centralized reactive handling of telemetry summaries and system transitions into `AppEventCoordinator` (Resolved Sep.24.97).
 *   **SOT ID 476**: Role-Switching Atomic State Reset - Remediated Issue #1313 by hardening `MonitorService` to handle dynamic role transitions via a reactive `appModeFlow` observer. Integrated `handleRoleTransition` to atomically reset processing state and jobs, preventing cross-role state contamination. (Resolved Sep.24.96)
 *   **SOT ID 475**: Unified Evaluation Snapshot - Remediated Issue #1312 by consolidating `AlarmTelemetrySnapshot` and `SensorStateSnapshot` into a single `SystemEvaluationSnapshot`. This ensures absolute temporal parity between kinematic and health logic. (Resolved Sep.24.96)
 *   **SOT ID 474**: Stateless Logic Refactoring - Remediated Issue #1163 by migrating `LocationProcessor`, `LocationSentinel`, and `GtoEngine` to a stateless evaluation model. Consolidated all mutable tracking data into `LocationProcessingState` and transitioned core engines to pure `object` implementations to ensure deterministic kinematic and sensor evaluation (Resolved Sep.24.95).
@@ -51,10 +53,11 @@
 *   **SOT ID 461**: Persistent Lux and Acoustic Baselines - Implemented persistence for environmental calibration, eliminating the 60s learning period after restarts (R-ID 461). (Resolved Sep.24.10)
 *   **SOT ID 460**: Atomic User Counter Hardening - Guarded `activeUsers` in `HardwareSuite` against negative values and resource leaks (R-ID 460). (Resolved Sep.24.04)
 *   **SOT ID 459**: Persistent Adaptive Vibration Floor - Implemented persistence for the physical baseline sensitivity anchor (R-ID 459). (Resolved Sep.24.03)
-*   **SOT ID 458**: Reboot-Aware Monotonic Clock Recovery - Implemented `recoverLastRealtime` to ensure timing anchors remain valid across device reboots (R-ID 458). (Resolved Sep.24.02)
+*   **SOT ID 458**: Reboot-Aware Monotonic Clock Recovery - Implemented `recoverLastRealtime` in `HistoryManager.kt` using role-isolated clock drift references (R-ID 458). (Resolved Sep.24.02)
 *   **SOT ID 457**: Fast-Path Allocation Optimization - Made spike detection callbacks optional to eliminate allocation churn in the tick loop (R-ID 457). (Resolved Sep.24.01)
 
 ## 4.2. Change History (Recent)
+*   **Sep.24.97**: Resolved Issue #1291 (Domain Event Bus Integration). Decoupled evaluation loop from all side-effects (SOT ID 477).
 *   **Sep.24.96**: Resolved Issue #1312 (Unified Evaluation Logic Snapshot) and Issue #1313 (Role-Switching Atomic State Reset).
 *   **Sep.24.95**: Resolved Issue #1163 (Stateless & Functional Logic Refactoring). Migrated location pipeline to stateless evaluation model (SOT ID 474).
 *   **Sep.24.94**: Resolved Issue #1311 (AppAlarmManager Stateless Evaluation Model). Relocated active alarms directly into `AlarmEvaluationState` (SOT ID 473).
@@ -63,8 +66,9 @@
 *   **Sep.24.91**: Resolved Issue #1234 / #1244 (Heuristic Correction for Thermal Recovery Audits) (SOT ID 470).
 *   **Sep.24.90**: Resolved Issue #1306 (Namespace Collision Risk). Introduced `"VR_"` prefix for remote state segregation (SOT ID 469).
 
-## 📋 Functional Requirements (146 R-IDs)
+## 📋 Functional Requirements (147 R-IDs)
 *   **R101-R117**: Core tracking, telemetry, and forensic rules.
+*   **R477**: Reactive Domain Bus orchestration.
 *   **R476**: Dynamic role-switching validation.
 *   **R475**: Unified evaluation logic snapshot.
 *   **R474**: Stateless location evaluation via consolidated state.
@@ -74,10 +78,11 @@
 *   *(Remaining requirements preserved in technical registry)*
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.110 (Domain Event Bus Integration)**: PASSED - Successfully decoupled evaluation loop from persistence and signaling via DomainEventBus. (Sep.24.97)
 *   **Chapter 31.109 (Role-Switching Atomic State Reset)**: PASSED - Successfully implemented live role transition handling in MonitorService. (Sep.24.96)
 *   **Chapter 31.108 (Unified Evaluation Logic Snapshot)**: PASSED - Successfully unified sensor and telemetry snapshots. (Sep.24.96)
 *   **Chapter 31.107 (Stateless Logic Refactoring)**: PASSED - Migrated location processor and sentinel to stateless engines. (Sep.24.95)
 *   **Chapter 31.106 (Stateless Evaluation Consolidation)**: PASSED - Purged nested mutable memory states from alarm evaluation pipeline. (Sep.24.94)
 
 ---
-*Next Audit: Oct.01.00. (Sep.24.96)*
+*Next Audit: Oct.01.00. (Sep.24.97)*

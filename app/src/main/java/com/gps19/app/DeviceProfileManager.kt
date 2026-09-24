@@ -7,10 +7,8 @@ import javax.inject.Singleton
 
 /**
  * DeviceProfileManager: Central controller for vendor-specific adaptations and loop continuity tweaks.
- * Centrally manages hardware hooks for Samsung, A15, and S21FE variants.
- * Sep.23.08:
- * - Issue #1204: Unified Hardware Lifecycle & Vendor Hardening. Integrated 
- *   DeviceHardeningStrategy and ProcessPriorityMonitor to consolidate WakeLock policies and stay-alive pulses.
+ * Sep.24.97:
+ * - Issue #1291: Updated executeContinuityTweaks to accept Long for tick counter.
  */
 @Singleton
 class DeviceProfileManager @Inject constructor(
@@ -44,7 +42,7 @@ class DeviceProfileManager @Inject constructor(
     suspend fun executeContinuityTweaks(
         capabilities: HardwareCapabilities,
         nowRt: Long,
-        serviceTickCounter: Int,
+        serviceTickCounter: Long,
         lastValidFixRt: Long,
         isPowerSaveMode: Boolean,
         localInternetLoss: Boolean,
@@ -61,7 +59,7 @@ class DeviceProfileManager @Inject constructor(
                 val gpsAge = nowRt - lastValidFixRt
                 JdHardwareManager.syncHardwareState(
                     timeProvider = timeProvider,
-                    tick = serviceTickCounter,
+                    tick = serviceTickCounter.toInt(),
                     status = LedStatus(
                         isPowerSave = isPowerSaveMode,
                         isGpsStale = gpsAge > TELEMETRY_UI_STALE_THRESHOLD_MS,

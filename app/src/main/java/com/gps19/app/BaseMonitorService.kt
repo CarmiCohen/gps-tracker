@@ -19,20 +19,9 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * Sep.24.50:
- * - Issue #1245: Non-Blocking History Flush on Service Termination. Transitioned 
- *   database flush from runBlocking to applicationScope to prevent ANRs (R-ID 465).
- * Sep.23.70:
- * - Issue #1236: Race Condition Remediation. Introduced initializationDeferred to 
- *   guarantee service state is fully hydrated before tick/heartbeat loops start (R-ID 452).
- * Sep.17.02:
- * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
- * Sep.14.52:
- * - Signaling State Reduction (#1041): Removed redundant transientDropDetected 
- *   latch now that signaling stability is managed via ConnectivitySuite (R-ID 335).
- * Sep.08.11:
- * - Issue #936: Forensic Auditor Consolidation (Idea #3). Injected ForensicAuditor 
- *   to allow shared hardware auditing across roles (R-ID 280).
+ * Sep.24.97:
+ * - Issue #1291: Promoted serviceTickCounter to Long to prevent overflow and 
+ *   align with DomainEvent telemetry types.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -69,7 +58,7 @@ abstract class BaseMonitorService : LifecycleService() {
     protected var serviceStartWall = 0L 
     protected var lastServiceTickTs = 0L 
     protected var lastServiceTickRealtime = 0L 
-    protected var serviceTickCounter = 0
+    protected var serviceTickCounter = 0L
     
     protected val isUiForeground = AtomicBoolean(false)
     protected var lastUiPulseTs = 0L

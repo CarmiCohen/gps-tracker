@@ -10,12 +10,10 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
- * Sep.24.93:
- * - Issue #1265 REMEDIATION: Centralized alert triggers, audio synthesis, and 
- *   forensic logging into a high-cohesion coordinator. Decoupled domain 
- *   reactions from background service lifecycles.
- * - Issue #1292 REMEDIATION: Implemented reactive siren state binding between 
- *   AppAlarmManager and AudioSynthesizer (R-ID 472).
+ * Sep.24.97:
+ * - Issue #1291: Integrated DomainEventBus to centralize side-effect reactions 
+ *   (forensics, ribbon updates, repository persistence) and decouple them from 
+ *   the background evaluation loop. Fixed mapping errors and suspend contexts.
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -28,7 +26,8 @@ class AppEventCoordinator @Inject constructor(
     private val repository: MainRepository,
     private val integrityMonitor: IntegrityMonitor,
     private val sessionManager: SessionManager,
-    private val historyManager: HistoryManager
+    private val historyManager: HistoryManager,
+    private val domainEventBus: DomainEventBus
 ) {
     private var isStarted = false
 
@@ -44,6 +43,7 @@ class AppEventCoordinator @Inject constructor(
         isStarted = true
 
         scope.launch(Dispatchers.Default) {
+            launch { observeDomainEvents(connectivitySuite) }
             launch { observeAlarmEvents(alarmManager) }
             launch { observeIntegrityEvents(alarmManager) }
             launch { observeProcessorEvents(primaryProcessor, remoteProcessor) }
@@ -55,6 +55,162 @@ class AppEventCoordinator @Inject constructor(
             launch { observeSirenRequirement(alarmManager) }
             launch { observePhysicalSirenState() }
         }
+    }
+
+    private suspend fun observeDomainEvents(connectivitySuite: ConnectivitySuite) {
+        domainEventBus.events.collect { event ->
+            when (event) {
+                is DomainEvent.TickEvaluated -> handleTickEvaluated(event, connectivitySuite)
+                is DomainEvent.HeuristicRecovery -> handleHeuristicRecovery(event)
+                is DomainEvent.StabilityViolation -> handleStabilityViolation(event)
+                is DomainEvent.PowerSaveTransition -> handlePowerSaveTransition(event)
+                is DomainEvent.ServiceStatus -> logManager.logServiceEvent(event.message, isImportant = event.isImportant)
+            }
+        }
+    }
+
+    private suspend fun handleTickEvaluated(event: DomainEvent.TickEvaluated, connectivitySuite: ConnectivitySuite) {
+        val proc = event.processed
+        val snapshot = event.snapshot
+        val health = event.health
+        val now = event.now
+        val nowRt = event.nowRt
+        val isTrackerMode = event.isTrackerMode
+
+        // 1. Repository Persistence
+        if (isTrackerMode) {
+            repository.updateLocation(LocationUpdate().apply {
+                this.kinetic.lat = proc?.optimizedPoint?.lat ?: 0.0; this.kinetic.lng = proc?.optimizedPoint?.lng ?: 0.0; this.kinetic.alt = proc?.optimizedPoint?.alt ?: 0.0; this.kinetic.speed = proc?.filteredSpeed ?: 0.0; this.kinetic.accuracy = proc?.currentAccuracy ?: 0.0; this.kinetic.bearing = snapshot.bearing; this.kinetic.gpsTs = proc?.timestamp ?: 0L; this.kinetic.rt = nowRt; this.kinetic.maxAccuracy = proc?.maxAccuracy ?: 0.0; this.kinetic.kineticEnergy = snapshot.kineticEnergy; this.kinetic.verticalVelocity = snapshot.peakVerticalVelocity
+                this.atmospheric.temp = snapshot.batteryTemp; this.atmospheric.maxTemp = health.maxTemp; this.atmospheric.vibration = snapshot.vibration; this.atmospheric.heading = snapshot.heading; this.atmospheric.baroAlt = snapshot.baroAlt; this.atmospheric.lux = snapshot.lux; this.atmospheric.isNear = snapshot.isNear; this.atmospheric.tiltDegrees = snapshot.tiltDegrees; this.atmospheric.acousticDb = snapshot.acousticDb; this.atmospheric.peakVibrationShock = snapshot.peakShock; this.atmospheric.peakVibrationShockTs = now; this.atmospheric.noiseIdx = event.noiseIdx; this.atmospheric.luxIdx = event.luxIdx; this.atmospheric.vibeIdx = event.vibeIdx; this.atmospheric.liftIdx = event.liftIdx; this.atmospheric.tiltIdx = event.tiltIdx; this.atmospheric.baroIdx = event.baroIdx; this.atmospheric.luxBaseline = snapshot.luxBaseline; this.atmospheric.acousticFloorDb = snapshot.acousticFloorDb; this.atmospheric.adaptiveVibrationFloor = snapshot.adaptiveVibrationFloor; this.atmospheric.proxIdx = event.proxIdx; this.atmospheric.proximityCm = event.proximityCm; this.atmospheric.proximityDebounceMs = event.proximityDebounceMs; this.atmospheric.vibrationRollingSum = event.vibrationRollingSum
+                this.integrity.battery = snapshot.batteryLevel; this.integrity.isCharging = snapshot.isCharging; this.integrity.currentMa = snapshot.currentMa; this.integrity.satsView = event.satsView; this.integrity.satsUsed = event.satsUsed; this.integrity.snrIdx = event.snrIdx; this.integrity.isPowerTamper = snapshot.isPowerTamper; this.integrity.isSitDetected = event.isSuspiciousMode; this.integrity.lastSitTs = event.lastSitTs; this.integrity.sitVz = snapshot.peakVerticalVelocity; this.integrity.sitVzTs = snapshot.peakVerticalVelocityTs; this.integrity.sitVzRt = snapshot.peakVerticalVelocityRt; this.integrity.sitDz = snapshot.peakVerticalDisplacement; this.integrity.sitBaro = snapshot.peakVerticalDisplacement; this.integrity.sitTilt = snapshot.tiltDegrees; this.integrity.sitShock = snapshot.peakShock; this.integrity.isBatteryLow = snapshot.isBatteryLow; this.integrity.isBatteryCritical = snapshot.isBatteryCritical; this.integrity.locationPendingReason = snapshot.locationPendingReason; this.integrity.isPowerSaveMode = snapshot.isPowerSaveMode; this.integrity.standbyBucket = snapshot.standbyBucket; this.integrity.netInterface = snapshot.netInterface; this.integrity.isStorageLow = snapshot.isStorageLow; this.integrity.isStorageCritical = snapshot.isStorageCritical; this.integrity.isBatterySteepDischarge = snapshot.isBatterySteepDischarge; this.integrity.isCoolingModeActive = snapshot.isCoolingModeActive; this.integrity.gpsHardwareLock = snapshot.isGpsHardwareLock; this.integrity.isUltraLongStationary = snapshot.isUltraLongStationary; this.integrity.isTamperDetected = snapshot.tamperDetected; this.integrity.tamperNote = snapshot.suppressionNote
+                this.ts = now; this.isMe = true; this.status = snapshot.status; this.lastValidFixRt = snapshot.lastValidFixRt; this.trackerState = if ((proc?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING
+            })
+            
+            // 2. Peer Signaling
+            if (event.isPeerActive) {
+                connectivitySuite.pushCurrentStatus(
+                    deviceId = configManager.deviceId, 
+                    viewerId = configManager.viewerId, 
+                    isTrackerMode = true, 
+                    loc = null, 
+                    filtered = proc?.optimizedPoint, 
+                    distToTracker = null, 
+                    distToHome = proc?.distToHome, 
+                    maxAccuracy = proc?.maxAccuracy ?: 0.0, 
+                    filteredSpeed = proc?.filteredSpeed ?: 0.0, 
+                    vibration = snapshot.vibration, 
+                    heading = snapshot.heading, 
+                    baroAlt = snapshot.baroAlt, 
+                    lux = snapshot.lux, 
+                    isNear = snapshot.isNear, 
+                    tiltDegrees = snapshot.tiltDegrees, 
+                    acousticDb = snapshot.acousticDb, 
+                    jumpTier = proc?.jumpTier ?: 0, 
+                    isJammer = proc?.jammerDetected ?: false, 
+                    isStalled = snapshot.isStalled, 
+                    peakShock = snapshot.peakShock, 
+                    peakShockTs = now, 
+                    luxBaseline = snapshot.luxBaseline, 
+                    acousticFloorDb = snapshot.acousticFloorDb, 
+                    adaptiveVibrationFloor = snapshot.adaptiveVibrationFloor, 
+                    proxIdx = event.proxIdx,
+                    proximityCm = event.proximityCm,
+                    proximityDebounceMs = event.proximityDebounceMs,
+                    vibrationRollingSum = event.vibrationRollingSum,
+                    micPending = false, 
+                    isTamperDetected = snapshot.tamperDetected, 
+                    isPowerTamper = snapshot.isPowerTamper, 
+                    isSitDetected = event.isSuspiciousMode, 
+                    isSitActive = false, 
+                    lastSitTs = event.lastSitTs, 
+                    receiptRt = nowRt, 
+                    violationUptimeMs = event.violationUptimeMs, 
+                    violationPercentage = event.violationPercentage, 
+                    verticalVelocity = snapshot.peakVerticalVelocity, 
+                    sitVz = snapshot.peakVerticalVelocity, 
+                    sitVzTs = snapshot.peakVerticalVelocityTs, 
+                    sitVzRt = snapshot.peakVerticalVelocityRt, 
+                    sitDz = snapshot.peakVerticalDisplacement, 
+                    sitBaro = snapshot.peakVerticalDisplacement, 
+                    sitTilt = snapshot.tiltDegrees, 
+                    sitShock = snapshot.peakShock, 
+                    isClockRegression = snapshot.isClockRegression, 
+                    isLocationPending = snapshot.isLocationPending, 
+                    locationPendingReason = snapshot.locationPendingReason, 
+                    lastValidFixRt = snapshot.lastValidFixRt, 
+                    gnssDetail = event.gnssDetail,
+                    isBatterySteepDischarge = snapshot.isBatterySteepDischarge,
+                    isCoolingModeActive = snapshot.isCoolingModeActive, 
+                    batteryLevel = snapshot.batteryLevel, 
+                    temp = snapshot.batteryTemp, 
+                    isCharging = snapshot.isCharging, 
+                    trackerState = if ((proc?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING, 
+                    status = snapshot.status, 
+                    isStorageLow = snapshot.isStorageLow, 
+                    isStorageCritical = snapshot.isStorageCritical, 
+                    isPowerSaveMode = snapshot.isPowerSaveMode, 
+                    standbyBucket = snapshot.standbyBucket, 
+                    netInterface = snapshot.netInterface, 
+                    snrIdx = event.snrIdx,
+                    noiseIdx = event.noiseIdx,
+                    luxIdx = event.luxIdx,
+                    vibeIdx = event.vibeIdx,
+                    liftIdx = event.liftIdx,
+                    tiltIdx = event.tiltIdx,
+                    baroIdx = event.baroIdx,
+                    kineticEnergy = snapshot.kineticEnergy,
+                    isAdaptiveJump = snapshot.isAdaptiveJump, 
+                    isBatteryLow = snapshot.isBatteryLow, 
+                    isBatteryCritical = snapshot.isBatteryCritical, 
+                    isUltraLongStationary = snapshot.isUltraLongStationary, 
+                    gpsHardwareLock = snapshot.isGpsHardwareLock, 
+                    tamperNote = snapshot.suppressionNote
+                )
+            }
+        }
+
+        // 3. Ribbon Updates
+        historyManager.updateRibbons(
+            now = now, nowRt = nowRt, lastTickTs = event.lastTickTs, lastTickRt = event.lastTickRt, 
+            serviceTickCounter = event.serviceTickCounter, rtt = event.rtt, 
+            peerSignal = if (event.isPeerActive) 10 else 0, peerAvail = event.isSocketConnected && event.isPeerActive, 
+            hasGps = (proc?.timestamp ?: 0L) > 0, isTrackerMode = isTrackerMode, 
+            accuracy = proc?.currentAccuracy ?: 0.0, maxAccuracy = proc?.maxAccuracy ?: 0.0, 
+            noiseIdx = event.noiseIdx, luxIdx = event.luxIdx, vibeIdx = event.vibeIdx, proxIdx = event.proxIdx, 
+            liftIdx = event.liftIdx, snrIdx = event.snrIdx, tiltIdx = event.tiltIdx, baroIdx = event.baroIdx, 
+            verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, 
+            sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, 
+            sitDz = snapshot.peakVerticalDisplacement, sitBaro = snapshot.peakVerticalDisplacement, 
+            sitTilt = snapshot.tiltDegrees, sitShock = snapshot.peakShock, 
+            isBatterySteepDischarge = snapshot.isBatterySteepDischarge, isCoolingModeActive = snapshot.isCoolingModeActive, 
+            speed = proc?.filteredSpeed ?: 0.0, bearing = snapshot.bearing, 
+            isSitDetected = if (isTrackerMode) event.isSuspiciousMode else false, isSitActive = false,
+            currentMa = snapshot.currentMa, locationPendingReason = snapshot.locationPendingReason, 
+            kineticEnergy = snapshot.kineticEnergy, isRecoveryEvent = event.recoveryFlagged, 
+            cpuLoad = snapshot.cpuLoad, ioWait = snapshot.ioWait, maxIoLatency = snapshot.maxIoLatency, 
+            isSilentFailure = snapshot.isSilentFailure, isBatteryLow = snapshot.isBatteryLow, 
+            isBatteryCritical = snapshot.isBatteryCritical, isUltraLongStationary = snapshot.isUltraLongStationary
+        )
+    }
+
+    private fun handleHeuristicRecovery(event: DomainEvent.HeuristicRecovery) {
+        logManager.logServiceEvent(
+            m = "HEURISTIC RECOVERY: ${event.message} - Heartbeat gap detected (${event.gapMs}ms). Reviving connection.", 
+            isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, 
+            lat = event.lat, lng = event.lng, accuracy = event.accuracy
+        )
+    }
+
+    private fun handleStabilityViolation(event: DomainEvent.StabilityViolation) {
+        logManager.logServiceEvent(
+            m = event.message, isImportant = true, isSpecial = event.isJitter, 
+            specialColor = if (event.isJitter) FORENSIC_PINK_COLOR else null, 
+            lat = event.lat, lng = event.lng, accuracy = event.accuracy
+        )
+    }
+
+    private fun handlePowerSaveTransition(event: DomainEvent.PowerSaveTransition) {
+        logManager.logServiceEvent(m = "POWER SAVER: ${if (event.isEngaged) "ENGAGED" else "DISABLED"}", isImportant = false)
     }
 
     private suspend fun observeAlarmEvents(alarmManager: AppAlarmManager) {
