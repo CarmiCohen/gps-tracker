@@ -17,6 +17,14 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.24.10:
+ * - Issue #1301 REMEDIATION: Loaded and persisted remote tracker Lux and Acoustic baselines 
+ *   within ViewerService to eliminate baseline learning lag upon restart (R-ID 461).
+ * - Issue #1302 REMEDIATION: Aligned selfProcessor with sensor updates in processTick to 
+ *   ensure correct local motion awareness.
+ * - Issue #1303 REMEDIATION: Removed cross-role HardwareSuite sensitivity contamination by 
+ *   decoupling local hardware settings from remote tracker anchors.
+ * - Issue #1304 REMEDIATION: Fixed peer stat reset logic to prevent local state corruption.
  * Sep.24.04:
  * - Issue #1271 REMEDIATION: Restored hardwareSuite's adaptive vibration floor during 
  *   initialization using the persisted value to prevent sensitivity resets.
@@ -100,6 +108,8 @@ class ViewerService : BaseMonitorService() {
         val savedLastSitTs = repository.getLong("V_" + LAST_SIT_TS_KEY, 0L)
         val savedBaseline = repository.getDouble("V_" + CHAIR_BASELINE_TILT_KEY, -1000.0)
         val savedVibeFloor = repository.getDouble("V_" + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0)
+        val savedLuxBaseline = repository.getDouble("V_" + TRACKER_LUX_BASELINE_KEY, -1.0)
+        val savedAcousticFloor = repository.getDouble("V_" + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
         val trackerState = repository.loadTrackerState("V_")
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
         val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
@@ -118,14 +128,15 @@ class ViewerService : BaseMonitorService() {
             savedSitShock = trackerState?.sitShock ?: 0.0,
             savedSitVzTs = trackerState?.sitVzTs ?: 0L,
             savedSitVzRt = trackerState?.sitVzRt ?: 0L,
-            savedVibrationFloor = savedVibeFloor
+            savedVibrationFloor = savedVibeFloor,
+            savedLuxBaseline = savedLuxBaseline,
+            savedAcousticFloor = savedAcousticFloor
         )
         
         selfProcessor.loadState(0.0, 0L, -1000.0, null, homePoints, maxDist)
 
-        if (savedVibeFloor >= 0.0) {
-            hardwareSuite.setAdaptiveVibrationFloor(savedVibeFloor)
-        }
+        // Issue #1303: Decoupled local hardwareSuite from remote tracker sensitivity anchor.
+        // Local floor will re-adapt autonomously for the monitor device.
 
         val savedAlarms = repository.getLastAlarmsJson("V_")
         alarmManager.restoreState(savedAlarms)
@@ -288,6 +299,12 @@ class ViewerService : BaseMonitorService() {
             }
             is ProcessorEvent.VibrationFloorChanged -> {
                 if (!isSelf) repository.saveDoubleSync("V_" + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
+            }
+            is ProcessorEvent.LuxBaselineChanged -> {
+                if (!isSelf) repository.saveDoubleSync("V_" + TRACKER_LUX_BASELINE_KEY, event.baseline)
+            }
+            is ProcessorEvent.AcousticFloorChanged -> {
+                if (!isSelf) repository.saveDoubleSync("V_" + TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
             }
             is ProcessorEvent.GpsStallDetected -> {
                 if (isSelf) logManager.logServiceEvent(m = "GPS STALL: Fix unchanged for >1s", isImportant = false)
@@ -556,6 +573,9 @@ class ViewerService : BaseMonitorService() {
             }
             lastPowerSaveCheckRt = nowRt
         }
+
+        // Issue #1302: Corrected local sensor integration for selfProcessor
+        selfProcessor.updateSensorData(evalSnapshot.sensor)
 
         val location = lastKnownLocation
         if (location != null) {

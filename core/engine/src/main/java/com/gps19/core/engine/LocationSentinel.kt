@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Sep.24.10:
+ * - Issue #1301: Expanded loadForensicState to restore persisted Lux and Acoustic 
+ *   baselines, eliminating the learning period on service restart (R-ID 461).
  * Sep.24.03:
  * - Issue #1271: Implemented persistence for Adaptive Vibration Floor. Updated 
  *   loadForensicState to restore the vibration floor anchor.
@@ -105,7 +108,9 @@ class LocationSentinel {
         savedSitShock: Double = 0.0,
         savedSitVzTs: Long = 0L,
         savedSitVzRt: Long = 0L,
-        savedVibrationFloor: Double = -1.0
+        savedVibrationFloor: Double = -1.0,
+        savedLuxBaseline: Double = -1.0,
+        savedAcousticFloor: Double = -1.0
     ) {
         this.lastSitTs = savedLastSitTs
         this.baselineSitTilt = savedBaseline
@@ -118,6 +123,12 @@ class LocationSentinel {
         this.lastSitVzRt = savedSitVzRt
         if (savedVibrationFloor >= 0.0) {
             this.adaptiveVibrationFloor = savedVibrationFloor
+        }
+        if (savedLuxBaseline >= 0.0) {
+            this.luxBaseline = savedLuxBaseline
+        }
+        if (savedAcousticFloor >= 0.0) {
+            this.acousticFloorDb = savedAcousticFloor
         }
     }
 

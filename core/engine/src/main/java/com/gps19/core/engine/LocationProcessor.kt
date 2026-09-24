@@ -16,6 +16,8 @@ sealed class ProcessorEvent {
     data class MaxAccuracyChanged(val accuracy: Double) : ProcessorEvent()
     data class ChairBaselineChanged(val baseline: Double) : ProcessorEvent()
     data class VibrationFloorChanged(val floor: Double) : ProcessorEvent()
+    data class LuxBaselineChanged(val baseline: Double) : ProcessorEvent()
+    data class AcousticFloorChanged(val floor: Double) : ProcessorEvent()
     data class GpsStallDetected(val rt: Long) : ProcessorEvent()
 }
 
@@ -28,6 +30,8 @@ interface LocationProcessorListener {
     fun onMaxAccuracyChanged(accuracy: Double) {}
     fun onChairBaselineChanged(baseline: Double) {}
     fun onVibrationFloorChanged(floor: Double) {}
+    fun onLuxBaselineChanged(baseline: Double) {}
+    fun onAcousticFloorChanged(floor: Double) {}
     fun onGpsStallDetected(rt: Long) {}
 }
 
@@ -38,6 +42,9 @@ open class DefaultLocationProcessorListener : LocationProcessorListener
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.24.10:
+ * - Issue #1301: Implemented persistence for Lux and Acoustic baselines. Added loadState 
+ *   restoration and event emission for significant drift (R-ID 461).
  * Sep.24.03:
  * - Issue #1271: Implemented persistence for Adaptive Vibration Floor. Added loadState 
  *   support and VibrationFloorChanged event emission for storage sync.
@@ -111,7 +118,9 @@ class LocationProcessor(
         savedSitShock: Double = 0.0,
         savedSitVzTs: Long = 0L,
         savedSitVzRt: Long = 0L,
-        savedVibrationFloor: Double = -1.0
+        savedVibrationFloor: Double = -1.0,
+        savedLuxBaseline: Double = -1.0,
+        savedAcousticFloor: Double = -1.0
     ) {
         if (savedMaxAccuracy > 0.0) {
             maxAccuracy = savedMaxAccuracy
@@ -124,7 +133,8 @@ class LocationProcessor(
         sentinel.loadForensicState(
             savedLastSitTs, savedBaseline,
             savedSitVz, savedSitDz, savedSitBaro, savedSitTilt, savedSitShock,
-            savedSitVzTs, savedSitVzRt, savedVibrationFloor
+            savedSitVzTs, savedSitVzRt, savedVibrationFloor,
+            savedLuxBaseline, savedAcousticFloor
         )
         
         if (trackerState != null && trackerState.lat != 0.0) {
@@ -232,13 +242,29 @@ class LocationProcessor(
                 _processorEvents.tryEmit(ProcessorEvent.LogAdded(message, "system", false, true, 0.0, 0.0, 0.0, null, snapshot.vibration))
             }
         ) {
-            val oldFloor = sentinel.adaptiveVibrationFloor
+            val oldVibeFloor = sentinel.adaptiveVibrationFloor
+            val oldLuxBaseline = sentinel.luxBaseline
+            val oldAcousticFloor = sentinel.acousticFloorDb
+            
             val baselineChanged = sentinel.updateSensorState(snapshot)
-            val newFloor = sentinel.adaptiveVibrationFloor
+            
+            val newVibeFloor = sentinel.adaptiveVibrationFloor
+            val newLuxBaseline = sentinel.luxBaseline
+            val newAcousticFloor = sentinel.acousticFloorDb
             
             // Issue #1271: Persist vibration floor if significant change detected (>0.01g)
-            if (abs(newFloor - oldFloor) > 0.01) {
-                _processorEvents.tryEmit(ProcessorEvent.VibrationFloorChanged(newFloor))
+            if (abs(newVibeFloor - oldVibeFloor) > 0.01) {
+                _processorEvents.tryEmit(ProcessorEvent.VibrationFloorChanged(newVibeFloor))
+            }
+            
+            // Issue #1301: Persist Lux baseline if significant change detected (>1.0 lux)
+            if (abs(newLuxBaseline - oldLuxBaseline) > 1.0) {
+                _processorEvents.tryEmit(ProcessorEvent.LuxBaselineChanged(newLuxBaseline))
+            }
+
+            // Issue #1301: Persist Acoustic floor if significant change detected (>1.0 dB)
+            if (abs(newAcousticFloor - oldAcousticFloor) > 1.0) {
+                _processorEvents.tryEmit(ProcessorEvent.AcousticFloorChanged(newAcousticFloor))
             }
 
             if (baselineChanged) {
@@ -410,7 +436,10 @@ class LocationProcessor(
             if (isLocal) updateWindowedAccuracy(accuracy) else if (providedMaxAccuracy > 0.0) maxAccuracy = providedMaxAccuracy
             
             if (providedAcousticLockoutRt > 0 || providedLightSpikeRt > 0 || providedAdaptiveVibrationFloor >= 0.0) {
-                val oldFloor = sentinel.adaptiveVibrationFloor
+                val oldVibeFloor = sentinel.adaptiveVibrationFloor
+                val oldLuxBaseline = sentinel.luxBaseline
+                val oldAcousticFloor = sentinel.acousticFloorDb
+                
                 val snapshot = SensorStateSnapshot(
                     vibration = -1.0, heading = -1.0, baroAlt = -1000.0, 
                     acousticLockoutRt = providedAcousticLockoutRt, 
@@ -419,9 +448,19 @@ class LocationProcessor(
                     isMuzzled = isMuzzled, nowRt = nowRt, nowTs = nowWall
                 )
                 sentinel.updateSensorState(snapshot)
-                val newFloor = sentinel.adaptiveVibrationFloor
-                if (abs(newFloor - oldFloor) > 0.01) {
-                    _processorEvents.tryEmit(ProcessorEvent.VibrationFloorChanged(newFloor))
+                
+                val newVibeFloor = sentinel.adaptiveVibrationFloor
+                val newLuxBaseline = sentinel.luxBaseline
+                val newAcousticFloor = sentinel.acousticFloorDb
+
+                if (abs(newVibeFloor - oldVibeFloor) > 0.01) {
+                    _processorEvents.tryEmit(ProcessorEvent.VibrationFloorChanged(newVibeFloor))
+                }
+                if (abs(newLuxBaseline - oldLuxBaseline) > 1.0) {
+                    _processorEvents.tryEmit(ProcessorEvent.LuxBaselineChanged(newLuxBaseline))
+                }
+                if (abs(newAcousticFloor - oldAcousticFloor) > 1.0) {
+                    _processorEvents.tryEmit(ProcessorEvent.AcousticFloorChanged(newAcousticFloor))
                 }
             }
 

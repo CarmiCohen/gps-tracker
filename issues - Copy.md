@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.10
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.04
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -10,9 +10,21 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1256: Monotonic Latch Staleness Across Reboots**
     *   *Description*: Persistence of siren cooldowns and violation timers using `elapsedRealtime` causes them to remain valid across reboots. Since `nowRt` resets to 0, old high-value latches can silence sirens for days.
     *   *Contribution*: **Critical (Safety)**. Prevents the "Permanent Muzzle" bug where safety features fail to trigger after a device restart.
+*   **Issue #1302: Redundant and Misaligned LocationProcessor in ViewerService**
+    *   *Finding*: `ViewerService` inherits an injected `LocationProcessor` from `BaseMonitorService` but also instantiates `selfProcessor` and `remoteProcessor`. The injected instance is updated with sensor data in `processTick`, while `selfProcessor` (used for local Viewer tracking) is not. This results in the Viewer role having degraded motion awareness and incorrect stationary detection for its own device.
+    *   *Contribution*: **High (Core Logic)**. Restores proper physical awareness and role fidelity to the Viewer role.
 *   **Issue #1307: Forensic Sampling Bottleneck During Rapid Event Sequences**
     *   *Finding*: The `forensicSamplingLoop` in `TrackerService` uses a conflated channel and an internal `delay(delayMs)`. If multiple physical spikes (acoustic/light) occur rapidly, the loop will be stuck in a delay from the first trigger, causing subsequent high-priority triggers to be dropped. Forensic captures should be decoupled from the sampling rate delay during spike events.
     *   *Contribution*: **High (Forensic Integrity)**. Ensures critical evidence (acoustic/light spikes) is never dropped during a theft event.
+*   **Issue #1301: Missing Persistence for Lux and Acoustic Baselines** (Gap in #1271)
+    *   *Finding*: Issue #1271 implemented persistence for the vibration floor, but omitted Lux and Acoustic baselines. These values reset to defaults on every service restart, leading to a "learning period" where false-positive tamper alerts are highly likely until the environment stabilizes again.
+    *   *Contribution*: **High (Alert Quality)**. Eliminates false-positive tamper alerts during the first 60 seconds of service startup.
+*   **Issue #1303: Cross-Role HardwareSuite Sensitivity Contamination** (Risk in #1230 / #1271)
+    *   *Finding*: `ViewerService.onServiceInitialize` restores the remote tracker's vibration floor from `V_ADAPTIVE_VIBRATION_FLOOR_KEY` and applies it to the singleton `HardwareSuite.setAdaptiveVibrationFloor()`. This incorrectly forces the Viewer device to use the Tracker's physical sensitivity anchor, corrupting local motion detection.
+    *   *Contribution*: **High (Safety Isolation)**. Ensures the physical profile of one device does not degrade the sensing accuracy of the other.
+*   **Issue #1304: Peer Stat Reset Logic Corrupts Local Tracker State** (Inconsistency in #1230)
+    *   *Finding*: `ConnectivitySuite.resetPeerStats()` uses the local role prefix (`T_` or `V_`) to clear baselines. In Tracker mode (`T_`), this causes the service to wipe its *own* Lux and Acoustic baselines on every disconnect/stop, negating the benefit of persistence and causing sensitivity resets.
+    *   *Contribution*: **High (Data Integrity)**. Guarantees that environmental calibration survives network drops.
 
 ### 🟡 Medium Priority (UX, Performance & Auditability)
 
@@ -119,14 +131,6 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
-*   **Issue #1301: Missing Persistence for Lux and Acoustic Baselines** (Resolved Sep.24.10)
-    *   *Remediation*: Implemented persistence for Lux and Acoustic baselines. Expanded `loadForensicState` to restore these anchors and added reactive event emission for significant drift to eliminate the startup learning period (R-ID 461).
-*   **Issue #1302: Redundant and Misaligned LocationProcessor in ViewerService** (Resolved Sep.24.10)
-    *   *Remediation*: Aligned the Viewer's `selfProcessor` with local sensor updates in `processTick`, ensuring correct motion awareness and role fidelity.
-*   **Issue #1303: Cross-Role HardwareSuite Sensitivity Contamination** (Resolved Sep.24.10)
-    *   *Remediation*: Decoupled local hardware settings from remote tracker anchors in `ViewerService`, ensuring the monitor device maintains autonomous physical sensitivity.
-*   **Issue #1304: Peer Stat Reset Logic Corrupts Local Tracker State** (Resolved Sep.24.10)
-    *   *Remediation*: Fixed stat reset routing in `ConnectivitySuite` to prevent local role state corruption during network drops.
 *   **Issue #1273: Atomic User Counter Risk in HardwareSuite** (Resolved Sep.24.04)
     *   *Remediation*: Guarded the `activeUsers` AtomicInteger in `HardwareSuite.stop()` to prevent it from falling into negative values. Hardened the deferred teardown check to use `<= 0` (R-ID 460).
 *   **Issue #1271: Missing Persistence for Adaptive Vibration Floor** (Resolved Sep.24.04)
@@ -152,4 +156,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 461 (Rules: 92, IDs: 461), Resolved: 1204, Open: 14, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**
+- **Current Audit Baseline: [SOT: 460 (Rules: 92, IDs: 460), Resolved: 1200, Open: 18, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**

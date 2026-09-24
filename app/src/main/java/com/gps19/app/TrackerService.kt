@@ -23,6 +23,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.24.10:
+ * - Issue #1301 REMEDIATION: Loaded and persisted Lux and Acoustic baselines across service
+ *   restarts to eliminate the startup baseline learning period (R-ID 461).
  * Sep.24.04:
  * - Issue #1271 REMEDIATION: Restored hardwareSuite's adaptive vibration floor during 
  *   initialization using the persisted value to prevent sensitivity resets.
@@ -116,10 +119,23 @@ class TrackerService : BaseMonitorService() {
         val savedLastSitTs = repository.getLong("T_" + LAST_SIT_TS_KEY, 0L)
         val savedBaseline = repository.getDouble("T_" + CHAIR_BASELINE_TILT_KEY, -1000.0)
         val savedVibeFloor = repository.getDouble("T_" + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0)
+        val savedLuxBaseline = repository.getDouble("T_" + TRACKER_LUX_BASELINE_KEY, -1.0)
+        val savedAcousticFloor = repository.getDouble("T_" + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
         val trackerState = repository.loadTrackerState("T_")
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
         val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
-        locationProcessor.loadState(savedMaxAcc, savedLastSitTs, savedBaseline, trackerState, homePoints, maxDist, savedVibrationFloor = savedVibeFloor)
+        
+        locationProcessor.loadState(
+            savedMaxAccuracy = savedMaxAcc,
+            savedLastSitTs = savedLastSitTs,
+            savedBaseline = savedBaseline,
+            trackerState = trackerState,
+            homePoints = homePoints,
+            maxDistance = maxDist,
+            savedVibrationFloor = savedVibeFloor,
+            savedLuxBaseline = savedLuxBaseline,
+            savedAcousticFloor = savedAcousticFloor
+        )
 
         if (savedVibeFloor >= 0.0) {
             hardwareSuite.setAdaptiveVibrationFloor(savedVibeFloor)
@@ -283,6 +299,12 @@ class TrackerService : BaseMonitorService() {
                     }
                     is ProcessorEvent.VibrationFloorChanged -> {
                         repository.saveDoubleSync("T_" + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
+                    }
+                    is ProcessorEvent.LuxBaselineChanged -> {
+                        repository.saveDoubleSync("T_" + TRACKER_LUX_BASELINE_KEY, event.baseline)
+                    }
+                    is ProcessorEvent.AcousticFloorChanged -> {
+                        repository.saveDoubleSync("T_" + TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
                     }
                     else -> {}
                 }
@@ -708,7 +730,7 @@ class TrackerService : BaseMonitorService() {
         if (isViewerActive) {
             val procViewer = lastProcessedLocation
             connectivitySuite.pushCurrentStatus(
-                deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true, loc = lastLocInBatch, filtered = procViewer?.optimizedPoint, distToTracker = null, distToHome = procViewer?.distToHome, maxAccuracy = procViewer?.maxAccuracy ?: 0.0, filteredSpeed = procViewer?.filteredSpeed ?: 0.0, vibration = evalSnapshot.sensor.vibration, heading = evalSnapshot.sensor.heading, baroAlt = evalSnapshot.sensor.baroAlt, lux = evalSnapshot.sensor.lux, isNear = evalSnapshot.sensor.isNear, tiltDegrees = evalSnapshot.sensor.tiltDegrees, acousticDb = evalSnapshot.sensor.acousticDb, jumpTier = procViewer?.jumpTier ?: 0, isJammer = procViewer?.jammerDetected ?: false, isStalled = evalSnapshot.health.gpsStalled, peakShock = evalSnapshot.sensor.peakShock, peakShockTs = now, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = snapshot.proximityIdx, proximityCm = snapshot.proximityCm, proximityDebounceMs = snapshot.proximityDebounceMs, vibrationRollingSum = snapshot.vibrationRollingSum, micPending = false, isTamperDetected = procViewer?.tamperDetected ?: false, isPowerTamper = evalSnapshot.health.isPowerTamper, isSitDetected = isSuspiciousMode, isSitActive = false, lastSitTs = locationProcessor.getLastSitTs(), receiptRt = nowRt, violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(), verticalVelocity = evalSnapshot.sensor.peakVerticalVelocity, sitVz = evalSnapshot.sensor.peakVerticalVelocity, sitVzTs = evalSnapshot.sensor.peakVerticalVelocityTs, sitVzRt = evalSnapshot.sensor.peakVerticalVelocityRt, sitDz = evalSnapshot.sensor.peakVerticalDisplacement, sitBaro = evalSnapshot.sensor.peakVerticalDisplacement, sitTilt = evalSnapshot.sensor.tiltDegrees, sitShock = evalSnapshot.sensor.peakShock, isClockRegression = procViewer?.isClockRegression ?: false, isLocationPending = evalSnapshot.health.isLocationPending, locationPendingReason = evalSnapshot.health.locationPendingReason, lastValidFixRt = evalSnapshot.health.lastValidFixRt, gnssDetail = latestGnssDetail, snrIdx = snrIdx, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = evalSnapshot.sensor.vibration / RIBBON_VIBRATION_SCALE_G, liftIdx = liftIdx, tiltIdx = tiltIdx, baroIdx = baroIdx, isBatterySteepDischarge = evalSnapshot.health.isBatterySteepDischarge, isCoolingModeActive = evalSnapshot.health.isCoolingModeActive, batteryLevel = evalSnapshot.health.batteryLevel, temp = evalSnapshot.health.batteryTemp, isCharging = evalSnapshot.health.isCharging, trackerState = if ((procViewer?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING, status = procViewer?.status ?: SentinelStatus.VALID, isStorageLow = evalSnapshot.health.isStorageLow, isStorageCritical = evalSnapshot.health.isStorageCritical, isPowerSaveMode = isPowerSaveActive || evalSnapshot.health.isPowerSaveMode, standbyBucket = evalSnapshot.health.standbyBucket, netInterface = evalSnapshot.health.netInterface, kineticEnergy = evalSnapshot.sensor.kineticEnergy, isAdaptiveJump = procViewer?.isAdaptiveJump ?: false, isBatteryLow = evalSnapshot.health.isBatteryLow, isBatteryCritical = evalSnapshot.health.isBatteryCritical, isUltraLongStationary = evalSnapshot.health.isUltraLongStationary, gpsHardwareLock = evalSnapshot.health.gpsHardwareLock,
+                deviceId = configManager.deviceId, viewerId = configManager.viewerId, isTrackerMode = true, loc = lastLocInBatch, filtered = procViewer?.optimizedPoint, distToTracker = null, distToHome = procViewer?.distToHome, maxAccuracy = procViewer?.maxAccuracy ?: 0.0, filteredSpeed = procViewer?.filteredSpeed ?: 0.0, vibration = evalSnapshot.sensor.vibration, heading = evalSnapshot.sensor.heading, baroAlt = evalSnapshot.sensor.baroAlt, lux = evalSnapshot.sensor.lux, isNear = evalSnapshot.sensor.isNear, tiltDegrees = evalSnapshot.sensor.tiltDegrees, acousticDb = evalSnapshot.sensor.acousticDb, jumpTier = procViewer?.jumpTier ?: 0, isJammer = procViewer?.jammerDetected ?: false, isStalled = evalSnapshot.health.gpsStalled, peakShock = evalSnapshot.sensor.peakShock, peakShockTs = now, luxBaseline = locationProcessor.getLuxBaseline(), acousticFloorDb = locationProcessor.getAcousticFloorDb(), adaptiveVibrationFloor = locationProcessor.getAdaptiveVibrationFloor(), proxIdx = snapshot.proximityIdx, proximityCm = snapshot.proximityCm, proximityDebounceMs = snapshot.proximityDebounceMs, vibrationRollingSum = snapshot.vibrationRollingSum, micPending = false, isTamperDetected = procViewer?.tamperDetected ?: false, isPowerTamper = evalSnapshot.health.isPowerTamper, isSitDetected = isSuspiciousMode, isSitActive = false, lastSitTs = locationProcessor.getLastSitTs(), receiptRt = nowRt, violationUptimeMs = sessionManager.violationUptimeMs, violationPercentage = sessionManager.getViolationPercentage(), verticalVelocity = evalSnapshot.sensor.peakVerticalVelocity, sitVz = evalSnapshot.sensor.peakVerticalVelocity, sitVzTs = evalSnapshot.sensor.peakVerticalVelocityTs, sitVzRt = evalSnapshot.sensor.peakVerticalVelocityRt, sitDz = evalSnapshot.sensor.peakVerticalDisplacement, sitBaro = evalSnapshot.sensor.peakVerticalDisplacement, sitTilt = evalSnapshot.sensor.tiltDegrees, sitShock = evalSnapshot.sensor.peakShock, isClockRegression = procViewer?.isClockRegression ?: false, isLocationPending = evalSnapshot.health.isLocationPending, locationPendingReason = evalSnapshot.health.locationPendingReason, lastValidFixRt = evalSnapshot.health.lastValidFixRt, gnssDetail = latestGnssDetail, snrIdx = snrIdx, noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = evalSnapshot.sensor.vibration / RIBBON_VIBRATION_SCALE_G, liftIdx = liftIdx, tiltIdx = tiltIdx, baroIdx = baroIdx, isBatterySteepDischarge = procViewer?.isClockRegression ?: false, isCoolingModeActive = evalSnapshot.health.isCoolingModeActive, batteryLevel = evalSnapshot.health.batteryLevel, temp = evalSnapshot.health.batteryTemp, isCharging = evalSnapshot.health.isCharging, trackerState = if ((procViewer?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING, status = procViewer?.status ?: SentinelStatus.VALID, isStorageLow = evalSnapshot.health.isStorageLow, isStorageCritical = evalSnapshot.health.isStorageCritical, isPowerSaveMode = isPowerSaveActive || evalSnapshot.health.isPowerSaveMode, standbyBucket = evalSnapshot.health.standbyBucket, netInterface = evalSnapshot.health.netInterface, kineticEnergy = evalSnapshot.sensor.kineticEnergy, isAdaptiveJump = procViewer?.isAdaptiveJump ?: false, isBatteryLow = evalSnapshot.health.isBatteryLow, isBatteryCritical = evalSnapshot.health.isBatteryCritical, isUltraLongStationary = evalSnapshot.health.isUltraLongStationary, gpsHardwareLock = evalSnapshot.health.gpsHardwareLock,
                 tamperNote = procViewer?.suppressionNote
             )
         }

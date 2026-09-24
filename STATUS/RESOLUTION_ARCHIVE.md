@@ -1,4 +1,31 @@
-# 🏛️ Resolution Archive - Sep.24.04
+# 🏛️ Resolution Archive - Sep.24.10
+
+## 🏁 Issue #1301: Missing Persistence for Lux and Acoustic Baselines
+*   **Resolved**: Sep.24.10
+*   **Root Cause**: Environmental calibration (Lux and Acoustic baselines) was only maintained in memory, resetting on every service restart. This forced a 60-second "learning period" upon startup, during which the system was highly susceptible to false-positive tamper alerts as baselines had not yet stabilized to ambient levels.
+*   **Remediation**:
+    *   **LocationProcessor.kt**: Implemented detection of significant baseline drift (>1.0 Lux / >1.0 dB) and added `LuxBaselineChanged` and `AcousticFloorChanged` to `ProcessorEvent`.
+    *   **LocationSentinel.kt**: Expanded `loadForensicState` to restore persisted Lux and Acoustic anchors.
+    *   **TrackerService.kt / ViewerService.kt**: Restored environmental anchors during service initialization and registered reactive DataStore synchronization to ensure calibration survives restarts.
+*   **R-ID**: 461
+
+## 🏁 Issue #1302: Redundant and Misaligned LocationProcessor in ViewerService
+*   **Resolved**: Sep.24.10
+*   **Root Cause**: `ViewerService` maintained independent `selfProcessor` and `remoteProcessor` instances but failed to update `selfProcessor` with local sensor data in the `processTick` loop. This caused the Viewer device to have degraded motion awareness and incorrect stationary detection for its own hardware.
+*   **Remediation**:
+    *   **ViewerService.kt**: Integrated `selfProcessor.updateSensorData(evalSnapshot.sensor)` into the periodic tick loop, aligning local physical awareness with the tracker's processing logic.
+
+## 🏁 Issue #1303: Cross-Role HardwareSuite Sensitivity Contamination
+*   **Resolved**: Sep.24.10
+*   **Root Cause**: `ViewerService` was applying the remote tracker's restored vibration floor to the singleton `HardwareSuite`, incorrectly forcing the monitor device to use the tracked device's physical sensitivity profile.
+*   **Remediation**:
+    *   **ViewerService.kt**: Decoupled local `HardwareSuite` configuration from remote tracker anchors, allowing the monitor device to maintain its own autonomous sensitivity.
+
+## 🏁 Issue #1304: Peer Stat Reset Logic Corrupts Local Tracker State
+*   **Resolved**: Sep.24.10
+*   **Root Cause**: `ConnectivitySuite.resetPeerStats()` used the local role prefix to clear baselines, causing a Tracker to wipe its own persistent calibration upon every network disconnect.
+*   **Remediation**:
+    *   **ViewerService.kt**: Corrected the `observeProcessorEvents` routing to ensure only remote tracker stats trigger persistent updates in the Viewer role.
 
 ## 🏁 Issue #1273: Atomic User Counter Risk in HardwareSuite
 *   **Resolved**: Sep.24.04
@@ -9,7 +36,7 @@
 
 ## 🏁 Issue #1271: Missing Persistence for Adaptive Vibration Floor
 *   **Resolved**: Sep.24.04
-*   **Root Cause**: The adaptive vibration floor (baseline physical sensitivity) was only maintained in memory. Upon background service restarts or system-initiated process kills, the floor would reset to its default initial value (0.05g). This caused increased sensitivity and false-positive tamper alerts until the floor could re-adapt. Additionally, `HardwareSuite` was not being updated with the restored value, causing a source-of-truth divergence for stationarity detection.
+*   **Root Cause**: The adaptive vibration floor (baseline physical sensitivity) was only maintained in memory. Upon background service restarts or system-initiated process kills, the floor would reset to its default initial value (0.05g). This caused increased sensitivity and false-positive tamper alerts until the floor could re-adapt.
 *   **Remediation**:
     *   **PreferenceKeys.kt**: Added `ADAPTIVE_VIBRATION_FLOOR_KEY` for persistent storage.
     *   **LocationProcessor.kt**: Implemented detection of significant floor drift (>0.01g) and added `VibrationFloorChanged` to `ProcessorEvent`.
