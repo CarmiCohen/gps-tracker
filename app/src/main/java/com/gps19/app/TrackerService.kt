@@ -23,6 +23,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.24.01:
+ * - Issue #1233 REMEDIATION: Omitted fast-path callbacks in processTick to eliminate 
+ *   high allocation churn of lambda re-registration on every tick.
  * Sep.23.70:
  * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation (prefix "T_")
  *   to prevent logic state corruption when switching between roles (R-ID 453).
@@ -491,22 +494,13 @@ class TrackerService : BaseMonitorService() {
 
         val evalSnapshot = EvaluationSnapshot(health = health, sensor = sensorSnapshot)
 
+        // Issue #1233: Omit onSpike callback to prevent high allocation churn during tick updates.
         hardwareSuite.setLightFastPath(
-            baseline = locationProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP,
-            onSpike = {
-                logManager.logServiceEvent(m = "Light Spike Detected (FastPath)", isImportant = false)
-                lastFastPathLightSpikeTs = timeProvider.elapsedRealtime()
-                triggerForensicSample()
-            }
+            baseline = locationProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP
         )
 
         hardwareSuite.setAcousticFastPath(
-            floor = locationProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0,
-            onSpike = {
-                logManager.logServiceEvent(m = "Acoustic Spike Detected (FastPath)", isImportant = false)
-                lastFastPathAcousticSpikeTs = timeProvider.elapsedRealtime()
-                triggerForensicSample()
-            }
+            floor = locationProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0
         )
 
         hardwareSuite.setHighLoad(evalSnapshot.health.isCoolingModeActive)

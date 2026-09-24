@@ -33,6 +33,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.24.01:
+ * - Issue #1233 REMEDIATION: Made fast-path onSpike callbacks optional to prevent 
+ *   high allocation churn of lambda re-registration on every service tick.
  * Sep.22.28:
  * - Issue #1187: Clobbered Fast-Path Baseline Learning on Sensor Thread. Added 
  *   preserveExistingBaseline parameter to HardwareFastPath update to protect 
@@ -115,13 +118,15 @@ class HardwareSuite @Inject constructor(
             onSpike = null; lastSpikeRt = 0L
         }
 
-        fun update(baseline: Double, threshold: Double, min: Double = -1.0, preserveExistingBaseline: Boolean = false, callback: () -> Unit) {
+        fun update(baseline: Double, threshold: Double, min: Double = -1.0, preserveExistingBaseline: Boolean = false, callback: (() -> Unit)? = null) {
             if (!preserveExistingBaseline || this.baseline < 0) {
                 this.baseline = baseline
             }
             this.spikeThreshold = threshold
             this.minThreshold = min
-            this.onSpike = callback
+            if (callback != null) {
+                this.onSpike = callback
+            }
         }
 
         fun evaluate(currentValue: Double, nowRt: Long, isWarming: Boolean, debounceMs: Long, alpha: Double = 0.0): Boolean {
@@ -1009,11 +1014,11 @@ class HardwareSuite @Inject constructor(
     
     fun isStationary() = SentinelValidator.isStationary(currentVibrationIndex, adaptiveVibrationFloor)
     
-    fun setAcousticFastPath(floor: Double, spikeThreshold: Double, minDb: Double, onSpike: () -> Unit) { 
+    fun setAcousticFastPath(floor: Double, spikeThreshold: Double, minDb: Double, onSpike: (() -> Unit)? = null) { 
         synchronized(this) { acousticFastPath.update(floor, spikeThreshold, minDb, false, onSpike) } 
     }
 
-    fun setLightFastPath(baseline: Double, spikeThreshold: Double, onSpike: () -> Unit) { 
+    fun setLightFastPath(baseline: Double, spikeThreshold: Double, onSpike: (() -> Unit)? = null) {
         synchronized(this) { lightFastPath.update(baseline, spikeThreshold, -1.0, true, onSpike) }
     }
     
