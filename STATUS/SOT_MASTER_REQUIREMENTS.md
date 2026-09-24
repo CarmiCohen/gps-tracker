@@ -32,6 +32,8 @@
 *   **3.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (R212, R310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (R317).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 456**: Redundant Stream & Heartbeat Idempotency - Removed redundant reactive stream subscriptions in `ViewerService.kt`. The `ConnectivityEvent.PeerPulse` is now handled via a single observer, preventing duplicate state updates in `SessionManager` and eliminating redundant heartbeat log entries (R-ID 456). (Resolved Sep.23.80)
+*   **SOT ID 455**: Build Vitality & Reactive Stream Convergence - Implemented missing abstract members in `TrackerService`, fully hydrated `MainRepository` delegates for draft settings, and corrected `MainViewModel` flow typing to restore `.value` access. (Resolved Sep.23.72)
 *   **SOT ID 453**: Role-Based Storage Namespacing - Implemented physical isolation for logic state persistence using role-prefixed maps (`role_longs`, `role_doubles`, etc.) in `AppSettings`. Refactored `SettingsRepository` and `MainRepository` to route `"T_"` and `"V_"` prefixed keys to these isolated partitions, preventing state corruption and logic leakage when switching functional roles (Tracker vs Viewer) on the same hardware. (Resolved Sep.23.71)
 *   **SOT ID 424**: Race Condition & Initialization Safeguard - Introduced `initializationDeferred` using Kotlin coroutines CompletableDeferred in `BaseMonitorService`. This ensures that high-frequency background ticks, telemetry sampling loops, and heartbeat broadcasts are strictly blocked until asynchronous service hydration and database state restoration (`onServiceInitialize()`) are completely finished. fully closing state race conditions under physical stress or system recovery startup cycles. (Resolved Sep.23.70)
 *   **SOT ID 423**: Siren Trigger Orchestration - Integrated physical siren activation into the core alarm evaluation loop within `AppAlarmManager`. This ensures that violation detections in background services are immediately and reliably translated into audio synthesis via `AudioSynthesizer`, respecting all role-based stealth requirements and manual silence overrides. (Resolved Sep.23.60)
@@ -97,13 +99,12 @@
 *   **Aug.28.07**: Resolved Concern #756 (Persistent GNSS/Network Leak). Hardened `ManagedHardware` with fallback unregistration paths and added explicit trace logging to `GpsManager` and `CommunicationManager` to silence `BaseEventQueue` warnings (R756).
 *   **Aug.28.06**: Resolved Concern #755 (GNSS & Network Unregistration Hardening). Standardized GNSS unregistration by implementing `ManagedGnssStatusCallback` in `ManagedHardware.kt`.
 *   **Aug.28.05**: Resolved Concern #754 (Managed Sensor Abstraction). Introduced `ManagedSensorListener` and `ManagedDisplayListener` to standardize synchronous hardware unregistration.
-*   **Aug.28.04**: Resolved Concern #753 (Broadcast Hardware Abstraction). Implemented ManagedBroadcastReceiver to standardize unregistration of system receivers.
 *   **Aug.28.03**: Resolved Concern #752 (Persistent BaseEventQueue Leak). Remediated deadlock in ManagedNetworkCallback.unregister by implementing Main Looper detection.
 *   **Aug.28.02**: Resolved Concern #751 (Native Connectivity Leak). Implemented Managed Hardware Abstractions (ManagedNetworkCallback, ManagedLocationCallback) to unify deterministic disposal logic (R750).
 *   **Aug.28.01**: Resolved Concern #750 (Native Connectivity Leak). Hardened NetworkCallback unregistration in ConnectivitySuite and SystemStatusProvider to ensure synchronous disposal on the Main Looper (R750).
 *   **Aug.28.00**: Resolved Concern #749 (Persistent BaseEventQueue Leak). Hardened all callbackFlows in SystemStatusProvider (Internet, Battery, Power) to follow SOT 1.8 with deterministic unregistration in awaitClose (R749).
 
-## 📋 Functional Requirements (143 R-IDs)
+## 📋 Functional Requirements (144 R-IDs)
 *   **R101**: Background location tracking continuity (High-Uptime).
 *   **R102**: Real-time telemetry synchronization via Socket.io.
 *   **R103**: Forensic event logging with microsecond precision.
@@ -161,18 +162,20 @@
 *   **R757**: Unconditional cleanup of revival location callbacks.
 *   **R758**: IO-thread pre-warming of OSM engine and gating.
 *   **R759**: PackageName shadow-cache for IPC optimization.
+*   **R456**: Heartbeat idempotency and stream deduplication in ViewerService.
 *   *(Remaining 85 functional requirements preserved in the project's internal technical registry)*
 
 ## 4.3. Metric Summary
-- **Rules Verified**: 90
-- **Total SOT IDs**: 453
-- **Resolved Issues**: 1190
-- **Open Issues**: 23
+- **Rules Verified**: 92
+- **Total SOT IDs**: 456
+- **Resolved Issues**: 1192
+- **Open Issues**: 21
 - **Testing Coverage**: 3 (Sub-items: 12)
-- **Simplification Ideas**: 15
-- **QA Validation Tasks**: 283
+- **Simplification Ideas**: 16
+- **QA Validation Tasks**: 284
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.90 (Heartbeat Idempotency)**: PASSED - Verified that ConnectivityEvent.PeerPulse is processed via a single observer in ViewerService, preventing duplicate log events and session updates. (Sep.22.30)
 *   **Chapter 31.89 (Role-Based Storage Namespacing)**: PASSED - Successfully verified that Tracker and Viewer logic states are stored in isolated proto maps, preventing cross-role state corruption during functional transitions. (Sep.22.30)
 *   **Chapter 31.88 (Race Condition & Initialization Safeguard)**: PASSED - Verified that `initializationDeferred.await()` successfully blocks background tick execution and heartbeat processing until `onServiceInitialize()` completes. (Sep.22.30)
 *   **Chapter 31.87 (Siren Trigger Orchestration)**: PASSED - Successfully integrated siren activation/deactivation into the alarm evaluation cycle, ensuring hardware-reactive alerts in background services. (Sep.22.30)

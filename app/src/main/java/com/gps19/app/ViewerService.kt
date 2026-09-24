@@ -17,6 +17,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.23.80:
+ * - Issue #1231 REMEDIATION: Removed redundant observeHistoryEvents which caused 
+ *   duplicate heartbeat processing from ConnectivitySuite (R-ID 456).
  * Sep.23.70:
  * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation (prefix "V_")
  *   to prevent logic state corruption when switching between roles (R-ID 453).
@@ -83,7 +86,6 @@ class ViewerService : BaseMonitorService() {
         observeIntegrityEvents()
         observeProcessorEvents()
         observeConnectivityEvents()
-        observeHistoryEvents()
         observeCommandEvents()
         observeRevivalEvents()
         
@@ -284,16 +286,6 @@ class ViewerService : BaseMonitorService() {
     }
 
     private fun observeConnectivityEvents() {
-        lifecycleScope.launch(Dispatchers.Default) {
-            connectivitySuite.connectivityEvents.collectLatest { event ->
-                when (event) {
-                    is ConnectivityEvent.PeerPulse -> handleTrackerPulse(event.id)
-                }
-            }
-        }
-    }
-
-    private fun observeHistoryEvents() {
         lifecycleScope.launch(Dispatchers.Default) {
             connectivitySuite.connectivityEvents.collectLatest { event ->
                 when (event) {

@@ -1,4 +1,11 @@
-# 🏛️ Resolution Archive - Sep.23.72
+# 🏛️ Resolution Archive - Sep.23.80
+
+## 🏁 Issue #1231: Redundant Stream Overlap & Duplicate Heartbeat Processing
+*   **Resolved**: Sep.23.80
+*   **Root Cause**: `ViewerService.kt` contained a duplication error where `ConnectivityEvent.PeerPulse` was being observed by two separate functions (`observeConnectivityEvents` and `observeHistoryEvents`). This caused duplicate processing of heartbeat signals in `SessionManager` and redundant logging.
+*   **Remediation**:
+    *   **ViewerService.kt**: Removed the redundant `observeHistoryEvents` function and its call during service initialization. Consolidated the peer pulse handling into the primary `observeConnectivityEvents` loop.
+*   **R-ID**: 456
 
 ## 🏁 Issue #1250: Build Vitality & Reactive Stream Convergence
 *   **Resolved**: Sep.23.72

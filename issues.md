@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.23.72
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.23.80
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -6,10 +6,6 @@ Finalizing the audit of background service stability and functional convergence 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
 ### Background Service Infrastructure & Hardening Gaps (Rigorous Audit of #1171)
-
-*   **Issue #1231: Redundant Stream Overlap & Duplicate Heartbeat Processing in ViewerService**
-    *   *Description*: `ViewerService.kt` contains a copy-paste duplication error where heartbeat events are processed twice.
-    *   *Significance*: **Medium-High (Logic Bug)**.
 
 *   **Issue #1232: Empty Stub Implementation of OEM Power Hardening Overrides**
     *   *Description*: `DeviceHardeningStrategy.kt` contains purely cosmetic log messages.
@@ -35,8 +31,9 @@ Finalizing the audit of background service stability and functional convergence 
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 16)
+## 💡 Strategic Simplification Ideas (Ideas: 17)
 
+*   **Issue #1295: Redundant Stream Observer Audit** (Low): The duplicate heartbeat issue in `ViewerService` suggests a need for a systematic audit of all `BaseMonitorService` descendants to ensure no other redundant reactive streams are active, further reducing CPU wakeups.
 *   **Issue #1294: Build-Time Interface Validation** (Medium): Implement a custom Gradle task to verify that all `BaseMonitorService` descendants implement the full abstract interface before compilation, preventing the "unimplemented member" regressions seen in Sep.23.71.
 *   **Issue #1293: Lifecycle-Aware Tick Orchestrator** (Low-Medium)
 *   **Issue #1292: Reactive Siren State Binding** (High)
@@ -46,6 +43,8 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1231: Redundant Stream Overlap & Duplicate Heartbeat Processing in ViewerService** (Resolved Sep.23.80)
+    *   *Remediation*: Removed redundant `observeHistoryEvents` and consolidated peer pulse handling to ensure idempotent processing (R-ID 456).
 *   **Issue #1250: Build Vitality & Reactive Stream Convergence** (Resolved Sep.23.72)
     *   *Remediation*: Implemented missing abstract members in `TrackerService`, fully hydrated `MainRepository` delegates for draft settings, and corrected `MainViewModel` flow typing to restore `.value` access.
 *   **Issue #1230: Shared Storage Key Leakage & Cross-Role State Corruption** (Resolved Sep.23.70)
@@ -53,4 +52,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1236: Race Conditions and Premature Tick Execution** (Resolved Sep.23.70)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 455 (Rules: 92, IDs: 455), Resolved: 1191, Open: 22, Testing: 3 (Sub-items: 12), Ideas: 16, QA: 284]**
+- **Current Audit Baseline: [SOT: 456 (Rules: 92, IDs: 456), Resolved: 1192, Open: 21, Testing: 3 (Sub-items: 12), Ideas: 17, QA: 284]**
