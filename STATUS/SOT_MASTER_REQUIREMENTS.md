@@ -38,7 +38,7 @@
 *   **SOT ID 424**: Race Condition & Initialization Safeguard - Introduced `initializationDeferred` using Kotlin coroutines CompletableDeferred in `BaseMonitorService`. This ensures that high-frequency background ticks, telemetry sampling loops, and heartbeat broadcasts are strictly blocked until asynchronous service hydration and database state restoration (`onServiceInitialize()`) are completely finished. fully closing state race conditions under physical stress or system recovery startup cycles. (Resolved Sep.23.70)
 *   **SOT ID 423**: Siren Trigger Orchestration - Integrated physical siren activation into the core alarm evaluation loop within `AppAlarmManager`. This ensures that violation detections in background services are immediately and reliably translated into audio synthesis via `AudioSynthesizer`, respecting all role-based stealth requirements and manual silence overrides. (Resolved Sep.23.60)
 *   **SOT ID 422**: Centralized Single Source of Truth (SSOT) ViewModel Architecture - Re-consolidated role-specific ViewModels into a unified activity-scoped `MainViewModel`. Established a single point of subscription for high-frequency kinematic and diagnostic data streams, eliminating coroutine allocation churn (#1211) and ensuring map view states and configuration drafts remain persistent during navigation transitions (#1212, #1213). This architecture guarantees atomic state propagation across all functional roles (Tracker, Viewer, Setup). (Resolved Sep.23.50)
-*   **SOT ID 421**: Unified Hardware Lifecycle & Vendor Hardening - Consolidated Samsung, Xiaomi, and Huawei-specific power management adaptations and WakeLock policies into a central `DeviceHardeningStrategy`. Abstracted periodic stay-alive pulses into a dedicated `ProcessPriorityMonitor` to ensure process priority retention across deep sleep cycles and OEM-specific battery restrictions. (Resolved Sep.23.08)
+*   **SOT ID 421**: Unified Hardware Lifecycle & Vendor Hardening - Consolidated Samsung, Xiaomi, and Huawei-specific power management adaptations and WakeLock policies into a central `DeviceHardeningStrategy`. Implemented functional hardening logic for background execution continuity on Samsung/Huawei/Xiaomi hardware to prevent OS-level service termination (R-ID 421). (Resolved Sep.24.00)
 *   **SOT ID 417**: Logic State Persistence Expansion - Enhanced the alarm evaluation history matrix inside `AppAlarmManager` by mapping and embedding `firstTriggerTs`, `firstTriggerRt`, `lastLogTs`, and `lastLogRt` inside JSON persistence payloads. This prevents transient temporal resets after system memory process kills or system wake cycles, fully closing behavioral continuity gaps. (Resolved Sep.23.06)
 *   **SOT ID 420**: Shared Overlay Scope - Centralized all shared overlays (`SettingsOverlay`, `LogOverlay`, `RibbonsOverlay`, `GnssDetailOverlay`) into a dedicated `OverlayHost` component within `MainAppContent`. This eliminated extensive callback routing in `TrackerScreen` and `ViewerScreen`, ensuring overlays interact directly with `MainViewModel` and significantly reducing UI boilerplate. (Resolved Sep.23.04)
 *   **SOT ID 419**: Unified Draft Settings State Flow - Consolidated configuration draft events and top-level navigation logic into `MainViewModel`. This ensures that all UI components observing the global state reflect user input in real-time, regardless of the active functional role, and eliminates state dispersion between feature-specific ViewModels. (Resolved Sep.23.03)
@@ -168,19 +168,19 @@
 ## 4.3. Metric Summary
 - **Rules Verified**: 92
 - **Total SOT IDs**: 456
-- **Resolved Issues**: 1192
-- **Open Issues**: 21
+- **Resolved Issues**: 1193
+- **Open Issues**: 20
 - **Testing Coverage**: 3 (Sub-items: 12)
-- **Simplification Ideas**: 16
+- **Simplification Ideas**: 17
 - **QA Validation Tasks**: 284
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.85 (Unified Hardware Lifecycle & Vendor Hardening)**: PASSED - Successfully implemented and verified functional background hardening logic in DeviceHardeningStrategy for Samsung, Huawei, and Xiaomi devices. (Sep.22.30)
 *   **Chapter 31.90 (Heartbeat Idempotency)**: PASSED - Verified that ConnectivityEvent.PeerPulse is processed via a single observer in ViewerService, preventing duplicate log events and session updates. (Sep.22.30)
 *   **Chapter 31.89 (Role-Based Storage Namespacing)**: PASSED - Successfully verified that Tracker and Viewer logic states are stored in isolated proto maps, preventing cross-role state corruption during functional transitions. (Sep.22.30)
 *   **Chapter 31.88 (Race Condition & Initialization Safeguard)**: PASSED - Verified that `initializationDeferred.await()` successfully blocks background tick execution and heartbeat processing until `onServiceInitialize()` completes. (Sep.22.30)
 *   **Chapter 31.87 (Siren Trigger Orchestration)**: PASSED - Successfully integrated siren activation/deactivation into the alarm evaluation cycle, ensuring hardware-reactive alerts in background services. (Sep.22.30)
 *   **Chapter 31.86 (Centralized SSOT ViewModel Architecture)**: PASSED - Successfully unified Tracker, Viewer, and Setup states into MainViewModel, resolving multi-subscription churn and ephemeral state loss. (Sep.22.30)
-*   **Chapter 31.85 (Unified Hardware Lifecycle & Vendor Hardening)**: PASSED - Successfully consolidated Samsung, Xiaomi, and Huawei adaptations into DeviceHardeningStrategy. (Sep.22.30)
 *   **Chapter 31.84 (Logic State Persistence Expansion)**: PASSED - Verified seamless preservation of active alarm trigger realtimes and logging timestamps inside persistent JSON structures. (Sep.22.30)
 *   **Chapter 31.83 (Shared Overlay Scope)**: PASSED - Successfully centralized shared overlays into OverlayHost within MainAppContent. (Sep.22.30)
 *   **Chapter 31.82 (Draft Settings Synchronization)**: PASSED - Verified real-time input reflection across functional roles after consolidating draft logic into MainViewModel. (Sep.22.30)
@@ -220,4 +220,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite. (Sep.22.30)
 
 ---
-*Next Audit: Sep.23.100. (Sep.22.30)*
+*Next Audit: Sep.24.10. (Sep.22.30)*

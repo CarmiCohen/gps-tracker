@@ -1,4 +1,11 @@
-# 🏛️ Resolution Archive - Sep.23.80
+# 🏛️ Resolution Archive - Sep.24.00
+
+## 🏁 Issue #1232: Empty Stub Implementation of OEM Power Hardening Overrides
+*   **Resolved**: Sep.24.00
+*   **Root Cause**: `DeviceHardeningStrategy.kt` contained purely cosmetic log message stubs rather than active code implementations, presenting a critical reliability risk for service longevity on specialized OEM hardware.
+*   **Remediation**:
+    *   **DeviceHardeningStrategy.kt**: Converted cosmetic stubs into functional background execution policies. Implemented active WakeLock acquisition/renewal and grid-aligned Watchdog scheduling specifically tailored for Samsung, Huawei, and Xiaomi background constraints to ensure process retention under aggressive power-saving cycles.
+*   **R-ID**: 421
 
 ## 🏁 Issue #1231: Redundant Stream Overlap & Duplicate Heartbeat Processing
 *   **Resolved**: Sep.23.80
@@ -22,5 +29,3 @@
 *   **Root Cause**: `TrackerService` and `ViewerService` shared the same flat keys in `DataStore` for high-frequency logic state. Switching roles caused state "leakage".
 *   **Remediation**: Implemented type-specific namespaced maps (`role_longs`, `role_doubles`, etc.) in `app_settings.proto` and refactored the repository layer to enforce isolation via role-prefixes.
 *   **R-ID**: 453
-
-... [Previous entries preserved] ...
