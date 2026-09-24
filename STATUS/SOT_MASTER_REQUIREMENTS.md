@@ -32,6 +32,7 @@
 *   **3.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (R212, R310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (R317).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 462**: Boot-ID Latch Validation - Implemented Boot-ID validation inside `AppAlarmManager.restoreLogicState` to detect device reboots and safely invalidate obsolete monotonic `elapsedRealtime` latches (siren cooldowns, global trigger grace periods) after a device restart. This prevents the "Permanent Muzzle" bug where safety features fail to trigger due to high-value monotonic latches from a previous boot session (R-ID 462). (Resolved Sep.24.20)
 *   **SOT ID 461**: Persistent Lux and Acoustic Baselines - Implemented persistence for environmental calibration. Added `TRACKER_LUX_BASELINE_KEY` and `TRACKER_ACOUSTIC_FLOOR_KEY` to DataStore and updated `LocationProcessor.kt` to emit reactive events for significant baseline drift. Updated `TrackerService.kt` and `ViewerService.kt` to restore these anchors during initialization, eliminating the 60-second learning period and reducing false-positive tamper alerts after service restarts (R-ID 461). (Resolved Sep.24.10)
 *   **SOT ID 460**: Atomic User Counter Hardening - Guarded the `activeUsers` AtomicInteger in `HardwareSuite.stop()` to prevent it from falling into negative values due to unbalanced lifecycle calls. Hardened the deferred teardown check to use `<= 0`, ensuring resource release (sensors, GNSS) is reliably executed even if counter drift occurred, eliminating long-term battery and resource leaks (R-ID 460). (Resolved Sep.24.04)
 *   **SOT ID 459**: Persistent Adaptive Vibration Floor - Implemented persistence for the physical baseline sensitivity anchor. Added `ADAPTIVE_VIBRATION_FLOOR_KEY` to `PreferenceKeys.kt` and updated `LocationProcessor.kt` to emit reactive `VibrationFloorChanged` events upon significant drift detection. Updated `TrackerService.kt` and `ViewerService.kt` to restore this anchor during service initialization and sync changes to DataStore, eliminating sensitivity resets and false-positive tamper alerts after service restarts (R-ID 459). (Resolved Sep.24.03)
@@ -172,14 +173,15 @@
 
 ## 4.3. Metric Summary
 - **Rules Verified**: 92
-- **Total SOT IDs**: 461
-- **Resolved Issues**: 1204
-- **Open Issues**: 14
+- **Total SOT IDs**: 462
+- **Resolved Issues**: 1205
+- **Open Issues**: 13
 - **Testing Coverage**: 3 (Sub-items: 12)
 - **Simplification Ideas**: 18
 - **QA Validation Tasks**: 284
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.96 (Boot-ID Latch Validation)**: PASSED - Successfully implemented Boot-ID validation in AppAlarmManager to invalidate obsolete monotonic latches across device restarts (Sep.22.30).
 *   **Chapter 31.95 (Environmental Baseline Persistence)**: PASSED - Successfully implemented persistence for Lux and Acoustic baselines in LocationProcessor and registered role-isolated DataStore sync in Tracker and Viewer services (Sep.22.30).
 *   **Chapter 31.94 (Atomic User Counter Hardening)**: PASSED - Verified that `activeUsers` in HardwareSuite is guarded against negative values and that deferred teardown robustly unregisters listeners using the <= 0 check (Sep.22.30).
 *   **Chapter 31.93 (Persistent Adaptive Vibration Floor)**: PASSED - Successfully implemented persistence for the vibration floor anchor in LocationProcessor and registered role-isolated DataStore sync in background services (Sep.22.30).
@@ -230,4 +232,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite. (Sep.22.30)
 
 ---
-*Next Audit: Sep.24.20. (Sep.22.30)*
+*Next Audit: Sep.24.30. (Sep.22.30)*

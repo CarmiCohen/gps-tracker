@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.10
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.20
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -7,9 +7,6 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🛑 High Priority (Safety, Data Integrity & Core Logic)
 
-*   **Issue #1256: Monotonic Latch Staleness Across Reboots**
-    *   *Description*: Persistence of siren cooldowns and violation timers using `elapsedRealtime` causes them to remain valid across reboots. Since `nowRt` resets to 0, old high-value latches can silence sirens for days.
-    *   *Contribution*: **Critical (Safety)**. Prevents the "Permanent Muzzle" bug where safety features fail to trigger after a device restart.
 *   **Issue #1307: Forensic Sampling Bottleneck During Rapid Event Sequences**
     *   *Finding*: The `forensicSamplingLoop` in `TrackerService` uses a conflated channel and an internal `delay(delayMs)`. If multiple physical spikes (acoustic/light) occur rapidly, the loop will be stuck in a delay from the first trigger, causing subsequent high-priority triggers to be dropped. Forensic captures should be decoupled from the sampling rate delay during spike events.
     *   *Contribution*: **High (Forensic Integrity)**. Ensures critical evidence (acoustic/light spikes) is never dropped during a theft event.
@@ -44,9 +41,6 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🛑 High Priority
 
-*   **Issue #1260: Boot-ID Validation for Persistent Monotonic Latches**
-    *   *Description*: Implement Boot-ID validation checks upon restoring persistent elapsedRealtime latches to detect device reboots and safely invalidate or adjust obsolete temporal locks. Resolves Issue #1256.
-    *   *Contribution*: **High (Safety)**. Critical fix for alarm reliability after restart.
 *   **Issue #1241: Functional Restoration of History Sync Streams in ViewerService**
     *   *Description*: Refactor the `observeHistoryEvents()` implementation in `ViewerService.kt` to subscribe to legitimate history backfill and sync event streams rather than mirroring the connectivity pulse listener. Resolves logic duplication and observation gaps identified in Issue #1231.
     *   *Contribution*: **High (Functional Parity)**. Ensures history data is correctly visualized on the monitor device.
@@ -119,6 +113,10 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1256: Monotonic Latch Staleness Across Reboots** (Resolved Sep.24.20)
+    *   *Remediation*: Implemented Boot-ID validation inside `AppAlarmManager.restoreLogicState` to detect device reboots and safely invalidate obsolete monotonic `elapsedRealtime` latches (cooldowns, violation timers) after a device restart, preventing the permanent muzzle bug.
+*   **Issue #1260: Boot-ID Validation for Persistent Monotonic Latches** (Resolved Sep.24.20)
+    *   *Remediation*: Remediated via Boot-ID check in `restoreLogicState`.
 *   **Issue #1301: Missing Persistence for Lux and Acoustic Baselines** (Resolved Sep.24.10)
     *   *Remediation*: Implemented persistence for Lux and Acoustic baselines. Expanded `loadForensicState` to restore these anchors and added reactive event emission for significant drift to eliminate the startup learning period (R-ID 461).
 *   **Issue #1302: Redundant and Misaligned LocationProcessor in ViewerService** (Resolved Sep.24.10)
@@ -152,4 +150,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 461 (Rules: 92, IDs: 461), Resolved: 1204, Open: 14, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**
+- **Current Audit Baseline: [SOT: 462 (Rules: 92, IDs: 462), Resolved: 1205, Open: 13, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**

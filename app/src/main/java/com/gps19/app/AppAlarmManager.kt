@@ -33,6 +33,9 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.24.20:
+ * - Issue #1256 / #1260 REMEDIATION: Implemented Boot-ID validation check inside 
+ *   restoreLogicState to invalidate obsolete monotonic latches across reboots.
  * Sep.23.70:
  * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation (prefix support)
  *   for logic state persistence to prevent cross-role state corruption (R-ID 453).
@@ -139,7 +142,7 @@ class AppAlarmManager @Inject constructor(
 
     /**
      * restoreLogicState: Restores geofence debounce and power latches from AppSettings.
-     * Sep.23.70 (Issue #1230): Supports role-based namespacing.
+     * Sep.24.20 (Issue #1256): Validates Boot-ID to prevent stale monotonic latches.
      */
     fun restoreLogicState(s: AppSettings, rolePrefix: String = "") {
         this.currentRolePrefix = rolePrefix
@@ -163,6 +166,21 @@ class AppAlarmManager @Inject constructor(
             lastSirenStopRt = s.roleLongsMap.getOrDefault(rolePrefix + LAST_SIREN_STOP_RT_KEY, 0L)
             lastGlobalTriggerRt = s.roleLongsMap.getOrDefault(rolePrefix + LAST_GLOBAL_TRIGGER_RT_KEY, 0L)
             evaluationState.forensicReliabilityDegradationStartRt = s.roleLongsMap.getOrDefault(rolePrefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, 0L)
+        }
+
+        // Boot-ID Validation Check
+        val savedBootId = s.roleStringsMap.getOrDefault(rolePrefix + "boot_id", "")
+        val currentBootId = timeProvider.getBootId()
+        if (savedBootId.isNotEmpty() && savedBootId != currentBootId) {
+            Timber.w("Reboot detected for role $rolePrefix! Invalidating obsolete monotonic latches.")
+            firstViolationRt = 0L
+            lastSirenStopRt = 0L
+            lastGlobalTriggerRt = 0L
+            evaluationState.forensicReliabilityDegradationStartRt = 0L
+            saveLogicState()
+        } else if (savedBootId.isEmpty()) {
+            // Seed the boot ID for the first time
+            saveLogicState()
         }
         
         evaluationState.firstViolationTs = firstViolationTs
@@ -188,6 +206,7 @@ class AppAlarmManager @Inject constructor(
                 forensicReliabilityDegradationStartRt = evaluationState.forensicReliabilityDegradationStartRt,
                 rolePrefix = currentRolePrefix
             )
+            repository.saveString(currentRolePrefix + "boot_id", timeProvider.getBootId())
         }
     }
 

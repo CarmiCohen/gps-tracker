@@ -13,6 +13,8 @@ import com.gps19.core.engine.*
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
@@ -23,15 +25,17 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.24.20:
+ * - Issue #1307 REMEDIATION: Decoupled spike-triggered forensic captures from the sampling 
+ *   rate delay by launching immediate captures for acoustic/light spikes.
+ * - Issue #1234 / #1244 REMEDIATION: Corrected Thermal Recovery Latency logic to measure 
+ *   total duration from entry to exit of cooling mode.
  * Sep.24.10:
  * - Issue #1301 REMEDIATION: Loaded and persisted Lux and Acoustic baselines across service
  *   restarts to eliminate the startup baseline learning period (R-ID 461).
  * Sep.24.04:
  * - Issue #1271 REMEDIATION: Restored hardwareSuite's adaptive vibration floor during 
  *   initialization using the persisted value to prevent sensitivity resets.
- * Sep.24.03:
- * - Issue #1271: Implemented persistence for Adaptive Vibration Floor. Restored floor anchor 
- *   during initialization and registered persistent observer for floor updates.
  * Sep.24.02:
  * - Issue #1255 REMEDIATION: Implemented reboot-aware monotonic clock recovery via 
  *   HistoryManager.recoverLastRealtime using role-isolated clock drift reference.
@@ -51,8 +55,13 @@ class TrackerService : BaseMonitorService() {
     
     private val forensicTriggerChannel = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.CONFLATED)
 
-    private fun triggerForensicSample() {
-        forensicTriggerChannel.trySend(Unit)
+    private fun triggerForensicSample(isSpike: Boolean = false) {
+        if (isSpike) {
+            // Issue #1307: Decouple high-priority spike captures from the sampling rate delay
+            lifecycleScope.launch(Dispatchers.Default) { performForensicCapture(true) }
+        } else {
+            forensicTriggerChannel.trySend(Unit)
+        }
     }
 
     private val locationBuffer = ConcurrentLinkedQueue<Location>()
@@ -81,7 +90,8 @@ class TrackerService : BaseMonitorService() {
     private var lastForensicTilt = 0.0
 
     private var lastWasCooling = false
-    private var recoveryTriggerRt = 0L
+    private var coolingEnteredRt = 0L
+    private val forensicCaptureMutex = Mutex()
 
     private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
 
@@ -390,7 +400,7 @@ class TrackerService : BaseMonitorService() {
             onSpike = {
                 logManager.logServiceEvent(m = "Acoustic Spike Detected (FastPath)", isImportant = false)
                 lastFastPathAcousticSpikeTs = timeProvider.elapsedRealtime()
-                triggerForensicSample()
+                triggerForensicSample(isSpike = true)
             }
         )
         hardwareSuite.setLightFastPath(
@@ -398,7 +408,7 @@ class TrackerService : BaseMonitorService() {
             onSpike = {
                 logManager.logServiceEvent(m = "Light Spike Detected (FastPath)", isImportant = false)
                 lastFastPathLightSpikeTs = timeProvider.elapsedRealtime()
-                triggerForensicSample()
+                triggerForensicSample(isSpike = true)
             }
         )
     }
@@ -439,7 +449,7 @@ class TrackerService : BaseMonitorService() {
                 lastForensicVibe = 0.0
                 lastForensicTilt = 0.0
                 lastWasCooling = false
-                recoveryTriggerRt = 0L
+                coolingEnteredRt = 0L
                 
                 lastHardwareRecoveryTs = 0L
                 lastFastPathAcousticSpikeTs = 0L
@@ -758,6 +768,43 @@ class TrackerService : BaseMonitorService() {
         }
     }
 
+    private suspend fun performForensicCapture(isSpike: Boolean) = forensicCaptureMutex.withLock {
+        val health = integrityMonitor.currentHealth
+        val proc = lastProcessedLocation
+        val snapshot = hardwareSuite.consumeForensicSnapshot()
+        
+        val lat = proc?.optimizedPoint?.lat ?: 0.0
+        val lng = proc?.optimizedPoint?.lng ?: 0.0
+        val vibe = snapshot.vibration
+        val tilt = snapshot.tiltDegrees
+
+        // Issue #1307: Decouple spikes from sampling rate gates
+        val dist = if (lastForensicLat != 0.0) PhysicsUtils.calculateDistance(lastForensicLat, lastForensicLng, lat, lng) else Double.MAX_VALUE
+        val vibeDelta = abs(vibe - lastForensicVibe)
+        val tiltDelta = abs(tilt - lastForensicTilt)
+        
+        val shouldLog = isSpike || dist > FORENSIC_SPATIAL_GATE_METERS || 
+                       vibeDelta > FORENSIC_IMU_VIBRATION_THRESHOLD || 
+                       tiltDelta > FORENSIC_IMU_TILT_THRESHOLD
+        
+        if (shouldLog) {
+            lastForensicLat = lat; lastForensicLng = lng; lastForensicVibe = vibe; lastForensicTilt = tilt
+            
+            logManager.logForensicTraceOptimized(
+                timestamp = timeProvider.currentTimeMillis(),
+                lat = lat,
+                lng = lng,
+                accuracy = proc?.currentAccuracy ?: 0.0,
+                maxAccuracy = proc?.maxAccuracy ?: 0.0,
+                vibe = vibe,
+                snr = snapshot.acousticDb,
+                batteryLevel = health.batteryLevel,
+                isCharging = health.isCharging,
+                batteryTemp = health.batteryTemp
+            )
+        }
+    }
+
     private fun startForensicSamplingLoop() {
         forensicSamplingJob?.cancel()
         forensicSamplingJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
@@ -770,57 +817,25 @@ class TrackerService : BaseMonitorService() {
             for (unit in forensicTriggerChannel) {
                 val health = integrityMonitor.currentHealth
 
+                // Issue #1244 Fix: Thermal Recovery Latency Audit
+                if (lastWasCooling && !health.isCoolingModeActive) {
+                    val latency = timeProvider.elapsedRealtime() - coolingEnteredRt
+                    logManager.logServiceEvent(m = "Forensic Performance Audit: Thermal Recovery Latency: ${latency}ms", isImportant = true)
+                    coolingEnteredRt = 0L
+                }
+                if (health.isCoolingModeActive && !lastWasCooling) {
+                    coolingEnteredRt = timeProvider.elapsedRealtime()
+                }
+                lastWasCooling = health.isCoolingModeActive
+
+                performForensicCapture(isSpike = false)
+
                 val delayMs = when {
                     health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS
                     logManager.isForensicBufferUnderPressure() -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS
                     health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS
                     else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS
                 }
-
-                if (recoveryTriggerRt > 0 && delayMs < FORENSIC_SAMPLING_INTERVAL_COOLING_MS) {
-                    val latency = timeProvider.elapsedRealtime() - recoveryTriggerRt
-                    logManager.logServiceEvent(m = "Forensic Performance Audit: Thermal Recovery Latency: ${latency}ms", isImportant = true)
-                    recoveryTriggerRt = 0L
-                }
-
-                val proc = lastProcessedLocation
-                val snapshot = hardwareSuite.consumeForensicSnapshot()
-                
-                val lat = proc?.optimizedPoint?.lat ?: 0.0
-                val lng = proc?.optimizedPoint?.lng ?: 0.0
-                val vibe = snapshot.vibration
-                val tilt = snapshot.tiltDegrees
-
-                if (lastWasCooling && !health.isCoolingModeActive) {
-                    recoveryTriggerRt = timeProvider.elapsedRealtime()
-                }
-
-                val dist = if (lastForensicLat != 0.0) PhysicsUtils.calculateDistance(lastForensicLat, lastForensicLng, lat, lng) else Double.MAX_VALUE
-                val vibeDelta = abs(vibe - lastForensicVibe)
-                val tiltDelta = abs(tilt - lastForensicTilt)
-                
-                val shouldLog = dist > FORENSIC_SPATIAL_GATE_METERS || 
-                               vibeDelta > FORENSIC_IMU_VIBRATION_THRESHOLD || 
-                               tiltDelta > FORENSIC_IMU_TILT_THRESHOLD
-                
-                if (shouldLog) {
-                    lastForensicLat = lat; lastForensicLng = lng; lastForensicVibe = vibe; lastForensicTilt = tilt
-                    
-                    logManager.logForensicTraceOptimized(
-                        timestamp = timeProvider.currentTimeMillis(),
-                        lat = lat,
-                        lng = lng,
-                        accuracy = proc?.currentAccuracy ?: 0.0,
-                        maxAccuracy = proc?.maxAccuracy ?: 0.0,
-                        vibe = vibe,
-                        snr = snapshot.acousticDb,
-                        batteryLevel = health.batteryLevel,
-                        isCharging = health.isCharging,
-                        batteryTemp = health.batteryTemp
-                    )
-                }
-
-                lastWasCooling = health.isCoolingModeActive
                 delay(delayMs)
             }
         }

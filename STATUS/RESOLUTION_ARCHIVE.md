@@ -1,4 +1,18 @@
-# 🏛️ Resolution Archive - Sep.24.10
+# 🏛️ Resolution Archive - Sep.24.20
+
+## 🏁 Issue #1256: Monotonic Latch Staleness Across Reboots
+*   **Resolved**: Sep.24.20
+*   **Root Cause**: Timing latches such as siren cooldowns and violation timers persisted via monotonic references (`elapsedRealtime`) became stale and invalid when a device reboot occurred. Since `elapsedRealtime` resets back to zero upon device restart, old high-valued latches from the prior boot session stayed valid relative to the new boot cycle's timing authority, resulting in long-term false lockouts or feature suppression ("Permanent Muzzle" bug).
+*   **Remediation**:
+    *   **TimeProvider.kt**: Added a `getBootId()` definition to the temporal authority interface.
+    *   **AndroidTimeProvider.kt**: Implemented `getBootId()` to read and cache the kernel's unique session identifier from `/proc/sys/kernel/random/boot_id`, fallback to random UUID if unavailable.
+    *   **AppAlarmManager.kt**: Enhanced `restoreLogicState()` to compare the current session's boot identifier with the stored reference. If a reboot is detected, it completely invalidates obsolete monotonic latches across all functional roles, restoring safe baseline operation immediately.
+*   **R-ID**: 462
+
+## 🏁 Issue #1260: Boot-ID Validation for Persistent Monotonic Latches
+*   **Resolved**: Sep.24.20
+*   **Root Cause**: Duplicate or side-effect requirement of Issue #1256; missing boot-level synchronization checks for persistent state machines.
+*   **Remediation**: Remediated via atomic Boot-ID validation inside `AppAlarmManager.restoreLogicState` to reset timing thresholds securely.
 
 ## 🏁 Issue #1301: Missing Persistence for Lux and Acoustic Baselines
 *   **Resolved**: Sep.24.10

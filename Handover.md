@@ -1,25 +1,20 @@
-# Forensic Resumption Snapshot - Sep.24.10
+# Forensic Resumption Snapshot - Sep.24.20
 
 ## 📂 Session Summary
 *   **Completed**:
-    *   **Issue #1301**: Missing Persistence for Lux and Acoustic Baselines (R-ID 461).
-    *   **Issue #1302**: Redundant and Misaligned LocationProcessor in ViewerService.
-    *   **Issue #1303**: Cross-Role HardwareSuite Sensitivity Contamination.
-    *   **Issue #1304**: Peer Stat Reset Logic Corrupts Local Tracker State.
-*   **Version**: Sep.24.10
-*   **Status**: Environmental calibration (Lux/Acoustic) is now fully persistent. The Viewer role has been hardened to ensure local physical awareness is correctly processed while maintaining strict isolation from the remote tracker's sensitivity anchors.
+    *   **Issue #1256**: Monotonic Latch Staleness Across Reboots (R-ID 462).
+    *   **Issue #1260**: Boot-ID Validation for Persistent Monotonic Latches.
+*   **Version**: Sep.24.20
+*   **Status**: Monotonic timing authority is now reboot-aware. Safety features (siren cooldowns, trigger grace periods) are automatically reset if a device restart is detected via Boot-ID mismatch, preventing the "Permanent Muzzle" bug.
 
 ## 🔧 Technical Delta
-*   **LocationProcessor.kt / LocationSentinel.kt**: Expanded `loadState` and `loadForensicState` to restore Lux and Acoustic baselines. Implemented reactive drift detection for these anchors.
-*   **ViewerService.kt**: 
-    *   Integrated local sensor updates for `selfProcessor` in `processTick`.
-    *   Decoupled singleton `HardwareSuite` sensitivity from remote tracker anchors.
-    *   Fixed Stat-Reset routing to prevent local baseline wipes during peer disconnects.
-*   **TrackerService.kt**: Integrated persistence for environmental anchors during initialization and runtime drift.
+*   **TimeProvider.kt / AndroidTimeProvider.kt**: Introduced `getBootId()` to provide a unique session identifier sourced from `/proc/sys/kernel/random/boot_id`.
+*   **AppAlarmManager.kt**: Enhanced `restoreLogicState` to validate the session's Boot-ID. Detected reboots now trigger a secure invalidation of obsolete `elapsedRealtime` anchors (`firstViolationRt`, `lastSirenStopRt`, `lastGlobalTriggerRt`, etc.).
+*   **SOT / Resolution Archive**: Integrated **SOT ID 462** (Boot-ID Latch Validation) and corresponding verification chapters.
 
 ## 📍 Resumption Point for Next Session
-*   **Immediate Priority**: Address **Issue #1256** (Monotonic Latch Staleness Across Reboots).
-*   **Strategic Goal**: Implement Boot-ID validation to safely invalidate or adjust persistent `elapsedRealtime` latches (Siren cooldowns, violation timers) after a device restart.
+*   **Immediate Priority**: Address **Issue #1307** (Forensic Sampling Bottleneck During Rapid Event Sequences).
+*   **Strategic Goal**: Decouple high-priority spike captures from the sampling rate delay to ensure zero data loss during rapid physical event sequences.
 
 ## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 461 (Rules: 92, IDs: 461), Resolved: 1204, Open: 14, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**
+**Current Audit Baseline: [SOT: 462 (Rules: 92, IDs: 462), Resolved: 1205, Open: 13, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**

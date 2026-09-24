@@ -1,19 +1,19 @@
 package com.gps19.core.engine
 
 /**
- * Interface to provide time values to the engine, allowing for deterministic
- * testing and removing Android framework dependencies.
+ * TimeProvider: Interface for temporal authority.
  */
 interface TimeProvider {
+    fun currentTimeMillis(): Long
     /**
-     * Returns milliseconds since boot, including time spent in sleep.
      * Equivalent to Android's SystemClock.elapsedRealtime().
+     * Returns milliseconds since boot, including time spent in sleep.
      */
     fun elapsedRealtime(): Long
 
     /**
-     * Returns the current wall-clock time in milliseconds.
-     * Equivalent to System.currentTimeMillis().
+     * Returns a unique ID for the current boot session.
+     * Used for monotonic latch validation across reboots.
      */
-    fun currentTimeMillis(): Long
+    fun getBootId(): String = "default_boot"
 }
