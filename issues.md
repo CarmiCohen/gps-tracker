@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.60
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.70
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -11,9 +11,6 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🟡 Medium Priority (UX, Performance & Auditability)
 
-*   **Issue #1272: Alarm Notification Leak in Tracker Mode**
-    *   *Description*: `AppNotificationManager` guards against showing full-screen intents in Tracker mode, but `AppAlarmManager` continues to persist alarm states. If a user flips from Tracker to Viewer while a background alarm is technically active, the siren triggers immediately, causing unexpected user distress.
-    *   *Contribution*: **Medium (UX Polish)**. Prevents unexpected "Siren Jumps" during role transitions.
 *   **Issue #1305: Performance Risk: Synchronous Repository Writes on Vibration Floor Jitter** (Risk in #1271)
     *   *Finding*: `LocationProcessor` emits a `VibrationFloorChanged` event for every drift >0.01g, which triggers a `saveDoubleSync` in the repository. On high-vibration environments, this can lead to excessive synchronous I/O on the service thread, potentially causing tick-loop jitter.
     *   *Contribution*: **Medium (Performance)**. Smooths out CPU usage and prevents "UI stutter" during intense physical monitoring.
@@ -52,7 +49,7 @@ Finalizing the audit of background service stability and functional convergence 
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 20)
+## 💡 Strategic Simplification Ideas (Ideas: 21)
 
 ### 🛑 High Priority
 *   **Issue #1292: Reactive Siren State Binding**
@@ -61,6 +58,8 @@ Finalizing the audit of background service stability and functional convergence 
     *   *Significance*: **High (Architecture)**. Centralize dispersed logging and triggers into a single `AppEventCoordinator` to eliminate cross-component coupling.
 
 ### 🟡 Medium Priority
+*   **Issue #1311: AppAlarmManager Stateless Evaluation Model**
+    *   *Significance*: **Medium (Architecture)**. Transition `AppAlarmManager` away from intermediate memory state persistence maps towards purely stateless snapshot calculations, further mitigating multi-role transition leakage vectors.
 *   **Issue #1310: Stream Orchestration Boilerplate Reduction**
     *   *Significance*: **Medium (Maintainability)**. Tracker and Viewer services share identical patterns for observing alarm, integrity, processor, connectivity, and history event streams. Consolidating these into a shared `ServiceObservationDelegate` or a unified event handler would eliminate 100+ lines of boilerplate.
 *   **Issue #1309: Unified Job Management in Monitor Services**
@@ -104,6 +103,8 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1272: Alarm Notification Leak in Tracker Mode** (Resolved Sep.24.70)
+    *   *Remediation*: Hardened `AppAlarmManager` state cleanup by ensuring `restoreState()` completely flushes in-memory active alarms before early returns. Explicitly updates and resets the `isTrackerMode` role gating flag upon logic state recovery to prevent unexpected "Siren Jumps" during transitions from Tracker to Viewer modes (R-ID 467).
 *   **Issue #1308: Missing Forensics Trace Collection in ViewerService** (Resolved Sep.24.60)
     *   *Remediation*: Implemented the `forensicSamplingLoop` and associated channel-driven trigger infrastructure in `ViewerService.kt`. This ensures the monitor role captures local environmental forensics (spatial, IMU, battery, thermal) with the same precision as the Tracker role, enabling comprehensive monitoring integrity audits (R-ID 466).
 *   **Issue #1245: Non-Blocking History Flush on Service Termination** (Resolved Sep.24.50)
@@ -149,4 +150,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 466 (Rules: 92, IDs: 466), Resolved: 1209, Open: 9, Testing: 3 (Sub-items: 12), Ideas: 20, QA: 284]**
+- **Current Audit Baseline: [SOT: 467 (Rules: 92, IDs: 467), Resolved: 1210, Open: 8, Testing: 3 (Sub-items: 12), Ideas: 21, QA: 284]**

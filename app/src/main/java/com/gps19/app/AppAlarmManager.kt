@@ -33,6 +33,10 @@ sealed class AlarmEvent {
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.24.70:
+ * - Issue #1272 REMEDIATION: Fixed state leak during role transitions by ensuring 
+ *   restoreState always clears in-memory alarms before early returns. Explicitly resets 
+ *   isTrackerMode on role restoration to prevent siren jumps (R-ID 467).
  * Sep.24.20:
  * - Issue #1256 / #1260 REMEDIATION: Implemented Boot-ID validation check inside 
  *   restoreLogicState to invalidate obsolete monotonic latches across reboots.
@@ -113,11 +117,16 @@ class AppAlarmManager @Inject constructor(
     }
 
     fun restoreState(json: String) {
-        if (json.isEmpty() || json == "[]") return
+        synchronized(activeAlarms) {
+            activeAlarms.clear()
+        }
+        if (json.isEmpty() || json == "[]") {
+            lastAlarmsJson = "[]"
+            return
+        }
         try {
             val array = JSONArray(json)
             synchronized(activeAlarms) {
-                activeAlarms.clear()
                 for (i in 0 until array.length()) {
                     val obj = array.getJSONObject(i)
                     val type = obj.getString("type")
@@ -146,6 +155,8 @@ class AppAlarmManager @Inject constructor(
      */
     fun restoreLogicState(s: AppSettings, rolePrefix: String = "") {
         this.currentRolePrefix = rolePrefix
+        this.isTrackerMode = (rolePrefix == "T_")
+        
         if (rolePrefix.isEmpty()) {
             firstViolationTs = s.firstViolationTs
             firstViolationRt = s.firstViolationRt
@@ -285,10 +296,7 @@ class AppAlarmManager @Inject constructor(
             acousticFloorDb = telemetry.acousticFloorDb, 
             adaptiveVibrationFloor = telemetry.adaptiveVibrationFloor, 
             peakVibrationShock = telemetry.peakVibrationShock,
-            isPowerTamper = telemetry.isPowerTamper, 
-            isLocationPending = telemetry.isLocationPending,
-            locationPendingReason = telemetry.locationPendingReason, 
-            isPowerSaveMode = telemetry.isPowerSaveMode,
+            isPowerSaveMode = telemetry.isPowerSaveMode, 
             standbyBucket = telemetry.standbyBucket, 
             netInterface = telemetry.netInterface,
             isStorageLow = telemetry.isStorageLow, 
@@ -304,7 +312,10 @@ class AppAlarmManager @Inject constructor(
             isUltraLongStationary = telemetry.isUltraLongStationary,
             isBatteryLow = telemetry.isBatteryLow, 
             isBatteryCritical = telemetry.isBatteryCritical,
-            tamperNote = telemetry.tamperNote
+            tamperNote = telemetry.tamperNote,
+            isPowerTamper = telemetry.isPowerTamper,
+            isLocationPending = telemetry.isLocationPending,
+            locationPendingReason = telemetry.locationPendingReason
         )
 
         val cachedPoints = repository.getCachedHomePoints()

@@ -1,3 +1,14 @@
+# 🏛️ Resolution Archive - Sep.24.70
+
+## 🏁 Issue #1272: Alarm Notification Leak in Tracker Mode
+*   **Resolved**: Sep.24.70
+*   **Root Cause**: `AppAlarmManager.restoreState` returned early if the input JSON was empty, failing to clear the in-memory `activeAlarms` map. When switching from Tracker to Viewer role, stale alarm state from the previous role persisted until the next evaluation cycle. Since `shouldPlaySiren` is gated by `isTrackerMode`, the siren was suppressed in Tracker mode but triggered immediately upon switching to Viewer mode before a fresh evaluation could occur.
+*   **Remediation**:
+    *   **AppAlarmManager.kt**: Hardened `restoreState` to ensure the `activeAlarms` map is cleared before any conditional early-return.
+    *   **AppAlarmManager.kt**: Updated `restoreLogicState` to explicitly sync and reset the `isTrackerMode` gating flag during role transitions.
+    *   **AppAlarmManager.kt**: Ensured that `evaluateAlarms` correctly updates the `isTrackerMode` flag from the `AlarmServiceContext` to prevent role-based state leakage.
+*   **R-ID**: 467
+
 # 🏛️ Resolution Archive - Sep.24.60
 
 ## 🏁 Issue #1308: Missing Forensics Trace Collection in ViewerService

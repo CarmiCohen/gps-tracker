@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.22.30)
+# SOT Master Requirements & Hardening Status (Sep.24.70)
 
 ## 🏗️ Architectural Master Rules (22 Rules)
 
@@ -32,6 +32,7 @@
 *   **3.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (R212, R310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (R317).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 467**: Alarm Role Transition Hardening - Corrected state retention leakage inside `AppAlarmManager` by ensuring `restoreState()` definitively purges the `activeAlarms` cache map before early returns. Explicitly updates and resets the `isTrackerMode` role gating flag upon logic state hydration to prevent unexpected "Siren Jumps" during transitions from Tracker background monitoring into Viewer dashboards (R-ID 467). (Resolved Sep.24.70)
 *   **SOT ID 466**: Viewer Forensic Sampling Loop - Implemented `forensicSamplingLoop` and buffered channel-driven trigger infrastructure in `ViewerService.kt`. This guarantees identical environmental, spatial, IMU, thermal, and battery forensic trace precision on the monitor device as the Tracker role, establishing absolute cross-role parity for monitoring integrity audits (R-ID 466). (Resolved Sep.24.60)
 *   **SOT ID 465**: Non-Blocking History Flush - Transitioned the final history buffer flush in `BaseMonitorService.onDestroy()` from a synchronous `runBlocking` call to a structured teardown routine offloaded to `@ApplicationScope`. Implemented a 2000ms hard timeout to prevent process-teardown hangs while ensuring data integrity, fully mitigating Issue #1235 ANR risks during service termination (R-ID 465). (Resolved Sep.24.50)
 *   **SOT ID 464**: History Sync Restoration - Refactored the `observeHistoryEvents()` implementation in `ViewerService.kt` to subscribe to legitimate history backfill and sync event streams via `historyManager.historyEvents`, resolving the logic duplication and observation gaps identified in Issue #1231, and restoring history trace integrity on viewer devices (R-ID 464). (Resolved Sep.24.40)
@@ -58,7 +59,7 @@
 *   **SOT ID 414**: Forensic & Sensor Efficiency Optimization - Introduced EvaluationSnapshot to group system health and sensor metrics into an atomic DTO for single-pass consumption in the background tick loop. This ensures consistent telemetry state across the entire processing iteration and minimizes parameter passing overhead. (Resolved Sep.22.32)
 *   **SOT ID 413**: Elimination of Multi-pass Fallbacks - Grouped individual sensor parameter clauses in updateSensorState into a structured SensorStateSnapshot to remove imperative value checking bounds and streamline parameter passing. (Resolved Sep.22.31)
 *   **SOT ID 412**: Vibration Floor Adaptation Guard - Guarded the fallback autonomous vibration floor adaptation path in `LocationSentinel.updateSensorState` with a check ensuring `vibration >= 0.0`. This prevents multiple uncoordinated adaptations using stale data when called from coordinate fix propagation paths solely to update lockout realtimes or other telemetry vectors. (Resolved Sep.22.30)
-*   **SOT ID 411**: Fast-Path Baseline Preservation - Added preserveExistingBaseline parameter to HardwareFastPath update to protect autonomous sensor-thread light baseline learning from 2-second background ticks. (Resolved Sep.22.28)
+*   **SOT ID 411**: Fast-Path Baseline Preservation - Added preserveExistingBaseline parameter to HardwareFastPath update to protect autonomous sensor-thread light baseline learning from 2-second background clicks. (Resolved Sep.22.28)
 *   **SOT ID 410**: Thermal Recovery Latency Audit - Corrected the thermal recovery latency audit check to evaluate across iteration passes rather than returning a 0ms intra-iteration result, establishing reliable precision for forensic audit traces. (Resolved Sep.22.28)
 *   **SOT ID 408**: Vibration Floor Semantic Alignment - Corrected `getAdaptiveVibrationFloor()` in `LocationProcessor.kt` to return `sentinel.adaptiveVibrationFloor` instead of `sentinel.acousticFloorDb`. This resolves the severe semantic leak across the telemetry pipeline, ensuring actual adaptive vibration baseline metrics are correctly propagated rather than acoustic ones. (Resolved Sep.22.26)
 *   **SOT ID 407**: Acoustic Fast-Path Adaptation - Added alpha baseline adaptation parameter to `acousticFastPath.evaluate` in `HardwareSuite.kt`. This ensures the high-frequency acoustic baseline independently tracks ambient background noise levels, maintaining symmetry with the light fast-path and core validation logic (R-ID 407). (Resolved Sep.22.15)
@@ -103,6 +104,7 @@
 *   **SOT ID 367**: Forensic Multi-Role Integrity Hardening - Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367). (Resolved Sep.19.08)
 
 ## 4.2. Change History (Recent)
+*   **Sep.24.70**: Resolved Issue #1272 (Alarm Notification Leak in Tracker Mode). Purged the active alarms memory payload on `restoreState()` early returns and explicitly reset the role-gating variables inside `AppAlarmManager` to eliminate siren jumps during transitions (SOT ID 467).
 *   **Sep.24.60**: Resolved Issue #1308 (Missing Forensics Trace Collection in ViewerService). Implemented the `forensicSamplingLoop` and associated channel-driven trigger infrastructure in `ViewerService.kt` to ensure complete cross-role parity for monitoring integrity audits (R-ID 466).
 *   **Sep.24.50**: Resolved Issue #1245 (Non-Blocking History Flush). Transitioned database flush in `BaseMonitorService.onDestroy()` to `@ApplicationScope` with timeout to prevent ANRs (R-ID 465).
 *   **Sep.24.40**: Resolved Issue #1241 (History Sync Restoration). Restored reactive history streams in `ViewerService.kt` via legitimate `HistoryManager` observations (R-ID 464).
@@ -173,7 +175,7 @@
 *   **R753**: ManagedBroadcastReceiver standardization.
 *   **R754**: ManagedSensor/DisplayListener abstraction.
 *   **R755**: Standardized GNSS unregistration timeout (2000ms).
-*   **R756**: Trace-logged unregistration handshake verification.
+*   **R756**: Trace-logged unregistration handshake verification._
 *   **R757**: Unconditional cleanup of revival location callbacks.
 *   **R758**: IO-thread pre-warming of OSM engine and gating.
 *   **R759**: PackageName shadow-cache for IPC optimization.
@@ -200,40 +202,40 @@
 *   **Chapter 31.84 (Logic State Persistence Expansion)**: PASSED - Verified seamless preservation of active alarm trigger realtimes and logging timestamps inside persistent JSON structures. (Sep.22.30)
 *   **Chapter 31.83 (Shared Overlay Scope)**: PASSED - Successfully centralized shared overlays into OverlayHost within MainAppContent. (Sep.22.30)
 *   **Chapter 31.82 (Draft Settings Synchronization)**: PASSED - Verified real-time input reflection across functional roles after consolidating draft logic into MainViewModel. (Sep.22.30)
-*   **Chapter 31.81 (Siren State Synchronization)**: PASSED - Converted siren playback feedback to StateFlow, ensuring cross-ViewModel reactive state consistency. (Sep.22.30)
-*   **Chapter 31.80 (Config & Trail Import)**: PASSED - Verified seamless configuration and trail point loading via MainFileHelper. (Sep.22.30)
+*   **Chapter 31.81 (Siren State Synchronization)**: PASSED - Converted siren playback feedback to StateFlow, ensuring cross-ViewModel reactive state consistency. (Sep.23.01)
+*   **Chapter 31.80 (Config & Trail Import)**: PASSED - Verified seamless configuration and trail point loading via MainFileHelper. (Sep.22.50)
 *   **Chapter 31.79 (ViewModel Decomposition)**: PASSED - Successfully decomposed monolithic MainViewModel into role-specific ViewModels. (Sep.22.30)
-*   **Chapter 31.78 (Forensic & Sensor Efficiency Optimization)**: PASSED - Grouped telemetry and health fields into unified EvaluationSnapshot DTO. (Sep.22.30)
-*   **Chapter 31.77 (Elimination of Multi-pass Fallbacks)**: PASSED - Grouped sensor branches into structured snapshots. (Sep.22.30)
+*   **Chapter 31.78 (Forensic & Sensor Efficiency Optimization)**: PASSED - Grouped telemetry and health fields into unified EvaluationSnapshot DTO. (Sep.22.32)
+*   **Chapter 31.77 (Elimination of Multi-pass Fallbacks)**: PASSED - Grouped sensor branches into structured snapshots. (Sep.22.31)
 *   **Chapter 31.76 (Vibration Floor Adaptation Guard)**: PASSED - Guarded autonomous vibration floor adaptation fallback. (Sep.22.30)
-*   **Chapter 31.75 (Fast-Path Baseline Preservation)**: PASSED - Verified preserveExistingBaseline updates light fast-path correctly. (Sep.22.30)
-*   **Chapter 31.74 (Thermal Recovery Latency Audit)**: PASSED - Corrected recovery latency check across iteration passes. (Sep.22.30)
-*   **Chapter 31.73 (Vibration Floor Semantic Alignment)**: PASSED - Corrected getAdaptiveVibrationFloor to return adaptiveVibrationFloor. (Sep.22.30)
-*   **Chapter 31.72 (Acoustic Fast-Path Adaptation)**: PASSED - Passing dynamic adaptation alpha to acoustic fast path evaluation. (Sep.22.30)
-*   **Chapter 31.71 (Trigger Sampling)**: PASSED - Transitioned from fixed-interval loop to reactive signal-on-spike sampling. (Sep.22.30)
-*   **Chapter 31.70 (State Partitioning)**: PASSED - Split MainUiState into specialized slices to isolate volatile triggers. (Sep.22.30)
-*   **Chapter 31.69 (Fast-Path Unification)**: PASSED - Unified acoustic and light fast-paths in HardwareSuite. (Sep.22.30)
-*   **Chapter 31.68 (Vendor Centralization)**: PASSED - Centralized hardware adaptations in DeviceProfileManager. (Sep.22.30)
-*   **Chapter 31.67 (UseCase Consolidation)**: PASSED - Verified creation of SpatialLogicUseCase. (Sep.22.30)
-*   **Chapter 31.66 (Persistence Refactoring)**: PASSED - Verified generic mutate extension and unified repository operations. (Sep.22.30)
-*   **Chapter 31.65 (Atomic Geofence)**: PASSED - Verified race-free home point updates and persistent ADD mode. (Sep.22.30)
-*   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states. (Sep.22.30)
-*   **Chapter 31.62 (Temperature Unit Layout)**: PASSED - Corrected SI unit presentation in StatusRowData. (Sep.22.30)
+*   **Chapter 31.75 (Fast-Path Baseline Preservation)**: PASSED - Verified preserveExistingBaseline updates light fast-path correctly. (Sep.22.28)
+*   **Chapter 31.74 (Thermal Recovery Latency Audit)**: PASSED - Corrected recovery latency check across iteration passes. (Sep.22.28)
+*   **Chapter 31.73 (Vibration Floor Semantic Alignment)**: PASSED - Corrected getAdaptiveVibrationFloor to return adaptiveVibrationFloor. (Sep.22.26)
+*   **Chapter 31.72 (Acoustic Fast-Path Adaptation)**: PASSED - Passing dynamic adaptation alpha to acoustic fast path evaluation. (Sep.22.15)
+*   **Chapter 31.71 (Trigger Sampling)**: PASSED - Transitioned from fixed-interval loop to reactive signal-on-spike sampling. (Sep.22.11)
+*   **Chapter 31.70 (State Partitioning)**: PASSED - Split MainUiState into specialized slices to isolate volatile triggers. (Sep.22.08)
+*   **Chapter 31.69 (Fast-Path Unification)**: PASSED - Unified acoustic and light fast-paths in HardwareSuite. (Sep.22.08)
+*   **Chapter 31.68 (Vendor Centralization)**: PASSED - Centralized hardware adaptations in DeviceProfileManager. (Sep.22.07)
+*   **Chapter 31.67 (UseCase Consolidation)**: PASSED - Verified creation of SpatialLogicUseCase. (Sep.22.05)
+*   **Chapter 31.66 (Persistence Refactoring)**: PASSED - Verified generic mutate extension and unified repository operations. (Sep.22.04)
+*   **Chapter 31.65 (Atomic Geofence)**: PASSED - Verified race-free home point updates and persistent ADD mode. (Sep.22.03)
+*   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states. (Sep.22.00)
+*   **Chapter 31.62 (Temperature Unit Layout)**: PASSED - Corrected SI unit presentation in StatusRowData. (Sep.22.00)
 *   **Chapter 31.61 (Session Lifecycle Coordinator)**: PASSED - Unified background session resets atomically across roles. (Sep.21.132)
 *   **Chapter 31.60 (Interface Isolation Utilities)**: PASSED - Created LocationProcessorListener & DefaultLocationProcessorListener. (Sep.21.131)
 *   **Chapter 31.59 (Dead Code Elimination)**: PASSED - Removed unused tracking property leftovers. (Sep.21.130)
 *   **Chapter 31.58 (GNSS Consolidation)**: PASSED - Verified nested GnssPolicyEngine evaluation pattern. (Sep.21.128)
 *   **Chapter 31.57 (Acoustic Refactoring)**: PASSED - Verified HistoryManager/TelemetryAggregator integration of EngineAcousticSample. (Sep.21.127)
 *   **Chapter 31.49 (Telemetry Conflation)**: PASSED - Verified location buffer drainage in TrackerService. (Sep.21.120)
-*   **Chapter 31.48 (Thread Visibility)**: PASSED - Verified Volatile markers in HardwareSuite. (Sep.22.30)
-*   **Chapter 31.47 (Forensic Reset)**: PASSED - Verified TrackerService sampling state reset. (Sep.22.30)
-*   **Chapter 31.46 (Vitality Timestamps)**: PASSED - Verified IntegrityMonitor timestamp reset. (Sep.22.30)
-*   **Chapter 31.44 (Light Sync)**: PASSED - Verified periodic baseline synchronization in processTick. (Sep.22.30)
-*   **Chapter 31.43 (Light Fast-Path)**: PASSED - Verified light spike propagation to LocationProcessor. (Sep.22.30)
-*   **Chapter 31.42 (False Jitter)**: PASSED - Verified lastGnssStatusRt reset in ForensicAuditor. (Sep.22.30)
-*   **Chapter 31.41 (Telemetry Parity)**: PASSED - Verified diagnostic flag persistence in Database/Mapper. (Sep.22.30)
-*   **Chapter 31.40 (Lifecycle Peaks)**: PASSED - Verified clearLifecycleLeftovers in HardwareSuite. (Sep.22.30)
-*   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite. (Sep.22.30)
+*   **Chapter 31.48 (Thread Visibility)**: PASSED - Verified Volatile markers in HardwareSuite. (Sep.20.25)
+*   **Chapter 31.47 (Forensic Reset)**: PASSED - Verified TrackerService sampling state reset. (Sep.20.22)
+*   **Chapter 31.46 (Vitality Timestamps)**: PASSED - Verified IntegrityMonitor timestamp reset. (Sep.20.20)
+*   **Chapter 31.44 (Light Sync)**: PASSED - Verified periodic baseline synchronization in processTick. (Sep.20.18)
+*   **Chapter 31.43 (Light Fast-Path)**: PASSED - Verified light spike propagation to LocationProcessor. (Sep.20.18)
+*   **Chapter 31.42 (False Jitter)**: PASSED - Verified lastGnssStatusRt reset in ForensicAuditor. (Sep.20.15)
+*   **Chapter 31.41 (Telemetry Parity)**: PASSED - Verified diagnostic flag persistence in Database/Mapper. (Sep.20.15)
+*   **Chapter 31.40 (Lifecycle Peaks)**: PASSED - Verified clearLifecycleLeftovers in HardwareSuite. (Sep.20.15)
+*   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite. (Sep.20.15)
 
 ---
-*Next Audit: Oct.01.00. (Sep.22.30)*
+*Next Audit: Oct.01.00. (Sep.24.70)*
