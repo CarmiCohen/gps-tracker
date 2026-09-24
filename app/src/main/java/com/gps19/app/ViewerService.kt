@@ -17,6 +17,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.24.04:
+ * - Issue #1271 REMEDIATION: Restored hardwareSuite's adaptive vibration floor during 
+ *   initialization using the persisted value to prevent sensitivity resets.
  * Sep.24.03:
  * - Issue #1271: Implemented persistence for Adaptive Vibration Floor. Restored floor anchor 
  *   during remoteProcessor initialization and registered persistent observer for floor updates.
@@ -119,6 +122,10 @@ class ViewerService : BaseMonitorService() {
         )
         
         selfProcessor.loadState(0.0, 0L, -1000.0, null, homePoints, maxDist)
+
+        if (savedVibeFloor >= 0.0) {
+            hardwareSuite.setAdaptiveVibrationFloor(savedVibeFloor)
+        }
 
         val savedAlarms = repository.getLastAlarmsJson("V_")
         alarmManager.restoreState(savedAlarms)

@@ -23,6 +23,9 @@ import kotlin.math.*
 
 /**
  * TrackerService: The "Black Box" background process.
+ * Sep.24.04:
+ * - Issue #1271 REMEDIATION: Restored hardwareSuite's adaptive vibration floor during 
+ *   initialization using the persisted value to prevent sensitivity resets.
  * Sep.24.03:
  * - Issue #1271: Implemented persistence for Adaptive Vibration Floor. Restored floor anchor 
  *   during initialization and registered persistent observer for floor updates.
@@ -117,6 +120,10 @@ class TrackerService : BaseMonitorService() {
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
         val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
         locationProcessor.loadState(savedMaxAcc, savedLastSitTs, savedBaseline, trackerState, homePoints, maxDist, savedVibrationFloor = savedVibeFloor)
+
+        if (savedVibeFloor >= 0.0) {
+            hardwareSuite.setAdaptiveVibrationFloor(savedVibeFloor)
+        }
 
         val savedAlarms = repository.getLastAlarmsJson("T_")
         alarmManager.restoreState(savedAlarms)
@@ -707,7 +714,7 @@ class TrackerService : BaseMonitorService() {
         }
 
         historyManager.updateRibbons(
-            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = if (isViewerActive && lastLocInBatch != null) 10 else 0, peerAvail = isSocketConnected && isViewerActive, hasGps = lastLocInBatch != null, isTrackerMode = true, accuracy = lastProcessedLocation?.currentAccuracy ?: 0.0, maxAccuracy = lastProcessedLocation?.maxAccuracy ?: 0.0, noiseIdx = noiseIdx, luxIdx = log10(evalSnapshot.sensor.lux + 1.0) / RIBBON_LUX_LOG_SCALE, vibeIdx = evalSnapshot.sensor.vibration / RIBBON_VIBRATION_SCALE_G, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = avgCn0 / RIBBON_SNR_SCALE_DB, tiltIdx = abs(evalSnapshot.sensor.tiltDegrees - locationProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG, baroIdx = (evalSnapshot.sensor.baroAlt - locationProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS, verticalVelocity = evalSnapshot.sensor.peakVerticalVelocity, sitVz = evalSnapshot.sensor.peakVerticalVelocity, sitVzTs = evalSnapshot.sensor.peakVerticalVelocityTs, sitVzRt = evalSnapshot.sensor.peakVerticalVelocityRt, sitDz = evalSnapshot.sensor.peakVerticalDisplacement, sitBaro = evalSnapshot.sensor.baroAlt, sitTilt = evalSnapshot.sensor.tiltDegrees, sitShock = evalSnapshot.sensor.peakShock, isBatterySteepDischarge = evalSnapshot.health.isBatterySteepDischarge, isCoolingModeActive = evalSnapshot.health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = lastLocInBatch?.bearing?.toDouble() ?: 0.0, isSitDetected = isSuspiciousMode, isSitActive = false, currentMa = evalSnapshot.health.currentMa, locationPendingReason = evalSnapshot.health.locationPendingReason, kineticEnergy = evalSnapshot.sensor.kineticEnergy, isRecoveryEvent = recoveryFlagged, cpuLoad = evalSnapshot.health.cpuLoad, ioWait = evalSnapshot.health.ioWait, maxIoLatency = evalSnapshot.health.maxIoLatency, isSilentFailure = evalSnapshot.health.isSilentFailure, isBatteryLow = evalSnapshot.health.isBatteryLow, isBatteryCritical = evalSnapshot.health.isBatteryCritical, isUltraLongStationary = evalSnapshot.health.isUltraLongStationary
+            now = now, nowRt = nowRt, lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime, serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), peerSignal = if (isViewerActive && lastLocInBatch != null) 10 else 0, peerAvail = isSocketConnected && isViewerActive, hasGps = lastLocInBatch != null, isTrackerMode = true, accuracy = lastProcessedLocation?.currentAccuracy ?: 0.0, maxAccuracy = lastProcessedLocation?.maxAccuracy ?: 0.0, noiseIdx = noiseIdx, luxIdx = log10(evalSnapshot.sensor.lux + 1.0) / RIBBON_LUX_LOG_SCALE, vibeIdx = evalSnapshot.sensor.vibration / RIBBON_VIBRATION_SCALE_G, proxIdx = snapshot.proximityIdx, liftIdx = liftIdx, snrIdx = avgCn0 / RIBBON_SNR_SCALE_DB, tiltIdx = abs(evalSnapshot.sensor.tiltDegrees - locationProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG, baroIdx = (evalSnapshot.sensor.baroAlt - locationProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS, verticalVelocity = evalSnapshot.sensor.peakVerticalVelocity, sitVz = evalSnapshot.sensor.peakVerticalVelocity, sitVzTs = evalSnapshot.sensor.peakVerticalVelocityTs, sitVzRt = evalSnapshot.sensor.peakVerticalVelocityRt, sitDz = evalSnapshot.sensor.peakVerticalDisplacement, sitBaro = evalSnapshot.sensor.peakVerticalDisplacement, sitTilt = evalSnapshot.sensor.tiltDegrees, sitShock = evalSnapshot.sensor.peakShock, isBatterySteepDischarge = evalSnapshot.health.isBatterySteepDischarge, isCoolingModeActive = evalSnapshot.health.isCoolingModeActive, speed = lastProcessedLocation?.filteredSpeed ?: 0.0, bearing = lastLocInBatch?.bearing?.toDouble() ?: 0.0, isSitDetected = isSuspiciousMode, isSitActive = false, currentMa = evalSnapshot.health.currentMa, locationPendingReason = evalSnapshot.health.locationPendingReason, kineticEnergy = evalSnapshot.sensor.kineticEnergy, isRecoveryEvent = recoveryFlagged, cpuLoad = evalSnapshot.health.cpuLoad, ioWait = evalSnapshot.health.ioWait, maxIoLatency = evalSnapshot.health.maxIoLatency, isSilentFailure = evalSnapshot.health.isSilentFailure, isBatteryLow = evalSnapshot.health.isBatteryLow, isBatteryCritical = evalSnapshot.health.isBatteryCritical, isUltraLongStationary = evalSnapshot.health.isUltraLongStationary
         )
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt

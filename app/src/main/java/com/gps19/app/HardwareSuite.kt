@@ -33,6 +33,11 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.24.04:
+ * - Issue #1273 REMEDIATION: Guarded activeUsers from falling below zero and hardened 
+ *   deferred teardown check to <= 0 (R-ID 460).
+ * - Issue #1271 REMEDIATION: Added setAdaptiveVibrationFloor to support restoring the 
+ *   persisted vibration floor anchor on service initialization (R-ID 459).
  * Sep.24.01:
  * - Issue #1233 REMEDIATION: Made fast-path onSpike callbacks optional to prevent 
  *   high allocation churn of lambda re-registration on every service tick.
@@ -473,7 +478,7 @@ class HardwareSuite @Inject constructor(
 
     fun stop() {
         synchronized(lifecycleLock) {
-            val count = activeUsers.decrementAndGet()
+            val count = activeUsers.updateAndGet { current -> max(0, current - 1) }
             Timber.d("HardwareSuite: stop() called. Remaining users: $count")
             
             if (count > 0) {
@@ -525,7 +530,7 @@ class HardwareSuite @Inject constructor(
                 delay(800)
 
                 synchronized(lifecycleLock) {
-                    if (!isStarted.get() && activeUsers.get() == 0) {
+                    if (!isStarted.get() && activeUsers.get() <= 0) {
                         Timber.i("HardwareSuite: Executing deferred hardware unregistration.")
                         
                         try { gnssStatusCallback.unregister(locationManager, gHandler) } catch (e: Exception) { Timber.e(e, "GNSS status unregistration failed") }
@@ -1013,6 +1018,14 @@ class HardwareSuite @Inject constructor(
     private fun updateOrientation() { if (hasGravity && hasGeomagnetic) { if (android.hardware.SensorManager.getRotationMatrix(rotationMatrixBuffer, inclinationMatrixBuffer, gravityBuffer, geomagneticBuffer)) { android.hardware.SensorManager.getOrientation(rotationMatrixBuffer, orientationBuffer); currentCompassHeading = (Math.toDegrees(orientationBuffer[0].toDouble()) + 360.0) % 360.0 } } }
     
     fun isStationary() = SentinelValidator.isStationary(currentVibrationIndex, adaptiveVibrationFloor)
+
+    fun setAdaptiveVibrationFloor(floor: Double) {
+        if (floor >= 0.0) {
+            synchronized(this) {
+                this.adaptiveVibrationFloor = floor
+            }
+        }
+    }
     
     fun setAcousticFastPath(floor: Double, spikeThreshold: Double, minDb: Double, onSpike: (() -> Unit)? = null) { 
         synchronized(this) { acousticFastPath.update(floor, spikeThreshold, minDb, false, onSpike) } 
