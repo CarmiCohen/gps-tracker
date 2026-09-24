@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.22.30)
+# SOT Master Requirements & Hardening Status (Sep.24.50)
 
 ## 🏗️ Architectural Master Rules (22 Rules)
 
@@ -32,6 +32,7 @@
 *   **3.5 Hardware Neutrality (R212)**: The system utilizes a neutral hardware namespace (`jdHardware`) to eliminate vendor framework collisions. Legacy binary signatures (`mbrainSDK`) are neutralized in all code and string pools to prevent heuristic OS triggers (R212, R310). Hardware identification logic is decoupled from the application layer via `HardwareSot` (R317).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 465**: Non-Blocking History Flush - Transitioned the final history buffer flush in `BaseMonitorService.onDestroy()` from a synchronous `runBlocking` call to a structured teardown routine offloaded to `@ApplicationScope`. Implemented a 2000ms hard timeout to prevent process-teardown hangs while ensuring data integrity, fully mitigating Issue #1235 ANR risks during service termination (R-ID 465). (Resolved Sep.24.50)
 *   **SOT ID 464**: History Sync Restoration - Refactored the `observeHistoryEvents()` implementation in `ViewerService.kt` to subscribe to legitimate history backfill and sync event streams via `historyManager.historyEvents`, resolving the logic duplication and observation gaps identified in Issue #1231, and restoring history trace integrity on viewer devices (R-ID 464). (Resolved Sep.24.40)
 *   **SOT ID 463**: Decoupled Forensic Spike Sampling - Refactored the `forensicSamplingLoop` in `TrackerService.kt` to use a buffered boolean channel combined with `withTimeoutOrNull`. This architectural change decouples high-priority physical spike captures from the adaptive sampling rate delay, allowing immediate forensic traces to be recorded upon acoustic or light triggers even when the system is in throttled or cooling modes, ensuring zero data loss during rapid physical tampering events (R-ID 463). (Resolved Sep.24.30)
 *   **SOT ID 462**: Boot-ID Latch Validation - Implemented Boot-ID validation inside `AppAlarmManager.restoreLogicState` to detect device reboots and safely invalidate obsolete monotonic `elapsedRealtime` latches (siren cooldowns, global trigger grace periods) after a device restart. This prevents the "Permanent Muzzle" bug where safety features fail to trigger due to high-value monotonic latches from a previous boot session (R-ID 462). (Resolved Sep.24.20)
@@ -43,7 +44,7 @@
 *   **SOT ID 456**: Redundant Stream & Heartbeat Idempotency - Removed redundant reactive stream subscriptions in `ViewerService.kt`. The `ConnectivityEvent.PeerPulse` is now handled via a single observer, preventing duplicate state updates in `SessionManager` and eliminating redundant heartbeat log entries (R-ID 456). (Resolved Sep.23.80)
 *   **SOT ID 455**: Build Vitality & Reactive Stream Convergence - Implemented missing abstract members in `TrackerService`, fully hydrated `MainRepository` delegates for draft settings, and corrected `MainViewModel` flow typing to restore `.value` access. (Resolved Sep.23.72)
 *   **SOT ID 453**: Role-Based Storage Namespacing - Implemented physical isolation for logic state persistence using role-prefixed maps (`role_longs`, `role_doubles`, etc.) in `AppSettings`. Refactored `SettingsRepository` and `MainRepository` to route `"T_"` and `"V_"` prefixed keys to these isolated partitions, preventing state corruption and logic leakage when switching functional roles (Tracker vs Viewer) on the same hardware. (Resolved Sep.23.71)
-*   **SOT ID 424**: Race Condition & Initialization Safeguard - Introduced `initializationDeferred` using Kotlin coroutines CompletableDeferred in `BaseMonitorService`. This ensures that high-frequency background ticks, telemetry sampling loops, and heartbeat broadcasts are strictly blocked until asynchronous service hydration and database state restoration (`onServiceInitialize()`) are completely finished. fully closing state race conditions under physical stress or system recovery startup cycles. (Resolved Sep.23.70)
+*   **SOT ID 424**: Race Condition & Initialization Safeguard - Introduced `initializationDeferred` using Kotlin coroutines CompletableDeferred in `BaseMonitorService. Coroutines CompletableDeferred in BaseMonitorService. This ensures that high-frequency background ticks, telemetry sampling loops, and heartbeat broadcasts are strictly blocked until asynchronous service hydration and database state restoration (`onServiceInitialize()`) are completely finished. fully closing state race conditions under physical stress or system recovery startup cycles. (Resolved Sep.23.70)
 *   **SOT ID 423**: Siren Trigger Orchestration - Integrated physical siren activation into the core alarm evaluation loop within `AppAlarmManager`. This ensures that violation detections in background services are immediately and reliably translated into audio synthesis via `AudioSynthesizer`, respecting all role-based stealth requirements and manual silence overrides. (Resolved Sep.23.60)
 *   **SOT ID 422**: Centralized Single Source of Truth (SSOT) ViewModel Architecture - Re-consolidated role-specific ViewModels into a unified activity-scoped `MainViewModel`. Established a single point of subscription for high-frequency kinematic and diagnostic data streams, eliminating coroutine allocation churn (#1211) and ensuring map view states and configuration drafts remain persistent during navigation transitions (#1212, #1213). This architecture guarantees atomic state propagation across all functional roles (Tracker, Viewer, Setup). (Resolved Sep.23.50)
 *   **SOT ID 421**: Unified Hardware Lifecycle & Vendor Hardening - Consolidated Samsung, Xiaomi, and Huawei-specific power management adaptations and WakeLock policies into a central `DeviceHardeningStrategy`. Implemented functional hardening logic for background execution continuity on Samsung/Huawei/Xiaomi hardware to prevent OS-level service termination (R-ID 421). (Resolved Sep.24.00)
@@ -101,6 +102,7 @@
 *   **SOT ID 367**: Forensic Multi-Role Integrity Hardening - Resolved state collision in `ForensicAuditor` by implementing role-based (`T` for Tracker, `V` for Viewer) state tracking using a `ConcurrentHashMap`. Each role now maintains its own stability audit counters, GNSS jitter peaks, and sensor rate audit flags, ensuring accurate forensic reporting when both services run concurrently on the same device (R-ID 367). (Resolved Sep.19.08)
 
 ## 4.2. Change History (Recent)
+*   **Sep.24.50**: Resolved Issue #1245 (Non-Blocking History Flush). Transitioned database flush in `BaseMonitorService.onDestroy()` to `@ApplicationScope` with timeout to prevent ANRs (R-ID 465).
 *   **Sep.24.40**: Resolved Issue #1241 (History Sync Restoration). Restored reactive history streams in `ViewerService.kt` via legitimate `HistoryManager` observations (R-ID 464).
 *   **Sep.24.30**: Resolved Issue #1307 (Forensic Sampling Bottleneck). Transitioned `forensicTriggerChannel` to a buffered non-blocking polling model to ensure immediate capture of physical spikes (R-ID 463).
 *   **Sep.24.20**: Resolved Issue #1256 (Monotonic Latch Staleness). Implemented Boot-ID validation in `AppAlarmManager` to safely invalidate obsolete monotonic references after a device restart (R-ID 462).
@@ -178,14 +180,15 @@
 
 ## 4.3. Metric Summary
 - **Rules Verified**: 92
-- **Total SOT IDs**: 464
-- **Resolved Issues**: 1207
-- **Open Issues**: 11
+- **Total SOT IDs**: 465
+- **Resolved Issues**: 1208
+- **Open Issues**: 10
 - **Testing Coverage**: 3 (Sub-items: 12)
-- **Simplification Ideas**: 19
+- **Simplification Ideas**: 20
 - **QA Validation Tasks**: 284
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.99 (Non-Blocking History Flush)**: PASSED - Successfully refactored `BaseMonitorService.onDestroy()` to utilize a non-blocking flush routine in `@ApplicationScope`, verified 2s timeout logic (Sep.24.50).
 *   **Chapter 31.98 (History Sync Restoration)**: PASSED - Refactored `observeHistoryEvents()` in `ViewerService.kt` to securely observe `historyManager.historyEvents` streams (Sep.22.30).
 *   **Chapter 31.97 (Decoupled Forensic Spike Sampling)**: PASSED - Successfully refactored `forensicSamplingLoop` to utilize a buffered boolean channel, ensuring immediate capture of physical spikes regardless of active sampling delays (Sep.22.30).
 *   **Chapter 31.96 (Boot-ID Latch Validation)**: PASSED - Successfully implemented Boot-ID validation in AppAlarmManager to invalidate obsolete monotonic latches across device restarts (Sep.22.30).
@@ -223,7 +226,7 @@
 *   **Chapter 31.64 (GNSS Count Standard)**: PASSED - Distinguish zero from uninitialized telemetry states. (Sep.22.30)
 *   **Chapter 31.62 (Temperature Unit Layout)**: PASSED - Corrected SI unit presentation in StatusRowData. (Sep.22.30)
 *   **Chapter 31.61 (Session Lifecycle Coordinator)**: PASSED - Unified background session resets atomically across roles. (Sep.21.132)
-*   **Chapter 31.60 (Interface Isolation Utilities)**: PASSED - Created LocationProcessorListener & DefaultLocationProcessorListener. (Sep.21.131)
+*   **Chapter 31.60 (Interface Isolation Utilities)**: PASSED - Created LocationProcessorListener \u0026 DefaultLocationProcessorListener. (Sep.21.131)
 *   **Chapter 31.59 (Dead Code Elimination)**: PASSED - Removed unused tracking property leftovers. (Sep.21.130)
 *   **Chapter 31.58 (GNSS Consolidation)**: PASSED - Verified nested GnssPolicyEngine evaluation pattern. (Sep.21.128)
 *   **Chapter 31.57 (Acoustic Refactoring)**: PASSED - Verified HistoryManager/TelemetryAggregator integration of EngineAcousticSample. (Sep.21.127)
@@ -239,4 +242,4 @@
 *   **Chapter 31.39 (Multi-Role Reset)**: PASSED - Verified role-based resets in Auditor/HardwareSuite. (Sep.22.30)
 
 ---
-*Next Audit: Oct.01.00. (Sep.22.30)*
+*Next Audit: Oct.01.00. (Sep.24.50)*

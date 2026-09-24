@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.40
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.50
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -11,9 +11,6 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🟡 Medium Priority (UX, Performance & Auditability)
 
-*   **Issue #1235: Synchronous Main-Thread runBlocking Invocation in Service Shutdown**
-    *   *Description*: `BaseMonitorService.onDestroy()` employs a synchronous `runBlocking` block to flush volatile history frames to the database on the primary thread during termination. Under intense storage pressure or heavy database lock contention, this blocks service teardown long enough to provoke OS watchdog thread starvation kills or generic ANR alerts.
-    *   *Contribution*: **Medium (Lifecycle Reliability)**. Prevents "Dirty Shutdowns" and potential database corruption during app termination.
 *   **Issue #1308: Missing Forensics Trace Collection in ViewerService**
     *   *Finding*: While `ViewerService` uses the `ForensicAuditor` for stability checks, it lacks the `forensicSamplingLoop` present in `TrackerService`. This prevents detailed forensic logging of the Viewer's environment, which is necessary for auditing monitoring integrity and potential local tampering.
     *   *Contribution*: **Medium (Audit Parity)**. Ensures both ends of the connection provide equal forensic traceability.
@@ -43,9 +40,6 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🟡 Medium Priority
 
-*   **Issue #1245: Non-Blocking History Flush on Service Termination**
-    *   *Description*: Transition the final history buffer flush in `BaseMonitorService.onDestroy()` from a synchronous `runBlocking` call to a structured teardown coroutine with a strict timeout, or delegate to a WorkManager task to prevent shutdown ANRs. Resolves Issue #1235.
-    *   *Contribution*: **Medium (Stability)**. Prevents process-teardown hangs.
 *   **Issue #1261: Refactor Tracker/Viewer Services into Role-Reactive MonitorService**
     *   *Description*: Merge TrackerService and ViewerService redundant boilerplate into a unified, lightweight, role-reactive background service driven by active mode flow changes.
     *   *Contribution*: **Medium (Maintainability)**. Consolidates 400+ lines of redundant boilerplate.
@@ -113,6 +107,8 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1245: Non-Blocking History Flush on Service Termination** (Resolved Sep.24.50)
+    *   *Remediation*: Transitioned the final history buffer flush in `BaseMonitorService.onDestroy()` from a synchronous `runBlocking` call to a structured teardown routine offloaded to `applicationScope` with an internal timeout, eliminating main thread shutdown ANRs (R-ID 465).
 *   **Issue #1241: Functional Restoration of History Sync Streams in ViewerService** (Resolved Sep.24.40)
     *   *Remediation*: Refactored `observeHistoryEvents()` in `ViewerService.kt` to subscribe to legitimate `historyManager.historyEvents` stream, restoring reactive backfill and sync event visualization on monitor devices (R-ID 464).
 *   **Issue #1307: Forensic Sampling Bottleneck During Rapid Event Sequences** (Resolved Sep.24.30)
@@ -154,4 +150,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 464 (Rules: 92, IDs: 464), Resolved: 1207, Open: 11, Testing: 3 (Sub-items: 12), Ideas: 20, QA: 284]**
+- **Current Audit Baseline: [SOT: 465 (Rules: 92, IDs: 465), Resolved: 1208, Open: 10, Testing: 3 (Sub-items: 12), Ideas: 20, QA: 284]**

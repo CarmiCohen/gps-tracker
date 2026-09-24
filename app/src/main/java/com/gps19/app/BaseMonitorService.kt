@@ -19,6 +19,9 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Sep.24.50:
+ * - Issue #1245: Non-Blocking History Flush on Service Termination. Transitioned 
+ *   database flush from runBlocking to applicationScope to prevent ANRs (R-ID 465).
  * Sep.23.70:
  * - Issue #1236: Race Condition Remediation. Introduced initializationDeferred to 
  *   guarantee service state is fully hydrated before tick/heartbeat loops start (R-ID 452).
@@ -57,6 +60,8 @@ abstract class BaseMonitorService : LifecycleService() {
     @Inject lateinit var commandRouter: CommandRouter
     
     @Inject lateinit var serviceBehaviorUseCase: ServiceBehaviorUseCase
+
+    @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
     
     protected val cachedPkgName: String get() = GpsApplication.PACKAGE_NAME
 
@@ -217,9 +222,15 @@ abstract class BaseMonitorService : LifecycleService() {
             }
         }
 
-        runBlocking {
-            withTimeoutOrNull(1000) {
-                repository.flushHistory()
+        // Issue #1245: Transition to non-blocking applicationScope to prevent ANRs during teardown.
+        applicationScope.launch(Dispatchers.IO) {
+            try {
+                withTimeout(2000) {
+                    repository.flushHistory()
+                    Timber.d("Issue #1245: Final history flush completed successfully")
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Issue #1245: Final history flush failed or timed out during teardown")
             }
         }
 
