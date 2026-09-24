@@ -1,3 +1,15 @@
+# 🏛️ Resolution Archive - Sep.24.60
+
+## 🏁 Issue #1308: Missing Forensics Trace Collection in ViewerService
+*   **Resolved**: Sep.24.60
+*   **Root Cause**: `ViewerService` lacked the high-precision `forensicSamplingLoop` present in `TrackerService`. While it performed stability audits via `ForensicAuditor`, it failed to capture the detailed environmental, spatial, and IMU traces required for a complete audit of the monitor device's integrity. This created a forensic asymmetry where local tampering or environment-based reliability issues on the Viewer could not be analyzed with the same granularity as the Tracker.
+*   **Remediation**:
+    *   **ViewerService.kt**: Implemented a role-isolated `forensicSamplingLoop` utilizing a buffered `Channel<Boolean>` for trigger coordination.
+    *   **ViewerService.kt**: Integrated spike-aware capture logic (`performForensicCapture`) that decouples physical IMU and spatial jumps from the adaptive sampling rate.
+    *   **ViewerService.kt**: Added thermal recovery latency audits to track sensor stabilization periods after cooling mode exits.
+    *   **ViewerService.kt**: Hardened the service teardown by explicitly canceling the sampling job in `onDestroy()`.
+*   **R-ID**: 466
+
 # 🏛️ Resolution Archive - Sep.24.50
 
 ## 🏁 Issue #1245: Non-Blocking History Flush on Service Termination

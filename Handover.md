@@ -1,22 +1,23 @@
-# Forensic Resumption Snapshot - Sep.24.50
+# Forensic Resumption Snapshot - Sep.24.60
 
 ## 📂 Session Summary
 *   **Completed**:
-    *   **Issue #1245**: Non-Blocking History Flush on Service Termination (R-ID 465). Resolves Issue #1235.
-*   **Version**: Sep.24.50
-*   **Status**: Process teardown performance has been fully hardened. `BaseMonitorService.onDestroy()` has been migrated away from blocking synchronous `runBlocking` calls to a structured non-blocking coroutine via `@ApplicationScope`, completely eliminating Main-thread watchdog starvation risks and generic process teardown ANRs.
+    *   **Issue #1308**: Forensic Trace Collection in ViewerService (R-ID 466).
+*   **Version**: Sep.24.60
+*   **Status**: Background service parity has been achieved. `ViewerService` now performs identical high-precision forensic sampling (IMU, spatial, thermal, and battery) as the `TrackerService`, allowing for comprehensive auditability of monitoring integrity on both ends of the connection.
 
 ## 🔧 Technical Delta
-*   **BaseMonitorService.kt**:
-    *   Injected `@ApplicationScope` `CoroutineScope` to handle application-lifecycle matching task coordination.
-    *   Refactored `onDestroy()` to offload the critical `repository.flushHistory()` sequence to `applicationScope` on `Dispatchers.IO`.
-    *   Hardened the background routine using a 2000ms `withTimeout` block to protect process-teardown bounds against database contention or disk I/O lock saturation.
-*   **app/build.gradle**: Incremented `versionName` to `Sep.24.50`.
-*   **SOT / Resolution Archive / issues.md**: Integrated **SOT ID 465** (Non-Blocking History Flush) and updated status files, verified metrics compliance.
+*   **ViewerService.kt**:
+    *   Implemented `forensicSamplingLoop` with a buffered `forensicTriggerChannel`.
+    *   Integrated `performForensicCapture` with Mutex-guarded spatial/vibration gating.
+    *   Added thermal recovery latency monitoring to audit sensor stabilization after cooling mode.
+    *   Ensured deterministic teardown of `forensicSamplingJob` in `onDestroy()`.
+*   **app/build.gradle**: Incremented `versionName` to `Sep.24.60`.
+*   **Status & Dashboards**: Integrated **SOT ID 466** (Viewer Forensic Sampling) and synchronized all metrics in `issues.md` and `STATUS/SOT_MASTER_REQUIREMENTS.md`.
 
 ## 📍 Resumption Point for Next Session
-*   **Immediate Priority**: Review background performance trace metrics under simulated stress.
-*   **Strategic Goal**: Address remaining medium-priority items (e.g., Issue #1308 Missing Forensics Trace Collection in ViewerService or Issue #1272 Alarm Notification Leak in Tracker Mode).
+*   **Immediate Priority**: Address **Issue #1272** (Alarm Notification Leak in Tracker Mode) to prevent siren jumps during role transitions.
+*   **Strategic Goal**: Evaluate the performance impact of high-frequency repository writes in **Issue #1305** under extreme vibration scenarios.
 
 ## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 465 (Rules: 92, IDs: 465), Resolved: 1208, Open: 10, Testing: 3 (Sub-items: 12), Ideas: 20, QA: 284]**
+**Current Audit Baseline: [SOT: 466 (Rules: 92, IDs: 466), Resolved: 1209, Open: 9, Testing: 3 (Sub-items: 12), Ideas: 20, QA: 284]**

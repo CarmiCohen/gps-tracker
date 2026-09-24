@@ -9,7 +9,10 @@ import androidx.lifecycle.lifecycleScope
 import com.gps19.core.engine.*
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import java.util.*
 import javax.inject.Inject
@@ -17,6 +20,9 @@ import kotlin.math.*
 
 /**
  * ViewerService: Background monitoring for the Viewer role.
+ * Sep.24.60:
+ * - Issue #1308 REMEDIATION: Implemented Forensic Sampling Loop in ViewerService.
+ *   Ensures local environment forensic parity with Tracker role (R-ID 466).
  * Sep.24.40:
  * - Issue #1241 REMEDIATION: Restored functional history sync streams by implementing 
  *   legitimate observation of HistoryManager events (R-ID 464).
@@ -49,6 +55,13 @@ class ViewerService : BaseMonitorService() {
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
     private var revivalEventsJob: Job? = null
+    private var forensicSamplingJob: Job? = null
+    
+    private val forensicTriggerChannel = Channel<Boolean>(Channel.BUFFERED)
+
+    private fun triggerForensicSample(isSpike: Boolean = false) {
+        forensicTriggerChannel.trySend(isSpike)
+    }
     
     private var lastKnownLocation: Location? = null
     private var lastProcessedLocation: ProcessedLocation? = null
@@ -65,6 +78,15 @@ class ViewerService : BaseMonitorService() {
     private var lastPowerSaveCheckRt = 0L
 
     private var currentIntervalMs = TICK_INTERVAL_MS
+
+    private var lastForensicLat = 0.0
+    private var lastForensicLng = 0.0
+    private var lastForensicVibe = 0.0
+    private var lastForensicTilt = 0.0
+
+    private var lastWasCooling = false
+    private var coolingEnteredRt = 0L
+    private val forensicCaptureMutex = Mutex()
 
     private lateinit var selfProcessor: LocationProcessor
     private lateinit var remoteProcessor: LocationProcessor
@@ -192,6 +214,7 @@ class ViewerService : BaseMonitorService() {
 
         startTickLoop()
         startHeartbeatLoop()
+        startForensicSamplingLoop()
         logManager.logServiceEvent("Viewer Engine Online (Coordinated)", isImportant = true)
     }
 
@@ -454,6 +477,13 @@ class ViewerService : BaseMonitorService() {
                 serviceStartRealtime = timeProvider.elapsedRealtime()
                 serviceStartWall = timeProvider.currentTimeMillis()
                 lastHardwareRecoveryTs = 0L
+                
+                lastForensicLat = 0.0
+                lastForensicLng = 0.0
+                lastForensicVibe = 0.0
+                lastForensicTilt = 0.0
+                lastWasCooling = false
+                coolingEnteredRt = 0L
             }
         )
     }
@@ -611,6 +641,7 @@ class ViewerService : BaseMonitorService() {
         
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
         serviceTickCounter++
+        triggerForensicSample()
     }
 
     override suspend fun onHeartbeat(now: Long, nowRt: Long) {
@@ -622,6 +653,82 @@ class ViewerService : BaseMonitorService() {
                 isSecure = !alarmManager.hasUnresolvedAlarms(), 
                 isPowerSave = isPowerSaveActive || health.isPowerSaveMode
             )
+        }
+    }
+
+    private suspend fun performForensicCapture(isSpike: Boolean) = forensicCaptureMutex.withLock {
+        val health = integrityMonitor.currentHealth
+        val proc = lastProcessedLocation
+        val snapshot = hardwareSuite.consumeForensicSnapshot()
+        
+        val lat = proc?.optimizedPoint?.lat ?: 0.0
+        val lng = proc?.optimizedPoint?.lng ?: 0.0
+        val vibe = snapshot.vibration
+        val tilt = snapshot.tiltDegrees
+
+        // Decouple spikes from sampling rate gates
+        val dist = if (lastForensicLat != 0.0) PhysicsUtils.calculateDistance(lastForensicLat, lastForensicLng, lat, lng) else Double.MAX_VALUE
+        val vibeDelta = abs(vibe - lastForensicVibe)
+        val tiltDelta = abs(tilt - lastForensicTilt)
+        
+        val shouldLog = isSpike || dist > FORENSIC_SPATIAL_GATE_METERS || 
+                       vibeDelta > FORENSIC_IMU_VIBRATION_THRESHOLD || 
+                       tiltDelta > FORENSIC_IMU_TILT_THRESHOLD
+        
+        if (shouldLog) {
+            lastForensicLat = lat; lastForensicLng = lng; lastForensicVibe = vibe; lastForensicTilt = tilt
+            
+            logManager.logForensicTraceOptimized(
+                timestamp = timeProvider.currentTimeMillis(),
+                lat = lat,
+                lng = lng,
+                accuracy = proc?.currentAccuracy ?: 0.0,
+                maxAccuracy = proc?.maxAccuracy ?: 0.0,
+                vibe = vibe,
+                snr = snapshot.acousticDb,
+                batteryLevel = health.batteryLevel,
+                isCharging = health.isCharging,
+                batteryTemp = health.batteryTemp
+            )
+        }
+    }
+
+    private fun startForensicSamplingLoop() {
+        forensicSamplingJob?.cancel()
+        forensicSamplingJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
+            initializationDeferred.await()
+            delay(STARTUP_SETTLING_DELAY_MS)
+
+            // Initial trigger to capture baseline state on service startup
+            triggerForensicSample()
+
+            while (isActive) {
+                val health = integrityMonitor.currentHealth
+
+                // Issue #1244 Fix: Thermal Recovery Latency Audit
+                if (lastWasCooling && !health.isCoolingModeActive) {
+                    val latency = timeProvider.elapsedRealtime() - coolingEnteredRt
+                    logManager.logServiceEvent(m = "Forensic Performance Audit (V): Thermal Recovery Latency: ${latency}ms", isImportant = true)
+                    coolingEnteredRt = 0L
+                }
+                if (health.isCoolingModeActive && !lastWasCooling) {
+                    coolingEnteredRt = timeProvider.elapsedRealtime()
+                }
+                lastWasCooling = health.isCoolingModeActive
+
+                val delayMs = when {
+                    health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS
+                    logManager.isForensicBufferUnderPressure() -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS
+                    health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS
+                    else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS
+                }
+
+                val trigger = withTimeoutOrNull(delayMs) {
+                    forensicTriggerChannel.receive()
+                }
+
+                performForensicCapture(isSpike = (trigger == true))
+            }
         }
     }
 
@@ -700,7 +807,7 @@ class ViewerService : BaseMonitorService() {
     }
 
     override fun onDestroy() {
-        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); revivalEventsJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel()
+        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); revivalEventsJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel()
         deviceProfileManager.teardownHardwareProfile(capabilities)
         super.onDestroy()
     }

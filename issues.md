@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.50
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.60
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -11,9 +11,6 @@ Finalizing the audit of background service stability and functional convergence 
 
 ### 🟡 Medium Priority (UX, Performance & Auditability)
 
-*   **Issue #1308: Missing Forensics Trace Collection in ViewerService**
-    *   *Finding*: While `ViewerService` uses the `ForensicAuditor` for stability checks, it lacks the `forensicSamplingLoop` present in `TrackerService`. This prevents detailed forensic logging of the Viewer's environment, which is necessary for auditing monitoring integrity and potential local tampering.
-    *   *Contribution*: **Medium (Audit Parity)**. Ensures both ends of the connection provide equal forensic traceability.
 *   **Issue #1272: Alarm Notification Leak in Tracker Mode**
     *   *Description*: `AppNotificationManager` guards against showing full-screen intents in Tracker mode, but `AppAlarmManager` continues to persist alarm states. If a user flips from Tracker to Viewer while a background alarm is technically active, the siren triggers immediately, causing unexpected user distress.
     *   *Contribution*: **Medium (UX Polish)**. Prevents unexpected "Siren Jumps" during role transitions.
@@ -107,6 +104,8 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1308: Missing Forensics Trace Collection in ViewerService** (Resolved Sep.24.60)
+    *   *Remediation*: Implemented the `forensicSamplingLoop` and associated channel-driven trigger infrastructure in `ViewerService.kt`. This ensures the monitor role captures local environmental forensics (spatial, IMU, battery, thermal) with the same precision as the Tracker role, enabling comprehensive monitoring integrity audits (R-ID 466).
 *   **Issue #1245: Non-Blocking History Flush on Service Termination** (Resolved Sep.24.50)
     *   *Remediation*: Transitioned the final history buffer flush in `BaseMonitorService.onDestroy()` from a synchronous `runBlocking` call to a structured teardown routine offloaded to `applicationScope` with an internal timeout, eliminating main thread shutdown ANRs (R-ID 465).
 *   **Issue #1241: Functional Restoration of History Sync Streams in ViewerService** (Resolved Sep.24.40)
@@ -150,4 +149,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 465 (Rules: 92, IDs: 465), Resolved: 1208, Open: 10, Testing: 3 (Sub-items: 12), Ideas: 20, QA: 284]**
+- **Current Audit Baseline: [SOT: 466 (Rules: 92, IDs: 466), Resolved: 1209, Open: 9, Testing: 3 (Sub-items: 12), Ideas: 20, QA: 284]**
