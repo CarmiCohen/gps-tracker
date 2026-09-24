@@ -23,6 +23,9 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.24.95:
+ * - Issue #1163: Updated LocationProcessor interactions to align with the 
+ *   stateless refactor.
  * Sep.24.93:
  * - Issue #1265 REMEDIATION: Integrated AppEventCoordinator to offload domain 
  *   event orchestration. Cleaned up redundant observers for alarms, integrity, 
@@ -394,7 +397,7 @@ class MonitorService : BaseMonitorService() {
             hardwareSuite.setLightFastPath(baseline = primaryProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP)
             hardwareSuite.setAcousticFastPath(floor = primaryProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0)
             hardwareSuite.setHighLoad(evalSnapshot.health.isCoolingModeActive)
-            isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(isSuspiciousMode, primaryProcessor.sentinel.checkPhysicalTamper(nowRt, false) == SentinelStatus.TAMPER, primaryProcessor.consumeSitDetected(), nowRt)
+            isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(isSuspiciousMode, primaryProcessor.checkPhysicalTamper(nowRt, false) == SentinelStatus.TAMPER, primaryProcessor.consumeSitDetected(), nowRt)
             val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(evalSnapshot.health.isCoolingModeActive, isSuspiciousMode, hardwareSuite.isStationary(), hardwareSuite.isScreenOn(), primaryProcessor.getMaxDistanceAuthority() > 0.0, nowRt, capabilities)
             if (targetGpsInterval != currentIntervalMs) {
                 currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, "T"); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)

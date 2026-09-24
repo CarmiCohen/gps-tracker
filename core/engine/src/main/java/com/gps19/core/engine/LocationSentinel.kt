@@ -5,100 +5,18 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
- * Sep.24.10:
- * - Issue #1301: Expanded loadForensicState to restore persisted Lux and Acoustic 
- *   baselines, eliminating the learning period on service restart (R-ID 461).
- * Sep.24.03:
- * - Issue #1271: Implemented persistence for Adaptive Vibration Floor. Updated 
- *   loadForensicState to restore the vibration floor anchor.
- * Sep.22.31:
- * - Issue #1182: Elimination of Multi-pass Fallbacks. Unified individual parameter clauses
- *   in updateSensorState into a structured SensorStateSnapshot to remove imperative value checking bounds.
+ * Sep.24.95:
+ * - Issue #1163: Transitioned to a completely stateless model. All operational 
+ *   state metrics are read from and written to LocationProcessingState.
  */
-class LocationSentinel {
+object LocationSentinel {
 
-    private val gtoEngine = GtoEngine()
     private val resultFlyweight = SentinelResult().apply { 
         jumpConfidence = JumpConfidence() 
     }
 
-    private var lastValidLat: Double = 0.0
-    private var lastValidLng: Double = 0.0
-    private var lastValidAlt: Double = 0.0
-    private var lastValidTs: Long = 0L // Wall-clock
-    private var lastValidRt: Long = 0L // Monotonic
-    private var lastValidSpeedMps: Double = 0.0
-    private var lastValidBearing: Double = 0.0
-    private var lastValidAccuracy: Double = 0.0
-
-    private var estimatedSpeedMps: Double = 0.0
-    private var estimatedBearing: Double = 0.0
-    private var stationaryProb: Double = 1.0
-
-    internal var currentVibrationIndex: Double = 0.0
-    var peakVibrationShock: Double = 0.0
-        private set
-    var peakVibrationShockRt: Long = 0L
-        private set
-
-    internal var currentCompassHeading: Double = 0.0
-    internal var lastCompassHeading: Double = 0.0
-    internal var currentBaroAlt: Double = 0.0
-    internal var currentLux: Double = 0.0
-    internal var isNear: Boolean = true
-    internal var isPowerTamper: Boolean = false
-    
-    var currentTiltDegrees: Double = 0.0
-        private set
-    
-    var currentAcousticDb: Double = 0.0
-        private set
-    private var lastFastPathAcousticSpikeRt: Long = 0L
-    private var lastFastPathLightSpikeRt: Long = 0L
-
-    // Issue #601: Kinetic Energy
-    var kineticEnergy: Double = 0.0
-        private set
-
-    // Sit Detection State
-    var isSitDetected: Boolean = false
-        private set
-        
-    var lastSitTs: Long = 0L // Wall-clock
-    var lastSitRt: Long = 0L // Monotonic
-    var baselineSitTilt: Double = -1.0
-    
-    // SIT Forensic Parameters (Forensic Parity R522)
-    var lastSitVz: Double = 0.0; internal set
-    var lastSitVzTs: Long = 0L; internal set
-    var lastSitVzRt: Long = 0L; internal set
-    var lastSitDz: Double = 0.0; internal set
-    var lastSitBaro: Double = 0.0; internal set
-    var lastSitTilt: Double = 0.0; internal set
-    var lastSitShock: Double = 0.0; internal set
-
-    private var sitDetectionCooldownRt: Long = 0L 
-    private var stationaryStartRt: Long = 0L 
-
-    // Tractor-Slow state
-    private var gpsMotionStartRt: Long = 0L 
-
-    // Dynamic Baselines
-    var luxBaseline: Double = -1.0
-        private set
-    var baroBaseline: Double = -1000.0
-        private set
-    var acousticFloorDb: Double = -1.0
-        private set
-    var adaptiveVibrationFloor: Double = INITIAL_VIBRATION_FLOOR
-        internal set
-        
-    private var lastAcousticContractionRt: Long = 0L
-
-    private var lastSnr: Double = 0.0
-    private var lastSatsUsed: Int = 0
-
     fun loadForensicState(
+        state: LocationProcessingState,
         savedLastSitTs: Long, 
         savedBaseline: Double,
         savedSitVz: Double = 0.0,
@@ -112,74 +30,78 @@ class LocationSentinel {
         savedLuxBaseline: Double = -1.0,
         savedAcousticFloor: Double = -1.0
     ) {
-        this.lastSitTs = savedLastSitTs
-        this.baselineSitTilt = savedBaseline
-        this.lastSitVz = savedSitVz
-        this.lastSitDz = savedSitDz
-        this.lastSitBaro = savedSitBaro
-        this.lastSitTilt = savedSitTilt
-        this.lastSitShock = savedSitShock
-        this.lastSitVzTs = savedSitVzTs
-        this.lastSitVzRt = savedSitVzRt
+        state.lastSitTs = savedLastSitTs
+        state.baselineSitTilt = savedBaseline
+        state.lastSitVz = savedSitVz
+        state.lastSitDz = savedSitDz
+        state.lastSitBaro = savedSitBaro
+        state.lastSitTilt = savedSitTilt
+        state.lastSitShock = savedSitShock
+        state.lastSitVzTs = savedSitVzTs
+        state.lastSitVzRt = savedSitVzRt
         if (savedVibrationFloor >= 0.0) {
-            this.adaptiveVibrationFloor = savedVibrationFloor
+            state.adaptiveVibrationFloor = savedVibrationFloor
         }
         if (savedLuxBaseline >= 0.0) {
-            this.luxBaseline = savedLuxBaseline
+            state.luxBaseline = savedLuxBaseline
         }
         if (savedAcousticFloor >= 0.0) {
-            this.acousticFloorDb = savedAcousticFloor
+            state.acousticFloorDb = savedAcousticFloor
         }
     }
 
-    fun setSpatialAnchor(lat: Double, lng: Double, alt: Double, timestamp: Long, rt: Long, accuracy: Double = 0.0) {
-        lastValidLat = lat; lastValidLng = lng; lastValidAlt = alt; lastValidTs = timestamp; lastValidRt = rt; lastValidAccuracy = accuracy
-        updateFilters(lat, lng, timestamp, 1.0)
+    fun setSpatialAnchor(state: LocationProcessingState, lat: Double, lng: Double, alt: Double, timestamp: Long, rt: Long, accuracy: Double = 0.0) {
+        state.sentinelLastValidLat = lat
+        state.sentinelLastValidLng = lng
+        state.sentinelLastValidAlt = alt
+        state.sentinelLastValidTs = timestamp
+        state.sentinelLastValidRt = rt
+        state.sentinelLastValidAccuracy = accuracy
+        updateFilters(state, lat, lng, timestamp, 1.0)
     }
 
-    private fun updateFilters(lat: Double, lng: Double, ts: Long, qScale: Double) {
-        if (lastValidTs > 0) {
-            val d = PhysicsUtils.calculateDistance(lastValidLat, lastValidLng, lat, lng)
-            val dt = max(0.1, (ts - lastValidTs) / 1000.0)
+    private fun updateFilters(state: LocationProcessingState, lat: Double, lng: Double, ts: Long, qScale: Double) {
+        if (state.sentinelLastValidTs > 0) {
+            val d = PhysicsUtils.calculateDistance(state.sentinelLastValidLat, state.sentinelLastValidLng, lat, lng)
+            val dt = max(0.1, (ts - state.sentinelLastValidTs) / 1000.0)
             val speed = d / dt
-            estimatedSpeedMps = PhysicsUtils.smoothCoordinate(estimatedSpeedMps, speed, SPEED_EMA_ALPHA)
+            state.estimatedSpeedMps = PhysicsUtils.smoothCoordinate(state.estimatedSpeedMps, speed, SPEED_EMA_ALPHA)
             
-            val bearing = PhysicsUtils.calculateBearing(lastValidLat, lastValidLng, lat, lng)
-            estimatedBearing = PhysicsUtils.smoothBearing(estimatedBearing, bearing, BEARING_EMA_ALPHA)
+            val bearing = PhysicsUtils.calculateBearing(state.sentinelLastValidLat, state.sentinelLastValidLng, lat, lng)
+            state.estimatedBearing = PhysicsUtils.smoothBearing(state.estimatedBearing, bearing, BEARING_EMA_ALPHA)
             
-            val prob = if (estimatedSpeedMps < STATIONARY_SPEED_THRESHOLD_MPS) 1.0 else 0.0
+            val prob = if (state.estimatedSpeedMps < STATIONARY_SPEED_THRESHOLD_MPS) 1.0 else 0.0
             
-            // Issue #201: Urban Canyon Dampening.
-            val isLowSnr = lastSnr > 0 && lastSnr < JUMP_GATE_LOW_SNR_THRESHOLD
-            val alpha = if (isStationary() && isLowSnr && prob < stationaryProb) {
-                POSITION_EMA_ALPHA_STATIONARY * 0.2 // 5x slower decay
+            val isLowSnr = state.lastSnr > 0 && state.lastSnr < JUMP_GATE_LOW_SNR_THRESHOLD
+            val alpha = if (isStationary(state) && isLowSnr && prob < state.stationaryProb) {
+                POSITION_EMA_ALPHA_STATIONARY * 0.2
             } else {
                 POSITION_EMA_ALPHA_STATIONARY
             }
             
-            stationaryProb = PhysicsUtils.smoothCoordinate(stationaryProb, prob, alpha)
+            state.stationaryProb = PhysicsUtils.smoothCoordinate(state.stationaryProb, prob, alpha)
         }
     }
 
-    fun updateSensorState(snapshot: SensorStateSnapshot): Boolean {
+    fun updateSensorState(state: LocationProcessingState, snapshot: SensorStateSnapshot): Boolean {
         var baselineChanged = false
         
-        this.lastCompassHeading = this.currentCompassHeading
-        if (snapshot.vibration >= 0.0) this.currentVibrationIndex = safeDouble(snapshot.vibration)
-        if (snapshot.acousticLockoutRt > 0) this.lastFastPathAcousticSpikeRt = snapshot.acousticLockoutRt
-        if (snapshot.lightSpikeRt > 0) this.lastFastPathLightSpikeRt = snapshot.lightSpikeRt
-        this.kineticEnergy = safeDouble(snapshot.kineticEnergy)
+        state.lastCompassHeading = state.currentCompassHeading
+        if (snapshot.vibration >= 0.0) state.currentVibrationIndex = safeDouble(snapshot.vibration)
+        if (snapshot.acousticLockoutRt > 0) state.lastFastPathAcousticSpikeRt = snapshot.acousticLockoutRt
+        if (snapshot.lightSpikeRt > 0) state.lastFastPathLightSpikeRt = snapshot.lightSpikeRt
+        state.kineticEnergy = safeDouble(snapshot.kineticEnergy)
         
-        if (snapshot.peakShock > this.peakVibrationShock && !snapshot.peakShock.isNaN()) {
-            this.peakVibrationShock = snapshot.peakShock
-            this.peakVibrationShockRt = snapshot.nowRt
+        if (snapshot.peakShock > state.peakVibrationShock && !snapshot.peakShock.isNaN()) {
+            state.peakVibrationShock = snapshot.peakShock
+            state.peakVibrationShockRt = snapshot.nowRt
         }
 
         val currentTilt = safeDouble(snapshot.tiltDegrees)
-        val tiltDelta = if (baselineSitTilt >= 0.0) abs(currentTilt - baselineSitTilt) else 0.0
-        val baroDelta = if (baroBaseline > -999.0) abs(safeDouble(snapshot.baroAlt) - baroBaseline) else 0.0
+        val tiltDelta = if (state.baselineSitTilt >= 0.0) abs(currentTilt - state.baselineSitTilt) else 0.0
+        val baroDelta = if (state.baroBaseline > -999.0) abs(safeDouble(snapshot.baroAlt) - state.baroBaseline) else 0.0
         
-        if (snapshot.nowRt > sitDetectionCooldownRt && !snapshot.isMuzzled && !snapshot.isWarming) {
+        if (snapshot.nowRt > state.sitDetectionCooldownRt && !snapshot.isMuzzled && !snapshot.isWarming) {
             val isSpatialTriggered = (tiltDelta > TILT_THRESHOLD_DEGREES) || 
                                      (baroDelta > BARO_LIFT_THRESHOLD_METERS) || 
                                      snapshot.plungeMatched
@@ -188,100 +110,90 @@ class LocationSentinel {
                 val hasSufficientForce = (snapshot.peakShock > VIBRATION_SHOCK_THRESHOLD_G) || snapshot.plungeMatched || (abs(snapshot.peakVerticalVelocity) > CHAIR_PLUNGE_VELOCITY_THRESHOLD)
                 
                 if (hasSufficientForce) {
-                    isSitDetected = true
-                    lastSitTs = snapshot.nowTs
-                    lastSitRt = snapshot.nowRt
-                    sitDetectionCooldownRt = snapshot.nowRt + SIT_DUPLICATE_GUARD_MS
+                    state.isSitDetected = true
+                    state.lastSitTs = snapshot.nowTs
+                    state.lastSitRt = snapshot.nowRt
+                    state.sitDetectionCooldownRt = snapshot.nowRt + SIT_DUPLICATE_GUARD_MS
                     
-                    lastSitVz = safeDouble(snapshot.peakVerticalVelocity)
-                    lastSitVzTs = if (snapshot.peakVerticalVelocityTs > 0) snapshot.peakVerticalVelocityTs else snapshot.nowTs
-                    lastSitVzRt = if (snapshot.peakVerticalVelocityRt > 0) snapshot.peakVerticalVelocityRt else snapshot.nowRt
-                    lastSitDz = safeDouble(snapshot.peakVerticalDisplacement)
-                    lastSitBaro = safeDouble(baroDelta)
-                    lastSitTilt = safeDouble(tiltDelta)
-                    lastSitShock = safeDouble(snapshot.peakShock)
+                    state.lastSitVz = safeDouble(snapshot.peakVerticalVelocity)
+                    state.lastSitVzTs = if (snapshot.peakVerticalVelocityTs > 0) snapshot.peakVerticalVelocityTs else snapshot.nowTs
+                    state.lastSitVzRt = if (snapshot.peakVerticalVelocityRt > 0) snapshot.peakVerticalVelocityRt else snapshot.nowRt
+                    state.lastSitDz = safeDouble(snapshot.peakVerticalDisplacement)
+                    state.lastSitBaro = safeDouble(baroDelta)
+                    state.lastSitTilt = safeDouble(tiltDelta)
+                    state.lastSitShock = safeDouble(snapshot.peakShock)
                 }
             }
         }
 
-        if (isStationary() && !isSitDetected) {
-            if (stationaryStartRt == 0L) stationaryStartRt = snapshot.nowRt
-            else if (snapshot.nowRt - stationaryStartRt > PASSIVE_ZEROING_STATIONARY_MS) {
-                if (abs(baselineSitTilt - currentTilt) > 0.1 && !currentTilt.isNaN()) {
-                    baselineSitTilt = currentTilt
+        if (isStationary(state) && !state.isSitDetected) {
+            if (state.stationaryStartRt == 0L) state.stationaryStartRt = snapshot.nowRt
+            else if (snapshot.nowRt - state.stationaryStartRt > PASSIVE_ZEROING_STATIONARY_MS) {
+                if (abs(state.baselineSitTilt - currentTilt) > 0.1 && !currentTilt.isNaN()) {
+                    state.baselineSitTilt = currentTilt
                     baselineChanged = true
                 }
-                stationaryStartRt = 0L
+                state.stationaryStartRt = 0L
             }
         } else {
-            stationaryStartRt = 0L
+            state.stationaryStartRt = 0L
         }
 
-        if (snapshot.heading >= 0.0) this.currentCompassHeading = safeDouble(snapshot.heading)
-        if (snapshot.baroAlt > -999.0) this.currentBaroAlt = safeDouble(snapshot.baroAlt)
-        if (snapshot.lux >= 0.0) this.currentLux = safeDouble(snapshot.lux)
-        this.isNear = snapshot.isNear
-        this.isPowerTamper = snapshot.powerTamper
-        this.currentTiltDegrees = currentTilt
-        if (snapshot.acousticDb >= 0.0) this.currentAcousticDb = safeDouble(snapshot.acousticDb)
+        if (snapshot.heading >= 0.0) state.currentCompassHeading = safeDouble(snapshot.heading)
+        if (snapshot.baroAlt > -999.0) state.currentBaroAlt = safeDouble(snapshot.baroAlt)
+        if (snapshot.lux >= 0.0) state.currentLux = safeDouble(snapshot.lux)
+        state.isNear = snapshot.isNear
+        state.isPowerTamper = snapshot.powerTamper
+        state.currentTiltDegrees = currentTilt
+        if (snapshot.acousticDb >= 0.0) state.currentAcousticDb = safeDouble(snapshot.acousticDb)
 
-        this.luxBaseline = SentinelValidator.updateLuxBaseline(this.luxBaseline, snapshot.lux, isStationary(), snapshot.isWarming)
-        this.baroBaseline = SentinelValidator.updateBaroBaseline(this.baroBaseline, snapshot.baroAlt, snapshot.isWarming)
+        state.luxBaseline = SentinelValidator.updateLuxBaseline(state.luxBaseline, snapshot.lux, isStationary(state), snapshot.isWarming)
+        state.baroBaseline = SentinelValidator.updateBaroBaseline(state.baroBaseline, snapshot.baroAlt, snapshot.isWarming)
 
         if (!snapshot.isSirenActive) {
             val updateDb = if (snapshot.acousticMinDb >= 0.0) snapshot.acousticMinDb else if (snapshot.acousticMinDb == -1.0 && snapshot.acousticDb >= 0.0) snapshot.acousticDb else -1.0
-            this.acousticFloorDb = SentinelValidator.updateAcousticFloor(this.acousticFloorDb, updateDb, snapshot.isWarming)
+            state.acousticFloorDb = SentinelValidator.updateAcousticFloor(state.acousticFloorDb, updateDb, snapshot.isWarming)
             
-            val contractionElapsedRt = snapshot.nowRt - lastAcousticContractionRt
-            if (contractionElapsedRt >= 500 || lastAcousticContractionRt == 0L) {
-                if (acousticFloorDb > ACOUSTIC_FLOOR_MIN_DB && lastAcousticContractionRt > 0) {
+            val contractionElapsedRt = snapshot.nowRt - state.lastAcousticContractionRt
+            if (contractionElapsedRt >= 500 || state.lastAcousticContractionRt == 0L) {
+                if (state.acousticFloorDb > ACOUSTIC_FLOOR_MIN_DB && state.lastAcousticContractionRt > 0) {
                     val secondsPassed = contractionElapsedRt / 1000.0
                     if (secondsPassed > 0) {
                         val decayFactor = Math.pow(ACOUSTIC_FLOOR_CONTRACTION_EMA, secondsPassed)
-                        acousticFloorDb = max(acousticFloorDb * decayFactor, ACOUSTIC_FLOOR_MIN_DB)
+                        state.acousticFloorDb = max(state.acousticFloorDb * decayFactor, ACOUSTIC_FLOOR_MIN_DB)
                     }
                 }
-                lastAcousticContractionRt = snapshot.nowRt
+                state.lastAcousticContractionRt = snapshot.nowRt
             }
         }
         
         if (snapshot.manualAdaptiveFloor >= 0.0) {
-            this.adaptiveVibrationFloor = snapshot.manualAdaptiveFloor
+            state.adaptiveVibrationFloor = snapshot.manualAdaptiveFloor
         } else if (snapshot.providedAdaptiveFloor >= 0.0) {
-            // Issue #1143: Use floor provided by HardwareSuite (Unified Authority)
-            this.adaptiveVibrationFloor = snapshot.providedAdaptiveFloor
+            state.adaptiveVibrationFloor = snapshot.providedAdaptiveFloor
         } else if (snapshot.vibration >= 0.0) { 
-            // Issue #1189: Guard adaptation to prevent double-counting when vibration is not provided
-            this.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(this.adaptiveVibrationFloor, currentVibrationIndex, snapshot.isWarming)
+            state.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(state.adaptiveVibrationFloor, state.currentVibrationIndex, snapshot.isWarming)
         }
         
         return baselineChanged
     }
 
-    fun consumeSitDetected(): Boolean {
-        val result = isSitDetected
-        isSitDetected = false
+    fun consumeSitDetected(state: LocationProcessingState): Boolean {
+        val result = state.isSitDetected
+        state.isSitDetected = false
         return result
     }
 
-    fun resetChainBaseline() {
-        // Obsolete name cleanup compatibility fallback helper
-        baselineSitTilt = -1.0
+    fun resetChairBaseline(state: LocationProcessingState) {
+        state.baselineSitTilt = -1.0
     }
 
-    fun resetChairBaseline() {
-        baselineSitTilt = -1.0
-    }
-
-    fun getEstimatedSpeedMps(): Double = estimatedSpeedMps
-    fun getEstimatedBearing(): Double = estimatedBearing
-    fun getStationaryProbability(): Double = stationaryProb
-
-    fun getHindsightBuffer(): List<RejectedPoint> = gtoEngine.getWindow().map {
+    fun getHindsightBuffer(state: LocationProcessingState): List<RejectedPoint> = GtoEngine.getWindow(state).map {
         RejectedPoint(it.lat, it.lng, it.alt, it.accuracy, it.bearing, it.speedMps, it.ts, it.rt)
     }
 
     fun processLocation(
+        state: LocationProcessingState,
         lat: Double, lng: Double, alt: Double, accuracy: Double, 
         maxAccuracy: Double, 
         bearing: Double,
@@ -293,52 +205,52 @@ class LocationSentinel {
         nowRt: Long,
         acousticFloorDb: Double = -1.0
     ): SentinelResult {
-        this.lastSnr = snr
-        this.lastSatsUsed = satsUsed
+        state.lastSnr = snr
+        state.lastSatsUsed = satsUsed
 
         if (acousticFloorDb >= 0.0) {
-            this.acousticFloorDb = max(acousticFloorDb, ACOUSTIC_FLOOR_MIN_DB)
+            state.acousticFloorDb = max(acousticFloorDb, ACOUSTIC_FLOOR_MIN_DB)
         }
         
-        if (lastValidTs == 0L) {
-            updateLastValid(lat, lng, alt, timestamp, nowRt, 0.0, bearing, accuracy)
-            updateFilters(lat, lng, timestamp, 1.0)
+        if (state.sentinelLastValidTs == 0L) {
+            updateLastValid(state, lat, lng, alt, timestamp, nowRt, 0.0, bearing, accuracy)
+            updateFilters(state, lat, lng, timestamp, 1.0)
             resultFlyweight.reset(SentinelStatus.VALID)
             resultFlyweight.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
             return resultFlyweight
         }
 
-        val timeDeltaMs = timestamp - lastValidTs
+        val timeDeltaMs = timestamp - state.sentinelLastValidTs
         if (timeDeltaMs <= 0 && timestamp != 0L) {
             resultFlyweight.reset(SentinelStatus.VALID)
             return resultFlyweight
         }
         
-        val altitudeDelta = if (lastValidAlt != 0.0) alt - lastValidAlt else 0.0
-        val isParking = isStationary()
+        val altitudeDelta = if (state.sentinelLastValidAlt != 0.0) alt - state.sentinelLastValidAlt else 0.0
+        val isParking = isStationary(state)
         
-        val dist = PhysicsUtils.calculateDistance(lastValidLat, lastValidLng, lat, lng)
+        val dist = PhysicsUtils.calculateDistance(state.sentinelLastValidLat, state.sentinelLastValidLng, lat, lng)
         val impliesMotion = dist > ACTIVE_MOVE_THRESHOLD
         
         if (impliesMotion) {
-            if (gpsMotionStartRt == 0L) gpsMotionStartRt = nowRt
+            if (state.gpsMotionStartRt == 0L) state.gpsMotionStartRt = nowRt
         } else {
-            gpsMotionStartRt = 0L
+            state.gpsMotionStartRt = 0L
         }
         
-        val isTractorSlowOverride = gpsMotionStartRt > 0 && (nowRt - gpsMotionStartRt > 10000L)
-        val hasPhysicalMotion = if (isMuzzled) false else (currentVibrationIndex > (adaptiveVibrationFloor * 1.5) || isTractorSlowOverride)
+        val isTractorSlowOverride = state.gpsMotionStartRt > 0 && (nowRt - state.gpsMotionStartRt > 10000L)
+        val hasPhysicalMotion = if (isMuzzled) false else (state.currentVibrationIndex > (state.adaptiveVibrationFloor * 1.5) || isTractorSlowOverride)
 
         resultFlyweight.reset()
         val conf = resultFlyweight.jumpConfidence!!
         PhysicsUtils.isVisualJump(
-            lastLat = lastValidLat, lastLng = lastValidLng,
+            lastLat = state.sentinelLastValidLat, lastLng = state.sentinelLastValidLng,
             newLat = lat, newLng = lng,
-            timeDeltaMs = if (lastValidRt > 0) (nowRt - lastValidRt) else timeDeltaMs, 
+            timeDeltaMs = if (state.sentinelLastValidRt > 0) (nowRt - state.sentinelLastValidRt) else timeDeltaMs, 
             accuracy = accuracy,
-            lastAccuracy = lastValidAccuracy,
+            lastAccuracy = state.sentinelLastValidAccuracy,
             snr = snr,
-            lastSpeedMps = lastValidSpeedMps,
+            lastSpeedMps = state.sentinelLastValidSpeedMps,
             isParking = isParking,
             altitudeDelta = altitudeDelta,
             hasPhysicalMotion = hasPhysicalMotion,
@@ -347,7 +259,7 @@ class LocationSentinel {
         
         var score = conf.score
         val augmentedScore = score.coerceIn(0, 100)
-        val timeDeltaSec = (if (lastValidRt > 0) (nowRt - lastValidRt) else timeDeltaMs) / 1000.0
+        val timeDeltaSec = (if (state.sentinelLastValidRt > 0) (nowRt - state.sentinelLastValidRt) else timeDeltaMs) / 1000.0
         val currentSpeedMps = dist / max(0.1, timeDeltaSec)
         
         conf.score = augmentedScore
@@ -363,16 +275,16 @@ class LocationSentinel {
         var behavioralReason = conf.reason
 
         if (!bypassBehavioral) {
-            if (gtoEngine.evaluateTrajectory(lat, lng, bearing, currentSpeedMps, timestamp, nowRt)) {
+            if (GtoEngine.evaluateTrajectory(state, lat, lng, bearing, currentSpeedMps, timestamp, nowRt)) {
                 val promoted = mutableListOf<EngineGeoPoint>()
-                gtoEngine.getWindow().forEach { p ->
-                    updateFilters(p.lat, p.lng, p.ts, SUSPICIOUS_Q_SCALE)
+                GtoEngine.getWindow(state).forEach { p ->
+                    updateFilters(state, p.lat, p.lng, p.ts, SUSPICIOUS_Q_SCALE)
                     promoted.add(EngineGeoPoint(p.lat, p.lng, p.alt, p.ts, p.rt, p.accuracy, p.maxAccuracy))
-                    updateLastValid(p.lat, p.lng, p.alt, p.ts, p.rt, p.speedMps, p.bearing, p.accuracy)
+                    updateLastValid(state, p.lat, p.lng, p.alt, p.ts, p.rt, p.speedMps, p.bearing, p.accuracy)
                 }
-                gtoEngine.clear()
-                updateFilters(lat, lng, timestamp, SUSPICIOUS_Q_SCALE)
-                updateLastValid(lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
+                GtoEngine.clear(state)
+                updateFilters(state, lat, lng, timestamp, SUSPICIOUS_Q_SCALE)
+                updateLastValid(state, lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
                 
                 resultFlyweight.status = SentinelStatus.TRAJECTORY_PROMOTED
                 resultFlyweight.reason = "Trajectory Promoted (GTO)"
@@ -382,65 +294,63 @@ class LocationSentinel {
             }
 
             if (behavioralStatus == SentinelStatus.JUMP) {
-                gtoEngine.addPoint(lat, lng, alt, accuracy, maxAccuracy, bearing, currentSpeedMps, timestamp, nowRt, currentVibrationIndex)
+                GtoEngine.addPoint(state, lat, lng, alt, accuracy, maxAccuracy, bearing, currentSpeedMps, timestamp, nowRt, state.currentVibrationIndex)
                 resultFlyweight.status = behavioralStatus
                 resultFlyweight.reason = behavioralReason
                 return resultFlyweight
             }
 
-            resultFlyweight.status = checkPhysicalTamper(nowRt, isMuzzled)
+            resultFlyweight.status = checkPhysicalTamper(state, nowRt, isMuzzled)
             if (resultFlyweight.status != SentinelStatus.VALID) {
                 return resultFlyweight
             }
             
             if (resultFlyweight.status == SentinelStatus.VALID && resultFlyweight.suppressionNote != null) {
-                updateFilters(lat, lng, timestamp, if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0)
-                updateLastValid(lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
-                gtoEngine.clear()
+                updateFilters(state, lat, lng, timestamp, if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0)
+                updateLastValid(state, lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
+                GtoEngine.clear(state)
                 resultFlyweight.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
                 return resultFlyweight
             }
         }
 
-        updateFilters(lat, lng, timestamp, if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0)
-        updateLastValid(lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
-        gtoEngine.clear()
+        updateFilters(state, lat, lng, timestamp, if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0)
+        updateLastValid(state, lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
+        GtoEngine.clear(state)
         resultFlyweight.status = behavioralStatus
         resultFlyweight.reason = behavioralReason
         resultFlyweight.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
         return resultFlyweight
     }
 
-    /**
-     * checkPhysicalTamper: Publicly accessible sensor status evaluator (R141).
-     */
     fun checkPhysicalTamper(
+        state: LocationProcessingState,
         nowRt: Long = 0L,
         isMuzzled: Boolean = false
     ): SentinelStatus {
         if (isMuzzled) return SentinelStatus.VALID
 
-        if (!isNear) {
+        if (!state.isNear) {
             resultFlyweight.reason = "Proximity Far"
             return SentinelStatus.TAMPER
         }
-        if (isPowerTamper) {
+        if (state.isPowerTamper) {
             resultFlyweight.reason = "Power disconnected"
             return SentinelStatus.TAMPER
         }
-        if (SentinelValidator.isTiltViolated(currentTiltDegrees)) {
+        if (SentinelValidator.isTiltViolated(state.currentTiltDegrees)) {
             resultFlyweight.reason = "Tilt detected"
             return SentinelStatus.TAMPER
         }
-        if (SentinelValidator.isShockViolated(peakVibrationShock, adaptiveVibrationFloor)) {
+        if (SentinelValidator.isShockViolated(state.peakVibrationShock, state.adaptiveVibrationFloor)) {
             resultFlyweight.reason = "Shock detected"
             return SentinelStatus.TAMPER
         }
         
-        if (baroBaseline > -999.0) {
-            val liftDelta = currentBaroAlt - baroBaseline
+        if (state.baroBaseline > -999.0) {
+            val liftDelta = state.currentBaroAlt - state.baroBaseline
             if (SentinelValidator.isLiftViolated(liftDelta)) {
-                if (currentVibrationIndex > VIBRATION_STATIONARY_THRESHOLD) {
+                if (state.currentVibrationIndex > VIBRATION_STATIONARY_THRESHOLD) {
                     resultFlyweight.reason = "Lift detected"
                     return SentinelStatus.TAMPER
                 } else {
@@ -450,30 +360,30 @@ class LocationSentinel {
             }
         }
         
-        if (SentinelValidator.isLightViolated(currentLux, luxBaseline)) {
+        if (SentinelValidator.isLightViolated(state.currentLux, state.luxBaseline)) {
             resultFlyweight.reason = "Light jump"
             return SentinelStatus.TAMPER
         }
 
-        val isLightSpikeRecently = (lastFastPathLightSpikeRt > 0 && (nowRt - lastFastPathLightSpikeRt < LIGHT_LOCKOUT_MS))
+        val isLightSpikeRecently = (state.lastFastPathLightSpikeRt > 0 && (nowRt - state.lastFastPathLightSpikeRt < LIGHT_LOCKOUT_MS))
         if (isLightSpikeRecently) {
             resultFlyweight.reason = "Light jump (FastPath)"
             return SentinelStatus.TAMPER
         }
 
-        val isAcousticLockedOut = (lastFastPathAcousticSpikeRt > 0 && (nowRt - lastFastPathAcousticSpikeRt < LIGHT_LOCKOUT_MS))
+        val isAcousticLockedOut = (state.lastFastPathAcousticSpikeRt > 0 && (nowRt - state.lastFastPathAcousticSpikeRt < LIGHT_LOCKOUT_MS))
         
-        if (!isAcousticLockedOut && SentinelValidator.isAcousticViolated(currentAcousticDb, acousticFloorDb)) {
+        if (!isAcousticLockedOut && SentinelValidator.isAcousticViolated(state.currentAcousticDb, state.acousticFloorDb)) {
             resultFlyweight.reason = "Acoustic alarm"
             return SentinelStatus.TAMPER
         }
 
-        if (SentinelValidator.isVibrationSuspicious(currentVibrationIndex, adaptiveVibrationFloor)) {
+        if (SentinelValidator.isVibrationSuspicious(state.currentVibrationIndex, state.adaptiveVibrationFloor)) {
             resultFlyweight.reason = "Vibration suspicion"
             return SentinelStatus.TAMPER
         }
         
-        if (!isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(currentAcousticDb, acousticFloorDb, currentVibrationIndex)) {
+        if (!isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(state.currentAcousticDb, state.acousticFloorDb, state.currentVibrationIndex)) {
             resultFlyweight.reason = "Acoustic suspicion"
             return SentinelStatus.TAMPER
         }
@@ -481,39 +391,67 @@ class LocationSentinel {
         return SentinelStatus.VALID
     }
 
-    fun isStationary(): Boolean = SentinelValidator.isStationary(currentVibrationIndex, adaptiveVibrationFloor)
+    fun isStationary(state: LocationProcessingState): Boolean = SentinelValidator.isStationary(state.currentVibrationIndex, state.adaptiveVibrationFloor)
 
-    fun shouldThrottlePolling(providedIsStationary: Boolean? = null): Boolean {
-        val stationary = providedIsStationary ?: isStationary()
+    fun shouldThrottlePolling(state: LocationProcessingState, providedIsStationary: Boolean? = null): Boolean {
+        val stationary = providedIsStationary ?: isStationary(state)
         return stationary &&
-               abs(currentCompassHeading - lastCompassHeading) < THROTTLE_COMPASS_LIMIT &&
-               (if (baroBaseline > -999.0) abs(currentBaroAlt - baroBaseline) < THROTTLE_BARO_LIMIT else true) &&
-               isNear && (currentLux - luxBaseline < THROTTLE_LUX_LIMIT) && !isPowerTamper &&
-               currentTiltDegrees < THROTTLE_TILT_LIMIT && (currentAcousticDb - acousticFloorDb < THROTTLE_ACOUSTIC_LIMIT)
+               abs(state.currentCompassHeading - state.lastCompassHeading) < THROTTLE_COMPASS_LIMIT &&
+               (if (state.baroBaseline > -999.0) abs(state.currentBaroAlt - state.baroBaseline) < THROTTLE_BARO_LIMIT else true) &&
+               state.isNear && (state.currentLux - state.luxBaseline < THROTTLE_LUX_LIMIT) && !state.isPowerTamper &&
+               state.currentTiltDegrees < THROTTLE_TILT_LIMIT && (state.currentAcousticDb - state.acousticFloorDb < THROTTLE_ACOUSTIC_LIMIT)
     }
 
-    private fun updateLastValid(lat: Double, lng: Double, alt: Double, ts: Long, rt: Long, speedMps: Double, bearing: Double, accuracy: Double) {
-        lastValidLat = lat; lastValidLng = lng; lastValidAlt = alt; lastValidTs = ts; lastValidRt = rt
-        lastValidSpeedMps = speedMps; lastValidBearing = bearing; lastValidAccuracy = accuracy
+    private fun updateLastValid(state: LocationProcessingState, lat: Double, lng: Double, alt: Double, ts: Long, rt: Long, speedMps: Double, bearing: Double, accuracy: Double) {
+        state.sentinelLastValidLat = lat
+        state.sentinelLastValidLng = lng
+        state.sentinelLastValidAlt = alt
+        state.sentinelLastValidTs = ts
+        state.sentinelLastValidRt = rt
+        state.sentinelLastValidSpeedMps = speedMps
+        state.sentinelLastValidBearing = bearing
+        state.sentinelLastValidAccuracy = accuracy
     }
 
-    fun reset() {
-        lastValidTs = 0L; lastValidRt = 0L; currentVibrationIndex = 0.0; currentBaroAlt = 0.0
-        currentLux = 0.0; isNear = true; isPowerTamper = false; currentTiltDegrees = 0.0
-        currentAcousticDb = 0.0; luxBaseline = -1.0; baroBaseline = -1000.0; acousticFloorDb = -1.0
-        adaptiveVibrationFloor = INITIAL_VIBRATION_FLOOR; peakVibrationShock = 0.0; peakVibrationShockRt = 0L
-        lastAcousticContractionRt = 0L
-        isSitDetected = false; lastSitTs = 0L; lastSitRt = 0L; baselineSitTilt = -1.0; sitDetectionCooldownRt = 0L; stationaryStartRt = 0L
-        lastSitVz = 0.0; lastSitVzTs = 0L; lastSitVzRt = 0L; lastSitDz = 0.0; lastSitBaro = 0.0; lastSitTilt = 0.0; lastSitShock = 0.0
-        gpsMotionStartRt = 0L
-        lastFastPathAcousticSpikeRt = 0L
-        lastFastPathLightSpikeRt = 0L
-        estimatedSpeedMps = 0.0
-        estimatedBearing = 0.0
-        stationaryProb = 1.0
-        lastValidAccuracy = 0.0
-        kineticEnergy = 0.0
-        gtoEngine.clear()
+    fun reset(state: LocationProcessingState) {
+        state.sentinelLastValidTs = 0L
+        state.sentinelLastValidRt = 0L
+        state.currentVibrationIndex = 0.0
+        state.currentBaroAlt = 0.0
+        state.currentLux = 0.0
+        state.isNear = true
+        state.isPowerTamper = false
+        state.currentTiltDegrees = 0.0
+        state.currentAcousticDb = 0.0
+        state.luxBaseline = -1.0
+        state.baroBaseline = -1000.0
+        state.acousticFloorDb = -1.0
+        state.adaptiveVibrationFloor = INITIAL_VIBRATION_FLOOR
+        state.peakVibrationShock = 0.0
+        state.peakVibrationShockRt = 0L
+        state.lastAcousticContractionRt = 0L
+        state.isSitDetected = false
+        state.lastSitTs = 0L
+        state.lastSitRt = 0L
+        state.baselineSitTilt = -1.0
+        state.sitDetectionCooldownRt = 0L
+        state.stationaryStartRt = 0L
+        state.lastSitVz = 0.0
+        state.lastSitVzTs = 0L
+        state.lastSitVzRt = 0L
+        state.lastSitDz = 0.0
+        state.lastSitBaro = 0.0
+        state.lastSitTilt = 0.0
+        state.lastSitShock = 0.0
+        state.gpsMotionStartRt = 0L
+        state.lastFastPathAcousticSpikeRt = 0L
+        state.lastFastPathLightSpikeRt = 0L
+        state.estimatedSpeedMps = 0.0
+        state.estimatedBearing = 0.0
+        state.stationaryProb = 1.0
+        state.sentinelLastValidAccuracy = 0.0
+        state.kineticEnergy = 0.0
+        GtoEngine.clear(state)
         resultFlyweight.reset()
     }
 }

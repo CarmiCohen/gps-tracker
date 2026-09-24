@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.94
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.24.95
 
 ## 🎯 Current Resumption Focus: Background Infrastructure Hardening
 Finalizing the audit of background service stability and functional convergence after the role-isolation refactor.
@@ -35,23 +35,23 @@ Finalizing the audit of background service stability and functional convergence 
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 17)
+## 💡 Strategic Simplification Ideas (Ideas: 16)
 
 ### 🛑 High Priority
 *   **Issue #1291: Domain Event Bus Integration**
     *   *Significance*: **High (Architecture)**. Centralize dispersed logging and triggers into a single `AppEventCoordinator` to eliminate cross-component coupling.
 
 ### 🟡 Medium Priority
+*   **Issue #1312: Unified Evaluation Logic Snapshot**
+    *   *Significance*: **Medium (Architecture)**. Consolidate `AlarmTelemetrySnapshot` and `SensorStateSnapshot` into a single `SystemEvaluationSnapshot` to ensure absolute temporal parity between kinematic and environmental logic.
 *   **Issue #1161: Unified Trajectory & Buffer Management**
     *   *Significance*: **Medium-High (Performance)**. Merge `GtoEngine` windows and `LocationSentinel` hindsight buffers into a single optimized `TrajectoryBuffer`.
 *   **Issue #1294: Build-Time Interface Validation**
     *   *Significance*: **Medium (Quality)**. Implement custom Gradle tasks to verify service implementations before compilation.
 *   **Issue #1290: UI State Mapper Consolidation**
-    *   *Significance*: **Medium (Maintainability)**. Merge `UiStateMapper` logic directly into `MainViewModel` to reduce DI surface area.
+    *   *Significance*: **Medium (Maintainability)**. Merge `UiStateMapper() logic directly into MainViewModel to reduce DI surface area.`
 *   **Issue #1172: Smart Signaling Dispatcher**
     *   *Significance*: **Medium (Network)**. Merge conflation and throttling logic into a reactive "Smart Dispatcher" to handle connection freshness.
-*   **Issue #1163: Stateless & Functional Logic Refactoring**
-    *   *Significance*: **Medium (Robustness)**. Migrate `LocationProcessor` to a functional model using immutable states.
 *   **Issue #1160: Flyweight & Pooling Expansion**
     *   *Significance*: **Medium (Performance)**. Expand flyweight patterns to all telemetry entities and use ring buffers to eliminate GC churn.
 *   **Issue #1173: Protobuf-First Persistence**
@@ -79,6 +79,8 @@ Finalizing the audit of background service stability and functional convergence 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1163: Stateless & Functional Logic Refactoring for LocationProcessor** (Resolved Sep.24.95)
+    *   *Remediation*: Migrated `LocationProcessor`, `LocationSentinel`, and `GtoEngine` to a stateless evaluation model. Introduced `LocationProcessingState` to encapsulate all mutable tracking data. Converted core logic engines into pure `object` implementations, ensuring that location validation and anchor management are deterministic functions of their state and inputs.
 *   **Issue #1311: AppAlarmManager Stateless Evaluation Model** (Resolved Sep.24.94)
     *   *Remediation*: Fully transitioned `AppAlarmManager` to a stateless evaluation model by moving all operational parameters and active alarm state containers directly into `AlarmEvaluationState`. Eliminated duplicate fields and nested mutable maps to completely preclude cross-role transition state leakage.
 *   **Issue #1265: Unified Event Orchestration via AppEventCoordinator** (Resolved Sep.24.93)
@@ -138,4 +140,4 @@ Finalizing the audit of background service stability and functional convergence 
 *   **Issue #1194: Unified Event Logging and Action Handling** (Resolved Sep.23.01)
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 472 (Rules: 94, IDs: 472), Resolved: 1216, Open: 3, Testing: 3 (Sub-items: 12), Ideas: 17, QA: 284]**
+- **Current Audit Baseline: [SOT: 474 (Rules: 94, IDs: 474), Resolved: 1217, Open: 2, Testing: 3 (Sub-items: 12), Ideas: 16, QA: 284]**

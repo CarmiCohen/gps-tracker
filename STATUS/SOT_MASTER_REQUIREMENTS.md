@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.24.94)
+# SOT Master Requirements & Hardening Status (Sep.22.30)
 
-## 🏗️ Architectural Master Rules (22 Rules)
+## 🏗️ Architectural Master Rules (24 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -19,7 +19,7 @@
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318/R323/R739/R758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering (R318, R323, R739, R758).
 *   **2.2 Native Watchdog & Retry (R301/R319)**: Native calls must be wrapped in a watchdog timer with exponential backoff retries (R301, R319).
-*   **2.3 Shadow-Cache Stability (R280/R721)**: High-frequency lookups must use `ShadowCache` with `ReentrantLock` (R280, R721).
+*   **2.3 Shadow-Cache Stability (R280/721)**: High-frequency lookups must use `ShadowCache` with `ReentrantLock` (R280, R721).
 *   **2.4 Imperative Map Isolation (R309)**: High-frequency map overlays must use standard collections isolated from Compose observation (R309).
 *   **2.5 Snap-Isolation Throttling (R312)**: High-frequency telemetry flows must utilize deep-parity throttling (R312).
 *   **2.6 GPS Warm-up Grace Period (R315)**: Violations must be suppressed for 30s after activation to allow provider stabilization (R315).
@@ -33,6 +33,7 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions (R212, R310, R317).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 474**: Stateless Logic Refactoring - Remediated Issue #1163 by migrating `LocationProcessor`, `LocationSentinel`, and `GtoEngine` to a stateless evaluation model. Consolidated all mutable tracking data into `LocationProcessingState` and transitioned core engines to pure `object` implementations to ensure deterministic kinematic and sensor evaluation (Resolved Sep.24.95).
 *   **SOT ID 473**: Stateless Evaluation Consolidation - Remediated Issue #1311 by shifting active alarm map states and tracking metadata entirely into `AlarmEvaluationState`. Fully purged secondary in-memory maps from `AppAlarmManager` to establish complete architectural isolation across role switches. (Resolved Sep.24.94)
 *   **SOT ID 472**: Unified Event Orchestration - Centralized alert triggers, audio synthesis, and forensic logging into a high-cohesion `AppEventCoordinator`. Decoupled domain reactions from background service lifecycles and established reactive siren state binding (Issue #1292) between `AppAlarmManager` and `AudioSynthesizer` to ensure absolute parity across functional roles (R-ID 472). (Resolved Sep.24.93)
 *   **SOT ID 471**: Service Lifecycle Unification - Consolidated `TrackerService` and `ViewerService` redundant boilerplate into a unified, role-reactive `MonitorService`. (Resolved Sep.24.92)
@@ -52,23 +53,26 @@
 *   **SOT ID 457**: Fast-Path Allocation Optimization - Made spike detection callbacks optional to eliminate allocation churn in the tick loop (R-ID 457). (Resolved Sep.24.01)
 
 ## 4.2. Change History (Recent)
+*   **Sep.24.95**: Resolved Issue #1163 (Stateless & Functional Logic Refactoring). Migrated location pipeline to stateless evaluation model (SOT ID 474).
 *   **Sep.24.94**: Resolved Issue #1311 (AppAlarmManager Stateless Evaluation Model). Relocated active alarms directly into `AlarmEvaluationState` (SOT ID 473).
 *   **Sep.24.93**: Resolved Issue #1265 (Unified Event Orchestration). Centralized alert, audio, and logging triggers into `AppEventCoordinator` (SOT ID 472).
 *   **Sep.24.92**: Resolved Issue #1261 (Service Lifecycle Unification). Consolidated services into a unified `MonitorService` (SOT ID 471).
 *   **Sep.24.91**: Resolved Issue #1234 / #1244 (Heuristic Correction for Thermal Recovery Audits) (SOT ID 470).
 *   **Sep.24.90**: Resolved Issue #1306 (Namespace Collision Risk). Introduced `"VR_"` prefix for remote state segregation (SOT ID 469).
 
-## 📋 Functional Requirements (145 R-IDs)
+## 📋 Functional Requirements (146 R-IDs)
 *   **R101-R117**: Core tracking, telemetry, and forensic rules.
-*   **R473**: Stateless evaluation via consolidated state.
+*   **R474**: Stateless location evaluation via consolidated state.
+*   **R473**: Stateless alarm evaluation via consolidated state.
 *   **R472**: Unified Event Orchestration via `AppEventCoordinator`.
 *   **R471**: Service Lifecycle Unification via `MonitorService`.
 *   *(Remaining requirements preserved in technical registry)*
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.106 (Stateless Evaluation Consolidation)**: PASSED - Purged nested mutable memory states from alarm evaluation pipeline. (Sep.24.94)
-*   **Chapter 31.105 (Unified Event Orchestration)**: PASSED - Successfully centralized domain reactions and siren binding into `AppEventCoordinator`. (Sep.24.93)
-*   **Chapter 31.104 (Service Lifecycle Unification)**: PASSED - Successfully consolidated background services into `MonitorService`. (Sep.24.92)
+*   **Chapter 31.107 (Stateless Logic Refactoring)**: PASSED - Migrated location processor and sentinel to stateless engines. (Sep.22.30)
+*   **Chapter 31.106 (Stateless Evaluation Consolidation)**: PASSED - Purged nested mutable memory states from alarm evaluation pipeline. (Sep.22.30)
+*   **Chapter 31.105 (Unified Event Orchestration)**: PASSED - Successfully centralized domain reactions and siren binding into `AppEventCoordinator`. (Sep.22.30)
+*   **Chapter 31.104 (Service Lifecycle Unification)**: PASSED - Successfully consolidated background services into `MonitorService`. (Sep.22.30)
 
 ---
-*Next Audit: Oct.01.00. (Sep.24.94)*
+*Next Audit: Oct.01.00. (Sep.22.30)*

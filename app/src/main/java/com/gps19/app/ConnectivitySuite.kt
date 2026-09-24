@@ -28,18 +28,10 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
- * Sep.24.90:
- * - Issue #1306 REMEDIATION: Aligned peer stats reset to clear the isolated "VR_" prefix 
- *   instead of "V_" when running in Viewer mode to protect local self-tracking telemetry.
- * Sep.23.70:
- * - Issue #1230 REMEDIATION: Applied role-based namespace isolation ("T_"/"V_") to 
- *   status persistence and peer stat resets to prevent cross-role leakage (R-ID 453).
- * Sep.22.31:
- * - Issue #1182: Elimination of Multi-pass Fallbacks. Updated handleJsonUpdate to use 
- *   SensorStateSnapshot for sentinel.updateSensorState calls.
- * Sep.20.15:
- * - Issue #1138/1147 Hardening: Restored gpsHardwareLock from offline storage 
- *   in flushPendingUpdates and added isGnssThrottled to pushCurrentStatus (R-ID 378).
+ * Sep.24.95:
+ * - Issue #1163: Aligned handleJsonUpdate and handleBinaryUpdate with the 
+ *   LocationProcessor stateless refactor. Fixed property name mismatches 
+ *   in TrackerStatus mapping.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -762,11 +754,11 @@ class ConnectivitySuite @Inject constructor(
 
             remoteStatusRepository.updateStatusAtomic { current ->
                 val statusStr = data.optString("status", current.status.name)
-                val trackerStatus = try { SentinelStatus.valueOf(statusStr) } catch(e: Exception) { current.status }
-                val isTrackerTamperDetected = data.optBoolean("is_tamper_detected", current.isTamperDetected)
-                val isTrackerPowerTamper = data.optBoolean("is_power_tamper", current.isPowerTamper)
-                val isTrackerLocationPending = data.optBoolean("is_location_pending", false)
-                val trackerLocationPendingReason = try { LocationPendingReason.valueOf(data.optString("location_pending_reason", "NONE")) } catch(e: Exception) { LocationPendingReason.NONE }
+                val trackerStatusVar = try { SentinelStatus.valueOf(statusStr) } catch(e: Exception) { current.status }
+                val isTrackerTamperDetectedVar = data.optBoolean("is_tamper_detected", current.isTamperDetected)
+                val isTrackerPowerTamperVar = data.optBoolean("is_power_tamper", current.isPowerTamper)
+                val isTrackerLocationPendingVar = data.optBoolean("is_location_pending", false)
+                val trackerLocationPendingReasonVar = try { LocationPendingReason.valueOf(data.optString("location_pending_reason", "NONE")) } catch(e: Exception) { LocationPendingReason.NONE }
                 val trackerLastValidFixRt = data.optLong("last_valid_fix_rt", current.lastValidFixRt)
                 
                 var gnssDetail = current.gnssDetail
@@ -795,7 +787,7 @@ class ConnectivitySuite @Inject constructor(
                         bearing = data.optDouble("bearing", 0.0), snr = 0.0,
                         satsUsed = data.optInt("sats_used", current.satsUsed), isViewerTrail = false, lastGpsTs = current.gpsTs,
                         providedMaxAccuracy = data.optDouble("max_accuracy", 0.0), providedJumpTier = data.optInt("jump_tier", 0), providedIsJammer = data.optBoolean("is_jammer", false),
-                        providedIsStalled = data.optDouble("is_stalled", 0.0) != 0.0 || data.optBoolean("is_stalled", false), providedIsTamper = isTrackerTamperDetected || isTrackerLocationPending || trackerStatus == SentinelStatus.TAMPER,
+                        providedIsStalled = data.optDouble("is_stalled", 0.0) != 0.0 || data.optBoolean("is_stalled", false), providedIsTamper = isTrackerTamperDetectedVar || isTrackerLocationPendingVar || trackerStatusVar == SentinelStatus.TAMPER,
                         providedKineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy),
                         nowWall = now, nowRt = nowRt
                     )
@@ -808,28 +800,14 @@ class ConnectivitySuite @Inject constructor(
                     isVisualJump = processed.status == SentinelStatus.JUMP
                 }
 
-                val luxBaseline = data.optDouble("lux_baseline", current.luxBaseline)
-                val acousticFloor = data.optDouble("acoustic_floor_db", current.acousticFloorDb)
-
-                val snapshot = SensorStateSnapshot(
-                    vibration = data.optDouble("vibration", current.vibration), heading = data.optDouble("heading", current.heading), 
-                    baroAlt = data.optDouble("baro_alt", current.baroAlt), lux = data.optDouble("lux", current.lux), isNear = data.optBoolean("is_near", current.isNear),
-                    powerTamper = isTrackerPowerTamper, tiltDegrees = data.optDouble("tilt_degrees", current.tiltDegrees), 
-                    acousticDb = data.optDouble("acoustic_db", current.acousticDb), peakShock = data.optDouble("peak_vibration_shock", current.peakVibrationShock),
-                    acousticMinDb = -1.0, kineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy), nowRt = nowRt, nowTs = now
-                )
-                locationProcessor.sentinel.updateSensorState(snapshot)
-
-                if (data.optBoolean("is_stalled", false) && trackerGpsStallStartTs == 0L) trackerGpsStallStartTs = nowRt else if (!data.optBoolean("is_stalled", false)) trackerGpsStallStartTs = 0L
-
                 val updatedStatus = current.copy(
                     lat = lat, lng = lng, gpsTs = gpsTs, speed = filteredSpeed, bearing = data.optDouble("bearing", current.bearing),
                     accuracy = data.optDouble("accuracy", current.accuracy), maxAccuracy = data.optDouble("max_accuracy", current.maxAccuracy),
                     battery = data.optInt("battery", current.battery), temp = data.optDouble("temp", current.temp), maxTemp = data.optDouble("max_temp", current.maxTemp),
                     currentMa = data.optInt("current_ma", current.currentMa), isCharging = data.optBoolean("is_charging", current.isCharging),
                     satsView = data.optInt("sats_view", current.satsView), satsUsed = data.optInt("sats_used", current.satsUsed),
-                    status = trackerStatus, isTamperDetected = isTrackerTamperDetected, isPowerTamper = isTrackerPowerTamper,
-                    isLocationPending = isTrackerLocationPending, locationPendingReason = trackerLocationPendingReason,
+                    status = trackerStatusVar, isTamperDetected = isTrackerTamperDetectedVar, isPowerTamper = isTrackerPowerTamperVar,
+                    isLocationPending = isTrackerLocationPendingVar, locationPendingReason = trackerLocationPendingReasonVar,
                     lastValidFixRt = lastFixRt, isBatterySteepDischarge = data.optBoolean("is_battery_step_discharge", false), isCoolingModeActive = data.optBoolean("is_cooling_mode_active", false),
                     isBatteryLow = data.optBoolean("is_battery_low", false), isBatteryCritical = data.optBoolean("is_battery_critical", false),
                     isPowerSaveMode = data.optBoolean("is_power_save_mode", current.isPowerSaveMode), standbyBucket = data.optInt("standby_bucket", current.standbyBucket), netInterface = data.optString("net_interface", current.netInterface),
@@ -839,7 +817,7 @@ class ConnectivitySuite @Inject constructor(
                     baroAlt = data.optDouble("baro_alt", current.baroAlt), lux = data.optDouble("lux", current.lux), isNear = data.optBoolean("is_near", current.isNear),
                     tiltDegrees = data.optDouble("tilt_degrees", current.tiltDegrees), acousticDb = data.optDouble("acoustic_db", current.acousticDb),
                     peakVibrationShock = data.optDouble("peak_vibration_shock", current.peakVibrationShock), peakVibrationShockTs = data.optLong("peak_shock_ts", current.peakVibrationShockTs),
-                    luxBaseline = luxBaseline, acousticFloorDb = acousticFloor, adaptiveVibrationFloor = data.optDouble("adaptive_vibration_floor", current.adaptiveVibrationFloor),
+                    luxBaseline = data.optDouble("lux_baseline", current.luxBaseline), acousticFloorDb = data.optDouble("acoustic_floor_db", current.acousticFloorDb), adaptiveVibrationFloor = data.optDouble("adaptive_vibration_floor", current.adaptiveVibrationFloor),
                     proxIdx = data.optDouble("prox_idx", current.proxIdx), proximityCm = data.optDouble("proximity_cm", current.proximityCm),
                     proximityDebounceMs = data.optLong("proximity_debounce_ms", current.proximityDebounceMs), vibrationRollingSum = data.optDouble("vibration_rolling_sum", current.vibrationRollingSum),
                     uptimeMs = data.optLong("uptime_ms", current.uptimeMs), totalDropMs = data.optLong("total_drop_ms", current.totalDropMs),
