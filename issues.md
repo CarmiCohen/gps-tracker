@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.25.01
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.25.02
 
 ## 🎯 Current Resumption Focus: DTO Convergence & Persistence Alignment
 Finalizing the unification of snapshot and update models to eliminate redundant mapping layers.
@@ -10,9 +10,6 @@ Finalizing the unification of snapshot and update models to eliminate redundant 
 *   **Issue #1323: Residual Imperative Persistence in MonitorService**
     *   *Finding*: Viewer self-tracking bypasses the bus and calls `updateRepositoryLocation` directly.
     *   *Risk*: Asymmetric architecture and blocking I/O risk on the service thread.
-*   **Issue #1331: DomainEventBus Capacity Hardening**
-    *   *Finding*: Converging 10+ sources into one flow may require a higher buffer capacity or drop strategy. (Formerly #1328).
-    *   *Requirement*: Implement `onBufferOverflow = BufferOverflow.DROP_OLDEST` and increase capacity to 128.
 
 ### 🟡 Medium Priority (UX, Performance & Auditability)
 
@@ -44,6 +41,8 @@ Finalizing the unification of snapshot and update models to eliminate redundant 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1331: DomainEventBus Capacity Hardening** (Resolved Sep.25.02)
+    *   *Remediation*: Increased extra buffer capacity to 128 and introduced DROP_OLDEST overflow policy to safeguard non-blocking execution of the background evaluation loop under high event congestion. (SOT ID 481).
 *   **Issue #1322: Multi-Flow Fragmentation Convergence** (Resolved Sep.25.01)
     *   *Remediation*: Converged all component-level event streams (Alarm, Integrity, Processor, Connectivity, History, Sensor, Command, Revival) into the unified `DomainEventBus`. Migrated bus infrastructure to core engine to support core-level signaling. (SOT ID 480).
 *   **Issue #1325: Unified Snapshot Metadata Gaps** (Resolved Sep.25.00)
@@ -58,4 +57,4 @@ Finalizing the unification of snapshot and update models to eliminate redundant 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 480 (Rules: 25, IDs: 480), Resolved: 1223, Open: 4, Testing: 3 (Sub-items: 12), Ideas: 19, QA: 284]**
+- **Current Audit Baseline: [SOT: 481 (Rules: 25, IDs: 481), Resolved: 1224, Open: 3, Testing: 3 (Sub-items: 12), Ideas: 19, QA: 284]**

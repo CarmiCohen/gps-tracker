@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.25.01)
+# SOT Master Requirements & Hardening Status (Sep.25.02)
 
 ## 🏗️ Architectural Master Rules (25 Rules)
 
@@ -15,10 +15,10 @@
 *   **1.10 Dependency Injection**: Hilt is the sole authority for dependency management.
 *   **1.11 Monotonic Time**: Use `elapsedRealtime` for all interval and duration logic (R116).
 *   **1.12 Domain Orchestration (R472)**: Domain events (Alarms, Sensors, Connectivity) must be orchestrated by a central `AppEventCoordinator` to decouple domain logic from background service lifecycles.
-*   **1.13 Reactive Domain Bus (R477/R480)**: High-frequency state transitions and telemetry summaries must be propagated via a non-blocking `DomainEventBus` to decouple the core evaluation loop from persistence and signaling side-effects (Added Sep.24.97, Refined Sep.25.01).
+*   **1.13 Reactive Domain Bus (R477/R480/R481)**: High-frequency state transitions and telemetry summaries must be propagated via a non-blocking `DomainEventBus` with hardened capacity (128) and overflow dropping to ensure the core evaluation loop remains atomic and non-blocking (Refined Sep.25.02).
 
 ### 2. UI & Performance Authority
-*   **2.1 Staggered Hydration Manager (R318-R758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
+*   **2.1 Staggered Hydration Manager (R318-758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
 *   **2.2 Native Watchdog & Retry (R301/R319)**: Native calls must be wrapped in a watchdog timer with exponential backoff retries.
 *   **2.3 Shadow-Cache Stability (R280/721)**: High-frequency lookups must use `ShadowCache` with `ReentrantLock`.
 *   **2.4 Imperative Map Isolation (R309)**: High-frequency map overlays must use standard collections isolated from Compose observation.
@@ -34,23 +34,21 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 480**: Multi-Flow Fragmentation Convergence - Remediated Issue #1322 by converging all component-level event streams into the unified `DomainEventBus`. Decoupled `AppEventCoordinator` from 10+ fragmented flows and moved bus infrastructure to core engine to support core-level signaling (Resolved Sep.25.01).
-*   **SOT ID 479**: Telemetry Corruption Remediation - Remediated Issue #1326 by correcting the satellite count mapping in `LocationProcessor`. Eliminated the legacy zero-placeholder in `processGpsPoint` (Resolved Sep.25.00).
-*   **SOT ID 478**: Unified Snapshot Metadata Completion - Remediated Issue #1325 by expanding `SystemEvaluationSnapshot` to include satellite counts, proximity indices, and violation statistics (Resolved Sep.25.00).
-*   **SOT ID 477**: Domain Event Bus Integration - Decoupled the `MonitorService` evaluation loop from all persistence, signaling, and ribbon update side-effects (Resolved Sep.24.97).
-*   **SOT ID 476**: Role-Switching Atomic State Reset - Hardened `MonitorService` to handle dynamic role transitions via atomic session resets (Resolved Sep.24.96).
-*   **SOT ID 475**: Unified Evaluation Snapshot - Consolidated distinct snapshots into a single `SystemEvaluationSnapshot` (Resolved Sep.24.96).
+*   **SOT ID 481**: DomainEventBus Capacity Hardening - Remediated Issue #1331 by increasing buffer capacity to 128 and implementing `DROP_OLDEST` strategy. Guaranteed non-blocking performance for the tick loop (Resolved Sep.25.02).
+*   **SOT ID 480**: Multi-Flow Fragmentation Convergence - Remediated Issue #1322 by converging all component-level event streams into the unified `DomainEventBus` (Resolved Sep.25.01).
+*   **SOT ID 479**: Telemetry Corruption Remediation - Remediated Issue #1326 by correcting the satellite count mapping in `LocationProcessor` (Resolved Sep.25.00).
+*   **SOT ID 478**: Unified Snapshot Metadata Completion - Remediated Issue #1325 by expanding `SystemEvaluationSnapshot` (Resolved Sep.25.00).
 
-## 📋 Functional Requirements (148 R-IDs)
+## 📋 Functional Requirements (149 R-IDs)
+*   **R481**: Reactive Bus Capacity Hardening.
 *   **R480**: Unified Multi-Flow Convergence.
 *   **R479**: Telemetry Corruption Remediation.
 *   **R478**: Unified Snapshot Metadata Parity.
-*   **R477**: Reactive Domain Bus orchestration.
 *   *(Remaining requirements preserved in technical registry)*
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.114 (Bus Resilience)**: PASSED - Verified non-blocking emission under high load with overflow drop strategy. (Sep.25.02)
 *   **Chapter 31.113 (Flow Convergence)**: PASSED - Eliminated fragmented flows; unified DomainEventBus orchestrates all system side-effects. (Sep.25.01)
-*   **Chapter 31.112 (Telemetry Integrity)**: PASSED - Corrected satellite count mapping and unified metadata propagation. (Sep.22.30)
 
 ---
-*Next Audit: Oct.01.00. (Sep.25.01)*
+*Next Audit: Oct.01.00. (Sep.25.02)*
