@@ -5,6 +5,8 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.25.03:
+ * - Issue #1323: Added ViewerLocationUpdated to DomainEvent for bus-driven persistence.
  * Sep.25.01:
  * - Issue #1322: Unified all component-level events (Alarm, Integrity, Processor, 
  *   Connectivity, History, Sensor, Command, Revival) into DomainEvent hierarchy.
@@ -384,6 +386,14 @@ sealed class DomainEvent {
     ) : DomainEvent()
 
     data class PowerSaveTransition(val isEngaged: Boolean) : DomainEvent()
+
+    data class ViewerLocationUpdated(
+        val processed: ProcessedLocation,
+        val snapshot: SystemEvaluationSnapshot,
+        val health: SystemHealthState,
+        val nowRt: Long,
+        val nowTs: Long
+    ) : DomainEvent()
     
     data class HeuristicRecovery(
         val message: String,

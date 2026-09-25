@@ -11,6 +11,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
@@ -23,11 +24,14 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.25.03:
+ * - Issue #1323: Converted Viewer self-tracking persistence to use DomainEventBus.
+ *   Eliminated imperative updateRepositoryLocation call to ensure architectural symmetry.
+ * - Issue #1322 Cleanup: Migrated connectivity and command event observation to 
+ *   the unified DomainEventBus. Eliminated component-level flow dependencies.
  * Sep.25.01:
  * - Issue #1322: Aligned eventCoordinator.start call site with the converged bus-centric model.
  *   Injected DomainEventBus into primary and remote LocationProcessors.
- * Sep.25.00:
- * - Issue #1325: Fully populated SystemEvaluationSnapshot metadata.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -43,7 +47,6 @@ class MonitorService : BaseMonitorService() {
 
     private var gpsCollectionJob: Job? = null
     private var gnssDetailJob: Job? = null
-    private var revivalEventsJob: Job? = null
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
     private var forensicSamplingJob: Job? = null
@@ -253,25 +256,30 @@ class MonitorService : BaseMonitorService() {
     }
 
     private suspend fun observeConnectivityEvents() {
-        connectivitySuite.connectivityEvents.collect { event ->
-            if (event is ConnectivityEvent.PeerPulse) {
-                if (isTrackerMode) handleViewerPulse(event.id) else handleTrackerPulse(event.id)
+        domainEventBus.events
+            .filterIsInstance<DomainEvent.Connectivity>()
+            .collect { event ->
+                val connectivityEvent = event.event
+                if (connectivityEvent is ConnectivityEvent.PeerPulse) {
+                    if (isTrackerMode) handleViewerPulse(connectivityEvent.id) else handleTrackerPulse(connectivityEvent.id)
+                }
             }
-        }
     }
 
     private suspend fun observeCommandEvents() {
-        commandRouter.commandEvents.collect { event ->
-            when (event) {
-                is CommandEvent.WatchdogTrigger -> { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
-                is CommandEvent.UiPulse -> { lastUiPulseTs = timeProvider.currentTimeMillis(); updateForegroundServiceType() }
-                is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
-                is CommandEvent.ResetTimers -> resetServiceTimers()
-                is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); lifecycleScope.launch { hardwareSuite.start() } }
-                is CommandEvent.ExecuteStressTest -> if (isTrackerMode) executeAutomatedStressTest()
-                is CommandEvent.SimulateStoragePressure -> {}
+        domainEventBus.events
+            .filterIsInstance<DomainEvent.Command>()
+            .collect { event ->
+                when (val commandEvent = event.event) {
+                    is CommandEvent.WatchdogTrigger -> { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
+                    is CommandEvent.UiPulse -> { lastUiPulseTs = timeProvider.currentTimeMillis(); updateForegroundServiceType() }
+                    is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(commandEvent.visible)
+                    is CommandEvent.ResetTimers -> resetServiceTimers()
+                    is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); lifecycleScope.launch { hardwareSuite.start() } }
+                    is CommandEvent.ExecuteStressTest -> if (isTrackerMode) executeAutomatedStressTest()
+                    is CommandEvent.SimulateStoragePressure -> {}
+                }
             }
-        }
     }
 
     private suspend fun observeSettingsChanges() {
@@ -311,25 +319,20 @@ class MonitorService : BaseMonitorService() {
                 speed = location.speed.toDouble(), gpsTs = location.time, accuracy = lastGpsAccuracy, 
                 bearing = location.bearing.toDouble(), snrSnapshot = hardwareSuite.averageSnr,
                 satsUsed = hardwareSuite.satellitesUsed, satsView = hardwareSuite.satellitesInView,
-                nowRt = nowRt, nowTs = nowWall
+                nowRt = nowRt, nowTs = nowWall, lastValidFixRt = primaryProcessor.getLastValidFixRt()
             )
             val processed = primaryProcessor.processGpsPoint(snapshot, isViewerTrail = true, lastGpsTs = sessionManager.lastGpsTs, isLocal = true)
             if (!processed.isClockRegression) sessionManager.lastGpsTs = location.time
             lastProcessedLocation = processed
-            updateRepositoryLocation(processed, location, nowRt, nowWall)
+            
+            domainEventBus.emit(DomainEvent.ViewerLocationUpdated(
+                processed = processed,
+                snapshot = snapshot,
+                health = integrityMonitor.currentHealth,
+                nowRt = nowRt,
+                nowTs = nowWall
+            ))
         }
-    }
-
-    private fun updateRepositoryLocation(processed: ProcessedLocation, location: Location, nowRt: Long, nowWall: Long) {
-        val health = integrityMonitor.currentHealth
-        repository.updateLocation(LocationUpdate().apply {
-            this.kinetic.lat = location.latitude; this.kinetic.lng = location.longitude; this.kinetic.alt = location.altitude; this.kinetic.speed = location.speed.toDouble(); this.kinetic.accuracy = location.accuracy.toDouble()
-            this.kinetic.bearing = location.bearing.toDouble(); this.kinetic.gpsTs = location.time; this.kinetic.rt = nowRt; this.kinetic.maxAccuracy = processed.maxAccuracy
-            this.atmospheric.temp = health.batteryTemp; this.atmospheric.maxTemp = health.maxTemp
-            this.integrity.battery = health.batteryLevel; this.integrity.isCharging = health.isCharging; this.integrity.satsView = hardwareSuite.satellitesInView; this.integrity.satsUsed = hardwareSuite.satellitesUsed; this.integrity.currentMa = health.currentMa
-            this.integrity.snrIdx = (hardwareSuite.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
-            this.ts = nowWall; this.isMe = true; this.lastValidFixRt = primaryProcessor.getLastValidFixRt(); this.status = processed.status; this.isClockRegression = processed.isClockRegression
-        })
     }
 
     private fun handleViewerPulse(id: String) {
@@ -586,7 +589,7 @@ class MonitorService : BaseMonitorService() {
     }
 
     override fun onDestroy() {
-        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); revivalEventsJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel()
+        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel()
         deviceProfileManager.teardownHardwareProfile(capabilities); super.onDestroy()
     }
 
@@ -646,10 +649,10 @@ class MonitorService : BaseMonitorService() {
     private fun executeAutomatedStressTest() {
         lifecycleScope.launch(Dispatchers.Default) {
             domainEventBus.emit(DomainEvent.ServiceStatus("FORENSIC STRESS TEST: Initiating 5s CPU/IO saturation burst.", isImportant = true))
-            val cpuJob = launch(Dispatchers.Default) { val end = System.currentTimeMillis() + 5000L; var count = 0L; while (System.currentTimeMillis() < end) { sin(count.toDouble()); cos(count.toDouble()); sqrt(count.toDouble()); count++ }; domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: CPU Saturation complete ($count iterations).")) }
+            val cpuOrder = launch(Dispatchers.Default) { val end = System.currentTimeMillis() + 5000L; var count = 0L; while (System.currentTimeMillis() < end) { sin(count.toDouble()); cos(count.toDouble()); sqrt(count.toDouble()); count++ }; domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: CPU Saturation complete ($count iterations).")) }
             val ioJob = launch(Dispatchers.IO) { val end = System.currentTimeMillis() + 5000L; val data = ByteArray(1024 * 1024) { 0xFF.toByte() }; val tempFile = File(cacheDir, "stress_test.tmp"); var writes = 0; while (System.currentTimeMillis() < end) { try { FileOutputStream(tempFile).use { fos -> fos.write(data); fos.flush() }; writes++ } catch (e: Exception) { Timber.e(e, "Stress Test IO failure") } }; tempFile.delete(); domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: IO Saturation complete ($writes MB written).")) }
             val forensicJob = launch(Dispatchers.Default) { repeat(500) { i -> logManager.logForensicTrace("STRESS_BURST: Forensic sample #$i injection."); if (i % 100 == 0) delay(1) }; domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: Forensic Saturation burst complete.")) }
-            joinAll(cpuJob, ioJob, forensicJob); domainEventBus.emit(DomainEvent.ServiceStatus("FORENSIC STRESS TEST: Saturation routine COMPLETED.", isImportant = true))
+            joinAll(cpuOrder, ioJob, forensicJob); domainEventBus.emit(DomainEvent.ServiceStatus("FORENSIC STRESS TEST: Saturation routine COMPLETED.", isImportant = true))
         }
     }
 

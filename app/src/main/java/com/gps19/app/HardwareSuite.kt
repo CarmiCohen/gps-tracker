@@ -33,6 +33,8 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.25.03:
+ * - Issue #1322 Cleanup: Fixed ACOUSTIC_DUTY_CYCLE_ON_MS typo.
  * Sep.25.01:
  * - Issue #1322: Converged Sensor and Revival event emission into DomainEventBus.
  *   Migrated LocationStatus and RevivalEvent to EngineModels.kt.
@@ -796,7 +798,7 @@ class HardwareSuite @Inject constructor(
                             val nowRt = timeProvider.elapsedRealtime()
                             if (powerSaveMode) {
                                 val adaptiveOffCycleMs = SentinelValidator.computeAdaptiveAcousticOffCycle(isStationary(), stationaryStartRt, nowRt)
-                                if (!isInOffCycle && (nowRt - lastDutyCycleTransitionRt > ACOUSTIC_DUT_CYCLE_ON_MS)) { 
+                                if (!isInOffCycle && (nowRt - lastDutyCycleTransitionRt > ACOUSTIC_DUTY_CYCLE_ON_MS)) {
                                     isInOffCycle = true; lastDutyCycleTransitionRt = nowRt; try { audioRecord.stop() } catch (e: Exception) {} 
                                 }
                                 else if (isInOffCycle && (nowRt - lastDutyCycleTransitionRt > adaptiveOffCycleMs)) { 

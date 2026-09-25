@@ -17,15 +17,11 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.25.03:
+ * - Issue #1322 Cleanup: Fixed unresolved references to revivalEvents and LocationStatus.
+ *   Migrated revival event observation to the unified DomainEventBus.
  * Sep.25.01:
  * - Issue #1322: Converged IntegrityEvent emission into DomainEventBus.
- * Sep.24.91:
- * - Issue #1244 Hardening: Captured precise coolingEnteredRt timestamp within handleBatteryUpdate.
- * Sep.20.20:
- * - Issue #1142 Hardening: Reset all vitality timestamps in resetStats() to 
- *   prevent false "Flow Stall" alerts on session restart (R-ID 383).
- * Sep.17.02:
- * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -118,8 +114,9 @@ class IntegrityMonitor @Inject constructor(
         }
 
         scope.launch {
-            hardwareSuite.revivalEvents
-                .onEach { event -> handleRevivalEvent(event) }
+            domainEventBus.events
+                .filterIsInstance<DomainEvent.Revival>()
+                .onEach { event -> handleRevivalEvent(event.event) }
                 .collect()
         }
 
@@ -280,7 +277,7 @@ class IntegrityMonitor @Inject constructor(
         }
     }
 
-    private fun handleLocationStatusUpdate(status: HardwareSuite.LocationStatus) {
+    private fun handleLocationStatusUpdate(status: LocationStatus) {
         val workingHealth = currentHealth
         if (status.isPending && !workingHealth.isLocationPending) {
             domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("Location fix pending: ${status.reason.name.replace("_", " ")} on this device", false)))

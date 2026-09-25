@@ -10,6 +10,9 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Sep.25.03:
+ * - Issue #1323: Implemented handleViewerLocationUpdated to converge Viewer 
+ *   self-tracking persistence into the bus-centric model.
  * Sep.25.01:
  * - Issue #1322: Converged all component-level flow observations into a single 
  *   DomainEventBus listener. Eliminated flow fragmentation and simplified the 
@@ -47,6 +50,7 @@ class AppEventCoordinator @Inject constructor(
         domainEventBus.events.collect { event ->
             when (event) {
                 is DomainEvent.TickEvaluated -> handleTickEvaluated(event, connectivitySuite)
+                is DomainEvent.ViewerLocationUpdated -> handleViewerLocationUpdated(event)
                 is DomainEvent.HeuristicRecovery -> handleHeuristicRecovery(event)
                 is DomainEvent.StabilityViolation -> handleStabilityViolation(event)
                 is DomainEvent.PowerSaveTransition -> handlePowerSaveTransition(event)
@@ -189,6 +193,21 @@ class AppEventCoordinator @Inject constructor(
             isSilentFailure = snapshot.isSilentFailure, isBatteryLow = snapshot.isBatteryLow, 
             isBatteryCritical = snapshot.isBatteryCritical, isUltraLongStationary = snapshot.isUltraLongStationary
         )
+    }
+
+    private suspend fun handleViewerLocationUpdated(event: DomainEvent.ViewerLocationUpdated) {
+        val proc = event.processed
+        val snapshot = event.snapshot
+        val health = event.health
+
+        repository.updateLocation(LocationUpdate().apply {
+            this.kinetic.lat = snapshot.lat; this.kinetic.lng = snapshot.lng; this.kinetic.alt = snapshot.alt; this.kinetic.speed = snapshot.speed; this.kinetic.accuracy = snapshot.accuracy
+            this.kinetic.bearing = snapshot.bearing; this.kinetic.gpsTs = snapshot.gpsTs; this.kinetic.rt = event.nowRt; this.kinetic.maxAccuracy = proc.maxAccuracy
+            this.atmospheric.temp = health.batteryTemp; this.atmospheric.maxTemp = health.maxTemp
+            this.integrity.battery = health.batteryLevel; this.integrity.isCharging = health.isCharging; this.integrity.satsView = snapshot.satsView; this.integrity.satsUsed = snapshot.satsUsed; this.integrity.currentMa = health.currentMa
+            this.integrity.snrIdx = ((snapshot.snrSnapshot ?: 0.0) / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
+            this.ts = event.nowTs; this.isMe = true; this.lastValidFixRt = snapshot.lastValidFixRt; this.status = proc.status; this.isClockRegression = proc.isClockRegression
+        })
     }
 
     private fun handleHeuristicRecovery(event: DomainEvent.HeuristicRecovery) {

@@ -1,3 +1,14 @@
+# 🏛️ Resolution Archive - Sep.25.03
+
+## 🏁 Issue #1323: Residual Imperative Persistence in MonitorService
+*   **Resolved**: Sep.25.03
+*   **Root Cause**: The Viewer role's self-tracking updates were being persisted via an imperative call to `updateRepositoryLocation` within `MonitorService.onLocationChanged`. This bypassed the reactive `DomainEventBus` architecture used by the Tracker role, creating architectural asymmetry and risking blocking the service thread with database I/O.
+*   **Remediation**:
+    *   **EngineModels.kt**: Added `DomainEvent.ViewerLocationUpdated` to the core event hierarchy.
+    *   **AppEventCoordinator.kt**: Implemented a reactive handler for `ViewerLocationUpdated` that offloads repository persistence to the coordination layer.
+    *   **MonitorService.kt**: Removed the imperative `updateRepositoryLocation` method and updated `onLocationChanged` to emit the new event to the bus.
+*   **R-ID**: 482
+
 # 🏛️ Resolution Archive - Sep.25.02
 
 ## 🏁 Issue #1331: DomainEventBus Capacity Hardening
