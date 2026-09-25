@@ -24,6 +24,9 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.25.04:
+ * - Issue #1327: Replaced redundant TickEvaluated emissions in pulse handlers with 
+ *   DomainEvent.PeerConnectionChanged to resolve event collision side-effects.
  * Sep.25.03:
  * - Issue #1323: Converted Viewer self-tracking persistence to use DomainEventBus.
  *   Eliminated imperative updateRepositoryLocation call to ensure architectural symmetry.
@@ -345,7 +348,9 @@ class MonitorService : BaseMonitorService() {
         }
         val isNew = sessionManager.onViewerPulse(id, timeProvider.elapsedRealtime())
         if (isNew || tickJob?.isActive != true) {
-            if (isNew) domainEventBus.emit(DomainEvent.ServiceStatus("Viewer connected: $id"))
+            if (isNew) {
+                domainEventBus.emit(DomainEvent.PeerConnectionChanged(isConnected = true, peerId = id))
+            }
             startTickLoop() 
         }
     }
@@ -360,13 +365,7 @@ class MonitorService : BaseMonitorService() {
         val isNew = sessionManager.onTrackerPulse(id, nowRt)
         if (isNew || tickJob?.isActive != true) {
             if (isNew) {
-                val proc = lastProcessedLocation
-                domainEventBus.emit(DomainEvent.TickEvaluated(
-                    now = timeProvider.currentTimeMillis(), nowRt = nowRt, isTrackerMode = isTrackerMode,
-                    snapshot = SystemEvaluationSnapshot(lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = proc?.maxAccuracy ?: 0.0),
-                    processed = proc, health = integrityMonitor.currentHealth, isSocketConnected = connectivitySuite.isConnected(), isPeerActive = true,
-                    serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt()
-                ))
+                domainEventBus.emit(DomainEvent.PeerConnectionChanged(isConnected = true, peerId = id))
             }
             startTickLoop()
         }

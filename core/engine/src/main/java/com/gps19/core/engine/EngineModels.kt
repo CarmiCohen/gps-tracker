@@ -7,6 +7,7 @@ import kotlinx.serialization.Transient
  * EngineModels: Data structures for the core tracking engine.
  * Sep.25.04:
  * - Issue #1324: Added PeerStatusReceived to DomainEvent for bus-driven peer persistence.
+ * - Issue #1327: Added PeerConnectionChanged to DomainEvent to resolve pulse event collisions.
  * Sep.25.03:
  * - Issue #1323: Added ViewerLocationUpdated to DomainEvent for bus-driven persistence.
  * Sep.25.01:
@@ -399,6 +400,11 @@ sealed class DomainEvent {
     
     data class PeerStatusReceived(
         val status: LocationUpdate
+    ) : DomainEvent()
+
+    data class PeerConnectionChanged(
+        val isConnected: Boolean,
+        val peerId: String
     ) : DomainEvent()
 
     data class HeuristicRecovery(

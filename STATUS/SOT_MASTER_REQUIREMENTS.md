@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.25.04)
+# SOT Master Requirements & Hardening Status (Sep.22.30)
 
 ## 🏗️ Architectural Master Rules (25 Rules)
 
@@ -34,6 +34,7 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 484**: Peer Lifecycle Decoupling - Remediated Issue #1327 by introducing `PeerConnectionChanged` to eliminate pulse-to-tick event collisions. (Resolved Sep.25.05).
 *   **SOT ID 483**: Peer Status Persistence Decoupling - Remediated Issue #1324 by offloading peer telemetry persistence from `ConnectivitySuite` to `AppEventCoordinator` via the `DomainEventBus`. (Resolved Sep.25.04).
 *   **SOT ID 482**: Residual Imperative Persistence in MonitorService - Remediated Issue #1323 by transitioning Viewer self-tracking location updates into the `DomainEventBus` with `ViewerLocationUpdated` event. (Resolved Sep.25.03).
 *   **SOT ID 481**: DomainEventBus Capacity Hardening - Remediated Issue #1331 by increasing buffer capacity to 128 and implementing `DROP_OLDEST` strategy. (Resolved Sep.25.02).
@@ -42,6 +43,7 @@
 *   **SOT ID 478**: Unified Snapshot Metadata Completion - Remediated Issue #1325 by expanding `SystemEvaluationSnapshot` (Resolved Sep.25.00).
 
 ## 📋 Functional Requirements (150 R-IDs)
+*   **R484**: Lifecycle-only peer connection events.
 *   **R483**: Bus-driven peer telemetry persistence.
 *   **R482**: Bus-driven Viewer self-tracking location updates.
 *   **R481**: Reactive Bus Capacity Hardening.
@@ -51,10 +53,11 @@
 *   *(Remaining requirements preserved in technical registry)*
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.116 (Peer Bus Persistence)**: PASSED - Verified peer status updates travel through the DomainEventBus to AppEventCoordinator for asynchronous repository writing. (Sep.25.04)
-*   **Chapter 31.115 (Viewer Bus Persistence)**: PASSED - Verified Viewer self-tracking updates travel through the DomainEventBus to AppEventCoordinator for asynchronous repository writing. (Sep.25.03)
-*   **Chapter 31.114 (Bus Resilience)**: PASSED - Verified non-blocking emission under high load with overflow drop strategy. (Sep.25.02)
-*   **Chapter 31.113 (Flow Convergence)**: PASSED - Eliminated fragmented flows; unified DomainEventBus orchestrates all system side-effects. (Sep.25.01)
+*   **Chapter 31.117 (Peer Lifecycle Decoupling)**: PASSED - Verified that peer pulses emit PeerConnectionChanged and do not trigger redundant repository/signaling side-effects. (Sep.22.30)
+*   **Chapter 31.116 (Peer Bus Persistence)**: PASSED - Verified peer status updates travel through the DomainEventBus to AppEventCoordinator for asynchronous repository writing. (Sep.22.30)
+*   **Chapter 31.115 (Viewer Bus Persistence)**: PASSED - Verified Viewer self-tracking updates travel through the DomainEventBus to AppEventCoordinator for asynchronous repository writing. (Sep.22.30)
+*   **Chapter 31.114 (Bus Resilience)**: PASSED - Verified non-blocking emission under high load with overflow drop strategy. (Sep.22.30)
+*   **Chapter 31.113 (Flow Convergence)**: PASSED - Eliminated fragmented flows; unified DomainEventBus orchestrates all system side-effects. (Sep.22.30)
 
 ---
-*Next Audit: Oct.01.00. (Sep.25.04)*
+*Next Audit: Oct.01.00. (Sep.22.30)*

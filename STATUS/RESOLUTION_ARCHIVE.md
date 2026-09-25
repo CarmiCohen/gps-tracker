@@ -1,3 +1,14 @@
+# 🏛️ Resolution Archive - Sep.25.05
+
+## 🏁 Issue #1327: Pulse-to-Tick Event Collision
+*   **Resolved**: Sep.25.05
+*   **Root Cause**: Peer heartbeat handlers in `MonitorService` were reusing the `DomainEvent.TickEvaluated` event to signal connectivity updates. This triggered the full telemetry processing and persistence pipeline (intended for local sensor ticks), leading to redundant repository writes, stale ribbon updates, and unnecessary signaling overhead for every peer pulse.
+*   **Remediation**:
+    *   **EngineModels.kt**: Introduced `DomainEvent.PeerConnectionChanged(isConnected: Boolean, peerId: String)` to the unified event hierarchy.
+    *   **MonitorService.kt**: Replaced redundant `TickEvaluated` emissions in `handleTrackerPulse` and `handleViewerPulse` with the new lifecycle-only event.
+    *   **AppEventCoordinator.kt**: Implemented a reactive handler for `PeerConnectionChanged` to log peer lifecycle events without triggering telemetry side-effects.
+*   **R-ID**: 484
+
 # 🏛️ Resolution Archive - Sep.25.04
 
 ## 🏁 Issue #1324: Peer Signaling Coupling to Repository
