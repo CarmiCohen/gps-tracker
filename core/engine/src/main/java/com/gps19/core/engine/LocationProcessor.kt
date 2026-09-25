@@ -5,15 +5,11 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.25.05:
+ * - Issue #1330: Adapted to unified SystemEvaluationSnapshot with nested 
+ *   Kinetic, Atmospheric, and Integrity states.
  * Sep.25.01:
  * - Issue #1322: Converged ProcessorEvent emission into DomainEventBus.
- * Sep.25.00:
- * - Issue #1326 REMEDIATION: Corrected satellite count mapping in processGpsPoint 
- *   to utilize snapshot.satsUsed, eliminating the zero-placeholder that caused 
- *   telemetry corruption.
- * Sep.24.97:
- * - Issue #1291: Refactored processGpsPoint to consume SystemEvaluationSnapshot 
- *   to align with the unified domain event model.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider,
@@ -157,7 +153,7 @@ class LocationProcessor(
             "updateSensorData",
             LatencyMonitor.AuditType.PERFORMANCE,
             { message, _ ->
-                emitEvent(ProcessorEvent.LogAdded(message, "system", false, true, 0.0, 0.0, 0.0, null, snapshot.vibration))
+                emitEvent(ProcessorEvent.LogAdded(message, "system", false, true, 0.0, 0.0, 0.0, null, snapshot.atmospheric.vibration))
             }
         ) {
             val oldVibeFloor = state.adaptiveVibrationFloor
@@ -228,13 +224,13 @@ class LocationProcessor(
         lastGpsTs: Long,
         isLocal: Boolean = false
     ): ProcessedLocation {
-        val lat = snapshot.lat
-        val lng = snapshot.lng
-        val alt = snapshot.alt
-        val androidSpeedMps = snapshot.speed
-        val gpsTs = snapshot.gpsTs
-        val accuracy = snapshot.accuracy
-        val bearing = snapshot.bearing
+        val lat = snapshot.kinetic.lat
+        val lng = snapshot.kinetic.lng
+        val alt = snapshot.kinetic.alt
+        val androidSpeedMps = snapshot.kinetic.speed
+        val gpsTs = snapshot.kinetic.gpsTs
+        val accuracy = snapshot.kinetic.accuracy
+        val bearing = snapshot.kinetic.bearing
         val snr = snapshot.snrSnapshot ?: 0.0
         val nowRt = snapshot.nowRt
         val nowWall = snapshot.nowTs
@@ -279,7 +275,7 @@ class LocationProcessor(
                     this.isSpatiallyValid = true
                     this.tamperDetected = snapshot.tamperDetected
                     this.jammerDetected = snapshot.jammerDetected
-                    this.kineticEnergy = snapshot.kineticEnergy
+                    this.kineticEnergy = snapshot.kinetic.kineticEnergy
                 }
             }
 
@@ -304,13 +300,13 @@ class LocationProcessor(
                         this.isSpatiallyValid = false
                         this.tamperDetected = snapshot.tamperDetected
                         this.jammerDetected = snapshot.jammerDetected
-                        this.kineticEnergy = snapshot.kineticEnergy
+                        this.kineticEnergy = snapshot.kinetic.kineticEnergy
                     }
                 }
             }
             
             if (accuracy <= HIGH_ACCURACY_THRESHOLD_METERS) { state.lastHighAccLat = lat; state.lastHighAccLng = lng; state.lastHighAccTs = nowWall; state.lastHighAccRt = nowRt }
-            if (isLocal) updateWindowedAccuracy(accuracy) else if (snapshot.maxAccuracy > 0.0) state.maxAccuracy = snapshot.maxAccuracy
+            if (isLocal) updateWindowedAccuracy(accuracy) else if (snapshot.kinetic.maxAccuracy > 0.0) state.maxAccuracy = snapshot.kinetic.maxAccuracy
             
             if (snapshot.acousticLockoutRt > 0 || snapshot.lightSpikeRt > 0 || snapshot.providedAdaptiveFloor >= 0.0) {
                 val oldVibeFloor = state.adaptiveVibrationFloor
@@ -337,7 +333,7 @@ class LocationProcessor(
             val sentinelResult = LocationSentinel.processLocation(
                 state = state,
                 lat = lat, lng = lng, alt = alt, accuracy = accuracy, maxAccuracy = state.maxAccuracy, 
-                bearing = bearing, snr = snr, satsUsed = snapshot.satsUsed, timestamp = effectiveTs,
+                bearing = bearing, snr = snr, satsUsed = snapshot.integrity.satsUsed, timestamp = effectiveTs,
                 bypassBehavioral = !isLocal, isSuspicious = snapshot.isMuzzled || adaptationMuzzled,
                 isMuzzled = snapshot.isMuzzled, nowTs = nowWall, nowRt = nowRt
             )
@@ -398,7 +394,7 @@ class LocationProcessor(
                     this.tamperDetected = finalIsTamper
                     this.jammerDetected = finalIsJammer
                     this.suppressionNote = finalSuppressionNote
-                    this.kineticEnergy = if (isLocal) state.kineticEnergy else snapshot.kineticEnergy
+                    this.kineticEnergy = if (isLocal) state.kineticEnergy else snapshot.kinetic.kineticEnergy
                 }
             }
 
@@ -493,7 +489,7 @@ class LocationProcessor(
                 this.jammerDetected = finalIsJammer
                 this.isAnchorLocked = isAnchorLockedNow
                 this.suppressionNote = finalSuppressionNote
-                this.kineticEnergy = if (isLocal) state.kineticEnergy else snapshot.kineticEnergy
+                this.kineticEnergy = if (isLocal) state.kineticEnergy else snapshot.kinetic.kineticEnergy
             }
         }
     }

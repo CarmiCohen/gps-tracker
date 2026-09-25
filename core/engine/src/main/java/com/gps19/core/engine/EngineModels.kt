@@ -5,21 +5,14 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.25.05:
+ * - Issue #1330: Unified SystemEvaluationSnapshot with LocationUpdate partitioned states 
+ *   (Kinetic, Atmospheric, Integrity) to eliminate the bridge mapping layer.
  * Sep.25.04:
  * - Issue #1324: Added PeerStatusReceived to DomainEvent for bus-driven peer persistence.
  * - Issue #1327: Added PeerConnectionChanged to DomainEvent to resolve pulse event collisions.
  * Sep.25.03:
  * - Issue #1323: Added ViewerLocationUpdated to DomainEvent for bus-driven persistence.
- * Sep.25.01:
- * - Issue #1322: Unified all component-level events (Alarm, Integrity, Processor, 
- *   Connectivity, History, Sensor, Command, Revival) into DomainEvent hierarchy.
- *   Migrated LocationStatus to core engine to support bus-driven health updates.
- * Sep.25.00:
- * - Issue #1325: Fully unified SystemEvaluationSnapshot with all metadata 
- *   required for parity (sats, proximity, vibration, violation stats).
- * - Issue #1326: Corrected satellite count mapping to prevent telemetry corruption.
- * - Refactor: Decommissioned redundant fields in DomainEvent.TickEvaluated to 
- *   enforce snapshot-centric state propagation.
  */
 
 @Serializable
@@ -166,27 +159,21 @@ class EngineConnectionPoint(
 }
 
 /**
- * SystemEvaluationSnapshot: Unified DTO for all telemetry, health metrics, and sensor data 
- * consumed during a background tick or alarm evaluation. (Issue #1312)
+ * SystemEvaluationSnapshot: Unified DTO for all telemetry and health metrics.
+ * Issue #1330: Migrated to partitioned states for zero-allocation bridging to LocationUpdate.
  */
 @Serializable
 data class SystemEvaluationSnapshot(
-    // Kinematic & Location State
+    // Partitioned States (Direct Parity with LocationUpdate)
+    val kinetic: KineticState = KineticState(),
+    val atmospheric: AtmosphericState = AtmosphericState(),
+    val integrity: IntegrityState = IntegrityState(),
+
+    // Evaluation Metadata & Transient State
     val status: SentinelStatus = SentinelStatus.VALID,
-    val lat: Double = 0.0,
-    val lng: Double = 0.0,
-    val alt: Double = 0.0,
-    val accuracy: Double = 0.0,
-    val maxAccuracy: Double = 0.0,
-    val speed: Double = 0.0,
-    val bearing: Double = 0.0,
-    val gpsTs: Long = 0L,
     val lastValidFixRt: Long = 0L,
-    val distToHome: Double? = null,
     val isStalled: Boolean = false,
     val isClockRegression: Boolean = false,
-
-    // Sentinel & Anomaly State
     val isJammer: Boolean = false,
     val jumpTier: Int = 0,
     val isAdaptiveJump: Boolean = false,
@@ -195,56 +182,6 @@ data class SystemEvaluationSnapshot(
     val isAnchorLocked: Boolean = false,
     val suppressionNote: String? = null,
 
-    // Environmental & Sensor State
-    val vibration: Double = -1.0,
-    val heading: Double = -1.0,
-    val baroAlt: Double = -1000.0,
-    val baroAltEma: Double = -1000.0,
-    val lux: Double = 0.0,
-    val isNear: Boolean = true,
-    val tiltDegrees: Double = 0.0,
-    val acousticDb: Double = 0.0,
-    val peakShock: Double = 0.0,
-    val acousticMinDb: Double = -1.0,
-    val luxBaseline: Double = 0.0,
-    val acousticFloorDb: Double = 0.0,
-    val adaptiveVibrationFloor: Double = 0.12,
-    val kineticEnergy: Double = 0.0,
-    val peakVerticalVelocity: Double = 0.0,
-    val peakVerticalVelocityTs: Long = 0L,
-    val peakVerticalVelocityRt: Long = 0L,
-    val peakVerticalDisplacement: Double = 0.0,
-
-    // Health & System State
-    val batteryLevel: Int = 100,
-    val batteryTemp: Double = 0.0,
-    val currentMa: Int = 0,
-    val isCharging: Boolean = false,
-    val isPowerTamper: Boolean = false,
-    val isLocationPending: Boolean = false,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val isPowerSaveMode: Boolean = false,
-    val standbyBucket: Int = -1,
-    val netInterface: String = "UNKNOWN",
-    val isStorageLow: Boolean = false,
-    val isStorageCritical: Boolean = false,
-    val isBatterySteepDischarge: Boolean = false,
-    val isCoolingModeActive: Boolean = false,
-    val isGpsHardwareLock: Boolean = false,
-    val cpuLoad: Double = 0.0,
-    val ioWait: Double = 0.0,
-    val maxIoLatency: Long = 0L,
-    val isSilentFailure: Boolean = false,
-    val isMaliAnomaly: Boolean = false,
-    val isUltraLongStationary: Boolean = false,
-    val isBatteryLow: Boolean = false,
-    val isBatteryCritical: Boolean = false,
-    var isSignalLoss: Boolean = false,
-    var isGpsStalling: Boolean = false,
-    val isGpsGap: Boolean = false,
-    val localInternetLoss: Boolean = false,
-    val isHardwareOnline: Boolean = true,
-    
     // Temporal Gating & Fast-Paths
     val acousticLockoutRt: Long = 0L,
     val lightSpikeRt: Long = 0L,
@@ -254,21 +191,38 @@ data class SystemEvaluationSnapshot(
     val nowTs: Long = 0L,
     val snrSnapshot: Double? = null,
     val vibeSnapshot: Double? = null,
-
-    // Metadata for Signaling & Persistence (Issue #1325)
-    val satsUsed: Int = -1,
-    val satsView: Int = -1,
-    val proxIdx: Double = 0.0,
-    val proximityCm: Double = -1.0,
-    val proximityDebounceMs: Long = 0L,
-    val vibrationRollingSum: Double = 0.0,
-    val violationUptimeMs: Long = 0L,
-    val violationPercentage: Double = 0.0,
     
     // Warm-up & Audio State
     val isWarming: Boolean = false,
-    val isSirenActive: Boolean = false
-)
+    val isSirenActive: Boolean = false,
+    
+    // Performance Metrics
+    val cpuLoad: Double = 0.0,
+    val ioWait: Double = 0.0,
+    val maxIoLatency: Long = 0L,
+    val isSilentFailure: Boolean = false,
+    val isMaliAnomaly: Boolean = false,
+    val localInternetLoss: Boolean = false,
+    val isHardwareOnline: Boolean = true,
+    val acousticMinDb: Double = -1.0
+) {
+    /**
+     * toLocationUpdate: Returns a new LocationUpdate based on this snapshot.
+     * Note: In high-frequency paths, use Repository flyweights instead.
+     */
+    fun toLocationUpdate(isMe: Boolean = true): LocationUpdate {
+        return LocationUpdate(
+            kinetic = kinetic.copy(),
+            atmospheric = atmospheric.copy(),
+            integrity = integrity.copy(),
+            status = status,
+            ts = nowTs,
+            isMe = isMe,
+            isClockRegression = isClockRegression,
+            lastValidFixRt = lastValidFixRt
+        )
+    }
+}
 
 /**
  * AlarmServiceContext: Unified DTO for service-level context in alarm evaluation.

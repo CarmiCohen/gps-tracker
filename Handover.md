@@ -1,21 +1,23 @@
-# Forensic Resumption Snapshot - Sep.25.05
+# Forensic Resumption Snapshot - Sep.25.06
 
 ## 📂 Session Summary
 *   **Completed**:
-    *   **Issue #1327**: Pulse-to-Tick Event Collision. Introduced `DomainEvent.PeerConnectionChanged` for lifecycle-only peer notifications. Replaced redundant `TickEvaluated` emissions in heartbeat pulse handlers to eliminate unnecessary side-effects and stale telemetry propagation.
-    *   **Architecture Hardening**: Decoupled connection statuses from high-frequency core telemetry evaluations, reinforcing the architectural boundary between network states and logic evaluation.
-*   **Version**: Sep.25.05
-*   **Status**: Peer lifecycle updates are isolated. The system strictly follows a non-blocking connection event propagation pattern.
+    *   **Issue #1330**: Snap-to-Update Monolith. Unified `SystemEvaluationSnapshot` with the partitioned state structures (`KineticState`, `AtmosphericState`, `IntegrityState`) shared with `LocationUpdate`.
+    *   **Orchestration Hardening**: Eliminated ~100 lines of manual bridge mapping in `AppEventCoordinator`. Telemetry data now flows through snapshot partitions directly to the repository and signaling layers.
+    *   **Zero-Allocation Buffering**: Hardened sub-state `copyFrom` methods to ensure the double-buffering scheme in `TelemetryRepository` remains allocation-free during high-frequency pulses.
+*   **Version**: Sep.25.06
+*   **Status**: DTO unification is complete. The bridge layer between logic evaluation and state persistence has been eliminated.
 
 ## 🔧 Technical Delta
-*   **EngineModels.kt**: Added `DomainEvent.PeerConnectionChanged(isConnected: Boolean, peerId: String)`.
-*   **MonitorService.kt**: Refactored `handleTrackerPulse` and `handleViewerPulse` to emit lightweight `PeerConnectionChanged` instead of `TickEvaluated`.
-*   **AppEventCoordinator.kt**: Implemented connection event handler for lifecycle tracking.
-*   **app/build.gradle**: Incremented version to `Sep.25.05`.
+*   **EngineModels.kt**: Refactored `SystemEvaluationSnapshot` to use partitioned states. Added `toLocationUpdate()` helper.
+*   **LocationUpdate.kt**: Added optimized `copyFrom()` to all state partitions.
+*   **MonitorService.kt**: Updated evaluation loop to populate partitioned snapshot.
+*   **AppEventCoordinator.kt**: Simplified `handleTickEvaluated` and `handleViewerLocationUpdated` to use direct partition passing.
+*   **app/build.gradle**: Incremented version to `Sep.25.06`.
 
 ## 📍 Resumption Point for Next Session
-*   **Immediate Priority**: Progress with Issue #1330 (Snap-to-Update Monolith) to eliminate the bridge layer between snapshots and location updates.
-*   **Strategic Goal**: Consolidate `LocationUpdate` construction into a single `TelemetryMapper` (Issue #1329) to clean up coordinate orchestration.
+*   **Immediate Priority**: Issue #1329 (Telemetry Mapping Convergence) - Centralize remaining manual mapping calls into `TelemetryMapper`.
+*   **Strategic Goal**: Issue #1314 (TrackerStatus Convergence) - Refactor the signaling DTO to match the partitioned engine architecture.
 
 ## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 484 (Rules: 25, IDs: 484), Resolved: 1227, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 21, QA: 284]**
+**Current Audit Baseline: [SOT: 485 (Rules: 25, IDs: 485), Resolved: 1229, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 21, QA: 284]**

@@ -24,7 +24,17 @@ data class KineticState(
     var kineticEnergy: Double = 0.0,
     var distToTracker: Double? = null,
     var distToHome: Double? = null
-)
+) {
+    fun copyFrom(other: KineticState) {
+        this.lat = other.lat; this.lng = other.lng; this.alt = other.alt; this.speed = other.speed
+        this.accuracy = other.accuracy; this.maxAccuracy = other.maxAccuracy; this.bearing = other.bearing
+        this.gpsTs = other.gpsTs; this.rt = other.rt; this.isJump = other.isJump
+        this.isTrajectoryPromoted = other.isTrajectoryPromoted; this.jumpTier = other.jumpTier
+        this.isAdaptiveJump = other.isAdaptiveJump; this.verticalVelocity = other.verticalVelocity
+        this.kineticEnergy = other.kineticEnergy; this.distToTracker = other.distToTracker
+        this.distToHome = other.distToHome
+    }
+}
 
 /**
  * AtmosphericState: Environmental and IMU sensor telemetry.
@@ -55,7 +65,20 @@ data class AtmosphericState(
     var isNear: Boolean = true,
     var liftIdx: Double = 0.0,
     var tiltIdx: Double = 0.0
-)
+) {
+    fun copyFrom(other: AtmosphericState) {
+        this.temp = other.temp; this.maxTemp = other.maxTemp; this.baroAlt = other.baroAlt
+        this.baroIdx = other.baroIdx; this.lux = other.lux; this.luxBaseline = other.luxBaseline
+        this.luxIdx = other.luxIdx; this.acousticDb = other.acousticDb; this.acousticFloorDb = other.acousticFloorDb
+        this.noiseIdx = other.noiseIdx; this.tiltDegrees = other.tiltDegrees; this.heading = other.heading
+        this.vibration = other.vibration; this.vibrationRollingSum = other.vibrationRollingSum
+        this.vibeIdx = other.vibeIdx; this.peakVibrationShock = other.peakVibrationShock
+        this.peakVibrationShockTs = other.peakVibrationShockTs; this.adaptiveVibrationFloor = other.adaptiveVibrationFloor
+        this.proxIdx = other.proxIdx; this.proximityCm = other.proximityCm
+        this.proximityDebounceMs = other.proximityDebounceMs; this.isNear = other.isNear
+        this.liftIdx = other.liftIdx; this.tiltIdx = other.tiltIdx
+    }
+}
 
 /**
  * IntegrityState: Hardware, system health, and session audit telemetry.
@@ -115,20 +138,40 @@ data class IntegrityState(
     var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     var signal: Int? = null,
     var tamperNote: String? = null
-)
+) {
+    fun copyFrom(other: IntegrityState) {
+        this.battery = other.battery; this.isCharging = other.isCharging; this.currentMa = other.currentMa
+        this.satsView = other.satsView; this.satsUsed = other.satsUsed; this.snrIdx = other.snrIdx
+        this.isTamperDetected = other.isTamperDetected; this.isPowerTamper = other.isPowerTamper
+        this.isJammer = other.isJammer; this.isStalled = other.isStalled; this.isSuspicious = other.isSuspicious
+        this.isAnchorLocked = other.isAnchorLocked; this.gpsHardwareLock = other.gpsHardwareLock
+        this.isBatteryLow = other.isBatteryLow; this.isBatteryCritical = other.isBatteryCritical
+        this.isCoolingModeActive = other.isCoolingModeActive; this.isUltraLongStationary = other.isUltraLongStationary
+        this.isGnssThrottled = other.isGnssThrottled; this.isBatterySteepDischarge = other.isBatterySteepDischarge
+        this.isPowerSaveMode = other.isPowerSaveMode; this.standbyBucket = other.standbyBucket
+        this.netInterface = other.netInterface; this.isStorageLow = other.isStorageLow
+        this.isStorageCritical = other.isStorageCritical; this.micPending = other.micPending
+        this.violationUptimeMs = other.violationUptimeMs; this.violationPercentage = other.violationPercentage
+        this.uptimeMs = other.uptimeMs; this.totalConnectedMs = other.totalConnectedMs
+        this.sessionConnectedMs = other.sessionConnectedMs; this.lastConnTs = other.lastConnTs
+        this.lastDiscTs = other.lastDiscTs; this.totalDropMs = other.totalDropMs
+        this.maxDropMs = other.maxDropMs; this.maxDropTs = other.maxDropTs
+        this.lastEnergyDeltaMa = other.lastEnergyDeltaMa; this.lastEnergyDeltaTemp = other.lastEnergyDeltaTemp
+        this.lastEnergyDurationMs = other.lastEnergyDurationMs; this.gnssDetail = other.gnssDetail
+        this.isSitDetected = other.isSitDetected; this.lastSitTs = other.lastSitTs
+        this.sitVz = other.sitVz; this.sitVzTs = other.sitVzTs; this.sitVzRt = other.sitVzRt
+        this.sitDz = other.sitDz; this.sitBaro = other.sitBaro; this.sitTilt = other.sitTilt
+        this.sitShock = other.sitShock; this.isSitActive = other.isSitActive
+        this.isLocationPending = other.isLocationPending; this.locationPendingReason = other.locationPendingReason
+        this.signal = other.signal; this.tamperNote = other.tamperNote
+    }
+}
 
 /**
  * LocationUpdate: Aggregated telemetry container.
- * Sep.22.00:
- * - Issue #1178: Initial GNSS satellite count blanking. Set default 
- *   satsView and satsUsed to -1 to allow UI to distinguish between 
- *   zero satellites and "no data" states (R-ID 399).
- * Sep.10.40:
- * - Issue #946 Visibility: Added tamperNote to IntegrityState for 
- *   role-agnostic forensic transparency (R-ID 288).
- * Sep.09.10:
- * - Legacy Field Cleanup RESOLVED: Removed all bridge properties. 
- *   Consumers now use .kinetic, .atmospheric, and .integrity directly (R-ID 284).
+ * Sep.25.05:
+ * - Issue #1330: Snap-to-Update Monolith. Hardened copyFrom methods for 
+ *   sub-states to ensure zero-allocation StateFlow propagation.
  */
 @Serializable
 class LocationUpdate(
@@ -143,9 +186,9 @@ class LocationUpdate(
     var lastValidFixRt: Long = 0L
 ) {
     fun copyFrom(other: LocationUpdate) {
-        this.kinetic = other.kinetic.copy()
-        this.atmospheric = other.atmospheric.copy()
-        this.integrity = other.integrity.copy()
+        this.kinetic.copyFrom(other.kinetic)
+        this.atmospheric.copyFrom(other.atmospheric)
+        this.integrity.copyFrom(other.integrity)
         this.status = other.status
         this.ts = other.ts
         this.isMe = other.isMe

@@ -1,3 +1,15 @@
+# 🏛️ Resolution Archive - Sep.25.06
+
+## 🏁 Issue #1330: Snap-to-Update Monolith
+*   **Resolved**: Sep.25.06
+*   **Root Cause**: `SystemEvaluationSnapshot` and `LocationUpdate` had duplicate field structures but were functionally decoupled, forcing `AppEventCoordinator` to perform heavy manual field-to-field mapping (~100 assignments) per background pulse. This introduced significant allocation churn and maintenance overhead.
+*   **Remediation**:
+    *   **EngineModels.kt**: Refactored `SystemEvaluationSnapshot` to consume the partitioned state structures (`KineticState`, `AtmosphericState`, `IntegrityState`) shared with `LocationUpdate`.
+    *   **LocationUpdate.kt**: Hardened `copyFrom` methods for sub-states to enable zero-allocation double-buffering in the repository.
+    *   **MonitorService.kt**: Aligned the core evaluation loop with the partitioned DTO structure.
+    *   **AppEventCoordinator.kt**: Eliminated the manual mapping layer; updates are now passed directly via snapshot partitions.
+*   **R-ID**: 485
+
 # 🏛️ Resolution Archive - Sep.25.05
 
 ## 🏁 Issue #1327: Pulse-to-Tick Event Collision

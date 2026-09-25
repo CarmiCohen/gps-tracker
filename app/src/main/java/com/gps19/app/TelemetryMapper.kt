@@ -4,18 +4,43 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Sep.25.07:
+ * - Issue #1329: Telemetry Mapping Convergence. Added mapSnapshotToUpdate to 
+ *   consolidate LocationUpdate construction and eliminate redundant mapping 
+ *   logic in AppEventCoordinator.
  * Sep.20.15:
  * - Issue #1138/1147 Hardening: Added gpsHardwareLock and isGnssThrottled 
  *   to all mapping layers for forensic parity (R-ID 378).
- * Aug.31.00:
- * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
- *   violationUptimeMs mapping for full parity in binary telemetry (R782).
- * - Forensic Audit: Hardened history mappings for violationUptimeMs and 
- *   isUltraLongStationary to ensure replay parity.
- * Aug.29.10:
- * - Concern #765: Added isUltraLongStationary mapping for full state parity.
  */
 object TelemetryMapper {
+
+    /**
+     * mapSnapshotToUpdate: Authority for converting an engine snapshot into a 
+     * persistence-ready LocationUpdate.
+     */
+    fun mapSnapshotToUpdate(
+        snapshot: SystemEvaluationSnapshot,
+        processed: ProcessedLocation?,
+        isMe: Boolean
+    ): LocationUpdate {
+        val speed = snapshot.kinetic.speed
+        val trackerState = when {
+            speed > 0.5 -> TrackerState.MOVING
+            else -> TrackerState.PARKING
+        }
+
+        return LocationUpdate(
+            kinetic = snapshot.kinetic.copy(),
+            atmospheric = snapshot.atmospheric.copy(),
+            integrity = snapshot.integrity.copy(),
+            status = snapshot.status,
+            ts = snapshot.nowTs,
+            isMe = isMe,
+            trackerState = trackerState,
+            isClockRegression = snapshot.isClockRegression,
+            lastValidFixRt = snapshot.lastValidFixRt
+        )
+    }
 
     /**
      * Maps core and forensic fields from EngineConnectionPoint to ConnectionPoint.

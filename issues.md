@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.25.05
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.25.06
 
-## 🎯 Current Resumption Focus: Snap-to-Update Monolith
-Progressing with the consolidation of telemetry DTOs to eliminate bridge layers.
+## 🎯 Current Resumption Focus: Architectural Hardening
+Ready for next priority item.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -16,12 +16,10 @@ Progressing with the consolidation of telemetry DTOs to eliminate bridge layers.
 ### 🛑 High Priority
 *   **Issue #1329: Telemetry Mapping Convergence**
     *   *Significance*: **High (Architecture)**. Consolidate `LocationUpdate` construction into a single `TelemetryMapper` to remove redundant mapping logic from the coordinator.
+*   **Issue #1314: TrackerStatus & Evaluation Snapshot Convergence**
+    *   *Significance*: **Medium (Architecture)**. Evaluate if `TrackerStatus` DTO can be merged into `SystemEvaluationSnapshot` or refactored to use partitioned states to eliminate the mapping layer in `ConnectivitySuite`.
 
 ### 🟡 Medium Priority
-*   **Issue #1330: Snap-to-Update Monolith**
-    *   *Significance*: **Medium (Logic)**. Since `SystemEvaluationSnapshot` now carries ~95% of `LocationUpdate` fields, evaluate merging them into a single polymorphic DTO to eliminate the bridge layer.
-*   **Issue #1314: TrackerStatus & Evaluation Snapshot Convergence**
-    *   *Significance*: **Medium (Architecture)**. Evaluate if `TrackerStatus` DTO can be merged into `SystemEvaluationSnapshot` to eliminate the mapping layer in `ConnectivitySuite`.
 *   **Issue #1332: Viewer Self-Tracking Snapshot Optimization**
     *   *Significance*: **Low (Simplicity)**. Now that Viewer persistence is bus-driven, evaluate if `ViewerLocationUpdated` can simply reuse `TickEvaluated` to further unify the event schema.
 *   **Issue #1333: Peer Connection State Caching**
@@ -31,6 +29,8 @@ Progressing with the consolidation of telemetry DTOs to eliminate bridge layers.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1330: Snap-to-Update Monolith** (Resolved Sep.25.06)
+    *   *Remediation*: Unified `SystemEvaluationSnapshot` with the partitioned state structure (`KineticState`, `AtmosphericState`, `IntegrityState`) used by `LocationUpdate`. Refactored `LocationProcessor`, `MonitorService`, and `AppEventCoordinator` to utilize these shared structures, eliminating ~100 lines of manual field-to-field mapping and reducing allocation churn during background pulses. (SOT ID 485).
 *   **Issue #1327: Pulse-to-Tick Event Collision** (Resolved Sep.25.05)
     *   *Remediation*: Introduced `DomainEvent.PeerConnectionChanged` to handle lifecycle-only notifications from peer pulses. Replaced redundant `TickEvaluated` emissions in pulse handlers to eliminate unnecessary side-effects and stale telemetry propagation. (SOT ID 484).
 *   **Issue #1324: Peer Signaling Coupling to Repository** (Resolved Sep.25.04)
@@ -49,4 +49,4 @@ Progressing with the consolidation of telemetry DTOs to eliminate bridge layers.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 484 (Rules: 25, IDs: 484), Resolved: 1227, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 21, QA: 284]**
+- **Current Audit Baseline: [SOT: 485 (Rules: 25, IDs: 485), Resolved: 1229, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 21, QA: 284]**
