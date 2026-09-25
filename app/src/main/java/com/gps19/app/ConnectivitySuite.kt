@@ -28,6 +28,9 @@ sealed class ConnectivityEvent {
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.25.00:
+ * - Issue #1325: Expanded pushCurrentStatus signature to accept satsUsed and 
+ *   satsView for telemetry parity.
  * Sep.24.97:
  * - Issue #1291: Aligned handleJsonUpdate and handleBinaryUpdate with the 
  *   LocationProcessor SystemEvaluationSnapshot refactor.
@@ -403,7 +406,9 @@ class ConnectivitySuite @Inject constructor(
                 
                 // Issue #1147: Restored from offline persistence.
                 gpsHardwareLock = entity.gpsHardwareLock,
-                isGnssThrottled = entity.isGnssThrottled
+                isGnssThrottled = entity.isGnssThrottled,
+                satsUsed = entity.satsUsed,
+                satsView = entity.satsView
             )
             val status = TelemetryMapper.mapPendingToStatus(entity, statusTemplate)
 
@@ -420,8 +425,8 @@ class ConnectivitySuite @Inject constructor(
                 val entityTemplate = PendingStatusEntity(
                     lat = status.lat, lng = status.lng, speed = status.speed, accuracy = status.accuracy, bearing = status.bearing,
                     battery = status.battery, temp = status.temp, isCharging = status.isCharging, timestamp = status.ts,
-                    gpsTs = status.gpsTs, satsView = status.gnssDetail?.satellites?.size ?: 0,
-                    satsUsed = status.gnssDetail?.satellites?.count { it.usedInFix } ?: 0,
+                    gpsTs = status.gpsTs, satsView = status.satsView,
+                    satsUsed = status.satsUsed,
                     maxAccuracy = status.maxAccuracy, distToTracker = null, distToHome = null,
                     isBatterySteepDischarge = status.isBatterySteepDischarge, isCoolingModeActive = status.isCoolingModeActive,
                     isStorageLow = status.isStorageLow, isStorageCritical = status.isStorageCritical,
@@ -487,7 +492,9 @@ class ConnectivitySuite @Inject constructor(
         isUltraLongStationary: Boolean = false,
         gpsHardwareLock: Boolean = false,
         isGnssThrottled: Boolean = false,
-        tamperNote: String? = null
+        tamperNote: String? = null,
+        satsUsed: Int = -1,
+        satsView: Int = -1
     ) {
         val trackerStatus = TrackerStatus(
             deviceId = deviceId, viewerId = viewerId, ts = timeProvider.currentTimeMillis(),
@@ -516,7 +523,9 @@ class ConnectivitySuite @Inject constructor(
             isBatteryLow = if (isTrackerMode) isBatteryLow else false, isBatteryCritical = if (isTrackerMode) isBatteryCritical else false,
             isUltraLongStationary = isUltraLongStationary, gpsHardwareLock = gpsHardwareLock,
             isGnssThrottled = isGnssThrottled,
-            tamperNote = tamperNote
+            tamperNote = tamperNote,
+            satsUsed = satsUsed,
+            satsView = satsView
         )
         sendTelemetry(trackerStatus)
     }
@@ -572,7 +581,9 @@ class ConnectivitySuite @Inject constructor(
                     isStalled = statusProto.isStalled,
                     tamperDetected = statusProto.isTamperDetected || statusProto.isLocationPending,
                     kineticEnergy = statusProto.kineticEnergy,
-                    nowTs = now, nowRt = nowRt
+                    nowTs = now, nowRt = nowRt,
+                    satsUsed = statusProto.satsUsed,
+                    satsView = statusProto.satsView
                 )
 
                 val processed = locationProcessor.processGpsPoint(
@@ -796,7 +807,9 @@ class ConnectivitySuite @Inject constructor(
                         isStalled = data.optDouble("is_stalled", 0.0) != 0.0 || data.optBoolean("is_stalled", false), 
                         tamperDetected = isTrackerTamperDetectedVar || isTrackerLocationPendingVar || trackerStatusVar == SentinelStatus.TAMPER,
                         kineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy),
-                        nowTs = now, nowRt = nowRt
+                        nowTs = now, nowRt = nowRt,
+                        satsUsed = data.optInt("sats_used", -1),
+                        satsView = data.optInt("sats_view", -1)
                     )
 
                     val processed = locationProcessor.processGpsPoint(

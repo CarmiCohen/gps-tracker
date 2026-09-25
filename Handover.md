@@ -1,22 +1,23 @@
-# Forensic Resumption Snapshot - Sep.24.96
+# Forensic Resumption Snapshot - Sep.25.00
 
 ## 📂 Session Summary
 *   **Completed**:
-    *   **Issue #1312**: Unified evaluation snapshots. Consolidated kinematic, environmental, and health data into `SystemEvaluationSnapshot`.
-    *   **Issue #1313**: Validated role-switching. Added reactive `appModeFlow` observation to `MonitorService` for atomic state resets.
-*   **Version**: Sep.24.96
-*   **Status**: Achieved absolute temporal parity in the background evaluation loop. The evaluation pipeline now consumes a single, unified DTO per tick.
+    *   **Issue #1326**: Telemetry Data Corruption Remediation. Corrected the `satsUsed` mapping in `LocationProcessor.kt` to source hardware values from the authoritative snapshot, eliminating the zero-placeholder risk.
+    *   **Issue #1325**: Unified Snapshot Metadata Completion. Expanded `SystemEvaluationSnapshot` to include `satsUsed`, `satsView`, `proxIdx`, `proximityCm`, `vibrationRollingSum`, `violationUptimeMs`, and `violationPercentage`.
+*   **Version**: Sep.25.00
+*   **Status**: Achieved absolute telemetry parity. The tracker engine now operates on a strictly snapshot-centric model, ensuring that kinematic data and forensic metadata are atomically coupled across the evaluation loop, repository persistence, and signaling layers.
 
 ## 🔧 Technical Delta
-*   **EngineModels.kt**: Defined `SystemEvaluationSnapshot` and decommissioned legacy snapshot types.
-*   **MonitorService.kt**: Refactored `processTick` to construct the unified snapshot. Implemented `handleRoleTransition` for live role switching.
-*   **LocationProcessor.kt / LocationSentinel.kt**: Updated to consume `SystemEvaluationSnapshot`.
-*   **AppAlarmManager.kt**: Fully migrated to the unified snapshot model.
-*   **app/build.gradle**: Incremented version to `Sep.24.96`.
+*   **EngineModels.kt**: Expanded `SystemEvaluationSnapshot` with all metadata fields required for a full `LocationUpdate`. Decommissioned redundant metadata fields from `DomainEvent.TickEvaluated`.
+*   **MonitorService.kt**: Refactored `processTick` and `evaluateAlarmsInternal` to fully populate the unified snapshot metadata from `HardwareSuite` and `SessionManager`.
+*   **LocationProcessor.kt**: Updated `processGpsPoint` to source `satsUsed` from the snapshot, resolving the data corruption root cause.
+*   **AppEventCoordinator.kt**: Refactored repository updates and peer signaling to consume metadata exclusively from the `SystemEvaluationSnapshot`.
+*   **ConnectivitySuite.kt**: Aligned `pushCurrentStatus` with the expanded metadata model.
+*   **app/build.gradle**: Incremented version to `Sep.25.00`.
 
 ## 📍 Resumption Point for Next Session
-*   **Immediate Priority**: Functional soak test of the unified snapshot logic on physical hardware to verify geofence and acoustic trigger sensitivity.
-*   **Strategic Goal**: Evaluate **Issue #1291** (Domain Event Bus) to further decouple logging from the evaluation loop.
+*   **Immediate Priority**: Converge Issue #1322 (Multi-Flow Fragmentation). Transition remaining component-level event observers (like `IntegrityMonitor` and `HardwareSuite` failure events) into the unified `DomainEventBus`.
+*   **Strategic Goal**: Evaluate Issue #1330 (DTO Convergence) to determine if `SystemEvaluationSnapshot` can eventually serve as the direct base for `LocationUpdate`.
 
 ## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 476 (Rules: 24, IDs: 476), Resolved: 1219, Open: 1, Testing: 3 (Sub-items: 12), Ideas: 15, QA: 284]**
+**Current Audit Baseline: [SOT: 479 (Rules: 25, IDs: 479), Resolved: 1222, Open: 5, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**

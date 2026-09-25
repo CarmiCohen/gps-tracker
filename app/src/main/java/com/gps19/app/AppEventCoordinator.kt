@@ -10,6 +10,10 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Sep.25.00:
+ * - Issue #1325: Migrated sat counts, proximity, and violation metadata mapping 
+ *   to use SystemEvaluationSnapshot, ensuring absolute telemetry parity.
+ * - Issue #1326: Corrected satsUsed mapping to prevent zero-placeholder corruption.
  * Sep.24.97:
  * - Issue #1291: Integrated DomainEventBus to centralize side-effect reactions 
  *   (forensics, ribbon updates, repository persistence) and decouple them from 
@@ -81,8 +85,10 @@ class AppEventCoordinator @Inject constructor(
         if (isTrackerMode) {
             repository.updateLocation(LocationUpdate().apply {
                 this.kinetic.lat = proc?.optimizedPoint?.lat ?: 0.0; this.kinetic.lng = proc?.optimizedPoint?.lng ?: 0.0; this.kinetic.alt = proc?.optimizedPoint?.alt ?: 0.0; this.kinetic.speed = proc?.filteredSpeed ?: 0.0; this.kinetic.accuracy = proc?.currentAccuracy ?: 0.0; this.kinetic.bearing = snapshot.bearing; this.kinetic.gpsTs = proc?.timestamp ?: 0L; this.kinetic.rt = nowRt; this.kinetic.maxAccuracy = proc?.maxAccuracy ?: 0.0; this.kinetic.kineticEnergy = snapshot.kineticEnergy; this.kinetic.verticalVelocity = snapshot.peakVerticalVelocity
-                this.atmospheric.temp = snapshot.batteryTemp; this.atmospheric.maxTemp = health.maxTemp; this.atmospheric.vibration = snapshot.vibration; this.atmospheric.heading = snapshot.heading; this.atmospheric.baroAlt = snapshot.baroAlt; this.atmospheric.lux = snapshot.lux; this.atmospheric.isNear = snapshot.isNear; this.atmospheric.tiltDegrees = snapshot.tiltDegrees; this.atmospheric.acousticDb = snapshot.acousticDb; this.atmospheric.peakVibrationShock = snapshot.peakShock; this.atmospheric.peakVibrationShockTs = now; this.atmospheric.noiseIdx = event.noiseIdx; this.atmospheric.luxIdx = event.luxIdx; this.atmospheric.vibeIdx = event.vibeIdx; this.atmospheric.liftIdx = event.liftIdx; this.atmospheric.tiltIdx = event.tiltIdx; this.atmospheric.baroIdx = event.baroIdx; this.atmospheric.luxBaseline = snapshot.luxBaseline; this.atmospheric.acousticFloorDb = snapshot.acousticFloorDb; this.atmospheric.adaptiveVibrationFloor = snapshot.adaptiveVibrationFloor; this.atmospheric.proxIdx = event.proxIdx; this.atmospheric.proximityCm = event.proximityCm; this.atmospheric.proximityDebounceMs = event.proximityDebounceMs; this.atmospheric.vibrationRollingSum = event.vibrationRollingSum
-                this.integrity.battery = snapshot.batteryLevel; this.integrity.isCharging = snapshot.isCharging; this.integrity.currentMa = snapshot.currentMa; this.integrity.satsView = event.satsView; this.integrity.satsUsed = event.satsUsed; this.integrity.snrIdx = event.snrIdx; this.integrity.isPowerTamper = snapshot.isPowerTamper; this.integrity.isSitDetected = event.isSuspiciousMode; this.integrity.lastSitTs = event.lastSitTs; this.integrity.sitVz = snapshot.peakVerticalVelocity; this.integrity.sitVzTs = snapshot.peakVerticalVelocityTs; this.integrity.sitVzRt = snapshot.peakVerticalVelocityRt; this.integrity.sitDz = snapshot.peakVerticalDisplacement; this.integrity.sitBaro = snapshot.peakVerticalDisplacement; this.integrity.sitTilt = snapshot.tiltDegrees; this.integrity.sitShock = snapshot.peakShock; this.integrity.isBatteryLow = snapshot.isBatteryLow; this.integrity.isBatteryCritical = snapshot.isBatteryCritical; this.integrity.locationPendingReason = snapshot.locationPendingReason; this.integrity.isPowerSaveMode = snapshot.isPowerSaveMode; this.integrity.standbyBucket = snapshot.standbyBucket; this.integrity.netInterface = snapshot.netInterface; this.integrity.isStorageLow = snapshot.isStorageLow; this.integrity.isStorageCritical = snapshot.isStorageCritical; this.integrity.isBatterySteepDischarge = snapshot.isBatterySteepDischarge; this.integrity.isCoolingModeActive = snapshot.isCoolingModeActive; this.integrity.gpsHardwareLock = snapshot.isGpsHardwareLock; this.integrity.isUltraLongStationary = snapshot.isUltraLongStationary; this.integrity.isTamperDetected = snapshot.tamperDetected; this.integrity.tamperNote = snapshot.suppressionNote
+                this.atmospheric.temp = snapshot.batteryTemp; this.atmospheric.maxTemp = health.maxTemp; this.atmospheric.vibration = snapshot.vibration; this.atmospheric.heading = snapshot.heading; this.atmospheric.baroAlt = snapshot.baroAlt; this.atmospheric.lux = snapshot.lux; this.atmospheric.isNear = snapshot.isNear; this.atmospheric.tiltDegrees = snapshot.tiltDegrees; this.atmospheric.acousticDb = snapshot.acousticDb; this.atmospheric.peakVibrationShock = snapshot.peakShock; this.atmospheric.peakVibrationShockTs = now; this.atmospheric.noiseIdx = event.noiseIdx; this.atmospheric.luxIdx = event.luxIdx; this.atmospheric.vibeIdx = event.vibeIdx; this.atmospheric.liftIdx = event.liftIdx; this.atmospheric.tiltIdx = event.tiltIdx; this.atmospheric.baroIdx = event.baroIdx; this.atmospheric.luxBaseline = snapshot.luxBaseline; this.atmospheric.acousticFloorDb = snapshot.acousticFloorDb; this.atmospheric.adaptiveVibrationFloor = snapshot.adaptiveVibrationFloor; this.atmospheric.proxIdx = snapshot.proxIdx; this.atmospheric.proximityCm = snapshot.proximityCm; this.atmospheric.proximityDebounceMs = snapshot.proximityDebounceMs; this.atmospheric.vibrationRollingSum = snapshot.vibrationRollingSum
+                this.integrity.battery = snapshot.batteryLevel; this.integrity.isCharging = snapshot.isCharging; this.integrity.currentMa = snapshot.currentMa; this.integrity.satsView = snapshot.satsView; this.integrity.satsUsed = snapshot.satsUsed; this.integrity.snrIdx = event.snrIdx; this.integrity.isPowerTamper = snapshot.isPowerTamper; this.integrity.isSitDetected = event.isSuspiciousMode; this.integrity.lastSitTs = event.lastSitTs; this.integrity.sitVz = snapshot.peakVerticalVelocity; this.integrity.sitVzTs = snapshot.peakVerticalVelocityTs; this.integrity.sitVzRt = snapshot.peakVerticalVelocityRt; this.integrity.sitDz = snapshot.peakVerticalDisplacement; this.integrity.sitBaro = snapshot.peakVerticalDisplacement; this.integrity.sitTilt = snapshot.tiltDegrees; this.integrity.sitShock = snapshot.peakShock; this.integrity.isBatteryLow = snapshot.isBatteryLow; this.integrity.isBatteryCritical = snapshot.isBatteryCritical; this.integrity.locationPendingReason = snapshot.locationPendingReason; this.integrity.isPowerSaveMode = snapshot.isPowerSaveMode; this.integrity.standbyBucket = snapshot.standbyBucket; this.integrity.netInterface = snapshot.netInterface; this.integrity.isStorageLow = snapshot.isStorageLow; this.integrity.isStorageCritical = snapshot.isStorageCritical; this.integrity.isBatterySteepDischarge = snapshot.isBatterySteepDischarge; this.integrity.isCoolingModeActive = snapshot.isCoolingModeActive; this.integrity.gpsHardwareLock = snapshot.isGpsHardwareLock; this.integrity.isUltraLongStationary = snapshot.isUltraLongStationary; this.integrity.isTamperDetected = snapshot.tamperDetected; this.integrity.tamperNote = snapshot.suppressionNote
+                this.integrity.violationUptimeMs = snapshot.violationUptimeMs
+                this.integrity.violationPercentage = snapshot.violationPercentage
                 this.ts = now; this.isMe = true; this.status = snapshot.status; this.lastValidFixRt = snapshot.lastValidFixRt; this.trackerState = if ((proc?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING
             })
             
@@ -113,10 +119,10 @@ class AppEventCoordinator @Inject constructor(
                     luxBaseline = snapshot.luxBaseline, 
                     acousticFloorDb = snapshot.acousticFloorDb, 
                     adaptiveVibrationFloor = snapshot.adaptiveVibrationFloor, 
-                    proxIdx = event.proxIdx,
-                    proximityCm = event.proximityCm,
-                    proximityDebounceMs = event.proximityDebounceMs,
-                    vibrationRollingSum = event.vibrationRollingSum,
+                    proxIdx = snapshot.proxIdx,
+                    proximityCm = snapshot.proximityCm,
+                    proximityDebounceMs = snapshot.proximityDebounceMs,
+                    vibrationRollingSum = snapshot.vibrationRollingSum,
                     micPending = false, 
                     isTamperDetected = snapshot.tamperDetected, 
                     isPowerTamper = snapshot.isPowerTamper, 
@@ -124,8 +130,8 @@ class AppEventCoordinator @Inject constructor(
                     isSitActive = false, 
                     lastSitTs = event.lastSitTs, 
                     receiptRt = nowRt, 
-                    violationUptimeMs = event.violationUptimeMs, 
-                    violationPercentage = event.violationPercentage, 
+                    violationUptimeMs = snapshot.violationUptimeMs, 
+                    violationPercentage = snapshot.violationPercentage, 
                     verticalVelocity = snapshot.peakVerticalVelocity, 
                     sitVz = snapshot.peakVerticalVelocity, 
                     sitVzTs = snapshot.peakVerticalVelocityTs, 
@@ -164,7 +170,9 @@ class AppEventCoordinator @Inject constructor(
                     isBatteryCritical = snapshot.isBatteryCritical, 
                     isUltraLongStationary = snapshot.isUltraLongStationary, 
                     gpsHardwareLock = snapshot.isGpsHardwareLock, 
-                    tamperNote = snapshot.suppressionNote
+                    tamperNote = snapshot.suppressionNote,
+                    satsUsed = snapshot.satsUsed,
+                    satsView = snapshot.satsView
                 )
             }
         }
@@ -176,7 +184,7 @@ class AppEventCoordinator @Inject constructor(
             peerSignal = if (event.isPeerActive) 10 else 0, peerAvail = event.isSocketConnected && event.isPeerActive, 
             hasGps = (proc?.timestamp ?: 0L) > 0, isTrackerMode = isTrackerMode, 
             accuracy = proc?.currentAccuracy ?: 0.0, maxAccuracy = proc?.maxAccuracy ?: 0.0, 
-            noiseIdx = event.noiseIdx, luxIdx = event.luxIdx, vibeIdx = event.vibeIdx, proxIdx = event.proxIdx, 
+            noiseIdx = event.noiseIdx, luxIdx = event.luxIdx, vibeIdx = event.vibeIdx, proxIdx = snapshot.proxIdx,
             liftIdx = event.liftIdx, snrIdx = event.snrIdx, tiltIdx = event.tiltIdx, baroIdx = event.baroIdx, 
             verticalVelocity = snapshot.peakVerticalVelocity, sitVz = snapshot.peakVerticalVelocity, 
             sitVzTs = snapshot.peakVerticalVelocityTs, sitVzRt = snapshot.peakVerticalVelocityRt, 

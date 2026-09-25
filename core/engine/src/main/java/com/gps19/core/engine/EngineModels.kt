@@ -5,10 +5,12 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * Sep.24.97:
- * - Issue #1291: Defined DomainEvent hierarchy to support unified event-bus 
- *   orchestration and decouple side-effects from the evaluation loop.
- *   Consolidated SystemEvaluationSnapshot with isWarming and isSirenActive.
+ * Sep.25.00:
+ * - Issue #1325: Fully unified SystemEvaluationSnapshot with all metadata 
+ *   required for parity (sats, proximity, vibration, violation stats).
+ * - Issue #1326: Corrected satellite count mapping to prevent telemetry corruption.
+ * - Refactor: Decommissioned redundant fields in DomainEvent.TickEvaluated to 
+ *   enforce snapshot-centric state propagation.
  */
 
 @Serializable
@@ -234,6 +236,16 @@ data class SystemEvaluationSnapshot(
     val nowTs: Long = 0L,
     val snrSnapshot: Double? = null,
     val vibeSnapshot: Double? = null,
+
+    // Metadata for Signaling & Persistence (Issue #1325)
+    val satsUsed: Int = -1,
+    val satsView: Int = -1,
+    val proxIdx: Double = 0.0,
+    val proximityCm: Double = -1.0,
+    val proximityDebounceMs: Long = 0L,
+    val vibrationRollingSum: Double = 0.0,
+    val violationUptimeMs: Long = 0L,
+    val violationPercentage: Double = 0.0,
     
     // Warm-up & Audio State
     val isWarming: Boolean = false,
@@ -279,17 +291,9 @@ sealed class DomainEvent {
         val recoveryFlagged: Boolean = false,
         
         // Metadata for Signaling & Ribbons
-        val satsView: Int = 0,
-        val satsUsed: Int = 0,
-        val proxIdx: Double = 0.0,
-        val proximityCm: Double = 0.0,
-        val proximityDebounceMs: Long = 0L,
-        val vibrationRollingSum: Double = 0.0,
         val gnssDetail: GnssDetail? = null,
         val isSuspiciousMode: Boolean = false,
         val lastSitTs: Long = 0L,
-        val violationUptimeMs: Long = 0L,
-        val violationPercentage: Double = 0.0,
         val lastTickTs: Long = 0L,
         val lastTickRt: Long = 0L,
         val noiseIdx: Double = 0.0,

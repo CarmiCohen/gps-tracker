@@ -23,13 +23,13 @@ sealed class ProcessorEvent {
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.25.00:
+ * - Issue #1326 REMEDIATION: Corrected satellite count mapping in processGpsPoint 
+ *   to utilize snapshot.satsUsed, eliminating the zero-placeholder that caused 
+ *   telemetry corruption.
  * Sep.24.97:
  * - Issue #1291: Refactored processGpsPoint to consume SystemEvaluationSnapshot 
  *   to align with the unified domain event model.
- * Sep.24.96:
- * - Issue #1312 REMEDIATION: Migrated updateSensorData and processGpsPoint to 
- *   consume unified SystemEvaluationSnapshot, ensuring data consistency across 
- *   all processing layers.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider
@@ -358,7 +358,7 @@ class LocationProcessor(
             val sentinelResult = LocationSentinel.processLocation(
                 state = state,
                 lat = lat, lng = lng, alt = alt, accuracy = accuracy, maxAccuracy = state.maxAccuracy, 
-                bearing = bearing, snr = snr, satsUsed = 0, timestamp = effectiveTs, 
+                bearing = bearing, snr = snr, satsUsed = snapshot.satsUsed, timestamp = effectiveTs,
                 bypassBehavioral = !isLocal, isSuspicious = snapshot.isMuzzled || adaptationMuzzled,
                 isMuzzled = snapshot.isMuzzled, nowTs = nowWall, nowRt = nowRt
             )

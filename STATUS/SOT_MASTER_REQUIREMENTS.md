@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.24.97)
+# SOT Master Requirements & Hardening Status (Sep.22.30)
 
 ## 🏗️ Architectural Master Rules (25 Rules)
 
@@ -34,6 +34,8 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions (R212, R310, R317).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 479**: Telemetry Corruption Remediation - Remediated Issue #1326 by correcting the satellite count mapping in `LocationProcessor`. Eliminated the legacy zero-placeholder in `processGpsPoint` and ensured `satsUsed` is sourced directly from the authoritative evaluation snapshot. (Resolved Sep.25.00).
+*   **SOT ID 478**: Unified Snapshot Metadata Completion - Remediated Issue #1325 by expanding `SystemEvaluationSnapshot` to include satellite counts, proximity indices, and violation statistics. Established absolute telemetry parity within the unified snapshot model to eliminate state fragmentation during event-bus propagation. (Resolved Sep.25.00).
 *   **SOT ID 477**: Domain Event Bus Integration - Remediated Issue #1291 by implementing a unified `DomainEventBus`. Decoupled the `MonitorService` evaluation loop from all persistence, signaling, and ribbon update side-effects. Centralized reactive handling of telemetry summaries and system transitions into `AppEventCoordinator` (Resolved Sep.24.97).
 *   **SOT ID 476**: Role-Switching Atomic State Reset - Remediated Issue #1313 by hardening `MonitorService` to handle dynamic role transitions via a reactive `appModeFlow` observer. Integrated `handleRoleTransition` to atomically reset processing state and jobs, preventing cross-role state contamination. (Resolved Sep.24.96)
 *   **SOT ID 475**: Unified Evaluation Snapshot - Remediated Issue #1312 by consolidating `AlarmTelemetrySnapshot` and `SensorStateSnapshot` into a single `SystemEvaluationSnapshot`. This ensures absolute temporal parity between kinematic and health logic. (Resolved Sep.24.96)
@@ -41,48 +43,26 @@
 *   **SOT ID 473**: Stateless Evaluation Consolidation - Remediated Issue #1311 by shifting active alarm map states and tracking metadata entirely into `AlarmEvaluationState`. Fully purged secondary in-memory maps from `AppAlarmManager` to establish complete architectural isolation across role switches. (Resolved Sep.24.94)
 *   **SOT ID 472**: Unified Event Orchestration - Centralized alert triggers, audio synthesis, and forensic logging into a high-cohesion `AppEventCoordinator`. Decoupled domain reactions from background service lifecycles and established reactive siren state binding (Issue #1292) between `AppAlarmManager` and `AudioSynthesizer` to ensure absolute parity across functional roles (R-ID 472). (Resolved Sep.24.93)
 *   **SOT ID 471**: Service Lifecycle Unification - Consolidated `TrackerService` and `ViewerService` redundant boilerplate into a unified, role-reactive `MonitorService`. (Resolved Sep.24.92)
-*   **SOT ID 470**: Thermal Recovery Latency Audit Correction - Refactored forensic loop sampling metrics in background services to eliminate loop iteration delay errors using authoritative `coolingEnteredRt` (R-ID 470). (Resolved Sep.24.91)
-*   **SOT ID 469**: Remote Namespace Isolation - Introduced the `"VR_"` prefix to segregate remote tracker logic state from local session telemetry (R-ID 469). (Resolved Sep.24.90)
-*   **SOT ID 468**: Debounced Baseline Persistence - Transitioned high-frequency baseline updates to a non-blocking debounced job model, eliminating tick-loop jitter (R-ID 468). (Resolved Sep.24.80)
-*   **SOT ID 467**: Alarm Role Transition Hardening - Hardened `AppAlarmManager` state cleanup during role transitions to prevent unexpected "Siren Jumps" (R-ID 467). (Resolved Sep.24.70)
-*   **SOT ID 466**: Viewer Forensic Sampling Loop - Implemented `forensicSamplingLoop` in `ViewerService.kt` to establish absolute cross-role parity for monitoring integrity audits (R-ID 466). (Resolved Sep.24.60)
-*   **SOT ID 465**: Non-Blocking History Flush - Transitioned database flush in `onDestroy()` to `@ApplicationScope` with timeout to prevent ANRs (R-ID 465). (Resolved Sep.24.50)
-*   **SOT ID 464**: History Sync Restoration - Refactored history observation in `ViewerService.kt` to restore history trace integrity on monitor devices (R-ID 464). (Resolved Sep.24.40)
-*   **SOT ID 463**: Decoupled Forensic Spike Sampling - Refactored `forensicSamplingLoop` to bypass sampling rate delays for high-priority physical spikes (R-ID 463). (Resolved Sep.24.30)
-*   **SOT ID 462**: Boot-ID Latch Validation - Implemented Boot-ID validation to invalidate obsolete monotonic latches after a device restart (R-ID 462). (Resolved Sep.24.20)
-*   **SOT ID 461**: Persistent Lux and Acoustic Baselines - Implemented persistence for environmental calibration, eliminating the 60s learning period after restarts (R-ID 461). (Resolved Sep.24.10)
-*   **SOT ID 460**: Atomic User Counter Hardening - Guarded `activeUsers` in `HardwareSuite` against negative values and resource leaks (R-ID 460). (Resolved Sep.24.04)
-*   **SOT ID 459**: Persistent Adaptive Vibration Floor - Implemented persistence for the physical baseline sensitivity anchor (R-ID 459). (Resolved Sep.24.03)
-*   **SOT ID 458**: Reboot-Aware Monotonic Clock Recovery - Implemented `recoverLastRealtime` in `HistoryManager.kt` using role-isolated clock drift references (R-ID 458). (Resolved Sep.24.02)
-*   **SOT ID 457**: Fast-Path Allocation Optimization - Made spike detection callbacks optional to eliminate allocation churn in the tick loop (R-ID 457). (Resolved Sep.24.01)
 
 ## 4.2. Change History (Recent)
+*   **Sep.25.00**: Resolved Issue #1325 (Unified Snapshot Metadata Gaps) and Issue #1326 (Telemetry Corruption Remediation).
 *   **Sep.24.97**: Resolved Issue #1291 (Domain Event Bus Integration). Decoupled evaluation loop from all side-effects (SOT ID 477).
 *   **Sep.24.96**: Resolved Issue #1312 (Unified Evaluation Logic Snapshot) and Issue #1313 (Role-Switching Atomic State Reset).
 *   **Sep.24.95**: Resolved Issue #1163 (Stateless & Functional Logic Refactoring). Migrated location pipeline to stateless evaluation model (SOT ID 474).
-*   **Sep.24.94**: Resolved Issue #1311 (AppAlarmManager Stateless Evaluation Model). Relocated active alarms directly into `AlarmEvaluationState` (SOT ID 473).
-*   **Sep.24.93**: Resolved Issue #1265 (Unified Event Orchestration). Centralized alert, audio, and logging triggers into `AppEventCoordinator` (SOT ID 472).
-*   **Sep.24.92**: Resolved Issue #1261 (Service Lifecycle Unification). Consolidated services into a unified `MonitorService` (SOT ID 471).
-*   **Sep.24.91**: Resolved Issue #1234 / #1244 (Heuristic Correction for Thermal Recovery Audits) (SOT ID 470).
-*   **Sep.24.90**: Resolved Issue #1306 (Namespace Collision Risk). Introduced `"VR_"` prefix for remote state segregation (SOT ID 469).
 
 ## 📋 Functional Requirements (147 R-IDs)
 *   **R101-R117**: Core tracking, telemetry, and forensic rules.
+*   **R479**: Telemetry Corruption Remediation.
+*   **R478**: Unified Snapshot Metadata Completion.
 *   **R477**: Reactive Domain Bus orchestration.
 *   **R476**: Dynamic role-switching validation.
 *   **R475**: Unified evaluation logic snapshot.
-*   **R474**: Stateless location evaluation via consolidated state.
-*   **R473**: Stateless alarm evaluation via consolidated state.
-*   **R472**: Unified Event Orchestration via `AppEventCoordinator`.
-*   **R471**: Service Lifecycle Unification via `MonitorService`.
 *   *(Remaining requirements preserved in technical registry)*
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.110 (Domain Event Bus Integration)**: PASSED - Successfully decoupled evaluation loop from persistence and signaling via DomainEventBus. (Sep.24.97)
-*   **Chapter 31.109 (Role-Switching Atomic State Reset)**: PASSED - Successfully implemented live role transition handling in MonitorService. (Sep.24.96)
-*   **Chapter 31.108 (Unified Evaluation Logic Snapshot)**: PASSED - Successfully unified sensor and telemetry snapshots. (Sep.24.96)
-*   **Chapter 31.107 (Stateless Logic Refactoring)**: PASSED - Migrated location processor and sentinel to stateless engines. (Sep.24.95)
-*   **Chapter 31.106 (Stateless Evaluation Consolidation)**: PASSED - Purged nested mutable memory states from alarm evaluation pipeline. (Sep.24.94)
+*   **Chapter 31.112 (Telemetry Integrity)**: PASSED - Corrected satellite count mapping and unified metadata propagation. (Sep.22.30)
+*   **Chapter 31.111 (Snapshot Metadata Parity)**: PASSED - Expanded SystemEvaluationSnapshot to include all required telemetry fields. (Sep.22.30)
+*   **Chapter 31.110 (Domain Event Bus Integration)**: PASSED - Successfully decoupled evaluation loop from persistence and signaling via DomainEventBus. (Sep.22.30)
 
 ---
-*Next Audit: Oct.01.00. (Sep.24.97)*
+*Next Audit: Oct.01.00. (Sep.22.30)*

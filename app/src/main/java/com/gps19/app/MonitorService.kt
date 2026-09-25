@@ -23,14 +23,12 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
- * Sep.24.97:
- * - Issue #1291: Integrated DomainEventBus to decouple side-effects from the 
- *   evaluation loop. Decoupled forensic logging, ribbon updates, and peer 
- *   signaling into AppEventCoordinator.
- * Sep.24.96:
- * - Issue #1312 REMEDIATION: Migrated evaluation pipeline to consume unified 
- *   SystemEvaluationSnapshot, ensuring absolute temporal parity between kinematic, 
- *   environmental, and health logic.
+ * Sep.25.00:
+ * - Issue #1325: Fully populated SystemEvaluationSnapshot metadata (sats, proximity, 
+ *   vibrationRollingSum, violation stats) to ensure absolute telemetry parity.
+ * - Issue #1326: Corrected satsUsed mapping to prevent zero-placeholder corruption.
+ * - Refactor: Cleaned up DomainEvent.TickEvaluated call site to align with 
+ *   snapshot-centric state propagation. Corrected evaluationSnapshot.copy errors.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -320,6 +318,7 @@ class MonitorService : BaseMonitorService() {
                 lat = location.latitude, lng = location.longitude, alt = location.altitude, 
                 speed = location.speed.toDouble(), gpsTs = location.time, accuracy = lastGpsAccuracy, 
                 bearing = location.bearing.toDouble(), snrSnapshot = hardwareSuite.averageSnr,
+                satsUsed = hardwareSuite.satellitesUsed, satsView = hardwareSuite.satellitesInView,
                 nowRt = nowRt, nowTs = nowWall
             )
             val processed = primaryProcessor.processGpsPoint(snapshot, isViewerTrail = true, lastGpsTs = sessionManager.lastGpsTs, isLocal = true)
@@ -335,7 +334,7 @@ class MonitorService : BaseMonitorService() {
             this.kinetic.lat = location.latitude; this.kinetic.lng = location.longitude; this.kinetic.alt = location.altitude; this.kinetic.speed = location.speed.toDouble(); this.kinetic.accuracy = location.accuracy.toDouble()
             this.kinetic.bearing = location.bearing.toDouble(); this.kinetic.gpsTs = location.time; this.kinetic.rt = nowRt; this.kinetic.maxAccuracy = processed.maxAccuracy
             this.atmospheric.temp = health.batteryTemp; this.atmospheric.maxTemp = health.maxTemp
-            this.integrity.battery = health.batteryLevel; this.integrity.isCharging = health.isCharging; this.integrity.satsView = hardwareSuite.satellitesInView; this.integrity.satsUsed = location.extras?.getInt("satellites") ?: hardwareSuite.satellitesUsed; this.integrity.currentMa = health.currentMa
+            this.integrity.battery = health.batteryLevel; this.integrity.isCharging = health.isCharging; this.integrity.satsView = hardwareSuite.satellitesInView; this.integrity.satsUsed = hardwareSuite.satellitesUsed; this.integrity.currentMa = health.currentMa
             this.integrity.snrIdx = (hardwareSuite.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
             this.ts = nowWall; this.isMe = true; this.lastValidFixRt = primaryProcessor.getLastValidFixRt(); this.status = processed.status; this.isClockRegression = processed.isClockRegression
         })
@@ -455,7 +454,12 @@ class MonitorService : BaseMonitorService() {
             isUltraLongStationary = health.isUltraLongStationary, isBatteryLow = health.isBatteryLow, isBatteryCritical = health.isBatteryCritical,
             isSignalLoss = health.signalLoss, localInternetLoss = health.localInternetLoss, isHardwareOnline = health.isHardwareOnline,
             acousticLockoutRt = if (isTrackerMode) lastFastPathAcousticSpikeTs else 0L, lightSpikeRt = if (isTrackerMode) lastFastPathLightSpikeTs else 0L,
-            isMuzzled = false, providedAdaptiveFloor = snapshot.adaptiveVibrationFloor, nowRt = nowRt, nowTs = now, snrSnapshot = hardwareSuite.averageSnr
+            isMuzzled = false, providedAdaptiveFloor = snapshot.adaptiveVibrationFloor, nowRt = nowRt, nowTs = now, snrSnapshot = hardwareSuite.averageSnr,
+            satsUsed = hardwareSuite.satellitesUsed, satsView = hardwareSuite.satellitesInView,
+            proxIdx = snapshot.proximityIdx, proximityCm = snapshot.proximityCm, proximityDebounceMs = snapshot.proximityDebounceMs,
+            vibrationRollingSum = snapshot.vibrationRollingSum,
+            violationUptimeMs = sessionManager.violationUptimeMs,
+            violationPercentage = sessionManager.getViolationPercentage()
         )
         
         if (isTrackerMode) {
@@ -526,7 +530,7 @@ class MonitorService : BaseMonitorService() {
                 val pointSnapshot = evaluationSnapshot.copy(
                     lat = location.latitude, lng = location.longitude, alt = location.altitude, 
                     speed = location.speed.toDouble(), gpsTs = location.time, accuracy = lastGpsAccuracy, 
-                    bearing = location.bearing.toDouble(), isViewerTrail = true, isLocal = true
+                    bearing = location.bearing.toDouble()
                 )
                 primaryProcessor.processGpsPoint(pointSnapshot, isViewerTrail = true, lastGpsTs = 0L, isLocal = true)
             }
@@ -546,11 +550,8 @@ class MonitorService : BaseMonitorService() {
             now = now, nowRt = nowRt, isTrackerMode = isTrackerMode, snapshot = evaluationSnapshot,
             processed = finalProc, health = health, isSocketConnected = isSocketConnected, isPeerActive = isPeerActive,
             serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), recoveryFlagged = recoveryFlagged,
-            satsView = hardwareSuite.satellitesInView, satsUsed = hardwareSuite.satellitesUsed,
-            proxIdx = snapshot.proximityIdx, proximityCm = snapshot.proximityCm, proximityDebounceMs = snapshot.proximityDebounceMs,
-            vibrationRollingSum = snapshot.vibrationRollingSum, gnssDetail = latestGnssDetail, isSuspiciousMode = isSuspiciousMode,
-            lastSitTs = primaryProcessor.getLastSitTs(), violationUptimeMs = sessionManager.violationUptimeMs,
-            violationPercentage = sessionManager.getViolationPercentage(), lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime,
+            gnssDetail = latestGnssDetail, isSuspiciousMode = isSuspiciousMode,
+            lastSitTs = primaryProcessor.getLastSitTs(), lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime,
             noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, liftIdx = liftIdx, snrIdx = snrIdx, tiltIdx = tiltIdx, baroIdx = baroIdx
         ))
 
@@ -582,7 +583,9 @@ class MonitorService : BaseMonitorService() {
                 isStorageLow = s.isStorageLow, isStorageCritical = s.isStorageCritical, isBatterySteepDischarge = s.isBatterySteepDischarge,
                 isCoolingModeActive = s.isCoolingModeActive, isGpsHardwareLock = s.gpsHardwareLock, suppressionNote = s.tamperNote,
                 isGpsStalling = s.isStalled, isGpsGap = s.isClockRegression || (nowRt - s.lastValidFixRt > GPS_GAP_THRESHOLD_MS),
-                snrSnapshot = s.snrIdx * RIBBON_SNR_SCALE_DB, vibeSnapshot = s.vibeIdx * RIBBON_VIBRATION_SCALE_G
+                snrSnapshot = s.snrIdx * RIBBON_SNR_SCALE_DB, vibeSnapshot = s.vibeIdx * RIBBON_VIBRATION_SCALE_G,
+                satsUsed = s.satsUsed, satsView = s.satsView, proxIdx = s.proxIdx, proximityCm = s.proximityCm, proximityDebounceMs = s.proximityDebounceMs,
+                vibrationRollingSum = s.vibrationRollingSum, violationUptimeMs = s.violationUptimeMs, violationPercentage = s.violationPercentage
             )
         }
 
