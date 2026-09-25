@@ -1,15 +1,9 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.25.03
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.25.04
 
-## 🎯 Current Resumption Focus: DTO Convergence & Persistence Alignment
-Finalizing the unification of snapshot and update models to eliminate redundant mapping layers.
+## 🎯 Current Resumption Focus: Pulse-to-Tick Event Collision
+Finalizing the decoupling of Peer Pulse from the core evaluation loop.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-
-### 🛑 High Priority (Safety, Data Integrity & Core Logic)
-
-*   **Issue #1324: Peer Signaling Coupling to Repository**
-    *   *Finding*: `ConnectivitySuite` executes direct repository writes for received peer status.
-    *   *Requirement*: Offload peer status persistence to `AppEventCoordinator` via `DomainEvent.PeerStatusReceived`.
 
 ### 🟡 Medium Priority (UX, Performance & Auditability)
 
@@ -37,6 +31,8 @@ Finalizing the unification of snapshot and update models to eliminate redundant 
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1324: Peer Signaling Coupling to Repository** (Resolved Sep.25.04)
+    *   *Remediation*: Transitioned peer telemetry persistence to a reactive, bus-driven model. `ConnectivitySuite` now emits `DomainEvent.PeerStatusReceived` upon validating incoming peer updates, which is then persisted by `AppEventCoordinator`. (SOT ID 483).
 *   **Issue #1323: Residual Imperative Persistence in MonitorService** (Resolved Sep.25.03)
     *   *Remediation*: Converged Viewer self-tracking persistence into the unified `DomainEventBus`. Eliminated the imperative `updateRepositoryLocation` method in `MonitorService`, offloading I/O to the `AppEventCoordinator`. (SOT ID 482).
 *   **Issue #1331: DomainEventBus Capacity Hardening** (Resolved Sep.25.02)
@@ -51,4 +47,4 @@ Finalizing the unification of snapshot and update models to eliminate redundant 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 482 (Rules: 25, IDs: 482), Resolved: 1225, Open: 2, Testing: 3 (Sub-items: 12), Ideas: 20, QA: 284]**
+- **Current Audit Baseline: [SOT: 483 (Rules: 25, IDs: 483), Resolved: 1226, Open: 1, Testing: 3 (Sub-items: 12), Ideas: 20, QA: 284]**

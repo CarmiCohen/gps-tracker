@@ -1,3 +1,14 @@
+# 🏛️ Resolution Archive - Sep.25.04
+
+## 🏁 Issue #1324: Peer Signaling Coupling to Repository
+*   **Resolved**: Sep.25.04
+*   **Root Cause**: `ConnectivitySuite` was executing direct imperative repository writes for received peer telemetry packets. This created tight coupling between the signaling layer and persistence layer, potentially blocking the network processing thread with database I/O and creating architectural inconsistency with the bus-centric model used for local tracking.
+*   **Remediation**:
+    *   **EngineModels.kt**: Added `DomainEvent.PeerStatusReceived(status: LocationUpdate)` to the unified event hierarchy.
+    *   **ConnectivitySuite.kt**: Refactored both binary (Protobuf) and JSON signaling handlers to emit `PeerStatusReceived` to the `DomainEventBus` instead of calling `mainRepository.updateLocation` directly.
+    *   **AppEventCoordinator.kt**: Implemented a reactive handler for `PeerStatusReceived` that persists the peer update to the repository asynchronously.
+*   **R-ID**: 483
+
 # 🏛️ Resolution Archive - Sep.25.03
 
 ## 🏁 Issue #1323: Residual Imperative Persistence in MonitorService

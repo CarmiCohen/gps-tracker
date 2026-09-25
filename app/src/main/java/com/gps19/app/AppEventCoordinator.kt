@@ -10,6 +10,8 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Sep.25.04:
+ * - Issue #1324: Added PeerStatusReceived handling to offload peer telemetry persistence from signaling.
  * Sep.25.03:
  * - Issue #1323: Implemented handleViewerLocationUpdated to converge Viewer 
  *   self-tracking persistence into the bus-centric model.
@@ -51,6 +53,7 @@ class AppEventCoordinator @Inject constructor(
             when (event) {
                 is DomainEvent.TickEvaluated -> handleTickEvaluated(event, connectivitySuite)
                 is DomainEvent.ViewerLocationUpdated -> handleViewerLocationUpdated(event)
+                is DomainEvent.PeerStatusReceived -> repository.updateLocation(event.status)
                 is DomainEvent.HeuristicRecovery -> handleHeuristicRecovery(event)
                 is DomainEvent.StabilityViolation -> handleStabilityViolation(event)
                 is DomainEvent.PowerSaveTransition -> handlePowerSaveTransition(event)

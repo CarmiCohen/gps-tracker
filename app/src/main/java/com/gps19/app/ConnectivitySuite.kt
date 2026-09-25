@@ -21,6 +21,9 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.25.04:
+ * - Issue #1324: Offloaded peer status persistence to AppEventCoordinator via 
+ *   DomainEvent.PeerStatusReceived to decouple signaling from repository.
  * Sep.25.01:
  * - Issue #1322: Converged ConnectivityEvent emission into DomainEventBus.
  * Sep.25.00:
@@ -636,45 +639,44 @@ class ConnectivitySuite @Inject constructor(
                     tamperNote = if (statusProto.hasTamperNote()) statusProto.tamperNote else null
                 )
 
-                scope.launch {
-                    mainRepository.updateLocation(LocationUpdate().apply {
-                        this.kinetic.lat = updatedStatus.lat; this.kinetic.lng = updatedStatus.lng; this.kinetic.speed = updatedStatus.speed; this.kinetic.accuracy = updatedStatus.accuracy; this.kinetic.bearing = updatedStatus.bearing
-                        this.kinetic.gpsTs = updatedStatus.gpsTs
-                        this.kinetic.maxAccuracy = updatedStatus.maxAccuracy
-                        this.kinetic.kineticEnergy = updatedStatus.kineticEnergy; this.kinetic.isAdaptiveJump = updatedStatus.isAdaptiveJump
-                        this.kinetic.verticalVelocity = updatedStatus.verticalVelocity
+                domainEventBus.emit(DomainEvent.PeerStatusReceived(LocationUpdate().apply {
+                    this.kinetic.lat = updatedStatus.lat; this.kinetic.lng = updatedStatus.lng; this.kinetic.speed = updatedStatus.speed; this.kinetic.accuracy = updatedStatus.accuracy; this.kinetic.bearing = updatedStatus.bearing
+                    this.kinetic.gpsTs = updatedStatus.gpsTs
+                    this.kinetic.maxAccuracy = updatedStatus.maxAccuracy
+                    this.kinetic.kineticEnergy = updatedStatus.kineticEnergy; this.kinetic.isAdaptiveJump = updatedStatus.isAdaptiveJump
+                    this.kinetic.verticalVelocity = updatedStatus.verticalVelocity
 
-                        this.atmospheric.temp = updatedStatus.temp
-                        this.atmospheric.maxTemp = updatedStatus.maxTemp
-                        this.atmospheric.noiseIdx = updatedStatus.noiseIdx; this.atmospheric.luxIdx = updatedStatus.luxIdx; this.atmospheric.vibeIdx = updatedStatus.vibeIdx; this.atmospheric.liftIdx = updatedStatus.liftIdx
-                        this.atmospheric.tiltIdx = updatedStatus.tiltDegrees; this.atmospheric.baroIdx = updatedStatus.baroIdx
-                        this.atmospheric.vibration = updatedStatus.vibration
+                    this.atmospheric.temp = updatedStatus.temp
+                    this.atmospheric.maxTemp = updatedStatus.maxTemp
+                    this.atmospheric.noiseIdx = updatedStatus.noiseIdx; this.atmospheric.luxIdx = updatedStatus.luxIdx; this.atmospheric.vibeIdx = updatedStatus.vibeIdx; this.atmospheric.liftIdx = updatedStatus.liftIdx
+                    this.atmospheric.tiltIdx = updatedStatus.tiltDegrees; this.atmospheric.baroIdx = updatedStatus.baroIdx
+                    this.atmospheric.vibration = updatedStatus.vibration
 
-                        this.integrity.battery = updatedStatus.battery; this.integrity.isCharging = updatedStatus.isCharging
-                        this.integrity.satsView = updatedStatus.satsView; this.integrity.satsUsed = updatedStatus.satsUsed 
-                        this.integrity.snrIdx = updatedStatus.snrIdx
-                        this.integrity.isPowerTamper = updatedStatus.isPowerTamper
-                        this.integrity.signal = (updatedStatus.snrIdx * 10.0).toInt().coerceIn(0, 10)
-                        this.integrity.isLocationPending = updatedStatus.isLocationPending 
-                        this.integrity.locationPendingReason = updatedStatus.locationPendingReason
-                        this.integrity.isBatterySteepDischarge = updatedStatus.isBatterySteepDischarge; this.integrity.isCoolingModeActive = updatedStatus.isCoolingModeActive
-                        this.integrity.isSitDetected = updatedStatus.isSitDetected; this.integrity.lastSitTs = updatedStatus.lastSitTs
-                        this.integrity.sitVz = updatedStatus.sitVz; this.integrity.sitVzTs = updatedStatus.sitVzTs; this.integrity.sitVzRt = updatedStatus.sitVzRt; this.integrity.sitDz = updatedStatus.sitDz
-                        this.integrity.sitBaro = updatedStatus.sitBaro; this.integrity.sitTilt = updatedStatus.tiltDegrees; this.integrity.sitShock = updatedStatus.peakVibrationShock
-                        this.integrity.isBatteryLow = updatedStatus.isBatteryLow; this.integrity.isBatteryCritical = updatedStatus.isBatteryCritical
-                        this.integrity.violationUptimeMs = updatedStatus.violationUptimeMs
-                        this.integrity.gpsHardwareLock = updatedStatus.gpsHardwareLock
-                        this.integrity.isGnssThrottled = updatedStatus.isGnssThrottled
-                        this.integrity.tamperNote = updatedStatus.tamperNote
+                    this.integrity.battery = updatedStatus.battery; this.integrity.isCharging = updatedStatus.isCharging
+                    this.integrity.satsView = updatedStatus.satsView; this.integrity.satsUsed = updatedStatus.satsUsed 
+                    this.integrity.snrIdx = updatedStatus.snrIdx
+                    this.integrity.isPowerTamper = updatedStatus.isPowerTamper
+                    this.integrity.signal = (updatedStatus.snrIdx * 10.0).toInt().coerceIn(0, 10)
+                    this.integrity.isLocationPending = updatedStatus.isLocationPending 
+                    this.integrity.locationPendingReason = updatedStatus.locationPendingReason
+                    this.integrity.isBatterySteepDischarge = updatedStatus.isBatterySteepDischarge; this.integrity.isCoolingModeActive = updatedStatus.isCoolingModeActive
+                    this.integrity.isSitDetected = updatedStatus.isSitDetected; this.integrity.lastSitTs = updatedStatus.lastSitTs
+                    this.integrity.sitVz = updatedStatus.sitVz; this.integrity.sitVzTs = updatedStatus.sitVzTs; this.integrity.sitVzRt = updatedStatus.sitVzRt; this.integrity.sitDz = updatedStatus.sitDz
+                    this.integrity.sitBaro = updatedStatus.sitBaro; this.integrity.sitTilt = updatedStatus.tiltDegrees; this.integrity.sitShock = updatedStatus.peakVibrationShock
+                    this.integrity.isBatteryLow = updatedStatus.isBatteryLow; this.integrity.isBatteryCritical = updatedStatus.isBatteryCritical
+                    this.integrity.violationUptimeMs = updatedStatus.violationUptimeMs
+                    this.integrity.gpsHardwareLock = updatedStatus.gpsHardwareLock
+                    this.integrity.isGnssThrottled = updatedStatus.isGnssThrottled
+                    this.integrity.tamperNote = updatedStatus.tamperNote
 
-                        this.status = updatedStatus.status 
-                        this.trackerState = updatedStatus.trackerState
-                        this.ts = now 
-                        this.isMe = false
-                        this.isClockRegression = updatedStatus.isClockRegression
-                        this.lastValidFixRt = updatedStatus.lastValidFixRt 
-                    })
-                }
+                    this.status = updatedStatus.status 
+                    this.trackerState = updatedStatus.trackerState
+                    this.ts = now 
+                    this.isMe = false
+                    this.isClockRegression = updatedStatus.isClockRegression
+                    this.lastValidFixRt = updatedStatus.lastValidFixRt 
+                }))
+                
                 updatedStatus
             }
         } catch (e: Exception) {
@@ -863,45 +865,44 @@ class ConnectivitySuite @Inject constructor(
                     tamperNote = if (data.has("tamper_note")) data.getString("tamper_note") else null
                 )
 
-                scope.launch {
-                    mainRepository.updateLocation(LocationUpdate().apply {
-                        this.kinetic.lat = updatedStatus.lat; this.kinetic.lng = updatedStatus.lng; this.kinetic.speed = updatedStatus.speed; this.kinetic.accuracy = updatedStatus.accuracy; this.kinetic.bearing = updatedStatus.bearing
-                        this.kinetic.gpsTs = updatedStatus.gpsTs
-                        this.kinetic.maxAccuracy = updatedStatus.maxAccuracy
-                        this.kinetic.kineticEnergy = updatedStatus.kineticEnergy; this.kinetic.isAdaptiveJump = updatedStatus.isAdaptiveJump
-                        this.kinetic.verticalVelocity = updatedStatus.verticalVelocity
+                domainEventBus.emit(DomainEvent.PeerStatusReceived(LocationUpdate().apply {
+                    this.kinetic.lat = updatedStatus.lat; this.kinetic.lng = updatedStatus.lng; this.kinetic.speed = updatedStatus.speed; this.kinetic.accuracy = updatedStatus.accuracy; this.kinetic.bearing = updatedStatus.bearing
+                    this.kinetic.gpsTs = updatedStatus.gpsTs
+                    this.kinetic.maxAccuracy = updatedStatus.maxAccuracy
+                    this.kinetic.kineticEnergy = updatedStatus.kineticEnergy; this.kinetic.isAdaptiveJump = updatedStatus.isAdaptiveJump
+                    this.kinetic.verticalVelocity = updatedStatus.verticalVelocity
 
-                        this.atmospheric.temp = updatedStatus.temp
-                        this.atmospheric.maxTemp = updatedStatus.maxTemp
-                        this.atmospheric.noiseIdx = updatedStatus.noiseIdx; this.atmospheric.luxIdx = updatedStatus.luxIdx; this.atmospheric.vibeIdx = updatedStatus.vibeIdx; this.atmospheric.liftIdx = updatedStatus.liftIdx
-                        this.atmospheric.tiltIdx = updatedStatus.tiltDegrees; this.atmospheric.baroIdx = updatedStatus.baroIdx
-                        this.atmospheric.vibration = updatedStatus.vibration
+                    this.atmospheric.temp = updatedStatus.temp
+                    this.atmospheric.maxTemp = updatedStatus.maxTemp
+                    this.atmospheric.noiseIdx = updatedStatus.noiseIdx; this.atmospheric.luxIdx = updatedStatus.luxIdx; this.atmospheric.vibeIdx = updatedStatus.vibeIdx; this.atmospheric.liftIdx = updatedStatus.liftIdx
+                    this.atmospheric.tiltIdx = updatedStatus.tiltDegrees; this.atmospheric.baroIdx = updatedStatus.baroIdx
+                    this.atmospheric.vibration = updatedStatus.vibration
 
-                        this.integrity.battery = updatedStatus.battery; this.integrity.isCharging = updatedStatus.isCharging
-                        this.integrity.satsView = updatedStatus.satsView; this.integrity.satsUsed = updatedStatus.satsUsed 
-                        this.integrity.snrIdx = updatedStatus.snrIdx
-                        this.integrity.isPowerTamper = updatedStatus.isPowerTamper
-                        this.integrity.signal = (updatedStatus.snrIdx * 10.0).toInt().coerceIn(0, 10)
-                        this.integrity.isLocationPending = updatedStatus.isLocationPending 
-                        this.integrity.locationPendingReason = updatedStatus.locationPendingReason
-                        this.integrity.isBatterySteepDischarge = updatedStatus.isBatterySteepDischarge; this.integrity.isCoolingModeActive = updatedStatus.isCoolingModeActive
-                        this.integrity.isSitDetected = updatedStatus.isSitDetected; this.integrity.lastSitTs = updatedStatus.lastSitTs
-                        this.integrity.sitVz = updatedStatus.sitVz; this.integrity.sitVzTs = updatedStatus.sitVzTs; this.integrity.sitVzRt = updatedStatus.sitVzRt; this.integrity.sitDz = updatedStatus.sitDz
-                        this.integrity.sitBaro = updatedStatus.sitBaro; this.integrity.sitTilt = updatedStatus.tiltDegrees; this.integrity.sitShock = updatedStatus.peakVibrationShock
-                        this.integrity.isBatteryLow = updatedStatus.isBatteryLow; this.integrity.isBatteryCritical = updatedStatus.isBatteryCritical
-                        this.integrity.violationUptimeMs = updatedStatus.violationUptimeMs
-                        this.integrity.gpsHardwareLock = updatedStatus.gpsHardwareLock
-                        this.integrity.isGnssThrottled = updatedStatus.isGnssThrottled
-                        this.integrity.tamperNote = updatedStatus.tamperNote
+                    this.integrity.battery = updatedStatus.battery; this.integrity.isCharging = updatedStatus.isCharging
+                    this.integrity.satsView = updatedStatus.satsView; this.integrity.satsUsed = updatedStatus.satsUsed 
+                    this.integrity.snrIdx = updatedStatus.snrIdx
+                    this.integrity.isPowerTamper = updatedStatus.isPowerTamper
+                    this.integrity.signal = (updatedStatus.snrIdx * 10.0).toInt().coerceIn(0, 10)
+                    this.integrity.isLocationPending = updatedStatus.isLocationPending 
+                    this.integrity.locationPendingReason = updatedStatus.locationPendingReason
+                    this.integrity.isBatterySteepDischarge = updatedStatus.isBatterySteepDischarge; this.integrity.isCoolingModeActive = updatedStatus.isCoolingModeActive
+                    this.integrity.isSitDetected = updatedStatus.isSitDetected; this.integrity.lastSitTs = updatedStatus.lastSitTs
+                    this.integrity.sitVz = updatedStatus.sitVz; this.integrity.sitVzTs = updatedStatus.sitVzTs; this.integrity.sitVzRt = updatedStatus.sitVzRt; this.integrity.sitDz = updatedStatus.sitDz
+                    this.integrity.sitBaro = updatedStatus.sitBaro; this.integrity.sitTilt = updatedStatus.tiltDegrees; this.integrity.sitShock = updatedStatus.peakVibrationShock
+                    this.integrity.isBatteryLow = updatedStatus.isBatteryLow; this.integrity.isBatteryCritical = updatedStatus.isBatteryCritical
+                    this.integrity.violationUptimeMs = updatedStatus.violationUptimeMs
+                    this.integrity.gpsHardwareLock = updatedStatus.gpsHardwareLock
+                    this.integrity.isGnssThrottled = updatedStatus.isGnssThrottled
+                    this.integrity.tamperNote = updatedStatus.tamperNote
 
-                        this.status = updatedStatus.status 
-                        this.trackerState = updatedStatus.trackerState
-                        this.ts = now 
-                        this.isMe = false
-                        this.isClockRegression = updatedStatus.isClockRegression
-                        this.lastValidFixRt = updatedStatus.lastValidFixRt 
-                    })
-                }
+                    this.status = updatedStatus.status 
+                    this.trackerState = updatedStatus.trackerState
+                    this.ts = now 
+                    this.isMe = false
+                    this.isClockRegression = updatedStatus.isClockRegression
+                    this.lastValidFixRt = updatedStatus.lastValidFixRt 
+                }))
+
                 updatedStatus
             }
         }
