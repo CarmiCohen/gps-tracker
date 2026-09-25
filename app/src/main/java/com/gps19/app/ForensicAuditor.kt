@@ -10,13 +10,12 @@ import kotlin.math.round
 
 /**
  * ForensicAuditor: Encapsulates high-assurance hardware audits (Stability, Jitter, Sensor Rates, Energy).
+ * Sep.25.01:
+ * - Issue #1322: Aligned computeEnergyFootprint with unified RevivalEvent model.
  * Sep.20.18:
  * - Issue #1132 Hardening: Implemented internal synchronization for RoleState to 
  *   ensure atomic check-and-set for jitter peaks and stability counters across 
  *   GNSS/Sensor and Tick threads (R-ID 382).
- * Sep.20.15:
- * - Issue #1122: Resolved False GNSS Jitter Spike on Suite Restart. 
- *   Explicitly zeroed lastGnssStatusRt in resetGnssJitter() and reset() (R-ID 379).
  */
 @Singleton
 class ForensicAuditor @Inject constructor(
@@ -253,7 +252,7 @@ class ForensicAuditor @Inject constructor(
         }
     }
 
-    fun computeEnergyFootprint(nowRt: Long, consume: Boolean = true): HardwareSuite.RevivalEvent.Footprint? {
+    fun computeEnergyFootprint(nowRt: Long, consume: Boolean = true): RevivalEvent.Footprint? {
         val start: BatteryStatus
         val startRt: Long
         synchronized(this) {
@@ -271,7 +270,7 @@ class ForensicAuditor @Inject constructor(
         val durationMs = nowRt - startRt
         
         Timber.i("ForensicAuditor: Energy Footprint Verdict (R-ID 259): Delta mA: $deltaMa, Delta Temp: $deltaTemp°C, Duration: ${durationMs}ms")
-        return HardwareSuite.RevivalEvent.Footprint(deltaMa, deltaTemp, durationMs)
+        return RevivalEvent.Footprint(deltaMa, deltaTemp, durationMs)
     }
 
     fun clearRevivalState() {

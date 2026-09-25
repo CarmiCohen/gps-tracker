@@ -5,6 +5,10 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.25.01:
+ * - Issue #1322: Unified all component-level events (Alarm, Integrity, Processor, 
+ *   Connectivity, History, Sensor, Command, Revival) into DomainEvent hierarchy.
+ *   Migrated LocationStatus to core engine to support bus-driven health updates.
  * Sep.25.00:
  * - Issue #1325: Fully unified SystemEvaluationSnapshot with all metadata 
  *   required for parity (sats, proximity, vibration, violation stats).
@@ -76,6 +80,15 @@ enum class LocationPendingReason {
     ACOUSTIC_VIOLATION, SIGNAL_LOSS,
     JAMMER_SUSPICION
 }
+
+@Serializable
+data class LocationStatus(
+    val isPending: Boolean = false,
+    val reason: LocationPendingReason = LocationPendingReason.NONE,
+    val lastFixRt: Long = 0L,
+    val lastPendingDurationMs: Long = 0L,
+    val recoveryConfirmed: Boolean = false
+)
 
 @Serializable
 class EngineConnectionPoint(
@@ -274,7 +287,72 @@ data class AlarmServiceContext(
 )
 
 /**
- * DomainEvent: Unified event hierarchy for cross-component orchestration. (Issue #1291)
+ * Component-level event containers. (Issue #1322: DomainEventBus convergence)
+ */
+
+sealed class AlarmEvent {
+    data class LogEvent(
+        val type: String, val message: String, val isImportant: Boolean, 
+        val extremeValue: Double?, val logId: String?, val durationMs: Long, 
+        val isSpecial: Boolean, val specialColor: Int?, 
+        val lat: Double, val lng: Double, val accuracy: Double, 
+        val maxAccuracy: Double, val snr: Double?, val vibe: Double?
+    ) : AlarmEvent()
+}
+
+sealed class IntegrityEvent {
+    data class ViolationSustained(val type: String) : IntegrityEvent()
+    data class ViolationResolved(val type: String) : IntegrityEvent()
+    data class LogEvent(val message: String, val isImportant: Boolean) : IntegrityEvent()
+    data class LocationStatusChanged(val status: LocationStatus) : IntegrityEvent()
+    data class GnssThrottledChanged(val throttled: Boolean) : IntegrityEvent()
+}
+
+sealed class ProcessorEvent {
+    data class TrailPointSaved(val lat: Double, val lng: Double, val isViewerTrail: Boolean, val status: SentinelStatus, val timestamp: Long, val accuracy: Double, val maxAccuracy: Double) : ProcessorEvent()
+    data class LogAdded(val message: String, val type: String, val isImportant: Boolean, val isSpecial: Boolean, val lat: Double, val lng: Double, val accuracy: Double, val snr: Double?, val vibe: Double?) : ProcessorEvent()
+    data class MaxAccuracyChanged(val accuracy: Double) : ProcessorEvent()
+    data class ChairBaselineChanged(val baseline: Double) : ProcessorEvent()
+    data class VibrationFloorChanged(val floor: Double) : ProcessorEvent()
+    data class LuxBaselineChanged(val baseline: Double) : ProcessorEvent()
+    data class AcousticFloorChanged(val floor: Double) : ProcessorEvent()
+    data class GpsStallDetected(val rt: Long) : ProcessorEvent()
+}
+
+sealed class ConnectivityEvent {
+    data class PeerPulse(val id: String) : ConnectivityEvent()
+}
+
+sealed class HistoryEvent {
+    data class LogEvent(val message: String, val isImportant: Boolean) : HistoryEvent()
+}
+
+sealed class AppSensorEvent {
+    data class HardwareFailure(val reason: String) : AppSensorEvent()
+    data class LogEvent(val message: String, val isImportant: Boolean) : AppSensorEvent()
+}
+
+sealed class CommandEvent {
+    object WatchdogTrigger : CommandEvent()
+    object UiPulse : CommandEvent()
+    data class UiVisibilityChanged(val visible: Boolean) : CommandEvent()
+    object ResetTimers : CommandEvent()
+    object SyncSensors : CommandEvent()
+    object ExecuteStressTest : CommandEvent()
+    data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : CommandEvent()
+}
+
+sealed class RevivalEvent {
+    data class Attempt(val count: Int) : RevivalEvent()
+    object HardwareLock : RevivalEvent()
+    object Success : RevivalEvent()
+    object RawBurstStarted : RevivalEvent()
+    object RawBurstEnded : RevivalEvent()
+    data class Footprint(val deltaMa: Int, val deltaTemp: Double, val durationMs: Long) : RevivalEvent()
+}
+
+/**
+ * DomainEvent: Unified event hierarchy for cross-component orchestration. (Issue #1291, #1322)
  */
 sealed class DomainEvent {
     data class TickEvaluated(
@@ -324,6 +402,16 @@ sealed class DomainEvent {
     ) : DomainEvent()
     
     data class ServiceStatus(val message: String, val isImportant: Boolean = false) : DomainEvent()
+
+    // Issue #1322: Component wrappers
+    data class Alarm(val event: AlarmEvent) : DomainEvent()
+    data class Integrity(val event: IntegrityEvent) : DomainEvent()
+    data class Processor(val event: ProcessorEvent, val isPrimary: Boolean) : DomainEvent()
+    data class Connectivity(val event: ConnectivityEvent) : DomainEvent()
+    data class History(val event: HistoryEvent) : DomainEvent()
+    data class Sensor(val event: AppSensorEvent) : DomainEvent()
+    data class Command(val event: CommandEvent) : DomainEvent()
+    data class Revival(val event: RevivalEvent) : DomainEvent()
 }
 
 /**

@@ -23,12 +23,11 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.25.01:
+ * - Issue #1322: Aligned eventCoordinator.start call site with the converged bus-centric model.
+ *   Injected DomainEventBus into primary and remote LocationProcessors.
  * Sep.25.00:
- * - Issue #1325: Fully populated SystemEvaluationSnapshot metadata (sats, proximity, 
- *   vibrationRollingSum, violation stats) to ensure absolute telemetry parity.
- * - Issue #1326: Corrected satsUsed mapping to prevent zero-placeholder corruption.
- * - Refactor: Cleaned up DomainEvent.TickEvaluated call site to align with 
- *   snapshot-centric state propagation. Corrected evaluationSnapshot.copy errors.
+ * - Issue #1325: Fully populated SystemEvaluationSnapshot metadata.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -85,8 +84,8 @@ class MonitorService : BaseMonitorService() {
         rolePrefix = if (isTrackerMode) "T_" else "V_"
         notificationManager.setTrackerMode(isTrackerMode)
         
-        primaryProcessor = LocationProcessor(timeProvider)
-        remoteProcessor = LocationProcessor(timeProvider)
+        primaryProcessor = LocationProcessor(timeProvider, domainEventBus)
+        remoteProcessor = LocationProcessor(timeProvider, domainEventBus)
     }
 
     override suspend fun onServiceInitialize() {
@@ -104,14 +103,7 @@ class MonitorService : BaseMonitorService() {
         refreshCapabilitiesInternal()
         deviceProfileManager.initializeHardwareProfile(capabilities, configManager.deviceId)
 
-        eventCoordinator.start(
-            alarmManager = alarmManager,
-            hardwareSuite = hardwareSuite,
-            connectivitySuite = connectivitySuite,
-            commandRouter = commandRouter,
-            primaryProcessor = primaryProcessor,
-            remoteProcessor = remoteProcessor
-        )
+        eventCoordinator.start(connectivitySuite = connectivitySuite)
 
         setupServiceObservers()
 

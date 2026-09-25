@@ -102,8 +102,14 @@ abstract class AppModule {
 
         @Provides
         @Singleton
-        fun provideLocationProcessor(timeProvider: TimeProvider): LocationProcessor {
-            return LocationProcessor(timeProvider)
+        fun provideDomainEventBus(): DomainEventBus {
+            return DomainEventBus()
+        }
+
+        @Provides
+        @Singleton
+        fun provideLocationProcessor(timeProvider: TimeProvider, domainEventBus: DomainEventBus): LocationProcessor {
+            return LocationProcessor(timeProvider, domainEventBus)
         }
 
         @Provides

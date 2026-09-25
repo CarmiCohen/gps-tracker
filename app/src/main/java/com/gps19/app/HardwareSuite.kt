@@ -33,28 +33,14 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.25.01:
+ * - Issue #1322: Converged Sensor and Revival event emission into DomainEventBus.
+ *   Migrated LocationStatus and RevivalEvent to EngineModels.kt.
  * Sep.24.04:
  * - Issue #1273 REMEDIATION: Guarded activeUsers from falling below zero and hardened 
  *   deferred teardown check to <= 0 (R-ID 460).
  * - Issue #1271 REMEDIATION: Added setAdaptiveVibrationFloor to support restoring the 
  *   persisted vibration floor anchor on service initialization (R-ID 459).
- * Sep.24.01:
- * - Issue #1233 REMEDIATION: Made fast-path onSpike callbacks optional to prevent 
- *   high allocation churn of lambda re-registration on every service tick.
- * Sep.22.28:
- * - Issue #1187: Clobbered Fast-Path Baseline Learning on Sensor Thread. Added 
- *   preserveExistingBaseline parameter to HardwareFastPath update to protect 
- *   autonomous sensor-thread light baseline learning from 2-second background ticks.
- * Sep.22.15:
- * - Issue #1188: Acoustic Fast-Path Adaptation. Added alpha baseline adaptation 
- *   parameter to acousticFastPath.evaluate to ensure ambient noise tracking (R-ID 407).
- * Sep.22.08:
- * - Issue #1169: Fast-Path Configuration Convergence. Unified acoustic and light 
- *   fast-path implementations using a generic HardwareFastPath structure to 
- *   handle baseline decay, spike detection, and debouncing symmetrically (R-ID 404).
- * Sep.21.130:
- * - Issue #1159: Unused Forensic Auditing Dead Code Elimination. Removed unused 
- *   maxGnssJitterMs and obsolete processReflection helper.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -64,16 +50,9 @@ class HardwareSuite @Inject constructor(
     private val systemMonitor: SystemMonitor,
     private val systemStatusProvider: SystemStatusProvider,
     private val powerStateProvider: PowerStateProvider,
-    private val forensicAuditor: ForensicAuditor
+    private val forensicAuditor: ForensicAuditor,
+    private val domainEventBus: DomainEventBus
 ) : ManagedSensorListener() {
-
-    data class LocationStatus(
-        val isPending: Boolean = false,
-        val reason: LocationPendingReason = LocationPendingReason.NONE,
-        val lastFixRt: Long = 0L,
-        val lastPendingDurationMs: Long = 0L,
-        val recoveryConfirmed: Boolean = false
-    )
 
     class ForensicSnapshot {
         var vibration: Double = 0.0
@@ -187,18 +166,6 @@ class HardwareSuite @Inject constructor(
     val isGnssThrottledFlow: SharedFlow<Boolean> = _isGnssThrottled.asSharedFlow()
     var isGnssThrottled = false; private set
 
-    private val _revivalEvents = MutableSharedFlow<RevivalEvent>(extraBufferCapacity = 8)
-    val revivalEvents = _revivalEvents.asSharedFlow()
-
-    sealed class RevivalEvent {
-        data class Attempt(val count: Int) : RevivalEvent()
-        object HardwareLock : RevivalEvent()
-        object Success : RevivalEvent()
-        object RawBurstStarted : RevivalEvent()
-        object RawBurstEnded : RevivalEvent()
-        data class Footprint(val deltaMa: Int, val deltaTemp: Double, val durationMs: Long) : RevivalEvent()
-    }
-
     private val _locationStatus = MutableSharedFlow<LocationStatus>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val locationStatusFlow: SharedFlow<LocationStatus> = _locationStatus.asSharedFlow()
     private var currentLocationStatus = LocationStatus()
@@ -213,9 +180,6 @@ class HardwareSuite @Inject constructor(
     }
 
     // --- Sensor State ---
-    private val _sensorEvents = MutableSharedFlow<AppSensorEvent>(extraBufferCapacity = 8, onBufferOverflow = BufferOverflow.DROP_OLDEST)
-    val sensorEvents: SharedFlow<AppSensorEvent> = _sensorEvents.asSharedFlow()
-
     private val accelerometer by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) }
     private val linearAccel by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION) }
     private val magnetometer by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) }
@@ -599,7 +563,7 @@ class HardwareSuite @Inject constructor(
                 val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L).setMaxUpdates(5).build()
                 fusedLocationClient.requestLocationUpdates(fastRequest, fusedCallback, handler.looper)
 
-                _revivalEvents.tryEmit(RevivalEvent.RawBurstStarted)
+                domainEventBus.emit(DomainEvent.Revival(RevivalEvent.RawBurstStarted))
                 locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, rawListener, handler.looper)
                 
                 delay(10000)
@@ -614,7 +578,7 @@ class HardwareSuite @Inject constructor(
                     if (rawRevivalListener == rawListener) {
                         rawListener.unregister(locationManager, handler)
                         rawRevivalListener = null
-                        _revivalEvents.tryEmit(RevivalEvent.RawBurstEnded)
+                        domainEventBus.emit(DomainEvent.Revival(RevivalEvent.RawBurstEnded))
                     }
                 }
             }
@@ -658,12 +622,16 @@ class HardwareSuite @Inject constructor(
             revivalBaselineCaptured = false 
         }
         
-        currentLocationStatus = current.copy(isPending = nextPending, reason = nextReason, lastFixRt = lastFixRt, lastPendingDurationMs = lastPendingDuration, recoveryConfirmed = recoveryConfirmed)
-        _locationStatus.tryEmit(currentLocationStatus)
+        val nextStatus = current.copy(isPending = nextPending, reason = nextReason, lastFixRt = lastFixRt, lastPendingDurationMs = lastPendingDuration, recoveryConfirmed = recoveryConfirmed)
+        if (nextStatus != currentLocationStatus) {
+            currentLocationStatus = nextStatus
+            _locationStatus.tryEmit(currentLocationStatus)
+            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LocationStatusChanged(currentLocationStatus)))
+        }
         
         if (shouldEmitSuccess) {
-            _revivalEvents.tryEmit(RevivalEvent.Success)
-            forensicAuditor.computeEnergyFootprint(nowRt)?.let { _revivalEvents.tryEmit(it) }
+            domainEventBus.emit(DomainEvent.Revival(RevivalEvent.Success))
+            forensicAuditor.computeEnergyFootprint(nowRt)?.let { domainEventBus.emit(DomainEvent.Revival(it)) }
         }
     }
 
@@ -672,8 +640,10 @@ class HardwareSuite @Inject constructor(
         val duration = if (stationaryStartRt > 0L) nowRt - stationaryStartRt else 0L
         val isUltra = isStationary() && duration > ULTRA_LONG_STATIONARY_DURATION_MS
         
-        isUltraLongStationary = isUltra
-        _isUltraLongStationary.tryEmit(isUltra)
+        if (isUltraLongStationary != isUltra) {
+            isUltraLongStationary = isUltra
+            _isUltraLongStationary.tryEmit(isUltra)
+        }
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -741,7 +711,7 @@ class HardwareSuite @Inject constructor(
                 }
 
                 forensicAuditor.auditSensorRate(nowRt, isWarming).forEach { (role, msg) ->
-                    _sensorEvents.tryEmit(AppSensorEvent.LogEvent("[$role] $msg", false))
+                    domainEventBus.emit(DomainEvent.Sensor(AppSensorEvent.LogEvent("[$role] $msg", false)))
                 }
             }
             Sensor.TYPE_LINEAR_ACCELERATION -> processLinearAcceleration(values[0], values[1], values[2], event.timestamp)
@@ -810,7 +780,7 @@ class HardwareSuite @Inject constructor(
             acousticThread = Thread {
                 while (isMonitoring) {
                     val sampleRate = ACOUSTIC_SAMPLE_RATE; val bufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-                    if (bufferSize <= 0) { if (isMonitoring) _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Invalid buffer size")); try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
+                    if (bufferSize <= 0) { if (isMonitoring) domainEventBus.emit(DomainEvent.Sensor(AppSensorEvent.HardwareFailure("AudioRecord: Invalid buffer size"))); try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
                     var audioRecord: AudioRecord? = null
                     try {
                         var attempts = 0
@@ -826,7 +796,7 @@ class HardwareSuite @Inject constructor(
                             val nowRt = timeProvider.elapsedRealtime()
                             if (powerSaveMode) {
                                 val adaptiveOffCycleMs = SentinelValidator.computeAdaptiveAcousticOffCycle(isStationary(), stationaryStartRt, nowRt)
-                                if (!isInOffCycle && (nowRt - lastDutyCycleTransitionRt > ACOUSTIC_DUTY_CYCLE_ON_MS)) { 
+                                if (!isInOffCycle && (nowRt - lastDutyCycleTransitionRt > ACOUSTIC_DUT_CYCLE_ON_MS)) { 
                                     isInOffCycle = true; lastDutyCycleTransitionRt = nowRt; try { audioRecord.stop() } catch (e: Exception) {} 
                                 }
                                 else if (isInOffCycle && (nowRt - lastDutyCycleTransitionRt > adaptiveOffCycleMs)) { 
@@ -846,10 +816,10 @@ class HardwareSuite @Inject constructor(
                                         lastAcousticLockoutRt = acousticFastPath.lastSpikeRt
                                     }
                                 }
-                            } else if (read < 0) { if (!isMonitoring) break; _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Hardware error")); break }
+                            } else if (read < 0) { if (!isMonitoring) break; domainEventBus.emit(DomainEvent.Sensor(AppSensorEvent.HardwareFailure("AudioRecord: Hardware error"))); break }
                         }
                         try { audioRecord.stop() } catch (ex: Exception) {}
-                    } catch (e: Exception) { if (isMonitoring) _sensorEvents.tryEmit(AppSensorEvent.HardwareFailure("AudioRecord: Exception - ${e.message}")) }
+                    } catch (e: Exception) { if (isMonitoring) domainEventBus.emit(DomainEvent.Sensor(AppSensorEvent.HardwareFailure("AudioRecord: Exception - ${e.message}"))) }
                     finally { isAcousticRunning = false; try { audioRecord?.release() } catch (ex: Exception) {}; if (isMonitoring) try { Thread.sleep(ACOUSTIC_GENERIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { } }
                 }
             }.apply { name = "AcousticMonitor"; priority = Thread.MIN_PRIORITY; start() }
@@ -922,13 +892,13 @@ class HardwareSuite @Inject constructor(
     }
 
     fun consumeLogicSnapshot(): ForensicSnapshot {
-        return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeLogicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(m, false)) }) {
+        return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeLogicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> domainEventBus.emit(DomainEvent.Sensor(AppSensorEvent.LogEvent(m, false))) }) {
             privateConsumeSnapshot(logicSnapshotBuffer, isForensic = false)
         }
     }
 
     fun consumeForensicSnapshot(): ForensicSnapshot {
-        return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeForensicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> _sensorEvents.tryEmit(AppSensorEvent.LogEvent(m, false)) }) {
+        return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeForensicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> domainEventBus.emit(DomainEvent.Sensor(AppSensorEvent.LogEvent(m, false))) }) {
             privateConsumeSnapshot(forensicSnapshotBuffer, isForensic = true)
         }
     }
@@ -1120,7 +1090,8 @@ class HardwareSuite @Inject constructor(
             forensicAuditor.reset(roleTag)
             
             revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
-            pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = sessionStartRt; currentLocationStatus = LocationStatus(); _locationStatus.tryEmit(currentLocationStatus)
+            pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = sessionStartRt; currentLocationStatus = LocationStatus()
+            _locationStatus.tryEmit(currentLocationStatus)
             isDisplayFlickering.set(false); lastDisplayTransitionRt = 0L
             
             // Issue #1127/1128/1133/1135: Clear lifecycle leftovers on reset
@@ -1156,13 +1127,13 @@ class HardwareSuite @Inject constructor(
                 if (revivalAttemptCount < MAX_REVIVAL_ATTEMPTS) {
                     revivalAttemptCount++
                     Timber.w("HardwareSuite: GNSS Recovery Pulse triggered (Attempt $revivalAttemptCount)")
-                    _revivalEvents.tryEmit(RevivalEvent.Attempt(revivalAttemptCount))
+                    domainEventBus.emit(DomainEvent.Revival(RevivalEvent.Attempt(revivalAttemptCount)))
                     restartLocationUpdates()
                 } else if (!isHardwareLocked) {
                     isHardwareLocked = true
                     Timber.e("HardwareSuite: MAX REVIVAL ATTEMPTS REACHED. GPS_HARDWARE_LOCK triggered.")
-                    _revivalEvents.tryEmit(RevivalEvent.HardwareLock)
-                    forensicAuditor.computeEnergyFootprint(nowRt, consume = false)?.let { _revivalEvents.tryEmit(it) }
+                    domainEventBus.emit(DomainEvent.Revival(RevivalEvent.HardwareLock))
+                    forensicAuditor.computeEnergyFootprint(nowRt, consume = false)?.let { domainEventBus.emit(DomainEvent.Revival(it)) }
                 }
             }
         } else { revivalAttemptCount = 0; isHardwareLocked = false }

@@ -1,28 +1,12 @@
 package com.gps19.core.engine
 
 import java.util.Locale
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlin.math.*
 
 /**
- * ProcessorEvent: Reactive event container for location processing results.
- */
-sealed class ProcessorEvent {
-    data class TrailPointSaved(val lat: Double, val lng: Double, val isViewerTrail: Boolean, val status: SentinelStatus, val timestamp: Long, val accuracy: Double, val maxAccuracy: Double) : ProcessorEvent()
-    data class LogAdded(val message: String, val type: String, val isImportant: Boolean, val isSpecial: Boolean, val lat: Double, val lng: Double, val accuracy: Double, val snr: Double?, val vibe: Double?) : ProcessorEvent()
-    data class MaxAccuracyChanged(val accuracy: Double) : ProcessorEvent()
-    data class ChairBaselineChanged(val baseline: Double) : ProcessorEvent()
-    data class VibrationFloorChanged(val floor: Double) : ProcessorEvent()
-    data class LuxBaselineChanged(val baseline: Double) : ProcessorEvent()
-    data class AcousticFloorChanged(val floor: Double) : ProcessorEvent()
-    data class GpsStallDetected(val rt: Long) : ProcessorEvent()
-}
-
-/**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.25.01:
+ * - Issue #1322: Converged ProcessorEvent emission into DomainEventBus.
  * Sep.25.00:
  * - Issue #1326 REMEDIATION: Corrected satellite count mapping in processGpsPoint 
  *   to utilize snapshot.satsUsed, eliminating the zero-placeholder that caused 
@@ -32,14 +16,9 @@ sealed class ProcessorEvent {
  *   to align with the unified domain event model.
  */
 class LocationProcessor(
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val domainEventBus: DomainEventBus? = null // Optional for unit tests
 ) {
-    private val _processorEvents = MutableSharedFlow<ProcessorEvent>(
-        extraBufferCapacity = 64,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-    val processorEvents: SharedFlow<ProcessorEvent> = _processorEvents.asSharedFlow()
-
     private val processedLocationFlyweight = ProcessedLocation()
     val state = LocationProcessingState()
 
@@ -178,7 +157,7 @@ class LocationProcessor(
             "updateSensorData",
             LatencyMonitor.AuditType.PERFORMANCE,
             { message, _ ->
-                _processorEvents.tryEmit(ProcessorEvent.LogAdded(message, "system", false, true, 0.0, 0.0, 0.0, null, snapshot.vibration))
+                emitEvent(ProcessorEvent.LogAdded(message, "system", false, true, 0.0, 0.0, 0.0, null, snapshot.vibration))
             }
         ) {
             val oldVibeFloor = state.adaptiveVibrationFloor
@@ -192,19 +171,19 @@ class LocationProcessor(
             val newAcousticFloor = state.acousticFloorDb
             
             if (abs(newVibeFloor - oldVibeFloor) > 0.01) {
-                _processorEvents.tryEmit(ProcessorEvent.VibrationFloorChanged(newVibeFloor))
+                emitEvent(ProcessorEvent.VibrationFloorChanged(newVibeFloor))
             }
             
             if (abs(newLuxBaseline - oldLuxBaseline) > 1.0) {
-                _processorEvents.tryEmit(ProcessorEvent.LuxBaselineChanged(newLuxBaseline))
+                emitEvent(ProcessorEvent.LuxBaselineChanged(newLuxBaseline))
             }
 
             if (abs(newAcousticFloor - oldAcousticFloor) > 1.0) {
-                _processorEvents.tryEmit(ProcessorEvent.AcousticFloorChanged(newAcousticFloor))
+                emitEvent(ProcessorEvent.AcousticFloorChanged(newAcousticFloor))
             }
 
             if (baselineChanged) {
-                _processorEvents.tryEmit(ProcessorEvent.ChairBaselineChanged(state.baselineSitTilt))
+                emitEvent(ProcessorEvent.ChairBaselineChanged(state.baselineSitTilt))
             }
             baselineChanged
         }
@@ -212,7 +191,7 @@ class LocationProcessor(
 
     fun resetChairBaseline() {
         LocationSentinel.resetChairBaseline(state)
-        _processorEvents.tryEmit(ProcessorEvent.ChairBaselineChanged(state.baselineSitTilt))
+        emitEvent(ProcessorEvent.ChairBaselineChanged(state.baselineSitTilt))
     }
 
     fun shouldThrottlePolling(providedIsStationary: Boolean? = null): Boolean = LocationSentinel.shouldThrottlePolling(state, providedIsStationary)
@@ -239,7 +218,7 @@ class LocationProcessor(
         
         if (abs(newMax - state.maxAccuracy) > 0.05) {
             state.maxAccuracy = newMax
-            _processorEvents.tryEmit(ProcessorEvent.MaxAccuracyChanged(state.maxAccuracy))
+            emitEvent(ProcessorEvent.MaxAccuracyChanged(state.maxAccuracy))
         }
     }
 
@@ -266,7 +245,7 @@ class LocationProcessor(
             "processGpsPoint",
             LatencyMonitor.AuditType.PERFORMANCE,
             { message, _ ->
-                _processorEvents.tryEmit(ProcessorEvent.LogAdded(message, "system", false, true, lat, lng, accuracy, snr, state.currentVibrationIndex))
+                emitEvent(ProcessorEvent.LogAdded(message, "system", false, true, lat, lng, accuracy, snr, state.currentVibrationIndex))
             }
         ) {
             processedLocationFlyweight.reset()
@@ -276,7 +255,7 @@ class LocationProcessor(
             if (state.lastTs > 0 && effectiveTs < state.lastTs) {
                 val delta = state.lastTs - effectiveTs
                 if (delta > CLOCK_REGRESSION_GATE_MS) { 
-                    _processorEvents.tryEmit(ProcessorEvent.LogAdded("Merge-on-Stale: Coordinate update bypassed due to hardware clock regression (${delta}ms). Merging status-only data.", "system", false, true, 0.0, 0.0, 0.0, snr, state.currentVibrationIndex))
+                    emitEvent(ProcessorEvent.LogAdded("Merge-on-Stale: Coordinate update bypassed due to hardware clock regression (${delta}ms). Merging status-only data.", "system", false, true, 0.0, 0.0, 0.0, snr, state.currentVibrationIndex))
                     if (delta > 86400000L) { state.lastTs = 0L; state.lastRt = 0L; LocationSentinel.reset(state) }
                 }
                 val status = snapshot.status
@@ -345,13 +324,13 @@ class LocationProcessor(
                 val newAcousticFloor = state.acousticFloorDb
 
                 if (abs(newVibeFloor - oldVibeFloor) > 0.01) {
-                    _processorEvents.tryEmit(ProcessorEvent.VibrationFloorChanged(newVibeFloor))
+                    emitEvent(ProcessorEvent.VibrationFloorChanged(newVibeFloor))
                 }
                 if (abs(newLuxBaseline - oldLuxBaseline) > 1.0) {
-                    _processorEvents.tryEmit(ProcessorEvent.LuxBaselineChanged(newLuxBaseline))
+                    emitEvent(ProcessorEvent.LuxBaselineChanged(newLuxBaseline))
                 }
                 if (abs(newAcousticFloor - oldAcousticFloor) > 1.0) {
-                    _processorEvents.tryEmit(ProcessorEvent.AcousticFloorChanged(newAcousticFloor))
+                    emitEvent(ProcessorEvent.AcousticFloorChanged(newAcousticFloor))
                 }
             }
 
@@ -371,11 +350,11 @@ class LocationProcessor(
                         state.lastLat, state.lastLng, state.lastTs, firstPromoted.lat, firstPromoted.lng, firstPromoted.ts,
                         startAcc = state.lastAcc, startMaxAcc = state.lastMaxAcc, endAcc = accuracy, endMaxAcc = state.maxAccuracy
                     ) { pLat, pLng, pTs, pAcc, pMaxAcc ->
-                        _processorEvents.tryEmit(ProcessorEvent.TrailPointSaved(pLat, pLng, isViewerTrail, SentinelStatus.VALID, pTs, accuracy = pAcc, maxAccuracy = pMaxAcc))
+                        emitEvent(ProcessorEvent.TrailPointSaved(pLat, pLng, isViewerTrail, SentinelStatus.VALID, pTs, accuracy = pAcc, maxAccuracy = pMaxAcc))
                     }
                 }
                 promotedPoints?.forEach { p ->
-                    _processorEvents.tryEmit(ProcessorEvent.TrailPointSaved(p.lat, p.lng, isViewerTrail, SentinelStatus.VALID, p.ts, accuracy = p.accuracy, maxAccuracy = p.maxAccuracy))
+                    emitEvent(ProcessorEvent.TrailPointSaved(p.lat, p.lng, isViewerTrail, SentinelStatus.VALID, p.ts, accuracy = p.accuracy, maxAccuracy = p.maxAccuracy))
                 }
             }
 
@@ -398,7 +377,7 @@ class LocationProcessor(
 
             if (!isSpatiallyValid) {
                 if (shouldSavePoint(snapshot.isMuzzled || adaptationMuzzled, true, PhysicsUtils.calculateDistance(state.lastSavedLat, state.lastSavedLng, lat, lng), 0L, state.maxAccuracy, nowRt)) {
-                    _processorEvents.tryEmit(ProcessorEvent.TrailPointSaved(lat, lng, isViewerTrail, finalStatus, effectiveTs, accuracy = accuracy, maxAccuracy = state.maxAccuracy))
+                    emitEvent(ProcessorEvent.TrailPointSaved(lat, lng, isViewerTrail, finalStatus, effectiveTs, accuracy = accuracy, maxAccuracy = state.maxAccuracy))
                 }
                 return@measureAndAudit processedLocationFlyweight.apply {
                     this.rawPoint = EngineGeoPoint(lat, lng, alt = alt, ts = effectiveTs, rt = nowRt, accuracy = accuracy, maxAccuracy = state.maxAccuracy)
@@ -452,7 +431,7 @@ class LocationProcessor(
             }
 
             state.lastLat = lat; state.lastLng = lng; state.lastTs = effectiveTs; state.lastRt = nowRt; state.lastAcc = accuracy; state.lastMaxAcc = state.maxAccuracy
-            if (!finalIsStalled) state.lastValidFixRt = nowRt else if (isLocal && !isViewerTrail) _processorEvents.tryEmit(ProcessorEvent.GpsStallDetected(nowRt))
+            if (!finalIsStalled) state.lastValidFixRt = nowRt else if (isLocal && !isViewerTrail) emitEvent(ProcessorEvent.GpsStallDetected(nowRt))
             
             val isThrottled = LocationSentinel.shouldThrottlePolling(state)
             val estimatedSpeed = state.estimatedSpeedMps
@@ -471,7 +450,7 @@ class LocationProcessor(
                 snr = snr,
                 vibeIndex = state.currentVibrationIndex,
                 onLog = { msg, lLat, lLng, lAcc, lVibe ->
-                    _processorEvents.tryEmit(ProcessorEvent.LogAdded(msg, "system", false, false, lLat, lLng, lAcc, null, lVibe))
+                    emitEvent(ProcessorEvent.LogAdded(msg, "system", false, false, lLat, lLng, lAcc, null, lVibe))
                 }
             )
 
@@ -480,7 +459,7 @@ class LocationProcessor(
 
             val timeSinceLastGpsSaveRt = if (nowRt > 0 && state.lastSavedRt > 0) nowRt - state.lastSavedRt else 0L
             if (shouldSavePoint(snapshot.isMuzzled || adaptationMuzzled, isThrottled, PhysicsUtils.calculateDistance(state.lastSavedLat, state.lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSaveRt, state.maxAccuracy, nowRt) && !skipPersistence) {
-                _processorEvents.tryEmit(ProcessorEvent.TrailPointSaved(persistencePoint.lat, persistencePoint.lng, isViewerTrail, finalStatus, effectiveTs, accuracy = persistencePoint.accuracy, maxAccuracy = persistencePoint.maxAccuracy))
+                emitEvent(ProcessorEvent.TrailPointSaved(persistencePoint.lat, persistencePoint.lng, isViewerTrail, finalStatus, effectiveTs, accuracy = persistencePoint.accuracy, maxAccuracy = persistencePoint.maxAccuracy))
                 state.lastSavedLat = persistencePoint.lat; state.lastSavedLng = persistencePoint.lng; state.lastSavedTs = nowWall; state.lastSavedRt = nowRt; state.lastSavedGpsTs = gpsTs
             }
             
@@ -517,6 +496,10 @@ class LocationProcessor(
                 this.kineticEnergy = if (isLocal) state.kineticEnergy else snapshot.kineticEnergy
             }
         }
+    }
+
+    private fun emitEvent(event: ProcessorEvent) {
+        domainEventBus?.emit(DomainEvent.Processor(event, isPrimary = true))
     }
 
     private fun isStationary(): Boolean = LocationSentinel.isStationary(state)
@@ -565,7 +548,7 @@ class LocationProcessor(
         AnchorEvaluator.reset(state)
         invalidateHomePointsCache()
         LocationSentinel.reset(state)
-        _processorEvents.tryEmit(ProcessorEvent.MaxAccuracyChanged(0.0))
+        emitEvent(ProcessorEvent.MaxAccuracyChanged(0.0))
         state.lastExpectedIntervalMs = 0L
         state.lastIntervalChangeRt = 0L
     }

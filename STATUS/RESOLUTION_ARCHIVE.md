@@ -1,3 +1,16 @@
+# 🏛️ Resolution Archive - Sep.25.01
+
+## 🏁 Issue #1322: Multi-Flow Fragmentation Convergence
+*   **Resolved**: Sep.25.01
+*   **Root Cause**: `AppEventCoordinator` observed 10+ fragmented reactive flows (`IntegrityEvent`, `ProcessorEvent`, etc.), leading to tight coupling between the background evaluation loop and side-effect handlers (logging, persistence, signaling). This created high architectural complexity and hindered module-level unit testing.
+*   **Remediation**:
+    *   **DomainEventBus**: Migrated to the `:core:engine` module to support core-level signaling without circular dependencies.
+    *   **EngineModels.kt**: Centralized all component-level event definitions (`Alarm`, `Integrity`, `Processor`, `Connectivity`, `History`, `Sensor`, `Command`, `Revival`) into a unified `DomainEvent` hierarchy.
+    *   **MonitorService.kt**: Injected the global bus into `LocationProcessor` instances and aligned orchestration initialization.
+    *   **AppEventCoordinator.kt**: Refactored to a strictly bus-centric model, observing a single `domainEventBus.events` stream to manage all system reactions.
+    *   **Component Hardening**: Refactored `AppAlarmManager`, `IntegrityMonitor`, `HardwareSuite`, `ConnectivitySuite`, `HistoryManager`, and `CommandRouter` to emit wrapped events directly to the centralized bus.
+*   **R-ID**: 480
+
 # 🏛️ Resolution Archive - Sep.25.00
 
 ## 🏁 Issue #1326: Telemetry Data Corruption in LocationProcessor

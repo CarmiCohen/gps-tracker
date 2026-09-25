@@ -1,18 +1,18 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.25.00
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.25.01
 
-## 🎯 Current Resumption Focus: Domain Event Bus Convergence
-Finalizing the decoupling of the evaluation loop and component-level reactive flows into a unified domain orchestrator.
+## 🎯 Current Resumption Focus: DTO Convergence & Persistence Alignment
+Finalizing the unification of snapshot and update models to eliminate redundant mapping layers.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
 ### 🛑 High Priority (Safety, Data Integrity & Core Logic)
 
-*   **Issue #1322: Multi-Flow Fragmentation (Issue #1291 Integration)**
-    *   *Finding*: Coordinator still observes 10+ fragmented flows (`IntegrityEvent`, `ProcessorEvent`, etc.) rather than a single bus.
-    *   *Requirement*: Converge component-level event streams into the unified `DomainEventBus`.
 *   **Issue #1323: Residual Imperative Persistence in MonitorService**
     *   *Finding*: Viewer self-tracking bypasses the bus and calls `updateRepositoryLocation` directly.
     *   *Risk*: Asymmetric architecture and blocking I/O risk on the service thread.
+*   **Issue #1331: DomainEventBus Capacity Hardening**
+    *   *Finding*: Converging 10+ sources into one flow may require a higher buffer capacity or drop strategy. (Formerly #1328).
+    *   *Requirement*: Implement `onBufferOverflow = BufferOverflow.DROP_OLDEST` and increase capacity to 128.
 
 ### 🟡 Medium Priority (UX, Performance & Auditability)
 
@@ -23,15 +23,9 @@ Finalizing the decoupling of the evaluation loop and component-level reactive fl
     *   *Finding*: Pulse handlers reuse `TickEvaluated` event, triggering redundant side-effects with potentially stale data.
     *   *Requirement*: Introduce `DomainEvent.PeerConnectionChanged` for lifecycle-only notifications.
 
-### 🔵 Low Priority (Forensic Precision)
-
-*   **Issue #1328: Event Bus Backpressure Risk**
-    *   *Finding*: Converging 10+ sources into one flow may require a higher buffer capacity.
-    *   *Requirement*: Increase `DomainEventBus` capacity and implement a drop strategy for non-critical telemetry.
-
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 18)
+## 💡 Strategic Simplification Ideas (Ideas: 19)
 
 ### 🛑 High Priority
 *   **Issue #1329: Telemetry Mapping Convergence**
@@ -50,10 +44,12 @@ Finalizing the decoupling of the evaluation loop and component-level reactive fl
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1322: Multi-Flow Fragmentation Convergence** (Resolved Sep.25.01)
+    *   *Remediation*: Converged all component-level event streams (Alarm, Integrity, Processor, Connectivity, History, Sensor, Command, Revival) into the unified `DomainEventBus`. Migrated bus infrastructure to core engine to support core-level signaling. (SOT ID 480).
 *   **Issue #1325: Unified Snapshot Metadata Gaps** (Resolved Sep.25.00)
-    *   *Remediation*: Expanded `SystemEvaluationSnapshot` to include all metadata required for a full `LocationUpdate` (sats, proximity, violation stats). (SOT ID 478).
+    *   *Remediation*: Expanded `SystemEvaluationSnapshot` to include all metadata required for a full `LocationUpdate`. (SOT ID 478).
 *   **Issue #1326: Telemetry Data Corruption in LocationProcessor** (Resolved Sep.25.00)
-    *   *Remediation*: Corrected satellite count mapping to use the actual `snapshot.satsUsed` value instead of a zero-placeholder. (SOT ID 479).
+    *   *Remediation*: Corrected satellite count mapping to use the actual `snapshot.satsUsed` value. (SOT ID 479).
 *   **Issue #1291: Domain Event Bus Integration** (Resolved Sep.24.97)
 *   **Issue #1312: Unified Evaluation Logic Snapshot** (Resolved Sep.24.96)
 *   **Issue #1313: Role-Switching Atomic State Reset** (Resolved Sep.24.96)
@@ -62,4 +58,4 @@ Finalizing the decoupling of the evaluation loop and component-level reactive fl
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 479 (Rules: 25, IDs: 479), Resolved: 1222, Open: 5, Testing: 3 (Sub-items: 12), Ideas: 18, QA: 284]**
+- **Current Audit Baseline: [SOT: 480 (Rules: 25, IDs: 480), Resolved: 1223, Open: 4, Testing: 3 (Sub-items: 12), Ideas: 19, QA: 284]**

@@ -21,14 +21,9 @@ import javax.inject.Singleton
 import kotlin.math.abs
 
 /**
- * HistoryEvent: Reactive event container for history-related logs and triggers.
- */
-sealed class HistoryEvent {
-    data class LogEvent(val message: String, val isImportant: Boolean) : HistoryEvent()
-}
-
-/**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.25.01:
+ * - Issue #1322: Converged HistoryEvent emission into DomainEventBus.
  * Sep.24.97:
  * - Issue #1291: Updated updateRibbons signature to accept Long for 
  *   serviceTickCounter to align with the unified DomainEventBus model.
@@ -42,14 +37,9 @@ class HistoryManager @Inject constructor(
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
     private val hardwareSuite: HardwareSuite,
-    private val locationProcessor: LocationProcessor
+    private val locationProcessor: LocationProcessor,
+    private val domainEventBus: DomainEventBus
 ) {
-    private val _historyEvents = MutableSharedFlow<HistoryEvent>(
-        extraBufferCapacity = 16,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-    val historyEvents: SharedFlow<HistoryEvent> = _historyEvents.asSharedFlow()
-
     private var scope: CoroutineScope? = null
     private val isInitialized = AtomicBoolean(false)
 
@@ -128,7 +118,7 @@ class HistoryManager @Inject constructor(
 
     private fun emitSanitizedLog(message: String, isImportant: Boolean = false) {
         val sanitized = ForensicSanitizer.sanitizeMessage(message)
-        _historyEvents.tryEmit(HistoryEvent.LogEvent(sanitized, isImportant))
+        domainEventBus.emit(DomainEvent.History(HistoryEvent.LogEvent(sanitized, isImportant)))
     }
 
     suspend fun updateRibbons(

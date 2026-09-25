@@ -15,32 +15,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * CommandEvent: Reactive event container for system and UI commands.
- * Sep.14.52:
- * - Signaling State Reduction (#1041): Removed redundant ViewerPulse and 
- *   TransientDrop (legacy relay status) events (R-ID 335).
- * Aug.22.05:
- * - Audit Chapter 12.3: Added SimulateStoragePressure support (R197).
- */
-sealed class CommandEvent {
-    object WatchdogTrigger : CommandEvent()
-    object UiPulse : CommandEvent()
-    data class UiVisibilityChanged(val visible: Boolean) : CommandEvent()
-    object ResetTimers : CommandEvent()
-    object SyncSensors : CommandEvent()
-    object ExecuteStressTest : CommandEvent()
-    data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : CommandEvent()
-}
-
-/**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Sep.25.01:
+ * - Issue #1322: Converged CommandEvent emission into DomainEventBus.
  * Sep.23.70:
  * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation for 
  *   alarm acknowledgment latches using ConfigManager context (R-ID 453).
- * Sep.12.47:
- * - Issue #1017 Hardening: Integrated integrityMonitor.resetStats() into reset 
- *   commands to ensure forensic parity and clear hardware health counters 
- *   during session transitions (R-ID 317).
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -57,16 +37,11 @@ class CommandRouter @Inject constructor(
     private val integrityMonitor: IntegrityMonitor,
     private val timeProvider: TimeProvider,
     private val audioSynthesizer: AudioSynthesizer,
-    private val historyManager: HistoryManager
+    private val historyManager: HistoryManager,
+    private val domainEventBus: DomainEventBus
 ) {
     private val isRegistered = AtomicBoolean(false)
     private val isObserving = AtomicBoolean(false)
-
-    private val _commandEvents = MutableSharedFlow<CommandEvent>(
-        extraBufferCapacity = 16,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-    val commandEvents: SharedFlow<CommandEvent> = _commandEvents.asSharedFlow()
 
     private val routerExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException) return@CoroutineExceptionHandler
@@ -91,7 +66,7 @@ class CommandRouter @Inject constructor(
     private val legacyReceiver = object : ManagedBroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
-                ACTION_ALARM_WAKEUP -> _commandEvents.tryEmit(CommandEvent.WatchdogTrigger)
+                ACTION_ALARM_WAKEUP -> domainEventBus.emit(DomainEvent.Command(CommandEvent.WatchdogTrigger))
             }
         }
     }
@@ -103,8 +78,8 @@ class CommandRouter @Inject constructor(
             .onEach { command ->
                 try {
                     when (command) {
-                        is UiCommand.SyncRequest -> _commandEvents.emit(CommandEvent.UiPulse)
-                        is UiCommand.UiVisibilityChanged -> _commandEvents.emit(CommandEvent.UiVisibilityChanged(command.visible))
+                        is UiCommand.SyncRequest -> domainEventBus.emit(DomainEvent.Command(CommandEvent.UiPulse))
+                        is UiCommand.UiVisibilityChanged -> domainEventBus.emit(DomainEvent.Command(CommandEvent.UiVisibilityChanged(command.visible)))
                         is UiCommand.StopSiren -> {
                             val prefix = if (configManager.isTrackerMode) "T_" else "V_"
                             repository.saveLongSync(prefix + LAST_ALARM_ACK_TS_KEY, timeProvider.currentTimeMillis())
@@ -118,7 +93,7 @@ class CommandRouter @Inject constructor(
                         }
                         is UiCommand.ClearTrails -> repository.clearTrails()
                         is UiCommand.StatsReset -> {
-                            _commandEvents.emit(CommandEvent.ResetTimers)
+                            domainEventBus.emit(DomainEvent.Command(CommandEvent.ResetTimers))
                             sessionManager.reset()
                             locationProcessor.resetStats()
                             connectivitySuite.resetPeerStats()
@@ -126,19 +101,19 @@ class CommandRouter @Inject constructor(
                             integrityMonitor.resetStats()
                         }
                         is UiCommand.SettingsUpdated -> {
-                            _commandEvents.emit(CommandEvent.SyncSensors)
+                            domainEventBus.emit(DomainEvent.Command(CommandEvent.SyncSensors))
                             connectivitySuite.connect(configManager.relayUrl)
                             connectivitySuite.updateIdentity(configManager.deviceId, configManager.viewerId, configManager.isTrackerMode)
                         }
                         is UiCommand.ZoomIn, is UiCommand.ZoomOut, is UiCommand.MapZoomIn, is UiCommand.MapZoomOut -> {}
                         is UiCommand.FullInitializationReset -> {
-                            _commandEvents.emit(CommandEvent.ResetTimers)
+                            domainEventBus.emit(DomainEvent.Command(CommandEvent.ResetTimers))
                             sessionManager.reset()
                             locationProcessor.resetStats()
                             connectivitySuite.resetPeerStats()
                             historyManager.reset()
                             integrityMonitor.resetStats()
-                            _commandEvents.emit(CommandEvent.SyncSensors)
+                            domainEventBus.emit(DomainEvent.Command(CommandEvent.SyncSensors))
                         }
                         is UiCommand.ExecuteTestAlarm -> {
                             if (configManager.isTrackerMode) {
@@ -169,7 +144,7 @@ class CommandRouter @Inject constructor(
                             }
                         }
                         is UiCommand.ExecuteStressTest -> {
-                            _commandEvents.emit(CommandEvent.ExecuteStressTest)
+                            domainEventBus.emit(DomainEvent.Command(CommandEvent.ExecuteStressTest))
                         }
                         is UiCommand.SimulateStoragePressure -> {
                             integrityMonitor.simulateStoragePressure(command.active, command.isCritical)

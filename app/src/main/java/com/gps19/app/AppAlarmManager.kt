@@ -17,20 +17,9 @@ import javax.inject.Singleton
 import kotlin.math.ceil
 
 /**
- * AlarmEvent: Reactive event container for alarm state changes and logging.
- */
-sealed class AlarmEvent {
-    data class LogEvent(
-        val type: String, val message: String, val isImportant: Boolean, 
-        val extremeValue: Double?, val logId: String?, val durationMs: Long, 
-        val isSpecial: Boolean, val specialColor: Int?, 
-        val lat: Double, val lng: Double, val accuracy: Double, 
-        val maxAccuracy: Double, val snr: Double?, val vibe: Double?
-    ) : AlarmEvent()
-}
-
-/**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.25.01:
+ * - Issue #1322: Converged AlarmEvent emission into DomainEventBus.
  * Sep.24.97:
  * - Issue #1291 Integration: Fixed property name mismatches (isSignalLoss, 
  *   isGpsStalling) in syncEvaluationState to resolve build errors.
@@ -44,16 +33,11 @@ class AppAlarmManager @Inject constructor(
     private val repository: MainRepository,
     private val sessionManager: SessionManager,
     private val notificationManager: AppNotificationManager,
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val domainEventBus: DomainEventBus
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     
-    private val _alarmEvents = MutableSharedFlow<AlarmEvent>(
-        extraBufferCapacity = 64,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
-    val alarmEvents: SharedFlow<AlarmEvent> = _alarmEvents.asSharedFlow()
-
     private val _isSirenRequired = MutableStateFlow(false)
     val isSirenRequired: StateFlow<Boolean> = _isSirenRequired.asStateFlow()
 
@@ -221,7 +205,7 @@ class AppAlarmManager @Inject constructor(
             report = evaluationReport,
             versionTag = versionTag,
             onSpike = { message, duration ->
-                _alarmEvents.tryEmit(AlarmEvent.LogEvent(
+                domainEventBus.emit(DomainEvent.Alarm(AlarmEvent.LogEvent(
                     type = ALERT_ID_PERFORMANCE_SPIKE,
                     message = "$versionTag $message",
                     isImportant = false,
@@ -232,12 +216,12 @@ class AppAlarmManager @Inject constructor(
                     specialColor = FORENSIC_PINK_COLOR,
                     lat = snapshot.lat, lng = snapshot.lng, accuracy = snapshot.accuracy,
                     maxAccuracy = snapshot.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
-                ))
+                )))
             },
             onTrigger = { eval ->
                 val isSpecial = isSpecialType(eval.type)
                 val specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
-                _alarmEvents.tryEmit(AlarmEvent.LogEvent(
+                domainEventBus.emit(DomainEvent.Alarm(AlarmEvent.LogEvent(
                     type = eval.type,
                     message = "$versionTag ALARM TRIGGERED: ${eval.title}",
                     isImportant = true,
@@ -248,12 +232,12 @@ class AppAlarmManager @Inject constructor(
                     specialColor = specialColor,
                     lat = snapshot.lat, lng = snapshot.lng, accuracy = snapshot.accuracy,
                     maxAccuracy = snapshot.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
-                ))
+                )))
             },
             onResolve = { eval, durationMs ->
                 val isSpecial = isSpecialType(eval.type)
                 val specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
-                _alarmEvents.tryEmit(AlarmEvent.LogEvent(
+                domainEventBus.emit(DomainEvent.Alarm(AlarmEvent.LogEvent(
                     type = eval.type,
                     message = "$versionTag ALARM RESOLVED: ${eval.title}",
                     isImportant = false,
@@ -264,7 +248,7 @@ class AppAlarmManager @Inject constructor(
                     specialColor = specialColor,
                     lat = snapshot.lat, lng = snapshot.lng, accuracy = snapshot.accuracy,
                     maxAccuracy = snapshot.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
-                ))
+                )))
             }
         )
         
