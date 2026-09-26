@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.9
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.10
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -60,7 +60,7 @@ Ready for next priority item.
 *   **Issue #1331: DomainEventBus Capacity Hardening** (Resolved Sep.25.02)
     *   *Remediation*: Increased extra buffer capacity to 128 and introduced DROP_OLDEST overflow policy. (SOT ID 481).
 *   **Issue #1322: Multi-Flow Fragmentation Convergence** (Resolved Sep.25.01)
-    *   =Remediation*: Converged all component-level event streams into the unified bus. (SOT ID 480).
+    *   *Remediation*: Converged all component-level event streams into the unified bus. (SOT ID 480).
 *   **Issue #1325: Unified Snapshot Metadata Gaps** (Resolved Sep.25.00)
     *   *Remediation*: Expanded `SystemEvaluationSnapshot` for full parity. (SOT ID 478).
 *   **Issue #1326: Telemetry Data Corruption in LocationProcessor** (Resolved Sep.25.00)
@@ -69,4 +69,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 496 (Rules: 32, IDs: 496), Resolved: 1241, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 283]**
+- **Current Audit Baseline: [SOT: 497 (Rules: 33, IDs: 497), Resolved: 1241, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 283]**
