@@ -9,7 +9,7 @@ plugins {
 
 // Issue #1035: Type Safety Validation for Dynamic Versioning
 def safeVersionCode = rootProject.hasProperty('autoVersionCode') ? rootProject.autoVersionCode : 1027
-def safeVersionName = rootProject.hasProperty('autoVersionName') ? rootProject.autoVersionName : "Sep.26.6"
+def safeVersionName = rootProject.hasProperty('autoVersionName') ? rootProject.autoVersionName : "Sep.26.8"
 
 // Ensure versionCode is a valid Integer
 if (!(safeVersionCode instanceof Integer)) {
@@ -106,7 +106,7 @@ dependencies {
     implementation libs.androidx.lifecycle.runtime.compose
     implementation libs.androidx.lifecycle.service
     implementation libs.androidx.activity.compose
-    platform(libs.androidx.compose.bom)
+    implementation platform(libs.androidx.compose.bom)
     implementation libs.androidx.material3
     implementation libs.material.icons.extended
     implementation libs.androidx.navigation.compose
@@ -157,7 +157,7 @@ dependencies {
     androidTestImplementation libs.androidx.junit
     androidTestImplementation libs.androidx.espresso.core
     androidTestImplementation libs.androidx.uiautomator
-    platform(libs.androidx.compose.bom)
+    androidTestImplementation platform(libs.androidx.compose.bom)
     androidTestImplementation libs.androidx.ui.test.junit4
     
     // Hilt Testing

@@ -1,3 +1,14 @@
+# 🏛️ Resolution Archive - Sep.26.8
+
+## 🏁 Issue #1215: Decommission legacy ViewModel artifacts
+*   **Resolved**: Sep.26.8
+*   **Root Cause**: Architectural technical debt resulting from feature-specific ViewModels (`SetupViewModel`, `TrackerViewModel`, `ViewerViewModel`) that were rendered redundant after the consolidation of all UI state and domain routing into the activity-scoped `MainViewModel` SSOT (Issue #1203).
+*   **Remediation**:
+    *   **Decommissioning**: Physically wiped and decommissioned `SetupViewModel.kt`, `TrackerViewModel.kt`, and `ViewerViewModel.kt`, leaving only legacy markers.
+    *   **Verification**: Confirmed `MainAppContent.kt` and all screens now correctly consume `MainViewModel` without residual dependency on feature ViewModels.
+    *   **Architecture**: Codified Rule 1.22 in SOT Master Requirements to prohibit feature-specific ViewModels in favor of the SSOT.
+*   **R-ID**: 496
+
 # 🏛️ Resolution Archive - Sep.26.6
 
 ## 🏁 Issue #1337: Role-Prefix Collision in Integrity Events
@@ -122,7 +133,7 @@
 # 🏛️ Resolution Archive - Sep.25.02
 
 ## 🏁 Issue #1331: DomainEventBus Capacity Hardening
-*   **Resolved**: System event capacity hardened.
+*   **Resolved**: Sep.25.02
 *   **Root Cause**: Event congestion during peak activity bursts.
 *   **Remediation**: Hardened `DomainEventBus` with an extra buffer capacity of 128 and drop oldest overflow policy.
 *   **R-ID**: 481

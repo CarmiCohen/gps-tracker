@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.6
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.8
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -15,11 +15,18 @@ Ready for next priority item.
 
 ### 🟡 Medium Priority
 *   *(Issue #1336 consolidated into hardening)*
+*   *(Issue #1215 resolved: Decommission legacy ViewModels)*
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1215: Decommission setupViewModel boilerplate** (Resolved Sep.26.8)
+    *   *Remediation*: Decommissioned legacy feature-specific ViewModels (`SetupViewModel.kt`, `TrackerViewModel.kt`, `ViewerViewModel.kt`) following the consolidation of all UI state and domain routing into the activity-scoped `MainViewModel` SSOT. (SOT ID 496).
+*   **Issue #1338: Lifecycle Hydration Staggering Verification** (Resolved Sep.23.50)
+    *   *Remediation*: Developed `HydrationStaggeringAuditTest` to verify that `LifecycleHydrationManager` correctly staggers level transitions under 100% CPU/IO saturation, ensuring deterministic startup on constrained hardware. (SOT ID 495).
+*   **Issue #1203: Hilt ViewModel Scope Optimization** (Resolved Sep.23.50)
+    *   *Remediation*: Optimized Hilt ViewModel scoping and eliminated redundant stream resource churn, state loss, and misrouted kinematic state by unifying all feature screens and overlays to consume the activity-scoped `MainViewModel` directly. (SOT ID 494).
 *   **Issue #1337: Role-Prefix Collision in Integrity Events** (Resolved Sep.26.6)
     *   *Remediation*: Refactored `AppEventCoordinator.handleIntegrityEvent` to strictly limit power alarm pending updates to Tracker mode only, preventing local power state leaks into the remote tracker's state during Viewer mode. Hardened `AppAlarmManager` by adding prefix validation within `setPowerAlarmPending` and `resetEvaluation` to prevent role-prefix flipping and write collisions. (SOT ID 493).
 *   **Issue #1336: AppEventCoordinator & HistoryManager Side-Effect Unification** (Resolved Sep.26.5)
@@ -43,7 +50,7 @@ Ready for next priority item.
 *   **Issue #1330: Snap-to-Update Monolith** (Resolved Sep.25.06)
     *   *Remediation*: Unified `SystemEvaluationSnapshot` with the partitioned state structure. (SOT ID 485).
 *   **Issue #1327: Pulse-to-Tick Event Collision** (Resolved Sep.25.05)
-    *   *Remediation*: Introduced `DomainEvent.PeerConnectionChanged` to handle lifecycle-only notifications. (SOT ID 484).
+    *   *Remediation*: Introduced `DomainEvent.PeerConnectionChanged(isConnected: Boolean, peerId: String)` to the unified event hierarchy. (SOT ID 484).
 *   **Issue #1324: Peer Signaling Coupling to Repository** (Resolved Sep.25.04)
     *   *Remediation*: Transitioned peer telemetry persistence to a reactive, bus-driven model. (SOT ID 483).
 *   **Issue #1323: Residual Imperative Persistence in MonitorService** (Resolved Sep.25.03)
@@ -60,4 +67,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 493 (Rules: 29, IDs: 493), Resolved: 1237, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
+- **Current Audit Baseline: [SOT: 496 (Rules: 32, IDs: 496), Resolved: 1240, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
