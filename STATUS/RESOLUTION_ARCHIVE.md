@@ -1,3 +1,13 @@
+# 🏛️ Resolution Archive - Sep.25.07
+
+## 🏁 Issue #1329: Telemetry Mapping Convergence
+*   **Resolved**: Sep.25.07
+*   **Root Cause**: `LocationUpdate` construction was fragmented across `AppEventCoordinator` handlers for `TickEvaluated` and `ViewerLocationUpdated`. This resulted in redundant mapping logic, inconsistencies in how `TrackerState` was derived (speed vs. filtered speed), and increased technical debt.
+*   **Remediation**:
+    *   **TelemetryMapper.kt**: Introduced `mapSnapshotToUpdate` as the central authority for converting a `SystemEvaluationSnapshot` and `ProcessedLocation` into a `LocationUpdate`.
+    *   **AppEventCoordinator.kt**: Refactored `handleTickEvaluated` and `handleViewerLocationUpdated` to utilize the centralized mapper, eliminating ~15 lines of manual property assignment and ensuring role-agnostic mapping consistency.
+*   **R-ID**: 486
+
 # 🏛️ Resolution Archive - Sep.25.06
 
 ## 🏁 Issue #1330: Snap-to-Update Monolith

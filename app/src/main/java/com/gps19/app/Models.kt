@@ -10,14 +10,10 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * Sep.25.08:
- * - Issue #1329: Fixed JSON key typo is_cooling_modeActive to is_cooling_mode_active 
- *   in TrackerStatus.toMap for signaling consistency.
- * Sep.25.01:
- * - Issue #1322: Removed AppSensorEvent (migrated to EngineModels.kt for bus convergence).
- * Sep.22.00:
- * - Issue #1178: Initial GNSS satellite count blanking. Set default 
- *   satellite counts to -1 in HudTelemetryState (R-ID 399).
+ * Sep.26.0:
+ * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence. Refactored 
+ *   TrackerStatus to use partitioned states (Kinetic, Atmospheric, Integrity) 
+ *   to align with system architecture and eliminate redundant bridging overhead.
  */
 
 @Serializable
@@ -145,7 +141,9 @@ class ConnectionPoint(
     var isSilentFailure: Boolean = false,
     var isUltraLongStationary: Boolean = false,
     var violationUptimeMs: Long = 0L,
-    var gpsHardwareLock: Boolean = false
+    var gpsHardwareLock: Boolean = false,
+    var isAnchorLocked: Boolean = false,
+    var isGnssThrottled: Boolean = false
 ) {
     fun copyFrom(other: ConnectionPoint) {
         this.localId = other.localId; this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt
@@ -166,7 +164,8 @@ class ConnectionPoint(
         this.kineticEnergy = other.kineticEnergy; this.cpuLoad = other.cpuLoad; this.ioWait = other.ioWait
         this.maxIoLatency = other.maxIoLatency; this.isSilentFailure = other.isSilentFailure
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
-        this.gpsHardwareLock = other.gpsHardwareLock
+        this.gpsHardwareLock = other.gpsHardwareLock; this.isAnchorLocked = other.isAnchorLocked
+        this.isGnssThrottled = other.isGnssThrottled
     }
 
     /**
@@ -180,7 +179,8 @@ class ConnectionPoint(
                luxIdx == other.luxIdx && noiseIdx == other.noiseIdx && liftIdx == other.liftIdx &&
                tiltIdx == other.tiltIdx && baroIdx == other.baroIdx && isSitActive == other.isSitActive &&
                isUltraLongStationary == other.isUltraLongStationary && violationUptimeMs == other.violationUptimeMs &&
-               gpsHardwareLock == other.gpsHardwareLock
+               gpsHardwareLock == other.gpsHardwareLock && isAnchorLocked == other.isAnchorLocked &&
+               isGnssThrottled == other.isGnssThrottled
     }
 
     fun reset() {
@@ -195,7 +195,7 @@ class ConnectionPoint(
         sitVz = 0.0; sitVzTs = 0L; sitVzRt = 0L; sitDz = 0.0; sitBaro = 0.0; sitTilt = 0.0
         sitShock = 0.0; kineticEnergy = 0.0; cpuLoad = 0.0; ioWait = 0.0; maxIoLatency = 0L
         isSilentFailure = false; isUltraLongStationary = false; violationUptimeMs = 0L
-        gpsHardwareLock = false
+        gpsHardwareLock = false; isAnchorLocked = false; isGnssThrottled = false
     }
 }
 
@@ -323,51 +323,122 @@ data class LogEntry(
 
 @Serializable
 data class TrackerStatus(
-    val deviceId: String = "", val viewerId: String = "", override val lat: Double = 0.0,
-    override val lng: Double = 0.0, override val alt: Double = 0.0, val speed: Double = 0.0,
-    val bearing: Double = 0.0, val accuracy: Double = 0.0, val maxAccuracy: Double = 0.0,
-    override val gpsTs: Long = 0L, override val ts: Long = 0L, override val rt: Long = 0L, 
-    val uptimeMs: Long = 0L, val lastConnTs: Long = 0L, val lastDiscTs: Long = 0L,
-    val totalDropMs: Long = 0L, val maxDropMs: Long = 0L, val maxDropTs: Long = 0L,
-    val totalConnectedMs: Long = 0L, val sessionConnectedMs: Long = 0L, val battery: Int = 100,
-    val temp: Double = 0.0, val maxTemp: Double = 0.0, val isCharging: Boolean = false,
-    val currentMa: Int = 0, val satsView: Int = -1, val satsUsed: Int = -1,
-    val peakVibrationShock: Double = 0.0, val peakVibrationShockTs: Long = 0L, val isPowerTamper: Boolean = false,
-    val violationUptimeMs: Long = 0L, val violationPercentage: Double = 0.0, val status: SentinelStatus = SentinelStatus.VALID,
-    val isJammer: Boolean = false, val isStalled: Boolean = false, val isTamperDetected: Boolean = false,
-    val vibration: Double = 0.0, val heading: Double = 0.0, val tiltDegrees: Double = 0.0,
-    val acousticDb: Double = 0.0, val baroAlt: Double = 0.0, val lux: Double = 0.0,
-    val isNear: Boolean = true, val luxBaseline: Double = 0.0, val acousticFloorDb: Double = 0.0,
-    val adaptiveVibrationFloor: Double = 0.12, val proxIdx: Double = 1.0, val proximityCm: Double = -1.0, 
-    val proximityDebounceMs: Long = 0L, val vibrationRollingSum: Double = 0.0, val isClockRegression: Boolean = false,
-    val jumpTier: Int = 0, val isLocationPending: Boolean = false,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    val lastValidFixRt: Long = 0L, val isPowerSaveMode: Boolean = false, val standbyBucket: Int = -1,
-    val netInterface: String = "UNKNOWN", val isStorageLow: Boolean = false, val isStorageCritical: Boolean = false,
-    val gnssDetail: GnssDetail? = null, val isBatteryWhitelisted: Boolean = false,
-    val isBatterySteepDischarge: Boolean = false, val isCoolingModeActive: Boolean = false,
+    val deviceId: String = "",
+    val viewerId: String = "",
+    val kinetic: KineticState = KineticState(),
+    val atmospheric: AtmosphericState = AtmosphericState(),
+    val integrity: IntegrityState = IntegrityState(),
+    val status: SentinelStatus = SentinelStatus.VALID,
+    override val ts: Long = 0L,
+    override val rt: Long = 0L,
     val trackerState: TrackerState = TrackerState.UNKNOWN,
-    val snrIdx: Double = 0.0, val noiseIdx: Double = 0.0, val luxIdx: Double = 0.0,
-    val vibeIdx: Double = 0.0, val liftIdx: Double = 0.0, val isAnchorLocked: Boolean = false,
-    val isSitDetected: Boolean = false, val isSitActive: Boolean = false, val lastSitTs: Long = 0L,
-    val verticalVelocity: Double = 0.0, val sitVz: Double = 0.0, val sitVzTs: Long = 0L,
-    val sitVzRt: Long = 0L, val sitDz: Double = 0.0, val sitBaro: Double = 0.0,
-    val sitTilt: Double = 0.0, val sitShock: Double = 0.0, val isJump: Boolean = false,
-    val isTrajectoryPromoted: Boolean = false, val isSuspicious: Boolean = false,
-    val tiltIdx: Double = 0.0, val baroIdx: Double = 0.0, val micPending: Boolean = false,
-    val kineticEnergy: Double = 0.0, val isAdaptiveJump: Boolean = false,
-    val isBatteryLow: Boolean = false, val isBatteryCritical: Boolean = false, val isSilentFailure: Boolean = false,
-    val isUltraLongStationary: Boolean = false,
-    val currentProximityCm: Double = -1.0,
-    val gpsHardwareLock: Boolean = false,
-    val isGnssThrottled: Boolean = false,
-    
-    // R-ID 259: Energy Footprint
-    val lastEnergyDeltaMa: Int = 0,
-    val lastEnergyDeltaTemp: Double = 0.0,
-    val lastEnergyDurationMs: Long = 0L,
-    val tamperNote: String? = null
+    val isClockRegression: Boolean = false,
+    val lastValidFixRt: Long = 0L,
+    val isSilentFailure: Boolean = false,
+    val isBatteryWhitelisted: Boolean = false
 ) : SpatialAnchor {
+
+    override val lat: Double get() = kinetic.lat
+    override val lng: Double get() = kinetic.lng
+    override val alt: Double get() = kinetic.alt
+    override val gpsTs: Long get() = kinetic.gpsTs
+
+    val speed: Double get() = kinetic.speed
+    val bearing: Double get() = kinetic.bearing
+    val accuracy: Double get() = kinetic.accuracy
+    val maxAccuracy: Double get() = kinetic.maxAccuracy
+
+    val uptimeMs: Long get() = integrity.uptimeMs
+    val lastConnTs: Long get() = integrity.lastConnTs
+    val lastDiscTs: Long get() = integrity.lastDiscTs
+    val totalDropMs: Long get() = integrity.totalDropMs
+    val maxDropMs: Long get() = integrity.maxDropMs
+    val maxDropTs: Long get() = integrity.maxDropTs
+    val totalConnectedMs: Long get() = integrity.totalConnectedMs
+    val sessionConnectedMs: Long get() = integrity.sessionConnectedMs
+
+    val battery: Int get() = integrity.battery
+    val temp: Double get() = atmospheric.temp
+    val maxTemp: Double get() = atmospheric.maxTemp
+    val isCharging: Boolean get() = integrity.isCharging
+    val currentMa: Int get() = integrity.currentMa
+    val satsView: Int get() = integrity.satsView
+    val satsUsed: Int get() = integrity.satsUsed
+
+    val peakVibrationShock: Double get() = atmospheric.peakVibrationShock
+    val peakVibrationShockTs: Long get() = atmospheric.peakVibrationShockTs
+    val isPowerTamper: Boolean get() = integrity.isPowerTamper
+    val violationUptimeMs: Long get() = integrity.violationUptimeMs
+    val violationPercentage: Double get() = integrity.violationPercentage
+
+    val isJammer: Boolean get() = integrity.isJammer
+    val isStalled: Boolean get() = integrity.isStalled
+    val isTamperDetected: Boolean get() = integrity.isTamperDetected
+    val vibration: Double get() = atmospheric.vibration
+    val heading: Double get() = atmospheric.heading
+    val tiltDegrees: Double get() = atmospheric.tiltDegrees
+    val acousticDb: Double get() = atmospheric.acousticDb
+    val baroAlt: Double get() = atmospheric.baroAlt
+    val lux: Double get() = atmospheric.lux
+    val isNear: Boolean get() = atmospheric.isNear
+    val luxBaseline: Double get() = atmospheric.luxBaseline
+    val acousticFloorDb: Double get() = atmospheric.acousticFloorDb
+    val adaptiveVibrationFloor: Double get() = atmospheric.adaptiveVibrationFloor
+    val proxIdx: Double get() = atmospheric.proxIdx
+    val proximityCm: Double get() = atmospheric.proximityCm
+    val proximityDebounceMs: Long get() = atmospheric.proximityDebounceMs
+    val vibrationRollingSum: Double get() = atmospheric.vibrationRollingSum
+
+    val jumpTier: Int get() = kinetic.jumpTier
+    val isLocationPending: Boolean get() = integrity.isLocationPending
+    val locationPendingReason: LocationPendingReason get() = integrity.locationPendingReason
+
+    val isPowerSaveMode: Boolean get() = integrity.isPowerSaveMode
+    val standbyBucket: Int get() = integrity.standbyBucket
+    val netInterface: String get() = integrity.netInterface
+    val isStorageLow: Boolean get() = integrity.isStorageLow
+    val isStorageCritical: Boolean get() = integrity.isStorageCritical
+    val gnssDetail: GnssDetail? get() = integrity.gnssDetail
+    val isBatterySteepDischarge: Boolean get() = integrity.isBatterySteepDischarge
+    val isCoolingModeActive: Boolean get() = integrity.isCoolingModeActive
+
+    val snrIdx: Double get() = integrity.snrIdx
+    val noiseIdx: Double get() = atmospheric.noiseIdx
+    val luxIdx: Double get() = atmospheric.luxIdx
+    val vibeIdx: Double get() = atmospheric.vibeIdx
+    val liftIdx: Double get() = atmospheric.liftIdx
+    val isAnchorLocked: Boolean get() = integrity.isAnchorLocked
+
+    val isSitDetected: Boolean get() = integrity.isSitDetected
+    val isSitActive: Boolean get() = integrity.isSitActive
+    val lastSitTs: Long get() = integrity.lastSitTs
+    val verticalVelocity: Double get() = kinetic.verticalVelocity
+    val sitVz: Double get() = integrity.sitVz
+    val sitVzTs: Long get() = integrity.sitVzTs
+    val sitVzRt: Long get() = integrity.sitVzRt
+    val sitDz: Double get() = integrity.sitDz
+    val sitBaro: Double get() = integrity.sitBaro
+    val sitTilt: Double get() = integrity.sitTilt
+    val sitShock: Double get() = integrity.sitShock
+    val isJump: Boolean get() = kinetic.isJump
+    val isTrajectoryPromoted: Boolean get() = kinetic.isTrajectoryPromoted
+    val isSuspicious: Boolean get() = integrity.isSuspicious
+    val tiltIdx: Double get() = atmospheric.tiltIdx
+    val baroIdx: Double get() = atmospheric.baroIdx
+    val micPending: Boolean get() = integrity.micPending
+    val kineticEnergy: Double get() = kinetic.kineticEnergy
+    val isAdaptiveJump: Boolean get() = kinetic.isAdaptiveJump
+    val isBatteryLow: Boolean get() = integrity.isBatteryLow
+    val isBatteryCritical: Boolean get() = integrity.isBatteryCritical
+    val isUltraLongStationary: Boolean get() = integrity.isUltraLongStationary
+    val currentProximityCm: Double get() = atmospheric.proximityCm
+    val gpsHardwareLock: Boolean get() = integrity.gpsHardwareLock
+    val isGnssThrottled: Boolean get() = integrity.isGnssThrottled
+
+    val lastEnergyDeltaMa: Int get() = integrity.lastEnergyDeltaMa
+    val lastEnergyDeltaTemp: Double get() = integrity.lastEnergyDeltaTemp
+    val lastEnergyDurationMs: Long get() = integrity.lastEnergyDurationMs
+    val tamperNote: String? get() = integrity.tamperNote
     
     fun toMap(fromViewer: Boolean): Map<String, Any?> = mutableMapOf<String, Any?>().apply {
         put("id", SignalingConstants.getTransmissionId(deviceId)); put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
@@ -405,6 +476,7 @@ data class TrackerStatus(
         put("vertical_velocity", verticalVelocity); put("kinetic_energy", kineticEnergy)
         put("is_adaptive_jump", isAdaptiveJump); put("is_battery_low", isBatteryLow)
         put("is_battery_critical", isBatteryCritical); put("is_silent_failure", isSilentFailure)
+        put("is_battery_whitelisted", isBatteryWhitelisted)
         put("is_ultra_long_stationary", isUltraLongStationary)
         put("gps_hardware_lock", gpsHardwareLock); put("is_gnss_throttled", isGnssThrottled)
         

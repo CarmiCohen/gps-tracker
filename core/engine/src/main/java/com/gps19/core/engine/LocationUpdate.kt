@@ -137,7 +137,14 @@ data class IntegrityState(
     var isLocationPending: Boolean = false,
     var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     var signal: Int? = null,
-    var tamperNote: String? = null
+    var tamperNote: String? = null,
+    var lastValidFixRt: Long = 0L,
+    var isSilentFailure: Boolean = false,
+    var isMaliAnomaly: Boolean = false,
+    var cpuLoad: Double = 0.0,
+    var ioWait: Double = 0.0,
+    var maxIoLatency: Long = 0L,
+    var isBatteryWhitelisted: Boolean = false
 ) {
     fun copyFrom(other: IntegrityState) {
         this.battery = other.battery; this.isCharging = other.isCharging; this.currentMa = other.currentMa
@@ -164,6 +171,13 @@ data class IntegrityState(
         this.sitShock = other.sitShock; this.isSitActive = other.isSitActive
         this.isLocationPending = other.isLocationPending; this.locationPendingReason = other.locationPendingReason
         this.signal = other.signal; this.tamperNote = other.tamperNote
+        this.lastValidFixRt = other.lastValidFixRt
+        this.isSilentFailure = other.isSilentFailure
+        this.isMaliAnomaly = other.isMaliAnomaly
+        this.cpuLoad = other.cpuLoad
+        this.ioWait = other.ioWait
+        this.maxIoLatency = other.maxIoLatency
+        this.isBatteryWhitelisted = other.isBatteryWhitelisted
     }
 }
 

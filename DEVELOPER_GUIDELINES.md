@@ -19,6 +19,7 @@ Perform the following steps in order once an issue is resolved:
 4. **App Build & Versioning**: Rebuild the app and update the `versionName` in `app/build.gradle`.
 5. **Git Release Block**: Prepare a Git command block to stage, commit, tag the version, and push to the remote repository.
 6. **Simplicity Audit**: Evaluate if the code or app architecture can be further simplified. Save these ideas directly in `issues.md` under the "Strategic Simplification Ideas" section. Ensure each idea is assigned a unique issue number and significance (High, Medium, Low), and maintains the order of items by their potential contribution to the app.
-7. **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot to prepare for a fresh chat session.
-8. **Session Termination**: Stop the chat immediately. Do not attempt to fix any other issues or continue work.
-9. **Audit Recalculation**: Recalculate all metrics and display them in the format: **Current Audit Baseline: [SOT: X (Rules: Y, IDs: Z), Resolved: A, Open: B, Testing: C (Sub-items: D), Ideas: E, QA: F]**.
+7. **Large File Protection**: Verify that Rule 7 was strictly followed for all file modifications, ensuring no truncation occurred in large `.md` or `.xml` files.
+8. **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot to prepare for a fresh chat session.
+9. **Session Termination**: Stop the chat immediately. Do not attempt to fix any other issues or continue work.
+10. **Audit Recalculation**: Recalculate all metrics and display them in the format: **Current Audit Baseline: [SOT: X (Rules: Y, IDs: Z), Resolved: A, Open: B, Testing: C (Sub-items: D), Ideas: E, QA: F]**.

@@ -24,12 +24,12 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
- * Sep.25.05:
- * - Issue #1330: Adapted SystemEvaluationSnapshot instantiation to the new 
- *   partitioned state structure (Kinetic, Atmospheric, Integrity).
- * Sep.25.04:
- * - Issue #1327: Replaced redundant TickEvaluated emissions in pulse handlers with 
- *   DomainEvent.PeerConnectionChanged to resolve event collision side-effects.
+ * Sep.25.08:
+ * - Issue #1329: Telemetry Mapping Convergence. Refactored evaluateAlarmsInternal 
+ *   to use TelemetryMapper, eliminating redundant mapping logic.
+ * Sep.25.07:
+ * - Issue #1329 Remediation: Fixed compilation errors in evaluateAlarmsInternal 
+ *   by aligning with the refactored SystemEvaluationSnapshot structure.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -157,6 +157,7 @@ class MonitorService : BaseMonitorService() {
                 homePoints = homePoints,
                 maxDistance = maxDist,
                 savedVibrationFloor = repository.getDouble("T_" + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
+                savedLastValidFixRt = repository.getLong("T_" + LAST_VALID_FIX_RT_KEY, 0L),
                 savedLuxBaseline = repository.getDouble("T_" + TRACKER_LUX_BASELINE_KEY, -1.0),
                 savedAcousticFloor = repository.getDouble("T_" + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
             )
@@ -181,6 +182,7 @@ class MonitorService : BaseMonitorService() {
                 savedSitShock = remoteState?.sitShock ?: 0.0,
                 savedSitVzTs = remoteState?.sitVzTs ?: 0L,
                 savedSitVzRt = remoteState?.sitVzRt ?: 0L,
+                savedLastValidFixRt = remoteState?.lastValidFixRt ?: 0L,
                 savedVibrationFloor = repository.getDouble("VR_" + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
                 savedLuxBaseline = repository.getDouble("VR_" + TRACKER_LUX_BASELINE_KEY, -1.0),
                 savedAcousticFloor = repository.getDouble("VR_" + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
@@ -509,7 +511,7 @@ class MonitorService : BaseMonitorService() {
         primaryProcessor.updateSensorData(evaluationSnapshot)
 
         if (nowRt - lastPowerSaveCheckRt > 5000L) {
-            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(hardwareSuite.isStationary(), evaluationSnapshot.isStalled, alarmManager.hasUnresolvedAlarms(), isUiVisible())
+            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(hardwareSuite.isStationary(), evaluationSnapshot.integrity.isStalled, alarmManager.hasUnresolvedAlarms(), isUiVisible())
             if (shouldBePowerSave != isPowerSaveActive) {
                 isPowerSaveActive = shouldBePowerSave; hardwareSuite.setPowerSaveMode(shouldBePowerSave); 
                 domainEventBus.emit(DomainEvent.PowerSaveTransition(shouldBePowerSave))
@@ -578,44 +580,20 @@ class MonitorService : BaseMonitorService() {
 
     private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isPeerActive: Boolean, processed: ProcessedLocation, hSnapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long, evaluationSnapshot: SystemEvaluationSnapshot) {
         val finalSnapshot = if (isTrackerMode) {
-            evaluationSnapshot.copy(
-                status = processed.status, isJammer = processed.jammerDetected, jumpTier = processed.jumpTier, isAdaptiveJump = processed.isAdaptiveJump,
-                kinetic = evaluationSnapshot.kinetic.copy(
-                    lat = processed.optimizedPoint.lat, lng = processed.optimizedPoint.lng, 
-                    accuracy = processed.currentAccuracy, maxAccuracy = processed.maxAccuracy,
-                    gpsTs = rawGpsTs, speed = processed.filteredSpeed, kineticEnergy = processed.kineticEnergy
-                ),
-                lastValidFixRt = primaryProcessor.getLastValidFixRt(), tamperDetected = processed.tamperDetected,
-                suppressionNote = processed.suppressionNote, vibeSnapshot = hSnapshot.vibration, snrSnapshot = hardwareSuite.averageSnr
+            // Issue #1329: Use centralized mapper for local snapshot refinement.
+            TelemetryMapper.mapProcessedToSnapshot(
+                snapshot = evaluationSnapshot,
+                processed = processed,
+                rawGpsTs = rawGpsTs,
+                lastValidFixRt = primaryProcessor.getLastValidFixRt(),
+                snrSnapshot = hardwareSuite.averageSnr
             )
         } else {
-            val s = connectivitySuite.trackerStatus
-            evaluationSnapshot.copy(
-                status = s.status, isJammer = s.isJammer, jumpTier = s.jumpTier, isAdaptiveJump = s.isAdaptiveJump,
-                kinetic = evaluationSnapshot.kinetic.copy(
-                    lat = s.lat, lng = s.lng, accuracy = s.accuracy, maxAccuracy = s.maxAccuracy, 
-                    gpsTs = s.gpsTs, speed = s.speed, kineticEnergy = s.kineticEnergy
-                ),
-                integrity = evaluationSnapshot.integrity.copy(
-                    battery = s.battery, currentMa = s.currentMa, isLocationPending = s.isLocationPending,
-                    locationPendingReason = s.locationPendingReason, isPowerTamper = s.isPowerTamper,
-                    isPowerSaveMode = s.isPowerSaveMode, standbyBucket = s.standbyBucket, netInterface = s.netInterface,
-                    isStorageLow = s.isStorageLow, isStorageCritical = s.isStorageCritical, isBatterySteepDischarge = s.isBatterySteepDischarge,
-                    isCoolingModeActive = s.isCoolingModeActive, gpsHardwareLock = s.gpsHardwareLock,
-                    satsUsed = s.satsUsed, satsView = s.satsView, violationUptimeMs = s.violationUptimeMs, 
-                    violationPercentage = s.violationPercentage, isBatteryLow = s.isBatteryLow, isBatteryCritical = s.isBatteryCritical
-                ),
-                atmospheric = evaluationSnapshot.atmospheric.copy(
-                    temp = s.temp, tiltDegrees = s.tiltDegrees, acousticDb = s.acousticDb, baroAlt = s.baroAlt, 
-                    lux = s.lux, isNear = s.isNear, luxBaseline = s.luxBaseline, acousticFloorDb = s.acousticFloorDb, 
-                    adaptiveVibrationFloor = s.adaptiveVibrationFloor, peakVibrationShock = s.peakVibrationShock,
-                    proxIdx = s.proxIdx, proximityCm = s.proximityCm, proximityDebounceMs = s.proximityDebounceMs,
-                    vibrationRollingSum = s.vibrationRollingSum
-                ),
-                lastValidFixRt = s.lastValidFixRt, tamperDetected = s.isTamperDetected, 
-                suppressionNote = s.tamperNote, isGpsStalling = s.isStalled, 
-                isGpsGap = s.isClockRegression || (nowRt - s.lastValidFixRt > GPS_GAP_THRESHOLD_MS),
-                snrSnapshot = s.snrIdx * RIBBON_SNR_SCALE_DB, vibeSnapshot = s.vibeIdx * RIBBON_VIBRATION_SCALE_G
+            // Issue #1329: Use centralized mapper for remote snapshot construction.
+            TelemetryMapper.mapStatusToSnapshot(
+                s = connectivitySuite.trackerStatus,
+                base = evaluationSnapshot,
+                nowRt = nowRt
             )
         }
 

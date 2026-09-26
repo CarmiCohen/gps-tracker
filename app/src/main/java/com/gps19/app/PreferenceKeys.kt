@@ -2,6 +2,8 @@ package com.gps19.app
 
 /**
  * PreferenceKeys: Centralized keys for DataStore and SharedPreferences.
+ * Sep.25.07:
+ * - Issue #1329: Added LAST_VALID_FIX_RT_KEY for monotonic fix tracking parity.
  * Sep.23.70:
  * - Issue #1230: Added missing keys for logic state and background auditing (R-ID 453).
  */
@@ -60,6 +62,7 @@ const val LAST_HISTORY_SIT_TS_KEY = "last_history_sit_ts"
 const val ADAPTIVE_VIBRATION_FLOOR_KEY = "adaptive_vibration_floor"
 
 const val LAST_ALARMS_JSON_KEY = "last_alarms_json"
+const val LAST_VALID_FIX_RT_KEY = "last_valid_fix_rt"
 
 // Issue #626: Foreground Service Start Hardening
 const val IS_RECOVERY_PENDING_KEY = "is_recovery_pending"

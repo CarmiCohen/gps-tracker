@@ -8,14 +8,14 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Sep.26.0:
+ * - Issue #1314: Expanded HistoryEntity and PendingStatusEntity to include 
+ *   isSilentFailure and isBatteryWhitelisted for parity with refactored 
+ *   TrackerStatus. Incremented version to 77 with migration (R-ID 501).
  * Sep.20.15:
  * - Issue #1138/1147 Hardening: Expanded PendingStatusEntity and HistoryEntity 
  *   to include gpsHardwareLock and isGnssThrottled flags. Incremented version 
  *   to 76 with migration (R-ID 378).
- * Aug.31.00:
- * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
- *   violationUptimeMs and isUltraLongStationary to PendingStatusEntity and 
- *   HistoryEntity. Incremented version to 75 with migration (R782).
  */
 @Entity(
     tableName = "logs", 
@@ -124,7 +124,9 @@ data class HistoryEntity(
     @ColumnInfo(defaultValue = "0") val violationUptimeMs: Long = 0L,
     @ColumnInfo(defaultValue = "0") val isUltraLongStationary: Boolean = false,
     @ColumnInfo(defaultValue = "0") val gpsHardwareLock: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isGnssThrottled: Boolean = false
+    @ColumnInfo(defaultValue = "0") val isGnssThrottled: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val isSilentFailure: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val isBatteryWhitelisted: Boolean = false
 )
 
 @Entity(tableName = "violations", indices = [Index(value = ["ts"])])
@@ -180,7 +182,9 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "0") val isUltraLongStationary: Boolean = false,
     @ColumnInfo(defaultValue = "0") val violationUptimeMs: Long = 0L,
     @ColumnInfo(defaultValue = "0") val gpsHardwareLock: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isGnssThrottled: Boolean = false
+    @ColumnInfo(defaultValue = "0") val isGnssThrottled: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val isSilentFailure: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val isBatteryWhitelisted: Boolean = false
 )
 
 @Dao
@@ -303,7 +307,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 76, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 77, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -327,6 +331,18 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_76_77 = object : Migration(76, 77) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // R-ID 501: Expanded parity for silent failure and battery whitelisting.
+                try {
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN isSilentFailure INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN isBatteryWhitelisted INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isSilentFailure INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isBatteryWhitelisted INTEGER NOT NULL DEFAULT 0")
+                } catch (e: Exception) {}
+            }
+        }
+
         val MIGRATION_75_76 = object : Migration(75, 76) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // R-ID 378: Forensic diagnostic expansion - gpsHardwareLock and isGnssThrottled.

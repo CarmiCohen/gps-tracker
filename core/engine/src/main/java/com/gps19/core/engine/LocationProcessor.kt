@@ -5,6 +5,8 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.25.07:
+ * - Issue #1329: Added savedLastValidFixRt to loadState for monotonic fix recovery.
  * Sep.25.05:
  * - Issue #1330: Adapted to unified SystemEvaluationSnapshot with nested 
  *   Kinetic, Atmospheric, and Integrity states.
@@ -32,6 +34,7 @@ class LocationProcessor(
         savedSitShock: Double = 0.0,
         savedSitVzTs: Long = 0L,
         savedSitVzRt: Long = 0L,
+        savedLastValidFixRt: Long = 0L,
         savedVibrationFloor: Double = -1.0,
         savedLuxBaseline: Double = -1.0,
         savedAcousticFloor: Double = -1.0
@@ -49,6 +52,8 @@ class LocationProcessor(
             savedSitVzTs, savedSitVzRt, savedVibrationFloor,
             savedLuxBaseline, savedAcousticFloor
         )
+
+        state.lastValidFixRt = savedLastValidFixRt
         
         if (trackerState != null && trackerState.lat != 0.0) {
             state.lastLat = trackerState.lat
@@ -265,7 +270,7 @@ class LocationProcessor(
                     this.filteredSpeed = state.estimatedSpeedMps
                     this.timestamp = effectiveTs
                     this.rt = nowRt
-                    this.isStalled = snapshot.isStalled
+                    this.isStalled = snapshot.integrity.isStalled
                     this.isClockRegression = true
                     this.receiptRt = nowRt
                     this.isTrajectoryPromoted = false
@@ -274,7 +279,7 @@ class LocationProcessor(
                     this.distToHome = state.lastNearestHomeDistance
                     this.isSpatiallyValid = true
                     this.tamperDetected = snapshot.tamperDetected
-                    this.jammerDetected = snapshot.jammerDetected
+                    this.jammerDetected = snapshot.integrity.isJammer
                     this.kineticEnergy = snapshot.kinetic.kineticEnergy
                 }
             }
@@ -292,14 +297,14 @@ class LocationProcessor(
                         this.filteredSpeed = state.estimatedSpeedMps
                         this.timestamp = effectiveTs
                         this.rt = nowRt
-                        this.isStalled = if (isLocal) false else snapshot.isStalled
+                        this.isStalled = if (isLocal) false else snapshot.integrity.isStalled
                         this.receiptRt = nowRt
                         this.jumpTier = snapshot.jumpTier
                         this.isAdaptiveJump = snapshot.isAdaptiveJump
                         this.distToHome = state.lastNearestHomeDistance
                         this.isSpatiallyValid = false
                         this.tamperDetected = snapshot.tamperDetected
-                        this.jammerDetected = snapshot.jammerDetected
+                        this.jammerDetected = snapshot.integrity.isJammer
                         this.kineticEnergy = snapshot.kinetic.kineticEnergy
                     }
                 }
@@ -360,13 +365,13 @@ class LocationProcessor(
             val finalSuppressionNote = if (isMuzzledJump) "Settling A15 Polling..." else sentinelResult.reason
 
             val isActualJammer = (sentinelResult.status == SentinelStatus.JAMMER_SUSPICION || (sentinelResult.jumpConfidence?.isOutlier == true))
-            val finalIsJump = (isActualJump && !isMuzzledJump) || snapshot.isJammer
+            val finalIsJump = (isActualJump && !isMuzzledJump) || snapshot.integrity.isJammer
             val finalIsTrajectoryPromoted = sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED
             val finalJumpTier = maxOf(sentinelResult.jumpConfidence?.tier ?: 0, snapshot.jumpTier)
             val finalIsAdaptiveJump = (sentinelResult.jumpConfidence?.isAdaptiveJump == true) || snapshot.isAdaptiveJump
             val finalIsTamper = sentinelResult.status == SentinelStatus.TAMPER || snapshot.tamperDetected
-            val finalIsJammer = finalIsJump || finalIsTamper || isActualJammer || snapshot.jammerDetected
-            val finalIsStalled = if (isLocal) (gpsTs != 0L && gpsTs == lastGpsTs) else snapshot.isStalled
+            val finalIsJammer = finalIsJump || finalIsTamper || isActualJammer || snapshot.integrity.isJammer
+            val finalIsStalled = if (isLocal) (gpsTs != 0L && gpsTs == lastGpsTs) else snapshot.integrity.isStalled
             val isSpatiallyValid = !finalIsJump && !finalIsJammer && finalStatus != SentinelStatus.OUTLIER
             
             val fallbackPoint = EngineGeoPoint(if (state.lastLat != 0.0) state.lastLat else lat, if (state.lastLng != 0.0) state.lastLng else lng, alt = alt, ts = if (state.lastTs != 0L) state.lastTs else effectiveTs, rt = if (state.lastRt != 0L) state.lastRt else nowRt, accuracy = state.lastAcc, maxAccuracy = state.lastMaxAcc)

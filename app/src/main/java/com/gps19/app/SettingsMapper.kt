@@ -4,11 +4,9 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsMapper: Conversion logic between DataStore Protos and Domain Models.
- * Sep.02.70:
- * - Idea #241: Protobuf Mapping Unification. Integrated TelemetryProtobufMapper 
- *   to handle TrackerStatusProto serialization, ensuring field parity (R-ID 245).
- * - Issue #180: Proto-Mirror Parity Verification. Completed mapping for all 
- *   TrackerStatus fields including RT, forensic indices, and behavior flags.
+ * Sep.26.0:
+ * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence. Aligned Proto 
+ *   mapping with partitioned TrackerStatus structure.
  */
 object SettingsMapper {
 
@@ -69,81 +67,68 @@ object SettingsMapper {
     }
 
     fun mapTrackerStatusFromProto(s: TrackerStatusProto): TrackerStatus {
-        return TrackerStatus(
+        val kinetic = KineticState(
             lat = s.lat, lng = s.lng, alt = s.alt,
-            speed = s.speed, bearing = s.bearing, accuracy = s.accuracy, maxAccuracy = s.maxAccuracy,
-            gpsTs = s.gpsTs, ts = s.ts, rt = s.rt, battery = s.battery, temp = s.temp, maxTemp = s.maxTemp, isCharging = s.isCharging,
-            satsView = s.satsView, satsUsed = s.satsUsed,
-            lastConnTs = s.lastConnTs, lastDiscTs = s.lastDiscTs,
-            uptimeMs = s.uptimeMs,
-            totalConnectedMs = s.totalConnectedMs, sessionConnectedMs = s.sessionConnectedMs,
-            totalDropMs = s.totalDropMs, maxDropMs = s.maxDropMs,
-            maxDropTs = s.maxDropTs, violationUptimeMs = s.violationUptimeMs, violationPercentage = s.violationPercentage,
-            isPowerTamper = s.isPowerTamper,
-            vibration = s.vibration,
-            heading = s.heading,
-            baroAlt = s.baroAlt,
-            lux = s.lux,
-            isNear = s.isNear,
-            tiltDegrees = s.tiltDegrees,
-            acousticDb = s.acousticDb,
-            peakVibrationShock = s.peakShock,
-            peakVibrationShockTs = s.peakShockTs,
-            luxBaseline = s.luxBaseline,
-            acousticFloorDb = s.acousticFloor,
-            adaptiveVibrationFloor = s.adaptiveVibrationFloor,
-            proxIdx = s.proxIdx,
-            isTamperDetected = s.isTamperDetected,
-            isPowerSaveMode = s.isPowerSaveMode,
-            standbyBucket = s.standbyBucket,
-            netInterface = s.netInterface,
-            isStorageLow = s.isStorageLow,
-            isStorageCritical = s.isStorageCritical,
-            isBatteryWhitelisted = s.isBatteryWhitelisted,
-            isBatterySteepDischarge = s.isBatterySteepDischarge,
-            isCoolingModeActive = s.isCoolingModeActive,
-            currentMa = s.currentMa,
-            trackerState = try { if (s.trackerState.isNullOrBlank()) TrackerState.UNKNOWN else TrackerState.valueOf(s.trackerState) } catch (e: Exception) { TrackerState.UNKNOWN },
-            status = try { if (s.status.isNullOrBlank()) SentinelStatus.VALID else SentinelStatus.valueOf(s.status) } catch (e: Exception) { SentinelStatus.VALID },
-            lastSitTs = s.lastSitTs,
-            sitVz = s.sitVz,
-            sitDz = s.sitDz,
-            sitBaro = s.sitBaro,
-            sitTilt = s.sitTilt,
-            sitShock = s.sitShock,
-            verticalVelocity = s.verticalVelocity,
-            kineticEnergy = s.kineticEnergy,
-            isAdaptiveJump = s.isAdaptiveJump,
-            isBatteryLow = s.isBatteryLow,
-            isBatteryCritical = s.isBatteryCritical,
-            isSilentFailure = s.isSilentFailure,
-            isJammer = s.isJammer,
-            isStalled = s.isStalled,
-            isClockRegression = s.isClockRegression,
-            jumpTier = s.jumpTier,
-            isLocationPending = s.isLocationPending,
-            locationPendingReason = try { LocationPendingReason.valueOf(s.locationPendingReason.name.removePrefix("LPR_")) } catch (e: Exception) { LocationPendingReason.NONE },
-            lastValidFixRt = s.lastValidFixRt,
-            snrIdx = s.snrIdx,
-            noiseIdx = s.noiseIdx,
-            luxIdx = s.luxIdx,
-            vibeIdx = s.vibeIdx,
-            liftIdx = s.liftIdx,
-            tiltIdx = s.tiltIdx,
-            baroIdx = s.baroIdx,
-            isSitDetected = s.isSitDetected,
-            isSitActive = s.isSitActive,
+            speed = s.speed, accuracy = s.accuracy, maxAccuracy = s.maxAccuracy,
+            bearing = s.bearing, gpsTs = s.gpsTs, rt = s.rt,
+            isJump = s.isJump, isTrajectoryPromoted = s.isTrajectoryPromoted,
+            jumpTier = s.jumpTier, isAdaptiveJump = s.isAdaptiveJump,
+            verticalVelocity = s.verticalVelocity, kineticEnergy = s.kineticEnergy
+        )
+
+        val atmospheric = AtmosphericState(
+            temp = s.temp, maxTemp = s.maxTemp, baroAlt = s.baroAlt,
+            lux = s.lux, luxBaseline = s.luxBaseline, 
+            acousticDb = s.acousticDb, acousticFloorDb = s.acousticFloor,
+            tiltDegrees = s.tiltDegrees, heading = s.heading,
+            vibration = s.vibration, vibrationRollingSum = s.vibrationRollingSum,
+            peakVibrationShock = s.peakShock, peakVibrationShockTs = s.peakShockTs,
+            adaptiveVibrationFloor = s.adaptiveVibrationFloor, proxIdx = s.proxIdx,
+            proximityCm = s.proximityCm, proximityDebounceMs = s.proximityDebounceMs,
+            isNear = s.isNear, noiseIdx = s.noiseIdx, luxIdx = s.luxIdx,
+            vibeIdx = s.vibeIdx, liftIdx = s.liftIdx, tiltIdx = s.tiltIdx,
+            baroIdx = s.baroIdx
+        )
+
+        val integrity = IntegrityState(
+            battery = s.battery, isCharging = s.isCharging, currentMa = s.currentMa,
+            satsView = s.satsView, satsUsed = s.satsUsed, snrIdx = s.snrIdx,
+            isTamperDetected = s.isTamperDetected, isPowerTamper = s.isPowerTamper,
+            isJammer = s.isJammer, isStalled = s.isStalled, isSuspicious = s.isSuspicious,
+            isAnchorLocked = s.isAnchorLocked, gpsHardwareLock = s.gpsHardwareLock,
+            isBatteryLow = s.isBatteryLow, isBatteryCritical = s.isBatteryCritical,
+            isCoolingModeActive = s.isCoolingModeActive, 
             isUltraLongStationary = s.isUltraLongStationary,
-            isJump = s.isJump,
-            micPending = s.micPending,
+            isGnssThrottled = s.isGnssThrottled, 
+            isBatterySteepDischarge = s.isBatterySteepDischarge,
+            isPowerSaveMode = s.isPowerSaveMode, standbyBucket = s.standbyBucket,
+            netInterface = s.netInterface, isStorageLow = s.isStorageLow,
+            isStorageCritical = s.isStorageCritical, micPending = s.micPending,
+            violationUptimeMs = s.violationUptimeMs, violationPercentage = s.violationPercentage,
+            uptimeMs = s.uptimeMs, totalConnectedMs = s.totalConnectedMs,
+            sessionConnectedMs = s.sessionConnectedMs, lastConnTs = s.lastConnTs,
+            lastDiscTs = s.lastDiscTs, totalDropMs = s.totalDropMs,
+            maxDropMs = s.maxDropMs, maxDropTs = s.maxDropTs,
+            lastSitTs = s.lastSitTs, sitVz = s.sitVz, sitDz = s.sitDz,
+            sitBaro = s.sitBaro, sitTilt = s.sitTilt, sitShock = s.sitShock,
+            isSitDetected = s.isSitDetected, isSitActive = s.isSitActive,
+            lastValidFixRt = s.lastValidFixRt
+        )
+
+        return TrackerStatus(
             deviceId = s.deviceId,
             viewerId = s.viewerId,
-            currentProximityCm = s.proximityCm,
-            proximityDebounceMs = s.proximityDebounceMs,
-            vibrationRollingSum = s.vibrationRollingSum,
-            isTrajectoryPromoted = s.isTrajectoryPromoted,
-            isSuspicious = s.isSuspicious,
-            isAnchorLocked = s.isAnchorLocked
+            kinetic = kinetic,
+            atmospheric = atmospheric,
+            integrity = integrity,
+            status = try { if (s.status.isNullOrBlank()) SentinelStatus.VALID else SentinelStatus.valueOf(s.status) } catch (e: Exception) { SentinelStatus.VALID },
+            ts = s.ts,
+            rt = s.rt,
+            trackerState = try { if (s.trackerState.isNullOrBlank()) TrackerState.UNKNOWN else TrackerState.valueOf(s.trackerState) } catch (e: Exception) { TrackerState.UNKNOWN },
+            isClockRegression = s.isClockRegression,
+            lastValidFixRt = s.lastValidFixRt,
+            isSilentFailure = s.isSilentFailure,
+            isBatteryWhitelisted = s.isBatteryWhitelisted
         )
     }
 
