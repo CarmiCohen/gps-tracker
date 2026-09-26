@@ -22,14 +22,11 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.25.08:
+ * - Issue #1329: Telemetry Mapping Convergence. Added updateRibbons(event) 
+ *   overload to centralize metadata extraction from TickEvaluated events.
  * Sep.25.01:
  * - Issue #1322: Converged HistoryEvent emission into DomainEventBus.
- * Sep.24.97:
- * - Issue #1291: Updated updateRibbons signature to accept Long for 
- *   serviceTickCounter to align with the unified DomainEventBus model.
- * Sep.24.02:
- * - Issue #1255 REMEDIATION: Implemented recoverLastRealtime to provide 
- *   reboot-aware monotonic clock recovery by calculating synthetic RT anchors.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -119,6 +116,62 @@ class HistoryManager @Inject constructor(
     private fun emitSanitizedLog(message: String, isImportant: Boolean = false) {
         val sanitized = ForensicSanitizer.sanitizeMessage(message)
         domainEventBus.emit(DomainEvent.History(HistoryEvent.LogEvent(sanitized, isImportant)))
+    }
+
+    /**
+     * updateRibbons: Unified entry point for ribbon updates from TickEvaluated events.
+     */
+    suspend fun updateRibbons(event: DomainEvent.TickEvaluated) {
+        val proc = event.processed
+        val snapshot = event.snapshot
+        
+        updateRibbons(
+            now = event.now,
+            nowRt = event.nowRt,
+            lastTickTs = event.lastTickTs,
+            lastTickRt = event.lastTickRt,
+            serviceTickCounter = event.serviceTickCounter,
+            rtt = event.rtt,
+            peerSignal = if (event.isPeerActive) 10 else 0,
+            peerAvail = event.isSocketConnected && event.isPeerActive,
+            hasGps = (proc?.timestamp ?: 0L) > 0,
+            isTrackerMode = event.isTrackerMode,
+            accuracy = proc?.currentAccuracy ?: 0.0,
+            maxAccuracy = proc?.maxAccuracy ?: 0.0,
+            noiseIdx = event.noiseIdx,
+            luxIdx = event.luxIdx,
+            vibeIdx = event.vibeIdx,
+            proxIdx = snapshot.atmospheric.proxIdx,
+            liftIdx = event.liftIdx,
+            snrIdx = event.snrIdx,
+            tiltIdx = event.tiltIdx,
+            baroIdx = event.baroIdx,
+            verticalVelocity = snapshot.kinetic.verticalVelocity,
+            sitVz = snapshot.integrity.sitVz,
+            sitVzTs = snapshot.integrity.sitVzTs,
+            sitVzRt = snapshot.integrity.sitVzRt,
+            sitDz = snapshot.integrity.sitDz,
+            sitBaro = snapshot.integrity.sitBaro,
+            sitTilt = snapshot.integrity.sitTilt,
+            sitShock = snapshot.integrity.sitShock,
+            isBatterySteepDischarge = snapshot.integrity.isBatterySteepDischarge,
+            isCoolingModeActive = snapshot.integrity.isCoolingModeActive,
+            speed = snapshot.kinetic.speed,
+            bearing = snapshot.kinetic.bearing,
+            isSitDetected = if (event.isTrackerMode) event.isSuspiciousMode else false,
+            isSitActive = false,
+            currentMa = snapshot.integrity.currentMa,
+            locationPendingReason = snapshot.integrity.locationPendingReason,
+            kineticEnergy = snapshot.kinetic.kineticEnergy,
+            isRecoveryEvent = event.recoveryFlagged,
+            cpuLoad = snapshot.cpuLoad,
+            ioWait = snapshot.ioWait,
+            maxIoLatency = snapshot.maxIoLatency,
+            isSilentFailure = snapshot.isSilentFailure,
+            isBatteryLow = snapshot.integrity.isBatteryLow,
+            isBatteryCritical = snapshot.integrity.isBatteryCritical,
+            isUltraLongStationary = snapshot.integrity.isUltraLongStationary
+        )
     }
 
     suspend fun updateRibbons(

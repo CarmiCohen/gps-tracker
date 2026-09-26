@@ -10,19 +10,14 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.25.08:
+ * - Issue #1329: Fixed JSON key typo is_cooling_modeActive to is_cooling_mode_active 
+ *   in TrackerStatus.toMap for signaling consistency.
  * Sep.25.01:
  * - Issue #1322: Removed AppSensorEvent (migrated to EngineModels.kt for bus convergence).
  * Sep.22.00:
  * - Issue #1178: Initial GNSS satellite count blanking. Set default 
  *   satellite counts to -1 in HudTelemetryState (R-ID 399).
- * Sep.16.05:
- * - Issue #1060 Capability Consolidation: Harmonized data structures with R-ID 348.
- * Sep.16.00:
- * - Issue #1055 Unified Performance Tier: Renamed isA15 to isStaggered 
- *   in HudConnectivityState to harmonize A15 and S21FE remediation (R-ID 348, formerly R-ID 347).
- * Sep.11.48:
- * - Issue #946: Vitality Pulse Standardization. Added systemPulse to all 
- *   segmented UI states to bypass distinctUntilChanged stalls (R-ID 289).
  */
 
 @Serializable
@@ -400,7 +395,7 @@ data class TrackerStatus(
         put("net_interface", ForensicSanitizer.scrubHardwareInfo(netInterface))
 
         put("is_storage_low", isStorageLow); put("is_storage_critical", isStorageCritical)
-        put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_modeActive", isCoolingModeActive)
+        put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_mode_active", isCoolingModeActive)
         put("tracker_state", trackerState.name); put("is_sit_detected", isSitDetected); put("last_sit_ts", lastSitTs)
         put("is_jump", isJump); put("mic_pending", micPending); put("snr_idx", snrIdx); put("noise_idx", noiseIdx)
         put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("lift_idx", liftIdx)

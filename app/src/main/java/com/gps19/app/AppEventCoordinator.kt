@@ -10,10 +10,12 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
- * Sep.25.05:
- * - Issue #1330: Snap-to-Update Monolith. Eliminated ~100 lines of manual 
- *   bridge mapping by leveraging unified partitioned states in SystemEvaluationSnapshot.
- * - Performance: Transitioned repository updates to use snapshot partitions directly.
+ * Sep.25.08:
+ * - Issue #1329: Telemetry Mapping Convergence. Fully consolidated ribbon updates 
+ *   using historyManager.updateRibbons(event) to eliminate redundant parameter logic.
+ * Sep.25.07:
+ * - Issue #1329: Telemetry Mapping Convergence. Consolidated LocationUpdate 
+ *   construction into TelemetryMapper to remove redundant mapping logic.
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -73,130 +75,37 @@ class AppEventCoordinator @Inject constructor(
 
         // 1. Repository Persistence (Snap-to-Update Monolith)
         if (isTrackerMode) {
-            repository.updateLocation(LocationUpdate(
-                kinetic = snapshot.kinetic.copy(),
-                atmospheric = snapshot.atmospheric.copy(),
-                integrity = snapshot.integrity.copy(),
-                status = snapshot.status,
-                ts = now,
-                isMe = true,
-                trackerState = if ((proc?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING,
-                isClockRegression = snapshot.isClockRegression,
-                lastValidFixRt = snapshot.lastValidFixRt
-            ))
+            repository.updateLocation(TelemetryMapper.mapSnapshotToUpdate(snapshot, proc, isMe = true, ts = now))
             
-            // 2. Peer Signaling (Bridge removal in progress)
+            // 2. Peer Signaling (Issue #1329: Centralized Status Mapping)
             if (event.isPeerActive) {
-                connectivitySuite.pushCurrentStatus(
-                    deviceId = configManager.deviceId, 
-                    viewerId = configManager.viewerId, 
-                    isTrackerMode = true, 
-                    loc = null, 
-                    filtered = proc?.optimizedPoint, 
-                    distToTracker = null, 
-                    distToHome = snapshot.kinetic.distToHome, 
-                    maxAccuracy = snapshot.kinetic.maxAccuracy, 
-                    filteredSpeed = snapshot.kinetic.speed, 
-                    vibration = snapshot.atmospheric.vibration, 
-                    heading = snapshot.atmospheric.heading, 
-                    baroAlt = snapshot.atmospheric.baroAlt, 
-                    lux = snapshot.atmospheric.lux, 
-                    isNear = snapshot.atmospheric.isNear, 
-                    tiltDegrees = snapshot.atmospheric.tiltDegrees, 
-                    acousticDb = snapshot.atmospheric.acousticDb, 
-                    jumpTier = snapshot.jumpTier, 
-                    isJammer = snapshot.jammerDetected, 
-                    isStalled = snapshot.isStalled, 
-                    peakShock = snapshot.atmospheric.peakVibrationShock, 
-                    peakShockTs = now, 
-                    luxBaseline = snapshot.atmospheric.luxBaseline, 
-                    acousticFloorDb = snapshot.atmospheric.acousticFloorDb, 
-                    adaptiveVibrationFloor = snapshot.atmospheric.adaptiveVibrationFloor, 
-                    proxIdx = snapshot.atmospheric.proxIdx,
-                    proximityCm = snapshot.atmospheric.proximityCm,
-                    proximityDebounceMs = snapshot.atmospheric.proximityDebounceMs,
-                    vibrationRollingSum = snapshot.atmospheric.vibrationRollingSum,
-                    micPending = false, 
-                    isTamperDetected = snapshot.tamperDetected, 
-                    isPowerTamper = snapshot.integrity.isPowerTamper, 
-                    isSitDetected = event.isSuspiciousMode, 
-                    isSitActive = false, 
-                    lastSitTs = event.lastSitTs, 
-                    receiptRt = nowRt, 
-                    violationUptimeMs = snapshot.integrity.violationUptimeMs, 
-                    violationPercentage = snapshot.integrity.violationPercentage, 
-                    verticalVelocity = snapshot.kinetic.verticalVelocity, 
-                    sitVz = snapshot.integrity.sitVz, 
-                    sitVzTs = snapshot.integrity.sitVzTs, 
-                    sitVzRt = snapshot.integrity.sitVzRt, 
-                    sitDz = snapshot.integrity.sitDz, 
-                    sitBaro = snapshot.integrity.sitBaro, 
-                    sitTilt = snapshot.integrity.sitTilt, 
-                    sitShock = snapshot.integrity.sitShock, 
-                    isClockRegression = snapshot.isClockRegression, 
-                    isLocationPending = snapshot.integrity.isLocationPending, 
-                    locationPendingReason = snapshot.integrity.locationPendingReason, 
-                    lastValidFixRt = snapshot.lastValidFixRt, 
-                    gnssDetail = event.gnssDetail,
-                    isBatterySteepDischarge = snapshot.integrity.isBatterySteepDischarge,
-                    isCoolingModeActive = snapshot.integrity.isCoolingModeActive, 
-                    batteryLevel = snapshot.integrity.battery, 
-                    temp = snapshot.atmospheric.temp, 
-                    isCharging = snapshot.integrity.isCharging, 
-                    trackerState = if ((proc?.filteredSpeed ?: 0.0) > 0.5) TrackerState.MOVING else TrackerState.PARKING, 
-                    status = snapshot.status, 
-                    isStorageLow = snapshot.integrity.isStorageLow, 
-                    isStorageCritical = snapshot.integrity.isStorageCritical, 
-                    isPowerSaveMode = snapshot.integrity.isPowerSaveMode, 
-                    standbyBucket = snapshot.integrity.standbyBucket, 
-                    netInterface = snapshot.integrity.netInterface, 
-                    snrIdx = event.snrIdx,
+                connectivitySuite.sendTelemetry(TelemetryMapper.mapSnapshotToStatus(
+                    snapshot = snapshot,
+                    processed = proc,
+                    deviceId = configManager.deviceId,
+                    viewerId = configManager.viewerId,
+                    now = now,
+                    nowRt = nowRt,
                     noiseIdx = event.noiseIdx,
                     luxIdx = event.luxIdx,
                     vibeIdx = event.vibeIdx,
                     liftIdx = event.liftIdx,
+                    snrIdx = event.snrIdx,
                     tiltIdx = event.tiltIdx,
                     baroIdx = event.baroIdx,
-                    kineticEnergy = snapshot.kinetic.kineticEnergy,
-                    isAdaptiveJump = snapshot.isAdaptiveJump, 
-                    isBatteryLow = snapshot.integrity.isBatteryLow, 
-                    isBatteryCritical = snapshot.integrity.isBatteryCritical, 
-                    isUltraLongStationary = snapshot.integrity.isUltraLongStationary, 
-                    gpsHardwareLock = snapshot.integrity.gpsHardwareLock, 
-                    tamperNote = snapshot.suppressionNote,
-                    satsUsed = snapshot.integrity.satsUsed,
-                    satsView = snapshot.integrity.satsView
-                )
+                    gnssDetail = event.gnssDetail,
+                    isSuspiciousMode = event.isSuspiciousMode,
+                    lastSitTs = event.lastSitTs
+                ))
             }
         }
 
-        // 3. Ribbon Updates
-        historyManager.updateRibbons(
-            now = now, nowRt = nowRt, lastTickTs = event.lastTickTs, lastTickRt = event.lastTickRt, 
-            serviceTickCounter = event.serviceTickCounter, rtt = event.rtt, 
-            peerSignal = if (event.isPeerActive) 10 else 0, peerAvail = event.isSocketConnected && event.isPeerActive, 
-            hasGps = (proc?.timestamp ?: 0L) > 0, isTrackerMode = isTrackerMode, 
-            accuracy = proc?.currentAccuracy ?: 0.0, maxAccuracy = proc?.maxAccuracy ?: 0.0, 
-            noiseIdx = event.noiseIdx, luxIdx = event.luxIdx, vibeIdx = event.vibeIdx, proxIdx = snapshot.atmospheric.proxIdx,
-            liftIdx = event.liftIdx, snrIdx = event.snrIdx, tiltIdx = event.tiltIdx, baroIdx = event.baroIdx, 
-            verticalVelocity = snapshot.kinetic.verticalVelocity, sitVz = snapshot.integrity.sitVz, 
-            sitVzTs = snapshot.integrity.sitVzTs, sitVzRt = snapshot.integrity.sitVzRt, 
-            sitDz = snapshot.integrity.sitDz, sitBaro = snapshot.integrity.sitBaro, 
-            sitTilt = snapshot.integrity.sitTilt, sitShock = snapshot.integrity.sitShock, 
-            isBatterySteepDischarge = snapshot.integrity.isBatterySteepDischarge, isCoolingModeActive = snapshot.integrity.isCoolingModeActive, 
-            speed = snapshot.kinetic.speed, bearing = snapshot.kinetic.bearing, 
-            isSitDetected = if (isTrackerMode) event.isSuspiciousMode else false, isSitActive = false,
-            currentMa = snapshot.integrity.currentMa, locationPendingReason = snapshot.integrity.locationPendingReason, 
-            kineticEnergy = snapshot.kinetic.kineticEnergy, isRecoveryEvent = event.recoveryFlagged, 
-            cpuLoad = snapshot.cpuLoad, ioWait = snapshot.ioWait, maxIoLatency = snapshot.maxIoLatency, 
-            isSilentFailure = snapshot.isSilentFailure, isBatteryLow = snapshot.integrity.isBatteryLow, 
-            isBatteryCritical = snapshot.integrity.isBatteryCritical, isUltraLongStationary = snapshot.integrity.isUltraLongStationary
-        )
+        // 3. Ribbon Updates (Issue #1329: Simplified Event-Driven Mapping)
+        historyManager.updateRibbons(event)
     }
 
     private suspend fun handleViewerLocationUpdated(event: DomainEvent.ViewerLocationUpdated) {
-        val snapshot = event.snapshot
-        repository.updateLocation(snapshot.toLocationUpdate(isMe = true))
+        repository.updateLocation(TelemetryMapper.mapSnapshotToUpdate(event.snapshot, event.processed, isMe = true, ts = event.nowTs))
     }
 
     private fun handlePeerConnectionChanged(event: DomainEvent.PeerConnectionChanged) {

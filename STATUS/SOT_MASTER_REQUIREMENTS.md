@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.25.05)
+# SOT Master Requirements & Hardening Status (Sep.22.30)
 
-## 🏗️ Architectural Master Rules (25 Rules)
+## 🏗️ Architectural Master Rules (26 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -17,6 +17,7 @@
 *   **1.12 Domain Orchestration (R472)**: Domain events (Alarms, Sensors, Connectivity) must be orchestrated by a central `AppEventCoordinator` to decouple domain logic from background service lifecycles.
 *   **1.13 Reactive Domain Bus (R477/R480/R481/R482)**: High-frequency state transitions and telemetry summaries must be propagated via a non-blocking `DomainEventBus` with hardened capacity (128) and overflow dropping to ensure the core evaluation loop remains atomic and non-blocking (Refined Sep.25.03).
 *   **1.14 Telemetry Partitioning (R485)**: All high-frequency telemetry DTOs must share partitioned state structures (Kinetic, Atmospheric, Integrity) to eliminate bridge mapping layers and enable zero-allocation flyweight double-buffering (Issue #1330).
+*   **1.15 Mapping Centralization (R486)**: Telemetry mapping and DTO construction must be centralized in `TelemetryMapper` to ensure consistency across self-tracking, peer signaling, and offline persistence. This includes authority over `LocationUpdate`, `TrackerStatus`, and `PendingStatusEntity` (Issue #1329).
 
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318-758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
@@ -35,6 +36,7 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 486**: Telemetry Mapping Convergence - Remediated Issue #1329 by centralizing all telemetry data transformation in `TelemetryMapper`. Consolidated mapping logic for `LocationUpdate`, `TrackerStatus`, and `PendingStatusEntity`, including incoming Proto/JSON signaling payloads. Removed ~250 lines of redundant mapping logic from `ConnectivitySuite` and `AppEventCoordinator`. (Resolved Sep.25.08).
 *   **SOT ID 485**: Snap-to-Update Monolith - Remediated Issue #1330 by unifying `SystemEvaluationSnapshot` with partitioned states used by `LocationUpdate`, eliminating the manual bridge mapping layer. (Resolved Sep.25.05).
 *   **SOT ID 484**: Peer Lifecycle Decoupling - Remediated Issue #1327 by introducing `PeerConnectionChanged` to eliminate pulse-to-tick event collisions. (Resolved Sep.25.05).
 *   **SOT ID 483**: Peer Status Persistence Decoupling - Remediated Issue #1324 by offloading peer telemetry persistence from `ConnectivitySuite` to `AppEventCoordinator` via the `DomainEventBus`. (Resolved Sep.25.04).
@@ -44,7 +46,8 @@
 *   **SOT ID 479**: Telemetry Corruption Remediation - Remediated Issue #1326 by correcting the satellite count mapping in `LocationProcessor` (Resolved Sep.25.00).
 *   **SOT ID 478**: Unified Snapshot Metadata Completion - Remediated Issue #1325 by expanding `SystemEvaluationSnapshot` (Resolved Sep.25.00).
 
-## 📋 Functional Requirements (150 R-IDs)
+## 📋 Functional Requirements (151 R-IDs)
+*   **R486**: Centralized Telemetry Mapping Authority.
 *   **R485**: Zero-allocation snap-to-update partitioning.
 *   **R484**: Lifecycle-only peer connection events.
 *   **R483**: Bus-driven peer telemetry persistence.
@@ -56,7 +59,8 @@
 *   *(Remaining requirements preserved in technical registry)*
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.118 (Partitioned State Unification)**: PASSED - Verified that SystemEvaluationSnapshot partitions map directly to LocationUpdate without manual assignments. (Sep.25.05)
+*   **Chapter 31.119 (Telemetry Mapping Convergence)**: PASSED - Verified that all telemetry construction (Updates, Status, Entities) is centralized in TelemetryMapper and used across all roles and transports. (Sep.22.30)
+*   **Chapter 31.118 (Partitioned State Unification)**: PASSED - Verified that SystemEvaluationSnapshot partitions map directly to LocationUpdate without manual assignments. (Sep.22.30)
 *   **Chapter 31.117 (Peer Lifecycle Decoupling)**: PASSED - Verified that peer pulses emit PeerConnectionChanged and do not trigger redundant repository/signaling side-effects. (Sep.22.30)
 *   **Chapter 31.116 (Peer Bus Persistence)**: PASSED - Verified peer status updates travel through the DomainEventBus to AppEventCoordinator for asynchronous repository writing. (Sep.22.30)
 *   **Chapter 31.115 (Viewer Bus Persistence)**: PASSED - Verified Viewer self-tracking updates travel through the DomainEventBus to AppEventCoordinator for asynchronous repository writing. (Sep.22.30)
@@ -64,4 +68,4 @@
 *   **Chapter 31.113 (Flow Flow Convergence)**: PASSED - Eliminated fragmented flows; unified DomainEventBus orchestrates all system side-effects. (Sep.22.30)
 
 ---
-*Next Audit: Oct.01.00. (Sep.25.05)*
+*Next Audit: Oct.01.00. (Sep.22.30)*

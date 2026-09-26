@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.25.06
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.25.08
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -11,11 +11,9 @@ Ready for next priority item.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 21)
+## 💡 Strategic Simplification Ideas (Ideas: 20)
 
 ### 🛑 High Priority
-*   **Issue #1329: Telemetry Mapping Convergence**
-    *   *Significance*: **High (Architecture)**. Consolidate `LocationUpdate` construction into a single `TelemetryMapper` to remove redundant mapping logic from the coordinator.
 *   **Issue #1314: TrackerStatus & Evaluation Snapshot Convergence**
     *   *Significance*: **Medium (Architecture)**. Evaluate if `TrackerStatus` DTO can be merged into `SystemEvaluationSnapshot` or refactored to use partitioned states to eliminate the mapping layer in `ConnectivitySuite`.
 
@@ -29,6 +27,8 @@ Ready for next priority item.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1329: Telemetry Mapping Convergence** (Resolved Sep.25.08)
+    *   *Remediation*: Fully centralized telemetry data transformation in `TelemetryMapper`. Consolidated mapping for `LocationUpdate`, `TrackerStatus`, and `PendingStatusEntity`, including incoming Proto/JSON signaling payloads. Removed ~250 lines of redundant mapping logic from `ConnectivitySuite` and `AppEventCoordinator`, ensuring a single source of truth for all role-agnostic data conversions. Fixed JSON key typos for cooling and battery state. (SOT ID 486).
 *   **Issue #1330: Snap-to-Update Monolith** (Resolved Sep.25.06)
     *   *Remediation*: Unified `SystemEvaluationSnapshot` with the partitioned state structure (`KineticState`, `AtmosphericState`, `IntegrityState`) used by `LocationUpdate`. Refactored `LocationProcessor`, `MonitorService`, and `AppEventCoordinator` to utilize these shared structures, eliminating ~100 lines of manual field-to-field mapping and reducing allocation churn during background pulses. (SOT ID 485).
 *   **Issue #1327: Pulse-to-Tick Event Collision** (Resolved Sep.25.05)
@@ -49,4 +49,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 485 (Rules: 25, IDs: 485), Resolved: 1229, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 21, QA: 284]**
+- **Current Audit Baseline: [SOT: 486 (Rules: 26, IDs: 486), Resolved: 1230, Open: 0, Testing: 3 (Sub-items: 13), Ideas: 20, QA: 284]**
