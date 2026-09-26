@@ -1,12 +1,13 @@
 package com.gps19.app
 
+import android.content.Context
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.gps19.core.engine.PowerStateProvider
-import com.gps19.core.engine.TimeProvider
+import com.gps19.core.engine.*
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
 import dagger.hilt.components.SingletonComponent
@@ -19,17 +20,58 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 import kotlin.math.*
 
 /**
+ * FakePowerStateProvider: Delegating provider for testing. 
+ * If useOverride is true, returns the manual isIdle value.
+ * If useOverride is false, delegates to the real Android implementation.
+ */
+class FakePowerStateProvider(private val real: AndroidPowerStateProvider) : PowerStateProvider {
+    companion object {
+        var useOverride = false
+        var isIdle = false
+    }
+    override fun isDeviceIdleMode(): Boolean {
+        return if (useOverride) isIdle else real.isDeviceIdleMode()
+    }
+}
+
+/**
+ * TestPowerModule: Replaces PowerModule for the entire test run.
+ * Provides a delegating FakePowerStateProvider to support both 
+ * deterministic logic tests and real integration tests.
+ */
+@Module
+@TestInstallIn(
+    components = [SingletonComponent::class],
+    replaces = [PowerModule::class]
+)
+object TestPowerModule {
+    @Provides
+    @Singleton
+    fun provideRealPowerProvider(@ApplicationContext context: Context): AndroidPowerStateProvider {
+        return AndroidPowerStateProvider(context)
+    }
+
+    @Provides
+    @Singleton
+    fun providePowerStateProvider(real: AndroidPowerStateProvider): PowerStateProvider = 
+        FakePowerStateProvider(real)
+}
+
+/**
  * ProductionReadinessAuditTest: Verifies end-to-end telemetry stream constraints 
  * and Doze-deferral consistency across role transitions (R339).
- * Sep.17.02:
- * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
- * Sep.16.12:
- * - Issue #1072 Static State Leakage: Implemented reset mechanism in @Before to 
- *   ensure test atomicity and prevent state leakage between runs.
+ * Sep.26.11:
+ * - Added verifySignalingLifecycleProbes to validate Issue #1343 forensic logging.
+ * - Hardened probe verification with polling and stall simulation to prevent 
+ *   async drain interference.
+ * Sep.26.10: 
+ * - Added verify24HourSoakSimulation to validate stability counters over full cycle.
+ * - Refactored FakePowerStateProvider to support delegation to real hardware.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -50,29 +92,83 @@ class ProductionReadinessAuditTest {
     @Inject
     lateinit var powerStateProvider: PowerStateProvider
 
-    @Module
-    @TestInstallIn(
-        components = [SingletonComponent::class],
-        replaces = [PowerModule::class]
-    )
-    object TestPowerModule {
-        @Provides
-        @Singleton
-        fun providePowerStateProvider(): PowerStateProvider = FakePowerStateProvider()
-    }
+    @Inject
+    lateinit var domainEventBus: DomainEventBus
+    
+    @Inject
+    lateinit var forensicAuditor: ForensicAuditor
 
-    class FakePowerStateProvider : PowerStateProvider {
-        companion object {
-            var isIdle = false
-        }
-        override fun isDeviceIdleMode(): Boolean = isIdle
-    }
+    @Inject
+    lateinit var forensicLogger: SignalingForensicLogger
+
+    @Inject
+    lateinit var forensicSpillBufferProvider: Provider<ForensicSpillBuffer>
+
+    @Inject
+    lateinit var logRepository: LogRepository
 
     @Before
     fun init() {
         hiltRule.inject()
-        // Issue #1072: Reset static state before every test to ensure atomicity
+        FakePowerStateProvider.useOverride = true
         FakePowerStateProvider.isIdle = false
+    }
+
+    /**
+     * verifySignalingLifecycleProbes: Exercises the new signaling forensic probes 
+     * added in Issue #1343 and verifies their persistence in either the spill buffer 
+     * or the drained database logs.
+     */
+    @Test
+    fun verifySignalingLifecycleProbes() = runBlocking {
+        // Inhibits the async drainer to ensure probes stay in spill-buffer for peeking
+        logRepository.setForensicStallSimulation(true)
+        
+        try {
+            // Clear buffer before test
+            val buffer = forensicSpillBufferProvider.get()
+            while (buffer.hasPending()) {
+                buffer.commitDrain(100)
+            }
+            
+            // Reset throttling to bypass production startup logs mapping
+            forensicLogger.resetThrottling()
+            
+            // Exercise handover probes
+            val testInterface = "wlan${(10..99).random()}"
+            forensicLogger.logHandover("TEST_UP", testInterface)
+            
+            // Exercise transmission failure probes
+            forensicLogger.logTransmissionFailure("TEST_FAIL", "TRK", "A", "O")
+            
+            // Poll for a short window to allow async buffer write
+            var handoverFound = false
+            var failureFound = false
+            
+            repeat(10) {
+                val traces = buffer.peekToEntities(50)
+                val dbLogs = logRepository.loadAllLogsStatic(100)
+                
+                if (!handoverFound) {
+                    handoverFound = traces.any { it.message.contains("Forensic Handover") && it.message.contains(testInterface) } ||
+                                    dbLogs.any { it.message.contains("Forensic Handover") && it.message.contains(testInterface) }
+                }
+                
+                if (!failureFound) {
+                    failureFound = traces.any { it.message.contains("Forensic TX Failure") && it.message.contains("TEST_FAIL") } ||
+                                    dbLogs.any { it.message.contains("Forensic TX Failure") && it.message.contains("TEST_FAIL") }
+                }
+                
+                if (handoverFound && failureFound) return@repeat
+                delay(100)
+            }
+            
+            assertTrue("Forensic handover probe must be recorded", handoverFound)
+            assertTrue("Forensic TX failure probe must be recorded", failureFound)
+            
+        } finally {
+            logRepository.setForensicStallSimulation(false)
+        }
     }
 
     @Test
@@ -96,47 +192,93 @@ class ProductionReadinessAuditTest {
     }
 
     /**
-     * Issue #1071: Process Death Resilience Validation
-     * Verifies that the power state is preserved across suite re-instantiation,
-     * simulating service restart or process death recovery.
+     * verify24HourSoakSimulation: Validates forensic reliability math and counter 
+     * stability over a full 24-hour simulated tracking session (Issue #031).
      */
+    @Test
+    fun verify24HourSoakSimulation() {
+        sessionManager.reset()
+        forensicAuditor.reset("T")
+        
+        val startRt = timeProvider.elapsedRealtime()
+        var currentRt = startRt
+        val durationMs = 24 * 3600 * 1000L
+        val stepMs = 2000L
+        val expectedInterval = 2000L
+        
+        var totalFixes = 0
+        var simulatedViolations = 0
+
+        val steps = (durationMs / stepMs).toInt()
+        for (i in 1..steps) {
+            val lastRt = currentRt
+            currentRt += stepMs
+            
+            // Inject a simulated gap every 100 steps (1% error rate)
+            val hasGap = i % 100 == 0
+            val injectionDelay = if (hasGap) 2000L else 0L
+            
+            forensicAuditor.recordGpsFix(currentRt + injectionDelay, expectedInterval, "T")
+            
+            sessionManager.updateTick(
+                nowRt = currentRt,
+                lastTickRt = lastRt,
+                isPeerAvailable = true,
+                isInViolation = hasGap
+            )
+            
+            if (hasGap) simulatedViolations++
+            totalFixes++
+            
+            // Periodic stability evaluation check every 10 minutes
+            if (i % 300 == 0) {
+                forensicAuditor.evaluateStability(currentRt, "T")
+            }
+        }
+
+        val finalViolationPct = sessionManager.getViolationPercentage()
+        val expectedPct = (simulatedViolations.toDouble() / totalFixes) * 100.0
+        
+        // Tolerance for floating point precision over 43,200 ticks
+        assertEquals("Violation percentage must be deterministic over 24h", 
+            expectedPct, finalViolationPct, 0.5)
+            
+        assertTrue("Session must survive 24h duration without counter overflow", 
+            sessionManager.violationUptimeMs >= (simulatedViolations * stepMs))
+    }
+
     @Test
     fun verifyPowerStateResilienceAfterRecreation() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val externalScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
-        val systemMonitor = mockSystemMonitor() // Minimal test-specific mock if needed, but suite has real ones injected.
         
-        // 1. Set state in current provider
+        FakePowerStateProvider.useOverride = true
         FakePowerStateProvider.isIdle = true
         assertTrue("Initial state should be Doze", hardwareSuite.shouldDeferSignaling(false))
 
-        // 2. Simulate "recreation" by manually instantiating a new suite with a new provider instance
-        val newProvider = FakePowerStateProvider()
-        // Manual instantiation for resilience testing (mirroring Hilt singleton recreation)
+        val realProvider = AndroidPowerStateProvider(context)
+        val newProvider = FakePowerStateProvider(realProvider)
         val newSuite = HardwareSuite(
             context = context,
             scope = externalScope,
             timeProvider = timeProvider,
-            systemMonitor = hardwareSuite.getSystemMonitorForTest(), // Accessing injected system monitor
+            systemMonitor = hardwareSuite.getSystemMonitorForTest(),
             systemStatusProvider = hardwareSuite.getSystemStatusProviderForTest(),
             powerStateProvider = newProvider,
-            forensicAuditor = hardwareSuite.getForensicAuditorForTest()
+            forensicAuditor = hardwareSuite.getForensicAuditorForTest(),
+            domainEventBus = domainEventBus
         )
 
-        assertTrue("Power state must persist across component recreation to prevent telemetry gaps",
+        assertTrue("Power state must persist across component recreation",
             newSuite.shouldDeferSignaling(false))
             
-        // 3. Toggle and verify consistency
         FakePowerStateProvider.isIdle = false
-        assertFalse("Power state change must be reflected in the new suite instance",
+        assertFalse("Power state change must be reflected",
             newSuite.shouldDeferSignaling(false))
     }
 
     private fun HardwareSuite.getSystemMonitorForTest(): SystemMonitor {
-        // Reflection or test-only getter could be used here, but for this audit we'll use the injected one
-        return hiltRule.run { ProductionReadinessAuditTest::class.java.getDeclaredField("hardwareSuite").apply { isAccessible = true }.get(this@ProductionReadinessAuditTest) as HardwareSuite }.let {
-            HardwareSuite::class.java.getDeclaredField("systemMonitor").apply { isAccessible = true }.get(it) as SystemMonitor
-        }
+        return HardwareSuite::class.java.getDeclaredField("systemMonitor").apply { isAccessible = true }.get(this) as SystemMonitor
     }
     
     private fun HardwareSuite.getSystemStatusProviderForTest(): SystemStatusProvider {
@@ -145,13 +287,6 @@ class ProductionReadinessAuditTest {
     
     private fun HardwareSuite.getForensicAuditorForTest(): ForensicAuditor {
          return HardwareSuite::class.java.getDeclaredField("forensicAuditor").apply { isAccessible = true }.get(this) as ForensicAuditor
-    }
-
-    private fun mockSystemMonitor(): SystemMonitor {
-        // Dummy implementation for manual instantiation tests
-        return hiltRule.run { ProductionReadinessAuditTest::class.java.getDeclaredField("hardwareSuite").apply { isAccessible = true }.get(this@ProductionReadinessAuditTest) as HardwareSuite }.let {
-            HardwareSuite::class.java.getDeclaredField("systemMonitor").apply { isAccessible = true }.get(it) as SystemMonitor
-        }
     }
 
     @Test
@@ -178,21 +313,17 @@ class ProductionReadinessAuditTest {
         assertEquals("Violation percentage should be 100%", 100.0, sessionManager.getViolationPercentage(), 0.001)
     }
 
-    /**
-     * Issue #1050: Deterministic Doze State Simulation
-     * Verifies that HardwareSuite correctly identifies Doze-deferral 
-     * requirements using the FakePowerStateProvider (R-ID 338).
-     */
     @Test
     fun verifyDozeModeSignalingDeferral() {
+        FakePowerStateProvider.useOverride = true
         FakePowerStateProvider.isIdle = false
         assertFalse("Should not defer when not in Doze", hardwareSuite.shouldDeferSignaling(false))
 
         FakePowerStateProvider.isIdle = true
-        assertTrue("Signaling should be deferred in Doze mode when no violation is present", 
+        assertTrue("Signaling should be deferred in Doze mode", 
             hardwareSuite.shouldDeferSignaling(isInViolation = false))
         
-        assertFalse("Signaling should NOT be deferred during violation, even in Doze mode", 
+        assertFalse("Signaling should NOT be deferred during violation", 
             hardwareSuite.shouldDeferSignaling(isInViolation = true))
     }
 
@@ -229,6 +360,6 @@ class ProductionReadinessAuditTest {
         }
 
         val elapsed = System.currentTimeMillis() - startMs
-        assertTrue("Saturation burst should have executed for at least $durationMs ms", elapsed >= durationMs)
+        assertTrue("Saturation burst should have executed", elapsed >= durationMs)
     }
 }

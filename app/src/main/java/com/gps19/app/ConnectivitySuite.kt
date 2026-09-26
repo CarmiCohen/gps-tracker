@@ -21,16 +21,13 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.26.11:
+ * - Issue #1343: Integrated Signaling Lifecycle Probes to forensicLogger 
+ *   to audit interface handover events and throttled outbound tx errors.
  * Sep.25.08:
  * - Issue #1329: Telemetry Mapping Convergence. Refactored handleBinaryUpdate 
  *   and handleJsonUpdate to use TelemetryMapper, eliminating ~200 lines of 
  *   manual mapping logic. Fixed battery typo in handleJsonUpdate.
- * - Issue #1329 Remediation: Corrected TelemetryMapper call signatures in 
- *   flushPendingUpdates and sendTelemetry to resolve build errors.
- * Sep.25.07:
- * - Issue #1329 Remediation: Aligned SystemEvaluationSnapshot instantiations 
- *   with the partitioned state structure to resolve build errors.
- * - Issue #1329: Consolidated LocationUpdate construction using TelemetryMapper.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -157,6 +154,8 @@ class ConnectivitySuite @Inject constructor(
                 if (signalingProvider.isConnected() || signalingProvider.isConnecting()) return@launch
                 if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) return@launch
 
+                // Issue #1343: Forensic handover registration
+                forensicLogger.logHandover("Interface Available. Reconnecting.", "active")
                 logManagerProvider.get().logServiceEvent("Network Handover: Available. Reconnecting.", false)
                 lastReconnectTs = nowRt
                 reconnectAttempt = 0
@@ -166,6 +165,8 @@ class ConnectivitySuite @Inject constructor(
         }
         override fun onNetworkLost() {
             if (isStopped.get()) return
+            // Issue #1343: Forensic handover lost interface registration
+            forensicLogger.logHandover("Interface Lost.", "none")
             logManagerProvider.get().logServiceEvent("Network Handover: Interface Lost.", false)
             telemetryRepository.updateRelayStatus(false)
         }
@@ -380,21 +381,29 @@ class ConnectivitySuite @Inject constructor(
         val pending = offlineRepository.getPendingStatusUpdates(limit)
         if (pending.isEmpty()) return
         pending.forEach { entity ->
-            // Issue #1329: Use centralized mapper to resolve build errors.
             val status = TelemetryMapper.mapPendingToStatus(entity, deviceId, viewerId)
-            if (sendTelemetryInternal(status, SignalingPriority.NORMAL)) offlineRepository.deletePendingStatusUpdate(entity.id)
+            if (sendTelemetryInternal(status, SignalingPriority.NORMAL)) {
+                offlineRepository.deletePendingStatusUpdate(entity.id)
+            } else {
+                // Issue #1343: Outbound transmission/sync failures logged to forensicLogger
+                forensicLogger.logTransmissionFailure("Pending update sync drop", if (isTrackerMode) "TRK" else "VWR", deviceId, viewerId)
+            }
         }
     }
 
     suspend fun sendTelemetry(status: TrackerStatus): Boolean {
         val success = sendTelemetryInternal(status, SignalingPriority.HIGH)
         if (isTrackerMode) {
-            // Issue #1230 REMEDIATION: Isolate local tracker status under "T_" prefix.
             mainRepository.saveTrackerState(status, "T_")
             if (!success) {
-                // Issue #1329: Use centralized mapper to resolve build errors.
                 val entity = TelemetryMapper.mapStatusToPending(status)
                 offlineRepository.addPendingStatusUpdate(entity)
+                // Issue #1343: Telemetry tx drop logging
+                forensicLogger.logTransmissionFailure("Telemetry high-priority drop", "TRK", deviceId, viewerId)
+            }
+        } else {
+            if (!success) {
+                forensicLogger.logTransmissionFailure("Viewer telemetry drop", "VWR", deviceId, viewerId)
             }
         }
         return success
@@ -579,8 +588,6 @@ class ConnectivitySuite @Inject constructor(
         mainRepository.updateRemoteActivity(0L) 
         trackerGpsStallStartTs = 0L
         
-        // Issue #1306 REMEDIATION: Peer stats reset must use the "VR_" prefix when in 
-        // Viewer mode to clear the remote baseline without corrupting local "V_" tracking baselines.
         val prefix = if (isTrackerMode) "T_" else "VR_"
         mainRepository.saveDoubleSync(prefix + TRACKER_LUX_BASELINE_KEY, 0.0)
         mainRepository.saveDoubleSync(prefix + TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)

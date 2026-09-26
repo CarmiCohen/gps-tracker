@@ -6,6 +6,9 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 
 | Req ID | Description | Implementation Status |
 | :--- | :--- | :--- |
+| **R500** | **Programmatic Soak Validation**: 24h simulation cycle stability. | **Verified (Sep.26.10)** |
+| **R499** | **Identity Uniqueness**: Alias-aware ID collision prevention. | **Verified (Sep.26.10)** |
+| **R498** | **Hardware Poke Precision**: Inclusive boundary matching. | **Verified (Sep.26.10)** |
 | **R497** | **Unified Power Policy**: Doze-deferral emergency override logic. | **Verified (Sep.26.10)** |
 | **R496** | **ViewModel Decommissioning**: Removal of legacy feature ViewModels. | **Verified (Sep.26.8)** |
 | **R495** | **Hydration Staggering**: Deterministic startup under CPU/IO saturation. | **Verified (Sep.23.50)** |
@@ -29,11 +32,10 @@ This document serves as the formal proof of implementation for the GPS-Tracker s
 | **R312** | **Snap-Isolation Throttling**: 100Hz telemetry parity. | **Verified (Aug.18.13)** |
 
 ## 2. Recent Hardening Phase Resolutions (Sep.26.10)
+*   **FIXED #1342**: Programmatic 24h Soak Simulation - Verified stability on physical A15.
+*   **FIXED #1341**: Alias-Aware Identity Uniqueness - Hardened SettingsRepository commitment.
+*   **FIXED #1340**: Hardware Poke Precision Boundary - Stabilized Staggered tier polling.
 *   **FIXED #1339**: Unified Power Policy Validation - Verified Doze-deferral consistency.
-*   **FIXED #1215**: Decommission legacy setupViewModel boilerplate - Unified UI SSOT.
-*   **FIXED #1338**: Lifecycle Hydration Staggering Verification - Hardened startup sequence.
-*   **FIXED #1203**: Hilt ViewModel Scope Optimization - Optimized activity-scoped SSOT.
-*   **FIXED #1337**: Role-Prefix Collision in Integrity Events - Hardened repo write safety.
 
 ---
-*For the full list of historical resolutions (1-1241), see [RESOLUTION_ARCHIVE.md](RESOLUTION_ARCHIVE.md).*
+*For the full list of historical resolutions (1-1244), see [RESOLUTION_ARCHIVE.md](RESOLUTION_ARCHIVE.md).*

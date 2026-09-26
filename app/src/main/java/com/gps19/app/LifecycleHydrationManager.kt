@@ -10,13 +10,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * LifecycleHydrationManager (Issue #318/323/739/758/874/880/882/885):
- * Centralizes and staggers the app hydration sequence to prevent Davey stalls
- * on budget hardware (SM-A155F) and performance-sensitive flagship variants (S21FE).
- * Sep.15.200:
- * - Issue #1056 Unified Performance Muzzle: Replaced isA15 check with 
- *   useStaggeredHydration to harmonized initialization logic for all 
- *   congestion-prone hardware (R-ID 346).
+ * LifecycleHydrationManager:
+ * Centralizes and staggers the app hydration sequence to prevent UI stalls.
+ * Sep.23.50:
+ * - Issue #1338: Hardened hydration lifecycle by integrating all phases 
+ *   (including Map/Overlay triggers) into the primary managed job to prevent 
+ *   coroutine leaks during role transitions.
  */
 @Singleton
 class LifecycleHydrationManager @Inject constructor() {
@@ -32,80 +31,59 @@ class LifecycleHydrationManager @Inject constructor() {
         hydrationJob = scope.launch(Dispatchers.Main.immediate) {
             Timber.d("Hydration: Starting sequence (staggered=$useStaggered)")
             
-            // Level 1: Surface (Basic UI shell ready)
-            delay(if (useStaggered) 500 else 200)
+            // Phase 1: Core Surface
+            delay(if (useStaggered) 500 else 100)
             _hydrationLevel.value = 1
-            Timber.d("Hydration: Level 1 (Surface)")
-
-            // Level 2: Core/Nav (Navigation and basic data)
-            delay(if (useStaggered) 750 else 300)
+            
+            delay(if (useStaggered) 750 else 200)
             _hydrationLevel.value = 2
-            Timber.d("Hydration: Level 2 (Core)")
-
-            // Level 3: Full (Heavy observations started, UI functional)
-            delay(if (useStaggered) 1000 else 400)
+            
+            delay(if (useStaggered) 1000 else 300)
             _hydrationLevel.value = 3
-            Timber.d("Hydration: Level 3 (Full)")
             
             onComplete()
 
-            // Map Hydration Sequence (Levels 4-7)
-            Looper.myQueue().addIdleHandler {
-                scope.launch(Dispatchers.Main.immediate) {
-                    var retryCount = 0
-                    while (!GpsApplication.isOsmReady.get() && retryCount < 50) {
-                        delay(100)
-                        retryCount++
-                    }
-                    
-                    if (!GpsApplication.isOsmReady.get()) {
-                        Timber.w("Hydration: OSM not ready after timeout, forcing Level 4")
-                    }
-
-                    // Level 4: Map Engine Base
-                    _hydrationLevel.value = 4
-                    Timber.d("Hydration: Level 4 (Map Engine Base)")
-                    
-                    val mapDelay = if (useStaggered) 600L else 100L
-                    
-                    delay(mapDelay)
-                    _hydrationLevel.value = 5
-                    Timber.d("Hydration: Level 5 (Map Trails)")
-                    
-                    delay(mapDelay)
-                    _hydrationLevel.value = 6
-                    Timber.d("Hydration: Level 6 (Map Current Positions)")
-                    
-                    delay(mapDelay)
-                    _hydrationLevel.value = 7
-                    Timber.d("Hydration: Level 7 (Map Violations)")
-
-                    // Phase 3: Overlay Hydration (Levels 8-11)
-                    val overlayDelay = if (useStaggered) 800L else 150L
-                    
-                    delay(overlayDelay)
-                    _hydrationLevel.value = 8
-                    Timber.d("Hydration: Level 8 (Settings Overlay Ready)")
-                    
-                    delay(overlayDelay)
-                    _hydrationLevel.value = 9
-                    Timber.d("Hydration: Level 9 (Log Overlay Ready)")
-                    
-                    delay(overlayDelay)
-                    _hydrationLevel.value = 10
-                    Timber.d("Hydration: Level 10 (Ribbons Overlay Ready)")
-                    
-                    delay(overlayDelay)
-                    _hydrationLevel.value = 11
-                    Timber.d("Hydration: Level 11 (GNSS Detail Ready - Fully Hydrated)")
-                }
-                false // One-shot
+            // Phase 2: Map & Data Engine (Triggered on Idle)
+            // We use a suspendable check instead of a detached IdleHandler to keep it in scope
+            yield() // Give UI a chance to breath
+            
+            var retryCount = 0
+            while (!GpsApplication.isOsmReady.get() && retryCount < 50) {
+                delay(200)
+                retryCount++
             }
+
+            // Levels 4-7: Map Elements
+            val mapDelay = if (useStaggered) 600L else 50L
+            
+            _hydrationLevel.value = 4
+            delay(mapDelay)
+            _hydrationLevel.value = 5
+            delay(mapDelay)
+            _hydrationLevel.value = 6
+            delay(mapDelay)
+            _hydrationLevel.value = 7
+
+            // Phase 3: Heavy Overlays
+            val overlayDelay = if (useStaggered) 800L else 100L
+            
+            delay(overlayDelay)
+            _hydrationLevel.value = 8
+            delay(overlayDelay)
+            _hydrationLevel.value = 9
+            delay(overlayDelay)
+            _hydrationLevel.value = 10
+            delay(overlayDelay)
+            _hydrationLevel.value = 11
+            
+            Timber.d("Hydration: Full sequence completed (Level 11)")
         }
     }
 
     fun reset() {
         hydrationJob?.cancel()
+        hydrationJob = null
         _hydrationLevel.value = 0
+        Timber.d("Hydration: Manager reset to Level 0")
     }
 }

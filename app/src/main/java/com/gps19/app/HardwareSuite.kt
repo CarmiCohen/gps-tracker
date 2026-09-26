@@ -1158,6 +1158,6 @@ class HardwareSuite @Inject constructor(
 
     fun shouldPokeHardware(isStaggered: Boolean, lastPokeRt: Long, intervalMs: Long): Boolean {
         if (!isStaggered) return false
-        return timeProvider.elapsedRealtime() - lastPokeRt > intervalMs
+        return timeProvider.elapsedRealtime() - lastPokeRt >= intervalMs
     }
 }

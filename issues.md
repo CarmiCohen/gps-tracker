@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.10
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.11
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -21,6 +21,14 @@ Ready for next priority item.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1343: Signaling Lifecycle Probes** (Resolved Sep.26.11)
+    *   *Remediation*: Deployed high-assurance forensic probes to `SignalingForensicLogger` and integrated them within `ConnectivitySuite` to trace interface handover events and log throttled outbound transmission failures. (SOT ID 501).
+*   **Issue #1342: Programmatic 24h Soak Simulation** (Resolved Sep.26.10)
+    *   *Remediation*: Implemented accelerated 24-hour simulation in `ProductionReadinessAuditTest.kt` to verify forensic counter stability and reliability math. (SOT ID 500).
+*   **Issue #1341: Alias-Aware Identity Uniqueness** (Resolved Sep.26.10)
+    *   *Remediation*: Hardened `SettingsRepository.commitDraftSettings` with alias-aware uniqueness checks using `SignalingConstants.areIdsUnique` to prevent role-prefix collisions. (SOT ID 499).
+*   **Issue #1340: Hardware Poke Precision Boundary** (Resolved Sep.26.10)
+    *   *Remediation*: Fixed boundary logic in `HardwareSuite.shouldPokeHardware` to use inclusive `>=` check, ensuring deterministic wakeups on staggered performance tiers. (SOT ID 498).
 *   **Issue #1339: Unified Power Policy Validation** (Resolved Sep.26.9)
     *   *Remediation*: Verified centralized backoff and Doze-deferral consistency across role transitions using `ProductionReadinessAuditTest`. Updated `QA_VALIDATION_STATUS.md` to clear the pending R339 verification entry.
 *   **Issue #1215: Decommission setupViewModel boilerplate** (Resolved Sep.26.8)
@@ -47,26 +55,8 @@ Ready for next priority item.
     *   *Remediation*: Unified GPS buffering and processing for all roles under a single evaluation path. (SOT ID 488).
 *   **Issue #1314: TrackerStatus & Evaluation Snapshot Convergence** (Resolved Sep.26.0)
     *   *Remediation*: Consolidated telemetry DTOs into partitioned engine states. (SOT ID 487).
-*   **Issue #1329: Telemetry Mapping Convergence** (Resolved Sep.25.08)
-    *   *Remediation*: Fully centralized telemetry data transformation in `TelemetryMapper`. (SOT ID 486).
-*   **Issue #1330: Snap-to-Update Monolith** (Resolved Sep.25.06)
-    *   *Remediation*: Unified `SystemEvaluationSnapshot` with the partitioned state structure. (SOT ID 485).
-*   **Issue #1327: Pulse-to-Tick Event Collision** (Resolved Sep.25.05)
-    *   *Remediation*: Introduced `DomainEvent.PeerConnectionChanged(isConnected: Boolean, peerId: String)` to the unified event hierarchy. (SOT ID 484).
-*   **Issue #1324: Peer Signaling Coupling to Repository** (Resolved Sep.25.04)
-    *   *Remediation*: Transitioned peer telemetry persistence to a reactive, bus-driven model. (SOT ID 483).
-*   **Issue #1323: Residual Imperative Persistence in MonitorService** (Resolved Sep.25.03)
-    *   *Remediation*: Converged Viewer self-tracking persistence into the unified `DomainEventBus`. (SOT ID 482).
-*   **Issue #1331: DomainEventBus Capacity Hardening** (Resolved Sep.25.02)
-    *   *Remediation*: Increased extra buffer capacity to 128 and introduced DROP_OLDEST overflow policy. (SOT ID 481).
-*   **Issue #1322: Multi-Flow Fragmentation Convergence** (Resolved Sep.25.01)
-    *   *Remediation*: Converged all component-level event streams into the unified bus. (SOT ID 480).
-*   **Issue #1325: Unified Snapshot Metadata Gaps** (Resolved Sep.25.00)
-    *   *Remediation*: Expanded `SystemEvaluationSnapshot` for full parity. (SOT ID 478).
-*   **Issue #1326: Telemetry Data Corruption in LocationProcessor** (Resolved Sep.25.00)
-    *   *Remediation*: Corrected satellite count mapping. (SOT ID 479).
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 497 (Rules: 33, IDs: 497), Resolved: 1241, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 283]**
+- **Current Audit Baseline: [SOT: 501 (Rules: 35, IDs: 501), Resolved: 1245, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**

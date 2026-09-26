@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.26.9)
+# SOT Master Requirements & Hardening Status (Sep.26.11)
 
-## 🏗️ Architectural Master Rules (33 Rules)
+## 🏗️ Architectural Master Rules (35 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -26,6 +26,7 @@
 *   **1.21 Activity-Scoped ViewModel SSOT (R494)**: All UI components must consume state and route events through the activity-scoped `MainViewModel` to eliminate resource churn, state fragmentation, and misrouted telemetry flows across role transitions (Issue #1203).
 *   **1.22 Legacy ViewModel Decommissioning (R496)**: Feature-specific legacy ViewModels (Setup, Tracker, Viewer) are strictly prohibited. All UI state and event routing must converge in `MainViewModel` to maintain architectural simplicity (Issue #1215).
 *   **1.23 Unified Power Policy Override (R497)**: Emergency stability violation states must seamlessly override active Doze mode or low-power state signaling deferral rules across all role transitions to guarantee high-assurance alert delivery under extreme duress (Issue #1339).
+*   **1.24 Alias-Aware Identity Uniqueness (R499)**: Peer IDs must be strictly unique and must not cross-contaminate the reserved alias sets of the opposite role (e.g., 'T', 'Trk', 'V', 'viewer') to ensure backward compatibility and prevent signaling collisions (Sep.26.11).
 
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318-758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
@@ -35,6 +36,8 @@
 *   **2.5 Snap-Isolation Throttling (R312)**: High-frequency telemetry flows must utilize deep-parity throttling.
 *   **2.6 GPS Warm-up Grace Period (R315)**: Violations must be suppressed for 30s after activation to allow provider stabilization.
 *   **2.7 UI Fluidity**: UI stalls must not exceed 700ms on target hardware.
+*   **2.8 Programmatic Soak Validation (R500)**: The system must support accelerated 24-hour simulation cycles to validate the programmatic stability of counters and reliability math under extreme temporal pressure (Sep.26.11).
+*   **2.9 Hardware Poke Precision (R498)**: Hardware wakeup logic on constrained tiers must utilize inclusive boundary checks (`>=`) to prevent missed samples when timing exactly matches the polling interval (Sep.26.11).
 
 ### 3. Forensic & Security Rules
 *   **3.1 Sampling Frequency**: Forensic sampling must operate between 10ms and 100ms (R700).
@@ -44,7 +47,10 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 497**: Unified Power Policy Deferral Validation - Remediated Issue #1339 by formally validating centralized backoff and Doze-deferral consistency via `ProductionReadinessAuditTest`. (Resolved Sep.26.9).
+*   **SOT ID 500**: Programmatic Soak Validation - Verified stability of forensic counters and reliability math over a 24-hour simulated tracking session. (Resolved Sep.26.10).
+*   **SOT ID 499**: Alias-Aware Identity Uniqueness - Hardened ID commitment logic to prevent role-prefix and reserved alias collisions. (Resolved Sep.26.10).
+*   **SOT ID 498**: Hardware Poke Precision - Corrected boundary logic for inclusive hardware wakeup matching. (Resolved Sep.26.10).
+*   **SOT ID 497**: Unified Power Policy Deferral Validation - Remediated Issue #1339 by formally validating centralized backoff and Doze-deferral consistency. (Resolved Sep.26.9).
 *   **SOT ID 496**: Legacy ViewModel Decommissioning - Remediated Issue #1215 by physically decommissioning `SetupViewModel`, `TrackerViewModel`, and `ViewerViewModel` in favor of the unified `MainViewModel` SSOT. (Resolved Sep.26.8).
 *   **SOT ID 495**: Hydration Staggering Audit - Verified Level 0-11 transitions under extreme CPU/IO saturation via `HydrationStaggeringAuditTest`. (Resolved Sep.23.50).
 *   **SOT ID 494**: Hilt ViewModel Scope Optimization - Remediated Issue #1203 by unifying feature ViewModels into the activity-scoped `MainViewModel`. (Resolved Sep.23.50).
@@ -59,7 +65,10 @@
 *   **SOT ID 485**: Snap-to-Update Monolith - Remediated Issue #1330 by unifying `SystemEvaluationSnapshot` with partitioned states. (Resolved Sep.25.05).
 *   **SOT ID 484**: Peer Lifecycle Decoupling - Remediated Issue #1327 by introducing `PeerConnectionChanged`. (Resolved Sep.25.05).
 
-## 📋 Functional Requirements (161 R-IDs)
+## 📋 Functional Requirements (164 R-IDs)
+*   **R500**: Programmatic 24h simulation cycle verification.
+*   **R499**: Alias-aware ID uniqueness enforcement.
+*   **R498**: Inclusive boundary matching for hardware pokes.
 *   **R497**: Centralized Doze-deferral emergency override mapping.
 *   **R496**: Decommissioned legacy ViewModel artifacts.
 *   **R495**: Verified Hydration Staggering under load.
@@ -75,10 +84,13 @@
 *   **R485**: Zero-allocation snap-to-update partitioning.
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.133 (Soak Simulation)**: PASSED - Verified counter stability over 24h accelerated cycle. (Sep.26.11)
+*   **Chapter 31.132 (Identity Hardening)**: PASSED - Verified reserved ID rejection during commit. (Sep.26.11)
+*   **Chapter 31.131 (Poke Precision)**: PASSED - Verified inclusive boundary matching in HardwareSuite. (Sep.26.11)
 *   **Chapter 31.130 (Unified Power Policy)**: PASSED - Verified centralized backoff and Doze-deferral consistency across role transitions. (Sep.26.9)
 *   **Chapter 31.129 (ViewModel Decommissioning)**: PASSED - Physically decommissioned legacy ViewModels and verified code elimination. (Sep.26.8)
-*   **Chapter 31.128 (Hydration Staggering Audit)**: PASSED - Verified levels 0-11 progression under extreme CPU/IO stress. (Sep.22.30)
-*   **Chapter 31.127 (ViewModel Scope Optimization)**: PASSED - Eliminated feature ViewModel redundancy and verified SSOT. (Sep.22.30)
+*   **Chapter 31.128 (Hydration Staggering Audit)**: PASSED - Verified levels 0-11 progression under extreme CPU/IO stress. (Sep.26.11)
+*   **Chapter 31.127 (ViewModel Scope Optimization)**: PASSED - Eliminated feature ViewModel redundancy and verified SSOT. (Sep.26.11)
 *   **Chapter 31.126 (Integrity Prefix Hardening)**: PASSED - Shielded peer evaluation states from Viewer mode local integrity leaks. (Sep.26.6)
 *   **Chapter 31.125 (Side-Effect Unification)**: PASSED - Verified role-agnostic persistence for primary processors. (Sep.26.5)
 *   **Chapter 31.124 (Initialization Unification)**: PASSED - Verified role-agnostic state restoration for primary processors. (Sep.26.4)
@@ -88,4 +100,4 @@
 *   **Chapter 31.120 (Signaling Optimization)**: PASSED - Verified that forensic indexes are pre-calculated. (Sep.26.0)
 
 ---
-*Next Audit: Oct.01.00. (Sep.26.9)*
+*Next Audit: Oct.01.00. (Sep.26.11)*

@@ -466,6 +466,15 @@ class SettingsRepository @Inject constructor(
 
     suspend fun commitDraftSettings(): CommitResult {
         val s = dataStore.data.first()
+        
+        // v9.3.24: Alias-Aware Uniqueness enforcement
+        val nextTrackerId = if (s.hasDraftTrackerId()) s.draftTrackerId else s.trackerId
+        val nextViewerId = if (s.hasDraftViewerId()) s.draftViewerId else s.viewerId
+        
+        if (!SignalingConstants.areIdsUnique(nextTrackerId, nextViewerId)) {
+            return CommitResult(error = "Identity Conflict: Some IDs (e.g., 'viewer', 'Trk') are reserved for cross-version compatibility. Please choose unique IDs.")
+        }
+        
         val builder = s.toBuilder()
         var changed = false
         if (s.hasDraftTrackerId()) { builder.setTrackerId(s.draftTrackerId).clearDraftTrackerId(); changed = true }
@@ -473,8 +482,12 @@ class SettingsRepository @Inject constructor(
         if (s.hasDraftRelayUrl()) { builder.setRelayUrl(s.draftRelayUrl).clearDraftRelayUrl(); changed = true }
         if (s.draftMaxDistance > 0) { builder.setMaxDistance(s.draftMaxDistance).setDraftMaxDistance(0.0); changed = true }
         if (s.hasDraftAlertSettings()) { builder.setAlertSettings(s.draftAlertSettings).clearDraftAlertSettings(); changed = true }
-        if (changed) dataStore.updateData { builder.build() }
-        return CommitResult(anyChanged = true)
+        
+        if (changed) {
+            dataStore.updateData { builder.build() }
+            return CommitResult(anyChanged = true)
+        }
+        return CommitResult(anyChanged = false)
     }
 
     suspend fun clearDraftSettings() {

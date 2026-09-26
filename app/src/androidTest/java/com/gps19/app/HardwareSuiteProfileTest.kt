@@ -12,10 +12,8 @@ import org.junit.runner.RunWith
 
 /**
  * HardwareSuiteProfileTest: Automated profiling study for the staggered performance tier.
- * Sep.17.05:
- * - Issue #1093 Cleanup: Renamed from UnifiedPowerPolicyProfileTest to match converged authority.
- * Sep.17.02:
- * - Issue #1093: Power & Hardware Provider Convergence. Migrated to HardwareSuite.
+ * Sep.23.50:
+ * - Fixed build error by providing DomainEventBus to HardwareSuite.
  */
 @RunWith(AndroidJUnit4::class)
 class HardwareSuiteProfileTest {
@@ -36,6 +34,9 @@ class HardwareSuiteProfileTest {
     }
 
     private val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    
+    // DomainEventBus is a concrete class with internal buffering.
+    private val testDomainEventBus = DomainEventBus()
 
     @Test
     fun verifyBackoffConvergenceAndJitterBounds() {
@@ -47,7 +48,8 @@ class HardwareSuiteProfileTest {
             systemMonitor = mockSystemMonitor(),
             systemStatusProvider = mockSystemStatusProvider(),
             powerStateProvider = fakePowerStateProvider,
-            forensicAuditor = mockForensicAuditor()
+            forensicAuditor = mockForensicAuditor(),
+            domainEventBus = testDomainEventBus
         )
 
         // Profile progression across 20 successive reconnect attempts
@@ -72,7 +74,8 @@ class HardwareSuiteProfileTest {
             systemMonitor = mockSystemMonitor(),
             systemStatusProvider = mockSystemStatusProvider(),
             powerStateProvider = fakePowerStateProvider,
-            forensicAuditor = mockForensicAuditor()
+            forensicAuditor = mockForensicAuditor(),
+            domainEventBus = testDomainEventBus
         )
         val intervalMs = 30000L
 

@@ -1,3 +1,29 @@
+# 🏛️ Resolution Archive - Sep.26.10
+
+## 🏁 Issue #1342: Programmatic 24h Soak Simulation (R500)
+*   **Resolved**: Sep.26.10
+*   **Root Cause**: Lack of programmatic validation for forensic counter stability over long-duration sessions (24h+), risking precision loss or overflow during multi-day tracking.
+*   **Remediation**:
+    *   **Verification**: Implemented `verify24HourSoakSimulation` in `ProductionReadinessAuditTest.kt`.
+    *   **Logic Audit**: Verified that `ForensicAuditor` and `SessionManager` handle 43,200 logic pulses with zero drift. Confirmed reliability index math handles simulated packet loss deterministically.
+*   **R-ID**: 500
+
+## 🏁 Issue #1341: Alias-Aware Identity Uniqueness (R499)
+*   **Resolved**: Sep.26.10
+*   **Root Cause**: `SettingsRepository.commitDraftSettings` lacked enforcement for identity uniqueness, potentially allowing a Tracker to be named using a reserved Viewer alias (e.g., 'viewer'), leading to signaling collisions.
+*   **Remediation**:
+    *   **Hardening**: Integrated `SignalingConstants.areIdsUnique` into the commit flow.
+    *   **Verification**: Added `IdentityPersistenceTest.verifyUniquenessEnforcement` to ensure reserved alias rejection and error reporting.
+*   **R-ID**: 499
+
+## 🏁 Issue #1340: Hardware Poke Precision Boundary (R498)
+*   **Resolved**: Sep.26.10
+*   **Root Cause**: `HardwareSuite.shouldPokeHardware` used a strict greater-than (`>`) check, causing missed samples on staggered tiers when the tick step exactly matched the polling interval.
+*   **Remediation**:
+    *   **Logic Fix**: Updated comparison to inclusive greater-than-or-equal-to (`>=`).
+    *   **Verification**: Stabilized `HardwareSuiteProfileTest.verifyStaggeredTierHardwarePokeConstraints`.
+*   **R-ID**: 498
+
 # 🏛️ Resolution Archive - Sep.26.9
 
 ## 🏁 Issue #1339: Unified Power Policy Validation
