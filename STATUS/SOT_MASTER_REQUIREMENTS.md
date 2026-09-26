@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.22.30)
+# SOT Master Requirements & Hardening Status (Sep.26.2)
 
-## 🏗️ Architectural Master Rules (26 Rules)
+## 🏗️ Architectural Master Rules (27 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -18,6 +18,7 @@
 *   **1.13 Reactive Domain Bus (R477/R480/R481/R482)**: High-frequency state transitions and telemetry summaries must be propagated via a non-blocking `DomainEventBus` with hardened capacity (128) and overflow dropping to ensure the core evaluation loop remains atomic and non-blocking (Refined Sep.25.03).
 *   **1.14 Telemetry Partitioning (R485)**: All high-frequency telemetry DTOs must share partitioned state structures (Kinetic, Atmospheric, Integrity) to eliminate bridge mapping layers and enable zero-allocation flyweight double-buffering (Issue #1330).
 *   **1.15 Mapping Centralization (R486)**: Telemetry mapping and DTO construction must be centralized in `TelemetryMapper` to ensure consistency across self-tracking, peer signaling, and offline persistence. This includes authority over `LocationUpdate`, `TrackerStatus`, and `PendingStatusEntity` (Issue #1329).
+*   **1.16 Peer Lifecycle Suppression (R489)**: Redundant peer lifecycle events must be suppressed at the coordinator level using connection state caching to prevent forensic log saturation (Issue #1333).
 
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318-758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
@@ -36,36 +37,31 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 486**: Telemetry Mapping Convergence - Remediated Issue #1329 by centralizing all telemetry data transformation in `TelemetryMapper`. Consolidated mapping logic for `LocationUpdate`, `TrackerStatus`, and `PendingStatusEntity`, including incoming Proto/JSON signaling payloads. Removed ~250 lines of redundant mapping logic from `ConnectivitySuite` and `AppEventCoordinator`. (Resolved Sep.25.08).
-*   **SOT ID 485**: Snap-to-Update Monolith - Remediated Issue #1330 by unifying `SystemEvaluationSnapshot` with partitioned states used by `LocationUpdate`, eliminating the manual bridge mapping layer. (Resolved Sep.25.05).
-*   **SOT ID 484**: Peer Lifecycle Decoupling - Remediated Issue #1327 by introducing `PeerConnectionChanged` to eliminate pulse-to-tick event collisions. (Resolved Sep.25.05).
-*   **SOT ID 483**: Peer Status Persistence Decoupling - Remediated Issue #1324 by offloading peer telemetry persistence from `ConnectivitySuite` to `AppEventCoordinator` via the `DomainEventBus`. (Resolved Sep.25.04).
-*   **SOT ID 482**: Residual Imperative Persistence in MonitorService - Remediated Issue #1323 by transitioning Viewer self-tracking location updates into the `DomainEventBus` with `ViewerLocationUpdated` event. (Resolved Sep.25.03).
-*   **SOT ID 481**: DomainEventBus Capacity Hardening - Remediated Issue #1331 by increasing buffer capacity to 128 and implementing `DROP_OLDEST` strategy. (Resolved Sep.25.02).
-*   **SOT ID 480**: Multi-Flow Fragmentation Convergence - Remediated Issue #1322 by converging all component-level event streams into the unified `DomainEventBus` (Resolved Sep.25.01).
-*   **SOT ID 479**: Telemetry Corruption Remediation - Remediated Issue #1326 by correcting the satellite count mapping in `LocationProcessor` (Resolved Sep.25.00).
-*   **SOT ID 478**: Unified Snapshot Metadata Completion - Remediated Issue #1325 by expanding `SystemEvaluationSnapshot` (Resolved Sep.25.00).
+*   **SOT ID 489**: Peer Connection State Caching - Remediated Issue #1333 by introducing connection state caching in `AppEventCoordinator` to suppress redundant lifecycle logging. (Resolved Sep.26.2).
+*   **SOT ID 488**: Viewer Self-Tracking Unification - Remediated Issue #1332 by unifying GPS processing for all roles and consolidating self-telemetry persistence under `TickEvaluated`. (Resolved Sep.26.1).
+*   **SOT ID 487**: TrackerStatus Convergence - Remediated Issue #1314 by pre-populating forensic indexes in `SystemEvaluationSnapshot` to eliminate mapping overhead during remote signaling. (Resolved Sep.26.0).
+*   **SOT ID 486**: Telemetry Mapping Convergence - Remediated Issue #1329 by centralizing all telemetry data transformation in `TelemetryMapper`. (Resolved Sep.25.08).
+*   **SOT ID 485**: Snap-to-Update Monolith - Remediated Issue #1330 by unifying `SystemEvaluationSnapshot` with partitioned states. (Resolved Sep.25.05).
+*   **SOT ID 484**: Peer Lifecycle Decoupling - Remediated Issue #1327 by introducing `PeerConnectionChanged`. (Resolved Sep.25.05).
+*   **SOT ID 483**: Peer Status Persistence Decoupling - Remediated Issue #1324 by offloading persistence to `AppEventCoordinator`. (Resolved Sep.25.04).
+*   **SOT ID 482**: Residual Imperative Persistence in MonitorService - Remediated Issue #1323 by transitioning updates to `DomainEventBus`. (Resolved Sep.25.03).
+*   **SOT ID 481**: DomainEventBus Capacity Hardening - Remediated Issue #1331 by increasing buffer capacity to 128. (Resolved Sep.25.02).
+*   **SOT ID 480**: Multi-Flow Fragmentation Convergence - Remediated Issue #1322 by converging all streams into unified `DomainEventBus`. (Resolved Sep.25.01).
 
-## 📋 Functional Requirements (151 R-IDs)
+## 📋 Functional Requirements (154 R-IDs)
+*   **R489**: Peer Lifecycle Suppression.
+*   **R488**: Unified Pipeline Persistence.
+*   **R487**: Snapshot Forensic Pre-population.
 *   **R486**: Centralized Telemetry Mapping Authority.
 *   **R485**: Zero-allocation snap-to-update partitioning.
-*   **R484**: Lifecycle-only peer connection events.
-*   **R483**: Bus-driven peer telemetry persistence.
-*   **R482**: Bus-driven Viewer self-tracking location updates.
-*   **R481**: Reactive Bus Capacity Hardening.
-*   **R480**: Unified Multi-Flow Convergence.
-*   **R479**: Telemetry Corruption Remediation.
-*   **R478**: Unified Snapshot Metadata Parity.
 *   *(Remaining requirements preserved in technical registry)*
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.119 (Telemetry Mapping Convergence)**: PASSED - Verified that all telemetry construction (Updates, Status, Entities) is centralized in TelemetryMapper and used across all roles and transports. (Sep.22.30)
-*   **Chapter 31.118 (Partitioned State Unification)**: PASSED - Verified that SystemEvaluationSnapshot partitions map directly to LocationUpdate without manual assignments. (Sep.22.30)
-*   **Chapter 31.117 (Peer Lifecycle Decoupling)**: PASSED - Verified that peer pulses emit PeerConnectionChanged and do not trigger redundant repository/signaling side-effects. (Sep.22.30)
-*   **Chapter 31.116 (Peer Bus Persistence)**: PASSED - Verified peer status updates travel through the DomainEventBus to AppEventCoordinator for asynchronous repository writing. (Sep.22.30)
-*   **Chapter 31.115 (Viewer Bus Persistence)**: PASSED - Verified Viewer self-tracking updates travel through the DomainEventBus to AppEventCoordinator for asynchronous repository writing. (Sep.22.30)
-*   **Chapter 31.114 (Bus Resilience)**: PASSED - Verified non-blocking emission under high load with overflow drop strategy. (Sep.22.30)
-*   **Chapter 31.113 (Flow Flow Convergence)**: PASSED - Eliminated fragmented flows; unified DomainEventBus orchestrates all system side-effects. (Sep.22.30)
+*   **Chapter 31.122 (Peer State Caching)**: PASSED - Verified that redundant peer lifecycle events are suppressed in logs. (Sep.26.2)
+*   **Chapter 31.121 (Viewer Pipeline Unification)**: PASSED - Verified that Viewer self-fixes follow the primary TickEvaluated path. (Sep.26.1)
+*   **Chapter 31.120 (Signaling Optimization)**: PASSED - Verified that forensic indexes are pre-calculated and embedded in the engine snapshot. (Sep.26.0)
+*   **Chapter 31.119 (Telemetry Mapping Convergence)**: PASSED - Centralized all construction in TelemetryMapper. (Sep.22.30)
+*   **Chapter 31.118 (Partitioned State Unification)**: PASSED - verified snapshot partition mapping. (Sep.22.30)
 
 ---
-*Next Audit: Oct.01.00. (Sep.22.30)*
+*Next Audit: Oct.01.00. (Sep.26.2)*

@@ -9,7 +9,8 @@ import timber.log.Timber
  * Sep.26.0:
  * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence. Refactored 
  *   mapping logic to support partitioned TrackerStatus DTO, drastically 
- *   reducing field-by-field copy overhead during signaling.
+ *   reducing field-by-field copy overhead during signaling. Eliminated 
+ *   redundant index parameters in mapSnapshotToStatus.
  */
 object TelemetryMapper {
 
@@ -53,13 +54,6 @@ object TelemetryMapper {
         viewerId: String,
         now: Long,
         nowRt: Long,
-        noiseIdx: Double,
-        luxIdx: Double,
-        vibeIdx: Double,
-        liftIdx: Double,
-        snrIdx: Double,
-        tiltIdx: Double,
-        baroIdx: Double,
         gnssDetail: GnssDetail? = null,
         isSuspiciousMode: Boolean = false,
         lastSitTs: Long = 0L
@@ -83,17 +77,9 @@ object TelemetryMapper {
             isAdaptiveJump = snapshot.isAdaptiveJump
         )
 
-        val atmospheric = snapshot.atmospheric.copy(
-            noiseIdx = noiseIdx,
-            luxIdx = luxIdx,
-            vibeIdx = vibeIdx,
-            liftIdx = liftIdx,
-            tiltIdx = tiltIdx,
-            baroIdx = baroIdx
-        )
+        val atmospheric = snapshot.atmospheric.copy()
 
         val integrity = snapshot.integrity.copy(
-            snrIdx = snrIdx,
             gnssDetail = gnssDetail ?: snapshot.integrity.gnssDetail,
             isSitActive = snapshot.integrity.isSitActive,
             isSitDetected = isSuspiciousMode,
@@ -153,7 +139,8 @@ object TelemetryMapper {
                 isStalled = proto.isStalled,
                 isTamperDetected = proto.isTamperDetected || proto.isLocationPending,
                 satsUsed = proto.satsUsed,
-                satsView = proto.satsView
+                satsView = proto.satsView,
+                snrIdx = proto.snrIdx
             ),
             snrSnapshot = proto.snrIdx * 5.0, 
             jumpTier = proto.jumpTier, 
@@ -272,7 +259,16 @@ object TelemetryMapper {
             ),
             integrity = IntegrityState(
                 satsUsed = data.optInt("sats_used", -1),
-                satsView = data.optInt("sats_view", -1)
+                satsView = data.optInt("sats_view", -1),
+                snrIdx = data.optDouble("snr_idx", current.snrIdx)
+            ),
+            atmospheric = AtmosphericState(
+                noiseIdx = data.optDouble("noise_idx", current.noiseIdx),
+                luxIdx = data.optDouble("lux_idx", current.luxIdx),
+                vibeIdx = data.optDouble("vibe_idx", current.vibeIdx),
+                liftIdx = data.optDouble("lift_idx", current.liftIdx),
+                tiltIdx = data.optDouble("tilt_idx", current.tiltIdx),
+                baroIdx = data.optDouble("baro_idx", current.baroIdx)
             ),
             jumpTier = data.optInt("jump_tier", 0), 
             isJammer = data.optBoolean("is_jammer", false),

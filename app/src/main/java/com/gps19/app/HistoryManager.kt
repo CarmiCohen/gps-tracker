@@ -22,11 +22,10 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * Sep.25.08:
- * - Issue #1329: Telemetry Mapping Convergence. Added updateRibbons(event) 
- *   overload to centralize metadata extraction from TickEvaluated events.
- * Sep.25.01:
- * - Issue #1322: Converged HistoryEvent emission into DomainEventBus.
+ * Sep.26.0:
+ * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence. Aligned 
+ *   updateRibbons(event) with simplified TickEvaluated signature, extracting 
+ *   forensic indexes directly from snapshot partitioned states.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -138,14 +137,14 @@ class HistoryManager @Inject constructor(
             isTrackerMode = event.isTrackerMode,
             accuracy = proc?.currentAccuracy ?: 0.0,
             maxAccuracy = proc?.maxAccuracy ?: 0.0,
-            noiseIdx = event.noiseIdx,
-            luxIdx = event.luxIdx,
-            vibeIdx = event.vibeIdx,
+            noiseIdx = snapshot.atmospheric.noiseIdx,
+            luxIdx = snapshot.atmospheric.luxIdx,
+            vibeIdx = snapshot.atmospheric.vibeIdx,
             proxIdx = snapshot.atmospheric.proxIdx,
-            liftIdx = event.liftIdx,
-            snrIdx = event.snrIdx,
-            tiltIdx = event.tiltIdx,
-            baroIdx = event.baroIdx,
+            liftIdx = snapshot.atmospheric.liftIdx,
+            snrIdx = snapshot.integrity.snrIdx,
+            tiltIdx = snapshot.atmospheric.tiltIdx,
+            baroIdx = snapshot.atmospheric.baroIdx,
             verticalVelocity = snapshot.kinetic.verticalVelocity,
             sitVz = snapshot.integrity.sitVz,
             sitVzTs = snapshot.integrity.sitVzTs,
@@ -164,10 +163,10 @@ class HistoryManager @Inject constructor(
             locationPendingReason = snapshot.integrity.locationPendingReason,
             kineticEnergy = snapshot.kinetic.kineticEnergy,
             isRecoveryEvent = event.recoveryFlagged,
-            cpuLoad = snapshot.cpuLoad,
-            ioWait = snapshot.ioWait,
-            maxIoLatency = snapshot.maxIoLatency,
-            isSilentFailure = snapshot.isSilentFailure,
+            cpuLoad = snapshot.integrity.cpuLoad,
+            ioWait = snapshot.integrity.ioWait,
+            maxIoLatency = snapshot.integrity.maxIoLatency,
+            isSilentFailure = snapshot.integrity.isSilentFailure,
             isBatteryLow = snapshot.integrity.isBatteryLow,
             isBatteryCritical = snapshot.integrity.isBatteryCritical,
             isUltraLongStationary = snapshot.integrity.isUltraLongStationary

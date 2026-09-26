@@ -5,14 +5,13 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * Sep.25.05:
- * - Issue #1330: Unified SystemEvaluationSnapshot with LocationUpdate partitioned states 
- *   (Kinetic, Atmospheric, Integrity) to eliminate the bridge mapping layer.
- * Sep.25.04:
- * - Issue #1324: Added PeerStatusReceived to DomainEvent for bus-driven peer persistence.
- * - Issue #1327: Added PeerConnectionChanged to DomainEvent to resolve pulse event collisions.
- * Sep.25.03:
- * - Issue #1323: Added ViewerLocationUpdated to DomainEvent for bus-driven persistence.
+ * Sep.26.1:
+ * - Issue #1332: Viewer Self-Tracking Snapshot Optimization. Removed 
+ *   ViewerLocationUpdated event; unified all self-telemetry persistence 
+ *   under TickEvaluated for architectural simplicity.
+ * Sep.26.0:
+ * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence. Simplified 
+ *   TickEvaluated event by removing redundant forensic indexes.
  */
 
 @Serializable
@@ -160,7 +159,6 @@ class EngineConnectionPoint(
 
 /**
  * SystemEvaluationSnapshot: Unified DTO for all telemetry and health metrics.
- * Issue #1330: Migrated to partitioned states for zero-allocation bridging to LocationUpdate.
  */
 @Serializable
 data class SystemEvaluationSnapshot(
@@ -208,7 +206,6 @@ data class SystemEvaluationSnapshot(
 ) {
     /**
      * toLocationUpdate: Returns a new LocationUpdate based on this snapshot.
-     * Note: In high-frequency paths, use Repository flyweights instead.
      */
     fun toLocationUpdate(isMe: Boolean = true): LocationUpdate {
         return LocationUpdate(
@@ -246,7 +243,7 @@ data class AlarmServiceContext(
 )
 
 /**
- * Component-level event containers. (Issue #1322: DomainEventBus convergence)
+ * Component-level event containers.
  */
 
 sealed class AlarmEvent {
@@ -311,7 +308,7 @@ sealed class RevivalEvent {
 }
 
 /**
- * DomainEvent: Unified event hierarchy for cross-component orchestration. (Issue #1291, #1322)
+ * DomainEvent: Unified event hierarchy for cross-component orchestration.
  */
 sealed class DomainEvent {
     data class TickEvaluated(
@@ -332,25 +329,10 @@ sealed class DomainEvent {
         val isSuspiciousMode: Boolean = false,
         val lastSitTs: Long = 0L,
         val lastTickTs: Long = 0L,
-        val lastTickRt: Long = 0L,
-        val noiseIdx: Double = 0.0,
-        val luxIdx: Double = 0.0,
-        val vibeIdx: Double = 0.0,
-        val liftIdx: Double = 0.0,
-        val snrIdx: Double = 0.0,
-        val tiltIdx: Double = 0.0,
-        val baroIdx: Double = 0.0
+        val lastTickRt: Long = 0L
     ) : DomainEvent()
 
     data class PowerSaveTransition(val isEngaged: Boolean) : DomainEvent()
-
-    data class ViewerLocationUpdated(
-        val processed: ProcessedLocation,
-        val snapshot: SystemEvaluationSnapshot,
-        val health: SystemHealthState,
-        val nowRt: Long,
-        val nowTs: Long
-    ) : DomainEvent()
     
     data class PeerStatusReceived(
         val status: LocationUpdate
@@ -379,7 +361,7 @@ sealed class DomainEvent {
     
     data class ServiceStatus(val message: String, val isImportant: Boolean = false) : DomainEvent()
 
-    // Issue #1322: Component wrappers
+    // Component wrappers
     data class Alarm(val event: AlarmEvent) : DomainEvent()
     data class Integrity(val event: IntegrityEvent) : DomainEvent()
     data class Processor(val event: ProcessorEvent, val isPrimary: Boolean) : DomainEvent()
@@ -613,7 +595,7 @@ class AlarmEvaluationState {
     var capabilities: HardwareCapabilities = HardwareCapabilities()
     var forensicReliabilityDegradationStartRt: Long = 0L
 
-    // Issue #1311: Stateless Evaluation consolidation
+    // Stateless Evaluation consolidation
     var powerAlarmPending: Boolean = false
     var lastSirenStopRt: Long = 0L
     var lastGlobalTriggerRt: Long = 0L
@@ -636,7 +618,7 @@ class AlarmEvaluationState {
     var maxDistance: Double = 0.0
     var distToHomeAuthority: Double? = null
 
-    // Issue #897: Sensitivity Propagation
+    // Sensitivity Propagation
     var vibrationSensitivity: Float = 0.5f
     var tiltSensitivity: Float = 0.5f
 
@@ -712,7 +694,6 @@ class AlarmEvaluationState {
         this.trackerLastValidFixRt = trackerLastValidFixRt
         this.trackerSpeed = trackerSpeed
         this.jumpTier = jumpTier
-        // this.isAdaptiveJump = isAdaptiveJump (Fix for val property)
         this.trackerBattery = trackerBattery
         this.trackerTemp = trackerTemp
         this.wasDistanceViolated = wasDistanceViolated
@@ -743,7 +724,6 @@ class EngineSnrSample(var ts: Long = 0L, var rt: Long = 0L, var snr: Double = 0.
 
 /**
  * EngineAcousticSample: Represents a forensic acoustic measurement.
- * R-ID 393: Decoupled from satellite SNR to prevent telemetry ambiguity.
  */
 class EngineAcousticSample(var ts: Long = 0L, var rt: Long = 0L, var db: Double = 0.0)
 

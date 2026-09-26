@@ -1,3 +1,36 @@
+# 🏛️ Resolution Archive - Sep.26.2
+
+## 🏁 Issue #1333: Peer Connection State Caching
+*   **Resolved**: Sep.26.2
+*   **Root Cause**: The system was logging `PEER LIFECYCLE` events every time a peer pulse was received, regardless of whether the connection state actually changed. This resulted in significant log noise and increased write overhead during active signaling sessions.
+*   **Remediation**:
+    *   **AppEventCoordinator.kt**: Introduced a `ConcurrentHashMap` (`peerConnectionCache`) to track the last known connection state of each remote peer.
+    *   **Logic**: Updated `handlePeerConnectionChanged` to suppress logging if the incoming state matches the cached state.
+    *   **Lifecycle**: Added cache clearing to the `ResetTimers` command handler to ensure clean state transitions across session boundaries.
+*   **R-ID**: 489
+
+# 🏛️ Resolution Archive - Sep.26.1
+
+## 🏁 Issue #1332: Viewer Self-Tracking Snapshot Optimization
+*   **Resolved**: Sep.26.1
+*   **Root Cause**: The Viewer role's self-tracking followed a separate, imperative code path compared to the Tracker role. This caused architectural asymmetry and required a redundant `ViewerLocationUpdated` event, increasing complexity in the DomainEventBus and coordinator.
+*   **Remediation**:
+    *   **MonitorService.kt**: Unified the GPS processing pipeline. Both roles now buffer incoming fixes in `locationBuffer` and process them during the primary `processTick` cycle.
+    *   **EngineModels.kt**: Removed the redundant `ViewerLocationUpdated` event from the `DomainEvent` hierarchy.
+    *   **AppEventCoordinator.kt**: Centralized local telemetry persistence within `handleTickEvaluated`, making it role-agnostic.
+*   **R-ID**: 488
+
+# 🏛️ Resolution Archive - Sep.26.0
+
+## 🏁 Issue #1314: TrackerStatus & Evaluation Snapshot Convergence
+*   **Resolved**: Sep.26.0
+*   **Root Cause**: Transitioning from engine evaluation to remote signaling required a heavy mapping layer (`mapSnapshotToStatus`) with over a dozen parameters. This was because forensic indexes (noise, lux, etc.) were calculated and passed as event metadata rather than being part of the primary state snapshot.
+*   **Remediation**:
+    *   **MonitorService.kt**: Refactored the evaluation loop to calculate and populate forensic indexes directly into the `SystemEvaluationSnapshot` partitioned states before event emission.
+    *   **EngineModels.kt**: Simplified the `TickEvaluated` event by removing redundant metadata fields.
+    *   **TelemetryMapper.kt**: Optimized `mapSnapshotToStatus` to leverage the pre-populated snapshot, drastically reducing mapping overhead and parameter passing.
+*   **R-ID**: 487
+
 # 🏛️ Resolution Archive - Sep.25.07
 
 ## 🏁 Issue #1329: Telemetry Mapping Convergence

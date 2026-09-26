@@ -1,26 +1,25 @@
-# Forensic Resumption Snapshot - Sep.25.07
+# Forensic Resumption Snapshot - Sep.26.2
 
 ## 📂 Session Summary
 *   **Completed**:
-    *   **Issue #1329**: Telemetry Mapping Convergence. Consolidated `LocationUpdate` construction into `TelemetryMapper.mapSnapshotToUpdate`.
-    *   **Architectural Hardening**: Aligned `AppAlarmManager`, `ConnectivitySuite`, and `MonitorService` with the partitioned `SystemEvaluationSnapshot` structure introduced in Issue #1330.
-    *   **Persistence Parity**: Introduced `LAST_VALID_FIX_RT_KEY` and updated `LocationProcessor` state loading to ensure monotonic fix references survive service role transitions and restarts.
-*   **Version**: Sep.25.07
-*   **Status**: Mapping centralization is complete. The system is now fully aligned with the partitioned telemetry architecture across all background domains.
+    *   **Issue #1333**: Peer Connection State Caching. Introduced a state cache in `AppEventCoordinator` to suppress redundant lifecycle logging during peer pulses.
+    *   **Issue #1332**: Viewer Self-Tracking Pipeline Unification. Unified GPS buffering and processing for all roles under a single evaluation path.
+    *   **Issue #1314**: TrackerStatus & Evaluation Snapshot Convergence. Consolidated telemetry DTOs into partitioned engine states to eliminate redundant mapping layers.
+*   **Version**: Sep.26.2
+*   **Status**: Telemetry core is fully unified and optimized. Logging noise from peer pulses is suppressed. Architectural Rule 1.16 added.
 
 ## 🔧 Technical Delta
-*   **TelemetryMapper.kt**: Added `mapSnapshotToUpdate` authority.
-*   **AppEventCoordinator.kt**: Switched to centralized mapping for persistence paths.
-*   **AppAlarmManager.kt**: Fixed field access errors by aligning with partitioned snapshot states.
-*   **ConnectivitySuite.kt**: Aligned peer update handlers with partitioned snapshot structure.
-*   **MonitorService.kt**: Fixed `loadState` calls and evaluation logic to match the refactored engine models.
-*   **LocationProcessor.kt**: Added `savedLastValidFixRt` to `loadState`.
-*   **PreferenceKeys.kt**: Added `LAST_VALID_FIX_RT_KEY`.
-*   **app/build.gradle**: Incremented version to `Sep.25.07`.
+*   **MonitorService.kt**: Unified GPS buffering and processing for both Tracker and Viewer roles. Moved forensic index calculations into the primary tick loop.
+*   **AppEventCoordinator.kt**: Implemented `peerConnectionCache` and integrated cache clearing into the `ResetTimers` command handler. Centralized local telemetry persistence under `handleTickEvaluated`.
+*   **EngineModels.kt**: Removed `ViewerLocationUpdated` event; simplified `TickEvaluated` event signature by removing redundant forensic fields.
+*   **HistoryManager.kt**: Refactored `updateRibbons` to extract telemetry metadata directly from snapshot partitioned states.
+*   **TelemetryMapper.kt**: Refactored `mapSnapshotToStatus` to leverage pre-populated engine snapshots.
+*   **STATUS/SOT_MASTER_REQUIREMENTS.md**: Updated to include Architectural Rule 1.16 (Peer Lifecycle Suppression).
+*   **issues.md**: Marked #1314, #1332, and #1333 as resolved.
 
 ## 📍 Resumption Point for Next Session
-*   **Immediate Priority**: Verify build stability after the massive DTO alignment.
-*   **Strategic Goal**: Issue #1314 (TrackerStatus Convergence) - Evaluate if the signaling DTO itself can be refactored to use the shared partitioned states to further reduce mapping overhead in `ConnectivitySuite`.
+*   **Immediate Priority**: Verify the stability of the unified `locationBuffer` logic under high-frequency GPS bursts (Stress testing).
+*   **Strategic Goal**: Holistic audit of `LocationProcessor` for any remaining role-specific branching that can be unified or simplified.
 
 ## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 486 (Rules: 26, IDs: 486), Resolved: 1230, Open: 0, Testing: 3 (Sub-items: 12), Ideas: 20, QA: 284]**
+**Current Audit Baseline: [SOT: 489 (Rules: 27, IDs: 489), Resolved: 1233, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**

@@ -4,18 +4,18 @@ import com.gps19.core.engine.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import timber.log.Timber
+import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
- * Sep.25.08:
- * - Issue #1329: Telemetry Mapping Convergence. Fully consolidated ribbon updates 
- *   using historyManager.updateRibbons(event) to eliminate redundant parameter logic.
- * Sep.25.07:
- * - Issue #1329: Telemetry Mapping Convergence. Consolidated LocationUpdate 
- *   construction into TelemetryMapper to remove redundant mapping logic.
+ * Sep.26.2:
+ * - Issue #1333: Peer Connection State Caching. Introduced peerConnectionCache 
+ *   to suppress redundant lifecycle logging. Added cache clearing to 
+ *   ResetTimers command handler to ensure clean state after session resets.
+ * - Issue #1332 Remediation: Removed stale reference to ViewerLocationUpdated.
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -31,6 +31,9 @@ class AppEventCoordinator @Inject constructor(
     private val domainEventBus: com.gps19.core.engine.DomainEventBus
 ) {
     private var isStarted = false
+    
+    // Issue #1333: Cache to suppress redundant peer lifecycle logs.
+    private val peerConnectionCache = ConcurrentHashMap<String, Boolean>()
 
     fun start(connectivitySuite: ConnectivitySuite) {
         if (isStarted) return
@@ -47,7 +50,6 @@ class AppEventCoordinator @Inject constructor(
         domainEventBus.events.collect { event ->
             when (event) {
                 is DomainEvent.TickEvaluated -> handleTickEvaluated(event, connectivitySuite)
-                is DomainEvent.ViewerLocationUpdated -> handleViewerLocationUpdated(event)
                 is DomainEvent.PeerStatusReceived -> repository.updateLocation(event.status)
                 is DomainEvent.PeerConnectionChanged -> handlePeerConnectionChanged(event)
                 is DomainEvent.HeuristicRecovery -> handleHeuristicRecovery(event)
@@ -74,41 +76,33 @@ class AppEventCoordinator @Inject constructor(
         val isTrackerMode = event.isTrackerMode
 
         // 1. Repository Persistence (Snap-to-Update Monolith)
-        if (isTrackerMode) {
-            repository.updateLocation(TelemetryMapper.mapSnapshotToUpdate(snapshot, proc, isMe = true, ts = now))
-            
-            // 2. Peer Signaling (Issue #1329: Centralized Status Mapping)
-            if (event.isPeerActive) {
-                connectivitySuite.sendTelemetry(TelemetryMapper.mapSnapshotToStatus(
-                    snapshot = snapshot,
-                    processed = proc,
-                    deviceId = configManager.deviceId,
-                    viewerId = configManager.viewerId,
-                    now = now,
-                    nowRt = nowRt,
-                    noiseIdx = event.noiseIdx,
-                    luxIdx = event.luxIdx,
-                    vibeIdx = event.vibeIdx,
-                    liftIdx = event.liftIdx,
-                    snrIdx = event.snrIdx,
-                    tiltIdx = event.tiltIdx,
-                    baroIdx = event.baroIdx,
-                    gnssDetail = event.gnssDetail,
-                    isSuspiciousMode = event.isSuspiciousMode,
-                    lastSitTs = event.lastSitTs
-                ))
-            }
+        repository.updateLocation(TelemetryMapper.mapSnapshotToUpdate(snapshot, proc, isMe = true, ts = now))
+        
+        // 2. Peer Signaling (Issue #1314: Convergence)
+        if (isTrackerMode && event.isPeerActive) {
+            connectivitySuite.sendTelemetry(TelemetryMapper.mapSnapshotToStatus(
+                snapshot = snapshot,
+                processed = proc,
+                deviceId = configManager.deviceId,
+                viewerId = configManager.viewerId,
+                now = now,
+                nowRt = nowRt,
+                gnssDetail = event.gnssDetail,
+                isSuspiciousMode = event.isSuspiciousMode,
+                lastSitTs = event.lastSitTs
+            ))
         }
 
-        // 3. Ribbon Updates (Issue #1329: Simplified Event-Driven Mapping)
+        // 3. Ribbon Updates (Issue #1314: Simplified Event-Driven Mapping)
         historyManager.updateRibbons(event)
     }
 
-    private suspend fun handleViewerLocationUpdated(event: DomainEvent.ViewerLocationUpdated) {
-        repository.updateLocation(TelemetryMapper.mapSnapshotToUpdate(event.snapshot, event.processed, isMe = true, ts = event.nowTs))
-    }
-
     private fun handlePeerConnectionChanged(event: DomainEvent.PeerConnectionChanged) {
+        val lastState = peerConnectionCache[event.peerId]
+        if (lastState == event.isConnected) return // Suppress redundant logging
+        
+        peerConnectionCache[event.peerId] = event.isConnected
+
         logManager.logServiceEvent(
             m = "PEER LIFECYCLE: Peer ${event.peerId} ${if (event.isConnected) "Connected" else "Disconnected"}",
             isImportant = true
@@ -251,7 +245,15 @@ class AppEventCoordinator @Inject constructor(
     }
 
     private fun handleCommandEvent(event: CommandEvent) {
-        // Handled in MonitorService
+        when (event) {
+            is CommandEvent.ResetTimers -> {
+                // Issue #1333: Clear peer connection cache on session reset
+                peerConnectionCache.clear()
+            }
+            else -> {
+                // Other commands handled in MonitorService
+            }
+        }
     }
 
     private fun handleRevivalEvent(event: RevivalEvent) {

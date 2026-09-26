@@ -24,12 +24,12 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
- * Sep.25.08:
- * - Issue #1329: Telemetry Mapping Convergence. Refactored evaluateAlarmsInternal 
- *   to use TelemetryMapper, eliminating redundant mapping logic.
- * Sep.25.07:
- * - Issue #1329 Remediation: Fixed compilation errors in evaluateAlarmsInternal 
- *   by aligning with the refactored SystemEvaluationSnapshot structure.
+ * Sep.26.1:
+ * - Issue #1332: Viewer Self-Tracking Snapshot Optimization. Unified GPS 
+ *   processing pipeline for both roles using locationBuffer. Consolidated 
+ *   self-telemetry persistence under TickEvaluated event.
+ * Sep.26.0:
+ * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -305,40 +305,9 @@ class MonitorService : BaseMonitorService() {
     }
 
     private fun onLocationChanged(location: Location) {
-        val nowRt = timeProvider.elapsedRealtime()
-        val nowWall = timeProvider.currentTimeMillis()
-        
         lastGpsBearing = location.bearing.toDouble()
         lastGpsAccuracy = location.accuracy.toDouble()
-        
-        if (isTrackerMode) {
-            locationBuffer.add(location)
-        } else {
-            val snapshot = SystemEvaluationSnapshot(
-                kinetic = KineticState(
-                    lat = location.latitude, lng = location.longitude, alt = location.altitude, 
-                    speed = location.speed.toDouble(), gpsTs = location.time, accuracy = lastGpsAccuracy, 
-                    bearing = location.bearing.toDouble(), rt = nowRt
-                ),
-                integrity = IntegrityState(
-                    satsUsed = hardwareSuite.satellitesUsed, satsView = hardwareSuite.satellitesInView,
-                    snrIdx = (hardwareSuite.averageSnr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0)
-                ),
-                snrSnapshot = hardwareSuite.averageSnr,
-                nowRt = nowRt, nowTs = nowWall, lastValidFixRt = primaryProcessor.getLastValidFixRt()
-            )
-            val processed = primaryProcessor.processGpsPoint(snapshot, isViewerTrail = true, lastGpsTs = sessionManager.lastGpsTs, isLocal = true)
-            if (!processed.isClockRegression) sessionManager.lastGpsTs = location.time
-            lastProcessedLocation = processed
-            
-            domainEventBus.emit(DomainEvent.ViewerLocationUpdated(
-                processed = processed,
-                snapshot = snapshot,
-                health = integrityMonitor.currentHealth,
-                nowRt = nowRt,
-                nowTs = nowWall
-            ))
-        }
+        locationBuffer.add(location)
     }
 
     private fun handleViewerPulse(id: String) {
@@ -520,46 +489,45 @@ class MonitorService : BaseMonitorService() {
             lastPowerSaveCheckRt = nowRt
         }
 
-        if (isTrackerMode) {
-            while (locationBuffer.isNotEmpty()) {
-                val loc = locationBuffer.poll() ?: break
-                val pointSnapshot = evaluationSnapshot.copy(
-                    kinetic = evaluationSnapshot.kinetic.copy(
-                        lat = loc.latitude, lng = loc.longitude, alt = loc.altitude, 
-                        speed = loc.speed.toDouble(), gpsTs = loc.time, 
-                        accuracy = loc.accuracy.toDouble(), bearing = loc.bearing.toDouble()
-                    ),
-                    isMuzzled = isSuspiciousMode
-                )
-                lastProcessedLocation = primaryProcessor.processGpsPoint(pointSnapshot, isViewerTrail = false, lastGpsTs = forensicAuditor.getLastGpsFixRealtime("T"), isLocal = true)
-                lastGpsBearing = loc.bearing.toDouble(); lastGpsAccuracy = loc.accuracy.toDouble()
+        // Issue #1332: Unified GPS point processing.
+        while (locationBuffer.isNotEmpty()) {
+            val loc = locationBuffer.poll() ?: break
+            val pointSnapshot = evaluationSnapshot.copy(
+                kinetic = evaluationSnapshot.kinetic.copy(
+                    lat = loc.latitude, lng = loc.longitude, alt = loc.altitude, 
+                    speed = loc.speed.toDouble(), gpsTs = loc.time, 
+                    accuracy = loc.accuracy.toDouble(), bearing = loc.bearing.toDouble()
+                ),
+                isMuzzled = if (isTrackerMode) isSuspiciousMode else false
+            )
+            lastProcessedLocation = primaryProcessor.processGpsPoint(
+                snapshot = pointSnapshot, 
+                isViewerTrail = !isTrackerMode, 
+                lastGpsTs = if (isTrackerMode) forensicAuditor.getLastGpsFixRealtime("T") else sessionManager.lastGpsTs, 
+                isLocal = true
+            )
+            if (!isTrackerMode && lastProcessedLocation?.isClockRegression == false) {
+                sessionManager.lastGpsTs = loc.time
             }
-            val proc = lastProcessedLocation
-            if (proc != null) {
-                evaluateAlarmsInternal(now, nowRt, isSocketConnected, isPeerActive, proc, hSnapshot, proc.timestamp, evaluationSnapshot)
-            }
-        } else {
-            val location = lastKnownLocation
-            if (location != null) {
-                val pointSnapshot = evaluationSnapshot.copy(
-                    kinetic = evaluationSnapshot.kinetic.copy(
-                        lat = location.latitude, lng = location.longitude, alt = location.altitude, 
-                        speed = location.speed.toDouble(), gpsTs = location.time, 
-                        accuracy = lastGpsAccuracy, bearing = location.bearing.toDouble()
-                    )
-                )
-                primaryProcessor.processGpsPoint(pointSnapshot, isViewerTrail = true, lastGpsTs = 0L, isLocal = true)
-            }
-            evaluateAlarmsInternal(now, nowRt, isSocketConnected, isPeerActive, lastProcessedLocation ?: ProcessedLocation(), hSnapshot, 0L, evaluationSnapshot)
+            lastGpsBearing = loc.bearing.toDouble()
+            lastGpsAccuracy = loc.accuracy.toDouble()
         }
 
-        val noiseIdx = (evaluationSnapshot.atmospheric.acousticDb - primaryProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB
-        val luxIdx = log10(evaluationSnapshot.atmospheric.lux + 1.0) / RIBBON_LUX_LOG_SCALE
-        val vibeIdx = evaluationSnapshot.atmospheric.vibration / RIBBON_VIBRATION_SCALE_G
-        val liftIdx = (evaluationSnapshot.atmospheric.baroAlt - primaryProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS
-        val snrIdx = (latestGnssDetail?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0) / RIBBON_SNR_SCALE_DB
-        val tiltIdx = abs(evaluationSnapshot.atmospheric.tiltDegrees - primaryProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG
-        val baroIdx = (evaluationSnapshot.atmospheric.baroAlt - primaryProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS
+        val proc = lastProcessedLocation
+        if (proc != null) {
+            evaluateAlarmsInternal(now, nowRt, isSocketConnected, isPeerActive, proc, hSnapshot, proc.timestamp, evaluationSnapshot)
+        }
+
+        // Issue #1314: Pre-populate forensic indexes in the snapshot before emission.
+        evaluationSnapshot.atmospheric.apply {
+            noiseIdx = (acousticDb - primaryProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB
+            luxIdx = log10(lux + 1.0) / RIBBON_LUX_LOG_SCALE
+            vibeIdx = vibration / RIBBON_VIBRATION_SCALE_G
+            liftIdx = (baroAlt - primaryProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS
+            tiltIdx = abs(tiltDegrees - primaryProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG
+            baroIdx = (baroAlt - primaryProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS
+        }
+        evaluationSnapshot.integrity.snrIdx = (latestGnssDetail?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0) / RIBBON_SNR_SCALE_DB
 
         val finalProc = lastProcessedLocation
         domainEventBus.emit(DomainEvent.TickEvaluated(
@@ -567,8 +535,7 @@ class MonitorService : BaseMonitorService() {
             processed = finalProc, health = health, isSocketConnected = isSocketConnected, isPeerActive = isPeerActive,
             serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), recoveryFlagged = recoveryFlagged,
             gnssDetail = latestGnssDetail, isSuspiciousMode = isSuspiciousMode,
-            lastSitTs = primaryProcessor.getLastSitTs(), lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime,
-            noiseIdx = noiseIdx, luxIdx = luxIdx, vibeIdx = vibeIdx, liftIdx = liftIdx, snrIdx = snrIdx, tiltIdx = tiltIdx, baroIdx = baroIdx
+            lastSitTs = primaryProcessor.getLastSitTs(), lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime
         ))
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt

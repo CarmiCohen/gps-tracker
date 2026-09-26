@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.25.08
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.2
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -11,22 +11,21 @@ Ready for next priority item.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 20)
-
-### 🛑 High Priority
-*   **Issue #1314: TrackerStatus & Evaluation Snapshot Convergence**
-    *   *Significance*: **Medium (Architecture)**. Evaluate if `TrackerStatus` DTO can be merged into `SystemEvaluationSnapshot` or refactored to use partitioned states to eliminate the mapping layer in `ConnectivitySuite`.
+## 💡 Strategic Simplification Ideas (Ideas: 17)
 
 ### 🟡 Medium Priority
-*   **Issue #1332: Viewer Self-Tracking Snapshot Optimization**
-    *   *Significance*: **Low (Simplicity)**. Now that Viewer persistence is bus-driven, evaluate if `ViewerLocationUpdated` can simply reuse `TickEvaluated` to further unify the event schema.
-*   **Issue #1333: Peer Connection State Caching**
-    *   *Significance*: **Low (UX)**. Introduce a `PeerConnectionState` cache in `AppEventCoordinator` to avoid redundant logging of connection events if the status hasn't changed.
+*   *(No immediate strategic ideas)*
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1333: Peer Connection State Caching** (Resolved Sep.26.2)
+    *   *Remediation*: Introduced a `ConcurrentHashMap` in `AppEventCoordinator` to track and cache the last known connection state of remote peers. Updated `handlePeerConnectionChanged` to suppress redundant logging when a peer pulse doesn't represent a state transition. Added cache clearing to the `ResetTimers` command handler to ensure log accuracy across session boundaries. (SOT ID 489).
+*   **Issue #1332: Viewer Self-Tracking Snapshot Optimization** (Resolved Sep.26.1)
+    *   *Remediation*: Unified the GPS processing pipeline for both Tracker and Viewer roles by routing all local fixes through `locationBuffer` within `MonitorService`. Removed the redundant `ViewerLocationUpdated` event and consolidated self-telemetry persistence under the `TickEvaluated` bus event. This eliminates role-specific branching in the telemetry core and simplifies the event schema. (SOT ID 488).
+*   **Issue #1314: TrackerStatus & Evaluation Snapshot Convergence** (Resolved Sep.26.0)
+    *   *Remediation*: Converged engine and signaling telemetry by pre-populating forensic indexes into `SystemEvaluationSnapshot` partitioned states within `MonitorService`. Simplified `TickEvaluated` event signature and `TelemetryMapper` logic to eliminate redundant parameter passing and redundant field-by-field copies. This aligns the signaling DTO (`TrackerStatus`) directly with the engine's internal state structure, reducing allocation churn during high-frequency telemetry pulses. (SOT ID 487).
 *   **Issue #1329: Telemetry Mapping Convergence** (Resolved Sep.25.08)
     *   *Remediation*: Fully centralized telemetry data transformation in `TelemetryMapper`. Consolidated mapping for `LocationUpdate`, `TrackerStatus`, and `PendingStatusEntity`, including incoming Proto/JSON signaling payloads. Removed ~250 lines of redundant mapping logic from `ConnectivitySuite` and `AppEventCoordinator`, ensuring a single source of truth for all role-agnostic data conversions. Fixed JSON key typos for cooling and battery state. (SOT ID 486).
 *   **Issue #1330: Snap-to-Update Monolith** (Resolved Sep.25.06)
@@ -49,4 +48,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 486 (Rules: 26, IDs: 486), Resolved: 1230, Open: 0, Testing: 3 (Sub-items: 13), Ideas: 20, QA: 284]**
+- **Current Audit Baseline: [SOT: 489 (Rules: 27, IDs: 489), Resolved: 1233, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
