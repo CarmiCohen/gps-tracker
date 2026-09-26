@@ -1,25 +1,24 @@
-# Forensic Resumption Snapshot - Sep.26.2
+# Forensic Resumption Snapshot - Sep.26.3
 
 ## 📂 Session Summary
 *   **Completed**:
-    *   **Issue #1333**: Peer Connection State Caching. Introduced a state cache in `AppEventCoordinator` to suppress redundant lifecycle logging during peer pulses.
-    *   **Issue #1332**: Viewer Self-Tracking Pipeline Unification. Unified GPS buffering and processing for all roles under a single evaluation path.
-    *   **Issue #1314**: TrackerStatus & Evaluation Snapshot Convergence. Consolidated telemetry DTOs into partitioned engine states to eliminate redundant mapping layers.
-*   **Version**: Sep.26.2
-*   **Status**: Telemetry core is fully unified and optimized. Logging noise from peer pulses is suppressed. Architectural Rule 1.16 added.
+    *   **Issue #1334**: Unified GPS Pipeline Hardening & Forensic Audit Integration. Fixed spatial anchor typo, standardized GPS temporal authority to wall-clock time, and integrated forensic stability auditing into the unified burst loop.
+    *   **Issue #1333**: Peer Connection State Caching. Introduced a state cache in `AppEventCoordinator` to suppress redundant lifecycle logging.
+    *   **Issue #1332**: Viewer Self-Tracking Pipeline Unification. Unified GPS buffering and processing for all roles.
+*   **Version**: Sep.26.3
+*   **Status**: GPS pipeline is architecturally hardened and audited. Unit tests are fully aligned with the unified snapshot model. Architectural Rule 1.17 added.
 
 ## 🔧 Technical Delta
-*   **MonitorService.kt**: Unified GPS buffering and processing for both Tracker and Viewer roles. Moved forensic index calculations into the primary tick loop.
-*   **AppEventCoordinator.kt**: Implemented `peerConnectionCache` and integrated cache clearing into the `ResetTimers` command handler. Centralized local telemetry persistence under `handleTickEvaluated`.
-*   **EngineModels.kt**: Removed `ViewerLocationUpdated` event; simplified `TickEvaluated` event signature by removing redundant forensic fields.
-*   **HistoryManager.kt**: Refactored `updateRibbons` to extract telemetry metadata directly from snapshot partitioned states.
-*   **TelemetryMapper.kt**: Refactored `mapSnapshotToStatus` to leverage pre-populated engine snapshots.
-*   **STATUS/SOT_MASTER_REQUIREMENTS.md**: Updated to include Architectural Rule 1.16 (Peer Lifecycle Suppression).
-*   **issues.md**: Marked #1314, #1332, and #1333 as resolved.
+*   **LocationProcessor.kt**: Fixed spatial anchor initialization typo (`lat, lng` correction).
+*   **MonitorService.kt**: Standardized `lastGpsTs` to wall-clock time across all roles; integrated `recordGpsFix` into the primary burst loop.
+*   **Engine Unit Tests**: Refactored `AdaptationMuzzleTest`, `AcousticCalibrationTest`, `AnchorEvaluatorTest`, `ForensicIdentityTest`, `GeofenceBatteryAuditTest`, and `MainAlarmLogicTest` to match new API signatures.
+*   **STATUS/SOT_MASTER_REQUIREMENTS.md**: Added Architectural Rule 1.17 (Temporal Authority Alignment) and SOT ID 490.
+*   **app/build.gradle**: Incremented `versionName` to `Sep.26.3`.
+*   **issues.md**: Resolved #1334; added strategic idea #1335 (Initialization Prefix Unification).
 
 ## 📍 Resumption Point for Next Session
-*   **Immediate Priority**: Verify the stability of the unified `locationBuffer` logic under high-frequency GPS bursts (Stress testing).
-*   **Strategic Goal**: Holistic audit of `LocationProcessor` for any remaining role-specific branching that can be unified or simplified.
+*   **Immediate Priority**: Implementation of **Issue #1335** to unify initialization prefixes in `MonitorService.loadLogicState`, eliminating role-specific branching for the `primaryProcessor`.
+*   **Strategic Goal**: Audit `AppEventCoordinator` for any remaining role-specific side-effect logic that can be consolidated.
 
 ## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 489 (Rules: 27, IDs: 489), Resolved: 1233, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
+**Current Audit Baseline: [SOT: 490 (Rules: 27, IDs: 490), Resolved: 1234, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 18, QA: 284]**

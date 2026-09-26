@@ -6,12 +6,8 @@ import org.junit.Test
 
 /**
  * AdaptationMuzzleTest: Validating A15-specific polling stabilization logic.
- * Sep.16.01:
- * - Issue #1059: Test Logic Alignment. Updated to correctly trigger internal muzzling 
- *   by establishing an initial interval before transition (R-ID 348, formerly R-ID 347).
- * Aug.04.50:
- * - Issue #715: Build Hardening. Updated to reactive flow collection to match 
- *   zero-churn ProcessorEvent migration.
+ * Sep.26.3:
+ * - Issue #1334: Updated to SystemEvaluationSnapshot API.
  */
 class AdaptationMuzzleTest {
 
@@ -32,17 +28,21 @@ class AdaptationMuzzleTest {
         timeProvider.elapsedTime = 10000L
 
         // 1. Establish initial fix and interval
-        // Internal muzzle only activates if transitioning FROM a non-zero interval.
         processor.updateExpectedInterval(timeProvider.elapsedTime, 45000L) 
 
+        val initialSnapshot = SystemEvaluationSnapshot(
+            kinetic = KineticState(lat = startLat, lng = startLng, alt = 10.0, gpsTs = now, accuracy = 5.0),
+            nowRt = timeProvider.elapsedTime,
+            nowTs = now
+        )
         processor.processGpsPoint(
-            lat = startLat, lng = startLng, alt = 10.0, androidSpeedMps = 0.0,
-            gpsTs = now, accuracy = 5.0, bearing = 0.0, snr = 40.0, satsUsed = 10,
-            isViewerTrail = false, lastGpsTs = 0L, isLocal = true
+            snapshot = initialSnapshot,
+            isViewerTrail = false,
+            lastGpsTs = 0L,
+            isLocal = true
         )
 
-        // 2. Simulate a frequency transition (e.g., from 45s to 2s)
-        // This triggers the internal muzzling logic in LocationProcessor.
+        // 2. Simulate a frequency transition
         processor.updateExpectedInterval(timeProvider.elapsedTime, 2000L)
 
         // 3. Simulate a "Jump" artifact immediately after transition.
@@ -51,11 +51,18 @@ class AdaptationMuzzleTest {
         timeProvider.wallTime = jumpTs
         timeProvider.elapsedTime += 2000L
 
+        val jumpSnapshot = SystemEvaluationSnapshot(
+            kinetic = KineticState(lat = jumpLat, lng = startLng, alt = 10.0, gpsTs = jumpTs, accuracy = 5.0),
+            nowRt = timeProvider.elapsedTime,
+            nowTs = jumpTs
+        )
+
         // With internal muzzle active - should be suppressed to VALID
         val resultMuzzled = processor.processGpsPoint(
-            lat = jumpLat, lng = startLng, alt = 10.0, androidSpeedMps = 0.0,
-            gpsTs = jumpTs, accuracy = 5.0, bearing = 0.0, snr = 40.0, satsUsed = 10,
-            isViewerTrail = false, lastGpsTs = now, isLocal = true
+            snapshot = jumpSnapshot,
+            isViewerTrail = false,
+            lastGpsTs = now,
+            isLocal = true
         )
 
         assertEquals("Jump should be suppressed to VALID when muzzled", SentinelStatus.VALID, resultMuzzled.status)
@@ -68,10 +75,17 @@ class AdaptationMuzzleTest {
         val nextJumpTs = jumpTs + 6000L
         timeProvider.wallTime = nextJumpTs
 
+        val expiredSnapshot = SystemEvaluationSnapshot(
+            kinetic = KineticState(lat = nextJumpLat, lng = startLng, alt = 10.0, gpsTs = nextJumpTs, accuracy = 5.0),
+            nowRt = timeProvider.elapsedTime,
+            nowTs = nextJumpTs
+        )
+
         val resultExpired = processor.processGpsPoint(
-            lat = nextJumpLat, lng = startLng, alt = 10.0, androidSpeedMps = 0.0,
-            gpsTs = nextJumpTs, accuracy = 5.0, bearing = 0.0, snr = 40.0, satsUsed = 10,
-            isViewerTrail = false, lastGpsTs = jumpTs, isLocal = true
+            snapshot = expiredSnapshot,
+            isViewerTrail = false,
+            lastGpsTs = jumpTs,
+            isLocal = true
         )
 
         assertEquals("Should be JUMP after muzzle expires", SentinelStatus.JUMP, resultExpired.status)

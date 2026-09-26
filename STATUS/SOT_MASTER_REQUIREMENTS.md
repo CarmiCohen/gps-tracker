@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.26.2)
+# SOT Master Requirements & Hardening Status (Sep.26.3)
 
 ## 🏗️ Architectural Master Rules (27 Rules)
 
@@ -19,6 +19,7 @@
 *   **1.14 Telemetry Partitioning (R485)**: All high-frequency telemetry DTOs must share partitioned state structures (Kinetic, Atmospheric, Integrity) to eliminate bridge mapping layers and enable zero-allocation flyweight double-buffering (Issue #1330).
 *   **1.15 Mapping Centralization (R486)**: Telemetry mapping and DTO construction must be centralized in `TelemetryMapper` to ensure consistency across self-tracking, peer signaling, and offline persistence. This includes authority over `LocationUpdate`, `TrackerStatus`, and `PendingStatusEntity` (Issue #1329).
 *   **1.16 Peer Lifecycle Suppression (R489)**: Redundant peer lifecycle events must be suppressed at the coordinator level using connection state caching to prevent forensic log saturation (Issue #1333).
+*   **1.17 Temporal Authority Alignment (R490)**: External temporal markers (`lastGpsTs`) must strictly utilize GPS wall-clock time for role-agnostic stall detection, while internal stability auditing (`recordGpsFix`) must be integrated into the primary unified burst processing loop to ensure high-frequency jitter validation (Issue #1334).
 
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318-758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
@@ -37,6 +38,7 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 490**: Unified GPS Pipeline Hardening - Remediated Issue #1334 by correcting spatial anchor initialization and standardizing GPS temporal authority across Tracker and Viewer roles. (Resolved Sep.26.3).
 *   **SOT ID 489**: Peer Connection State Caching - Remediated Issue #1333 by introducing connection state caching in `AppEventCoordinator` to suppress redundant lifecycle logging. (Resolved Sep.26.2).
 *   **SOT ID 488**: Viewer Self-Tracking Unification - Remediated Issue #1332 by unifying GPS processing for all roles and consolidating self-telemetry persistence under `TickEvaluated`. (Resolved Sep.26.1).
 *   **SOT ID 487**: TrackerStatus Convergence - Remediated Issue #1314 by pre-populating forensic indexes in `SystemEvaluationSnapshot` to eliminate mapping overhead during remote signaling. (Resolved Sep.26.0).
@@ -49,6 +51,7 @@
 *   **SOT ID 480**: Multi-Flow Fragmentation Convergence - Remediated Issue #1322 by converging all streams into unified `DomainEventBus`. (Resolved Sep.25.01).
 
 ## 📋 Functional Requirements (154 R-IDs)
+*   **R490**: Unified Temporal Authority Alignment.
 *   **R489**: Peer Lifecycle Suppression.
 *   **R488**: Unified Pipeline Persistence.
 *   **R487**: Snapshot Forensic Pre-population.
@@ -57,6 +60,7 @@
 *   *(Remaining requirements preserved in technical registry)*
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.123 (Temporal Authorization)**: PASSED - Verified role-agnostic GPS stall detection and burst stability auditing. (Sep.26.3)
 *   **Chapter 31.122 (Peer State Caching)**: PASSED - Verified that redundant peer lifecycle events are suppressed in logs. (Sep.26.2)
 *   **Chapter 31.121 (Viewer Pipeline Unification)**: PASSED - Verified that Viewer self-fixes follow the primary TickEvaluated path. (Sep.26.1)
 *   **Chapter 31.120 (Signaling Optimization)**: PASSED - Verified that forensic indexes are pre-calculated and embedded in the engine snapshot. (Sep.26.0)
@@ -64,4 +68,4 @@
 *   **Chapter 31.118 (Partitioned State Unification)**: PASSED - verified snapshot partition mapping. (Sep.22.30)
 
 ---
-*Next Audit: Oct.01.00. (Sep.26.2)*
+*Next Audit: Oct.01.00. (Sep.26.3)*

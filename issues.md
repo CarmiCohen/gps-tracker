@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.2
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.3
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -11,31 +11,39 @@ Ready for next priority item.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 17)
+## 💡 Strategic Simplification Ideas (Ideas: 18)
 
 ### 🟡 Medium Priority
-*   *(No immediate strategic ideas)*
+*   **Issue #1335: Initialization Prefix Unification**
+    *   *Description*: Unify `MonitorService.loadLogicState` to use `rolePrefix` for the `primaryProcessor` state restoration regardless of role, while reserving the "VR_" prefix strictly for the `remoteProcessor`. This removes the explicit `isTrackerMode` branching during initialization and ensures consistent self-tracking persistence for both Tracker and Viewer roles.
+    *   *Significance*: Medium.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1334: Unified GPS Pipeline Hardening & Forensic Audit Integration** (Resolved Sep.26.3)
+    *   *Remediation*: 
+        1. Fixed a critical typo in `LocationProcessor.loadState` where the spatial anchor was incorrectly initialized with duplicate latitudes (`lat, lat` instead of `lat, lng`), preventing filter divergence on service restart.
+        2. Standardized `lastGpsTs` tracking to wall-clock time (`loc.time`) uniformly across Tracker and Viewer roles in `MonitorService` to ensure reliable GPS stall detection.
+        3. Integrated `ForensicAuditor.recordGpsFix` into the unified `locationBuffer` processing loop to audit stability and jitter during high-frequency GPS bursts.
+        4. Refactored 42 unit tests in `:core:engine` to align with the stateless `LocationProcessingState` and unified `SystemEvaluationSnapshot` pipeline signature. (SOT ID 490).
 *   **Issue #1333: Peer Connection State Caching** (Resolved Sep.26.2)
-    *   *Remediation*: Introduced a `ConcurrentHashMap` in `AppEventCoordinator` to track and cache the last known connection state of remote peers. Updated `handlePeerConnectionChanged` to suppress redundant logging when a peer pulse doesn't represent a state transition. Added cache clearing to the `ResetTimers` command handler to ensure log accuracy across session boundaries. (SOT ID 489).
-*   **Issue #1332: Viewer Self-Tracking Snapshot Optimization** (Resolved Sep.26.1)
-    *   *Remediation*: Unified the GPS processing pipeline for both Tracker and Viewer roles by routing all local fixes through `locationBuffer` within `MonitorService`. Removed the redundant `ViewerLocationUpdated` event and consolidated self-telemetry persistence under the `TickEvaluated` bus event. This eliminates role-specific branching in the telemetry core and simplifies the event schema. (SOT ID 488).
+    *   *Remediation*: Introduced a state cache in `AppEventCoordinator` to suppress redundant lifecycle logging during peer pulses. (SOT ID 489).
+*   **Issue #1332: Viewer Self-Tracking Pipeline Unification** (Resolved Sep.26.1)
+    *   *Remediation*: Unified GPS buffering and processing for all roles under a single evaluation path. (SOT ID 488).
 *   **Issue #1314: TrackerStatus & Evaluation Snapshot Convergence** (Resolved Sep.26.0)
-    *   *Remediation*: Converged engine and signaling telemetry by pre-populating forensic indexes into `SystemEvaluationSnapshot` partitioned states within `MonitorService`. Simplified `TickEvaluated` event signature and `TelemetryMapper` logic to eliminate redundant parameter passing and redundant field-by-field copies. This aligns the signaling DTO (`TrackerStatus`) directly with the engine's internal state structure, reducing allocation churn during high-frequency telemetry pulses. (SOT ID 487).
+    *   *Remediation*: Consolidated telemetry DTOs into partitioned engine states. (SOT ID 487).
 *   **Issue #1329: Telemetry Mapping Convergence** (Resolved Sep.25.08)
-    *   *Remediation*: Fully centralized telemetry data transformation in `TelemetryMapper`. Consolidated mapping for `LocationUpdate`, `TrackerStatus`, and `PendingStatusEntity`, including incoming Proto/JSON signaling payloads. Removed ~250 lines of redundant mapping logic from `ConnectivitySuite` and `AppEventCoordinator`, ensuring a single source of truth for all role-agnostic data conversions. Fixed JSON key typos for cooling and battery state. (SOT ID 486).
+    *   *Remediation*: Fully centralized telemetry data transformation in `TelemetryMapper`. (SOT ID 486).
 *   **Issue #1330: Snap-to-Update Monolith** (Resolved Sep.25.06)
-    *   *Remediation*: Unified `SystemEvaluationSnapshot` with the partitioned state structure (`KineticState`, `AtmosphericState`, `IntegrityState`) used by `LocationUpdate`. Refactored `LocationProcessor`, `MonitorService`, and `AppEventCoordinator` to utilize these shared structures, eliminating ~100 lines of manual field-to-field mapping and reducing allocation churn during background pulses. (SOT ID 485).
+    *   *Remediation*: Unified `SystemEvaluationSnapshot` with the partitioned state structure. (SOT ID 485).
 *   **Issue #1327: Pulse-to-Tick Event Collision** (Resolved Sep.25.05)
-    *   *Remediation*: Introduced `DomainEvent.PeerConnectionChanged` to handle lifecycle-only notifications from peer pulses. Replaced redundant `TickEvaluated` emissions in pulse handlers to eliminate unnecessary side-effects and stale telemetry propagation. (SOT ID 484).
+    *   *Remediation*: Introduced `DomainEvent.PeerConnectionChanged` to handle lifecycle-only notifications. (SOT ID 484).
 *   **Issue #1324: Peer Signaling Coupling to Repository** (Resolved Sep.25.04)
-    *   *Remediation*: Transitioned peer telemetry persistence to a reactive, bus-driven model. `ConnectivitySuite` now emits `DomainEvent.PeerStatusReceived` upon validating incoming peer updates, which is then persisted by `AppEventCoordinator`. (SOT ID 483).
+    *   *Remediation*: Transitioned peer telemetry persistence to a reactive, bus-driven model. (SOT ID 483).
 *   **Issue #1323: Residual Imperative Persistence in MonitorService** (Resolved Sep.25.03)
-    *   *Remediation*: Converged Viewer self-tracking persistence into the unified `DomainEventBus`. Eliminated the imperative `updateRepositoryLocation` method in `MonitorService`, offloading I/O to the `AppEventCoordinator`. (SOT ID 482).
+    *   *Remediation*: Converged Viewer self-tracking persistence into the unified `DomainEventBus`. (SOT ID 482).
 *   **Issue #1331: DomainEventBus Capacity Hardening** (Resolved Sep.25.02)
     *   *Remediation*: Increased extra buffer capacity to 128 and introduced DROP_OLDEST overflow policy. (SOT ID 481).
 *   **Issue #1322: Multi-Flow Fragmentation Convergence** (Resolved Sep.25.01)
@@ -48,4 +56,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 489 (Rules: 27, IDs: 489), Resolved: 1233, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
+- **Current Audit Baseline: [SOT: 490 (Rules: 27, IDs: 490), Resolved: 1234, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 18, QA: 284]**

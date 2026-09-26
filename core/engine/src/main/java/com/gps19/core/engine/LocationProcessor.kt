@@ -5,6 +5,8 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.26.3:
+ * - Issue #1334: Fixed Spatial Anchor initialization typo (lat, lat -> lat, lng).
  * Sep.25.07:
  * - Issue #1329: Added savedLastValidFixRt to loadState for monotonic fix recovery.
  * Sep.25.05:
@@ -60,7 +62,7 @@ class LocationProcessor(
             state.lastLng = trackerState.lng
             state.lastTs = trackerState.gpsTs
             state.lastRt = timeProvider.elapsedRealtime()
-            LocationSentinel.setSpatialAnchor(state, trackerState.lat, trackerState.lat, trackerState.alt, trackerState.gpsTs, state.lastRt)
+            LocationSentinel.setSpatialAnchor(state, trackerState.lat, trackerState.lng, trackerState.alt, trackerState.gpsTs, state.lastRt)
         }
 
         state.cachedHomePoints = homePoints

@@ -8,9 +8,8 @@ import org.junit.Test
 
 /**
  * ForensicIdentityTest: Verifying signature-based trace deduplication.
- * Aug.04.50:
- * - Issue #715: Build Hardening. Updated to reactive flow collection to match 
- *   zero-churn ProcessorEvent migration and remediated LocationProcessorListener drift.
+ * Sep.26.3:
+ * - Issue #1334: Adapted to SystemEvaluationSnapshot API.
  */
 class ForensicIdentityTest {
 
@@ -31,18 +30,32 @@ class ForensicIdentityTest {
         timeProvider.wallTime = ts
         timeProvider.elapsedTime = 10000L
 
+        val initialSnapshot = SystemEvaluationSnapshot(
+            kinetic = KineticState(lat = lat, lng = lng, alt = 0.0, speed = 0.0, gpsTs = ts, accuracy = 5.0, bearing = 0.0),
+            nowRt = timeProvider.elapsedTime,
+            nowTs = ts
+        )
+
         // 1. Process first point - should be saved
         processor.processGpsPoint(
-            lat = lat, lng = lng, alt = 0.0, androidSpeedMps = 0.0,
-            gpsTs = ts, accuracy = 5.0, bearing = 0.0, snr = 40.0, satsUsed = 10,
-            isViewerTrail = false, lastGpsTs = 0L, isLocal = true
+            snapshot = initialSnapshot,
+            isViewerTrail = false,
+            lastGpsTs = 0L,
+            isLocal = true
+        )
+
+        val duplicateSnapshot = SystemEvaluationSnapshot(
+            kinetic = KineticState(lat = lat, lng = lng, alt = 0.0, speed = 0.0, gpsTs = ts, accuracy = 5.0, bearing = 0.0),
+            nowRt = timeProvider.elapsedTime,
+            nowTs = ts
         )
 
         // 2. Process same point again after 5s - should be suppressed (within same TS)
         val result = processor.processGpsPoint(
-            lat = lat, lng = lng, alt = 0.0, androidSpeedMps = 0.0,
-            gpsTs = ts, accuracy = 5.0, bearing = 0.0, snr = 40.0, satsUsed = 10,
-            isViewerTrail = false, lastGpsTs = ts, isLocal = true
+            snapshot = duplicateSnapshot,
+            isViewerTrail = false,
+            lastGpsTs = ts,
+            isLocal = true
         )
 
         assertTrue("Duplicate point should be suppressed", result.isStalled)

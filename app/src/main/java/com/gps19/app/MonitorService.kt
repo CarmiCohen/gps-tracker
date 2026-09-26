@@ -24,6 +24,9 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.26.3:
+ * - Issue #1334: Unified GPS Pipeline Hardening & Forensic Audit Integration. Standardized 
+ *   lastGpsTs tracking to wall-clock time across roles and integrated forensic stability fix auditing.
  * Sep.26.1:
  * - Issue #1332: Viewer Self-Tracking Snapshot Optimization. Unified GPS 
  *   processing pipeline for both roles using locationBuffer. Consolidated 
@@ -489,9 +492,13 @@ class MonitorService : BaseMonitorService() {
             lastPowerSaveCheckRt = nowRt
         }
 
-        // Issue #1332: Unified GPS point processing.
+        // Issue #1332 & Issue #1334: Unified GPS point processing with full Forensic audit integration.
         while (locationBuffer.isNotEmpty()) {
             val loc = locationBuffer.poll() ?: break
+            
+            // Standardized: Perform forensic stability fix audit within the primary loop
+            forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, if (isTrackerMode) "T" else "V")
+
             val pointSnapshot = evaluationSnapshot.copy(
                 kinetic = evaluationSnapshot.kinetic.copy(
                     lat = loc.latitude, lng = loc.longitude, alt = loc.altitude, 
@@ -503,10 +510,10 @@ class MonitorService : BaseMonitorService() {
             lastProcessedLocation = primaryProcessor.processGpsPoint(
                 snapshot = pointSnapshot, 
                 isViewerTrail = !isTrackerMode, 
-                lastGpsTs = if (isTrackerMode) forensicAuditor.getLastGpsFixRealtime("T") else sessionManager.lastGpsTs, 
+                lastGpsTs = sessionManager.lastGpsTs, 
                 isLocal = true
             )
-            if (!isTrackerMode && lastProcessedLocation?.isClockRegression == false) {
+            if (lastProcessedLocation?.isClockRegression == false) {
                 sessionManager.lastGpsTs = loc.time
             }
             lastGpsBearing = loc.bearing.toDouble()

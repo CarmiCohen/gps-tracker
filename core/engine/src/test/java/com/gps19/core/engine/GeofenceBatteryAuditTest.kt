@@ -7,13 +7,8 @@ import kotlin.math.*
 
 /**
  * GeofenceBatteryAuditTest: Verification of R406a Dynamic Polling vs. Geofence Integrity.
- * Sep.16.05:
- * - Issue #1060 Capability Consolidation: Updated HardwareCapabilities initialization 
- *   to match direct performanceTier enum pattern (R-ID 348).
- * Sep.16.01:
- * - Issue #1059: Unified Staggered Tier Audit. Updated HardwareCapabilities 
- *   to use isStaggeredTier flag (R-ID 348, formerly R-ID 347).
- * [Issue #169] Geofence Accuracy vs. Battery Audit.
+ * Sep.26.3:
+ * - Issue #1334: Adapted to SystemEvaluationSnapshot and MainAlarmLogic API.
  */
 class GeofenceBatteryAuditTest {
 
@@ -31,6 +26,8 @@ class GeofenceBatteryAuditTest {
     }
 
     private val spikeLogger: (String, Long) -> Unit = { _, _ -> }
+    private val onTrigger: (AlarmEvaluationState.ActiveAlarm) -> Unit = { }
+    private val onResolve: (AlarmEvaluationState.ActiveAlarm, Long) -> Unit = { _, _ -> }
 
     private fun createDefaultState(): AlarmEvaluationState {
         val now = mockTimeProvider.currentTimeMillis()
@@ -94,7 +91,7 @@ class GeofenceBatteryAuditTest {
         state.trackerLat = 10.0011 // ~120m away
         state.trackerSpeed = 5.0
         state.lastGpsPacketRt = state.nowRt
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger, onTrigger, onResolve)
         val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
         assertTrue("Geofence should trigger immediately on throttled fix due to predictive exit", geofence?.conditionMet == true)
     }
@@ -109,7 +106,7 @@ class GeofenceBatteryAuditTest {
         state.health.isBatterySteepDischarge = true
         state.health.cpuLoad = 0.8
         state.trackerBattery = 19
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger, onTrigger, onResolve)
         val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
         val battery = report.reports.find { it.type == ALERT_ID_BATTERY_STEEP_DISCHARGE }
         assertTrue("Geofence breach must be active", geofence?.conditionMet == true)
@@ -129,7 +126,7 @@ class GeofenceBatteryAuditTest {
         state.nowRt = mockTimeProvider.elapsedRealtime()
         state.health.isLocationPending = true
         state.trackerSpeed = 20.0
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger, onTrigger, onResolve)
         assertTrue("Violation must NOT clear during GPS gap uncertainty expansion", state.wasDistanceViolated)
     }
 
@@ -140,14 +137,41 @@ class GeofenceBatteryAuditTest {
         val nowRt = mockTimeProvider.elapsedRealtime()
         val nowWall = mockTimeProvider.currentTimeMillis()
         
-        processor.processGpsPoint(10.0, 10.0, 0.0, 0.0, nowWall, 5.0, 0.0, 40.0, 10, false, 0L, true, nowWall = nowWall, nowRt = nowRt)
+        val snap1 = SystemEvaluationSnapshot(
+            kinetic = KineticState(lat = 10.0, lng = 10.0, alt = 0.0, speed = 0.0, accuracy = 5.0, bearing = 0.0, gpsTs = nowWall),
+            nowRt = nowRt,
+            nowTs = nowWall
+        )
+        processor.processGpsPoint(snapshot = snap1, isViewerTrail = false, lastGpsTs = 0L, isLocal = true)
         
-        processor.updateSensorData(vibration = 2.0, heading = 0.0, baroAlt = 0.0, nowRt = nowRt + 1000, nowWall = nowWall + 1000)
-        val res2 = processor.processGpsPoint(10.00005, 10.0, 0.0, 5.0, nowWall + 2000, 5.0, 0.0, 40.0, 10, false, nowWall, true, nowWall = nowWall + 2000, nowRt = nowRt + 2000)
+        val snapSensor1 = SystemEvaluationSnapshot(
+            atmospheric = AtmosphericState(vibration = 2.0, heading = 0.0, baroAlt = 0.0),
+            nowRt = nowRt + 1000,
+            nowTs = nowWall + 1000
+        )
+        processor.updateSensorData(snapSensor1)
+        
+        val snap2 = SystemEvaluationSnapshot(
+            kinetic = KineticState(lat = 10.00005, lng = 10.0, alt = 0.0, speed = 5.0, accuracy = 5.0, bearing = 0.0, gpsTs = nowWall + 2000),
+            nowRt = nowRt + 2000,
+            nowTs = nowWall + 2000
+        )
+        val res2 = processor.processGpsPoint(snapshot = snap2, isViewerTrail = false, lastGpsTs = nowWall, isLocal = true)
         assertEquals(SentinelStatus.TAMPER, res2.status)
         
-        processor.updateSensorData(vibration = 0.05, heading = 0.0, baroAlt = 0.0, nowRt = nowRt + 3000, nowWall = nowWall + 3000)
-        val res3 = processor.processGpsPoint(10.0, 10.0, 0.0, 0.0, nowWall + 4000, 5.0, 0.0, 40.0, 10, false, nowWall + 2000, true, nowWall = nowWall + 4000, nowRt = nowRt + 4000)
+        val snapSensor2 = SystemEvaluationSnapshot(
+            atmospheric = AtmosphericState(vibration = 0.05, heading = 0.0, baroAlt = 0.0),
+            nowRt = nowRt + 3000,
+            nowTs = nowWall + 3000
+        )
+        processor.updateSensorData(snapSensor2)
+        
+        val snap3 = SystemEvaluationSnapshot(
+            kinetic = KineticState(lat = 10.0, lng = 10.0, alt = 0.0, speed = 0.0, accuracy = 5.0, bearing = 0.0, gpsTs = nowWall + 4000),
+            nowRt = nowRt + 4000,
+            nowTs = nowWall + 4000
+        )
+        val res3 = processor.processGpsPoint(snapshot = snap3, isViewerTrail = false, lastGpsTs = nowWall + 2000, isLocal = true)
         assertEquals(SentinelStatus.VALID, res3.status)
     }
 
@@ -164,7 +188,7 @@ class GeofenceBatteryAuditTest {
             ioWait = 0.5
             maxIoLatency = 1000L
         }
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger, onTrigger, onResolve)
         val silentFailure = report.reports.find { it.type == ALERT_ID_SILENT_FAILURE }
         assertTrue("Silent Failure should trigger due to thermal-correlated stall", silentFailure?.conditionMet == true)
     }

@@ -1,3 +1,17 @@
+# 🏛️ Resolution Archive - Sep.26.3
+
+## 🏁 Issue #1334: Unified GPS Pipeline Hardening & Forensic Audit Integration
+*   **Resolved**: Sep.26.3
+*   **Root Cause**: 
+    1.  **Coordinate Duplication Typo**: `LocationProcessor.loadState` was initializing the spatial anchor with duplicate latitudes (`lat, lat` instead of `lat, lng`), corrupting the filter state on restart.
+    2.  **Temporal Inconsistency**: `MonitorService` was tracking `lastGpsTs` using mixed time domains (Realtime vs Wall-clock), which caused intermittent failures in GPS stall detection.
+    3.  **Missing Audit Point**: High-frequency GPS bursts in the unified `locationBuffer` were bypassing the `ForensicAuditor.recordGpsFix` stability audit.
+*   **Remediation**:
+    *   **LocationProcessor.kt**: Corrected the `setSpatialAnchor` call to use both `lat` and `lng`.
+    *   **MonitorService.kt**: Standardized `lastGpsTs` tracking to wall-clock time (`loc.time`) for all roles and integrated `forensicAuditor.recordGpsFix` into the unified burst processing loop.
+    *   **Unit Tests**: Aligned 42 unit tests with the updated `LocationProcessingState` and `SystemEvaluationSnapshot` pipeline signatures.
+*   **R-ID**: 490
+
 # 🏛️ Resolution Archive - Sep.26.2
 
 ## 🏁 Issue #1333: Peer Connection State Caching
