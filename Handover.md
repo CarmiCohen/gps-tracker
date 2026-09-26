@@ -1,21 +1,21 @@
-# Forensic Resumption Snapshot - Sep.26.4
+# Forensic Resumption Snapshot - Sep.26.5
 
 ## 📂 Session Summary
 *   **Completed**:
-    *   **Issue #1335**: Initialization Prefix Unification. Unified `MonitorService.loadLogicState` to use `rolePrefix` for `primaryProcessor` state restoration regardless of role, eliminating role-specific branching and ensuring consistent self-tracking persistence.
-*   **Version**: Sep.26.4
-*   **Status**: Initialization logic for self-tracking is now role-agnostic. Architectural Rule 1.18 added.
-*   **Audit Baseline**: [SOT: 491 (Rules: 28, IDs: 491), Resolved: 1235, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]
+    *   **Issue #1336**: AppEventCoordinator & HistoryManager Side-Effect Unification. Removed restrictive role-specific branching guards from processor events, enabling role-agnostic state persistence for primary self-tracking processors across all modes. Unified integrity event side-effects via dynamic alarmPrefix mapping.
+*   **Version**: Sep.26.5
+*   **Status**: Domain side-effects triggered by processor events are now completely role-agnostic. Architectural Rule 1.19 added.
+*   **Audit Baseline**: [SOT: 492 (Rules: 29, IDs: 492), Resolved: 1236, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]
 
 ## 🔧 Technical Delta
-*   **MonitorService.kt**: Refactored `loadLogicState` to use `rolePrefix` for all `primaryProcessor` restoration calls; strictly isolated `VR_` prefix to the `remoteProcessor`.
-*   **app/build.gradle**: Incremented `versionName` to `Sep.26.4`.
-*   **STATUS/SOT_MASTER_REQUIREMENTS.md**: Added Architectural Rule 1.18 (Initialization Prefix Unification) and SOT ID 491.
-*   **issues.md**: Resolved #1335.
+*   **AppEventCoordinator.kt**: Refactored `handleProcessorEvent` to eliminate role guards from accuracy, chair baseline, vibration floor, lux baseline, and acoustic floor updates; aligned `handleIntegrityEvent` power tamper alarms with the dynamic prefix model.
+*   **app/build.gradle**: Incremented `versionName` to `Sep.26.5`.
+*   **STATUS/SOT_MASTER_REQUIREMENTS.md**: Added Architectural Rule 1.19 (Side-Effect Unification) and SOT ID 492.
+*   **issues.md**: Resolved #1336.
 
 ## 📍 Resumption Point for Next Session
-*   **Immediate Priority**: Audit `AppEventCoordinator` for remaining role-specific side-effect logic (e.g., peer connection events or notification triggers) that can be consolidated into role-agnostic paths.
-*   **Strategic Goal**: Evaluate `HistoryManager` for potential prefix unification to align with the `rolePrefix` model used in `MonitorService`.
+*   **Immediate Priority**: Audit `AppAlarmManager` verification scenarios or telemetry logging for any further hardcoded role assumptions.
+*   **Strategic Goal**: Verify multi-level staggering under the `LifecycleHydrationManager` across both role lifecycles.
 
 ## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 491 (Rules: 28, IDs: 491), Resolved: 1235, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
+**Current Audit Baseline: [SOT: 492 (Rules: 29, IDs: 492), Resolved: 1236, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**

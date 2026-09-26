@@ -1,25 +1,42 @@
-//# 🟢 Guidelines for Implementation
+# 🟢 Guidelines for Implementation
 
-The following rules MUST be followed strictly for every task:
+The following rules **MUST** be followed strictly for every task:
 
-1. **Display Issue**: Display the selected issue here before starting the fix.
-2. **Root-Cause Remediation**: Remediate the issues using only root-cause-oriented solutions, keep consistency with the project's architecture, design principles, and long-term maintainability objectives. Avoid temporary mitigations or workaround-based implementations. Rigorously remove leftovers, and leftovers of the leftovers, etc. Try to keep the app simple.
-3. **Record Concerns**: Document any newly identified concerns in `issues.md`. Concerns include - risks, defects, inconsistencies.
-4. **Mark Resolved**: Record all fixed issues in the relevant status tracking file and mark them as resolved.
-5. **Continuous Handover**: Update `Handover.md` after each modification to any `.kt` file.
-6. **Transparency**: Briefly explain each action before executing it.
-7. **Large File Protection**: Prioritize using `replace_text` for targeted updates in large files (especially `.md` and `.xml`) to prevent accidental data loss or truncation. Avoid using summaries or placeholders when using `write_file`.
+1.  **Display Issue**: Explicitly display the selected issue details before initiating any fix.
+2.  **Root-Cause Remediation**:
+    *   **Architecture First**: Resolve issues using root-cause-oriented solutions that align with the project's architecture and long-term maintainability.
+    *   **No Workarounds**: Avoid temporary mitigations. Rigorously remove all "leftovers" from previous or current implementations.
+    *   **Simplicity**: Prioritize code and architectural simplicity.
+3.  **Comprehensive Resolution**: Ensure the implementation is fully resolved by addressing:
+    *   Missing functionality and unhandled edge cases.
+    *   Unfinished integration points.
+    *   Inconsistencies with requirements.
+    *   Unintended side effects and remaining risks.
+4.  **Record Concerns**: Document newly identified risks, defects, or inconsistencies in `issues.md`.
+5.  **Mark Resolved**: Update the relevant status tracking files and mark fixed issues as resolved.
+6.  **Continuous Handover**: Update `Handover.md` immediately after any modification to a `.kt` file.
+7.  **Transparency**: Provide a brief explanation for every action performed.
+8.  **Large File Protection**:
+    *   Use `replace_text` for targeted updates in large files (especially `.md` and `.xml`) to prevent data loss or truncation.
+    *   Never use summaries or placeholders when using `write_file`.
+9.  **Completion Adherence**: Execute the **Completion Sequence** in strict order after finishing an issue.
+10. **Strict Termination**: Once the completion sequence is finished, do not implement anything else. **STOP ALL PROCESSING.**
+
+---
 
 ## 🏁 Completion Sequence
-Perform the following steps in order once an issue is resolved:
 
-1. **Integrity Audit**: Verify that no `*.md` or `*.xml` files were accidentally truncated and ensure the change is consistent with existing code and documentation.
-2. **State Tracking Update**: Update `issues.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, and `STATUS/RESOLUTION_ARCHIVE.md`. Record all fixed issues and verify that new concerns have issue numbers assigned.
-3. **Dashboard Extension**: Extend and synchronize the **Hardening Progress Dashboard** in `issues.md` to match the **Current Audit Baseline** (SOT Rules, SOT IDs, Resolved, Open, Testing Chapters, Testing Sub-items, Simplification Ideas, and QA Validation tasks).
-4. **App Build & Versioning**: Rebuild the app and update the `versionName` in `app/build.gradle`.
-5. **Git Release Block**: Prepare a Git command block to stage, commit, tag the version, and push to the remote repository.
-6. **Simplicity Audit**: Evaluate if the code or app architecture can be further simplified. Save these ideas directly in `issues.md` under the "Strategic Simplification Ideas" section. Ensure each idea is assigned a unique issue number and significance (High, Medium, Low), and maintains the order of items by their potential contribution to the app.
-7. **Large File Protection**: Verify that Rule 7 was strictly followed for all file modifications, ensuring no truncation occurred in large `.md` or `.xml` files.
-8. **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot to prepare for a fresh chat session.
-9. **Session Termination**: Stop the chat immediately. Do not attempt to fix any other issues or continue work.
-10. **Audit Recalculation**: Recalculate all metrics and display them in the format: **Current Audit Baseline: [SOT: X (Rules: Y, IDs: Z), Resolved: A, Open: B, Testing: C (Sub-items: D), Ideas: E, QA: F]**.
+Perform these steps in strict sequence once an issue is resolved:
+
+1.  **Integrity Audit**: Verify no `*.md` or `*.xml` files were truncated. Ensure all changes are consistent with existing code and documentation.
+2.  **State Tracking Update**: Synchronize `issues.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, and `STATUS/RESOLUTION_ARCHIVE.md`. Assign issue numbers to all new concerns.
+3.  **Dashboard Synchronization**: Update the **Hardening Progress Dashboard** in `issues.md` to reflect the **Current Audit Baseline** (SOT Rules/IDs, Resolved, Open, Testing, Simplification Ideas, and QA tasks).
+4.  **App Build & Versioning**: Rebuild the application and increment the `versionName` in `app/build.gradle`.
+5.  **Git Release Block**: Generate a Git command block for staging, committing, tagging the version, and pushing to the remote.
+6.  **Simplicity Audit**: Evaluate potential architectural simplifications. Document these in the "Strategic Simplification Ideas" section of `issues.md` with unique IDs and significance levels (High, Medium, Low).
+7.  **Rule 8 Verification**: Confirm that Rule 8 (Large File Protection) was strictly followed for all modifications.
+8.  **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot for the next session.
+9.  **Session Termination**: Stop the chat immediately. Do not attempt further fixes.
+10. **Audit Recalculation**: Display final metrics in the format:  
+    **Current Audit Baseline: [SOT: X (Rules: Y, IDs: Z), Resolved: A, Open: B, Testing: C (Sub-items: D), Ideas: E, QA: F]**
+11. **Final Stop**: After the audit recalculation, **STOP ALL PROCESSING.**

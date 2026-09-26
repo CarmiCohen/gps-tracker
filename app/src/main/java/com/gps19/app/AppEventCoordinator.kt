@@ -11,11 +11,11 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
- * Sep.26.2:
- * - Issue #1333: Peer Connection State Caching. Introduced peerConnectionCache 
- *   to suppress redundant lifecycle logging. Added cache clearing to 
- *   ResetTimers command handler to ensure clean state after session resets.
- * - Issue #1332 Remediation: Removed stale reference to ViewerLocationUpdated.
+ * Sep.26.5:
+ * - Issue #1336: AppEventCoordinator & HistoryManager Side-Effect Unification.
+ *   Removed restrictive role-specific branching guards from processor events,
+ *   enabling role-agnostic persistence for primary self-tracking processors across all modes.
+ * - Unified handleIntegrityEvent using dynamic alarmPrefix mapping.
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -142,15 +142,16 @@ class AppEventCoordinator @Inject constructor(
     }
 
     private fun handleIntegrityEvent(event: IntegrityEvent) {
+        val alarmPrefix = if (configManager.isTrackerMode) "T_" else "VR_"
         when (event) {
             is IntegrityEvent.ViolationSustained -> {
-                if (configManager.isTrackerMode && event.type == ALERT_ID_TRACKER_POWER) {
-                    alarmManager.setPowerAlarmPending(true, "T_")
+                if (event.type == ALERT_ID_TRACKER_POWER) {
+                    alarmManager.setPowerAlarmPending(true, alarmPrefix)
                 }
             }
             is IntegrityEvent.ViolationResolved -> {
-                if (configManager.isTrackerMode && event.type == ALERT_ID_TRACKER_POWER) {
-                    alarmManager.setPowerAlarmPending(false, "T_")
+                if (event.type == ALERT_ID_TRACKER_POWER) {
+                    alarmManager.setPowerAlarmPending(false, alarmPrefix)
                 }
             }
             is IntegrityEvent.LogEvent -> {
@@ -189,7 +190,7 @@ class AppEventCoordinator @Inject constructor(
                 )
             }
             is ProcessorEvent.MaxAccuracyChanged -> {
-                if (isTrackerMode || !isPrimary) repository.saveDoubleSync(prefix + MAX_ACCURACY_KEY, event.accuracy)
+                repository.saveDoubleSync(prefix + MAX_ACCURACY_KEY, event.accuracy)
             }
             is ProcessorEvent.ChairBaselineChanged -> {
                 val telem = if (isTrackerMode || isPrimary) repository.getLocalLocationSync() else repository.getTrackerLocationSync()
@@ -197,22 +198,16 @@ class AppEventCoordinator @Inject constructor(
                     m = "Passive Zeroing: Chair baseline calibrated to ${event.baseline.roundToOneDecimal()}°", 
                     lat = telem.kinetic.lat, lng = telem.kinetic.lng, accuracy = telem.kinetic.maxAccuracy
                 )
-                if (isTrackerMode || !isPrimary) repository.saveDoubleSync(prefix + CHAIR_BASELINE_TILT_KEY, event.baseline)
+                repository.saveDoubleSync(prefix + CHAIR_BASELINE_TILT_KEY, event.baseline)
             }
             is ProcessorEvent.VibrationFloorChanged -> {
-                if (isTrackerMode || !isPrimary) {
-                    repository.saveDoubleDebounced(prefix + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
-                }
+                repository.saveDoubleDebounced(prefix + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
             }
             is ProcessorEvent.LuxBaselineChanged -> {
-                if (isTrackerMode || !isPrimary) {
-                    repository.saveDoubleDebounced(prefix + TRACKER_LUX_BASELINE_KEY, event.baseline)
-                }
+                repository.saveDoubleDebounced(prefix + TRACKER_LUX_BASELINE_KEY, event.baseline)
             }
             is ProcessorEvent.AcousticFloorChanged -> {
-                if (isTrackerMode || !isPrimary) {
-                    repository.saveDoubleDebounced(prefix + TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
-                }
+                repository.saveDoubleDebounced(prefix + TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
             }
             is ProcessorEvent.GpsStallDetected -> {
                 if (!isTrackerMode && isPrimary) logManager.logServiceEvent(m = "GPS STALL: Fix unchanged for >1s", isImportant = false)

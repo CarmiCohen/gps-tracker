@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.4
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.5
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -11,17 +11,17 @@ Ready for next priority item.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 18)
+## 💡 Strategic Simplification Ideas (Ideas: 17)
 
 ### 🟡 Medium Priority
-*   **Issue #1336: HistoryManager Prefix Unification**
-    *   *Description*: Align `HistoryManager` initialization and storage paths with the `rolePrefix` model used in `MonitorService` to ensure consistent role-based persistence.
-    *   *Significance*: Medium.
+*   *(Issue #1336 consolidated into hardening)*
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1336: AppEventCoordinator & HistoryManager Side-Effect Unification** (Resolved Sep.26.5)
+    *   *Remediation*: Refactored `AppEventCoordinator` to remove role-specific branching guards in `handleProcessorEvent`, enabling consistent persistence for self-tracking state (Max Accuracy, Chair Baseline, etc.) regardless of role. Unified `handleIntegrityEvent` to use dynamic `alarmPrefix` mapping ("T_" or "VR_") for power alarm pending state, ensuring alignment with `MonitorService` restoration logic. (SOT ID 492).
 *   **Issue #1335: Initialization Prefix Unification** (Resolved Sep.26.4)
     *   *Remediation*: Unified `MonitorService.loadLogicState` to use `rolePrefix` for the `primaryProcessor` state restoration regardless of role, while reserving the "VR_" prefix strictly for the `remoteProcessor`. This removed the explicit `isTrackerMode` branching during initialization and ensured consistent self-tracking persistence for both Tracker and Viewer roles. (SOT ID 491).
 *   **Issue #1334: Unified GPS Pipeline Hardening & Forensic Audit Integration** (Resolved Sep.26.3)
@@ -58,4 +58,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 491 (Rules: 28, IDs: 491), Resolved: 1235, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 18, QA: 284]**
+- **Current Audit Baseline: [SOT: 492 (Rules: 29, IDs: 492), Resolved: 1236, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
