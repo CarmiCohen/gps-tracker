@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.5
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.6
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -20,6 +20,8 @@ Ready for next priority item.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1337: Role-Prefix Collision in Integrity Events** (Resolved Sep.26.6)
+    *   *Remediation*: Refactored `AppEventCoordinator.handleIntegrityEvent` to strictly limit power alarm pending updates to Tracker mode only, preventing local power state leaks into the remote tracker's state during Viewer mode. Hardened `AppAlarmManager` by adding prefix validation within `setPowerAlarmPending` and `resetEvaluation` to prevent role-prefix flipping and write collisions. (SOT ID 493).
 *   **Issue #1336: AppEventCoordinator & HistoryManager Side-Effect Unification** (Resolved Sep.26.5)
     *   *Remediation*: Refactored `AppEventCoordinator` to remove role-specific branching guards in `handleProcessorEvent`, enabling consistent persistence for self-tracking state (Max Accuracy, Chair Baseline, etc.) regardless of role. Unified `handleIntegrityEvent` to use dynamic `alarmPrefix` mapping ("T_" or "VR_") for power alarm pending state, ensuring alignment with `MonitorService` restoration logic. (SOT ID 492).
 *   **Issue #1335: Initialization Prefix Unification** (Resolved Sep.26.4)
@@ -58,4 +60,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 492 (Rules: 29, IDs: 492), Resolved: 1236, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
+- **Current Audit Baseline: [SOT: 493 (Rules: 29, IDs: 493), Resolved: 1237, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**

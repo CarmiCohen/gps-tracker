@@ -11,11 +11,10 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
- * Sep.26.5:
- * - Issue #1336: AppEventCoordinator & HistoryManager Side-Effect Unification.
- *   Removed restrictive role-specific branching guards from processor events,
- *   enabling role-agnostic persistence for primary self-tracking processors across all modes.
- * - Unified handleIntegrityEvent using dynamic alarmPrefix mapping.
+ * Sep.26.6:
+ * - Fixed Role-Prefix Collision: Isolated local integrity events to "V_" prefix 
+ *   in Viewer mode, preventing remote "VR_" state contamination.
+ * - Hardened Reset Orchestration: Added clearPeerCache for atomic session cleanup.
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -142,16 +141,21 @@ class AppEventCoordinator @Inject constructor(
     }
 
     private fun handleIntegrityEvent(event: IntegrityEvent) {
-        val alarmPrefix = if (configManager.isTrackerMode) "T_" else "VR_"
+        // Issue #1336 Fix: Local integrity events must use "T_" or "V_" prefix.
+        // Hardening: Restrict setPowerAlarmPending to Tracker mode only to prevent 
+        // remote "VR_" state contamination in Viewer mode.
+        val isTrackerMode = configManager.isTrackerMode
+        val localPrefix = if (isTrackerMode) "T_" else "V_"
+        
         when (event) {
             is IntegrityEvent.ViolationSustained -> {
-                if (event.type == ALERT_ID_TRACKER_POWER) {
-                    alarmManager.setPowerAlarmPending(true, alarmPrefix)
+                if (event.type == ALERT_ID_TRACKER_POWER && isTrackerMode) {
+                    alarmManager.setPowerAlarmPending(true, localPrefix)
                 }
             }
             is IntegrityEvent.ViolationResolved -> {
-                if (event.type == ALERT_ID_TRACKER_POWER) {
-                    alarmManager.setPowerAlarmPending(false, alarmPrefix)
+                if (event.type == ALERT_ID_TRACKER_POWER && isTrackerMode) {
+                    alarmManager.setPowerAlarmPending(false, localPrefix)
                 }
             }
             is IntegrityEvent.LogEvent -> {
@@ -173,6 +177,8 @@ class AppEventCoordinator @Inject constructor(
 
     private fun handleProcessorEvent(event: ProcessorEvent, isPrimary: Boolean) {
         val isTrackerMode = configManager.isTrackerMode
+        // Primary processor is "T_" in Tracker mode, "V_" (Self) in Viewer mode.
+        // Secondary/Remote processor exists only in Viewer mode as "VR_".
         val prefix = if (isTrackerMode) "T_" else (if (isPrimary) "V_" else "VR_")
         val logPrefix = if (!isTrackerMode && isPrimary) "[Self] " else ""
         

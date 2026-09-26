@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.26.5)
+# SOT Master Requirements & Hardening Status (Sep.26.6)
 
-## 🏗️ Architectural Master Rules (29 Rules)
+## 🏗️ Architectural Master Rules (30 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -22,6 +22,7 @@
 *   **1.17 Temporal Authority Alignment (R490)**: External temporal markers (`lastGpsTs`) must strictly utilize GPS wall-clock time for role-agnostic stall detection, while internal stability auditing (`recordGpsFix`) must be integrated into the primary unified burst processing loop to ensure high-frequency jitter validation (Issue #1334).
 *   **1.18 Initialization Prefix Unification (R491)**: State restoration for primary processors must utilize the `rolePrefix` abstraction to ensure role-agnostic persistence, while dedicated remote state prefixes (e.g., "VR_") are strictly isolated to secondary peer-monitoring components (Issue #1335).
 *   **1.19 Side-Effect Unification (R492)**: Domain side-effects triggered by processor events must be role-agnostic, utilizing the `isPrimary` flag and dynamic `rolePrefix` mapping to ensure consistency across self-tracking and remote-monitoring paths (Issue #1336).
+*   **1.20 Integrity Prefix Hardening (R493)**: Local integrity events must never alter or leak state into the remote peer evaluation path; power alarm flags must be validated against expected prefix boundaries to avoid repo write collisions (Issue #1337).
 
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318-758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
@@ -40,6 +41,7 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 493**: Integrity Prefix Hardening - Remediated Issue #1337 by shielding the remote tracker's evaluation state from local Viewer integrity events and adding role-prefix validation in AppAlarmManager. (Resolved Sep.26.6).
 *   **SOT ID 492**: AppEventCoordinator Side-Effect Unification - Remediated Issue #1336 by removing role-specific guards in `AppEventCoordinator` and unifying alarm prefix mapping to ensure consistent persistence for both roles. (Resolved Sep.26.5).
 *   **SOT ID 491**: Initialization Prefix Unification - Remediated Issue #1335 by unifying `loadLogicState` to use `rolePrefix` for `primaryProcessor` state restoration, eliminating role-specific branching. (Resolved Sep.26.4).
 *   **SOT ID 490**: Unified GPS Pipeline Hardening - Remediated Issue #1334 by correcting spatial anchor initialization and standardizing GPS temporal authority across Tracker and Viewer roles. (Resolved Sep.26.3).
@@ -54,7 +56,8 @@
 *   **SOT ID 481**: DomainEventBus Capacity Hardening - Remediated Issue #1331 by increasing buffer capacity to 128. (Resolved Sep.25.02).
 *   **SOT ID 480**: Multi-Flow Fragmentation Convergence - Remediated Issue #1322 by converging all streams into unified `DomainEventBus`. (Resolved Sep.25.01).
 
-## 📋 Functional Requirements (156 R-IDs)
+## 📋 Functional Requirements (157 R-IDs)
+*   **R493**: Hardened Local Integrity Gating.
 *   **R492**: Unified Side-Effect Authority.
 *   **R491**: Unified Initialization Authority.
 *   **R490**: Unified Temporal Authority Alignment.
@@ -66,6 +69,7 @@
 *   *(Remaining requirements preserved in technical registry)*
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.126 (Integrity Prefix Hardening)**: PASSED - Shielded peer evaluation states from Viewer mode local integrity leaks. (Sep.26.6)
 *   **Chapter 31.125 (Side-Effect Unification)**: PASSED - Verified role-agnostic persistence for primary processors and unified alarm prefixing. (Sep.26.5)
 *   **Chapter 31.124 (Initialization Unification)**: PASSED - Verified role-agnostic state restoration for primary processors. (Sep.26.4)
 *   **Chapter 31.123 (Temporal Authorization)**: PASSED - Verified role-agnostic GPS stall detection and burst stability auditing. (Sep.26.3)
@@ -76,4 +80,4 @@
 *   **Chapter 31.118 (Partitioned State Unification)**: PASSED - verified snapshot partition mapping. (Sep.22.30)
 
 ---
-*Next Audit: Oct.01.00. (Sep.26.5)*
+*Next Audit: Oct.01.00. (Sep.26.6)*

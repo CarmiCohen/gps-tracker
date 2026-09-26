@@ -18,12 +18,12 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.26.6:
+ * - Fixed Role-Prefix Collision: Hardened setPowerAlarmPending and resetEvaluation 
+ *   against invalid prefix mapping or role prefix flipping.
  * Sep.25.08:
  * - Issue #1329: Telemetry Mapping Convergence. Refactored syncEvaluationState 
  *   to use TelemetryMapper.mapSnapshotToHealth, eliminating manual mapping logic.
- * Sep.25.07:
- * - Issue #1329 Remediation: Fixed compilation errors in evaluateAlarms and 
- *   syncEvaluationState by aligning with the partitioned SystemEvaluationSnapshot structure.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -56,9 +56,14 @@ class AppAlarmManager @Inject constructor(
     fun getSettings(): AlertSettings = currentSettings
 
     fun setPowerAlarmPending(pending: Boolean, rolePrefix: String = "") {
-        if (evaluationState.powerAlarmPending != pending || this.currentRolePrefix != rolePrefix) {
+        val targetPrefix = if (rolePrefix.isNotEmpty()) rolePrefix else this.currentRolePrefix
+        if (targetPrefix != "T_" && targetPrefix != "VR_") {
+            Timber.w("AppAlarmManager: Rejecting invalid power alarm prefix mapping: $targetPrefix")
+            return
+        }
+        if (evaluationState.powerAlarmPending != pending || this.currentRolePrefix != targetPrefix) {
             evaluationState.powerAlarmPending = pending
-            this.currentRolePrefix = rolePrefix
+            this.currentRolePrefix = targetPrefix
             saveLogicState()
             updateSirenRequirement()
         }
@@ -369,7 +374,11 @@ class AppAlarmManager @Inject constructor(
 
     fun getLastAlarmsJson(): String = lastAlarmsJson
     
-    fun resetEvaluation() {
+    fun resetEvaluation(rolePrefix: String = "") {
+        val targetPrefix = if (rolePrefix.isNotEmpty()) rolePrefix else this.currentRolePrefix
+        if (targetPrefix == "T_" || targetPrefix == "VR_") {
+            this.currentRolePrefix = targetPrefix
+        }
         synchronized(evaluationState.activeAlarms) { evaluationState.activeAlarms.clear() }
         lastAlarmsJson = "[]"; repository.saveAlarmsJsonSync("[]", currentRolePrefix)
         evaluationState.firstViolationTs = 0L; evaluationState.firstViolationRt = 0L; evaluationState.wasDistanceViolated = false; evaluationState.distanceViolationCounter = 0
