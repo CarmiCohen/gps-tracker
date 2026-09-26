@@ -24,6 +24,9 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.26.4:
+ * - Issue #1335: Initialization Prefix Unification. Unified loadLogicState to use rolePrefix 
+ *   for primaryProcessor state restoration uniformly across roles.
  * Sep.26.3:
  * - Issue #1334: Unified GPS Pipeline Hardening & Forensic Audit Integration. Standardized 
  *   lastGpsTs tracking to wall-clock time across roles and integrated forensic stability fix auditing.
@@ -150,26 +153,35 @@ class MonitorService : BaseMonitorService() {
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
         val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
 
-        if (isTrackerMode) {
-            val trackerState = repository.loadTrackerState("T_")
-            primaryProcessor.loadState(
-                savedMaxAccuracy = repository.getDouble("T_" + MAX_ACCURACY_KEY, 0.0),
-                savedLastSitTs = repository.getLong("T_" + LAST_SIT_TS_KEY, 0L),
-                savedBaseline = repository.getDouble("T_" + CHAIR_BASELINE_TILT_KEY, -1000.0),
-                trackerState = trackerState,
-                homePoints = homePoints,
-                maxDistance = maxDist,
-                savedVibrationFloor = repository.getDouble("T_" + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
-                savedLastValidFixRt = repository.getLong("T_" + LAST_VALID_FIX_RT_KEY, 0L),
-                savedLuxBaseline = repository.getDouble("T_" + TRACKER_LUX_BASELINE_KEY, -1.0),
-                savedAcousticFloor = repository.getDouble("T_" + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
-            )
-            alarmManager.restoreState(repository.getLastAlarmsJson("T_"))
-            alarmManager.restoreLogicState(settingsSnapshot, "T_")
-            
-            val vibeFloor = repository.getDouble("T_" + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0)
-            if (vibeFloor >= 0.0) hardwareSuite.setAdaptiveVibrationFloor(vibeFloor)
-        } else {
+        // Issue #1335: Unify primaryProcessor state restoration using rolePrefix regardless of role
+        val primaryState = repository.loadTrackerState(rolePrefix)
+        primaryProcessor.loadState(
+            savedMaxAccuracy = repository.getDouble(rolePrefix + MAX_ACCURACY_KEY, 0.0),
+            savedLastSitTs = repository.getLong(rolePrefix + LAST_SIT_TS_KEY, 0L),
+            savedBaseline = repository.getDouble(rolePrefix + CHAIR_BASELINE_TILT_KEY, -1000.0),
+            trackerState = primaryState,
+            homePoints = homePoints,
+            maxDistance = maxDist,
+            savedSitVz = primaryState?.sitVz ?: 0.0,
+            savedSitDz = primaryState?.sitDz ?: 0.0,
+            savedSitBaro = primaryState?.sitBaro ?: 0.0,
+            savedSitTilt = primaryState?.sitTilt ?: 0.0,
+            savedSitShock = primaryState?.sitShock ?: 0.0,
+            savedSitVzTs = primaryState?.sitVzTs ?: 0L,
+            savedSitVzRt = primaryState?.sitVzRt ?: 0L,
+            savedLastValidFixRt = repository.getLong(rolePrefix + LAST_VALID_FIX_RT_KEY, 0L),
+            savedVibrationFloor = repository.getDouble(rolePrefix + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
+            savedLuxBaseline = repository.getDouble(rolePrefix + TRACKER_LUX_BASELINE_KEY, -1.0),
+            savedAcousticFloor = repository.getDouble(rolePrefix + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
+        )
+
+        val vibeFloor = repository.getDouble(rolePrefix + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0)
+        if (vibeFloor >= 0.0 && isTrackerMode) {
+            hardwareSuite.setAdaptiveVibrationFloor(vibeFloor)
+        }
+
+        // Strictly reserve the "VR_" prefix for the remoteProcessor state restoration in Viewer mode
+        if (!isTrackerMode) {
             val remoteState = repository.loadTrackerState("VR_")
             remoteProcessor.loadState(
                 savedMaxAccuracy = repository.getDouble("VR_" + MAX_ACCURACY_KEY, 0.0),
@@ -190,10 +202,11 @@ class MonitorService : BaseMonitorService() {
                 savedLuxBaseline = repository.getDouble("VR_" + TRACKER_LUX_BASELINE_KEY, -1.0),
                 savedAcousticFloor = repository.getDouble("VR_" + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
             )
-            primaryProcessor.loadState(0.0, 0L, -1000.0, null, homePoints, maxDist)
-            alarmManager.restoreState(repository.getLastAlarmsJson("VR_"))
-            alarmManager.restoreLogicState(settingsSnapshot, "VR_")
         }
+
+        val alarmPrefix = if (isTrackerMode) "T_" else "VR_"
+        alarmManager.restoreState(repository.getLastAlarmsJson(alarmPrefix))
+        alarmManager.restoreLogicState(settingsSnapshot, alarmPrefix)
     }
 
     private fun setupServiceObservers() {

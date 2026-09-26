@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.3
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.4
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -14,14 +14,16 @@ Ready for next priority item.
 ## 💡 Strategic Simplification Ideas (Ideas: 18)
 
 ### 🟡 Medium Priority
-*   **Issue #1335: Initialization Prefix Unification**
-    *   *Description*: Unify `MonitorService.loadLogicState` to use `rolePrefix` for the `primaryProcessor` state restoration regardless of role, while reserving the "VR_" prefix strictly for the `remoteProcessor`. This removes the explicit `isTrackerMode` branching during initialization and ensures consistent self-tracking persistence for both Tracker and Viewer roles.
+*   **Issue #1336: HistoryManager Prefix Unification**
+    *   *Description*: Align `HistoryManager` initialization and storage paths with the `rolePrefix` model used in `MonitorService` to ensure consistent role-based persistence.
     *   *Significance*: Medium.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1335: Initialization Prefix Unification** (Resolved Sep.26.4)
+    *   *Remediation*: Unified `MonitorService.loadLogicState` to use `rolePrefix` for the `primaryProcessor` state restoration regardless of role, while reserving the "VR_" prefix strictly for the `remoteProcessor`. This removed the explicit `isTrackerMode` branching during initialization and ensured consistent self-tracking persistence for both Tracker and Viewer roles. (SOT ID 491).
 *   **Issue #1334: Unified GPS Pipeline Hardening & Forensic Audit Integration** (Resolved Sep.26.3)
     *   *Remediation*: 
         1. Fixed a critical typo in `LocationProcessor.loadState` where the spatial anchor was incorrectly initialized with duplicate latitudes (`lat, lat` instead of `lat, lng`), preventing filter divergence on service restart.
@@ -56,4 +58,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 490 (Rules: 27, IDs: 490), Resolved: 1234, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 18, QA: 284]**
+- **Current Audit Baseline: [SOT: 491 (Rules: 28, IDs: 491), Resolved: 1235, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 18, QA: 284]**

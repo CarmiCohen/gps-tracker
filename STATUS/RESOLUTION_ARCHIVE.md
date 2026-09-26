@@ -1,3 +1,12 @@
+# 🏛️ Resolution Archive - Sep.26.4
+
+## 🏁 Issue #1335: Initialization Prefix Unification
+*   **Resolved**: Sep.26.4
+*   **Root Cause**: `MonitorService.loadLogicState` contained explicit `isTrackerMode` code branching during restoration of the `primaryProcessor` state. This created architectural asymmetry, adding unneeded initialization branches and risking state restoration failures for self-tracking data under changing roles.
+*   **Remediation**:
+    *   **MonitorService.kt**: Refactored `loadLogicState` to use the role-agnostic `rolePrefix` for all `primaryProcessor` state restoration calls uniformly across both Tracker and Viewer roles. Strictly reserved the `"VR_"` prefix for the remote monitoring `remoteProcessor` component.
+*   **R-ID**: 491
+
 # 🏛️ Resolution Archive - Sep.26.3
 
 ## 🏁 Issue #1334: Unified GPS Pipeline Hardening & Forensic Audit Integration

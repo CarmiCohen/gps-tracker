@@ -1,24 +1,21 @@
-# Forensic Resumption Snapshot - Sep.26.3
+# Forensic Resumption Snapshot - Sep.26.4
 
 ## 📂 Session Summary
 *   **Completed**:
-    *   **Issue #1334**: Unified GPS Pipeline Hardening & Forensic Audit Integration. Fixed spatial anchor typo, standardized GPS temporal authority to wall-clock time, and integrated forensic stability auditing into the unified burst loop.
-    *   **Issue #1333**: Peer Connection State Caching. Introduced a state cache in `AppEventCoordinator` to suppress redundant lifecycle logging.
-    *   **Issue #1332**: Viewer Self-Tracking Pipeline Unification. Unified GPS buffering and processing for all roles.
-*   **Version**: Sep.26.3
-*   **Status**: GPS pipeline is architecturally hardened and audited. Unit tests are fully aligned with the unified snapshot model. Architectural Rule 1.17 added.
+    *   **Issue #1335**: Initialization Prefix Unification. Unified `MonitorService.loadLogicState` to use `rolePrefix` for `primaryProcessor` state restoration regardless of role, eliminating role-specific branching and ensuring consistent self-tracking persistence.
+*   **Version**: Sep.26.4
+*   **Status**: Initialization logic for self-tracking is now role-agnostic. Architectural Rule 1.18 added.
+*   **Audit Baseline**: [SOT: 491 (Rules: 28, IDs: 491), Resolved: 1235, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]
 
 ## 🔧 Technical Delta
-*   **LocationProcessor.kt**: Fixed spatial anchor initialization typo (`lat, lng` correction).
-*   **MonitorService.kt**: Standardized `lastGpsTs` to wall-clock time across all roles; integrated `recordGpsFix` into the primary burst loop.
-*   **Engine Unit Tests**: Refactored `AdaptationMuzzleTest`, `AcousticCalibrationTest`, `AnchorEvaluatorTest`, `ForensicIdentityTest`, `GeofenceBatteryAuditTest`, and `MainAlarmLogicTest` to match new API signatures.
-*   **STATUS/SOT_MASTER_REQUIREMENTS.md**: Added Architectural Rule 1.17 (Temporal Authority Alignment) and SOT ID 490.
-*   **app/build.gradle**: Incremented `versionName` to `Sep.26.3`.
-*   **issues.md**: Resolved #1334; added strategic idea #1335 (Initialization Prefix Unification).
+*   **MonitorService.kt**: Refactored `loadLogicState` to use `rolePrefix` for all `primaryProcessor` restoration calls; strictly isolated `VR_` prefix to the `remoteProcessor`.
+*   **app/build.gradle**: Incremented `versionName` to `Sep.26.4`.
+*   **STATUS/SOT_MASTER_REQUIREMENTS.md**: Added Architectural Rule 1.18 (Initialization Prefix Unification) and SOT ID 491.
+*   **issues.md**: Resolved #1335.
 
 ## 📍 Resumption Point for Next Session
-*   **Immediate Priority**: Implementation of **Issue #1335** to unify initialization prefixes in `MonitorService.loadLogicState`, eliminating role-specific branching for the `primaryProcessor`.
-*   **Strategic Goal**: Audit `AppEventCoordinator` for any remaining role-specific side-effect logic that can be consolidated.
+*   **Immediate Priority**: Audit `AppEventCoordinator` for remaining role-specific side-effect logic (e.g., peer connection events or notification triggers) that can be consolidated into role-agnostic paths.
+*   **Strategic Goal**: Evaluate `HistoryManager` for potential prefix unification to align with the `rolePrefix` model used in `MonitorService`.
 
 ## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 490 (Rules: 27, IDs: 490), Resolved: 1234, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 18, QA: 284]**
+**Current Audit Baseline: [SOT: 491 (Rules: 28, IDs: 491), Resolved: 1235, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
