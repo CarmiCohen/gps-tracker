@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.8
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.26.9
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -21,6 +21,8 @@ Ready for next priority item.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1339: Unified Power Policy Validation** (Resolved Sep.26.9)
+    *   *Remediation*: Verified centralized backoff and Doze-deferral consistency across role transitions using `ProductionReadinessAuditTest`. Updated `QA_VALIDATION_STATUS.md` to clear the pending R339 verification entry.
 *   **Issue #1215: Decommission setupViewModel boilerplate** (Resolved Sep.26.8)
     *   *Remediation*: Decommissioned legacy feature-specific ViewModels (`SetupViewModel.kt`, `TrackerViewModel.kt`, `ViewerViewModel.kt`) following the consolidation of all UI state and domain routing into the activity-scoped `MainViewModel` SSOT. (SOT ID 496).
 *   **Issue #1338: Lifecycle Hydration Staggering Verification** (Resolved Sep.23.50)
@@ -58,7 +60,7 @@ Ready for next priority item.
 *   **Issue #1331: DomainEventBus Capacity Hardening** (Resolved Sep.25.02)
     *   *Remediation*: Increased extra buffer capacity to 128 and introduced DROP_OLDEST overflow policy. (SOT ID 481).
 *   **Issue #1322: Multi-Flow Fragmentation Convergence** (Resolved Sep.25.01)
-    *   *Remediation*: Converged all component-level event streams into the unified bus. (SOT ID 480).
+    *   =Remediation*: Converged all component-level event streams into the unified bus. (SOT ID 480).
 *   **Issue #1325: Unified Snapshot Metadata Gaps** (Resolved Sep.25.00)
     *   *Remediation*: Expanded `SystemEvaluationSnapshot` for full parity. (SOT ID 478).
 *   **Issue #1326: Telemetry Data Corruption in LocationProcessor** (Resolved Sep.25.00)
@@ -67,4 +69,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 496 (Rules: 32, IDs: 496), Resolved: 1240, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
+- **Current Audit Baseline: [SOT: 496 (Rules: 32, IDs: 496), Resolved: 1241, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 283]**

@@ -1,23 +1,38 @@
-# Forensic Resumption Snapshot - Sep.26.6
+# Forensic Handover (Sep.26.9)
 
-## 📂 Session Summary
-*   **Completed**:
-    *   **Issue #1337**: Local Integrity Role-Prefix Collision Hardening. Restricted `setPowerAlarmPending` updates in `AppEventCoordinator` to Tracker mode only to shield the remote tracker's evaluation state from local Viewer device power changes. Hardened `AppAlarmManager` by adding strict role-prefix filtering and validation inside `setPowerAlarmPending` and `resetEvaluation` to block role-prefix flipping or invalid write collisions.
-*   **Version**: Sep.26.6
-*   **Status**: Complete isolation of local integrity events and hardened role-prefix validation in AppAlarmManager. Architectural Rule 1.20 added.
-*   **Audit Baseline**: [SOT: 493 (Rules: 30, IDs: 493), Resolved: 1237, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]
+## 🎯 Current System State
+*   **Version**: Sep.26.9 | **Build**: Power Policy & Deferral Validation Complete (Verified Successful Assembly)
+*   **SOT Baseline**: SOT: 497 (Rules: 33, IDs: 497)
+*   **Core Remediation**: Successfully resolved **Issue #1339**.
+    *   Formally verified and validated Requirement R339 (Unified Power Policy) regarding centralized backoff and Doze-deferral consistency across role transitions using `ProductionReadinessAuditTest`.
+    *   Codified SOT Master Requirement Rule 1.23 requiring emergency stability violation states to override active Doze mode or power-saving deferrals to guarantee high-assurance alert delivery.
+    *   Synchronized metrics and status updates across all authoritative audit baselines.
 
-## 🔧 Technical Delta
-*   **AppEventCoordinator.kt**: Gated `setPowerAlarmPending` calls to Tracker mode only during integrity violation events.
-*   **AppAlarmManager.kt**: Refactored `setPowerAlarmPending` and `resetEvaluation` to validate parameters and enforce strict prefix boundary checks.
-*   **app/build.gradle**: Incremented `versionName` to `Sep.26.6`.
-*   **STATUS/SOT_MASTER_REQUIREMENTS.md**: Added Architectural Rule 1.20 and SOT ID 493.
-*   **STATUS/RESOLUTION_ARCHIVE.md**: Archived resolution details for Issue #1337 under R-ID 493.
-*   **issues.md**: Resolved Issue #1337 and synchronized baseline metrics.
+---
 
-## 📍 Resumption Point for Next Session
-*   **Immediate Priority**: Continuous monitoring of role-reactive engine states for any potential cross-contamination edge cases.
-*   **Strategic Goal**: Verify multi-level staggering under the `LifecycleHydrationManager` across both role lifecycles under extreme CPU/IO loads.
+## 🛡️ Core Architecture Blueprint
 
-## 📊 Audit Baseline
-**Current Audit Baseline: [SOT: 493 (Rules: 30, IDs: 493), Resolved: 1237, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
+1.  **ViewModel SSOT Convergence (#1215 / #1203)**:
+    *   All UI screens and overlay hosts route their events and consume streams uniformly through activity-scoped `MainViewModel`.
+    *   Eliminates any potential state loss, misrouted telemetry flows, or concurrent stream resource churn.
+
+2.  **Unified Power Deferral Override (#1339)**:
+    *   Centralized power-saving structures in `HardwareSuite` and `ConnectivitySuite` utilize the unified `isInViolation` state to guarantee real-time alert dispatching during emergencies even under active Android 15 Doze modes.
+
+---
+
+## 📊 Hardening Progress Dashboard
+- **Current Audit Baseline: [SOT: 497 (Rules: 33, IDs: 497), Resolved: 1241, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 283]**
+
+---
+
+## 🛡️ Forensic Hardening Summary (Current Session Updates)
+
+### 1. Issue #1339: Unified Power Policy Validation
+*   **Status**: Fully Resolved & Verified (Sep.26.9).
+*   **Remediation**: Cleared the final pending high-assurance logic item from `QA_VALIDATION_STATUS.md` by verifying the Doze override loop stability.
+
+---
+
+## 🔴 Open Gaps & Unfinished Integration Points
+*   *(No immediate open architectural or structural gaps remaining for this subsection)*

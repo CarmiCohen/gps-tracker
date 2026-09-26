@@ -1,3 +1,14 @@
+# 🏛️ Resolution Archive - Sep.26.9
+
+## 🏁 Issue #1339: Unified Power Policy Validation
+*   **Resolved**: Sep.26.9
+*   **Root Cause**: Requirement R339 (Unified Power Policy) remained in a "Pending Validation" state, requiring formal verification of centralized backoff and Doze-deferral consistency across role transitions to ensure Android 15 compliance.
+*   **Remediation**:
+    *   **Verification**: Executed `ProductionReadinessAuditTest` which verified `HardwareSuite.shouldDeferSignaling` logic, confirming that signaling is correctly deferred in Doze mode unless a stability violation is active.
+    *   **Logic Audit**: Confirmed `ConnectivitySuite` and `SessionManager` correctly utilize the unified `isInViolation` state to override power-saving deferrals, ensuring critical telemetry delivery during emergencies.
+    *   **QA Sync**: Updated `QA_VALIDATION_STATUS.md` to mark R339 as Passed, clearing the final pending high-assurance logic item.
+*   **R-ID**: 339
+
 # 🏛️ Resolution Archive - Sep.26.8
 
 ## 🏁 Issue #1215: Decommission legacy ViewModel artifacts

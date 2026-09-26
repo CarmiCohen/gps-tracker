@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.26.8)
+# SOT Master Requirements & Hardening Status (Sep.26.9)
 
-## 🏗️ Architectural Master Rules (32 Rules)
+## 🏗️ Architectural Master Rules (33 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -25,6 +25,7 @@
 *   **1.20 Integrity Prefix Hardening (R493)**: Local integrity events must never alter or leak state into the remote peer evaluation path; power alarm flags must be validated against expected prefix boundaries to avoid repo write collisions (Issue #1337).
 *   **1.21 Activity-Scoped ViewModel SSOT (R494)**: All UI components must consume state and route events through the activity-scoped `MainViewModel` to eliminate resource churn, state fragmentation, and misrouted telemetry flows across role transitions (Issue #1203).
 *   **1.22 Legacy ViewModel Decommissioning (R496)**: Feature-specific legacy ViewModels (Setup, Tracker, Viewer) are strictly prohibited. All UI state and event routing must converge in `MainViewModel` to maintain architectural simplicity (Issue #1215).
+*   **1.23 Unified Power Policy Override (R497)**: Emergency stability violation states must seamlessly override active Doze mode or low-power state signaling deferral rules across all role transitions to guarantee high-assurance alert delivery under extreme duress (Issue #1339).
 
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318-758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
@@ -43,6 +44,7 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 497**: Unified Power Policy Deferral Validation - Remediated Issue #1339 by formally validating centralized backoff and Doze-deferral consistency via `ProductionReadinessAuditTest`. (Resolved Sep.26.9).
 *   **SOT ID 496**: Legacy ViewModel Decommissioning - Remediated Issue #1215 by physically decommissioning `SetupViewModel`, `TrackerViewModel`, and `ViewerViewModel` in favor of the unified `MainViewModel` SSOT. (Resolved Sep.26.8).
 *   **SOT ID 495**: Hydration Staggering Audit - Verified Level 0-11 transitions under extreme CPU/IO saturation via `HydrationStaggeringAuditTest`. (Resolved Sep.23.50).
 *   **SOT ID 494**: Hilt ViewModel Scope Optimization - Remediated Issue #1203 by unifying feature ViewModels into the activity-scoped `MainViewModel`. (Resolved Sep.23.50).
@@ -57,7 +59,8 @@
 *   **SOT ID 485**: Snap-to-Update Monolith - Remediated Issue #1330 by unifying `SystemEvaluationSnapshot` with partitioned states. (Resolved Sep.25.05).
 *   **SOT ID 484**: Peer Lifecycle Decoupling - Remediated Issue #1327 by introducing `PeerConnectionChanged`. (Resolved Sep.25.05).
 
-## 📋 Functional Requirements (160 R-IDs)
+## 📋 Functional Requirements (161 R-IDs)
+*   **R497**: Centralized Doze-deferral emergency override mapping.
 *   **R496**: Decommissioned legacy ViewModel artifacts.
 *   **R495**: Verified Hydration Staggering under load.
 *   **R494**: Single Source of Truth via activity-scoped ViewModel.
@@ -72,6 +75,7 @@
 *   **R485**: Zero-allocation snap-to-update partitioning.
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.130 (Unified Power Policy)**: PASSED - Verified centralized backoff and Doze-deferral consistency across role transitions. (Sep.26.9)
 *   **Chapter 31.129 (ViewModel Decommissioning)**: PASSED - Physically decommissioned legacy ViewModels and verified code elimination. (Sep.26.8)
 *   **Chapter 31.128 (Hydration Staggering Audit)**: PASSED - Verified levels 0-11 progression under extreme CPU/IO stress. (Sep.22.30)
 *   **Chapter 31.127 (ViewModel Scope Optimization)**: PASSED - Eliminated feature ViewModel redundancy and verified SSOT. (Sep.22.30)
@@ -84,4 +88,4 @@
 *   **Chapter 31.120 (Signaling Optimization)**: PASSED - Verified that forensic indexes are pre-calculated. (Sep.26.0)
 
 ---
-*Next Audit: Oct.01.00. (Sep.26.8)*
+*Next Audit: Oct.01.00. (Sep.26.9)*
