@@ -8,33 +8,26 @@ import io.socket.client.IO
 import io.socket.client.Socket
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.json.JSONObject
 import timber.log.Timber
 import java.util.Arrays
-import java.util.Random
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
-import javax.inject.Provider
 import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Sep.27.7:
+ * - Issue #1172: Smart Signaling Dispatcher. Refactored to utilize the reactive 
+ *   SmartSignalingDispatcher for unified conflation and adaptive throttling.
  * Sep.16.14:
  * - Signaling Conflation Traceability (#1051): Migrated hardcoded conflation 
  *   delays to SIGNALING_CONFLATION_DELAY_MS (100ms) and 
  *   SIGNALING_CONFLATION_DELAY_VIOLATION_MS (20ms) (R-ID 312).
- * Sep.15.13:
- * - Performance Tuning (#1051): Optimized signaling emission latency by 
- *   integrating SessionManager to apply SIGNALING_EMIT_DELAY_VIOLATION_MS (20ms) 
- *   during active violations (R-ID 343).
- * Sep.15.04:
- * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
- *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -45,11 +38,6 @@ class CommunicationManager @Inject constructor(
     private val timeProvider: TimeProvider,
     private val sessionManager: SessionManager
 ) : SignalingProvider {
-
-    private sealed class SignalingCommand {
-        data class Emit(val event: String, val data: JSONObject) : SignalingCommand()
-        data class EmitBinary(val event: String, val routingId: String, val data: ByteArray) : SignalingCommand()
-    }
 
     private var socket: Socket? = null
     private var isStopped = false
@@ -85,33 +73,17 @@ class CommunicationManager @Inject constructor(
 
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
     
-    private var normalPriorityQueue = Channel<SignalingCommand>(capacity = Channel.UNLIMITED)
-    private var queueProcessorJob: Job? = null
-    
-    private var pendingLocationMap: MutableMap<String, Any?>? = null
-    private var conflationJob: Job? = null
-
-    init {
-        startQueueProcessor()
-    }
-
-    private fun startQueueProcessor() {
-        queueProcessorJob?.cancel()
-        queueProcessorJob = scope.launch(Dispatchers.IO) {
-            for (command in normalPriorityQueue) {
-                if (isStopped) break
-                if (!isConnected()) { delay(1000); continue }
-                when (command) {
-                    is SignalingCommand.Emit -> socket?.emit(command.event, command.data)
-                    is SignalingCommand.EmitBinary -> socket?.emit(command.event, command.routingId, command.data)
-                }
-                
-                // R-ID 343: Optimize emission latency during active violations
-                val delayMs = if (sessionManager.isInViolation) SIGNALING_EMIT_DELAY_VIOLATION_MS else SIGNALING_EMIT_DELAY_MS
-                delay(delayMs)
-            }
-        }
-    }
+    private val dispatcher = SmartSignalingDispatcher(
+        scope = scope,
+        isViolationProvider = { sessionManager.isInViolation },
+        jsonSink = { event, data -> 
+            if (!isStopped) socket?.emit(event, JSONObject(data))
+        },
+        binarySink = { event, routingId, data ->
+            if (!isStopped) socket?.emit(event, routingId, data)
+        },
+        isConnectedProvider = { isConnected() }
+    )
 
     private fun isDefaultViewer(id: String) = id == SignalingConstants.DEFAULT_VIEWER_ID || id.isEmpty()
 
@@ -185,8 +157,6 @@ class CommunicationManager @Inject constructor(
         
         if (!scope.isActive) {
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
-            normalPriorityQueue = Channel(capacity = Channel.UNLIMITED)
-            startQueueProcessor()
         }
 
         if (!roleChanged && (isConnectingInternal.get() || isConnected())) return
@@ -196,12 +166,6 @@ class CommunicationManager @Inject constructor(
         socket?.disconnect(); socket?.off(); socket = null
         isConnectingInternal.set(true)
         
-        if (roleChanged) {
-            normalPriorityQueue.close()
-            normalPriorityQueue = Channel(capacity = Channel.UNLIMITED)
-            startQueueProcessor()
-        }
-
         logToApp("Starting connection session [$sessionId] to $relayUrl (Role: ${if(isTracker) "Tracker" else "Viewer"})", true)
         markTraffic() 
 
@@ -293,8 +257,6 @@ class CommunicationManager @Inject constructor(
     private fun handleLocationRelay(args: Array<Any>) {
         try {
             val data = args[0] as JSONObject
-            // Sep.14.10: Removed pre-emission filtering. Delegation to ConnectivitySuite 
-            // ensures forensic drop visibility (R-ID 320).
             _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(data))
         } catch (e: Exception) { Timber.e("location_relay parse error") }
     }
@@ -302,7 +264,6 @@ class CommunicationManager @Inject constructor(
     private fun handleLocationRelayBinary(args: Array<Any>) {
         try {
             val data = args[0] as ByteArray
-            // Sep.14.10: Removed pre-emission filtering. Delegation to ConnectivitySuite.
             _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(data))
         } catch (e: Exception) { Timber.e("location_relay_bin parse error") }
     }
@@ -310,8 +271,6 @@ class CommunicationManager @Inject constructor(
     private fun handleLogRelay(args: Array<Any>) {
         try {
             val data = args[0] as JSONObject
-            // Sep.14.10: Removed pre-emission filtering. All remote logs must be 
-            // validated by the suite before persistence.
             val wrapped = JSONObject()
             val keys = data.keys()
             while(keys.hasNext()) { val k = keys.next(); wrapped.put(k, data.get(k)) }
@@ -324,7 +283,6 @@ class CommunicationManager @Inject constructor(
         try {
             val data = args[0] as JSONObject
             val incomingViewerId = data.optString("viewer_id")
-            // Light filtering retained for simple pulse events to avoid flow saturation.
             if (isTrackerMode) {
                 if (!SignalingConstants.isViewerMatch(incomingViewerId, viewerId) && !isDefaultViewer(viewerId)) return
             } else {
@@ -348,7 +306,7 @@ class CommunicationManager @Inject constructor(
                     val incomingMap = mutableMapOf<String, Any?>()
                     data.keys().forEach { incomingMap[it] = data.get(it) }
                     SignalPayloadGenerator.createPongPayload(incomingMap as Map<String, Any>, deviceId, isTrackerMode)?.let { pongMap ->
-                        emitInternal("pong_cmd", JSONObject(pongMap), SignalingPriority.HIGH)
+                        emitInternal("pong_cmd", pongMap, SignalingPriority.HIGH)
                     }
                     _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply {
                         put("type", SignalingConstants.getPulseType(isTrackerMode)); put("id", deviceId); put("viewer_id", incomingViewerId); put("from_viewer", isViewerPing)
@@ -386,7 +344,10 @@ class CommunicationManager @Inject constructor(
     override fun setConnectionLostCallback(callback: () -> Unit) { this.onConnectionLost = callback }
     override fun clearRtt() { rtts.clear(); lastRttInternal = 0 }
     override fun getRtt(): Int = lastRttInternal
-    override fun emit(event: String, data: JSONObject, priority: SignalingPriority) { emitInternal(event, data, priority) }
+    
+    override fun emit(event: String, data: JSONObject, priority: SignalingPriority) { 
+        emitInternal(event, data.toMap(), priority) 
+    }
 
     @Synchronized
     override fun transmit(status: TrackerStatus, priority: SignalingPriority, fromViewer: Boolean) {
@@ -404,49 +365,21 @@ class CommunicationManager @Inject constructor(
                 try {
                     val cos = CodedOutputStream.newInstance(serializationBuffer, 0, size)
                     message.writeTo(cos); cos.checkNoSpaceLeft()
-                    emitBinaryInternal("location_update_bin", SignalingConstants.getTransmissionId(deviceId), serializationBuffer, size, priority)
+                    val payload = Arrays.copyOf(serializationBuffer, size)
+                    dispatcher.dispatch(SmartSignalingDispatcher.Command.Binary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), payload, priority))
                     return
                 } catch (e: Exception) { Timber.e(e, "Pre-allocated serialization failed") }
             }
-            emitBinaryInternal("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray(), priority = priority)
+            dispatcher.dispatch(SmartSignalingDispatcher.Command.Binary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray(), priority))
         } else {
-            emitInternal("location_update", JSONObject(status.toMap(fromViewer)), priority)
+            emitInternal("location_update", status.toMap(fromViewer), priority)
         }
     }
 
-    private fun emitInternal(event: String, data: JSONObject, priority: SignalingPriority) {
+    private fun emitInternal(event: String, data: Map<String, Any?>, priority: SignalingPriority) {
         if (isStopped) return
         markTraffic()
-        if (priority == SignalingPriority.HIGH) {
-            socket?.emit(event, data)
-        } else {
-            if (event == "location_update") emitLocationConflated(data.toMap()) 
-            else normalPriorityQueue.trySend(SignalingCommand.Emit(event, data))
-        }
-    }
-
-    private fun emitBinaryInternal(event: String, routingId: String, data: ByteArray, length: Int = data.size, priority: SignalingPriority) {
-        if (isStopped) return
-        markTraffic()
-        val payload = if (length == data.size) data else Arrays.copyOf(data, length)
-        if (priority == SignalingPriority.HIGH) socket?.emit(event, routingId, payload)
-        else normalPriorityQueue.trySend(SignalingCommand.EmitBinary(event, routingId, payload))
-    }
-
-    private fun emitLocationConflated(incoming: Map<String, Any?>) {
-        pendingLocationMap = SignalingMessageConflator.conflate(pendingLocationMap, incoming).toMutableMap()
-        if (conflationJob == null || !conflationJob!!.isActive) {
-            conflationJob = scope.launch {
-                // R-ID 343/312: Use unified conflation delays
-                val conflationDelay = if (sessionManager.isInViolation) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
-                delay(conflationDelay)
-                val mapToSend = pendingLocationMap
-                if (mapToSend != null && isConnected() && !isStopped) { 
-                    normalPriorityQueue.trySend(SignalingCommand.Emit("location_update", JSONObject(mapToSend as Map<*, *>)))
-                    pendingLocationMap = null
-                }
-            }
-        }
+        dispatcher.dispatch(SmartSignalingDispatcher.Command.Json(event, data, priority))
     }
 
     private fun JSONObject.toMap(): Map<String, Any?> {
@@ -458,11 +391,11 @@ class CommunicationManager @Inject constructor(
 
     override fun isConnected() = socket?.connected() ?: false
     override fun isConnecting(): Boolean = isConnectingInternal.get()
+    
     override fun disconnect() { 
         isStopped = true; isConnectingInternal.set(false)
         currentSessionId.incrementAndGet()
-        queueProcessorJob?.cancel(); queueProcessorJob = null
-        normalPriorityQueue.close()
+        dispatcher.shutdown()
         socket?.disconnect(); socket?.off(); socket = null
         telemetryRepository.updateRelayStatus(false)
         scope.cancel()

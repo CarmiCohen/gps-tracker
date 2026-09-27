@@ -1,19 +1,9 @@
 package com.gps19.app
 
 import com.gps19.core.engine.SignalingConstants
+import com.gps19.core.engine.SignalingPriority
 import kotlinx.coroutines.flow.SharedFlow
 import org.json.JSONObject
-
-/**
- * SignalingPriority: Classification for frame prioritization.
- * July.27.00 Audit:
- * - Telemetry (Location Updates) promoted to HIGH to prevent head-of-line blocking 
- *   from high-volume forensic logs.
- */
-enum class SignalingPriority {
-    HIGH,   // Time-critical: Telemetry, Alarms, Pings, Commands, Identity
-    NORMAL  // Bulk data: Forensic Logs, Status Snapshots
-}
 
 /**
  * SignalingEvent: Reactive event container for incoming relay data.

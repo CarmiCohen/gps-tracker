@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.27.6)
+# SOT Master Requirements & Hardening Status (Sep.27.7)
 
-## 🏗️ Architectural Master Rules (39 Rules)
+## 🏗️ Architectural Master Rules (40 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -31,6 +31,7 @@
 *   **1.26 Signaling Flapping Resilience (R503)**: Connectivity managers must handle high-frequency signaling transitions (5Hz+) without resource leakage or state corruption to ensure stability during extreme network instability (Sep.27.2).
 *   **1.27 Flattened Event Hierarchy (R504)**: The `DomainEvent` hierarchy must remain flat, avoiding nested component wrappers to minimize object allocation churn and dispatching overhead in the reactive coordination layer (Issue #1348).
 *   **1.28 Unified Trajectory Management (R506)**: The system must utilize a single `TrajectoryBuffer` authority to consolidate sliding windows and hindsight corrections, eliminating dual terminology and redundant array allocations (Issue #1161).
+*   **1.29 Smart Signaling Dispatcher (R507)**: The signaling system must utilize a single `SmartSignalingDispatcher` coordination layer to manage prioritized transmission queuing, adaptive throttling, and unified update conflation (Issue #1172).
 
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318-758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
@@ -51,6 +52,7 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 507**: Smart Signaling Dispatcher - Integrated conflation, priority queuing, and adaptive throttling into a first-class reactive coordination layer, optimizing transmission latency and connection freshness. (Resolved Sep.27.7).
 *   **SOT ID 506**: Unified Trajectory & Buffer Management - Consolidated scattered trajectory windows and hindsight buffers into a first-class `TrajectoryBuffer` component, eliminating redundant terminology and array allocations. (Resolved Sep.27.6).
 *   **SOT ID 505**: LocationProcessingState Mutability Reduction - Partitioned the core tracking state into specialized sub-states (Accuracy, Forensic, Gto, Anchor) to isolate transient telemetry and improve domain isolation. (Resolved Sep.27.5).
 *   **SOT ID 504**: DomainEvent Hierarchy Flattening - Simplified the core event hierarchy by removing component wrappers to optimize dispatch overhead and reduce allocation churn. (Resolved Sep.27.4).
@@ -75,7 +77,8 @@
 *   **SOT ID 485**: Snap-to-Update Monolith - Remediated Issue #1330 by unifying `SystemEvaluationSnapshot` with partitioned states. (Resolved Sep.25.05).
 *   **SOT ID 484**: Peer Lifecycle Decoupling - Remediated Issue #1327 by introducing `PeerConnectionChanged`. (Resolved Sep.25.05).
 
-## 📋 Functional Requirements (168 R-IDs)
+## 📋 Functional Requirements (169 R-IDs)
+*   **R507**: Smart Signaling Dispatcher coordination layer for unified transmission.
 *   **R506**: Unified TrajectoryBuffer authority for rolling history.
 *   **R505**: LocationProcessingState partitioning for mutability reduction.
 *   **R504**: DomainEvent flattening for dispatch optimization.
@@ -100,6 +103,7 @@
 *   **R485**: Zero-allocation snap-to-update partitioning.
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.139 (Smart Signaling Dispatcher)**: PASSED - Verified reactive prioritized dispatching and violation-based adaptive throttling via SmartSignalingDispatcher. (Sep.27.7)
 *   **Chapter 31.138 (Trajectory Unification)**: PASSED - Verified single-authority buffer management and hindsight mapping consistency. (Sep.27.6)
 *   **Chapter 31.137 (State Partitioning)**: PASSED - Verified sub-state isolation and field-level access decoupling in core engine. (Sep.27.5)
 *   **Chapter 31.136 (Event Flattening)**: PASSED - Verified direct component event emission and dispatcher overhead reduction. (Sep.27.4)
@@ -121,4 +125,4 @@
 *   **Chapter 31.120 (Signaling Optimization)**: PASSED - Verified that forensic indexes are pre-calculated. (Sep.26.0)
 
 ---
-*Next Audit: Oct.01.00. (Sep.27.6)*
+*Next Audit: Oct.01.00. (Sep.27.7)*

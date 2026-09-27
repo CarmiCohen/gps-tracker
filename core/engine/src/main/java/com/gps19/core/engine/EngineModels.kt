@@ -5,6 +5,8 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.27.7:
+ * - Issue #1172: Smart Signaling Dispatcher. Added SignalingPriority enum to core engine models.
  * Sep.27.6:
  * - Issue #1161: Unified Trajectory & Buffer Management. Introduced TrajectoryBuffer 
  *   and TrajectoryNode to replace GtoBufferState and GtoNode.
@@ -42,6 +44,17 @@ enum class DiscoveryPhase {
 
 enum class SentinelStatus {
     VALID, JUMP, TAMPER, TRAJECTORY_PROMOTED, OUTLIER, JITTER, JAMMER_SUSPICION
+}
+
+/**
+ * SignalingPriority: Classification for frame prioritization.
+ * Sep.27.7:
+ * - Issue #1172: Smart Signaling Dispatcher. Relocated to core:engine for 
+ *   centralized dispatching logic.
+ */
+enum class SignalingPriority {
+    HIGH,   // Time-critical: Telemetry, Alarms, Pings, Commands, Identity
+    NORMAL  // Bulk data: Forensic Logs, Status Snapshots
 }
 
 enum class CapabilityStatus {

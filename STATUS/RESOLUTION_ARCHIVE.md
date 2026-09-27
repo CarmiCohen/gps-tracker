@@ -1,3 +1,13 @@
+# 🏛️ Resolution Archive - Sep.27.7
+
+## 🏁 Issue #1172: Smart Signaling Dispatcher
+*   **Resolved**: Sep.27.7
+*   **Root Cause**: Messaging, conflation, and throttling were handled non-reactively via distributed timer channels and loose thread scopes inside `CommunicationManager`, resulting in potential race hazards, high latency under active violations, and high coupling with Socket.io.
+*   **Remediation**:
+    *   **SmartSignalingDispatcher.kt**: Implemented a standalone, transport-agnostic reactive coordination layer that manages prioritized transmission queuing, adaptive throttling, and unified location map conflation using non-blocking Coroutine Channels and AtomicReferences.
+    *   **CommunicationManager.kt**: Refactored to delegate all outbound priority queuing and temporal delays to `SmartSignalingDispatcher`, streamlining message emission.
+*   **SOT ID**: 507
+
 # 🏛️ Resolution Archive - Sep.27.6
 
 ## 🏁 Issue #1161: Unified Trajectory & Buffer Management

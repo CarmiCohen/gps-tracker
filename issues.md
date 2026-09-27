@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.6
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.7
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -14,11 +14,7 @@ Ready for next priority item.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 12)
-
-### 🔴 High Priority
-*   **Issue #1172: Smart Signaling Dispatcher**
-    *   *Significance*: **High (Network)**. Merge conflation and throttling logic into a reactive "Smart Dispatcher" to handle connection freshness.
+## 💡 Strategic Simplification Ideas (Ideas: 11)
 
 ### 🟡 Medium Priority
 *   **Issue #1294: Build-Time Interface Validation**
@@ -50,6 +46,7 @@ Ready for next priority item.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1172: Smart Signaling Dispatcher** (Resolved Sep.27.7)
 *   **Issue #1161: Unified Trajectory & Buffer Management** (Resolved Sep.27.6)
 *   **Issue #1349: LocationProcessingState Mutability Reduction** (Resolved Sep.27.5)
 *   **Issue #1348: DomainEvent Hierarchy Simplification** (Resolved Sep.27.4)
@@ -61,4 +58,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.27.6: [SOT: 506 (Rules: 40), Open: H:1, M:0, L:0, Ideas: H:1, M:7, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.27.7: [SOT: 507 (Rules: 41), Open: H:1, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
