@@ -1,25 +1,25 @@
-# Forensic Handover (Sep.27.10)
+# Forensic Handover (Sep.27.11)
 
 ## 🎯 Current System State
-*   **Version**: Sep.27.10 | **Build**: Success (Reactive Siren Lockout)
-*   **SOT Baseline**: SOT ID: 510 (Rules: 42, R-IDs: 172)
-*   **Core Remediation**: Successfully resolved **Issue #1201** (Reactive Siren Lockout).
-    *   Decoupled siren cooldown/lockout logic from `AudioSynthesizer` into a dedicated `SirenLockoutUseCase`.
-    *   Exposed `silencedUntilRt` reactively via `MainUiState` to ensure UI transparency when alarms are suppressed.
-    *   Harmonized manual user silence and auto-stop cooldowns under a single authority.
+*   **Version**: Sep.27.11 | **Build**: Success (UI Event Routing Unification)
+*   **SOT Baseline**: SOT ID: 511 (Rules: 43, R-IDs: 172)
+*   **Core Remediation**: Successfully resolved **Issue #1202** (UI Event Routing Unification).
+    *   Introduced `UiEventCoordinator` as the central authority for routing UI events to domain logic.
+    *   Refactored `MainViewModel` to delegate `onEvent` handling, reducing its complexity.
+    *   Unified settings draft management and debounced auto-save logic into the coordinator.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
 
-1.  **Centralized Lockout Authority**:
-    *   `SirenLockoutUseCase` is now the sole source of truth for whether audio alerts are suppressed.
-    *   `AudioSynthesizer` is now a stateless procedural generation utility.
+1.  **Event Orchestration Layer**:
+    *   `UiEventCoordinator`: Sole authority for mapping user intent (`UiEvent`) to domain actions.
+    *   `MainViewModel`: Pure SSOT for UI state observation and event emission.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.27.10: [SOT Count: 172 (Rules: 42), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.27.11: [SOT Count: 172 (Rules: 43), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 
 ---
 

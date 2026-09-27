@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.10
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.11
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -21,8 +21,6 @@ Ready for next priority item.
     *   *Significance*: **Medium (Performance)**. Substitute JSON mapping with pure Protobuf binary pipelines to speed up disk I/O.
 *   **Issue #1205: Context-Aware Power Optimization**
     *   *Significance*: **Medium (Battery)**. Dynamically adjust sensor polling based on activity recognition to extend battery life.
-*   **Issue #1202: UI Event Routing Unification**
-    *   *Significance*: **Medium (Architecture)**. Refactor navigation into a single coordinator to decouple ViewModels from UI implementation.
 
 ### 🔵 Low Priority
 *   **Issue #1293: Lifecycle-Aware Tick Orchestrator**
@@ -38,6 +36,7 @@ Ready for next priority item.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1202: UI Event Routing Unification** (Resolved Sep.27.11)
 *   **Issue #1201: Reactive Siren Lockout** (Resolved Sep.27.10)
 *   **Issue #1290: UI State Mapper Consolidation** (Resolved Sep.27.9)
 *   **Issue #1346: Physical Device Soak Test (24-Hour Observation)** (Resolved Sep.27.8)
@@ -53,5 +52,6 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.27.10: [SOT Count: 171 (Rules: 41), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.27.11: [SOT Count: 172 (Rules: 42), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.27.10: [SOT Count: 172 (Rules: 42), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.27.9: [SOT Count: 171 (Rules: 41), Open: H:0, M:0, L:0, Ideas: H:0, M:6, L:4, Testing: 3 (Sub-items: 15), QA: 284]**

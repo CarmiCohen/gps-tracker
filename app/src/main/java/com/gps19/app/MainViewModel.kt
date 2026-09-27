@@ -21,12 +21,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Sep.27.11:
+ * - Issue #1202 RESOLVED: Unified UI event routing into UiEventCoordinator.
+ *   Decommissioned procedural onEvent logic and draft management helpers (R-ID 511).
  * Sep.27.10:
  * - Issue #1201 RESOLVED: Integrated SirenLockoutUseCase to manage siren cooldowns 
- *   reactively. Decoupled lockout logic from AudioSynthesizer (R-ID 510).
- * Sep.27.9:
- * - Issue #1290 RESOLVED: Consolidated UI state mapping logic directly into MainViewModel 
- *   to minimize DI surface area and remove the redundant stateless interface mapping layer.
+ *   reactively (R-ID 510).
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -44,6 +44,7 @@ class MainViewModel @Inject constructor(
     val audioSynthesizer: AudioSynthesizer,
     private val hydrationManager: LifecycleHydrationManager,
     private val sirenLockoutUseCase: SirenLockoutUseCase,
+    private val uiEventCoordinator: UiEventCoordinator,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -438,215 +439,20 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    /**
+     * Issue #1202: Unified UI event routing.
+     * Delegates to UiEventCoordinator for procedural logic and domain orchestration.
+     */
     fun onEvent(event: UiEvent) {
-        when (event) {
-            is UiEvent.ToggleMap, is UiEvent.ToggleLog, is UiEvent.ToggleSettings, 
-            is UiEvent.TogglePhoneSetup, is UiEvent.ToggleRibbons, is UiEvent.SetDashboardExpanded,
-            is UiEvent.ToggleGnssDetail, is UiEvent.SetSubSettings, is UiEvent.ShowStopTrackingConfirmation,
-            is UiEvent.NavigateToDiagnostics, is UiEvent.SetPendingMode -> {
-                if (event is UiEvent.ToggleSettings) {
-                    if (event.visible) updateState { it.copy(settings = it.settings.copy(draftSettings = settingsUseCase.prepareDraft(it))) }
-                    else commitDraft()
-                }
-                updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
-            }
-            is UiEvent.SetUiVisible -> {
-                repository.sendCommand(UiCommand.UiVisibilityChanged(event.visible))
-                if (!event.visible && _uiState.value.navigation.isSettingsOpen) commitDraft()
-            }
-            is UiEvent.SetSystemActive -> { 
-                updateState { it.copy(session = it.session.copy(isSystemActive = event.active)) } 
-                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { sessionUseCase.setSystemActive(event.active) }
-            }
-            is UiEvent.SetAppMode -> {
-                viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
-                    _kinematicState.update { current -> current.apply { reset() } }
-                    _diagnosticState.update { current -> current.apply { reset() } }
-                    val newStartTime = sessionUseCase.setAppMode(event.mode)
-                    updateState { it.copy(
-                        session = it.session.copy(
-                            appMode = event.mode, 
-                            appStartTime = newStartTime ?: it.session.appStartTime,
-                            isSystemActive = if (event.mode != null) true else it.session.isSystemActive
-                        )
-                    )}
-                }
-            }
-            is UiEvent.ConfirmStopTracking, UiEvent.ManualExit -> {
-                _kinematicState.update { current -> current.apply { reset() } }
-                _diagnosticState.update { current -> current.apply { reset() } }
-                updateState { it.copy(
-                    session = it.session.copy(isSystemActive = false, appMode = null),
-                    settings = it.settings.copy(isSafeMode = false)
-                ) }
-                repository.setSafeMode(false)
-                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-                    sessionUseCase.stopTrackingSession()
-                }
-            }
-            is UiEvent.TriggerRecovery -> {
-                if (_uiState.value.simulation.isRecoveryPending) {
-                    updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
-                    updateState { it.copy(simulation = it.simulation.copy(isRecoveryPending = false)) }
-                }
-            }
-            is UiEvent.SetRecoveryPending -> updateState { it.copy(simulation = it.simulation.copy(isRecoveryPending = event.pending)) }
-            is UiEvent.SetForensicSimulation -> {
-                updateState { it.copy(simulation = it.simulation.copy(isForensicStallSimulated = event.active)) }
-                repository.setForensicStallSimulation(event.active)
-            }
-            is UiEvent.SetStorageSimulation -> {
-                updateState { it.copy(simulation = it.simulation.copy(isStorageSimulated = event.active, isStorageCriticalSimulated = event.isCritical)) }
-                repository.sendCommand(UiCommand.SimulateStoragePressure(event.active, event.isCritical))
-            }
-            is UiEvent.SetManualSelection -> updateState { it.copy(spatial = it.spatial.copy(isManualSelectionInProgress = event.active)) }
-            is UiEvent.SetSettlingActive -> updateState { it.copy(session = it.session.copy(isSettlingActive = event.active)) }
-            is UiEvent.ToggleSetupBypass -> updateState { it.copy(session = it.session.copy(isSetupBypassActive = event.active)) }
-            is UiEvent.DismissAlarms -> {
-                updateDiagnosticState { it.apply { isRedScreenVisible = false } }
-                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-                    alertUseCase.dismissAlarms()
-                }
-            }
-            is UiEvent.DismissIdentitySanitization -> {
-                updateState { it.copy(settings = it.settings.copy(isIdentitySanitized = false)) }
-                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-                    repository.saveBoolean(IDENTITY_SANITIZED_KEY, false)
-                }
-            }
-            is UiEvent.SetRedScreenVisible -> {
-                updateDiagnosticState { it.apply { isRedScreenVisible = event.visible } }
-            }
-            is UiEvent.StopSiren -> {
-                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-                    alertUseCase.stopSiren(event.causes)
-                }
-            }
-            is UiEvent.ToggleStrictMode -> {
-                updateNavigation { navigationUseCase.handleNavigationEvent(event, _uiState.value) }
-            }
-            is UiEvent.RefreshPermissionStatus -> {
-                viewModelScope.launch(Dispatchers.IO) {
-                    val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
-                    withContext(Dispatchers.Main.immediate) {
-                        updateState { it.copy(session = it.session.copy(permissions = newState)) }
-                    }
-                }
-            }
-            is UiEvent.ToggleXiaomiManualOverride -> {
-                viewModelScope.launch(Dispatchers.IO) {
-                    val current = _uiState.value.session.permissions.isManualOverride
-                    repository.saveBoolean(IS_XIAOMI_MANUAL_OVERRIDE_KEY, !current)
-                }
-            }
-            is UiEvent.RequestTestAlarm -> {
-                repository.sendCommand(UiCommand.ExecuteTestAlarm)
-            }
-            is UiEvent.UpdateDraftDeviceId, is UiEvent.UpdateDraftViewerId, is UiEvent.UpdateDraftRelayUrl, 
-            is UiEvent.UpdateDraftMaxDistance, is UiEvent.UpdateDraftAlertSettings, is UiEvent.UpdateDraftAlarmVolume, 
-            is UiEvent.CommitSettings -> handleDraftEvent(event)
-            is UiEvent.BulkUpdateSettings -> {
-                viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-                    settingsUseCase.bulkUpdateSettings(
-                        deviceId = event.deviceId,
-                        viewerId = event.viewerId,
-                        relayUrl = event.relayUrl,
-                        maxDistance = event.maxDistance,
-                        alertSettings = event.alertSettings,
-                        homePoints = event.homePoints
-                    )
-                }
-            }
-            is UiEvent.LogAction -> {
-                repository.addLog(
-                    LogEntry(
-                        localId = UUID.randomUUID().toString(),
-                        timestamp = timeProvider.currentTimeMillis(),
-                        message = event.message,
-                        type = event.type.uppercase(),
-                        isImportant = event.isImportant,
-                        id = _uiState.value.settings.deviceId,
-                        viewerId = _uiState.value.settings.viewerId,
-                        isSpecial = event.isSpecial,
-                        specialColor = event.specialColor
-                    )
-                )
-            }
-            is UiEvent.ClearLogs -> repository.clearLogs()
-            is UiEvent.ClearHomePoints -> viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-                val newPoints = spatialLogicUseCase.clearHomePoints(_uiState.value.spatial.maxDistance)
-                withContext(Dispatchers.Main.immediate) {
-                    updateState { it.copy(spatial = it.spatial.copy(homePoints = newPoints)) }
-                }
-            }
-            is UiEvent.ResetStats -> viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-                repository.resetStats()
-            }
-            is UiEvent.SetLogFilterShowDetails -> repository.updateLogFilters(details = event.show)
-            is UiEvent.SetLogFilterShowRecovered -> repository.updateLogFilters(recovered = event.show)
-            is UiEvent.SetReplayCursor -> {
-                updateNavigation { it.copy(replayCursorTs = event.ts) }
-                replayCursorRequest.value = event.ts
-            }
-            is UiEvent.ToggleTestSiren -> {
-                if (_diagnosticState.value.isSirenPlaying) {
-                    audioSynthesizer.stopSiren(timeProvider = timeProvider)
-                } else {
-                    val s = _uiState.value.settings.draftSettings.alertSettings
-                    val volume = if (s.useMaxVolume) 1.0f else if (s.useCustomVolume) s.alarmVolume else 1.0f
-                    audioSynthesizer.playSiren(
-                        _uiState.value.settings.selectedSirenType, force = true, volume = volume, 
-                        overrideSilence = s.overrideSilence, 
-                        loop = true, vibrate = s.vibrationEnabled,
-                        timeProvider = timeProvider
-                    )
-                }
-            }
-            is UiEvent.SetFenceVisible, is UiEvent.SetViolationsVisible, is UiEvent.SetGeofenceViolationsVisible,
-            is UiEvent.SetMapButtonsVisible, is UiEvent.SetMapLocked, is UiEvent.MapZoomIn, is UiEvent.MapZoomOut,
-            is UiEvent.CenterTracker, is UiEvent.CenterViewer, is UiEvent.SetGeofenceMode -> {
-                updateState { spatialLogicUseCase.handleMapEvent(event, it) }
-            }
-            is UiEvent.MapTap -> handleMapTap(event.point)
-            is UiEvent.AddHomePoint(event.point)
-            is UiEvent.RemoveHomePoint(index = event.index)
-            is UiEvent.ExecuteStressTest -> {
-                repository.sendCommand(UiCommand.ExecuteStressTest)
-            }
-            is UiEvent.ExecuteNetworkStressTest -> {
-                repository.sendCommand(UiCommand.ExecuteNetworkStressTest)
-            }
-            else -> {}
-        }
-    }
-
-    private fun handleDraftEvent(event: UiEvent) {
-        when (event) {
-            is UiEvent.UpdateDraftDeviceId -> updateDraft { it.copy(deviceId = event.id) }
-            is UiEvent.UpdateDraftViewerId -> updateDraft { it.copy(viewerId = event.id) }
-            is UiEvent.UpdateDraftRelayUrl -> updateDraft { it.copy(relayUrl = event.url) }
-            is UiEvent.UpdateDraftMaxDistance -> updateDraft { it.copy(maxDistance = event.distance) }
-            is UiEvent.UpdateDraftAlertSettings -> updateDraft { it.copy(alertSettings = event.settings) }
-            is UiEvent.UpdateDraftAlarmVolume -> updateDraft { it.alertSettings.copy(alarmVolume = event.volume).let { s -> it.copy(alertSettings = s) } }
-            is UiEvent.CommitSettings -> commitDraft()
-            else -> {}
-        }
-    }
-
-    private fun commitDraft() {
-        val finalDraft = _uiState.value.settings.draftSettings
-        autoSaveJob?.cancel()
-        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            settingsUseCase.saveDraftToRepo(finalDraft)
-            settingsUseCase.commitDraft()
-            updateState { it.copy(settings = it.settings.copy(draftSettings = DraftSettings())) }
-        }
-    }
-
-    private fun updateDraft(update: (DraftSettings) -> DraftSettings) {
-        updateState { it.copy(settings = it.settings.copy(draftSettings = update(it.settings.draftSettings))) }
-        autoSaveJob?.cancel()
-        autoSaveJob = viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) { delay(300L); settingsUseCase.saveDraftToRepo(_uiState.value.settings.draftSettings) }
+        uiEventCoordinator.handleEvent(
+            event = event,
+            currentState = _uiState.value,
+            scope = viewModelScope,
+            onStateUpdate = { updateState(it) },
+            onKinematicUpdate = { updateKinematicState(it) },
+            onDiagnosticUpdate = { updateDiagnosticState(it) },
+            onReplayRequest = { replayCursorRequest.value = it }
+        )
     }
 
     private fun updateState(update: (MainUiState) -> MainUiState) { _uiState.update { current -> update(current) } }
@@ -717,34 +523,6 @@ class MainViewModel @Inject constructor(
             isSpecial = isSpecial, specialColor = specialColor, role = _uiState.value.session.appMode ?: "system"
         )
         repository.addLog(entry)
-    }
-
-    private fun handleMapTap(point: GeoPoint) {
-        val mode = _uiState.value.spatial.geofenceMode
-        if (mode == GeofenceMode.ADD) {
-            onEvent(UiEvent.AddHomePoint(point))
-        } else if (mode == GeofenceMode.REMOVE) {
-            val idx = spatialLogicUseCase.findNearestPointIndex(_uiState.value.spatial.homePoints, point)
-            if (idx != -1) onEvent(UiEvent.RemoveHomePoint(idx))
-        }
-    }
-
-    private fun handleAddHomePoint(point: GeoPoint) {
-        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            val newPoints = spatialLogicUseCase.addHomePoint(point)
-            withContext(Dispatchers.Main.immediate) {
-                updateState { it.copy(spatial = it.spatial.copy(homePoints = newPoints, isFenceVisible = true)) }
-            }
-        }
-    }
-
-    private fun handleRemoveHomePoint(index: Int) {
-        viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
-            val newPoints = spatialLogicUseCase.removeHomePoint(index)
-            withContext(Dispatchers.Main.immediate) {
-                updateState { it.copy(spatial = it.spatial.copy(homePoints = newPoints)) }
-            }
-        }
     }
 
     // Consolidated Mapping Functions from UiStateMapper
@@ -993,7 +771,7 @@ class MainViewModel @Inject constructor(
             trackerTemp = diag.trackerBattery.temp.toFloat(),
             viewerTemp = diag.battery.temp.toFloat(),
             hasActiveAlarms = diag.activeAlarms.any { !it.isResolved },
-            isRedScreenVisible = (diag.activeAlarms.any { !it.isResolved } && !diag.isRedScreenVisible),
+            isRedScreenSuppressed = (diag.activeAlarms.any { !it.isResolved } && !diag.isRedScreenVisible),
             isSirenPlaying = diag.isSirenPlaying,
             activeAlarms = diag.activeAlarms,
             progressPulse = progressValue,

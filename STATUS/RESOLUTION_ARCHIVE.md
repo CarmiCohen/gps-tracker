@@ -1,3 +1,14 @@
+# 🏛️ Resolution Archive - Sep.27.11
+
+## 🏁 Issue #1202: UI Event Routing Unification
+*   **Resolved**: Sep.27.11
+*   **Root Cause**: `MainViewModel.onEvent` contained a massive, procedural `when (event)` block that directly orchestrated UseCases, persistence, and state updates. This pattern created a tight coupling between user interface events and domain orchestration, leading to a "God Object" architecture in the ViewModel and increasing maintenance surface area.
+*   **Remediation**:
+    *   **UiEventCoordinator.kt**: Introduced a central, standalone `UiEventCoordinator` component to manage all routing of `UiEvent`s to their corresponding domain UseCases and Repositories.
+    *   **MainViewModel.kt**: Completely refactored `onEvent` to delegate directly to `UiEventCoordinator`, drastically reducing its internal logic surface area and architectural complexity.
+    *   **Settings Management**: Unified and moved the debounced draft auto-save and draft preparation logic into the coordinator layer to maintain pure state handling in the ViewModel tier.
+*   **SOT ID**: 511 (UI Event Routing Unification)
+
 # 🏛️ Resolution Archive - Sep.27.10
 
 ## 🏁 Issue #1201: Reactive Siren Lockout
