@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.27.9)
+# SOT Master Requirements & Hardening Status (Sep.26.11)
 
-## 🏗️ Architectural Master Rules (41 Rules)
+## 🏗️ Architectural Master Rules (42 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -33,6 +33,7 @@
 *   **1.28 Unified Trajectory Management (R506)**: The system must utilize a single `TrajectoryBuffer` authority to consolidate sliding windows and hindsight corrections, eliminating dual terminology and redundant array allocations (Issue #1161).
 *   **1.29 Smart Signaling Dispatcher (R507)**: The signaling system must utilize a single `SmartSignalingDispatcher` coordination layer to manage prioritized transmission queuing, adaptive throttling, and unified update conflation (Issue #1172).
 *   **1.30 Continuous Stability Audit Logging (R508)**: The forensic auditor must continuously output reliability metrics and jitter peaks to Logcat every 10 seconds under standard tracking constraints to facilitate 24-hour physical soak auditing (Issue #1346).
+*   **1.31 Reactive Siren Lockout (R510)**: The system must manage siren lockout and cooldown states via a central, transport-agnostic `SirenLockoutUseCase` authority to decouple domain safety gates from hardware audio generation pipelines (Issue #1201).
 
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318-758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
@@ -53,6 +54,7 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 510**: Reactive Siren Lockout - Decoupled siren cooldown/lockout logic from audio generation and centralized it within a reactive `SirenLockoutUseCase` authority. (Resolved Sep.27.10).
 *   **SOT ID 509**: UI State Mapper Consolidation - Merged `UiStateMapper` logic directly into `MainViewModel` to reduce DI surface area and remove the redundant stateless interface mapping layer. (Resolved Sep.27.9).
 *   **SOT ID 508**: Continuous Stability Audit Logging - Hardened the forensic auditor loop to output reliability and jitter snapshots to standard stream authorities to unblock 24-hour continuous physical soak monitoring. (Resolved Sep.27.8).
 *   **SOT ID 507**: Smart Signaling Dispatcher - Integrated conflation, priority queuing, and adaptive throttling into a first-class reactive coordination layer, optimizing transmission latency and connection freshness. (Resolved Sep.27.7).
@@ -81,6 +83,7 @@
 *   **SOT ID 484**: Peer Lifecycle Decoupling - Remediated Issue #1327 by introducing `PeerConnectionChanged`. (Resolved Sep.25.05).
 
 ## 📋 Functional Requirements (171 R-IDs)
+*   **R510**: Centralized SirenLockoutUseCase authority for transport-agnostic siren suppression tracking.
 *   **R509**: Consolidated UI State mapping architecture for architectural surface area reduction.
 *   **R508**: Continuous Stability Audit Logging for physical 24h soak test observation.
 *   **R507**: Smart Signaling Dispatcher coordination layer for unified transmission.
@@ -108,6 +111,7 @@
 *   **R485**: Zero-allocation snap-to-update partitioning.
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.142 (Reactive Siren Lockout)**: PASSED - Successfully decoupled siren lockout state from audio generation pipelines and unified it under SirenLockoutUseCase. (Sep.26.11)
 *   **Chapter 31.141 (UI State Mapping Consolidation)**: PASSED - Verified direct integration of mapping helpers into MainViewModel and reduced dependency injection footprint. (Sep.27.9)
 *   **Chapter 31.140 (Physical Soak Readiness)**: PASSED - Hardened ForensicAuditor to output non-blocking status logging to standard streams to allow uninterrupted 24h hardware audits. (Sep.27.8)
 *   **Chapter 31.139 (Smart Signaling Dispatcher)**: PASSED - Verified reactive prioritized dispatching and violation-based adaptive throttling via SmartSignalingDispatcher. (Sep.27.7)
@@ -132,4 +136,4 @@
 *   **Chapter 31.120 (Signaling Optimization)**: PASSED - Verified that forensic indexes are pre-calculated. (Sep.26.0)
 
 ---
-*Next Audit: Oct.01.00. (Sep.27.9)*
+*Next Audit: Oct.01.00. (Sep.26.11)*

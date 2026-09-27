@@ -18,11 +18,11 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.27.10:
+ * - Issue #1201 RESOLVED: Integrated SirenLockoutUseCase to centralize siren lockout logic.
+ *   Removed redundant internal cooldown checks in favor of reactive lockout state (R-ID 510).
  * Sep.27.4:
  * - Issue #1348: Flattened DomainEvent hierarchy, emitting AlarmEvent directly.
- * Sep.26.6:
- * - Fixed Role-Prefix Collision: Hardened setPowerAlarmPending and resetEvaluation 
- *   against invalid prefix mapping or role prefix flipping.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -31,7 +31,8 @@ class AppAlarmManager @Inject constructor(
     private val sessionManager: SessionManager,
     private val notificationManager: AppNotificationManager,
     private val timeProvider: TimeProvider,
-    private val domainEventBus: DomainEventBus
+    private val domainEventBus: DomainEventBus,
+    private val sirenLockoutUseCase: SirenLockoutUseCase
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     
@@ -46,6 +47,13 @@ class AppAlarmManager @Inject constructor(
     
     private var isTrackerMode: Boolean = false
     private var currentRolePrefix: String = ""
+
+    init {
+        // React to lockout changes to refresh siren requirement
+        sirenLockoutUseCase.silencedUntilRt
+            .onEach { updateSirenRequirement() }
+            .launchIn(scope)
+    }
 
     fun updateSettings(settings: AlertSettings) {
         this.currentSettings = settings
@@ -74,19 +82,25 @@ class AppAlarmManager @Inject constructor(
         }
     }
 
-    fun shouldPlaySiren(silencedUntilRt: Long = 0L): Boolean {
+    fun shouldPlaySiren(): Boolean {
         if (isTrackerMode) return false
         if (currentSettings.globalMute) return false
         if (!hasUnresolvedAlarms()) return false
-        val nowRt = timeProvider.elapsedRealtime()
         
+        // Centralized Lockout Check
+        if (sirenLockoutUseCase.isLockedOut()) return false
+        
+        // Additional engine-level safety (e.g. recent manual stop)
+        val nowRt = timeProvider.elapsedRealtime()
         if (evaluationState.lastSirenStopRt > 0L && nowRt - evaluationState.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS) return false
-        if (nowRt < silencedUntilRt) return false
+        
         return true
     }
     
     fun notifySirenManualStop() {
         evaluationState.lastSirenStopRt = timeProvider.elapsedRealtime()
+        // Also update the centralized lockout to ensure UI and other components are in sync
+        sirenLockoutUseCase.setSilence(SIREN_RESUME_COOLDOWN_MS)
         saveLogicState()
         updateSirenRequirement()
     }
@@ -276,7 +290,6 @@ class AppAlarmManager @Inject constructor(
         snapshot: SystemEvaluationSnapshot,
         serviceContext: AlarmServiceContext
     ) {
-        // Issue #1329: Centralized authority for health state synchronization.
         TelemetryMapper.mapSnapshotToHealth(snapshot, evaluationState.health)
 
         val cachedPoints = repository.getCachedHomePoints()

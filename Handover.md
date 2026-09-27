@@ -1,23 +1,25 @@
-# Forensic Handover (Sep.27.9)
+# Forensic Handover (Sep.27.10)
 
 ## 🎯 Current System State
-*   **Version**: Sep.27.9 | **Build**: Success (UI State Mapper Consolidated)
-*   **SOT Baseline**: SOT: 507 (Rules: 41, IDs: 507)
-*   **Core Remediation**: Successfully resolved **Issue #1290** (UI State Mapper Consolidation).
-    *   Merged stateless `UiStateMapper` logic directly into `MainViewModel` as private helper functions.
-    *   Eliminated unnecessary DI binding layer in `AppModule.kt` and deprecated/decommissioned interface artifacts to minimize DI surface area.
+*   **Version**: Sep.27.10 | **Build**: Success (Reactive Siren Lockout)
+*   **SOT Baseline**: SOT ID: 510 (Rules: 42, R-IDs: 172)
+*   **Core Remediation**: Successfully resolved **Issue #1201** (Reactive Siren Lockout).
+    *   Decoupled siren cooldown/lockout logic from `AudioSynthesizer` into a dedicated `SirenLockoutUseCase`.
+    *   Exposed `silencedUntilRt` reactively via `MainUiState` to ensure UI transparency when alarms are suppressed.
+    *   Harmonized manual user silence and auto-stop cooldowns under a single authority.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
 
-1.  **State Separation & Reactive Pipelines**:
-    *   UI State transformations from `DiagnosticState` and `KinematicState` now live directly within `MainViewModel`, simplifying feature-specific mappings.
+1.  **Centralized Lockout Authority**:
+    *   `SirenLockoutUseCase` is now the sole source of truth for whether audio alerts are suppressed.
+    *   `AudioSynthesizer` is now a stateless procedural generation utility.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.27.9: [SOT: 507 (Rules: 41), Open: H:0, M:0, L:0, Ideas: H:0, M:6, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.27.10: [SOT Count: 172 (Rules: 42), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 
 ---
 

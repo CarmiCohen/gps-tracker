@@ -1,3 +1,16 @@
+# 🏛️ Resolution Archive - Sep.27.10
+
+## 🏁 Issue #1201: Reactive Siren Lockout
+*   **Resolved**: Sep.27.10
+*   **Root Cause**: The siren lockout and cooldown state (`silencedUntilRt`) was directly managed within the procedural audio generation component (`AudioSynthesizer`). This created a tight coupling between domain policy (when a siren is permitted to play) and hardware/audio synthesis, violating clean separation of concerns and preventing other domain/UI components from reactively observing the lockout status.
+*   **Remediation**:
+    *   **SirenLockoutUseCase.kt**: Introduced a dedicated, thread-safe `SirenLockoutUseCase` to act as the single source of truth for siren lockout state using a reactive `StateFlow<Long>`.
+    *   **AudioSynthesizer.kt**: Refactored to remove all independent lockout state management, querying `SirenLockoutUseCase` directly to gate audio generation.
+    *   **AppAlarmManager.kt**: Refactored to observe the reactive `silencedUntilRt` flow from `SirenLockoutUseCase` and automatically re-evaluate system-wide siren playback requirements upon lockout changes.
+    *   **CommandRouter.kt**: Updated command handling paths to update the centralized lockout authority.
+    *   **MainUiState.kt**: Extended `DiagnosticState` with a `silencedUntilRt` property to enable full visibility and reactivity in the UI tier.
+*   **SOT ID**: 510 (Reactive Siren Lockout)
+
 # 🏛️ Resolution Archive - Sep.27.9
 
 ## 🏁 Issue #1290: UI State Mapper Consolidation

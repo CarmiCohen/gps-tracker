@@ -6,10 +6,10 @@ import org.osmdroid.util.GeoPoint
 /**
  * MainUiState: Composite UI state partitioned into specialized slices to 
  * minimize recomposition costs and isolate volatile triggers (Issue #1166).
+ * Sep.27.10:
+ * - Issue #1201: Added silencedUntilRt to DiagnosticState for reactive lockout transparency.
  * Sep.27.2:
  * - Issue #1345: Added ExecuteNetworkStressTest to UiCommand and UiEvent.
- * Sep.23.50:
- * - Issue #1203: Consistently unified DiagnosticState for SSOT.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -287,6 +287,7 @@ class DiagnosticState(
     var isNewViolationDetected: Boolean = false,
     var powerAlarmPending: Boolean = false,
     var isAlarmSilenced: Boolean = false,
+    var silencedUntilRt: Long = 0L,
     var isSirenPlaying: Boolean = false,
     var isRedScreenVisible: Boolean = false,
     var maxTrackerAccuracy: Double = 0.0,
@@ -317,6 +318,7 @@ class DiagnosticState(
         this.isNewViolationDetected = other.isNewViolationDetected
         this.powerAlarmPending = other.powerAlarmPending
         this.isAlarmSilenced = other.isAlarmSilenced
+        this.silencedUntilRt = other.silencedUntilRt
         this.isSirenPlaying = other.isSirenPlaying
         this.isRedScreenVisible = other.isRedScreenVisible
         this.maxTrackerAccuracy = other.maxTrackerAccuracy
@@ -348,6 +350,7 @@ class DiagnosticState(
         isNewViolationDetected = false
         powerAlarmPending = false
         isAlarmSilenced = false
+        silencedUntilRt = 0L
         isSirenPlaying = false
         isRedScreenVisible = false
         maxTrackerAccuracy = 0.0
@@ -516,5 +519,4 @@ sealed class UiCommand {
     object ExecuteStressTest : UiCommand()
     object ExecuteNetworkStressTest : UiCommand()
     data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : UiCommand()
-    object CommitSettings : UiCommand()
 }

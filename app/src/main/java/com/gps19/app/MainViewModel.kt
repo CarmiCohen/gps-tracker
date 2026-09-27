@@ -21,18 +21,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Sep.27.10:
+ * - Issue #1201 RESOLVED: Integrated SirenLockoutUseCase to manage siren cooldowns 
+ *   reactively. Decoupled lockout logic from AudioSynthesizer (R-ID 510).
  * Sep.27.9:
  * - Issue #1290 RESOLVED: Consolidated UI state mapping logic directly into MainViewModel 
  *   to minimize DI surface area and remove the redundant stateless interface mapping layer.
- * Sep.27.2:
- * - Issue #1345: Added event handling for ExecuteNetworkStressTest (R-ID 345).
- * Sep.23.71:
- * - Issue #1230 REMEDIATION: Integrated AlertUseCase to ensure role-based 
- *   namespacing for alarm acknowledgments and siren dismissal (R-ID 453).
- * Sep.23.50:
- * - Issue #1203 RESOLVED: Optimized Hilt ViewModel scoping and eliminated 
- *   redundant stream resource churn, state loss, and misrouted kinematic state.
- *   Consolidated Tracker/Viewer/Setup states into a single source of truth.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -49,6 +43,7 @@ class MainViewModel @Inject constructor(
     val timeProvider: TimeProvider,
     val audioSynthesizer: AudioSynthesizer,
     private val hydrationManager: LifecycleHydrationManager,
+    private val sirenLockoutUseCase: SirenLockoutUseCase,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -419,6 +414,17 @@ class MainViewModel @Inject constructor(
             }
             .flowOn(Dispatchers.Main.immediate)
             .launchIn(viewModelScope)
+
+        sirenLockoutUseCase.silencedUntilRt
+            .onEach { ts -> 
+                updateDiagnosticState { it.apply { 
+                    silencedUntilRt = ts
+                    isAlarmSilenced = sirenLockoutUseCase.isLockedOut()
+                    pulse = timeProvider.elapsedRealtime()
+                } }
+            }
+            .flowOn(Dispatchers.Main.immediate)
+            .launchIn(viewModelScope)
         
         viewModelScope.launch(Dispatchers.IO) { 
             while(true) { 
@@ -602,8 +608,8 @@ class MainViewModel @Inject constructor(
                 updateState { spatialLogicUseCase.handleMapEvent(event, it) }
             }
             is UiEvent.MapTap -> handleMapTap(event.point)
-            is UiEvent.AddHomePoint -> handleAddHomePoint(event.point)
-            is UiEvent.RemoveHomePoint -> handleRemoveHomePoint(index = event.index)
+            is UiEvent.AddHomePoint(event.point)
+            is UiEvent.RemoveHomePoint(index = event.index)
             is UiEvent.ExecuteStressTest -> {
                 repository.sendCommand(UiCommand.ExecuteStressTest)
             }
@@ -987,7 +993,7 @@ class MainViewModel @Inject constructor(
             trackerTemp = diag.trackerBattery.temp.toFloat(),
             viewerTemp = diag.battery.temp.toFloat(),
             hasActiveAlarms = diag.activeAlarms.any { !it.isResolved },
-            isRedScreenSuppressed = (diag.activeAlarms.any { !it.isResolved } && !diag.isRedScreenVisible),
+            isRedScreenVisible = (diag.activeAlarms.any { !it.isResolved } && !diag.isRedScreenVisible),
             isSirenPlaying = diag.isSirenPlaying,
             activeAlarms = diag.activeAlarms,
             progressPulse = progressValue,

@@ -16,10 +16,10 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Sep.27.10:
+ * - Issue #1201 RESOLVED: Updated StopSiren path to utilize SirenLockoutUseCase authority (R-ID 510).
  * Sep.27.4:
  * - Issue #1348: Flattened DomainEvent hierarchy, emitting CommandEvent directly.
- * Sep.27.2:
- * - Issue #1345: Added routing for ExecuteNetworkStressTest to ConnectivitySuite (R-ID 345).
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -37,7 +37,8 @@ class CommandRouter @Inject constructor(
     private val timeProvider: TimeProvider,
     private val audioSynthesizer: AudioSynthesizer,
     private val historyManager: HistoryManager,
-    private val domainEventBus: DomainEventBus
+    private val domainEventBus: DomainEventBus,
+    private val sirenLockoutUseCase: SirenLockoutUseCase
 ) {
     private val isRegistered = AtomicBoolean(false)
     private val isObserving = AtomicBoolean(false)
@@ -87,6 +88,8 @@ class CommandRouter @Inject constructor(
                             alarmManager.dismissResolvedAlarms()
                             integrityMonitor.clearPowerTamper()
                             sessionManager.notifyTamperCleared() 
+                            // R-ID 510: Centralized Lockout Authority
+                            sirenLockoutUseCase.setSilence(SILENCE_TIMEOUT_MS)
                             audioSynthesizer.stopSiren(timeProvider = timeProvider)
                             notificationManager.cancelAlarm()
                         }
@@ -150,10 +153,6 @@ class CommandRouter @Inject constructor(
                         }
                         is UiCommand.SimulateStoragePressure -> {
                             integrityMonitor.simulateStoragePressure(command.active, command.isCritical)
-                        }
-                        is UiCommand.CommitSettings -> {
-                            // Handled at ViewModel level, but mapped here for exhaustiveness if needed in future
-                            logManager.logServiceEvent("UI COMMAND: CommitSettings received", false)
                         }
                     }
                 } catch (e: Exception) {

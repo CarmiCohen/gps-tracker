@@ -14,7 +14,6 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicLong
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.PI
@@ -23,31 +22,29 @@ import kotlin.math.exp
 
 /**
  * AudioSynthesizer: Procedural audio generator for sirens and alerts.
+ * Sep.27.10:
+ * - Issue #1201 RESOLVED: Decoupled siren lockout logic into SirenLockoutUseCase.
+ *   AudioSynthesizer is now focused on audio generation (R-ID 510).
  * Sep.23.01:
  * - Issue #1193 Hardening: Converted isLooping to MutableStateFlow to expose 
  *   isSirenPlaying flow, resolving asymmetric state dispersion between 
  *   engine and UI layers (R-ID 418).
- * Sep.15.04:
- * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
- *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
  */
 @Singleton
 class AudioSynthesizer @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val sirenLockoutUseCase: SirenLockoutUseCase
 ) {
     private val _isSirenPlaying = MutableStateFlow(false)
     val isSirenPlaying: StateFlow<Boolean> = _isSirenPlaying.asStateFlow()
 
     private val isForced = AtomicBoolean(false)
-    private val silencedUntilRt = AtomicLong(0)
     
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var sirenJob: Job? = null
 
     fun isPlaying(): Boolean = _isSirenPlaying.value
     fun isForced(): Boolean = isForced.get()
-    
-    fun getSilencedUntilRt(): Long = silencedUntilRt.get()
 
     fun playShortAlert() {
         scope.launch {
@@ -84,7 +81,10 @@ class AudioSynthesizer @Inject constructor(
             return
         }
 
-        if (!force && timeProvider.elapsedRealtime() < silencedUntilRt.get()) return
+        if (!force && sirenLockoutUseCase.isLockedOut()) {
+            Timber.d("Siren suppressed by lockout cooldown")
+            return
+        }
         
         if (!overrideSilence) {
             val am = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
@@ -148,7 +148,7 @@ class AudioSynthesizer @Inject constructor(
                     isForced.set(false)
                     if (isAutoStopped) {
                         Timber.d("Siren auto-stopped (${SIREN_AUTO_STOP_MS/1000}s limit reached). Triggering cooldown.")
-                        setSilence(SIREN_RESUME_COOLDOWN_MS, timeProvider)
+                        sirenLockoutUseCase.setSilence(SIREN_RESUME_COOLDOWN_MS)
                     }
                     Timber.d("Siren loop finished (flags reset)")
                 }
@@ -208,19 +208,8 @@ class AudioSynthesizer @Inject constructor(
         _isSirenPlaying.value = false
         isForced.set(false)
         sirenJob?.cancel()
-        setSilence(silenceDurationMs, timeProvider)
+        sirenLockoutUseCase.setSilence(silenceDurationMs)
         Timber.d("Siren stop requested")
-    }
-
-    private fun setSilence(durationMs: Long, timeProvider: TimeProvider) {
-        if (durationMs > 0) {
-            val newSilenceRt = timeProvider.elapsedRealtime() + durationMs
-            while (true) {
-                val current = silencedUntilRt.get()
-                if (newSilenceRt <= current) break
-                if (silencedUntilRt.compareAndSet(current, newSilenceRt)) break
-            }
-        }
     }
 
     private suspend fun playBuffer(samples: ShortArray, overrideSilence: Boolean, timeProvider: TimeProvider) = withContext(Dispatchers.Default) {
