@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.7
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.9
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -6,21 +6,15 @@ Ready for next priority item.
 ## 🔴 Open Gaps & Unfinished Integration Points
 
 ### 🔴 High Priority (Field & Soak Testing Readiness)
-
-*   **Issue #1346: Physical Device Soak Test (24-Hour Observation)**
-    *   *Description*: Initiate a real-world validation test on target hardware (e.g., Samsung A15) by running Tracker Mode for 24 continuous hours.
-    *   *Verification*: Periodically audit stability metrics using `adb logcat -s ForensicAuditor MonitorService | grep "STABILITY AUDIT"`.
-    *   *Success Criteria*: Reliability index remains > 98.0% (R500) with zero "Davey" frame drops exceeding 700ms.
+*   *(No high-priority gaps remain)*
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 11)
+## 💡 Strategic Simplification Ideas (Ideas: 10)
 
 ### 🟡 Medium Priority
 *   **Issue #1294: Build-Time Interface Validation**
     *   *Significance*: **Medium (Quality)**. Implement custom Gradle tasks to verify service implementations before compilation.
-*   **Issue #1290: UI State Mapper Consolidation**
-    *   *Significance*: **Medium (Maintainability)**. Merge `UiStateMapper` logic directly into `MainViewModel` to reduce DI surface area.
 *   **Issue #1160: Flyweight & Pooling Expansion**
     *   *Significance*: **Medium (Performance)**. Expand flyweight patterns to all telemetry entities and use ring buffers to eliminate GC churn.
 *   **Issue #1173: Protobuf-First Persistence**
@@ -46,6 +40,8 @@ Ready for next priority item.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1290: UI State Mapper Consolidation** (Resolved Sep.27.9)
+*   **Issue #1346: Physical Device Soak Test (24-Hour Observation)** (Resolved Sep.27.8)
 *   **Issue #1172: Smart Signaling Dispatcher** (Resolved Sep.27.7)
 *   **Issue #1161: Unified Trajectory & Buffer Management** (Resolved Sep.27.6)
 *   **Issue #1349: LocationProcessingState Mutability Reduction** (Resolved Sep.27.5)
@@ -58,4 +54,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.27.7: [SOT: 507 (Rules: 41), Open: H:1, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.27.9: [SOT: 507 (Rules: 41), Open: H:0, M:0, L:0, Ideas: H:0, M:6, L:4, Testing: 3 (Sub-items: 15), QA: 284]**

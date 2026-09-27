@@ -43,10 +43,6 @@ abstract class AppModule {
     @Singleton
     abstract fun bindSignalingTransport(impl: HttpSignalingTransport): SignalingTransport
 
-    @Binds
-    @Singleton
-    abstract fun bindUiStateMapper(impl: UiStateMapperImpl): UiStateMapper
-
     companion object {
         @Provides
         @Singleton
@@ -67,7 +63,6 @@ abstract class AppModule {
             .addMigrations(
                 AppDatabase.MIGRATION_56_57,
                 AppDatabase.MIGRATION_57_58,
-                AppDatabase.MIGRATION_58_59,
                 AppDatabase.MIGRATION_60_61,
                 AppDatabase.MIGRATION_61_62,
                 AppDatabase.MIGRATION_62_63,

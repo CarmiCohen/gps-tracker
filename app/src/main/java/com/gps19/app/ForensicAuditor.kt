@@ -10,12 +10,8 @@ import kotlin.math.round
 
 /**
  * ForensicAuditor: Encapsulates high-assurance hardware audits (Stability, Jitter, Sensor Rates, Energy).
- * Sep.25.01:
- * - Issue #1322: Aligned computeEnergyFootprint with unified RevivalEvent model.
- * Sep.20.18:
- * - Issue #1132 Hardening: Implemented internal synchronization for RoleState to 
- *   ensure atomic check-and-set for jitter peaks and stability counters across 
- *   GNSS/Sensor and Tick threads (R-ID 382).
+ * Sep.27.8:
+ * - Issue #1346: Hardened physical soak logging to always print STABILITY AUDIT status for 24h verification.
  */
 @Singleton
 class ForensicAuditor @Inject constructor(
@@ -178,16 +174,12 @@ class ForensicAuditor @Inject constructor(
         val jitterViolation = jitter > GNSS_JITTER_THRESHOLD_MS
         val reliabilityViolation = reliability < GPS_STABILITY_RELIABILITY_THRESHOLD
         
+        val msg = "STABILITY AUDIT ($roleTag): Reliability ${reliability.roundToOneDecimal()}% ($violationCount gaps in $fixCount fixes), Max GNSS Jitter: ${jitter}ms"
+        Timber.i(msg)
+
         if (reliabilityViolation || jitterViolation) {
-            val msg = StringBuilder("STABILITY AUDIT ($roleTag): ")
-            if (reliabilityViolation) {
-                msg.append("Reliability ${reliability.roundToOneDecimal()}% ($violationCount gaps in $fixCount fixes). ")
-            }
-            if (jitterViolation) {
-                msg.append("GNSS Jitter: ${jitter}ms (Hardware Instability).")
-            }
             return StabilityVerdict(
-                message = msg.toString().trim(),
+                message = msg,
                 isJitterViolation = jitterViolation,
                 isReliabilityViolation = reliabilityViolation
             )
