@@ -6,11 +6,10 @@ import org.osmdroid.util.GeoPoint
 /**
  * MainUiState: Composite UI state partitioned into specialized slices to 
  * minimize recomposition costs and isolate volatile triggers (Issue #1166).
+ * Sep.27.2:
+ * - Issue #1345: Added ExecuteNetworkStressTest to UiCommand and UiEvent.
  * Sep.23.50:
  * - Issue #1203: Consistently unified DiagnosticState for SSOT.
- * Sep.23.08:
- * - Issue #1204: Unified Hardware Lifecycle. Added isHuaweiDevice to 
- *   PermissionState for vendor-specific hardening visibility.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -494,6 +493,7 @@ sealed class UiEvent {
     data class SetReplayCursor(val ts: Long?) : UiEvent()
     data class SetForensicSimulation(val active: Boolean) : UiEvent()
     object ExecuteStressTest : UiEvent()
+    object ExecuteNetworkStressTest : UiEvent()
     data class SetStorageSimulation(val active: Boolean, val isCritical: Boolean) : UiEvent()
     data class SetManualSelection(val active: Boolean) : UiEvent()
     data class SetSettlingActive(val active: Boolean) : UiEvent()
@@ -514,6 +514,7 @@ sealed class UiCommand {
     object MapZoomIn : UiCommand()
     object MapZoomOut : UiCommand()
     object ExecuteStressTest : UiCommand()
+    object ExecuteNetworkStressTest : UiCommand()
     data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : UiCommand()
     object CommitSettings : UiCommand()
 }

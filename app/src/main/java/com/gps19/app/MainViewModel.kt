@@ -21,6 +21,8 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Sep.27.2:
+ * - Issue #1345: Added event handling for ExecuteNetworkStressTest (R-ID 345).
  * Sep.23.71:
  * - Issue #1230 REMEDIATION: Integrated AlertUseCase to ensure role-based 
  *   namespacing for alarm acknowledgments and siren dismissal (R-ID 453).
@@ -600,6 +602,12 @@ class MainViewModel @Inject constructor(
             is UiEvent.MapTap -> handleMapTap(event.point)
             is UiEvent.AddHomePoint -> handleAddHomePoint(event.point)
             is UiEvent.RemoveHomePoint -> handleRemoveHomePoint(index = event.index)
+            is UiEvent.ExecuteStressTest -> {
+                repository.sendCommand(UiCommand.ExecuteStressTest)
+            }
+            is UiEvent.ExecuteNetworkStressTest -> {
+                repository.sendCommand(UiCommand.ExecuteNetworkStressTest)
+            }
             else -> {}
         }
     }

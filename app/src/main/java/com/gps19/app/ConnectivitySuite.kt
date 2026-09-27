@@ -21,6 +21,9 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.27.2:
+ * - Issue #1345: Implemented executeFlappingStressTest to verify signaling 
+ *   resilience during high-frequency network flapping (R-ID 345).
  * Sep.26.11:
  * - Issue #1343: Integrated Signaling Lifecycle Probes to forensicLogger 
  *   to audit interface handover events and throttled outbound tx errors.
@@ -648,6 +651,33 @@ class ConnectivitySuite @Inject constructor(
                 reconnectAttempt = 0
                 signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                 wakeUpRelay()
+            }
+        }
+    }
+
+    /**
+     * executeFlappingStressTest: Initiates a 10s high-frequency signaling flapping 
+     * burst to verify resource stability and event resilience (R-ID 345).
+     */
+    fun executeFlappingStressTest() {
+        scope.launch(Dispatchers.Default) {
+            domainEventBus.emit(DomainEvent.ServiceStatus("NETWORK STRESS TEST: Initiating 10s Signaling Flapping Burst.", isImportant = true))
+            val start = timeProvider.elapsedRealtime()
+            var count = 0
+            while (timeProvider.elapsedRealtime() - start < 10000) {
+                if (signalingProvider.isConnected()) {
+                    signalingProvider.disconnect()
+                } else {
+                    signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
+                }
+                count++
+                delay(200) // 5Hz flapping
+            }
+            domainEventBus.emit(DomainEvent.ServiceStatus("NETWORK STRESS TEST: Flapping burst complete ($count transitions).", isImportant = true))
+            
+            // Final recovery attempt
+            if (!signalingProvider.isConnected()) {
+                signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
             }
         }
     }

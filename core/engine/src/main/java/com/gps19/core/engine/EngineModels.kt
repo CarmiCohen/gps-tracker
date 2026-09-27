@@ -5,6 +5,8 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.27.2:
+ * - Issue #1345: Added ExecuteNetworkStressTest to CommandEvent.
  * Sep.26.12:
  * - Issue #1344: Added thermalHeadroom and heapAllocatedMb to SystemEvaluationSnapshot.
  * Sep.26.1:
@@ -302,6 +304,7 @@ sealed class CommandEvent {
     object ResetTimers : CommandEvent()
     object SyncSensors : CommandEvent()
     object ExecuteStressTest : CommandEvent()
+    object ExecuteNetworkStressTest : CommandEvent()
     data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : CommandEvent()
 }
 

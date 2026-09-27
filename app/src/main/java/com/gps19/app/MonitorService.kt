@@ -24,6 +24,8 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.27.2:
+ * - Issue #1345: Integrated ExecuteNetworkStressTest command handling.
  * Sep.26.12:
  * - Issue #1344: Integrated thermalHeadroom and heapAllocatedMb into 
  *   SystemEvaluationSnapshot for forensic tracking.
@@ -296,6 +298,7 @@ class MonitorService : BaseMonitorService() {
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); lifecycleScope.launch { hardwareSuite.start() } }
                     is CommandEvent.ExecuteStressTest -> if (isTrackerMode) executeAutomatedStressTest()
+                    is CommandEvent.ExecuteNetworkStressTest -> connectivitySuite.executeFlappingStressTest()
                     is CommandEvent.SimulateStoragePressure -> {}
                 }
             }

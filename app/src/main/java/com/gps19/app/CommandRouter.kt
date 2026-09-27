@@ -16,6 +16,8 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Sep.27.2:
+ * - Issue #1345: Added routing for ExecuteNetworkStressTest to ConnectivitySuite (R-ID 345).
  * Sep.25.01:
  * - Issue #1322: Converged CommandEvent emission into DomainEventBus.
  * Sep.23.70:
@@ -145,6 +147,9 @@ class CommandRouter @Inject constructor(
                         }
                         is UiCommand.ExecuteStressTest -> {
                             domainEventBus.emit(DomainEvent.Command(CommandEvent.ExecuteStressTest))
+                        }
+                        is UiCommand.ExecuteNetworkStressTest -> {
+                            domainEventBus.emit(DomainEvent.Command(CommandEvent.ExecuteNetworkStressTest))
                         }
                         is UiCommand.SimulateStoragePressure -> {
                             integrityMonitor.simulateStoragePressure(command.active, command.isCritical)
