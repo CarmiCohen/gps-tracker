@@ -82,6 +82,8 @@ data class AtmosphericState(
 
 /**
  * IntegrityState: Hardware, system health, and session audit telemetry.
+ * Sep.26.12:
+ * - Issue #1344: Added thermalHeadroom and heapAllocatedMb forensic probes.
  */
 @Serializable
 data class IntegrityState(
@@ -144,7 +146,9 @@ data class IntegrityState(
     var cpuLoad: Double = 0.0,
     var ioWait: Double = 0.0,
     var maxIoLatency: Long = 0L,
-    var isBatteryWhitelisted: Boolean = false
+    var isBatteryWhitelisted: Boolean = false,
+    var thermalHeadroom: Double = 0.0,
+    var heapAllocatedMb: Double = 0.0
 ) {
     fun copyFrom(other: IntegrityState) {
         this.battery = other.battery; this.isCharging = other.isCharging; this.currentMa = other.currentMa
@@ -178,6 +182,8 @@ data class IntegrityState(
         this.ioWait = other.ioWait
         this.maxIoLatency = other.maxIoLatency
         this.isBatteryWhitelisted = other.isBatteryWhitelisted
+        this.thermalHeadroom = other.thermalHeadroom
+        this.heapAllocatedMb = other.heapAllocatedMb
     }
 }
 

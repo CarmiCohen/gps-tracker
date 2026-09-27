@@ -6,6 +6,8 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Sep.26.12:
+ * - Issue #1344: Added thermalHeadroom and heapAllocatedMb to all mapping paths.
  * Sep.26.0:
  * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence. Refactored 
  *   mapping logic to support partitioned TrackerStatus DTO, drastically 
@@ -84,7 +86,9 @@ object TelemetryMapper {
             isSitActive = snapshot.integrity.isSitActive,
             isSitDetected = isSuspiciousMode,
             lastSitTs = lastSitTs,
-            tamperNote = snapshot.suppressionNote
+            tamperNote = snapshot.suppressionNote,
+            thermalHeadroom = snapshot.thermalHeadroom,
+            heapAllocatedMb = snapshot.heapAllocatedMb
         )
 
         return TrackerStatus(
@@ -276,7 +280,9 @@ object TelemetryMapper {
             tamperDetected = data.optBoolean("is_tamper_detected", current.isTamperDetected) || 
                              data.optBoolean("is_location_pending", false) || 
                              statusVar == SentinelStatus.TAMPER,
-            nowTs = now, nowRt = nowRt
+            nowTs = now, nowRt = nowRt,
+            thermalHeadroom = data.optDouble("thermal_headroom", 0.0),
+            heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
         )
     }
 
@@ -379,7 +385,9 @@ object TelemetryMapper {
             isUltraLongStationary = data.optBoolean("is_ultra_long_stationary", current.isUltraLongStationary),
             gpsHardwareLock = data.optBoolean("gps_hw_lock", current.gpsHardwareLock),
             isGnssThrottled = data.optBoolean("is_gnss_throttled", current.isGnssThrottled),
-            tamperNote = if (data.has("tamper_note")) data.getString("tamper_note") else null
+            tamperNote = if (data.has("tamper_note")) data.getString("tamper_note") else null,
+            thermalHeadroom = data.optDouble("thermal_headroom", 0.0),
+            heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
         )
 
         return current.copy(
@@ -440,7 +448,9 @@ object TelemetryMapper {
             isPowerTamper = snapshot.integrity.isPowerTamper,
             isLocationPending = snapshot.integrity.isLocationPending,
             locationPendingReason = snapshot.integrity.locationPendingReason,
-            coolingEnteredRt = snapshot.nowRt 
+            coolingEnteredRt = snapshot.nowRt,
+            thermalHeadroom = snapshot.thermalHeadroom,
+            heapAllocatedMb = snapshot.heapAllocatedMb
         )
     }
 
@@ -497,7 +507,9 @@ object TelemetryMapper {
             suppressionNote = s.tamperNote,
             isStalled = s.isStalled,
             isClockRegression = s.isClockRegression || (nowRt - s.lastValidFixRt > 30000L), 
-            snrSnapshot = s.snrIdx * 5.0
+            snrSnapshot = s.snrIdx * 5.0,
+            thermalHeadroom = s.integrity.thermalHeadroom,
+            heapAllocatedMb = s.integrity.heapAllocatedMb
         )
     }
 
@@ -554,6 +566,8 @@ object TelemetryMapper {
             ioWait = p.ioWait
             maxIoLatency = p.maxIoLatency
             isSilentFailure = p.isSilentFailure
+            thermalHeadroom = p.thermalHeadroom
+            heapAllocatedMb = p.heapAllocatedMb
         }
     }
 
@@ -591,6 +605,8 @@ object TelemetryMapper {
             isUltraLongStationary = entity.isUltraLongStationary
             gpsHardwareLock = entity.gpsHardwareLock
             isAnchorLocked = entity.isAnchorLocked
+            thermalHeadroom = entity.thermalHeadroom
+            heapAllocatedMb = entity.heapAllocatedMb
         }
     }
 
@@ -642,7 +658,9 @@ object TelemetryMapper {
             isBatteryCritical = p.isBatteryCritical,
             violationUptimeMs = p.violationUptimeMs,
             isUltraLongStationary = p.isUltraLongStationary,
-            gpsHardwareLock = p.gpsHardwareLock
+            gpsHardwareLock = p.gpsHardwareLock,
+            thermalHeadroom = p.thermalHeadroom,
+            heapAllocatedMb = p.heapAllocatedMb
         )
     }
 
@@ -701,7 +719,9 @@ object TelemetryMapper {
             isUltraLongStationary = status.isUltraLongStationary,
             violationUptimeMs = status.violationUptimeMs,
             gpsHardwareLock = status.gpsHardwareLock,
-            isGnssThrottled = status.isGnssThrottled
+            isGnssThrottled = status.isGnssThrottled,
+            thermalHeadroom = status.integrity.thermalHeadroom,
+            heapAllocatedMb = status.integrity.heapAllocatedMb
         )
     }
 
@@ -742,7 +762,9 @@ object TelemetryMapper {
             isUltraLongStationary = entity.isUltraLongStationary,
             violationUptimeMs = entity.violationUptimeMs,
             gpsHardwareLock = entity.gpsHardwareLock,
-            isGnssThrottled = entity.isGnssThrottled
+            isGnssThrottled = entity.isGnssThrottled,
+            thermalHeadroom = entity.thermalHeadroom,
+            heapAllocatedMb = entity.heapAllocatedMb
         )
 
         return TrackerStatus(

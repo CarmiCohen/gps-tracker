@@ -9,6 +9,9 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Sep.26.12:
+ * - Issue #1344: Expanded logForensicTraceOptimized to include thermalHeadroom 
+ *   and heapAllocatedMb forensic probes.
  * Sep.09.10:
  * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .atmospheric)
  *   in LocationUpdate to support bridge removal (R-ID 284).
@@ -82,12 +85,14 @@ class LogManager @Inject constructor(
      */
     fun logForensicTraceOptimized(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
-        vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double
+        vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double,
+        thermalHeadroom: Double = 0.0, heapAllocatedMb: Double = 0.0
     ) {
         val buffer = forensicSpillBufferProvider.get()
         if (!buffer.writeTraceOptimized(
             timestamp, lat, lng, accuracy, maxAccuracy, vibe, snr, 
-            batteryTemp, batteryLevel, isCharging
+            batteryTemp, batteryLevel, isCharging, thermalHeadroom = thermalHeadroom,
+            heapAllocatedMb = heapAllocatedMb
         )) {
             handleOverflow()
         } else {
@@ -202,7 +207,9 @@ class LogManager @Inject constructor(
             vibeSnapshot = finalVibe,
             tempSnapshot = health.batteryTemp,
             battSnapshot = health.batteryLevel,
-            chargingSnapshot = health.isCharging
+            chargingSnapshot = health.isCharging,
+            thermalSnapshot = health.thermalHeadroom,
+            heapSnapshot = health.heapAllocatedMb
         )
         
         val suite = connectivitySuite

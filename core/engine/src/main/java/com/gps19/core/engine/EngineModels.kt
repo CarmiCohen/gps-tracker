@@ -5,6 +5,8 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.26.12:
+ * - Issue #1344: Added thermalHeadroom and heapAllocatedMb to SystemEvaluationSnapshot.
  * Sep.26.1:
  * - Issue #1332: Viewer Self-Tracking Snapshot Optimization. Removed 
  *   ViewerLocationUpdated event; unified all self-telemetry persistence 
@@ -134,7 +136,9 @@ class EngineConnectionPoint(
     var isBatteryLow: Boolean = false,
     var isBatteryCritical: Boolean = false,
     var isUltraLongStationary: Boolean = false,
-    var violationUptimeMs: Long = 0L
+    var violationUptimeMs: Long = 0L,
+    var thermalHeadroom: Double = 0.0,
+    var heapAllocatedMb: Double = 0.0
 ) {
     fun copyFrom(other: EngineConnectionPoint) {
         this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt; this.remoteSig = other.remoteSig
@@ -154,6 +158,7 @@ class EngineConnectionPoint(
         this.cpuLoad = other.cpuLoad; this.ioWait = other.ioWait; this.maxIoLatency = other.maxIoLatency
         this.isSilentFailure = other.isSilentFailure; this.isBatteryLow = other.isBatteryLow; this.isBatteryCritical = other.isBatteryCritical
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
+        this.thermalHeadroom = other.thermalHeadroom; this.heapAllocatedMb = other.heapAllocatedMb
     }
 }
 
@@ -202,7 +207,9 @@ data class SystemEvaluationSnapshot(
     val isMaliAnomaly: Boolean = false,
     val localInternetLoss: Boolean = false,
     val isHardwareOnline: Boolean = true,
-    val acousticMinDb: Double = -1.0
+    val acousticMinDb: Double = -1.0,
+    val thermalHeadroom: Double = 0.0,
+    val heapAllocatedMb: Double = 0.0
 ) {
     /**
      * toLocationUpdate: Returns a new LocationUpdate based on this snapshot.

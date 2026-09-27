@@ -10,6 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.26.12:
+ * - Issue #1344: Added thermalHeadroom and heapAllocatedMb forensic probes 
+ *   to TrackerStatus, ConnectionPoint, and LogEntry. Fixed isBatterySteepDischarge typo.
  * Sep.26.0:
  * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence. Refactored 
  *   TrackerStatus to use partitioned states (Kinetic, Atmospheric, Integrity) 
@@ -143,7 +146,9 @@ class ConnectionPoint(
     var violationUptimeMs: Long = 0L,
     var gpsHardwareLock: Boolean = false,
     var isAnchorLocked: Boolean = false,
-    var isGnssThrottled: Boolean = false
+    var isGnssThrottled: Boolean = false,
+    var thermalHeadroom: Double = 0.0,
+    var heapAllocatedMb: Double = 0.0
 ) {
     fun copyFrom(other: ConnectionPoint) {
         this.localId = other.localId; this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt
@@ -166,6 +171,8 @@ class ConnectionPoint(
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
         this.gpsHardwareLock = other.gpsHardwareLock; this.isAnchorLocked = other.isAnchorLocked
         this.isGnssThrottled = other.isGnssThrottled
+        this.thermalHeadroom = other.thermalHeadroom
+        this.heapAllocatedMb = other.heapAllocatedMb
     }
 
     /**
@@ -180,7 +187,8 @@ class ConnectionPoint(
                tiltIdx == other.tiltIdx && baroIdx == other.baroIdx && isSitActive == other.isSitActive &&
                isUltraLongStationary == other.isUltraLongStationary && violationUptimeMs == other.violationUptimeMs &&
                gpsHardwareLock == other.gpsHardwareLock && isAnchorLocked == other.isAnchorLocked &&
-               isGnssThrottled == other.isGnssThrottled
+               isGnssThrottled == other.isGnssThrottled && thermalHeadroom == other.thermalHeadroom && 
+               heapAllocatedMb == other.heapAllocatedMb
     }
 
     fun reset() {
@@ -196,6 +204,7 @@ class ConnectionPoint(
         sitShock = 0.0; kineticEnergy = 0.0; cpuLoad = 0.0; ioWait = 0.0; maxIoLatency = 0L
         isSilentFailure = false; isUltraLongStationary = false; violationUptimeMs = 0L
         gpsHardwareLock = false; isAnchorLocked = false; isGnssThrottled = false
+        thermalHeadroom = 0.0; heapAllocatedMb = 0.0
     }
 }
 
@@ -252,7 +261,9 @@ data class LogEntry(
     val gpsHardwareLock: Boolean = false,
     val tempSnapshot: Double? = null,
     val battSnapshot: Int? = null,
-    val chargingSnapshot: Boolean? = null
+    val chargingSnapshot: Boolean? = null,
+    val thermalSnapshot: Double? = null,
+    val heapSnapshot: Double? = null
 ) {
     /**
      * contentEquals: Deep parity check to suppress redundant Logcat/UI noise (R312).
@@ -261,7 +272,8 @@ data class LogEntry(
         return timestamp == other.timestamp && message == other.message && 
                count == other.count && durationMs == other.durationMs &&
                lat == other.lat && lng == other.lng && accuracy == other.accuracy &&
-               snrSnapshot == other.snrSnapshot && vibeSnapshot == other.vibeSnapshot
+               snrSnapshot == other.snrSnapshot && vibeSnapshot == other.vibeSnapshot &&
+               thermalSnapshot == other.thermalSnapshot && heapSnapshot == other.heapSnapshot
     }
 
     fun toJSONObject(): JSONObject {
@@ -292,6 +304,8 @@ data class LogEntry(
             tempSnapshot?.let { put("temp_snapshot", it) }
             battSnapshot?.let { put("batt_snapshot", it) }
             chargingSnapshot?.let { put("charging_snapshot", it) }
+            thermalSnapshot?.let { put("thermal_snapshot", it) }
+            heapSnapshot?.let { put("heap_snapshot", it) }
         }
     }
 
@@ -315,7 +329,9 @@ data class LogEntry(
                 spillIdx = obj.optInt("spill_idx", -1), gpsHardwareLock = obj.optBoolean("gps_hw_lock", false),
                 tempSnapshot = if (obj.has("temp_snapshot")) obj.optDouble("temp_snapshot") else null,
                 battSnapshot = if (obj.has("batt_snapshot")) obj.optInt("batt_snapshot") else null,
-                chargingSnapshot = if (obj.has("charging_snapshot")) obj.optBoolean("charging_snapshot") else null
+                chargingSnapshot = if (obj.has("charging_snapshot")) obj.optBoolean("charging_snapshot") else null,
+                thermalSnapshot = if (obj.has("thermal_snapshot")) obj.optDouble("thermal_snapshot") else null,
+                heapSnapshot = if (obj.has("heap_snapshot")) obj.optDouble("heap_snapshot") else null
             )
         }
     }
@@ -440,6 +456,9 @@ data class TrackerStatus(
     val lastEnergyDurationMs: Long get() = integrity.lastEnergyDurationMs
     val tamperNote: String? get() = integrity.tamperNote
     
+    val thermalHeadroom: Double get() = integrity.thermalHeadroom
+    val heapAllocatedMb: Double get() = integrity.heapAllocatedMb
+
     fun toMap(fromViewer: Boolean): Map<String, Any?> = mutableMapOf<String, Any?>().apply {
         put("id", SignalingConstants.getTransmissionId(deviceId)); put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
         put("from_viewer", fromViewer); put("lat", lat); put("lng", lng); put("alt", alt)
@@ -485,6 +504,10 @@ data class TrackerStatus(
         put("last_energy_delta_temp", lastEnergyDeltaTemp)
         put("last_energy_duration_ms", lastEnergyDurationMs)
         put("tamper_note", tamperNote)
+        
+        // Issue #1344: Forensic probes
+        put("thermal_headroom", thermalHeadroom)
+        put("heap_allocated_mb", heapAllocatedMb)
     }
 
     companion object {
@@ -591,7 +614,9 @@ data class DashboardHealthState(
     val lastEnergyDeltaMa: Int = 0,
     val lastEnergyDeltaTemp: Double = 0.0,
     val lastEnergyDurationMs: Long = 0L,
-    val systemPulse: Long = 0L
+    val systemPulse: Long = 0L,
+    val thermalHeadroom: Double = 0.0,
+    val heapAllocatedMb: Double = 0.0
 )
 
 /**
@@ -679,6 +704,8 @@ data class DashboardState(
     val lastEnergyDeltaTemp get() = health.lastEnergyDeltaTemp
     val lastEnergyDurationMs get() = health.lastEnergyDurationMs
     val systemPulse get() = health.systemPulse
+    val thermalHeadroom get() = health.thermalHeadroom
+    val heapAllocatedMb get() = health.heapAllocatedMb
 }
 
 class StatsState(

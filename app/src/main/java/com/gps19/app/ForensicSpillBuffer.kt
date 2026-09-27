@@ -18,6 +18,10 @@ import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Sep.26.12:
+ * - Issue #1344: Added thermalHeadroom and heapAllocatedMb forensic probes 
+ *   to the binary schema. Incremented version to 4. Reduced message space 
+ *   to accommodate new metrics. Fixed LatencyMonitor typo.
  * Sep.15.210:
  * - Issue #1055: Forensic Write Latency Spike. Relaxed audit thresholds to 10ms 
  *   to accommodate budget hardware scheduling jitter. Moved UTF-8 encoding 
@@ -51,7 +55,7 @@ class ForensicSpillBuffer @Inject constructor(
     
     private companion object {
         const val MAGIC_NUMBER = 0x46535042
-        const val CURRENT_VERSION = 3 
+        const val CURRENT_VERSION = 4 
         const val HEADER_SIZE = 128
         const val CHECKSUM_SIZE = 4
         
@@ -74,6 +78,8 @@ class ForensicSpillBuffer @Inject constructor(
         
         const val HIGH_PRESSURE_THRESHOLD = 0.8 
         const val DEFAULT_TRACE_MSG = "FORENSIC_TRACE"
+        
+        const val DATA_FIELDS_SIZE = 56 // Increased from 48 to accommodate 2 extra floats
     }
 
     init {
@@ -95,7 +101,7 @@ class ForensicSpillBuffer @Inject constructor(
 
                 if (magic != MAGIC_NUMBER || version != CURRENT_VERSION || cap != FORENSIC_SPILL_CAPACITY || entrySz != FORENSIC_SPILL_ENTRY_SIZE) {
                     resetBuffer()
-                    if (exists) Timber.w("Forensic Persistence Audit: Spill-buffer signature mismatch. Resetting.")
+                    if (exists) Timber.w("Forensic Persistence Audit: Spill-buffer signature mismatch (Expected v$CURRENT_VERSION, found v$version). Resetting.")
                 } else {
                     val recoveredWrite = buffer.getInt(OFF_WRITE_IDX)
                     val recoveredCount = buffer.getInt(OFF_COUNT)
@@ -148,7 +154,7 @@ class ForensicSpillBuffer @Inject constructor(
 
         // Issue #1055: Encoding moved outside the measured block (R-ID 348)
         val rawBytes = entry.message.toByteArray(Charsets.UTF_8)
-        val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE - 48 - CHECKSUM_SIZE
+        val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE - DATA_FIELDS_SIZE - CHECKSUM_SIZE
         var msgLen = rawBytes.size.coerceAtMost(maxMsgLen)
         
         if (msgLen < rawBytes.size) {
@@ -168,7 +174,7 @@ class ForensicSpillBuffer @Inject constructor(
                 if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
 
                 entryWriteBuffer.clear()
-                Arrays.fill(entryWriteBuffer.array(), 48, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
+                Arrays.fill(entryWriteBuffer.array(), DATA_FIELDS_SIZE, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
 
                 entryWriteBuffer.putLong(entry.timestamp)
                 entryWriteBuffer.putDouble(entry.lat)
@@ -179,6 +185,10 @@ class ForensicSpillBuffer @Inject constructor(
                 entryWriteBuffer.putFloat(entry.vibeSnapshot?.toFloat() ?: -1.0f)
                 entryWriteBuffer.putFloat(entry.snrSnapshot?.toFloat() ?: -1.0f)
                 entryWriteBuffer.putFloat(entry.tempSnapshot?.toFloat() ?: 0.0f)
+                
+                // Issue #1344: Added probes
+                entryWriteBuffer.putFloat(entry.thermalSnapshot?.toFloat() ?: 0.0f)
+                entryWriteBuffer.putFloat(entry.heapSnapshot?.toFloat() ?: 0.0f)
 
                 var flags = 0
                 if (entry.isImportant) flags = flags or 0x01
@@ -213,7 +223,7 @@ class ForensicSpillBuffer @Inject constructor(
     fun writeTraceOptimized(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
         vibe: Double, snr: Double, batteryTemp: Double, batteryLevel: Int, isCharging: Boolean,
-        gpsHardwareLock: Boolean = false
+        gpsHardwareLock: Boolean = false, thermalHeadroom: Double = 0.0, heapAllocatedMb: Double = 0.0
     ): Boolean {
         return LatencyMonitor.measureAndAudit<Boolean>(
             timeProvider = timeProvider,
@@ -228,7 +238,7 @@ class ForensicSpillBuffer @Inject constructor(
                 if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
                 
                 entryWriteBuffer.clear()
-                Arrays.fill(entryWriteBuffer.array(), 48, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
+                Arrays.fill(entryWriteBuffer.array(), DATA_FIELDS_SIZE, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
 
                 entryWriteBuffer.putLong(timestamp)
                 entryWriteBuffer.putDouble(lat)
@@ -239,6 +249,10 @@ class ForensicSpillBuffer @Inject constructor(
                 entryWriteBuffer.putFloat(vibe.toFloat())
                 entryWriteBuffer.putFloat(snr.toFloat())
                 entryWriteBuffer.putFloat(batteryTemp.toFloat())
+                
+                // Issue #1344: Added probes
+                entryWriteBuffer.putFloat(thermalHeadroom.toFloat())
+                entryWriteBuffer.putFloat(heapAllocatedMb.toFloat())
 
                 var flags = 0
                 if (isCharging) flags = flags or 0x04
@@ -323,6 +337,11 @@ class ForensicSpillBuffer @Inject constructor(
                         val vibe = readEntryWrapper.getFloat().toDouble()
                         val snr = readEntryWrapper.getFloat().toDouble()
                         val batTemp = readEntryWrapper.getFloat().toDouble()
+                        
+                        // Issue #1344: Read probes
+                        val thermal = readEntryWrapper.getFloat().toDouble()
+                        val heap = readEntryWrapper.getFloat().toDouble()
+
                         val flags = readEntryWrapper.get().toInt()
                         val batLevel = readEntryWrapper.get().toInt() and 0xFF
                         val msgLen = readEntryWrapper.get().toInt() and 0xFF
@@ -354,7 +373,9 @@ class ForensicSpillBuffer @Inject constructor(
                             gpsHardwareLock = (flags and 0x08) != 0,
                             tempSnapshot = batTemp,
                             battSnapshot = batLevel,
-                            chargingSnapshot = (flags and 0x04) != 0
+                            chargingSnapshot = (flags and 0x04) != 0,
+                            thermalSnapshot = thermal,
+                            heapSnapshot = heap
                         ))
                     }
                     tempReadIdx = (tempReadIdx + 1) % FORENSIC_SPILL_CAPACITY

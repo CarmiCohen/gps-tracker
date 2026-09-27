@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Sep.26.12:
+ * - Issue #1344: Added thermalHeadroom and heapAllocatedMb forensic probes.
  * Sep.24.91:
  * - Issue #1244 Hardening: Added coolingEnteredRt for precise Thermal Recovery Latency auditing.
  * Sep.10.40:
@@ -60,6 +62,8 @@ class SystemHealthState(
     var ioWait: Double = 0.0,
     var maxIoLatency: Long = 0L, 
     var isThermalThrottling: Boolean = false,
+    var thermalHeadroom: Double = 0.0,
+    var heapAllocatedMb: Double = 0.0,
 
     // Forensic Persistence Health (Issue #714/R714)
     var forensicReliability: Double = 1.0,
@@ -167,6 +171,8 @@ class SystemHealthState(
         this.ioWait = other.ioWait
         this.maxIoLatency = other.maxIoLatency
         this.isThermalThrottling = other.isThermalThrottling
+        this.thermalHeadroom = other.thermalHeadroom
+        this.heapAllocatedMb = other.heapAllocatedMb
         this.forensicReliability = other.forensicReliability
         this.uptimeMs = other.uptimeMs
         this.lastConnTs = other.lastConnTs
@@ -234,7 +240,8 @@ class SystemHealthState(
         isUltraLongStationary: Boolean = false, isMaliAnomaly: Boolean = false,
         isGnssThrottled: Boolean = false,
         lastEnergyDeltaMa: Int = 0, lastEnergyDeltaTemp: Double = 0.0, lastEnergyDurationMs: Long = 0L,
-        tamperNote: String? = null, coolingEnteredRt: Long = 0L
+        tamperNote: String? = null, coolingEnteredRt: Long = 0L,
+        thermalHeadroom: Double = 0.0, heapAllocatedMb: Double = 0.0
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -273,6 +280,8 @@ class SystemHealthState(
         this.ioWait = ioWait
         this.maxIoLatency = maxIoLatency
         this.isThermalThrottling = isThermalThrottling
+        this.thermalHeadroom = thermalHeadroom
+        this.heapAllocatedMb = heapAllocatedMb
         this.forensicReliability = forensicReliability
         this.vibration = vibration
         this.isBatteryLow = isBatteryLow
@@ -332,6 +341,8 @@ class SystemHealthState(
         ioWait = 0.0
         maxIoLatency = 0L
         isThermalThrottling = false
+        thermalHeadroom = 0.0
+        heapAllocatedMb = 0.0
         forensicReliability = 1.0
         uptimeMs = 0L
         lastConnTs = 0L
@@ -357,7 +368,7 @@ class SystemHealthState(
         acousticFloorDb = 0.0
         adaptiveVibrationFloor = 0.12
         proxIdx = 1.0
-        proximityCm = -1.0
+        proximityCm = 0.0
         proximityDebounceMs = 0L
         vibrationRollingSum = 0.0
         kineticEnergy = 0.0

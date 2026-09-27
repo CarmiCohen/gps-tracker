@@ -17,6 +17,9 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.26.12:
+ * - Issue #1344: Integrated thermalHeadroom and heapAllocatedMb into 
+ *   periodic integrity heartbeat (R-ID 348).
  * Sep.25.03:
  * - Issue #1322 Cleanup: Fixed unresolved references to revivalEvents and LocationStatus.
  *   Migrated revival event observation to the unified DomainEventBus.
@@ -209,6 +212,9 @@ class IntegrityMonitor @Inject constructor(
         var cpu = systemStatusProvider.getCpuLoad()
         var iow = systemStatusProvider.getIoWait()
         var maxIo = LatencyMonitor.consumeMaxIoLatency()
+        
+        val thermal = systemStatusProvider.getThermalHeadroom()
+        val heap = systemStatusProvider.getHeapAllocatedMb()
 
         if (isMaliAnomalySimulated.get()) {
             cpu = 7.5
@@ -235,6 +241,8 @@ class IntegrityMonitor @Inject constructor(
             h.ioWait = iow
             h.maxIoLatency = maxIo
             h.isMaliAnomaly = maliAnomaly
+            h.thermalHeadroom = thermal
+            h.heapAllocatedMb = heap
             
             val isSilent = SentinelValidator.isSilentFailure(
                 gpsStalled = h.gpsStalled,

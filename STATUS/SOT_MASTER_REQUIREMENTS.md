@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.26.11)
+# SOT Master Requirements & Hardening Status (Sep.26.12)
 
-## 🏗️ Architectural Master Rules (35 Rules)
+## 🏗️ Architectural Master Rules (36 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -27,6 +27,7 @@
 *   **1.22 Legacy ViewModel Decommissioning (R496)**: Feature-specific legacy ViewModels (Setup, Tracker, Viewer) are strictly prohibited. All UI state and event routing must converge in `MainViewModel` to maintain architectural simplicity (Issue #1215).
 *   **1.23 Unified Power Policy Override (R497)**: Emergency stability violation states must seamlessly override active Doze mode or low-power state signaling deferral rules across all role transitions to guarantee high-assurance alert delivery under extreme duress (Issue #1339).
 *   **1.24 Alias-Aware Identity Uniqueness (R499)**: Peer IDs must be strictly unique and must not cross-contaminate the reserved alias sets of the opposite role (e.g., 'T', 'Trk', 'V', 'viewer') to ensure backward compatibility and prevent signaling collisions (Sep.26.11).
+*   **1.25 Forensic Resource Auditing (R502)**: Periodic integrity heartbeats must record Thermal Headroom and Heap Utilization into forensic traces to validate hardware stability and zero-allocation logic during long-duration soak tests (Sep.26.12).
 
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318-758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
@@ -47,6 +48,8 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 502**: Thermal & Memory Forensic Probes - Integrated OS-level thermal headroom and heap allocation monitoring into the periodic integrity heartbeat. (Resolved Sep.26.12).
+*   **SOT ID 501**: Signaling Lifecycle Probes - Deployed high-assurance forensic probes to SignalingForensicLogger to audit interface handovers and transmission failures. (Resolved Sep.26.11).
 *   **SOT ID 500**: Programmatic Soak Validation - Verified stability of forensic counters and reliability math over a 24-hour simulated tracking session. (Resolved Sep.26.10).
 *   **SOT ID 499**: Alias-Aware Identity Uniqueness - Hardened ID commitment logic to prevent role-prefix and reserved alias collisions. (Resolved Sep.26.10).
 *   **SOT ID 498**: Hardware Poke Precision - Corrected boundary logic for inclusive hardware wakeup matching. (Resolved Sep.26.10).
@@ -55,7 +58,7 @@
 *   **SOT ID 495**: Hydration Staggering Audit - Verified Level 0-11 transitions under extreme CPU/IO saturation via `HydrationStaggeringAuditTest`. (Resolved Sep.23.50).
 *   **SOT ID 494**: Hilt ViewModel Scope Optimization - Remediated Issue #1203 by unifying feature ViewModels into the activity-scoped `MainViewModel`. (Resolved Sep.23.50).
 *   **SOT ID 493**: Integrity Prefix Hardening - Remediated Issue #1337 by shielding the remote tracker's evaluation state from local Viewer integrity events. (Resolved Sep.26.6).
-*   **SOT ID 492**: AppEventCoordinator Side-Effect Unification - Remediated Issue #1336 by removing role-specific guards and unifying alarm prefix mapping. (Resolved Sep.26.5).
+*   **SOT ID 492**: AppEventCoordinator Side-Effect Unification - Remediated Issue #1336 by removing role-specific branching guards and unifying alarm prefix mapping. (Resolved Sep.26.5).
 *   **SOT ID 491**: Initialization Prefix Unification - Remediated Issue #1335 by unifying `loadLogicState` to use `rolePrefix`. (Resolved Sep.26.4).
 *   **SOT ID 490**: Unified GPS Pipeline Hardening - Remediated Issue #1334 by correcting spatial anchor initialization and standardizing GPS temporal authority. (Resolved Sep.26.3).
 *   **SOT ID 489**: Peer Connection State Caching - Remediated Issue #1333 by introducing connection state caching. (Resolved Sep.26.2).
@@ -65,7 +68,9 @@
 *   **SOT ID 485**: Snap-to-Update Monolith - Remediated Issue #1330 by unifying `SystemEvaluationSnapshot` with partitioned states. (Resolved Sep.25.05).
 *   **SOT ID 484**: Peer Lifecycle Decoupling - Remediated Issue #1327 by introducing `PeerConnectionChanged`. (Resolved Sep.25.05).
 
-## 📋 Functional Requirements (164 R-IDs)
+## 📋 Functional Requirements (165 R-IDs)
+*   **R502**: Forensic resource auditing (Thermal, Memory).
+*   **R501**: Signaling lifecycle and handover auditing.
 *   **R500**: Programmatic 24h simulation cycle verification.
 *   **R499**: Alias-aware ID uniqueness enforcement.
 *   **R498**: Inclusive boundary matching for hardware pokes.
@@ -84,6 +89,7 @@
 *   **R485**: Zero-allocation snap-to-update partitioning.
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.134 (Resource Probes)**: PASSED - Verified thermal and memory auditing in forensic trace. (Sep.26.12)
 *   **Chapter 31.133 (Soak Simulation)**: PASSED - Verified counter stability over 24h accelerated cycle. (Sep.26.11)
 *   **Chapter 31.132 (Identity Hardening)**: PASSED - Verified reserved ID rejection during commit. (Sep.26.11)
 *   **Chapter 31.131 (Poke Precision)**: PASSED - Verified inclusive boundary matching in HardwareSuite. (Sep.26.11)
@@ -100,4 +106,4 @@
 *   **Chapter 31.120 (Signaling Optimization)**: PASSED - Verified that forensic indexes are pre-calculated. (Sep.26.0)
 
 ---
-*Next Audit: Oct.01.00. (Sep.26.11)*
+*Next Audit: Oct.01.00. (Sep.26.12)*

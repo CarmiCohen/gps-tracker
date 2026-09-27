@@ -61,6 +61,8 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Sep.26.12:
+ * - Issue #1344: Added getThermalHeadroom and getHeapAllocatedMb forensic probes.
  * Sep.23.08:
  * - Issue #1204: Unified Hardware Lifecycle. Added Huawei device detection 
  *   and integrated it into the unified PermissionState (R-ID 348).
@@ -97,6 +99,9 @@ interface SystemStatusProvider {
 
     suspend fun getCpuLoad(): Double
     suspend fun getIoWait(): Double
+    
+    fun getThermalHeadroom(): Double
+    fun getHeapAllocatedMb(): Double
 }
 
 @Singleton
@@ -503,6 +508,28 @@ class SystemStatusProviderImpl @Inject constructor(
                     if (parts.size >= 6) parts[5].toDouble() else 0.0
                 } else 0.0
             }
+        } catch (e: Exception) {
+            0.0
+        }
+    }
+
+    override fun getThermalHeadroom(): Double {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                powerManager.getThermalHeadroom(0).toDouble()
+            } catch (e: Exception) {
+                0.0
+            }
+        } else {
+            0.0
+        }
+    }
+
+    override fun getHeapAllocatedMb(): Double {
+        return try {
+            val runtime = Runtime.getRuntime()
+            val usedBytes = runtime.totalMemory() - runtime.freeMemory()
+            usedBytes.toDouble() / (1024.0 * 1024.0)
         } catch (e: Exception) {
             0.0
         }

@@ -30,7 +30,7 @@ Perform these steps in strict sequence once an issue is resolved:
 
 1.  **Integrity Audit**: Verify no `*.md` or `*.xml` files were truncated. Ensure all changes are consistent with existing code and documentation.
 2.  **State Tracking Update**: Synchronize `issues.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, and `STATUS/RESOLUTION_ARCHIVE.md`. Assign issue numbers to all new concerns.
-3.  **Dashboard Synchronization**: Update the **Hardening Progress Dashboard** in `issues.md` to reflect the **Current Audit Baseline** (SOT Rules/IDs, Resolved, Open, Testing, Simplification Ideas, and QA tasks).
+3.  **Dashboard Synchronization**: Update the **Hardening Progress Dashboard** in `issues.md` to reflect the **Current Audit Baseline** (SOT Rules, Resolved, Open (H/M/L), Ideas (H/M/L/R), Testing, and QA tasks).
 4.  **App Build & Versioning**: Rebuild the application and increment the `versionName` in `app/build.gradle`.
 5.  **Git Release Block**: Generate a Git command block for staging, committing, tagging the version, and pushing to the remote.
 6.  **Simplicity Audit**: Evaluate potential architectural simplifications. Document these in the "Strategic Simplification Ideas" section of `issues.md` with unique IDs and significance levels (High, Medium, Low).
@@ -38,5 +38,5 @@ Perform these steps in strict sequence once an issue is resolved:
 8.  **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot for the next session.
 9.  **Session Termination**: Stop the chat immediately. Do not attempt further fixes.
 10. **Audit Recalculation**: Display final metrics in the format:  
-    **Current Audit Baseline: [SOT: X (Rules: Y, IDs: Z), Resolved: A, Open: B, Testing: C (Sub-items: D), Ideas: E, QA: F]**
+    **Current Audit Baseline: [SOT: X (Rules: Y), Resolved: A, Open: H:xx, M:xx, L:xx Ideas: H:xx, M:xx, L:xx Resolved:xx, Testing: C (Sub-items: D), QA: F]**
 11. **Final Stop**: After the audit recalculation, **STOP ALL PROCESSING.**

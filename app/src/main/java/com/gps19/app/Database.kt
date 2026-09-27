@@ -8,6 +8,10 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Sep.26.12:
+ * - Issue #1344: Expanded LogEntity, HistoryEntity and PendingStatusEntity to include 
+ *   thermalHeadroom and heapAllocatedMb forensic probes. Incremented 
+ *   version to 79 with migration (R-ID 502).
  * Sep.26.0:
  * - Issue #1314: Expanded HistoryEntity and PendingStatusEntity to include 
  *   isSilentFailure and isBatteryWhitelisted for parity with refactored 
@@ -58,7 +62,9 @@ data class LogEntity(
     @ColumnInfo(defaultValue = "0") val gpsHardwareLock: Boolean = false,
     val tempSnapshot: Double? = null,
     val battSnapshot: Int? = null,
-    val chargingSnapshot: Boolean? = null
+    val chargingSnapshot: Boolean? = null,
+    val thermalSnapshot: Double? = null,
+    val heapSnapshot: Double? = null
 )
 
 data class ForensicSignature(
@@ -126,7 +132,9 @@ data class HistoryEntity(
     @ColumnInfo(defaultValue = "0") val gpsHardwareLock: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isGnssThrottled: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isSilentFailure: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isBatteryWhitelisted: Boolean = false
+    @ColumnInfo(defaultValue = "0") val isBatteryWhitelisted: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val thermalHeadroom: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val heapAllocatedMb: Double = 0.0
 )
 
 @Entity(tableName = "violations", indices = [Index(value = ["ts"])])
@@ -184,7 +192,9 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "0") val gpsHardwareLock: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isGnssThrottled: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isSilentFailure: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val isBatteryWhitelisted: Boolean = false
+    @ColumnInfo(defaultValue = "0") val isBatteryWhitelisted: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val thermalHeadroom: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val heapAllocatedMb: Double = 0.0
 )
 
 @Dao
@@ -307,7 +317,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 77, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 79, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -331,6 +341,28 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_78_79 = object : Migration(78, 79) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #1344: Forensic diagnostic expansion - thermalSnapshot and heapSnapshot for LogEntity.
+                try {
+                    db.execSQL("ALTER TABLE logs ADD COLUMN thermalSnapshot REAL")
+                    db.execSQL("ALTER TABLE logs ADD COLUMN heapSnapshot REAL")
+                } catch (e: Exception) {}
+            }
+        }
+
+        val MIGRATION_77_78 = object : Migration(77, 78) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // R-ID 502: Expanded parity for thermal headroom and heap allocation forensic probes.
+                try {
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN thermalHeadroom REAL NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN heapAllocatedMb REAL NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN thermalHeadroom REAL NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN heapAllocatedMb REAL NOT NULL DEFAULT 0")
+                } catch (e: Exception) {}
+            }
+        }
+
         val MIGRATION_76_77 = object : Migration(76, 77) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // R-ID 501: Expanded parity for silent failure and battery whitelisting.
@@ -530,6 +562,7 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_58_59 = object : Migration(58, 59) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN noiseIdx REAL NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN luxIdx REAL NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN luxIdx REAL NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN vibeIdx REAL NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN liftIdx REAL NOT NULL DEFAULT 0")

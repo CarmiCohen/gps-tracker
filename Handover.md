@@ -28,7 +28,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 501 (Rules: 35, IDs: 501), Resolved: 1245, Open: 0, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
+- **Current Audit Baseline: [SOT: 501 (Rules: 35, IDs: 501), Resolved: 1245, Open: 4, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
 
 ---
 
@@ -47,4 +47,11 @@
 ---
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   *(No immediate open architectural gaps remain. System is ready for physical long-run soak testing.)*
+*   **Issue #1344: Implement Thermal & Memory Forensic Probes**
+    *   *Description*: Add probes to `MonitorService` to capture `PowerManager.getThermalHeadroom` and track heap allocation growth to verify zero-allocation logic holds over a 24h field soak test.
+*   **Issue #1345: Expand Automated Network Stress Tests**
+    *   *Description*: Implement a simulation in `ConnectivitySuite` that toggles the relay connection status at high frequency to ensure the new `PeerConnectionChanged` events and backoff logic don't leak resources during network flapping.
+*   **Issue #1346: Physical Device Soak Test (24-Hour Observation)**
+    *   *Description*: Initiate a real-world validation test on target hardware (e.g., Samsung A15) by running Tracker Mode for 24 continuous hours.
+*   **Issue #1347: Audit and Itemize Strategic Simplification Candidates**
+    *   *Description*: Prune legacy complexity to match the "Ideas: 17" count by explicitly cataloging the remaining 15 candidates.

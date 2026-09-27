@@ -24,6 +24,9 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.26.12:
+ * - Issue #1344: Integrated thermalHeadroom and heapAllocatedMb into 
+ *   SystemEvaluationSnapshot for forensic tracking.
  * Sep.26.4:
  * - Issue #1335: Initialization Prefix Unification. Unified loadLogicState to use rolePrefix 
  *   for primaryProcessor state restoration uniformly across roles.
@@ -446,7 +449,8 @@ class MonitorService : BaseMonitorService() {
                 isUltraLongStationary = health.isUltraLongStationary, isBatteryLow = health.isBatteryLow, 
                 isBatteryCritical = health.isBatteryCritical, satsUsed = hardwareSuite.satellitesUsed, 
                 satsView = hardwareSuite.satellitesInView, violationUptimeMs = sessionManager.violationUptimeMs,
-                violationPercentage = sessionManager.getViolationPercentage()
+                violationPercentage = sessionManager.getViolationPercentage(),
+                thermalHeadroom = health.thermalHeadroom, heapAllocatedMb = health.heapAllocatedMb
             ),
             nowRt = nowRt, nowTs = now, snrSnapshot = hardwareSuite.averageSnr,
             acousticLockoutRt = if (isTrackerMode) lastFastPathAcousticSpikeTs else 0L, 
@@ -455,7 +459,8 @@ class MonitorService : BaseMonitorService() {
             cpuLoad = health.cpuLoad, ioWait = health.ioWait, maxIoLatency = health.maxIoLatency, 
             isSilentFailure = health.isSilentFailure, isMaliAnomaly = health.isMaliAnomaly,
             localInternetLoss = health.localInternetLoss, isHardwareOnline = health.isHardwareOnline,
-            acousticMinDb = hSnapshot.acousticPeakMin
+            acousticMinDb = hSnapshot.acousticPeakMin,
+            thermalHeadroom = health.thermalHeadroom, heapAllocatedMb = health.heapAllocatedMb
         )
         
         if (isTrackerMode) {
