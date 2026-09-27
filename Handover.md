@@ -1,12 +1,12 @@
-# Forensic Handover (Sep.27.12)
+# Forensic Handover (Sep.27.13)
 
 ## 🎯 Current System State
-*   **Version**: Sep.27.12 | **Build**: Success (Unified State Mapping Authority)
-*   **SOT Baseline**: SOT ID: 512 (Rules: 44, R-IDs: 174)
-*   **Core Remediation**: Successfully resolved **Issue #1350** (Unified State Mapping Authority).
-    *   Introduced `UiStateCoordinator` as the central authority for reactive state projections (Dashboard, HUD, Map).
-    *   Refactored `MainViewModel` to delegate all mapping logic, achieving a "perfectly thin" ViewModel pattern.
-    *   Isolated osmdroid trail segment computation from the ViewModel into the coordinator.
+*   **Version**: Sep.27.13 | **Build**: Success (Unified Subscription Scoping)
+*   **SOT Baseline**: SOT ID: 513 (Rules: 45, R-IDs: 175)
+*   **Core Remediation**: Successfully resolved **Issue #1351** (StateSubscription Coroutine Scoping).
+    *   Unified 10+ reactive flow collections in `MainViewModel.startBaseObservations` into a single structured coroutine scope.
+    *   Eliminated redundant `launchIn(viewModelScope)` and `flowOn(Dispatchers.Main.immediate)` calls.
+    *   Improved structured concurrency and resource management in the primary UI state coordinator.
 
 ---
 
@@ -14,13 +14,13 @@
 
 1.  **Event Orchestration Layer**:
     *   `UiEventCoordinator`: Sole authority for mapping user intent (`UiEvent`) to domain actions.
-    *   `MainViewModel`: Pure SSOT for UI state observation and event emission.
+    *   `MainViewModel`: Pure SSOT for UI state observation and event emission; utilizes unified subscription scoping for all reactive data streams.
     *   `UiStateCoordinator`: Sole authority for projecting domain state into UI-specific DTOs (Dashboard/HUD).
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.27.12: [SOT Count: 174 (Rules: 44), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:5, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.27.13: [SOT Count: 175 (Rules: 45), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 
 ---
 

@@ -1,4 +1,11 @@
-# 🏛️ Resolution Archive - Sep.27.12
+# 🏛️ Resolution Archive - Sep.27.13
+
+## 🏁 Issue #1351: StateSubscription Coroutine Scoping
+*   **Resolved**: Sep.27.13
+*   **Root Cause**: `MainViewModel.startBaseObservations` utilized multiple separate `.onEach { ... }.launchIn(viewModelScope)` data stream allocations. This led to fragmented subscription scopes, separate job allocations, and redundant `.flowOn(Dispatchers.Main.immediate)` specifications, violating structured concurrency orchestration principles.
+*   **Remediation**:
+    *   **MainViewModel.kt**: Refactored `startBaseObservations` to orchestrate all reactive data streams inside a single parent coroutine block. Used child `launch` coroutine builders for individual flow collections, eliminating redundant launch overhead and ensuring atomic structured execution.
+*   **SOT ID**: 513 (Unified StateSubscription Coroutine Scoping)
 
 ## 🏁 Issue #1350: Unified State Mapping Authority
 *   **Resolved**: Sep.27.12
@@ -9,8 +16,6 @@
     *   **Architecture**: Unified the reactive projection pipeline, ensuring consistency across all UI components and improving testability by isolating mapping logic from ViewModel lifecycle management.
 *   **SOT ID**: 512 (Unified State Mapping Authority)
 
-# 🏛️ Resolution Archive - Sep.27.11
-
 ## 🏁 Issue #1202: UI Event Routing Unification
 *   **Resolved**: Sep.27.11
 *   **Root Cause**: `MainViewModel.onEvent` contained a massive, procedural `when (event)` block that directly orchestrated UseCases, persistence, and state updates. This pattern created a tight coupling between user interface events and domain orchestration, leading to a "God Object" architecture in the ViewModel and increasing maintenance surface area.
@@ -19,8 +24,6 @@
     *   **MainViewModel.kt**: Completely refactored `onEvent` to delegate directly to `UiEventCoordinator`, drastically reducing its internal logic surface area and architectural complexity.
     *   **Settings Management**: Unified and moved the debounced draft auto-save and draft preparation logic into the coordinator layer to maintain pure state handling in the ViewModel tier.
 *   **SOT ID**: 511 (UI Event Routing Unification)
-
-# 🏛️ Resolution Archive - Sep.27.10
 
 ## 🏁 Issue #1201: Reactive Siren Lockout
 *   **Resolved**: Sep.27.10
@@ -33,8 +36,6 @@
     *   **MainUiState.kt**: Extended `DiagnosticState` with a `silencedUntilRt` property to enable full visibility and reactivity in the UI tier.
 *   **SOT ID**: 510 (Reactive Siren Lockout)
 
-# 🏛️ Resolution Archive - Sep.27.9
-
 ## 🏁 Issue #1290: UI State Mapper Consolidation
 *   **Resolved**: Sep.27.9
 *   **Root Cause**: The existence of a separate, stateless `UiStateMapper` interface and implementation layer introduced unnecessary DI surface area and increased the cognitive load for maintaining UI state transformations, despite the logic being exclusively consumed by `MainViewModel`.
@@ -43,4 +44,3 @@
     *   **AppModule.kt**: Removed the `UiStateMapper` binding.
     *   **Cleanup**: Decommissioned `UiStateMapper.kt` and verified the removal of the redundant mapping layer.
 *   **SOT ID**: 509 (UI Mapping Consolidation)
-*(Earlier resolutions truncated for brevity)*

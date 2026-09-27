@@ -21,9 +21,8 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
- * Sep.27.12:
- * - Issue #1350 RESOLVED: Extracted reactive state mapping (Dashboard/HUD/Map) 
- *   into a dedicated UiStateCoordinator, achieving a perfectly thin ViewModel.
+ * Sep.27.13:
+ * - Issue #1351 RESOLVED: Unified StateSubscription coroutine scoping in startBaseObservations.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -277,136 +276,137 @@ class MainViewModel @Inject constructor(
     }
 
     private fun startBaseObservations() {
-        stateSubscriptionUseCase.observeRepositorySettings()
-            .onEach { update ->
-                updateState { it.copy(
-                    settings = it.settings.copy(
-                        deviceId = update.trackerId, viewerId = update.viewerId, relayUrl = update.relayUrl,
-                        lastAlarmAckTs = update.lastAlarmAckTs, isIdentitySanitized = update.identitySanitized,
-                        alertSettings = update.alertSettings
-                    ),
-                    spatial = it.spatial.copy(
-                        maxDistance = update.maxDistance, homePoints = update.homePoints
-                    ),
-                    session = it.session.copy(
-                        appMode = update.appMode, isSystemActive = update.isSystemActive,
-                        permissions = it.permissions.copy(isManualOverride = update.isXiaomiManualOverride)
-                    )
-                )}
+        viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) {
+            // 1. Settings & Session
+            launch {
+                stateSubscriptionUseCase.observeRepositorySettings().collect { update ->
+                    updateState { it.copy(
+                        settings = it.settings.copy(
+                            deviceId = update.trackerId, viewerId = update.viewerId, relayUrl = update.relayUrl,
+                            lastAlarmAckTs = update.lastAlarmAckTs, isIdentitySanitized = update.identitySanitized,
+                            alertSettings = update.alertSettings
+                        ),
+                        spatial = it.spatial.copy(
+                            maxDistance = update.maxDistance, homePoints = update.homePoints
+                        ),
+                        session = it.session.copy(
+                            appMode = update.appMode, isSystemActive = update.isSystemActive,
+                            permissions = it.permissions.copy(isManualOverride = update.isXiaomiManualOverride)
+                        )
+                    )}
+                }
             }
-            .flowOn(Dispatchers.Main.immediate)
-            .launchIn(viewModelScope)
 
-        stateSubscriptionUseCase.observeInternetStatus()
-            .onEach { online -> 
-                updateDiagnosticState { current ->
-                    current.apply {
-                        connectivity.isLocalOnline = online
-                        pulse = timeProvider.elapsedRealtime()
+            // 2. Connectivity & Diagnostics
+            launch {
+                stateSubscriptionUseCase.observeInternetStatus().collect { online -> 
+                    updateDiagnosticState { current ->
+                        current.apply {
+                            connectivity.isLocalOnline = online
+                            pulse = timeProvider.elapsedRealtime()
+                        }
                     }
                 }
             }
-            .flowOn(Dispatchers.Main.immediate)
-            .launchIn(viewModelScope)
 
-        stateSubscriptionUseCase.observeConnectivityBasics()
-            .onEach { update ->
-                _rtt.value = update.lastRtt
-                updateDiagnosticState { current -> 
-                    current.apply {
-                        connectivity.isRelayConnected = update.isRelayConnected
-                        connectivity.lastRemoteActivityTs = update.lastRemoteActivityTs
-                        recoveryCount = update.recoveryCount
-                        cumulativeRecoveryBlackoutMs = update.cumulativeRecoveryBlackoutMs
-                        pulse = timeProvider.elapsedRealtime()
+            launch {
+                stateSubscriptionUseCase.observeConnectivityBasics().collect { update ->
+                    _rtt.value = update.lastRtt
+                    updateDiagnosticState { current -> 
+                        current.apply {
+                            connectivity.isRelayConnected = update.isRelayConnected
+                            connectivity.lastRemoteActivityTs = update.lastRemoteActivityTs
+                            recoveryCount = update.recoveryCount
+                            cumulativeRecoveryBlackoutMs = update.cumulativeRecoveryBlackoutMs
+                            pulse = timeProvider.elapsedRealtime()
+                        }
                     }
                 }
             }
-            .flowOn(Dispatchers.Main.immediate)
-            .launchIn(viewModelScope)
 
-        stateSubscriptionUseCase.observeIntegrityUpdates()
-            .onEach { update ->
-                updateDiagnosticState { current -> 
-                    current.activeAlarms = update.activeAlarms
-                    current.pulse = timeProvider.elapsedRealtime()
-                    current
+            launch {
+                stateSubscriptionUseCase.observeIntegrityUpdates().collect { update ->
+                    updateDiagnosticState { current -> 
+                        current.activeAlarms = update.activeAlarms
+                        current.pulse = timeProvider.elapsedRealtime()
+                        current
+                    }
                 }
             }
-            .flowOn(Dispatchers.Main.immediate)
-            .launchIn(viewModelScope)
 
-        stateSubscriptionUseCase.observeBatteryStatus().onEach { status -> 
-            updateDiagnosticState { current -> 
-                current.battery.level = status.level
-                current.battery.temp = status.temp
-                current.apply { pulse = timeProvider.elapsedRealtime() }
-            } 
-            _currentMa.value = status.level
-        }
-        .flowOn(Dispatchers.Main.immediate)
-        .launchIn(viewModelScope)
-
-        repository.localLocation.onEach { update ->
-            val nowMs = timeProvider.currentTimeMillis()
-            val nowRt = timeProvider.elapsedRealtime()
-            updateKinematicState { current ->
-                telemetryUseCase.mapLocalLocation(update, current.localLocation, nowMs, _uiState.value.session.appStartTime)
-                telemetryUseCase.mapHealthFromUpdate(update, current.localHealth)
-                current.apply { pulse = nowRt }
-            }
-            _gpsIndexData.value = GpsIndexData(update.integrity.snrIdx, update.integrity.satsUsed.toDouble(), update.integrity.satsView.toDouble(), 0.0)
-        }
-        .flowOn(Dispatchers.Main.immediate)
-        .launchIn(viewModelScope)
-
-        remoteStatusRepository.remoteStatus.onEach { status ->
-            _remoteSignal.value = remoteStatusRepository.peerSignal.value
-            _trackerState.value = status.trackerState
-            _trackerMaxTemp.value = status.maxTemp
-            updateKinematicState { current ->
-                telemetryUseCase.mapTrackerLocationFromStatus(status, current.trackerLocation)
-                telemetryUseCase.mapHealthFromStatus(status, current.trackerHealth)
-                current.apply { pulse = timeProvider.elapsedRealtime() }
-            }
-            updateDiagnosticState { current ->
-                current.trackerBattery.level = status.battery
-                current.trackerBattery.temp = status.temp
-                current.trackerIsGnssThrottled = status.isGnssThrottled
-                current.pulse = timeProvider.elapsedRealtime()
-                current
-            }
-        }
-        .flowOn(Dispatchers.Main.immediate)
-        .launchIn(viewModelScope)
-
-        audioSynthesizer.isSirenPlaying
-            .onEach { playing ->
-                updateDiagnosticState { it.apply { isSirenPlaying = playing } }
-            }
-            .flowOn(Dispatchers.Main.immediate)
-            .launchIn(viewModelScope)
-
-        sirenLockoutUseCase.silencedUntilRt
-            .onEach { ts -> 
-                updateDiagnosticState { it.apply { 
-                    silencedUntilRt = ts
-                    isAlarmSilenced = sirenLockoutUseCase.isLockedOut()
-                    pulse = timeProvider.elapsedRealtime()
-                } }
-            }
-            .flowOn(Dispatchers.Main.immediate)
-            .launchIn(viewModelScope)
-        
-        viewModelScope.launch(Dispatchers.IO) { 
-            while(true) { 
-                val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
-                val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
-                withContext(Dispatchers.Main.immediate) { 
-                    updateState { it.copy(session = it.session.copy(permissions = newState)) } 
+            launch {
+                stateSubscriptionUseCase.observeBatteryStatus().collect { status -> 
+                    updateDiagnosticState { current -> 
+                        current.battery.level = status.level
+                        current.battery.temp = status.temp
+                        current.apply { pulse = timeProvider.elapsedRealtime() }
+                    } 
+                    _currentMa.value = status.level
                 }
-                delay(if (refreshFast) 5000L else 30000L) 
-            } 
+            }
+
+            // 3. Telemetry (Local & Remote)
+            launch {
+                repository.localLocation.collect { update ->
+                    val nowMs = timeProvider.currentTimeMillis()
+                    val nowRt = timeProvider.elapsedRealtime()
+                    updateKinematicState { current ->
+                        telemetryUseCase.mapLocalLocation(update, current.localLocation, nowMs, _uiState.value.session.appStartTime)
+                        telemetryUseCase.mapHealthFromUpdate(update, current.localHealth)
+                        current.apply { pulse = nowRt }
+                    }
+                    _gpsIndexData.value = GpsIndexData(update.integrity.snrIdx, update.integrity.satsUsed.toDouble(), update.integrity.satsView.toDouble(), 0.0)
+                }
+            }
+
+            launch {
+                remoteStatusRepository.remoteStatus.collect { status ->
+                    _remoteSignal.value = remoteStatusRepository.peerSignal.value
+                    _trackerState.value = status.trackerState
+                    _trackerMaxTemp.value = status.maxTemp
+                    updateKinematicState { current ->
+                        telemetryUseCase.mapTrackerLocationFromStatus(status, current.trackerLocation)
+                        telemetryUseCase.mapHealthFromStatus(status, current.trackerHealth)
+                        current.apply { pulse = timeProvider.elapsedRealtime() }
+                    }
+                    updateDiagnosticState { current ->
+                        current.trackerBattery.level = status.battery
+                        current.trackerBattery.temp = status.temp
+                        current.trackerIsGnssThrottled = status.isGnssThrottled
+                        current.pulse = timeProvider.elapsedRealtime()
+                        current
+                    }
+                }
+            }
+
+            // 4. Audio & Alarms
+            launch {
+                audioSynthesizer.isSirenPlaying.collect { playing ->
+                    updateDiagnosticState { it.apply { isSirenPlaying = playing } }
+                }
+            }
+
+            launch {
+                sirenLockoutUseCase.silencedUntilRt.collect { ts -> 
+                    updateDiagnosticState { it.apply { 
+                        silencedUntilRt = ts
+                        isAlarmSilenced = sirenLockoutUseCase.isLockedOut()
+                        pulse = timeProvider.elapsedRealtime()
+                    } }
+                }
+            }
+            
+            // 5. Background Polling (Permissions)
+            launch(Dispatchers.IO) { 
+                while(true) { 
+                    val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
+                    val newState = systemStatusProvider.getPermissionState(forceRefresh = true)
+                    withContext(Dispatchers.Main.immediate) { 
+                        updateState { it.copy(session = it.session.copy(permissions = newState)) } 
+                    }
+                    delay(if (refreshFast) 5000L else 30000L) 
+                } 
+            }
         }
     }
 

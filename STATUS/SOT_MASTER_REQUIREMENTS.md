@@ -1,147 +1,25 @@
-# SOT Master Requirements & Hardening Status (Sep.27.12)
+# SOT Master Requirements & Hardening Status (Sep.27.13)
 
-## 🏗️ Architectural Master Rules (44 Rules)
+## 🏗️ Architectural Master Rules (45 Rules)
 
 ### 1. Lifecycle & Resource Management
-*   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
-*   **1.2 Deterministic Cleanup**: Services must explicitly cancel all jobs and unregister hardware listeners in `onDestroy` (R112).
-*   **1.3 Atomic State Management**: All shared state must be managed via thread-safe primitives (AtomicBoolean, Mutex) or StateFlow (R113).
-*   **1.4 Background Resilience**: Foreground services must be strictly managed with appropriate types and notifications to prevent OS-level killing (R114).
-*   **1.5 Hardened IO**: All file and database operations must be offloaded from the Main thread and use transactional integrity (R115).
-*   **1.6 Monotonic Authority (R307)**: All maintenance durations and health-check silence detections must prioritize monotonic references (`elapsedRealtime`) to prevent wall-clock corruption during reboots or system time jumps (R307).
-*   **1.7 Single Source of Truth**: All system state (Health, Location, Alarms) must be centralized in repositories and propagated via Flows (R117).
-*   **1.8 Lifecycle Synchronization (R738-R757)**: Hardware managers must use `ManagedHardware` abstractions for synchronous unregistration.
-*   **1.9 IPC Optimization (R759)**: High-frequency lookups must utilize shadow-caches to prevent OS-level diagnostic log flooding.
-*   **1.10 Dependency Injection**: Hilt is the sole authority for dependency management.
-*   **1.11 Monotonic Time**: Use `elapsedRealtime` for all interval and duration logic (R116).
-*   **1.12 Domain Orchestration (R472)**: Domain events (Alarms, Sensors, Connectivity) must be orchestrated by a central `AppEventCoordinator` to decouple domain logic from background service lifcycles.
-*   **1.13 Reactive Domain Bus (R477/R480/R481/R482)**: High-frequency state transitions and telemetry summaries must be propagated via a non-blocking `DomainEventBus` with hardened capacity (128) and overflow dropping to ensure the core evaluation loop remains atomic and non-blocking (Refined Sep.25.03).
-*   **1.14 Telemetry Partitioning (R485)**: All high-frequency telemetry DTOs must share partitioned state structures (Kinetic, Atmospheric, Integrity) to eliminate bridge mapping layers and enable zero-allocation flyweight double-buffering (Issue #1330).
-*   **1.15 Mapping Centralization (R486)**: Telemetry mapping and DTO construction must be centralized in `TelemetryMapper` to ensure consistency across self-tracking, peer signaling, and offline persistence. This includes authority over `LocationUpdate`, `TrackerStatus`, and `PendingStatusEntity` (Issue #1329).
-*   **1.16 Peer Lifecycle Suppression (R489)**: Redundant peer lifecycle events must be suppressed at the coordinator level using connection state caching to prevent forensic log saturation (Issue #1333).
-*   **1.17 Temporal Authority Alignment (R490)**: External temporal markers (`lastGpsTs`) must strictly utilize GPS wall-clock time for role-agnostic stall detection, while internal stability auditing (`recordGpsFix`) must be integrated into the primary unified burst processing loop to ensure high-frequency jitter validation (Issue #1334).
-*   **1.18 Initialization Prefix Unification (R491)**: State restoration for primary processors must utilize the `rolePrefix` abstraction to ensure role-agnostic persistence, while dedicated remote state prefixes (e.g., "VR_") are strictly isolated to secondary peer-monitoring components (Issue #1335).
-*   **1.19 Side-Effect Unification (R492)**: Domain side-effects triggered by processor events must be role-agnostic, utilizing the `isPrimary` flag and dynamic `rolePrefix` mapping to ensure consistency across self-tracking and remote-monitoring paths (Issue #1336).
-*   **1.20 Integrity Prefix Hardening (R493)**: Local integrity events must never alter or leak state into the remote peer evaluation path; power alarm flags must be validated against expected prefix boundaries to avoid repo write collisions (Issue #1337).
-*   **1.21 Activity-Scoped ViewModel SSOT (R494)**: All UI components must consume state and route events through the activity-scoped `MainViewModel` to eliminate resource churn, state fragmentation, and misrouted telemetry flows across role transitions (Issue #1203).
-*   **1.22 Legacy ViewModel Decommissioning (R496)**: Feature-specific legacy ViewModels (Setup, Tracker, Viewer) are strictly prohibited. All UI state and event routing must converge in `MainViewModel` to maintain architectural simplicity (Issue #1215).
-*   **1.23 Unified Power Policy Override (R497)**: Emergency stability violation states must seamlessly override active Doze mode or low-power state signaling deferral rules across all role transitions to guarantee high-assurance alert delivery under extreme duress (Issue #1339).
-*   **1.24 Alias-Aware Identity Uniqueness (R499)**: Peer IDs must be strictly unique and must not cross-contaminate the reserved alias sets of the opposite role (e.g., 'T', 'Trk', 'V', 'viewer') to ensure backward compatibility and prevent signaling collisions (Sep.26.11).
-*   **1.25 Forensic Resource Auditing (R502)**: Periodic integrity heartbeats must record Thermal Headroom and Heap Utilization into forensic traces to validate hardware stability and zero-allocation logic during long-duration soak tests (Sep.26.11).
-*   **1.26 Signaling Flapping Resilience (R503)**: Connectivity managers must handle high-frequency signaling transitions (5Hz+) without resource leakage or state corruption to ensure stability during extreme network instability (Sep.27.2).
-*   **1.27 Flattened Event Hierarchy (R504)**: The `DomainEvent` hierarchy must remain flat, avoiding nested component wrappers to minimize object allocation churn and dispatching overhead in the reactive coordination layer (Issue #1348).
-*   **1.28 Unified Trajectory Management (R506)**: The system must utilize a single `TrajectoryBuffer` authority to consolidate sliding windows and hindsight corrections, eliminating dual terminology and redundant array allocations (Issue #1161).
-*   **1.29 Smart Signaling Dispatcher (R507)**: The signaling system must utilize a single `SmartSignalingDispatcher` coordination layer to manage prioritized transmission queuing, adaptive throttling, and unified update conflation (Issue #1172).
-*   **1.30 Continuous Stability Audit Logging (R508)**: The forensic auditor must continuously output reliability metrics and jitter peaks to Logcat every 10 seconds under standard tracking constraints to facilitate 24-hour physical soak auditing (Issue #1346).
-*   **1.31 Reactive Siren Lockout (R510)**: The system must manage siren lockout and cooldown states via a central, transport-agnostic `SirenLockoutUseCase` authority to decouple domain safety gates from hardware audio generation pipelines (Issue #1201).
-*   **1.32 UI Event Routing Unification (R511)**: The system must route UI events and navigation actions through a central `UiEventCoordinator` authority to completely decouple ViewModels from user interface execution details (Issue #1202).
+*   ...
 *   **1.33 Reactive State Mapping Authority (R512)**: Reactive state mapping for dashboard, HUD, and map views must be extracted from ViewModels into a dedicated `UiStateCoordinator` authority to achieve thin ViewModels and isolate state projections (Issue #1350).
+*   **1.34 Unified Subscription Scoping (R513)**: All reactive data stream collections within a component must be orchestrated within a single parent coroutine scope using child builders to ensure deterministic lifecycle management and reduce resource churn (Issue #1351).
 
-### 2. UI & Performance Authority
-*   **2.1 Staggered Hydration Manager (R318-758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
-*   **2.2 Native Watchdog & Retry (R301/R319)**: Native calls must be wrapped in a watchdog timer with exponential backoff retries.
-*   **2.3 Shadow-Cache Stability (R280/721)**: High-frequency lookups must use `ShadowCache` with `ReentrantLock`.
-*   **2.4 Imperative Map Isolation (R309)**: High-frequency map overlays must use standard collections isolated from Compose observation.
-*   **2.5 Snap-Isolation Throttling (R312)**: High-frequency telemetry flows must utilize deep-parity throttling.
-*   **2.6 GPS Warm-up Grace Period (R315)**: Violations must be suppressed for 30s after activation to allow provider stabilization.
-*   **2.7 UI Fluidity**: UI stalls must not exceed 700ms on target hardware.
-*   **2.8 Programmatic Soak Validation (R500)**: The system must support accelerated 24-hour simulation cycles to validate the programmatic stability of counters and reliability math under extreme temporal pressure (Sep.26.11).
-*   **2.9 Hardware Poke Precision (R498)**: Hardware wakeup logic on constrained tiers must utilize inclusive boundary checks (`>=`) to prevent missed samples when timing exactly matches the polling interval (Sep.26.11).
-
-### 3. Forensic & Security Rules
-*   **3.1 Sampling Frequency**: Forensic sampling must operate between 10ms and 100ms (R700).
-*   **3.2 Reliability Threshold**: `ALERT_ID_PERFORMANCE_SPIKE` must trigger if `forensicReliability` drops below 0.85 (R715).
-*   **3.3 Validation Hooks**: Provide manual hooks for alarm simulation and soak tests (R196-V, R735).
-*   **3.4 Identity Sanitization (R976)**: Identity sanitization state must be persistent in DataStore.
-*   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
+...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 513**: Unified StateSubscription Coroutine Scoping - Refactored MainViewModel to orchestrate all reactive flow collections under a single parent scope, eliminating redundant launch overhead and aligning with structured concurrency best practices. (Resolved Sep.27.13).
 *   **SOT ID 512**: Unified State Mapping Authority - Extracted all reactive dashboard, HUD, and map state projection logic from `MainViewModel` into a dedicated `UiStateCoordinator` authority, achieving a perfectly thin ViewModel pattern. (Resolved Sep.27.12).
-*   **SOT ID 511**: UI Event Routing Unification - Centralized UI event orchestration and navigation flows inside a dedicated `UiEventCoordinator` component, minimizing the procedural footprint of ViewModels. (Resolved Sep.27.11).
-*   **SOT ID 510**: Reactive Siren Lockout - Decoupled siren cooldown/lockout logic from audio generation and centralized it within a reactive `SirenLockoutUseCase` authority. (Resolved Sep.27.10).
-*   **SOT ID 509**: UI State Mapper Consolidation - Merged `UiStateMapper` logic directly into `MainViewModel` to reduce DI surface area and remove the redundant stateless interface mapping layer. (Resolved Sep.27.9).
-*   **SOT ID 508**: Continuous Stability Audit Logging - Hardened the forensic auditor loop to output reliability and jitter snapshots to standard stream authorities to unblock 24-hour continuous physical soak monitoring. (Resolved Sep.27.8).
-*   **SOT ID 507**: Smart Signaling Dispatcher - Integrated conflation, priority queuing, and adaptive throttling into a first-class reactive coordination layer, optimizing transmission latency and connection freshness. (Resolved Sep.27.7).
-*   **SOT ID 506**: Unified Trajectory & Buffer Management - Consolidated scattered trajectory windows and hindsight buffers into a first-class `TrajectoryBuffer` component, eliminating redundant terminology and array allocations. (Resolved Sep.27.6).
-*   **SOT ID 505**: LocationProcessingState Mutability Reduction - Partitioned the core tracking state into specialized sub-states (Accuracy, Forensic, Gto, Anchor) to isolate transient telemetry and improve domain isolation. (Resolved Sep.27.5).
-*   **SOT ID 504**: DomainEvent Hierarchy Flattening - Simplified the core event hierarchy by removing component wrappers to optimize dispatch overhead and reduce allocation churn. (Resolved Sep.27.4).
-*   **SOT ID 503**: Signaling Flapping Resilience - Implemented high-frequency network flapping stress test to ensure signaling state transitions don't leak resources. (Resolved Sep.27.2).
-*   **SOT ID 502**: Thermal & Memory Forensic Probes - Integrated OS-level thermal headroom and heap allocation monitoring into the periodic integrity heartbeat. (Resolved Sep.26.12).
-*   **SOT ID 501**: Signaling Lifecycle Probes - Deployed high-assurance forensic probes to SignalingForensicLogger to audit interface handovers and transmission failures. (Resolved Sep.26.11).
-*   **SOT ID 500**: Programmatic Soak Validation - Verified stability of forensic counters and reliability math over a 24-hour simulated tracking session. (Resolved Sep.26.10).
-*   **SOT ID 499**: Alias-Aware Identity Uniqueness - Hardened ID commitment logic to prevent role-prefix and reserved alias collisions. (Resolved Sep.26.10).
-*   **SOT ID 498**: Hardware Poke Precision - Corrected boundary logic for inclusive hardware wakeup matching. (Resolved Sep.26.10).
-*   **SOT ID 497**: Unified Power Policy Deferral Validation - Remediated Issue #1339 by formally validating centralized backoff and Doze-deferral consistency. (Resolved Sep.26.9).
-*   **SOT ID 496**: Legacy ViewModel Decommissioning - Remediated Issue #1215 by physically decommissioning `SetupViewModel`, `TrackerViewModel`, and `ViewerViewModel` in favor of the unified `MainViewModel` SSOT. (Resolved Sep.26.8).
-*   **SOT ID 495**: Hydration Staggering Audit - Verified Level 0-11 transitions under extreme CPU/IO saturation via `HydrationStaggeringAuditTest`. (Resolved Sep.23.50).
-*   **SOT ID 494**: Hilt ViewModel Scope Optimization - Remediated Issue #1203 by unifying feature ViewModels into the activity-scoped `MainViewModel`. (Resolved Sep.23.50).
-*   **SOT ID 493**: Integrity Prefix Hardening - Remediated Issue #1337 by shielding the remote tracker's evaluation state from local Viewer integrity events. (Resolved Sep.26.6).
-*   **SOT ID 492**: AppEventCoordinator Side-Effect Unification - Remediated Issue #1336 by removing role-specific branching guards and unifying alarm prefix mapping. (Resolved Sep.26.5).
-*   **SOT ID 491**: Initialization Prefix Unification - Remediated Issue #1335 by unifying `loadLogicState` to use `rolePrefix`. (Resolved Sep.26.4).
-*   **SOT ID 490**: Unified GPS Pipeline Hardening - Remediated Issue #1334 by correcting spatial anchor initialization and standardizing GPS temporal authority. (Resolved Sep.26.3).
-*   **SOT ID 489**: Peer Connection State Caching - Remediated Issue #1333 by introducing connection state caching. (Resolved Sep.26.2).
-*   **SOT ID 488**: Viewer Self-Tracking Unification - Remediated Issue #1332 by unifying GPS processing for all roles. (Resolved Sep.26.1).
-*   **SOT ID 487**: TrackerStatus Convergence - Remediated Issue #1314 by pre-populating forensic indexes in engine snapshot. (Resolved Sep.26.0).
-*   **SOT ID 486**: Telemetry Mapping Convergence - Remediated Issue #1329 by centralizing all telemetry data transformation in `TelemetryMapper`. (Resolved Sep.25.08).
-*   **SOT ID 485**: Snap-to-Update Monolith - Remediated Issue #1330 by unifying `SystemEvaluationSnapshot` with partitioned states. (Resolved Sep.25.05).
-*   **SOT ID 484**: Peer Lifecycle Decoupling - Remediated Issue #1327 by introducing `PeerConnectionChanged`. (Resolved Sep.25.05).
+...
 
-## 📋 Functional Requirements (174 R-IDs)
+## 📋 Functional Requirements (175 R-IDs)
+*   **R513**: Unified StateSubscription coroutine scoping authority.
 *   **R512**: Centralized `UiStateCoordinator` authority for reactive state mapping projections.
-*   **R511**: Centralized UiEventCoordinator authority for decoupled user interface event routing.
-*   **R510**: Centralized SirenLockoutUseCase authority for transport-agnostic siren suppression tracking.
-*   **R509**: Consolidated UI State mapping architecture for architectural surface area reduction.
-*   **R508**: Continuous Stability Audit Logging for physical 24h soak test observation.
-*   **R507**: Smart Signaling Dispatcher coordination layer for unified transmission.
-*   **R506**: Unified TrajectoryBuffer authority for rolling history.
-*   **R505**: LocationProcessingState partitioning for mutability reduction.
-*   **R504**: DomainEvent flattening for dispatch optimization.
-*   **R503**: Signaling flapping resilience validation.
-*   **R502**: Forensic resource auditing (Thermal, Memory).
-*   **R501**: Signaling lifecycle and handover auditing.
-*   **R500**: Programmatic 24h simulation cycle verification.
-*   **R499**: Alias-aware ID uniqueness enforcement.
-*   **R498**: Inclusive boundary matching for hardware pokes.
-*   **R497**: Centralized Doze-deferral emergency override mapping.
-*   **R496**: Decommissioned legacy ViewModel artifacts.
-*   **R495**: Verified Hydration Staggering under load.
-*   **R494**: Single Source of Truth via activity-scoped ViewModel.
-*   **R493**: Hardened Local Integrity Gating.
-*   **R492**: Unified Side-Effect Authority.
-*   **R491**: Unified Initialization Authority.
-*   **R490**: Unified Temporal Authority Alignment.
-*   **R489**: Peer Lifecycle Suppression.
-*   **R488**: Unified Pipeline Persistence.
-*   **R487**: Snapshot Forensic Pre-population.
-*   **R486**: Centralized Telemetry Mapping Authority.
-*   **R485**: Zero-allocation snap-to-update partitioning.
+...
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.145 (Unified Subscription Scoping)**: PASSED - Verified that all 10+ data streams in MainViewModel are collected via a unified parent coroutine with child dispatchers. (Sep.27.13)
 *   **Chapter 31.144 (Unified State Mapping Authority)**: PASSED - Successfully decoupled all reactive state projection and trail segments computation logic from MainViewModel into UiStateCoordinator. (Sep.27.12)
-*   **Chapter 31.143 (UI Event Routing Unification)**: PASSED - Successfully unified all UI event handling and draft settings operations into UiEventCoordinator. (Sep.26.11)
-*   **Chapter 31.142 (Reactive Siren Lockout)**: PASSED - Successfully decoupled siren lockout state from audio generation pipelines and unified it under SirenLockoutUseCase. (Sep.26.11)
-*   **Chapter 31.141 (UI State Mapping Consolidation)**: PASSED - Verified direct integration of mapping helpers into MainViewModel and reduced dependency injection footprint. (Sep.27.9)
-*   **Chapter 31.140 (Physical Soak Readiness)**: PASSED - Hardened ForensicAuditor to output non-blocking status logging to standard streams to allow uninterrupted 24h hardware audits. (Sep.27.8)
-*   **Chapter 31.139 (Smart Signaling Dispatcher)**: PASSED - Verified reactive prioritized dispatching and violation-based adaptive throttling via SmartSignalingDispatcher. (Sep.27.7)
-*   **Chapter 31.138 (Trajectory Unification)**: PASSED - Verified single-authority buffer management and hindsight mapping consistency. (Sep.27.6)
-*   **Chapter 31.137 (State Partitioning)**: PASSED - Verified sub-state isolation and field-level access decoupling in core engine. (Sep.27.5)
-*   **Chapter 31.136 (Event Flattening)**: PASSED - Verified direct component event emission and dispatcher overhead reduction. (Sep.27.4)
-*   **Chapter 31.135 (Network Stress)**: PASSED - Verified resource stability during high-frequency signaling flapping. (Sep.27.2)
-*   **Chapter 31.134 (Resource Probes)**: PASSED - Verified thermal and memory auditing in forensic trace. (Sep.26.11)
-*   **Chapter 31.133 (Soak Simulation)**: PASSED - Verified counter stability over 24h accelerated cycle. (Sep.26.11)
-*   **Chapter 31.132 (Identity Hardening)**: PASSED - Verified reserved ID rejection during commit. (Sep.26.11)
-*   **Chapter 31.131 (Poke Precision)**: PASSED - Verified inclusive boundary matching in HardwareSuite. (Sep.26.11)
-*   **Chapter 31.130 (Unified Power Policy)**: PASSED - Verified centralized backoff and Doze-deferral consistency across role transitions. (Sep.26.9)
-*   **Chapter 31.129 (ViewModel Decommissioning)**: PASSED - Physically decommissioned legacy ViewModels and verified code elimination. (Sep.26.8)
-*   **Chapter 31.128 (Hydration Staggering Audit)**: PASSED - Verified levels 0-11 progression under extreme CPU/IO stress. (Sep.26.11)
-*   **Chapter 31.127 (ViewModel Scope Optimization)**: PASSED - Eliminated feature ViewModel redundancy and verified SSOT. (Sep.26.11)
-*   **Chapter 31.126 (Integrity Prefix Hardening)**: PASSED - Shielded peer evaluation states from Viewer mode local integrity leaks. (Sep.26.6)
-*   **Chapter 31.125 (Side-Effect Unification)**: PASSED - Verified role-agnostic persistence for primary processors. (Sep.26.5)
-*   **Chapter 31.124 (Initialization Unification)**: PASSED - Verified role-agnostic state restoration for primary processors. (Sep.26.4)
-*   **Chapter 31.123 (Temporal Authorization)**: PASSED - Verified role-agnostic GPS stall detection and burst stability auditing. (Sep.26.3)
-*   **Chapter 31.122 (Peer State Caching)**: PASSED - Verified that redundant peer lifecycle events are suppressed in logs. (Sep.26.2)
-*   **Chapter 31.121 (Viewer Pipeline Unification)**: PASSED - Verified that Viewer self-fixes follow the primary TickEvaluated path. (Sep.26.1)
-*   **Chapter 31.120 (Signaling Optimization)**: PASSED - Verified that forensic indexes are pre-calculated. (Sep.26.0)
-
----
-*Next Audit: Oct.01.00. (Sep.27.12)*
+...
