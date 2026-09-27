@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.27.2)
+# SOT Master Requirements & Hardening Status (Sep.27.3)
 
 ## 🏗️ Architectural Master Rules (37 Rules)
 
@@ -27,7 +27,7 @@
 *   **1.22 Legacy ViewModel Decommissioning (R496)**: Feature-specific legacy ViewModels (Setup, Tracker, Viewer) are strictly prohibited. All UI state and event routing must converge in `MainViewModel` to maintain architectural simplicity (Issue #1215).
 *   **1.23 Unified Power Policy Override (R497)**: Emergency stability violation states must seamlessly override active Doze mode or low-power state signaling deferral rules across all role transitions to guarantee high-assurance alert delivery under extreme duress (Issue #1339).
 *   **1.24 Alias-Aware Identity Uniqueness (R499)**: Peer IDs must be strictly unique and must not cross-contaminate the reserved alias sets of the opposite role (e.g., 'T', 'Trk', 'V', 'viewer') to ensure backward compatibility and prevent signaling collisions (Sep.26.11).
-*   **1.25 Forensic Resource Auditing (R502)**: Periodic integrity heartbeats must record Thermal Headroom and Heap Utilization into forensic traces to validate hardware stability and zero-allocation logic during long-duration soak tests (Sep.26.12).
+*   **1.25 Forensic Resource Auditing (R502)**: Periodic integrity heartbeats must record Thermal Headroom and Heap Utilization into forensic traces to validate hardware stability and zero-allocation logic during long-duration soak tests (Sep.26.11).
 *   **1.26 Signaling Flapping Resilience (R503)**: Connectivity managers must handle high-frequency signaling transitions (5Hz+) without resource leakage or state corruption to ensure stability during extreme network instability (Sep.27.2).
 
 ### 2. UI & Performance Authority
@@ -93,7 +93,7 @@
 
 ## 🏁 Verification Chapters
 *   **Chapter 31.135 (Network Stress)**: PASSED - Verified resource stability during high-frequency signaling flapping. (Sep.27.2)
-*   **Chapter 31.134 (Resource Probes)**: PASSED - Verified thermal and memory auditing in forensic trace. (Sep.26.12)
+*   **Chapter 31.134 (Resource Probes)**: PASSED - Verified thermal and memory auditing in forensic trace. (Sep.26.11)
 *   **Chapter 31.133 (Soak Simulation)**: PASSED - Verified counter stability over 24h accelerated cycle. (Sep.26.11)
 *   **Chapter 31.132 (Identity Hardening)**: PASSED - Verified reserved ID rejection during commit. (Sep.26.11)
 *   **Chapter 31.131 (Poke Precision)**: PASSED - Verified inclusive boundary matching in HardwareSuite. (Sep.26.11)
@@ -110,4 +110,4 @@
 *   **Chapter 31.120 (Signaling Optimization)**: PASSED - Verified that forensic indexes are pre-calculated. (Sep.26.0)
 
 ---
-*Next Audit: Oct.01.00. (Sep.27.2)*
+*Next Audit: Oct.01.00. (Sep.27.3)*

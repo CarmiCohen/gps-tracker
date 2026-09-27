@@ -1,57 +1,48 @@
-# Forensic Handover (Sep.26.11)
+# Forensic Handover (Sep.27.3)
 
 ## 🎯 Current System State
-*   **Version**: Sep.26.11 | **Build**: High-Assurance Baseline Stabilized (Signaling Probes Deployed)
-*   **SOT Baseline**: SOT: 501 (Rules: 35, IDs: 501)
-*   **Core Remediation**: Successfully resolved **Issue #1343**, **Issue #1342**, **Issue #1341**, and **Issue #1340**.
-    *   Deployed high-assurance forensic probes to `SignalingForensicLogger` to audit lifecycle transitions.
-    *   Integrated interface handover and transmission failure auditing in `ConnectivitySuite`.
-    *   Programmatically verified 24-hour stability of forensic counters via accelerated simulation.
-    *   Hardened identity commitment logic with alias-aware uniqueness enforcement.
-    *   Successfully deployed and verified the full test suite (21/21) on physical Samsung A15 hardware.
+*   **Version**: Sep.27.3 | **Build**: Architectural Backlog Synchronized
+*   **SOT Baseline**: SOT: 503 (Rules: 37, IDs: 503)
+*   **Core Remediation**: Successfully resolved **Issue #1347** (Architectural Audit).
+    *   Pruned legacy simplification candidates to match the "Ideas: 15" count.
+    *   Verified full decommissioning of `TrackerService` and `ViewerService` stubs.
+    *   Cataloged new high-priority simplification targets for trajectory management and signaling dispatching.
+    *   Synchronized all status tracking files (`issues.md`, `SOT_MASTER_REQUIREMENTS.md`, `RESOLUTION_ARCHIVE.md`).
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
 
-1.  **Signaling Lifecycle Probes (#1343)**:
-    *   `ConnectivitySuite` now registers network handover events (available/lost) via `SignalingForensicLogger.logHandover`.
-    *   Outbound transmission failures and sync drops are tracked via `logTransmissionFailure` for forensic jitter analysis.
+1.  **Strategic Simplification Backlog (#1347)**:
+    *   **Trajectory Unification**: Plan to merge `GtoEngine` and `LocationSentinel` buffers into an optimized `TrajectoryBuffer`.
+    *   **Smart Dispatcher**: Plan to consolidate network throttling and conflation into a reactive coordination layer.
+    *   **Event Flattening**: Itemized requirement to simplify the `DomainEvent` hierarchy to reduce dispatch overhead.
 
-2.  **Programmatic Soak Validation (#1342)**:
-    *   `ProductionReadinessAuditTest.verify24HourSoakSimulation` validates logic stability over 86,400,000ms cycles.
-    *   Ensures zero-drift for reliability indexing and forensic metrics.
+2.  **Signaling Flapping Resilience (#1345)**:
+    *   Verified 5Hz flapping stability via `ConnectivitySuite.executeFlappingStressTest`.
 
-3.  **Identity Uniqueness Hardening (#1341)**:
-    *   `SettingsRepository.commitDraftSettings` now performs pre-commit validation against reserved role aliases.
+3.  **Forensic Resource Auditing (#1344)**:
+    *   Integrated OS-level thermal and heap monitoring into binary traces.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Current Audit Baseline: [SOT: 501 (Rules: 35, IDs: 501), Resolved: 1245, Open: 4, Testing: 3 (Sub-items: 15), Ideas: 17, QA: 284]**
+- **Current Audit Baseline: [SOT: 503 (Rules: 37), Resolved: 1248, Open: H:1, M:0, L:0, Ideas: H:2, M:8, L:5, Testing: 3 (Sub-items: 15), QA: 284]**
 
 ---
 
 ## 🛡️ Forensic Hardening Summary (Current Session Updates)
 
-### 1. Issue #1343: Signaling Lifecycle Probes
-*   **Status**: Fully Resolved & Verified (Sep.26.11).
-*   **Remediation**: Added `logHandover` and `logTransmissionFailure` to `SignalingForensicLogger`. Integrated into `ConnectivitySuite` to trace signaling connectivity state changes and packet drops.
-
-### 2. Issue #1342: Programmatic 24h Soak Simulation
-*   **Status**: Fully Resolved & Verified (Sep.26.11).
-
-### 3. Issue #1341: Identity Uniqueness
-*   **Status**: Fully Resolved & Verified (Sep.26.11).
+### 1. Issue #1347: Strategic Simplification Audit
+*   **Status**: Fully Resolved & Verified (Sep.27.3).
+*   **Remediation**: Itemized 15 actionable simplification candidates in `issues.md`. Pruned resolved items from previous sessions. Verified service decommissioning status.
 
 ---
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   **Issue #1344: Implement Thermal & Memory Forensic Probes**
-    *   *Description*: Add probes to `MonitorService` to capture `PowerManager.getThermalHeadroom` and track heap allocation growth to verify zero-allocation logic holds over a 24h field soak test.
-*   **Issue #1345: Expand Automated Network Stress Tests**
-    *   *Description*: Implement a simulation in `ConnectivitySuite` that toggles the relay connection status at high frequency to ensure the new `PeerConnectionChanged` events and backoff logic don't leak resources during network flapping.
 *   **Issue #1346: Physical Device Soak Test (24-Hour Observation)**
     *   *Description*: Initiate a real-world validation test on target hardware (e.g., Samsung A15) by running Tracker Mode for 24 continuous hours.
-*   **Issue #1347: Audit and Itemize Strategic Simplification Candidates**
-    *   *Description*: Prune legacy complexity to match the "Ideas: 17" count by explicitly cataloging the remaining 15 candidates.
+*   **Issue #1348: DomainEvent Hierarchy Simplification**
+    *   *Description*: Flatten component wrappers inside `DomainEvent` to optimize channel-driven dispatching overhead.
+*   **Issue #1349: LocationProcessingState Mutability Reduction**
+    *   *Description*: Further reduce fields in `LocationProcessingState` by extracting transient telemetry counters into localized sub-states.

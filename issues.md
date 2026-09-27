@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.2
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.3
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -12,26 +12,21 @@ Ready for next priority item.
     *   *Verification*: Periodically audit stability metrics using `adb logcat -s ForensicAuditor MonitorService | grep "STABILITY AUDIT"`.
     *   *Success Criteria*: Reliability index remains > 98.0% (R500) with zero "Davey" frame drops exceeding 700ms.
 
-### 🟡 Medium Priority (UX, Performance & Auditability)
-
-*   **Issue #1347: Audit and Itemize Strategic Simplification Candidates**
-    *   *Description*: Prune legacy complexity across the codebase to match the "Ideas: 17" dashboard metadata count. Explicitly catalog the remaining 15 candidates (e.g., further unifying `LocationProcessor` states or simplifying the `DomainEvent` hierarchy).
-
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 17)
+## 💡 Strategic Simplification Ideas (Ideas: 15)
+
+### 🔴 High Priority
+*   **Issue #1161: Unified Trajectory & Buffer Management**
+    *   *Significance*: **High (Performance)**. Merge `GtoEngine` windows and `LocationSentinel` hindsight buffers into a single optimized `TrajectoryBuffer`.
+*   **Issue #1172: Smart Signaling Dispatcher**
+    *   *Significance*: **High (Network)**. Merge conflation and throttling logic into a reactive "Smart Dispatcher" to handle connection freshness.
 
 ### 🟡 Medium Priority
-*   **Issue #1161: Unified Trajectory & Buffer Management**
-    *   *Significance*: **Medium-High (Performance)**. Merge `GtoEngine` windows and `LocationSentinel` hindsight buffers into a single optimized `TrajectoryBuffer`.
 *   **Issue #1294: Build-Time Interface Validation**
     *   *Significance*: **Medium (Quality)**. Implement custom Gradle tasks to verify service implementations before compilation.
 *   **Issue #1290: UI State Mapper Consolidation**
     *   *Significance*: **Medium (Maintainability)**. Merge `UiStateMapper` logic directly into `MainViewModel` to reduce DI surface area.
-*   **Issue #1172: Smart Signaling Dispatcher**
-    *   *Significance*: **Medium (Network)**. Merge conflation and throttling logic into a reactive "Smart Dispatcher" to handle connection freshness.
-*   **Issue #1163: Stateless & Functional Logic Refactoring**
-    *   *Significance*: **Medium (Robustness)**. Migrate `LocationProcessor` to a functional model using immutable states.
 *   **Issue #1160: Flyweight & Pooling Expansion**
     *   *Significance*: **Medium (Performance)**. Expand flyweight patterns to all telemetry entities and use ring buffers to eliminate GC churn.
 *   **Issue #1173: Protobuf-First Persistence**
@@ -42,8 +37,8 @@ Ready for next priority item.
     *   *Significance*: **Medium (Domain Logic)**. Decouple siren cooldown logic from audio generation by moving it into a dedicated UseCase.
 *   **Issue #1202: UI Event Routing Unification**
     *   *Significance*: **Medium (Architecture)**. Refactor navigation into a single coordinator to decouple ViewModels from UI implementation.
-*   *(Issue #1336 consolidated into hardening)*
-*   *(Issue #1215 resolved: Decommission legacy ViewModels)*
+*   **Issue #1348: DomainEvent Hierarchy Simplification**
+    *   *Significance*: **Medium (Architecture)**. Flatten component wrappers inside `DomainEvent` to optimize channel-driven dispatching overhead.
 
 ### 🔵 Low Priority
 *   **Issue #1293: Lifecycle-Aware Tick Orchestrator**
@@ -52,17 +47,16 @@ Ready for next priority item.
     *   *Significance*: **Low-Medium (UI Decoupling)**. Extract osmdroid management into a standalone controller to keep UI code declarative.
 *   **Issue #1296: Centralized Boot Lifecycle Authority**
     *   *Significance*: **Low (Testability)**. Move monotonic clock recovery logic to a dedicated authority to simplify background service testing.
-*   **Issue #1295: Redundant Stream Observer Audit**
-    *   *Significance*: **Low (CPU)**. Systematically audit all service descendants to ensure no redundant reactive streams are active.
-*   **Issue #1171: Service & Worker Consolidation**
-    *   *Significance*: **Low (Maintenance)**. Merge role-specific services into a single monitor service to reduce manifest overhead.
 *   **Issue #1175: Real-time Only Path (Pivot Option)**
     *   *Significance*: **Strategic (Maintenance Tradeoff)**. Consider removing backlog sync and forensic backfilling to dramatically reduce codebase complexity.
+*   **Issue #1349: LocationProcessingState Mutability Reduction**
+    *   *Significance*: **Low (Robustness)**. Further reduce fields in `LocationProcessingState` by extracting transient telemetry counters into localized sub-states.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1347: Audit and Itemize Strategic Simplification Candidates** (Resolved Sep.27.3)
 *   **Issue #1345: Expand Automated Network Stress Tests** (Resolved Sep.27.2)
 *   **Issue #1344: Implement Thermal & Memory Forensic Probes** (Resolved Sep.26.12)
 *(Earlier resolutions archived to STATUS/RESOLUTION_ARCHIVE.md)*
@@ -70,4 +64,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.27.2: [SOT: 503 (Rules: 37), Resolved: 1247, Open: H:1, M:1, L:0, Ideas: H:0, M:10, L:6, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.27.3: [SOT: 503 (Rules: 40), Resolved: 1248, Open: H:1, M:0, L:0, Ideas: H:2, M:8, L:5, Testing: 3 (Sub-items: 15), QA: 284]**

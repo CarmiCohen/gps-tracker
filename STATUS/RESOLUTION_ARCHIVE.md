@@ -1,3 +1,14 @@
+# 🏛️ Resolution Archive - Sep.27.3
+
+## 🏁 Issue #1347: Audit and Itemize Strategic Simplification Candidates
+*   **Resolved**: Sep.27.3
+*   **Root Cause**: Backlog drift and legacy complexity markers (e.g., decommissioned services and redundant mappers) created overhead and architectural noise, requiring a formal audit to align with the "Ideas: 15" hardening goal.
+*   **Remediation**:
+    *   **issues.md**: Audited and pruned the "Strategic Simplification Ideas" list to 15 active candidates. Added high-priority candidates for Trajectory/Buffer unification and Smart Dispatcher consolidation.
+    *   **Audit**: Verified that `TrackerService` and `ViewerService` are fully decommissioned stubs and removed their active references from manifest-level logic in previous turns.
+    *   **Architecture**: Cataloged new simplification opportunities including `DomainEvent` hierarchy flattening and `LocationProcessingState` mutability reduction.
+*   **SOT ID**: N/A (Process Audit)
+
 # 🏛️ Resolution Archive - Sep.27.2
 
 ## 🏁 Issue #1345: Expand Automated Network Stress Tests
