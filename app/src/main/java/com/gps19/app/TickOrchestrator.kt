@@ -8,12 +8,12 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * TickOrchestrator: Centralized lifecycle authority for background services.
- * Encapsulates initialization state gates and manages periodic loop executions
+ * Encapsulates initialization state gates and manages lifecycle-bound jobs
  * to maintain strict structured concurrency and simplify background task lifecycles.
  */
 class TickOrchestrator {
     private val initializationDeferred = CompletableDeferred<Unit>()
-    private val activeJobs = ConcurrentHashMap<String, Job>()
+    private val managedJobs = ConcurrentHashMap<String, Job>()
 
     /**
      * Signal that the parent service has finished its pre-initialization setup.
@@ -30,39 +30,67 @@ class TickOrchestrator {
     }
 
     /**
-     * Launches a lifecycle-managed loop that automatically waits for service initialization.
+     * Launches a lifecycle-managed job that automatically waits for service initialization.
+     * Replaces any existing job with the same name.
+     */
+    fun launchJob(
+        name: String,
+        scope: CoroutineScope,
+        block: suspend CoroutineScope.() -> Unit
+    ): Job {
+        managedJobs[name]?.cancel()
+        val job = scope.launch {
+            initializationDeferred.await()
+            block()
+        }
+        managedJobs[name] = job
+        return job
+    }
+
+    /**
+     * Alias for launchJob, specifically for periodic loops.
      */
     fun launchLoop(
         name: String,
         scope: CoroutineScope,
         block: suspend CoroutineScope.() -> Unit
     ) {
-        activeJobs[name]?.cancel()
-        activeJobs[name] = scope.launch {
-            initializationDeferred.await()
-            block()
-        }
+        launchJob(name, scope, block)
     }
 
     /**
-     * Cancels a specific background loop.
+     * Cancels a specific managed job.
+     */
+    fun cancelJob(name: String) {
+        managedJobs.remove(name)?.cancel()
+    }
+
+    /**
+     * Alias for cancelJob.
      */
     fun cancelLoop(name: String) {
-        activeJobs.remove(name)?.cancel()
+        cancelJob(name)
     }
 
     /**
-     * Checks whether a loop is actively executing.
+     * Checks whether a job is actively executing.
+     */
+    fun isJobActive(name: String): Boolean {
+        return managedJobs[name]?.isActive == true
+    }
+
+    /**
+     * Alias for isJobActive.
      */
     fun isLoopActive(name: String): Boolean {
-        return activeJobs[name]?.isActive == true
+        return isJobActive(name)
     }
 
     /**
-     * Atomic cancellation of all orchestrated loops.
+     * Atomic cancellation of all orchestrated jobs and loops.
      */
     fun cancelAll() {
-        activeJobs.values.forEach { it.cancel() }
-        activeJobs.clear()
+        managedJobs.values.forEach { it.cancel() }
+        managedJobs.clear()
     }
 }

@@ -19,8 +19,8 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * Sep.27.14:
- * - Issue #1293: Integrated Lifecycle-Aware TickOrchestrator for managing background loops.
+ * Sep.27.15:
+ * - Issue #1352: Extended TickOrchestrator for unified job management.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -63,7 +63,6 @@ abstract class BaseMonitorService : LifecycleService() {
     protected var lastUiPulseTs = 0L
     
     protected val tickOrchestrator = TickOrchestrator()
-    protected var fgsUpdateJob: Job? = null
     
     private var lastFgsUpdateRealtime = 0L
     private val FGS_UPDATE_THROTTLE_MS = 5000L
@@ -190,7 +189,6 @@ abstract class BaseMonitorService : LifecycleService() {
         Timber.w("Issue #910: Service onDestroy invoked. Stack:\n${Thread.currentThread().stackTrace.take(15).joinToString("\n")}")
         
         tickOrchestrator.cancelAll()
-        fgsUpdateJob?.cancel()
         
         hardwareSuite.stop()
 

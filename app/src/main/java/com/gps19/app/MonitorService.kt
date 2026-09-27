@@ -24,8 +24,8 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
- * Sep.27.14:
- * - Issue #1293: Refactored background tasks and loops using lifecycle-aware TickOrchestrator.
+ * Sep.27.15:
+ * - Issue #1352: Unified background job orchestration via TickOrchestrator.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -38,11 +38,6 @@ class MonitorService : BaseMonitorService() {
     private var activeMode: String? = null
     private var rolePrefix: String = "T_"
     private var isTrackerMode: Boolean = true
-
-    private var gpsCollectionJob: Job? = null
-    private var gnssDetailJob: Job? = null
-    private var settingsJob: Job? = null
-    private var alarmEvalJob: Job? = null
     
     private val forensicTriggerChannel = Channel<Boolean>(Channel.BUFFERED)
     private val forensicCaptureMutex = Mutex()
@@ -114,8 +109,12 @@ class MonitorService : BaseMonitorService() {
         commandRouter.register()
         commandRouter.startObservingCommands(lifecycleScope)
 
-        gpsCollectionJob = lifecycleScope.launch(Dispatchers.Default) { hardwareSuite.getLocationFlow().collectLatest { onLocationChanged(it) } }
-        gnssDetailJob = lifecycleScope.launch(Dispatchers.Default) { hardwareSuite.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
+        tickOrchestrator.launchJob("gps_collection", lifecycleScope + Dispatchers.Default) {
+            hardwareSuite.getLocationFlow().collectLatest { onLocationChanged(it) }
+        }
+        tickOrchestrator.launchJob("gnss_detail", lifecycleScope + Dispatchers.Default) {
+            hardwareSuite.gnssDetailFlow.collectLatest { latestGnssDetail = it }
+        }
 
         val recoveredTs = repository.getLong(rolePrefix + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
         val recoveredDrift = repository.getLong(CLOCK_DRIFT_REF_KEY, 0L)
@@ -197,7 +196,7 @@ class MonitorService : BaseMonitorService() {
     }
 
     private fun setupServiceObservers() {
-        lifecycleScope.launch(Dispatchers.Default) {
+        tickOrchestrator.launchJob("service_observers", lifecycleScope + Dispatchers.Default) {
             launch { observeConnectivityEvents() }
             launch { observeCommandEvents() }
             launch { observeSettingsChanges() }
@@ -218,9 +217,9 @@ class MonitorService : BaseMonitorService() {
         Timber.i("MonitorService: Handling dynamic role transition from $activeMode to $newMode")
         domainEventBus.emit(DomainEvent.ServiceStatus("Engine transitioning role: $activeMode -> $newMode", isImportant = true))
 
-        gpsCollectionJob?.cancel()
-        gnssDetailJob?.cancel()
-        alarmEvalJob?.cancel()
+        tickOrchestrator.cancelJob("gps_collection")
+        tickOrchestrator.cancelJob("gnss_detail")
+        tickOrchestrator.cancelJob("alarm_evaluation")
         
         val oldTag = if (isTrackerMode) "T" else "V"
         sessionCoordinator.resetSession(roleTag = oldTag, processors = listOf(primaryProcessor, remoteProcessor), onReset = {
@@ -244,8 +243,12 @@ class MonitorService : BaseMonitorService() {
         primaryProcessor.setLastValidFixRt(timeProvider.elapsedRealtime())
         remoteProcessor.setLastValidFixRt(timeProvider.elapsedRealtime())
 
-        gpsCollectionJob = lifecycleScope.launch(Dispatchers.Default) { hardwareSuite.getLocationFlow().collectLatest { onLocationChanged(it) } }
-        gnssDetailJob = lifecycleScope.launch(Dispatchers.Default) { hardwareSuite.gnssDetailFlow.collectLatest { latestGnssDetail = it } }
+        tickOrchestrator.launchJob("gps_collection", lifecycleScope + Dispatchers.Default) {
+            hardwareSuite.getLocationFlow().collectLatest { onLocationChanged(it) }
+        }
+        tickOrchestrator.launchJob("gnss_detail", lifecycleScope + Dispatchers.Default) {
+            hardwareSuite.gnssDetailFlow.collectLatest { latestGnssDetail = it }
+        }
 
         if (isTrackerMode) {
             setupPhysicalFastPaths()
@@ -374,8 +377,7 @@ class MonitorService : BaseMonitorService() {
 
     override fun updateForegroundServiceType() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            fgsUpdateJob?.cancel()
-            fgsUpdateJob = lifecycleScope.launch(Dispatchers.Main.immediate) {
+            tickOrchestrator.launchJob("fgs_update", lifecycleScope + Dispatchers.Main.immediate) {
                 delay(200)
                 val type = getAvailableForegroundServiceType()
                 val health = integrityMonitor.currentHealth
@@ -567,11 +569,12 @@ class MonitorService : BaseMonitorService() {
         }
 
         val serviceContext = AlarmServiceContext(now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = isTrackerMode, isRelayConnected = isSocketConnected, isTrackerConnected = if (isTrackerMode) true else isPeerActive, isUiVisible = isUiVisible(), distToHomeAuthority = if (isTrackerMode) processed.distToHome else (if (isSocketConnected && isPeerActive) PhysicsUtils.calculateDistance(finalSnapshot.kinetic.lat, finalSnapshot.kinetic.lng, (repository.getCachedHomePoints().firstOrNull()?.latitude ?: 0.0), (repository.getCachedHomePoints().firstOrNull()?.longitude ?: 0.0)) else null), maxDistanceAuthority = (if (isTrackerMode) primaryProcessor else remoteProcessor).getMaxDistanceAuthority(), capabilities = capabilities, rolePrefix = if (isTrackerMode) "T_" else "VR_")
-        alarmEvalJob?.cancel(); alarmEvalJob = lifecycleScope.launch(Dispatchers.Default) { alarmManager.evaluateAlarms(finalSnapshot, serviceContext) }
+        tickOrchestrator.launchJob("alarm_evaluation", lifecycleScope + Dispatchers.Default) {
+            alarmManager.evaluateAlarms(finalSnapshot, serviceContext)
+        }
     }
 
     override fun onDestroy() {
-        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel()
         deviceProfileManager.teardownHardwareProfile(capabilities); super.onDestroy()
     }
 

@@ -1,12 +1,12 @@
-# Forensic Handover (Sep.27.14)
+# Forensic Handover (Sep.27.15)
 
 ## 🎯 Current System State
-*   **Version**: Sep.27.14 | **Build**: Success (Lifecycle-Aware Tick Orchestration)
-*   **SOT Baseline**: SOT ID: 514 (Rules: 46, R-IDs: 176)
-*   **Core Remediation**: Successfully resolved **Issue #1293** (Lifecycle-Aware Tick Orchestrator).
-    *   Introduced `TickOrchestrator` to encapsulate background service lifecycle gating and initialization deferred waits.
-    *   Refactored `MonitorService` and `BaseMonitorService` periodic loops (tick, heartbeat, forensic sampling) to run deterministically via the lifecycle orchestrator.
-    *   Cleaned up decoupled job cancellation mechanisms into atomic `cancelAll()` orchestration.
+*   **Version**: Sep.27.15 | **Build**: Success (Unified Service Job Orchestration)
+*   **SOT Baseline**: SOT ID: 515 (Rules: 47, R-IDs: 177)
+*   **Core Remediation**: Successfully resolved **Issue #1352** (Unified Service Job Orchestration).
+    *   Extended `TickOrchestrator` to support generalized job management (`launchJob`, `cancelJob`).
+    *   Refactored `MonitorService` to orchestrate all background tasks (GPS, GNSS, Observers, FGS updates, Alarm Eval) through the orchestrator.
+    *   Eliminated all manual `Job?` fields in the service layer, ensuring atomic cleanup via `cancelAll()`.
 
 ---
 
@@ -14,14 +14,13 @@
 
 1.  **Event Orchestration Layer**:
     *   `UiEventCoordinator`: Sole authority for mapping user intent (`UiEvent`) to domain actions.
-    *   `MainViewModel`: Pure SSOT for UI state observation and event emission; utilizes unified subscription scoping.
-    *   `UiStateCoordinator`: Sole authority for projecting domain state into UI-specific DTOs.
-    *   `TickOrchestrator`: Standalone lifecycle authority for structural background loops execution.
+    *   `MainViewModel`: Pure SSOT for UI state observation and event emission.
+    *   `TickOrchestrator`: Standalone lifecycle authority for all structural background jobs and loops.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.27.14: [SOT Count: 176 (Rules: 46), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.27.15: [SOT Count: 177 (Rules: 47), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 
 ---
 
