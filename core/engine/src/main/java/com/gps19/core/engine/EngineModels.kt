@@ -5,6 +5,9 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.27.17:
+ * - Issue #1160: Flyweight & Pooling Expansion. Converted SystemEvaluationSnapshot 
+ *   fields to vars and kept data class to retain copy() compatibility while eliminating GC churn via pooling.
  * Sep.27.7:
  * - Issue #1172: Smart Signaling Dispatcher. Added SignalingPriority enum to core engine models.
  * Sep.27.6:
@@ -174,6 +177,7 @@ class EngineConnectionPoint(
 
 /**
  * SystemEvaluationSnapshot: Unified DTO for all telemetry and health metrics.
+ * Refactored to data class with mutable fields for backward-compatible flyweight optimization.
  */
 @Serializable
 data class SystemEvaluationSnapshot(
@@ -183,44 +187,100 @@ data class SystemEvaluationSnapshot(
     val integrity: IntegrityState = IntegrityState(),
 
     // Evaluation Metadata & Transient State
-    val status: SentinelStatus = SentinelStatus.VALID,
-    val lastValidFixRt: Long = 0L,
-    val isStalled: Boolean = false,
-    val isClockRegression: Boolean = false,
-    val isJammer: Boolean = false,
-    val jumpTier: Int = 0,
-    val isAdaptiveJump: Boolean = false,
-    val tamperDetected: Boolean = false,
-    val jammerDetected: Boolean = false,
-    val isAnchorLocked: Boolean = false,
-    val suppressionNote: String? = null,
+    var status: SentinelStatus = SentinelStatus.VALID,
+    var lastValidFixRt: Long = 0L,
+    var isStalled: Boolean = false,
+    var isClockRegression: Boolean = false,
+    var isJammer: Boolean = false,
+    var jumpTier: Int = 0,
+    var isAdaptiveJump: Boolean = false,
+    var tamperDetected: Boolean = false,
+    var jammerDetected: Boolean = false,
+    var isAnchorLocked: Boolean = false,
+    var suppressionNote: String? = null,
 
     // Temporal Gating & Fast-Paths
-    val acousticLockoutRt: Long = 0L,
-    val lightSpikeRt: Long = 0L,
-    val isMuzzled: Boolean = false,
-    val providedAdaptiveFloor: Double = -1.0,
-    val nowRt: Long = 0L,
-    val nowTs: Long = 0L,
-    val snrSnapshot: Double? = null,
-    val vibeSnapshot: Double? = null,
+    var acousticLockoutRt: Long = 0L,
+    var lightSpikeRt: Long = 0L,
+    var isMuzzled: Boolean = false,
+    var providedAdaptiveFloor: Double = -1.0,
+    var nowRt: Long = 0L,
+    var nowTs: Long = 0L,
+    var snrSnapshot: Double? = null,
+    var vibeSnapshot: Double? = null,
     
     // Warm-up & Audio State
-    val isWarming: Boolean = false,
-    val isSirenActive: Boolean = false,
+    var isWarming: Boolean = false,
+    var isSirenActive: Boolean = false,
     
     // Performance Metrics
-    val cpuLoad: Double = 0.0,
-    val ioWait: Double = 0.0,
-    val maxIoLatency: Long = 0L,
-    val isSilentFailure: Boolean = false,
-    val isMaliAnomaly: Boolean = false,
-    val localInternetLoss: Boolean = false,
-    val isHardwareOnline: Boolean = true,
-    val acousticMinDb: Double = -1.0,
-    val thermalHeadroom: Double = 0.0,
-    val heapAllocatedMb: Double = 0.0
+    var cpuLoad: Double = 0.0,
+    var ioWait: Double = 0.0,
+    var maxIoLatency: Long = 0L,
+    var isSilentFailure: Boolean = false,
+    var isMaliAnomaly: Boolean = false,
+    var localInternetLoss: Boolean = false,
+    var isHardwareOnline: Boolean = true,
+    var acousticMinDb: Double = -1.0,
+    var thermalHeadroom: Double = 0.0,
+    var heapAllocatedMb: Double = 0.0
 ) {
+    /**
+     * copyFrom: Performs a deep mutable copy to this instance from another (R-ID 392).
+     */
+    fun copyFrom(other: SystemEvaluationSnapshot) {
+        this.kinetic.copyFrom(other.kinetic)
+        this.atmospheric.copyFrom(other.atmospheric)
+        this.integrity.copyFrom(other.integrity)
+        this.status = other.status
+        this.lastValidFixRt = other.lastValidFixRt
+        this.isStalled = other.isStalled
+        this.isClockRegression = other.isClockRegression
+        this.isJammer = other.isJammer
+        this.jumpTier = other.jumpTier
+        this.isAdaptiveJump = other.isAdaptiveJump
+        this.tamperDetected = other.tamperDetected
+        this.jammerDetected = other.jammerDetected
+        this.isAnchorLocked = other.isAnchorLocked
+        this.suppressionNote = other.suppressionNote
+        this.acousticLockoutRt = other.acousticLockoutRt
+        this.lightSpikeRt = other.lightSpikeRt
+        this.isMuzzled = other.isMuzzled
+        this.providedAdaptiveFloor = other.providedAdaptiveFloor
+        this.nowRt = other.nowRt
+        this.nowTs = other.nowTs
+        this.snrSnapshot = other.snrSnapshot
+        this.vibeSnapshot = other.vibeSnapshot
+        this.isWarming = other.isWarming
+        this.isSirenActive = other.isSirenActive
+        this.cpuLoad = other.cpuLoad
+        this.ioWait = other.ioWait
+        this.maxIoLatency = other.maxIoLatency
+        this.isSilentFailure = other.isSilentFailure
+        this.isMaliAnomaly = other.isMaliAnomaly
+        this.localInternetLoss = other.localInternetLoss
+        this.isHardwareOnline = other.isHardwareOnline
+        this.acousticMinDb = other.acousticMinDb
+        this.thermalHeadroom = other.thermalHeadroom
+        this.heapAllocatedMb = other.heapAllocatedMb
+    }
+
+    /**
+     * reset: Reverts the instance to default state for reuse (R-ID 392).
+     */
+    fun reset() {
+        kinetic.reset()
+        atmospheric.reset()
+        integrity.reset()
+        status = SentinelStatus.VALID; lastValidFixRt = 0L; isStalled = false; isClockRegression = false
+        isJammer = false; jumpTier = 0; isAdaptiveJump = false; tamperDetected = false; jammerDetected = false
+        isAnchorLocked = false; suppressionNote = null; acousticLockoutRt = 0L; lightSpikeRt = 0L
+        isMuzzled = false; providedAdaptiveFloor = -1.0; nowRt = 0L; nowTs = 0L; snrSnapshot = null
+        vibeSnapshot = null; isWarming = false; isSirenActive = false; cpuLoad = 0.0; ioWait = 0.0
+        maxIoLatency = 0L; isSilentFailure = false; isMaliAnomaly = false; localInternetLoss = false
+        isHardwareOnline = true; acousticMinDb = -1.0; thermalHeadroom = 0.0; heapAllocatedMb = 0.0
+    }
+
     /**
      * toLocationUpdate: Returns a new LocationUpdate based on this snapshot.
      */

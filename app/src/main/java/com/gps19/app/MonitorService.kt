@@ -24,6 +24,9 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.27.17:
+ * - Issue #1160: Flyweight & Pooling Expansion. Refactored processTick and 
+ *   alarm evaluation to use reusable flyweight snapshots, eliminating GC churn.
  * Sep.27.16:
  * - Issue #1173: Protobuf-First Persistence. Migrated alarm state restoration to Protobuf.
  * Sep.27.15:
@@ -68,6 +71,11 @@ class MonitorService : BaseMonitorService() {
     
     private var lastGpsBearing = 0.0
     private var lastGpsAccuracy = 0.0
+
+    // R-ID 392: Reusable flyweight snapshots to eliminate GC churn on the evaluation path.
+    private val evaluationSnapshotFlyweight = SystemEvaluationSnapshot()
+    private val pointSnapshotFlyweight = SystemEvaluationSnapshot()
+    private val alarmSnapshotFlyweight = SystemEvaluationSnapshot()
 
     override fun onServicePreInit() {
         runBlocking {
@@ -409,52 +417,54 @@ class MonitorService : BaseMonitorService() {
         val isSocketConnected = connectivitySuite.isConnected(); connectivitySuite.updateRelayStatus(isSocketConnected)
         val isPeerActive = if (isTrackerMode) (sessionManager.getViewerCount() > 0 || isRecentUiPulse()) else (connectivitySuite.lastPeerActivityTs > 0 && (nowRt - connectivitySuite.lastPeerActivityTs < WATCH_TIMEOUT_MS))
 
-        val evaluationSnapshot = SystemEvaluationSnapshot(
-            kinetic = KineticState(
-                kineticEnergy = hSnapshot.kineticEnergy,
+        // R-ID 392: Populate flyweight instead of allocating a new snapshot every tick.
+        evaluationSnapshotFlyweight.apply {
+            reset()
+            kinetic.apply {
+                kineticEnergy = hSnapshot.kineticEnergy
                 rt = nowRt
-            ),
-            atmospheric = AtmosphericState(
-                vibration = hSnapshot.vibration, heading = hSnapshot.heading, baroAlt = hSnapshot.baroAlt,
-                lux = hSnapshot.lux, isNear = hSnapshot.isNear, tiltDegrees = hSnapshot.tiltDegrees, 
-                acousticDb = hSnapshot.acousticDb, peakVibrationShock = hSnapshot.peakShock, 
-                luxBaseline = primaryProcessor.getLuxBaseline(), acousticFloorDb = primaryProcessor.getAcousticFloorDb(),
-                adaptiveVibrationFloor = hSnapshot.adaptiveVibrationFloor,
-                proxIdx = hSnapshot.proximityIdx, proximityCm = hSnapshot.proximityCm, 
-                proximityDebounceMs = hSnapshot.proximityDebounceMs,
+            }
+            atmospheric.apply {
+                vibration = hSnapshot.vibration; heading = hSnapshot.heading; baroAlt = hSnapshot.baroAlt
+                lux = hSnapshot.lux; isNear = hSnapshot.isNear; tiltDegrees = hSnapshot.tiltDegrees 
+                acousticDb = hSnapshot.acousticDb; peakVibrationShock = hSnapshot.peakShock 
+                luxBaseline = primaryProcessor.getLuxBaseline(); acousticFloorDb = primaryProcessor.getAcousticFloorDb()
+                adaptiveVibrationFloor = hSnapshot.adaptiveVibrationFloor
+                proxIdx = hSnapshot.proximityIdx; proximityCm = hSnapshot.proximityCm 
+                proximityDebounceMs = hSnapshot.proximityDebounceMs
                 vibrationRollingSum = hSnapshot.vibrationRollingSum
-            ),
-            integrity = IntegrityState(
-                battery = health.batteryLevel, isCharging = health.isCharging, currentMa = health.currentMa,
-                isPowerTamper = health.isPowerTamper, isLocationPending = health.isLocationPending, 
-                locationPendingReason = health.locationPendingReason,
-                isPowerSaveMode = isPowerSaveActive || health.isPowerSaveMode, standbyBucket = health.standbyBucket, 
-                netInterface = health.netInterface, isStorageLow = health.isStorageLow, 
-                isStorageCritical = health.isStorageCritical, isBatterySteepDischarge = health.isBatterySteepDischarge,
-                isCoolingModeActive = health.isCoolingModeActive, gpsHardwareLock = health.gpsHardwareLock, 
-                isUltraLongStationary = health.isUltraLongStationary, isBatteryLow = health.isBatteryLow, 
-                isBatteryCritical = health.isBatteryCritical, satsUsed = hardwareSuite.satellitesUsed, 
-                satsView = hardwareSuite.satellitesInView, violationUptimeMs = sessionManager.violationUptimeMs,
-                violationPercentage = sessionManager.getViolationPercentage(),
-                thermalHeadroom = health.thermalHeadroom, heapAllocatedMb = health.heapAllocatedMb
-            ),
-            nowRt = nowRt, nowTs = now, snrSnapshot = hardwareSuite.averageSnr,
-            acousticLockoutRt = if (isTrackerMode) lastFastPathAcousticSpikeTs else 0L, 
-            lightSpikeRt = if (isTrackerMode) lastFastPathLightSpikeTs else 0L,
-            providedAdaptiveFloor = hSnapshot.adaptiveVibrationFloor,
-            cpuLoad = health.cpuLoad, ioWait = health.ioWait, maxIoLatency = health.maxIoLatency, 
-            isSilentFailure = health.isSilentFailure, isMaliAnomaly = health.isMaliAnomaly,
-            localInternetLoss = health.localInternetLoss, isHardwareOnline = health.isHardwareOnline,
-            acousticMinDb = hSnapshot.acousticPeakMin,
-            thermalHeadroom = health.thermalHeadroom, heapAllocatedMb = health.heapAllocatedMb
-        )
+            }
+            integrity.apply {
+                battery = health.batteryLevel; isCharging = health.isCharging; currentMa = health.currentMa
+                isPowerTamper = health.isPowerTamper; isLocationPending = health.isLocationPending 
+                locationPendingReason = health.locationPendingReason
+                isPowerSaveMode = isPowerSaveActive || health.isPowerSaveMode; standbyBucket = health.standbyBucket 
+                netInterface = health.netInterface; isStorageLow = health.isStorageLow 
+                isStorageCritical = health.isStorageCritical; isBatterySteepDischarge = health.isBatterySteepDischarge
+                isCoolingModeActive = health.isCoolingModeActive; gpsHardwareLock = health.gpsHardwareLock 
+                isUltraLongStationary = health.isUltraLongStationary; isBatteryLow = health.isBatteryLow 
+                isBatteryCritical = health.isBatteryCritical; satsUsed = hardwareSuite.satellitesUsed 
+                satsView = hardwareSuite.satellitesInView; violationUptimeMs = sessionManager.violationUptimeMs
+                violationPercentage = sessionManager.getViolationPercentage()
+                thermalHeadroom = health.thermalHeadroom; heapAllocatedMb = health.heapAllocatedMb
+            }
+            this.nowRt = nowRt; this.nowTs = now; snrSnapshot = hardwareSuite.averageSnr
+            acousticLockoutRt = if (isTrackerMode) lastFastPathAcousticSpikeTs else 0L 
+            lightSpikeRt = if (isTrackerMode) lastFastPathLightSpikeTs else 0L
+            providedAdaptiveFloor = hSnapshot.adaptiveVibrationFloor
+            cpuLoad = health.cpuLoad; ioWait = health.ioWait; maxIoLatency = health.maxIoLatency 
+            isSilentFailure = health.isSilentFailure; isMaliAnomaly = health.isMaliAnomaly
+            localInternetLoss = health.localInternetLoss; isHardwareOnline = health.isHardwareOnline
+            acousticMinDb = hSnapshot.acousticPeakMin
+            thermalHeadroom = health.thermalHeadroom; heapAllocatedMb = health.heapAllocatedMb
+        }
         
         if (isTrackerMode) {
             hardwareSuite.setLightFastPath(baseline = primaryProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP)
             hardwareSuite.setAcousticFastPath(floor = primaryProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0)
-            hardwareSuite.setHighLoad(evaluationSnapshot.integrity.isCoolingModeActive)
+            hardwareSuite.setHighLoad(evaluationSnapshotFlyweight.integrity.isCoolingModeActive)
             isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(isSuspiciousMode, primaryProcessor.checkPhysicalTamper(nowRt, false) == SentinelStatus.TAMPER, primaryProcessor.consumeSitDetected(), nowRt)
-            val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(evaluationSnapshot.integrity.isCoolingModeActive, isSuspiciousMode, hardwareSuite.isStationary(), hardwareSuite.isScreenOn(), primaryProcessor.getMaxDistanceAuthority() > 0.0, nowRt, capabilities)
+            val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(evaluationSnapshotFlyweight.integrity.isCoolingModeActive, isSuspiciousMode, hardwareSuite.isStationary(), hardwareSuite.isScreenOn(), primaryProcessor.getMaxDistanceAuthority() > 0.0, nowRt, capabilities)
             if (targetGpsInterval != currentIntervalMs) {
                 currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, "T"); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)
             }
@@ -466,7 +476,7 @@ class MonitorService : BaseMonitorService() {
         }
 
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isPeerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
-        deviceProfileManager.executeContinuityTweaks(capabilities, nowRt, serviceTickCounter, primaryProcessor.getLastValidFixRt(), evaluationSnapshot.integrity.isPowerSaveMode, evaluationSnapshot.localInternetLoss, isSocketConnected, isPeerActive)
+        deviceProfileManager.executeContinuityTweaks(capabilities, nowRt, serviceTickCounter, primaryProcessor.getLastValidFixRt(), evaluationSnapshotFlyweight.integrity.isPowerSaveMode, evaluationSnapshotFlyweight.localInternetLoss, isSocketConnected, isPeerActive)
 
         var recoveryFlagged = false
         if (lastServiceTickRealtime > 0) {
@@ -484,10 +494,10 @@ class MonitorService : BaseMonitorService() {
             domainEventBus.emit(DomainEvent.StabilityViolation(message = verdict.message, isJitter = verdict.isJitterViolation, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy))
         }
         
-        primaryProcessor.updateSensorData(evaluationSnapshot)
+        primaryProcessor.updateSensorData(evaluationSnapshotFlyweight)
 
         if (nowRt - lastPowerSaveCheckRt > 5000L) {
-            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(hardwareSuite.isStationary(), evaluationSnapshot.integrity.isStalled, alarmManager.hasUnresolvedAlarms(), isUiVisible())
+            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(hardwareSuite.isStationary(), evaluationSnapshotFlyweight.integrity.isStalled, alarmManager.hasUnresolvedAlarms(), isUiVisible())
             if (shouldBePowerSave != isPowerSaveActive) {
                 isPowerSaveActive = shouldBePowerSave; hardwareSuite.setPowerSaveMode(shouldBePowerSave); 
                 domainEventBus.emit(DomainEvent.PowerSaveTransition(shouldBePowerSave))
@@ -501,16 +511,19 @@ class MonitorService : BaseMonitorService() {
             
             forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, if (isTrackerMode) "T" else "V")
 
-            val pointSnapshot = evaluationSnapshot.copy(
-                kinetic = evaluationSnapshot.kinetic.copy(
-                    lat = loc.latitude, lng = loc.longitude, alt = loc.altitude, 
-                    speed = loc.speed.toDouble(), gpsTs = loc.time, 
-                    accuracy = loc.accuracy.toDouble(), bearing = loc.bearing.toDouble()
-                ),
+            // R-ID 392: Use pointSnapshot flyweight for GPS coordinate processing.
+            pointSnapshotFlyweight.apply {
+                copyFrom(evaluationSnapshotFlyweight)
+                kinetic.apply {
+                    lat = loc.latitude; lng = loc.longitude; alt = loc.altitude 
+                    speed = loc.speed.toDouble(); gpsTs = loc.time 
+                    accuracy = loc.accuracy.toDouble(); bearing = loc.bearing.toDouble()
+                }
                 isMuzzled = if (isTrackerMode) isSuspiciousMode else false
-            )
+            }
+            
             lastProcessedLocation = primaryProcessor.processGpsPoint(
-                snapshot = pointSnapshot, 
+                snapshot = pointSnapshotFlyweight, 
                 isViewerTrail = !isTrackerMode, 
                 lastGpsTs = sessionManager.lastGpsTs, 
                 isLocal = true
@@ -524,10 +537,10 @@ class MonitorService : BaseMonitorService() {
 
         val proc = lastProcessedLocation
         if (proc != null) {
-            evaluateAlarmsInternal(now, nowRt, isSocketConnected, isPeerActive, proc, hSnapshot, proc.timestamp, evaluationSnapshot)
+            evaluateAlarmsInternal(now, nowRt, isSocketConnected, isPeerActive, proc, hSnapshot, proc.timestamp, evaluationSnapshotFlyweight)
         }
 
-        evaluationSnapshot.atmospheric.apply {
+        evaluationSnapshotFlyweight.atmospheric.apply {
             noiseIdx = (acousticDb - primaryProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB
             luxIdx = log10(lux + 1.0) / RIBBON_LUX_LOG_SCALE
             vibeIdx = vibration / RIBBON_VIBRATION_SCALE_G
@@ -535,11 +548,11 @@ class MonitorService : BaseMonitorService() {
             tiltIdx = abs(tiltDegrees - primaryProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG
             baroIdx = (baroAlt - primaryProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS
         }
-        evaluationSnapshot.integrity.snrIdx = (latestGnssDetail?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0) / RIBBON_SNR_SCALE_DB
+        evaluationSnapshotFlyweight.integrity.snrIdx = (latestGnssDetail?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0) / RIBBON_SNR_SCALE_DB
 
         val finalProc = lastProcessedLocation
         domainEventBus.emit(DomainEvent.TickEvaluated(
-            now = now, nowRt = nowRt, isTrackerMode = isTrackerMode, snapshot = evaluationSnapshot,
+            now = now, nowRt = nowRt, isTrackerMode = isTrackerMode, snapshot = evaluationSnapshotFlyweight,
             processed = finalProc, health = health, isSocketConnected = isSocketConnected, isPeerActive = isPeerActive,
             serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), recoveryFlagged = recoveryFlagged,
             gnssDetail = latestGnssDetail, isSuspiciousMode = isSuspiciousMode,
@@ -554,25 +567,30 @@ class MonitorService : BaseMonitorService() {
     }
 
     private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isPeerActive: Boolean, processed: ProcessedLocation, hSnapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long, evaluationSnapshot: SystemEvaluationSnapshot) {
-        val finalSnapshot = if (isTrackerMode) {
+        // R-ID 392: Use alarmSnapshot flyweight to avoid allocation in evaluation path.
+        if (isTrackerMode) {
             TelemetryMapper.mapProcessedToSnapshot(
                 snapshot = evaluationSnapshot,
                 processed = processed,
                 rawGpsTs = rawGpsTs,
                 lastValidFixRt = primaryProcessor.getLastValidFixRt(),
-                snrSnapshot = hardwareSuite.averageSnr
+                snrSnapshot = hardwareSuite.averageSnr,
+                out = alarmSnapshotFlyweight
             )
         } else {
             TelemetryMapper.mapStatusToSnapshot(
                 s = connectivitySuite.trackerStatus,
                 base = evaluationSnapshot,
-                nowRt = nowRt
+                nowRt = nowRt,
+                out = alarmSnapshotFlyweight
             )
         }
 
-        val serviceContext = AlarmServiceContext(now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = isTrackerMode, isRelayConnected = isSocketConnected, isTrackerConnected = if (isTrackerMode) true else isPeerActive, isUiVisible = isUiVisible(), distToHomeAuthority = if (isTrackerMode) processed.distToHome else (if (isSocketConnected && isPeerActive) PhysicsUtils.calculateDistance(finalSnapshot.kinetic.lat, finalSnapshot.kinetic.lng, (repository.getCachedHomePoints().firstOrNull()?.latitude ?: 0.0), (repository.getCachedHomePoints().firstOrNull()?.longitude ?: 0.0)) else null), maxDistanceAuthority = (if (isTrackerMode) primaryProcessor else remoteProcessor).getMaxDistanceAuthority(), capabilities = capabilities, rolePrefix = if (isTrackerMode) "T_" else "VR_")
+        val serviceContext = AlarmServiceContext(now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = isTrackerMode, isRelayConnected = isSocketConnected, isTrackerConnected = if (isTrackerMode) true else isPeerActive, isUiVisible = isUiVisible(), distToHomeAuthority = if (isTrackerMode) processed.distToHome else (if (isSocketConnected && isPeerActive) PhysicsUtils.calculateDistance(alarmSnapshotFlyweight.kinetic.lat, alarmSnapshotFlyweight.kinetic.lng, (repository.getCachedHomePoints().firstOrNull()?.latitude ?: 0.0), (repository.getCachedHomePoints().firstOrNull()?.longitude ?: 0.0)) else null), maxDistanceAuthority = (if (isTrackerMode) primaryProcessor else remoteProcessor).getMaxDistanceAuthority(), capabilities = capabilities, rolePrefix = if (isTrackerMode) "T_" else "VR_")
         tickOrchestrator.launchJob("alarm_evaluation", lifecycleScope + Dispatchers.Default) {
-            alarmManager.evaluateAlarms(finalSnapshot, serviceContext)
+            // We pass a copy here because evaluateAlarms might be async or run in parallel with next tick.
+            // Ticks happen every 1s. To be safe, we snapshot for evaluation.
+            alarmManager.evaluateAlarms(alarmSnapshotFlyweight.copy(), serviceContext)
         }
     }
 

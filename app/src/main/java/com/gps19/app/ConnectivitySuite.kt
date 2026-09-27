@@ -21,6 +21,9 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.27.17:
+ * - Issue #1160: Flyweight & Pooling Expansion. Refactored packet handling 
+ *   to use reusable flyweight snapshots, eliminating GC churn.
  * Sep.27.4:
  * - Issue #1348: Flattened DomainEvent hierarchy, emitting component events directly.
  * Sep.27.2:
@@ -72,6 +75,12 @@ class ConnectivitySuite @Inject constructor(
 
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
+
+    // R-ID 392: Reusable flyweights for zero-allocation packet processing.
+    private val snapshotFlyweight = SystemEvaluationSnapshot()
+    private val updateFlyweight = LocationUpdate()
+    private val statusFlyweight = TrackerStatus()
+    private val pendingStatusFlyweight = TrackerStatus()
 
     val trackerStatus get() = remoteStatusRepository.remoteStatus.value
     val isTrackerConnected get() = remoteStatusRepository.isTrackerConnected.value
@@ -379,7 +388,8 @@ class ConnectivitySuite @Inject constructor(
         val pending = offlineRepository.getPendingStatusUpdates(limit)
         if (pending.isEmpty()) return
         pending.forEach { entity ->
-            val status = TelemetryMapper.mapPendingToStatus(entity, deviceId, viewerId)
+            // R-ID 392: Use flyweight for pending updates.
+            val status = TelemetryMapper.mapPendingToStatus(entity, deviceId, viewerId, pendingStatusFlyweight)
             if (sendTelemetryInternal(status, SignalingPriority.NORMAL)) {
                 offlineRepository.deletePendingStatusUpdate(entity.id)
             } else {
@@ -450,21 +460,23 @@ class ConnectivitySuite @Inject constructor(
             remoteStatusRepository.setPeerSignal((statusProto.snrIdx * 10.0).toInt().coerceIn(0, 10))
 
             remoteStatusRepository.updateStatusAtomic { current ->
-                val snapshot = TelemetryMapper.mapProtoToSnapshot(statusProto, now, nowRt)
+                // R-ID 392: Use flyweights for binary update processing.
+                TelemetryMapper.mapProtoToSnapshot(statusProto, now, nowRt, snapshotFlyweight)
 
                 val processed = locationProcessor.processGpsPoint(
-                    snapshot = snapshot,
+                    snapshot = snapshotFlyweight,
                     isViewerTrail = false,
                     lastGpsTs = current.gpsTs,
                     isLocal = false
                 )
                 
                 val lastFixRt = if (processed.optimizedPoint.lat != 0.0 && processed.optimizedPoint.lng != 0.0) nowRt else statusProto.lastValidFixRt
-                val updatedStatus = TelemetryMapper.mapProtoToStatus(statusProto, current, processed, now, lastFixRt)
+                TelemetryMapper.mapProtoToStatus(statusProto, current, processed, now, lastFixRt, statusFlyweight)
 
-                domainEventBus.emit(DomainEvent.PeerStatusReceived(TelemetryMapper.mapStatusToUpdate(updatedStatus, isMe = false)))
+                TelemetryMapper.mapStatusToUpdate(statusFlyweight, isMe = false, out = updateFlyweight)
+                domainEventBus.emit(DomainEvent.PeerStatusReceived(updateFlyweight.copy()))
                 
-                updatedStatus
+                statusFlyweight
             }
         } catch (e: Exception) {
             Timber.e(e, "Protobuf direct parse error")
@@ -548,10 +560,11 @@ class ConnectivitySuite @Inject constructor(
             remoteStatusRepository.setPeerSignal(data.optInt("signal", 0))
 
             remoteStatusRepository.updateStatusAtomic { current ->
-                val snapshot = TelemetryMapper.mapJsonToSnapshot(data, current, now, nowRt)
+                // R-ID 392: Use flyweights for JSON update processing.
+                TelemetryMapper.mapJsonToSnapshot(data, current, now, nowRt, snapshotFlyweight)
 
                 val processed = locationProcessor.processGpsPoint(
-                    snapshot = snapshot,
+                    snapshot = snapshotFlyweight,
                     isViewerTrail = false,
                     lastGpsTs = current.gpsTs,
                     isLocal = false
@@ -572,11 +585,12 @@ class ConnectivitySuite @Inject constructor(
                     } catch (e: Exception) { Timber.e(e, "GNSS detail parse error") }
                 }
 
-                val updatedStatus = TelemetryMapper.mapJsonToStatus(data, current, processed, now, lastFixRt, gnssDetail)
+                TelemetryMapper.mapJsonToStatus(data, current, processed, now, lastFixRt, gnssDetail, statusFlyweight)
 
-                domainEventBus.emit(DomainEvent.PeerStatusReceived(TelemetryMapper.mapStatusToUpdate(updatedStatus, isMe = false)))
+                TelemetryMapper.mapStatusToUpdate(statusFlyweight, isMe = false, out = updateFlyweight)
+                domainEventBus.emit(DomainEvent.PeerStatusReceived(updateFlyweight.copy()))
 
-                updatedStatus
+                statusFlyweight
             }
         }
     }

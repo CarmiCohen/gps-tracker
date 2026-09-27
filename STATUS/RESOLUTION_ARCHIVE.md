@@ -1,4 +1,14 @@
-# 🏛️ Resolution Archive - Sep.27.16
+# 🏛️ Resolution Archive - Sep.27.17
+
+## 🏁 Issue #1160: Flyweight & Pooling Expansion
+*   **Resolved**: Sep.27.17
+*   **Root Cause**: High-frequency telemetry propagation paths (1Hz tick evaluation and signaling) were allocating fresh `SystemEvaluationSnapshot`, `TrackerStatus`, and `LocationUpdate` objects every second. This created significant GC pressure and memory fragmentation, especially on budget Android hardware.
+*   **Remediation**:
+    *   **EngineModels.kt & LocationUpdate.kt**: Converted core telemetry DTOs into mutable flyweights by making fields `var` and adding `reset()` and `copyFrom()` methods.
+    *   **TelemetryMapper.kt**: Refactored mapping logic to accept "out" parameters, enabling zero-allocation transformation between engine and app DTOs.
+    *   **MonitorService.kt**: Introduced private flyweight instances for the tick loop, coordinate processing, and alarm evaluation.
+    *   **AppEventCoordinator.kt & ConnectivitySuite.kt**: Migrated event handling and packet processing to use reusable pooled instances, eliminating allocations in the steady-state signaling path.
+*   **SOT ID**: 517 (Flyweight & Pooling Expansion)
 
 ## 🏁 Issue #1173: Protobuf-First Persistence
 *   **Resolved**: Sep.27.16
@@ -18,13 +28,5 @@
     *   **MonitorService.kt**: Refactored all background tasks—including `gps_collection`, `gnss_detail`, `service_observers`, `fgs_update`, and `alarm_evaluation`—to use `TickOrchestrator`.
     *   **Lifecycle Integrity**: Ensured all background jobs are gated by the service's initialization state and atomically cancelled during `onDestroy` or role transitions via `tickOrchestrator.cancelAll()`.
 *   **SOT ID**: 515 (Unified Service Job Orchestration)
-
-## 🏁 Issue #1293: Lifecycle-Aware Tick Orchestrator
-*   **Resolved**: Sep.27.14
-*   **Root Cause**: Background services managed multiple internal loops (`tickJob`, `heartbeatJob`, `forensicSamplingJob`) with decentralized synchronization gates (`initializationDeferred`). This setup scattered state-checking responsibilities across components, risking unpredictable lifecycle transitions and complicating testing.
-*   **Remediation**:
-    *   **TickOrchestrator.kt**: Created a single standalone, thread-safe orchestrator handling initialization completeness gates, named loop builder lifecycles, and centralized atomic cancellations.
-    *   **BaseMonitorService.kt** & **MonitorService.kt**: Removed separate manual job structures and deferred waits, routing all tick, heartbeat, and forensic loops through `TickOrchestrator` to secure deterministic structured concurrency.
-*   **SOT ID**: 514 (Lifecycle-Aware Tick Orchestration)
 
 ... (Earlier entries)

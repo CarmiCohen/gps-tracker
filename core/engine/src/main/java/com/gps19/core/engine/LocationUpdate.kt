@@ -34,6 +34,13 @@ data class KineticState(
         this.kineticEnergy = other.kineticEnergy; this.distToTracker = other.distToTracker
         this.distToHome = other.distToHome
     }
+
+    fun reset() {
+        lat = 0.0; lng = 0.0; alt = 0.0; speed = 0.0; accuracy = 0.0; maxAccuracy = 0.0; bearing = 0.0
+        gpsTs = 0L; rt = 0L; isJump = false; isTrajectoryPromoted = false; jumpTier = 0
+        isAdaptiveJump = false; verticalVelocity = 0.0; kineticEnergy = 0.0
+        distToTracker = null; distToHome = null
+    }
 }
 
 /**
@@ -78,12 +85,18 @@ data class AtmosphericState(
         this.proximityDebounceMs = other.proximityDebounceMs; this.isNear = other.isNear
         this.liftIdx = other.liftIdx; this.tiltIdx = other.tiltIdx
     }
+
+    fun reset() {
+        temp = 0.0; maxTemp = 0.0; baroAlt = 0.0; baroIdx = 0.0; lux = 0.0; luxBaseline = 0.0; luxIdx = 0.0
+        acousticDb = 0.0; acousticFloorDb = 0.0; noiseIdx = 0.0; tiltDegrees = 0.0; heading = 0.0
+        vibration = 0.0; vibrationRollingSum = 0.0; vibeIdx = 0.0; peakVibrationShock = 0.0
+        peakVibrationShockTs = 0L; adaptiveVibrationFloor = 0.0; proxIdx = 0.0; proximityCm = -1.0
+        proximityDebounceMs = 0L; isNear = true; liftIdx = 0.0; tiltIdx = 0.0
+    }
 }
 
 /**
  * IntegrityState: Hardware, system health, and session audit telemetry.
- * Sep.26.12:
- * - Issue #1344: Added thermalHeadroom and heapAllocatedMb forensic probes.
  */
 @Serializable
 data class IntegrityState(
@@ -185,16 +198,33 @@ data class IntegrityState(
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
     }
+
+    fun reset() {
+        battery = -1; isCharging = false; currentMa = 0; satsView = -1; satsUsed = -1; snrIdx = 0.0
+        isTamperDetected = false; isPowerTamper = false; isJammer = false; isStalled = false
+        isSuspicious = false; isAnchorLocked = false; gpsHardwareLock = false; isBatteryLow = false
+        isBatteryCritical = false; isCoolingModeActive = false; isUltraLongStationary = false
+        isGnssThrottled = false; isBatterySteepDischarge = false; isPowerSaveMode = false
+        standbyBucket = -1; netInterface = "UNKNOWN"; isStorageLow = false; isStorageCritical = false
+        micPending = false; violationUptimeMs = 0L; violationPercentage = 0.0; uptimeMs = 0L
+        totalConnectedMs = 0L; sessionConnectedMs = 0L; lastConnTs = 0L; lastDiscTs = 0L
+        totalDropMs = 0L; maxDropMs = 0L; maxDropTs = 0L; lastEnergyDeltaMa = 0; lastEnergyDeltaTemp = 0.0
+        lastEnergyDurationMs = 0L; gnssDetail = null; isSitDetected = false; lastSitTs = 0L
+        sitVz = 0.0; sitVzTs = 0L; sitVzRt = 0L; sitDz = 0.0; sitBaro = 0.0; sitTilt = 0.0
+        sitShock = 0.0; isSitActive = false; isLocationPending = false
+        locationPendingReason = LocationPendingReason.NONE; signal = null; tamperNote = null
+        lastValidFixRt = 0L; isSilentFailure = false; isMaliAnomaly = false; cpuLoad = 0.0
+        ioWait = 0.0; maxIoLatency = 0L; isBatteryWhitelisted = false
+        thermalHeadroom = 0.0; heapAllocatedMb = 0.0
+    }
 }
 
 /**
  * LocationUpdate: Aggregated telemetry container.
- * Sep.25.05:
- * - Issue #1330: Snap-to-Update Monolith. Hardened copyFrom methods for 
- *   sub-states to ensure zero-allocation StateFlow propagation.
+ * Refactored to data class for backward-compatible deep copy support.
  */
 @Serializable
-class LocationUpdate(
+data class LocationUpdate(
     var kinetic: KineticState = KineticState(),
     var atmospheric: AtmosphericState = AtmosphericState(),
     var integrity: IntegrityState = IntegrityState(),
@@ -215,5 +245,26 @@ class LocationUpdate(
         this.trackerState = other.trackerState
         this.isClockRegression = other.isClockRegression
         this.lastValidFixRt = other.lastValidFixRt
+    }
+
+    /**
+     * duplicate: Performs a deep copy to ensure thread safety during event emission (R-ID 392).
+     */
+    fun duplicate(): LocationUpdate = copy(
+        kinetic = kinetic.copy(),
+        atmospheric = atmospheric.copy(),
+        integrity = integrity.copy()
+    )
+
+    fun reset() {
+        kinetic.reset()
+        atmospheric.reset()
+        integrity.reset()
+        status = SentinelStatus.VALID
+        ts = 0L
+        isMe = true
+        trackerState = TrackerState.UNKNOWN
+        isClockRegression = false
+        lastValidFixRt = 0L
     }
 }

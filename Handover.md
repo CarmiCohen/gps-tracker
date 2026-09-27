@@ -1,12 +1,12 @@
-# Forensic Handover (Sep.26.11)
+# Forensic Handover (Sep.27.17)
 
 ## 🎯 Current System State
-*   **Version**: Sep.27.15 | **Build**: Success (Unified Service Job Orchestration)
-*   **SOT Baseline**: SOT ID: 515 (Rules: 47, R-IDs: 177)
-*   **Core Remediation**: Successfully resolved **Issue #1352** (Unified Service Job Orchestration).
-    *   Extended `TickOrchestrator` to support generalized job management (`launchJob`, `cancelJob`).
-    *   Refactored `MonitorService` to orchestrate all background tasks (GPS, GNSS, Observers, FGS updates, Alarm Eval) through the orchestrator.
-    *   Eliminated all manual `Job?` fields in the service layer, ensuring atomic cleanup via `cancelAll()`.
+*   **Version**: Sep.27.17 | **Build**: Success (Flyweight & Pooling Expansion)
+*   **SOT Baseline**: SOT ID: 517 (Rules: 49, R-IDs: 179)
+*   **Core Remediation**: Successfully resolved **Issue #1160** (Flyweight & Pooling Expansion).
+    *   Converted `SystemEvaluationSnapshot`, `TrackerStatus`, and `LocationUpdate` into mutable flyweights.
+    *   Optimized `MonitorService` and `ConnectivitySuite` to utilize reusable pooled instances for the 1Hz telemetry cycle.
+    *   Eliminated all object allocations in the steady-state evaluation and signaling paths, reducing GC churn and memory fragmentation.
 
 ---
 
@@ -16,11 +16,13 @@
     *   `UiEventCoordinator`: Sole authority for mapping user intent (`UiEvent`) to domain actions.
     *   `MainViewModel`: Pure SSOT for UI state observation and event emission.
     *   `TickOrchestrator`: Standalone lifecycle authority for all structural background jobs and loops.
+2.  **Zero-Allocation Telemetry**:
+    *   `TelemetryMapper`: Centralized authority for zero-allocation DTO transformation using "out" parameters.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.27.15: [SOT Count: 177 (Rules: 47), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.27.17: [SOT Count: 179 (Rules: 49), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 
 ---
 

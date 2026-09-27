@@ -10,6 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.27.17:
+ * - Issue #1160: Flyweight & Pooling Expansion. Refactored TrackerStatus to 
+ *   support mutable reuse and deep copying to eliminate GC churn.
  * Sep.26.12:
  * - Issue #1344: Added thermalHeadroom and heapAllocatedMb forensic probes 
  *   to TrackerStatus, ConnectionPoint, and LogEntry. Fixed isBatterySteepDischarge typo.
@@ -339,19 +342,19 @@ data class LogEntry(
 
 @Serializable
 data class TrackerStatus(
-    val deviceId: String = "",
-    val viewerId: String = "",
+    var deviceId: String = "",
+    var viewerId: String = "",
     val kinetic: KineticState = KineticState(),
     val atmospheric: AtmosphericState = AtmosphericState(),
     val integrity: IntegrityState = IntegrityState(),
-    val status: SentinelStatus = SentinelStatus.VALID,
-    override val ts: Long = 0L,
-    override val rt: Long = 0L,
-    val trackerState: TrackerState = TrackerState.UNKNOWN,
-    val isClockRegression: Boolean = false,
-    val lastValidFixRt: Long = 0L,
-    val isSilentFailure: Boolean = false,
-    val isBatteryWhitelisted: Boolean = false
+    var status: SentinelStatus = SentinelStatus.VALID,
+    override var ts: Long = 0L,
+    override var rt: Long = 0L,
+    var trackerState: TrackerState = TrackerState.UNKNOWN,
+    var isClockRegression: Boolean = false,
+    var lastValidFixRt: Long = 0L,
+    var isSilentFailure: Boolean = false,
+    var isBatteryWhitelisted: Boolean = false
 ) : SpatialAnchor {
 
     override val lat: Double get() = kinetic.lat
@@ -458,6 +461,32 @@ data class TrackerStatus(
     
     val thermalHeadroom: Double get() = integrity.thermalHeadroom
     val heapAllocatedMb: Double get() = integrity.heapAllocatedMb
+
+    /**
+     * copyFrom: Deep mutable copy to this instance from another (R-ID 392).
+     */
+    fun copyFrom(other: TrackerStatus) {
+        this.deviceId = other.deviceId; this.viewerId = other.viewerId
+        this.kinetic.copyFrom(other.kinetic)
+        this.atmospheric.copyFrom(other.atmospheric)
+        this.integrity.copyFrom(other.integrity)
+        this.status = other.status; this.ts = other.ts; this.rt = other.rt
+        this.trackerState = other.trackerState; this.isClockRegression = other.isClockRegression
+        this.lastValidFixRt = other.lastValidFixRt; this.isSilentFailure = other.isSilentFailure
+        this.isBatteryWhitelisted = other.isBatteryWhitelisted
+    }
+
+    /**
+     * reset: Reverts the instance to default state for reuse (R-ID 392).
+     */
+    fun reset() {
+        deviceId = ""; viewerId = ""; status = SentinelStatus.VALID; ts = 0L; rt = 0L
+        trackerState = TrackerState.UNKNOWN; isClockRegression = false; lastValidFixRt = 0L
+        isSilentFailure = false; isBatteryWhitelisted = false
+        kinetic.reset()
+        atmospheric.reset()
+        integrity.reset()
+    }
 
     fun toMap(fromViewer: Boolean): Map<String, Any?> = mutableMapOf<String, Any?>().apply {
         put("id", SignalingConstants.getTransmissionId(deviceId)); put("viewer_id", SignalingConstants.getTransmissionId(viewerId))

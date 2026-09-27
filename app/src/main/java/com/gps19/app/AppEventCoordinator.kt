@@ -11,6 +11,9 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Sep.27.17:
+ * - Issue #1160: Flyweight & Pooling Expansion. Refactored handleTickEvaluated 
+ *   to use reusable flyweight instances for persistence and signaling updates.
  * Sep.27.4:
  * - Issue #1348: Flattened DomainEvent hierarchy. Pattern matches component events directly.
  */
@@ -31,6 +34,10 @@ class AppEventCoordinator @Inject constructor(
     
     // Issue #1333: Cache to suppress redundant peer lifecycle logs.
     private val peerConnectionCache = ConcurrentHashMap<String, Boolean>()
+
+    // R-ID 392: Reusable flyweights for zero-allocation event handling.
+    private val updateFlyweight = LocationUpdate()
+    private val statusFlyweight = TrackerStatus()
 
     fun start(connectivitySuite: ConnectivitySuite) {
         if (isStarted) return
@@ -73,11 +80,14 @@ class AppEventCoordinator @Inject constructor(
         val isTrackerMode = event.isTrackerMode
 
         // 1. Repository Persistence (Snap-to-Update Monolith)
-        repository.updateLocation(TelemetryMapper.mapSnapshotToUpdate(snapshot, proc, isMe = true, ts = now))
+        // R-ID 392: Use flyweight for repository update.
+        TelemetryMapper.mapSnapshotToUpdate(snapshot, proc, isMe = true, ts = now, out = updateFlyweight)
+        repository.updateLocation(updateFlyweight)
         
         // 2. Peer Signaling (Issue #1314: Convergence)
         if (isTrackerMode && event.isPeerActive) {
-            connectivitySuite.sendTelemetry(TelemetryMapper.mapSnapshotToStatus(
+            // R-ID 392: Use flyweight for signaling.
+            TelemetryMapper.mapSnapshotToStatus(
                 snapshot = snapshot,
                 processed = proc,
                 deviceId = configManager.deviceId,
@@ -86,8 +96,10 @@ class AppEventCoordinator @Inject constructor(
                 nowRt = nowRt,
                 gnssDetail = event.gnssDetail,
                 isSuspiciousMode = event.isSuspiciousMode,
-                lastSitTs = event.lastSitTs
-            ))
+                lastSitTs = event.lastSitTs,
+                out = statusFlyweight
+            )
+            connectivitySuite.sendTelemetry(statusFlyweight)
         }
 
         // 3. Ribbon Updates (Issue #1314: Simplified Event-Driven Mapping)
