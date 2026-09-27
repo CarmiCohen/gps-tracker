@@ -1,4 +1,12 @@
-# 🏛️ Resolution Archive - Sep.27.13
+# 🏛️ Resolution Archive - Sep.27.14
+
+## 🏁 Issue #1293: Lifecycle-Aware Tick Orchestrator
+*   **Resolved**: Sep.27.14
+*   **Root Cause**: Background services managed multiple internal loops (`tickJob`, `heartbeatJob`, `forensicSamplingJob`) with decentralized synchronization gates (`initializationDeferred`). This setup scattered state-checking responsibilities across components, risking unpredictable lifecycle transitions and complicating testing.
+*   **Remediation**:
+    *   **TickOrchestrator.kt**: Created a single standalone, thread-safe orchestrator handling initialization completeness gates, named loop builder lifecycles, and centralized atomic cancellations.
+    *   **BaseMonitorService.kt** & **MonitorService.kt**: Removed separate manual job structures and deferred waits, routing all tick, heartbeat, and forensic loops through `TickOrchestrator` to secure deterministic structured concurrency.
+*   **SOT ID**: 514 (Lifecycle-Aware Tick Orchestration)
 
 ## 🏁 Issue #1351: StateSubscription Coroutine Scoping
 *   **Resolved**: Sep.27.13

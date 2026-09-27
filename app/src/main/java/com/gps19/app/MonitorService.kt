@@ -24,10 +24,8 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
- * Sep.27.4:
- * - Issue #1348: Flattened DomainEvent hierarchy. Updated event filtering logic.
- * Sep.27.2:
- * - Issue #1345: Integrated ExecuteNetworkStressTest command handling.
+ * Sep.27.14:
+ * - Issue #1293: Refactored background tasks and loops using lifecycle-aware TickOrchestrator.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -45,7 +43,6 @@ class MonitorService : BaseMonitorService() {
     private var gnssDetailJob: Job? = null
     private var settingsJob: Job? = null
     private var alarmEvalJob: Job? = null
-    private var forensicSamplingJob: Job? = null
     
     private val forensicTriggerChannel = Channel<Boolean>(Channel.BUFFERED)
     private val forensicCaptureMutex = Mutex()
@@ -323,7 +320,7 @@ class MonitorService : BaseMonitorService() {
             lifecycleScope.launch(Dispatchers.IO) { repository.saveString(VIEWER_ID_KEY, id) } 
         }
         val isNew = sessionManager.onViewerPulse(id, timeProvider.elapsedRealtime())
-        if (isNew || tickJob?.isActive != true) {
+        if (isNew || !tickOrchestrator.isLoopActive("tick_loop")) {
             if (isNew) {
                 domainEventBus.emit(DomainEvent.PeerConnectionChanged(isConnected = true, peerId = id))
             }
@@ -339,7 +336,7 @@ class MonitorService : BaseMonitorService() {
             lifecycleScope.launch(Dispatchers.IO) { repository.saveString(TRACKER_ID_KEY, id) }
         }
         val isNew = sessionManager.onTrackerPulse(id, nowRt)
-        if (isNew || tickJob?.isActive != true) {
+        if (isNew || !tickOrchestrator.isLoopActive("tick_loop")) {
             if (isNew) {
                 domainEventBus.emit(DomainEvent.PeerConnectionChanged(isConnected = true, peerId = id))
             }
@@ -574,7 +571,7 @@ class MonitorService : BaseMonitorService() {
     }
 
     override fun onDestroy() {
-        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel(); forensicSamplingJob?.cancel()
+        gpsCollectionJob?.cancel(); gnssDetailJob?.cancel(); settingsJob?.cancel(); alarmEvalJob?.cancel()
         deviceProfileManager.teardownHardwareProfile(capabilities); super.onDestroy()
     }
 
@@ -598,8 +595,8 @@ class MonitorService : BaseMonitorService() {
     }
 
     private fun startForensicSamplingLoop() {
-        forensicSamplingJob?.cancel(); forensicSamplingJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
-            initializationDeferred.await(); delay(STARTUP_SETTLING_DELAY_MS); triggerForensicSample(); var cachedCoolingEnteredRt = 0L
+        tickOrchestrator.launchLoop("forensic_sampling_loop", lifecycleScope + serviceExceptionHandler) {
+            delay(STARTUP_SETTLING_DELAY_MS); triggerForensicSample(); var cachedCoolingEnteredRt = 0L
             while (isActive) {
                 val health = integrityMonitor.currentHealth
                 if (lastWasCooling && !health.isCoolingModeActive) {

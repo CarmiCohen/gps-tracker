@@ -19,9 +19,8 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
- * Sep.24.97:
- * - Issue #1291: Promoted serviceTickCounter to Long to prevent overflow and 
- *   align with DomainEvent telemetry types.
+ * Sep.27.14:
+ * - Issue #1293: Integrated Lifecycle-Aware TickOrchestrator for managing background loops.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -63,8 +62,7 @@ abstract class BaseMonitorService : LifecycleService() {
     protected val isUiForeground = AtomicBoolean(false)
     protected var lastUiPulseTs = 0L
     
-    protected var tickJob: Job? = null
-    protected var heartbeatJob: Job? = null
+    protected val tickOrchestrator = TickOrchestrator()
     protected var fgsUpdateJob: Job? = null
     
     private var lastFgsUpdateRealtime = 0L
@@ -72,8 +70,6 @@ abstract class BaseMonitorService : LifecycleService() {
 
     protected var isSystemActive = false
         private set
-
-    protected val initializationDeferred = CompletableDeferred<Unit>()
 
     protected val serviceExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException) return@CoroutineExceptionHandler
@@ -103,7 +99,7 @@ abstract class BaseMonitorService : LifecycleService() {
             }
             
             onServiceInitialize()
-            initializationDeferred.complete(Unit)
+            tickOrchestrator.completeInitialization()
 
             launch(Dispatchers.IO) {
                 systemMonitor.acquireWakeLock()
@@ -130,9 +126,7 @@ abstract class BaseMonitorService : LifecycleService() {
     protected abstract suspend fun onServiceInitialize()
 
     protected fun startTickLoop() {
-        tickJob?.cancel()
-        tickJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
-            initializationDeferred.await()
+        tickOrchestrator.launchLoop("tick_loop", lifecycleScope + serviceExceptionHandler) {
             while (isActive) { 
                 val startTime = timeProvider.elapsedRealtime()
                 val now = timeProvider.currentTimeMillis()
@@ -150,9 +144,7 @@ abstract class BaseMonitorService : LifecycleService() {
     }
 
     protected fun startHeartbeatLoop() {
-        heartbeatJob?.cancel()
-        heartbeatJob = lifecycleScope.launch(Dispatchers.Default + serviceExceptionHandler) {
-            initializationDeferred.await()
+        tickOrchestrator.launchLoop("heartbeat_loop", lifecycleScope + serviceExceptionHandler) {
             while (isActive) {
                 val now = timeProvider.currentTimeMillis()
                 val nowRt = timeProvider.elapsedRealtime()
@@ -197,8 +189,7 @@ abstract class BaseMonitorService : LifecycleService() {
     override fun onDestroy() {
         Timber.w("Issue #910: Service onDestroy invoked. Stack:\n${Thread.currentThread().stackTrace.take(15).joinToString("\n")}")
         
-        tickJob?.cancel()
-        heartbeatJob?.cancel()
+        tickOrchestrator.cancelAll()
         fgsUpdateJob?.cancel()
         
         hardwareSuite.stop()

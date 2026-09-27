@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.13
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.14
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -23,8 +23,8 @@ Ready for next priority item.
     *   *Significance*: **Medium (Battery)**. Dynamically adjust sensor polling based on activity recognition to extend battery life.
 
 ### 🔵 Low Priority
-*   **Issue #1293: Lifecycle-Aware Tick Orchestrator**
-    *   *Significance*: **Low-Medium (Refactoring)**. Refactor background services to use a TickOrchestrator that handles initialization gates internally.
+*   **Issue #1352: Unified Service Job Orchestration**
+    *   *Significance*: **Low-Medium (Consistency)**. Extend TickOrchestrator to manage all lifecycle-bound jobs in MonitorService (e.g., GPS collection, settings observation), not just periodic loops.
 *   **Issue #1167: Map Overlay Imperative to Declarative Controller**
     *   *Significance*: **Low-Medium (UI Decoupling)**. Extract osmdroid management into a standalone controller to keep UI code declarative.
 *   **Issue #1296: Centralized Boot Lifecycle Authority**
@@ -36,6 +36,7 @@ Ready for next priority item.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1293: Lifecycle-Aware Tick Orchestrator** (Resolved Sep.27.14)
 *   **Issue #1351: StateSubscription Coroutine Scoping** (Resolved Sep.27.13)
 *   **Issue #1350: Unified State Mapping Authority** (Resolved Sep.27.12)
 *   **Issue #1202: UI Event Routing Unification** (Resolved Sep.27.11)
@@ -54,6 +55,7 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.27.14: [SOT Count: 176 (Rules: 46), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.27.13: [SOT Count: 175 (Rules: 45), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.27.12: [SOT Count: 174 (Rules: 44), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:5, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.27.11: [SOT Count: 173 (Rules: 43), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:5, Testing: 3 (Sub-items: 15), QA: 284]**
