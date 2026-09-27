@@ -8,8 +8,9 @@ import org.junit.Test
 
 /**
  * LocationSentinelHindsightTest: Validating trajectory promotion and jump buffering.
- * Sep.26.3:
- * - Issue #1334: Adapted to SystemEvaluationSnapshot API and LocationProcessingState state architecture.
+ * Sep.27.5:
+ * - Issue #1349: Mutability Reduction. Updated references to follow partitioned 
+ *   sub-states within LocationProcessingState.
  */
 class LocationSentinelHindsightTest {
 

@@ -7,8 +7,9 @@ import org.junit.Test
 
 /**
  * AcousticCalibrationTest: Auditing R810-M (Acoustic Floor Recovery).
- * Sep.26.3:
- * - Issue #1334: Adapted to LocationProcessingState and SystemEvaluationSnapshot API.
+ * Sep.27.5:
+ * - Issue #1349: Mutability Reduction. Updated references to follow partitioned 
+ *   sub-states within LocationProcessingState.
  */
 class AcousticCalibrationTest {
 
@@ -30,7 +31,7 @@ class AcousticCalibrationTest {
         )
         LocationSentinel.updateSensorState(state, snap)
         // Should be at least MIN_FLOOR
-        assertEquals(MIN_FLOOR, state.acousticFloorDb, 0.001)
+        assertEquals(MIN_FLOOR, state.forensic.acousticFloorDb, 0.001)
     }
 
     @Test
@@ -56,8 +57,8 @@ class AcousticCalibrationTest {
         }
         
         // Floor should have increased from 50.0
-        assertTrue("Floor should climb above $MIN_FLOOR during saturation", state.acousticFloorDb > MIN_FLOOR)
-        assertTrue("Floor should stay below peak during climb", state.acousticFloorDb < 90.0)
+        assertTrue("Floor should climb above $MIN_FLOOR during saturation", state.forensic.acousticFloorDb > MIN_FLOOR)
+        assertTrue("Floor should stay below peak during climb", state.forensic.acousticFloorDb < 90.0)
     }
 
     @Test
@@ -74,7 +75,7 @@ class AcousticCalibrationTest {
             LocationSentinel.updateSensorState(state, snap)
         }
         
-        val saturatedFloor = state.acousticFloorDb
+        val saturatedFloor = state.forensic.acousticFloorDb
         assertTrue(saturatedFloor > 60.0)
 
         // 2. Return to silence (40dB) and verify recovery
@@ -89,8 +90,8 @@ class AcousticCalibrationTest {
             LocationSentinel.updateSensorState(state, snap)
         }
 
-        assertTrue("Floor should recover downwards", state.acousticFloorDb < saturatedFloor)
-        assertEquals("Floor should eventually return to MIN_FLOOR", MIN_FLOOR, state.acousticFloorDb, 0.5)
+        assertTrue("Floor should recover downwards", state.forensic.acousticFloorDb < saturatedFloor)
+        assertEquals("Floor should eventually return to MIN_FLOOR", MIN_FLOOR, state.forensic.acousticFloorDb, 0.5)
     }
 
     @Test
@@ -110,7 +111,7 @@ class AcousticCalibrationTest {
         )
         LocationSentinel.updateSensorState(state, snap2)
         
-        val floorAtStart = state.acousticFloorDb
+        val floorAtStart = state.forensic.acousticFloorDb
         
         // Pass time without updateSensorState calls (e.g. duty cycle off)
         // Then call again - contraction should have applied based on time delta
@@ -121,6 +122,6 @@ class AcousticCalibrationTest {
         )
         LocationSentinel.updateSensorState(state, snap3)
         
-        assertTrue("Floor should have contracted significantly over 55s", state.acousticFloorDb < floorAtStart)
+        assertTrue("Floor should have contracted significantly over 55s", state.forensic.acousticFloorDb < floorAtStart)
     }
 }

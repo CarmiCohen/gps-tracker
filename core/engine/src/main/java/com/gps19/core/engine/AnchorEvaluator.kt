@@ -5,9 +5,8 @@ import kotlin.math.max
 
 /**
  * AnchorEvaluator: Manages stationary anchor state and breakout logic.
- * Sep.24.95:
- * - Issue #1163: Transitioned to a stateless model. All operational state is 
- *   encapsulated within LocationProcessingState.
+ * Sep.27.5:
+ * - Issue #1349: Mutability Reduction. Adapted to access fields via state.anchor.
  */
 object AnchorEvaluator {
 
@@ -36,22 +35,22 @@ object AnchorEvaluator {
         var finalPoint = point
 
         val isLowSnr = snr > 0 && snr < JUMP_GATE_LOW_SNR_THRESHOLD
-        val shouldHoldAnchor = state.isAnchorActive && isPhysicallyStationary && isLowSnr
+        val shouldHoldAnchor = state.anchor.isActive && isPhysicallyStationary && isLowSnr
         
         if (!isSuspicious && !isAdaptationMuzzled && (stationaryProb > ANCHOR_ENGAGEMENT_PROBABILITY || shouldHoldAnchor)) {
             // 1. Engagement Logic
-            if (!state.isAnchorActive && isPhysicallyStationary) {
-                state.parkingAnchorPoint.update(point.lat, point.lng, point.alt, point.ts, point.rt, point.accuracy, point.maxAccuracy)
-                state.isAnchorActive = true
-                state.anchorEscapeScore = 0.0
-                state.trendCount = 0
-                state.averageCount = 0
+            if (!state.anchor.isActive && isPhysicallyStationary) {
+                state.anchor.parkingPoint.update(point.lat, point.lng, point.alt, point.ts, point.rt, point.accuracy, point.maxAccuracy)
+                state.anchor.isActive = true
+                state.anchor.escapeScore = 0.0
+                state.anchor.trendCount = 0
+                state.anchor.averageCount = 0
                 
                 // Add first point to averaging buffer
-                val p = state.anchorAveragingBuffer[state.averageIdx]
+                val p = state.anchor.averagingBuffer[state.anchor.averageIdx]
                 p.update(point.lat, point.lng, point.alt, point.ts, point.rt, point.accuracy, point.maxAccuracy)
-                state.averageIdx = (state.averageIdx + 1) % ANCHOR_AVERAGING_WINDOW_SIZE
-                state.averageCount = 1
+                state.anchor.averageIdx = (state.anchor.averageIdx + 1) % ANCHOR_AVERAGING_WINDOW_SIZE
+                state.anchor.averageCount = 1
 
                 onLog(
                     "Stationary Anchor engaged at ${String.format(Locale.getDefault(), "%.5f, %.5f", point.lat, point.lng)} (Prob: ${String.format(Locale.getDefault(), "%.2f", stationaryProb)})",
@@ -59,31 +58,31 @@ object AnchorEvaluator {
                 )
             }
 
-            if (state.isAnchorActive) {
+            if (state.anchor.isActive) {
                 // 2. Score Calculation & Breakout Threshold
                 val breakoutThreshold = max(PARKING_ANCHOR_MIN_DIST, maxAccuracy * PARKING_ANCHOR_FACTOR)
-                val distFromAnchor = PhysicsUtils.calculateDistance(state.parkingAnchorPoint.lat, state.parkingAnchorPoint.lng, point.lat, point.lng)
+                val distFromAnchor = PhysicsUtils.calculateDistance(state.anchor.parkingPoint.lat, state.anchor.parkingPoint.lng, point.lat, point.lng)
                 val transitionZoneStart = breakoutThreshold * ANCHOR_TRANSITION_ZONE_START
 
                 // 3. Coordinate-averaging convergence
                 if (distFromAnchor < transitionZoneStart) {
-                    val p = state.anchorAveragingBuffer[state.averageIdx]
+                    val p = state.anchor.averagingBuffer[state.anchor.averageIdx]
                     p.update(point.lat, point.lng, point.alt, point.ts, point.rt, point.accuracy, point.maxAccuracy)
-                    state.averageIdx = (state.averageIdx + 1) % ANCHOR_AVERAGING_WINDOW_SIZE
-                    if (state.averageCount < ANCHOR_AVERAGING_WINDOW_SIZE) state.averageCount++
+                    state.anchor.averageIdx = (state.anchor.averageIdx + 1) % ANCHOR_AVERAGING_WINDOW_SIZE
+                    if (state.anchor.averageCount < ANCHOR_AVERAGING_WINDOW_SIZE) state.anchor.averageCount++
 
                     var sumLat = 0.0
                     var sumLng = 0.0
-                    for (i in 0 until state.averageCount) {
-                        sumLat += state.anchorAveragingBuffer[i].lat
-                        sumLng += state.anchorAveragingBuffer[i].lng
+                    for (i in 0 until state.anchor.averageCount) {
+                        sumLat += state.anchor.averagingBuffer[i].lat
+                        sumLng += state.anchor.averagingBuffer[i].lng
                     }
-                    state.parkingAnchorPoint.lat = sumLat / state.averageCount
-                    state.parkingAnchorPoint.lng = sumLng / state.averageCount
+                    state.anchor.parkingPoint.lat = sumLat / state.anchor.averageCount
+                    state.anchor.parkingPoint.lng = sumLng / state.anchor.averageCount
                 }
 
                 if (!isPhysicallyStationary) {
-                    state.anchorEscapeScore = ANCHOR_ESCAPE_SCORE_THRESHOLD
+                    state.anchor.escapeScore = ANCHOR_ESCAPE_SCORE_THRESHOLD
                 } else {
                     if (distFromAnchor > transitionZoneStart) {
                         val accuracyPenalty = if (point.accuracy > ANCHOR_ACCURACY_PENALTY_LIMIT) {
@@ -99,47 +98,47 @@ object AnchorEvaluator {
 
                         val safetyValveFactor = if (distFromAnchor > breakoutThreshold * 2.0) 2.0 else 1.0
 
-                        state.anchorEscapeScore += (increment * accuracyPenalty * imuDamping * snrDamping * safetyValveFactor)
+                        state.anchor.escapeScore += (increment * accuracyPenalty * imuDamping * snrDamping * safetyValveFactor)
                     } else {
-                        state.anchorEscapeScore = (state.anchorEscapeScore * 0.8).coerceAtLeast(0.0)
+                        state.anchor.escapeScore = (state.anchor.escapeScore * 0.8).coerceAtLeast(0.0)
                     }
 
-                    state.anchorEscapeScore += estimatedSpeed * ANCHOR_VELOCITY_WEIGHT_MPS
+                    state.anchor.escapeScore += estimatedSpeed * ANCHOR_VELOCITY_WEIGHT_MPS
 
                     // Trend analysis
-                    val tp = state.anchorTrendPoints[state.trendIdx]
+                    val tp = state.anchor.trendPoints[state.anchor.trendIdx]
                     tp.update(point.lat, point.lng, point.alt, point.ts, point.rt, point.accuracy, point.maxAccuracy)
-                    state.trendIdx = (state.trendIdx + 1) % ANCHOR_TREND_WINDOW_SIZE
-                    if (state.trendCount < ANCHOR_TREND_WINDOW_SIZE) state.trendCount++
+                    state.anchor.trendIdx = (state.anchor.trendIdx + 1) % ANCHOR_TREND_WINDOW_SIZE
+                    if (state.anchor.trendCount < ANCHOR_TREND_WINDOW_SIZE) state.anchor.trendCount++
 
-                    if (state.trendCount >= ANCHOR_TREND_WINDOW_SIZE) {
-                        val p0 = state.anchorTrendPoints[(state.trendIdx - 3 + ANCHOR_TREND_WINDOW_SIZE) % ANCHOR_TREND_WINDOW_SIZE]
-                        val p1 = state.anchorTrendPoints[(state.trendIdx - 2 + ANCHOR_TREND_WINDOW_SIZE) % ANCHOR_TREND_WINDOW_SIZE]
-                        val p2 = state.anchorTrendPoints[(state.trendIdx - 1 + ANCHOR_TREND_WINDOW_SIZE) % ANCHOR_TREND_WINDOW_SIZE]
+                    if (state.anchor.trendCount >= ANCHOR_TREND_WINDOW_SIZE) {
+                        val p0 = state.anchor.trendPoints[(state.anchor.trendIdx - 3 + ANCHOR_TREND_WINDOW_SIZE) % ANCHOR_TREND_WINDOW_SIZE]
+                        val p1 = state.anchor.trendPoints[(state.anchor.trendIdx - 2 + ANCHOR_TREND_WINDOW_SIZE) % ANCHOR_TREND_WINDOW_SIZE]
+                        val p2 = state.anchor.trendPoints[(state.anchor.trendIdx - 1 + ANCHOR_TREND_WINDOW_SIZE) % ANCHOR_TREND_WINDOW_SIZE]
                         
-                        val d1 = PhysicsUtils.calculateDistance(state.parkingAnchorPoint.lat, state.parkingAnchorPoint.lng, p0.lat, p0.lng)
-                        val d2 = PhysicsUtils.calculateDistance(state.parkingAnchorPoint.lat, state.parkingAnchorPoint.lng, p1.lat, p1.lng)
-                        val d3 = PhysicsUtils.calculateDistance(state.parkingAnchorPoint.lat, state.parkingAnchorPoint.lng, p2.lat, p2.lng)
+                        val d1 = PhysicsUtils.calculateDistance(state.anchor.parkingPoint.lat, state.anchor.parkingPoint.lng, p0.lat, p0.lng)
+                        val d2 = PhysicsUtils.calculateDistance(state.anchor.parkingPoint.lat, state.anchor.parkingPoint.lng, p1.lat, p1.lng)
+                        val d3 = PhysicsUtils.calculateDistance(state.anchor.parkingPoint.lat, state.anchor.parkingPoint.lng, p2.lat, p2.lng)
                         
                         if (d3 > d2 && d2 > d1 && d3 > transitionZoneStart) {
-                            state.anchorEscapeScore += 30.0
+                            state.anchor.escapeScore += 30.0
                         }
                     }
                 }
 
                 if (isAccuracySnap) {
-                    state.anchorEscapeScore = (state.anchorEscapeScore * 0.5).coerceAtLeast(0.0)
+                    state.anchor.escapeScore = (state.anchor.escapeScore * 0.5).coerceAtLeast(0.0)
                 }
 
                 // 4. Decision Logic
                 val effectiveBreakoutThreshold = if (isAccuracySnap) breakoutThreshold * 1.5 else breakoutThreshold
-                if (state.anchorEscapeScore < ANCHOR_ESCAPE_SCORE_THRESHOLD && distFromAnchor < effectiveBreakoutThreshold) {
+                if (state.anchor.escapeScore < ANCHOR_ESCAPE_SCORE_THRESHOLD && distFromAnchor < effectiveBreakoutThreshold) {
                     skipPersistence = true
                     isLockedNow = true
                     
                     state.optimizedPointFlyweight.update(
-                        lat = state.parkingAnchorPoint.lat,
-                        lng = state.parkingAnchorPoint.lng,
+                        lat = state.anchor.parkingPoint.lat,
+                        lng = state.anchor.parkingPoint.lng,
                         alt = point.alt,
                         ts = point.ts,
                         rt = point.rt,
@@ -150,7 +149,7 @@ object AnchorEvaluator {
                 } else {
                     val reason = when {
                         !isPhysicallyStationary -> "Physical Motion"
-                        state.anchorEscapeScore >= ANCHOR_ESCAPE_SCORE_THRESHOLD -> "Displacement Trend (Score: ${state.anchorEscapeScore.toInt()})"
+                        state.anchor.escapeScore >= ANCHOR_ESCAPE_SCORE_THRESHOLD -> "Displacement Trend (Score: ${state.anchor.escapeScore.toInt()})"
                         else -> "Distance Threshold"
                     }
                     onLog(
@@ -161,7 +160,7 @@ object AnchorEvaluator {
                 }
             }
         } else {
-            if (state.isAnchorActive) {
+            if (state.anchor.isActive) {
                 onLog(
                     "Stationary Anchor released (Prob: ${String.format(Locale.getDefault(), "%.2f", stationaryProb)})",
                     point.lat, point.lng, point.accuracy, vibeIndex
@@ -170,15 +169,15 @@ object AnchorEvaluator {
             }
         }
 
-        state.isAnchorLockedState = isLockedNow
+        state.anchor.isLocked = isLockedNow
         return AnchorResult(isLockedNow, finalPoint, skipPersistence)
     }
 
     fun reset(state: LocationProcessingState) {
-        state.isAnchorActive = false
-        state.anchorEscapeScore = 0.0
-        state.trendCount = 0
-        state.averageCount = 0
-        state.isAnchorLockedState = false
+        state.anchor.isActive = false
+        state.anchor.escapeScore = 0.0
+        state.anchor.trendCount = 0
+        state.anchor.averageCount = 0
+        state.anchor.isLocked = false
     }
 }

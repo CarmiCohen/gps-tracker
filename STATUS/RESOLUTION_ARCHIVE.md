@@ -1,3 +1,15 @@
+# 🏛️ Resolution Archive - Sep.27.5
+
+## 🏁 Issue #1349: LocationProcessingState Mutability Reduction
+*   **Resolved**: Sep.27.5
+*   **Root Cause**: `LocationProcessingState` was a monolithic data class containing mixed concerns (accuracy tracking, forensic telemetry, trajectory buffers, and anchor logic), leading to high mutability and poor domain isolation.
+*   **Remediation**:
+    *   **EngineModels.kt**: Partitioned `LocationProcessingState` into four specialized sub-states: `AccuracyState`, `SentinelForensicState`, `GtoBufferState`, and `AnchorState`.
+    *   **Logic Alignment**: Refactored `LocationProcessor`, `LocationSentinel`, `AnchorEvaluator`, and `GtoEngine` to utilize these sub-states, improving field-level access decoupling and reducing the monolithic footprint.
+    *   **Cleanup**: Removed redundant naming prefixes (e.g., `sentinelLastValidLat` converted to `forensic.lastValidLat`) to simplify the internal processing API.
+    *   **App Integration**: Updated `MonitorService` and tests to ensure full parity with the partitioned hierarchy.
+*   **SOT ID**: 505
+
 # 🏛️ Resolution Archive - Sep.27.4
 
 ## 🏁 Issue #1348: DomainEvent Hierarchy Simplification

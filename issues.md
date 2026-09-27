@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.4
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.5
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -14,7 +14,7 @@ Ready for next priority item.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 14)
+## 💡 Strategic Simplification Ideas (Ideas: 13)
 
 ### 🔴 High Priority
 *   **Issue #1161: Unified Trajectory & Buffer Management**
@@ -47,13 +47,12 @@ Ready for next priority item.
     *   *Significance*: **Low (Testability)**. Move monotonic clock recovery logic to a dedicated authority to simplify background service testing.
 *   **Issue #1175: Real-time Only Path (Pivot Option)**
     *   *Significance*: **Strategic (Maintenance Tradeoff)**. Consider removing backlog sync and forensic backfilling to dramatically reduce codebase complexity.
-*   **Issue #1349: LocationProcessingState Mutability Reduction**
-    *   *Significance*: **Low (Robustness)**. Further reduce fields in `LocationProcessingState` by extracting transient telemetry counters into localized sub-states.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1349: LocationProcessingState Mutability Reduction** (Resolved Sep.27.5)
 *   **Issue #1348: DomainEvent Hierarchy Simplification** (Resolved Sep.27.4)
 *   **Issue #1347: Audit and Itemize Strategic Simplification Candidates** (Resolved Sep.27.3)
 *   **Issue #1345: Expand Automated Network Stress Tests** (Resolved Sep.27.2)
@@ -63,4 +62,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.27.4: [SOT: 503 (Rules: 40), Resolved: 1249, Open: H:1, M:0, L:0, Ideas: H:2, M:7, L:5, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.27.5: [SOT: 505 (Rules: 39), Open: H:1, M:0, L:0, Ideas: H:2, M:7, L:4, Testing: 3 (Sub-items: 15), QA: 284]**

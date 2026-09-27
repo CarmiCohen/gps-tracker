@@ -5,11 +5,11 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.27.5:
+ * - Issue #1349: Mutability Reduction. Partitioned LocationProcessingState into 
+ *   specialized sub-states (Accuracy, Forensic, Gto, Anchor) to isolate transient telemetry.
  * Sep.27.4:
- * - Issue #1348: Flattened DomainEvent hierarchy by removing component wrappers.
- *   Component events (AlarmEvent, IntegrityEvent, etc.) now inherit directly from DomainEvent.
- * Sep.27.2:
- * - Issue #1345: Added ExecuteNetworkStressTest to CommandEvent.
+ * - Issue #1348: Flattened DomainEvent hierarchy.
  */
 
 @Serializable
@@ -441,55 +441,40 @@ class ProcessedLocation {
 }
 
 /**
- * LocationProcessingState: Consolidated operational state for LocationProcessor, 
- * LocationSentinel, and GtoEngine.
+ * AccuracyState: Isolated transient accuracy metrics.
  */
 @Serializable
-class LocationProcessingState {
-    // LocationProcessor State
+class AccuracyState {
     var lastProcessedAccuracy: Double = 0.0
     var maxAccuracy: Double = 0.0
-    var accuracyWindowBuffer: DoubleArray = DoubleArray(ACCURACY_WINDOW_MAX_SIZE)
-    var accuracyWindowSize: Int = 0
-    var accuracyWindowHead: Int = 0
-    var lastWindowUpdateRt: Long = 0L
-    var lastValidFixRt: Long = 0L
-    var lastLat: Double = 0.0
-    var lastLng: Double = 0.0
-    var lastTs: Long = 0L
-    var lastRt: Long = 0L
-    var lastAcc: Double = 0.0
-    var lastMaxAcc: Double = 0.0
-    var lastSavedLat: Double = 0.0
-    var lastSavedLng: Double = 0.0
-    var lastSavedTs: Long = 0L
-    var lastSavedRt: Long = 0L
-    var lastSavedGpsTs: Long = 0L
-    var lastHighAccLat: Double = 0.0
-    var lastHighAccLng: Double = 0.0
-    var lastHighAccTs: Long = 0L
-    var lastHighAccRt: Long = 0L
-    var lastExpectedIntervalMs: Long = 0L
-    var lastIntervalChangeRt: Long = 0L
-    var lastNearestHomeDistance: Double? = null
-    var lastDistanceToTracker: Double? = null
-    var maxDistanceAuthority: Double = 60.0
+    var windowBuffer: DoubleArray = DoubleArray(ACCURACY_WINDOW_MAX_SIZE)
+    var windowSize: Int = 0
+    var windowHead: Int = 0
+    var lastUpdateRt: Long = 0L
+}
 
-    // LocationSentinel State
-    var sentinelLastValidLat: Double = 0.0
-    var sentinelLastValidLng: Double = 0.0
-    var sentinelLastValidAlt: Double = 0.0
-    var sentinelLastValidTs: Long = 0L
-    var sentinelLastValidRt: Long = 0L
-    var sentinelLastValidSpeedMps: Double = 0.0
-    var sentinelLastValidBearing: Double = 0.0
-    var sentinelLastValidAccuracy: Double = 0.0
+/**
+ * SentinelForensicState: Isolated forensic telemetry and sensor baselines.
+ */
+@Serializable
+class SentinelForensicState {
+    var lastValidLat: Double = 0.0
+    var lastValidLng: Double = 0.0
+    var lastValidAlt: Double = 0.0
+    var lastValidTs: Long = 0L
+    var lastValidRt: Long = 0L
+    var lastValidSpeedMps: Double = 0.0
+    var lastValidBearing: Double = 0.0
+    var lastValidAccuracy: Double = 0.0
+    
     var estimatedSpeedMps: Double = 0.0
     var estimatedBearing: Double = 0.0
     var stationaryProb: Double = 1.0
+    
     var currentVibrationIndex: Double = 0.0
     var peakVibrationShock: Double = 0.0
     var peakVibrationShockRt: Long = 0L
+    
     var currentCompassHeading: Double = 0.0
     var lastCompassHeading: Double = 0.0
     var currentBaroAlt: Double = 0.0
@@ -498,9 +483,10 @@ class LocationProcessingState {
     var isPowerTamper: Boolean = false
     var currentTiltDegrees: Double = 0.0
     var currentAcousticDb: Double = 0.0
+    
     var lastFastPathAcousticSpikeRt: Long = 0L
     var lastFastPathLightSpikeRt: Long = 0L
-    var kineticEnergy: Double = 0.0
+    
     var isSitDetected: Boolean = false
     var lastSitTs: Long = 0L
     var lastSitRt: Long = 0L
@@ -513,42 +499,98 @@ class LocationProcessingState {
     var lastSitTilt: Double = 0.0
     var lastSitShock: Double = 0.0
     var sitDetectionCooldownRt: Long = 0L
+    
     var stationaryStartRt: Long = 0L
     var gpsMotionStartRt: Long = 0L
+    
     var luxBaseline: Double = -1.0
     var baroBaseline: Double = -1000.0
     var acousticFloorDb: Double = -1.0
     var adaptiveVibrationFloor: Double = INITIAL_VIBRATION_FLOOR
     var lastAcousticContractionRt: Long = 0L
+    
     var lastSnr: Double = 0.0
     var lastSatsUsed: Int = 0
+}
 
-    // GtoEngine State (Window Size 5)
-    var gtoLatBuffer: DoubleArray = DoubleArray(5)
-    var gtoLngBuffer: DoubleArray = DoubleArray(5)
-    var gtoAltBuffer: DoubleArray = DoubleArray(5)
-    var gtoAccBuffer: DoubleArray = DoubleArray(5)
-    var gtoMaxAccBuffer: DoubleArray = DoubleArray(5)
-    var gtoBearingBuffer: DoubleArray = DoubleArray(5)
-    var gtoSpeedBuffer: DoubleArray = DoubleArray(5)
-    var gtoTsBuffer: LongArray = LongArray(5)
-    var gtoRtBuffer: LongArray = LongArray(5)
-    var gtoVibeBuffer: DoubleArray = DoubleArray(5)
-    var gtoHead: Int = 0
-    var gtoSize: Int = 0
-    
-    // AnchorEvaluator State
-    var parkingAnchorPoint: EngineGeoPoint = EngineGeoPoint()
-    var isAnchorActive: Boolean = false
-    var anchorEscapeScore: Double = 0.0
-    var anchorTrendPoints: MutableList<EngineGeoPoint> = MutableList(3) { EngineGeoPoint() }
+/**
+ * GtoBufferState: Isolated trajectory buffers.
+ */
+@Serializable
+class GtoBufferState {
+    var latBuffer: DoubleArray = DoubleArray(5)
+    var lngBuffer: DoubleArray = DoubleArray(5)
+    var altBuffer: DoubleArray = DoubleArray(5)
+    var accBuffer: DoubleArray = DoubleArray(5)
+    var maxAccBuffer: DoubleArray = DoubleArray(5)
+    var bearingBuffer: DoubleArray = DoubleArray(5)
+    var speedBuffer: DoubleArray = DoubleArray(5)
+    var tsBuffer: LongArray = LongArray(5)
+    var rtBuffer: LongArray = LongArray(5)
+    var vibeBuffer: DoubleArray = DoubleArray(5)
+    var head: Int = 0
+    var size: Int = 0
+}
+
+/**
+ * AnchorState: Isolated stationary anchor logic state.
+ */
+@Serializable
+class AnchorState {
+    var parkingPoint: EngineGeoPoint = EngineGeoPoint()
+    var isActive: Boolean = false
+    var escapeScore: Double = 0.0
+    var trendPoints: MutableList<EngineGeoPoint> = MutableList(3) { EngineGeoPoint() }
     var trendCount: Int = 0
     var trendIdx: Int = 0
-    var anchorAveragingBuffer: MutableList<EngineGeoPoint> = MutableList(8) { EngineGeoPoint() }
+    var averagingBuffer: MutableList<EngineGeoPoint> = MutableList(8) { EngineGeoPoint() }
     var averageCount: Int = 0
     var averageIdx: Int = 0
-    var isAnchorLockedState: Boolean = false
-    var optimizedPointFlyweight: EngineGeoPoint = EngineGeoPoint()
+    var isLocked: Boolean = false
+}
+
+/**
+ * LocationProcessingState: Consolidated operational state for LocationProcessor, 
+ * LocationSentinel, and GtoEngine.
+ * Partitioned into specialized sub-states to reduce monolithic mutability footprint.
+ */
+@Serializable
+class LocationProcessingState {
+    // Partitioned Sub-States
+    val accuracy = AccuracyState()
+    val forensic = SentinelForensicState()
+    val gto = GtoBufferState()
+    val anchor = AnchorState()
+
+    // Core Tracking State
+    var lastValidFixRt: Long = 0L
+    var lastLat: Double = 0.0
+    var lastLng: Double = 0.0
+    var lastTs: Long = 0L
+    var lastRt: Long = 0L
+    var lastAcc: Double = 0.0
+    var lastMaxAcc: Double = 0.0
+    
+    var lastSavedLat: Double = 0.0
+    var lastSavedLng: Double = 0.0
+    var lastSavedTs: Long = 0L
+    var lastSavedRt: Long = 0L
+    var lastSavedGpsTs: Long = 0L
+    
+    var lastHighAccLat: Double = 0.0
+    var lastHighAccLng: Double = 0.0
+    var lastHighAccTs: Long = 0L
+    var lastHighAccRt: Long = 0L
+    
+    var lastExpectedIntervalMs: Long = 0L
+    var lastIntervalChangeRt: Long = 0L
+    var lastNearestHomeDistance: Double? = null
+    var lastDistanceToTracker: Double? = null
+    var maxDistanceAuthority: Double = 60.0
+    
+    var kineticEnergy: Double = 0.0
+    
+    val optimizedPointFlyweight: EngineGeoPoint = EngineGeoPoint()
 
     @Transient
     var cachedHomePoints: List<EngineGeoPoint>? = null

@@ -6,8 +6,9 @@ import org.junit.Test
 
 /**
  * AnchorEvaluatorTest: Verifies stationary anchor logic (R990c, R990d, R990e).
- * Sep.26.3:
- * - Issue #1334: Adapted to stateless AnchorEvaluator and LocationProcessingState.
+ * Sep.27.5:
+ * - Issue #1349: Mutability Reduction. Updated references to follow partitioned 
+ *   sub-states within LocationProcessingState.
  */
 class AnchorEvaluatorTest {
 
@@ -20,7 +21,7 @@ class AnchorEvaluatorTest {
     @Before
     fun setup() {
         logs.clear()
-        state.accuracyWindowSize = 0
+        state.accuracy.windowSize = 0
         AnchorEvaluator.reset(state)
     }
 
@@ -70,7 +71,7 @@ class AnchorEvaluatorTest {
             )
         }
 
-        val anchor = state.parkingAnchorPoint
+        val anchor = state.anchor.parkingPoint
         // Average should be between 32.7940 and 32.794018
         assertTrue("Lat should be averaged: ${anchor.lat}", anchor.lat > 32.7940 && anchor.lat < 32.794018)
     }
@@ -79,7 +80,7 @@ class AnchorEvaluatorTest {
     fun `test breakout by physical motion`() {
         val basePoint = createPoint(32.7940, 34.9896, 10.0)
         AnchorEvaluator.evaluate(state, basePoint, true, 0.95, 0.0, 10.0, false, false, false, 30.0, 0.1, logCapture)
-        assertTrue(state.isAnchorLockedState)
+        assertTrue(state.anchor.isLocked)
 
         val movingPoint = createPoint(32.7945, 34.9896, 10.0) // ~55m away
         val res = AnchorEvaluator.evaluate(
@@ -133,7 +134,7 @@ class AnchorEvaluatorTest {
             AnchorEvaluator.evaluate(state, snapPoint, true, 0.95, 0.0, 10.0, false, false, true, 30.0, 0.1, logCapture)
         }
         
-        assertTrue("Accuracy Snap should delay breakout", state.isAnchorLockedState)
+        assertTrue("Accuracy Snap should delay breakout", state.anchor.isLocked)
     }
 
     @Test
