@@ -24,6 +24,8 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.27.16:
+ * - Issue #1173: Protobuf-First Persistence. Migrated alarm state restoration to Protobuf.
  * Sep.27.15:
  * - Issue #1352: Unified background job orchestration via TickOrchestrator.
  */
@@ -191,7 +193,7 @@ class MonitorService : BaseMonitorService() {
         }
 
         val alarmPrefix = if (isTrackerMode) "T_" else "VR_"
-        alarmManager.restoreState(repository.getLastAlarmsJson(alarmPrefix))
+        alarmManager.restoreState(repository.loadActiveAlarms(alarmPrefix))
         alarmManager.restoreLogicState(settingsSnapshot, alarmPrefix)
     }
 

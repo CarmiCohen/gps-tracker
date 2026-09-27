@@ -1,4 +1,14 @@
-# 🏛️ Resolution Archive - Sep.27.15
+# 🏛️ Resolution Archive - Sep.27.16
+
+## 🏁 Issue #1173: Protobuf-First Persistence
+*   **Resolved**: Sep.27.16
+*   **Root Cause**: High-frequency alarm state persistence was utilizing `org.json` serialization, leading to repeated string allocations and parsing overhead in the core evaluation loop. This increased GC pressure and disk I/O latency.
+*   **Remediation**:
+    *   **app_settings.proto**: Added `ActiveAlarmProto` and a role-indexed map (`role_alarms`) to the DataStore schema.
+    *   **SettingsMapper.kt**: Implemented direct binary mapping between `ActiveAlarm` domain models and Protobuf messages.
+    *   **SettingsRepository.kt**: Refactored to support binary list operations and role-based alarm isolation.
+    *   **AppAlarmManager.kt**: Completely removed `org.json` dependencies, migrating to reactive binary persistence for the active alarm registry.
+*   **SOT ID**: 516 (Protobuf-First Persistence)
 
 ## 🏁 Issue #1352: Unified Service Job Orchestration
 *   **Resolved**: Sep.27.15

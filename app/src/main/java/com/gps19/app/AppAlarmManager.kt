@@ -5,19 +5,17 @@ import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
 import timber.log.Timber
-import java.util.*
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.27.16:
+ * - Issue #1173: Protobuf-First Persistence. Substituted JSON alarm state with 
+ *   binary Protobuf pipelines.
  * Sep.27.10:
  * - Issue #1201 RESOLVED: Integrated SirenLockoutUseCase to centralize siren lockout logic.
  *   Removed redundant internal cooldown checks in favor of reactive lockout state (R-ID 510).
@@ -39,7 +37,6 @@ class AppAlarmManager @Inject constructor(
     private val _isSirenRequired = MutableStateFlow(false)
     val isSirenRequired: StateFlow<Boolean> = _isSirenRequired.asStateFlow()
 
-    private var lastAlarmsJson = "[]"
     private var currentSettings = AlertSettings()
 
     private val evaluationReport = SystemHealthReport()
@@ -105,37 +102,10 @@ class AppAlarmManager @Inject constructor(
         updateSirenRequirement()
     }
 
-    fun restoreState(json: String) {
+    fun restoreState(alarms: List<AlarmEvaluationState.ActiveAlarm>) {
         synchronized(evaluationState.activeAlarms) {
             evaluationState.activeAlarms.clear()
-        }
-        if (json.isEmpty() || json == "[]") {
-            lastAlarmsJson = "[]"
-            updateSirenRequirement()
-            return
-        }
-        try {
-            val array = JSONArray(json)
-            synchronized(evaluationState.activeAlarms) {
-                for (i in 0 until array.length()) {
-                    val obj = array.getJSONObject(i)
-                    val type = obj.getString("type")
-                    evaluationState.activeAlarms[type] = AlarmEvaluationState.ActiveAlarm(
-                        type = type,
-                        title = obj.optString("title", "Violation"),
-                        subtitle = obj.optString("subtitle", ""),
-                        isTriggered = obj.optBoolean("isTriggered", false),
-                        firstTriggerTs = obj.optLong("firstTriggerTs", 0L),
-                        firstTriggerRt = obj.optLong("firstTriggerRt", 0L),
-                        lastLogTs = obj.optLong("lastLogTs", 0L),
-                        lastLogRt = obj.optLong("lastLogRt", 0L),
-                        isResolved = obj.optBoolean("isResolved", true)
-                    )
-                }
-            }
-            lastAlarmsJson = json
-        } catch (e: Exception) {
-            Timber.e(e, "Siren Persistence: Failed to restore alarm state")
+            alarms.forEach { evaluationState.activeAlarms[it.type] = it }
         }
         updateSirenRequirement()
     }
@@ -268,7 +238,7 @@ class AppAlarmManager @Inject constructor(
             }
         )
         
-        updateAlarmsJson()
+        persistActiveAlarms()
         
         val stateChanged = evaluationState.wasDistanceViolated != oldWasViolated || 
                            evaluationState.distanceViolationCounter != oldCounter || 
@@ -350,26 +320,17 @@ class AppAlarmManager @Inject constructor(
             val iterator = evaluationState.activeAlarms.entries.iterator()
             while (iterator.hasNext()) { if (iterator.next().value.isResolved) iterator.remove() }
         }
-        updateAlarmsJson()
+        persistActiveAlarms()
         updateSirenRequirement()
     }
 
-    private fun updateAlarmsJson() {
-        val jsonArray = JSONArray()
-        synchronized(evaluationState.activeAlarms) {
-            evaluationState.activeAlarms.values.forEach { eval ->
-                val obj = JSONObject()
-                obj.put("type", eval.type); obj.put("isTriggered", eval.isTriggered); obj.put("isResolved", eval.isResolved)
-                obj.put("title", eval.title); obj.put("subtitle", eval.subtitle); obj.put("isSirenDisabled", currentSettings.globalMute)
-                obj.put("firstTriggerTs", eval.firstTriggerTs)
-                obj.put("firstTriggerRt", eval.firstTriggerRt)
-                obj.put("lastLogTs", eval.lastLogTs)
-                obj.put("lastLogRt", eval.lastLogRt)
-                jsonArray.put(obj)
-            }
+    private fun persistActiveAlarms() {
+        val alarms = synchronized(evaluationState.activeAlarms) {
+            evaluationState.activeAlarms.values.toList()
         }
-        val newJson = jsonArray.toString()
-        if (newJson != lastAlarmsJson) { lastAlarmsJson = newJson; repository.saveAlarmsJsonSync(newJson, currentRolePrefix) }
+        scope.launch {
+            repository.saveActiveAlarms(alarms, currentRolePrefix)
+        }
     }
 
     private fun isSpecialType(type: String): Boolean {
@@ -384,15 +345,13 @@ class AppAlarmManager @Inject constructor(
         }
     }
 
-    fun getLastAlarmsJson(): String = lastAlarmsJson
-    
     fun resetEvaluation(rolePrefix: String = "") {
         val targetPrefix = if (rolePrefix.isNotEmpty()) rolePrefix else this.currentRolePrefix
         if (targetPrefix == "T_" || targetPrefix == "VR_") {
             this.currentRolePrefix = targetPrefix
         }
         synchronized(evaluationState.activeAlarms) { evaluationState.activeAlarms.clear() }
-        lastAlarmsJson = "[]"; repository.saveAlarmsJsonSync("[]", currentRolePrefix)
+        persistActiveAlarms()
         evaluationState.firstViolationTs = 0L; evaluationState.firstViolationRt = 0L; evaluationState.wasDistanceViolated = false; evaluationState.distanceViolationCounter = 0
         
         val nowRt = timeProvider.elapsedRealtime()

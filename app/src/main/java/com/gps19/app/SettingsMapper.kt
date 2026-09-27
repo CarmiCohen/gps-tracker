@@ -7,6 +7,8 @@ import com.gps19.core.engine.*
  * Sep.26.0:
  * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence. Aligned Proto 
  *   mapping with partitioned TrackerStatus structure.
+ * Sep.27.16:
+ * - Issue #1173: Protobuf-First Persistence. Added mapping for ActiveAlarm fields.
  */
 object SettingsMapper {
 
@@ -136,5 +138,33 @@ object SettingsMapper {
         val builder = TrackerStatusProto.newBuilder()
         TelemetryProtobufMapper.mapToPersistence(status, builder)
         return builder.build()
+    }
+
+    fun activeAlarmToProto(alarm: AlarmEvaluationState.ActiveAlarm): ActiveAlarmProto {
+        return ActiveAlarmProto.newBuilder()
+            .setType(alarm.type)
+            .setTitle(alarm.title)
+            .setSubtitle(alarm.subtitle)
+            .setIsTriggered(alarm.isTriggered)
+            .setFirstTriggerTs(alarm.firstTriggerTs)
+            .setFirstTriggerRt(alarm.firstTriggerRt)
+            .setLastLogTs(alarm.lastLogTs)
+            .setLastLogRt(alarm.lastLogRt)
+            .setIsResolved(alarm.isResolved)
+            .build()
+    }
+
+    fun activeAlarmFromProto(p: ActiveAlarmProto): AlarmEvaluationState.ActiveAlarm {
+        return AlarmEvaluationState.ActiveAlarm(
+            type = p.type,
+            title = p.title,
+            subtitle = p.subtitle,
+            isTriggered = p.isTriggered,
+            firstTriggerTs = p.firstTriggerTs,
+            firstTriggerRt = p.firstTriggerRt,
+            lastLogTs = p.lastLogTs,
+            lastLogRt = p.lastLogRt,
+            isResolved = p.isResolved
+        )
     }
 }

@@ -55,6 +55,8 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Sep.27.16:
+ * - Issue #1173: Protobuf-First Persistence. Migrated alarm state to Protobuf role_alarms map.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -108,7 +110,6 @@ class SettingsRepository @Inject constructor(
     val alertSettingsFlow: Flow<AlertSettings> = dataStore.data.map { SettingsMapper.protoToAlertSettings(it.alertSettings) }
     val identitySanitizedFlow: Flow<Boolean> = dataStore.data.map { it.identitySanitized }
     val isSystemActiveFlow: Flow<Boolean> = dataStore.data.map { it.isSystemActive }
-    val lastAlarmsJsonFlow: Flow<String> = dataStore.data.map { it.lastAlarmsJson }
     val isXiaomiManualOverrideFlow: Flow<Boolean> = dataStore.data.map { it.isXiaomiManualOverride }
     val recoveryCountFlow: Flow<Int> = dataStore.data.map { it.recoveryCount }
     val cumulativeRecoveryBlackoutMsFlow: Flow<Long> = dataStore.data.map { it.totalDrop }
@@ -128,7 +129,6 @@ class SettingsRepository @Inject constructor(
                     VIEWER_ID_KEY -> setViewerId(value)
                     RELAY_URL_KEY -> setRelayUrl(value)
                     SELECTED_SIREN_KEY -> setSelectedSiren(value)
-                    LAST_ALARMS_JSON_KEY -> setLastAlarmsJson(value)
                 }
             }
         }
@@ -226,7 +226,6 @@ class SettingsRepository @Inject constructor(
             TRACKER_ID_KEY -> settings.trackerId
             VIEWER_ID_KEY -> settings.viewerId
             RELAY_URL_KEY -> settings.relayUrl
-            LAST_ALARMS_JSON_KEY -> settings.lastAlarmsJson
             else -> ""
         }
         return value.ifEmpty { default }
@@ -322,6 +321,7 @@ class SettingsRepository @Inject constructor(
             roleIntsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleInts(it) }
             roleStringsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleStrings(it) }
             removeRoleStates(prefix)
+            removeRoleAlarms(prefix)
         }
     }
 
@@ -414,6 +414,28 @@ class SettingsRepository @Inject constructor(
                     .setLastSirenStopRt(lastSirenStopRt).setLastGlobalTriggerRt(lastGlobalTriggerRt).setForensicReliabilityDegradationStartRt(forensicReliabilityDegradationStartRt)
             }
         }
+    }
+
+    suspend fun saveActiveAlarms(alarms: List<AlarmEvaluationState.ActiveAlarm>, rolePrefix: String? = null) {
+        dataStore.mutate {
+            val protoAlarms = alarms.map { SettingsMapper.activeAlarmToProto(it) }
+            if (rolePrefix != null) {
+                val listProto = ActiveAlarmsListProto.newBuilder().addAllAlarms(protoAlarms).build()
+                putRoleAlarms(rolePrefix, listProto)
+            } else {
+                clearActiveAlarms().addAllActiveAlarms(protoAlarms)
+            }
+        }
+    }
+
+    suspend fun loadActiveAlarms(rolePrefix: String? = null): List<AlarmEvaluationState.ActiveAlarm> {
+        val settings = dataStore.data.first()
+        val protoAlarms = if (rolePrefix != null) {
+            settings.roleAlarmsMap[rolePrefix]?.alarmsList ?: emptyList()
+        } else {
+            settings.activeAlarmsList
+        }
+        return protoAlarms.map { SettingsMapper.activeAlarmFromProto(it) }
     }
 
     suspend fun saveSettingsBulk(

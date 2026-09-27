@@ -82,7 +82,8 @@ message AppSettings {
     optional double chair_baseline_tilt = 66;
     optional int64 last_history_sit_ts = 67;
 
-    optional string last_alarms_json = 68;
+    // optional string last_alarms_json = 68; // Removed in Sep.27.16
+    reserved 68;
 
     // Issue #626: Foreground Service Start Hardening
     optional bool is_recovery_pending = 69;
@@ -112,6 +113,10 @@ message AppSettings {
     map<string, int32> role_ints = 103;
     map<string, string> role_strings = 104;
     map<string, TrackerStatusProto> role_states = 105;
+
+    // Issue #1173: Protobuf-First Persistence
+    repeated ActiveAlarmProto active_alarms = 106;
+    map<string, ActiveAlarmsListProto> role_alarms = 107;
 }
 
 enum TrackerStateProto {
@@ -397,4 +402,20 @@ message TrackerStatusProto {
     double energy_delta_temp = 112;
     int64 energy_duration_ms = 113;
     optional string tamper_note = 114;
+}
+
+message ActiveAlarmProto {
+    string type = 1;
+    string title = 2;
+    string subtitle = 3;
+    bool is_triggered = 4;
+    int64 first_trigger_ts = 5;
+    int64 first_trigger_rt = 6;
+    int64 last_log_ts = 7;
+    int64 last_log_rt = 8;
+    bool is_resolved = 9;
+}
+
+message ActiveAlarmsListProto {
+    repeated ActiveAlarmProto alarms = 1;
 }

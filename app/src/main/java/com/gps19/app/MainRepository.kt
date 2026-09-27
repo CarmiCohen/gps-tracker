@@ -29,12 +29,12 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Sep.27.16:
+ * - Issue #1173: Protobuf-First Persistence. Substituted JSON alarm state with 
+ *   binary Protobuf pipelines.
  * Sep.24.93:
  * - Issue #1265 REMEDIATION: Added getLocalLocationSync, getTrackerLocationSync, 
  *   and saveDoubleDebounced to support unified event orchestration.
- * Sep.24.90:
- * - Issue #1306 REMEDIATION: Added support for "VR_" (Viewer-Remote) prefix to 
- *   segregate remote tracker logic state from local viewer telemetry.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -72,8 +72,8 @@ class MainRepository @Inject constructor(
 
     companion object {
         const val DEFAULT_RELAY_URL = SettingsRepository.DEFAULT_RELAY_URL
-        const val DEFAULT_TRACKER_ID = SettingsRepository.DEFAULT_TRACKER_ID
-        const val DEFAULT_VIEWER_ID = SettingsRepository.DEFAULT_VIEWER_ID
+        const val DEFAULT_TRACKER_ID = SignalingConstants.DEFAULT_TRACKER_ID
+        const val DEFAULT_VIEWER_ID = SignalingConstants.DEFAULT_VIEWER_ID
         const val DEFAULT_MAX_DISTANCE = SettingsRepository.DEFAULT_MAX_DISTANCE
         
         private const val DB_PRUNE_THRESHOLD_HISTORY = 500
@@ -163,7 +163,6 @@ class MainRepository @Inject constructor(
     val alertSettingsFlow = settings.alertSettingsFlow
     val identitySanitizedFlow = settings.identitySanitizedFlow
     val isSystemActiveFlow = settings.isSystemActiveFlow
-    val lastAlarmsJsonFlow = settings.lastAlarmsJsonFlow
 
     init {
         scope.launch { lastAlarmAckTsFlow.collect { lastAlarmAckTs = it } }
@@ -403,8 +402,14 @@ class MainRepository @Inject constructor(
     suspend fun addPendingStatusUpdate(update: PendingStatusEntity) { offlineRepository.addPendingStatusUpdate(update) }
     suspend fun getPendingStatusUpdates(limit: Int): List<PendingStatusEntity> = offlineRepository.getPendingStatusUpdates(limit)
     suspend fun deletePendingStatusUpdate(id: Long) = offlineRepository.deletePendingStatusUpdate(id)
-    suspend fun getLastAlarmsJson(rolePrefix: String? = null): String = settings.getString((rolePrefix ?: "") + LAST_ALARMS_JSON_KEY, "[]")
-    fun saveAlarmsJsonSync(json: String, rolePrefix: String? = null) { scope.launch { settings.saveString((rolePrefix ?: "") + LAST_ALARMS_JSON_KEY, json) } }
+
+    suspend fun saveActiveAlarms(alarms: List<AlarmEvaluationState.ActiveAlarm>, rolePrefix: String? = null) {
+        settings.saveActiveAlarms(alarms, rolePrefix)
+    }
+
+    suspend fun loadActiveAlarms(rolePrefix: String? = null): List<AlarmEvaluationState.ActiveAlarm> {
+        return settings.loadActiveAlarms(rolePrefix)
+    }
 
     private val _logFilterDetails = MutableStateFlow(false)
     val logFilterDetails = _logFilterDetails.asStateFlow()
