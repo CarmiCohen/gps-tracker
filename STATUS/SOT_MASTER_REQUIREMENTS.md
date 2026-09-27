@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.27.5)
+# SOT Master Requirements & Hardening Status (Sep.27.6)
 
-## 🏗️ Architectural Master Rules (38 Rules)
+## 🏗️ Architectural Master Rules (39 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -30,6 +30,7 @@
 *   **1.25 Forensic Resource Auditing (R502)**: Periodic integrity heartbeats must record Thermal Headroom and Heap Utilization into forensic traces to validate hardware stability and zero-allocation logic during long-duration soak tests (Sep.26.11).
 *   **1.26 Signaling Flapping Resilience (R503)**: Connectivity managers must handle high-frequency signaling transitions (5Hz+) without resource leakage or state corruption to ensure stability during extreme network instability (Sep.27.2).
 *   **1.27 Flattened Event Hierarchy (R504)**: The `DomainEvent` hierarchy must remain flat, avoiding nested component wrappers to minimize object allocation churn and dispatching overhead in the reactive coordination layer (Issue #1348).
+*   **1.28 Unified Trajectory Management (R506)**: The system must utilize a single `TrajectoryBuffer` authority to consolidate sliding windows and hindsight corrections, eliminating dual terminology and redundant array allocations (Issue #1161).
 
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318-758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
@@ -50,6 +51,7 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 506**: Unified Trajectory & Buffer Management - Consolidated scattered trajectory windows and hindsight buffers into a first-class `TrajectoryBuffer` component, eliminating redundant terminology and array allocations. (Resolved Sep.27.6).
 *   **SOT ID 505**: LocationProcessingState Mutability Reduction - Partitioned the core tracking state into specialized sub-states (Accuracy, Forensic, Gto, Anchor) to isolate transient telemetry and improve domain isolation. (Resolved Sep.27.5).
 *   **SOT ID 504**: DomainEvent Hierarchy Flattening - Simplified the core event hierarchy by removing component wrappers to optimize dispatch overhead and reduce allocation churn. (Resolved Sep.27.4).
 *   **SOT ID 503**: Signaling Flapping Resilience - Implemented high-frequency network flapping stress test to ensure signaling state transitions don't leak resources. (Resolved Sep.27.2).
@@ -73,7 +75,8 @@
 *   **SOT ID 485**: Snap-to-Update Monolith - Remediated Issue #1330 by unifying `SystemEvaluationSnapshot` with partitioned states. (Resolved Sep.25.05).
 *   **SOT ID 484**: Peer Lifecycle Decoupling - Remediated Issue #1327 by introducing `PeerConnectionChanged`. (Resolved Sep.25.05).
 
-## 📋 Functional Requirements (167 R-IDs)
+## 📋 Functional Requirements (168 R-IDs)
+*   **R506**: Unified TrajectoryBuffer authority for rolling history.
 *   **R505**: LocationProcessingState partitioning for mutability reduction.
 *   **R504**: DomainEvent flattening for dispatch optimization.
 *   **R503**: Signaling flapping resilience validation.
@@ -97,6 +100,7 @@
 *   **R485**: Zero-allocation snap-to-update partitioning.
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.138 (Trajectory Unification)**: PASSED - Verified single-authority buffer management and hindsight mapping consistency. (Sep.27.6)
 *   **Chapter 31.137 (State Partitioning)**: PASSED - Verified sub-state isolation and field-level access decoupling in core engine. (Sep.27.5)
 *   **Chapter 31.136 (Event Flattening)**: PASSED - Verified direct component event emission and dispatcher overhead reduction. (Sep.27.4)
 *   **Chapter 31.135 (Network Stress)**: PASSED - Verified resource stability during high-frequency signaling flapping. (Sep.27.2)
@@ -117,4 +121,4 @@
 *   **Chapter 31.120 (Signaling Optimization)**: PASSED - Verified that forensic indexes are pre-calculated. (Sep.26.0)
 
 ---
-*Next Audit: Oct.01.00. (Sep.27.5)*
+*Next Audit: Oct.01.00. (Sep.27.6)*

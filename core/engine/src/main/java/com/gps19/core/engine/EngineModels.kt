@@ -5,11 +5,12 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.27.6:
+ * - Issue #1161: Unified Trajectory & Buffer Management. Introduced TrajectoryBuffer 
+ *   and TrajectoryNode to replace GtoBufferState and GtoNode.
  * Sep.27.5:
  * - Issue #1349: Mutability Reduction. Partitioned LocationProcessingState into 
- *   specialized sub-states (Accuracy, Forensic, Gto, Anchor) to isolate transient telemetry.
- * Sep.27.4:
- * - Issue #1348: Flattened DomainEvent hierarchy.
+ *   specialized sub-states (Accuracy, Forensic, Trajectory, Anchor).
  */
 
 @Serializable
@@ -392,6 +393,20 @@ data class RejectedPoint(
 )
 
 @Serializable
+data class TrajectoryNode(
+    val lat: Double,
+    val lng: Double,
+    val alt: Double,
+    val accuracy: Double,
+    val maxAccuracy: Double,
+    val bearing: Double,
+    val speedMps: Double,
+    val ts: Long,
+    val rt: Long,
+    val vibrationIndex: Double
+)
+
+@Serializable
 class ProcessedLocation {
     var rawPoint: EngineGeoPoint = EngineGeoPoint()
     var optimizedPoint: EngineGeoPoint = EngineGeoPoint()
@@ -514,20 +529,21 @@ class SentinelForensicState {
 }
 
 /**
- * GtoBufferState: Isolated trajectory buffers.
+ * TrajectoryBuffer: Optimized unified buffer for trajectory history and hindsight.
+ * Replaces GtoBufferState.
  */
 @Serializable
-class GtoBufferState {
-    var latBuffer: DoubleArray = DoubleArray(5)
-    var lngBuffer: DoubleArray = DoubleArray(5)
-    var altBuffer: DoubleArray = DoubleArray(5)
-    var accBuffer: DoubleArray = DoubleArray(5)
-    var maxAccBuffer: DoubleArray = DoubleArray(5)
-    var bearingBuffer: DoubleArray = DoubleArray(5)
-    var speedBuffer: DoubleArray = DoubleArray(5)
-    var tsBuffer: LongArray = LongArray(5)
-    var rtBuffer: LongArray = LongArray(5)
-    var vibeBuffer: DoubleArray = DoubleArray(5)
+class TrajectoryBuffer {
+    var latBuffer: DoubleArray = DoubleArray(TRAJECTORY_BUFFER_MAX_SIZE)
+    var lngBuffer: DoubleArray = DoubleArray(TRAJECTORY_BUFFER_MAX_SIZE)
+    var altBuffer: DoubleArray = DoubleArray(TRAJECTORY_BUFFER_MAX_SIZE)
+    var accBuffer: DoubleArray = DoubleArray(TRAJECTORY_BUFFER_MAX_SIZE)
+    var maxAccBuffer: DoubleArray = DoubleArray(TRAJECTORY_BUFFER_MAX_SIZE)
+    var bearingBuffer: DoubleArray = DoubleArray(TRAJECTORY_BUFFER_MAX_SIZE)
+    var speedBuffer: DoubleArray = DoubleArray(TRAJECTORY_BUFFER_MAX_SIZE)
+    var tsBuffer: LongArray = LongArray(TRAJECTORY_BUFFER_MAX_SIZE)
+    var rtBuffer: LongArray = LongArray(TRAJECTORY_BUFFER_MAX_SIZE)
+    var vibeBuffer: DoubleArray = DoubleArray(TRAJECTORY_BUFFER_MAX_SIZE)
     var head: Int = 0
     var size: Int = 0
 }
@@ -559,7 +575,7 @@ class LocationProcessingState {
     // Partitioned Sub-States
     val accuracy = AccuracyState()
     val forensic = SentinelForensicState()
-    val gto = GtoBufferState()
+    val trajectory = TrajectoryBuffer()
     val anchor = AnchorState()
 
     // Core Tracking State

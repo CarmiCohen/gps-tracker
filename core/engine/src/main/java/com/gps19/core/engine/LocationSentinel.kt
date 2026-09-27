@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Sep.27.6:
+ * - Issue #1161: Unified Trajectory & Buffer Management. Adapted to reference 
+ *   TrajectoryNode during hindsight mapping.
  * Sep.27.5:
  * - Issue #1349: Mutability Reduction. Refactored references to use partitioned sub-states 
  *   with cleaned field names (e.g., state.forensic.lastValidLat).

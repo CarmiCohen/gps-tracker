@@ -1,10 +1,23 @@
+# 🏛️ Resolution Archive - Sep.27.6
+
+## 🏁 Issue #1161: Unified Trajectory & Buffer Management
+*   **Resolved**: Sep.27.6
+*   **Root Cause**: Trajectory data was scattered across redundant primitive arrays in `GtoBufferState` and conceptually overlapping "hindsight" buffers in `LocationSentinel`, leading to dual terminology and suboptimal memory access patterns.
+*   **Remediation**:
+    *   **EngineModels.kt**: Introduced `TrajectoryBuffer` and `TrajectoryNode` to replace `GtoBufferState` and `GtoNode`. Unified all trajectory-related telemetry (lat, lng, alt, accuracy, maxAccuracy, bearing, speed, ts, rt, vibe) into a single optimized ring buffer.
+    *   **EngineConstants.kt**: Unified capacity and age constants under `TRAJECTORY_BUFFER_MAX_SIZE` and `TRAJECTORY_HINDSIGHT_MAX_AGE_MS`.
+    *   **GtoEngine.kt**: Refactored `evaluateTrajectory` and `addPoint` to operate on the unified `TrajectoryBuffer`.
+    *   **LocationSentinel.kt**: Updated `getHindsightBuffer` to utilize the unified mapping from `TrajectoryNode` to `RejectedPoint`.
+    *   **Validation**: Successfully executed `:core:engine:test` ensuring zero regressions in trajectory promotion logic.
+*   **SOT ID**: 506
+
 # 🏛️ Resolution Archive - Sep.27.5
 
 ## 🏁 Issue #1349: LocationProcessingState Mutability Reduction
 *   **Resolved**: Sep.27.5
 *   **Root Cause**: `LocationProcessingState` was a monolithic data class containing mixed concerns (accuracy tracking, forensic telemetry, trajectory buffers, and anchor logic), leading to high mutability and poor domain isolation.
 *   **Remediation**:
-    *   **EngineModels.kt**: Partitioned `LocationProcessingState` into four specialized sub-states: `AccuracyState`, `SentinelForensicState`, `GtoBufferState`, and `AnchorState`.
+    *   **EngineModels.kt**: Partitioned `LocationProcessingState` into four specialized sub-states: `AccuracyState`, `SentinelForensicState`, `GtoBufferState` (now `TrajectoryBuffer`), and `AnchorState`.
     *   **Logic Alignment**: Refactored `LocationProcessor`, `LocationSentinel`, `AnchorEvaluator`, and `GtoEngine` to utilize these sub-states, improving field-level access decoupling and reducing the monolithic footprint.
     *   **Cleanup**: Removed redundant naming prefixes (e.g., `sentinelLastValidLat` converted to `forensic.lastValidLat`) to simplify the internal processing API.
     *   **App Integration**: Updated `MonitorService` and tests to ensure full parity with the partitioned hierarchy.

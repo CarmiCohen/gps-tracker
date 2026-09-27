@@ -2,21 +2,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.27.6:
+ * - Issue #1161: Added unified TRAJECTORY_BUFFER_MAX_SIZE and TRAJECTORY_HINDSIGHT_MAX_AGE_MS constants.
  * Sep.20.12:
  * - Issue #1149: Added LIGHT_LOCKOUT_MS (5s) for fast-path tamper persistence.
  * Sep.19.06:
  * - Issue #1111: Added DISPLAY_FLICKER_TIMEOUT_MS (3s) for proximity hysteresis decay.
- * Sep.16.14:
- * - Signaling Conflation Traceability (#1051): Migrated hardcoded conflation 
- *   delays to SIGNALING_CONFLATION_DELAY_MS (100ms) and 
- *   SIGNALING_CONFLATION_DELAY_VIOLATION_MS (20ms) (R-ID 312).
- * Sep.15.13:
- * - Performance Tuning (#1051): Added SYNC_INTERVAL_VIOLATION_MS (2s) and 
- *   SIGNALING_EMIT_DELAY_VIOLATION_MS (20ms) to optimize forensic data 
- *   latency during active violations (R-ID 343).
- * Sep.11.58:
- * - Issue #950 Hardening: Relaxed GNSS stability thresholds to accommodate A15 
- *   hardware jitter (Jitter: 500ms -> 3000ms, Gap: 200ms -> 1000ms).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -26,6 +17,10 @@ const val GRAVITY_EARTH = 9.80665
 // Global App Defaults (Inherited by Engine)
 const val DEFAULT_LAT = 32.7940
 const val DEFAULT_LNG = 34.9896
+
+// Unified Trajectory Buffer Constants
+const val TRAJECTORY_BUFFER_MAX_SIZE = 5
+const val TRAJECTORY_HINDSIGHT_MAX_AGE_MS = 60000L
 
 // Performance & Latency Thresholds
 const val LATENCY_THRESHOLD_GPS_PROCESS_MS = 100L

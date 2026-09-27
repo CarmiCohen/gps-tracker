@@ -4,67 +4,55 @@ import kotlin.math.*
 
 /**
  * GtoEngine: Graph Trajectory Optimization.
- * Sep.27.5:
- * - Issue #1349: Mutability Reduction. Adapted to access fields via state.gto sub-state.
+ * Sep.27.6:
+ * - Issue #1161: Unified Trajectory & Buffer Management. Refactored to use 
+ *   TrajectoryBuffer and TrajectoryNode from EngineModels.kt.
  */
 object GtoEngine {
-
-    private const val MAX_WINDOW_SIZE = 5
-    private const val HINDSIGHT_MAX_AGE_MS = 60000L
-
-    data class GtoNode(
-        val lat: Double,
-        val lng: Double,
-        val alt: Double,
-        val accuracy: Double,
-        val maxAccuracy: Double, 
-        val bearing: Double,
-        val speedMps: Double,
-        val ts: Long,
-        val rt: Long,
-        val vibrationIndex: Double
-    )
 
     fun addPoint(
         state: LocationProcessingState,
         lat: Double, lng: Double, alt: Double, accuracy: Double, maxAccuracy: Double,
         bearing: Double, speedMps: Double, ts: Long, rt: Long, vibrationIndex: Double
     ) {
+        val buffer = state.trajectory
+        
         // Prune aged points
-        while (state.gto.size > 0) {
-            val tailIdx = (state.gto.head - state.gto.size + MAX_WINDOW_SIZE) % MAX_WINDOW_SIZE
-            if ((rt - state.gto.rtBuffer[tailIdx]) > HINDSIGHT_MAX_AGE_MS) {
-                state.gto.size--
+        while (buffer.size > 0) {
+            val tailIdx = (buffer.head - buffer.size + TRAJECTORY_BUFFER_MAX_SIZE) % TRAJECTORY_BUFFER_MAX_SIZE
+            if ((rt - buffer.rtBuffer[tailIdx]) > TRAJECTORY_HINDSIGHT_MAX_AGE_MS) {
+                buffer.size--
             } else {
                 break
             }
         }
 
         // Add new point
-        state.gto.latBuffer[state.gto.head] = lat
-        state.gto.lngBuffer[state.gto.head] = lng
-        state.gto.altBuffer[state.gto.head] = alt
-        state.gto.accBuffer[state.gto.head] = accuracy
-        state.gto.maxAccBuffer[state.gto.head] = maxAccuracy
-        state.gto.bearingBuffer[state.gto.head] = bearing
-        state.gto.speedBuffer[state.gto.head] = speedMps
-        state.gto.tsBuffer[state.gto.head] = ts
-        state.gto.rtBuffer[state.gto.head] = rt
-        state.gto.vibeBuffer[state.gto.head] = vibrationIndex
+        buffer.latBuffer[buffer.head] = lat
+        buffer.lngBuffer[buffer.head] = lng
+        buffer.altBuffer[buffer.head] = alt
+        buffer.accBuffer[buffer.head] = accuracy
+        buffer.maxAccBuffer[buffer.head] = maxAccuracy
+        buffer.bearingBuffer[buffer.head] = bearing
+        buffer.speedBuffer[buffer.head] = speedMps
+        buffer.tsBuffer[buffer.head] = ts
+        buffer.rtBuffer[buffer.head] = rt
+        buffer.vibeBuffer[buffer.head] = vibrationIndex
         
-        state.gto.head = (state.gto.head + 1) % MAX_WINDOW_SIZE
-        if (state.gto.size < MAX_WINDOW_SIZE) state.gto.size++
+        buffer.head = (buffer.head + 1) % TRAJECTORY_BUFFER_MAX_SIZE
+        if (buffer.size < TRAJECTORY_BUFFER_MAX_SIZE) buffer.size++
     }
 
     fun evaluateTrajectory(state: LocationProcessingState, newLat: Double, newLng: Double, newBearing: Double, newSpeedMps: Double, timestamp: Long, rt: Long): Boolean {
-        if (state.gto.size == 0) return false
+        val buffer = state.trajectory
+        if (buffer.size == 0) return false
 
-        val lastIdx = (state.gto.head - 1 + MAX_WINDOW_SIZE) % MAX_WINDOW_SIZE
-        val lastRt = state.gto.rtBuffer[lastIdx]
-        val lastLat = state.gto.latBuffer[lastIdx]
-        val lastLng = state.gto.lngBuffer[lastIdx]
-        val lastBearing = state.gto.bearingBuffer[lastIdx]
-        val lastSpeed = state.gto.speedBuffer[lastIdx]
+        val lastIdx = (buffer.head - 1 + TRAJECTORY_BUFFER_MAX_SIZE) % TRAJECTORY_BUFFER_MAX_SIZE
+        val lastRt = buffer.rtBuffer[lastIdx]
+        val lastLat = buffer.latBuffer[lastIdx]
+        val lastLng = buffer.lngBuffer[lastIdx]
+        val lastBearing = buffer.bearingBuffer[lastIdx]
+        val lastSpeed = buffer.speedBuffer[lastIdx]
 
         val angleDiff = abs(newBearing - lastBearing).let { if (it > 180) 360 - it else it }
         val distFromLast = PhysicsUtils.calculateDistance(lastLat, lastLng, newLat, newLng)
@@ -72,15 +60,15 @@ object GtoEngine {
         val timeFromLast = (rt - lastRt) / 1000.0
         val impliedSpeed = distFromLast / max(0.1, timeFromLast)
         
-        if (rt <= lastRt || (rt - lastRt) > HINDSIGHT_MAX_AGE_MS) return false
+        if (rt <= lastRt || (rt - lastRt) > TRAJECTORY_HINDSIGHT_MAX_AGE_MS) return false
         
         // Zero-Churn average calculation
         var vibrationSum = 0.0
-        for (i in 0 until state.gto.size) {
-            val idx = (state.gto.head - state.gto.size + i + MAX_WINDOW_SIZE) % MAX_WINDOW_SIZE
-            vibrationSum += state.gto.vibeBuffer[idx]
+        for (i in 0 until buffer.size) {
+            val idx = (buffer.head - buffer.size + i + TRAJECTORY_BUFFER_MAX_SIZE) % TRAJECTORY_BUFFER_MAX_SIZE
+            vibrationSum += buffer.vibeBuffer[idx]
         }
-        val avgVibration = vibrationSum / state.gto.size
+        val avgVibration = vibrationSum / buffer.size
         
         val GTO_TOW_SPEED_THRESHOLD = 15.0
         val PROMOTION_ANGLE_TOLERANCE = 30.0
@@ -93,20 +81,20 @@ object GtoEngine {
         
         if (!isKinematicallyConsistent) return false
 
-        if (state.gto.size >= 2) {
-            val startIdx = (state.gto.head - state.gto.size + MAX_WINDOW_SIZE) % MAX_WINDOW_SIZE
-            val startLat = state.gto.latBuffer[startIdx]
-            val startLng = state.gto.lngBuffer[startIdx]
+        if (buffer.size >= 2) {
+            val startIdx = (buffer.head - buffer.size + TRAJECTORY_BUFFER_MAX_SIZE) % TRAJECTORY_BUFFER_MAX_SIZE
+            val startLat = buffer.latBuffer[startIdx]
+            val startLng = buffer.lngBuffer[startIdx]
             
             val totalDisplacement = PhysicsUtils.calculateDistance(startLat, startLng, newLat, newLng)
             var totalPathLength = 0.0
             
             var prevIdx = startIdx
-            for (i in 1 until state.gto.size) {
-                val currIdx = (startIdx + i) % MAX_WINDOW_SIZE
+            for (i in 1 until buffer.size) {
+                val currIdx = (startIdx + i) % TRAJECTORY_BUFFER_MAX_SIZE
                 totalPathLength += PhysicsUtils.calculateDistance(
-                    state.gto.latBuffer[prevIdx], state.gto.lngBuffer[prevIdx],
-                    state.gto.latBuffer[currIdx], state.gto.lngBuffer[currIdx]
+                    buffer.latBuffer[prevIdx], buffer.lngBuffer[prevIdx],
+                    buffer.latBuffer[currIdx], buffer.lngBuffer[currIdx]
                 )
                 prevIdx = currIdx
             }
@@ -129,21 +117,22 @@ object GtoEngine {
         return true
     }
 
-    fun getWindow(state: LocationProcessingState): List<GtoNode> {
-        val result = mutableListOf<GtoNode>()
-        for (i in 0 until state.gto.size) {
-            val idx = (state.gto.head - state.gto.size + i + MAX_WINDOW_SIZE) % MAX_WINDOW_SIZE
-            result.add(GtoNode(
-                state.gto.latBuffer[idx], state.gto.lngBuffer[idx], state.gto.altBuffer[idx],
-                state.gto.accBuffer[idx], state.gto.maxAccBuffer[idx], state.gto.bearingBuffer[idx],
-                state.gto.speedBuffer[idx], state.gto.tsBuffer[idx], state.gto.rtBuffer[idx], state.gto.vibeBuffer[idx]
+    fun getWindow(state: LocationProcessingState): List<TrajectoryNode> {
+        val buffer = state.trajectory
+        val result = mutableListOf<TrajectoryNode>()
+        for (i in 0 until buffer.size) {
+            val idx = (buffer.head - buffer.size + i + TRAJECTORY_BUFFER_MAX_SIZE) % TRAJECTORY_BUFFER_MAX_SIZE
+            result.add(TrajectoryNode(
+                buffer.latBuffer[idx], buffer.lngBuffer[idx], buffer.altBuffer[idx],
+                buffer.accBuffer[idx], buffer.maxAccBuffer[idx], buffer.bearingBuffer[idx],
+                buffer.speedBuffer[idx], buffer.tsBuffer[idx], buffer.rtBuffer[idx], buffer.vibeBuffer[idx]
             ))
         }
         return result
     }
 
     fun clear(state: LocationProcessingState) {
-        state.gto.head = 0
-        state.gto.size = 0
+        state.trajectory.head = 0
+        state.trajectory.size = 0
     }
 }
