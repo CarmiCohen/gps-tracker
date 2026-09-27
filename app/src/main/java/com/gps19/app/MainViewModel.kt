@@ -21,12 +21,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
- * Sep.27.11:
- * - Issue #1202 RESOLVED: Unified UI event routing into UiEventCoordinator.
- *   Decommissioned procedural onEvent logic and draft management helpers (R-ID 511).
- * Sep.27.10:
- * - Issue #1201 RESOLVED: Integrated SirenLockoutUseCase to manage siren cooldowns 
- *   reactively (R-ID 510).
+ * Sep.27.12:
+ * - Issue #1350 RESOLVED: Extracted reactive state mapping (Dashboard/HUD/Map) 
+ *   into a dedicated UiStateCoordinator, achieving a perfectly thin ViewModel.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -45,6 +42,7 @@ class MainViewModel @Inject constructor(
     private val hydrationManager: LifecycleHydrationManager,
     private val sirenLockoutUseCase: SirenLockoutUseCase,
     private val uiEventCoordinator: UiEventCoordinator,
+    private val uiStateCoordinator: UiStateCoordinator,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -138,11 +136,11 @@ class MainViewModel @Inject constructor(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val trackerTrailSegments: StateFlow<List<MapTrailSegment>> = trackerTrailFlow
-        .map { trail -> computeTrailSegments(trail, BrandJd.toArgb()) }
+        .map { trail -> uiStateCoordinator.computeTrailSegments(trail, BrandJd.toArgb()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val viewerTrailSegments: StateFlow<List<MapTrailSegment>> = viewerTrailFlow
-        .map { trail -> computeTrailSegments(trail, ViewerCyan.toArgb()) }
+        .map { trail -> uiStateCoordinator.computeTrailSegments(trail, ViewerCyan.toArgb()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val dashboardState: StateFlow<DashboardState> = combine(
@@ -156,9 +154,9 @@ class MainViewModel @Inject constructor(
         _trackerMaxTemp
     ) { (mode, kin, diag), pulseRt, state, tMax ->
         val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
-        val conn = mapDashboardConnectivity(mode, diag, pulseRt)
-        val tel = mapDashboardTelemetry(mode, kin, pulseRt, state, isUltra)
-        val health = mapDashboardHealth(mode, kin, diag, diag.battery.temp, tMax, pulseRt)
+        val conn = uiStateCoordinator.mapDashboardConnectivity(mode, diag, pulseRt)
+        val tel = uiStateCoordinator.mapDashboardTelemetry(mode, kin, pulseRt, state, isUltra)
+        val health = uiStateCoordinator.mapDashboardHealth(mode, kin, diag, diag.battery.temp, tMax, pulseRt)
         DashboardState(conn, tel, health)
     }
     .distinctUntilChanged()
@@ -174,7 +172,7 @@ class MainViewModel @Inject constructor(
         _remoteSignal,
         _systemPulseRt
     ) { (session, settings), diag, rtt, sig, pulseRt ->
-        mapHudConnectivity(
+        uiStateCoordinator.mapHudConnectivity(
             session.appMode, 
             settings.deviceId, 
             settings.viewerId, 
@@ -194,7 +192,7 @@ class MainViewModel @Inject constructor(
     ) { mode, kin, pulseRt, state ->
         val m = mode ?: "tracker"
         val isUltra = if (m == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
-        mapHudTelemetry(m, kin, pulseRt, state, isUltra)
+        uiStateCoordinator.mapHudTelemetry(m, kin, pulseRt, state, isUltra)
     }
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudTelemetryState())
 
@@ -203,11 +201,9 @@ class MainViewModel @Inject constructor(
         _systemPulseRt, 
         _kinematicState.map { it.localHealth.isMaliAnomaly }.distinctUntilChanged()
     ) { diag, pulseRt, isMali ->
-        mapHudHealth(diag, pulseRt, isMali)
+        uiStateCoordinator.mapHudHealth(diag, pulseRt, isMali)
     }
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudHealthState())
-
-    private var sTrkLat = 0.0; private var sTrkLng = 0.0; private var sVwrLat = 0.0; private var sVwrLng = 0.0
 
     val mapViewState: StateFlow<MapViewState> = combine(
         combine(
@@ -224,33 +220,8 @@ class MainViewModel @Inject constructor(
         viewerTrailSegments,
         repository.violationsFlow.distinctUntilChanged()
     ) { parts, pulseRt, trkSegs, vwrSegs, vios ->
-        val m = parts.mode ?: "tracker"
-        val pulse = timeProvider.currentTimeMillis()
-        val tLat = if (m == "tracker") parts.kin.localLocation.kinetic.lat else parts.kin.trackerLocation.kinetic.lat
-        val tLng = if (m == "tracker") parts.kin.localLocation.kinetic.lng else parts.kin.trackerLocation.kinetic.lng
-        val tTs = if (m == "tracker") parts.kin.localLocation.kinetic.gpsTs else parts.kin.trackerLocation.kinetic.gpsTs
-        val tTel = if (m == "tracker") parts.kin.localLocation.ts else parts.kin.trackerLocation.ts
-        val vLat = if (m == "viewer") parts.kin.localLocation.kinetic.lat else 0.0
-        val vLng = if (m == "viewer") parts.kin.localLocation.kinetic.lng else 0.0
-        
-        if (PhysicsUtils.isValidLocation(tLat, tLng)) {
-            val alpha = if (parts.kin.localLocation.kinetic.speed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
-            if (sTrkLat == 0.0 || PhysicsUtils.calculateDistance(sTrkLat, sTrkLng, tLat, tLng) > 100.0) { sTrkLat = tLat; sTrkLng = tLng }
-            else { sTrkLat = PhysicsUtils.smoothCoordinate(sTrkLat, tLat, alpha); sTrkLng = PhysicsUtils.smoothCoordinate(sTrkLng, tLng, alpha) }
-        }
-        
-        MapViewState(
-            appMode = m, hydrationLevel = parts.hydration, isMapButtonsVisible = parts.spatial.isMapButtonsVisible, isFenceVisible = parts.spatial.isFenceVisible, 
-            geofenceMode = parts.spatial.geofenceMode, isViolationsVisible = parts.spatial.isViolationsVisible, isGeofenceViolationsVisible = parts.spatial.isGeofenceViolationsVisible, 
-            maxDistance = parts.spatial.maxDistance, isMapLocked = parts.spatial.isMapLocked, mapFollowMode = parts.spatial.mapFollowMode,
-            centeringTrackerTrigger = parts.triggers.centeringTrackerTrigger, centeringViewerTrigger = parts.triggers.centeringViewerTrigger, 
-            zoomInTrigger = parts.triggers.zoomInTrigger, zoomOutTrigger = parts.triggers.zoomOutTrigger, homePoints = parts.spatial.homePoints,
-            trackerLat = tLat, trackerLng = tLng, trackerGpsTs = tTs, trackerTelemetryTs = tTel,
-            viewerLat = vLat, viewerLng = vLng, systemPulse = pulse, systemPulseRt = pulseRt,
-            trackerSegments = trkSegs, viewerSegments = vwrSegs, violations = vios,
-            isTrackerFresh = tTs > 0 && (pulse - tTel + kotlin.math.max(0L, tTel - tTs)) < GPS_UI_FAIL_THRESHOLD_MS,
-            isTrackerValid = PhysicsUtils.isValidLocation(tLat, tLng),
-            smoothedTrackerLat = sTrkLat, smoothedTrackerLng = sTrkLng
+        uiStateCoordinator.mapMapViewState(
+            parts.mode, parts.hydration, parts.spatial, parts.triggers, parts.kin, pulseRt, trkSegs, vwrSegs, vios
         )
     }
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MapViewState())
@@ -503,12 +474,6 @@ class MainViewModel @Inject constructor(
         }
     }
 
-    private fun computeTrailSegments(trailPoints: List<TrailPoint>, color: Int): List<MapTrailSegment> {
-        if (trailPoints.isEmpty()) return emptyList()
-        val geoPoints = trailPoints.map { it.toGeoPoint() }
-        return listOf(MapTrailSegment(geoPoints, color, geoPoints.hashCode()))
-    }
-
     fun clearTrails() {
         viewModelScope.launch(Dispatchers.IO + uiExceptionHandler) {
             repository.clearTrails()
@@ -523,260 +488,5 @@ class MainViewModel @Inject constructor(
             isSpecial = isSpecial, specialColor = specialColor, role = _uiState.value.session.appMode ?: "system"
         )
         repository.addLog(entry)
-    }
-
-    // Consolidated Mapping Functions from UiStateMapper
-    private fun mapDashboardConnectivity(
-        appMode: String?,
-        diag: DiagnosticState,
-        nowRt: Long
-    ): DashboardConnectivityState {
-        val isViewer = appMode == "viewer"
-        val activeStats = if (isViewer) diag.trackerStats else diag.stats
-        val lastSeenTs = diag.connectivity.lastRemoteActivityTs
-
-        val isLocalServiceAlive = (nowRt - diag.pulse) < TELEMETRY_UI_STALE_THRESHOLD_MS
-        
-        val watchdogSec = if (isViewer && lastSeenTs > 0) {
-            val remaining = (WATCH_TIMEOUT_MS - (nowRt - lastSeenTs)) / 1000
-            maxOf(0L, remaining)
-        } else 0L
-
-        return DashboardConnectivityState(
-            lastSeenTs = lastSeenTs,
-            watchdogOk = isLocalServiceAlive,
-            watchdogCountdownSec = if (isViewer) watchdogSec else 0L,
-            totalUptimeMs = activeStats.uptimeMs,
-            sessionMs = if (activeStats.lastConnTs > 0) activeStats.sessionConnectedMs else 0L,
-            sinceConnMs = if (activeStats.lastConnTs > 0) (nowRt - activeStats.lastConnTs) else 0L,
-            sinceDiscoMs = if (activeStats.lastDiscTs > 0) (nowRt - activeStats.lastDiscTs) else 0L,
-            totalDropMs = activeStats.totalDropMs,
-            maxDropMs = activeStats.maxDropMs,
-            engineVersion = BuildConfig.VERSION_NAME,
-            netInterface = diag.connectivity.netInterface,
-            systemPulse = nowRt
-        )
-    }
-
-    private fun mapDashboardTelemetry(
-        appMode: String?,
-        kinematicState: KinematicState,
-        nowRt: Long,
-        trackerState: TrackerState,
-        isUltra: Boolean
-    ): DashboardTelemetryState {
-        val isViewer = appMode == "viewer"
-        val loc = if (isViewer) kinematicState.trackerLocation else kinematicState.localLocation
-        
-        val telemetryAge = if (kinematicState.pulse > 0) nowRt - kinematicState.pulse else Long.MAX_VALUE
-        val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
-        
-        val isGpsActive = (nowRt - loc.kinetic.rt) < GPS_UI_FAIL_THRESHOLD_MS && loc.kinetic.gpsTs > 0
-
-        val gnss = loc.integrity.gnssDetail
-        val avgCn0 = gnss?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0
-
-        return DashboardTelemetryState(
-            lat = if (isGpsActive) loc.kinetic.lat else 0.0,
-            lng = if (isGpsActive) loc.kinetic.lng else 0.0,
-            gpsSpeedMps = loc.kinetic.speed,
-            trackerAccuracy = loc.kinetic.accuracy,
-            trackerMaxAcc = if (loc.kinetic.maxAccuracy > 0) loc.kinetic.maxAccuracy else loc.kinetic.accuracy,
-            viewerAccuracy = if (appMode == "tracker") 0.0 else kinematicState.localLocation.kinetic.accuracy,
-            viewerMaxAcc = if (appMode == "tracker") 0.0 else (if(kinematicState.localLocation.kinetic.maxAccuracy > 0) kinematicState.localLocation.kinetic.maxAccuracy else kinematicState.localLocation.kinetic.accuracy),
-            satsUsed = loc.integrity.satsUsed,
-            satsView = loc.integrity.satsView,
-            snr = avgCn0,
-            distToHome = kinematicState.distanceTrackerToHome,
-            distToViewer = kinematicState.distanceTrackerToViewer,
-            isGpsFresh = isGpsActive,
-            isTelemetryFresh = isTelemetryFresh,
-            isLocationPending = if (isViewer) kinematicState.trackerHealth.isLocationPending else kinematicState.localHealth.isLocationPending,
-            locationPendingReason = if (isViewer) kinematicState.trackerHealth.locationPendingReason else kinematicState.localHealth.locationPendingReason,
-            trackerState = trackerState,
-            status = loc.status,
-            tamperReason = if (isViewer) kinematicState.trackerHealth.tamperNote else kinematicState.localHealth.tamperNote,
-            isUltraLongStationary = isUltra,
-            systemPulse = nowRt
-        )
-    }
-
-    private fun mapDashboardHealth(
-        appMode: String?,
-        kinematicState: KinematicState,
-        diag: DiagnosticState,
-        localMaxTemp: Double,
-        trackerMaxTemp: Double,
-        nowRt: Long
-    ): DashboardHealthState {
-        val isViewer = appMode == "viewer"
-        val health = if (isViewer) kinematicState.trackerHealth else kinematicState.localHealth
-
-        return DashboardHealthState(
-            batteryLevel = if (isViewer) diag.trackerBattery.level else diag.battery.level,
-            trackerTemp = diag.trackerBattery.temp,
-            trackerMaxTemp = trackerMaxTemp,
-            viewerTemp = diag.battery.temp,
-            viewerMaxTemp = localMaxTemp,
-            vibration = health.vibration,
-            heading = health.heading,
-            tilt = health.tiltDegrees,
-            acousticDb = health.acousticDb,
-            baroAlt = health.baroAlt,
-            lux = health.lux,
-            isNear = health.isNear,
-            proximityCm = health.proximityCm,
-            proximityDebounceMs = health.proximityDebounceMs,
-            rollingVibration = health.vibrationRollingSum,
-            kineticEnergy = health.kineticEnergy,
-            peakShock = health.peakVibrationShock,
-            luxBaseline = health.luxBaseline,
-            acousticFloorDb = health.acousticFloorDb,
-            vibrationFloor = health.adaptiveVibrationFloor,
-            isMicPending = health.micPending,
-            isPowerTamper = health.isPowerTamper,
-            violationUptimeMs = health.violationUptimeMs,
-            violationPercentage = health.violationPercentage,
-            isPowerSaveMode = health.isPowerSaveMode,
-            standbyBucket = health.standbyBucket,
-            netInterface = health.netInterface,
-            isStorageLow = health.isStorageLow,
-            isStorageCritical = health.isStorageCritical,
-            isBatterySteepDischarge = health.isBatterySteepDischarge,
-            isCoolingModeActive = health.isCoolingModeActive,
-            trackerCurrentMa = health.currentMa,
-            isBatteryLow = health.isBatteryLow,
-            isBatteryCritical = health.isBatteryCritical,
-            cpuLoad = health.cpuLoad,
-            ioWait = health.ioWait,
-            maxIoLatency = health.maxIoLatency,
-            isSilentFailure = health.isSilentFailure,
-            isMaliAnomaly = health.isMaliAnomaly,
-            isGnssThrottled = health.isGnssThrottled,
-            lastEnergyDeltaMa = health.lastEnergyDeltaMa,
-            lastEnergyDeltaTemp = health.lastEnergyDeltaTemp,
-            lastEnergyDurationMs = health.lastEnergyDurationMs,
-            systemPulse = nowRt
-        )
-    }
-
-    private fun mapHudConnectivity(
-        appMode: String?,
-        deviceId: String,
-        viewerId: String,
-        isSystemActive: Boolean,
-        isSafeMode: Boolean,
-        isStaggered: Boolean,
-        diag: DiagnosticState,
-        rtt: Int,
-        remoteSignal: Int,
-        nowRt: Long
-    ): HudConnectivityState {
-        val lastSeenTs = diag.connectivity.lastRemoteActivityTs
-        
-        val isTelemetryFresh = if (lastSeenTs > 0) {
-            (nowRt - lastSeenTs) < TELEMETRY_UI_STALE_THRESHOLD_MS
-        } else false
-
-        val commIndex = if (isSystemActive && diag.connectivity.isRelayConnected) {
-            TelemetryUtils.calculateCommIndex(rtt, 10, 10)
-        } else 0
-
-        val remoteCommIndex = if (appMode == "viewer" && isTelemetryFresh) {
-            TelemetryUtils.calculateCommIndex(rtt, remoteSignal, 10)
-        } else 0
-
-        val isDataHealthy = (appMode == "viewer") && 
-                            isTelemetryFresh &&
-                            diag.connectivity.isLocalOnline && 
-                            diag.connectivity.isRelayConnected
-
-        val isLocalServiceAlive = (nowRt - diag.pulse) < TELEMETRY_UI_STALE_THRESHOLD_MS
-
-        val throttled = if (appMode == "viewer") diag.trackerIsGnssThrottled else diag.isGnssThrottled
-
-        return HudConnectivityState(
-            appMode = appMode,
-            isInternet = diag.connectivity.isLocalOnline,
-            isRelayConnected = diag.connectivity.isRelayConnected,
-            isTelemetryFresh = isTelemetryFresh,
-            isDataHealthy = isDataHealthy,
-            commIndex = commIndex,
-            remoteCommIndex = remoteCommIndex,
-            trackerId = deviceId,
-            viewerId = viewerId,
-            watchdogOk = isLocalServiceAlive,
-            rtt = rtt,
-            remoteSignal = remoteSignal,
-            isSystemActive = isSystemActive,
-            isSafeMode = isSafeMode,
-            isStaggered = isStaggered,
-            isGnssThrottled = throttled,
-            systemPulse = nowRt
-        )
-    }
-
-    private fun mapHudTelemetry(
-        appMode: String?,
-        kinematicState: KinematicState,
-        nowRt: Long,
-        trackerState: TrackerState,
-        isUltra: Boolean
-    ): HudTelemetryState {
-        val loc = if (appMode == "viewer") kinematicState.trackerLocation else kinematicState.localLocation
-        val isGpsFresh = (nowRt - loc.kinetic.rt) < GPS_UI_FAIL_THRESHOLD_MS && loc.kinetic.gpsTs > 0
-
-        return HudTelemetryState(
-            isLocalGpsActive = if (appMode == "tracker") isGpsFresh else (nowRt - kinematicState.localLocation.kinetic.rt < GPS_UI_FAIL_THRESHOLD_MS),
-            isGpsFresh = isGpsFresh,
-            speedMps = (if (appMode == "viewer") kinematicState.trackerLocation.kinetic.speed else 0.0).toFloat(),
-            trackerAccuracy = kinematicState.trackerLocation.kinetic.accuracy.toFloat(),
-            maxTrackerAccuracy = kinematicState.trackerLocation.kinetic.maxAccuracy.toFloat(),
-            viewerAccuracy = (if (kinematicState.localLocation.kinetic.lat != 0.0) kinematicState.localLocation.kinetic.accuracy.toFloat() else 0f),
-            maxViewerAccuracy = kinematicState.localLocation.kinetic.maxAccuracy.toFloat(),
-            satsUsed = kinematicState.trackerLocation.integrity.satsUsed,
-            satsView = kinematicState.trackerLocation.integrity.satsView,
-            viewerSatsUsed = kinematicState.localLocation.integrity.satsUsed,
-            viewerSatsView = kinematicState.localLocation.integrity.satsView,
-            distToHome = kinematicState.distanceTrackerToHome,
-            distToViewer = kinematicState.distanceTrackerToViewer,
-            lastGpsTs = loc.kinetic.gpsTs,
-            viewerGpsTs = kinematicState.localLocation.kinetic.gpsTs,
-            trackerState = trackerState,
-            isTrackerLocPending = kinematicState.trackerHealth.isLocationPending,
-            trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
-            isViewerLocPending = kinematicState.localHealth.isLocationPending,
-            viewerLocPendingReason = kinematicState.localHealth.locationPendingReason,
-            isUltraLongStationary = isUltra,
-            systemPulse = nowRt
-        )
-    }
-
-    private fun mapHudHealth(
-        diag: DiagnosticState,
-        nowRt: Long,
-        isMaliAnomaly: Boolean
-    ): HudHealthState {
-        val rawPulse = diag.connectivity.lastRemoteActivityTs
-        val age = if (rawPulse > 0) nowRt - rawPulse else Long.MAX_VALUE
-        val progressValue = if (rawPulse > 0) {
-            maxOf(0f, minOf(1f, (TELEMETRY_UI_STALE_THRESHOLD_MS - age).toFloat() / TELEMETRY_UI_STALE_THRESHOLD_MS))
-        } else 0f
-
-        return HudHealthState(
-            battery = diag.battery.level,
-            remoteBattery = diag.trackerBattery.level,
-            isCharging = diag.battery.isChargingStable,
-            remoteCharging = diag.trackerBattery.isChargingStable,
-            trackerTemp = diag.trackerBattery.temp.toFloat(),
-            viewerTemp = diag.battery.temp.toFloat(),
-            hasActiveAlarms = diag.activeAlarms.any { !it.isResolved },
-            isRedScreenSuppressed = (diag.activeAlarms.any { !it.isResolved } && !diag.isRedScreenVisible),
-            isSirenPlaying = diag.isSirenPlaying,
-            activeAlarms = diag.activeAlarms,
-            progressPulse = progressValue,
-            systemPulse = nowRt,
-            isMaliAnomaly = isMaliAnomaly
-        )
     }
 }

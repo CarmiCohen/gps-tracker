@@ -1,12 +1,12 @@
-# Forensic Handover (Sep.27.11)
+# Forensic Handover (Sep.27.12)
 
 ## 🎯 Current System State
-*   **Version**: Sep.27.11 | **Build**: Success (UI Event Routing Unification)
-*   **SOT Baseline**: SOT ID: 511 (Rules: 43, R-IDs: 172)
-*   **Core Remediation**: Successfully resolved **Issue #1202** (UI Event Routing Unification).
-    *   Introduced `UiEventCoordinator` as the central authority for routing UI events to domain logic.
-    *   Refactored `MainViewModel` to delegate `onEvent` handling, reducing its complexity.
-    *   Unified settings draft management and debounced auto-save logic into the coordinator.
+*   **Version**: Sep.27.12 | **Build**: Success (Unified State Mapping Authority)
+*   **SOT Baseline**: SOT ID: 512 (Rules: 44, R-IDs: 174)
+*   **Core Remediation**: Successfully resolved **Issue #1350** (Unified State Mapping Authority).
+    *   Introduced `UiStateCoordinator` as the central authority for reactive state projections (Dashboard, HUD, Map).
+    *   Refactored `MainViewModel` to delegate all mapping logic, achieving a "perfectly thin" ViewModel pattern.
+    *   Isolated osmdroid trail segment computation from the ViewModel into the coordinator.
 
 ---
 
@@ -15,11 +15,12 @@
 1.  **Event Orchestration Layer**:
     *   `UiEventCoordinator`: Sole authority for mapping user intent (`UiEvent`) to domain actions.
     *   `MainViewModel`: Pure SSOT for UI state observation and event emission.
+    *   `UiStateCoordinator`: Sole authority for projecting domain state into UI-specific DTOs (Dashboard/HUD).
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.27.11: [SOT Count: 172 (Rules: 43), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.27.12: [SOT Count: 174 (Rules: 44), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:5, Testing: 3 (Sub-items: 15), QA: 284]**
 
 ---
 

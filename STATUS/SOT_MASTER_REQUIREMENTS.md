@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.27.11)
+# SOT Master Requirements & Hardening Status (Sep.27.12)
 
-## 🏗️ Architectural Master Rules (43 Rules)
+## 🏗️ Architectural Master Rules (44 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Context Isolation**: Components must use `@ApplicationContext` to avoid Activity-leak scenarios (R110).
@@ -35,6 +35,7 @@
 *   **1.30 Continuous Stability Audit Logging (R508)**: The forensic auditor must continuously output reliability metrics and jitter peaks to Logcat every 10 seconds under standard tracking constraints to facilitate 24-hour physical soak auditing (Issue #1346).
 *   **1.31 Reactive Siren Lockout (R510)**: The system must manage siren lockout and cooldown states via a central, transport-agnostic `SirenLockoutUseCase` authority to decouple domain safety gates from hardware audio generation pipelines (Issue #1201).
 *   **1.32 UI Event Routing Unification (R511)**: The system must route UI events and navigation actions through a central `UiEventCoordinator` authority to completely decouple ViewModels from user interface execution details (Issue #1202).
+*   **1.33 Reactive State Mapping Authority (R512)**: Reactive state mapping for dashboard, HUD, and map views must be extracted from ViewModels into a dedicated `UiStateCoordinator` authority to achieve thin ViewModels and isolate state projections (Issue #1350).
 
 ### 2. UI & Performance Authority
 *   **2.1 Staggered Hydration Manager (R318-758)**: Hydration must be managed by `LifecycleHydrationManager` with multi-level staggering.
@@ -55,6 +56,7 @@
 *   **3.5 Hardware Neutrality (R212)**: Use neutral hardware namespaces (`jdHardware`) to eliminate vendor framework collisions.
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 512**: Unified State Mapping Authority - Extracted all reactive dashboard, HUD, and map state projection logic from `MainViewModel` into a dedicated `UiStateCoordinator` authority, achieving a perfectly thin ViewModel pattern. (Resolved Sep.27.12).
 *   **SOT ID 511**: UI Event Routing Unification - Centralized UI event orchestration and navigation flows inside a dedicated `UiEventCoordinator` component, minimizing the procedural footprint of ViewModels. (Resolved Sep.27.11).
 *   **SOT ID 510**: Reactive Siren Lockout - Decoupled siren cooldown/lockout logic from audio generation and centralized it within a reactive `SirenLockoutUseCase` authority. (Resolved Sep.27.10).
 *   **SOT ID 509**: UI State Mapper Consolidation - Merged `UiStateMapper` logic directly into `MainViewModel` to reduce DI surface area and remove the redundant stateless interface mapping layer. (Resolved Sep.27.9).
@@ -84,7 +86,8 @@
 *   **SOT ID 485**: Snap-to-Update Monolith - Remediated Issue #1330 by unifying `SystemEvaluationSnapshot` with partitioned states. (Resolved Sep.25.05).
 *   **SOT ID 484**: Peer Lifecycle Decoupling - Remediated Issue #1327 by introducing `PeerConnectionChanged`. (Resolved Sep.25.05).
 
-## 📋 Functional Requirements (173 R-IDs)
+## 📋 Functional Requirements (174 R-IDs)
+*   **R512**: Centralized `UiStateCoordinator` authority for reactive state mapping projections.
 *   **R511**: Centralized UiEventCoordinator authority for decoupled user interface event routing.
 *   **R510**: Centralized SirenLockoutUseCase authority for transport-agnostic siren suppression tracking.
 *   **R509**: Consolidated UI State mapping architecture for architectural surface area reduction.
@@ -114,7 +117,8 @@
 *   **R485**: Zero-allocation snap-to-update partitioning.
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.143 (UI Event Routing Unification)**: PASSED - Successfully unified all UI event handling and draft settings operations into UiEventCoordinator. (Sep.27.11)
+*   **Chapter 31.144 (Unified State Mapping Authority)**: PASSED - Successfully decoupled all reactive state projection and trail segments computation logic from MainViewModel into UiStateCoordinator. (Sep.27.12)
+*   **Chapter 31.143 (UI Event Routing Unification)**: PASSED - Successfully unified all UI event handling and draft settings operations into UiEventCoordinator. (Sep.26.11)
 *   **Chapter 31.142 (Reactive Siren Lockout)**: PASSED - Successfully decoupled siren lockout state from audio generation pipelines and unified it under SirenLockoutUseCase. (Sep.26.11)
 *   **Chapter 31.141 (UI State Mapping Consolidation)**: PASSED - Verified direct integration of mapping helpers into MainViewModel and reduced dependency injection footprint. (Sep.27.9)
 *   **Chapter 31.140 (Physical Soak Readiness)**: PASSED - Hardened ForensicAuditor to output non-blocking status logging to standard streams to allow uninterrupted 24h hardware audits. (Sep.27.8)
@@ -140,4 +144,4 @@
 *   **Chapter 31.120 (Signaling Optimization)**: PASSED - Verified that forensic indexes are pre-calculated. (Sep.26.0)
 
 ---
-*Next Audit: Oct.01.00. (Sep.27.11)*
+*Next Audit: Oct.01.00. (Sep.27.12)*
