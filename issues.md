@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.3
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.4
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -14,7 +14,7 @@ Ready for next priority item.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 15)
+## 💡 Strategic Simplification Ideas (Ideas: 14)
 
 ### 🔴 High Priority
 *   **Issue #1161: Unified Trajectory & Buffer Management**
@@ -37,8 +37,6 @@ Ready for next priority item.
     *   *Significance*: **Medium (Domain Logic)**. Decouple siren cooldown logic from audio generation by moving it into a dedicated UseCase.
 *   **Issue #1202: UI Event Routing Unification**
     *   *Significance*: **Medium (Architecture)**. Refactor navigation into a single coordinator to decouple ViewModels from UI implementation.
-*   **Issue #1348: DomainEvent Hierarchy Simplification**
-    *   *Significance*: **Medium (Architecture)**. Flatten component wrappers inside `DomainEvent` to optimize channel-driven dispatching overhead.
 
 ### 🔵 Low Priority
 *   **Issue #1293: Lifecycle-Aware Tick Orchestrator**
@@ -56,6 +54,7 @@ Ready for next priority item.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1348: DomainEvent Hierarchy Simplification** (Resolved Sep.27.4)
 *   **Issue #1347: Audit and Itemize Strategic Simplification Candidates** (Resolved Sep.27.3)
 *   **Issue #1345: Expand Automated Network Stress Tests** (Resolved Sep.27.2)
 *   **Issue #1344: Implement Thermal & Memory Forensic Probes** (Resolved Sep.26.12)
@@ -64,4 +63,4 @@ Ready for next priority item.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.27.3: [SOT: 503 (Rules: 40), Resolved: 1248, Open: H:1, M:0, L:0, Ideas: H:2, M:8, L:5, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.27.4: [SOT: 503 (Rules: 40), Resolved: 1249, Open: H:1, M:0, L:0, Ideas: H:2, M:7, L:5, Testing: 3 (Sub-items: 15), QA: 284]**

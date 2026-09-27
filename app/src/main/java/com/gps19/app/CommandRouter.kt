@@ -16,13 +16,10 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Sep.27.4:
+ * - Issue #1348: Flattened DomainEvent hierarchy, emitting CommandEvent directly.
  * Sep.27.2:
  * - Issue #1345: Added routing for ExecuteNetworkStressTest to ConnectivitySuite (R-ID 345).
- * Sep.25.01:
- * - Issue #1322: Converged CommandEvent emission into DomainEventBus.
- * Sep.23.70:
- * - Issue #1230 REMEDIATION: Implemented role-based namespace isolation for 
- *   alarm acknowledgment latches using ConfigManager context (R-ID 453).
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -68,7 +65,7 @@ class CommandRouter @Inject constructor(
     private val legacyReceiver = object : ManagedBroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
-                ACTION_ALARM_WAKEUP -> domainEventBus.emit(DomainEvent.Command(CommandEvent.WatchdogTrigger))
+                ACTION_ALARM_WAKEUP -> domainEventBus.emit(CommandEvent.WatchdogTrigger)
             }
         }
     }
@@ -80,8 +77,8 @@ class CommandRouter @Inject constructor(
             .onEach { command ->
                 try {
                     when (command) {
-                        is UiCommand.SyncRequest -> domainEventBus.emit(DomainEvent.Command(CommandEvent.UiPulse))
-                        is UiCommand.UiVisibilityChanged -> domainEventBus.emit(DomainEvent.Command(CommandEvent.UiVisibilityChanged(command.visible)))
+                        is UiCommand.SyncRequest -> domainEventBus.emit(CommandEvent.UiPulse)
+                        is UiCommand.UiVisibilityChanged -> domainEventBus.emit(CommandEvent.UiVisibilityChanged(command.visible))
                         is UiCommand.StopSiren -> {
                             val prefix = if (configManager.isTrackerMode) "T_" else "V_"
                             repository.saveLongSync(prefix + LAST_ALARM_ACK_TS_KEY, timeProvider.currentTimeMillis())
@@ -95,7 +92,7 @@ class CommandRouter @Inject constructor(
                         }
                         is UiCommand.ClearTrails -> repository.clearTrails()
                         is UiCommand.StatsReset -> {
-                            domainEventBus.emit(DomainEvent.Command(CommandEvent.ResetTimers))
+                            domainEventBus.emit(CommandEvent.ResetTimers)
                             sessionManager.reset()
                             locationProcessor.resetStats()
                             connectivitySuite.resetPeerStats()
@@ -103,19 +100,19 @@ class CommandRouter @Inject constructor(
                             integrityMonitor.resetStats()
                         }
                         is UiCommand.SettingsUpdated -> {
-                            domainEventBus.emit(DomainEvent.Command(CommandEvent.SyncSensors))
+                            domainEventBus.emit(CommandEvent.SyncSensors)
                             connectivitySuite.connect(configManager.relayUrl)
                             connectivitySuite.updateIdentity(configManager.deviceId, configManager.viewerId, configManager.isTrackerMode)
                         }
                         is UiCommand.ZoomIn, is UiCommand.ZoomOut, is UiCommand.MapZoomIn, is UiCommand.MapZoomOut -> {}
                         is UiCommand.FullInitializationReset -> {
-                            domainEventBus.emit(DomainEvent.Command(CommandEvent.ResetTimers))
+                            domainEventBus.emit(CommandEvent.ResetTimers)
                             sessionManager.reset()
                             locationProcessor.resetStats()
                             connectivitySuite.resetPeerStats()
                             historyManager.reset()
                             integrityMonitor.resetStats()
-                            domainEventBus.emit(DomainEvent.Command(CommandEvent.SyncSensors))
+                            domainEventBus.emit(CommandEvent.SyncSensors)
                         }
                         is UiCommand.ExecuteTestAlarm -> {
                             if (configManager.isTrackerMode) {
@@ -146,10 +143,10 @@ class CommandRouter @Inject constructor(
                             }
                         }
                         is UiCommand.ExecuteStressTest -> {
-                            domainEventBus.emit(DomainEvent.Command(CommandEvent.ExecuteStressTest))
+                            domainEventBus.emit(CommandEvent.ExecuteStressTest)
                         }
                         is UiCommand.ExecuteNetworkStressTest -> {
-                            domainEventBus.emit(DomainEvent.Command(CommandEvent.ExecuteNetworkStressTest))
+                            domainEventBus.emit(CommandEvent.ExecuteNetworkStressTest)
                         }
                         is UiCommand.SimulateStoragePressure -> {
                             integrityMonitor.simulateStoragePressure(command.active, command.isCritical)

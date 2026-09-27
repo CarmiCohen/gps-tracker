@@ -17,14 +17,11 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.27.4:
+ * - Issue #1348: Flattened DomainEvent hierarchy, emitting IntegrityEvent directly.
  * Sep.26.12:
  * - Issue #1344: Integrated thermalHeadroom and heapAllocatedMb into 
  *   periodic integrity heartbeat (R-ID 348).
- * Sep.25.03:
- * - Issue #1322 Cleanup: Fixed unresolved references to revivalEvents and LocationStatus.
- *   Migrated revival event observation to the unified DomainEventBus.
- * Sep.25.01:
- * - Issue #1322: Converged IntegrityEvent emission into DomainEventBus.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -118,8 +115,8 @@ class IntegrityMonitor @Inject constructor(
 
         scope.launch {
             domainEventBus.events
-                .filterIsInstance<DomainEvent.Revival>()
-                .onEach { event -> handleRevivalEvent(event.event) }
+                .filterIsInstance<RevivalEvent>()
+                .onEach { event -> handleRevivalEvent(event) }
                 .collect()
         }
 
@@ -145,31 +142,31 @@ class IntegrityMonitor @Inject constructor(
     private fun handleRevivalEvent(event: RevivalEvent) {
         when (event) {
             is RevivalEvent.Attempt -> {
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("GPS REVIVAL: Hardware restart attempt ${event.count} on this device.", false)))
+                domainEventBus.emit(IntegrityEvent.LogEvent("GPS REVIVAL: Hardware restart attempt ${event.count} on this device.", false))
             }
             is RevivalEvent.HardwareLock -> {
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("CRITICAL: GPS_HARDWARE_LOCK - All revival attempts failed on this device. Manual intervention required.", true)))
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationSustained(ALERT_ID_GPS_HARDWARE_LOCK)))
+                domainEventBus.emit(IntegrityEvent.LogEvent("CRITICAL: GPS_HARDWARE_LOCK - All revival attempts failed on this device. Manual intervention required.", true))
+                domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_GPS_HARDWARE_LOCK))
                 updateHealth { it.gpsHardwareLock = true }
             }
             is RevivalEvent.Success -> {
                 if (currentHealth.gpsHardwareLock) {
-                    domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("GPS REVIVAL: Hardware fix restored on this device.", false)))
-                    domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationResolved(ALERT_ID_GPS_HARDWARE_LOCK)))
+                    domainEventBus.emit(IntegrityEvent.LogEvent("GPS REVIVAL: Hardware fix restored on this device.", false))
+                    domainEventBus.emit(IntegrityEvent.ViolationResolved(ALERT_ID_GPS_HARDWARE_LOCK))
                     updateHealth { it.gpsHardwareLock = false }
                 }
             }
             is RevivalEvent.RawBurstStarted -> {
                 val h = currentHealth
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("AUDIT: Raw GNSS Burst STARTED. [Batt: ${h.batteryLevel}%, Current: ${h.currentMa}mA, Temp: ${h.batteryTemp}°C]", false)))
+                domainEventBus.emit(IntegrityEvent.LogEvent("AUDIT: Raw GNSS Burst STARTED. [Batt: ${h.batteryLevel}%, Current: ${h.currentMa}mA, Temp: ${h.batteryTemp}°C]", false))
             }
             is RevivalEvent.RawBurstEnded -> {
                 val h = currentHealth
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("AUDIT: Raw GNSS Burst ENDED. [Batt: ${h.batteryLevel}%, Current: ${h.currentMa}mA, Temp: ${h.batteryTemp}°C]", false)))
+                domainEventBus.emit(IntegrityEvent.LogEvent("AUDIT: Raw GNSS Burst ENDED. [Batt: ${h.batteryLevel}%, Current: ${h.currentMa}mA, Temp: ${h.batteryTemp}°C]", false))
             }
             is RevivalEvent.Footprint -> {
                 val msg = "ENERGY AUDIT: Revival Footprint (R-ID 259) - Delta: ${event.deltaMa}mA, Temp Rise: ${event.deltaTemp}°C, Duration: ${event.durationMs}ms"
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent(msg, true)))
+                domainEventBus.emit(IntegrityEvent.LogEvent(msg, true))
                 Timber.i("IntegrityMonitor: $msg")
                 
                 updateHealth { h ->
@@ -206,7 +203,7 @@ class IntegrityMonitor @Inject constructor(
             if (locationStalled) stalls.add("Location")
             
             val msg = "INTEGRITY WARNING: Reactive flow stall detected (${stalls.joinToString(", ")}). Monitoring vitality compromised on this device."
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent(msg, true)))
+            domainEventBus.emit(IntegrityEvent.LogEvent(msg, true))
         }
 
         var cpu = systemStatusProvider.getCpuLoad()
@@ -226,8 +223,8 @@ class IntegrityMonitor @Inject constructor(
         if (systemStatusProvider.isStaggeredPerformanceTier() || isMaliAnomalySimulated.get()) {
             if (maxIo > LATENCY_THRESHOLD_DB_WRITE_MS) {
                 val msg = "PERFORMANCE WARNING: Critical I/O Spike detected on budget hardware (%dms). System stress: [CPU: %.1f, IOW: %.1f]".format(maxIo, cpu, iow)
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent(msg, true)))
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationSustained(ALERT_ID_PERFORMANCE_SPIKE)))
+                domainEventBus.emit(IntegrityEvent.LogEvent(msg, true))
+                domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_PERFORMANCE_SPIKE))
             }
             
             maliAnomaly = checkMaliDriverAnomaly(maxIo, cpu, iow)
@@ -254,10 +251,10 @@ class IntegrityMonitor @Inject constructor(
             )
             
             if (isSilent && !h.isSilentFailure) {
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("FORENSIC ALERT: Silent Failure detected on this device. Location stall correlated with high resource load.", true)))
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationSustained(ALERT_ID_SILENT_FAILURE)))
+                domainEventBus.emit(IntegrityEvent.LogEvent("FORENSIC ALERT: Silent Failure detected on this device. Location stall correlated with high resource load.", true))
+                domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_SILENT_FAILURE))
             } else if (!isSilent && h.isSilentFailure) {
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationResolved(ALERT_ID_SILENT_FAILURE)))
+                domainEventBus.emit(IntegrityEvent.ViolationResolved(ALERT_ID_SILENT_FAILURE))
             }
             h.isSilentFailure = isSilent
         }
@@ -267,10 +264,10 @@ class IntegrityMonitor @Inject constructor(
         if (maxIo > 500 && cpu > 6.0) {
             if (!currentHealth.isMaliAnomaly) {
                 Timber.w("Forensic Audit (R266): Potential Mali driver configuration failure suspected. [IO: %dms, CPU: %.1f]", maxIo, cpu)
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent(
+                domainEventBus.emit(IntegrityEvent.LogEvent(
                     "STRESS AUDIT: Mali Driver Anomaly detected on this device (High I/O correlation). UI throttling engaged.",
                     isImportant = true
-                )))
+                ))
             }
             return true
         }
@@ -288,17 +285,17 @@ class IntegrityMonitor @Inject constructor(
     private fun handleLocationStatusUpdate(status: LocationStatus) {
         val workingHealth = currentHealth
         if (status.isPending && !workingHealth.isLocationPending) {
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("Location fix pending: ${status.reason.name.replace("_", " ")} on this device", false)))
+            domainEventBus.emit(IntegrityEvent.LogEvent("Location fix pending: ${status.reason.name.replace("_", " ")} on this device", false))
         } 
         else if (!status.isPending && workingHealth.isLocationPending && status.recoveryConfirmed) {
             val durationSec = status.lastPendingDurationMs / 1000.0
             val reasonStr = workingHealth.locationPendingReason.name.replace("_", " ")
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("Location fix restored after ${"%.1f".format(durationSec)}s gap ($reasonStr resolved) on this device", false)))
+            domainEventBus.emit(IntegrityEvent.LogEvent("Location fix restored after ${"%.1f".format(durationSec)}s gap ($reasonStr resolved) on this device", false))
         }
 
         val isStalled = status.reason == LocationPendingReason.GPS_STALL
         if (isStalled && !workingHealth.gpsStalled) {
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("GPS STALL: Hardware fix on this device has not updated despite satellite visibility.", true)))
+            domainEventBus.emit(IntegrityEvent.LogEvent("GPS STALL: Hardware fix on this device has not updated despite satellite visibility.", true))
         }
 
         updateHealth { h ->
@@ -328,12 +325,12 @@ class IntegrityMonitor @Inject constructor(
         if (!isCooling && batteryTemp >= MAX_SAFE_TEMPERATURE_CELSIUS) {
             isCooling = true
             coolingEnteredTimestamp = nowRt
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE on this device.", true)))
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationSustained(ALERT_ID_TRACKER_TEMP)))
+            domainEventBus.emit(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE on this device.", true))
+            domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_TRACKER_TEMP))
         } else if (isCooling && batteryTemp < MAX_SAFE_TEMPERATURE_RECOVERY) {
             isCooling = false
             coolingEnteredTimestamp = 0L
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("System Info: Thermal limit recovered (${batteryTemp}°C) on this device.", false)))
+            domainEventBus.emit(IntegrityEvent.LogEvent("System Info: Thermal limit recovered (${batteryTemp}°C) on this device.", false))
         }
 
         if (isCharging) onPowerConnected() else onPowerDisconnected()
@@ -373,17 +370,17 @@ class IntegrityMonitor @Inject constructor(
         
         if (critical != workingHealth.isStorageCritical) {
             if (critical) {
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Internal storage is CRITICAL (${megabytesAvailable}MB) on this device.", true)))
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL)))
+                domainEventBus.emit(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Internal storage is CRITICAL (${megabytesAvailable}MB) on this device.", true))
+                domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL))
             }
         }
 
         if (low != workingHealth.isStorageLow) {
             if (low && !critical) {
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("SYSTEM WARNING: Internal storage is low (${megabytesAvailable}MB) on this device.", true)))
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW)))
+                domainEventBus.emit(IntegrityEvent.LogEvent("SYSTEM WARNING: Internal storage is low (${megabytesAvailable}MB) on this device.", true))
+                domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW))
             } else if (!low) {
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("System Info: Storage space restored (${megabytesAvailable}MB) on this device.", false)))
+                domainEventBus.emit(IntegrityEvent.LogEvent("System Info: Storage space restored (${megabytesAvailable}MB) on this device.", false))
             }
         }
 
@@ -402,9 +399,9 @@ class IntegrityMonitor @Inject constructor(
 
         if (powerSave != workingHealth.isPowerSaveMode) {
             if (powerSave) {
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("SYSTEM WARNING: Power Save Mode active on this device. Sensors and GPS may be throttled.", true)))
+                domainEventBus.emit(IntegrityEvent.LogEvent("SYSTEM WARNING: Power Save Mode active on this device. Sensors and GPS may be throttled.", true))
             } else {
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("System Info: Power Save Mode deactivated on this device.", false)))
+                domainEventBus.emit(IntegrityEvent.LogEvent("System Info: Power Save Mode deactivated on this device.", false))
             }
         }
 
@@ -422,7 +419,7 @@ class IntegrityMonitor @Inject constructor(
                 if (workingHealth.standbyBucket != -1) {
                     val isCritical = bucket >= UsageStatsManager.STANDBY_BUCKET_RARE
                     val msg = "SYSTEM PRIORITY: Standby bucket on this device changed to $bucketName. ${if (isCritical) "Background tracking may be severely limited." else ""}"
-                    domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent(msg, isCritical)))
+                    domainEventBus.emit(IntegrityEvent.LogEvent(msg, isCritical))
                 }
             }
         }
@@ -442,14 +439,14 @@ class IntegrityMonitor @Inject constructor(
         
         val newNet = systemStatusProvider.getNetworkInterface()
         if (newNet != workingHealth.netInterface) {
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("Network switched to $newNet on this device", false)))
+            domainEventBus.emit(IntegrityEvent.LogEvent("Network switched to $newNet on this device", false))
         }
 
         var isPowerTamper = workingHealth.isPowerTamper
         if (lastPowerDisconnectTs > 0 && !isPowerTamper) {
             if (checkViolationSustained(ALERT_ID_TRACKER_POWER, lastPowerDisconnectTs, POWER_DISCONNECT_DEBOUNCE_MS)) {
                 isPowerTamper = true
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("Device power tamper confirmed (debounce met) on this device", true)))
+                domainEventBus.emit(IntegrityEvent.LogEvent("Device power tamper confirmed (debounce met) on this device", true))
             }
         }
 
@@ -483,8 +480,8 @@ class IntegrityMonitor @Inject constructor(
         if (isSteep && !currentHealth.isBatterySteepDischarge) {
             val elapsedMin = (nowRt - earliest.first) / 60000
             val loadContext = if (isHighLoad) "(High Load: CPU %.1f)".format(currentHealth.cpuLoad) else "(Normal Load)"
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected on this device $loadContext ($drop% in ${elapsedMin}m).", true)))
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationSustained(ALERT_ID_BATTERY_STEEP_DISCHARGE)))
+            domainEventBus.emit(IntegrityEvent.LogEvent("CRITICAL BATTERY HEALTH: Steep discharge detected on this device $loadContext ($drop% in ${elapsedMin}m).", true))
+            domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_BATTERY_STEEP_DISCHARGE))
         }
         return isSteep
     }
@@ -499,13 +496,13 @@ class IntegrityMonitor @Inject constructor(
     fun simulateCoolingMode(active: Boolean) {
         val msg = if (active) "SYSTEM EMERGENCY: Simulated Thermal limit reached. Entering forced COOLING MODE." 
                   else "System Info: Simulated Thermal limit recovered."
-        domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent(msg, active)))
+        domainEventBus.emit(IntegrityEvent.LogEvent(msg, active))
         
         val nowRt = timeProvider.elapsedRealtime()
         val coolingEnteredTimestamp = if (active) nowRt else 0L
 
-        if (active) domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationSustained(ALERT_ID_TRACKER_TEMP)))
-        else domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_TEMP)))
+        if (active) domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_TRACKER_TEMP))
+        else domainEventBus.emit(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_TEMP))
 
         updateHealth { h ->
             h.isCoolingModeActive = active
@@ -527,14 +524,14 @@ class IntegrityMonitor @Inject constructor(
             else -> "SYSTEM WARNING: Simulated Internal storage is low."
         }
         
-        domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent(msg, active)))
+        domainEventBus.emit(IntegrityEvent.LogEvent(msg, active))
         
         if (active) {
-            if (critical) domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL)))
-            else domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW)))
+            if (critical) domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_CRITICAL))
+            else domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_SYSTEM_STORAGE_LOW))
         } else {
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationResolved(ALERT_ID_SYSTEM_STORAGE_CRITICAL)))
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationResolved(ALERT_ID_SYSTEM_STORAGE_LOW)))
+            domainEventBus.emit(IntegrityEvent.ViolationResolved(ALERT_ID_SYSTEM_STORAGE_CRITICAL))
+            domainEventBus.emit(IntegrityEvent.ViolationResolved(ALERT_ID_SYSTEM_STORAGE_LOW))
         }
 
         updateHealth { h ->
@@ -550,7 +547,7 @@ class IntegrityMonitor @Inject constructor(
         isMaliAnomalySimulated.set(active)
         val msg = if (active) "System Info: Mali Driver Anomaly simulation ENABLED." 
                   else "System Info: Mali Driver Anomaly simulation DISABLED."
-        domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent(msg, false)))
+        domainEventBus.emit(IntegrityEvent.LogEvent(msg, false))
     }
 
     suspend fun isInternetHardwarePresent(): Boolean {
@@ -568,7 +565,7 @@ class IntegrityMonitor @Inject constructor(
         if (!online) {
             val firstDetected = sustainedViolations.getOrPut(ALERT_ID_LOCAL_INTERNET) { now }
             if (now - firstDetected > INTERNET_LOSS_THRESHOLD_MS) {
-                domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationSustained(ALERT_ID_LOCAL_INTERNET)))
+                domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_LOCAL_INTERNET))
                 updateHealth { it.localInternetLoss = true }
                 return false
             }
@@ -606,7 +603,7 @@ class IntegrityMonitor @Inject constructor(
 
     fun checkViolationSustained(type: String, startTs: Long, threshold: Long): Boolean {
         if (startTs > 0 && (timeProvider.elapsedRealtime() - startTs) > threshold) {
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationSustained(type)))
+            domainEventBus.emit(IntegrityEvent.ViolationSustained(type))
             return true
         }
         return false
@@ -615,7 +612,7 @@ class IntegrityMonitor @Inject constructor(
     fun onPowerDisconnected() {
         if (!currentHealth.isPowerTamper && lastPowerDisconnectTs == 0L) {
             lastPowerDisconnectTs = timeProvider.elapsedRealtime()
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("Device power unplugged, starting debounce... on this device", false)))
+            domainEventBus.emit(IntegrityEvent.LogEvent("Device power unplugged, starting debounce... on this device", false))
         }
     }
 
@@ -623,8 +620,8 @@ class IntegrityMonitor @Inject constructor(
         lastPowerDisconnectTs = 0L
         if (currentHealth.isPowerTamper) {
             updateHealth { it.isPowerTamper = false }
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_POWER)))
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LogEvent("Device power restored on this device", false)))
+            domainEventBus.emit(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_POWER))
+            domainEventBus.emit(IntegrityEvent.LogEvent("Device power restored on this device", false))
         }
     }
 
@@ -632,7 +629,7 @@ class IntegrityMonitor @Inject constructor(
 
     fun clearPowerTamper() {
         updateHealth { it.isPowerTamper = false }
-        domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_POWER)))
+        domainEventBus.emit(IntegrityEvent.ViolationResolved(ALERT_ID_TRACKER_POWER))
         lastPowerDisconnectTs = 0L
     }
 

@@ -11,10 +11,8 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
- * Sep.26.6:
- * - Fixed Role-Prefix Collision: Isolated local integrity events to "V_" prefix 
- *   in Viewer mode, preventing remote "VR_" state contamination.
- * - Hardened Reset Orchestration: Added clearPeerCache for atomic session cleanup.
+ * Sep.27.4:
+ * - Issue #1348: Flattened DomainEvent hierarchy. Pattern matches component events directly.
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -55,14 +53,14 @@ class AppEventCoordinator @Inject constructor(
                 is DomainEvent.StabilityViolation -> handleStabilityViolation(event)
                 is DomainEvent.PowerSaveTransition -> handlePowerSaveTransition(event)
                 is DomainEvent.ServiceStatus -> logManager.logServiceEvent(event.message, isImportant = event.isImportant)
-                is DomainEvent.Alarm -> handleAlarmEvent(event.event)
-                is DomainEvent.Integrity -> handleIntegrityEvent(event.event)
-                is DomainEvent.Processor -> handleProcessorEvent(event.event, event.isPrimary)
-                is DomainEvent.Connectivity -> handleConnectivityEvent(event.event)
-                is DomainEvent.History -> handleHistoryEvent(event.event)
-                is DomainEvent.Sensor -> handleSensorEvent(event.event)
-                is DomainEvent.Command -> handleCommandEvent(event.event)
-                is DomainEvent.Revival -> handleRevivalEvent(event.event)
+                is AlarmEvent -> handleAlarmEvent(event)
+                is IntegrityEvent -> handleIntegrityEvent(event)
+                is ProcessorEvent -> handleProcessorEvent(event, event.isPrimary)
+                is ConnectivityEvent -> handleConnectivityEvent(event)
+                is HistoryEvent -> handleHistoryEvent(event)
+                is AppSensorEvent -> handleSensorEvent(event)
+                is CommandEvent -> handleCommandEvent(event)
+                is RevivalEvent -> handleRevivalEvent(event)
             }
         }
     }
@@ -141,9 +139,6 @@ class AppEventCoordinator @Inject constructor(
     }
 
     private fun handleIntegrityEvent(event: IntegrityEvent) {
-        // Issue #1336 Fix: Local integrity events must use "T_" or "V_" prefix.
-        // Hardening: Restrict setPowerAlarmPending to Tracker mode only to prevent 
-        // remote "VR_" state contamination in Viewer mode.
         val isTrackerMode = configManager.isTrackerMode
         val localPrefix = if (isTrackerMode) "T_" else "V_"
         
@@ -177,8 +172,6 @@ class AppEventCoordinator @Inject constructor(
 
     private fun handleProcessorEvent(event: ProcessorEvent, isPrimary: Boolean) {
         val isTrackerMode = configManager.isTrackerMode
-        // Primary processor is "T_" in Tracker mode, "V_" (Self) in Viewer mode.
-        // Secondary/Remote processor exists only in Viewer mode as "VR_".
         val prefix = if (isTrackerMode) "T_" else (if (isPrimary) "V_" else "VR_")
         val logPrefix = if (!isTrackerMode && isPrimary) "[Self] " else ""
         
@@ -248,7 +241,6 @@ class AppEventCoordinator @Inject constructor(
     private fun handleCommandEvent(event: CommandEvent) {
         when (event) {
             is CommandEvent.ResetTimers -> {
-                // Issue #1333: Clear peer connection cache on session reset
                 peerConnectionCache.clear()
             }
             else -> {

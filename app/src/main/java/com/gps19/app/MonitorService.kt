@@ -24,23 +24,10 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.27.4:
+ * - Issue #1348: Flattened DomainEvent hierarchy. Updated event filtering logic.
  * Sep.27.2:
  * - Issue #1345: Integrated ExecuteNetworkStressTest command handling.
- * Sep.26.12:
- * - Issue #1344: Integrated thermalHeadroom and heapAllocatedMb into 
- *   SystemEvaluationSnapshot for forensic tracking.
- * Sep.26.4:
- * - Issue #1335: Initialization Prefix Unification. Unified loadLogicState to use rolePrefix 
- *   for primaryProcessor state restoration uniformly across roles.
- * Sep.26.3:
- * - Issue #1334: Unified GPS Pipeline Hardening & Forensic Audit Integration. Standardized 
- *   lastGpsTs tracking to wall-clock time across roles and integrated forensic stability fix auditing.
- * Sep.26.1:
- * - Issue #1332: Viewer Self-Tracking Snapshot Optimization. Unified GPS 
- *   processing pipeline for both roles using locationBuffer. Consolidated 
- *   self-telemetry persistence under TickEvaluated event.
- * Sep.26.0:
- * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -96,8 +83,8 @@ class MonitorService : BaseMonitorService() {
         rolePrefix = if (isTrackerMode) "T_" else "V_"
         notificationManager.setTrackerMode(isTrackerMode)
         
-        primaryProcessor = LocationProcessor(timeProvider, domainEventBus)
-        remoteProcessor = LocationProcessor(timeProvider, domainEventBus)
+        primaryProcessor = LocationProcessor(timeProvider, domainEventBus, isPrimary = true)
+        remoteProcessor = LocationProcessor(timeProvider, domainEventBus, isPrimary = false)
     }
 
     override suspend fun onServiceInitialize() {
@@ -158,7 +145,6 @@ class MonitorService : BaseMonitorService() {
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
         val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
 
-        // Issue #1335: Unify primaryProcessor state restoration using rolePrefix regardless of role
         val primaryState = repository.loadTrackerState(rolePrefix)
         primaryProcessor.loadState(
             savedMaxAccuracy = repository.getDouble(rolePrefix + MAX_ACCURACY_KEY, 0.0),
@@ -185,7 +171,6 @@ class MonitorService : BaseMonitorService() {
             hardwareSuite.setAdaptiveVibrationFloor(vibeFloor)
         }
 
-        // Strictly reserve the "VR_" prefix for the remoteProcessor state restoration in Viewer mode
         if (!isTrackerMode) {
             val remoteState = repository.loadTrackerState("VR_")
             remoteProcessor.loadState(
@@ -278,23 +263,20 @@ class MonitorService : BaseMonitorService() {
 
     private suspend fun observeConnectivityEvents() {
         domainEventBus.events
-            .filterIsInstance<DomainEvent.Connectivity>()
+            .filterIsInstance<ConnectivityEvent.PeerPulse>()
             .collect { event ->
-                val connectivityEvent = event.event
-                if (connectivityEvent is ConnectivityEvent.PeerPulse) {
-                    if (isTrackerMode) handleViewerPulse(connectivityEvent.id) else handleTrackerPulse(connectivityEvent.id)
-                }
+                if (isTrackerMode) handleViewerPulse(event.id) else handleTrackerPulse(event.id)
             }
     }
 
     private suspend fun observeCommandEvents() {
         domainEventBus.events
-            .filterIsInstance<DomainEvent.Command>()
+            .filterIsInstance<CommandEvent>()
             .collect { event ->
-                when (val commandEvent = event.event) {
+                when (event) {
                     is CommandEvent.WatchdogTrigger -> { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
                     is CommandEvent.UiPulse -> { lastUiPulseTs = timeProvider.currentTimeMillis(); updateForegroundServiceType() }
-                    is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(commandEvent.visible)
+                    is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); lifecycleScope.launch { hardwareSuite.start() } }
                     is CommandEvent.ExecuteStressTest -> if (isTrackerMode) executeAutomatedStressTest()
@@ -513,11 +495,9 @@ class MonitorService : BaseMonitorService() {
             lastPowerSaveCheckRt = nowRt
         }
 
-        // Issue #1332 & Issue #1334: Unified GPS point processing with full Forensic audit integration.
         while (locationBuffer.isNotEmpty()) {
             val loc = locationBuffer.poll() ?: break
             
-            // Standardized: Perform forensic stability fix audit within the primary loop
             forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, if (isTrackerMode) "T" else "V")
 
             val pointSnapshot = evaluationSnapshot.copy(
@@ -546,7 +526,6 @@ class MonitorService : BaseMonitorService() {
             evaluateAlarmsInternal(now, nowRt, isSocketConnected, isPeerActive, proc, hSnapshot, proc.timestamp, evaluationSnapshot)
         }
 
-        // Issue #1314: Pre-populate forensic indexes in the snapshot before emission.
         evaluationSnapshot.atmospheric.apply {
             noiseIdx = (acousticDb - primaryProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB
             luxIdx = log10(lux + 1.0) / RIBBON_LUX_LOG_SCALE
@@ -575,7 +554,6 @@ class MonitorService : BaseMonitorService() {
 
     private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isPeerActive: Boolean, processed: ProcessedLocation, hSnapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long, evaluationSnapshot: SystemEvaluationSnapshot) {
         val finalSnapshot = if (isTrackerMode) {
-            // Issue #1329: Use centralized mapper for local snapshot refinement.
             TelemetryMapper.mapProcessedToSnapshot(
                 snapshot = evaluationSnapshot,
                 processed = processed,
@@ -584,7 +562,6 @@ class MonitorService : BaseMonitorService() {
                 snrSnapshot = hardwareSuite.averageSnr
             )
         } else {
-            // Issue #1329: Use centralized mapper for remote snapshot construction.
             TelemetryMapper.mapStatusToSnapshot(
                 s = connectivitySuite.trackerStatus,
                 base = evaluationSnapshot,

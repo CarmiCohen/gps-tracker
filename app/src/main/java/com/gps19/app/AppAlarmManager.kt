@@ -18,12 +18,11 @@ import kotlin.math.ceil
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.27.4:
+ * - Issue #1348: Flattened DomainEvent hierarchy, emitting AlarmEvent directly.
  * Sep.26.6:
  * - Fixed Role-Prefix Collision: Hardened setPowerAlarmPending and resetEvaluation 
  *   against invalid prefix mapping or role prefix flipping.
- * Sep.25.08:
- * - Issue #1329: Telemetry Mapping Convergence. Refactored syncEvaluationState 
- *   to use TelemetryMapper.mapSnapshotToHealth, eliminating manual mapping logic.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -208,7 +207,7 @@ class AppAlarmManager @Inject constructor(
             report = evaluationReport,
             versionTag = versionTag,
             onSpike = { message, duration ->
-                domainEventBus.emit(DomainEvent.Alarm(AlarmEvent.LogEvent(
+                domainEventBus.emit(AlarmEvent.LogEvent(
                     type = ALERT_ID_PERFORMANCE_SPIKE,
                     message = "$versionTag $message",
                     isImportant = false,
@@ -219,12 +218,12 @@ class AppAlarmManager @Inject constructor(
                     specialColor = FORENSIC_PINK_COLOR,
                     lat = snapshot.kinetic.lat, lng = snapshot.kinetic.lng, accuracy = snapshot.kinetic.accuracy,
                     maxAccuracy = snapshot.kinetic.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
-                )))
+                ))
             },
             onTrigger = { eval ->
                 val isSpecial = isSpecialType(eval.type)
                 val specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
-                domainEventBus.emit(DomainEvent.Alarm(AlarmEvent.LogEvent(
+                domainEventBus.emit(AlarmEvent.LogEvent(
                     type = eval.type,
                     message = "$versionTag ALARM TRIGGERED: ${eval.title}",
                     isImportant = true,
@@ -235,12 +234,12 @@ class AppAlarmManager @Inject constructor(
                     specialColor = specialColor,
                     lat = snapshot.kinetic.lat, lng = snapshot.kinetic.lng, accuracy = snapshot.kinetic.accuracy,
                     maxAccuracy = snapshot.kinetic.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
-                )))
+                ))
             },
             onResolve = { eval, durationMs ->
                 val isSpecial = isSpecialType(eval.type)
                 val specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
-                domainEventBus.emit(DomainEvent.Alarm(AlarmEvent.LogEvent(
+                domainEventBus.emit(AlarmEvent.LogEvent(
                     type = eval.type,
                     message = "$versionTag ALARM RESOLVED: ${eval.title}",
                     isImportant = false,
@@ -251,7 +250,7 @@ class AppAlarmManager @Inject constructor(
                     specialColor = specialColor,
                     lat = snapshot.kinetic.lat, lng = snapshot.kinetic.lng, accuracy = snapshot.kinetic.accuracy,
                     maxAccuracy = snapshot.kinetic.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
-                )))
+                ))
             }
         )
         

@@ -22,10 +22,10 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.27.4:
+ * - Issue #1348: Flattened DomainEvent hierarchy, emitting HistoryEvent directly.
  * Sep.26.0:
- * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence. Aligned 
- *   updateRibbons(event) with simplified TickEvaluated signature, extracting 
- *   forensic indexes directly from snapshot partitioned states.
+ * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -114,7 +114,7 @@ class HistoryManager @Inject constructor(
 
     private fun emitSanitizedLog(message: String, isImportant: Boolean = false) {
         val sanitized = ForensicSanitizer.sanitizeMessage(message)
-        domainEventBus.emit(DomainEvent.History(HistoryEvent.LogEvent(sanitized, isImportant)))
+        domainEventBus.emit(HistoryEvent.LogEvent(sanitized, isImportant))
     }
 
     /**

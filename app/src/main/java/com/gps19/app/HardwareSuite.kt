@@ -33,16 +33,8 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
- * Sep.25.03:
- * - Issue #1322 Cleanup: Fixed ACOUSTIC_DUTY_CYCLE_ON_MS typo.
- * Sep.25.01:
- * - Issue #1322: Converged Sensor and Revival event emission into DomainEventBus.
- *   Migrated LocationStatus and RevivalEvent to EngineModels.kt.
- * Sep.24.04:
- * - Issue #1273 REMEDIATION: Guarded activeUsers from falling below zero and hardened 
- *   deferred teardown check to <= 0 (R-ID 460).
- * - Issue #1271 REMEDIATION: Added setAdaptiveVibrationFloor to support restoring the 
- *   persisted vibration floor anchor on service initialization (R-ID 459).
+ * Sep.27.4:
+ * - Issue #1348: Flattened DomainEvent hierarchy, emitting component events directly.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -474,7 +466,6 @@ class HardwareSuite @Inject constructor(
             isDisplayFlickering.set(false)
             lastDisplayTransitionRt = 0L
             
-            // Issue #1127/1128/1133/1135: Clear lifecycle leftovers on stop
             clearLifecycleLeftovers()
 
             Timber.i("HardwareSuite: Starting deferred teardown sequence.")
@@ -565,7 +556,7 @@ class HardwareSuite @Inject constructor(
                 val fastRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 1000L).setMaxUpdates(5).build()
                 fusedLocationClient.requestLocationUpdates(fastRequest, fusedCallback, handler.looper)
 
-                domainEventBus.emit(DomainEvent.Revival(RevivalEvent.RawBurstStarted))
+                domainEventBus.emit(RevivalEvent.RawBurstStarted)
                 locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, rawListener, handler.looper)
                 
                 delay(10000)
@@ -580,7 +571,7 @@ class HardwareSuite @Inject constructor(
                     if (rawRevivalListener == rawListener) {
                         rawListener.unregister(locationManager, handler)
                         rawRevivalListener = null
-                        domainEventBus.emit(DomainEvent.Revival(RevivalEvent.RawBurstEnded))
+                        domainEventBus.emit(RevivalEvent.RawBurstEnded)
                     }
                 }
             }
@@ -628,12 +619,12 @@ class HardwareSuite @Inject constructor(
         if (nextStatus != currentLocationStatus) {
             currentLocationStatus = nextStatus
             _locationStatus.tryEmit(currentLocationStatus)
-            domainEventBus.emit(DomainEvent.Integrity(IntegrityEvent.LocationStatusChanged(currentLocationStatus)))
+            domainEventBus.emit(IntegrityEvent.LocationStatusChanged(currentLocationStatus))
         }
         
         if (shouldEmitSuccess) {
-            domainEventBus.emit(DomainEvent.Revival(RevivalEvent.Success))
-            forensicAuditor.computeEnergyFootprint(nowRt)?.let { domainEventBus.emit(DomainEvent.Revival(it)) }
+            domainEventBus.emit(RevivalEvent.Success)
+            forensicAuditor.computeEnergyFootprint(nowRt)?.let { domainEventBus.emit(it) }
         }
     }
 
@@ -672,10 +663,6 @@ class HardwareSuite @Inject constructor(
     fun setPollingInterval(intervalMs: Long) { if (pollingIntervalFlow.value != intervalMs) pollingIntervalFlow.value = intervalMs }
     fun resetGnssJitter() { forensicAuditor.resetGnssJitter() }
 
-    /**
-     * getSnrSamples: Refactored to use forensicSequence abstraction.
-     * Issue #1152: Flyweight Sequence Abstraction.
-     */
     fun getSnrSamples(fromRt: Long, toRt: Long): Sequence<EngineSnrSample> = 
         snrBuffer.forensicSequence(
             flyweight = EngineSnrSample(),
@@ -713,7 +700,7 @@ class HardwareSuite @Inject constructor(
                 }
 
                 forensicAuditor.auditSensorRate(nowRt, isWarming).forEach { (role, msg) ->
-                    domainEventBus.emit(DomainEvent.Sensor(AppSensorEvent.LogEvent("[$role] $msg", false)))
+                    domainEventBus.emit(AppSensorEvent.LogEvent("[$role] $msg", false))
                 }
             }
             Sensor.TYPE_LINEAR_ACCELERATION -> processLinearAcceleration(values[0], values[1], values[2], event.timestamp)
@@ -782,7 +769,7 @@ class HardwareSuite @Inject constructor(
             acousticThread = Thread {
                 while (isMonitoring) {
                     val sampleRate = ACOUSTIC_SAMPLE_RATE; val bufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-                    if (bufferSize <= 0) { if (isMonitoring) domainEventBus.emit(DomainEvent.Sensor(AppSensorEvent.HardwareFailure("AudioRecord: Invalid buffer size"))); try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
+                    if (bufferSize <= 0) { if (isMonitoring) domainEventBus.emit(AppSensorEvent.HardwareFailure("AudioRecord: Invalid buffer size")); try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
                     var audioRecord: AudioRecord? = null
                     try {
                         var attempts = 0
@@ -818,10 +805,10 @@ class HardwareSuite @Inject constructor(
                                         lastAcousticLockoutRt = acousticFastPath.lastSpikeRt
                                     }
                                 }
-                            } else if (read < 0) { if (!isMonitoring) break; domainEventBus.emit(DomainEvent.Sensor(AppSensorEvent.HardwareFailure("AudioRecord: Hardware error"))); break }
+                            } else if (read < 0) { if (!isMonitoring) break; domainEventBus.emit(AppSensorEvent.HardwareFailure("AudioRecord: Hardware error")); break }
                         }
                         try { audioRecord.stop() } catch (ex: Exception) {}
-                    } catch (e: Exception) { if (isMonitoring) domainEventBus.emit(DomainEvent.Sensor(AppSensorEvent.HardwareFailure("AudioRecord: Exception - ${e.message}"))) }
+                    } catch (e: Exception) { if (isMonitoring) domainEventBus.emit(AppSensorEvent.HardwareFailure("AudioRecord: Exception - ${e.message}")) }
                     finally { isAcousticRunning = false; try { audioRecord?.release() } catch (ex: Exception) {}; if (isMonitoring) try { Thread.sleep(ACOUSTIC_GENERIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { } }
                 }
             }.apply { name = "AcousticMonitor"; priority = Thread.MIN_PRIORITY; start() }
@@ -832,8 +819,6 @@ class HardwareSuite @Inject constructor(
         synchronized(acousticLock) {
             isMonitoring = false
             isAcousticRunning = false
-            // Issue #1123 Hardening: Removed synchronous join() to prevent service stalls.
-            // Resource exclusivity is handled in startAcousticMonitoring.
             acousticThread?.interrupt()
             acousticThread = null
         }
@@ -894,21 +879,17 @@ class HardwareSuite @Inject constructor(
     }
 
     fun consumeLogicSnapshot(): ForensicSnapshot {
-        return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeLogicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> domainEventBus.emit(DomainEvent.Sensor(AppSensorEvent.LogEvent(m, false))) }) {
+        return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeLogicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> domainEventBus.emit(AppSensorEvent.LogEvent(m, false)) }) {
             privateConsumeSnapshot(logicSnapshotBuffer, isForensic = false)
         }
     }
 
     fun consumeForensicSnapshot(): ForensicSnapshot {
-        return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeForensicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> domainEventBus.emit(DomainEvent.Sensor(AppSensorEvent.LogEvent(m, false))) }) {
+        return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeForensicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> domainEventBus.emit(AppSensorEvent.LogEvent(m, false)) }) {
             privateConsumeSnapshot(forensicSnapshotBuffer, isForensic = true)
         }
     }
 
-    /**
-     * getSensorSamples: Refactored to use forensicSequence abstraction.
-     * Issue #1152: Flyweight Sequence Abstraction.
-     */
     fun getSensorSamples(fromRt: Long, toRt: Long): Sequence<EngineSensorSnapshot> =
         sensorBuffer.forensicSequence(
             flyweight = EngineSensorSnapshot(),
@@ -916,10 +897,6 @@ class HardwareSuite @Inject constructor(
             transform = { source, target -> target.copyFrom(source) }
         )
 
-    /**
-     * getAcousticSamples: Refactored to use forensicSequence abstraction.
-     * Issue #1155: Acoustic-SNR Semantic Mismatch.
-     */
     fun getAcousticSamples(fromRt: Long, toRt: Long): Sequence<EngineAcousticSample> =
         sensorBuffer.forensicSequence(
             flyweight = EngineAcousticSample(),
@@ -1080,15 +1057,10 @@ class HardwareSuite @Inject constructor(
         }
     }
 
-    /**
-     * resetBaseline: Targeted or global reset of hardware temporal markers and baselines.
-     * Issue #1124: Supported roleTag for selective ForensicAuditor reset.
-     */
     fun resetBaseline(roleTag: String? = null) { 
         synchronized(this) {
             emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryStartRt = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; 
             
-            // Issue #1124: Selective Forensic Reset
             forensicAuditor.reset(roleTag)
             
             revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
@@ -1096,7 +1068,6 @@ class HardwareSuite @Inject constructor(
             _locationStatus.tryEmit(currentLocationStatus)
             isDisplayFlickering.set(false); lastDisplayTransitionRt = 0L
             
-            // Issue #1127/1128/1133/1135: Clear lifecycle leftovers on reset
             clearLifecycleLeftovers()
         }
     }
@@ -1129,13 +1100,13 @@ class HardwareSuite @Inject constructor(
                 if (revivalAttemptCount < MAX_REVIVAL_ATTEMPTS) {
                     revivalAttemptCount++
                     Timber.w("HardwareSuite: GNSS Recovery Pulse triggered (Attempt $revivalAttemptCount)")
-                    domainEventBus.emit(DomainEvent.Revival(RevivalEvent.Attempt(revivalAttemptCount)))
+                    domainEventBus.emit(RevivalEvent.Attempt(revivalAttemptCount))
                     restartLocationUpdates()
                 } else if (!isHardwareLocked) {
                     isHardwareLocked = true
                     Timber.e("HardwareSuite: MAX REVIVAL ATTEMPTS REACHED. GPS_HARDWARE_LOCK triggered.")
-                    domainEventBus.emit(DomainEvent.Revival(RevivalEvent.HardwareLock))
-                    forensicAuditor.computeEnergyFootprint(nowRt, consume = false)?.let { domainEventBus.emit(DomainEvent.Revival(it)) }
+                    domainEventBus.emit(RevivalEvent.HardwareLock)
+                    forensicAuditor.computeEnergyFootprint(nowRt, consume = false)?.let { domainEventBus.emit(it) }
                 }
             }
         } else { revivalAttemptCount = 0; isHardwareLocked = false }

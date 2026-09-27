@@ -21,16 +21,11 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.27.4:
+ * - Issue #1348: Flattened DomainEvent hierarchy, emitting component events directly.
  * Sep.27.2:
  * - Issue #1345: Implemented executeFlappingStressTest to verify signaling 
  *   resilience during high-frequency network flapping (R-ID 345).
- * Sep.26.11:
- * - Issue #1343: Integrated Signaling Lifecycle Probes to forensicLogger 
- *   to audit interface handover events and throttled outbound tx errors.
- * Sep.25.08:
- * - Issue #1329: Telemetry Mapping Convergence. Refactored handleBinaryUpdate 
- *   and handleJsonUpdate to use TelemetryMapper, eliminating ~200 lines of 
- *   manual mapping logic. Fixed battery typo in handleJsonUpdate.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -447,7 +442,7 @@ class ConnectivitySuite @Inject constructor(
             val nowRt = timeProvider.elapsedRealtime()
             val peerId = statusProto.id
 
-            domainEventBus.emit(DomainEvent.Connectivity(ConnectivityEvent.PeerPulse(peerId)))
+            domainEventBus.emit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt)
             remoteStatusRepository.setTrackerConnected(true)
             mainRepository.updateRemoteActivity(nowRt) 
@@ -524,7 +519,7 @@ class ConnectivitySuite @Inject constructor(
                 isImportant = true
             ))
             Handler(Looper.getMainLooper()).post { Toast.makeText(context, "REMOTE: Chair Baseline Zeroed", Toast.LENGTH_SHORT).show() }
-            domainEventBus.emit(DomainEvent.Connectivity(ConnectivityEvent.PeerPulse(peerId)))
+            domainEventBus.emit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt)
             return
         }
@@ -533,14 +528,14 @@ class ConnectivitySuite @Inject constructor(
             if (!isTrackerMode && !fromViewer) {
                 remoteStatusRepository.setTrackerConnected(true)
             }
-            domainEventBus.emit(DomainEvent.Connectivity(ConnectivityEvent.PeerPulse(peerId)))
+            domainEventBus.emit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt)
             mainRepository.updateRemoteActivity(nowRt)
             return
         }
 
         if (isTrackerMode && fromViewer) {
-            domainEventBus.emit(DomainEvent.Connectivity(ConnectivityEvent.PeerPulse(peerId)))
+            domainEventBus.emit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt); remoteStatusRepository.setTrackerConnected(true); mainRepository.updateRemoteActivity(nowRt); return
         }
 
@@ -548,7 +543,7 @@ class ConnectivitySuite @Inject constructor(
             val remoteTs = data.optLong("ts", 0L)
             if (!remoteStatusRepository.shouldProcessPacket(remoteTs)) return
 
-            domainEventBus.emit(DomainEvent.Connectivity(ConnectivityEvent.PeerPulse(peerId)))
+            domainEventBus.emit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt); remoteStatusRepository.setTrackerConnected(true); mainRepository.updateRemoteActivity(nowRt)
             remoteStatusRepository.setPeerSignal(data.optInt("signal", 0))
 

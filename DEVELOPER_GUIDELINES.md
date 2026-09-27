@@ -38,5 +38,6 @@ Perform these steps in strict sequence once an issue is resolved:
 8.  **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot for the next session.
 9.  **Session Termination**: Stop the chat immediately. Do not attempt further fixes.
 10. **Audit Recalculation**: Display final metrics in the format:  
-    **Current Audit Baseline: [SOT: X (Rules: Y), Resolved: A, Open: H:xx, M:xx, L:xx Ideas: H:xx, M:xx, L:xx Resolved:xx, Testing: C (Sub-items: D), QA: F]**
+    **Current Audit Baseline: [SOT: X (Rules: Y), Resolved: A, Open: H:xx, M:xx, L:xx Ideas: H:xx, M:xx, L:xx Resolved:xx, Testing: C (Sub-items: D), QA: F]**  
+    *(Example current baseline line: `- **Sep.27.3: [SOT: 503 (Rules: 40), Resolved: 1248, Open: H:1, M:0, L:0, Ideas: H:2, M:8, L:5, Testing: 3 (Sub-items: 15), QA: 284]**`)*
 11. **Final Stop**: After the audit recalculation, **STOP ALL PROCESSING.**
