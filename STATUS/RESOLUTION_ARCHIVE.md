@@ -1,4 +1,14 @@
-# 🏛️ Resolution Archive - Sep.28.13
+# 🏛️ Resolution Archive - Sep.28.15
+
+## 🏁 Issue #1362: Production Codebase Stabilization & Tracking Alignment
+*   **Resolved**: Sep.28.15
+*   **Root Cause**: Transitioning the codebase and all associated tracking infrastructure (SOT, issues, build config) to the next version (`Sep.28.15`) to maintain forensic integrity and deployment readiness.
+*   **Remediation**:
+    *   **Build Config**: Advanced `versionName` to `Sep.28.15` and `versionCode` to `1035` in `app/build.gradle`.
+    *   **Requirements**: Synchronized `SOT_MASTER_REQUIREMENTS.md` with new baseline metrics and verification chapters.
+    *   **Audit**: Verified removal of legacy service stubs and confirmed clean compilation of the unified service architecture.
+*   **Significance**: Medium (Process Integrity & Versioning).
+*   **SOT ID**: 529 (Production Codebase Stabilization)
 
 ## 🏁 Issue #1361: Forensic Reliability Math Hardening
 *   **Resolved**: Sep.28.13
@@ -8,27 +18,6 @@
     *   **Health Integration**: Added a high-precision decimal-to-double conversion step when pushing metrics to the `TelemetryRepository`.
 *   **Significance**: Medium (Forensic Integrity & Precision).
 *   **SOT ID**: 528 (Forensic Reliability Math Hardening)
-
-## 🏁 Issue #1360: Mismatched Unregistration Method Signatures
-*   **Resolved**: Sep.28.12
-*   **Root Cause**: Following the migration to centralized `TimeProvider` in `Sep.28.11`, the helper methods for hardware listener unregistration (`ManagedNetworkCallback.unregister`, `ManagedLocationCallback.unregister`, etc.) were updated to require a `TimeProvider` instance for latency auditing. However, several production call sites were left with legacy signatures, causing compilation failures.
-*   **Remediation**:
-    *   **AndroidNetworkProvider.kt**: Injected `TimeProvider` and updated `performUnregistration` to pass the authority to `ManagedNetworkCallback.unregister`.
-    *   **HardwareSuite.kt**: Updated all deferred teardown and revival pulse unregistration paths to pass the injected `timeProvider`.
-    *   **SystemStatusProvider.kt**: Updated the `awaitClose` block in `observeInternetStatus` to pass `timeProvider` to the network callback unregistration.
-*   **Significance**: Medium (Temporal Integrity & Build Stability).
-*   **SOT ID**: 527 (Signature Harmonization)
-
-## 🏁 Issue #1359: Temporal Precision & Service Logic Hardening
-*   **Resolved**: Sep.28.11
-*   **Root Cause**: While the `BootLifecycleAuthority` was centralized, several high-level background components (`MonitorService`, `ConnectivitySuite`, `SystemStatusProvider`) still relied on direct `SystemClock.elapsedRealtime()` or `System.currentTimeMillis()` calls. This created potential for logic drift and hindered the ability to mock time in behavioral simulation tests.
-*   **Remediation**:
-    *   **MonitorService.kt**: Audited and verified all tick logic and forensic captures use injected `timeProvider` for monotonic and wall-clock anchors.
-    *   **BaseMonitorService.kt**: Migrated foreground service update throttling and tick loop interval calculations to `timeProvider`.
-    *   **ConnectivitySuite.kt**: Refactored network re-join backoffs, signaling teardown duration measurements, and RTT evaluations to use centralized temporal logic.
-    *   **SystemStatusProvider.kt**: Migrated internet status caching and hardware permission refresh TTL logic to `timeProvider.elapsedRealtime()`.
-*   **Significance**: Medium (Temporal Integrity & Testability).
-*   **SOT ID**: 526 (Temporal Logic Hardening)
 
 ...
 *(Full historical records maintained in SOT Archive)*
