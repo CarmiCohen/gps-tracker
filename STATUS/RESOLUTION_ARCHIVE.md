@@ -12,12 +12,12 @@
 
 ## 🏁 Issue #1375: Remediate WorkManager Initialization Failure in Instrumented Tests
 *   **Resolved**: Sep.28.28
-*   **Root Cause**: WorkManager is not initialized during Hilt instrumented tests because HiltTestApplication does not implement Configuration.Provider, causing IllegalStateException in lifecycle-dependent components.
+*   **Root Cause**: WorkManager is not initialized during Hilt instrumented tests because HiltTestApplication does not implement Configuration.Provider.
 *   **Remediation**:
-    *   **Test Environment**: Implemented GpsTestBaseApplication and GpsTestApplication interface using @CustomTestApplication to provide valid WorkManager configuration.
+    *   **Test Environment**: Implemented GpsTestBaseApplication and GpsTestApplication interface using @CustomTestApplication.
     *   **Test Runner**: Updated HiltTestRunner to utilize the custom test application class.
 *   **Significance**: High (Test Infrastructure & Stability).
-*   **SOT ID**: 542 (Test Environment Governance)
+*   **SOT ID**: 541 (Test Environment Governance)
 
 ...
 *(Full historical records maintained in SOT Archive)*
