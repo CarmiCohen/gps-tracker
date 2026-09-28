@@ -1,4 +1,12 @@
-# 🏛️ Resolution Archive - Sep.28.5
+# 🏛️ Resolution Archive - Sep.28.6
+
+## 🏁 Issue #1167: Map Overlay Imperative to Declarative Controller
+*   **Resolved**: Sep.28.6
+*   **Root Cause**: The `OsmMap` composable was overloaded with imperative `LaunchedEffect` triggers and direct handling of `MapOverlayManager` side effects, breaching the declarative boundaries of Compose UI and containing redundant coordinate smoothing already computed at the state mapping layer.
+*   **Remediation**:
+    *   **MapController.kt**: Introduced a dedicated imperative coordinator class to isolate `MapView` layout state updates, asynchronous caching overlays, follow-modes, and camera animations.
+    *   **MapComponents.kt**: Re-factored `OsmMap` into a clean declarative wrapper that delegates platform map operations to `MapController`. Excised redundant UI-side EMA filters in favor of `UiStateCoordinator` authority values.
+    *   **Validation**: Built and compiled with full regression verification.
 
 ## 🏁 Issue #1355: TimeProvider Cleanup
 *   **Resolved**: Sep.28.5

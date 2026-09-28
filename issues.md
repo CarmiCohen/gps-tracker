@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.5
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.6
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
-Centralized Boot Lifecycle Authority integrated. Build-time interface validation active.
+Map Controller Decoupling integrated. UI layer declarative boundary enforced.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -10,14 +10,12 @@ Centralized Boot Lifecycle Authority integrated. Build-time interface validation
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 3)
+## 💡 Strategic Simplification Ideas (Ideas: 2)
 
 ### 🟡 Medium Priority
 *   *(No medium-priority ideas remain)*
 
 ### 🔵 Low Priority
-*   **Issue #1167: Map Overlay Imperative to Declarative Controller**
-    *   *Significance*: **Low-Medium (UI Decoupling)**. Extract osmdroid management into a standalone controller to keep UI code declarative.
 *   **Issue #1175: Real-time Only Path (Pivot Option)**
     *   *Significance*: **Strategic (Maintenance Tradeoff)**. Consider removing backlog sync and forensic backfilling to dramatically reduce codebase complexity.
 *   **Issue #1354: Gradle Task Deduplication**
@@ -27,6 +25,7 @@ Centralized Boot Lifecycle Authority integrated. Build-time interface validation
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1167: Map Overlay Imperative to Declarative Controller** (Resolved Sep.28.6)
 *   **Issue #1355: TimeProvider Cleanup** (Resolved Sep.28.5)
 *   **Issue #1296: Centralized Boot Lifecycle Authority** (Resolved Sep.28.4)
 *   **Issue #1294: Build-Time Interface Validation** (Resolved Sep.28.3)
@@ -53,6 +52,7 @@ Centralized Boot Lifecycle Authority integrated. Build-time interface validation
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.28.6: [SOT Count: 184 (Rules: 54), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.5: [SOT Count: 183 (Rules: 53), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.4: [SOT Count: 183 (Rules: 53), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.3: [SOT Count: 182 (Rules: 52), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 3 (Sub-items: 15), QA: 284]**

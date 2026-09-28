@@ -1,0 +1,119 @@
+package com.gps19.app
+
+import android.content.Context
+import androidx.compose.runtime.snapshots.Snapshot
+import com.gps19.core.engine.*
+import org.osmdroid.util.BoundingBox
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.MapView
+
+/**
+ * MapController: Decouples imperative osmdroid manipulation from Compose UI.
+ * Issue #1167: Centralizes overlay updates, smoothing coordination, and camera triggers.
+ */
+class MapController(
+    private val context: Context,
+    private val mapView: MapView,
+    density: Float
+) {
+    private val overlayManager = MapOverlayManager(context, mapView, density)
+    private var lastTriggerPulse = 0L
+
+    fun update(state: MapViewState, onTap: (GeoPoint) -> Unit, onRemoveMarker: (Int) -> Unit) {
+        Snapshot.withoutReadObservation {
+            val isTrackerMode = state.appMode == "tracker"
+            var changed = false
+
+            // Overlay Hydration Layers
+            if (state.hydrationLevel >= 4) {
+                changed = overlayManager.updateHomePoints(state.homePoints, state.isFenceVisible, state.maxDistance, isTrackerMode, state.geofenceMode, onTap, onRemoveMarker) || changed
+            }
+            if (state.hydrationLevel >= 5) {
+                changed = overlayManager.updateTrails(state.trackerSegments, state.viewerSegments, state.systemPulseRt) || changed
+            }
+            if (state.hydrationLevel >= 6) {
+                changed = overlayManager.updateCurrentPositions(
+                    trackerValid = state.isTrackerValid,
+                    trackerPos = state.smoothedTrackerPos,
+                    isTrackerFresh = state.isTrackerFresh,
+                    trackerAccuracy = state.trackerAccuracy,
+                    maxTrackerAccuracy = state.trackerMaxAccuracy,
+                    trackerSpeed = state.trackerSpeed,
+                    isTrackerPending = state.trackerLocPending,
+                    trackerLastValidFixRt = state.trackerLastValidFixRt,
+                    viewerValid = state.isViewerValid,
+                    viewerPos = state.smoothedViewerPos,
+                    isViewerFresh = state.isViewerFresh,
+                    viewerAccuracy = state.viewerAccuracy,
+                    viewerMaxAcc = state.viewerMaxAcc,
+                    viewerSpeed = state.viewerSpeed,
+                    isViewerPending = state.viewerLocPending,
+                    viewerLastValidFixRt = state.viewerLastValidFixRt,
+                    systemPulseRt = state.systemPulseRt
+                ) || changed
+            }
+            if (state.hydrationLevel >= 7) {
+                changed = overlayManager.updateViolations(state.violations, state.isViolationsVisible, state.isGeofenceViolationsVisible, state.systemPulseRt) || changed
+            }
+            if (state.hydrationLevel >= 8) {
+                changed = overlayManager.updateReplayCursor(state.replayCursorPos) || changed
+            }
+
+            if (changed) mapView.invalidate()
+
+            // Camera Coordination
+            handleCameraTriggers(state)
+            handleFollowLogic(state)
+        }
+    }
+
+    private fun handleCameraTriggers(state: MapViewState) {
+        if (state.centeringTrackerTrigger > 0 && state.smoothedTrackerPos != null) {
+            lastTriggerPulse = state.systemPulse
+            mapView.controller.animateTo(state.smoothedTrackerPos)
+            mapView.controller.setZoom(18.0)
+        }
+        if (state.centeringViewerTrigger > 0 && state.smoothedViewerPos != null) {
+            lastTriggerPulse = state.systemPulse
+            mapView.controller.animateTo(state.smoothedViewerPos)
+            mapView.controller.setZoom(18.0)
+        }
+        if (state.zoomInTrigger > 0) mapView.controller.zoomIn()
+        if (state.zoomOutTrigger > 0) mapView.controller.zoomOut()
+    }
+
+    private fun handleFollowLogic(state: MapViewState) {
+        if (!state.isMapLocked) return
+        if (state.systemPulse - lastTriggerPulse < 500) return
+
+        val sTrk = state.smoothedTrackerPos
+        val sVwr = state.smoothedViewerPos
+
+        when (state.mapFollowMode) {
+            MapFollowMode.VIEWER -> if (sVwr != null) mapView.controller.setCenter(sVwr)
+            MapFollowMode.TRACKER -> if (sTrk != null) mapView.controller.setCenter(sTrk)
+            MapFollowMode.AUTO -> {
+                if (sTrk != null && sVwr != null && state.isTrackerFresh && state.isViewerFresh) {
+                    val dist = PhysicsUtils.calculateDistance(sTrk.latitude, sTrk.longitude, sVwr.latitude, sVwr.longitude)
+                    if (dist in 100.0..100000.0) {
+                        val box = BoundingBox.fromGeoPoints(listOf(sTrk, sVwr))
+                        mapView.zoomToBoundingBox(box.increaseByScale(1.4f), false)
+                        if (mapView.zoomLevelDouble > 18.0) mapView.controller.setZoom(18.0)
+                    } else mapView.controller.setCenter(sTrk)
+                } else if (sTrk != null || sVwr != null) {
+                    mapView.controller.setCenter(sTrk ?: sVwr!!)
+                }
+            }
+            MapFollowMode.NONE -> {}
+        }
+    }
+
+    fun trimMemory(level: Int) = overlayManager.trimMemory(level)
+
+    fun detach() {
+        overlayManager.onDetach()
+        mapView.onDetach()
+        mapView.tileProvider.tileCache.clear()
+        mapView.tileProvider.detach()
+    }
+}

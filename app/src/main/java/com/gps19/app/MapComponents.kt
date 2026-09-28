@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
-import org.osmdroid.util.BoundingBox
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.CustomZoomButtonsController
@@ -40,15 +39,15 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Sep.28.6:
+ * - Issue #1167 RESOLVED: Extracted osmdroid management and imperative coordination 
+ *   into MapController. Removed redundant UI-side EMA smoothing (already handled 
+ *   in UiStateCoordinator). (R-ID 522).
  * Sep.13.30:
  * - Issue #1023 Remediation: Restored Map Scale by adding ScaleBarOverlay to 
  *   MapView overlays list.
  * - Issue #1023 Visibility: Adjusted MapSettingsToggle top padding in portrait 
  *   mode (100.dp) to prevent occlusion by HeaderBar and StatusBar (R1023).
- * Sep.10.20:
- * - Rigorous Audit #243: Fully consolidated MapToolsOverlay and marker 
- *   freshness into MapViewState. Eliminated all remaining individual 
- *   parameter passing and UI-side derived state (R-ID 287).
  */
 
 @Composable
@@ -63,7 +62,7 @@ fun AppMapContainer(
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val toggleTopPadding = if (isLandscape) 12.dp else 110.dp
 
-    val initialCenter = remember(state.trackerLat, state.viewerLat) {
+    val initialCenter = remember(state.trackerLat, state.trackerLng) {
         when {
             state.isTrackerValid -> GeoPoint(state.trackerLat, state.trackerLng)
             state.isViewerValid -> GeoPoint(state.viewerLat, state.viewerLng)
@@ -160,103 +159,20 @@ fun OsmMap(
 ) {
     val context = LocalContext.current
     val density = context.resources.displayMetrics.density
-    val isTrackerMode = state.appMode == "tracker"
 
-    val overlayManager = remember(mapViewRef.value) {
-        mapViewRef.value?.let { MapOverlayManager(context, it, density) }
+    val mapController = remember(mapViewRef.value) {
+        mapViewRef.value?.let { MapController(context, it, density) }
     }
 
-    DisposableEffect(overlayManager) {
+    DisposableEffect(mapController) {
         val callback = object : ComponentCallbacks2 {
-            override fun onTrimMemory(level: Int) { overlayManager?.trimMemory(level) }
+            override fun onTrimMemory(level: Int) { mapController?.trimMemory(level) }
             override fun onConfigurationChanged(newConfig: Configuration) {}
-            override fun onLowMemory() { overlayManager?.trimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) }
+            override fun onLowMemory() { mapController?.trimMemory(ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) }
         }
         context.registerComponentCallbacks(callback)
         onDispose { context.unregisterComponentCallbacks(callback) }
     }
-
-    val smoothedTrackerPos = remember { mutableStateOf<GeoPoint?>(null) }
-    val smoothedViewerPos = remember { mutableStateOf<GeoPoint?>(null) }
-
-    LaunchedEffect(state.trackerLat, state.trackerLng, state.trackerSpeed) {
-        if (state.isTrackerValid) {
-            val last = smoothedTrackerPos.value
-            val alpha = if (state.trackerSpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
-            smoothedTrackerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, state.trackerLat, state.trackerLng) > 100.0) {
-                GeoPoint(state.trackerLat, state.trackerLng)
-            } else {
-                GeoPoint(
-                    PhysicsUtils.smoothCoordinate(last.latitude, state.trackerLat, alpha),
-                    PhysicsUtils.smoothCoordinate(last.longitude, state.trackerLng, alpha)
-                )
-            }
-        }
-    }
-
-    LaunchedEffect(state.viewerLat, state.viewerLng, state.viewerSpeed) {
-        if (state.isViewerValid) {
-            val last = smoothedViewerPos.value
-            val alpha = if (state.viewerSpeed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
-            smoothedViewerPos.value = if (last == null || PhysicsUtils.calculateDistance(last.latitude, last.longitude, state.viewerLat, state.viewerLng) > 100.0) {
-                GeoPoint(state.viewerLat, state.viewerLng)
-            } else {
-                GeoPoint(
-                    PhysicsUtils.smoothCoordinate(last.latitude, state.viewerLat, alpha),
-                    PhysicsUtils.smoothCoordinate(last.longitude, state.viewerLng, alpha)
-                )
-            }
-        }
-    }
-
-    val localLockStatus = remember { mutableStateOf(state.isMapLocked) }
-    LaunchedEffect(state.isMapLocked) { localLockStatus.value = state.isMapLocked }
-
-    var lastTriggerTs by remember { mutableLongStateOf(0L) }
-
-    LaunchedEffect(localLockStatus.value, state.trackerLat, state.trackerLng, state.viewerLat, state.viewerLng, state.isTrackerFresh, state.isViewerFresh, state.mapFollowMode, smoothedTrackerPos.value, smoothedViewerPos.value) {
-        if (localLockStatus.value) {
-            if (state.systemPulse - lastTriggerTs < 500) return@LaunchedEffect
-            val sTrk = smoothedTrackerPos.value
-            val sVwr = smoothedViewerPos.value
-            val view = mapViewRef.value ?: return@LaunchedEffect
-            
-            when (state.mapFollowMode) {
-                MapFollowMode.VIEWER -> { if (sVwr != null) view.controller.setCenter(sVwr) }
-                MapFollowMode.TRACKER -> { if (sTrk != null) view.controller.setCenter(sTrk) }
-                MapFollowMode.AUTO -> {
-                    if (sTrk != null && sVwr != null && state.isTrackerFresh && state.isViewerFresh) {
-                        val dist = PhysicsUtils.calculateDistance(sTrk.latitude, sTrk.longitude, sVwr.latitude, sVwr.longitude)
-                        if (dist in 100.0..100000.0) {
-                            val box = BoundingBox.fromGeoPoints(listOf(sTrk, sVwr))
-                            view.zoomToBoundingBox(box.increaseByScale(1.4f), false)
-                            if (view.zoomLevelDouble > 18.0) view.controller.setZoom(18.0)
-                        } else view.controller.setCenter(sTrk)
-                    } else if (sTrk != null || sVwr != null) {
-                        view.controller.setCenter(sTrk ?: sVwr!!)
-                    }
-                }
-                MapFollowMode.NONE -> {}
-            }
-        }
-    }
-
-    LaunchedEffect(state.centeringTrackerTrigger) {
-        val sTrk = smoothedTrackerPos.value
-        if (state.centeringTrackerTrigger > 0 && sTrk != null) {
-            lastTriggerTs = state.systemPulse; mapViewRef.value?.controller?.animateTo(sTrk); mapViewRef.value?.controller?.setZoom(18.0)
-        }
-    }
-
-    LaunchedEffect(state.centeringViewerTrigger) {
-        val sVwr = smoothedViewerPos.value
-        if (state.centeringViewerTrigger > 0 && sVwr != null) {
-            lastTriggerTs = state.systemPulse; mapViewRef.value?.controller?.animateTo(sVwr); mapViewRef.value?.controller?.setZoom(18.0)
-        }
-    }
-
-    LaunchedEffect(state.zoomInTrigger) { if (state.zoomInTrigger > 0) mapViewRef.value?.controller?.zoomIn() }
-    LaunchedEffect(state.zoomOutTrigger) { if (state.zoomOutTrigger > 0) mapViewRef.value?.controller?.zoomOut() }
 
     AndroidView(factory = { 
         MapView(context).apply { 
@@ -265,7 +181,6 @@ fun OsmMap(
             val sp = if (initialCenter != null) initialCenter else GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
             controller.setZoom(18.0); controller.setCenter(sp)
             
-            // Issue #1023: Restore Scale Bar
             val scaleBar = ScaleBarOverlay(this).apply { 
                 setUnitsOfMeasure(ScaleBarOverlay.UnitsOfMeasure.metric)
                 setScaleBarOffset(20, 20)
@@ -275,7 +190,7 @@ fun OsmMap(
             
             overlays.add(MapEventsOverlay(object : MapEventsReceiver {
                 override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
-                    if (!isTrackerMode) { performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY); onTap(p) }
+                    if (state.appMode != "tracker") { performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY); onTap(p) }
                     return true
                 }
                 override fun longPressHelper(p: GeoPoint): Boolean = true
@@ -283,60 +198,15 @@ fun OsmMap(
 
             overlays.add(object : Overlay() {
                 override fun onTouchEvent(event: MotionEvent, mapView: MapView): Boolean {
-                    if (event.action == MotionEvent.ACTION_DOWN) { localLockStatus.value = false; onLockChange(false) }
+                    if (event.action == MotionEvent.ACTION_DOWN) { onLockChange(false) }
                     return false
                 }
             })
         } 
-    }, update = { view ->
-        Snapshot.withoutReadObservation {
-            overlayManager?.let { om ->
-                var changed = false
-                
-                if (state.hydrationLevel >= 4) {
-                    changed = om.updateHomePoints(state.homePoints, state.isFenceVisible, state.maxDistance, isTrackerMode, state.geofenceMode, onTap, onRemoveMarker) || changed
-                }
-                
-                if (state.hydrationLevel >= 5) {
-                    changed = om.updateTrails(state.trackerSegments, state.viewerSegments, state.systemPulseRt) || changed
-                }
-                
-                if (state.hydrationLevel >= 6) {
-                    changed = om.updateCurrentPositions(
-                        trackerValid = state.isTrackerValid,
-                        trackerPos = smoothedTrackerPos.value,
-                        isTrackerFresh = state.isTrackerFresh,
-                        trackerAccuracy = state.trackerAccuracy,
-                        maxTrackerAccuracy = state.trackerMaxAccuracy,
-                        trackerSpeed = state.trackerSpeed,
-                        isTrackerPending = state.trackerLocPending,
-                        trackerLastValidFixRt = state.trackerLastValidFixRt,
-                        viewerValid = state.isViewerValid,
-                        viewerPos = smoothedViewerPos.value,
-                        isViewerFresh = state.isViewerFresh,
-                        viewerAccuracy = state.viewerAccuracy,
-                        viewerMaxAcc = state.viewerMaxAcc,
-                        viewerSpeed = state.viewerSpeed,
-                        isViewerPending = state.viewerLocPending,
-                        viewerLastValidFixRt = state.viewerLastValidFixRt,
-                        systemPulseRt = state.systemPulseRt
-                    ) || changed
-                }
-
-                if (state.hydrationLevel >= 7) {
-                    changed = om.updateViolations(state.violations, state.isViolationsVisible, state.isGeofenceViolationsVisible, state.systemPulseRt) || changed
-                }
-                
-                if (state.hydrationLevel >= 8) {
-                    changed = om.updateReplayCursor(state.replayCursorPos) || changed
-                }
-                
-                if (changed) { view.invalidate() }
-            }
-        }
-    }, onRelease = { view -> 
-        overlayManager?.onDetach()
-        view.onDetach(); view.tileProvider.tileCache.clear(); view.tileProvider.detach() 
+    }, update = { 
+        mapController?.update(state, onTap, onRemoveMarker)
+    }, onRelease = { 
+        mapController?.detach()
     }, modifier = Modifier.fillMaxSize())
 }
 
