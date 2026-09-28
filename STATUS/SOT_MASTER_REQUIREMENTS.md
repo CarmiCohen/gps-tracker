@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.28.13)
+# SOT Master Requirements & Hardening Status (Sep.28.14)
 
 ## 🏗️ Architectural Master Rules (60 Rules)
 
@@ -32,8 +32,8 @@
 *   **Chapter 31.154 (Map Controller Decoupling)**: PASSED - Verified declarative boundary for Map UI. (Sep.28.6)
 *   **Chapter 31.155 (Build Pipeline Hardening)**: PASSED - Verified successful `kaptReleaseKotlin` execution following dependency and kapt configuration adjustments. (Sep.28.8)
 *   **Chapter 31.156 (Legacy Component Pruning)**: PASSED - Verified zero remaining references to legacy service stubs in the functional classpath. (Sep.28.9)
-*   **Chapter 31.157 (Build Pipeline Dependency Pruning)**: PASSED - Verified successful `:app:assembleDebug` execution following KSP migration for Room and Hilt. (Sep.28.10)
+*   **Chapter 31.157 (Build Pipeline Dependency Pruning)**: PASSED - Verified successful `:app:assembleDebug` execution following KSP migration for Room and Hilt. (Sep.28.11)
 *   **Chapter 31.158 (Temporal Logic Hardening)**: PASSED - Verified zero remaining direct `SystemClock` or `System.currentTimeMillis()` calls in core service orchestration via grep audit. (Sep.28.11)
-*   **Chapter 31.159 (Signature Harmonization)**: PASSED - Verified successful compilation and clean signature mapping across all managed unregistration contexts via `:app:assembleDebug`. (Sep.28.12)
-*   **Chapter 31.160 (Forensic Reliability Math Hardening)**: PASSED - Verified precision stability via high-frequency burst simulation and clean compilation. (Sep.28.13)
+*   **Chapter 31.159 (Signature Harmonization)**: PASSED - Verified successful compilation and clean signature mapping across all managed unregistration contexts via `:app:assembleDebug`. (Sep.28.11)
+*   **Chapter 31.160 (Forensic Reliability Math Hardening)**: PASSED - Verified precision stability via high-frequency burst simulation and clean compilation. (Sep.28.11)
 ...
