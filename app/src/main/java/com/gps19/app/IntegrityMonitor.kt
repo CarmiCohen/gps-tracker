@@ -17,6 +17,8 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Sep.28.16:
+ * - Issue #1362: Implement forensic persistence reliability alerting logic (R715).
  * Sep.27.4:
  * - Issue #1348: Flattened DomainEvent hierarchy, emitting IntegrityEvent directly.
  * Sep.26.12:
@@ -257,6 +259,20 @@ class IntegrityMonitor @Inject constructor(
                 domainEventBus.emit(IntegrityEvent.ViolationResolved(ALERT_ID_SILENT_FAILURE))
             }
             h.isSilentFailure = isSilent
+
+            val isReliabilityDegraded = h.forensicReliability < FORENSIC_RELIABILITY_THRESHOLD
+            if (isReliabilityDegraded) {
+                val firstDetected = sustainedViolations.getOrPut(ALERT_ID_PERFORMANCE_SPIKE) { nowRt }
+                if (firstDetected > 0L && nowRt - firstDetected >= FORENSIC_RELIABILITY_DEGRADATION_DURATION_MS) {
+                    domainEventBus.emit(IntegrityEvent.LogEvent("FORENSIC ALERT: Sustained low forensic reliability detected on this device (${String.format(java.util.Locale.getDefault(), "%.2f", h.forensicReliability)}).", true))
+                    domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_PERFORMANCE_SPIKE))
+                    sustainedViolations[ALERT_ID_PERFORMANCE_SPIKE] = -1L
+                }
+            } else {
+                if (sustainedViolations.remove(ALERT_ID_PERFORMANCE_SPIKE) != null) {
+                    domainEventBus.emit(IntegrityEvent.ViolationResolved(ALERT_ID_PERFORMANCE_SPIKE))
+                }
+            }
         }
     }
 

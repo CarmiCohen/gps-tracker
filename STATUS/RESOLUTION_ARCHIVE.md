@@ -1,6 +1,16 @@
-# 🏛️ Resolution Archive - Sep.28.15
+# 🏛️ Resolution Archive - Sep.28.16
 
-## 🏁 Issue #1362: Production Codebase Stabilization & Tracking Alignment
+## 🏁 Issue #1362: Forensic Persistence Health Alerting
+*   **Resolved**: Sep.28.16
+*   **Root Cause**: Lack of automated alerting infrastructure for forensic data path degradation. If forensic backfilling fails or stalls, the system did not proactively alert operators, risking data loss during long disconnect loops.
+*   **Remediation**:
+    *   **IntegrityMonitor.kt**: Instrumented periodic integrity heartbeats to check `health.forensicReliability` against `FORENSIC_RELIABILITY_THRESHOLD` (0.85).
+    *   **Debounce Logic**: Integrated a 30-second sustained duration check via `sustainedViolations` map to safeguard against transient drop spikes.
+    *   **Alerting**: Dispatches `ALERT_ID_PERFORMANCE_SPIKE` sustained and resolution event blocks directly to the unified `DomainEventBus`.
+*   **Significance**: High (Forensic Path Self-Healing).
+*   **SOT ID**: 530 (Forensic Persistence Health Alerting)
+
+## 🏁 Issue #1363: Production Codebase Stabilization & Tracking Alignment
 *   **Resolved**: Sep.28.15
 *   **Root Cause**: Transitioning the codebase and all associated tracking infrastructure (SOT, issues, build config) to the next version (`Sep.28.15`) to maintain forensic integrity and deployment readiness.
 *   **Remediation**:

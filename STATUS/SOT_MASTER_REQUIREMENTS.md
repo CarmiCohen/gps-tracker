@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.28.11)
+# SOT Master Requirements & Hardening Status (Sep.28.16)
 
-## 🏗️ Architectural Master Rules (60 Rules)
+## 🏗️ Architectural Master Rules (61 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ...
@@ -12,6 +12,7 @@
 *   **1.47 Temporal Logic Hardening (R526)**: To ensure logic consistency across deep-sleep transitions and enable high-fidelity behavioral testing, all background orchestration, backoff, and forensic measurement logic must exclusively use the centralized `TimeProvider` monotonic and wall-clock sources (Issue #1359).
 *   **1.48 Signature Harmonization (R527)**: To ensure robust asynchronous cleanup of hardware hooks, all unregistration callbacks and lifecycle teardown paths across the app layer must perfectly harmonize with centralized TimeProvider references to eliminate lifecycle-driven runtime anomalies (Issue #1360).
 *   **1.49 Forensic Reliability Precision (R528)**: The `LogRepository` MUST utilize `BigDecimal` fixed-point arithmetic for the forensic reliability EMA to prevent cumulative precision loss during high-frequency trace bursts and ensure alert consistency (Issue #1361).
+*   **1.50 Persistence Health Alerting Authority (R715/S530)**: The `IntegrityMonitor` MUST monitor forensic persistence reliability and trigger a `PERFORMANCE_SPIKE` alert if the reliability EMA falls below the 0.85 threshold for a sustained 30-second window (Issue #1362).
 
 ...
 
@@ -25,6 +26,7 @@
 *   **SOT ID 527**: Signature Harmonization - Remediated mismatched unregistration signatures in production listeners by enforcing TimeProvider integration across all hardware suite and network provider teardown scopes. (Resolved Sep.28.12).
 *   **SOT ID 528**: Forensic Reliability Math Hardening - Migrated reliability EMA accumulator to BigDecimal to ensure absolute precision under extreme burst loads. (Resolved Sep.28.13).
 *   **SOT ID 529**: Production Codebase Stabilization - Advanced versioning to Sep.28.15 and synchronized all status tracking files to ensure absolute project alignment. (Resolved Sep.28.15).
+*   **SOT ID 530**: Forensic Persistence Health Alerting - Implemented automated alerting for forensic reliability degradation via IntegrityMonitor with 30s debounce. (Resolved Sep.28.16).
 
 ---
 
@@ -38,4 +40,5 @@
 *   **Chapter 31.159 (Signature Harmonization)**: PASSED - Verified successful compilation and clean signature mapping across all managed unregistration contexts via `:app:assembleDebug`. (Sep.28.11)
 *   **Chapter 31.160 (Forensic Reliability Math Hardening)**: PASSED - Verified precision stability via high-frequency burst simulation and clean compilation. (Sep.28.11)
 *   **Chapter 31.161 (Production Codebase Stabilization)**: PASSED - Verified build stability and version alignment at Sep.28.15. (Sep.28.11)
+*   **Chapter 31.162 (Forensic Persistence Health Alerting)**: PASSED - Verified automated alerting for reliability degradation in IntegrityMonitor heartbeat via compilation audit. (Sep.28.16)
 ...
