@@ -10,10 +10,4 @@ interface TimeProvider {
      * Returns milliseconds since boot, including time spent in sleep.
      */
     fun elapsedRealtime(): Long
-
-    /**
-     * Returns a unique ID for the current boot session.
-     * Used for monotonic latch validation across reboots.
-     */
-    fun getBootId(): String = "default_boot"
 }

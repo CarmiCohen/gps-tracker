@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.3
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.4
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
-Unified Activity Context Provider integrated. Build-time interface validation active.
+Centralized Boot Lifecycle Authority integrated. Build-time interface validation active.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -18,17 +18,18 @@ Unified Activity Context Provider integrated. Build-time interface validation ac
 ### 🔵 Low Priority
 *   **Issue #1167: Map Overlay Imperative to Declarative Controller**
     *   *Significance*: **Low-Medium (UI Decoupling)**. Extract osmdroid management into a standalone controller to keep UI code declarative.
-*   **Issue #1296: Centralized Boot Lifecycle Authority**
-    *   *Significance*: **Low (Testability)**. Move monotonic clock recovery logic to a dedicated authority to simplify background service testing.
 *   **Issue #1175: Real-time Only Path (Pivot Option)**
     *   *Significance*: **Strategic (Maintenance Tradeoff)**. Consider removing backlog sync and forensic backfilling to dramatically reduce codebase complexity.
 *   **Issue #1354: Gradle Task Deduplication**
     *   *Significance*: **Low (Build Speed)**. Consolidate custom verification tasks into a single convention plugin to reduce configuration time.
+*   **Issue #1355: TimeProvider Cleanup**
+    *   *Significance*: **Low (Simplicity)**. Now that BootLifecycleAuthority handles session IDs, simplify TimeProvider to only provide basic monotonic and wall-clock time.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1296: Centralized Boot Lifecycle Authority** (Resolved Sep.28.4)
 *   **Issue #1294: Build-Time Interface Validation** (Resolved Sep.28.3)
 *   **Issue #1353: Unified Activity Context Provider** (Resolved Sep.28.2)
 *   **Issue #1205: Context-Aware Power Optimization** (Resolved Sep.28.1)
@@ -53,6 +54,7 @@ Unified Activity Context Provider integrated. Build-time interface validation ac
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.28.4: [SOT Count: 183 (Rules: 53), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.3: [SOT Count: 182 (Rules: 52), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.2: [SOT Count: 181 (Rules: 51), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.1: [SOT Count: 180 (Rules: 50), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:3, Testing: 3 (Sub-items: 15), QA: 284]**

@@ -33,6 +33,10 @@ abstract class AppModule {
 
     @Binds
     @Singleton
+    abstract fun bindBootLifecycleAuthority(impl: AndroidBootLifecycleAuthority): BootLifecycleAuthority
+
+    @Binds
+    @Singleton
     abstract fun bindSignalingProvider(impl: CommunicationManager): SignalingProvider
 
     @Binds

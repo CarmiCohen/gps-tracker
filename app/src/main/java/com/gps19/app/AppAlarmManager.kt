@@ -13,6 +13,8 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.28.4:
+ * - Issue #1296: Integrated BootLifecycleAuthority to centralize boot lifecycle validation.
  * Sep.27.16:
  * - Issue #1173: Protobuf-First Persistence. Substituted JSON alarm state with 
  *   binary Protobuf pipelines.
@@ -29,6 +31,7 @@ class AppAlarmManager @Inject constructor(
     private val sessionManager: SessionManager,
     private val notificationManager: AppNotificationManager,
     private val timeProvider: TimeProvider,
+    private val bootLifecycleAuthority: BootLifecycleAuthority,
     private val domainEventBus: DomainEventBus,
     private val sirenLockoutUseCase: SirenLockoutUseCase
 ) {
@@ -137,8 +140,7 @@ class AppAlarmManager @Inject constructor(
         }
 
         val savedBootId = s.roleStringsMap.getOrDefault(rolePrefix + "boot_id", "")
-        val currentBootId = timeProvider.getBootId()
-        if (savedBootId.isNotEmpty() && savedBootId != currentBootId) {
+        if (!bootLifecycleAuthority.isSessionValid(savedBootId)) {
             evaluationState.firstViolationRt = 0L
             evaluationState.lastSirenStopRt = 0L
             evaluationState.lastGlobalTriggerRt = 0L
@@ -165,7 +167,7 @@ class AppAlarmManager @Inject constructor(
                 forensicReliabilityDegradationStartRt = evaluationState.forensicReliabilityDegradationStartRt,
                 rolePrefix = currentRolePrefix
             )
-            repository.saveString(currentRolePrefix + "boot_id", timeProvider.getBootId())
+            repository.saveString(currentRolePrefix + "boot_id", bootLifecycleAuthority.getCurrentBootId())
         }
     }
 
@@ -190,7 +192,7 @@ class AppAlarmManager @Inject constructor(
             timeProvider = timeProvider,
             report = evaluationReport,
             versionTag = versionTag,
-            onSpike = { message, duration ->
+            onSpike = { message: String, duration: Long ->
                 domainEventBus.emit(AlarmEvent.LogEvent(
                     type = ALERT_ID_PERFORMANCE_SPIKE,
                     message = "$versionTag $message",
@@ -204,7 +206,7 @@ class AppAlarmManager @Inject constructor(
                     maxAccuracy = snapshot.kinetic.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
                 ))
             },
-            onTrigger = { eval ->
+            onTrigger = { eval: AlarmEvaluationState.ActiveAlarm ->
                 val isSpecial = isSpecialType(eval.type)
                 val specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
                 domainEventBus.emit(AlarmEvent.LogEvent(
@@ -220,7 +222,7 @@ class AppAlarmManager @Inject constructor(
                     maxAccuracy = snapshot.kinetic.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
                 ))
             },
-            onResolve = { eval, durationMs ->
+            onResolve = { eval: AlarmEvaluationState.ActiveAlarm, durationMs: Long ->
                 val isSpecial = isSpecialType(eval.type)
                 val specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
                 domainEventBus.emit(AlarmEvent.LogEvent(

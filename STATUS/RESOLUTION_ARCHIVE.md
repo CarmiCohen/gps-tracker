@@ -1,4 +1,14 @@
-# 🏛️ Resolution Archive - Sep.28.3
+# 🏛️ Resolution Archive - Sep.28.4
+
+## 🏁 Issue #1296: Centralized Boot Lifecycle Authority
+*   **Resolved**: Sep.28.4
+*   **Root Cause**: Monotonic clock recovery and boot session validation logic were scattered across the codebase and embedded inside `TimeProvider` and background components like `AppAlarmManager`, which impeded clean platform abstraction and background-service testability.
+*   **Remediation**:
+    *   **BootLifecycleAuthority.kt**: Defined a brand-new interface contract in `:core:engine` specifying session validation and monotonic clock recovery methods.
+    *   **AndroidBootLifecycleAuthority.kt**: Implemented the Android-specific contract using the localized `/proc/sys/kernel/random/boot_id` source.
+    *   **AppAlarmManager.kt**: Refactored to delegate boot session tracking, invalidation handling, and logic state cleanups to the centralized `BootLifecycleAuthority`.
+    *   **Hilt Hooking**: Configured build-time interface analysis bindings for the new authority to prevent runtime injection issues.
+*   **SOT ID**: 521 (Centralized Boot Lifecycle Authority)
 
 ## 🏁 Issue #1294: Build-Time Interface Validation
 *   **Resolved**: Sep.28.3
@@ -27,5 +37,3 @@
     *   **ServiceBehaviorUseCase.kt**: Refactored `calculateGpsInterval` to scale polling rates based on activity context, enabling immediate 60s relaxation when `STILL` and enforcing 2s precision when `IN_VEHICLE`.
     *   **Full-Stack Parity**: Updated versioning to Sep.28.1 and synchronized all tracking metadata.
 *   **SOT ID**: 518 (Context-Aware Power Scaling)
-
-... (Earlier entries)

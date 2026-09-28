@@ -29,7 +29,7 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    return "Sep.28.3"
+    return "Sep.28.4"
 }
 
 ext {
@@ -86,6 +86,7 @@ tasks.register('verifyInterfaceBindings') {
     doLast {
         def requiredInterfaces = [
             "TimeProvider",
+            "BootLifecycleAuthority",
             "PowerStateProvider",
             "NetworkProvider",
             "SignalingTransport",
