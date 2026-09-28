@@ -1,62 +1,60 @@
-# 📑 Forensic Chat Session Log: Issue #1205 (In Progress)
+# 📑 Forensic Chat Session Log - Sep.27.18
 
-## 🏁 Session Metadata
-*   **Version Name**: Sep.27.18
-*   **Target Issue ID**: #1205
-*   **Title**: Context-Aware Power Optimization
-*   **Significance**: Medium (Battery)
-*   **Status**: Models Extended, Discovery Complete, Logic Implementation Pending.
+## 🏁 Task: Remediate Issue #1205 - Context-Aware Power Optimization
+
+### 🎯 Objective
+Implement dynamic sensor and GPS polling adjustments based on high-level activity recognition (STILL, WALKING, IN_VEHICLE) to extend battery life without sacrificing coordinate precision during movement.
 
 ---
 
-## 🔍 Comprehensive Architectural Discovery & Codebase Mapping
+## 🔍 Discovery & Analysis Phase
 
-We have performed an exhaustive discovery phase across the `:app` and `:core:engine` subprojects to understand the constraints and integration points for implementing context-aware power management.
-
-### 1. Centralized Polling Authorities (`EngineConstants.kt`)
-The tracking engine utilizes central constants defined in `com.gps19.core.engine.EngineConstants.kt` to enforce device polling strategies:
-*   `HIGH_FREQUENCY_GPS_POLLING_MS` = 2000L
-*   `MOVING_GPS_POLLING_MS` = 5000L
-*   `STATIONARY_GPS_POLLING_MS` = 60000L
-*   `SCREEN_OFF_GPS_POLLING_MS` = 45000L
-*   `SUSPICIOUS_GPS_POLLING_MS` = 10000L
-*   `COOLING_GPS_POLLING_MS` = 30000L
-*   `VIEWER_GPS_POLLING_MS` = 10000L
-*   `ULTRA_LONG_STATIONARY_GPS_POLLING_MS` = 300000L (5 minutes)
-
-### 2. Behavioral State Control (`ServiceBehaviorUseCase.kt`)
-The service behavior is determined dynamically inside `ServiceBehaviorUseCase.calculateGpsInterval(...)`:
-*   Tracks stationary duration using a realtime delta (`nowRt - lastMotionDetectedTs`).
-*   Transitions the interval into `STATIONARY_GPS_POLLING_MS` or `ULTRA_LONG_STATIONARY_GPS_POLLING_MS` when the physical status remains motionless.
-*   **Gap Identified**: The current logic relies solely on physical vibration indices (`isStationary`) and time durations. It lacks finer-grained context awareness from high-level user activities.
-
-### 3. Background Pipeline and Flyweights (`MonitorService.kt` & `HardwareSuite.kt`)
-*   `MonitorService.kt` runs the background collection loops orchestrated via `TickOrchestrator`.
-*   Uses flyweight pooling (`evaluationSnapshotFlyweight`, etc.) to eliminate GC churn.
-*   `HardwareSuite.kt` controls sensor registration and `fusedLocationClient`.
-*   Permission state auditing already proactively checks for `ACTIVITY_RECOGNITION`.
+1.  **System Audit**: Verified current polling authority in `EngineConstants.kt`. Intervals range from 2s (`HIGH_FREQUENCY`) to 5m (`ULTRA_LONG_STATIONARY`).
+2.  **Logic Gap**: `ServiceBehaviorUseCase.calculateGpsInterval` relied solely on a boolean `isStationary` (vibration-based) and duration. It could not distinguish between "Still in a vibrating environment" and "Slow movement," leading to sub-optimal power states.
+3.  **Architecture**: The system uses a zero-allocation telemetry pipeline with flyweight snapshots (`SystemEvaluationSnapshot`) to prevent GC churn on the 1Hz tick path.
 
 ---
 
-## 🛠 Progress & Modifications
+## 🛠 Implementation Details (Root-Cause Remediation)
 
-### 1. Core Engine Model Modifications (`EngineModels.kt` & `LocationUpdate.kt`)
-*   **`ActivityType` Enum**: Defined a serializable enum representing discrete operational contexts: `STILL`, `WALKING`, `RUNNING`, `BICYCLING`, `IN_VEHICLE`, `TILTING`, `UNKNOWN`.
-*   **`SystemEvaluationSnapshot`**: Added `activityType: ActivityType` field. Updated `copyFrom` and `reset` to support zero-allocation reuse.
-*   **`EngineConnectionPoint`**: Added `activityType: ActivityType` field. Updated `copyFrom`.
-*   **`EngineSensorSnapshot`**: Added `activityType: ActivityType` field. Updated `copyFrom`.
-*   **`KineticState`**: Added `activityType: ActivityType` to the spatial telemetry container in `LocationUpdate.kt`.
+### 1. Model Extension (`:core:engine`)
+- **`ActivityType` Enum**: Added to `EngineModels.kt` (`STILL`, `WALKING`, `RUNNING`, `BICYCLING`, `IN_VEHICLE`, `TILTING`, `UNKNOWN`).
+- **Telemetry Convergence**: Integrated `activityType` into `SystemEvaluationSnapshot`, `EngineConnectionPoint`, and `EngineSensorSnapshot`.
+- **Kinetic State**: Updated `KineticState` in `LocationUpdate.kt` to carry the context.
 
-### 2. State Synchronization
-*   **`Handover.md`**: Updated with forensic state snapshot of the current architectural extension.
+### 2. Heuristic Activity Classifier (`HardwareSuite.kt`)
+- Implemented `updateActivityHeuristic()`:
+    - `IN_VEHICLE`: GPS Speed > 10 m/s.
+    - `WALKING`: GPS Speed > 1.2 m/s or high vibration floor.
+    - `STILL`: Physically stationary + vibration < 80% of adaptive floor.
+- Integrated detection into the 1-second sensor buffer loop.
+
+### 3. Adaptive Power Scaling (`ServiceBehaviorUseCase.kt`)
+- Refactored `calculateGpsInterval` to evaluate `ActivityType`.
+- **Optimization**: If `ActivityType.STILL` is confirmed, the system now relaxes to `STATIONARY_GPS_POLLING_MS` (60s) immediately, bypassing the standard 60s `MOVING_HOLD_DURATION_MS` timer.
+- **Precision**: If `IN_VEHICLE`, the system enforces `HIGH_FREQUENCY_GPS_POLLING_MS` (2s) regardless of screen state to ensure navigation-grade trajectory capture.
+
+### 4. Persistence & Signaling Path (`:app`)
+- **Schema Evolution**: Updated `Database.kt` to Version 80. Added `activityType` columns to `connection_history` and `pending_status_updates` with Migration 79 -> 80.
+- **Binary Protocol**: Updated `app_settings.proto` to include `activity_type` in `RealtimeStatus` and `TrackerStatusProto`.
+- **Mapping Authority**: Updated `TelemetryMapper.kt` and `TelemetryProtobufMapper.kt` to propagate activity context across all transformation paths.
+- **Service Orchestration**: Updated `MonitorService.kt` to pass the detected activity into the behavior use case during every tick.
 
 ---
 
-## 🔴 Remaining Tasks for Issue #1205
-1.  **Activity Recognition Bridge**: Implement pattern-based or API-based activity classification in `HardwareSuite.kt`.
-2.  **Adaptive Polling Scaling**: Update `ServiceBehaviorUseCase.calculateGpsInterval` to use `ActivityType` for faster or slower backoffs (e.g., immediate 1min polling if `STILL`).
-3.  **Telemetry Mapping**: Update `TelemetryMapper.kt` to propagate `activityType` from snapshots to status updates and connection points.
+## 🟢 Completion Sequence Results
+
+1.  **Integrity Audit**: Verified zero truncation in `.kt`, `.xml`, and `.proto` files.
+2.  **Versioning**: Incremented `versionName` to `Sep.27.18` in `app/build.gradle`.
+3.  **State Tracking**: 
+    - `Handover.md`: Updated with forensic state of the activity pipeline.
+    - `issues.md`: Issue #1205 marked as RESOLVED.
+    - `SOT_MASTER_REQUIREMENTS.md`: New rule **1.39 Activity-Aware Power Scaling (R518)** added.
+    - `RESOLUTION_ARCHIVE.md`: Documented root-cause remediation logic.
+4.  **Strategic Simplification**: Identified Idea #1353 to abstract classification into a Strategy pattern.
 
 ---
 
-**[Session Terminated by User Request]**
+**[Version Name]: Sep.27.18: [SOT Count: 180 (Rules: 50), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
+
+**STOP ALL PROCESSING.**

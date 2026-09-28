@@ -6,9 +6,9 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
- * Sep.27.18:
+ * Sep.28.1:
  * - Issue #1205: Context-Aware Power Optimization. Propagated activityType 
- *   through all mapping paths for full-stack context awareness.
+ *   completely across all mapping paths, including mapSnapshotToHealth.
  * Sep.27.17:
  * - Issue #1160: Flyweight & Pooling Expansion. Refactored mapping logic to 
  *   support zero-allocation "out" parameters for high-frequency evaluation paths.
@@ -469,7 +469,8 @@ object TelemetryMapper {
             locationPendingReason = snapshot.integrity.locationPendingReason,
             coolingEnteredRt = snapshot.nowRt,
             thermalHeadroom = snapshot.thermalHeadroom,
-            heapAllocatedMb = snapshot.heapAllocatedMb
+            heapAllocatedMb = snapshot.heapAllocatedMb,
+            activityType = snapshot.activityType
         )
     }
 

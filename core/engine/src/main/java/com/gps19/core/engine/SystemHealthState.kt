@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Sep.28.1:
+ * - Issue #1205: Context-Aware Power Optimization. Integrated activityType 
+ *   into the health state model for context-aware background logic.
  * Sep.26.12:
  * - Issue #1344: Added thermalHeadroom and heapAllocatedMb forensic probes.
  * Sep.24.91:
@@ -125,7 +128,8 @@ class SystemHealthState(
     var lastEnergyDeltaMa: Int = 0,
     var lastEnergyDeltaTemp: Double = 0.0,
     var lastEnergyDurationMs: Long = 0L,
-    var tamperNote: String? = null
+    var tamperNote: String? = null,
+    var activityType: ActivityType = ActivityType.UNKNOWN
 ) {
     fun copyFrom(other: SystemHealthState) {
         this.signalLoss = other.signalLoss
@@ -221,6 +225,7 @@ class SystemHealthState(
         this.lastEnergyDeltaTemp = other.lastEnergyDeltaTemp
         this.lastEnergyDurationMs = other.lastEnergyDurationMs
         this.tamperNote = other.tamperNote
+        this.activityType = other.activityType
     }
 
     fun update(
@@ -241,7 +246,8 @@ class SystemHealthState(
         isGnssThrottled: Boolean = false,
         lastEnergyDeltaMa: Int = 0, lastEnergyDeltaTemp: Double = 0.0, lastEnergyDurationMs: Long = 0L,
         tamperNote: String? = null, coolingEnteredRt: Long = 0L,
-        thermalHeadroom: Double = 0.0, heapAllocatedMb: Double = 0.0
+        thermalHeadroom: Double = 0.0, heapAllocatedMb: Double = 0.0,
+        activityType: ActivityType = ActivityType.UNKNOWN
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -295,6 +301,7 @@ class SystemHealthState(
         this.lastEnergyDurationMs = lastEnergyDurationMs
         this.tamperNote = tamperNote
         this.coolingEnteredRt = coolingEnteredRt
+        this.activityType = activityType
     }
     
     fun reset() {
@@ -391,5 +398,6 @@ class SystemHealthState(
         lastEnergyDeltaTemp = 0.0
         lastEnergyDurationMs = 0L
         tamperNote = null
+        activityType = ActivityType.UNKNOWN
     }
 }

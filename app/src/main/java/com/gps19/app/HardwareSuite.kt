@@ -2,7 +2,11 @@ package com.gps19.app
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -33,11 +37,13 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.28.1:
+ * - Issue #1205: Context-Aware Power Optimization. Fully integrated Activity 
+ *   Recognition bridge via Google Play Services to supplement heuristic detection.
+ *   Added SecurityException handling for runtime permission revocations.
  * Sep.27.18:
  * - Issue #1205: Context-Aware Power Optimization. Integrated ActivityType 
  *   into ForensicSnapshot and added heuristic activity detection.
- * Sep.27.4:
- * - Issue #1348: Flattened DomainEvent hierarchy, emitting component events directly.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -129,6 +135,7 @@ class HardwareSuite @Inject constructor(
 
     private val locationManager by lazy { context.getSystemService(Context.LOCATION_SERVICE) as LocationManager }
     private val fusedLocationClient by lazy { LocationServices.getFusedLocationProviderClient(context) }
+    private val activityRecognitionClient by lazy { ActivityRecognition.getClient(context) }
     private val sensorManager by lazy { context.getSystemService(Context.SENSOR_SERVICE) as android.hardware.SensorManager }
     private val displayManager by lazy { context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager }
 
@@ -276,9 +283,37 @@ class HardwareSuite @Inject constructor(
     val isUltraLongStationaryFlow: SharedFlow<Boolean> = _isUltraLongStationary.asSharedFlow()
     private var isUltraLongStationary = false
 
-    // Issue #1205: Heuristic Activity Detection
+    // Issue #1205: Activity Detection
     @Volatile private var lastGpsSpeedMps = 0.0
     @Volatile private var currentActivityType = ActivityType.UNKNOWN
+    @Volatile private var lastActivityUpdateTs = 0L
+    private val ACTIVITY_RECEIVER_ACTION = "com.gps19.app.ACTION_ACTIVITY_UPDATE"
+    private var activityPendingIntent: PendingIntent? = null
+
+    private val activityReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == ACTIVITY_RECEIVER_ACTION) {
+                val result = ActivityRecognitionResult.extractResult(intent) ?: return
+                val mostProbable = result.mostProbableActivity
+                
+                val nextActivity = when (mostProbable.type) {
+                    DetectedActivity.STILL -> ActivityType.STILL
+                    DetectedActivity.WALKING -> ActivityType.WALKING
+                    DetectedActivity.RUNNING -> ActivityType.RUNNING
+                    DetectedActivity.ON_BICYCLE -> ActivityType.BICYCLING
+                    DetectedActivity.IN_VEHICLE -> ActivityType.IN_VEHICLE
+                    DetectedActivity.TILTING -> ActivityType.TILTING
+                    else -> ActivityType.UNKNOWN
+                }
+                
+                if (nextActivity != ActivityType.UNKNOWN) {
+                    currentActivityType = nextActivity
+                    lastActivityUpdateTs = timeProvider.currentTimeMillis()
+                    Timber.d("HardwareSuite: Activity Recognition Update: $nextActivity (${mostProbable.confidence}%)")
+                }
+            }
+        }
+    }
 
     private val gnssPolicyEngine = GnssPolicyEngine()
 
@@ -440,6 +475,7 @@ class HardwareSuite @Inject constructor(
 
             registerSensors()
             startAcousticMonitoring()
+            startActivityRecognition()
         }
     }
 
@@ -485,6 +521,7 @@ class HardwareSuite @Inject constructor(
             revivalPulseJob?.cancel(); revivalPulseJob = null
             
             stopAcousticMonitoring()
+            stopActivityRecognition()
 
             val handler = hardwareHandler
             val gHandler = gnssHandler
@@ -649,6 +686,9 @@ class HardwareSuite @Inject constructor(
     }
 
     private fun updateActivityHeuristic() {
+        // If we haven't had an Activity Recognition update in 2 minutes, fallback to heuristics
+        if (timeProvider.currentTimeMillis() - lastActivityUpdateTs < 120000L) return
+
         val speedMps = lastGpsSpeedMps
         val vibe = currentVibrationIndex
         val isStat = isStationary()
@@ -850,6 +890,46 @@ class HardwareSuite @Inject constructor(
 
     fun isAcousticMonitoringEnabled() = isMonitoring
     fun isAcousticMonitoringActive() = isAcousticRunning
+
+    @SuppressLint("MissingPermission")
+    private fun startActivityRecognition() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
+            ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) != PackageManager.PERMISSION_GRANTED) {
+            Timber.w("HardwareSuite: Activity Recognition permission NOT granted.")
+            return
+        }
+
+        try {
+            val intent = Intent(ACTIVITY_RECEIVER_ACTION).setPackage(context.packageName)
+            activityPendingIntent = PendingIntent.getBroadcast(
+                context, 0, intent, 
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
+            )
+            
+            context.registerReceiver(activityReceiver, IntentFilter(ACTIVITY_RECEIVER_ACTION), 
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Context.RECEIVER_NOT_EXPORTED else 0
+            )
+
+            activityRecognitionClient.requestActivityUpdates(60000L, activityPendingIntent!!)
+                .addOnSuccessListener { Timber.i("HardwareSuite: Activity Recognition requested.") }
+                .addOnFailureListener { Timber.e(it, "HardwareSuite: Activity Recognition failed to start.") }
+        } catch (e: SecurityException) {
+            Timber.e(e, "HardwareSuite: Activity Recognition permission revoked mid-session.")
+        } catch (e: Exception) {
+            Timber.e(e, "HardwareSuite: Error starting Activity Recognition.")
+        }
+    }
+
+    private fun stopActivityRecognition() {
+        try {
+            activityPendingIntent?.let { activityRecognitionClient.removeActivityUpdates(it) }
+            context.unregisterReceiver(activityReceiver)
+        } catch (e: Exception) {
+            // Ignore unregistration errors
+        } finally {
+            activityPendingIntent = null
+        }
+    }
 
     private fun privateConsumeSnapshot(buffer: CircularStateBuffer<ForensicSnapshot>, isForensic: Boolean): ForensicSnapshot {
         synchronized(this) {
@@ -1081,6 +1161,7 @@ class HardwareSuite @Inject constructor(
             lastPlungePhaseRt = 0L
             lastGpsSpeedMps = 0.0
             currentActivityType = ActivityType.UNKNOWN
+            lastActivityUpdateTs = 0L
         }
     }
 

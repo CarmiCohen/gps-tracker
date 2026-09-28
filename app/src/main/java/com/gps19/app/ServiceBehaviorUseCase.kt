@@ -6,7 +6,7 @@ import javax.inject.Singleton
 
 /**
  * ServiceBehaviorUseCase: Encapsulates high-level logic for service-level state transitions.
- * Sep.27.18:
+ * Sep.28.1:
  * - Issue #1205: Context-Aware Power Optimization. Integrated ActivityType into 
  *   GPS interval calculation (R406a).
  * Sep.16.05:

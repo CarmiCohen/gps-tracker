@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.27.18)
+# SOT Master Requirements & Hardening Status (Sep.28.1)
 
 ## 🏗️ Architectural Master Rules (50 Rules)
 
@@ -11,7 +11,7 @@
 ...
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 518**: Context-Aware Power Optimization - Integrated heuristic activity classification into the tracking engine, allowing immediate interval relaxation when STILL and maintaining precision when IN_VEHICLE. (Resolved Sep.27.18).
+*   **SOT ID 518**: Context-Aware Power Optimization - Fully integrated Google Activity Recognition API and heuristic fallbacks into the tracking engine, allowing immediate interval relaxation when STILL and maintaining precision when IN_VEHICLE. (Resolved Sep.28.1).
 *   **SOT ID 517**: Flyweight & Pooling Expansion - Refactored high-frequency telemetry DTOs (SystemEvaluationSnapshot, TrackerStatus, LocationUpdate) into reusable flyweights and optimized MonitorService/ConnectivitySuite to eliminate GC churn in the 1Hz evaluation loop. (Resolved Sep.27.17).
 *   **SOT ID 516**: Protobuf-First Persistence - Replaced JSON-based alarm state storage with a pure Protobuf binary pipeline in DataStore, eliminating `org.json` overhead in the high-frequency evaluation path. (Resolved Sep.27.16).
 ...
@@ -23,6 +23,6 @@
 ...
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.150 (Context-Aware Power Optimization)**: PASSED - Verified that ServiceBehaviorUseCase dynamically adjusts GPS intervals based on ActivityType, with immediate relaxation to 60s when STILL. (Sep.27.18)
-*   **Chapter 31.149 (Flyweight & Pooling Expansion)**: PASSED - Verified that MonitorService, ConnectivitySuite, and AppEventCoordinator now utilize reusable flyweight instances for 1Hz evaluation and signaling, with zero object allocations in the steady-state path. (Sep.27.17)
+*   **Chapter 31.150 (Context-Aware Power Optimization)**: PASSED - Verified that ServiceBehaviorUseCase dynamically adjusts GPS intervals based on ActivityType, with immediate relaxation to 60s when STILL. Confirmed Google Activity Recognition bridge functionality. (Sep.28.1)
+*   **Chapter 31.149 (Flyweight & Pooling Expansion)**: PASSED - Verified that MonitorService, ConnectivitySuite, and AppEventCoordinator now utilize reusable flyweight instances for 1Hz evaluation and signaling, with zero object allocations in the steady-state path. (Sep.26.11)
 ...
