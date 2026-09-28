@@ -1,4 +1,13 @@
-# 🏛️ Resolution Archive - Sep.28.1
+# 🏛️ Resolution Archive - Sep.28.2
+
+## 🏁 Issue #1353: Unified Activity Context Provider
+*   **Resolved**: Sep.28.2
+*   **Root Cause**: User activity detection (API-based and heuristic) was tightly coupled within `HardwareSuite.kt`, increasing the complexity of the hardware management layer and making activity logic difficult to test or modify in isolation.
+*   **Remediation**:
+    *   **ActivityContextProvider.kt**: Created a dedicated, thread-safe singleton to encapsulate Google Play Services Activity Recognition and the GPS speed/vibration heuristic fallback mechanism.
+    *   **HardwareSuite.kt**: Refactored to inject `ActivityContextProvider`. Removed internal BroadcastReceiver, activity recognition request logic, and redundant heuristic state. Offloaded activity heuristic updates to the provider during the sensor tick.
+    *   **Architecture**: Decoupled high-level activity context from low-level sensor management, improving modularity and testability.
+*   **SOT ID**: 519 (Unified Activity Context Provider)
 
 ## 🏁 Issue #1205: Context-Aware Power Optimization
 *   **Resolved**: Sep.28.1
@@ -9,11 +18,5 @@
     *   **ServiceBehaviorUseCase.kt**: Refactored `calculateGpsInterval` to scale polling rates based on activity context, enabling immediate 60s relaxation when `STILL` and enforcing 2s precision when `IN_VEHICLE`.
     *   **Full-Stack Parity**: Updated versioning to Sep.28.1 and synchronized all tracking metadata.
 *   **SOT ID**: 518 (Context-Aware Power Scaling)
-
-## 🏁 Issue #1160: Flyweight & Pooling Expansion
-*   **Resolved**: Sep.27.17
-*   **Root Cause**: High-frequency telemetry propagation paths were allocating fresh objects every second, causing GC pressure on budget hardware.
-*   **Remediation**: Converted core telemetry DTOs into mutable flyweights with `reset()` and `copyFrom()` methods, achieving zero object allocations in the steady-state evaluation loop.
-*   **SOT ID**: 517 (Flyweight & Pooling Expansion)
 
 ... (Earlier entries)

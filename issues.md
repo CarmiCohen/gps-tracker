@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.1
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.2
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
-System context-awareness fully integrated. Ready for field validation.
+Unified Activity Context Provider integrated. Hardware layer decoupled.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -10,13 +10,11 @@ System context-awareness fully integrated. Ready for field validation.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 6)
+## 💡 Strategic Simplification Ideas (Ideas: 5)
 
 ### 🟡 Medium Priority
 *   **Issue #1294: Build-Time Interface Validation**
     *   *Significance*: **Medium (Quality)**. Implement custom Gradle tasks to verify service implementations before compilation.
-*   **Issue #1353: Unified Activity Context Provider**
-    *   *Significance*: **Medium (Simplicity)**. Consolidate Activity Recognition and GPS heuristic detection into a standalone `ActivityContextProvider` to offload `HardwareSuite`.
 
 ### 🔵 Low Priority
 *   **Issue #1167: Map Overlay Imperative to Declarative Controller**
@@ -30,6 +28,7 @@ System context-awareness fully integrated. Ready for field validation.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1353: Unified Activity Context Provider** (Resolved Sep.28.2)
 *   **Issue #1205: Context-Aware Power Optimization** (Resolved Sep.28.1)
 *   **Issue #1160: Flyweight & Pooling Expansion** (Resolved Sep.27.17)
 *   **Issue #1173: Protobuf-First Persistence** (Resolved Sep.27.16)
@@ -52,6 +51,7 @@ System context-awareness fully integrated. Ready for field validation.
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.28.2: [SOT Count: 181 (Rules: 51), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.1: [SOT Count: 180 (Rules: 50), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.27.18: [SOT Count: 180 (Rules: 50), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.27.17: [SOT Count: 179 (Rules: 49), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
