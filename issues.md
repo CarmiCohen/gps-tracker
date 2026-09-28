@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.8
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.9
 
 ## 🎯 Current Resumption Focus: Build Pipeline Hardening
 Release-path annotation processing stabilized. Dependency leakage remediated.
@@ -25,6 +25,7 @@ Release-path annotation processing stabilized. Dependency leakage remediated.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1358: Codebase Leftovers Pruning & Version Hardening** (Resolved Sep.28.9)
 *   **Issue #1356: kaptReleaseKotlin Stub Generation Hardening** (Resolved Sep.28.8)
 *   **Issue #1354: Gradle Task Deduplication** (Resolved Sep.28.7)
 *   **Issue #1167: Map Overlay Imperative to Declarative Controller** (Resolved Sep.28.6)
@@ -36,6 +37,7 @@ Release-path annotation processing stabilized. Dependency leakage remediated.
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.28.9: [SOT Count: 186 (Rules: 56), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 16), QA: 286]**
 - **Sep.28.8: [SOT Count: 185 (Rules: 55), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 15), QA: 285]**
 - **Sep.28.7: [SOT Count: 184 (Rules: 54), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.6: [SOT Count: 184 (Rules: 54), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 15), QA: 284]**

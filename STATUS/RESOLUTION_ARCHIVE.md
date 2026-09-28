@@ -1,4 +1,13 @@
-# 🏛️ Resolution Archive - Sep.28.8
+# 🏛️ Resolution Archive - Sep.28.9
+
+## 🏁 Issue #1358: Codebase Leftovers Pruning & Version Hardening
+*   **Resolved**: Sep.28.9
+*   **Root Cause**: Following the unification of background orchestration into `MonitorService`, the decommissioned `TrackerService.kt` and `ViewerService.kt` files remained as empty leftover stubs in the tree. This violated strict code cleanliness and build optimization policies.
+*   **Remediation**:
+    *   **Source Code**: Permanently removed the obsolete `TrackerService.kt` and `ViewerService.kt` files from the source tree.
+    *   **Version Baseline**: Advanced the project and subproject version configurations to `Sep.28.9` and verified compliance with the unified `verifyProjectIntegrity` task.
+*   **Significance**: Low (Codebase Hygiene & Architecture Hardening).
+*   **SOT ID**: 524 (Legacy Component Pruning)
 
 ## 🏁 Issue #1356: kaptReleaseKotlin Stub Generation Hardening
 *   **Resolved**: Sep.28.8
