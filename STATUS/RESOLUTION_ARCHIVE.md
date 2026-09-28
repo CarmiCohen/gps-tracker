@@ -1,4 +1,13 @@
-# 🏛️ Resolution Archive - Sep.28.7
+# 🏛️ Resolution Archive - Sep.28.8
+
+## 🏁 Issue #1356: kaptReleaseKotlin Stub Generation Hardening
+*   **Resolved**: Sep.28.8
+*   **Root Cause**: During the release build type processing (`kaptReleaseKotlin`), the Kotlin Annotation Processing Tool (kapt) failed to resolve Compose `@Preview` annotations or dependencies on the release classpath. This led to `NonExistentClass` placeholders in generated stubs, causing subsequent Java compilation to fail.
+*   **Remediation**:
+    *   **app/build.gradle**: Enabled `correctErrorTypes = true` in the `kapt` configuration block to allow the build to proceed even with unresolved types in stubs.
+    *   **app/build.gradle**: Promoted `libs.androidx.ui.tooling.preview` to `implementation` to ensure its presence on the classpath during all build variants' annotation processing phases.
+*   **Significance**: Medium (Release Pipeline Stability).
+*   **SOT ID**: 523 (Build Pipeline Hardening)
 
 ## 🏁 Issue #1354: Gradle Task Deduplication
 *   **Resolved**: Sep.28.7

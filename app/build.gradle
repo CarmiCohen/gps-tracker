@@ -9,7 +9,7 @@ plugins {
 
 // Issue #1035: Type Safety Validation for Dynamic Versioning
 def safeVersionCode = rootProject.hasProperty('autoVersionCode') ? rootProject.autoVersionCode : 1034
-def safeVersionName = rootProject.hasProperty('autoVersionName') ? rootProject.autoVersionName : "Sep.28.7"
+def safeVersionName = rootProject.hasProperty('autoVersionName') ? rootProject.autoVersionName : "Sep.28.8"
 
 // Ensure versionCode is a valid Integer
 if (!(safeVersionCode instanceof Integer)) {
@@ -18,6 +18,10 @@ if (!(safeVersionCode instanceof Integer)) {
     } catch (Exception ignored) {
         safeVersionCode = 1034
     }
+}
+
+kapt {
+    correctErrorTypes = true
 }
 
 android {
@@ -110,6 +114,7 @@ dependencies {
     implementation libs.androidx.material3
     implementation libs.material.icons.extended
     implementation libs.androidx.navigation.compose
+    implementation libs.androidx.ui.tooling.preview
 
     // DataStore & Protobuf
     implementation libs.datastore

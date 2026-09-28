@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.7
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.8
 
-## 🎯 Current Resumption Focus: Architectural Hardening
-Gradle Task Deduplication integrated. Configuration overhead eliminated.
+## 🎯 Current Resumption Focus: Build Pipeline Hardening
+Release-path annotation processing stabilized. Dependency leakage remediated.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -10,7 +10,7 @@ Gradle Task Deduplication integrated. Configuration overhead eliminated.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 1)
+## 💡 Strategic Simplification Ideas (Ideas: 2)
 
 ### 🟡 Medium Priority
 *   *(No medium-priority ideas remain)*
@@ -18,39 +18,25 @@ Gradle Task Deduplication integrated. Configuration overhead eliminated.
 ### 🔵 Low Priority
 *   **Issue #1175: Real-time Only Path (Pivot Option)**
     *   *Significance*: **Strategic (Maintenance Tradeoff)**. Consider removing backlog sync and forensic backfilling to dramatically reduce codebase complexity.
+*   **Issue #1357: Build Pipeline Dependency Pruning**
+    *   *Significance*: **Low (Build Speed)**. Evaluate migration from kapt to KSP for all modules to eliminate Java stub generation overhead and potential classpath resolution conflicts.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1356: kaptReleaseKotlin Stub Generation Hardening** (Resolved Sep.28.8)
 *   **Issue #1354: Gradle Task Deduplication** (Resolved Sep.28.7)
 *   **Issue #1167: Map Overlay Imperative to Declarative Controller** (Resolved Sep.28.6)
 *   **Issue #1355: TimeProvider Cleanup** (Resolved Sep.28.5)
 *   **Issue #1296: Centralized Boot Lifecycle Authority** (Resolved Sep.28.4)
 *   **Issue #1294: Build-Time Interface Validation** (Resolved Sep.28.3)
 *   **Issue #1353: Unified Activity Context Provider** (Resolved Sep.28.2)
-*   **Issue #1205: Context-Aware Power Optimization** (Resolved Sep.28.1)
-*   **Issue #1160: Flyweight & Pooling Expansion** (Resolved Sep.27.17)
-*   **Issue #1173: Protobuf-First Persistence** (Resolved Sep.27.16)
-*   **Issue #1352: Unified Service Job Orchestration** (Resolved Sep.27.15)
-*   **Issue #1293: Lifecycle-Aware Tick Orchestrator** (Resolved Sep.27.14)
-*   **Issue #1351: StateSubscription Coroutine Scoping** (Resolved Sep.27.13)
-*   **Issue #1350: Unified State Mapping Authority** (Resolved Sep.27.12)
-*   **Issue #1202: UI Event Routing Unification** (Resolved Sep.27.11)
-*   **Issue #1201: Reactive Siren Lockout** (Resolved Sep.27.10)
-*   **Issue #1290: UI State Mapper Consolidation** (Resolved Sep.27.9)
-*   **Issue #1346: Physical Device Soak Test (24-Hour Observation)** (Resolved Sep.27.8)
-*   **Issue #1172: Smart Signaling Dispatcher** (Resolved Sep.27.7)
-*   **Issue #1161: Unified Trajectory & Buffer Management** (Resolved Sep.27.6)
-*   **Issue #1349: LocationProcessingState Mutability Reduction** (Resolved Sep.27.5)
-*   **Issue #1348: DomainEvent Hierarchy Simplification** (Resolved Sep.27.4)
-*   **Issue #1347: Audit and Itemize Strategic Simplification Candidates** (Resolved Sep.27.3)
-*   **Issue #1345: Expand Automated Network Stress Tests** (Resolved Sep.27.2)
-*   **Issue #1344: Implement Thermal & Memory Forensic Probes** (Resolved Sep.26.12)
 
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.28.8: [SOT Count: 185 (Rules: 55), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 15), QA: 285]**
 - **Sep.28.7: [SOT Count: 184 (Rules: 54), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.6: [SOT Count: 184 (Rules: 54), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.5: [SOT Count: 183 (Rules: 53), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
@@ -58,6 +44,3 @@ Gradle Task Deduplication integrated. Configuration overhead eliminated.
 - **Sep.28.3: [SOT Count: 182 (Rules: 52), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.2: [SOT Count: 181 (Rules: 51), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.1: [SOT Count: 180 (Rules: 50), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.27.18: [SOT Count: 180 (Rules: 50), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.27.17: [SOT Count: 179 (Rules: 49), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.27.9: [SOT Count: 171 (Rules: 41), Open: H:0, M:0, L:0, Ideas: H:0, M:6, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
