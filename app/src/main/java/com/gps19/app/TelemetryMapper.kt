@@ -6,6 +6,9 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Sep.27.18:
+ * - Issue #1205: Context-Aware Power Optimization. Propagated activityType 
+ *   through all mapping paths for full-stack context awareness.
  * Sep.27.17:
  * - Issue #1160: Flyweight & Pooling Expansion. Refactored mapping logic to 
  *   support zero-allocation "out" parameters for high-frequency evaluation paths.
@@ -33,6 +36,7 @@ object TelemetryMapper {
 
         return out.apply {
             kinetic.copyFrom(snapshot.kinetic)
+            kinetic.activityType = snapshot.activityType
             atmospheric.copyFrom(snapshot.atmospheric)
             integrity.copyFrom(snapshot.integrity)
             this.status = snapshot.status
@@ -82,6 +86,7 @@ object TelemetryMapper {
                 isJump = snapshot.kinetic.isJump
                 kineticEnergy = snapshot.kinetic.kineticEnergy
                 isAdaptiveJump = snapshot.isAdaptiveJump
+                this.activityType = snapshot.activityType
             }
 
             atmospheric.copyFrom(snapshot.atmospheric)
@@ -153,6 +158,10 @@ object TelemetryMapper {
             isStalled = proto.isStalled
             tamperDetected = proto.isTamperDetected || proto.isLocationPending
             nowTs = now; this.nowRt = nowRt
+            
+            activityType = try { 
+                ActivityType.valueOf(proto.activityType) 
+            } catch (e: Exception) { ActivityType.UNKNOWN }
         }
     }
 
@@ -181,6 +190,9 @@ object TelemetryMapper {
                 kineticEnergy = proto.kineticEnergy
                 isAdaptiveJump = proto.isAdaptiveJump
                 jumpTier = proto.jumpTier
+                activityType = try { 
+                    ActivityType.valueOf(proto.activityType) 
+                } catch (e: Exception) { ActivityType.UNKNOWN }
             }
 
             atmospheric.apply {
@@ -284,6 +296,10 @@ object TelemetryMapper {
             nowTs = now; this.nowRt = nowRt
             thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
             heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
+            
+            activityType = try { 
+                ActivityType.valueOf(data.optString("activity_type", current.activityType.name)) 
+            } catch (e: Exception) { ActivityType.UNKNOWN }
         }
     }
 
@@ -317,6 +333,9 @@ object TelemetryMapper {
                 isAdaptiveJump = data.optBoolean("is_adaptive_jump", current.isAdaptiveJump)
                 jumpTier = data.optInt("jump_tier", current.jumpTier)
                 verticalVelocity = data.optDouble("vertical_velocity", current.verticalVelocity)
+                activityType = try { 
+                    ActivityType.valueOf(data.optString("activity_type", current.activityType.name)) 
+                } catch (e: Exception) { ActivityType.UNKNOWN }
             }
 
             atmospheric.apply {
@@ -479,6 +498,7 @@ object TelemetryMapper {
                 gpsTs = rawGpsTs
                 speed = processed.filteredSpeed
                 kineticEnergy = processed.kineticEnergy
+                this.activityType = snapshot.activityType
             }
             this.lastValidFixRt = lastValidFixRt
             tamperDetected = processed.tamperDetected
@@ -514,6 +534,7 @@ object TelemetryMapper {
             snrSnapshot = s.snrIdx * 5.0
             thermalHeadroom = s.integrity.thermalHeadroom
             heapAllocatedMb = s.integrity.heapAllocatedMb
+            this.activityType = s.activityType
         }
     }
 
@@ -539,6 +560,7 @@ object TelemetryMapper {
             isBatteryLow = p.isBatteryLow; isBatteryCritical = p.isBatteryCritical; cpuLoad = p.cpuLoad
             ioWait = p.ioWait; maxIoLatency = p.maxIoLatency; isSilentFailure = p.isSilentFailure
             thermalHeadroom = p.thermalHeadroom; heapAllocatedMb = p.heapAllocatedMb
+            activityType = p.activityType
         }
     }
 
@@ -567,6 +589,9 @@ object TelemetryMapper {
             violationUptimeMs = entity.violationUptimeMs; isUltraLongStationary = entity.isUltraLongStationary
             gpsHardwareLock = entity.gpsHardwareLock; isAnchorLocked = entity.isAnchorLocked
             thermalHeadroom = entity.thermalHeadroom; heapAllocatedMb = entity.heapAllocatedMb
+            activityType = try { 
+                ActivityType.valueOf(entity.activityType) 
+            } catch (e: Exception) { ActivityType.UNKNOWN }
         }
     }
 
@@ -590,7 +615,8 @@ object TelemetryMapper {
             maxAccuracy = p.maxAccuracy, isAnchorLocked = p.isAnchorLocked, isBatteryLow = p.isBatteryLow,
             isBatteryCritical = p.isBatteryCritical, violationUptimeMs = p.violationUptimeMs,
             isUltraLongStationary = p.isUltraLongStationary, gpsHardwareLock = p.gpsHardwareLock,
-            thermalHeadroom = p.thermalHeadroom, heapAllocatedMb = p.heapAllocatedMb
+            thermalHeadroom = p.thermalHeadroom, heapAllocatedMb = p.heapAllocatedMb,
+            activityType = p.activityType.name
         )
     }
 
@@ -620,7 +646,7 @@ object TelemetryMapper {
             isBatteryCritical = status.isBatteryCritical, isUltraLongStationary = status.isUltraLongStationary,
             violationUptimeMs = status.violationUptimeMs, gpsHardwareLock = status.gpsHardwareLock,
             isGnssThrottled = status.isGnssThrottled, thermalHeadroom = status.integrity.thermalHeadroom,
-            heapAllocatedMb = status.integrity.heapAllocatedMb
+            heapAllocatedMb = status.integrity.heapAllocatedMb, activityType = status.activityType.name
         )
     }
 
@@ -640,6 +666,9 @@ object TelemetryMapper {
                 bearing = entity.bearing; gpsTs = entity.gpsTs
                 verticalVelocity = entity.verticalVelocity; kineticEnergy = 0.0
                 isAdaptiveJump = false
+                activityType = try { 
+                    ActivityType.valueOf(entity.activityType) 
+                } catch (e: Exception) { ActivityType.UNKNOWN }
             }
 
             atmospheric.apply {

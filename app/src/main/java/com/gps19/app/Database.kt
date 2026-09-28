@@ -8,6 +8,10 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Sep.27.18:
+ * - Issue #1205: Context-Aware Power Optimization. Added activityType to 
+ *   HistoryEntity and PendingStatusEntity for telemetry parity. 
+ *   Incremented version to 80 with migration (R-ID 503).
  * Sep.26.12:
  * - Issue #1344: Expanded LogEntity, HistoryEntity and PendingStatusEntity to include 
  *   thermalHeadroom and heapAllocatedMb forensic probes. Incremented 
@@ -134,7 +138,8 @@ data class HistoryEntity(
     @ColumnInfo(defaultValue = "0") val isSilentFailure: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isBatteryWhitelisted: Boolean = false,
     @ColumnInfo(defaultValue = "0") val thermalHeadroom: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val heapAllocatedMb: Double = 0.0
+    @ColumnInfo(defaultValue = "0") val heapAllocatedMb: Double = 0.0,
+    @ColumnInfo(defaultValue = "UNKNOWN") val activityType: String = "UNKNOWN"
 )
 
 @Entity(tableName = "violations", indices = [Index(value = ["ts"])])
@@ -194,7 +199,8 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "0") val isSilentFailure: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isBatteryWhitelisted: Boolean = false,
     @ColumnInfo(defaultValue = "0") val thermalHeadroom: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val heapAllocatedMb: Double = 0.0
+    @ColumnInfo(defaultValue = "0") val heapAllocatedMb: Double = 0.0,
+    @ColumnInfo(defaultValue = "UNKNOWN") val activityType: String = "UNKNOWN"
 )
 
 @Dao
@@ -268,7 +274,7 @@ interface TrailDao {
 
 @Dao
 interface HistoryDao {
-    @Insert suspend fun insert(point: HistoryEntity)
+    @Insert suspend fun insert(history: HistoryEntity)
     @Insert suspend fun insertAll(points: List<HistoryEntity>)
     @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 300") fun getHistoryFlow(ribbonKey: String): Flow<List<HistoryEntity>>
     @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 300") suspend fun getHistory(ribbonKey: String): List<HistoryEntity>
@@ -317,7 +323,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 79, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 80, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -341,6 +347,16 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_79_80 = object : Migration(79, 80) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #1205: Context-Aware Power Optimization - activityType parity.
+                try {
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN activityType TEXT NOT NULL DEFAULT 'UNKNOWN'")
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN activityType TEXT NOT NULL DEFAULT 'UNKNOWN'")
+                } catch (e: Exception) {}
+            }
+        }
+
         val MIGRATION_78_79 = object : Migration(78, 79) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #1344: Forensic diagnostic expansion - thermalSnapshot and heapSnapshot for LogEntity.

@@ -6,6 +6,9 @@ import javax.inject.Singleton
 
 /**
  * ServiceBehaviorUseCase: Encapsulates high-level logic for service-level state transitions.
+ * Sep.27.18:
+ * - Issue #1205: Context-Aware Power Optimization. Integrated ActivityType into 
+ *   GPS interval calculation (R406a).
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Transitioned from requiresAdaptationMuzzle 
  *   to direct performanceTier enum comparison (R-ID 348).
@@ -45,6 +48,7 @@ class ServiceBehaviorUseCase @Inject constructor(
         isStationary: Boolean,
         isScreenOn: Boolean,
         isGeofenceActive: Boolean,
+        activityType: ActivityType,
         nowRt: Long,
         capabilities: HardwareCapabilities
     ): Long {
@@ -60,6 +64,11 @@ class ServiceBehaviorUseCase @Inject constructor(
         return when {
             isCoolingMode -> COOLING_GPS_POLLING_MS
             isSuspiciousMode -> SUSPICIOUS_GPS_POLLING_MS
+            // Issue #1205: Activity-aware fast relaxation. If confirmed STILL, 
+            // drop to 1-minute polling immediately even if MOVING_HOLD_DURATION_MS hasn't passed.
+            activityType == ActivityType.STILL && !isSuspiciousMode -> STATIONARY_GPS_POLLING_MS
+            // Activity-aware high velocity: If IN_VEHICLE, maintain high frequency regardless of screen.
+            activityType == ActivityType.IN_VEHICLE -> HIGH_FREQUENCY_GPS_POLLING_MS
             isUltraLongStationary -> ULTRA_LONG_STATIONARY_GPS_POLLING_MS
             isStationaryState -> STATIONARY_GPS_POLLING_MS
             // Issue #898 / #1055: On staggered tier hardware, never drop to 45s when moving 

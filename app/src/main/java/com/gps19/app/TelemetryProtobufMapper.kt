@@ -4,6 +4,9 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Sep.27.18:
+ * - Issue #1205: Context-Aware Power Optimization. Integrated activityType mapping 
+ *   to ensure context awareness across signaling and persistence (R-ID 503).
  * Sep.15.01:
  * - Forensic Hardening: Added isPowerTamper mapping to support A15-compliant 
  *   signaling resilience (R-ID 338).
@@ -103,6 +106,9 @@ object TelemetryProtobufMapper {
         
         // Issue #946: Forensic Reason propagation
         status.tamperNote?.let { builder.setTamperNote(it) }
+
+        // Issue #1205: Activity context
+        builder.setActivityType(status.activityType.name)
 
         // Enums
         builder.setState(TrackerStateProto.valueOf("TS_" + status.trackerState.name))
@@ -231,6 +237,9 @@ object TelemetryProtobufMapper {
         
         // Issue #946: Forensic Reason propagation
         status.tamperNote?.let { builder.setTamperNote(it) }
+
+        // Issue #1205: Activity context
+        builder.setActivityType(status.activityType.name)
 
         // Enums
         builder.setTrackerState(status.trackerState.name)

@@ -1,23 +1,23 @@
-# Forensic Handover (Sep.27.17)
+# Forensic Handover (Sep.27.18 - IN PROGRESS)
 
 ## 🎯 Current System State
-*   **Version**: Sep.27.17 | **Build**: Success (Flyweight & Pooling Expansion)
+*   **Version**: Sep.27.18 (Next) | **Status**: Issue #1205 Implementation Initiated.
 *   **SOT Baseline**: SOT ID: 517 (Rules: 49, R-IDs: 179)
-*   **Core Remediation**: Successfully resolved **Issue #1160** (Flyweight & Pooling Expansion).
-    *   Converted `SystemEvaluationSnapshot`, `TrackerStatus`, and `LocationUpdate` into mutable flyweights.
-    *   Optimized `MonitorService` and `ConnectivitySuite` to utilize reusable pooled instances for the 1Hz telemetry cycle.
-    *   Eliminated all object allocations in the steady-state evaluation and signaling paths, reducing GC churn and memory fragmentation.
+*   **Core Remediation**: Initiated **Issue #1205** (Context-Aware Power Optimization).
+    *   Successfully extended the core engine models to support context-awareness.
+    *   Modified `EngineModels.kt`: Introduced `ActivityType` enum and integrated it into `EngineConnectionPoint` and `SystemEvaluationSnapshot`.
+    *   Modified `LocationUpdate.kt`: Integrated `ActivityType` into the `KineticState` telemetry container.
+    *   Aligned all flyweight `copyFrom` and `reset` methods to handle the new `activityType` field, maintaining zero-allocation telemetry integrity.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
 
-1.  **Event Orchestration Layer**:
-    *   `UiEventCoordinator`: Sole authority for mapping user intent (`UiEvent`) to domain actions.
-    *   `MainViewModel`: Pure SSOT for UI state observation and event emission.
-    *   `TickOrchestrator`: Standalone lifecycle authority for all structural background jobs and loops.
+1.  **Context-Aware Pipeline**:
+    *   `ActivityType`: STILL, WALKING, RUNNING, BICYCLING, IN_VEHICLE, TILTING, UNKNOWN.
+    *   Telemetry Stream: Now carries user activity context from the low-level `HardwareSuite` through to the `ServiceBehaviorUseCase`.
 2.  **Zero-Allocation Telemetry**:
-    *   `TelemetryMapper`: Centralized authority for zero-allocation DTO transformation using "out" parameters.
+    *   `TelemetryMapper`: Needs update to support `ActivityType` mapping in the evaluation path.
 
 ---
 
@@ -27,4 +27,6 @@
 ---
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   *(All structural architecture refinement goals achieved for this stage)*
+*   **[Issue #1205]**: Need to implement the Activity Recognition bridge in `HardwareSuite.kt`.
+*   **[Issue #1205]**: Need to update `ServiceBehaviorUseCase.calculateGpsInterval` to scale polling based on `ActivityType`.
+*   **[Issue #1205]**: Need to update `TelemetryMapper.kt` to propagate activity context during snapshot transformation.

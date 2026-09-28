@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.17
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.27.18
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Ready for next priority item.
@@ -15,8 +15,6 @@ Ready for next priority item.
 ### 🟡 Medium Priority
 *   **Issue #1294: Build-Time Interface Validation**
     *   *Significance*: **Medium (Quality)**. Implement custom Gradle tasks to verify service implementations before compilation.
-*   **Issue #1205: Context-Aware Power Optimization**
-    *   *Significance*: **Medium (Battery)**. Dynamically adjust sensor polling based on activity recognition to extend battery life.
 
 ### 🔵 Low Priority
 *   **Issue #1167: Map Overlay Imperative to Declarative Controller**
@@ -30,6 +28,7 @@ Ready for next priority item.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1205: Context-Aware Power Optimization** (Resolved Sep.27.18)
 *   **Issue #1160: Flyweight & Pooling Expansion** (Resolved Sep.27.17)
 *   **Issue #1173: Protobuf-First Persistence** (Resolved Sep.27.16)
 *   **Issue #1352: Unified Service Job Orchestration** (Resolved Sep.27.15)
@@ -47,17 +46,13 @@ Ready for next priority item.
 *   **Issue #1347: Audit and Itemize Strategic Simplification Candidates** (Resolved Sep.27.3)
 *   **Issue #1345: Expand Automated Network Stress Tests** (Resolved Sep.27.2)
 *   **Issue #1344: Implement Thermal & Memory Forensic Probes** (Resolved Sep.26.12)
-*(Earlier resolutions archived to STATUS/RESOLUTION_ARCHIVE.md)*
 
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.27.18: [SOT Count: 180 (Rules: 50), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.27.17: [SOT Count: 179 (Rules: 49), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.27.16: [SOT Count: 178 (Rules: 48), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.27.15: [SOT Count: 177 (Rules: 47), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.27.14: [SOT Count: 176 (Rules: 46), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.27.13: [SOT Count: 175 (Rules: 45), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.27.12: [SOT Count: 174 (Rules: 44), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:5, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.27.11: [SOT Count: 173 (Rules: 43), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:5, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.27.10: [SOT Count: 172 (Rules: 42), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.27.9: [SOT Count: 171 (Rules: 41), Open: H:0, M:0, L:0, Ideas: H:0, M:6, L:4, Testing: 3 (Sub-items: 15), QA: 284]**

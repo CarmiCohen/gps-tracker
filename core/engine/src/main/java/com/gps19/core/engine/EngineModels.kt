@@ -5,6 +5,9 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.27.18:
+ * - Issue #1205: Context-Aware Power Optimization. Added ActivityType enum 
+ *   and integrated it into EngineConnectionPoint, SystemEvaluationSnapshot, and EngineSensorSnapshot.
  * Sep.27.17:
  * - Issue #1160: Flyweight & Pooling Expansion. Converted SystemEvaluationSnapshot 
  *   fields to vars and kept data class to retain copy() compatibility while eliminating GC churn via pooling.
@@ -40,6 +43,9 @@ class EngineGeoPoint(
 
 @Serializable
 enum class TrackerState { MOVING, PARKING, JUMPING, OFFLINE, UNKNOWN }
+
+@Serializable
+enum class ActivityType { STILL, WALKING, RUNNING, BICYCLING, IN_VEHICLE, TILTING, UNKNOWN }
 
 enum class DiscoveryPhase {
     BOOTSTRAP, DISCOVERING, MONITORING
@@ -151,7 +157,8 @@ class EngineConnectionPoint(
     var isUltraLongStationary: Boolean = false,
     var violationUptimeMs: Long = 0L,
     var thermalHeadroom: Double = 0.0,
-    var heapAllocatedMb: Double = 0.0
+    var heapAllocatedMb: Double = 0.0,
+    var activityType: ActivityType = ActivityType.UNKNOWN
 ) {
     fun copyFrom(other: EngineConnectionPoint) {
         this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt; this.remoteSig = other.remoteSig
@@ -172,6 +179,7 @@ class EngineConnectionPoint(
         this.isSilentFailure = other.isSilentFailure; this.isBatteryLow = other.isBatteryLow; this.isBatteryCritical = other.isBatteryCritical
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
         this.thermalHeadroom = other.thermalHeadroom; this.heapAllocatedMb = other.heapAllocatedMb
+        this.activityType = other.activityType
     }
 }
 
@@ -223,7 +231,8 @@ data class SystemEvaluationSnapshot(
     var isHardwareOnline: Boolean = true,
     var acousticMinDb: Double = -1.0,
     var thermalHeadroom: Double = 0.0,
-    var heapAllocatedMb: Double = 0.0
+    var heapAllocatedMb: Double = 0.0,
+    var activityType: ActivityType = ActivityType.UNKNOWN
 ) {
     /**
      * copyFrom: Performs a deep mutable copy to this instance from another (R-ID 392).
@@ -263,6 +272,7 @@ data class SystemEvaluationSnapshot(
         this.acousticMinDb = other.acousticMinDb
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
+        this.activityType = other.activityType
     }
 
     /**
@@ -279,6 +289,7 @@ data class SystemEvaluationSnapshot(
         vibeSnapshot = null; isWarming = false; isSirenActive = false; cpuLoad = 0.0; ioWait = 0.0
         maxIoLatency = 0L; isSilentFailure = false; isMaliAnomaly = false; localInternetLoss = false
         isHardwareOnline = true; acousticMinDb = -1.0; thermalHeadroom = 0.0; heapAllocatedMb = 0.0
+        activityType = ActivityType.UNKNOWN
     }
 
     /**
@@ -857,13 +868,13 @@ class EngineSensorSnapshot(
     var ts: Long = 0L, var rt: Long = 0L, var acoustic: Double = 0.0, var lux: Double = 0.0,
     var vibe: Double = 0.0, var proxIdx: Double = 0.0, var lift: Double = 0.0, var tilt: Double = 0.0,
     var isSitDetected: Boolean = false, var sitVzTs: Long = 0L, var sitVzRt: Long = 0L,
-    var sitShock: Double = 0.0, var kineticEnergy: Double = 0.0
+    var sitShock: Double = 0.0, var kineticEnergy: Double = 0.0, var activityType: ActivityType = ActivityType.UNKNOWN
 ) {
     fun copyFrom(other: EngineSensorSnapshot) {
         this.ts = other.ts; this.rt = other.rt; this.acoustic = other.acoustic; this.lux = other.lux
         this.vibe = other.vibe; this.proxIdx = other.proxIdx; this.lift = other.lift; this.tilt = other.tilt
         this.isSitDetected = other.isSitDetected; this.sitVzTs = other.sitVzTs; this.sitVzRt = other.sitVzRt
-        this.sitShock = other.sitShock; this.kineticEnergy = other.kineticEnergy
+        this.sitShock = other.sitShock; this.kineticEnergy = other.kineticEnergy; this.activityType = other.activityType
     }
 }
 

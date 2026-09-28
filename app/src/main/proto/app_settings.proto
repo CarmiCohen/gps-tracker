@@ -236,6 +236,9 @@ message RealtimeStatus {
     int64 energy_duration_ms = 73;
     optional string tamper_note = 74;
     bool is_power_tamper = 75;
+
+    // Issue #1205: Context-Aware Power Optimization
+    optional string activity_type = 76;
 }
 
 message GeoPointProto {
@@ -402,6 +405,9 @@ message TrackerStatusProto {
     double energy_delta_temp = 112;
     int64 energy_duration_ms = 113;
     optional string tamper_note = 114;
+
+    // Issue #1205: Context-Aware Power Optimization
+    optional string activity_type = 115;
 }
 
 message ActiveAlarmProto {

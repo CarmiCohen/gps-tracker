@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * KineticState: Spatial and motion telemetry.
+ * Sep.27.18:
+ * - Issue #1205: Context-Aware Power Optimization. Added activityType field.
  */
 @Serializable
 data class KineticState(
@@ -23,7 +25,8 @@ data class KineticState(
     var verticalVelocity: Double = 0.0,
     var kineticEnergy: Double = 0.0,
     var distToTracker: Double? = null,
-    var distToHome: Double? = null
+    var distToHome: Double? = null,
+    var activityType: ActivityType = ActivityType.UNKNOWN
 ) {
     fun copyFrom(other: KineticState) {
         this.lat = other.lat; this.lng = other.lng; this.alt = other.alt; this.speed = other.speed
@@ -33,13 +36,14 @@ data class KineticState(
         this.isAdaptiveJump = other.isAdaptiveJump; this.verticalVelocity = other.verticalVelocity
         this.kineticEnergy = other.kineticEnergy; this.distToTracker = other.distToTracker
         this.distToHome = other.distToHome
+        this.activityType = other.activityType
     }
 
     fun reset() {
         lat = 0.0; lng = 0.0; alt = 0.0; speed = 0.0; accuracy = 0.0; maxAccuracy = 0.0; bearing = 0.0
         gpsTs = 0L; rt = 0L; isJump = false; isTrajectoryPromoted = false; jumpTier = 0
         isAdaptiveJump = false; verticalVelocity = 0.0; kineticEnergy = 0.0
-        distToTracker = null; distToHome = null
+        distToTracker = null; distToHome = null; activityType = ActivityType.UNKNOWN
     }
 }
 

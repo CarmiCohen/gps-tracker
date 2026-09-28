@@ -24,6 +24,9 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.27.18:
+ * - Issue #1205: Context-Aware Power Optimization. Propagated ActivityType 
+ *   through evaluation snapshots to drive behavioral scaling.
  * Sep.27.17:
  * - Issue #1160: Flyweight & Pooling Expansion. Refactored processTick and 
  *   alarm evaluation to use reusable flyweight snapshots, eliminating GC churn.
@@ -457,6 +460,7 @@ class MonitorService : BaseMonitorService() {
             localInternetLoss = health.localInternetLoss; isHardwareOnline = health.isHardwareOnline
             acousticMinDb = hSnapshot.acousticPeakMin
             thermalHeadroom = health.thermalHeadroom; heapAllocatedMb = health.heapAllocatedMb
+            activityType = hSnapshot.activityType
         }
         
         if (isTrackerMode) {
@@ -464,7 +468,7 @@ class MonitorService : BaseMonitorService() {
             hardwareSuite.setAcousticFastPath(floor = primaryProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0)
             hardwareSuite.setHighLoad(evaluationSnapshotFlyweight.integrity.isCoolingModeActive)
             isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(isSuspiciousMode, primaryProcessor.checkPhysicalTamper(nowRt, false) == SentinelStatus.TAMPER, primaryProcessor.consumeSitDetected(), nowRt)
-            val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(evaluationSnapshotFlyweight.integrity.isCoolingModeActive, isSuspiciousMode, hardwareSuite.isStationary(), hardwareSuite.isScreenOn(), primaryProcessor.getMaxDistanceAuthority() > 0.0, nowRt, capabilities)
+            val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(evaluationSnapshotFlyweight.integrity.isCoolingModeActive, isSuspiciousMode, hardwareSuite.isStationary(), hardwareSuite.isScreenOn(), primaryProcessor.getMaxDistanceAuthority() > 0.0, evaluationSnapshotFlyweight.activityType, nowRt, capabilities)
             if (targetGpsInterval != currentIntervalMs) {
                 currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, "T"); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)
             }

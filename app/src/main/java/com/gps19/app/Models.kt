@@ -10,6 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Sep.27.18:
+ * - Issue #1205: Context-Aware Power Optimization. Added activityType to 
+ *   ConnectionPoint and TrackerStatus for full-stack context awareness.
  * Sep.27.17:
  * - Issue #1160: Flyweight & Pooling Expansion. Refactored TrackerStatus to 
  *   support mutable reuse and deep copying to eliminate GC churn.
@@ -151,7 +154,8 @@ class ConnectionPoint(
     var isAnchorLocked: Boolean = false,
     var isGnssThrottled: Boolean = false,
     var thermalHeadroom: Double = 0.0,
-    var heapAllocatedMb: Double = 0.0
+    var heapAllocatedMb: Double = 0.0,
+    var activityType: ActivityType = ActivityType.UNKNOWN
 ) {
     fun copyFrom(other: ConnectionPoint) {
         this.localId = other.localId; this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt
@@ -176,6 +180,7 @@ class ConnectionPoint(
         this.isGnssThrottled = other.isGnssThrottled
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
+        this.activityType = other.activityType
     }
 
     /**
@@ -191,7 +196,7 @@ class ConnectionPoint(
                isUltraLongStationary == other.isUltraLongStationary && violationUptimeMs == other.violationUptimeMs &&
                gpsHardwareLock == other.gpsHardwareLock && isAnchorLocked == other.isAnchorLocked &&
                isGnssThrottled == other.isGnssThrottled && thermalHeadroom == other.thermalHeadroom && 
-               heapAllocatedMb == other.heapAllocatedMb
+               heapAllocatedMb == other.heapAllocatedMb && activityType == other.activityType
     }
 
     fun reset() {
@@ -207,7 +212,7 @@ class ConnectionPoint(
         sitShock = 0.0; kineticEnergy = 0.0; cpuLoad = 0.0; ioWait = 0.0; maxIoLatency = 0L
         isSilentFailure = false; isUltraLongStationary = false; violationUptimeMs = 0L
         gpsHardwareLock = false; isAnchorLocked = false; isGnssThrottled = false
-        thermalHeadroom = 0.0; heapAllocatedMb = 0.0
+        thermalHeadroom = 0.0; heapAllocatedMb = 0.0; activityType = ActivityType.UNKNOWN
     }
 }
 
@@ -366,6 +371,7 @@ data class TrackerStatus(
     val bearing: Double get() = kinetic.bearing
     val accuracy: Double get() = kinetic.accuracy
     val maxAccuracy: Double get() = kinetic.maxAccuracy
+    val activityType: ActivityType get() = kinetic.activityType
 
     val uptimeMs: Long get() = integrity.uptimeMs
     val lastConnTs: Long get() = integrity.lastConnTs
@@ -527,6 +533,7 @@ data class TrackerStatus(
         put("is_battery_whitelisted", isBatteryWhitelisted)
         put("is_ultra_long_stationary", isUltraLongStationary)
         put("gps_hardware_lock", gpsHardwareLock); put("is_gnss_throttled", isGnssThrottled)
+        put("activity_type", activityType.name)
         
         // R-ID 259: Energy Footprint mapping for serialization
         put("last_energy_delta_ma", lastEnergyDeltaMa)
@@ -595,7 +602,8 @@ data class DashboardTelemetryState(
     val tamperReason: String? = null,
     val isTamperDetected: Boolean = false,
     val isUltraLongStationary: Boolean = false,
-    val systemPulse: Long = 0L
+    val systemPulse: Long = 0L,
+    val activityType: ActivityType = ActivityType.UNKNOWN
 )
 
 @Serializable
@@ -692,6 +700,7 @@ data class DashboardState(
     val tamperReason get() = telemetry.tamperReason
     val isTamperDetected get() = telemetry.isTamperDetected
     val isUltraLongStationary get() = telemetry.isUltraLongStationary
+    val activityType get() = telemetry.activityType
 
     val vibration get() = health.vibration
     val heading get() = health.heading
@@ -851,7 +860,8 @@ data class HudTelemetryState(
     val isViewerLocPending: Boolean = false,
     val viewerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val isUltraLongStationary: Boolean = false,
-    val systemPulse: Long = 0L
+    val systemPulse: Long = 0L,
+    val activityType: ActivityType = ActivityType.UNKNOWN
 )
 
 @Serializable
@@ -865,6 +875,7 @@ data class HudHealthState(
     val hasActiveAlarms: Boolean = false,
     val isRedScreenSuppressed: Boolean = false,
     val isSirenPlaying: Boolean = false,
+    val activityType: ActivityType = ActivityType.UNKNOWN,
     val activeAlarms: List<AlarmInfo> = emptyList(),
     val progressPulse: Float = 0f,
     val systemPulse: Long = 0L,

@@ -33,6 +33,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.27.18:
+ * - Issue #1205: Context-Aware Power Optimization. Integrated ActivityType 
+ *   into ForensicSnapshot and added heuristic activity detection.
  * Sep.27.4:
  * - Issue #1348: Flattened DomainEvent hierarchy, emitting component events directly.
  */
@@ -70,6 +73,7 @@ class HardwareSuite @Inject constructor(
         var acousticPeakMin: Double = -1.0
         var kineticEnergy: Double = 0.0
         var adaptiveVibrationFloor: Double = 0.0
+        var activityType: ActivityType = ActivityType.UNKNOWN
 
         fun reset() {
             vibration = 0.0; heading = 0.0; baroAlt = 0.0; lux = 0.0; isNear = false
@@ -77,7 +81,7 @@ class HardwareSuite @Inject constructor(
             peakVerticalVelocityTs = 0L; peakVerticalVelocityRt = 0L; peakVerticalDisplacement = 0.0
             plungeMatched = false; proximityIdx = 0.0; proximityCm = -1.0; proximityDebounceMs = 0L
             vibrationRollingSum = 0.0; acousticPeak = 0.0; acousticPeakMin = -1.0; kineticEnergy = 0.0
-            adaptiveVibrationFloor = 0.0
+            adaptiveVibrationFloor = 0.0; activityType = ActivityType.UNKNOWN
         }
     }
 
@@ -229,7 +233,7 @@ class HardwareSuite @Inject constructor(
     private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
 
     private val sensorBuffer = CircularStateBuffer(256, { EngineSensorSnapshot() }, {
-        it.ts = 0L; it.rt = 0L; it.acoustic = 0.0; it.lux = 0.0; it.vibe = 0.0; it.proxIdx = 0.0; it.lift = 0.0; it.tilt = 0.0; it.isSitDetected = false; it.sitVzTs = 0L; it.sitVzRt = 0L; it.sitShock = 0.0; it.kineticEnergy = 0.0
+        it.ts = 0L; it.rt = 0L; it.acoustic = 0.0; it.lux = 0.0; it.vibe = 0.0; it.proxIdx = 0.0; it.lift = 0.0; it.tilt = 0.0; it.isSitDetected = false; it.sitVzTs = 0L; it.sitVzRt = 0L; it.sitShock = 0.0; it.kineticEnergy = 0.0; it.activityType = ActivityType.UNKNOWN
     })
     @Volatile private var lastBufferRecordRt = 0L
 
@@ -271,6 +275,10 @@ class HardwareSuite @Inject constructor(
     private val _isUltraLongStationary = MutableSharedFlow<Boolean>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val isUltraLongStationaryFlow: SharedFlow<Boolean> = _isUltraLongStationary.asSharedFlow()
     private var isUltraLongStationary = false
+
+    // Issue #1205: Heuristic Activity Detection
+    @Volatile private var lastGpsSpeedMps = 0.0
+    @Volatile private var currentActivityType = ActivityType.UNKNOWN
 
     private val gnssPolicyEngine = GnssPolicyEngine()
 
@@ -373,6 +381,7 @@ class HardwareSuite @Inject constructor(
                     updateLocationStatus()
                     checkRevivalLifecycle()
                     updateStationaryExposure()
+                    updateActivityHeuristic()
                 }
                 delay(2000L)
             }
@@ -639,13 +648,27 @@ class HardwareSuite @Inject constructor(
         }
     }
 
+    private fun updateActivityHeuristic() {
+        val speedMps = lastGpsSpeedMps
+        val vibe = currentVibrationIndex
+        val isStat = isStationary()
+        
+        currentActivityType = when {
+            speedMps > 10.0 -> ActivityType.IN_VEHICLE
+            speedMps > 1.2 -> ActivityType.WALKING
+            isStat && vibe < (adaptiveVibrationFloor * 0.8) -> ActivityType.STILL
+            vibe > VIBRATION_SUSPICIOUS_THRESHOLD_G -> ActivityType.WALKING // High vibration usually walking/running
+            else -> ActivityType.UNKNOWN
+        }
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
     @SuppressLint("MissingPermission")
     private val hardwareObservationFlow = pollingIntervalFlow.flatMapLatest { interval ->
         callbackFlow<GpsUpdate> {
             start() 
-            fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
-            val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
+            fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime(); lastGpsSpeedMps = loc.speed.toDouble(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
+            val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime(); lastGpsSpeedMps = it.speed.toDouble(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
             val handler = synchronized(lifecycleLock) { hardwareHandler }
             synchronized(lifecycleLock) { activeLocationCallback?.unregister(fusedLocationClient, handler); activeLocationCallback = fusedCallback }
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval).setMinUpdateIntervalMillis(interval / 2).build()
@@ -747,6 +770,7 @@ class HardwareSuite @Inject constructor(
                     this.acoustic = secPeakDb
                     this.isSitDetected = secSitDetected
                     this.kineticEnergy = secPeakKinetic
+                    this.activityType = currentActivityType
                 }
             }
             lastBufferRecordRt = nowRt; secPeakLux = currentLux; secPeakVibe = currentVibrationIndex; secSumProxIdx = 0.0; secProxCount = 0; secPeakTilt = currentTiltDegrees; secPeakLift = abs(relativeAltitude); secPeakDb = currentAcousticDb; secPeakKinetic = currentKineticEnergy; secSitDetected = false
@@ -854,6 +878,7 @@ class HardwareSuite @Inject constructor(
                     acousticPeakMin = if (minDb >= 100.0) -1.0 else minDb
                     kineticEnergy = this@HardwareSuite.currentKineticEnergy
                     adaptiveVibrationFloor = this@HardwareSuite.adaptiveVibrationFloor
+                    activityType = currentActivityType
                 }
                 if (isForensic) {
                     forensicPeakVibration = 0.0
@@ -1054,6 +1079,8 @@ class HardwareSuite @Inject constructor(
             plungePhase = 0
             plungeMatched = false
             lastPlungePhaseRt = 0L
+            lastGpsSpeedMps = 0.0
+            currentActivityType = ActivityType.UNKNOWN
         }
     }
 
