@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.16
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.17
 
 ## 🎯 Current Resumption Focus: Production Codebase Stabilization
-Advancing codebase logic tracking and version metrics cleanly to Sep.28.16.
+Advancing codebase logic tracking and version metrics cleanly to Sep.28.17.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -23,6 +23,7 @@ Advancing codebase logic tracking and version metrics cleanly to Sep.28.16.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1364: Production Codebase Stabilization & Tracking Alignment** (Resolved Sep.28.17)
 *   **Issue #1362: Forensic Persistence Health Alerting (R715)** (Resolved Sep.28.16)
 *   **Issue #1363: Production Codebase Stabilization & Tracking Alignment** (Resolved Sep.28.15)
 *   **Issue #1361: Forensic Reliability Math Hardening** (Resolved Sep.28.13)
@@ -41,6 +42,7 @@ Advancing codebase logic tracking and version metrics cleanly to Sep.28.16.
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.28.17: [SOT Count: 193 (Rules: 61), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
 - **Sep.28.16: [SOT Count: 192 (Rules: 61), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
 - **Sep.28.15: [SOT Count: 191 (Rules: 60), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
 - **Sep.28.14: [SOT Count: 190 (Rules: 60), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
