@@ -1,4 +1,15 @@
-# 🏛️ Resolution Archive - Sep.28.9
+# 🏛️ Resolution Archive - Sep.28.10
+
+## 🏁 Issue #1357: Build Pipeline Dependency Pruning (KSP Migration)
+*   **Resolved**: Sep.28.10
+*   **Root Cause**: The project relied on `kapt` (Kotlin Annotation Processing Tool) for Room and Hilt, which introduces significant build overhead due to Java stub generation. This slowed down compilation and created risks of classpath resolution conflicts, especially in release variants.
+*   **Remediation**:
+    *   **libs.versions.toml**: Added KSP plugin version `1.9.23-1.0.19` synchronized with the project's Kotlin version.
+    *   **build.gradle (root)**: Integrated the KSP plugin into the top-level build configuration and advanced the global `versionName` to `Sep.28.10`.
+    *   **app/build.gradle**: Migrated from `kotlin-kapt` to `com.google.devtools.ksp`. Replaced all `kapt` dependency configurations with `ksp` for Room and Hilt compilers.
+    *   **Optimization**: Excised the legacy `kapt` configuration block, reducing build script complexity.
+*   **Significance**: Low (Build Speed & Architectural Modernization).
+*   **SOT ID**: 525 (Build Pipeline Dependency Pruning)
 
 ## 🏁 Issue #1358: Codebase Leftovers Pruning & Version Hardening
 *   **Resolved**: Sep.28.9

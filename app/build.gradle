@@ -1,7 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
-    id 'kotlin-kapt'
+    alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.protobuf)
@@ -9,7 +9,7 @@ plugins {
 
 // Issue #1035: Type Safety Validation for Dynamic Versioning
 def safeVersionCode = rootProject.hasProperty('autoVersionCode') ? rootProject.autoVersionCode : 1034
-def safeVersionName = rootProject.hasProperty('autoVersionName') ? rootProject.autoVersionName : "Sep.28.9"
+def safeVersionName = rootProject.hasProperty('autoVersionName') ? rootProject.autoVersionName : "Sep.28.10"
 
 // Ensure versionCode is a valid Integer
 if (!(safeVersionCode instanceof Integer)) {
@@ -18,10 +18,6 @@ if (!(safeVersionCode instanceof Integer)) {
     } catch (Exception ignored) {
         safeVersionCode = 1034
     }
-}
-
-kapt {
-    correctErrorTypes = true
 }
 
 android {
@@ -136,10 +132,10 @@ dependencies {
 
     // Hilt
     implementation libs.hilt.android
-    kapt libs.hilt.compiler
+    ksp libs.hilt.compiler
     implementation libs.hilt.navigation.compose
     implementation libs.hilt.work
-    kapt libs.hilt.androidx.compiler
+    ksp libs.hilt.androidx.compiler
 
     // WorkManager
     implementation libs.androidx.work.runtime.ktx
@@ -147,7 +143,7 @@ dependencies {
     // Room
     implementation libs.room.runtime
     implementation libs.room.ktx
-    kapt libs.room.compiler
+    ksp libs.room.compiler
 
     // Networking & Logging
     implementation libs.okhttp
@@ -167,7 +163,7 @@ dependencies {
     
     // Hilt Testing
     androidTestImplementation libs.hilt.android.testing
-    kaptAndroidTest libs.hilt.compiler
+    kspAndroidTest libs.hilt.compiler
 
     debugImplementation libs.androidx.ui.tooling
     debugImplementation libs.androidx.ui.test.manifest
