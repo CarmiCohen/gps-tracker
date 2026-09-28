@@ -1,4 +1,12 @@
-# 🏛️ Resolution Archive - Sep.28.4
+# 🏛️ Resolution Archive - Sep.28.5
+
+## 🏁 Issue #1355: TimeProvider Cleanup
+*   **Resolved**: Sep.28.5
+*   **Root Cause**: The architectural extraction of the Centralized Boot Lifecycle Authority in the previous step left legacy session-tracking expectations on the temporal layer. `TimeProvider` needed to be strictly flattened to simple monotonic and wall-clock contracts to guarantee pure separation of concerns.
+*   **Remediation**:
+    *   **TimeProvider.kt**: Enforced basic, streamlined temporal methods (`currentTimeMillis`, `elapsedRealtime`), completely eliminating lingering platform boot-session or identifier footprints from the interface signature.
+    *   **ServiceBehaviorAuditTest.kt**: Patched a compile-time signature regression in the test suite by correctly supplying the contextual `activityType` parameter to `calculateGpsInterval` calls, restoring test suite integrity.
+    *   **Validation**: Successfully executed the entire test runner suite across all modules, proving zero logic regressions or compilation leakage.
 
 ## 🏁 Issue #1296: Centralized Boot Lifecycle Authority
 *   **Resolved**: Sep.28.4
@@ -27,13 +35,3 @@
     *   **HardwareSuite.kt**: Refactored to inject `ActivityContextProvider`. Removed internal BroadcastReceiver, activity recognition request logic, and redundant heuristic state. Offloaded activity heuristic updates to the provider during the sensor tick.
     *   **Architecture**: Decoupled high-level activity context from low-level sensor management, improving modularity and testability.
 *   **SOT ID**: 519 (Unified Activity Context Provider)
-
-## 🏁 Issue #1205: Context-Aware Power Optimization
-*   **Resolved**: Sep.28.1
-*   **Root Cause**: The tracking engine relied on physical vibration indices and temporal duration, lacking a reliable source for user activity context. This caused delayed polling relaxation when stationary and potential coordinate gaps during rapid transit.
-*   **Remediation**:
-    *   **HardwareSuite.kt**: Fully integrated the Google Activity Recognition API bridge to provide high-confidence activity context (`STILL`, `WALKING`, `RUNNING`, `IN_VEHICLE`). Implemented a 2-minute heuristic fallback for cases where Play Services updates are unavailable.
-    *   **SystemHealthState.kt & TelemetryMapper.kt**: Integrated `activityType` into the core health model and ensured its propagation through the zero-allocation telemetry pipeline (`mapSnapshotToHealth`).
-    *   **ServiceBehaviorUseCase.kt**: Refactored `calculateGpsInterval` to scale polling rates based on activity context, enabling immediate 60s relaxation when `STILL` and enforcing 2s precision when `IN_VEHICLE`.
-    *   **Full-Stack Parity**: Updated versioning to Sep.28.1 and synchronized all tracking metadata.
-*   **SOT ID**: 518 (Context-Aware Power Scaling)

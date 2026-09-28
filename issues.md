@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.4
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.5
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
 Centralized Boot Lifecycle Authority integrated. Build-time interface validation active.
@@ -10,7 +10,7 @@ Centralized Boot Lifecycle Authority integrated. Build-time interface validation
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 4)
+## 💡 Strategic Simplification Ideas (Ideas: 3)
 
 ### 🟡 Medium Priority
 *   *(No medium-priority ideas remain)*
@@ -22,13 +22,12 @@ Centralized Boot Lifecycle Authority integrated. Build-time interface validation
     *   *Significance*: **Strategic (Maintenance Tradeoff)**. Consider removing backlog sync and forensic backfilling to dramatically reduce codebase complexity.
 *   **Issue #1354: Gradle Task Deduplication**
     *   *Significance*: **Low (Build Speed)**. Consolidate custom verification tasks into a single convention plugin to reduce configuration time.
-*   **Issue #1355: TimeProvider Cleanup**
-    *   *Significance*: **Low (Simplicity)**. Now that BootLifecycleAuthority handles session IDs, simplify TimeProvider to only provide basic monotonic and wall-clock time.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1355: TimeProvider Cleanup** (Resolved Sep.28.5)
 *   **Issue #1296: Centralized Boot Lifecycle Authority** (Resolved Sep.28.4)
 *   **Issue #1294: Build-Time Interface Validation** (Resolved Sep.28.3)
 *   **Issue #1353: Unified Activity Context Provider** (Resolved Sep.28.2)
@@ -54,6 +53,7 @@ Centralized Boot Lifecycle Authority integrated. Build-time interface validation
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.28.5: [SOT Count: 183 (Rules: 53), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.4: [SOT Count: 183 (Rules: 53), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.3: [SOT Count: 182 (Rules: 52), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.2: [SOT Count: 181 (Rules: 51), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
