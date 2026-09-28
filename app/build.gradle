@@ -8,15 +8,15 @@ plugins {
 }
 
 // Issue #1035: Type Safety Validation for Dynamic Versioning
-def safeVersionCode = rootProject.hasProperty('autoVersionCode') ? rootProject.autoVersionCode : 1040
-def safeVersionName = rootProject.hasProperty('autoVersionName') ? rootProject.autoVersionName : "Sep.28.20"
+def safeVersionCode = rootProject.hasProperty('autoVersionCode') ? rootProject.autoVersionCode : 1041
+def safeVersionName = rootProject.hasProperty('autoVersionName') ? rootProject.autoVersionName : "Sep.28.22"
 
 // Ensure versionCode is a valid Integer
 if (!(safeVersionCode instanceof Integer)) {
     try {
         safeVersionCode = safeVersionCode.toString().toInteger()
     } catch (Exception ignored) {
-        safeVersionCode = 1040
+        safeVersionCode = 1041
     }
 }
 
