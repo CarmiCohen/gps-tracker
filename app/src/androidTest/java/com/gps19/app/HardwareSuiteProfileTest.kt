@@ -12,8 +12,8 @@ import org.junit.runner.RunWith
 
 /**
  * HardwareSuiteProfileTest: Automated profiling study for the staggered performance tier.
- * Sep.23.50:
- * - Fixed build error by providing DomainEventBus to HardwareSuite.
+ * Sep.28.27:
+ * - Issue #1374: Fixed SystemStatusProviderImpl mock instantiation to pass mockTimeProvider.
  */
 @RunWith(AndroidJUnit4::class)
 class HardwareSuiteProfileTest {
@@ -49,7 +49,8 @@ class HardwareSuiteProfileTest {
             systemStatusProvider = mockSystemStatusProvider(),
             powerStateProvider = fakePowerStateProvider,
             forensicAuditor = mockForensicAuditor(),
-            domainEventBus = testDomainEventBus
+            domainEventBus = testDomainEventBus,
+            activityContextProvider = mockActivityContextProvider(context)
         )
 
         // Profile progression across 20 successive reconnect attempts
@@ -75,7 +76,8 @@ class HardwareSuiteProfileTest {
             systemStatusProvider = mockSystemStatusProvider(),
             powerStateProvider = fakePowerStateProvider,
             forensicAuditor = mockForensicAuditor(),
-            domainEventBus = testDomainEventBus
+            domainEventBus = testDomainEventBus,
+            activityContextProvider = mockActivityContextProvider(context)
         )
         val intervalMs = 30000L
 
@@ -92,10 +94,14 @@ class HardwareSuiteProfileTest {
     }
 
     private fun mockSystemStatusProvider(): SystemStatusProvider {
-        return SystemStatusProviderImpl(ApplicationProvider.getApplicationContext(), testScope)
+        return SystemStatusProviderImpl(ApplicationProvider.getApplicationContext(), testScope, mockTimeProvider)
     }
 
     private fun mockForensicAuditor(): ForensicAuditor {
         return ForensicAuditor(mockTimeProvider, mockSystemStatusProvider())
+    }
+
+    private fun mockActivityContextProvider(context: android.content.Context): ActivityContextProvider {
+        return ActivityContextProvider(context, mockTimeProvider)
     }
 }

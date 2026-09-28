@@ -65,13 +65,8 @@ object TestPowerModule {
 /**
  * ProductionReadinessAuditTest: Verifies end-to-end telemetry stream constraints 
  * and Doze-deferral consistency across role transitions (R339).
- * Sep.26.11:
- * - Added verifySignalingLifecycleProbes to validate Issue #1343 forensic logging.
- * - Hardened probe verification with polling and stall simulation to prevent 
- *   async drain interference.
- * Sep.26.10: 
- * - Added verify24HourSoakSimulation to validate stability counters over full cycle.
- * - Refactored FakePowerStateProvider to support delegation to real hardware.
+ * Sep.28.26:
+ * - Issue #1373: Updated constructor invocation of HardwareSuite to include activityContextProvider.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -266,7 +261,8 @@ class ProductionReadinessAuditTest {
             systemStatusProvider = hardwareSuite.getSystemStatusProviderForTest(),
             powerStateProvider = newProvider,
             forensicAuditor = hardwareSuite.getForensicAuditorForTest(),
-            domainEventBus = domainEventBus
+            domainEventBus = domainEventBus,
+            activityContextProvider = ActivityContextProvider(context, timeProvider)
         )
 
         assertTrue("Power state must persist across component recreation",
