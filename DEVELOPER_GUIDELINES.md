@@ -21,6 +21,7 @@ The following rules **MUST** be followed strictly for every task:
     *   Never use summaries or placeholders when using `write_file`.
 9.  **Completion Adherence**: Execute the **Completion Sequence** in strict order after finishing an issue.
 10. **Strict Termination**: Once the completion sequence is finished, do not implement anything else. **STOP ALL PROCESSING.**
+11. **Traceability Rule**: Remember to add the issue # to the git and to the relevant doc files.
 
 ---
 
@@ -32,7 +33,7 @@ Perform these steps in strict sequence once an issue is resolved:
 2.  **State Tracking Update**: Synchronize `issues.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, and `STATUS/RESOLUTION_ARCHIVE.md`. Assign issue numbers to all new concerns.
 3.  **Dashboard Synchronization**: Update the **Hardening Progress Dashboard** in `issues.md` with the latest **Audit Baseline** entry, prefixed with the current **Version Name** (e.g., `Sep.27.9`).
 4.  **App Build & Versioning**: Rebuild the application and increment the `versionName` in `app/build.gradle`.
-5.  **Git Release Block**: Generate a Git command block for staging, committing, tagging the version, and pushing to the remote.
+5.  **Git Release Block**: Generate a Git command block for staging, committing, tagging the version, and pushing to the remote. Remember to add the issue # to the git and to the relevant doc files.
 6.  **Simplicity Audit**: Evaluate potential architectural simplifications. Document these in the "Strategic Simplification Ideas" section of `issues.md` with unique IDs and significance levels (High, Medium, Low).
 7.  **Rule 8 Verification**: Confirm that Rule 8 (Large File Protection) was strictly followed for all modifications.
 8.  **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot for the next session.

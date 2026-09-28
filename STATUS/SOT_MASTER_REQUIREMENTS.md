@@ -1,6 +1,6 @@
 # SOT Master Requirements & Hardening Status (Sep.28.11)
 
-## 🏗️ Architectural Master Rules (61 Rules)
+## 🏗️ Architectural Master Rules (62 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ...
@@ -13,6 +13,7 @@
 *   **1.48 Signature Harmonization (R527)**: To ensure robust asynchronous cleanup of hardware hooks, all unregistration callbacks and lifecycle teardown paths across the app layer must perfectly harmonize with centralized TimeProvider references to eliminate lifecycle-driven runtime anomalies (Issue #1360).
 *   **1.49 Forensic Reliability Precision (R528)**: The `LogRepository` MUST utilize `BigDecimal` fixed-point arithmetic for the forensic reliability EMA to prevent cumulative precision loss during high-frequency trace bursts and ensure alert consistency (Issue #1361).
 *   **1.50 Persistence Health Alerting Authority (R715/S530)**: The `IntegrityMonitor` MUST monitor forensic persistence reliability and trigger a `PERFORMANCE_SPIKE` alert if the reliability EMA falls below the 0.85 threshold for a sustained 30-second window (Issue #1362).
+*   **1.51 Traceability Rule Enforcement (R716/S537)**: All structural modifications and resolutions MUST be explicitly linked to an Issue # in both Git commit messages and relevant documentation files to ensure absolute forensic auditability (Issue #1370).
 
 ...
 
@@ -33,6 +34,7 @@
 *   **SOT ID 534**: Production Codebase Stabilization - Advanced versioning to Sep.28.20 and synchronized forensic tracking baselines. (Resolved Sep.28.20).
 *   **SOT ID 535**: Production Codebase Stabilization - Advanced versioning to Sep.28.21 and synchronized forensic tracking baselines. (Resolved Sep.28.21).
 *   **SOT ID 536**: Production Codebase Stabilization - Advanced versioning to Sep.28.22 and synchronized forensic tracking baselines. (Resolved Sep.28.22).
+*   **SOT ID 537**: Guideline Refinement: Traceability Rule Enforcement - Formally integrated Issue # traceability into developer guidelines and architectural rules. (Resolved Sep.28.23).
 
 ---
 
@@ -53,4 +55,5 @@
 *   **Chapter 31.166 (Production Codebase Stabilization)**: PASSED - Verified build stability and version alignment at Sep.28.20. (Sep.28.11)
 *   **Chapter 31.167 (Production Codebase Stabilization)**: PASSED - Verified build stability and version alignment at Sep.28.21. (Sep.28.11)
 *   **Chapter 31.168 (Production Codebase Stabilization)**: PASSED - Verified build stability and version alignment at Sep.28.22. (Sep.28.11)
+*   **Chapter 31.169 (Guideline Refinement: Traceability Rule Enforcement)**: PASSED - Verified strict rule 11 integration in DEVELOPER_GUIDELINES.md. (Sep.28.11)
 ...
