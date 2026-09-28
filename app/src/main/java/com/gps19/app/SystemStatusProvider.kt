@@ -18,7 +18,6 @@ import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
 import android.os.StatFs
-import android.os.SystemClock
 import android.os.storage.StorageManager
 import android.provider.Settings
 import androidx.core.content.ContextCompat
@@ -61,14 +60,11 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Sep.28.11:
+ * - Issue #1359: Temporal Precision & Service Logic Hardening. Migrated 
+ *   hardware status and internet cache throttling to use centralized timeProvider.
  * Sep.26.12:
  * - Issue #1344: Added getThermalHeadroom and getHeapAllocatedMb forensic probes.
- * Sep.23.08:
- * - Issue #1204: Unified Hardware Lifecycle. Added Huawei device detection 
- *   and integrated it into the unified PermissionState (R-ID 348).
- * Sep.16.05:
- * - Issue #1060 Capability Consolidation: Added getPerformanceTier() to return 
- *   PerformanceTier enum directly (R-ID 348).
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -107,7 +103,8 @@ interface SystemStatusProvider {
 @Singleton
 class SystemStatusProviderImpl @Inject constructor(
     @ApplicationContext private val context: Context,
-    @ApplicationScope private val externalScope: CoroutineScope
+    @ApplicationScope private val externalScope: CoroutineScope,
+    private val timeProvider: TimeProvider
 ) : SystemStatusProvider {
 
     private val powerManager by lazy { context.getSystemService(Context.POWER_SERVICE) as PowerManager }
@@ -168,7 +165,7 @@ class SystemStatusProviderImpl @Inject constructor(
     override fun getPerformanceTier(): PerformanceTier = if (isStaggeredTier) PerformanceTier.STAGGERED else PerformanceTier.STANDARD
 
     override suspend fun isLocalOnline(): Boolean = internetMutex.withLock {
-        val now = SystemClock.elapsedRealtime()
+        val now = timeProvider.elapsedRealtime()
         if (now - lastInternetCheckRt < INTERNET_CACHE_TTL_MS && lastInternetCheckRt != 0L) {
             return cachedInternetStatus
         }
@@ -200,7 +197,7 @@ class SystemStatusProviderImpl @Inject constructor(
     }
 
     override suspend fun getPermissionState(forceRefresh: Boolean): PermissionState {
-        val now = SystemClock.elapsedRealtime()
+        val now = timeProvider.elapsedRealtime()
         val isStale = now - lastFullRefreshTime > PERMISSION_TTL_MS
         
         val shouldExecute = when {
@@ -210,7 +207,7 @@ class SystemStatusProviderImpl @Inject constructor(
 
         if (shouldExecute) {
             refreshMutex.withLock {
-                val currentNow = SystemClock.elapsedRealtime()
+                val currentNow = timeProvider.elapsedRealtime()
                 val doubleCheckExecute = when {
                     forceRefresh -> (currentNow - lastHardwareCheckRt >= FORCED_REFRESH_COOLDOWN_MS) || lastHardwareCheckRt == 0L
                     else -> (currentNow - lastFullRefreshTime > PERMISSION_TTL_MS)

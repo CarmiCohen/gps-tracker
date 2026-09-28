@@ -13,50 +13,46 @@ import android.net.ConnectivityManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.tasks.Tasks
+import com.gps19.core.engine.TimeProvider
 import timber.log.Timber
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 /**
  * ManagedUnregistrationHelper: Centralized logic for safe unregistration
  * of hardware listeners. 
- * Sep.14.10 Audit (#1022):
- * - Simplification Idea #17: Converted to fire-and-forget asynchronous 
- *   unregistration. Removed CountDownLatch wait blocks to ensure rapid 
- *   teardown and prevent stalling signaling disconnects during mode switches.
+ * Sep.28.11:
+ * - Issue #1359: Temporal Precision & Service Logic Hardening. Migrated 
+ *   unregistration duration monitoring to use centralized timeProvider.
  */
 object ManagedUnregistrationHelper {
     fun safeUnregister(
         label: String,
         handler: Handler?,
+        timeProvider: TimeProvider,
         action: () -> Unit
     ) {
         Timber.d("$label: Starting unregistration...")
 
         if (handler == null || Looper.myLooper() == handler.looper) {
-            val startTime = SystemClock.elapsedRealtime()
+            val startTime = timeProvider.elapsedRealtime()
             try {
                 action()
-                Timber.d("$label: Immediate unregistration complete in ${SystemClock.elapsedRealtime() - startTime}ms.")
+                Timber.d("$label: Immediate unregistration complete in ${timeProvider.elapsedRealtime() - startTime}ms.")
             } catch (e: Exception) {
                 Timber.e(e, "$label: Immediate unregistration failed")
             }
             return
         }
 
-        // Idea #17 Implementation: Fire-and-forget to avoid blocking the caller (ConnectivitySuite).
         handler.post {
-            val taskStartTime = SystemClock.elapsedRealtime()
+            val taskStartTime = timeProvider.elapsedRealtime()
             try {
                 action()
-                val duration = SystemClock.elapsedRealtime() - taskStartTime
+                val duration = timeProvider.elapsedRealtime() - taskStartTime
                 Timber.d("$label: Async unregistration complete in ${duration}ms.")
             } catch (e: Exception) {
-                Timber.e(e, "$label: Async unregistration failed after ${SystemClock.elapsedRealtime() - taskStartTime}ms")
+                Timber.e(e, "$label: Async unregistration failed after ${timeProvider.elapsedRealtime() - taskStartTime}ms")
             }
         }
     }
@@ -67,10 +63,11 @@ object ManagedUnregistrationHelper {
  * ConnectivityManager.NetworkCallback.
  */
 abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
-    fun unregister(cm: ConnectivityManager, handler: Handler? = Handler(Looper.getMainLooper())) {
+    fun unregister(cm: ConnectivityManager, timeProvider: TimeProvider, handler: Handler? = Handler(Looper.getMainLooper())) {
         ManagedUnregistrationHelper.safeUnregister(
             "ManagedNetworkCallback",
-            handler
+            handler,
+            timeProvider
         ) { 
             try {
                 cm.unregisterNetworkCallback(this) 
@@ -86,12 +83,12 @@ abstract class ManagedNetworkCallback : ConnectivityManager.NetworkCallback() {
  * FusedLocationProvider location updates.
  */
 abstract class ManagedLocationCallback : LocationCallback() {
-    fun unregister(client: FusedLocationProviderClient, handler: Handler?) {
+    fun unregister(client: FusedLocationProviderClient, timeProvider: TimeProvider, handler: Handler?) {
         ManagedUnregistrationHelper.safeUnregister(
             "ManagedLocationCallback",
-            handler
+            handler,
+            timeProvider
         ) {
-            // Sep.14.10: Removed Tasks.await and unused task variable (Idea #17).
             client.removeLocationUpdates(this)
             Timber.d("ManagedLocationCallback: Task submitted.")
         }
@@ -103,10 +100,11 @@ abstract class ManagedLocationCallback : LocationCallback() {
  * GnssStatus.Callback.
  */
 abstract class ManagedGnssStatusCallback : GnssStatus.Callback() {
-    fun unregister(lm: LocationManager, handler: Handler?) {
+    fun unregister(lm: LocationManager, timeProvider: TimeProvider, handler: Handler?) {
         ManagedUnregistrationHelper.safeUnregister(
             "ManagedGnssStatusCallback",
-            handler
+            handler,
+            timeProvider
         ) { lm.unregisterGnssStatusCallback(this) }
     }
 }
@@ -121,10 +119,11 @@ abstract class ManagedLocationListener : android.location.LocationListener {
     @Deprecated("Deprecated in API 29")
     override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) {}
 
-    fun unregister(lm: LocationManager, handler: Handler?) {
+    fun unregister(lm: LocationManager, timeProvider: TimeProvider, handler: Handler?) {
         ManagedUnregistrationHelper.safeUnregister(
             "ManagedLocationListener",
-            handler
+            handler,
+            timeProvider
         ) { lm.removeUpdates(this) }
     }
 }
@@ -153,19 +152,20 @@ abstract class ManagedBroadcastReceiver : BroadcastReceiver() {
 abstract class ManagedSensorListener : SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
-    fun unregister(sm: AndroidSensorManager, handler: Handler?) {
-        performUnregistration(sm, null, handler)
+    fun unregister(sm: AndroidSensorManager, timeProvider: TimeProvider, handler: Handler?) {
+        performUnregistration(sm, null, timeProvider, handler)
     }
 
-    fun unregister(sm: AndroidSensorManager, sensor: Sensor, handler: Handler?) {
-        performUnregistration(sm, sensor, handler)
+    fun unregister(sm: AndroidSensorManager, sensor: Sensor, timeProvider: TimeProvider, handler: Handler?) {
+        performUnregistration(sm, sensor, timeProvider, handler)
     }
 
-    private fun performUnregistration(sm: AndroidSensorManager, sensor: Sensor?, handler: Handler?) {
+    private fun performUnregistration(sm: AndroidSensorManager, sensor: Sensor?, timeProvider: TimeProvider, handler: Handler?) {
         val label = if (sensor == null) "global" else "specific (${sensor.name})"
         ManagedUnregistrationHelper.safeUnregister(
             "ManagedSensorListener ($label)",
-            handler
+            handler,
+            timeProvider
         ) {
             if (sensor == null) sm.unregisterListener(this)
             else sm.unregisterListener(this, sensor)
@@ -181,10 +181,11 @@ abstract class ManagedDisplayListener : DisplayManager.DisplayListener {
     override fun onDisplayAdded(displayId: Int) {}
     override fun onDisplayRemoved(displayId: Int) {}
 
-    fun unregister(dm: DisplayManager, handler: Handler?) {
+    fun unregister(dm: DisplayManager, timeProvider: TimeProvider, handler: Handler?) {
         ManagedUnregistrationHelper.safeUnregister(
             "ManagedDisplayListener",
-            handler
+            handler,
+            timeProvider
         ) { dm.unregisterDisplayListener(this) }
     }
 }

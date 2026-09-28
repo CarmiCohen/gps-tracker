@@ -21,14 +21,14 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.28.11:
+ * - Issue #1359: Temporal Precision & Service Logic Hardening. Migrated 
+ *   teardown duration monitoring to use centralized timeProvider.
  * Sep.27.17:
  * - Issue #1160: Flyweight & Pooling Expansion. Refactored packet handling 
  *   to use reusable flyweight snapshots, eliminating GC churn.
  * Sep.27.4:
  * - Issue #1348: Flattened DomainEvent hierarchy, emitting component events directly.
- * Sep.27.2:
- * - Issue #1345: Implemented executeFlappingStressTest to verify signaling 
- *   resilience during high-frequency network flapping (R-ID 345).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -161,7 +161,6 @@ class ConnectivitySuite @Inject constructor(
                 if (signalingProvider.isConnected() || signalingProvider.isConnecting()) return@launch
                 if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) return@launch
 
-                // Issue #1343: Forensic handover registration
                 forensicLogger.logHandover("Interface Available. Reconnecting.", "active")
                 logManagerProvider.get().logServiceEvent("Network Handover: Available. Reconnecting.", false)
                 lastReconnectTs = nowRt
@@ -172,7 +171,6 @@ class ConnectivitySuite @Inject constructor(
         }
         override fun onNetworkLost() {
             if (isStopped.get()) return
-            // Issue #1343: Forensic handover lost interface registration
             forensicLogger.logHandover("Interface Lost.", "none")
             logManagerProvider.get().logServiceEvent("Network Handover: Interface Lost.", false)
             telemetryRepository.updateRelayStatus(false)
@@ -388,12 +386,10 @@ class ConnectivitySuite @Inject constructor(
         val pending = offlineRepository.getPendingStatusUpdates(limit)
         if (pending.isEmpty()) return
         pending.forEach { entity ->
-            // R-ID 392: Use flyweight for pending updates.
             val status = TelemetryMapper.mapPendingToStatus(entity, deviceId, viewerId, pendingStatusFlyweight)
             if (sendTelemetryInternal(status, SignalingPriority.NORMAL)) {
                 offlineRepository.deletePendingStatusUpdate(entity.id)
             } else {
-                // Issue #1343: Outbound transmission/sync failures logged to forensicLogger
                 forensicLogger.logTransmissionFailure("Pending update sync drop", if (isTrackerMode) "TRK" else "VWR", deviceId, viewerId)
             }
         }
@@ -406,7 +402,6 @@ class ConnectivitySuite @Inject constructor(
             if (!success) {
                 val entity = TelemetryMapper.mapStatusToPending(status)
                 offlineRepository.addPendingStatusUpdate(entity)
-                // Issue #1343: Telemetry tx drop logging
                 forensicLogger.logTransmissionFailure("Telemetry high-priority drop", "TRK", deviceId, viewerId)
             }
         } else {
@@ -460,7 +455,6 @@ class ConnectivitySuite @Inject constructor(
             remoteStatusRepository.setPeerSignal((statusProto.snrIdx * 10.0).toInt().coerceIn(0, 10))
 
             remoteStatusRepository.updateStatusAtomic { current ->
-                // R-ID 392: Use flyweights for binary update processing.
                 TelemetryMapper.mapProtoToSnapshot(statusProto, now, nowRt, snapshotFlyweight)
 
                 val processed = locationProcessor.processGpsPoint(
@@ -560,7 +554,6 @@ class ConnectivitySuite @Inject constructor(
             remoteStatusRepository.setPeerSignal(data.optInt("signal", 0))
 
             remoteStatusRepository.updateStatusAtomic { current ->
-                // R-ID 392: Use flyweights for JSON update processing.
                 TelemetryMapper.mapJsonToSnapshot(data, current, now, nowRt, snapshotFlyweight)
 
                 val processed = locationProcessor.processGpsPoint(
@@ -608,7 +601,7 @@ class ConnectivitySuite @Inject constructor(
     fun stop() { 
         if (!isStarted.getAndSet(false)) return
         isStopped.set(true)
-        val stopStartTime = SystemClock.elapsedRealtime()
+        val stopStartTime = timeProvider.elapsedRealtime()
         Timber.i("ConnectivitySuite: Starting teardown sequence (R-ID 197).")
 
         resetPeerStats()
@@ -624,11 +617,11 @@ class ConnectivitySuite @Inject constructor(
         
         networkProvider.registerListener(networkListener)
         
-        val sigStart = SystemClock.elapsedRealtime()
+        val sigStart = timeProvider.elapsedRealtime()
         signalingProvider.disconnect() 
-        val sigDuration = SystemClock.elapsedRealtime() - sigStart
+        val sigDuration = timeProvider.elapsedRealtime() - sigStart
         
-        val totalDuration = SystemClock.elapsedRealtime() - stopStartTime
+        val totalDuration = timeProvider.elapsedRealtime() - stopStartTime
         Timber.i("""
             ConnectivitySuite: Teardown Summary (Issue #197 Verification):
             - Total Teardown Time: ${totalDuration}ms
@@ -664,10 +657,6 @@ class ConnectivitySuite @Inject constructor(
         }
     }
 
-    /**
-     * executeFlappingStressTest: Initiates a 10s high-frequency signaling flapping 
-     * burst to verify resource stability and event resilience (R-ID 345).
-     */
     fun executeFlappingStressTest() {
         scope.launch(Dispatchers.Default) {
             domainEventBus.emit(DomainEvent.ServiceStatus("NETWORK STRESS TEST: Initiating 10s Signaling Flapping Burst.", isImportant = true))
@@ -680,11 +669,10 @@ class ConnectivitySuite @Inject constructor(
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                 }
                 count++
-                delay(200) // 5Hz flapping
+                delay(200) 
             }
             domainEventBus.emit(DomainEvent.ServiceStatus("NETWORK STRESS TEST: Flapping burst complete ($count transitions).", isImportant = true))
             
-            // Final recovery attempt
             if (!signalingProvider.isConnected()) {
                 signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
             }

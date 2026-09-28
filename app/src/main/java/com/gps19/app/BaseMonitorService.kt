@@ -5,7 +5,6 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
-import android.os.SystemClock
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.gps19.core.engine.*
@@ -19,6 +18,9 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Sep.28.11:
+ * - Issue #1359: Temporal Precision & Service Logic Hardening. Migrated 
+ *   foreground service throttling to use centralized timeProvider.
  * Sep.27.15:
  * - Issue #1352: Extended TickOrchestrator for unified job management.
  */
@@ -162,7 +164,7 @@ abstract class BaseMonitorService : LifecycleService() {
     }
 
     protected fun safeStartForeground(id: Int, notification: Notification, type: Int = 0, force: Boolean = false) {
-        val now = SystemClock.elapsedRealtime()
+        val now = timeProvider.elapsedRealtime()
         if (!force && lastFgsUpdateRealtime != 0L && (now - lastFgsUpdateRealtime < FGS_UPDATE_THROTTLE_MS)) return
         
         lastFgsUpdateRealtime = now

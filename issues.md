@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.10
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.11
 
-## 🎯 Current Resumption Focus: Build Pipeline Hardening
-Release-path annotation processing stabilized. Dependency leakage remediated.
+## 🎯 Current Resumption Focus: Temporal Precision & Service Logic Hardening
+Monotonic clock references and temporal gates unified under centralized TimeProvider authority.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -23,6 +23,7 @@ Release-path annotation processing stabilized. Dependency leakage remediated.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1359: Temporal Precision & Service Logic Hardening** (Resolved Sep.28.11)
 *   **Issue #1357: Build Pipeline Dependency Pruning (KSP Migration)** (Resolved Sep.28.10)
 *   **Issue #1358: Codebase Leftovers Pruning & Version Hardening** (Resolved Sep.28.9)
 *   **Issue #1356: kaptReleaseKotlin Stub Generation Hardening** (Resolved Sep.28.8)
@@ -36,6 +37,7 @@ Release-path annotation processing stabilized. Dependency leakage remediated.
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.28.11: [SOT Count: 188 (Rules: 58), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
 - **Sep.28.10: [SOT Count: 187 (Rules: 57), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
 - **Sep.28.9: [SOT Count: 186 (Rules: 56), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 16), QA: 286]**
 - **Sep.28.8: [SOT Count: 185 (Rules: 55), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 15), QA: 285]**
