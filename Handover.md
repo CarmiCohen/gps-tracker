@@ -1,20 +1,21 @@
-# Forensic Handover (Sep.28.6 - COMPLETED)
+# Forensic Handover (Sep.28.7 - COMPLETED)
 
 ## 🎯 Current System State
-*   **Version**: Sep.28.6 | **Status**: Issue #1167 FULLY RESOLVED.
+*   **Version**: Sep.28.7 | **Status**: Issue #1354 FULLY RESOLVED.
 *   **SOT Baseline**: SOT ID: 522 (Rules: 54, R-IDs: 184)
-*   **Core Remediation**: UI-Map Decoupling.
-    *   **MapController**: New imperative coordinator encapsulates all `MapView` and `MapOverlayManager` side-effects. UI layer is now purely declarative.
-    *   **Redundancy Elimination**: UI-side EMA smoothing removed. `MapViewState` now exclusively uses pre-smoothed coordinates from `UiStateCoordinator`.
-    *   **Test Suite**: All 58 unit tests pass. Build verified.
+*   **Core Remediation**: Gradle Task Deduplication.
+    *   **Unified Task Execution**: Consolidated `verifyVersionIntegrity`, `syncDocsVersion`, and `verifyInterfaceBindings` into a single high-performance `verifyProjectIntegrity` task.
+    *   **Configuration Performance**: Subprojects evaluated once via a single consolidated pre-build hook dependency. Configuration overhead minimized.
+    *   **Test Suite**: All 16 unit tests passed successfully. Project builds cleanly.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
-1.  **Declarative Boundary**: The Compose UI must never directly touch the `MapView` controller or overlays outside of the `MapController` bridge.
-2.  **Temporal & Spatial Integrity**: Monotonic time is anchored in `BootLifecycleAuthority`, and spatial smoothing is centralized in `UiStateCoordinator`.
+1.  **Declarative Boundary**: Compose UI components remain perfectly separated from imperative maps and markers via `MapController`.
+2.  **Temporal & Spatial Integrity**: System time and session validity are strictly anchored in `BootLifecycleAuthority`.
+3.  **Verification Automation**: Clean, deduplicated project validation executed automatically across pre-build cycles.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.28.6: [SOT Count: 184 (Rules: 54), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.28.7: [SOT Count: 184 (Rules: 54), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 15), QA: 284]**

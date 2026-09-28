@@ -1,4 +1,13 @@
-# 🏛️ Resolution Archive - Sep.28.6
+# 🏛️ Resolution Archive - Sep.28.7
+
+## 🏁 Issue #1354: Gradle Task Deduplication
+*   **Resolved**: Sep.28.7
+*   **Root Cause**: Multiple custom verification and synchronization tasks (`verifyVersionIntegrity`, `syncDocsVersion`, `verifyInterfaceBindings`) were registered individually and attached to the `preBuild` phase of all subprojects. This resulted in redundant task configuration, increased build graph complexity, and slower project evaluation.
+*   **Remediation**:
+    *   **build.gradle**: Consolidated the three distinct tasks into a single unified task named `verifyProjectIntegrity`.
+    *   **Optimization**: Merged version type-safety audits, Hilt interface binding validation, and automated documentation version synchronization into a single atomic execution unit.
+    *   **Lifecycle Hook**: Updated the `subprojects` configuration to depend exclusively on `verifyProjectIntegrity` during the `preBuild` phase, significantly reducing the overhead of architectural audits during local development and CI runs.
+*   **Significance**: Low (Build Speed & Maintenance Optimization).
 
 ## 🏁 Issue #1167: Map Overlay Imperative to Declarative Controller
 *   **Resolved**: Sep.28.6

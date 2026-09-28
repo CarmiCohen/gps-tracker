@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.6
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.7
 
 ## 🎯 Current Resumption Focus: Architectural Hardening
-Map Controller Decoupling integrated. UI layer declarative boundary enforced.
+Gradle Task Deduplication integrated. Configuration overhead eliminated.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -10,7 +10,7 @@ Map Controller Decoupling integrated. UI layer declarative boundary enforced.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 2)
+## 💡 Strategic Simplification Ideas (Ideas: 1)
 
 ### 🟡 Medium Priority
 *   *(No medium-priority ideas remain)*
@@ -18,13 +18,12 @@ Map Controller Decoupling integrated. UI layer declarative boundary enforced.
 ### 🔵 Low Priority
 *   **Issue #1175: Real-time Only Path (Pivot Option)**
     *   *Significance*: **Strategic (Maintenance Tradeoff)**. Consider removing backlog sync and forensic backfilling to dramatically reduce codebase complexity.
-*   **Issue #1354: Gradle Task Deduplication**
-    *   *Significance*: **Low (Build Speed)**. Consolidate custom verification tasks into a single convention plugin to reduce configuration time.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1354: Gradle Task Deduplication** (Resolved Sep.28.7)
 *   **Issue #1167: Map Overlay Imperative to Declarative Controller** (Resolved Sep.28.6)
 *   **Issue #1355: TimeProvider Cleanup** (Resolved Sep.28.5)
 *   **Issue #1296: Centralized Boot Lifecycle Authority** (Resolved Sep.28.4)
@@ -52,6 +51,7 @@ Map Controller Decoupling integrated. UI layer declarative boundary enforced.
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.28.7: [SOT Count: 184 (Rules: 54), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.6: [SOT Count: 184 (Rules: 54), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.5: [SOT Count: 183 (Rules: 53), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.4: [SOT Count: 183 (Rules: 53), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 3 (Sub-items: 15), QA: 284]**

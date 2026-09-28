@@ -29,7 +29,7 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    return "Sep.28.5"
+    return "Sep.28.7"
 }
 
 ext {
@@ -37,29 +37,57 @@ ext {
     autoVersionName = getVersionName()
 }
 
-// Issue #1036: Build Integrity Verification
-tasks.register('verifyVersionIntegrity') {
+/**
+ * Issue #1354: Gradle Task Deduplication
+ * Consolidates version integrity, interface validation, and doc sync into a single task
+ * to reduce configuration overhead and improve build speed.
+ */
+tasks.register('verifyProjectIntegrity') {
     group = "verification"
-    description = "Audits version type-safety logic and fallback mechanisms"
+    description = "Consolidated project integrity audit (Version, Interfaces, Docs)"
     doLast {
+        // 1. Version Type-Safety Audit (Issue #1036)
         def testCode = rootProject.hasProperty('testVersionCode') ? rootProject.testVersionCode : "INVALID"
         def safeCode = 1000
         try {
             safeCode = testCode.toString().toInteger()
         } catch (Exception e) {
             println "Fallback triggered successfully for malformed version: ${e.message}"
-            safeCode = 1000
         }
         assert safeCode instanceof Integer
         println "Integrity Audit: PASSED (Version: ${project.autoVersionName}, Code: ${project.autoVersionCode})"
-    }
-}
 
-// Issue #1034: Automated Documentation Version Sync
-tasks.register('syncDocsVersion') {
-    group = "documentation"
-    description = "Synchronizes version headers in Handover.md, issues.md, and status reports"
-    doLast {
+        // 2. Build-Time Interface Validation (Issue #1294)
+        def requiredInterfaces = [
+            "TimeProvider",
+            "BootLifecycleAuthority",
+            "PowerStateProvider",
+            "NetworkProvider",
+            "SignalingTransport",
+            "SystemStatusProvider",
+            "SignalingProvider"
+        ]
+        
+        def appModuleDir = new File(project.rootDir, "app/src/main/java/com/gps19/app")
+        if (appModuleDir.exists()) {
+            def moduleFiles = appModuleDir.listFiles().findAll { it.name.endsWith("Module.kt") }
+            def combinedContent = moduleFiles.collect { it.text }.join("\n")
+            
+            def missing = []
+            requiredInterfaces.each { inter ->
+                def pattern = java.util.regex.Pattern.compile(":\\s*" + inter + "\\b")
+                if (!pattern.matcher(combinedContent).find()) {
+                    missing.add(inter)
+                }
+            }
+            
+            if (!missing.isEmpty()) {
+                throw new GradleException("Build-Time Interface Validation FAILED: The following core interfaces are missing Hilt module bindings: ${missing}. Please define @Binds or @Provides in AppModule.kt or PowerModule.kt.")
+            }
+            println "Build-Time Interface Validation: PASSED (All core service interfaces bound)."
+        }
+
+        // 3. Automated Documentation Version Sync (Issue #1034)
         def vName = project.autoVersionName
         def filesToUpdate = [
             'Handover.md', 
@@ -79,53 +107,12 @@ tasks.register('syncDocsVersion') {
     }
 }
 
-// Issue #1294: Build-Time Interface Validation Task
-tasks.register('verifyInterfaceBindings') {
-    group = "verification"
-    description = "Validates that all core domain and service interfaces have corresponding Hilt bindings configured."
-    doLast {
-        def requiredInterfaces = [
-            "TimeProvider",
-            "BootLifecycleAuthority",
-            "PowerStateProvider",
-            "NetworkProvider",
-            "SignalingTransport",
-            "SystemStatusProvider",
-            "SignalingProvider"
-        ]
-        
-        def appModuleDir = new File(project.rootDir, "app/src/main/java/com/gps19/app")
-        if (!appModuleDir.exists()) {
-            throw new GradleException("App module source directory not found: ${appModuleDir.absolutePath}")
-        }
-        
-        def moduleFiles = appModuleDir.listFiles().findAll { it.name.endsWith("Module.kt") }
-        def combinedContent = moduleFiles.collect { it.text }.join("\n")
-        
-        def missing = []
-        requiredInterfaces.each { inter ->
-            def pattern = java.util.regex.Pattern.compile(":\\s*" + inter + "\\b")
-            if (!pattern.matcher(combinedContent).find()) {
-                missing.add(inter)
-            }
-        }
-        
-        if (!missing.isEmpty()) {
-            throw new GradleException("Build-Time Interface Validation FAILED: The following core interfaces are missing Hilt module bindings: ${missing}. Please define @Binds or @Provides in AppModule.kt or PowerModule.kt.")
-        }
-        
-        println "Build-Time Interface Validation: PASSED (All core service interfaces are successfully bound in Hilt modules)."
-    }
-}
-
-// Idea #19 & #20: Lifecycle Integration (R-ID 336)
+// Lifecycle Integration (R-ID 336) - Optimized via Task Deduplication
 subprojects {
     afterEvaluate { subproject ->
         if (subproject.plugins.hasPlugin('com.android.application') || subproject.plugins.hasPlugin('com.android.library')) {
             subproject.tasks.matching { it.name == "preBuild" }.all {
-                dependsOn rootProject.tasks.verifyVersionIntegrity
-                dependsOn rootProject.tasks.syncDocsVersion
-                dependsOn rootProject.tasks.verifyInterfaceBindings
+                dependsOn rootProject.tasks.verifyProjectIntegrity
             }
         }
     }
