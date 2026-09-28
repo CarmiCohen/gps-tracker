@@ -37,6 +37,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Sep.28.12:
+ * - Issue #1360: Mismatched unregistration signatures. Remediated compilation
+ *   failures by passing timeProvider to all ManagedHardware unregister calls.
  * Sep.28.2:
  * - Issue #1353: Unified Activity Context Provider. Refactored activity recognition
  *   and heuristic fallback into ActivityContextProvider, offloading HardwareSuite.
@@ -507,15 +510,15 @@ class HardwareSuite @Inject constructor(
                     if (!isStarted.get() && activeUsers.get() <= 0) {
                         Timber.i("HardwareSuite: Executing deferred hardware unregistration.")
                         
-                        try { gnssStatusCallback.unregister(locationManager, gHandler) } catch (e: Exception) { Timber.e(e, "GNSS status unregistration failed") }
+                        try { gnssStatusCallback.unregister(locationManager, timeProvider, gHandler) } catch (e: Exception) { Timber.e(e, "GNSS status unregistration failed") }
                         
-                        activeLocationCallback?.unregister(fusedLocationClient, handler); activeLocationCallback = null
-                        revivalCallback?.unregister(fusedLocationClient, handler); revivalCallback = null
-                        rawRevivalListener?.unregister(locationManager, handler); rawRevivalListener = null
+                        activeLocationCallback?.unregister(fusedLocationClient, timeProvider, handler); activeLocationCallback = null
+                        revivalCallback?.unregister(fusedLocationClient, timeProvider, handler); revivalCallback = null
+                        rawRevivalListener?.unregister(locationManager, timeProvider, handler); rawRevivalListener = null
                         
-                        this@HardwareSuite.unregister(sensorManager, handler)
+                        this@HardwareSuite.unregister(sensorManager, timeProvider, handler)
                         
-                        displayListener.unregister(displayManager, handler)
+                        displayListener.unregister(displayManager, timeProvider, handler)
 
                         if (hardwareThread == threadToQuit) {
                             threadToQuit?.quitSafely()
@@ -559,13 +562,13 @@ class HardwareSuite @Inject constructor(
             
             val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(p0: LocationResult) {} }
             synchronized(lifecycleLock) {
-                revivalCallback?.unregister(fusedLocationClient, handler)
+                revivalCallback?.unregister(fusedLocationClient, timeProvider, handler)
                 revivalCallback = fusedCallback
             }
             
             val rawListener = object : ManagedLocationListener() { override fun onLocationChanged(location: Location) {} }
             synchronized(lifecycleLock) {
-                rawRevivalListener?.unregister(locationManager, handler)
+                rawRevivalListener?.unregister(locationManager, timeProvider, handler)
                 rawRevivalListener = rawListener
             }
 
@@ -582,11 +585,11 @@ class HardwareSuite @Inject constructor(
             } finally {
                 synchronized(lifecycleLock) {
                     if (revivalCallback == fusedCallback) {
-                        fusedCallback.unregister(fusedLocationClient, handler)
+                        fusedCallback.unregister(fusedLocationClient, timeProvider, handler)
                         revivalCallback = null
                     }
                     if (rawRevivalListener == rawListener) {
-                        rawListener.unregister(locationManager, handler)
+                        rawListener.unregister(locationManager, timeProvider, handler)
                         rawRevivalListener = null
                         domainEventBus.emit(RevivalEvent.RawBurstEnded)
                     }
@@ -673,13 +676,13 @@ class HardwareSuite @Inject constructor(
             fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime(); lastGpsSpeedMps = loc.speed.toDouble(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
             val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime(); lastGpsSpeedMps = it.speed.toDouble(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
             val handler = synchronized(lifecycleLock) { hardwareHandler }
-            synchronized(lifecycleLock) { activeLocationCallback?.unregister(fusedLocationClient, handler); activeLocationCallback = fusedCallback }
+            synchronized(lifecycleLock) { activeLocationCallback?.unregister(fusedLocationClient, timeProvider, handler); activeLocationCallback = fusedCallback }
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval).setMinUpdateIntervalMillis(interval / 2).build()
             
             try { fusedLocationClient.requestLocationUpdates(request, fusedCallback, handler?.looper ?: Looper.getMainLooper()) } catch (e: Exception) { close(e) }
             
             val internalJob = _internalGpsFlow.onEach { trySend(it) }.launchIn(this)
-            awaitClose { internalJob.cancel(); synchronized(lifecycleLock) { if (activeLocationCallback == fusedCallback) activeLocationCallback = null }; fusedCallback.unregister(fusedLocationClient, handler); stop() }
+            awaitClose { internalJob.cancel(); synchronized(lifecycleLock) { if (activeLocationCallback == fusedCallback) activeLocationCallback = null }; fusedCallback.unregister(fusedLocationClient, timeProvider, handler); stop() }
         }
     }.shareIn(scope = scope, started = SharingStarted.WhileSubscribed(5000), replay = 1)
 
@@ -1030,9 +1033,9 @@ class HardwareSuite @Inject constructor(
                 revivalPulseJob = null
                 
                 val handler = hardwareHandler
-                revivalCallback?.unregister(fusedLocationClient, handler)
+                revivalCallback?.unregister(fusedLocationClient, timeProvider, handler)
                 revivalCallback = null
-                rawRevivalListener?.unregister(locationManager, handler)
+                rawRevivalListener?.unregister(locationManager, timeProvider, handler)
                 rawRevivalListener = null
             }
             Timber.i("HardwareSuite: Safe Mode active. Revival pulses suppressed.")
@@ -1111,7 +1114,7 @@ class HardwareSuite @Inject constructor(
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !systemStatusProvider.isActivityRecognitionGranted()) { isStepDetectorRegistered = false; return@launch }
                 val targetHandler = synchronized(lifecycleLock) { if (!isStarted.get()) return@launch; hardwareHandler } ?: return@launch
                 withContext(targetHandler.asCoroutineDispatcher()) { 
-                    unregister(sensorManager, detector, targetHandler)
+                    unregister(sensorManager, detector, timeProvider, targetHandler)
                     synchronized(lifecycleLock) { 
                         if (isStarted.get()) isStepDetectorRegistered = sensorManager.registerListener(this@HardwareSuite, detector, android.hardware.SensorManager.SENSOR_DELAY_NORMAL, hardwareHandler) 
                     } 

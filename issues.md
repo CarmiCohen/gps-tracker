@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.11
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.13
 
-## 🎯 Current Resumption Focus: Temporal Precision & Service Logic Hardening
-Monotonic clock references and temporal gates unified under centralized TimeProvider authority.
+## 🎯 Current Resumption Focus: Forensic Reliability Math Hardening
+Hardening the forensic reliability EMA calculation using high-precision arithmetic to prevent precision loss during high-frequency bursts.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -23,6 +23,8 @@ Monotonic clock references and temporal gates unified under centralized TimeProv
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1361: Forensic Reliability Math Hardening** (Resolved Sep.28.13)
+*   **Issue #1360: Mismatched Unregistration Method Signatures** (Resolved Sep.28.12)
 *   **Issue #1359: Temporal Precision & Service Logic Hardening** (Resolved Sep.28.11)
 *   **Issue #1357: Build Pipeline Dependency Pruning (KSP Migration)** (Resolved Sep.28.10)
 *   **Issue #1358: Codebase Leftovers Pruning & Version Hardening** (Resolved Sep.28.9)
@@ -37,6 +39,8 @@ Monotonic clock references and temporal gates unified under centralized TimeProv
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.28.13: [SOT Count: 190 (Rules: 60), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
+- **Sep.28.12: [SOT Count: 189 (Rules: 59), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
 - **Sep.28.11: [SOT Count: 188 (Rules: 58), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
 - **Sep.28.10: [SOT Count: 187 (Rules: 57), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
 - **Sep.28.9: [SOT Count: 186 (Rules: 56), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 16), QA: 286]**

@@ -6,6 +6,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -19,6 +21,9 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Sep.28.13:
+ * - Issue #1361 Hardening: Migrated liveReliability EMA calculation to 
+ *   BigDecimal to ensure absolute precision during high-frequency bursts (R714).
  * Aug.21.06:
  * - Issue #196 Hardening: Added setForensicStallSimulation for urban multipath 
  *   validation. performForensicDrain now supports simulated failures to verify 
@@ -44,7 +49,7 @@ class LogRepository @Inject constructor(
 
     private val forensicSuccessCount = AtomicInteger(0)
     private val forensicFailureCount = AtomicInteger(0)
-    private var liveReliability = 1.0
+    private var liveReliability = BigDecimal.ONE
     private val isForensicStallSimulated = AtomicBoolean(false)
 
     private val logBuffer = Channel<BufferedLog>(LOG_BUFFER_CAPACITY)
@@ -65,7 +70,7 @@ class LogRepository @Inject constructor(
         private const val FORENSIC_FILL_THRESHOLD = FORENSIC_SPILL_CAPACITY / 4
         private const val FORENSIC_CONVERGENCE_STALL_LIMIT = 3
         private const val FORENSIC_EMERGENCY_FILL_LEVEL = 0.9
-        private const val RELIABILITY_EMA_ALPHA = 0.1 
+        private val RELIABILITY_EMA_ALPHA = BigDecimal("0.1") 
         private const val PRUNE_COOLDOWN_MS = 30000L 
         private const val UI_LOG_UPDATE_SAMPLE_MS = 1000L 
         private const val REFINED_PRUNE_CHUNK_SIZE = 1000 
@@ -234,10 +239,16 @@ class LogRepository @Inject constructor(
     }
 
     private fun updateReliability(success: Boolean) {
-        val currentSample = if (success) 1.0 else 0.0
-        liveReliability = (RELIABILITY_EMA_ALPHA * currentSample) + ((1.0 - RELIABILITY_EMA_ALPHA) * liveReliability)
+        val currentSample = if (success) BigDecimal.ONE else BigDecimal.ZERO
+        val alpha = RELIABILITY_EMA_ALPHA
+        val oneMinusAlpha = BigDecimal.ONE.subtract(alpha)
+        
+        liveReliability = alpha.multiply(currentSample)
+            .add(oneMinusAlpha.multiply(liveReliability))
+            .setScale(8, RoundingMode.HALF_UP)
+            
         val health = telemetry.systemHealth.value
-        health.forensicReliability = liveReliability
+        health.forensicReliability = liveReliability.toDouble()
         telemetry.updateHealth(health)
     }
 

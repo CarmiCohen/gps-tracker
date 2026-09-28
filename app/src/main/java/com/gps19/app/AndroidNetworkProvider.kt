@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import com.gps19.core.engine.NetworkListener
 import com.gps19.core.engine.NetworkProvider
+import com.gps19.core.engine.TimeProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
 import javax.inject.Inject
@@ -19,13 +20,17 @@ import javax.inject.Singleton
  * AndroidNetworkProvider: Production implementation of NetworkProvider 
  * using ConnectivityManager.NetworkCallback.
  * 
+ * Sep.28.12:
+ * - Issue #1360: Mismatched unregistration signatures. Injected TimeProvider
+ *   to comply with updated ManagedNetworkCallback.unregister requirement.
  * Sep.16.11 Fix (#20): Resolved race condition in asynchronous unregistration.
  * All registration state transitions are now serialized on the Main Looper
  * to prevent overlapping platform calls during rapid listener toggling.
  */
 @Singleton
 class AndroidNetworkProvider @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val timeProvider: TimeProvider
 ) : NetworkProvider {
 
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -105,7 +110,7 @@ class AndroidNetworkProvider @Inject constructor(
 
     private fun performUnregistration() {
         // ManagedNetworkCallback.unregister executes synchronously if already on mainHandler's looper.
-        networkCallback.unregister(connectivityManager, mainHandler)
+        networkCallback.unregister(connectivityManager, timeProvider, mainHandler)
         isRegistered = false
         Timber.d("AndroidNetworkProvider: Unregistered callback")
     }

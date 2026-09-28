@@ -301,7 +301,7 @@ class SystemStatusProviderImpl @Inject constructor(
             trySend(false)
         }
         awaitClose { 
-            callback.unregister(connectivityManager, Handler(Looper.getMainLooper()))
+            callback.unregister(connectivityManager, timeProvider, Handler(Looper.getMainLooper()))
         }
     }.flowOn(Dispatchers.IO)
      .conflate()
