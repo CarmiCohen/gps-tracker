@@ -1,33 +1,26 @@
-# Forensic Handover (Sep.28.1 - COMPLETED)
+# Forensic Handover (Sep.28.3 - COMPLETED)
 
 ## 🎯 Current System State
-*   **Version**: Sep.28.1 | **Status**: Issue #1205 FULLY RESOLVED.
-*   **SOT Baseline**: SOT ID: 518 (Rules: 50, R-IDs: 180)
-*   **Core Remediation**: Finalized **Issue #1205** (Context-Aware Power Optimization).
-    *   **Activity Recognition**: Integrated Google Play Services Activity Recognition API in `HardwareSuite.kt`.
-    *   **Heuristic Fallback**: Implemented a 120s GPS speed/vibration fallback if Play Services is unavailable.
-    *   **Behavioral Scaling**: `ServiceBehaviorUseCase` now scales polling dynamically:
-        *   `STILL`: Immediate relaxation to 60s.
-        *   `IN_VEHICLE`: Sustained 2s precision regardless of screen state.
-    *   **Telemetry Pipeline**: `activityType` is now propagated through `SystemEvaluationSnapshot` -> `SystemHealthState` -> `LocationUpdate`.
+*   **Version**: Sep.28.3 | **Status**: Issue #1294 FULLY RESOLVED.
+*   **SOT Baseline**: SOT ID: 520 (Rules: 52, R-IDs: 182)
+*   **Core Remediation**: Build-Time Interface Validation.
+    *   **verifyInterfaceBindings**: Implemented a custom static analysis Gradle task hooked into the `preBuild` phase.
+    *   **Cross-Module Integrity**: Statically verifies that required service interfaces defined in `:core:engine` have concrete mappings/bindings configured in `:app` Hilt modules.
+    *   **Compilation Guard**: Automatically fails the build prior to full compilation if bindings are omitted, eliminating runtime `ProvisionException` errors.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
 
-1.  **Context-Aware Pipeline**:
-    *   `ActivityType`: STILL, WALKING, RUNNING, BICYCLING, IN_VEHICLE, TILTING, UNKNOWN.
-    *   Telemetry Stream: Now carries user activity context from low-level hardware to the signaling DTO.
-2.  **Zero-Allocation Telemetry**:
-    *   Maintained flyweight integrity. No new allocations introduced in the high-frequency evaluation loop.
+1.  **Hilt Boundary Guard**: The `verifyInterfaceBindings` task performs automated token scanning across `AppModule.kt` and `PowerModule.kt` to ensure complete coverage of core engine providers.
+2.  **Lifecycle Integration**: Leverages Gradle's task dependencies to inject validation seamlessly into the Android subproject compilation chain.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.28.1: [SOT Count: 180 (Rules: 50), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.28.3: [SOT Count: 182 (Rules: 52), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 
 ---
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   *(No open gaps for Issue #1205)*
-*   **Future Idea (#1353)**: Evaluate consolidating heuristic and API-based activity detection into a standalone `ActivityContextProvider`.
+*   *(No open architectural gaps remain)*

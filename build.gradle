@@ -29,7 +29,7 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    return "Sep.26.11"
+    return "Sep.28.3"
 }
 
 ext {
@@ -79,6 +79,44 @@ tasks.register('syncDocsVersion') {
     }
 }
 
+// Issue #1294: Build-Time Interface Validation Task
+tasks.register('verifyInterfaceBindings') {
+    group = "verification"
+    description = "Validates that all core domain and service interfaces have corresponding Hilt bindings configured."
+    doLast {
+        def requiredInterfaces = [
+            "TimeProvider",
+            "PowerStateProvider",
+            "NetworkProvider",
+            "SignalingTransport",
+            "SystemStatusProvider",
+            "SignalingProvider"
+        ]
+        
+        def appModuleDir = new File(project.rootDir, "app/src/main/java/com/gps19/app")
+        if (!appModuleDir.exists()) {
+            throw new GradleException("App module source directory not found: ${appModuleDir.absolutePath}")
+        }
+        
+        def moduleFiles = appModuleDir.listFiles().findAll { it.name.endsWith("Module.kt") }
+        def combinedContent = moduleFiles.collect { it.text }.join("\n")
+        
+        def missing = []
+        requiredInterfaces.each { inter ->
+            def pattern = java.util.regex.Pattern.compile(":\\s*" + inter + "\\b")
+            if (!pattern.matcher(combinedContent).find()) {
+                missing.add(inter)
+            }
+        }
+        
+        if (!missing.isEmpty()) {
+            throw new GradleException("Build-Time Interface Validation FAILED: The following core interfaces are missing Hilt module bindings: ${missing}. Please define @Binds or @Provides in AppModule.kt or PowerModule.kt.")
+        }
+        
+        println "Build-Time Interface Validation: PASSED (All core service interfaces are successfully bound in Hilt modules)."
+    }
+}
+
 // Idea #19 & #20: Lifecycle Integration (R-ID 336)
 subprojects {
     afterEvaluate { subproject ->
@@ -86,6 +124,7 @@ subprojects {
             subproject.tasks.matching { it.name == "preBuild" }.all {
                 dependsOn rootProject.tasks.verifyVersionIntegrity
                 dependsOn rootProject.tasks.syncDocsVersion
+                dependsOn rootProject.tasks.verifyInterfaceBindings
             }
         }
     }

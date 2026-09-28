@@ -1,4 +1,13 @@
-# 🏛️ Resolution Archive - Sep.28.2
+# 🏛️ Resolution Archive - Sep.28.3
+
+## 🏁 Issue #1294: Build-Time Interface Validation
+*   **Resolved**: Sep.28.3
+*   **Root Cause**: Lack of static verification for Hilt module bindings created a risk of runtime `ProvisionException` errors when core interfaces defined in `:core:engine` lacked implementations in the `:app` module.
+*   **Remediation**:
+    *   **build.gradle**: Implemented `verifyInterfaceBindings` custom Gradle task.
+    *   **Static Analysis**: The task parses `AppModule.kt` and `PowerModule.kt` for `: Interface` binding patterns using regex, ensuring `TimeProvider`, `PowerStateProvider`, `NetworkProvider`, `SignalingTransport`, `SystemStatusProvider`, and `SignalingProvider` are correctly bound.
+    *   **Lifecycle Hook**: Integrated the task into the `preBuild` phase of all subprojects, ensuring the build fails immediately if architectural consistency is violated.
+*   **SOT ID**: 520 (Build-Time Interface Validation)
 
 ## 🏁 Issue #1353: Unified Activity Context Provider
 *   **Resolved**: Sep.28.2
