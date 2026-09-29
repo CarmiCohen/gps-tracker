@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.29.6:
+ * - Issue #1378 Hardening: Renamed FORENSIC_SPILL_ENTRY_SIZE to ..._V5 to 
+ *   force compilation cache invalidation across hardware-specific builds.
  * Sep.29.3:
  * - Issue #1378: Increased FORENSIC_SPILL_ENTRY_SIZE to 128 bytes to provide 
  *   ample headroom for forensic probes and technical metadata on high-performance 
@@ -49,7 +52,7 @@ const val LOG_BUFFER_CAPACITY = 5000
 
 // Issue #669: Forensic Spill-Buffer (MappedByteBuffer)
 const val FORENSIC_SPILL_FILE_NAME = "forensic_spill.bin"
-const val FORENSIC_SPILL_ENTRY_SIZE = 128
+const val FORENSIC_SPILL_ENTRY_SIZE_V5 = 128
 const val FORENSIC_SPILL_CAPACITY = 10000 
 const val FORENSIC_DRAIN_INTERVAL_MS = 5000L
 const val FORENSIC_DRAIN_THROTTLE_MIN_MS = 500L

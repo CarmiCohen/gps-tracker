@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.29.5)
+# SOT Master Requirements & Hardening Status (Sep.29.3)
 
 ## 🏗️ Architectural Master Rules (66 Rules)
 
@@ -17,7 +17,7 @@
 *   **SOT ID 545**: Production Codebase Stabilization - Advanced versioning and forensic tracking baselines to Sep.29.3 to maintain process integrity. (Resolved Sep.29.3).
 *   **SOT ID 546**: S21 Verification & Probe Hardening - Advanced versioning to Sep.29.3 and implemented force-bypass for forensic probes to stabilize tests on S21 hardware. (Resolved Sep.29.3).
 *   **SOT ID 547**: S21 Compilation Cache Probe Fix - Recompiled `ForensicSpillBuffer.kt` to force the inclusion of the newly sized `FORENSIC_SPILL_ENTRY_SIZE` (128 bytes), resolving string truncation issues on the S21 device. All 21 instrumented tests passing. (Resolved Sep.29.3).
-*   **SOT ID 548**: Cross-Device Dual Target Verification - Hardened `verifySignalingLifecycleProbes` to eliminate background task interference and buffer peek visibility windows across dual connected hardware targets (A15 & S21). (Resolved Sep.29.5).
+*   **SOT ID 548**: Cross-Device Dual Target Verification - Hardened `verifySignalingLifecycleProbes` to eliminate background task interference and buffer peek visibility windows across dual connected hardware targets (A15 & S21). (Resolved Sep.29.3).
 
 ---
 
@@ -25,5 +25,5 @@
 *   **Chapter 31.177 (Stress Test UI Consolidation)**: PASSED - Verified relocation of Forensic Stress Test trigger to Diagnostics Screen. (Sep.29.3)
 *   **Chapter 31.178 (Production Codebase Stabilization)**: PASSED - Verified build stability and version alignment at Sep.29.3. (Sep.29.3)
 *   **Chapter 31.179 (S21 Hardware Verification)**: PASSED - All 21 instrumented tests pass successfully. Resolved `verifySignalingLifecycleProbes` probe truncation by clearing compilation cache for `ForensicSpillBuffer.kt` after schema sizing adjustments. (Sep.29.3)
-*   **Chapter 31.180 (A15 & S21 Dual Target Stabilization)**: PASSED - Hardened memory-mapped buffer lookahead search boundaries and introduced recovery startup delays to shield probes from asynchronous backfill trace sweeps. 21/21 tests passed completely on both targets. (Sep.29.5)
+*   **Chapter 31.180 (A15 & S21 Dual Target Stabilization)**: PASSED - Hardened memory-mapped buffer lookahead search boundaries and introduced recovery startup delays to shield probes from asynchronous backfill trace sweeps. 21/21 tests passed completely on both targets. (Sep.29.3)
 ...

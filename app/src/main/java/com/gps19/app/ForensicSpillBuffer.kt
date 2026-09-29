@@ -18,13 +18,13 @@ import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Sep.29.6:
+ * - Issue #1378: Migrated to FORENSIC_SPILL_ENTRY_SIZE_V5 to force 
+ *   compilation cache invalidation across heterogeneous hardware clusters.
  * Sep.29.3:
  * - Issue #1378: Advanced version to 5 and hardened synchronization. Switched 
  *   to instance-level locking in peekToEntities to prevent concurrent write interference 
  *   on high-performance hardware (S21).
- * Sep.26.12:
- * - Issue #1344: Added thermalHeadroom and heapAllocatedMb forensic probes 
- *   to the binary schema. Incremented version to 4.
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -39,10 +39,10 @@ class ForensicSpillBuffer @Inject constructor(
     private val totalCount = AtomicInteger(0)
     private val readIdx = AtomicInteger(0)
     
-    private val entryWriteBuffer = ByteBuffer.allocate(FORENSIC_SPILL_ENTRY_SIZE).order(ByteOrder.nativeOrder())
+    private val entryWriteBuffer = ByteBuffer.allocate(FORENSIC_SPILL_ENTRY_SIZE_V5).order(ByteOrder.nativeOrder())
     private val writeCrc = CRC32()
     
-    private val readEntryBytes = ByteArray(FORENSIC_SPILL_ENTRY_SIZE)
+    private val readEntryBytes = ByteArray(FORENSIC_SPILL_ENTRY_SIZE_V5)
     private val readEntryWrapper = ByteBuffer.wrap(readEntryBytes).order(ByteOrder.nativeOrder())
     private val readCrc = CRC32()
     
@@ -77,7 +77,7 @@ class ForensicSpillBuffer @Inject constructor(
     init {
         try {
             val exists = spillFile.exists()
-            val size = (FORENSIC_SPILL_CAPACITY * FORENSIC_SPILL_ENTRY_SIZE).toLong() + HEADER_SIZE
+            val size = (FORENSIC_SPILL_CAPACITY * FORENSIC_SPILL_ENTRY_SIZE_V5).toLong() + HEADER_SIZE
             RandomAccessFile(spillFile, "rw").use { raf ->
                 mappedBuffer = raf.channel.map(FileChannel.MapMode.READ_WRITE, 0, size).apply {
                     order(ByteOrder.nativeOrder())
@@ -91,7 +91,7 @@ class ForensicSpillBuffer @Inject constructor(
                 val cap = if (magic == MAGIC_NUMBER) buffer.getInt(OFF_CAPACITY) else -1
                 val entrySz = if (magic == MAGIC_NUMBER) buffer.getInt(OFF_ENTRY_SIZE) else -1
 
-                if (magic != MAGIC_NUMBER || version != CURRENT_VERSION || cap != FORENSIC_SPILL_CAPACITY || entrySz != FORENSIC_SPILL_ENTRY_SIZE) {
+                if (magic != MAGIC_NUMBER || version != CURRENT_VERSION || cap != FORENSIC_SPILL_CAPACITY || entrySz != FORENSIC_SPILL_ENTRY_SIZE_V5) {
                     resetBuffer()
                     if (exists) Timber.w("Forensic Persistence Audit: Spill-buffer reset (v$version -> v$CURRENT_VERSION). Reason: Schema mismatch or Version bump.")
                 } else {
@@ -125,7 +125,7 @@ class ForensicSpillBuffer @Inject constructor(
         buffer.putInt(OFF_MAGIC, MAGIC_NUMBER)
         buffer.putInt(OFF_VERSION, CURRENT_VERSION)
         buffer.putInt(OFF_CAPACITY, FORENSIC_SPILL_CAPACITY)
-        buffer.putInt(OFF_ENTRY_SIZE, FORENSIC_SPILL_ENTRY_SIZE)
+        buffer.putInt(OFF_ENTRY_SIZE, FORENSIC_SPILL_ENTRY_SIZE_V5)
         buffer.putLong(OFF_LAST_WRITE_RT, 0L)
         buffer.putInt(OFF_WRITE_IDX, 0)
         buffer.putInt(OFF_COUNT, 0)
@@ -147,7 +147,7 @@ class ForensicSpillBuffer @Inject constructor(
         val rawBytes = entry.message.toByteArray(Charsets.UTF_8)
         
         // Force evaluation of maxMsgLen here using the updated constant
-        val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE - DATA_FIELDS_SIZE - CHECKSUM_SIZE
+        val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE_V5 - DATA_FIELDS_SIZE - CHECKSUM_SIZE
         var msgLen = rawBytes.size.coerceAtMost(maxMsgLen)
         
         if (msgLen < rawBytes.size) {
@@ -167,7 +167,7 @@ class ForensicSpillBuffer @Inject constructor(
                 if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
 
                 entryWriteBuffer.clear()
-                Arrays.fill(entryWriteBuffer.array(), DATA_FIELDS_SIZE, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
+                Arrays.fill(entryWriteBuffer.array(), DATA_FIELDS_SIZE, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE, 0.toByte())
 
                 entryWriteBuffer.putLong(entry.timestamp)
                 entryWriteBuffer.putDouble(entry.lat)
@@ -194,14 +194,14 @@ class ForensicSpillBuffer @Inject constructor(
                 entryWriteBuffer.put(0.toByte()) 
                 entryWriteBuffer.put(rawBytes, 0, msgLen)
                 
-                entryWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                entryWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
 
                 writeCrc.reset()
-                writeCrc.update(entryWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                writeCrc.update(entryWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
                 entryWriteBuffer.putInt(writeCrc.value.toInt())
 
                 val currentWrite = writeIdx.get()
-                val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE)
+                val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE_V5)
                 
                 buffer.position(offset)
                 buffer.put(entryWriteBuffer.array())
@@ -230,7 +230,7 @@ class ForensicSpillBuffer @Inject constructor(
                 if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
                 
                 entryWriteBuffer.clear()
-                Arrays.fill(entryWriteBuffer.array(), DATA_FIELDS_SIZE, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE, 0.toByte())
+                Arrays.fill(entryWriteBuffer.array(), DATA_FIELDS_SIZE, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE, 0.toByte())
 
                 entryWriteBuffer.putLong(timestamp)
                 entryWriteBuffer.putDouble(lat)
@@ -254,13 +254,13 @@ class ForensicSpillBuffer @Inject constructor(
                 entryWriteBuffer.put(0.toByte())
                 entryWriteBuffer.put(0.toByte())
 
-                entryWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                entryWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
                 writeCrc.reset()
-                writeCrc.update(entryWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                writeCrc.update(entryWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
                 entryWriteBuffer.putInt(writeCrc.value.toInt())
 
                 val currentWrite = writeIdx.get()
-                val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE)
+                val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE_V5)
                 buffer.position(offset)
                 buffer.put(entryWriteBuffer.array())
 
@@ -301,15 +301,15 @@ class ForensicSpillBuffer @Inject constructor(
                 
                 var tempReadIdx = currentReadIdx
                 repeat(toPeekCount) {
-                    val offset = HEADER_SIZE + (tempReadIdx * FORENSIC_SPILL_ENTRY_SIZE)
+                    val offset = HEADER_SIZE + (tempReadIdx * FORENSIC_SPILL_ENTRY_SIZE_V5)
                     readBuffer.position(offset)
                     readBuffer.get(readEntryBytes)
                     
                     readEntryWrapper.clear()
                     readCrc.reset()
-                    readCrc.update(readEntryBytes, 0, FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                    readCrc.update(readEntryBytes, 0, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
                     
-                    val storedCrc = readEntryWrapper.getInt(FORENSIC_SPILL_ENTRY_SIZE - CHECKSUM_SIZE)
+                    val storedCrc = readEntryWrapper.getInt(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
                     if (storedCrc == readCrc.value.toInt()) {
                         val ts = readEntryWrapper.getLong()
                         val lat = readEntryWrapper.getDouble()
