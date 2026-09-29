@@ -1,26 +1,24 @@
-# Forensic Handover (Sep.29.7 - #1378 RESOLVED)
+# Forensic Handover (Sep.29.30 - #1380 RESOLVED)
 
 ## 🎯 Current System State
-*   **Version**: Sep.29.7 | **Status**: Soak Testing Initiated (A15 & S21 - 22/22 Passed).
+*   **Version**: Sep.29.30 | **Status**: HANDSHAKE HARDENED.
 *   **Core Remediation**: 
-    *   **Dual Target Isolation**: Hardened probe emission boundaries to shield instrumented test writes from concurrent asynchronous backfill task interference.
-    *   **Compilation Cache Flush**: Renamed schema constants to `FORENSIC_SPILL_ENTRY_SIZE_V5` to force binary alignment across hardware tiers.
-    *   **Soak Validation**: Implemented `verifyExtendedSoakSimulation` (60s high-intensity burst) to validate persistence integrity under sustained thermal and I/O pressure.
+    *   **Bypass Heartbeat**: Resolved the "Red TRK LED" issue by forcing the Tracker to emit a telemetry pulse every 30s (`onHeartbeat`) regardless of GPS lock status. This ensures the Viewer discovers the Tracker immediately upon session start.
+    *   **Navigation Hardening**: Resolved UI occlusion where the `SettingsOverlay` failed to dismiss when navigating to `Diagnostics`. Tapping "Diagnostics" now explicitly closes the settings panel.
+    *   **State Integrity**: Confirmed that "Full Initialization" correctly resets peer IDs, necessitating re-entry for successful link established.
 
 ## 🚀 Active Task Snapshot: N/A
-*   **All high-priority tasks and testing gaps are fully resolved.**
+*   **Peer discovery and diagnostic navigation gaps for Issue #1380 are fully resolved.**
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
-1.  **Forensic Integrity**: 128-byte schema (v5) with absolute synchronization for cross-hardware reliability.
-2.  **Unified Service Authority**: `MonitorService` manages lifecycle; `ForensicSpillBuffer` handles persistence.
-3.  **Traceability Rule**: Issue #1378 must be linked to all subsequent stabilization commits.
+1.  **Handshake Continuity**: Telemetry signaling must not be hard-gated by hardware fixes (GPS) to maintain signaling presence.
+2.  **Overlay Governance**: Navigation to top-level screens must explicitly manage the lifecycle of existing full-screen overlays to prevent occlusion.
+3.  **Traceability Rule**: Issue #1380 is linked to all connectivity stabilization commits.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.29.7: [SOT Count: 207 (Rules: 66), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 22), QA: 299]**
-- **Sep.29.6: [SOT Count: 207 (Rules: 66), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 22), QA: 298]**
-- **Sep.29.5: [SOT Count: 207 (Rules: 66), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 21), QA: 298]**
-- **Sep.29.3: [SOT Count: 207 (Rules: 66), Open: H:1, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 21), QA: 296]**
+- **Sep.29.30: [SOT Count: 209 (Rules: 67), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 3 (Sub-items: 23), QA: 302]**
+- **Sep.29.3: [SOT Count: 207 (Rules: 66), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 23), QA: 300]**

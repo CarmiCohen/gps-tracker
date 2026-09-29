@@ -25,9 +25,6 @@ import javax.inject.Provider
 import javax.inject.Singleton
 import kotlin.math.*
 
-/**
- * FakePowerStateProvider: Delegating provider for testing. 
- */
 class FakePowerStateProvider(private val real: AndroidPowerStateProvider) : PowerStateProvider {
     companion object {
         var useOverride = false
@@ -56,14 +53,6 @@ object TestPowerModule {
         FakePowerStateProvider(real)
 }
 
-/**
- * ProductionReadinessAuditTest: Verifies end-to-end telemetry stream constraints 
- * and Doze-deferral consistency across role transitions (R339).
- * Sep.29.6:
- * - Issue #1378: Hardened verifySignalingLifecycleProbes with full-capacity 
- *   buffer sweeps and explicit synchronization delays for S21 multi-core stability.
- * - Added verifyExtendedSoakSimulation to validate persistence under sustained load.
- */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
 class ProductionReadinessAuditTest {
@@ -103,22 +92,17 @@ class ProductionReadinessAuditTest {
         hiltRule.inject()
         FakePowerStateProvider.useOverride = true
         FakePowerStateProvider.isIdle = false
+        forensicSpillBufferProvider.get().resetBufferForTest()
     }
 
-    /**
-     * verifySignalingLifecycleProbes: Exercises the signaling forensic probes 
-     * and verifies their persistence in the memory-mapped spill buffer.
-     */
     @Test
     fun verifySignalingLifecycleProbes() = runBlocking {
         logRepository.setForensicStallSimulation(true)
         
         try {
-            // S21: Allow any background initialization to settle
             delay(2000)
             
             val buffer = forensicSpillBufferProvider.get()
-            // Absolute Buffer Reset for Clean Audit
             while (buffer.hasPending()) {
                 buffer.commitDrain(1000)
             }
@@ -128,9 +112,6 @@ class ProductionReadinessAuditTest {
             val testInterface = "wlan${(10..99).random()}"
             val failureTag = "TEST_FAIL_${(100..999).random()}"
             
-            Timber.d("AUDIT: Logging test probes: $testInterface, $failureTag")
-            
-            // Bypass LogManager sanitization path to verify RAW schema integrity
             val ts = timeProvider.currentTimeMillis()
             val probe1 = LogEntry(
                 localId = "P1-$ts", timestamp = ts,
@@ -149,15 +130,14 @@ class ProductionReadinessAuditTest {
             var handoverFound = false
             var failureFound = false
             var lastObservedCount = 0
+            var lastObservedMessages = listOf<String>()
 
-            // S21 Hardware: Extended polling to 5s to allow MappedByteBuffer consistency
-            // and full background saturation sweep.
             repeat(50) {
-                // Scan the ENTIRE capacity to find the probes even if roll-over starts
                 val traces = buffer.peekToEntities(FORENSIC_SPILL_CAPACITY)
                 val dbLogs = logRepository.loadAllLogsStatic(1000)
                 
                 lastObservedCount = traces.size
+                lastObservedMessages = traces.map { it.message }
 
                 if (!handoverFound) {
                     handoverFound = traces.any { it.message.contains("Forensic Handover") && it.message.contains(testInterface) } ||
@@ -173,40 +153,26 @@ class ProductionReadinessAuditTest {
                 delay(100)
             }
             
-            if (!handoverFound || !failureFound) {
-                val traces = buffer.peekToEntities(50)
-                Timber.e("AUDIT FAILURE. Count: $lastObservedCount. Last 50 messages: ${traces.map { it.message }}")
-            }
-
-            assertTrue("Forensic handover probe [$testInterface] must be recorded. Found in $lastObservedCount traces.", handoverFound)
-            assertTrue("Forensic TX failure probe [$failureTag] must be recorded. Found in $lastObservedCount traces.", failureFound)
+            assertTrue("Probes not found! Count: $lastObservedCount. Traces: $lastObservedMessages", handoverFound && failureFound)
             
         } finally {
             logRepository.setForensicStallSimulation(false)
         }
     }
 
-    /**
-     * verifyExtendedSoakSimulation: Exercises the persistence and telemetry engine 
-     * under a sustained mock load for 60 seconds.
-     */
     @Test
     fun verifyExtendedSoakSimulation() = runBlocking {
         logRepository.setForensicStallSimulation(false)
         val startTime = timeProvider.elapsedRealtime()
         val durationMs = 60000L // 60s Soak
         
-        Timber.i("AUDIT: Starting 60s Extended Soak Simulation.")
-        
         var ticks = 0
         while (timeProvider.elapsedRealtime() - startTime < durationMs) {
             val nowRt = timeProvider.elapsedRealtime()
             
-            // Simulate Telemetry Activity
             sessionManager.onTrackerPulse("Soak_Device", nowRt)
             sessionManager.updateTick(nowRt + 1000, nowRt, true, isInViolation = false)
             
-            // Inject High-Frequency Forensic Bursts
             if (ticks % 5 == 0) {
                 repeat(10) { i ->
                     forensicLogger.logHandover("SOAK_BURST_$ticks", "wlan$i", force = true)
@@ -218,13 +184,9 @@ class ProductionReadinessAuditTest {
             
             if (ticks % 20 == 0) {
                 val buffer = forensicSpillBufferProvider.get()
-                Timber.d("SOAK STATUS: Ticks: $ticks, Buffer Pending: ${buffer.getPendingCount()}")
-                // Verify no heap overflow or buffer deadlock
                 assertTrue("Buffer must maintain operational state", buffer.getFillLevel() <= 1.0)
             }
         }
-        
-        Timber.i("AUDIT: Extended Soak Simulation Completed Successfully ($ticks ticks).")
     }
 
     @Test

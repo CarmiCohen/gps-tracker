@@ -24,6 +24,10 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.29.30:
+ * - Connection Hardening: Implemented Bypass Heartbeat (Issue #LinkFix). 
+ *   Tracker now forces a telemetry pulse even without GPS fix to stabilize 
+ *   peer discovery on initial handshake.
  * Sep.28.29:
  * - Issue #071 Hardening: Enhanced executeAutomatedStressTest to inject manual 
  *   Jammer and Stall markers and enable LogRepository stall simulation for 
@@ -345,7 +349,7 @@ class MonitorService : BaseMonitorService() {
     private fun handleTrackerPulse(id: String) {
         if (!SignalingConstants.isValidTrackerId(id)) return
         val nowRt = timeProvider.elapsedRealtime()
-        if ((configManager.deviceId == SettingsRepository.DEFAULT_TRACKER_ID || configManager.deviceId.isEmpty()) && id.isNotEmpty() && id != "Active Tracker") {
+        if ((configManager.deviceId == SignalingConstants.DEFAULT_TRACKER_ID || configManager.deviceId.isEmpty()) && id.isNotEmpty() && id != "Active Tracker") {
             configManager.deviceId = id; connectivitySuite.updateIdentity(id, configManager.viewerId, false)
             lifecycleScope.launch(Dispatchers.IO) { repository.saveString(TRACKER_ID_KEY, id) }
         }
@@ -608,6 +612,25 @@ class MonitorService : BaseMonitorService() {
         if (isSystemActive) {
             val health = integrityMonitor.currentHealth
             notificationManager.updatePulse(sats = hardwareSuite.satellitesUsed, battery = health.batteryLevel, isSecure = !alarmManager.hasUnresolvedAlarms(), isPowerSave = isPowerSaveActive || health.isPowerSaveMode)
+
+            // Sep.29.30 Bypass Heartbeat: Force telemetry transmission to Relay even if no GPS fix exists (Issue #LinkFix)
+            if (isTrackerMode) {
+                Timber.d("MonitorService: Issuing Bypass Heartbeat to stabilize peer link.")
+                val snapshot = evaluationSnapshotFlyweight
+                val status = TelemetryMapper.mapSnapshotToStatus(
+                    snapshot = snapshot,
+                    processed = lastProcessedLocation,
+                    deviceId = configManager.deviceId,
+                    viewerId = configManager.viewerId,
+                    now = now,
+                    nowRt = nowRt,
+                    gnssDetail = latestGnssDetail,
+                    isSuspiciousMode = isSuspiciousMode,
+                    lastSitTs = primaryProcessor.getLastSitTs(),
+                    out = TrackerStatus()
+                )
+                connectivitySuite.sendTelemetry(status)
+            }
         }
     }
 

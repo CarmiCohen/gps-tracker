@@ -37,6 +37,8 @@ class ForensicStressAuditTest {
     @Before
     fun init() {
         hiltRule.inject()
+        // Issue #1378: Ensure strict isolation for test buffer
+        spillBuffer.resetBufferForTest()
     }
 
     @Test

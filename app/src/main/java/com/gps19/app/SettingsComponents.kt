@@ -151,7 +151,14 @@ fun SettingsOverlay(
                     }
 
                     if (visibleCount >= 4) {
-                        Button(onClick = { onEvent(UiEvent.NavigateToDiagnostics(true)) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Slate700)) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_diagnostics)) }
+                        Button(
+                            onClick = { 
+                                onEvent(UiEvent.ToggleSettings(false))
+                                onEvent(UiEvent.NavigateToDiagnostics(true))
+                            }, 
+                            modifier = Modifier.fillMaxWidth(), 
+                            colors = ButtonDefaults.buttonColors(containerColor = Slate700)
+                        ) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_diagnostics)) }
                         Spacer(Modifier.height(24.dp))
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {

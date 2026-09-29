@@ -16,16 +16,6 @@ import java.util.zip.CRC32
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/**
- * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
- * Sep.29.6:
- * - Issue #1378: Migrated to FORENSIC_SPILL_ENTRY_SIZE_V5 to force 
- *   compilation cache invalidation across heterogeneous hardware clusters.
- * Sep.29.3:
- * - Issue #1378: Advanced version to 5 and hardened synchronization. Switched 
- *   to instance-level locking in peekToEntities to prevent concurrent write interference 
- *   on high-performance hardware (S21).
- */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -93,7 +83,6 @@ class ForensicSpillBuffer @Inject constructor(
 
                 if (magic != MAGIC_NUMBER || version != CURRENT_VERSION || cap != FORENSIC_SPILL_CAPACITY || entrySz != FORENSIC_SPILL_ENTRY_SIZE_V5) {
                     resetBuffer()
-                    if (exists) Timber.w("Forensic Persistence Audit: Spill-buffer reset (v$version -> v$CURRENT_VERSION). Reason: Schema mismatch or Version bump.")
                 } else {
                     val recoveredWrite = buffer.getInt(OFF_WRITE_IDX)
                     val recoveredCount = buffer.getInt(OFF_COUNT)
@@ -105,19 +94,18 @@ class ForensicSpillBuffer @Inject constructor(
                         writeIdx.set(recoveredWrite)
                         totalCount.set(recoveredCount)
                         readIdx.set(recoveredRead)
-                        
-                        if (recoveredCount > 0) {
-                            Timber.i("Forensic Persistence Audit: Restored $recoveredCount traces (v$CURRENT_VERSION).")
-                        }
                     } else {
                         resetBuffer()
-                        Timber.w("Forensic Persistence Audit: Indices OOB. Resetting.")
                     }
                 }
             }
         } catch (e: Exception) {
             Timber.e(e, "Forensic Audit: Buffer init failed")
         }
+    }
+
+    fun resetBufferForTest() {
+        resetBuffer()
     }
 
     private fun resetBuffer() {
@@ -146,7 +134,6 @@ class ForensicSpillBuffer @Inject constructor(
 
         val rawBytes = entry.message.toByteArray(Charsets.UTF_8)
         
-        // Force evaluation of maxMsgLen here using the updated constant
         val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE_V5 - DATA_FIELDS_SIZE - CHECKSUM_SIZE
         var msgLen = rawBytes.size.coerceAtMost(maxMsgLen)
         
@@ -167,8 +154,8 @@ class ForensicSpillBuffer @Inject constructor(
                 if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
 
                 entryWriteBuffer.clear()
-                Arrays.fill(entryWriteBuffer.array(), DATA_FIELDS_SIZE, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE, 0.toByte())
-
+                Arrays.fill(entryWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE_V5, 0.toByte())
+                
                 entryWriteBuffer.putLong(entry.timestamp)
                 entryWriteBuffer.putDouble(entry.lat)
                 entryWriteBuffer.putDouble(entry.lng)
@@ -192,7 +179,10 @@ class ForensicSpillBuffer @Inject constructor(
                 entryWriteBuffer.put(entry.battSnapshot?.toByte() ?: 0.toByte())
                 entryWriteBuffer.put(msgLen.toByte())
                 entryWriteBuffer.put(0.toByte()) 
-                entryWriteBuffer.put(rawBytes, 0, msgLen)
+                
+                if (msgLen > 0) {
+                    entryWriteBuffer.put(rawBytes, 0, msgLen)
+                }
                 
                 entryWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
 
@@ -205,6 +195,8 @@ class ForensicSpillBuffer @Inject constructor(
                 
                 buffer.position(offset)
                 buffer.put(entryWriteBuffer.array())
+                
+                Timber.w("DEBUG_WRITE: msgLen=$msgLen, maxMsgLen=$maxMsgLen, bytes=${entryWriteBuffer.array().take(60).joinToString { it.toString() }}")
 
                 advanceWritePointer(buffer)
                 true
@@ -230,7 +222,7 @@ class ForensicSpillBuffer @Inject constructor(
                 if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
                 
                 entryWriteBuffer.clear()
-                Arrays.fill(entryWriteBuffer.array(), DATA_FIELDS_SIZE, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE, 0.toByte())
+                Arrays.fill(entryWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE_V5, 0.toByte())
 
                 entryWriteBuffer.putLong(timestamp)
                 entryWriteBuffer.putDouble(lat)
@@ -251,7 +243,7 @@ class ForensicSpillBuffer @Inject constructor(
                 
                 entryWriteBuffer.put(flags.toByte())
                 entryWriteBuffer.put(batteryLevel.toByte())
-                entryWriteBuffer.put(0.toByte())
+                entryWriteBuffer.put(0.toByte()) // msgLen = 0
                 entryWriteBuffer.put(0.toByte())
 
                 entryWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
@@ -310,6 +302,9 @@ class ForensicSpillBuffer @Inject constructor(
                     readCrc.update(readEntryBytes, 0, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
                     
                     val storedCrc = readEntryWrapper.getInt(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
+                    
+                    Timber.w("DEBUG_READ: storedCrc=$storedCrc, calcCrc=${readCrc.value.toInt()}, bytes=${readEntryBytes.take(60).joinToString { it.toString() }}")
+
                     if (storedCrc == readCrc.value.toInt()) {
                         val ts = readEntryWrapper.getLong()
                         val lat = readEntryWrapper.getDouble()
