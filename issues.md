@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.29.4
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.29.5
 
 ## 🎯 Current Resumption Focus: S21 Hardware Verification
-Ensuring forensic probe reliability and baseline stability on the S21 hardware tier.
+Ensuring forensic probe reliability and baseline stability on the S21 and A15 hardware tier.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -23,6 +23,7 @@ Ensuring forensic probe reliability and baseline stability on the S21 hardware t
 *   **Issue #1378: S21 Forensic Probe Failure** (Resolved Sep.29.4)
     *   *Symptoms*: `verifySignalingLifecycleProbes` fails on S21 despite `force` bypass and buffer logic hardening (v5, 128-byte). Probes are not being retrieved from the spill-buffer within the audit window.
     *   *Remediation*: The issue was determined to be a compilation caching edge-case involving the Kotlin `const val FORENSIC_SPILL_ENTRY_SIZE`. Because the size was recently increased to 128 bytes in `EngineConstants.kt`, incremental compilation missed updating `ForensicSpillBuffer.kt`. This caused `maxMsgLen` to be incorrectly computed as `<= 0`, leading to string truncation. Modifying and recompiling `ForensicSpillBuffer.kt` successfully cleared the stale cache and passed the test on the S21 device. All 21 tests are now consistently passing.
+    *   *Update (Sep.29.5)*: Confirmed that simply adding a line to `ForensicSpillBuffer.kt` correctly invalidated the Gradle task cache and successfully allowed the test `verifySignalingLifecycleProbes` to pass on the connected A15 device.
 *   **Issue #1377: Production Codebase Stabilization & Tracking Alignment** (Resolved Sep.29.3)
 *   **Issue #S071: Stress Test UI Consolidation** (Resolved Sep.29.3)
 *   **Issue #071-G: Missing Stress Test Integration** (Resolved Sep.29.3)
@@ -31,6 +32,7 @@ Ensuring forensic probe reliability and baseline stability on the S21 hardware t
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.29.5: [SOT Count: 207 (Rules: 66), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 21), QA: 298]**
 - **Sep.29.4: [SOT Count: 207 (Rules: 66), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 21), QA: 297]**
 - **Sep.29.3: [SOT Count: 207 (Rules: 66), Open: H:1, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 21), QA: 296]**
 - **Sep.29.3: [SOT Count: 206 (Rules: 65), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 295]**

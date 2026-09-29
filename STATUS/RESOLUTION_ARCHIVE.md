@@ -1,7 +1,7 @@
-# 🏛️ Resolution Archive - Sep.29.4
+# 🏛️ Resolution Archive - Sep.29.3
 
 ## 🏁 Issue #1378: S21 Hardware Verification & Forensic Probe Failure (Final Resolution)
-*   **Resolved**: Sep.29.4
+*   **Resolved**: Sep.29.3
 *   **Root Cause**: Compilation caching edge-case involving the Kotlin `const val FORENSIC_SPILL_ENTRY_SIZE`. After the size was increased to 128 bytes in `EngineConstants.kt`, incremental compilation missed updating `ForensicSpillBuffer.kt`. This caused `maxMsgLen` to be incorrectly computed as `<= 0` (due to the older, smaller inlined constant), leading to string truncation (empty strings) and the buffer falling back to `DEFAULT_TRACE_MSG` (`"FORENSIC_TRACE"`).
 *   **Remediation**:
     *   **Compilation Reset**: Recompiled `ForensicSpillBuffer.kt` to force the inclusion of the updated `FORENSIC_SPILL_ENTRY_SIZE` (128 bytes). This immediately corrected the `msgLen` computation. All 21 instrumented tests on the S21 hardware now pass.

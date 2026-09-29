@@ -130,6 +130,8 @@ class ProductionReadinessAuditTest {
             var handoverFound = false
             var failureFound = false
             
+            var lastTracesMessages = ""
+
             // S21 Hardware: Extended polling to 3s to allow MappedByteBuffer consistency
             repeat(30) {
                 val traces = buffer.peekToEntities(100)
@@ -137,6 +139,7 @@ class ProductionReadinessAuditTest {
                 
                 if (traces.isNotEmpty()) {
                     Timber.d("AUDIT: Peeked ${traces.size} traces from buffer. Pending: ${buffer.getPendingCount()}")
+                    lastTracesMessages = traces.joinToString { it.message }
                 }
 
                 if (!handoverFound) {
@@ -158,8 +161,8 @@ class ProductionReadinessAuditTest {
                 Timber.e("AUDIT FAILURE. Last 50 traces: ${lastTraces.map { it.message }}")
             }
 
-            assertTrue("Forensic handover probe [$testInterface] must be recorded", handoverFound)
-            assertTrue("Forensic TX failure probe [$failureTag] must be recorded", failureFound)
+            assertTrue("Forensic handover probe [$testInterface] must be recorded. Buffer content: $lastTracesMessages", handoverFound)
+            assertTrue("Forensic TX failure probe [$failureTag] must be recorded. Buffer content: $lastTracesMessages", failureFound)
             
         } finally {
             logRepository.setForensicStallSimulation(false)

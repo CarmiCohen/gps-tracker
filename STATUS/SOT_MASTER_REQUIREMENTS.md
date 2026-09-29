@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.29.4)
+# SOT Master Requirements & Hardening Status (Sep.29.3)
 
 ## 🏗️ Architectural Master Rules (66 Rules)
 
@@ -16,12 +16,12 @@
 *   **SOT ID 544**: Stress Test UI Consolidation - Relocated Forensic Stress Test trigger to Diagnostics Screen to stabilize onboarding UX. (Resolved Sep.29.3).
 *   **SOT ID 545**: Production Codebase Stabilization - Advanced versioning and forensic tracking baselines to Sep.29.3 to maintain process integrity. (Resolved Sep.29.3).
 *   **SOT ID 546**: S21 Verification & Probe Hardening - Advanced versioning to Sep.29.3 and implemented force-bypass for forensic probes to stabilize tests on S21 hardware. (Resolved Sep.29.3).
-*   **SOT ID 547**: S21 Compilation Cache Probe Fix - Recompiled `ForensicSpillBuffer.kt` to force the inclusion of the newly sized `FORENSIC_SPILL_ENTRY_SIZE` (128 bytes), resolving string truncation issues on the S21 device. All 21 instrumented tests passing. (Resolved Sep.29.4).
+*   **SOT ID 547**: S21 Compilation Cache Probe Fix - Recompiled `ForensicSpillBuffer.kt` to force the inclusion of the newly sized `FORENSIC_SPILL_ENTRY_SIZE` (128 bytes), resolving string truncation issues on the S21 device. All 21 instrumented tests passing. (Resolved Sep.29.3).
 
 ---
 
 ## 🏁 Verification Chapters
 *   **Chapter 31.177 (Stress Test UI Consolidation)**: PASSED - Verified relocation of Forensic Stress Test trigger to Diagnostics Screen. (Sep.29.3)
 *   **Chapter 31.178 (Production Codebase Stabilization)**: PASSED - Verified build stability and version alignment at Sep.29.3. (Sep.29.3)
-*   **Chapter 31.179 (S21 Hardware Verification)**: PASSED - All 21 instrumented tests pass successfully. Resolved `verifySignalingLifecycleProbes` probe truncation by clearing compilation cache for `ForensicSpillBuffer.kt` after schema sizing adjustments. (Sep.29.4)
+*   **Chapter 31.179 (S21 Hardware Verification)**: PASSED - All 21 instrumented tests pass successfully. Resolved `verifySignalingLifecycleProbes` probe truncation by clearing compilation cache for `ForensicSpillBuffer.kt` after schema sizing adjustments. (Sep.29.3)
 ...

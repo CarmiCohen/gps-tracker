@@ -145,6 +145,8 @@ class ForensicSpillBuffer @Inject constructor(
         val buffer = mappedBuffer ?: return false
 
         val rawBytes = entry.message.toByteArray(Charsets.UTF_8)
+        
+        // Force evaluation of maxMsgLen here using the updated constant
         val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE - DATA_FIELDS_SIZE - CHECKSUM_SIZE
         var msgLen = rawBytes.size.coerceAtMost(maxMsgLen)
         
@@ -325,7 +327,7 @@ class ForensicSpillBuffer @Inject constructor(
                         val flags = readEntryWrapper.get().toInt()
                         val batLevel = readEntryWrapper.get().toInt() and 0xFF
                         val msgLen = readEntryWrapper.get().toInt() and 0xFF
-                        readEntryWrapper.get()
+                        readEntryWrapper.get() // read the padding byte
 
                         val msg = if (msgLen > 0) {
                             String(readEntryBytes, readEntryWrapper.position(), msgLen, Charsets.UTF_8)
