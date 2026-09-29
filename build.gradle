@@ -15,6 +15,9 @@ tasks.register('clean', Delete) {
     delete rootProject.layout.buildDirectory
 }
 
+/**
+ * Issue #1035: Type Safety Validation for Dynamic Versioning
+ */
 def getGitCommitCount() {
     try {
         def process = "git rev-list --count HEAD".execute([], project.rootDir)
@@ -30,7 +33,7 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    return "Sep.28.30"
+    return "Sep.29.3"
 }
 
 ext {
@@ -101,7 +104,7 @@ tasks.register('verifyProjectIntegrity') {
             if (file.exists()) {
                 println "Updating version in ${fileName} to ${vName}..."
                 def content = file.text
-                def updatedContent = content.replaceAll(/\(v?\w{3}\.\d{2}\.\d{2}\)/, "(${vName})")
+                def updatedContent = content.replaceAll(/(Sep\.\d{2}\.\d+)/, vName)
                 file.text = updatedContent
             }
         }

@@ -1,20 +1,19 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.30
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.29.3
 
-## 🎯 Current Resumption Focus: Production Codebase Stabilization
-Advancing codebase logic tracking and version metrics cleanly to Sep.28.30.
+## 🎯 Current Resumption Focus: S21 Hardware Verification
+Ensuring forensic probe reliability and baseline stability on the S21 hardware tier.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
 ### 🔴 High Priority (Field & Soak Testing Readiness)
-*   *(No high-priority gaps remain for the current baseline)*
+*   **Issue #1378: S21 Forensic Probe Failure**
+    *   *Symptoms*: `verifySignalingLifecycleProbes` fails on S21 despite `force` bypass and buffer logic hardening (v5, 128-byte). Probes are not being retrieved from the spill-buffer within the audit window.
+    *   *Investigation Node*: Suspected `MappedByteBuffer` visibility latency or race condition under high S21 I/O throughput.
+    *   *Files*: `ForensicSpillBuffer.kt`, `ProductionReadinessAuditTest.kt`, `LogRepository.kt`.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 2)
-
-### 🟡 Medium Priority
-*   **Issue #S071: Stress Test UI Consolidation** (ID: S071, Sig: Medium)
-    *   *Idea*: Move the "Trigger Forensic Stress Test" button to the Diagnostics screen instead of PhoneSetupOverlay once the initial setup UX is stabilized.
+## 💡 Strategic Simplification Ideas (Ideas: 1)
 
 ### 🔵 Low Priority
 *   **Issue #1175: Real-time Only Path (Pivot Option)**
@@ -24,65 +23,17 @@ Advancing codebase logic tracking and version metrics cleanly to Sep.28.30.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1378: S21 Device Verification & Codebase Advancement** (In Progress Sep.29.3)
+    *   *Remediation*: Advanced versioning baseline to Sep.29.3. Implemented `force` parameter in `SignalingForensicLogger` to ensure test probe recording under high-frequency background activity (R720). Hardened `ForensicSpillBuffer` with version 5 schema (128-byte entries) and instance-level synchronization.
+*   **Issue #1377: Production Codebase Stabilization & Tracking Alignment** (Resolved Sep.29.2)
+*   **Issue #S071: Stress Test UI Consolidation** (Resolved Sep.29.1)
 *   **Issue #071-G: Missing Stress Test Integration** (Resolved Sep.28.30)
-    *   *Remediation*: Wired `onExecuteStressTest` callback to `MainViewModel` and enhanced `MonitorService` logic to inject forensic markers (Jammer/Stall) and saturate system resources for 40s (R715).
 *   **Issue #1376: Production Codebase Stabilization & Tracking Alignment** (Resolved Sep.28.29)
-*   **Issue #1375: Remediate WorkManager Initialization Failure in Instrumented Tests** (Resolved Sep.28.28)
-*   **Issue #1374: Remediate Mock SystemStatusProvider Constructor Parameter Mismatch** (Resolved Sep.28.27)
-*   **Issue #1373: Remediate Instrumented Test Compilation Failures (DI Mismatch)** (Resolved Sep.28.27)
-*   **Issue #1372: Remediate AndroidTest Dependency Version Resolution Failure** (Resolved Sep.28.25)
-*   **Issue #1371: Test Suite Verification Round & QA Status Synchronization** (Resolved Sep.28.24)
-*   **Issue #1370: Guideline Refinement: Traceability Rule Enforcement** (Resolved Sep.28.23)
-*   **Issue #1369: Production Codebase Stabilization & Tracking Alignment** (Resolved Sep.28.22)
-*   **Issue #1368: Production Codebase Stabilization & Tracking Alignment** (Resolved Sep.28.21)
-*   **Issue #1367: Production Codebase Stabilization & Tracking Alignment** (Resolved Sep.28.20)
-*   **Issue #1366: Production Codebase Stabilization & Tracking Alignment** (Resolved Sep.28.19)
-*   **Issue #1365: Production Codebase Stabilization & Tracking Alignment** (Resolved Sep.28.18)
-*   **Issue #1364: Production Codebase Stabilization & Tracking Alignment** (Resolved Sep.28.17)
-*   **Issue #1362: Forensic Persistence Health Alerting (R715)** (Resolved Sep.28.16)
-*   **Issue #1363: Production Codebase Stabilization & Tracking Alignment** (Resolved Sep.28.15)
-*   **Issue #1361: Forensic Reliability Math Hardening** (Resolved Sep.28.13)
-*   **Issue #1360: Mismatched Unregistration Method Signatures** (Resolved Sep.28.12)
-*   **Issue #1359: Temporal Precision & Service Logic Hardening** (Resolved Sep.28.11)
-*   **Issue #1357: Build Pipeline Dependency Pruning (KSP Migration)** (Resolved Sep.28.10)
-*   **Issue #1358: Codebase Leftovers Pruning & Version Hardening** (Resolved Sep.28.9)
-*   **Issue #1356: kaptReleaseKotlin Stub Generation Hardening** (Resolved Sep.28.8)
-*   **Issue #1354: Gradle Task Deduplication** (Resolved Sep.28.7)
-*   **Issue #1167: Map Overlay Imperative to Declarative Controller** (Resolved Sep.28.6)
-*   **Issue #1355: TimeProvider Cleanup** (Resolved Sep.28.5)
-*   **Issue #1296: Centralized Boot Lifecycle Authority** (Resolved Sep.28.4)
-*   **Issue #1294: Build-Time Interface Validation** (Resolved Sep.28.3)
-*   **Issue #1353: Unified Activity Context Provider** (Resolved Sep.28.2)
 
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.29.3: [SOT Count: 207 (Rules: 66), Open: H:1, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 21), QA: 296]**
+- **Sep.29.2: [SOT Count: 206 (Rules: 65), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 295]**
+- **Sep.29.1: [SOT Count: 205 (Rules: 65), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 294]**
 - **Sep.28.30: [SOT Count: 204 (Rules: 65), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 3 (Sub-items: 16), QA: 293]**
-- **Sep.28.29: [SOT Count: 203 (Rules: 64), Open: H:0, M:1, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 292]**
-- **Sep.28.28: [SOT Count: 201 (Rules: 64), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 291]**
-- **Sep.28.27: [SOT Count: 200 (Rules: 63), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 290]**
-- **Sep.28.25: [SOT Count: 197 (Rules: 63), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 288]**
-- **Sep.28.24: [SOT Count: 196 (Rules: 62), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 287]**
-- **Sep.28.23: [SOT Count: 196 (Rules: 62), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.22: [SOT Count: 195 (Rules: 61), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.21: [SOT Count: 194 (Rules: 61), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.20: [SOT Count: 194 (Rules: 61), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.19: [SOT Count: 194 (Rules: 61), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.18: [SOT Count: 194 (Rules: 61), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.17: [SOT Count: 193 (Rules: 61), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.16: [SOT Count: 192 (Rules: 61), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.15: [SOT Count: 191 (Rules: 60), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.14: [SOT Count: 190 (Rules: 60), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.13: [SOT Count: 190 (Rules: 60), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.12: [SOT Count: 189 (Rules: 59), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.11: [SOT Count: 188 (Rules: 58), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.10: [SOT Count: 187 (Rules: 57), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.9: [SOT Count: 186 (Rules: 56), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 16), QA: 286]**
-- **Sep.28.8: [SOT Count: 185 (Rules: 55), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 15), QA: 285]**
-- **Sep.28.7: [SOT Count: 184 (Rules: 54), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.28.6: [SOT Count: 184 (Rules: 54), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.28.5: [SOT Count: 183 (Rules: 53), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.28.4: [SOT Count: 183 (Rules: 53), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.28.3: [SOT Count: 182 (Rules: 52), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.28.2: [SOT Count: 181 (Rules: 51), Open: H:0, M:1, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.28.1: [SOT Count: 180 (Rules: 50), Open: H:0, M:2, L:3, Testing: 3 (Sub-items: 15), QA: 284]**

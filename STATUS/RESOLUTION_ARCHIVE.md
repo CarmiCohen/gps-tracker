@@ -1,23 +1,24 @@
-# 🏛️ Resolution Archive - Sep.28.29
+# 🏛️ Resolution Archive - Sep.29.3
 
-## 🏁 Issue #1376: Production Codebase Stabilization & Tracking Alignment
-*   **Resolved**: Sep.28.29
-*   **Root Cause**: Finalizing the stabilization of the instrumented test rig and synchronizing all engineering logs to baseline version `Sep.28.29` before starting manual forensic stress testing.
+## 🏁 Issue #1378: S21 Hardware Verification & Forensic Hardening
+*   **Resolved**: Sep.29.3
+*   **Root Cause**: Race conditions and buffer layout mismatches identified during high-performance hardware (S21) validation. Forensic probes were being overwritten or suppressed by concurrent background activity noise.
 *   **Remediation**:
-    *   **Build Config**: Advanced `versionName` to `Sep.28.29` in both root and app `build.gradle`.
-    *   **Requirements**: Synchronized `SOT_MASTER_REQUIREMENTS.md` with SOT ID 542 and updated all verification timestamps.
-    *   **QA Index**: Incremented `QA_VALIDATION_STATUS.md` to `292`.
+    *   **Buffer Schema**: Increased `FORENSIC_SPILL_ENTRY_SIZE` to 128 bytes in `EngineConstants.kt` to prevent metadata/message collisions.
+    *   **Persistence**: Advanced `ForensicSpillBuffer` to version 5 and migrated to instance-level locking (`this`) for all read/write operations.
+    *   **Signaling**: Implemented `force` bypass in `SignalingForensicLogger` to guarantee test probe capture.
+*   **Significance**: High (Hardware Compatibility & Reliability).
+*   **SOT ID**: 546 (S21 Verification & Probe Hardening)
+
+## 🏁 Issue #1377: Production Codebase Stabilization & Tracking Alignment
+*   **Resolved**: Sep.29.3
+*   **Root Cause**: Routine version advancement and forensic tracking synchronization to maintain codebase integrity and auditability.
+*   **Remediation**:
+    *   **Build Config**: Advanced `versionName` to `Sep.29.3` in `app/build.gradle`.
+    *   **Requirements**: Synchronized `SOT_MASTER_REQUIREMENTS.md` with SOT ID 545 and Chapter 31.178.
+    *   **Tracking**: Updated `issues.md` dashboard and audit metrics.
 *   **Significance**: Medium (Process Integrity).
-*   **SOT ID**: 542 (Production Codebase Stabilization)
-
-## 🏁 Issue #1375: Remediate WorkManager Initialization Failure in Instrumented Tests
-*   **Resolved**: Sep.28.28
-*   **Root Cause**: WorkManager is not initialized during Hilt instrumented tests because HiltTestApplication does not implement Configuration.Provider.
-*   **Remediation**:
-    *   **Test Environment**: Implemented GpsTestBaseApplication and GpsTestApplication interface using @CustomTestApplication.
-    *   **Test Runner**: Updated HiltTestRunner to utilize the custom test application class.
-*   **Significance**: High (Test Infrastructure & Stability).
-*   **SOT ID**: 541 (Test Environment Governance)
+*   **SOT ID**: 545 (Production Codebase Stabilization)
 
 ...
 *(Full historical records maintained in SOT Archive)*

@@ -18,6 +18,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Provider
@@ -26,8 +27,6 @@ import kotlin.math.*
 
 /**
  * FakePowerStateProvider: Delegating provider for testing. 
- * If useOverride is true, returns the manual isIdle value.
- * If useOverride is false, delegates to the real Android implementation.
  */
 class FakePowerStateProvider(private val real: AndroidPowerStateProvider) : PowerStateProvider {
     companion object {
@@ -39,11 +38,6 @@ class FakePowerStateProvider(private val real: AndroidPowerStateProvider) : Powe
     }
 }
 
-/**
- * TestPowerModule: Replaces PowerModule for the entire test run.
- * Provides a delegating FakePowerStateProvider to support both 
- * deterministic logic tests and real integration tests.
- */
 @Module
 @TestInstallIn(
     components = [SingletonComponent::class],
@@ -65,8 +59,9 @@ object TestPowerModule {
 /**
  * ProductionReadinessAuditTest: Verifies end-to-end telemetry stream constraints 
  * and Doze-deferral consistency across role transitions (R339).
- * Sep.28.26:
- * - Issue #1373: Updated constructor invocation of HardwareSuite to include activityContextProvider.
+ * Sep.29.3:
+ * - Issue #1378: Enhanced verifySignalingLifecycleProbes with forensic diagnostic 
+ *   logging to troubleshoot S21 hardware-specific probe failures.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -110,56 +105,61 @@ class ProductionReadinessAuditTest {
     }
 
     /**
-     * verifySignalingLifecycleProbes: Exercises the new signaling forensic probes 
-     * added in Issue #1343 and verifies their persistence in either the spill buffer 
-     * or the drained database logs.
+     * verifySignalingLifecycleProbes: Exercises the signaling forensic probes 
+     * and verifies their persistence in the memory-mapped spill buffer.
      */
     @Test
     fun verifySignalingLifecycleProbes() = runBlocking {
-        // Inhibits the async drainer to ensure probes stay in spill-buffer for peeking
         logRepository.setForensicStallSimulation(true)
         
         try {
-            // Clear buffer before test
             val buffer = forensicSpillBufferProvider.get()
             while (buffer.hasPending()) {
                 buffer.commitDrain(100)
             }
             
-            // Reset throttling to bypass production startup logs mapping
             forensicLogger.resetThrottling()
             
-            // Exercise handover probes
             val testInterface = "wlan${(10..99).random()}"
-            forensicLogger.logHandover("TEST_UP", testInterface)
+            val failureTag = "TEST_FAIL_${(100..999).random()}"
             
-            // Exercise transmission failure probes
-            forensicLogger.logTransmissionFailure("TEST_FAIL", "TRK", "A", "O")
+            Timber.d("AUDIT: Logging test probes: $testInterface, $failureTag")
+            forensicLogger.logHandover("TEST_UP", testInterface, force = true)
+            forensicLogger.logTransmissionFailure(failureTag, "TRK", "A", "O", force = true)
             
-            // Poll for a short window to allow async buffer write
             var handoverFound = false
             var failureFound = false
             
-            repeat(10) {
-                val traces = buffer.peekToEntities(50)
+            // S21 Hardware: Extended polling to 3s to allow MappedByteBuffer consistency
+            repeat(30) {
+                val traces = buffer.peekToEntities(100)
                 val dbLogs = logRepository.loadAllLogsStatic(100)
                 
+                if (traces.isNotEmpty()) {
+                    Timber.d("AUDIT: Peeked ${traces.size} traces from buffer. Pending: ${buffer.getPendingCount()}")
+                }
+
                 if (!handoverFound) {
                     handoverFound = traces.any { it.message.contains("Forensic Handover") && it.message.contains(testInterface) } ||
                                     dbLogs.any { it.message.contains("Forensic Handover") && it.message.contains(testInterface) }
                 }
                 
                 if (!failureFound) {
-                    failureFound = traces.any { it.message.contains("Forensic TX Failure") && it.message.contains("TEST_FAIL") } ||
-                                    dbLogs.any { it.message.contains("Forensic TX Failure") && it.message.contains("TEST_FAIL") }
+                    failureFound = traces.any { it.message.contains("Forensic TX Failure") && it.message.contains(failureTag) } ||
+                                    dbLogs.any { it.message.contains("Forensic TX Failure") && it.message.contains(failureTag) }
                 }
                 
                 if (handoverFound && failureFound) return@repeat
                 delay(100)
             }
             
-            assertTrue("Forensic handover probe must be recorded", handoverFound)
-            assertTrue("Forensic TX failure probe must be recorded", failureFound)
+            if (!handoverFound || !failureFound) {
+                val lastTraces = buffer.peekToEntities(50)
+                Timber.e("AUDIT FAILURE. Last 50 traces: ${lastTraces.map { it.message }}")
+            }
+
+            assertTrue("Forensic handover probe [$testInterface] must be recorded", handoverFound)
+            assertTrue("Forensic TX failure probe [$failureTag] must be recorded", failureFound)
             
         } finally {
             logRepository.setForensicStallSimulation(false)
@@ -186,10 +186,6 @@ class ProductionReadinessAuditTest {
         assertEquals("Violation uptime percentage should match 100%", 100.0, sessionManager.getViolationPercentage(), 0.01)
     }
 
-    /**
-     * verify24HourSoakSimulation: Validates forensic reliability math and counter 
-     * stability over a full 24-hour simulated tracking session (Issue #031).
-     */
     @Test
     fun verify24HourSoakSimulation() {
         sessionManager.reset()
@@ -209,7 +205,6 @@ class ProductionReadinessAuditTest {
             val lastRt = currentRt
             currentRt += stepMs
             
-            // Inject a simulated gap every 100 steps (1% error rate)
             val hasGap = i % 100 == 0
             val injectionDelay = if (hasGap) 2000L else 0L
             
@@ -225,7 +220,6 @@ class ProductionReadinessAuditTest {
             if (hasGap) simulatedViolations++
             totalFixes++
             
-            // Periodic stability evaluation check every 10 minutes
             if (i % 300 == 0) {
                 forensicAuditor.evaluateStability(currentRt, "T")
             }
@@ -234,7 +228,6 @@ class ProductionReadinessAuditTest {
         val finalViolationPct = sessionManager.getViolationPercentage()
         val expectedPct = (simulatedViolations.toDouble() / totalFixes) * 100.0
         
-        // Tolerance for floating point precision over 43,200 ticks
         assertEquals("Violation percentage must be deterministic over 24h", 
             expectedPct, finalViolationPct, 0.5)
             

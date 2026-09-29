@@ -10,6 +10,9 @@ import javax.inject.Singleton
 /**
  * SignalingForensicLogger: Decouples signaling-specific forensic logging 
  * and throttling from the main ConnectivitySuite.
+ * Sep.29.3:
+ * - Issue #1378: Added force parameter to logTransmissionFailure and logHandover
+ *   to guarantee test probe recording under concurrent background network activity.
  * Sep.26.11:
  * - Issue #1343: Signaling Lifecycle Probes. Added throttled logging for 
  *   transmission failures and interface handovers (R-ID 334).
@@ -58,10 +61,10 @@ class SignalingForensicLogger @Inject constructor(
     /**
      * logTransmissionFailure: Throttled audit of outbound signaling failures.
      */
-    fun logTransmissionFailure(reason: String, mode: String, deviceId: String, viewerId: String) {
+    fun logTransmissionFailure(reason: String, mode: String, deviceId: String, viewerId: String, force: Boolean = false) {
         val nowRt = timeProvider.elapsedRealtime()
-        if (lastTxFailureLogTs == 0L || nowRt - lastTxFailureLogTs > 15000L) {
-            lastTxFailureLogTs = nowRt
+        if (force || lastTxFailureLogTs == 0L || nowRt - lastTxFailureLogTs > 15000L) {
+            if (!force) lastTxFailureLogTs = nowRt
             val logMsg = "Forensic TX Failure: $reason (Mode: $mode, D:$deviceId, V:$viewerId)"
             Timber.w(logMsg)
             logManagerProvider.get().logForensicTrace(logMsg)
@@ -71,10 +74,10 @@ class SignalingForensicLogger @Inject constructor(
     /**
      * logHandover: Records network interface transitions in the forensic trace.
      */
-    fun logHandover(status: String, interfaceName: String?) {
+    fun logHandover(status: String, interfaceName: String?, force: Boolean = false) {
         val nowRt = timeProvider.elapsedRealtime()
-        if (lastHandoverLogTs == 0L || nowRt - lastHandoverLogTs > 5000L) {
-            lastHandoverLogTs = nowRt
+        if (force || lastHandoverLogTs == 0L || nowRt - lastHandoverLogTs > 5000L) {
+            if (!force) lastHandoverLogTs = nowRt
             val msg = "Forensic Handover: $status (${interfaceName ?: "unknown"})"
             Timber.i(msg)
             logManagerProvider.get().logForensicTrace(msg)

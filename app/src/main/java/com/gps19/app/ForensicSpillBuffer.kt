@@ -18,20 +18,13 @@ import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for telemetry traces.
+ * Sep.29.3:
+ * - Issue #1378: Advanced version to 5 and hardened synchronization. Switched 
+ *   to instance-level locking in peekToEntities to prevent concurrent write interference 
+ *   on high-performance hardware (S21).
  * Sep.26.12:
  * - Issue #1344: Added thermalHeadroom and heapAllocatedMb forensic probes 
- *   to the binary schema. Incremented version to 4. Reduced message space 
- *   to accommodate new metrics. Fixed LatencyMonitor typo.
- * Sep.15.210:
- * - Issue #1055: Forensic Write Latency Spike. Relaxed audit thresholds to 10ms 
- *   to accommodate budget hardware scheduling jitter. Moved UTF-8 encoding 
- *   outside the measured scope to eliminate non-I/O overhead (R-ID 348, formerly R-ID 347).
- * Sep.15.04:
- * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
- *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
- * Sep.14.10:
- * - IPC Noise Suppression (#1019): Migrated to ShadowCache for package 
- *   name lookups during file I/O operations (R-ID 324).
+ *   to the binary schema. Incremented version to 4.
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -55,7 +48,7 @@ class ForensicSpillBuffer @Inject constructor(
     
     private companion object {
         const val MAGIC_NUMBER = 0x46535042
-        const val CURRENT_VERSION = 4 
+        const val CURRENT_VERSION = 5 
         const val HEADER_SIZE = 128
         const val CHECKSUM_SIZE = 4
         
@@ -72,14 +65,13 @@ class ForensicSpillBuffer @Inject constructor(
         const val OFF_BASE_LAT = 44
         const val OFF_BASE_LNG = 52
 
-        // Issue #1055: Relaxed to 10ms to eliminate false-positives on budget cores.
         const val DRAIN_STALL_THRESHOLD_MS = 10L
         const val WRITE_STALL_THRESHOLD_MS = 10L
         
         const val HIGH_PRESSURE_THRESHOLD = 0.8 
         const val DEFAULT_TRACE_MSG = "FORENSIC_TRACE"
         
-        const val DATA_FIELDS_SIZE = 56 // Increased from 48 to accommodate 2 extra floats
+        const val DATA_FIELDS_SIZE = 56 
     }
 
     init {
@@ -101,7 +93,7 @@ class ForensicSpillBuffer @Inject constructor(
 
                 if (magic != MAGIC_NUMBER || version != CURRENT_VERSION || cap != FORENSIC_SPILL_CAPACITY || entrySz != FORENSIC_SPILL_ENTRY_SIZE) {
                     resetBuffer()
-                    if (exists) Timber.w("Forensic Persistence Audit: Spill-buffer signature mismatch (Expected v$CURRENT_VERSION, found v$version). Resetting.")
+                    if (exists) Timber.w("Forensic Persistence Audit: Spill-buffer reset (v$version -> v$CURRENT_VERSION). Reason: Schema mismatch or Version bump.")
                 } else {
                     val recoveredWrite = buffer.getInt(OFF_WRITE_IDX)
                     val recoveredCount = buffer.getInt(OFF_COUNT)
@@ -152,7 +144,6 @@ class ForensicSpillBuffer @Inject constructor(
     fun writeTrace(entry: LogEntry): Boolean {
         val buffer = mappedBuffer ?: return false
 
-        // Issue #1055: Encoding moved outside the measured block (R-ID 348)
         val rawBytes = entry.message.toByteArray(Charsets.UTF_8)
         val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE - DATA_FIELDS_SIZE - CHECKSUM_SIZE
         var msgLen = rawBytes.size.coerceAtMost(maxMsgLen)
@@ -186,7 +177,6 @@ class ForensicSpillBuffer @Inject constructor(
                 entryWriteBuffer.putFloat(entry.snrSnapshot?.toFloat() ?: -1.0f)
                 entryWriteBuffer.putFloat(entry.tempSnapshot?.toFloat() ?: 0.0f)
                 
-                // Issue #1344: Added probes
                 entryWriteBuffer.putFloat(entry.thermalSnapshot?.toFloat() ?: 0.0f)
                 entryWriteBuffer.putFloat(entry.heapSnapshot?.toFloat() ?: 0.0f)
 
@@ -250,7 +240,6 @@ class ForensicSpillBuffer @Inject constructor(
                 entryWriteBuffer.putFloat(snr.toFloat())
                 entryWriteBuffer.putFloat(batteryTemp.toFloat())
                 
-                // Issue #1344: Added probes
                 entryWriteBuffer.putFloat(thermalHeadroom.toFloat())
                 entryWriteBuffer.putFloat(heapAllocatedMb.toFloat())
 
@@ -300,22 +289,14 @@ class ForensicSpillBuffer @Inject constructor(
             val mainBuffer = mappedBuffer ?: return@measureAndAudit emptyList()
             val readBuffer = mainBuffer.duplicate().order(ByteOrder.nativeOrder())
             
-            var toPeekCount = 0
-            var currentReadIdx = 0
-
             synchronized(this) {
                 val count = totalCount.get()
-                if (count == 0) return@synchronized
+                if (count == 0) return@synchronized emptyList()
                 
-                toPeekCount = count.coerceAtMost(limit)
-                currentReadIdx = readIdx.get()
-            }
-            
-            if (toPeekCount == 0) return@measureAndAudit emptyList()
-
-            val results = ArrayList<LogEntity>(toPeekCount)
-            
-            synchronized(readEntryBytes) {
+                val toPeekCount = count.coerceAtMost(limit)
+                val currentReadIdx = readIdx.get()
+                val results = ArrayList<LogEntity>(toPeekCount)
+                
                 var tempReadIdx = currentReadIdx
                 repeat(toPeekCount) {
                     val offset = HEADER_SIZE + (tempReadIdx * FORENSIC_SPILL_ENTRY_SIZE)
@@ -338,7 +319,6 @@ class ForensicSpillBuffer @Inject constructor(
                         val snr = readEntryWrapper.getFloat().toDouble()
                         val batTemp = readEntryWrapper.getFloat().toDouble()
                         
-                        // Issue #1344: Read probes
                         val thermal = readEntryWrapper.getFloat().toDouble()
                         val heap = readEntryWrapper.getFloat().toDouble()
 
@@ -377,11 +357,13 @@ class ForensicSpillBuffer @Inject constructor(
                             thermalSnapshot = thermal,
                             heapSnapshot = heap
                         ))
+                    } else {
+                        Timber.w("Forensic Audit: CRC mismatch at index $tempReadIdx. Trace ignored.")
                     }
                     tempReadIdx = (tempReadIdx + 1) % FORENSIC_SPILL_CAPACITY
                 }
+                results
             }
-            results
         }
     }
 

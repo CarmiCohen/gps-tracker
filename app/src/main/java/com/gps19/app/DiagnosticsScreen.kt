@@ -20,6 +20,9 @@ import com.gps19.core.engine.PerformanceTier
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Sep.29.01:
+ * - Issue #S071 Stress Test UI Consolidation: Moved "Trigger Forensic Stress Test" 
+ *   button from PhoneSetupOverlay to Diagnostics validation hooks.
  * Sep.16.05:
  * - Issue #1060 Capability Consolidation: Checked performanceTier enum directly (R-ID 348).
  * Sep.16.00:
@@ -46,6 +49,7 @@ fun DiagnosticsScreen(
     onToggleForensicSimulation: (Boolean) -> Unit,
     onToggleStorageSimulation: (Boolean, Boolean) -> Unit,
     onToggleSetupBypass: (Boolean) -> Unit = {},
+    onExecuteStressTest: () -> Unit = {},
     onRequestBatteryExemption: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
     onRequestAppInfo: () -> Unit,
@@ -200,6 +204,17 @@ fun DiagnosticsScreen(
                 color = Color.Gray,
                 fontWeight = FontWeight.Bold
             )
+
+            // Issue #S071: Consolidated Forensic Stress Test trigger
+            Button(
+                onClick = onExecuteStressTest,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = ForensicPink)
+            ) {
+                Icon(Icons.Default.Speed, null)
+                Spacer(Modifier.width(8.dp))
+                Text("TRIGGER FORENSIC STRESS TEST", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
 
             // Setup Overlay Bypass (Issue #735)
             Row(

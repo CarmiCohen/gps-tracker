@@ -40,13 +40,13 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Sep.29.01:
+ * - Issue #S071 Stress Test UI Consolidation: Routed stress test execution to 
+ *   DiagnosticsScreen and removed obsolete callback from PhoneSetupOverlay.
  * Sep.23.50:
  * - Issue #1203 RESOLVED: Eliminated SetupViewModel redundancy (Issue #1215).
  *   Consolidated all diagnostic and setup events into MainViewModel.
  *   Screens now consume activity-scoped MainViewModel directly.
- * Sep.28.29:
- * - Issue #071 Hardening: Pass onExecuteStressTest to PhoneSetupOverlay and dismiss Settings overlay
- *   prior to showing Phone Setup to prevent layout overlap occlusion.
  */
 @Composable
 fun MainAppContent(
@@ -386,6 +386,7 @@ fun MainAppContent(
                                     onToggleForensicSimulation = { active -> viewModel.onEvent(UiEvent.SetForensicSimulation(active)) },
                                     onToggleStorageSimulation = { active, critical -> viewModel.onEvent(UiEvent.SetStorageSimulation(active, critical)) },
                                     onToggleSetupBypass = { active -> viewModel.onEvent(UiEvent.ToggleSetupBypass(active)) },
+                                    onExecuteStressTest = { viewModel.onEvent(UiEvent.ExecuteStressTest) },
                                     onRequestBatteryExemption = onRequestBatteryExemption,
                                     onRequestOverlayPermission = onRequestOverlayPermission,
                                     onRequestAppInfo = onRequestAppInfo,
@@ -404,7 +405,6 @@ fun MainAppContent(
                         onExactAlarm = { onRequestExactAlarm() }, onHardwarePermission = { onRequestHardwarePermission() },
                         onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                         onTestAlarm = { viewModel.onEvent(UiEvent.RequestTestAlarm) },
-                        onExecuteStressTest = { viewModel.onEvent(UiEvent.ExecuteStressTest) },
                         onNavigateToDiagnostics = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
                         isSetupBypassActive = sessionState.isSetupBypassActive, permissions = sessionState.permissions, homePointsCount = spatialState.homePoints.size,
                         isTrackerMode = sessionState.appMode == "tracker", onGoToMap = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.ToggleMap(true)) }

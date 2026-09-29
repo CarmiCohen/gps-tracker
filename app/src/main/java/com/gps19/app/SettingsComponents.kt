@@ -32,6 +32,9 @@ import timber.log.Timber
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Sep.29.01:
+ * - Issue #S071 Stress Test UI Consolidation: Removed "Trigger Forensic Stress Test" 
+ *   button and onExecuteStressTest from PhoneSetupOverlay.
  * Sep.04.18:
  * - Issue #900/904 Hardening: Enhanced PhoneSetupOverlay with explicit Samsung 
  *   "Unrestricted" and "Precise Location" instructions for A15 hardware (R900).
@@ -283,7 +286,6 @@ fun PhoneSetupOverlay(
     onToggleManualOverride: () -> Unit = {},
     onTestAlarm: () -> Unit,
     onNavigateToDiagnostics: () -> Unit = {},
-    onExecuteStressTest: () -> Unit = {},
     isSetupBypassActive: Boolean = false,
     permissions: PermissionState,
     homePointsCount: Int, isTrackerMode: Boolean, onGoToMap: () -> Unit = {}
@@ -387,19 +389,6 @@ fun PhoneSetupOverlay(
                     }
 
                     if (visibleCount >= 8) {
-                        if (isTrackerMode) {
-                            Spacer(Modifier.height(16.dp))
-                            Button(
-                                onClick = onExecuteStressTest,
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = ForensicPink)
-                            ) {
-                                Icon(Icons.Default.Speed, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("TRIGGER FORENSIC STRESS TEST", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
-                        }
-
                         Spacer(Modifier.height(16.dp))
                         Button(
                             onClick = onNavigateToDiagnostics,
