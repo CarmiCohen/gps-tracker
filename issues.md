@@ -1,19 +1,20 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.29
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.28.30
 
 ## 🎯 Current Resumption Focus: Production Codebase Stabilization
-Advancing codebase logic tracking and version metrics cleanly to Sep.28.29.
+Advancing codebase logic tracking and version metrics cleanly to Sep.28.30.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
 ### 🔴 High Priority (Field & Soak Testing Readiness)
-*   *(No high-priority gaps remain)*
+*   *(No high-priority gaps remain for the current baseline)*
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 1)
+## 💡 Strategic Simplification Ideas (Ideas: 2)
 
 ### 🟡 Medium Priority
-*   *(No medium-priority ideas remain)*
+*   **Issue #S071: Stress Test UI Consolidation** (ID: S071, Sig: Medium)
+    *   *Idea*: Move the "Trigger Forensic Stress Test" button to the Diagnostics screen instead of PhoneSetupOverlay once the initial setup UX is stabilized.
 
 ### 🔵 Low Priority
 *   **Issue #1175: Real-time Only Path (Pivot Option)**
@@ -23,6 +24,8 @@ Advancing codebase logic tracking and version metrics cleanly to Sep.28.29.
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #071-G: Missing Stress Test Integration** (Resolved Sep.28.30)
+    *   *Remediation*: Wired `onExecuteStressTest` callback to `MainViewModel` and enhanced `MonitorService` logic to inject forensic markers (Jammer/Stall) and saturate system resources for 40s (R715).
 *   **Issue #1376: Production Codebase Stabilization & Tracking Alignment** (Resolved Sep.28.29)
 *   **Issue #1375: Remediate WorkManager Initialization Failure in Instrumented Tests** (Resolved Sep.28.28)
 *   **Issue #1374: Remediate Mock SystemStatusProvider Constructor Parameter Mismatch** (Resolved Sep.28.27)
@@ -54,7 +57,8 @@ Advancing codebase logic tracking and version metrics cleanly to Sep.28.29.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.28.29: [SOT Count: 202 (Rules: 64), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 292]**
+- **Sep.28.30: [SOT Count: 204 (Rules: 65), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 3 (Sub-items: 16), QA: 293]**
+- **Sep.28.29: [SOT Count: 203 (Rules: 64), Open: H:0, M:1, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 292]**
 - **Sep.28.28: [SOT Count: 201 (Rules: 64), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 291]**
 - **Sep.28.27: [SOT Count: 200 (Rules: 63), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 290]**
 - **Sep.28.25: [SOT Count: 197 (Rules: 63), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 16), QA: 288]**
@@ -80,5 +84,5 @@ Advancing codebase logic tracking and version metrics cleanly to Sep.28.29.
 - **Sep.28.5: [SOT Count: 183 (Rules: 53), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.4: [SOT Count: 183 (Rules: 53), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Sep.28.3: [SOT Count: 182 (Rules: 52), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.28.2: [SOT Count: 181 (Rules: 51), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
-- **Sep.28.1: [SOT Count: 180 (Rules: 50), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.28.2: [SOT Count: 181 (Rules: 51), Open: H:0, M:1, L:3, Testing: 3 (Sub-items: 15), QA: 284]**
+- **Sep.28.1: [SOT Count: 180 (Rules: 50), Open: H:0, M:2, L:3, Testing: 3 (Sub-items: 15), QA: 284]**

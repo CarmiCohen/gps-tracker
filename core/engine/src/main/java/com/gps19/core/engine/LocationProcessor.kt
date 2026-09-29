@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Sep.28.29:
+ * - Issue #071 Hardening: Ensure manual stall injection flag is respected 
+ *   during local processing for forensic pipeline verification (R-ID 544).
  * Sep.27.5:
  * - Issue #1349: Mutability Reduction. Updated references to follow partitioned 
  *   sub-states within LocationProcessingState.
@@ -294,7 +297,7 @@ class LocationProcessor(
                         this.filteredSpeed = state.forensic.estimatedSpeedMps
                         this.timestamp = effectiveTs
                         this.rt = nowRt
-                        this.isStalled = if (isLocal) false else snapshot.integrity.isStalled
+                        this.isStalled = if (isLocal) snapshot.integrity.isStalled else snapshot.integrity.isStalled
                         this.receiptRt = nowRt
                         this.jumpTier = snapshot.jumpTier
                         this.isAdaptiveJump = snapshot.isAdaptiveJump
@@ -368,7 +371,8 @@ class LocationProcessor(
             val finalIsAdaptiveJump = (sentinelResult.jumpConfidence?.isAdaptiveJump == true) || snapshot.isAdaptiveJump
             val finalIsTamper = sentinelResult.status == SentinelStatus.TAMPER || snapshot.tamperDetected
             val finalIsJammer = finalIsJump || finalIsTamper || isActualJammer || snapshot.integrity.isJammer
-            val finalIsStalled = if (isLocal) (gpsTs != 0L && gpsTs == lastGpsTs) else snapshot.integrity.isStalled
+            // R-ID 544: Explicitly check manual injection flag for stalls even in local mode.
+            val finalIsStalled = snapshot.integrity.isStalled || (isLocal && (gpsTs != 0L && gpsTs == lastGpsTs))
             val isSpatiallyValid = !finalIsJump && !finalIsTamper && finalStatus != SentinelStatus.OUTLIER
             
             val fallbackPoint = EngineGeoPoint(if (state.lastLat != 0.0) state.lastLat else lat, if (state.lastLng != 0.0) state.lastLng else lng, alt = alt, ts = if (state.lastTs != 0L) state.lastTs else effectiveTs, rt = if (state.lastRt != 0L) state.lastRt else nowRt, accuracy = state.lastAcc, maxAccuracy = state.lastMaxAcc)

@@ -44,6 +44,9 @@ import timber.log.Timber
  * - Issue #1203 RESOLVED: Eliminated SetupViewModel redundancy (Issue #1215).
  *   Consolidated all diagnostic and setup events into MainViewModel.
  *   Screens now consume activity-scoped MainViewModel directly.
+ * Sep.28.29:
+ * - Issue #071 Hardening: Pass onExecuteStressTest to PhoneSetupOverlay and dismiss Settings overlay
+ *   prior to showing Phone Setup to prevent layout overlap occlusion.
  */
 @Composable
 fun MainAppContent(
@@ -401,6 +404,7 @@ fun MainAppContent(
                         onExactAlarm = { onRequestExactAlarm() }, onHardwarePermission = { onRequestHardwarePermission() },
                         onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                         onTestAlarm = { viewModel.onEvent(UiEvent.RequestTestAlarm) },
+                        onExecuteStressTest = { viewModel.onEvent(UiEvent.ExecuteStressTest) },
                         onNavigateToDiagnostics = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
                         isSetupBypassActive = sessionState.isSetupBypassActive, permissions = sessionState.permissions, homePointsCount = spatialState.homePoints.size,
                         isTrackerMode = sessionState.appMode == "tracker", onGoToMap = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.ToggleMap(true)) }
@@ -483,7 +487,10 @@ fun OverlayHost(
             onUpdateSirenType = { type -> viewModel.onEvent(UiEvent.SetSirenType(type)) },
             onUpdateAlarmVolume = { vol -> viewModel.onEvent(UiEvent.UpdateDraftAlarmVolume(vol)) },
             onTestSiren = { viewModel.onEvent(UiEvent.ToggleTestSiren) },
-            onShowPhoneSetup = { viewModel.onEvent(UiEvent.TogglePhoneSetup(true)) },
+            onShowPhoneSetup = { 
+                viewModel.onEvent(UiEvent.ToggleSettings(false))
+                viewModel.onEvent(UiEvent.TogglePhoneSetup(true))
+            },
             onEvent = { event -> viewModel.onEvent(event) }
         )
     } else if (navigationState.isLogVisible) {

@@ -16,10 +16,10 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Sep.28.29:
+ * - Issue #071 Hardening: Added explicit logging for ExecuteStressTest command routing.
  * Sep.27.10:
  * - Issue #1201 RESOLVED: Updated StopSiren path to utilize SirenLockoutUseCase authority (R-ID 510).
- * Sep.27.4:
- * - Issue #1348: Flattened DomainEvent hierarchy, emitting CommandEvent directly.
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -146,6 +146,7 @@ class CommandRouter @Inject constructor(
                             }
                         }
                         is UiCommand.ExecuteStressTest -> {
+                            Timber.i("CommandRouter: Routing ExecuteStressTest to domain event bus.")
                             domainEventBus.emit(CommandEvent.ExecuteStressTest)
                         }
                         is UiCommand.ExecuteNetworkStressTest -> {
