@@ -11,6 +11,10 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Sep.29.31:
+ * - Handshake Hardening (#LinkFix): Relaxed telemetry gating during discovery phase. 
+ *   Trackers now broadcast telemetry during the first 5 minutes (300 ticks) 
+ *   regardless of Peer Activity status to resolve handshake deadlocks.
  * Sep.27.17:
  * - Issue #1160: Flyweight & Pooling Expansion. Refactored handleTickEvaluated 
  *   to use reusable flyweight instances for persistence and signaling updates.
@@ -85,7 +89,8 @@ class AppEventCoordinator @Inject constructor(
         repository.updateLocation(updateFlyweight)
         
         // 2. Peer Signaling (Issue #1314: Convergence)
-        if (isTrackerMode && event.isPeerActive) {
+        // Handshake Hardening: Force broadcast during first 5 minutes (300 ticks) regardless of isPeerActive.
+        if (isTrackerMode && (event.isPeerActive || event.serviceTickCounter < 300)) {
             // R-ID 392: Use flyweight for signaling.
             TelemetryMapper.mapSnapshotToStatus(
                 snapshot = snapshot,

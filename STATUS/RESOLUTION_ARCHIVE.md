@@ -1,7 +1,7 @@
-# 🏛️ Resolution Archive - Sep.29.30
+# 🏛️ Resolution Archive - Sep.29.3
 
 ## 🏁 Issue #1380: Peer Link Discovery & Navigation Hardening
-*   **Resolved**: Sep.29.30
+*   **Resolved**: Sep.29.3
 *   **Root Cause**: 
     1.  **Handshake Asymmetry**: The Tracker logic was configured to only send telemetry packets once a GPS fix was obtained. In indoors or poor-signal environments, the Tracker would remain silent, preventing the Viewer from discovering it even if the Relay was active.
     2.  **UI Navigation Deadlock**: The `SettingsOverlay` (Composable) did not consume the `NavigateToDiagnostics` event by closing itself. It remained as a full-screen overlay, occluding the `DiagnosticsScreen` and making the "Diagnostics" button appear unresponsive.
