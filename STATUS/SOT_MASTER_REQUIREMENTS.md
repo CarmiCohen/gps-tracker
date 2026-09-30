@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.29.3)
+# SOT Master Requirements & Hardening Status (Sep.30.1)
 
 ## 🏗️ Architectural Master Rules (68 Rules)
 
@@ -23,8 +23,8 @@
 *   **SOT ID 549**: Dual Target Forensic Parity - Hardened probe emission boundaries to shield instrumented test writes from concurrent asynchronous backfill task interference and renamed schema constants to `FORENSIC_SPILL_ENTRY_SIZE_V5` to force binary alignment. (Resolved Sep.29.3).
 *   **SOT ID 550**: Soak Stability Baseline - Implemented `verifyExtendedSoakSimulation` (60s high-intensity burst) to validate persistence integrity under sustained thermal and I/O pressure. (Resolved Sep.29.3).
 *   **SOT ID 551**: Test Buffer Isolation - Implemented `resetBufferForTest()` across test classes and hardened schema clear loop to guarantee state isolation and prevent cross-test leakage. Passed 23/23 natively. (Resolved Sep.29.3).
-*   **SOT ID 552**: Peer Discovery Hardening - Implemented "Bypass Heartbeat" to force telemetry transmission without GPS lock and resolved Settings-Diagnostics navigation occlusion. (Resolved Sep.29.3).
-*   **SOT ID 553**: Handshake Discovery Hardening - Relaxed coordinate validation in `SignalingValidator` to support 0,0 heartbeats and forced transmission during discovery. (Resolved Sep.29.3).
+*   **SOT ID 552**: Peer Discovery Hardening - Implemented "Bypass Heartbeat" to force telemetry transmission without GPS lock and resolved Settings-Diagnostics navigation occlusion. (Resolved Sep.30.1).
+*   **SOT ID 553**: Handshake Discovery Hardening - Relaxed coordinate validation in `SignalingValidator` to support 0,0 heartbeats and forced transmission during discovery. (Resolved Sep.30.1).
 
 ---
 
@@ -36,5 +36,5 @@
 *   **Chapter 31.181 (Dual Target Forensic Parity)**: PASSED - Verified compilation cache flush via `V5` schema constant and emission boundary hardening. (Sep.29.3)
 *   **Chapter 31.182 (Soak Stability Baseline)**: PASSED - Verified `verifyExtendedSoakSimulation` reliability under sustained 60s load on A15 and S21. (Sep.29.3)
 *   **Chapter 31.183 (Test Buffer Isolation)**: PASSED - Resolved `[wlanXX] must be recorded` cross-test memory leak on dual-targets by hard resetting the Memory-Mapped Buffer before executions. (Sep.29.3)
-*   **Chapter 31.184 (Peer Discovery & UI Fix)**: PASSED - Verified telemetry emission without GPS fix and fixed Settings/Diagnostics occlusion. (Sep.29.3)
-*   **Chapter 31.185 (Handshake Discovery Hardening)**: PASSED - Relaxed `SignalingValidator` to accept zero-coordinate packets and forced transmission during discovery. (Sep.29.3)
+*   **Chapter 31.184 (Peer Discovery & UI Fix)**: PASSED - Verified telemetry emission without GPS fix and fixed Settings/Diagnostics occlusion. (Sep.30.1)
+*   **Chapter 31.185 (Handshake Discovery Hardening)**: PASSED - Relaxed `SignalingValidator` to accept zero-coordinate packets and forced transmission during discovery. (Sep.30.1)
