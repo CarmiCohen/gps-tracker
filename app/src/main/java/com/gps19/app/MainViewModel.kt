@@ -21,12 +21,13 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Sep.30.40:
+ * - Issue #1391 RESOLVED: Enforced R872 (Stealth Authority). Guarded Red-Screen 
+ *   promotion to ensure it only triggers in Viewer mode.
  * Sep.30.5:
  * - Issue #1389 RESOLVED: Implemented Reactive Red-Screen Promotion.
  *   The UI now reactively promotes the AlarmOverlay when critical violations are 
  *   detected, ensuring visibility even if fullScreenIntent is suppressed by the system.
- * Sep.27.13:
- * - Issue #1351 RESOLVED: Unified StateSubscription coroutine scoping in startBaseObservations.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -335,7 +336,10 @@ class MainViewModel @Inject constructor(
                         
                         // Issue #1389: Reactive Red-Screen Promotion
                         // If we have active unresolved alarms and the UI is foreground, ensure red screen is visible.
-                        if (update.activeAlarms.any { !it.isResolved } && _uiState.value.session.isSystemActive) {
+                        // Issue #1391: R872 (Stealth Authority) Enforced. Guard promotion by appMode.
+                        if (update.activeAlarms.any { !it.isResolved } && 
+                            _uiState.value.session.isSystemActive && 
+                            _uiState.value.session.appMode == "viewer") {
                             if (!current.isRedScreenVisible) {
                                 current.isRedScreenVisible = true
                             }
@@ -398,7 +402,10 @@ class MainViewModel @Inject constructor(
                     updateDiagnosticState { it.apply { isSirenPlaying = playing } }
                     
                     // Issue #1389: Promotion on siren engagement
-                    if (playing && _uiState.value.session.isSystemActive) {
+                    // Issue #1391: R872 (Stealth Authority) Enforced. Guard promotion by appMode.
+                    if (playing && 
+                        _uiState.value.session.isSystemActive && 
+                        _uiState.value.session.appMode == "viewer") {
                         updateDiagnosticState { it.apply { isRedScreenVisible = true } }
                     }
                 }

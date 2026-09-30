@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.30.6
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.30.40
 
 ## 🎯 Current Resumption Focus: Field & Soak Stability
 Ensuring forensic probe reliability and baseline stability during extended field operations.
@@ -6,10 +6,7 @@ Ensuring forensic probe reliability and baseline stability during extended field
 ## 🔴 Open Gaps & Unfinished Integration Points
 
 ### 🔴 High Priority (Field & Soak Testing Readiness)
-*   **Issue #1385: Peer Link & Diagnostic LED Stall.**
-    *   *Symptoms*: Viewer LEDs (GPS, TRK, DAT) are Red. Tracker LEDs are GPS (Red), DAT (Red), VWR (Cyan). Indicates complete connection failure between devices.
-*   **Issue #1386: Tracker HUD Velocity State Inconsistency.**
-    *   *Symptoms*: HUD shows "MOVING" while speed is constant 0.0 km/h.
+*   *All high-priority hardening issues for this cycle are RESOLVED.*
 
 ---
 
@@ -25,23 +22,18 @@ Ensuring forensic probe reliability and baseline stability during extended field
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
+*   **Issue #1385: Peer Link & Diagnostic LED Stall.** (Resolved Sep.30.40)
+    *   *Remediation*: Refactored `CommunicationManager.kt` relay handlers to support multi-argument payloads (routingId + data). This fixed the parse errors caused by relay server argument prepending, restoring the TRK/DAT/VWR link.
+*   **Issue #1391: Alarm Leakage on Tracker (Stealth Violation).** (Resolved Sep.30.40)
+    *   *Remediation*: Enforced **R872 (Stealth Authority)** in `MainViewModel`. Guarded Reactive Red-Screen promotion and siren engagement triggers to ensure they only manifest in Viewer mode.
+*   **Issue #1386: Tracker HUD Velocity State Inconsistency.** (Resolved Sep.30.40)
+    *   *Remediation*: Centralized behavioral state authority in the engine tick (`MonitorService.kt`) via `TrackerStateManager`. Propagated state via `SystemEvaluationSnapshot` to ensure global parity.
 *   **Issue #1384: Ribbon Time Ruler Legibility.** (Resolved Sep.30.6)
-    *   *Remediation*: Implemented **Scale-Aware Ribbon Layouts** in `SharedUiComponents.kt`. Expanded label widths, increased Time Ruler vertical height, and implemented a reserved bottom-padding mechanism (`bottomReserved`) to ensure timestamps are never cropped. Calibrated contrast by increasing overlay opacity to 95%.
 *   **Issue #1383: Tracker Map Autonomous Zoom-In.** (Resolved Sep.30.6)
-    *   *Remediation*: Implemented **Stateful Trigger Tracking** in `MapController`. The controller now caches the last-seen cumulative trigger counts from `MapViewState`, ensuring that imperative Osmdroid camera animations (zoom/centering) only execute when the trigger explicitly increments, preventing re-execution loops during UI state refreshes.
 *   **Issue #1389: Reactive Red-Screen / Missing Alarm UI on Startup.** (Resolved Sep.30.6)
-    *   *Remediation*: Implemented **Reactive Red-Screen Promotion** in `MainViewModel`. The UI now automatically triggers the `AlarmOverlay` when violations are detected, bypassing the unreliability of system-level `fullScreenIntent` delivery on Android 14/15. Fixed the data flow gap in `StateSubscriptionUseCase` to ensure active alarms are correctly propagated to the view.
 *   **Issue #1382: Spontaneous & Unstoppable Viewer Siren.** (Resolved Sep.30.6)
-    *   *Remediation*: Synchronized `AudioSynthesizer` siren loop with `AppNotificationManager` in `AppEventCoordinator`. Critical alarms now trigger the Red Screen overlay and system notification, allowing users to acknowledge and dismiss violations to prevent autonomous re-triggering.
-*   **Issue #1387: Documentation Version Mismatch.** (Resolved Sep.30.6)
-    *   *Remediation*: Synchronized version headers across `issues.md`, `Handover.md`, and `STATUS/` directory.
-*   **Issue #1388: App Deployment Version Inconsistency.** (Resolved Sep.30.6)
-    *   *Remediation*: Updated `versionName` in `app/build.gradle` to `Sep.30.6`.
-*   **Issue #1381: Heartbeat Centralization** (Resolved Sep.30.6)
-    *   *Remediation*: Moved bypass heartbeat loop to `ConnectivitySuite`, delegating telemetry mapping strictly to `AppEventCoordinator`.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.30.6: [SOT Count: 221 (Rules: 72), Open: H:2, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 23), QA: 304]**
-- **Sep.30.6: [SOT Count: 220 (Rules: 71), Open: H:3, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 23), QA: 304]**
+- **Sep.30.40: [SOT Count: 224 (Rules: 74), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 6 (Sub-items: 29), QA: 304]**

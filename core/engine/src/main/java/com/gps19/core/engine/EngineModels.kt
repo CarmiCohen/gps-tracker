@@ -5,20 +5,12 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.30.40:
+ * - Issue #1386: Added trackerState to SystemEvaluationSnapshot to centralize 
+ *   behavioral state authority and prevent HUD/Signaling inconsistency (R-ID 548).
  * Sep.27.18:
  * - Issue #1205: Context-Aware Power Optimization. Added ActivityType enum 
  *   and integrated it into EngineConnectionPoint, SystemEvaluationSnapshot, and EngineSensorSnapshot.
- * Sep.27.17:
- * - Issue #1160: Flyweight & Pooling Expansion. Converted SystemEvaluationSnapshot 
- *   fields to vars and kept data class to retain copy() compatibility while eliminating GC churn via pooling.
- * Sep.27.7:
- * - Issue #1172: Smart Signaling Dispatcher. Added SignalingPriority enum to core engine models.
- * Sep.27.6:
- * - Issue #1161: Unified Trajectory & Buffer Management. Introduced TrajectoryBuffer 
- *   and TrajectoryNode to replace GtoBufferState and GtoNode.
- * Sep.27.5:
- * - Issue #1349: Mutability Reduction. Partitioned LocationProcessingState into 
- *   specialized sub-states (Accuracy, Forensic, Trajectory, Anchor).
  */
 
 @Serializable
@@ -206,6 +198,7 @@ data class SystemEvaluationSnapshot(
     var jammerDetected: Boolean = false,
     var isAnchorLocked: Boolean = false,
     var suppressionNote: String? = null,
+    var trackerState: TrackerState = TrackerState.UNKNOWN,
 
     // Temporal Gating & Fast-Paths
     var acousticLockoutRt: Long = 0L,
@@ -252,6 +245,7 @@ data class SystemEvaluationSnapshot(
         this.jammerDetected = other.jammerDetected
         this.isAnchorLocked = other.isAnchorLocked
         this.suppressionNote = other.suppressionNote
+        this.trackerState = other.trackerState
         this.acousticLockoutRt = other.acousticLockoutRt
         this.lightSpikeRt = other.lightSpikeRt
         this.isMuzzled = other.isMuzzled
@@ -284,7 +278,8 @@ data class SystemEvaluationSnapshot(
         integrity.reset()
         status = SentinelStatus.VALID; lastValidFixRt = 0L; isStalled = false; isClockRegression = false
         isJammer = false; jumpTier = 0; isAdaptiveJump = false; tamperDetected = false; jammerDetected = false
-        isAnchorLocked = false; suppressionNote = null; acousticLockoutRt = 0L; lightSpikeRt = 0L
+        isAnchorLocked = false; suppressionNote = null; trackerState = TrackerState.UNKNOWN
+        acousticLockoutRt = 0L; lightSpikeRt = 0L
         isMuzzled = false; providedAdaptiveFloor = -1.0; nowRt = 0L; nowTs = 0L; snrSnapshot = null
         vibeSnapshot = null; isWarming = false; isSirenActive = false; cpuLoad = 0.0; ioWait = 0.0
         maxIoLatency = 0L; isSilentFailure = false; isMaliAnomaly = false; localInternetLoss = false
@@ -304,7 +299,8 @@ data class SystemEvaluationSnapshot(
             ts = nowTs,
             isMe = isMe,
             isClockRegression = isClockRegression,
-            lastValidFixRt = lastValidFixRt
+            lastValidFixRt = lastValidFixRt,
+            trackerState = trackerState
         )
     }
 }

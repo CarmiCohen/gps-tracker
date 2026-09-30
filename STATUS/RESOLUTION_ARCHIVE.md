@@ -1,4 +1,29 @@
-# 🏛️ Resolution Archive - Sep.30.6
+# 🏛️ Resolution Archive - Sep.30.40
+
+## 🏁 Issue #1385: Peer Link & Diagnostic LED Stall
+*   **Resolved**: Sep.30.40
+*   **Root Cause**: Argument slot mismatch in Socket.io relay handlers. The `CommunicationManager` strictly assumed the payload was in the first argument (`args[0]`). Production relay servers often prepend a `routingId` (sender context), shifting the payload to `args[1]`. This caused parse errors (attempting to parse a String ID as JSON/Binary), resulting in red LEDs on the Viewer.
+*   **Remediation**: 
+    *   **Adaptive Extraction**: Refactored all relay handlers in `CommunicationManager.kt` (`handleLocationRelay`, `handleLocationRelayBinary`, etc.) to check `args.size` and dynamically extract the payload from either index 0 or 1.
+*   **Significance**: High (Connectivity Integrity).
+*   **SOT ID**: 561 (Peer Relay Argument Robustness)
+
+## 🏁 Issue #1391: Alarm Leakage on Tracker (Stealth Violation)
+*   **Resolved**: Sep.30.40
+*   **Root Cause**: Unconditional UI promotion in `MainViewModel`. The `activeAlarmsFlow` observer reactively triggered `isRedScreenVisible = true` whenever any unresolved violation existed, regardless of whether the app was in Tracker or Viewer mode. This violated the stealth requirement (R872) for Trackers.
+*   **Remediation**:
+    *   **Stealth Guarding**: Added a strict `appMode == "viewer"` check to the reactive promotion logic in `MainViewModel.kt`.
+*   **Significance**: High (Stealth & Behavioral Integrity).
+*   **SOT ID**: 562 (Stealth Authority Enforcement)
+
+## 🏁 Issue #1386: Tracker HUD Velocity State Inconsistency
+*   **Resolved**: Sep.30.40
+*   **Root Cause**: Distributed Behavioral Logic. `TrackerState` (MOVING vs PARKING) was being calculated independently in the UI mapper and the engine. The mapper used a simple 0.5 m/s gate, while the engine used `ACTIVE_MOVE_THRESHOLD` (2.0 m/s) plus a 60s moving-hold timer. This caused the HUD to show "MOVING" while the speed readout was "0.0 km/h".
+*   **Remediation**:
+    *   **Unified Authority**: Moved the definitive `TrackerState` calculation into the engine tick (`MonitorService.kt`) using `TrackerStateManager`. 
+    *   **State Propagation**: Added `trackerState` to `SystemEvaluationSnapshot` to ensure persistence and signaling layers reflect the exact same state as the local HUD.
+*   **Significance**: Medium (UX Consistency).
+*   **SOT ID**: 560 (Centralized Behavioral Authority)
 
 ## 🏁 Issue #1384: Ribbon Time Ruler Legibility
 *   **Resolved**: Sep.30.6
@@ -9,24 +34,6 @@
     *   **Contrast Enhancement**: Increased overlay opacity to 95%.
 *   **Significance**: High (UX & Forensic Integrity).
 *   **SOT ID**: 559 (Scale-Aware Ribbon Layouts)
-
-## 🏁 Issue #1383: Tracker Map Autonomous Zoom-In
-*   **Resolved**: Sep.30.6
-*   **Root Cause**: Imperative Camera Trigger Re-entrancy. The `MapController` was reactively triggering Osmdroid camera animations (zoomIn, animateTo) whenever their respective trigger counters in `MapViewState` were non-zero. Since these counters are cumulative and persistent in the state, any subsequent UI state refresh (e.g., pulse update) caused the controller to re-execute the animation, creating an unstoppable zoom-in loop that fought against manual user gestures.
-*   **Remediation**:
-    *   **Stateful Trigger Tracking**: Implemented local `lastSeen` caches for all camera triggers (`lastCenteringTrackerTrigger`, `lastZoomInTrigger`, etc.) within `MapController.kt`.
-    *   **Monotonic Execution**: The controller now only executes imperative animations when the cumulative counter in the state strictly increments compared to the local cache.
-*   **Significance**: High (UX Stability & Map Integrity).
-*   **SOT ID**: 558 (Stateful Camera Triggers)
-
-## 🏁 Issue #1382: Spontaneous & Unstoppable Viewer Siren
-*   **Resolved**: Sep.30.6
-*   **Root Cause**: Asymmetric alerting orchestration. The `AppEventCoordinator` reactively triggered the physical audio loop via `AudioSynthesizer` but failed to invoke the `AppNotificationManager`. Consequently, the Viewer's critical alarm notification and full-screen `AlarmActivity` were never displayed. Without the Red Screen UI, the user had no visible way to acknowledge and dismiss the underlying violations, leading to the siren re-engaging autonomously after each auto-stop lockout period expired.
-*   **Remediation**:
-    *   **Exposed Alarm Summary**: Added `getActiveAlarmSummary()` to `AppAlarmManager` to provide a list of active violations.
-    *   **Synchronized Alerting**: Updated `AppEventCoordinator.observeSirenRequirement()` to trigger `notificationManager.updateAlarmNotification()` and `cancelAlarm()` in lockstep with the physical siren.
-*   **Significance**: High (Safety & UX Integrity).
-*   **SOT ID**: 556 (Siren UI Synchronization)
 
 ...
 *(Full historical records maintained in SOT Archive)*

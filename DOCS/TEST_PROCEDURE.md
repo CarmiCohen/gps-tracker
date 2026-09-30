@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vSep.29.0)
+# Test Procedure - GPS Tracker (vSep.30.6)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -50,10 +50,9 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 *   **3.1 Main Screen Completeness:**
     *   Verify HUD elements and Stationary status.
-*   **3.2 Physical Sentinel (Alarm Logic):**
-    *   Vibration Test.
-    *   Tilt Test.
-    *   Light-Jump.
+*   **3.2 Physical Sentinel & Stealth Audit (Issue #1391):**
+    *   **Action:** Trigger sentinel violations (Vibration, Tilt, Geofence).
+    *   **Verification:** **ABSOLUTE STEALTH (R872)**. Verify the Tracker device remains audible silent and visually dark (no Red Screen, no Notification sound, no Siren). Confirm event is logged internally but suppressed from local UI/Audio.
 *   **3.3 Service Persistence:**
     *   Swipe app away; verify foreground notification persists.
 *   **3.4 Status Row Presentation (Issue #1176, #1178):**
@@ -71,8 +70,9 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 **Goal:** Validate real-time synchronization.
 
 *   **4.1 Viewer Setup:** ID sync.
-*   **4.2 Remote HUD Sync:**
-    *   Trigger alarm on Tracker; verify on Viewer.
+*   **4.2 Remote HUD Sync & Alarm Authority (Issue #1391):**
+    *   **Action:** Trigger alarm on remote Tracker.
+    *   **Verification:** Verify Alarm manifest ONLY on Viewer (Red Screen + Siren). Confirm Viewer is the exclusive authority for alarm alerts as per **R872**.
 *   **4.3 Temporal Authority Check:**
     *   Verify `isGpsFresh` uses receipt-time deltas.
 *   **4.4 Spontaneous Alarm Audit (Issue #1382):**
@@ -112,4 +112,4 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ---
 **Total Testing Chapters: 100**
-*(Full historical procedure synchronized Sep.29.0)*
+*(Full historical procedure synchronized Sep.30.6)*

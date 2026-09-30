@@ -5,11 +5,11 @@ import timber.log.Timber
 
 /**
  * TrackerStateManager: Logic for mapping raw telemetry to high-level behavioral states.
+ * Sep.30.40:
+ * - Issue #1386 RESOLVED: Unified TrackerState authority. Moved mapping 
+ *   responsibility here to ensure signaling and UI reflect the same state (R-ID 548).
  * Sep.02.50:
- * - Issue #005 Hardening: Replaced all android.util.Log calls with Timber to 
- *   ensure log spillage protection on Samsung A15/G990 hardware (R759).
- * July.1.16:
- * - Issue #512: Consolidate Sentinel Statuses. Replaced isVisualJump with SentinelStatus.
+ * - Issue #005 Hardening: Replaced all android.util.Log calls with Timber.
  */
 object TrackerStateManager {
     private var currentState = TrackerState.UNKNOWN

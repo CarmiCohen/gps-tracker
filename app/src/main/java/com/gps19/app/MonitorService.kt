@@ -24,19 +24,12 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.30.40:
+ * - Issue #1386 RESOLVED: Integrated TrackerStateManager into processTick. 
+ *   Centralized behavioral state authority to ensure consistency between 
+ *   HUD, Signaling, and Persistence (R-ID 548).
  * Sep.30.4:
  * - Alignment: Updated to alignment Sep.30.4.
- * Sep.30.2:
- * - Issue #1381: Heartbeat Centralization. Removed Bypass Heartbeat manual trigger, 
- *   delegating link health completely to ConnectivitySuite's internal loops.
- * Sep.29.30:
- * - Connection Hardening: Implemented Bypass Heartbeat (Issue #LinkFix). 
- *   Tracker now forces a telemetry pulse even without GPS fix to stabilize 
- *   peer discovery on initial handshake.
- * Sep.28.29:
- * - Issue #071 Hardening: Enhanced executeAutomatedStressTest to inject manual 
- *   Jammer and Stall markers and enable LogRepository stall simulation for 
- *   forensic math verification (R-ID 543). Extended duration to 40s to cross R715 threshold.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -552,6 +545,18 @@ class MonitorService : BaseMonitorService() {
 
         val proc = lastProcessedLocation
         if (proc != null) {
+            // R-ID 548: Centralize TrackerState authority in engine tick.
+            evaluationSnapshotFlyweight.trackerState = if (isTrackerMode) {
+                TrackerStateManager.updateState(
+                    status = proc.status,
+                    speed = proc.filteredSpeed,
+                    vibration = evaluationSnapshotFlyweight.atmospheric.vibration,
+                    vibrationFloor = primaryProcessor.getAdaptiveVibrationFloor(),
+                    isTrackerConnected = isSocketConnected && isPeerActive,
+                    systemTimePulse = nowRt
+                )
+            } else TrackerState.UNKNOWN
+
             evaluateAlarmsInternal(now, nowRt, isSocketConnected, isPeerActive, proc, hSnapshot, proc.timestamp, evaluationSnapshotFlyweight)
         }
 

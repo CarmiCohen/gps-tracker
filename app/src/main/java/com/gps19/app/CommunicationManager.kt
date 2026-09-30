@@ -21,13 +21,13 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Sep.30.40:
+ * - Issue #1385 Peer Link Hardening: Refactored handleLocationRelayBinary 
+ *   to support multi-argument payloads (routingId + data) from the relay. 
+ *   Ensures binary telemetry is correctly extracted even if relayed with sender context.
  * Sep.27.7:
  * - Issue #1172: Smart Signaling Dispatcher. Refactored to utilize the reactive 
  *   SmartSignalingDispatcher for unified conflation and adaptive throttling.
- * Sep.16.14:
- * - Signaling Conflation Traceability (#1051): Migrated hardcoded conflation 
- *   delays to SIGNALING_CONFLATION_DELAY_MS (100ms) and 
- *   SIGNALING_CONFLATION_DELAY_VIOLATION_MS (20ms) (R-ID 312).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -256,21 +256,25 @@ class CommunicationManager @Inject constructor(
 
     private fun handleLocationRelay(args: Array<Any>) {
         try {
-            val data = args[0] as JSONObject
+            val data = if (args.size > 1 && args[1] is JSONObject) args[1] as JSONObject 
+                       else args[0] as JSONObject
             _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(data))
         } catch (e: Exception) { Timber.e("location_relay parse error") }
     }
 
     private fun handleLocationRelayBinary(args: Array<Any>) {
         try {
-            val data = args[0] as ByteArray
+            // R-ID 392: Binary relay might include routingId as the first argument.
+            val data = if (args.size > 1 && args[1] is ByteArray) args[1] as ByteArray 
+                       else args[0] as ByteArray
             _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(data))
         } catch (e: Exception) { Timber.e("location_relay_bin parse error") }
     }
 
     private fun handleLogRelay(args: Array<Any>) {
         try {
-            val data = args[0] as JSONObject
+            val data = if (args.size > 1 && args[1] is JSONObject) args[1] as JSONObject 
+                       else args[0] as JSONObject
             val wrapped = JSONObject()
             val keys = data.keys()
             while(keys.hasNext()) { val k = keys.next(); wrapped.put(k, data.get(k)) }
@@ -281,7 +285,8 @@ class CommunicationManager @Inject constructor(
 
     private fun handleViewerStatusRelay(args: Array<Any>) {
         try {
-            val data = args[0] as JSONObject
+            val data = if (args.size > 1 && args[1] is JSONObject) args[1] as JSONObject 
+                       else args[0] as JSONObject
             val incomingViewerId = data.optString("viewer_id")
             if (isTrackerMode) {
                 if (!SignalingConstants.isViewerMatch(incomingViewerId, viewerId) && !isDefaultViewer(viewerId)) return
@@ -296,7 +301,8 @@ class CommunicationManager @Inject constructor(
 
     private fun handlePingRelay(args: Array<Any>) {
         try {
-            val data = args[0] as JSONObject
+            val data = if (args.size > 1 && args[1] is JSONObject) args[1] as JSONObject 
+                       else args[0] as JSONObject
             val pingDeviceId = data.optString("id", "")
             val incomingViewerId = data.optString("viewer_id", "")
             if (SignalingConstants.isTrackerMatch(pingDeviceId, deviceId) && deviceId.isNotEmpty()) {
@@ -318,7 +324,8 @@ class CommunicationManager @Inject constructor(
 
     private fun handlePongRelay(args: Array<Any>) {
         try {
-            val data = args[0] as JSONObject
+            val data = if (args.size > 1 && args[1] is JSONObject) args[1] as JSONObject 
+                       else args[0] as JSONObject
             val pingDeviceId = data.optString("id", "")
             val pongViewerId = data.optString("viewer_id", "")
             if (SignalingConstants.isTrackerMatch(pingDeviceId, deviceId) && deviceId.isNotEmpty()) {

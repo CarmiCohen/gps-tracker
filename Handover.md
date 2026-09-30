@@ -1,29 +1,35 @@
-# Forensic Handover (Sep.30.6 - #1384 RESOLVED)
+# Forensic Handover (Sep.30.40 - BEHAVIORAL UNITY)
 
 ## 🎯 Current System State
-*   **Version**: `Sep.30.6` | **Status**: RIBBON LEGIBILITY RESOLVED, SCALE-AWARE LAYOUTS ENFORCED.
-*   **Ribbon Legibility (#1384)**:
-    *   **Remediation**: Implemented **Scale-Aware Ribbon Layouts** in `SharedUiComponents.kt`. Refactored `ForensicRibbonContainer` to use orientation-aware height metrics and reserved bottom-padding for time ruler timestamps. Expanded label widths to prevent truncation of scale indicators.
-    *   **Architectural Rule (1.62)**: Added rule requiring reserved bottom-padding and orientation-aware height for forensic ribbons.
-*   **Map Zoom Stability (#1383)**: Resolved in `Sep.30.6`.
-*   **Deployment Status**: App `Sep.30.6` ready for field validation on SM-A155F.
+*   **Version**: `Sep.30.40` | **Status**: BEHAVIORAL AUTHORITY UNIFIED, PEER LINK RESTORED, STEALTH ENFORCED.
+*   **Peer Link Robustness (#1385)**:
+    *   **Remediation**: Refactored `CommunicationManager.kt` (lines 224-278). All relay event handlers (`handleLocationRelay`, `handleLocationRelayBinary`, `handleLogRelay`, etc.) now adaptively extract payloads by checking `args.size > 1` to accommodate relay servers that prepend a `routingId`.
+    *   **Verification**: Verified TRK/DAT/VWR LEDs return to Green/Active upon receiving relayed telemetry.
+*   **Tracker Stealth Authority (#1391)**:
+    *   **Remediation**: In `MainViewModel.kt` (lines 261 & 363), guarded Reactive Red-Screen promotion and siren engagement triggers with a strict `_uiState.value.session.appMode == "viewer"` check. Trackers now remain dark and silent during violations as per **R872**.
+*   **Behavioral Authority Unified (#1386)**:
+    *   **Remediation**: 
+        1.  Added `trackerState: TrackerState` to `SystemEvaluationSnapshot` in `EngineModels.kt`.
+        2.  Updated `MonitorService.kt` (line 512) to calculate definitively the `TrackerState` using `TrackerStateManager.updateState` during the primary engine tick.
+        3.  Refactored `TelemetryMapper.kt` to pull `trackerState` directly from snapshots or protos, eliminating distributed logic and HUD/Signaling velocity mismatches (R-ID 548).
+*   **Rule Enforcement**: Added **Rule 1.63 (Centralized Behavioral Authority)** and **Rule 1.64 (Peer Relay Argument Robustness)** to `SOT_MASTER_REQUIREMENTS.md`.
 
-## 🚀 Resumption Focus: Issue #1385 (Peer Link & Diagnostic LED Stall)
-*   **Target**: Investigation of connection failures between Tracker and Viewer.
-*   **Symptoms**: Red LEDs for GPS/TRK/DAT on Viewer; Red GPS/DAT on Tracker.
+## 🚀 Resumption Focus: Field Soak Validation
+*   **Target**: Sustained forensic probe reliability on Samsung A15 hardware.
+*   **Symptoms to Monitor**: Verify that "MOVING" vs "PARKING" states in the HUD are perfectly consistent with the 0.0 km/h readout (accounting for the 60s moving-hold timer).
 *   **Audit Path**:
-    1.  Check `ConnectivitySuite.kt` for socket connection status.
-    2.  Verify Relay URL configuration in `app_settings.proto` and DataStore.
+    1.  Perform long-duration stationary test to verify "PARKING" transition.
+    2.  Check `StatusBar` for accidental "Ghost Alarms" on Tracker device.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
-1.  **Scale-Aware UI**: Forensic UI components (Ribbons) MUST use reserved padding and orientation-aware height to ensure legibility on small viewports.
-2.  **Stateful Triggers**: Imperative UI commands (camera, audio) MUST be guarded by cumulative counters to prevent re-entrancy loops.
-3.  **Reactive UI**: The UI layer MUST reactively reflect engine states (Alarms, Mode, Connectivity).
+1.  **Centralized Authority**: High-level behavioral states MUST be determined by the engine tick, not the mapping/serialization layers.
+2.  **Argument Robustness**: Signaling consumers MUST be tolerant of `routingId` presence in Socket.io payloads.
+3.  **Stealth First**: Tracker mode MUST suppress all local UI alarms and sirens, delegating responsibility to the Viewer.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Sep.30.6)
-- **Status**: [SOT Count: 221 (Rules: 72), Open: H:2, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 23), QA: 304]
-- **QA Record**: Fully synchronized to baseline `Sep.30.6`.
+## 📊 Hardening Progress Dashboard (Sep.30.40)
+- **Status**: [SOT Count: 224 (Rules: 74), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 6 (Sub-items: 29), QA: 304]
+- **QA Record**: Fully synchronized to baseline `Sep.30.40`.

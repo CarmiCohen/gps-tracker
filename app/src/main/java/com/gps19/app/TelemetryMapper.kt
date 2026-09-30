@@ -6,14 +6,12 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Sep.30.40:
+ * - Issue #1386 RESOLVED: Unified TrackerState authority. Mapping now uses 
+ *   the definitive state calculated by the engine tick (R-ID 548).
  * Sep.28.1:
  * - Issue #1205: Context-Aware Power Optimization. Propagated activityType 
  *   completely across all mapping paths, including mapSnapshotToHealth.
- * Sep.27.17:
- * - Issue #1160: Flyweight & Pooling Expansion. Refactored mapping logic to 
- *   support zero-allocation "out" parameters for high-frequency evaluation paths.
- * Sep.26.12:
- * - Issue #1344: Added thermalHeadroom and heapAllocatedMb to all mapping paths.
  */
 object TelemetryMapper {
 
@@ -28,12 +26,6 @@ object TelemetryMapper {
         ts: Long,
         out: LocationUpdate
     ): LocationUpdate {
-        val speed = processed?.filteredSpeed ?: snapshot.kinetic.speed
-        val trackerState = when {
-            speed > 0.5 -> TrackerState.MOVING
-            else -> TrackerState.PARKING
-        }
-
         return out.apply {
             kinetic.copyFrom(snapshot.kinetic)
             kinetic.activityType = snapshot.activityType
@@ -42,7 +34,7 @@ object TelemetryMapper {
             this.status = snapshot.status
             this.ts = ts
             this.isMe = isMe
-            this.trackerState = trackerState
+            this.trackerState = snapshot.trackerState
             this.isClockRegression = snapshot.isClockRegression
             this.lastValidFixRt = snapshot.lastValidFixRt
         }
@@ -64,12 +56,6 @@ object TelemetryMapper {
         lastSitTs: Long = 0L,
         out: TrackerStatus
     ): TrackerStatus {
-        val speed = processed?.filteredSpeed ?: snapshot.kinetic.speed
-        val trackerState = when {
-            speed > 0.5 -> TrackerState.MOVING
-            else -> TrackerState.PARKING
-        }
-
         return out.apply {
             this.deviceId = deviceId
             this.viewerId = viewerId
@@ -79,7 +65,7 @@ object TelemetryMapper {
                 lat = processed?.optimizedPoint?.lat ?: snapshot.kinetic.lat
                 lng = processed?.optimizedPoint?.lng ?: snapshot.kinetic.lng
                 alt = processed?.optimizedPoint?.alt ?: snapshot.kinetic.alt
-                this.speed = speed
+                this.speed = processed?.filteredSpeed ?: snapshot.kinetic.speed
                 accuracy = processed?.currentAccuracy ?: snapshot.kinetic.accuracy
                 maxAccuracy = processed?.maxAccuracy ?: snapshot.kinetic.maxAccuracy
                 gpsTs = processed?.timestamp ?: snapshot.kinetic.gpsTs
@@ -105,7 +91,7 @@ object TelemetryMapper {
             this.status = snapshot.status
             this.ts = now
             this.rt = nowRt
-            this.trackerState = trackerState
+            this.trackerState = snapshot.trackerState
             this.isClockRegression = snapshot.isClockRegression
             this.lastValidFixRt = snapshot.lastValidFixRt
             this.isSilentFailure = snapshot.isSilentFailure
@@ -158,6 +144,7 @@ object TelemetryMapper {
             isStalled = proto.isStalled
             tamperDetected = proto.isTamperDetected || proto.isLocationPending
             nowTs = now; this.nowRt = nowRt
+            trackerState = TrackerStatus.mapProtoToTrackerState(proto.state.name)
             
             activityType = try { 
                 ActivityType.valueOf(proto.activityType) 
@@ -296,6 +283,7 @@ object TelemetryMapper {
             nowTs = now; this.nowRt = nowRt
             thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
             heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
+            trackerState = try { TrackerState.valueOf(data.optString("tracker_state", current.trackerState.name)) } catch(e: Exception) { current.trackerState }
             
             activityType = try { 
                 ActivityType.valueOf(data.optString("activity_type", current.activityType.name)) 
@@ -415,7 +403,7 @@ object TelemetryMapper {
 
             this.status = statusVar
             this.ts = now
-            this.trackerState = try { TrackerState.valueOf(data.optString("tracker_state", "UNKNOWN")) } catch(e: Exception) { current.trackerState }
+            this.trackerState = try { TrackerState.valueOf(data.optString("tracker_state", current.trackerState.name)) } catch(e: Exception) { current.trackerState }
             this.isClockRegression = processed.isClockRegression
             this.lastValidFixRt = lastFixRt
         }
@@ -536,6 +524,7 @@ object TelemetryMapper {
             thermalHeadroom = s.integrity.thermalHeadroom
             heapAllocatedMb = s.integrity.heapAllocatedMb
             this.activityType = s.activityType
+            this.trackerState = s.trackerState
         }
     }
 
