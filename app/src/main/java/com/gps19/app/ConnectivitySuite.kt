@@ -21,6 +21,9 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.30.2:
+ * - Issue #1381: Heartbeat Centralization. Moved Bypass Heartbeat logic into 
+ *   internal loops.
  * Sep.28.11:
  * - Issue #1359: Temporal Precision & Service Logic Hardening. Migrated 
  *   teardown duration monitoring to use centralized timeProvider.
@@ -72,6 +75,7 @@ class ConnectivitySuite @Inject constructor(
     private var syncJob: Job? = null
     private var signalingJob: Job? = null
     private var identitySyncJob: Job? = null
+    private var heartbeatJob: Job? = null
 
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
@@ -81,6 +85,8 @@ class ConnectivitySuite @Inject constructor(
     private val updateFlyweight = LocationUpdate()
     private val statusFlyweight = TrackerStatus()
     private val pendingStatusFlyweight = TrackerStatus()
+    
+    private val localStatusFlyweight = TrackerStatus()
 
     val trackerStatus get() = remoteStatusRepository.remoteStatus.value
     val isTrackerConnected get() = remoteStatusRepository.isTrackerConnected.value
@@ -223,6 +229,7 @@ class ConnectivitySuite @Inject constructor(
         startKeepAliveLoop()
         startSyncLoop()
         startIdentitySyncLoop()
+        startHeartbeatLoop()
         initializePeerState()
     }
 
@@ -244,6 +251,7 @@ class ConnectivitySuite @Inject constructor(
         startSyncLoop()
         startSignalingObservation()
         startIdentitySyncLoop()
+        startHeartbeatLoop()
     }
 
     private fun startKeepAliveLoop() {
@@ -256,6 +264,21 @@ class ConnectivitySuite @Inject constructor(
                 
                 val delayMs = calculateNextRejoinDelay()
                 delay(delayMs)
+            }
+        }
+    }
+    
+    private fun startHeartbeatLoop() {
+        heartbeatJob?.cancel()
+        heartbeatJob = scope.launch(Dispatchers.IO) {
+            while (isActive) {
+                delay(30000)
+                if (isTrackerMode && isConnected() && !isStopped.get()) {
+                    if (localStatusFlyweight.ts > 0 && !hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) {
+                        Timber.d("ConnectivitySuite: Issuing Bypass Heartbeat to stabilize peer link.")
+                        sendTelemetryInternal(localStatusFlyweight, SignalingPriority.NORMAL)
+                    }
+                }
             }
         }
     }
@@ -393,6 +416,10 @@ class ConnectivitySuite @Inject constructor(
                 forensicLogger.logTransmissionFailure("Pending update sync drop", if (isTrackerMode) "TRK" else "VWR", deviceId, viewerId)
             }
         }
+    }
+
+    fun updateLocalTelemetry(status: TrackerStatus) {
+        localStatusFlyweight.copyFrom(status)
     }
 
     suspend fun sendTelemetry(status: TrackerStatus): Boolean {
@@ -613,6 +640,7 @@ class ConnectivitySuite @Inject constructor(
         syncJob?.cancel(); syncJob = null
         signalingJob?.cancel(); signalingJob = null
         identitySyncJob?.cancel(); identitySyncJob = null
+        heartbeatJob?.cancel(); heartbeatJob = null
         scope.cancel()
         
         networkProvider.registerListener(networkListener)

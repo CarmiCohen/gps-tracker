@@ -24,6 +24,9 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.30.2:
+ * - Issue #1381: Heartbeat Centralization. Removed Bypass Heartbeat manual trigger, 
+ *   delegating link health completely to ConnectivitySuite's internal loops.
  * Sep.29.30:
  * - Connection Hardening: Implemented Bypass Heartbeat (Issue #LinkFix). 
  *   Tracker now forces a telemetry pulse even without GPS fix to stabilize 
@@ -612,25 +615,6 @@ class MonitorService : BaseMonitorService() {
         if (isSystemActive) {
             val health = integrityMonitor.currentHealth
             notificationManager.updatePulse(sats = hardwareSuite.satellitesUsed, battery = health.batteryLevel, isSecure = !alarmManager.hasUnresolvedAlarms(), isPowerSave = isPowerSaveActive || health.isPowerSaveMode)
-
-            // Sep.29.30 Bypass Heartbeat: Force telemetry transmission to Relay even if no GPS fix exists (Issue #LinkFix)
-            if (isTrackerMode) {
-                Timber.d("MonitorService: Issuing Bypass Heartbeat to stabilize peer link.")
-                val snapshot = evaluationSnapshotFlyweight
-                val status = TelemetryMapper.mapSnapshotToStatus(
-                    snapshot = snapshot,
-                    processed = lastProcessedLocation,
-                    deviceId = configManager.deviceId,
-                    viewerId = configManager.viewerId,
-                    now = now,
-                    nowRt = nowRt,
-                    gnssDetail = latestGnssDetail,
-                    isSuspiciousMode = isSuspiciousMode,
-                    lastSitTs = primaryProcessor.getLastSitTs(),
-                    out = TrackerStatus()
-                )
-                connectivitySuite.sendTelemetry(status)
-            }
         }
     }
 

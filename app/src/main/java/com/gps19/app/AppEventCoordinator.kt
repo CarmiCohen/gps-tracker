@@ -11,6 +11,9 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Sep.30.2:
+ * - Issue #1381: Heartbeat Centralization. Always maps and provides local 
+ *   telemetry to ConnectivitySuite for internal heartbeat logic.
  * Sep.29.31:
  * - Handshake Hardening (#LinkFix): Relaxed telemetry gating during discovery phase. 
  *   Trackers now broadcast telemetry during the first 5 minutes (300 ticks) 
@@ -89,8 +92,7 @@ class AppEventCoordinator @Inject constructor(
         repository.updateLocation(updateFlyweight)
         
         // 2. Peer Signaling (Issue #1314: Convergence)
-        // Handshake Hardening: Force broadcast during first 5 minutes (300 ticks) regardless of isPeerActive.
-        if (isTrackerMode && (event.isPeerActive || event.serviceTickCounter < 300)) {
+        if (isTrackerMode) {
             // R-ID 392: Use flyweight for signaling.
             TelemetryMapper.mapSnapshotToStatus(
                 snapshot = snapshot,
@@ -104,7 +106,12 @@ class AppEventCoordinator @Inject constructor(
                 lastSitTs = event.lastSitTs,
                 out = statusFlyweight
             )
-            connectivitySuite.sendTelemetry(statusFlyweight)
+            connectivitySuite.updateLocalTelemetry(statusFlyweight)
+            
+            // Handshake Hardening: Force broadcast during first 5 minutes (300 ticks) regardless of isPeerActive.
+            if (event.isPeerActive || event.serviceTickCounter < 300) {
+                connectivitySuite.sendTelemetry(statusFlyweight)
+            }
         }
 
         // 3. Ribbon Updates (Issue #1314: Simplified Event-Driven Mapping)

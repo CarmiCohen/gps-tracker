@@ -1,5 +1,15 @@
 # 🏛️ Resolution Archive - Sep.29.3
 
+## 🏁 Issue #1381: Heartbeat Centralization
+*   **Resolved**: Sep.29.3
+*   **Root Cause**: The "Bypass Heartbeat" introduced in #1380 to solve peer discovery deadlocks was implemented as a manual override in `MonitorService`. This violated the separation of concerns by placing transport-layer signaling loop logic into the reactive Service layer.
+*   **Remediation**:
+    *   **Delegated Telemetry**: Updated `AppEventCoordinator` to map and explicitly deliver `localStatusFlyweight` to `ConnectivitySuite` every tick, regardless of link status.
+    *   **Internal Heartbeat Loop**: Added `startHeartbeatLoop()` to `ConnectivitySuite` which evaluates the stored flyweight every 30s. If the regular high-frequency telemetry sync has been suppressed (e.g. `!isPeerActive` and past discovery phase), it triggers a priority pulse to keep the link alive.
+    *   **Service Layer Simplification**: Removed the manual override from `MonitorService`, making it purely reactive again.
+*   **Significance**: Medium (Architectural Cleanup).
+*   **SOT ID**: 554 (Heartbeat Centralization)
+
 ## 🏁 Issue #1380: Peer Link Discovery & Navigation Hardening
 *   **Resolved**: Sep.29.3
 *   **Root Cause**: 

@@ -1,27 +1,27 @@
-# Forensic Handover (Sep.30.1 - #1380 RESOLVED)
+# Forensic Handover (Sep.29.3 - #1381 RESOLVED)
 
 ## 🎯 Current System State
-*   **Version**: Sep.30.1 | **Status**: HANDSHAKE HARDENED.
+*   **Version**: Sep.29.3 | **Status**: HEARTBEAT CENTRALIZED.
 *   **Core Remediation**: 
-    *   **Bypass Heartbeat**: Resolved the "Red TRK LED" issue by forcing the Tracker to emit a telemetry pulse every 30s (`onHeartbeat`) regardless of GPS lock status. This ensures the Viewer discovers the Tracker immediately upon session start.
-    *   **Handshake Acceptance**: Relaxed `SignalingValidator` to accept zero-coordinate presence pulses during initial handshake discovery.
-    *   **Navigation Hardening**: Resolved UI occlusion where the `SettingsOverlay` failed to dismiss when navigating to `Diagnostics`. Tapping "Diagnostics" now explicitly closes the settings panel.
-    *   **State Integrity**: Confirmed that "Full Initialization" correctly resets peer IDs, necessitating re-entry for successful link established.
+    *   **Heartbeat Centralization**: Removed the "Bypass Heartbeat" manual override from `MonitorService`, successfully moving link health maintenance entirely to `ConnectivitySuite`.
+    *   **Telemetry Delegation**: `AppEventCoordinator` now explicitly delivers the latest mapped `localStatusFlyweight` to `ConnectivitySuite` every tick via `updateLocalTelemetry()`.
+    *   **Signaling Authority**: `ConnectivitySuite` now operates an internal `startHeartbeatLoop()` that pulses the cached telemetry payload every 30s when the link is quiet, ensuring discovery signaling without bloating the Service layer.
 
 ## 🚀 Active Task Snapshot: N/A
-*   **Peer discovery and diagnostic navigation gaps for Issue #1380 are fully resolved.**
+*   **Architectural cleanup for Issue #1381 is fully resolved.** The Service layer is now purely reactive.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
-1.  **Handshake Continuity**: Telemetry signaling must not be hard-gated by hardware fixes (GPS) to maintain signaling presence.
-2.  **Overlay Governance**: Navigation to top-level screens must explicitly manage the lifecycle of existing full-screen overlays to prevent occlusion.
-3.  **Traceability Rule**: Issue #1380 is linked to all connectivity stabilization commits.
+1.  **Signaling Authority Centralization**: Internal heartbeat timing logic MUST reside exclusively within the signaling transport layers (`ConnectivitySuite`) to preserve Service layer reactivity and simplify test coverage boundaries.
+2.  **Handshake Continuity**: Telemetry signaling must not be hard-gated by hardware fixes (GPS) to maintain signaling presence.
+3.  **Traceability Rule**: Issue #1381 is linked to all architectural consolidation commits.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.30.1: [SOT Count: 211 (Rules: 68), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 3 (Sub-items: 23), QA: 304]**
-- **Sep.29.31: [SOT Count: 211 (Rules: 68), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 3 (Sub-items: 23), QA: 304]**
-- **Sep.29.30: [SOT Count: 209 (Rules: 67), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 3 (Sub-items: 23), QA: 302]**
+- **Sep.29.3: [SOT Count: 211 (Rules: 68), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 23), QA: 304]**
+- **Sep.29.3: [SOT Count: 211 (Rules: 68), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 3 (Sub-items: 23), QA: 304]**
+- **Sep.29.3: [SOT Count: 211 (Rules: 68), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 3 (Sub-items: 23), QA: 304]**
+- **Sep.29.3: [SOT Count: 209 (Rules: 67), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 3 (Sub-items: 23), QA: 302]**
 - **Sep.29.3: [SOT Count: 207 (Rules: 66), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 23), QA: 300]**
