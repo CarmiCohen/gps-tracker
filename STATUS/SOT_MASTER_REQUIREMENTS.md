@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.30.43)
+# SOT Master Requirements & Hardening Status (Sep.30.50)
 
-## 🏗️ Architectural Master Rules (75 Rules)
+## 🏗️ Architectural Master Rules (78 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted for brevity)
@@ -8,6 +8,9 @@
 *   **1.62 Scale-Aware Ribbon Layouts (R727/S559)**: Forensic ribbons and time rulers MUST utilize reserved bottom-padding and orientation-aware height metrics to prevent timestamp truncation and ensure legibility across budget hardware viewports (Issue #1384).
 *   **1.63 Centralized Behavioral Authority (R-ID 548/S560)**: The high-level behavioral state of the tracker (`TrackerState`) MUST be determined exclusively within the engine's primary tick loop (`MonitorService`) via `TrackerStateManager`. Downstream consumers (HUD, Signaling, Persistence) MUST utilize the state value captured in the `SystemEvaluationSnapshot` to ensure global consistency and prevent velocity-state desynchronization (Issue #1386).
 *   **1.64 Peer Relay Argument Robustness (R-ID 549/S561)**: Signaling relay handlers MUST adaptively support both single-argument and multi-argument (routingId-prefixed) payloads to ensure link stability across varying Socket.io relay server configurations (Issue #1385).
+*   **1.65 Unified Role Identity Authority (R-ID 565/S565)**: The system MUST utilize a central `AppRole` enum for all role-based logic. The use of manual string prefixes (`T_`, `V_`, `VR_`) for repository keys or signaling identification is strictly forbidden to prevent contract fragility (Issue #1406).
+*   **1.66 Persistent Alarm Lockout (R-ID 566/S566)**: Manual siren silences and cooldowns MUST be persisted to the database and remain valid across application restarts and device reboots. The `lastSirenStopRt` must not be wiped upon `boot_id` changes (Issue #1404).
+*   **1.67 Standardized Dismissal Lockout (R-ID 567/S567)**: Manual user dismissal of an alarm MUST engage a minimum 30-second siren lockout period, as defined in the Alarming SOT (Issue #1403).
 
 ...
 

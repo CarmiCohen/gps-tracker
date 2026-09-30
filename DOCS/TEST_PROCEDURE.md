@@ -84,6 +84,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **4.6 Peer Connectivity (Issue #1385):**
     *   **Action:** Verify Diagnostic LEDs on both devices.
     *   **Verification:** Confirm GPS, TRK, DAT (Viewer) and VWR (Tracker) transition to Green/Cyan indicating active link.
+*   **4.7 Connectivity Alarm Suppression (Issue #1401):**
+    *   **Action:** Induce Relay connection loss on Viewer.
+    *   **Verification:** Verify "Relay Lost" or "Offline" alerts do NOT trigger a siren and do NOT force the full-screen Red Alert overlay. Confirm alerts appear in the status area and logs but allow uninterrupted navigation to other screens.
+*   **4.8 Alarm Overlay Z-Index (Issue #1402):**
+    *   **Action:** Trigger a security alarm (e.g., Tamper) while Settings or Logs overlay is open.
+    *   **Verification:** Confirm Red Alert screen appears ABOVE the Settings/Logs overlay, completely covering the UI as a priority sentinel.
 
 ## Chapter 5 - Recovery and Edge Cases
 **Goal:** Verify system resilience against signal loss.

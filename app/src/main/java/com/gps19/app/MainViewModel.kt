@@ -21,6 +21,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Sep.30.44:
+ * - Issue #1401: Suppressed Red-Screen promotion for non-critical (siren-disabled) 
+ *   alarms. Ensures connectivity alerts do not block navigation.
  * Sep.30.42:
  * - Issue #1390: Replaced cumulative map triggers with CameraAction SharedFlow.
  * Sep.30.40:
@@ -342,9 +345,9 @@ class MainViewModel @Inject constructor(
                         current.activeAlarms = update.activeAlarms
                         
                         // Issue #1389: Reactive Red-Screen Promotion
-                        // If we have active unresolved alarms and the UI is foreground, ensure red screen is visible.
                         // Issue #1391: R872 (Stealth Authority) Enforced. Guard promotion by appMode.
-                        if (update.activeAlarms.any { !it.isResolved } && 
+                        // Issue #1401: Only promote for non-siren-disabled (Special) alarms.
+                        if (update.activeAlarms.any { !it.isResolved && !it.isSirenDisabled } && 
                             _uiState.value.session.isSystemActive && 
                             _uiState.value.session.appMode == "viewer") {
                             if (!current.isRedScreenVisible) {
@@ -410,6 +413,8 @@ class MainViewModel @Inject constructor(
                     
                     // Issue #1389: Promotion on siren engagement
                     // Issue #1391: R872 (Stealth Authority) Enforced. Guard promotion by appMode.
+                    // Issue #1401: Promotion will only happen if shouldPlaySiren() was true, 
+                    // which now requires a non-siren-disabled alarm.
                     if (playing && 
                         _uiState.value.session.isSystemActive && 
                         _uiState.value.session.appMode == "viewer") {

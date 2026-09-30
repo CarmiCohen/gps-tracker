@@ -40,13 +40,12 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Sep.30.45:
+ * - Issue #1402: Relocated AlarmOverlay to the end of the Box hierarchy to 
+ *   ensure it renders on top of all other shared overlays (Settings, Logs, Ribbons).
  * Sep.29.01:
  * - Issue #S071 Stress Test UI Consolidation: Routed stress test execution to 
  *   DiagnosticsScreen and removed obsolete callback from PhoneSetupOverlay.
- * Sep.23.50:
- * - Issue #1203 RESOLVED: Eliminated SetupViewModel redundancy (Issue #1215).
- *   Consolidated all diagnostic and setup events into MainViewModel.
- *   Screens now consume activity-scoped MainViewModel directly.
  */
 @Composable
 fun MainAppContent(
@@ -411,21 +410,6 @@ fun MainAppContent(
                     )
                 }
 
-                if (diagnosticState.isRedScreenVisible && sessionState.appMode != null && sessionState.hydrationLevel >= 3) {
-                    AlarmOverlay(
-                        alarms = diagnosticState.activeAlarms, isMuted = diagnosticState.isAlarmSilenced,
-                        isLocationPending = kinematicState.trackerHealth.isLocationPending,
-                        backgroundStatus = sessionState.permissions.backgroundStatus, hasBackgroundRestriction = sessionState.permissions.hasBackgroundRestriction,
-                        onHardwarePermissionClick = { onRequestHardwarePermission() },
-                        onMute = { 
-                            val currentCauses = diagnosticState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { context.getString(R.string.status_muted) }
-                            viewModel.onEvent(UiEvent.StopSiren(currentCauses))
-                        },
-                        onClose = { viewModel.onEvent(UiEvent.DismissAlarms) },
-                        onGoToMap = { viewModel.onEvent(UiEvent.DismissAlarms); viewModel.onEvent(UiEvent.ToggleMap(true)) }
-                    )
-                }
-
                 if (navigationState.isStopTrackingConfirmationVisible && sessionState.hydrationLevel >= 3) {
                     var timeLeft by remember { mutableStateOf(5) }
                     LaunchedEffect(Unit) { while (timeLeft > 0) { delay(1000); timeLeft-- }; viewModel.onEvent(UiEvent.ShowStopTrackingConfirmation(false)) }
@@ -448,6 +432,22 @@ fun MainAppContent(
                     importLauncher = importLauncher,
                     activity = activity
                 )
+                
+                // Issue #1402: Renders AlarmOverlay at the root level to ensure highest Z-index visibility.
+                if (diagnosticState.isRedScreenVisible && sessionState.appMode != null && sessionState.hydrationLevel >= 3) {
+                    AlarmOverlay(
+                        alarms = diagnosticState.activeAlarms, isMuted = diagnosticState.isAlarmSilenced,
+                        isLocationPending = kinematicState.trackerHealth.isLocationPending,
+                        backgroundStatus = sessionState.permissions.backgroundStatus, hasBackgroundRestriction = sessionState.permissions.hasBackgroundRestriction,
+                        onHardwarePermissionClick = { onRequestHardwarePermission() },
+                        onMute = { 
+                            val currentCauses = diagnosticState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { context.getString(R.string.status_muted) }
+                            viewModel.onEvent(UiEvent.StopSiren(currentCauses))
+                        },
+                        onClose = { viewModel.onEvent(UiEvent.DismissAlarms) },
+                        onGoToMap = { viewModel.onEvent(UiEvent.DismissAlarms); viewModel.onEvent(UiEvent.ToggleMap(true)) }
+                    )
+                }
             }
         }
     }

@@ -1,27 +1,31 @@
-# Forensic Handover (Sep.30.43 - HARDWARE VERIFIED)
+# Forensic Handover (Oct.01.24 - ALARM & CONTRACT AUDIT)
 
 ## 🎯 Current System State
-*   **Version**: `Sep.30.43` | **Status**: HARDWARE VERIFIED, REACTIVE FLOW STABLE.
-*   **Camera Event Flow (#1390)**:
-    *   **Verification**: Physical testing on S21 and A15 confirmed that Zoom In/Out and Centering actions are responsive and free of recursive loops.
-    *   **Remediation**: Commands are delivered via `SharedFlow<CameraAction>`, completely decoupling imperative UI actions from the persistent `MapViewState`.
-*   **Build Authority**: Fixed root `build.gradle` to prevent automatic version reverts. Both devices are now synchronized to the correct baseline.
+*   **Version**: `Oct.01.24` | **Status**: ALARM AUDIT COMPLETE - HARDENING REQUIRED.
+*   **Role Prefix Mismatch (#1406)**:
+    *   **Discovery**: Critical inconsistency between `CommandRouter` (`V_`) and `AppAlarmManager/AlertUseCase` (`VR_`). 
+    *   **Impact**: Manual "Stop/Mute" actions are saved to orphaned keys, causing immediate re-triggering loops.
+*   **Lockout Persistence Gap (#1404)**:
+    *   **Discovery**: `lastSirenStopRt` is wiped on `boot_id` changes (process kills/reboots).
+    *   **Impact**: Active alarms sound again on service recovery even if previously muted.
+*   **Requirement Deviation (#1403)**: Siren lockout is 15s (implemented) vs 30s (SOT mandated).
 
-## 🚀 Resumption Focus: Production Deployment
-*   **Target**: Final production builds for Samsung A15 hardware.
-*   **Audit Path**:
-    1.  Monitor production relay logs for any `routingId` parsing anomalies in large-scale deployments.
-    2.  Verify Battery optimization whitelisting behavior on fresh installs (A15 specific).
+## 🚀 Resumption Focus: Horizontal Hardening
+*   **Target**: Stabilize Alarm Muting and Communication Contracts.
+*   **Immediate Path**:
+    1.  **Standardize Role Identity**: Replace all hardcoded `"T_"`, `"V_"`, and `"VR_"` strings with a unified `AppRole` enum in `core:engine`.
+    2.  **Fix Lockout Persistence**: Modify `AppAlarmManager.restoreLogicState` to preserve mute timestamps across reboots.
+    3.  **Regression Guarding**: Implement `MainAlarmLogicTest` cases for the 30s lockout and manual dismissal acknowledgement.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
-1.  **Stealth First**: Tracker mode MUST suppress all local UI alarms and sirens (R872).
-2.  **Reactive Commands**: Imperative UI actions (Camera, Alarms) SHOULD use Flows rather than persistent state triggers.
-3.  **Tick Authority**: Behavioral states MUST be determined by the engine, not the mapping layer.
+1.  **Contractual Integrity**: Communication between modules MUST use strict Kotlin types/Enums, never raw strings.
+2.  **Stealth First**: Tracker mode MUST be strictly silent and dark (R872).
+3.  **UDF Authority**: UI must strictly reflect the `SystemEvaluationSnapshot` produced by the engine.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Sep.30.43)
-- **Status**: [SOT Count: 225 (Rules: 75), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 6 (Sub-items: 29), QA: 306]
-- **QA Record**: Fully synchronized and hardware-validated at `Sep.30.43`.
+## 📊 Hardening Progress Dashboard (Oct.01.24)
+- **Status**: [SOT Count: 227 (Rules: 75), Open: H:4, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 6, QA: 312]
+- **Audit Record**: `Alarms.md` created as the specification for automated regression testing.

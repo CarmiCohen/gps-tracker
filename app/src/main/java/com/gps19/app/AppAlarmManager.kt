@@ -13,6 +13,9 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.30.44:
+ * - Issue #1401: Fixed AlarmInfo mapping to correctly populate isSirenDisabled 
+ *   using isSpecialType. Ensures connectivity alerts do not trigger sirens.
  * Sep.30.5:
  * - Issue #1389 REMEDIATION: Added activeAlarmsFlow to support reactive 
  *   UI promotion. Ensures the Red Screen can be triggered without relying 
@@ -95,7 +98,14 @@ class AppAlarmManager @Inject constructor(
     fun shouldPlaySiren(): Boolean {
         if (isTrackerMode) return false
         if (currentSettings.globalMute) return false
-        if (!hasUnresolvedAlarms()) return false
+        
+        // Issue #1401: Only play siren if there is at least one unresolved "Special" alarm
+        synchronized(evaluationState.activeAlarms) {
+            val hasSpecialUnresolved = evaluationState.activeAlarms.values.any { 
+                !it.isResolved && isSpecialType(it.type) 
+            }
+            if (!hasSpecialUnresolved) return false
+        }
         
         // Centralized Lockout Check
         if (sirenLockoutUseCase.isLockedOut()) return false
@@ -333,7 +343,13 @@ class AppAlarmManager @Inject constructor(
     private fun syncActiveAlarmsFlow() {
         val list = synchronized(evaluationState.activeAlarms) {
             evaluationState.activeAlarms.values.map { 
-                AlarmInfo(title = it.title, subtitle = it.subtitle, type = it.type, isResolved = it.isResolved) 
+                AlarmInfo(
+                    title = it.title, 
+                    subtitle = it.subtitle, 
+                    type = it.type, 
+                    isResolved = it.isResolved,
+                    isSirenDisabled = !isSpecialType(it.type)
+                )
             }
         }
         _activeAlarmsFlow.value = list
