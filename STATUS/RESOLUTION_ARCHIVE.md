@@ -1,7 +1,7 @@
-# 🏛️ Resolution Archive - Sep.30.42
+# 🏛️ Resolution Archive - Sep.30.43
 
 ## 🏁 Issue #1390: Camera Action Event Flow
-*   **Resolved**: Sep.30.42
+*   **Resolved**: Sep.30.43
 *   **Root Cause**: Imperative map commands (zoom, centering) were being driven by cumulative trigger counters within the persistent `MapViewState`. This caused unnecessary state churn and required complex state-tracking logic in the `MapController` to prevent re-execution loops during unrelated UI state refreshes.
 *   **Remediation**: 
     *   **SharedFlow Migration**: Replaced cumulative counters with a single `SharedFlow<CameraAction>` in `MainViewModel`.
@@ -10,10 +10,10 @@
 *   **Significance**: Low (Architectural Hygiene).
 *   **SOT ID**: 564 (Camera Action Event Flow)
 
-## 🏛️ Resolution Archive - Sep.30.6
+## 🏛️ Resolution Archive - Sep.30.43
 
-## 🏁 Issue #Audit-Sep.30.6: Field Soak & Stealth Validation
-*   **Resolved**: Sep.30.6
+## 🏁 Issue #Audit-Sep.30.43: Field Soak & Stealth Validation
+*   **Resolved**: Sep.30.43
 *   **Root Cause**: Audit of forensic reliability and stealth enforcement (R872) for release readiness.
 *   **Remediation**: 
     *   **Behavioral Audit**: Confirmed 65s PARKING hysteresis in `TrackerStateManager.kt` (60s hold + 5s buffer).

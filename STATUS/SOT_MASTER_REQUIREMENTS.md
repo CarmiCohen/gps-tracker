@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.30.42)
+# SOT Master Requirements & Hardening Status (Sep.30.43)
 
 ## 🏗️ Architectural Master Rules (75 Rules)
 
@@ -12,17 +12,17 @@
 ...
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 564**: Camera Action Event Flow - Migrated imperative map commands to `SharedFlow<CameraAction>`, resolving state churn and trigger-loop risks. (Resolved Sep.30.42).
-*   **SOT ID 563**: Forensic & Stealth Audit - Verified 65s PARKING hysteresis and absolute stealth enforcement (R872) for release readiness. (Resolved Sep.30.41).
-*   **SOT ID 561**: Peer Relay Argument Robustness - Refactored `CommunicationManager` to support multi-argument payloads. (Resolved Sep.30.40).
-*   **SOT ID 560**: Centralized Behavioral Authority - Migrated `TrackerState` calculation to the engine tick. (Resolved Sep.30.40).
-*   **SOT ID 562**: Stealth Authority Enforcement - Guarded Red-Screen promotion in `MainViewModel`. (Resolved Sep.30.40).
-*   **SOT ID 559**: Scale-Aware Ribbon Layouts - Refactored `ForensicRibbonContainer` forlegibility on SM-A155F. (Resolved Sep.30.6).
+*   **SOT ID 564**: Camera Action Event Flow - Migrated imperative map commands to `SharedFlow<CameraAction>`, resolving state churn and trigger-loop risks. (Resolved Sep.30.43).
+*   **SOT ID 563**: Forensic & Stealth Audit - Verified 65s PARKING hysteresis and absolute stealth enforcement (R872) for release readiness. (Resolved Sep.30.43).
+*   **SOT ID 561**: Peer Relay Argument Robustness - Refactored `CommunicationManager` to support multi-argument payloads. (Resolved Sep.30.43).
+*   **SOT ID 560**: Centralized Behavioral Authority - Migrated `TrackerState` calculation to the engine tick. (Resolved Sep.30.43).
+*   **SOT ID 562**: Stealth Authority Enforcement - Guarded Red-Screen promotion in `MainViewModel`. (Resolved Sep.30.43).
+*   **SOT ID 559**: Scale-Aware Ribbon Layouts - Refactored `ForensicRibbonContainer` forlegibility on SM-A155F. (Resolved Sep.30.43).
 
 ---
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.196 (Camera Flow Audit)**: PASSED - Verified that Zoom and Center events trigger correctly via SharedFlow without persistent state counter increment loops. (Sep.30.42)
-*   **Chapter 31.195 (Forensic & Stealth Audit)**: PASSED - Verified 65s PARKING hysteresis and absolute stealth enforcement (R872) on Tracker hardware. (Sep.30.41)
-*   **Chapter 31.194 (Behavioral Authority Audit)**: PASSED - Verified that `TrackerState` in HUD and Signaling are perfectly synchronized. (Sep.30.40)
-*   **Chapter 31.193 (Peer Link Robustness Audit)**: PASSED - Verified connection stability with relay servers that prepend routing IDs. (Sep.30.40)
+*   **Chapter 31.196 (Camera Flow Audit)**: PASSED - Verified that Zoom and Center events trigger correctly via SharedFlow without persistent state counter increment loops. (Sep.30.43)
+*   **Chapter 31.195 (Forensic & Stealth Audit)**: PASSED - Verified 65s PARKING hysteresis and absolute stealth enforcement (R872) on Tracker hardware. (Sep.30.43)
+*   **Chapter 31.194 (Behavioral Authority Audit)**: PASSED - Verified that `TrackerState` in HUD and Signaling are perfectly synchronized. (Sep.30.43)
+*   **Chapter 31.193 (Peer Link Robustness Audit)**: PASSED - Verified connection stability with relay servers that prepend routing IDs. (Sep.30.43)

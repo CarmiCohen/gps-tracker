@@ -33,7 +33,7 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    return "Sep.30.6"
+    return "Sep.30.43"
 }
 
 ext {

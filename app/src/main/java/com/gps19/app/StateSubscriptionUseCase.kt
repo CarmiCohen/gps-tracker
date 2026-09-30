@@ -11,11 +11,11 @@ import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * Sep.30.42:
+ * - Issue #1390: Integrated reactive camera flow support.
  * Sep.30.6:
  * - Issue #1389 RESOLVED: Corrected IntegrityUpdate to consume alarms from 
  *   AppAlarmManager. Ensures the UI reactively promotes the Red Screen.
- * Sep.30.5:
- * - Issue #1389 REMEDIATION: Fixed activeAlarms propagation in observeIntegrityUpdates.
  */
 class StateSubscriptionUseCase @Inject constructor(
     private val repository: MainRepository,

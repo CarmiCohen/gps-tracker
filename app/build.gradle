@@ -7,18 +7,9 @@ plugins {
     alias(libs.plugins.protobuf)
 }
 
-// Issue #1035: Type Safety Validation for Dynamic Versioning
-def safeVersionCode = rootProject.hasProperty('autoVersionCode') ? rootProject.autoVersionCode : 1058
-def safeVersionName = rootProject.hasProperty('autoVersionName') ? rootProject.autoVersionName : "Sep.30.42"
-
-// Ensure versionCode is a valid Integer
-if (!(safeVersionCode instanceof Integer)) {
-    try {
-        safeVersionCode = safeVersionCode.toString().toInteger()
-    } catch (Exception ignored) {
-        safeVersionCode = 1058
-    }
-}
+// FORCE OVERRIDE for Issue #1035 Alignment
+def safeVersionCode = 1062
+def safeVersionName = "Sep.30.42"
 
 android {
     namespace 'com.gps19.app'
