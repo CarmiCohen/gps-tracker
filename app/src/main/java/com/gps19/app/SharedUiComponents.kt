@@ -115,7 +115,7 @@ fun RibbonsOverlay(
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
-            color = Color.Black.copy(alpha = 0.85f)
+            color = Color.Black.copy(alpha = 0.95f)
         ) {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                 Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
@@ -291,7 +291,8 @@ fun ForensicRibbonContainer(
             color = titleColor.copy(alpha = 0.7f), 
             fontSize = 9.sp, 
             fontWeight = FontWeight.Black, 
-            modifier = Modifier.width(28.dp).padding(start = 2.dp)
+            modifier = Modifier.width(34.dp).padding(start = 2.dp),
+            maxLines = 1
         )
         Box(modifier = Modifier
             .weight(1f)
@@ -321,9 +322,11 @@ fun ForensicRibbonContainer(
             .drawWithCache {
                 val totalPoints = MAX_HISTORY_POINTS_PER_RIBBONS.toFloat()
                 val pointWidth = size.width / totalPoints
-                val maxHeight = size.height * 0.8f
-                val baseLineY = size.height * 0.9f
-                val tickHeightPx = 2.dp.toPx()
+                val isTimeRuler = title == scale
+                val bottomReserved = if (isTimeRuler) (if (isLandscape) 18.dp.toPx() else 16.dp.toPx()) else size.height * 0.1f
+                val baseLineY = size.height - bottomReserved
+                val maxHeight = if (isTimeRuler) baseLineY * 0.85f else size.height * 0.8f
+                val tickHeightPx = if (isTimeRuler) 4.dp.toPx() else 2.dp.toPx()
                 
                 val gaps = Path()
                 val strictGaps = Path()
@@ -466,7 +469,7 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
     val density = LocalDensity.current
     val textPaint = remember(isLandscape, density) { android.graphics.Paint().apply { color = android.graphics.Color.WHITE; with(density) { textSize = (if (isLandscape) 10.sp.toPx() else 7.sp.toPx()) }; textAlign = android.graphics.Paint.Align.CENTER; typeface = android.graphics.Typeface.MONOSPACE } }
 
-    ForensicRibbonContainer(scale, Color.Gray, if (isLandscape) 60.dp else 34.dp, history, scale, isStrictMode, replayCursorTs, onScrub) { totalPoints, pointWidth, connectionBaseY, maxHeight, landscape ->
+    ForensicRibbonContainer(scale, Color.Gray, if (isLandscape) 64.dp else 46.dp, history, scale, isStrictMode, replayCursorTs, onScrub) { totalPoints, pointWidth, connectionBaseY, maxHeight, landscape ->
         if (history.isEmpty()) return@ForensicRibbonContainer
         val ribbonMaxHeight = if (landscape) 16.dp.toPx() else 10.dp.toPx()
         val effectiveBaseY = connectionBaseY - (if (landscape) 4.dp.toPx() else 2.dp.toPx())

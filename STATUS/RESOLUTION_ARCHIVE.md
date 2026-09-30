@@ -1,5 +1,15 @@
 # 🏛️ Resolution Archive - Sep.30.6
 
+## 🏁 Issue #1384: Ribbon Time Ruler Legibility
+*   **Resolved**: Sep.30.6
+*   **Root Cause**: Vertical space starvation and label truncation. The `ForensicRibbonContainer` used a fixed percentage-based baseline that didn't account for the vertical height required by monospaced timestamps on small screens (A15). The label width was also too narrow for time scale indicators like "4M".
+*   **Remediation**:
+    *   **Reserved Bottom Padding**: Implemented `bottomReserved` logic in `drawWithCache` to guarantee 16-18dp of clear space for text.
+    *   **Monotonic Scaling**: Increased Ribbon Ruler height to 46dp (portrait) and expanded label width to 34dp.
+    *   **Contrast Enhancement**: Increased overlay opacity to 95%.
+*   **Significance**: High (UX & Forensic Integrity).
+*   **SOT ID**: 559 (Scale-Aware Ribbon Layouts)
+
 ## 🏁 Issue #1383: Tracker Map Autonomous Zoom-In
 *   **Resolved**: Sep.30.6
 *   **Root Cause**: Imperative Camera Trigger Re-entrancy. The `MapController` was reactively triggering Osmdroid camera animations (zoomIn, animateTo) whenever their respective trigger counters in `MapViewState` were non-zero. Since these counters are cumulative and persistent in the state, any subsequent UI state refresh (e.g., pulse update) caused the controller to re-execute the animation, creating an unstoppable zoom-in loop that fought against manual user gestures.
