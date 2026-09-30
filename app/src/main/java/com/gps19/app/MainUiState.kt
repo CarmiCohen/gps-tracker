@@ -6,6 +6,8 @@ import org.osmdroid.util.GeoPoint
 /**
  * MainUiState: Composite UI state partitioned into specialized slices to 
  * minimize recomposition costs and isolate volatile triggers (Issue #1166).
+ * Sep.30.42:
+ * - Issue #1390: Removed MapTriggers; transitioned to CameraAction SharedFlow.
  * Sep.27.10:
  * - Issue #1201: Added silencedUntilRt to DiagnosticState for reactive lockout transparency.
  * Sep.27.2:
@@ -15,7 +17,6 @@ data class MainUiState(
     val session: SessionUiState = SessionUiState(),
     val settings: SettingsUiState = SettingsUiState(),
     val spatial: SpatialUiState = SpatialUiState(),
-    val triggers: MapTriggers = MapTriggers(),
     val navigation: NavigationState = NavigationState(isMapVisible = true),
     val simulation: SimulationUiState = SimulationUiState()
 ) {
@@ -146,14 +147,14 @@ data class SpatialUiState(
 )
 
 /**
- * MapTriggers: One-shot event triggers for map manipulation.
+ * CameraAction: Imperative map commands delivered via SharedFlow (Issue #1390).
  */
-data class MapTriggers(
-    val centeringTrackerTrigger: Int = 0,
-    val centeringViewerTrigger: Int = 0,
-    val zoomInTrigger: Int = 0,
-    val zoomOutTrigger: Int = 0
-)
+sealed class CameraAction {
+    object CenterTracker : CameraAction()
+    object CenterViewer : CameraAction()
+    object ZoomIn : CameraAction()
+    object ZoomOut : CameraAction()
+}
 
 /**
  * SimulationUiState: Flags for forensic auditing and stress simulations.
@@ -179,10 +180,6 @@ data class MapViewState(
     val maxDistance: Double = 0.0,
     val isMapLocked: Boolean = false,
     val mapFollowMode: MapFollowMode = MapFollowMode.NONE,
-    val centeringTrackerTrigger: Int = 0,
-    val centeringViewerTrigger: Int = 0,
-    val zoomInTrigger: Int = 0,
-    val zoomOutTrigger: Int = 0,
     val homePoints: List<GeoPoint> = emptyList(),
     val trackerLat: Double = 0.0,
     val trackerLng: Double = 0.0,

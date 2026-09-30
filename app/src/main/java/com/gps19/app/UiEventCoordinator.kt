@@ -15,10 +15,8 @@ import javax.inject.Singleton
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
  * Decouples MainViewModel from procedural orchestration.
- * Sep.27.11: 
- * - Issue #1202: Initial Implementation.
- * - Added systemStatusProvider for RefreshPermissionStatus handling.
- * - Integrated debounced draft auto-save logic.
+ * Sep.30.42:
+ * - Issue #1390: Integrated onCameraAction callback to handle imperative map commands.
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -44,7 +42,8 @@ class UiEventCoordinator @Inject constructor(
         onStateUpdate: ( (MainUiState) -> MainUiState ) -> Unit,
         onKinematicUpdate: ( (KinematicState) -> KinematicState ) -> Unit,
         onDiagnosticUpdate: ( (DiagnosticState) -> DiagnosticState ) -> Unit,
-        onReplayRequest: (Long?) -> Unit
+        onReplayRequest: (Long?) -> Unit,
+        onCameraAction: (CameraAction) -> Unit
     ) {
         when (event) {
             // --- Navigation & Visibility ---
@@ -163,12 +162,22 @@ class UiEventCoordinator @Inject constructor(
 
             // --- Spatial & Geofencing ---
             is UiEvent.SetFenceVisible, is UiEvent.SetViolationsVisible, is UiEvent.SetGeofenceViolationsVisible,
-            is UiEvent.SetMapButtonsVisible, is UiEvent.SetMapLocked, is UiEvent.MapZoomIn, is UiEvent.MapZoomOut,
-            is UiEvent.CenterTracker, is UiEvent.CenterViewer, is UiEvent.SetGeofenceMode -> {
+            is UiEvent.SetMapButtonsVisible, is UiEvent.SetMapLocked, is UiEvent.SetGeofenceMode -> {
                 onStateUpdate { spatialLogicUseCase.handleMapEvent(event, it) }
             }
 
-            is UiEvent.MapTap -> handleMapTap(event.point, currentState, scope, onStateUpdate)
+            is UiEvent.MapZoomIn -> onCameraAction(CameraAction.ZoomIn)
+            is UiEvent.MapZoomOut -> onCameraAction(CameraAction.ZoomOut)
+            is UiEvent.CenterTracker -> {
+                onStateUpdate { spatialLogicUseCase.handleMapEvent(event, it) }
+                onCameraAction(CameraAction.CenterTracker)
+            }
+            is UiEvent.CenterViewer -> {
+                onStateUpdate { spatialLogicUseCase.handleMapEvent(event, it) }
+                onCameraAction(CameraAction.CenterViewer)
+            }
+
+            is UiEvent.MapTap -> handleMapTap(event.point, currentState, scope, onStateUpdate, onCameraAction)
 
             is UiEvent.AddHomePoint -> {
                 scope.launch(Dispatchers.IO) {
@@ -291,13 +300,13 @@ class UiEventCoordinator @Inject constructor(
         }
     }
 
-    private fun handleMapTap(point: GeoPoint, state: MainUiState, scope: CoroutineScope, onStateUpdate: ( (MainUiState) -> MainUiState ) -> Unit) {
+    private fun handleMapTap(point: GeoPoint, state: MainUiState, scope: CoroutineScope, onStateUpdate: ( (MainUiState) -> MainUiState ) -> Unit, onCameraAction: (CameraAction) -> Unit) {
         val mode = state.spatial.geofenceMode
         if (mode == GeofenceMode.ADD) {
-            handleEvent(UiEvent.AddHomePoint(point), state, scope, onStateUpdate, {}, {}, {})
+            handleEvent(UiEvent.AddHomePoint(point), state, scope, onStateUpdate, {}, {}, {}, onCameraAction)
         } else if (mode == GeofenceMode.REMOVE) {
             val idx = spatialLogicUseCase.findNearestPointIndex(state.spatial.homePoints, point)
-            if (idx != -1) handleEvent(UiEvent.RemoveHomePoint(idx), state, scope, onStateUpdate, {}, {}, {})
+            if (idx != -1) handleEvent(UiEvent.RemoveHomePoint(idx), state, scope, onStateUpdate, {}, {}, {}, onCameraAction)
         }
     }
 }

@@ -8,6 +8,8 @@ import javax.inject.Singleton
 /**
  * UiStateCoordinator: Unified Authority for reactive state mapping (Dashboard/HUD/Map).
  * Achieves a perfectly thin ViewModel by separating state projection logic from orchestration.
+ * Sep.30.42:
+ * - Issue #1390: Removed MapTriggers from mapMapViewState.
  * Sep.27.12: Initial implementation for Issue #1350.
  */
 @Singleton
@@ -275,7 +277,6 @@ class UiStateCoordinator @Inject constructor(
         mode: String?,
         hydration: Int,
         spatial: SpatialUiState,
-        triggers: MapTriggers,
         kin: KinematicState,
         pulseRt: Long,
         trkSegs: List<MapTrailSegment>,
@@ -305,8 +306,7 @@ class UiStateCoordinator @Inject constructor(
             appMode = m, hydrationLevel = hydration, isMapButtonsVisible = spatial.isMapButtonsVisible, isFenceVisible = spatial.isFenceVisible, 
             geofenceMode = spatial.geofenceMode, isViolationsVisible = spatial.isViolationsVisible, isGeofenceViolationsVisible = spatial.isGeofenceViolationsVisible, 
             maxDistance = spatial.maxDistance, isMapLocked = spatial.isMapLocked, mapFollowMode = spatial.mapFollowMode,
-            centeringTrackerTrigger = triggers.centeringTrackerTrigger, centeringViewerTrigger = triggers.centeringViewerTrigger, 
-            zoomInTrigger = triggers.zoomInTrigger, zoomOutTrigger = triggers.zoomOutTrigger, homePoints = spatial.homePoints,
+            homePoints = spatial.homePoints,
             trackerLat = tLat, trackerLng = tLng, trackerGpsTs = tTs, trackerTelemetryTs = tTel,
             viewerLat = vLat, viewerLng = vLng, systemPulse = pulse, systemPulseRt = pulseRt,
             trackerSegments = trkSegs, viewerSegments = vwrSegs, violations = vios,

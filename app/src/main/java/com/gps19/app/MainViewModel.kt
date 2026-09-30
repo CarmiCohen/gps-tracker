@@ -21,13 +21,11 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Sep.30.42:
+ * - Issue #1390: Replaced cumulative map triggers with CameraAction SharedFlow.
  * Sep.30.40:
  * - Issue #1391 RESOLVED: Enforced R872 (Stealth Authority). Guarded Red-Screen 
  *   promotion to ensure it only triggers in Viewer mode.
- * Sep.30.5:
- * - Issue #1389 RESOLVED: Implemented Reactive Red-Screen Promotion.
- *   The UI now reactively promotes the AlarmOverlay when critical violations are 
- *   detected, ensuring visibility even if fullScreenIntent is suppressed by the system.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -56,6 +54,9 @@ class MainViewModel @Inject constructor(
 
     private val _uiState = MutableStateFlow(MainUiState())
     val uiState: StateFlow<MainUiState> = _uiState.asStateFlow()
+
+    private val _cameraActions = MutableSharedFlow<CameraAction>(extraBufferCapacity = 16)
+    val cameraActions: SharedFlow<CameraAction> = _cameraActions.asSharedFlow()
 
     val sessionUiState: StateFlow<SessionUiState> = _uiState
         .map { it.session }
@@ -214,10 +215,9 @@ class MainViewModel @Inject constructor(
             _uiState.map { it.session.appMode }.distinctUntilChanged(),
             _uiState.map { it.session.hydrationLevel }.distinctUntilChanged(),
             _uiState.map { it.spatial }.distinctUntilChanged(),
-            _uiState.map { it.triggers }.distinctUntilChanged(),
             _kinematicState
-        ) { mode, hydration, spatial, triggers, kin ->
-            FiveParts(mode, hydration, spatial, triggers, kin)
+        ) { mode, hydration, spatial, kin ->
+            FourParts(mode, hydration, spatial, kin)
         },
         _systemPulseRt,
         trackerTrailSegments,
@@ -225,12 +225,19 @@ class MainViewModel @Inject constructor(
         repository.violationsFlow.distinctUntilChanged()
     ) { parts, pulseRt, trkSegs, vwrSegs, vios ->
         uiStateCoordinator.mapMapViewState(
-            parts.mode, parts.hydration, parts.spatial, parts.triggers, parts.kin, pulseRt, trkSegs, vwrSegs, vios
+            mode = parts.mode, 
+            hydration = parts.hydration, 
+            spatial = parts.spatial, 
+            kin = parts.kin, 
+            pulseRt = pulseRt, 
+            trkSegs = trkSegs, 
+            vwrSegs = vwrSegs, 
+            vios = vios
         )
     }
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MapViewState())
 
-    private data class FiveParts(val mode: String?, val hydration: Int, val spatial: SpatialUiState, val triggers: MapTriggers, val kin: KinematicState)
+    private data class FourParts(val mode: String?, val hydration: Int, val spatial: SpatialUiState, val kin: KinematicState)
 
     private val replayCursorRequest = MutableStateFlow<Long?>(null)
     private var autoSaveJob: Job? = null
@@ -444,10 +451,13 @@ class MainViewModel @Inject constructor(
             event = event,
             currentState = _uiState.value,
             scope = viewModelScope,
-            onStateUpdate = { updateState(it) },
-            onKinematicUpdate = { updateKinematicState(it) },
-            onDiagnosticUpdate = { updateDiagnosticState(it) },
-            onReplayRequest = { replayCursorRequest.value = it }
+            onStateUpdate = { update: (MainUiState) -> MainUiState -> updateState(update) },
+            onKinematicUpdate = { update: (KinematicState) -> KinematicState -> updateKinematicState(update) },
+            onDiagnosticUpdate = { update: (DiagnosticState) -> DiagnosticState -> updateDiagnosticState(update) },
+            onReplayRequest = { ts: Long? -> replayCursorRequest.value = ts },
+            onCameraAction = { action: CameraAction -> 
+                viewModelScope.launch { _cameraActions.emit(action) }
+            }
         )
     }
 

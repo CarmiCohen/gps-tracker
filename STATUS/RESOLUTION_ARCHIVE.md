@@ -1,4 +1,16 @@
-# 🏛️ Resolution Archive - Sep.30.6
+# 🏛️ Resolution Archive - Sep.30.42
+
+## 🏁 Issue #1390: Camera Action Event Flow
+*   **Resolved**: Sep.30.42
+*   **Root Cause**: Imperative map commands (zoom, centering) were being driven by cumulative trigger counters within the persistent `MapViewState`. This caused unnecessary state churn and required complex state-tracking logic in the `MapController` to prevent re-execution loops during unrelated UI state refreshes.
+*   **Remediation**: 
+    *   **SharedFlow Migration**: Replaced cumulative counters with a single `SharedFlow<CameraAction>` in `MainViewModel`.
+    *   **Orchestration Refactor**: Updated `UiEventCoordinator` to emit discrete actions (e.g., `CenterTracker`, `ZoomIn`) directly to the flow.
+    *   **Reactive Execution**: Refactored `MapComponents` and `MapController` to collect these actions reactively via `LaunchedEffect`, ensuring commands are executed exactly once per emission and completely decoupling them from persistent state.
+*   **Significance**: Low (Architectural Hygiene).
+*   **SOT ID**: 564 (Camera Action Event Flow)
+
+## 🏛️ Resolution Archive - Sep.30.6
 
 ## 🏁 Issue #Audit-Sep.30.6: Field Soak & Stealth Validation
 *   **Resolved**: Sep.30.6
@@ -9,33 +21,6 @@
     *   **HUD Parity**: Confirmed that `MonitorService` tick authority eliminates velocity-state mismatches.
 *   **Significance**: High (Release Integrity).
 *   **SOT ID**: 563 (Forensic & Stealth Audit)
-
-## 🏛️ Resolution Archive - Sep.30.6
-
-## 🏁 Issue #1385: Peer Link & Diagnostic LED Stall
-*   **Resolved**: Sep.30.6
-*   **Root Cause**: Argument slot mismatch in Socket.io relay handlers. The `CommunicationManager` strictly assumed the payload was in the first argument (`args[0]`). Production relay servers often prepend a `routingId` (sender context), shifting the payload to `args[1]`. This caused parse errors (attempting to parse a String ID as JSON/Binary), resulting in red LEDs on the Viewer.
-*   **Remediation**: 
-    *   **Adaptive Extraction**: Refactored all relay handlers in `CommunicationManager.kt` (`handleLocationRelay`, `handleLocationRelayBinary`, etc.) to check `args.size` and dynamically extract the payload from either index 0 or 1.
-*   **Significance**: High (Connectivity Integrity).
-*   **SOT ID**: 561 (Peer Relay Argument Robustness)
-
-## 🏁 Issue #1391: Alarm Leakage on Tracker (Stealth Violation)
-*   **Resolved**: Sep.30.6
-*   **Root Cause**: Unconditional UI promotion in `MainViewModel`. The `activeAlarmsFlow` observer reactively triggered `isRedScreenVisible = true` whenever any unresolved violation existed, regardless of whether the app was in Tracker or Viewer mode. This violated the stealth requirement (R872) for Trackers.
-*   **Remediation**:
-    *   **Stealth Guarding**: Added a strict `appMode == "viewer"` check to the reactive promotion logic in `MainViewModel.kt`.
-*   **Significance**: High (Stealth & Behavioral Integrity).
-*   **SOT ID**: 562 (Stealth Authority Enforcement)
-
-## 🏁 Issue #1386: Tracker HUD Velocity State Inconsistency
-*   **Resolved**: Sep.30.6
-*   **Root Cause**: Distributed Behavioral Logic. `TrackerState` (MOVING vs PARKING) was being calculated independently in the UI mapper and the engine. The mapper used a simple 0.5 m/s gate, while the engine used `ACTIVE_MOVE_THRESHOLD` (2.0 m/s) plus a 60s moving-hold timer. This caused the HUD to show "MOVING" while the speed readout was "0.0 km/h".
-*   **Remediation**:
-    *   **Unified Authority**: Moved the definitive `TrackerState` calculation into the engine tick (`MonitorService.kt`) using `TrackerStateManager`. 
-    *   **State Propagation**: Added `trackerState` to `SystemEvaluationSnapshot` to ensure persistence and signaling layers reflect the exact same state as the local HUD.
-*   **Significance**: Medium (UX Consistency).
-*   **SOT ID**: 560 (Centralized Behavioral Authority)
 
 ...
 *(Full historical records maintained in SOT Archive)*

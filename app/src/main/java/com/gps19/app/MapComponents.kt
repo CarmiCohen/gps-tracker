@@ -39,20 +39,17 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Sep.30.42:
+ * - Issue #1390: Integrated CameraAction SharedFlow to handle imperative map commands.
  * Sep.28.6:
  * - Issue #1167 RESOLVED: Extracted osmdroid management and imperative coordination 
- *   into MapController. Removed redundant UI-side EMA smoothing (already handled 
- *   in UiStateCoordinator). (R-ID 522).
- * Sep.13.30:
- * - Issue #1023 Remediation: Restored Map Scale by adding ScaleBarOverlay to 
- *   MapView overlays list.
- * - Issue #1023 Visibility: Adjusted MapSettingsToggle top padding in portrait 
- *   mode (100.dp) to prevent occlusion by HeaderBar and StatusBar (R1023).
+ *   into MapController. (R-ID 522).
  */
 
 @Composable
 fun AppMapContainer(
     state: MapViewState,
+    cameraActions: kotlinx.coroutines.flow.SharedFlow<CameraAction>? = null,
     onEvent: (UiEvent) -> Unit,
     onClearTrails: () -> Unit,
     onSaveTrail: () -> Unit,
@@ -75,6 +72,7 @@ fun AppMapContainer(
     Box(modifier = Modifier.fillMaxSize()) {
         OsmMap(
             state = state,
+            cameraActions = cameraActions,
             initialCenter = initialCenter,
             onTap = { onEvent(UiEvent.MapTap(it)) },
             onRemoveMarker = { if (!isTrackerMode) onEvent(UiEvent.RemoveHomePoint(it)) },
@@ -151,6 +149,7 @@ fun MapSettingsToggle(isMapButtonsVisible: Boolean, onToggle: () -> Unit, modifi
 @Composable
 fun OsmMap(
     state: MapViewState,
+    cameraActions: kotlinx.coroutines.flow.SharedFlow<CameraAction>? = null,
     initialCenter: GeoPoint? = null,
     onTap: (GeoPoint) -> Unit,
     onRemoveMarker: (Int) -> Unit,
@@ -162,6 +161,17 @@ fun OsmMap(
 
     val mapController = remember(mapViewRef.value) {
         mapViewRef.value?.let { MapController(context, it, density) }
+    }
+
+    LaunchedEffect(mapController, cameraActions) {
+        cameraActions?.collect { action ->
+            when (action) {
+                is CameraAction.CenterTracker -> mapController?.centerTracker(state.smoothedTrackerPos)
+                is CameraAction.CenterViewer -> mapController?.centerViewer(state.smoothedViewerPos)
+                is CameraAction.ZoomIn -> mapController?.zoomIn()
+                is CameraAction.ZoomOut -> mapController?.zoomOut()
+            }
+        }
     }
 
     DisposableEffect(mapController) {

@@ -25,9 +25,10 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Viewer-mode UI.
+ * Sep.30.42:
+ * - Issue #1390: Passed cameraActions Flow to AppMapContainer.
  * Sep.23.50:
- * - Issue #1203 RESOLVED: Unified ViewModel scope. Using MainViewModel directly 
- *   to eliminate resource churn and state fragmentation (R-ID 419).
+ * - Issue #1203 RESOLVED: Unified ViewModel scope. (R-ID 419).
  */
 
 @Composable
@@ -171,6 +172,7 @@ fun ViewerScreen(
                             if (sessionState.hydrationLevel >= 6 && isMapVisible && !isAnyOverlayOpen) {
                                 AppMapContainer(
                                     state = mapViewState,
+                                    cameraActions = viewModel.cameraActions,
                                     onEvent = { event -> viewModel.onEvent(event) },
                                     onClearTrails = { viewModel.clearTrails() },
                                     onSaveTrail = onSaveTrail,
@@ -200,6 +202,7 @@ fun ViewerScreen(
                 if (sessionState.hydrationLevel >= 6 && isMapVisible && !isAnyOverlayOpen) {
                     AppMapContainer(
                         state = mapViewState,
+                        cameraActions = viewModel.cameraActions,
                         onEvent = { event -> viewModel.onEvent(event) },
                         onClearTrails = { viewModel.clearTrails() },
                         onSaveTrail = onSaveTrail,

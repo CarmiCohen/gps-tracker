@@ -9,8 +9,8 @@ import org.osmdroid.views.MapView
 
 /**
  * MapController: Decouples imperative osmdroid manipulation from Compose UI.
- * Issue #1167: Centralizes overlay updates, smoothing coordination, and camera triggers.
- * Issue #1383 RESOLVED: Implemented stateful trigger tracking to prevent autonomous zoom loops.
+ * Sep.30.42:
+ * - Issue #1390: Transitioned from cumulative triggers to explicit camera action methods.
  */
 class MapController(
     private val context: Context,
@@ -19,12 +19,6 @@ class MapController(
 ) {
     private val overlayManager = MapOverlayManager(context, mapView, density)
     private var lastTriggerPulse = 0L
-
-    // R-ID 1383: Stateful trigger tracking to prevent loops
-    private var lastCenteringTrackerTrigger = 0
-    private var lastCenteringViewerTrigger = 0
-    private var lastZoomInTrigger = 0
-    private var lastZoomOutTrigger = 0
 
     fun update(state: MapViewState, onTap: (GeoPoint) -> Unit, onRemoveMarker: (Int) -> Unit) {
         Snapshot.withoutReadObservation {
@@ -69,38 +63,38 @@ class MapController(
             if (changed) mapView.invalidate()
 
             // Camera Coordination
-            handleCameraTriggers(state)
             handleFollowLogic(state)
         }
     }
 
-    private fun handleCameraTriggers(state: MapViewState) {
-        // Issue #1383: Only trigger if the cumulative count has increased
-        if (state.centeringTrackerTrigger > lastCenteringTrackerTrigger && state.smoothedTrackerPos != null) {
-            lastCenteringTrackerTrigger = state.centeringTrackerTrigger
-            lastTriggerPulse = state.systemPulse
-            mapView.controller.animateTo(state.smoothedTrackerPos)
+    fun centerTracker(pos: GeoPoint?) {
+        if (pos != null) {
+            lastTriggerPulse = System.currentTimeMillis() // Approximate pulse for follow logic lockout
+            mapView.controller.animateTo(pos)
             mapView.controller.setZoom(18.0)
         }
-        if (state.centeringViewerTrigger > lastCenteringViewerTrigger && state.smoothedViewerPos != null) {
-            lastCenteringViewerTrigger = state.centeringViewerTrigger
-            lastTriggerPulse = state.systemPulse
-            mapView.controller.animateTo(state.smoothedViewerPos)
+    }
+
+    fun centerViewer(pos: GeoPoint?) {
+        if (pos != null) {
+            lastTriggerPulse = System.currentTimeMillis()
+            mapView.controller.animateTo(pos)
             mapView.controller.setZoom(18.0)
         }
-        if (state.zoomInTrigger > lastZoomInTrigger) {
-            lastZoomInTrigger = state.zoomInTrigger
-            mapView.controller.zoomIn()
-        }
-        if (state.zoomOutTrigger > lastZoomOutTrigger) {
-            lastZoomOutTrigger = state.zoomOutTrigger
-            mapView.controller.zoomOut()
-        }
+    }
+
+    fun zoomIn() {
+        mapView.controller.zoomIn()
+    }
+
+    fun zoomOut() {
+        mapView.controller.zoomOut()
     }
 
     private fun handleFollowLogic(state: MapViewState) {
         if (!state.isMapLocked) return
-        if (state.systemPulse - lastTriggerPulse < 500) return
+        // Lockout following if a manual trigger happened recently
+        if (System.currentTimeMillis() - lastTriggerPulse < 500) return
 
         val sTrk = state.smoothedTrackerPos
         val sVwr = state.smoothedViewerPos

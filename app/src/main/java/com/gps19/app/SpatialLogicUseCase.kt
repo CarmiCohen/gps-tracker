@@ -8,12 +8,8 @@ import javax.inject.Inject
  * SpatialLogicUseCase: Consolidated business logic for spatial operations, 
  * geofence management, and map-related state transitions.
  * 
- * Sep.22.08:
- * - Issue #1166: State Partitioning & Slicing. Updated handleMapEvent to 
- *   support the nested MainUiState structure (R-ID 405).
- * Sep.22.05:
- * - Issue #1181: Consolidated HomePointUseCase and MapUseCase to reduce 
- *   ViewModel dependency surface area (R-ID 402).
+ * Sep.30.42:
+ * - Issue #1390: Removed trigger increment logic; now handled via CameraAction Flow.
  */
 class SpatialLogicUseCase @Inject constructor(
     private val repository: MainRepository
@@ -59,17 +55,13 @@ class SpatialLogicUseCase @Inject constructor(
             is UiEvent.SetMapButtonsVisible -> currentState.copy(spatial = currentState.spatial.copy(isMapButtonsVisible = event.visible))
             is UiEvent.SetMapLocked -> currentState.copy(spatial = currentState.spatial.copy(isMapLocked = event.locked))
             is UiEvent.SetGeofenceMode -> currentState.copy(spatial = currentState.spatial.copy(geofenceMode = event.mode))
-            is UiEvent.MapZoomIn -> currentState.copy(triggers = currentState.triggers.copy(zoomInTrigger = currentState.triggers.zoomInTrigger + 1))
-            is UiEvent.MapZoomOut -> currentState.copy(triggers = currentState.triggers.copy(zoomOutTrigger = currentState.triggers.zoomOutTrigger + 1))
             is UiEvent.CenterTracker -> currentState.copy(
-                triggers = currentState.triggers.copy(centeringTrackerTrigger = currentState.triggers.centeringTrackerTrigger + 1),
                 spatial = currentState.spatial.copy(
                     isMapLocked = true,
                     mapFollowMode = MapFollowMode.AUTO
                 )
             )
             is UiEvent.CenterViewer -> currentState.copy(
-                triggers = currentState.triggers.copy(centeringViewerTrigger = currentState.triggers.centeringViewerTrigger + 1),
                 spatial = currentState.spatial.copy(
                     isMapLocked = true,
                     mapFollowMode = MapFollowMode.VIEWER
