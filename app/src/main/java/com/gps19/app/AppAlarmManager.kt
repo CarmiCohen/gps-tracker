@@ -13,6 +13,8 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.30.4:
+ * - Issue #1382: Added getActiveAlarmSummary() to support UI notification triggering.
  * Sep.28.4:
  * - Issue #1296: Integrated BootLifecycleAuthority to centralize boot lifecycle validation.
  * Sep.27.16:
@@ -79,6 +81,17 @@ class AppAlarmManager @Inject constructor(
     fun hasUnresolvedAlarms(): Boolean {
         synchronized(evaluationState.activeAlarms) {
             return evaluationState.activeAlarms.values.any { !it.isResolved }
+        }
+    }
+
+    /**
+     * Issue #1382: Returns a comma-separated summary of all currently active (unresolved) alarm titles.
+     */
+    fun getActiveAlarmSummary(): String {
+        synchronized(evaluationState.activeAlarms) {
+            return evaluationState.activeAlarms.values
+                .filter { !it.isResolved }
+                .joinToString(", ") { it.title }
         }
     }
 

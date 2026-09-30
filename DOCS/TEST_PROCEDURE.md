@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vSep.22.05)
+# Test Procedure - GPS Tracker (vSep.29.0)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -60,6 +60,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   **1176 SI Unit Suffix:** Verify temperature displays as `X°` (e.g., `35°`).
     *   **1178 GNSS Initialization:** Verify satellite counts show `--/--` before hardware initialization, then transition to numeric values.
     *   **Status (Sep.22.00):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **3.5 Tracker Map Stability (Issue #1383):**
+    *   **Action:** Tap zoom buttons and perform pinch gestures on the map.
+    *   **Verification:** Verify map does not enter "Autonomous Zoom-In" loop. Confirm zoom-out functions correctly.
+*   **3.6 HUD Velocity Logic (Issue #1386):**
+    *   **Action:** Observe HUD state while stationary.
+    *   **Verification:** Verify "MOVING" status is not displayed when speed is 0.0 km/h.
 
 ## Chapter 4 - Viewer Mode & Remote Sync
 **Goal:** Validate real-time synchronization.
@@ -69,6 +75,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   Trigger alarm on Tracker; verify on Viewer.
 *   **4.3 Temporal Authority Check:**
     *   Verify `isGpsFresh` uses receipt-time deltas.
+*   **4.4 Spontaneous Alarm Audit (Issue #1382):**
+    *   **Action:** Deploy app and monitor Viewer behavior without triggering alarms.
+    *   **Verification:** Confirm no siren sounds immediately after deployment or autonomously thereafter. Verify that Global Mute and Volume controls correctly suppress audio.
+*   **4.5 Ribbon UX Legibility (Issue #1384):**
+    *   **Action:** Inspect the Ribbon time ruler.
+    *   **Verification:** Verify time ruler text and markings are clearly legible and not occluded or blurred.
+*   **4.6 Peer Connectivity (Issue #1385):**
+    *   **Action:** Verify Diagnostic LEDs on both devices.
+    *   **Verification:** Confirm GPS, TRK, DAT (Viewer) and VWR (Tracker) transition to Green/Cyan indicating active link.
 
 ## Chapter 5 - Recovery and Edge Cases
 **Goal:** Verify system resilience against signal loss.
@@ -97,4 +112,4 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ---
 **Total Testing Chapters: 100**
-*(Full historical procedure synchronized Sep.22.05)*
+*(Full historical procedure synchronized Sep.29.0)*

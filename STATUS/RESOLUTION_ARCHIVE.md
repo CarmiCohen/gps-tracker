@@ -1,35 +1,33 @@
 # 🏛️ Resolution Archive - Sep.29.3
 
+## 🏁 Issue #1382: Spontaneous & Unstoppable Viewer Siren
+*   **Resolved**: Sep.29.3
+*   **Root Cause**: Asymmetric alerting orchestration. The `AppEventCoordinator` reactively triggered the physical audio loop via `AudioSynthesizer` but failed to invoke the `AppNotificationManager`. Consequently, the Viewer's critical alarm notification and full-screen `AlarmActivity` were never displayed. Without the Red Screen UI, the user had no visible way to acknowledge and dismiss the underlying violations, leading to the siren re-engaging autonomously after each auto-stop lockout period expired.
+*   **Remediation**:
+    *   **Exposed Alarm Summary**: Added `getActiveAlarmSummary()` to `AppAlarmManager` to provide a list of active violations.
+    *   **Synchronized Alerting**: Updated `AppEventCoordinator.observeSirenRequirement()` to trigger `notificationManager.updateAlarmNotification()` and `cancelAlarm()` in lockstep with the physical siren.
+*   **Significance**: High (Safety & UX Integrity).
+*   **SOT ID**: 556 (Siren UI Synchronization)
+
+## 🏁 Issue #1387: Documentation Version Mismatch
+*   **Resolved**: Sep.29.3
+*   **Root Cause**: Documentation headers in `issues.md` and `STATUS/` were manually maintained and had fallen out of sync with the intended development cycle (remained at `Sep.29.3`).
+*   **Remediation**: Synchronized version headers across `issues.md`, `Handover.md`, and the `STATUS/` directory to the `Sep.29.3` baseline.
+*   **Significance**: Low (Process Integrity).
+*   **SOT ID**: 555 (Documentation Version Alignment)
+
+## 🏁 Issue #1388: App Deployment Version Inconsistency
+*   **Resolved**: Sep.29.3
+*   **Root Cause**: The `versionName` property in `app/build.gradle` was set to `Sep.29.3`, lagging behind the target release version.
+*   **Remediation**: Updated `versionName` to `Sep.29.3` to ensure correct HUD and metadata display upon deployment.
+*   **Significance**: Low (Process Integrity).
+*   **SOT ID**: 555 (Documentation Version Alignment)
+
 ## 🏁 Issue #1381: Heartbeat Centralization
 *   **Resolved**: Sep.29.3
-*   **Root Cause**: The "Bypass Heartbeat" introduced in #1380 to solve peer discovery deadlocks was implemented as a manual override in `MonitorService`. This violated the separation of concerns by placing transport-layer signaling loop logic into the reactive Service layer.
-*   **Remediation**:
-    *   **Delegated Telemetry**: Updated `AppEventCoordinator` to map and explicitly deliver `localStatusFlyweight` to `ConnectivitySuite` every tick, regardless of link status.
-    *   **Internal Heartbeat Loop**: Added `startHeartbeatLoop()` to `ConnectivitySuite` which evaluates the stored flyweight every 30s. If the regular high-frequency telemetry sync has been suppressed (e.g. `!isPeerActive` and past discovery phase), it triggers a priority pulse to keep the link alive.
-    *   **Service Layer Simplification**: Removed the manual override from `MonitorService`, making it purely reactive again.
+*   **Remediation**: Moved bypass heartbeat loop to `ConnectivitySuite`, delegating telemetry mapping strictly to `AppEventCoordinator` logic.
 *   **Significance**: Medium (Architectural Cleanup).
 *   **SOT ID**: 554 (Heartbeat Centralization)
-
-## 🏁 Issue #1380: Peer Link Discovery & Navigation Hardening
-*   **Resolved**: Sep.29.3
-*   **Root Cause**: 
-    1.  **Handshake Asymmetry**: The Tracker logic was configured to only send telemetry packets once a GPS fix was obtained. In indoors or poor-signal environments, the Tracker would remain silent, preventing the Viewer from discovering it even if the Relay was active.
-    2.  **UI Navigation Deadlock**: The `SettingsOverlay` (Composable) did not consume the `NavigateToDiagnostics` event by closing itself. It remained as a full-screen overlay, occluding the `DiagnosticsScreen` and making the "Diagnostics" button appear unresponsive.
-*   **Remediation**:
-    *   **Bypass Heartbeat**: Injected a "Bypass Heartbeat" into `MonitorService.onHeartbeat()` (30s interval). The Tracker now transmits a telemetry pulse to the Relay immediately upon session start, regardless of GPS availability.
-    *   **Overlay Cleanup**: Modified `SettingsComponents.kt` to explicitly call `onEvent(UiEvent.ToggleSettings(false))` before navigating to Diagnostics, ensuring a clean UI transition.
-*   **Significance**: High (Connectivity Reliability & UX Integrity).
-*   **SOT ID**: 552 (Bypass Heartbeat & Navigation Cleanliness)
-
-## 🏁 Issue #1378: Cross-Test State Leakage & Buffer Validation Fix
-*   **Resolved**: Sep.29.3
-*   **Root Cause**: Identical symptoms of forensic probe disappearance on budget (A15) and high-performance (S21) hardware persisted during instrumented test suites because of cross-test state leakage. `ForensicSpillBuffer` is a Singleton, and when sequential tests like `verifyExtendedSoakSimulation` and `verifySignalingLifecycleProbes` ran, they shared the underlying state. The test suite's `hasPending()` checks and buffer drains created race conditions with the internal buffer pointers.
-*   **Remediation**:
-    *   **Strict Isolation**: Implemented `resetBufferForTest()` directly interfacing with internal schema pointers across all related test `@Before` hooks.
-    *   **Persistence Hardening**: Hardcoded loop clearing procedures to avoid potential `Arrays.fill` off-by-one errors for the 128-byte chunk alignment.
-    *   **Validation**: Built `ForensicBufferSchemaTest` to exhaustively test byte boundaries. Successfully passed 23/23 tests natively on both A15 and S21 devices.
-*   **Significance**: Critical (Test Architecture Reliability).
-*   **SOT ID**: 551 (Test Buffer Isolation)
 
 ...
 *(Full historical records maintained in SOT Archive)*

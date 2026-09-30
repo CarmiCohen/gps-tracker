@@ -11,20 +11,12 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Sep.30.4:
+ * - Issue #1382 RESOLVED: Integrated AppNotificationManager into siren 
+ *   requirement flow. Ensures critical alarm overlays and notifications 
+ *   are triggered alongside the physical siren for visibility and dismissal.
  * Sep.30.3:
  * - Maintenance: Updated to alignment Sep.30.3.
- * Sep.30.2:
- * - Issue #1381: Heartbeat Centralization. Always maps and provides local 
- *   telemetry to ConnectivitySuite for internal heartbeat logic.
- * Sep.29.31:
- * - Handshake Hardening (#LinkFix): Relaxed telemetry gating during discovery phase. 
- *   Trackers now broadcast telemetry during the first 5 minutes (300 ticks) 
- *   regardless of Peer Activity status to resolve handshake deadlocks.
- * Sep.27.17:
- * - Issue #1160: Flyweight & Pooling Expansion. Refactored handleTickEvaluated 
- *   to use reusable flyweight instances for persistence and signaling updates.
- * Sep.27.4:
- * - Issue #1348: Flattened DomainEvent hierarchy. Pattern matches component events directly.
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -305,17 +297,29 @@ class AppEventCoordinator @Inject constructor(
     private suspend fun observeSirenRequirement() {
         alarmManager.isSirenRequired.collectLatest { required ->
             val isCurrentlyPlaying = audioSynthesizer.isPlaying()
+            val isTrackerMode = configManager.isTrackerMode
+            
             if (required && !isCurrentlyPlaying) {
                 audioSynthesizer.playSiren(
                     timeProvider = timeProvider,
-                    isTrackerMode = configManager.isTrackerMode,
+                    isTrackerMode = isTrackerMode,
                     vibrate = true,
                     force = true
                 )
+                
+                // Issue #1382: Trigger critical notification for visibility and dismissal
+                if (!isTrackerMode) {
+                    val summary = alarmManager.getActiveAlarmSummary()
+                    notificationManager.updateAlarmNotification(summary)
+                }
             } else if (!required && isCurrentlyPlaying) {
                 if (!audioSynthesizer.isForced()) {
                     audioSynthesizer.stopSiren(timeProvider = timeProvider)
+                    if (!isTrackerMode) notificationManager.cancelAlarm()
                 }
+            } else if (!required && !isCurrentlyPlaying) {
+                 // Ensure alarm is cleared if requirement drops and nothing is playing
+                 if (!isTrackerMode) notificationManager.cancelAlarm()
             }
         }
     }
