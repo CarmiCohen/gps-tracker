@@ -5,12 +5,13 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Sep.30.60:
+ * - Issue #1405 RESOLVED: Removed siren lockout wipe on new triggers. Ensures 
+ *   that a manual "Stop" remains respected for the full SIREN_RESUME_COOLDOWN_MS 
+ *   even if different alarm types trigger sequentially.
  * Sep.24.94:
  * - Issue #1311: Refactored detectViolations to manage ActiveAlarm lifecycle 
  *   directly within AlarmEvaluationState for a stateless evaluation model.
- * Sep.11.22:
- * - Issue #133 Audit: Updated evaluatePhysical to sync isTamperDetected 
- *   flag into health state for Silent Failure suppression (R-ID 312).
  */
 object MainAlarmLogic {
 
@@ -80,8 +81,6 @@ object MainAlarmLogic {
 
         report.reports.forEach { violation ->
             val type = violation.type
-            // Note: Enabled check should be done by the caller or passed in. 
-            // Assuming for now the report only contains relevant conditions.
             val eval = state.activeAlarms[type] ?: AlarmEvaluationState.ActiveAlarm(type, violation.title)
 
             if (violation.conditionMet) {
@@ -93,9 +92,9 @@ object MainAlarmLogic {
                         eval.isResolved = false
                         triggerOccurred = true
                         onTrigger(eval)
-                        if (nowRt - state.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS) {
-                            state.lastSirenStopRt = 0L 
-                        }
+                        
+                        // Issue #1405: Removed wiping of lastSirenStopRt here.
+                        // Lockout should persist across new alarm types until it naturally expires.
                     }
                 }
                 eval.lastLogTs = now
@@ -246,7 +245,6 @@ object MainAlarmLogic {
         health.isTamperDetected = isTamperCondition
 
         val tamperSubtitle = if (isTamperCondition) {
-            // R-ID 288: Prioritize specific note from sentinel/remote peer if available
             health.tamperNote ?: when {
                 health.status == SentinelStatus.TAMPER -> "Hardware sentinel violation"
                 isShock -> "Shock: ${String.format(Locale.getDefault(), "%.1f", health.peakVibrationShock)}G"
@@ -273,7 +271,7 @@ object MainAlarmLogic {
             type = ALERT_ID_TRACKER_TILT,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_TRACKER_TILT),
             subtitle = if (isTilt) String.format(Locale.getDefault(), "%.1f° tilt", health.tiltDegrees) else "Tilt violation",
-            conditionMet = isTilt,
+            conditionMet = if (isTracker) isTilt else false, 
             extremeValue = health.tiltDegrees
         )
 
@@ -281,7 +279,7 @@ object MainAlarmLogic {
             type = ALERT_ID_TRACKER_ACOUSTIC,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_TRACKER_ACOUSTIC),
             subtitle = if (isAcousticMet) String.format(Locale.getDefault(), "%.1f dB peak (Base: %.1f)", health.acousticDb, health.acousticFloorDb) else "Acoustic violation",
-            conditionMet = isAcousticMet,
+            conditionMet = if (isTracker) isAcousticMet else false,
             extremeValue = health.acousticDb,
             technicalDetails = if (isAcousticMet && health.isLocationPending) "LOCATION_PENDING: ${health.locationPendingReason.name}" else null
         )
@@ -290,7 +288,7 @@ object MainAlarmLogic {
             type = ALERT_ID_TRACKER_LIFT,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_TRACKER_LIFT),
             subtitle = if (isLift) "Lift: ${String.format(Locale.getDefault(), "%.1f", liftDelta)}m" else "Lift violation",
-            conditionMet = isLift,
+            conditionMet = if (isTracker) isLift else false,
             extremeValue = abs(liftDelta)
         )
 

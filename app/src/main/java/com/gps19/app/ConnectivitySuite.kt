@@ -21,19 +21,11 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.30.60:
+ * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
+ *   ensure prefix consistency ("VR_" authority) (R-ID 453/565).
  * Sep.30.3:
  * - Maintenance: Updated to alignment Sep.30.3.
- * Sep.30.2:
- * - Issue #1381: Heartbeat Centralization. Moved Bypass Heartbeat logic into 
- *   internal loops.
- * Sep.28.11:
- * - Issue #1359: Temporal Precision & Service Logic Hardening. Migrated 
- *   teardown duration monitoring to use centralized timeProvider.
- * Sep.27.17:
- * - Issue #1160: Flyweight & Pooling Expansion. Refactored packet handling 
- *   to use reusable flyweight snapshots, eliminating GC churn.
- * Sep.27.4:
- * - Issue #1348: Flattened DomainEvent hierarchy, emitting component events directly.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -427,7 +419,8 @@ class ConnectivitySuite @Inject constructor(
     suspend fun sendTelemetry(status: TrackerStatus): Boolean {
         val success = sendTelemetryInternal(status, SignalingPriority.HIGH)
         if (isTrackerMode) {
-            mainRepository.saveTrackerState(status, "T_")
+            // R-ID 453/565: Standardized Role Identity Authority
+            mainRepository.saveTrackerState(status, AppRole.TRACKER.prefix)
             if (!success) {
                 val entity = TelemetryMapper.mapStatusToPending(status)
                 offlineRepository.addPendingStatusUpdate(entity)
@@ -622,7 +615,8 @@ class ConnectivitySuite @Inject constructor(
         mainRepository.updateRemoteActivity(0L) 
         trackerGpsStallStartTs = 0L
         
-        val prefix = if (isTrackerMode) "T_" else "VR_"
+        // R-ID 453/565: Standardized Role Identity Authority
+        val prefix = if (isTrackerMode) AppRole.TRACKER.prefix else AppRole.VIEWER_REMOTE.prefix
         mainRepository.saveDoubleSync(prefix + TRACKER_LUX_BASELINE_KEY, 0.0)
         mainRepository.saveDoubleSync(prefix + TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
     }

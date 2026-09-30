@@ -18,12 +18,9 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
- * Sep.24.92:
- * - Issue #1261: Service Unification. Migrated to MonitorService for system 
- *   maintenance recovery (R-ID 471).
- * Sep.23.70:
- * - Issue #1230 REMEDIATION: Made worker role-aware to correctly audit namespaced 
- *   service ticks ("T_" or "V_" prefixes) (R-ID 453).
+ * Sep.30.60:
+ * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
+ *   ensure prefix consistency (R-ID 453/565).
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -71,8 +68,9 @@ class MaintenanceWorker @AssistedInject constructor(
         val now = timeProvider.currentTimeMillis()
         val nowRt = timeProvider.elapsedRealtime()
         
-        // R-ID 453: Use role-based prefix to audit the correct logic state
-        val prefix = if (savedMode == "tracker") "T_" else "V_"
+        // R-ID 453/565: Local recovery audits local service ticks
+        val role = if (savedMode == "tracker") AppRole.TRACKER else AppRole.VIEWER_SELF
+        val prefix = role.prefix
         
         val lastTick = repository.getLong(prefix + LAST_SERVICE_TICK_TS_KEY, 0L)
         val lastTickRt = repository.getLong(prefix + LAST_SERVICE_TICK_REALTIME_KEY, 0L)
@@ -136,7 +134,6 @@ class MaintenanceWorker @AssistedInject constructor(
                     specialColor = FORENSIC_PINK_COLOR
                 ))
 
-                // Issue #1261: Unified MonitorService manages role transitions internally
                 val serviceIntent = Intent(applicationContext, MonitorService::class.java).apply {
                     setPackage(GpsApplication.PACKAGE_NAME)
                 }

@@ -11,12 +11,9 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
- * Sep.30.4:
- * - Issue #1382 RESOLVED: Integrated AppNotificationManager into siren 
- *   requirement flow. Ensures critical alarm overlays and notifications 
- *   are triggered alongside the physical siren for visibility and dismissal.
- * Sep.30.3:
- * - Maintenance: Updated to alignment Sep.30.3.
+ * Sep.30.60:
+ * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
+ *   ensure prefix consistency ("VR_" parity with AlarmManager) (R-ID 453).
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -29,7 +26,7 @@ class AppEventCoordinator @Inject constructor(
     private val repository: MainRepository,
     private val alarmManager: AppAlarmManager,
     private val historyManager: HistoryManager,
-    private val domainEventBus: com.gps19.core.engine.DomainEventBus
+    private val domainEventBus: DomainEventBus
 ) {
     private var isStarted = false
     
@@ -81,13 +78,11 @@ class AppEventCoordinator @Inject constructor(
         val isTrackerMode = event.isTrackerMode
 
         // 1. Repository Persistence (Snap-to-Update Monolith)
-        // R-ID 392: Use flyweight for repository update.
         TelemetryMapper.mapSnapshotToUpdate(snapshot, proc, isMe = true, ts = now, out = updateFlyweight)
         repository.updateLocation(updateFlyweight)
         
         // 2. Peer Signaling (Issue #1314: Convergence)
         if (isTrackerMode) {
-            // R-ID 392: Use flyweight for signaling.
             TelemetryMapper.mapSnapshotToStatus(
                 snapshot = snapshot,
                 processed = proc,
@@ -102,19 +97,17 @@ class AppEventCoordinator @Inject constructor(
             )
             connectivitySuite.updateLocalTelemetry(statusFlyweight)
             
-            // Handshake Hardening: Force broadcast during first 5 minutes (300 ticks) regardless of isPeerActive.
             if (event.isPeerActive || event.serviceTickCounter < 300) {
                 connectivitySuite.sendTelemetry(statusFlyweight)
             }
         }
 
-        // 3. Ribbon Updates (Issue #1314: Simplified Event-Driven Mapping)
         historyManager.updateRibbons(event)
     }
 
     private fun handlePeerConnectionChanged(event: DomainEvent.PeerConnectionChanged) {
         val lastState = peerConnectionCache[event.peerId]
-        if (lastState == event.isConnected) return // Suppress redundant logging
+        if (lastState == event.isConnected) return 
         
         peerConnectionCache[event.peerId] = event.isConnected
 
@@ -158,17 +151,17 @@ class AppEventCoordinator @Inject constructor(
 
     private fun handleIntegrityEvent(event: IntegrityEvent) {
         val isTrackerMode = configManager.isTrackerMode
-        val localPrefix = if (isTrackerMode) "T_" else "V_"
+        val localRole = if (isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_SELF
         
         when (event) {
             is IntegrityEvent.ViolationSustained -> {
                 if (event.type == ALERT_ID_TRACKER_POWER && isTrackerMode) {
-                    alarmManager.setPowerAlarmPending(true, localPrefix)
+                    alarmManager.setPowerAlarmPending(true, localRole.prefix)
                 }
             }
             is IntegrityEvent.ViolationResolved -> {
                 if (event.type == ALERT_ID_TRACKER_POWER && isTrackerMode) {
-                    alarmManager.setPowerAlarmPending(false, localPrefix)
+                    alarmManager.setPowerAlarmPending(false, localRole.prefix)
                 }
             }
             is IntegrityEvent.LogEvent -> {
@@ -190,7 +183,8 @@ class AppEventCoordinator @Inject constructor(
 
     private fun handleProcessorEvent(event: ProcessorEvent, isPrimary: Boolean) {
         val isTrackerMode = configManager.isTrackerMode
-        val prefix = if (isTrackerMode) "T_" else (if (isPrimary) "V_" else "VR_")
+        // R-ID 453/565: Local processing uses local role prefixes
+        val prefix = if (isTrackerMode) AppRole.TRACKER.prefix else (if (isPrimary) AppRole.VIEWER_SELF.prefix else AppRole.VIEWER_REMOTE.prefix)
         val logPrefix = if (!isTrackerMode && isPrimary) "[Self] " else ""
         
         when (event) {
@@ -233,9 +227,7 @@ class AppEventCoordinator @Inject constructor(
     }
 
     private fun handleConnectivityEvent(event: ConnectivityEvent) {
-        if (event is ConnectivityEvent.PeerPulse) {
-            // Orchestration for peer activity if needed
-        }
+        if (event is ConnectivityEvent.PeerPulse) { }
     }
 
     private fun handleHistoryEvent(event: HistoryEvent) {
@@ -261,9 +253,7 @@ class AppEventCoordinator @Inject constructor(
             is CommandEvent.ResetTimers -> {
                 peerConnectionCache.clear()
             }
-            else -> {
-                // Other commands handled in MonitorService
-            }
+            else -> { }
         }
     }
 
@@ -307,7 +297,6 @@ class AppEventCoordinator @Inject constructor(
                     force = true
                 )
                 
-                // Issue #1382: Trigger critical notification for visibility and dismissal
                 if (!isTrackerMode) {
                     val summary = alarmManager.getActiveAlarmSummary()
                     notificationManager.updateAlarmNotification(summary)
@@ -318,7 +307,6 @@ class AppEventCoordinator @Inject constructor(
                     if (!isTrackerMode) notificationManager.cancelAlarm()
                 }
             } else if (!required && !isCurrentlyPlaying) {
-                 // Ensure alarm is cleared if requirement drops and nothing is playing
                  if (!isTrackerMode) notificationManager.cancelAlarm()
             }
         }

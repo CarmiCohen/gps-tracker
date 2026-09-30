@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.30.60:
+ * - Issue #1403: Standardized Siren Lockout to 30s as per SOT mandate.
  * Sep.30.4:
  * - Alignment: Updated to alignment Sep.30.4.
  * Sep.29.6:
@@ -183,7 +185,7 @@ const val VIBRATION_SHOCK_MULTIPLIER = 7.0
 const val VIBRATION_SUSPICIOUS_MULTIPLIER = 2.5
 const val INITIAL_VIBRATION_FLOOR = 0.05
 const val VIBRATION_WINDOW_SIZE = 5 
-const val PASSIVE_ZEROING_STATIONARY_MS = 300000L
+const val PASSIVE_ZEROING_STATIONARY_MS = 30000L
 const val ROTATION_INIT_STATIONARY_MS = 3000L
 const val BARO_ZEROING_INTERVAL_MS = 300000L 
 const val SPIKE_DEBOUNCE_MS = 5000L
@@ -471,7 +473,7 @@ const val LOG_MUZZLE_STARTUP_MS = 60000L
 const val FORENSIC_PINK_COLOR = 0xFFFF00FF.toInt()
 
 // Siren and Alarm UI
-const val SIREN_RESUME_COOLDOWN_MS = 15000L
+const val SIREN_RESUME_COOLDOWN_MS = 30000L
 const val SIREN_AUTO_STOP_MS = 30000L
 const val SIREN_FADE_IN_DURATION_MS = 1000L
 const val SIREN_SAMPLE_RATE = 44100

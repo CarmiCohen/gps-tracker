@@ -55,6 +55,9 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Sep.30.60:
+ * - Issue #1406: Standardized Role Identity Authority. Eliminated remaining 
+ *   hardcoded prefix strings ("T_", "V_", "VR_") in favor of AppRole enum (R-ID 565).
  * Sep.27.16:
  * - Issue #1173: Protobuf-First Persistence. Migrated alarm state to Protobuf role_alarms map.
  */
@@ -103,8 +106,14 @@ class SettingsRepository @Inject constructor(
     val relayUrlFlow: Flow<String> = dataStore.data.map { it.relayUrl.ifEmpty { DEFAULT_RELAY_URL } }
     val isManualExitFlow: Flow<Boolean> = dataStore.data.map { it.isManualExit }
     val lastAlarmAckTsFlow: Flow<Long> = dataStore.data.map { it.lastAlarmAckTs }
-    val trackerAlarmAckTsFlow: Flow<Long> = dataStore.data.map { it.roleLongsMap.getOrDefault("T_$LAST_ALARM_ACK_TS_KEY", 0L) }
-    val viewerAlarmAckTsFlow: Flow<Long> = dataStore.data.map { it.roleLongsMap.getOrDefault("V_$LAST_ALARM_ACK_TS_KEY", 0L) }
+    
+    val trackerAlarmAckTsFlow: Flow<Long> = dataStore.data.map { 
+        it.roleLongsMap.getOrDefault(AppRole.TRACKER.prefix + LAST_ALARM_ACK_TS_KEY, 0L) 
+    }
+    val viewerAlarmAckTsFlow: Flow<Long> = dataStore.data.map { 
+        it.roleLongsMap.getOrDefault(AppRole.VIEWER_SELF.prefix + LAST_ALARM_ACK_TS_KEY, 0L) 
+    }
+    
     val homePointsFlow: Flow<List<GeoPoint>> = dataStore.data.map { it.homePointsList.map { p -> GeoPoint(p.lat, p.lng) } }
     val maxDistanceFlow: Flow<Double> = dataStore.data.map { if (it.maxDistance > 0.0) it.maxDistance else DEFAULT_MAX_DISTANCE }
     val alertSettingsFlow: Flow<AlertSettings> = dataStore.data.map { SettingsMapper.protoToAlertSettings(it.alertSettings) }
@@ -118,9 +127,15 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getAppMode(): String? = dataStore.data.first().appMode.ifEmpty { null }
 
+    private fun isNamespaced(key: String): Boolean {
+        return key.startsWith(AppRole.TRACKER.prefix) || 
+               key.startsWith(AppRole.VIEWER_SELF.prefix) || 
+               key.startsWith(AppRole.VIEWER_REMOTE.prefix)
+    }
+
     suspend fun saveString(keyName: String, value: String) {
         dataStore.mutate {
-            if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
+            if (isNamespaced(keyName)) {
                 this.putRoleStrings(keyName, value)
             } else {
                 when (keyName) {
@@ -136,7 +151,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun saveLong(keyName: String, value: Long) {
         dataStore.mutate {
-            if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
+            if (isNamespaced(keyName)) {
                 this.putRoleLongs(keyName, value)
             } else {
                 when (keyName) {
@@ -168,7 +183,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun saveDouble(keyName: String, value: Double) {
         dataStore.mutate {
-            if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
+            if (isNamespaced(keyName)) {
                 this.putRoleDoubles(keyName, value)
             } else {
                 when (keyName) {
@@ -185,7 +200,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun saveBoolean(keyName: String, value: Boolean) {
         dataStore.mutate {
-            if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
+            if (isNamespaced(keyName)) {
                 this.putRoleBools(keyName, value)
             } else {
                 when (keyName) {
@@ -204,7 +219,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun saveInt(keyName: String, value: Int) {
         dataStore.mutate {
-            if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
+            if (isNamespaced(keyName)) {
                 this.putRoleInts(keyName, value)
             } else {
                 when (keyName) {
@@ -219,7 +234,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getString(keyName: String, default: String): String {
         val settings = dataStore.data.first()
-        if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
+        if (isNamespaced(keyName)) {
             return settings.roleStringsMap.getOrDefault(keyName, default)
         }
         val value = when (keyName) {
@@ -233,7 +248,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getLong(keyName: String, default: Long): Long {
         val settings = dataStore.data.first()
-        if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
+        if (isNamespaced(keyName)) {
             return settings.roleLongsMap.getOrDefault(keyName, default)
         }
         val value = when (keyName) {
@@ -265,7 +280,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getDouble(keyName: String, default: Double): Double {
         val settings = dataStore.data.first()
-        if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
+        if (isNamespaced(keyName)) {
             return settings.roleDoublesMap.getOrDefault(keyName, default)
         }
         val value = when (keyName) {
@@ -282,7 +297,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getBoolean(keyName: String, default: Boolean): Boolean {
         val settings = dataStore.data.first()
-        if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
+        if (isNamespaced(keyName)) {
             return settings.roleBoolsMap.getOrDefault(keyName, default)
         }
         return when (keyName) {
@@ -300,7 +315,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getInt(keyName: String, default: Int): Int {
         val settings = dataStore.data.first()
-        if (keyName.startsWith("T_") || keyName.startsWith("V_") || keyName.startsWith("VR_")) {
+        if (isNamespaced(keyName)) {
             return settings.roleIntsMap.getOrDefault(keyName, default)
         }
         val value = when (keyName) {

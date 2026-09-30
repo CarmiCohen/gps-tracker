@@ -13,15 +13,15 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.30.60:
+ * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
+ *   fix prefix mismatch ("VR_" parity with CommandRouter) (R-ID 453).
+ * - Issue #1404: Fixed Alarm Lockout Persistence. Utilizes BootLifecycleAuthority 
+ *   to recover lastSirenStopRt across service restarts, preventing immediate 
+ *   re-triggering after process recovery.
  * Sep.30.44:
  * - Issue #1401: Fixed AlarmInfo mapping to correctly populate isSirenDisabled 
  *   using isSpecialType. Ensures connectivity alerts do not trigger sirens.
- * Sep.30.5:
- * - Issue #1389 REMEDIATION: Added activeAlarmsFlow to support reactive 
- *   UI promotion. Ensures the Red Screen can be triggered without relying 
- *   exclusively on notification fullScreenIntents.
- * Sep.30.4:
- * - Issue #1382: Added getActiveAlarmSummary() to support UI notification triggering.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -48,7 +48,7 @@ class AppAlarmManager @Inject constructor(
     private val evaluationState = AlarmEvaluationState()
     
     private var isTrackerMode: Boolean = false
-    private var currentRolePrefix: String = ""
+    private var currentRole: AppRole = AppRole.TRACKER
 
     init {
         // React to lockout changes to refresh siren requirement
@@ -65,14 +65,15 @@ class AppAlarmManager @Inject constructor(
     fun getSettings(): AlertSettings = currentSettings
 
     fun setPowerAlarmPending(pending: Boolean, rolePrefix: String = "") {
-        val targetPrefix = if (rolePrefix.isNotEmpty()) rolePrefix else this.currentRolePrefix
-        if (targetPrefix != "T_" && targetPrefix != "VR_") {
-            Timber.w("AppAlarmManager: Rejecting invalid power alarm prefix mapping: $targetPrefix")
-            return
+        val targetRole = when (rolePrefix) {
+            AppRole.TRACKER.prefix -> AppRole.TRACKER
+            AppRole.VIEWER_REMOTE.prefix -> AppRole.VIEWER_REMOTE
+            else -> this.currentRole
         }
-        if (evaluationState.powerAlarmPending != pending || this.currentRolePrefix != targetPrefix) {
+        
+        if (evaluationState.powerAlarmPending != pending || this.currentRole != targetRole) {
             evaluationState.powerAlarmPending = pending
-            this.currentRolePrefix = targetPrefix
+            this.currentRole = targetRole
             saveLogicState()
             updateSirenRequirement()
         }
@@ -84,9 +85,6 @@ class AppAlarmManager @Inject constructor(
         }
     }
 
-    /**
-     * Issue #1382: Returns a comma-separated summary of all currently active (unresolved) alarm titles.
-     */
     fun getActiveAlarmSummary(): String {
         synchronized(evaluationState.activeAlarms) {
             return evaluationState.activeAlarms.values
@@ -99,7 +97,6 @@ class AppAlarmManager @Inject constructor(
         if (isTrackerMode) return false
         if (currentSettings.globalMute) return false
         
-        // Issue #1401: Only play siren if there is at least one unresolved "Special" alarm
         synchronized(evaluationState.activeAlarms) {
             val hasSpecialUnresolved = evaluationState.activeAlarms.values.any { 
                 !it.isResolved && isSpecialType(it.type) 
@@ -135,40 +132,39 @@ class AppAlarmManager @Inject constructor(
     }
 
     fun restoreLogicState(s: AppSettings, rolePrefix: String = "") {
-        this.currentRolePrefix = rolePrefix
-        this.isTrackerMode = (rolePrefix == "T_")
+        this.currentRole = if (rolePrefix == AppRole.TRACKER.prefix) AppRole.TRACKER else AppRole.VIEWER_REMOTE
+        this.isTrackerMode = (currentRole == AppRole.TRACKER)
         
-        if (rolePrefix.isEmpty()) {
-            evaluationState.firstViolationTs = s.firstViolationTs
-            evaluationState.firstViolationRt = s.firstViolationRt
-            evaluationState.firstViolationWasJump = s.firstViolationWasJump
-            evaluationState.distanceViolationCounter = s.distanceViolationCounter
-            evaluationState.wasDistanceViolated = s.wasDistanceViolated
-            evaluationState.powerAlarmPending = s.powerAlarmPending
-            evaluationState.lastSirenStopRt = s.lastSirenStopRt
-            evaluationState.lastGlobalTriggerRt = s.lastGlobalTriggerRt
-            evaluationState.forensicReliabilityDegradationStartRt = s.forensicReliabilityDegradationStartRt
-        } else {
-            evaluationState.firstViolationTs = s.roleLongsMap.getOrDefault(rolePrefix + FIRST_VIOLATION_TS_KEY, 0L)
-            evaluationState.firstViolationRt = s.roleLongsMap.getOrDefault(rolePrefix + FIRST_VIOLATION_RT_KEY, 0L)
-            evaluationState.firstViolationWasJump = s.roleBoolsMap.getOrDefault(rolePrefix + FIRST_VIOLATION_WAS_JUMP_KEY, false)
-            evaluationState.distanceViolationCounter = s.roleIntsMap.getOrDefault(rolePrefix + DISTANCE_VIOLATION_COUNTER_KEY, 0)
-            evaluationState.wasDistanceViolated = s.roleBoolsMap.getOrDefault(rolePrefix + WAS_DISTANCE_VIOLATED_KEY, false)
-            evaluationState.powerAlarmPending = s.roleBoolsMap.getOrDefault(rolePrefix + POWER_ALARM_PENDING_KEY, false)
-            evaluationState.lastSirenStopRt = s.roleLongsMap.getOrDefault(rolePrefix + LAST_SIREN_STOP_RT_KEY, 0L)
-            evaluationState.lastGlobalTriggerRt = s.roleLongsMap.getOrDefault(rolePrefix + LAST_GLOBAL_TRIGGER_RT_KEY, 0L)
-            evaluationState.forensicReliabilityDegradationStartRt = s.roleLongsMap.getOrDefault(rolePrefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, 0L)
-        }
+        val prefix = currentRole.prefix
+        evaluationState.firstViolationTs = s.roleLongsMap.getOrDefault(prefix + FIRST_VIOLATION_TS_KEY, 0L)
+        evaluationState.firstViolationRt = s.roleLongsMap.getOrDefault(prefix + FIRST_VIOLATION_RT_KEY, 0L)
+        evaluationState.firstViolationWasJump = s.roleBoolsMap.getOrDefault(prefix + FIRST_VIOLATION_WAS_JUMP_KEY, false)
+        evaluationState.distanceViolationCounter = s.roleIntsMap.getOrDefault(prefix + DISTANCE_VIOLATION_COUNTER_KEY, 0)
+        evaluationState.wasDistanceViolated = s.roleBoolsMap.getOrDefault(prefix + WAS_DISTANCE_VIOLATED_KEY, false)
+        evaluationState.powerAlarmPending = s.roleBoolsMap.getOrDefault(prefix + POWER_ALARM_PENDING_KEY, false)
+        evaluationState.lastSirenStopRt = s.roleLongsMap.getOrDefault(prefix + LAST_SIREN_STOP_RT_KEY, 0L)
+        evaluationState.lastGlobalTriggerRt = s.roleLongsMap.getOrDefault(prefix + LAST_GLOBAL_TRIGGER_RT_KEY, 0L)
+        evaluationState.forensicReliabilityDegradationStartRt = s.roleLongsMap.getOrDefault(prefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, 0L)
 
-        val savedBootId = s.roleStringsMap.getOrDefault(rolePrefix + "boot_id", "")
+        val savedBootId = s.roleStringsMap.getOrDefault(prefix + "boot_id", "")
         if (!bootLifecycleAuthority.isSessionValid(savedBootId)) {
+            // Full Reboot: Monotonic clock reset, wipe RT dependent states
             evaluationState.firstViolationRt = 0L
             evaluationState.lastSirenStopRt = 0L
             evaluationState.lastGlobalTriggerRt = 0L
             evaluationState.forensicReliabilityDegradationStartRt = 0L
             saveLogicState()
-        } else if (savedBootId.isEmpty()) {
-            saveLogicState()
+        } else {
+            // Service Restart: Recover monotonic timestamps to preserve lockout
+            evaluationState.lastSirenStopRt = bootLifecycleAuthority.recoverMonotonicTime(evaluationState.lastSirenStopRt, savedBootId)
+            evaluationState.lastGlobalTriggerRt = bootLifecycleAuthority.recoverMonotonicTime(evaluationState.lastGlobalTriggerRt, savedBootId)
+            
+            // Sync the centralized lockout use case with the recovered state
+            val nowRt = timeProvider.elapsedRealtime()
+            if (evaluationState.lastSirenStopRt > 0 && nowRt - evaluationState.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS) {
+                val remaining = SIREN_RESUME_COOLDOWN_MS - (nowRt - evaluationState.lastSirenStopRt)
+                sirenLockoutUseCase.setSilence(remaining)
+            }
         }
         
         syncActiveAlarmsFlow()
@@ -187,9 +183,9 @@ class AppAlarmManager @Inject constructor(
                 lastSirenStopRt = evaluationState.lastSirenStopRt,
                 lastGlobalTriggerRt = evaluationState.lastGlobalTriggerRt,
                 forensicReliabilityDegradationStartRt = evaluationState.forensicReliabilityDegradationStartRt,
-                rolePrefix = currentRolePrefix
+                rolePrefix = currentRole.prefix
             )
-            repository.saveString(currentRolePrefix + "boot_id", bootLifecycleAuthority.getCurrentBootId())
+            repository.saveString(currentRole.prefix + "boot_id", bootLifecycleAuthority.getCurrentBootId())
         }
     }
 
@@ -198,7 +194,7 @@ class AppAlarmManager @Inject constructor(
         serviceContext: AlarmServiceContext
     ) {
         this.isTrackerMode = serviceContext.isTrackerMode
-        this.currentRolePrefix = serviceContext.rolePrefix
+        this.currentRole = if (serviceContext.rolePrefix == AppRole.VIEWER_REMOTE.prefix) AppRole.VIEWER_REMOTE else AppRole.TRACKER
         val versionTag = "[${BuildConfig.VERSION_NAME}]"
         
         syncEvaluationState(snapshot, serviceContext)
@@ -370,7 +366,7 @@ class AppAlarmManager @Inject constructor(
             evaluationState.activeAlarms.values.toList()
         }
         scope.launch {
-            repository.saveActiveAlarms(alarms, currentRolePrefix)
+            repository.saveActiveAlarms(alarms, currentRole.prefix)
         }
     }
 
@@ -387,9 +383,8 @@ class AppAlarmManager @Inject constructor(
     }
 
     fun resetEvaluation(rolePrefix: String = "") {
-        val targetPrefix = if (rolePrefix.isNotEmpty()) rolePrefix else this.currentRolePrefix
-        if (targetPrefix == "T_" || targetPrefix == "VR_") {
-            this.currentRolePrefix = targetPrefix
+        if (rolePrefix.isNotEmpty()) {
+            this.currentRole = if (rolePrefix == AppRole.VIEWER_REMOTE.prefix) AppRole.VIEWER_REMOTE else AppRole.TRACKER
         }
         synchronized(evaluationState.activeAlarms) { evaluationState.activeAlarms.clear() }
         persistActiveAlarms()

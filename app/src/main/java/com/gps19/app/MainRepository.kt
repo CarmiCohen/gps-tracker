@@ -29,12 +29,9 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
- * Sep.27.16:
- * - Issue #1173: Protobuf-First Persistence. Substituted JSON alarm state with 
- *   binary Protobuf pipelines.
- * Sep.24.93:
- * - Issue #1265 REMEDIATION: Added getLocalLocationSync, getTrackerLocationSync, 
- *   and saveDoubleDebounced to support unified event orchestration.
+ * Sep.30.60:
+ * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum for 
+ *   acknowledgment tracking and prefix authority (R-ID 453/565).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -177,18 +174,18 @@ class MainRepository @Inject constructor(
     suspend fun saveLong(key: String, value: Long) {
         when (key) {
             LAST_ALARM_ACK_TS_KEY -> lastAlarmAckTs = value
-            "T_$LAST_ALARM_ACK_TS_KEY" -> trackerAlarmAckTs = value
-            "V_$LAST_ALARM_ACK_TS_KEY" -> viewerAlarmAckTs = value
-            "VR_$LAST_ALARM_ACK_TS_KEY" -> viewerRemoteAlarmAckTs = value
+            AppRole.TRACKER.prefix + LAST_ALARM_ACK_TS_KEY -> trackerAlarmAckTs = value
+            AppRole.VIEWER_SELF.prefix + LAST_ALARM_ACK_TS_KEY -> viewerAlarmAckTs = value
+            AppRole.VIEWER_REMOTE.prefix + LAST_ALARM_ACK_TS_KEY -> viewerRemoteAlarmAckTs = value
         }
         settings.saveLong(key, value)
     }
     fun saveLongSync(key: String, value: Long) {
         when (key) {
             LAST_ALARM_ACK_TS_KEY -> lastAlarmAckTs = value
-            "T_$LAST_ALARM_ACK_TS_KEY" -> trackerAlarmAckTs = value
-            "V_$LAST_ALARM_ACK_TS_KEY" -> viewerAlarmAckTs = value
-            "VR_$LAST_ALARM_ACK_TS_KEY" -> viewerRemoteAlarmAckTs = value
+            AppRole.TRACKER.prefix + LAST_ALARM_ACK_TS_KEY -> trackerAlarmAckTs = value
+            AppRole.VIEWER_SELF.prefix + LAST_ALARM_ACK_TS_KEY -> viewerAlarmAckTs = value
+            AppRole.VIEWER_REMOTE.prefix + LAST_ALARM_ACK_TS_KEY -> viewerRemoteAlarmAckTs = value
         }
         scope.launch { settings.saveLong(key, value) }
     }
@@ -231,9 +228,9 @@ class MainRepository @Inject constructor(
 
     fun getLastAlarmAckTsSync(rolePrefix: String? = null): Long {
         return when (rolePrefix) {
-            "T_" -> trackerAlarmAckTs
-            "V_" -> viewerAlarmAckTs
-            "VR_" -> viewerRemoteAlarmAckTs
+            AppRole.TRACKER.prefix -> trackerAlarmAckTs
+            AppRole.VIEWER_SELF.prefix -> viewerAlarmAckTs
+            AppRole.VIEWER_REMOTE.prefix -> viewerRemoteAlarmAckTs
             else -> lastAlarmAckTs
         }
     }

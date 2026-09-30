@@ -16,10 +16,10 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
- * Sep.28.29:
- * - Issue #071 Hardening: Added explicit logging for ExecuteStressTest command routing.
- * Sep.27.10:
- * - Issue #1201 RESOLVED: Updated StopSiren path to utilize SirenLockoutUseCase authority (R-ID 510).
+ * Sep.30.60:
+ * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
+ *   fix prefix mismatch. StopSiren now updates AppRole.VIEWER_REMOTE in 
+ *   Viewer mode to align with AppAlarmManager authority (R-ID 453/565).
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -81,14 +81,15 @@ class CommandRouter @Inject constructor(
                         is UiCommand.SyncRequest -> domainEventBus.emit(CommandEvent.UiPulse)
                         is UiCommand.UiVisibilityChanged -> domainEventBus.emit(CommandEvent.UiVisibilityChanged(command.visible))
                         is UiCommand.StopSiren -> {
-                            val prefix = if (configManager.isTrackerMode) "T_" else "V_"
-                            repository.saveLongSync(prefix + LAST_ALARM_ACK_TS_KEY, timeProvider.currentTimeMillis())
-                            alarmManager.setPowerAlarmPending(false, prefix)
+                            // R-ID 453/565: Local stop command affects the local app's alarm state.
+                            // In Viewer mode, the alarm authority is VIEWER_REMOTE ("VR_").
+                            val role = if (configManager.isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE
+                            repository.saveLongSync(role.prefix + LAST_ALARM_ACK_TS_KEY, timeProvider.currentTimeMillis())
+                            alarmManager.setPowerAlarmPending(false, role.prefix)
                             alarmManager.notifySirenManualStop() 
                             alarmManager.dismissResolvedAlarms()
                             integrityMonitor.clearPowerTamper()
                             sessionManager.notifyTamperCleared() 
-                            // R-ID 510: Centralized Lockout Authority
                             sirenLockoutUseCase.setSilence(SILENCE_TIMEOUT_MS)
                             audioSynthesizer.stopSiren(timeProvider = timeProvider)
                             notificationManager.cancelAlarm()

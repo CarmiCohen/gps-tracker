@@ -1,31 +1,30 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.30.50
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.30.60
 
-## 🎯 Current Resumption Focus: Alarm System Hardening
-Resolving re-triggering loops and ensuring SOT compliance for siren lockout and prefix consistency.
+## 🎯 Current Resumption Focus: Horizontal Hardening & Release Stability
+Stability of Alarm Muting, Communication Contracts, and UI State Authority.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
 ### 🔴 High Priority (Field & Soak Testing Readiness)
-*   **Issue #1406: Role Prefix Mismatch (Critical Bug).**
-    *   *Significance*: **Functional Failure**. `CommandRouter` utilizes `"V_"` for Viewer role state, while `AppAlarmManager` and `AlertUseCase` utilize `"VR_"`. Acknowledgments are saved to orphaned keys, causing the engine to re-trigger alarms immediately as it never sees the "Stop" event.
-*   **Issue #1403: Siren Lockout Duration Mismatch (SOT Deviation).**
-    *   *Significance*: **SOT Compliance**. Requirement mandates 30s lockout; implementation uses 15s (`SIREN_RESUME_COOLDOWN_MS`).
-*   **Issue #1404: Alarm Lockout Persistence Loss.**
-    *   *Significance*: **User Experience**. `AppAlarmManager` wipes `lastSirenStopRt` on reboot/restart, causing previously muted alarms to fire again on service recovery.
-*   **Issue #1405: Sequential Trigger Mute Failure.**
-    *   *Significance*: **Logic Flaw**. New "Special" alarm types can break an existing siren lockout, leading to "unmutable" alarm sequences.
+*(No high-priority gaps remain open)*
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 1)
+## 💡 Strategic Simplification Ideas (Ideas: 2)
 
 ### 🔵 Low Priority
+*   **Issue #1407: Unified Storage Authority.**
+    *   *Significance*: **Maintenance (Refactoring)**. Now that `AppRole` is established, refactor `SettingsRepository` to accept an `AppRole` parameter for all namespaced calls, eliminating string manipulation and improving type safety.
 *   **Issue #1175: Real-time Only Path (Pivot Option)**
     *   *Significance*: **Strategic (Maintenance Tradeoff)**. Consider removing backlog sync and forensic backfilling to dramatically reduce codebase complexity.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1406: Role Identity Authority.** (Resolved Sep.30.60)
+*   **Issue #1403: Siren Lockout Compliance.** (Resolved Sep.30.60)
+*   **Issue #1404: Lockout Persistence.** (Resolved Sep.30.60)
+*   **Issue #1405: Sequential Trigger Mute Protection.** (Resolved Sep.30.60)
 *   **Issue #1402: Alarm Overlay Z-Index.** (Resolved Sep.30.43)
 *   **Issue #1401: Connectivity Alarm Suppression.** (Resolved Sep.30.43)
 *   **Issue #1390: Camera Action Event Flow.** (Resolved Sep.30.43)
@@ -39,5 +38,6 @@ Resolving re-triggering loops and ensuring SOT compliance for siren lockout and 
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Sep.30.60: [SOT Count: 227 (Rules: 78), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 6, QA: 316]**
 - **Sep.30.50: [SOT Count: 227 (Rules: 78), Open: H:4, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 6, QA: 312]**
 - **Sep.30.43: [SOT Count: 227 (Rules: 75), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 6, QA: 308]**

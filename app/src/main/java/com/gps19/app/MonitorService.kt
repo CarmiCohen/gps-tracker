@@ -24,12 +24,11 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.30.60:
+ * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
+ *   ensure prefix consistency (R-ID 453/565).
  * Sep.30.40:
  * - Issue #1386 RESOLVED: Integrated TrackerStateManager into processTick. 
- *   Centralized behavioral state authority to ensure consistency between 
- *   HUD, Signaling, and Persistence (R-ID 548).
- * Sep.30.4:
- * - Alignment: Updated to alignment Sep.30.4.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -40,7 +39,7 @@ class MonitorService : BaseMonitorService() {
     @Inject lateinit var domainEventBus: DomainEventBus
 
     private var activeMode: String? = null
-    private var rolePrefix: String = "T_"
+    private var currentRole: AppRole = AppRole.TRACKER
     private var isTrackerMode: Boolean = true
     
     private val forensicTriggerChannel = Channel<Boolean>(Channel.BUFFERED)
@@ -71,11 +70,9 @@ class MonitorService : BaseMonitorService() {
     private var lastGpsBearing = 0.0
     private var lastGpsAccuracy = 0.0
 
-    // Manual Injection States for Stress Testing (#071)
     private var isManualJammerActive = false
     private var isManualStallActive = false
 
-    // R-ID 392: Reusable flyweight snapshots to eliminate GC churn on the evaluation path.
     private val evaluationSnapshotFlyweight = SystemEvaluationSnapshot()
     private val pointSnapshotFlyweight = SystemEvaluationSnapshot()
     private val alarmSnapshotFlyweight = SystemEvaluationSnapshot()
@@ -85,7 +82,7 @@ class MonitorService : BaseMonitorService() {
             activeMode = repository.getAppMode() ?: "tracker"
         }
         isTrackerMode = activeMode == "tracker"
-        rolePrefix = if (isTrackerMode) "T_" else "V_"
+        currentRole = if (isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_SELF
         notificationManager.setTrackerMode(isTrackerMode)
         
         primaryProcessor = LocationProcessor(timeProvider, domainEventBus, isPrimary = true)
@@ -93,8 +90,8 @@ class MonitorService : BaseMonitorService() {
     }
 
     override suspend fun onServiceInitialize() {
-        repository.saveLongSync(rolePrefix + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
-        repository.saveLongSync(rolePrefix + LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime())
+        repository.saveLongSync(currentRole.prefix + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        repository.saveLongSync(currentRole.prefix + LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime())
 
         val trackerId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
         val viewerId = repository.getString(VIEWER_ID_KEY, SettingsRepository.DEFAULT_VIEWER_ID)
@@ -116,7 +113,7 @@ class MonitorService : BaseMonitorService() {
         
         loadLogicState()
 
-        historyManager.initialize(lifecycleScope, rolePrefix)
+        historyManager.initialize(lifecycleScope, currentRole.prefix)
         hardwareSuite.start()
 
         commandRouter.register()
@@ -129,7 +126,7 @@ class MonitorService : BaseMonitorService() {
             hardwareSuite.gnssDetailFlow.collectLatest { latestGnssDetail = it }
         }
 
-        val recoveredTs = repository.getLong(rolePrefix + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        val recoveredTs = repository.getLong(currentRole.prefix + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
         val recoveredDrift = repository.getLong(CLOCK_DRIFT_REF_KEY, 0L)
         
         lastServiceTickTs = recoveredTs
@@ -154,11 +151,11 @@ class MonitorService : BaseMonitorService() {
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
         val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
 
-        val primaryState = repository.loadTrackerState(rolePrefix)
+        val primaryState = repository.loadTrackerState(currentRole.prefix)
         primaryProcessor.loadState(
-            savedMaxAccuracy = repository.getDouble(rolePrefix + MAX_ACCURACY_KEY, 0.0),
-            savedLastSitTs = repository.getLong(rolePrefix + LAST_SIT_TS_KEY, 0L),
-            savedBaseline = repository.getDouble(rolePrefix + CHAIR_BASELINE_TILT_KEY, -1000.0),
+            savedMaxAccuracy = repository.getDouble(currentRole.prefix + MAX_ACCURACY_KEY, 0.0),
+            savedLastSitTs = repository.getLong(currentRole.prefix + LAST_SIT_TS_KEY, 0L),
+            savedBaseline = repository.getDouble(currentRole.prefix + CHAIR_BASELINE_TILT_KEY, -1000.0),
             trackerState = primaryState,
             homePoints = homePoints,
             maxDistance = maxDist,
@@ -169,23 +166,24 @@ class MonitorService : BaseMonitorService() {
             savedSitShock = primaryState?.sitShock ?: 0.0,
             savedSitVzTs = primaryState?.sitVzTs ?: 0L,
             savedSitVzRt = primaryState?.sitVzRt ?: 0L,
-            savedLastValidFixRt = repository.getLong(rolePrefix + LAST_VALID_FIX_RT_KEY, 0L),
-            savedVibrationFloor = repository.getDouble(rolePrefix + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
-            savedLuxBaseline = repository.getDouble(rolePrefix + TRACKER_LUX_BASELINE_KEY, -1.0),
-            savedAcousticFloor = repository.getDouble(rolePrefix + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
+            savedLastValidFixRt = repository.getLong(currentRole.prefix + LAST_VALID_FIX_RT_KEY, 0L),
+            savedVibrationFloor = repository.getDouble(currentRole.prefix + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
+            savedLuxBaseline = repository.getDouble(currentRole.prefix + TRACKER_LUX_BASELINE_KEY, -1.0),
+            savedAcousticFloor = repository.getDouble(currentRole.prefix + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
         )
 
-        val vibeFloor = repository.getDouble(rolePrefix + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0)
+        val vibeFloor = repository.getDouble(currentRole.prefix + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0)
         if (vibeFloor >= 0.0 && isTrackerMode) {
             hardwareSuite.setAdaptiveVibrationFloor(vibeFloor)
         }
 
         if (!isTrackerMode) {
-            val remoteState = repository.loadTrackerState("VR_")
+            val remoteRole = AppRole.VIEWER_REMOTE
+            val remoteState = repository.loadTrackerState(remoteRole.prefix)
             remoteProcessor.loadState(
-                savedMaxAccuracy = repository.getDouble("VR_" + MAX_ACCURACY_KEY, 0.0),
-                savedLastSitTs = repository.getLong("VR_" + LAST_SIT_TS_KEY, 0L),
-                savedBaseline = repository.getDouble("VR_" + CHAIR_BASELINE_TILT_KEY, -1000.0),
+                savedMaxAccuracy = repository.getDouble(remoteRole.prefix + MAX_ACCURACY_KEY, 0.0),
+                savedLastSitTs = repository.getLong(remoteRole.prefix + LAST_SIT_TS_KEY, 0L),
+                savedBaseline = repository.getDouble(remoteRole.prefix + CHAIR_BASELINE_TILT_KEY, -1000.0),
                 trackerState = remoteState,
                 homePoints = homePoints,
                 maxDistance = maxDist,
@@ -197,15 +195,15 @@ class MonitorService : BaseMonitorService() {
                 savedSitVzTs = remoteState?.sitVzTs ?: 0L,
                 savedSitVzRt = remoteState?.sitVzRt ?: 0L,
                 savedLastValidFixRt = remoteState?.lastValidFixRt ?: 0L,
-                savedVibrationFloor = repository.getDouble("VR_" + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
-                savedLuxBaseline = repository.getDouble("VR_" + TRACKER_LUX_BASELINE_KEY, -1.0),
-                savedAcousticFloor = repository.getDouble("VR_" + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
+                savedVibrationFloor = repository.getDouble(remoteRole.prefix + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
+                savedLuxBaseline = repository.getDouble(remoteRole.prefix + TRACKER_LUX_BASELINE_KEY, -1.0),
+                savedAcousticFloor = repository.getDouble(remoteRole.prefix + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
             )
         }
 
-        val alarmPrefix = if (isTrackerMode) "T_" else "VR_"
-        alarmManager.restoreState(repository.loadActiveAlarms(alarmPrefix))
-        alarmManager.restoreLogicState(settingsSnapshot, alarmPrefix)
+        val alarmRole = if (isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE
+        alarmManager.restoreState(repository.loadActiveAlarms(alarmRole.prefix))
+        alarmManager.restoreLogicState(settingsSnapshot, alarmRole.prefix)
     }
 
     private fun setupServiceObservers() {
@@ -241,7 +239,7 @@ class MonitorService : BaseMonitorService() {
 
         activeMode = newMode
         isTrackerMode = newMode == "tracker"
-        rolePrefix = if (isTrackerMode) "T_" else "V_"
+        currentRole = if (isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_SELF
         notificationManager.setTrackerMode(isTrackerMode)
         configManager.isTrackerMode = isTrackerMode
 
@@ -420,7 +418,6 @@ class MonitorService : BaseMonitorService() {
         val isSocketConnected = connectivitySuite.isConnected(); connectivitySuite.updateRelayStatus(isSocketConnected)
         val isPeerActive = if (isTrackerMode) (sessionManager.getViewerCount() > 0 || isRecentUiPulse()) else (connectivitySuite.lastPeerActivityTs > 0 && (nowRt - connectivitySuite.lastPeerActivityTs < WATCH_TIMEOUT_MS))
 
-        // R-ID 392: Populate flyweight instead of allocating a new snapshot every tick.
         evaluationSnapshotFlyweight.apply {
             reset()
             kinetic.apply {
@@ -450,8 +447,6 @@ class MonitorService : BaseMonitorService() {
                 satsView = hardwareSuite.satellitesInView; violationUptimeMs = sessionManager.violationUptimeMs
                 violationPercentage = sessionManager.getViolationPercentage()
                 thermalHeadroom = health.thermalHeadroom; heapAllocatedMb = health.heapAllocatedMb
-                
-                // Issue #071 Manual Injections
                 if (isManualJammerActive) isJammer = true
                 if (isManualStallActive) isStalled = true
             }
@@ -474,12 +469,12 @@ class MonitorService : BaseMonitorService() {
             isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(isSuspiciousMode, primaryProcessor.checkPhysicalTamper(nowRt, false) == SentinelStatus.TAMPER, primaryProcessor.consumeSitDetected(), nowRt)
             val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(evaluationSnapshotFlyweight.integrity.isCoolingModeActive, isSuspiciousMode, hardwareSuite.isStationary(), hardwareSuite.isScreenOn(), primaryProcessor.getMaxDistanceAuthority() > 0.0, evaluationSnapshotFlyweight.activityType, nowRt, capabilities)
             if (targetGpsInterval != currentIntervalMs) {
-                currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, "T"); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)
+                currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, currentRole.prefix); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)
             }
         } else {
             val targetGpsInterval = if (isUiVisible()) HIGH_FREQUENCY_GPS_POLLING_MS else VIEWER_GPS_POLLING_MS
             if (targetGpsInterval != currentIntervalMs) {
-                currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, "V"); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)
+                currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, currentRole.prefix); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)
             }
         }
 
@@ -497,7 +492,7 @@ class MonitorService : BaseMonitorService() {
             }
         }
 
-        forensicAuditor.evaluateStability(nowRt, if (isTrackerMode) "T" else "V")?.let { verdict ->
+        forensicAuditor.evaluateStability(nowRt, currentRole.prefix)?.let { verdict ->
             val proc = lastProcessedLocation
             domainEventBus.emit(DomainEvent.StabilityViolation(message = verdict.message, isJitter = verdict.isJitterViolation, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy))
         }
@@ -516,10 +511,7 @@ class MonitorService : BaseMonitorService() {
 
         while (locationBuffer.isNotEmpty()) {
             val loc = locationBuffer.poll() ?: break
-            
-            forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, if (isTrackerMode) "T" else "V")
-
-            // R-ID 392: Use pointSnapshot flyweight for GPS coordinate processing.
+            forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, currentRole.prefix)
             pointSnapshotFlyweight.apply {
                 copyFrom(evaluationSnapshotFlyweight)
                 kinetic.apply {
@@ -529,34 +521,16 @@ class MonitorService : BaseMonitorService() {
                 }
                 isMuzzled = if (isTrackerMode) isSuspiciousMode else false
             }
-            
-            lastProcessedLocation = primaryProcessor.processGpsPoint(
-                snapshot = pointSnapshotFlyweight, 
-                isViewerTrail = !isTrackerMode, 
-                lastGpsTs = sessionManager.lastGpsTs, 
-                isLocal = true
-            )
-            if (lastProcessedLocation?.isClockRegression == false) {
-                sessionManager.lastGpsTs = loc.time
-            }
-            lastGpsBearing = loc.bearing.toDouble()
-            lastGpsAccuracy = loc.accuracy.toDouble()
+            lastProcessedLocation = primaryProcessor.processGpsPoint(snapshot = pointSnapshotFlyweight, isViewerTrail = !isTrackerMode, lastGpsTs = sessionManager.lastGpsTs, isLocal = true)
+            if (lastProcessedLocation?.isClockRegression == false) { sessionManager.lastGpsTs = loc.time }
+            lastGpsBearing = loc.bearing.toDouble(); lastGpsAccuracy = loc.accuracy.toDouble()
         }
 
         val proc = lastProcessedLocation
         if (proc != null) {
-            // R-ID 548: Centralize TrackerState authority in engine tick.
             evaluationSnapshotFlyweight.trackerState = if (isTrackerMode) {
-                TrackerStateManager.updateState(
-                    status = proc.status,
-                    speed = proc.filteredSpeed,
-                    vibration = evaluationSnapshotFlyweight.atmospheric.vibration,
-                    vibrationFloor = primaryProcessor.getAdaptiveVibrationFloor(),
-                    isTrackerConnected = isSocketConnected && isPeerActive,
-                    systemTimePulse = nowRt
-                )
+                TrackerStateManager.updateState(status = proc.status, speed = proc.filteredSpeed, vibration = evaluationSnapshotFlyweight.atmospheric.vibration, vibrationFloor = primaryProcessor.getAdaptiveVibrationFloor(), isTrackerConnected = isSocketConnected && isPeerActive, systemTimePulse = nowRt)
             } else TrackerState.UNKNOWN
-
             evaluateAlarmsInternal(now, nowRt, isSocketConnected, isPeerActive, proc, hSnapshot, proc.timestamp, evaluationSnapshotFlyweight)
         }
 
@@ -580,36 +554,21 @@ class MonitorService : BaseMonitorService() {
         ))
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
-        repository.saveLongSync(rolePrefix + LAST_SERVICE_TICK_TS_KEY, now)
-        repository.saveLongSync(rolePrefix + LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
+        repository.saveLongSync(currentRole.prefix + LAST_SERVICE_TICK_TS_KEY, now)
+        repository.saveLongSync(currentRole.prefix + LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
         serviceTickCounter++
         triggerForensicSample()
     }
 
     private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isPeerActive: Boolean, processed: ProcessedLocation, hSnapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long, evaluationSnapshot: SystemEvaluationSnapshot) {
-        // R-ID 392: Use alarmSnapshot flyweight to avoid allocation in evaluation path.
         if (isTrackerMode) {
-            TelemetryMapper.mapProcessedToSnapshot(
-                snapshot = evaluationSnapshot,
-                processed = processed,
-                rawGpsTs = rawGpsTs,
-                lastValidFixRt = primaryProcessor.getLastValidFixRt(),
-                snrSnapshot = hardwareSuite.averageSnr,
-                out = alarmSnapshotFlyweight
-            )
+            TelemetryMapper.mapProcessedToSnapshot(snapshot = evaluationSnapshot, processed = processed, rawGpsTs = rawGpsTs, lastValidFixRt = primaryProcessor.getLastValidFixRt(), snrSnapshot = hardwareSuite.averageSnr, out = alarmSnapshotFlyweight)
         } else {
-            TelemetryMapper.mapStatusToSnapshot(
-                s = connectivitySuite.trackerStatus,
-                base = evaluationSnapshot,
-                nowRt = nowRt,
-                out = alarmSnapshotFlyweight
-            )
+            TelemetryMapper.mapStatusToSnapshot(s = connectivitySuite.trackerStatus, base = evaluationSnapshot, nowRt = nowRt, out = alarmSnapshotFlyweight)
         }
 
-        val serviceContext = AlarmServiceContext(now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = isTrackerMode, isRelayConnected = isSocketConnected, isTrackerConnected = if (isTrackerMode) true else isPeerActive, isUiVisible = isUiVisible(), distToHomeAuthority = if (isTrackerMode) processed.distToHome else (if (isSocketConnected && isPeerActive) PhysicsUtils.calculateDistance(alarmSnapshotFlyweight.kinetic.lat, alarmSnapshotFlyweight.kinetic.lng, (repository.getCachedHomePoints().firstOrNull()?.latitude ?: 0.0), (repository.getCachedHomePoints().firstOrNull()?.longitude ?: 0.0)) else null), maxDistanceAuthority = (if (isTrackerMode) primaryProcessor else remoteProcessor).getMaxDistanceAuthority(), capabilities = capabilities, rolePrefix = if (isTrackerMode) "T_" else "VR_")
+        val serviceContext = AlarmServiceContext(now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = isTrackerMode, isRelayConnected = isSocketConnected, isTrackerConnected = if (isTrackerMode) true else isPeerActive, isUiVisible = isUiVisible(), distToHomeAuthority = if (isTrackerMode) processed.distToHome else (if (isSocketConnected && isPeerActive) PhysicsUtils.calculateDistance(alarmSnapshotFlyweight.kinetic.lat, alarmSnapshotFlyweight.kinetic.lng, (repository.getCachedHomePoints().firstOrNull()?.latitude ?: 0.0), (repository.getCachedHomePoints().firstOrNull()?.longitude ?: 0.0)) else null), maxDistanceAuthority = (if (isTrackerMode) primaryProcessor else remoteProcessor).getMaxDistanceAuthority(), capabilities = capabilities, rolePrefix = if (isTrackerMode) AppRole.TRACKER.prefix else AppRole.VIEWER_REMOTE.prefix)
         tickOrchestrator.launchJob("alarm_evaluation", lifecycleScope + Dispatchers.Default) {
-            // We pass a copy here because evaluateAlarms might be async or run in parallel with next tick.
-            // Ticks happen every 1s. To be safe, we snapshot for evaluation.
             alarmManager.evaluateAlarms(alarmSnapshotFlyweight.copy(), serviceContext)
         }
     }
@@ -673,26 +632,12 @@ class MonitorService : BaseMonitorService() {
 
     private fun executeAutomatedStressTest() {
         lifecycleScope.launch(Dispatchers.Default) {
-            Timber.i("MonitorService: Initiating executeAutomatedStressTest.")
-            domainEventBus.emit(DomainEvent.ServiceStatus("FORENSIC TEST: Manually injecting Jammer/Stall markers", isImportant = true))
-            
-            isManualJammerActive = true
-            isManualStallActive = true
-            repository.setForensicStallSimulation(true)
-            
-            domainEventBus.emit(DomainEvent.ServiceStatus("FORENSIC STRESS TEST: Initiating 10s CPU/IO saturation burst.", isImportant = true))
+            isManualJammerActive = true; isManualStallActive = true; repository.setForensicStallSimulation(true)
             val cpuOrder = launch(Dispatchers.Default) { val end = System.currentTimeMillis() + 10000L; var count = 0L; while (System.currentTimeMillis() < end) { sin(count.toDouble()); cos(count.toDouble()); sqrt(count.toDouble()); count++ }; domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: CPU Saturation complete ($count iterations).")) }
             val ioJob = launch(Dispatchers.IO) { val end = System.currentTimeMillis() + 10000L; val data = ByteArray(1024 * 1024) { 0xFF.toByte() }; val tempFile = File(cacheDir, "stress_test.tmp"); var writes = 0; while (System.currentTimeMillis() < end) { try { FileOutputStream(tempFile).use { fos -> fos.write(data); fos.flush() }; writes++ } catch (e: Exception) { Timber.e(e, "Stress Test IO failure") } }; tempFile.delete(); domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: IO Saturation complete ($writes MB written).")) }
             val forensicJob = launch(Dispatchers.Default) { repeat(1000) { i -> logManager.logForensicTrace("STRESS_BURST: Forensic sample #$i injection."); if (i % 100 == 0) delay(1) }; domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: Forensic Saturation burst complete.")) }
-            
             joinAll(cpuOrder, ioJob, forensicJob)
-            
-            delay(40000) // Extended duration to 40s to cross 30s reliability alerting threshold (R715)
-            isManualJammerActive = false
-            isManualStallActive = false
-            repository.setForensicStallSimulation(false)
-            
-            domainEventBus.emit(DomainEvent.ServiceStatus("FORENSIC STRESS TEST: Saturation routine COMPLETED.", isImportant = true))
+            delay(40000); isManualJammerActive = false; isManualStallActive = false; repository.setForensicStallSimulation(false)
         }
     }
 

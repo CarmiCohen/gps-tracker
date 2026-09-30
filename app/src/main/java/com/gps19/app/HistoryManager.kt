@@ -22,10 +22,11 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.30.60:
+ * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
+ *   ensure prefix consistency (R-ID 453/565).
  * Sep.27.4:
  * - Issue #1348: Flattened DomainEvent hierarchy, emitting HistoryEvent directly.
- * Sep.26.0:
- * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -59,23 +60,24 @@ class HistoryManager @Inject constructor(
     private var lastAuditTs = 0L
     private var lastTimeTriggerTs = 0L
     private var lastSitDetectedRt = 0L
-    private var currentRolePrefix: String = ""
+    private var currentRole: AppRole = AppRole.TRACKER
 
     private val ribbonMutex = Mutex()
 
     /**
-     * initialize: Binds the manager to an active service scope and hydrates role-prefixed state.
+     * initialize: Binds the manager to an active service scope and hydrates role-aware state.
      */
     suspend fun initialize(scope: CoroutineScope, rolePrefix: String = "") {
         this.scope = scope
-        this.currentRolePrefix = rolePrefix
+        // R-ID 453/565: HistoryManager initialization handles the local role (Tracker or Viewer-Self)
+        this.currentRole = if (rolePrefix == AppRole.VIEWER_SELF.prefix) AppRole.VIEWER_SELF else AppRole.TRACKER
         
         withContext(Dispatchers.IO) {
-            val lastSitTs = repository.getLong(rolePrefix + LAST_HISTORY_SIT_TS_KEY, 0L)
+            val lastSitTs = repository.getLong(currentRole.prefix + LAST_HISTORY_SIT_TS_KEY, 0L)
             if (lastSitTs > 0) {
                  lastSitDetectedRt = timeProvider.elapsedRealtime() - (timeProvider.currentTimeMillis() - lastSitTs)
             }
-            clockDriftRef = repository.getLong(rolePrefix + CLOCK_DRIFT_REF_KEY, 0L)
+            clockDriftRef = repository.getLong(currentRole.prefix + CLOCK_DRIFT_REF_KEY, 0L)
             lastProcessedHour = repository.getInt(LAST_AUTO_SAVE_HOUR_KEY, -1)
         }
         isInitialized.set(true)
@@ -234,7 +236,7 @@ class HistoryManager @Inject constructor(
             this.cpuLoad = cpuLoad; this.ioWait = ioWait; this.maxIoLatency = maxIoLatency; this.isSilentFailure = isSilentFailure
             this.isBatteryLow = isBatteryLow; this.isBatteryCritical = isBatteryCritical
             this.noiseIdx = noiseIdx; this.luxIdx = luxIdx; this.vibeIdx = vibeIdx; this.proxIdx = proxIdx
-            this.liftIdx = liftIdx; this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
+            this.initLiftIdx(liftIdx); this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
             this.isUltraLongStationary = isUltraLongStationary
         }
         
@@ -285,7 +287,7 @@ class HistoryManager @Inject constructor(
             this.cpuLoad = cpuLoad; this.ioWait = ioWait; this.maxIoLatency = maxIoLatency; this.isSilentFailure = isSilentFailure
             this.isBatteryLow = isBatteryLow; this.isBatteryCritical = isBatteryCritical
             this.noiseIdx = noiseIdx; this.luxIdx = luxIdx; this.vibeIdx = vibeIdx; this.proxIdx = proxIdx
-            this.liftIdx = liftIdx; this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
+            this.initLiftIdx(liftIdx); this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
             this.sitVz = sitVz; this.sitVzTs = sitVzTs; this.sitVzRt = sitVzRt; this.sitDz = sitDz
             this.sitBaro = sitBaro; this.sitTilt = sitTilt; this.sitShock = sitShock; this.verticalVelocity = verticalVelocity
             this.isUltraLongStationary = isUltraLongStationary
@@ -354,7 +356,7 @@ class HistoryManager @Inject constructor(
         val currentDrift = nowWall - monotonic
         if (clockDriftRef == 0L) {
             clockDriftRef = currentDrift
-            scope?.launch { repository.saveLong(currentRolePrefix + CLOCK_DRIFT_REF_KEY, currentDrift) }
+            scope?.launch { repository.saveLong(currentRole.prefix + CLOCK_DRIFT_REF_KEY, currentDrift) }
             return
         }
         val delta = abs(currentDrift - clockDriftRef)
@@ -362,7 +364,7 @@ class HistoryManager @Inject constructor(
             val direction = if (currentDrift > clockDriftRef) "forward" else "backward"
             emitSanitizedLog("FORENSIC ALERT: System clock jump detected ($direction ${delta / 1000}s).", true)
             clockDriftRef = currentDrift
-            scope?.launch { repository.saveLong(currentRolePrefix + CLOCK_DRIFT_REF_KEY, currentDrift) }
+            scope?.launch { repository.saveLong(currentRole.prefix + CLOCK_DRIFT_REF_KEY, currentDrift) }
         }
     }
 
@@ -370,7 +372,7 @@ class HistoryManager @Inject constructor(
         if (!isDetected) return false
         if (abs(rt - lastSitDetectedRt) < SIT_DUPLICATE_GUARD_MS) return false
         lastSitDetectedRt = rt
-        scope?.launch { repository.saveLong(currentRolePrefix + LAST_HISTORY_SIT_TS_KEY, ts) }
+        scope?.launch { repository.saveLong(currentRole.prefix + LAST_HISTORY_SIT_TS_KEY, ts) }
         return true
     }
 
@@ -425,5 +427,9 @@ class HistoryManager @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun EngineConnectionPoint.initLiftIdx(value: Double) {
+        this.liftIdx = value
     }
 }

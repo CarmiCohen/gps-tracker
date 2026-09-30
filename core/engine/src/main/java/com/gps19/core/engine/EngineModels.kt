@@ -5,12 +5,10 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * Sep.30.40:
- * - Issue #1386: Added trackerState to SystemEvaluationSnapshot to centralize 
- *   behavioral state authority and prevent HUD/Signaling inconsistency (R-ID 548).
- * Sep.27.18:
- * - Issue #1205: Context-Aware Power Optimization. Added ActivityType enum 
- *   and integrated it into EngineConnectionPoint, SystemEvaluationSnapshot, and EngineSensorSnapshot.
+ * Sep.30.60:
+ * - Issue #1406: Standardized Role Identity. Refined AppRole enum to 
+ *   distinguish between VIEWER_SELF ("V_") and VIEWER_REMOTE ("VR_").
+ * - Fixed LogEvent data class properties (missing val).
  */
 
 @Serializable
@@ -39,6 +37,17 @@ enum class TrackerState { MOVING, PARKING, JUMPING, OFFLINE, UNKNOWN }
 @Serializable
 enum class ActivityType { STILL, WALKING, RUNNING, BICYCLING, IN_VEHICLE, TILTING, UNKNOWN }
 
+/**
+ * AppRole: Unified role identity for prefixing and state isolation.
+ * Standardizes namespace to prevent acknowledgment loops (Issue #1406).
+ */
+@Serializable
+enum class AppRole(val prefix: String) {
+    TRACKER("T_"),
+    VIEWER_SELF("V_"),
+    VIEWER_REMOTE("VR_")
+}
+
 enum class DiscoveryPhase {
     BOOTSTRAP, DISCOVERING, MONITORING
 }
@@ -47,15 +56,8 @@ enum class SentinelStatus {
     VALID, JUMP, TAMPER, TRAJECTORY_PROMOTED, OUTLIER, JITTER, JAMMER_SUSPICION
 }
 
-/**
- * SignalingPriority: Classification for frame prioritization.
- * Sep.27.7:
- * - Issue #1172: Smart Signaling Dispatcher. Relocated to core:engine for 
- *   centralized dispatching logic.
- */
 enum class SignalingPriority {
-    HIGH,   // Time-critical: Telemetry, Alarms, Pings, Commands, Identity
-    NORMAL  // Bulk data: Forensic Logs, Status Snapshots
+    HIGH, NORMAL
 }
 
 enum class CapabilityStatus {
@@ -175,18 +177,11 @@ class EngineConnectionPoint(
     }
 }
 
-/**
- * SystemEvaluationSnapshot: Unified DTO for all telemetry and health metrics.
- * Refactored to data class with mutable fields for backward-compatible flyweight optimization.
- */
 @Serializable
 data class SystemEvaluationSnapshot(
-    // Partitioned States (Direct Parity with LocationUpdate)
     val kinetic: KineticState = KineticState(),
     val atmospheric: AtmosphericState = AtmosphericState(),
     val integrity: IntegrityState = IntegrityState(),
-
-    // Evaluation Metadata & Transient State
     var status: SentinelStatus = SentinelStatus.VALID,
     var lastValidFixRt: Long = 0L,
     var isStalled: Boolean = false,
@@ -199,8 +194,6 @@ data class SystemEvaluationSnapshot(
     var isAnchorLocked: Boolean = false,
     var suppressionNote: String? = null,
     var trackerState: TrackerState = TrackerState.UNKNOWN,
-
-    // Temporal Gating & Fast-Paths
     var acousticLockoutRt: Long = 0L,
     var lightSpikeRt: Long = 0L,
     var isMuzzled: Boolean = false,
@@ -209,12 +202,8 @@ data class SystemEvaluationSnapshot(
     var nowTs: Long = 0L,
     var snrSnapshot: Double? = null,
     var vibeSnapshot: Double? = null,
-    
-    // Warm-up & Audio State
     var isWarming: Boolean = false,
     var isSirenActive: Boolean = false,
-    
-    // Performance Metrics
     var cpuLoad: Double = 0.0,
     var ioWait: Double = 0.0,
     var maxIoLatency: Long = 0L,
@@ -227,9 +216,6 @@ data class SystemEvaluationSnapshot(
     var heapAllocatedMb: Double = 0.0,
     var activityType: ActivityType = ActivityType.UNKNOWN
 ) {
-    /**
-     * copyFrom: Performs a deep mutable copy to this instance from another (R-ID 392).
-     */
     fun copyFrom(other: SystemEvaluationSnapshot) {
         this.kinetic.copyFrom(other.kinetic)
         this.atmospheric.copyFrom(other.atmospheric)
@@ -269,9 +255,6 @@ data class SystemEvaluationSnapshot(
         this.activityType = other.activityType
     }
 
-    /**
-     * reset: Reverts the instance to default state for reuse (R-ID 392).
-     */
     fun reset() {
         kinetic.reset()
         atmospheric.reset()
@@ -287,9 +270,6 @@ data class SystemEvaluationSnapshot(
         activityType = ActivityType.UNKNOWN
     }
 
-    /**
-     * toLocationUpdate: Returns a new LocationUpdate based on this snapshot.
-     */
     fun toLocationUpdate(isMe: Boolean = true): LocationUpdate {
         return LocationUpdate(
             kinetic = kinetic.copy(),
@@ -305,9 +285,6 @@ data class SystemEvaluationSnapshot(
     }
 }
 
-/**
- * AlarmServiceContext: Unified DTO for service-level context in alarm evaluation.
- */
 @Serializable
 data class AlarmServiceContext(
     val now: Long,
@@ -326,10 +303,6 @@ data class AlarmServiceContext(
     val rolePrefix: String = ""
 )
 
-/**
- * DomainEvent: Unified event hierarchy for cross-component orchestration.
- * Flattened for performance.
- */
 sealed class DomainEvent {
     data class TickEvaluated(
         val now: Long,
@@ -343,8 +316,6 @@ sealed class DomainEvent {
         val serviceTickCounter: Long,
         val rtt: Int,
         val recoveryFlagged: Boolean = false,
-        
-        // Metadata for Signaling & Ribbons
         val gnssDetail: GnssDetail? = null,
         val isSuspiciousMode: Boolean = false,
         val lastSitTs: Long = 0L,
@@ -353,38 +324,12 @@ sealed class DomainEvent {
     ) : DomainEvent()
 
     data class PowerSaveTransition(val isEngaged: Boolean) : DomainEvent()
-    
-    data class PeerStatusReceived(
-        val status: LocationUpdate
-    ) : DomainEvent()
-
-    data class PeerConnectionChanged(
-        val isConnected: Boolean,
-        val peerId: String
-    ) : DomainEvent()
-
-    data class HeuristicRecovery(
-        val message: String,
-        val gapMs: Long,
-        val lat: Double,
-        val lng: Double,
-        val accuracy: Double
-    ) : DomainEvent()
-
-    data class StabilityViolation(
-        val message: String,
-        val isJitter: Boolean,
-        val lat: Double,
-        val lng: Double,
-        val accuracy: Double
-    ) : DomainEvent()
-    
+    data class PeerStatusReceived(val status: LocationUpdate) : DomainEvent()
+    data class PeerConnectionChanged(val isConnected: Boolean, val peerId: String) : DomainEvent()
+    data class HeuristicRecovery(val message: String, val gapMs: Long, val lat: Double, val lng: Double, val accuracy: Double) : DomainEvent()
+    data class StabilityViolation(val message: String, val isJitter: Boolean, val lat: Double, val lng: Double, val accuracy: Double) : DomainEvent()
     data class ServiceStatus(val message: String, val isImportant: Boolean = false) : DomainEvent()
 }
-
-/**
- * Component-level events inheriting directly from DomainEvent.
- */
 
 sealed class AlarmEvent : DomainEvent() {
     data class LogEvent(
@@ -448,9 +393,6 @@ sealed class RevivalEvent : DomainEvent() {
     data class Footprint(val deltaMa: Int, val deltaTemp: Double, val durationMs: Long) : RevivalEvent()
 }
 
-/**
- * SpatialAnchor: Polymorphic base for coordinate-aware telemetry.
- */
 interface SpatialAnchor {
     val lat: Double
     val lng: Double
@@ -462,28 +404,15 @@ interface SpatialAnchor {
 
 @Serializable
 data class RejectedPoint(
-    val lat: Double,
-    val lng: Double,
-    val alt: Double,
-    val accuracy: Double,
-    val bearing: Double,
-    val speedMps: Double,
-    val ts: Long,
-    val rt: Long
+    val lat: Double, val lng: Double, val alt: Double, val accuracy: Double, 
+    val bearing: Double, val speedMps: Double, val ts: Long, val rt: Long
 )
 
 @Serializable
 data class TrajectoryNode(
-    val lat: Double,
-    val lng: Double,
-    val alt: Double,
-    val accuracy: Double,
-    val maxAccuracy: Double,
-    val bearing: Double,
-    val speedMps: Double,
-    val ts: Long,
-    val rt: Long,
-    val vibrationIndex: Double
+    val lat: Double, val lng: Double, val alt: Double, val accuracy: Double, 
+    val maxAccuracy: Double, val bearing: Double, val speedMps: Double, 
+    val ts: Long, val rt: Long, val vibrationIndex: Double
 )
 
 @Serializable
@@ -535,9 +464,6 @@ class ProcessedLocation {
     }
 }
 
-/**
- * AccuracyState: Isolated transient accuracy metrics.
- */
 @Serializable
 class AccuracyState {
     var lastProcessedAccuracy: Double = 0.0
@@ -548,9 +474,6 @@ class AccuracyState {
     var lastUpdateRt: Long = 0L
 }
 
-/**
- * SentinelForensicState: Isolated forensic telemetry and sensor baselines.
- */
 @Serializable
 class SentinelForensicState {
     var lastValidLat: Double = 0.0
@@ -561,15 +484,12 @@ class SentinelForensicState {
     var lastValidSpeedMps: Double = 0.0
     var lastValidBearing: Double = 0.0
     var lastValidAccuracy: Double = 0.0
-    
     var estimatedSpeedMps: Double = 0.0
     var estimatedBearing: Double = 0.0
     var stationaryProb: Double = 1.0
-    
     var currentVibrationIndex: Double = 0.0
     var peakVibrationShock: Double = 0.0
     var peakVibrationShockRt: Long = 0L
-    
     var currentCompassHeading: Double = 0.0
     var lastCompassHeading: Double = 0.0
     var currentBaroAlt: Double = 0.0
@@ -578,10 +498,8 @@ class SentinelForensicState {
     var isPowerTamper: Boolean = false
     var currentTiltDegrees: Double = 0.0
     var currentAcousticDb: Double = 0.0
-    
     var lastFastPathAcousticSpikeRt: Long = 0L
     var lastFastPathLightSpikeRt: Long = 0L
-    
     var isSitDetected: Boolean = false
     var lastSitTs: Long = 0L
     var lastSitRt: Long = 0L
@@ -594,24 +512,17 @@ class SentinelForensicState {
     var lastSitTilt: Double = 0.0
     var lastSitShock: Double = 0.0
     var sitDetectionCooldownRt: Long = 0L
-    
     var stationaryStartRt: Long = 0L
     var gpsMotionStartRt: Long = 0L
-    
     var luxBaseline: Double = -1.0
     var baroBaseline: Double = -1000.0
     var acousticFloorDb: Double = -1.0
     var adaptiveVibrationFloor: Double = INITIAL_VIBRATION_FLOOR
     var lastAcousticContractionRt: Long = 0L
-    
     var lastSnr: Double = 0.0
     var lastSatsUsed: Int = 0
 }
 
-/**
- * TrajectoryBuffer: Optimized unified buffer for trajectory history and hindsight.
- * Replaces GtoBufferState.
- */
 @Serializable
 class TrajectoryBuffer {
     var latBuffer: DoubleArray = DoubleArray(TRAJECTORY_BUFFER_MAX_SIZE)
@@ -628,9 +539,6 @@ class TrajectoryBuffer {
     var size: Int = 0
 }
 
-/**
- * AnchorState: Isolated stationary anchor logic state.
- */
 @Serializable
 class AnchorState {
     var parkingPoint: EngineGeoPoint = EngineGeoPoint()
@@ -645,20 +553,12 @@ class AnchorState {
     var isLocked: Boolean = false
 }
 
-/**
- * LocationProcessingState: Consolidated operational state for LocationProcessor, 
- * LocationSentinel, and GtoEngine.
- * Partitioned into specialized sub-states to reduce monolithic mutability footprint.
- */
 @Serializable
 class LocationProcessingState {
-    // Partitioned Sub-States
     val accuracy = AccuracyState()
     val forensic = SentinelForensicState()
     val trajectory = TrajectoryBuffer()
     val anchor = AnchorState()
-
-    // Core Tracking State
     var lastValidFixRt: Long = 0L
     var lastLat: Double = 0.0
     var lastLng: Double = 0.0
@@ -666,30 +566,23 @@ class LocationProcessingState {
     var lastRt: Long = 0L
     var lastAcc: Double = 0.0
     var lastMaxAcc: Double = 0.0
-    
     var lastSavedLat: Double = 0.0
     var lastSavedLng: Double = 0.0
     var lastSavedTs: Long = 0L
     var lastSavedRt: Long = 0L
     var lastSavedGpsTs: Long = 0L
-    
     var lastHighAccLat: Double = 0.0
     var lastHighAccLng: Double = 0.0
     var lastHighAccTs: Long = 0L
     var lastHighAccRt: Long = 0L
-    
     var lastExpectedIntervalMs: Long = 0L
     var lastIntervalChangeRt: Long = 0L
     var lastNearestHomeDistance: Double? = null
     var lastDistanceToTracker: Double? = null
     var maxDistanceAuthority: Double = 60.0
-    
     var kineticEnergy: Double = 0.0
-    
     val optimizedPointFlyweight: EngineGeoPoint = EngineGeoPoint()
-
-    @Transient
-    var cachedHomePoints: List<EngineGeoPoint>? = null
+    @Transient var cachedHomePoints: List<EngineGeoPoint>? = null
 }
 
 @Serializable
@@ -727,8 +620,6 @@ class AlarmEvaluationState {
     var appStartTime: Long = 0L
     var capabilities: HardwareCapabilities = HardwareCapabilities()
     var forensicReliabilityDegradationStartRt: Long = 0L
-
-    // Stateless Evaluation consolidation
     var powerAlarmPending: Boolean = false
     var lastSirenStopRt: Long = 0L
     var lastGlobalTriggerRt: Long = 0L
@@ -750,101 +641,52 @@ class AlarmEvaluationState {
     var homePoints: MutableList<EngineGeoPoint> = mutableListOf()
     var maxDistance: Double = 0.0
     var distToHomeAuthority: Double? = null
-
-    // Sensitivity Propagation
     var vibrationSensitivity: Float = 0.5f
     var tiltSensitivity: Float = 0.5f
 
     fun getOrCreateHomePoint(index: Int): EngineGeoPoint {
-        while (homePoints.size <= index) {
-            homePoints.add(EngineGeoPoint())
-        }
+        while (homePoints.size <= index) { homePoints.add(EngineGeoPoint()) }
         return homePoints[index]
     }
 
     fun truncateHomePoints(size: Int) {
-        while (homePoints.size > size) {
-            homePoints.removeAt(homePoints.size - 1)
-        }
+        while (homePoints.size > size) { homePoints.removeAt(homePoints.size - 1) }
     }
 
     fun update(
-        now: Long,
-        nowRt: Long,
-        serviceStartTime: Long,
-        serviceStartRt: Long,
-        lastAlarmAckTs: Long,
-        appStartTime: Long,
-        isRelayConnected: Boolean,
-        isTrackerConnected: Boolean,
-        discoveryPhase: DiscoveryPhase,
-        trackerLat: Double,
-        trackerLng: Double,
-        trackerGpsAccuracy: Double,
-        maxTrackerAccuracy: Double,
-        lastGpsPacketTs: Long,
-        lastGpsPacketRt: Long,
-        trackerLastValidFixTs: Long,
-        trackerLastValidFixRt: Long,
-        trackerSpeed: Double,
-        jumpTier: Int,
-        isAdaptiveJump: Boolean,
-        trackerBattery: Int,
-        trackerTemp: Double,
-        wasDistanceViolated: Boolean,
-        distanceViolationCounter: Int,
-        firstViolationTs: Long,
-        firstViolationRt: Long,
-        firstViolationWasJump: Boolean,
-        maxDistance: Double,
-        distToHomeAuthority: Double?,
-        isGpsGap: Boolean,
-        trackerBaroAltEma: Double,
-        isTrackerMode: Boolean,
-        capabilities: HardwareCapabilities,
-        vibrationSensitivity: Float = 0.5f,
-        tiltSensitivity: Float = 0.5f,
-        powerAlarmPending: Boolean = false,
-        lastSirenStopRt: Long = 0L,
+        now: Long, nowRt: Long, serviceStartTime: Long, serviceStartRt: Long,
+        lastAlarmAckTs: Long, appStartTime: Long, isRelayConnected: Boolean,
+        isTrackerConnected: Boolean, discoveryPhase: DiscoveryPhase,
+        trackerLat: Double, trackerLng: Double, trackerGpsAccuracy: Double,
+        maxTrackerAccuracy: Double, lastGpsPacketTs: Long, lastGpsPacketRt: Long,
+        trackerLastValidFixTs: Long, trackerLastValidFixRt: Long,
+        trackerSpeed: Double, jumpTier: Int, isAdaptiveJump: Boolean,
+        trackerBattery: Int, trackerTemp: Double, wasDistanceViolated: Boolean,
+        distanceViolationCounter: Int, firstViolationTs: Long, firstViolationRt: Long,
+        firstViolationWasJump: Boolean, maxDistance: Double,
+        distToHomeAuthority: Double?, isGpsGap: Boolean, trackerBaroAltEma: Double,
+        isTrackerMode: Boolean, capabilities: HardwareCapabilities,
+        vibrationSensitivity: Float = 0.5f, tiltSensitivity: Float = 0.5f,
+        powerAlarmPending: Boolean = false, lastSirenStopRt: Long = 0L,
         lastGlobalTriggerRt: Long = 0L
     ) {
-        this.now = now
-        this.nowRt = nowRt
-        this.serviceStartTime = serviceStartTime
-        this.serviceStartRt = serviceStartRt
-        this.lastAlarmAckTs = lastAlarmAckTs
-        this.appStartTime = appStartTime
-        this.isRelayConnected = isRelayConnected
-        this.isTrackerConnected = isTrackerConnected
-        this.discoveryPhase = discoveryPhase
-        this.trackerLat = trackerLat
-        this.trackerLng = trackerLng
-        this.trackerGpsAccuracy = trackerGpsAccuracy
-        this.maxTrackerAccuracy = maxTrackerAccuracy
-        this.lastGpsPacketTs = lastGpsPacketTs
-        this.lastGpsPacketRt = lastGpsPacketRt
-        this.trackerLastValidFixTs = trackerLastValidFixTs
-        this.trackerLastValidFixRt = trackerLastValidFixRt
-        this.trackerSpeed = trackerSpeed
-        this.jumpTier = jumpTier
-        this.trackerBattery = trackerBattery
-        this.trackerTemp = trackerTemp
-        this.wasDistanceViolated = wasDistanceViolated
-        this.distanceViolationCounter = distanceViolationCounter
-        this.firstViolationTs = firstViolationTs
-        this.firstViolationRt = firstViolationRt
-        this.firstViolationWasJump = firstViolationWasJump
-        this.maxDistance = maxDistance
-        this.distToHomeAuthority = distToHomeAuthority
-        this.isGpsGap = isGpsGap
-        this.trackerBaroAltEma = trackerBaroAltEma
-        this.isTrackerMode = isTrackerMode
-        this.capabilities = capabilities
-        this.vibrationSensitivity = vibrationSensitivity
-        this.tiltSensitivity = tiltSensitivity
-        this.powerAlarmPending = powerAlarmPending
-        this.lastSirenStopRt = lastSirenStopRt
-        this.lastGlobalTriggerRt = lastGlobalTriggerRt
+        this.now = now; this.nowRt = nowRt; this.serviceStartTime = serviceStartTime
+        this.serviceStartRt = serviceStartRt; this.lastAlarmAckTs = lastAlarmAckTs
+        this.appStartTime = appStartTime; this.isRelayConnected = isRelayConnected
+        this.isTrackerConnected = isTrackerConnected; this.discoveryPhase = discoveryPhase
+        this.trackerLat = trackerLat; this.trackerLng = trackerLng; this.trackerGpsAccuracy = trackerGpsAccuracy
+        this.maxTrackerAccuracy = maxTrackerAccuracy; this.lastGpsPacketTs = lastGpsPacketTs
+        this.lastGpsPacketRt = lastGpsPacketRt; this.trackerLastValidFixTs = trackerLastValidFixTs
+        this.trackerLastValidFixRt = trackerLastValidFixRt; this.trackerSpeed = trackerSpeed
+        this.jumpTier = jumpTier; this.trackerBattery = trackerBattery; this.trackerTemp = trackerTemp
+        this.wasDistanceViolated = wasDistanceViolated; this.distanceViolationCounter = distanceViolationCounter
+        this.firstViolationTs = firstViolationTs; this.firstViolationRt = firstViolationRt
+        this.firstViolationWasJump = firstViolationWasJump; this.maxDistance = maxDistance
+        this.distToHomeAuthority = distToHomeAuthority; this.isGpsGap = isGpsGap
+        this.trackerBaroAltEma = trackerBaroAltEma; this.isTrackerMode = isTrackerMode
+        this.capabilities = capabilities; this.vibrationSensitivity = vibrationSensitivity
+        this.tiltSensitivity = tiltSensitivity; this.powerAlarmPending = powerAlarmPending
+        this.lastSirenStopRt = lastSirenStopRt; this.lastGlobalTriggerRt = lastGlobalTriggerRt
     }
 }
 
@@ -854,10 +696,6 @@ enum class RibbonScale(val key: String, val intervalSeconds: Int) {
 }
 
 class EngineSnrSample(var ts: Long = 0L, var rt: Long = 0L, var snr: Double = 0.0)
-
-/**
- * EngineAcousticSample: Represents a forensic acoustic measurement.
- */
 class EngineAcousticSample(var ts: Long = 0L, var rt: Long = 0L, var db: Double = 0.0)
 
 class EngineSensorSnapshot(

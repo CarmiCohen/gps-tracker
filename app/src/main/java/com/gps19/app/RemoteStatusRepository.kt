@@ -11,16 +11,12 @@ import javax.inject.Singleton
 
 /**
  * RemoteStatusRepository: Single Source of Truth for Remote Peer Telemetry.
+ * Sep.30.60:
+ * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
+ *   ensure prefix consistency ("VR_" authority) (R-ID 453/565).
  * Sep.24.90:
  * - Issue #1306 REMEDIATION: Transitioned from "V_" to "VR_" prefix for remote 
  *   telemetry to eliminate namespace collisions with Viewer's self-tracking state.
- * Sep.23.70:
- * - Issue #1230 REMEDIATION: Applied "V_" role prefix to state persistence 
- *   to ensure remote telemetry isolation (R-ID 453).
- * Aug.14.03:
- * - Issue #171: Forensic Jitter Audit. Relaxed shouldProcessPacket to allow 
- *   out-of-order packets within MONOTONIC_JITTER_TOLERANCE_MS (2s) to prevent 
- *   forensic data loss during multi-viewer jitter (R171).
  */
 @Singleton
 class RemoteStatusRepository @Inject constructor(
@@ -46,9 +42,8 @@ class RemoteStatusRepository @Inject constructor(
         if (isInitialized.getAndSet(true)) return
 
         try {
-            // R-ID 453: Use Viewer-Remote prefix to isolate remote status persistence
-            // Issue #1306: Migrated from "V_" to "VR_" to avoid collision with self-ticks
-            mainRepository.loadTrackerState("VR_")?.let { savedStatus ->
+            // R-ID 453/565: Standardized Role Identity
+            mainRepository.loadTrackerState(AppRole.VIEWER_REMOTE.prefix)?.let { savedStatus ->
                 _remoteStatus.value = savedStatus
             }
         } catch (e: Exception) {
@@ -58,13 +53,13 @@ class RemoteStatusRepository @Inject constructor(
 
     fun updateStatus(status: TrackerStatus) {
         _remoteStatus.value = status
-        mainRepository.saveTrackerState(status, "VR_")
+        mainRepository.saveTrackerState(status, AppRole.VIEWER_REMOTE.prefix)
     }
 
     fun updateStatusAtomic(action: (TrackerStatus) -> TrackerStatus) {
         _remoteStatus.update { current ->
             val next = action(current)
-            mainRepository.saveTrackerState(next, "VR_")
+            mainRepository.saveTrackerState(next, AppRole.VIEWER_REMOTE.prefix)
             next
         }
     }
