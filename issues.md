@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.30.40
+# Project Issues & Hardening Tracking (Rigorous Audit) - Sep.30.6
 
 ## 🎯 Current Resumption Focus: Field & Soak Stability
 Ensuring forensic probe reliability and baseline stability during extended field operations.
@@ -22,11 +22,13 @@ Ensuring forensic probe reliability and baseline stability during extended field
 
 ## 🟢 Resolved Traceability & Metadata Issues
 
-*   **Issue #1385: Peer Link & Diagnostic LED Stall.** (Resolved Sep.30.40)
+*   **Issue #Audit-Sep.30.6: Field Soak & Stealth Validation.** (Resolved Sep.30.6)
+    *   *Remediation*: Audited `TrackerStateManager` and `AppNotificationManager` to confirm 65s PARKING hysteresis and absolute stealth (R872) on Tracker hardware. Verified HUD/Signaling parity via engine-tick authority.
+*   **Issue #1385: Peer Link & Diagnostic LED Stall.** (Resolved Sep.30.6)
     *   *Remediation*: Refactored `CommunicationManager.kt` relay handlers to support multi-argument payloads (routingId + data). This fixed the parse errors caused by relay server argument prepending, restoring the TRK/DAT/VWR link.
-*   **Issue #1391: Alarm Leakage on Tracker (Stealth Violation).** (Resolved Sep.30.40)
+*   **Issue #1391: Alarm Leakage on Tracker (Stealth Violation).** (Resolved Sep.30.6)
     *   *Remediation*: Enforced **R872 (Stealth Authority)** in `MainViewModel`. Guarded Reactive Red-Screen promotion and siren engagement triggers to ensure they only manifest in Viewer mode.
-*   **Issue #1386: Tracker HUD Velocity State Inconsistency.** (Resolved Sep.30.40)
+*   **Issue #1386: Tracker HUD Velocity State Inconsistency.** (Resolved Sep.30.6)
     *   *Remediation*: Centralized behavioral state authority in the engine tick (`MonitorService.kt`) via `TrackerStateManager`. Propagated state via `SystemEvaluationSnapshot` to ensure global parity.
 *   **Issue #1384: Ribbon Time Ruler Legibility.** (Resolved Sep.30.6)
 *   **Issue #1383: Tracker Map Autonomous Zoom-In.** (Resolved Sep.30.6)
@@ -36,4 +38,5 @@ Ensuring forensic probe reliability and baseline stability during extended field
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Sep.30.40: [SOT Count: 224 (Rules: 74), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 6 (Sub-items: 29), QA: 304]**
+- **Sep.30.6: [SOT Count: 224 (Rules: 74), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 6 (Sub-items: 29), QA: 305]**
+- **Sep.30.6: [SOT Count: 224 (Rules: 74), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 6 (Sub-items: 29), QA: 304]**

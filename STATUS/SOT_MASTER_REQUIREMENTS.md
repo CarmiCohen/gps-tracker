@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Sep.30.40)
+# SOT Master Requirements & Hardening Status (Sep.30.41)
 
 ## 🏗️ Architectural Master Rules (74 Rules)
 
@@ -12,6 +12,7 @@
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 563**: Forensic & Stealth Audit - Verified 65s PARKING hysteresis and absolute stealth enforcement (R872) for release readiness. (Resolved Sep.30.41).
 *   **SOT ID 561**: Peer Relay Argument Robustness - Refactored `CommunicationManager` to support multi-argument payloads, resolving the Peer Link stall caused by relay server argument prepending. (Resolved Sep.30.40).
 *   **SOT ID 560**: Centralized Behavioral Authority - Migrated `TrackerState` calculation to the engine tick to eliminate HUD velocity inconsistencies. (Resolved Sep.30.40).
 *   **SOT ID 562**: Stealth Authority Enforcement - Guarded Red-Screen promotion in `MainViewModel` to prevent Tracker-mode UI leakage. (Resolved Sep.30.40).
@@ -21,6 +22,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.195 (Forensic & Stealth Audit)**: PASSED - Verified 65s PARKING hysteresis and absolute stealth enforcement (R872) on Tracker hardware. (Sep.30.41)
 *   **Chapter 31.194 (Behavioral Authority Audit)**: PASSED - Verified that `TrackerState` in HUD and Signaling are perfectly synchronized with 0.0 km/h "PARKING" states. (Sep.30.40)
 *   **Chapter 31.193 (Peer Link Robustness Audit)**: PASSED - Verified connection stability with relay servers that prepend routing IDs to payloads. (Sep.30.40)
 *   **Chapter 31.192 (Tracker Stealth Audit)**: PASSED - Verified that Trackers remain silent/dark even during active Geofence violations. (Sep.30.40)
