@@ -24,6 +24,8 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.30.3:
+ * - Maintenance: Updated to alignment Sep.30.3.
  * Sep.30.2:
  * - Issue #1381: Heartbeat Centralization. Removed Bypass Heartbeat manual trigger, 
  *   delegating link health completely to ConnectivitySuite's internal loops.
