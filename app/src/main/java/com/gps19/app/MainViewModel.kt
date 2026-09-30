@@ -21,6 +21,10 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Sep.30.5:
+ * - Issue #1389 RESOLVED: Implemented Reactive Red-Screen Promotion.
+ *   The UI now reactively promotes the AlarmOverlay when critical violations are 
+ *   detected, ensuring visibility even if fullScreenIntent is suppressed by the system.
  * Sep.27.13:
  * - Issue #1351 RESOLVED: Unified StateSubscription coroutine scoping in startBaseObservations.
  */
@@ -328,6 +332,15 @@ class MainViewModel @Inject constructor(
                 stateSubscriptionUseCase.observeIntegrityUpdates().collect { update ->
                     updateDiagnosticState { current -> 
                         current.activeAlarms = update.activeAlarms
+                        
+                        // Issue #1389: Reactive Red-Screen Promotion
+                        // If we have active unresolved alarms and the UI is foreground, ensure red screen is visible.
+                        if (update.activeAlarms.any { !it.isResolved } && _uiState.value.session.isSystemActive) {
+                            if (!current.isRedScreenVisible) {
+                                current.isRedScreenVisible = true
+                            }
+                        }
+
                         current.pulse = timeProvider.elapsedRealtime()
                         current
                     }
@@ -383,6 +396,11 @@ class MainViewModel @Inject constructor(
             launch {
                 audioSynthesizer.isSirenPlaying.collect { playing ->
                     updateDiagnosticState { it.apply { isSirenPlaying = playing } }
+                    
+                    // Issue #1389: Promotion on siren engagement
+                    if (playing && _uiState.value.session.isSystemActive) {
+                        updateDiagnosticState { it.apply { isRedScreenVisible = true } }
+                    }
                 }
             }
 

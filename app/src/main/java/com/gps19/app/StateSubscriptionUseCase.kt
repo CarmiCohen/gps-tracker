@@ -11,22 +11,18 @@ import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
- * Sep.22.50:
- * - Issue #1191 REMEDIATION: Integrated alertSettingsFlow into observeRepositorySettings
- *   to ensure UI consistency after bulk configuration imports (R-ID 416).
- * Aug.26.13:
- * - Concern #737 Remediation: Integrated identitySanitizedFlow into 
- *   observeRepositorySettings to support persistent dismissal of sanitization 
- *   warnings (R976).
- * Aug.15.03:
- * - Issue #182 Hardening: Offloaded history merging to Dispatchers.Default 
- *   to prevent Main-thread stalls and Startup ANRs (R182).
+ * Sep.30.6:
+ * - Issue #1389 RESOLVED: Corrected IntegrityUpdate to consume alarms from 
+ *   AppAlarmManager. Ensures the UI reactively promotes the Red Screen.
+ * Sep.30.5:
+ * - Issue #1389 REMEDIATION: Fixed activeAlarms propagation in observeIntegrityUpdates.
  */
 class StateSubscriptionUseCase @Inject constructor(
     private val repository: MainRepository,
     private val gpsStatusManager: GpsStatusManager,
     private val systemStatusProvider: SystemStatusProvider,
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val alarmManager: AppAlarmManager
 ) {
     private val _historyFlows = mapOf(
         "4M" to MutableStateFlow<List<ConnectionPoint>>(emptyList()),
@@ -86,10 +82,6 @@ class StateSubscriptionUseCase @Inject constructor(
         }
     }
 
-    /**
-     * Issue #174: Optimized trail lookup using binary search.
-     * Completes in O(log N) to support high-frequency scrubbing.
-     */
     fun findClosestTrailPoint(trail: List<TrailPoint>, targetTs: Long): TrailPoint? {
         if (trail.isEmpty()) return null
         
@@ -168,19 +160,29 @@ class StateSubscriptionUseCase @Inject constructor(
         .flowOn(Dispatchers.Default)
     }
 
-    fun observeIntegrityUpdates(): Flow<IntegrityUpdate> = repository.systemHealth.map { health ->
-        val nextIdx = (integrityBufferIdx + 1) % 2
-        val next = integrityBuffers[nextIdx]
-        next.update(
-            health = health, isLocalOnline = health.isHardwareOnline,
-            batteryLevel = health.batteryLevel, batteryTemp = health.batteryTemp,
-            isCharging = health.isCharging, maxTemp = health.maxTemp,
-            activeAlarms = emptyList(), activeAlarmTypes = emptySet()
-        )
-        integrityBufferIdx = nextIdx
-        next
+    /**
+     * Issue #1389: Reactive Integrity Updates.
+     * Combines systemHealth with AppAlarmManager's active alarms to propagate 
+     * critical status to the UI for Red Screen promotion.
+     */
+    fun observeIntegrityUpdates(): Flow<IntegrityUpdate> {
+        return combine(
+            repository.systemHealth,
+            alarmManager.activeAlarmsFlow
+        ) { health, alarms ->
+            val nextIdx = (integrityBufferIdx + 1) % 2
+            val next = integrityBuffers[nextIdx]
+            
+            next.update(
+                health = health, isLocalOnline = health.isHardwareOnline,
+                batteryLevel = health.batteryLevel, batteryTemp = health.batteryTemp,
+                isCharging = health.isCharging, maxTemp = health.maxTemp,
+                activeAlarms = alarms, activeAlarmTypes = alarms.map { it.type }.toSet()
+            )
+            integrityBufferIdx = nextIdx
+            next
+        }.flowOn(Dispatchers.Default)
     }
-    .flowOn(Dispatchers.Default)
 
     class IntegrityUpdate(
         var health: SystemHealthState = SystemHealthState(),

@@ -1,25 +1,29 @@
-# Forensic Handover (Sep.30.4 - #1382 RESOLVED)
+# Forensic Handover (Sep.30.6 - #1383 RESOLVED)
 
 ## 🎯 Current System State
-*   **Version**: Sep.30.4 | **Status**: SIREN UI SYNCED.
-*   **Core Remediation**: 
-    *   **Siren Alerting Orchestration**: Fixed Issue #1382 by synchronizing physical siren audio with `AppNotificationManager` in `AppEventCoordinator`. Critical alarms now reliably trigger the Red Screen overlay and system notification, providing a clear path for user dismissal and preventing autonomous re-triggering loops.
-    *   **Metadata Alignment**: Synchronized all tracking documents and `app/build.gradle` to the `Sep.30.4` baseline (Issues #1387, #1388).
+*   **Version**: `Sep.30.6` | **Status**: MAP ZOOM STABILITY RESOLVED, STATEFUL TRIGGERS ENFORCED.
+*   **Map Zoom Stability (#1383)**:
+    *   **Remediation**: Implemented **Stateful Trigger Tracking** in `MapController.kt`. The controller now stores `lastSeen` cumulative counts for `zoomInTrigger`, `zoomOutTrigger`, `centeringTrackerTrigger`, and `centeringViewerTrigger`. It only executes Osmdroid camera animations when these counters strictly increment.
+    *   **Architectural Rule (1.61)**: Added rule requiring imperative camera animations to be guarded by stateful trigger tracking to prevent reactive loops.
+*   **Reactive Red-Screen (#1389)**: Resolved in previous version `Sep.30.6`.
+*   **Deployment Status**: App `Sep.30.6` ready for deployment. Versioning incremented in `app/build.gradle`.
 
-## 🚀 Active Task Snapshot: Issue #1383
-*   **Target**: Tracker Map Autonomous Zoom-In.
-*   **Symptoms**: Tapping zoom-in works, but zoom-out or pinch triggers autonomous zoom-in behavior.
+## 🚀 Resumption Focus: Issue #1384 (Ribbon Time Ruler Legibility)
+*   **Target**: UI/Rendering audit for the Ribbon Time Ruler.
+*   **Symptoms**: Time ruler is unreadable.
+*   **Audit Path**:
+    1.  **Compose Rendering**: Inspect `TimeRulerComponent.kt` (or equivalent) for font scaling or color contrast issues.
+    2.  **Screenshot Analysis**: Use `take_screenshot` to verify visual artifacts.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
-1.  **Siren UI Synchronization**: All physical siren triggers MUST be accompanied by a UI notification and Red Screen overlay to ensure user control and state visibility.
-2.  **Signaling Authority Centralization**: Internal heartbeat timing resides exclusively within `ConnectivitySuite`.
-3.  **Traceability Rule**: Issues #1382, #1387, #1388 are linked to this release.
+1.  **Stateful Triggers**: Imperative UI commands (camera, audio) MUST be guarded by cumulative counters and local `lastSeen` state to prevent re-entrancy loops.
+2.  **Reactive UI**: The UI layer MUST reactively reflect engine states (Alarms, Mode, Connectivity).
+3.  **Signaling Authority**: `ConnectivitySuite.kt` manages all heartbeat timing.
 
 ---
 
-## 📊 Hardening Progress Dashboard
-- **Sep.30.4: [SOT Count: 219 (Rules: 69), Open: H:4, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 23), QA: 304]**
-- **Sep.30.3: [SOT Count: 218 (Rules: 68), Open: H:7, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 23), QA: 304]**
-- **Sep.29.3: [SOT Count: 211 (Rules: 68), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 3 (Sub-items: 23), QA: 304]**
+## 📊 Hardening Progress Dashboard (Sep.30.6)
+- **Status**: [SOT Count: 220 (Rules: 71), Open: H:3, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 3 (Sub-items: 23), QA: 304]
+- **QA Record**: Fully synchronized to baseline `Sep.30.6`.

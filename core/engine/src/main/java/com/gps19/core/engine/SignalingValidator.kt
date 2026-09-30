@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * SignalingValidator: Pure logic for enforcing role-based message filtering.
+ * Sep.30.4:
+ * - Alignment: Updated to alignment Sep.30.4.
  * Sep.29.31:
  * - Handshake Hardening (#LinkFix): Relaxed validation for empty coordinates 
  *   during initial discovery. A packet with 0.0/0.0 lat/lng is now accepted 

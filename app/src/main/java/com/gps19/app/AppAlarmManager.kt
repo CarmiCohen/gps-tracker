@@ -13,18 +13,12 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.30.5:
+ * - Issue #1389 REMEDIATION: Added activeAlarmsFlow to support reactive 
+ *   UI promotion. Ensures the Red Screen can be triggered without relying 
+ *   exclusively on notification fullScreenIntents.
  * Sep.30.4:
  * - Issue #1382: Added getActiveAlarmSummary() to support UI notification triggering.
- * Sep.28.4:
- * - Issue #1296: Integrated BootLifecycleAuthority to centralize boot lifecycle validation.
- * Sep.27.16:
- * - Issue #1173: Protobuf-First Persistence. Substituted JSON alarm state with 
- *   binary Protobuf pipelines.
- * Sep.27.10:
- * - Issue #1201 RESOLVED: Integrated SirenLockoutUseCase to centralize siren lockout logic.
- *   Removed redundant internal cooldown checks in favor of reactive lockout state (R-ID 510).
- * Sep.27.4:
- * - Issue #1348: Flattened DomainEvent hierarchy, emitting AlarmEvent directly.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -41,6 +35,9 @@ class AppAlarmManager @Inject constructor(
     
     private val _isSirenRequired = MutableStateFlow(false)
     val isSirenRequired: StateFlow<Boolean> = _isSirenRequired.asStateFlow()
+
+    private val _activeAlarmsFlow = MutableStateFlow<List<AlarmInfo>>(emptyList())
+    val activeAlarmsFlow: StateFlow<List<AlarmInfo>> = _activeAlarmsFlow.asStateFlow()
 
     private var currentSettings = AlertSettings()
 
@@ -123,6 +120,7 @@ class AppAlarmManager @Inject constructor(
             evaluationState.activeAlarms.clear()
             alarms.forEach { evaluationState.activeAlarms[it.type] = it }
         }
+        syncActiveAlarmsFlow()
         updateSirenRequirement()
     }
 
@@ -163,6 +161,7 @@ class AppAlarmManager @Inject constructor(
             saveLogicState()
         }
         
+        syncActiveAlarmsFlow()
         updateSirenRequirement()
     }
 
@@ -264,6 +263,7 @@ class AppAlarmManager @Inject constructor(
             saveLogicState()
         }
 
+        syncActiveAlarmsFlow()
         updateSirenRequirement()
     }
 
@@ -330,12 +330,22 @@ class AppAlarmManager @Inject constructor(
         )
     }
 
+    private fun syncActiveAlarmsFlow() {
+        val list = synchronized(evaluationState.activeAlarms) {
+            evaluationState.activeAlarms.values.map { 
+                AlarmInfo(title = it.title, subtitle = it.subtitle, type = it.type, isResolved = it.isResolved) 
+            }
+        }
+        _activeAlarmsFlow.value = list
+    }
+
     fun dismissResolvedAlarms() {
         synchronized(evaluationState.activeAlarms) {
             val iterator = evaluationState.activeAlarms.entries.iterator()
             while (iterator.hasNext()) { if (iterator.next().value.isResolved) iterator.remove() }
         }
         persistActiveAlarms()
+        syncActiveAlarmsFlow()
         updateSirenRequirement()
     }
 
@@ -376,6 +386,7 @@ class AppAlarmManager @Inject constructor(
         
         evaluationState.lastGlobalTriggerRt = 0L
         saveLogicState()
+        syncActiveAlarmsFlow()
         updateSirenRequirement()
     }
 }

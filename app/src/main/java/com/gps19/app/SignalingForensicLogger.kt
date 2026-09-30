@@ -10,6 +10,8 @@ import javax.inject.Singleton
 /**
  * SignalingForensicLogger: Decouples signaling-specific forensic logging 
  * and throttling from the main ConnectivitySuite.
+ * Sep.30.4:
+ * - Alignment: Updated to alignment Sep.30.4.
  * Sep.29.3:
  * - Issue #1378: Added force parameter to logTransmissionFailure and logHandover
  *   to guarantee test probe recording under concurrent background network activity.

@@ -10,6 +10,7 @@ import org.osmdroid.views.MapView
 /**
  * MapController: Decouples imperative osmdroid manipulation from Compose UI.
  * Issue #1167: Centralizes overlay updates, smoothing coordination, and camera triggers.
+ * Issue #1383 RESOLVED: Implemented stateful trigger tracking to prevent autonomous zoom loops.
  */
 class MapController(
     private val context: Context,
@@ -18,6 +19,12 @@ class MapController(
 ) {
     private val overlayManager = MapOverlayManager(context, mapView, density)
     private var lastTriggerPulse = 0L
+
+    // R-ID 1383: Stateful trigger tracking to prevent loops
+    private var lastCenteringTrackerTrigger = 0
+    private var lastCenteringViewerTrigger = 0
+    private var lastZoomInTrigger = 0
+    private var lastZoomOutTrigger = 0
 
     fun update(state: MapViewState, onTap: (GeoPoint) -> Unit, onRemoveMarker: (Int) -> Unit) {
         Snapshot.withoutReadObservation {
@@ -68,18 +75,27 @@ class MapController(
     }
 
     private fun handleCameraTriggers(state: MapViewState) {
-        if (state.centeringTrackerTrigger > 0 && state.smoothedTrackerPos != null) {
+        // Issue #1383: Only trigger if the cumulative count has increased
+        if (state.centeringTrackerTrigger > lastCenteringTrackerTrigger && state.smoothedTrackerPos != null) {
+            lastCenteringTrackerTrigger = state.centeringTrackerTrigger
             lastTriggerPulse = state.systemPulse
             mapView.controller.animateTo(state.smoothedTrackerPos)
             mapView.controller.setZoom(18.0)
         }
-        if (state.centeringViewerTrigger > 0 && state.smoothedViewerPos != null) {
+        if (state.centeringViewerTrigger > lastCenteringViewerTrigger && state.smoothedViewerPos != null) {
+            lastCenteringViewerTrigger = state.centeringViewerTrigger
             lastTriggerPulse = state.systemPulse
             mapView.controller.animateTo(state.smoothedViewerPos)
             mapView.controller.setZoom(18.0)
         }
-        if (state.zoomInTrigger > 0) mapView.controller.zoomIn()
-        if (state.zoomOutTrigger > 0) mapView.controller.zoomOut()
+        if (state.zoomInTrigger > lastZoomInTrigger) {
+            lastZoomInTrigger = state.zoomInTrigger
+            mapView.controller.zoomIn()
+        }
+        if (state.zoomOutTrigger > lastZoomOutTrigger) {
+            lastZoomOutTrigger = state.zoomOutTrigger
+            mapView.controller.zoomOut()
+        }
     }
 
     private fun handleFollowLogic(state: MapViewState) {

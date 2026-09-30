@@ -1,4 +1,4 @@
-# QA Validation Status (Sep.29.3)
+# QA Validation Status (Sep.30.4)
 
 This document tracks the verification status of all high-assurance logic and forensic refinements.
 
@@ -21,7 +21,7 @@ This document tracks the verification status of all high-assurance logic and for
 ## 🟢 Validated & Resolved (Core Record)
 | ID | Feature | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **R546** | **Probe Hardening** | **Passed** | Implemented 'force' bypass for forensic loggers (R720) to stabilize test capture on high-performance tiers (Sep.29.3). |
+| **R546** | **Probe Hardening** | **Passed** | Implemented 'force' bypass for forensic loggers (R720) to stabilize test capture on high-performance tiers (Sep.30.4). |
 | **R545** | **Production Stabilization** | **Passed** | Formally baselined version Sep.29.2 to maintain process integrity (Sep.29.2). |
 | **R544** | **Stress Test UI Consolidation** | **Passed** | Verified relocation of Forensic Stress Test trigger to Diagnostics Screen (Sep.29.1). |
 | **R339** | **Unified Power Policy** | **Passed** | Verified centralized backoff and Doze-deferral consistency across role transitions (Sep.26.9). |

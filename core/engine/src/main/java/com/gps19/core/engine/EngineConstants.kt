@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Sep.30.4:
+ * - Alignment: Updated to alignment Sep.30.4.
  * Sep.29.6:
  * - Issue #1378 Hardening: Renamed FORENSIC_SPILL_ENTRY_SIZE to ..._V5 to 
  *   force compilation cache invalidation across hardware-specific builds.
@@ -325,7 +327,7 @@ const val MAX_SAFE_TEMPERATURE_CELSIUS = 46.0
 const val MAX_SAFE_TEMPERATURE_RECOVERY = 44.0
 const val BATTERY_STEEP_DISCHARGE_THRESHOLD_NORMAL = 5 
 const val BATTERY_STEEP_DISCHARGE_THRESHOLD_HIGH_LOAD = 10
-const val BATTERY_STEEP_DISCHARGE_WINDOW_MS = 600000L
+const val BATTERY_STEEP_DISCHARGE_WINDOW_MS = 60000L
 
 // Storage thresholds
 const val SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB = 10L
