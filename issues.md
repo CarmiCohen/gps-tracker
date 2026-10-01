@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.1.6
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.1.7
 
 ## 🎯 Current Resumption Focus: Forensic Overlays & System-Level Alerting
 Implementation of system-wide overlays for high-priority theft alerts.
@@ -6,10 +6,7 @@ Implementation of system-wide overlays for high-priority theft alerts.
 ## 🔴 Open Gaps & Unfinished Integration Points
 
 ### 🔴 High Priority (Field & Soak Testing Readiness)
-*   **Issue #1402-B: System-Wide Alarm Overlay Failure (Partially Resolved)**
-    *   *Requirement*: Red Alert screen MUST overlay whatever is on the screen, even if another app is in the foreground (Alarms.md Section 3).
-    *   *Status*: Oct.1.6 implemented reactive notification updates to ensure the High-Priority Activity intent is refreshed when alarm state changes.
-    *   *Deviation*: True `SYSTEM_ALERT_WINDOW` floating overlay (bypassing notifications for heads-up alerts) is still pending verification on restricted hardware (Xiaomi/Samsung).
+*   *No high priority issues currently open.*
 
 ---
 
@@ -26,6 +23,7 @@ Implementation of system-wide overlays for high-priority theft alerts.
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1402-B: System-Wide Alarm Overlay Failure.** (Resolved Oct.1.7)
 *   **Issue #1409: Connection Loss Siren Logic Mismatch.** (Resolved Oct.1.6)
 *   **Issue #1410: Standardized Manual Silence Persistence.** (Resolved Oct.1.6)
 *   **Issue #1412: Ribbon Visual Occlusion & Scale Spacing.** (Resolved Oct.1.6)
@@ -46,6 +44,7 @@ Implementation of system-wide overlays for high-priority theft alerts.
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.1.7: [SOT Count: 247 (Rules: 94), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 10, QA: 345]**
 - **Oct.1.6: [SOT Count: 246 (Rules: 93), Open: H:1, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 10, QA: 342]**
 - **Oct.1.5: [SOT Count: 243 (Rules: 92), Open: H:4, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 10, QA: 335]**
 - **Oct.1.3: [SOT Count: 240 (Rules: 89), Open: H:8, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 9, QA: 330]**

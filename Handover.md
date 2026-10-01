@@ -1,28 +1,28 @@
-# Forensic Handover (Oct.1.6 - ALARM SIGNALING & UI)
+# Forensic Handover (Oct.1.7 - SYSTEM OVERLAY)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.1.6` | **Status**: HARDENED (Alarm Logic & Ribbons).
+*   **Version**: `Oct.1.7` | **Status**: HARDENED (Emergency UI).
+*   **System-Wide Alerting**:
+    *   **Overlay Service**: `AlarmOverlayService` implemented to draw over other apps using `SYSTEM_ALERT_WINDOW` (R578).
+    *   **Permission Awareness**: `AppNotificationManager` reactively prompts for overlay permissions and provides a direct "Fix" action if suppressed.
+    *   **Activity Convergence**: `MainActivity` handles `ACTION_FIX_PERMISSIONS` to streamline user recovery from policy blocks.
 *   **Alarm Signaling**:
-    *   **Coupled Logic**: Sirens and Red-Screen promotion are now strictly coupled with "Special" alarms.
-    *   **Connectivity Suppression**: `SIGNAL_LOSS` and `GPS_STALL` are removed from `AppAlarmManager.isSpecialType` (Line 245), making them notification-only.
-    *   **Manual Silence**: User-initiated stops now enforce a 5-minute lockout (`SILENCE_TIMEOUT_MS`) via `SirenLockoutUseCase`.
-*   **UI Hardening**:
-    *   **Analytical Ribbons**: Standardized connection header to "CON". Adjusted `baseLineY` (Line 414) and `bottomReserved` (Line 413) in `SharedUiComponents.kt` to prevent drawing overlap with time scale numbers.
-    *   **Tick Spacing**: Refined `tickIntervalMs` and `tickAlignMs` (Lines 378-400) for large-scale ribbons (4H/24H/7D) to ensure legibility.
-*   **Reactive Promotion**: `AppEventCoordinator` reactively updates high-priority notification summary (Line 245) whenever the active special alarm list changes.
+    *   **Coupled Logic**: Sirens and Red-Screen promotion are strictly coupled with "Special" alarms.
+    *   **Manual Silence**: User-initiated stops enforce a 5-minute lockout (`SILENCE_TIMEOUT_MS`) via `SirenLockoutUseCase`.
+*   **Reactive Promotion**: `AppEventCoordinator` reactively updates notification summary; `AppNotificationManager` handles service-level promotion of the overlay.
 
 ## 🔴 Open Gaps (High Priority)
-*   **Issue #1402-B (System Overlay)**: The app uses `fullScreenIntent` and `showWhenLocked`. However, true `SYSTEM_ALERT_WINDOW` floating overlay (drawing over other apps while unlocked) is not yet implemented. Audit is needed on Xiaomi/Samsung devices to see if current activity promotion is sufficient.
 *   **Issue #1410 (Viewer Persistence)**: Investigate reports of recurring alarms on Viewer after re-install; check for server-side acknowledge replays.
+*   **Resource Management**: Monitor for `WindowManager` leaks on extreme low-memory devices during long-duration alerts.
 
-## 🚀 Resumption Focus: System-Level Alerting
+## 🚀 Resumption Focus: Field Verification & Stability
 *   **Immediate Path**: 
-    1.  Verify `AlarmActivity` visibility when app is backgrounded and device is unlocked.
-    2.  If promotion fails, implement `SYSTEM_ALERT_WINDOW` in `AppNotificationManager` and `AlarmActivity`.
-    3.  Audit `MainViewModel` (Line 383) to ensure `isRedScreenVisible` reactive trigger doesn't conflict with manual dismissals during high-frequency telemetry.
+    1.  Verify `AlarmOverlayService` stability under heavy background load.
+    2.  Audit battery consumption during sustained "Tamper" states where the overlay is active.
+    3.  Confirm cross-role (Tracker -> Viewer) signal convergence for overlay dismissal.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.1.6)
-- **Status**: [SOT Count: 246 (Rules: 93), Open: H:1, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 10, QA: 342]
-- **Audit Record**: Connectivity sirens decoupled; Ribbon spacing refined; 5m lockout enforced.
+## 📊 Hardening Progress Dashboard (Oct.1.7)
+- **Status**: [SOT Count: 247 (Rules: 94), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 10, QA: 345]
+- **Audit Record**: System-wide overlay implemented; Permission recovery streamlined; Build Oct.1.7 successful.

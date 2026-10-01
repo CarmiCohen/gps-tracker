@@ -19,13 +19,12 @@ import timber.log.Timber
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
+ * Oct.1.7:
+ * - Issue #1402-B: System-Wide Alarm Overlay. Integrated ACTION_FIX_PERMISSIONS 
+ *   handler to navigate directly to overlay or battery settings from the overlay UI.
  * Sep.24.92:
  * - Issue #1261: Service Unification. Migrated to unified MonitorService for 
  *   all background operations (R-ID 471).
- * Sep.07.70:
- * - Service Mutual Exclusivity: Enforced service termination of the opposite 
- *   role during mode transitions to prevent "ghost" telemetry in single-device 
- *   testing (R-ID 975).
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -69,22 +68,7 @@ class MainActivity : ComponentActivity() {
                     finishAffinity()
                 },
                 onRequestBatteryExemption = { launchBatteryExemptionSetting() },
-                onRequestOverlayPermission = {
-                    val pkg = cachedPkgName.ifBlank { packageName }
-                    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
-                        data = android.net.Uri.fromParts("package", pkg, null)
-                    }
-                    try {
-                        startActivity(intent)
-                    } catch (e: Exception) {
-                        try {
-                            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
-                        } catch (e2: Exception) {
-                            Toast.makeText(this, "Could not open overlay settings", Toast.LENGTH_SHORT).show()
-                            Timber.e(e2, "Overlay permission launch failure")
-                        }
-                    }
-                },
+                onRequestOverlayPermission = { launchOverlayPermissionSetting() },
                 onRequestAppInfo = {
                     val pkg = cachedPkgName.ifBlank { packageName }
                     try {
@@ -110,6 +94,8 @@ class MainActivity : ComponentActivity() {
                     }
                 },
                 onRequestHardwarePermission = {
+                    // Forward to specialized vendor settings if needed, otherwise App Info
+                    launchOverlayPermissionSetting()
                 },
                 onStopTracking = {
                     val trace = Thread.currentThread().stackTrace.take(15).joinToString("\n")
@@ -149,15 +135,39 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun launchOverlayPermissionSetting() {
+        val pkg = cachedPkgName.ifBlank { packageName }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            try {
+                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
+                    data = android.net.Uri.fromParts("package", pkg, null)
+                }
+                startActivity(intent)
+            } catch (e: Exception) {
+                try {
+                    startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
+                } catch (e2: Exception) {
+                    Toast.makeText(this, "Could not open overlay settings", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent) {
-        if (intent.action == ACTION_NAVIGATE_TO_MAP) {
-            Timber.d("Handling ACTION_NAVIGATE_TO_MAP deep link")
-            viewModel.onEvent(UiEvent.ToggleMap(true))
+        when (intent.action) {
+            ACTION_NAVIGATE_TO_MAP -> {
+                Timber.d("Handling ACTION_NAVIGATE_TO_MAP deep link")
+                viewModel.onEvent(UiEvent.ToggleMap(true))
+            }
+            ACTION_FIX_PERMISSIONS -> {
+                Timber.d("Handling ACTION_FIX_PERMISSIONS deep link")
+                launchOverlayPermissionSetting()
+            }
         }
     }
 
@@ -172,5 +182,6 @@ class MainActivity : ComponentActivity() {
 
     companion object {
         const val ACTION_NAVIGATE_TO_MAP = "com.gps19.app.ACTION_NAVIGATE_TO_MAP"
+        const val ACTION_FIX_PERMISSIONS = "com.gps19.app.ACTION_FIX_PERMISSIONS"
     }
 }

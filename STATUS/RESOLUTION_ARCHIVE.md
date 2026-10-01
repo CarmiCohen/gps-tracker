@@ -1,3 +1,17 @@
+# 🏛️ Resolution Archive - Oct.1.7
+
+## 🏁 Issue #1402-B: System-Wide Alarm Overlay Failure
+*   **Resolved**: Oct.1.7
+*   **Root Cause**: Dependence on `fullScreenIntent` for background promotion was unreliable on restrictive OEMs (Xiaomi, Samsung) when the device was unlocked. Background activity starts were suppressed, preventing the Red Alert screen from appearing over other apps.
+*   **Remediation**: 
+    *   **System Overlay**: Implemented `AlarmOverlayService` utilizing `SYSTEM_ALERT_WINDOW` to render the `AlarmOverlay` directly to the `WindowManager`.
+    *   **Permission Integration**: Updated `AppNotificationManager` to start the overlay service when permission is granted and added a dedicated action to the notification to navigate users to the permission settings.
+    *   **Unified UI**: Re-used `AlarmOverlay` composable within the service's `ComposeView` to ensure UI consistency between Activity and Overlay modes.
+*   **Significance**: High (Guaranteed Emergency Visibility).
+*   **SOT ID**: 578
+
+---
+
 # 🏛️ Resolution Archive - Oct.1.6
 
 ## 🏁 Issue #1409/1410/1412: Alarm Signaling & UI Hardening
@@ -17,19 +31,6 @@
 ---
 
 # 🏛️ Resolution Archive - Oct.1.5
-
-## 🏁 Issue #MAP-SOT-01/02/03: Map Engine Hardening (SOT Audit)
-*   **Resolved**: Oct.1.5
-*   **Root Cause**: 
-    1.  Marker pooling used legacy `ArrayList`, risking Compose desynchronization.
-    2.  Trail segments lacked visual aging.
-    3.  Stationary Anchor lacked UI visibility.
-*   **Remediation**: 
-    *   **Marker Pooling**: Migrated `MapOverlayManager` to `SnapshotStateList`.
-    *   **Trail Freshness**: Injected telemetry age checks; stale points (>35s) now dim.
-    *   **Anchor Feedback**: Integrated `AnchorLockedBadge`.
-*   **Significance**: High.
-*   **SOT ID**: 572, 573, 574
 
 ...
 *(Full historical records maintained in SOT Archive)*

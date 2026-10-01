@@ -18,13 +18,13 @@ import javax.inject.Singleton
 
 /**
  * AppNotificationManager: Manages system notifications and full-screen alarm intents.
+ * Oct.1.7:
+ * - Issue #1402-B: System-Wide Alarm Overlay. Integrated AlarmOverlayService 
+ *   start/stop logic into updateAlarmNotification and cancelAlarm.
+ *   Added detection for ACTION_MANAGE_OVERLAY_PERMISSION.
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
  *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
- * Sep.14.20:
- * - Issue #1025 Optimization: Implemented state-change caching for pulse notifications. 
- *   Reduced IPC overhead by suppressing redundant notify() calls when content 
- *   is identical (R-ID 325).
  */
 @Singleton
 class AppNotificationManager @Inject constructor(
@@ -113,6 +113,16 @@ class AppNotificationManager @Inject constructor(
     fun updateAlarmNotification(causes: String, showPermissionAction: Boolean = false) {
         if (isTrackerMode) return
 
+        // Issue #1402-B: System-Wide Overlay Promotion
+        if (Settings.canDrawOverlays(context)) {
+            val serviceIntent = Intent(context, AlarmOverlayService::class.java)
+            try {
+                context.startService(serviceIntent)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to start AlarmOverlayService")
+            }
+        }
+
         val intent = Intent(context, AlarmActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_USER_ACTION or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
             putExtra("causes", causes)
@@ -135,17 +145,33 @@ class AppNotificationManager @Inject constructor(
             .setOnlyAlertOnce(true)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
 
-        if (showPermissionAction) {
-            val settingsIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.fromParts("package", GpsApplication.PACKAGE_NAME, null)
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        val needsOverlayPermission = !Settings.canDrawOverlays(context)
+        
+        if (showPermissionAction || needsOverlayPermission) {
+            val settingsIntent = if (needsOverlayPermission && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}")).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+            } else {
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", context.packageName, null)
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
             }
+            
             val settingsPendingIntent = PendingIntent.getActivity(
                 context, 1, settingsIntent,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            builder.addAction(0, "FIX BACKGROUND RESTRICTION", settingsPendingIntent)
-            builder.setContentText("$causes (Overlay Hidden - Tap to fix)")
+            
+            val actionLabel = if (needsOverlayPermission) "ENABLE OVERLAY ALERT" else "FIX BACKGROUND RESTRICTION"
+            builder.addAction(0, actionLabel, settingsPendingIntent)
+            
+            if (needsOverlayPermission) {
+                builder.setContentText("$causes (Overlay Permission Required)")
+            } else {
+                builder.setContentText("$causes (Overlay Hidden - Tap to fix)")
+            }
         }
 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -155,6 +181,13 @@ class AppNotificationManager @Inject constructor(
     fun cancelAlarm() {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.cancel(alarmNotificationId)
+        
+        // Issue #1402-B: Dismiss System Overlay
+        try {
+            context.stopService(Intent(context, AlarmOverlayService::class.java))
+        } catch (e: Exception) {
+            // Service might not be running
+        }
     }
 
     fun getNotificationId() = notificationId
