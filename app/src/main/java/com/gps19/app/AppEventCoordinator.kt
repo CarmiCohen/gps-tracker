@@ -14,7 +14,7 @@ import kotlin.math.round
  * Sep.30.70:
  * - Issue #1407: Unified Storage Authority. Updated to pass AppRole objects 
  *   to repository storage API, eliminating manual prefixing. Fixed type mismatch 
- *   in setPowerAlarmPending calls.
+ *   in setPowerAlarmPending calls and enforced debounced storage authority (R-ID 568).
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
  *   ensure prefix consistency ("VR_" parity with AlarmManager) (R-ID 453).
@@ -282,9 +282,10 @@ class AppEventCoordinator @Inject constructor(
                 )
             }
             is RevivalEvent.Attempt -> logManager.logServiceEvent(m = "GPS REVIVAL ${roleTag}: Hardware restart attempt ${event.count} triggered.", isImportant = false)
-            is RevivalEvent.Success -> logManager.logServiceEvent(m = "GPS REVIVAL ${roleTag}: Hardware fix restored successfully.", isImportant = true)
+            is RevivalEvent.SimpleSuccess -> logManager.logServiceEvent(m = "GPS REVIVAL ${roleTag}: Hardware fix restored successfully.", isImportant = true)
             is RevivalEvent.RawBurstStarted -> {}
             is RevivalEvent.RawBurstEnded -> {}
+            else -> {}
         }
     }
 

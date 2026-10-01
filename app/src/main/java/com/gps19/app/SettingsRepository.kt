@@ -59,7 +59,7 @@ data class CommitResult(
  * - Issue #1407: Unified Storage Authority. Refactored to accept AppRole parameter 
  *   for namespaced calls, eliminating manual string concatenation. Enforced type safety 
  *   by removing ambiguous string-prefixed overloads for role-based state (R-ID 568).
- * - Simplicity Audit: Consolidated namespaced storage routing.
+ * - Simplicity Audit: Consolidated namespaced storage routing and removed redundant checks.
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity Authority. Eliminated remaining 
  *   hardcoded prefix strings ("T_", "V_", "VR_") in favor of AppRole enum (R-ID 565).
@@ -129,10 +129,6 @@ class SettingsRepository @Inject constructor(
     suspend fun getSettingsSnapshot(): AppSettings = dataStore.data.first()
 
     suspend fun getAppMode(): String? = dataStore.data.first().appMode.ifEmpty { null }
-
-    private fun isNamespaced(key: String): Boolean {
-        return AppRole.entries.any { key.startsWith(it.prefix) }
-    }
 
     private fun routeToNamespaced(key: String): Pair<AppRole, String>? {
         val role = AppRole.entries.find { key.startsWith(it.prefix) } ?: return null

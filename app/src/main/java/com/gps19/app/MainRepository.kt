@@ -29,10 +29,10 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
- * Sep.30.70:
- * - Issue #1407: Unified Storage Authority. Added role-based storage overloads 
- *   to eliminate manual prefixing in namespaced calls. Resolved overload resolution 
- *   ambiguity by removing legacy string-prefix methods (R-ID 568).
+ * Oct.1.1:
+ * - Issue #1407: Unified Storage Authority. Purged all legacy string-prefixed 
+ *   role overloads to resolve compiler ambiguity and enforce AppRole enum 
+ *   as the exclusive authority for persistent state isolation (R-ID 568).
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum for 
  *   acknowledgment tracking and prefix authority (R-ID 453/565).
@@ -173,20 +173,10 @@ class MainRepository @Inject constructor(
         startUiHistoryEmitter()
     }
 
-    suspend fun saveString(key: String, value: String) = settings.saveString(key, value)
-    fun saveStringSync(key: String, value: String) { scope.launch { settings.saveString(key, value) } }
-    
+    // --- Unified Role-Based API ---
+
     suspend fun saveString(role: AppRole, key: String, value: String) = settings.saveString(role, key, value)
     fun saveStringSync(role: AppRole, key: String, value: String) { scope.launch { settings.saveString(role, key, value) } }
-
-    suspend fun saveLong(key: String, value: Long) {
-        if (key == LAST_ALARM_ACK_TS_KEY) lastAlarmAckTs = value
-        settings.saveLong(key, value)
-    }
-    fun saveLongSync(key: String, value: Long) {
-        if (key == LAST_ALARM_ACK_TS_KEY) lastAlarmAckTs = value
-        scope.launch { settings.saveLong(key, value) }
-    }
 
     suspend fun saveLong(role: AppRole, key: String, value: Long) {
         if (key == LAST_ALARM_ACK_TS_KEY) {
@@ -209,20 +199,8 @@ class MainRepository @Inject constructor(
         scope.launch { settings.saveLong(role, key, value) }
     }
 
-    suspend fun saveDouble(key: String, value: Double) = settings.saveDouble(key, value)
-    fun saveDoubleSync(key: String, value: Double) { scope.launch { settings.saveDouble(key, value) } }
-    
     suspend fun saveDouble(role: AppRole, key: String, value: Double) = settings.saveDouble(role, key, value)
     fun saveDoubleSync(role: AppRole, key: String, value: Double) { scope.launch { settings.saveDouble(role, key, value) } }
-
-    fun saveDoubleDebounced(key: String, value: Double) {
-        debounceJobs[key]?.cancel()
-        debounceJobs[key] = scope.launch {
-            delay(SAVE_DEBOUNCE_MS)
-            settings.saveDouble(key, value)
-            debounceJobs.remove(key)
-        }
-    }
 
     fun saveDoubleDebounced(role: AppRole, key: String, value: Double) {
         val compositeKey = role.prefix + key
@@ -234,32 +212,57 @@ class MainRepository @Inject constructor(
         }
     }
 
-    suspend fun saveBoolean(key: String, value: Boolean) = settings.saveBoolean(key, value)
-    fun saveBooleanSync(key: String, value: Boolean) { scope.launch { settings.saveBoolean(key, value) } }
-    
     suspend fun saveBoolean(role: AppRole, key: String, value: Boolean) = settings.saveBoolean(role, key, value)
     fun saveBooleanSync(role: AppRole, key: String, value: Boolean) { scope.launch { settings.saveBoolean(role, key, value) } }
 
-    suspend fun saveInt(key: String, value: Int) = settings.saveInt(key, value)
-    fun saveIntSync(key: String, value: Int) { scope.launch { settings.saveInt(key, value) } }
-    
     suspend fun saveInt(role: AppRole, key: String, value: Int) = settings.saveInt(role, key, value)
     fun saveIntSync(role: AppRole, key: String, value: Int) { scope.launch { settings.saveInt(role, key, value) } }
 
-    suspend fun getString(key: String, default: String) = settings.getString(key, default)
     suspend fun getString(role: AppRole, key: String, default: String) = settings.getString(role, key, default)
-
-    suspend fun getLong(keyName: String, default: Long) = settings.getLong(keyName, default)
     suspend fun getLong(role: AppRole, key: String, default: Long) = settings.getLong(role, key, default)
-
-    suspend fun getDouble(key: String, default: Double) = settings.getDouble(key, default)
     suspend fun getDouble(role: AppRole, key: String, default: Double) = settings.getDouble(role, key, default)
-
-    suspend fun getInt(key: String, default: Int): Int = settings.getInt(key, default)
     suspend fun getInt(role: AppRole, key: String, default: Int): Int = settings.getInt(role, key, default)
-
-    suspend fun getBoolean(key: String, default: Boolean): Boolean = settings.getBoolean(key, default)
     suspend fun getBoolean(role: AppRole, key: String, default: Boolean): Boolean = settings.getBoolean(role, key, default)
+
+    // --- Global String-Keyed API (Non-Namespaced only) ---
+
+    suspend fun saveString(key: String, value: String) = settings.saveString(key, value)
+    fun saveStringSync(key: String, value: String) { scope.launch { settings.saveString(key, value) } }
+
+    suspend fun saveLong(key: String, value: Long) {
+        if (key == LAST_ALARM_ACK_TS_KEY) lastAlarmAckTs = value
+        settings.saveLong(key, value)
+    }
+    fun saveLongSync(key: String, value: Long) {
+        if (key == LAST_ALARM_ACK_TS_KEY) lastAlarmAckTs = value
+        scope.launch { settings.saveLong(key, value) }
+    }
+
+    suspend fun saveDouble(key: String, value: Double) = settings.saveDouble(key, value)
+    fun saveDoubleSync(key: String, value: Double) { scope.launch { settings.saveDouble(key, value) } }
+    
+    fun saveDoubleDebounced(key: String, value: Double) {
+        debounceJobs[key]?.cancel()
+        debounceJobs[key] = scope.launch {
+            delay(SAVE_DEBOUNCE_MS)
+            settings.saveDouble(key, value)
+            debounceJobs.remove(key)
+        }
+    }
+
+    suspend fun saveBoolean(key: String, value: Boolean) = settings.saveBoolean(key, value)
+    fun saveBooleanSync(key: String, value: Boolean) { scope.launch { settings.saveBoolean(key, value) } }
+
+    suspend fun saveInt(key: String, value: Int) = settings.saveInt(key, value)
+    fun saveIntSync(key: String, value: Int) { scope.launch { settings.saveInt(key, value) } }
+
+    suspend fun getString(key: String, default: String) = settings.getString(key, default)
+    suspend fun getLong(keyName: String, default: Long) = settings.getLong(keyName, default)
+    suspend fun getDouble(key: String, default: Double) = settings.getDouble(key, default)
+    suspend fun getInt(key: String, default: Int): Int = settings.getInt(key, default)
+    suspend fun getBoolean(key: String, default: Boolean): Boolean = settings.getBoolean(key, default)
+
+    // --- State & Authority ---
 
     suspend fun getAppMode() = settings.getAppMode()
     suspend fun setAppMode(mode: String?) = settings.setAppMode(mode)
@@ -275,12 +278,12 @@ class MainRepository @Inject constructor(
     
     fun getCachedHomePoints(): List<GeoPoint> = cachedHomePoints ?: emptyList()
 
-    fun getLastAlarmAckTsSync(rolePrefix: String? = null): Long {
-        return when (rolePrefix) {
-            AppRole.TRACKER.prefix -> trackerAlarmAckTs
-            AppRole.VIEWER_SELF.prefix -> viewerAlarmAckTs
-            AppRole.VIEWER_REMOTE.prefix -> viewerRemoteAlarmAckTs
-            else -> lastAlarmAckTs
+    fun getLastAlarmAckTsSync(role: AppRole? = null): Long {
+        return when (role) {
+            AppRole.TRACKER -> trackerAlarmAckTs
+            AppRole.VIEWER_SELF -> viewerAlarmAckTs
+            AppRole.VIEWER_REMOTE -> viewerRemoteAlarmAckTs
+            null -> lastAlarmAckTs
         }
     }
 

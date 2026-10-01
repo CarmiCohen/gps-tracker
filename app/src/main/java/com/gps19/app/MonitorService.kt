@@ -24,14 +24,13 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
- * Sep.30.70:
+ * Oct.1.1:
  * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
- *   API in SettingsRepository, eliminating manual prefixing.
+ *   API in SettingsRepository and updated ForensicAuditor calls to use AppRole enum.
+ *   Fixed session reset contract.
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
  *   ensure prefix consistency (R-ID 453/565).
- * Sep.30.40:
- * - Issue #1386 RESOLVED: Integrated TrackerStateManager into processTick. 
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -235,8 +234,7 @@ class MonitorService : BaseMonitorService() {
         tickOrchestrator.cancelJob("gnss_detail")
         tickOrchestrator.cancelJob("alarm_evaluation")
         
-        val oldTag = if (isTrackerMode) "T" else "V"
-        sessionCoordinator.resetSession(roleTag = oldTag, processors = listOf(primaryProcessor, remoteProcessor), onReset = {
+        sessionCoordinator.resetSession(role = currentRole, processors = listOf(primaryProcessor, remoteProcessor), onReset = {
             locationBuffer.clear()
         })
 
@@ -362,10 +360,9 @@ class MonitorService : BaseMonitorService() {
     }
 
     private fun resetServiceTimers() {
-        val tag = if (isTrackerMode) "T" else "V"
         val processors = mutableListOf(primaryProcessor, remoteProcessor)
         
-        sessionCoordinator.resetSession(roleTag = tag, processors = processors, onReset = {
+        sessionCoordinator.resetSession(role = currentRole, processors = processors, onReset = {
             serviceStartRealtime = timeProvider.elapsedRealtime()
             serviceStartWall = timeProvider.currentTimeMillis()
             lastHardwareRecoveryTs = 0L; lastForensicLat = 0.0; lastForensicLng = 0.0; lastForensicVibe = 0.0; lastForensicTilt = 0.0; lastWasCooling = false
@@ -472,12 +469,12 @@ class MonitorService : BaseMonitorService() {
             isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(isSuspiciousMode, primaryProcessor.checkPhysicalTamper(nowRt, false) == SentinelStatus.TAMPER, primaryProcessor.consumeSitDetected(), nowRt)
             val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(evaluationSnapshotFlyweight.integrity.isCoolingModeActive, isSuspiciousMode, hardwareSuite.isStationary(), hardwareSuite.isScreenOn(), primaryProcessor.getMaxDistanceAuthority() > 0.0, evaluationSnapshotFlyweight.activityType, nowRt, capabilities)
             if (targetGpsInterval != currentIntervalMs) {
-                currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, currentRole.prefix); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)
+                currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, currentRole); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)
             }
         } else {
             val targetGpsInterval = if (isUiVisible()) HIGH_FREQUENCY_GPS_POLLING_MS else VIEWER_GPS_POLLING_MS
             if (targetGpsInterval != currentIntervalMs) {
-                currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, currentRole.prefix); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)
+                currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, currentRole); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)
             }
         }
 
@@ -495,7 +492,7 @@ class MonitorService : BaseMonitorService() {
             }
         }
 
-        forensicAuditor.evaluateStability(nowRt, currentRole.prefix)?.let { verdict ->
+        forensicAuditor.evaluateStability(nowRt, currentRole)?.let { verdict ->
             val proc = lastProcessedLocation
             domainEventBus.emit(DomainEvent.StabilityViolation(message = verdict.message, isJitter = verdict.isJitterViolation, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy))
         }
@@ -514,7 +511,7 @@ class MonitorService : BaseMonitorService() {
 
         while (locationBuffer.isNotEmpty()) {
             val loc = locationBuffer.poll() ?: break
-            forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, currentRole.prefix)
+            forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, currentRole)
             pointSnapshotFlyweight.apply {
                 copyFrom(evaluationSnapshotFlyweight)
                 kinetic.apply {
@@ -570,7 +567,7 @@ class MonitorService : BaseMonitorService() {
             TelemetryMapper.mapStatusToSnapshot(s = connectivitySuite.trackerStatus, base = evaluationSnapshot, nowRt = nowRt, out = alarmSnapshotFlyweight)
         }
 
-        val serviceContext = AlarmServiceContext(now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = isTrackerMode, isRelayConnected = isSocketConnected, isTrackerConnected = if (isTrackerMode) true else isPeerActive, isUiVisible = isUiVisible(), distToHomeAuthority = if (isTrackerMode) processed.distToHome else (if (isSocketConnected && isPeerActive) PhysicsUtils.calculateDistance(alarmSnapshotFlyweight.kinetic.lat, alarmSnapshotFlyweight.kinetic.lng, (repository.getCachedHomePoints().firstOrNull()?.latitude ?: 0.0), (repository.getCachedHomePoints().firstOrNull()?.longitude ?: 0.0)) else null), maxDistanceAuthority = (if (isTrackerMode) primaryProcessor else remoteProcessor).getMaxDistanceAuthority(), capabilities = capabilities, rolePrefix = if (isTrackerMode) AppRole.TRACKER.prefix else AppRole.VIEWER_REMOTE.prefix)
+        val serviceContext = AlarmServiceContext(now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = isTrackerMode, isRelayConnected = isSocketConnected, isTrackerConnected = if (isTrackerMode) true else isPeerActive, isUiVisible = isUiVisible(), distToHomeAuthority = if (isTrackerMode) processed.distToHome else (if (isSocketConnected && isPeerActive) PhysicsUtils.calculateDistance(alarmSnapshotFlyweight.kinetic.lat, alarmSnapshotFlyweight.kinetic.lng, (repository.getCachedHomePoints().firstOrNull()?.latitude ?: 0.0), (repository.getCachedHomePoints().firstOrNull()?.longitude ?: 0.0)) else null), maxDistanceAuthority = (if (isTrackerMode) primaryProcessor else remoteProcessor).getMaxDistanceAuthority(), capabilities = capabilities, role = if (isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE)
         tickOrchestrator.launchJob("alarm_evaluation", lifecycleScope + Dispatchers.Default) {
             alarmManager.evaluateAlarms(alarmSnapshotFlyweight.copy(), serviceContext)
         }

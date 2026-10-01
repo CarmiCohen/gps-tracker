@@ -5,9 +5,9 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * Sep.30.70:
- * - Issue #1407: Unified Storage Authority. Refactored AlarmServiceContext to 
- *   utilize AppRole directly, eliminating string-based role identifiers.
+ * Oct.1.1:
+ * - Issue #1407: Unified Storage Authority. Added AppRole.fromKey helper to 
+ *   centralize namespaced key parsing and eliminate redundant routing logic.
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Refined AppRole enum to 
  *   distinguish between VIEWER_SELF ("V_") and VIEWER_REMOTE ("VR_").
@@ -48,7 +48,18 @@ enum class ActivityType { STILL, WALKING, RUNNING, BICYCLING, IN_VEHICLE, TILTIN
 enum class AppRole(val prefix: String) {
     TRACKER("T_"),
     VIEWER_SELF("V_"),
-    VIEWER_REMOTE("VR_")
+    VIEWER_REMOTE("VR_");
+
+    companion object {
+        /**
+         * fromKey: Decodes a namespaced key into its role and base key.
+         * R-ID 568: Central authority for namespace routing.
+         */
+        fun fromKey(key: String): Pair<AppRole, String>? {
+            val role = entries.find { key.startsWith(it.prefix) } ?: return null
+            return role to key.removePrefix(role.prefix)
+        }
+    }
 }
 
 enum class DiscoveryPhase {
@@ -251,7 +262,7 @@ data class SystemEvaluationSnapshot(
         this.isSilentFailure = other.isSilentFailure
         this.isMaliAnomaly = other.isMaliAnomaly
         this.localInternetLoss = other.localInternetLoss
-        this.isHardwareOnline = @true
+        this.isHardwareOnline = other.isHardwareOnline
         this.acousticMinDb = other.acousticMinDb
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb

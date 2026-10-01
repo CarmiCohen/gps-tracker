@@ -7,8 +7,9 @@ import javax.inject.Singleton
 
 /**
  * SessionLifecycleCoordinator: Centralized authority for resetting session-specific state.
- * Issue #1165: Unified Session Lifecycle Management. Ensures all hardware peaks, 
- * temporal lockouts, and vitality markers are zeroed atomically upon session restart.
+ * Oct.1.1:
+ * - Issue #1407: Unified Storage Authority. Migrated resetSession to use AppRole 
+ *   enum, eliminating fragile string-based "T"/"V" tags (R-ID 568).
  */
 @Singleton
 class SessionLifecycleCoordinator @Inject constructor(
@@ -24,26 +25,26 @@ class SessionLifecycleCoordinator @Inject constructor(
 
     /**
      * resetSession: Performs a coordinated reset of all session-related components.
-     * @param roleTag "T" for Tracker, "V" for Viewer.
+     * @param role Target AppRole for the reset.
      * @param processors List of LocationProcessors to reset.
      * @param onReset Callback for service-specific local state cleanup.
      */
     fun resetSession(
-        roleTag: String,
+        role: AppRole,
         processors: List<LocationProcessor>,
         onReset: () -> Unit
     ) {
-        Timber.i("SessionLifecycleCoordinator: Initiating atomic session reset for role [$roleTag].")
+        Timber.i("SessionLifecycleCoordinator: Initiating atomic session reset for role [${role.name}].")
 
         // 1. Reset Global Singletons
-        alarmManager.resetEvaluation()
+        alarmManager.resetEvaluation(role)
         sessionManager.reset()
         integrityMonitor.resetStats()
         forensicUseCase.resetLatches()
         
         // 2. Reset Role-Specific Shared Hardware State
-        forensicAuditor.reset(roleTag)
-        hardwareSuite.resetBaseline(roleTag)
+        forensicAuditor.reset(role)
+        hardwareSuite.resetBaseline(role.prefix.removeSuffix("_"))
 
         // 3. Reset Engine State
         processors.forEach { it.resetStats() }
@@ -51,6 +52,6 @@ class SessionLifecycleCoordinator @Inject constructor(
         // 4. Service-Specific Local State Cleanup
         onReset()
 
-        logManager.logServiceEvent(m = "Session Terminated [$roleTag]", isImportant = false)
+        logManager.logServiceEvent(m = "Session Terminated [${role.name}]", isImportant = false)
     }
 }
