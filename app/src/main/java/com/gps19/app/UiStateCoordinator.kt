@@ -8,6 +8,9 @@ import javax.inject.Singleton
 /**
  * UiStateCoordinator: Unified Authority for reactive state mapping (Dashboard/HUD/Map).
  * Achieves a perfectly thin ViewModel by separating state projection logic from orchestration.
+ * Oct.1.5:
+ * - Issue #MAP-SOT-02: Dimming stale segments in computeTrailSegments (R338).
+ * - Issue #MAP-SOT-03: Mapped isAnchorLocked to MapViewState.
  * Sep.30.42:
  * - Issue #1390: Removed MapTriggers from mapMapViewState.
  * Sep.27.12: Initial implementation for Issue #1350.
@@ -285,10 +288,11 @@ class UiStateCoordinator @Inject constructor(
     ): MapViewState {
         val m = mode ?: "tracker"
         val pulse = timeProvider.currentTimeMillis()
-        val tLat = if (m == "tracker") kin.localLocation.kinetic.lat else kin.trackerLocation.kinetic.lat
-        val tLng = if (m == "tracker") kin.localLocation.kinetic.lng else kin.trackerLocation.kinetic.lng
-        val tTs = if (m == "tracker") kin.localLocation.kinetic.gpsTs else kin.trackerLocation.kinetic.gpsTs
-        val tTel = if (m == "tracker") kin.localLocation.ts else kin.trackerLocation.ts
+        val loc = if (m == "tracker") kin.localLocation else kin.trackerLocation
+        val tLat = loc.kinetic.lat
+        val tLng = loc.kinetic.lng
+        val tTs = loc.kinetic.gpsTs
+        val tTel = loc.ts
         val vLat = if (m == "viewer") kin.localLocation.kinetic.lat else 0.0
         val vLng = if (m == "viewer") kin.localLocation.kinetic.lng else 0.0
         
@@ -306,6 +310,7 @@ class UiStateCoordinator @Inject constructor(
             appMode = m, hydrationLevel = hydration, isMapButtonsVisible = spatial.isMapButtonsVisible, isFenceVisible = spatial.isFenceVisible, 
             geofenceMode = spatial.geofenceMode, isViolationsVisible = spatial.isViolationsVisible, isGeofenceViolationsVisible = spatial.isGeofenceViolationsVisible, 
             maxDistance = spatial.maxDistance, isMapLocked = spatial.isMapLocked, mapFollowMode = spatial.mapFollowMode,
+            isAnchorLocked = loc.integrity.isAnchorLocked,
             homePoints = spatial.homePoints,
             trackerLat = tLat, trackerLng = tLng, trackerGpsTs = tTs, trackerTelemetryTs = tTel,
             viewerLat = vLat, viewerLng = vLng, systemPulse = pulse, systemPulseRt = pulseRt,
@@ -316,9 +321,38 @@ class UiStateCoordinator @Inject constructor(
         )
     }
 
+    /**
+     * computeTrailSegments: Dimming stale segments (Issue #MAP-SOT-02 / R338).
+     */
     fun computeTrailSegments(trailPoints: List<TrailPoint>, color: Int): List<MapTrailSegment> {
         if (trailPoints.isEmpty()) return emptyList()
-        val geoPoints = trailPoints.map { it.toGeoPoint() }
-        return listOf(MapTrailSegment(geoPoints, color, geoPoints.hashCode()))
+        val now = timeProvider.currentTimeMillis()
+        val segments = mutableListOf<MapTrailSegment>()
+        var currentPoints = mutableListOf<org.osmdroid.util.GeoPoint>()
+        var currentIsStale: Boolean? = null
+        val slateGray = 0xFF64748B.toInt() // Slate500 equivalent
+
+        trailPoints.forEach { pt ->
+            val age = now - pt.timestamp
+            val isStale = age > 35000L // R338 requirement
+            
+            if (currentIsStale != null && isStale != currentIsStale) {
+                if (currentPoints.isNotEmpty()) {
+                    segments.add(MapTrailSegment(currentPoints.toList(), if (currentIsStale == true) slateGray else color, currentPoints.hashCode()))
+                    // Connect segments by starting new one with last point of previous
+                    val last = currentPoints.last()
+                    currentPoints = mutableListOf(last)
+                }
+            }
+            
+            currentPoints.add(pt.toGeoPoint())
+            currentIsStale = isStale
+        }
+        
+        if (currentPoints.isNotEmpty()) {
+            segments.add(MapTrailSegment(currentPoints.toList(), if (currentIsStale == true) slateGray else color, currentPoints.hashCode()))
+        }
+        
+        return segments
     }
 }

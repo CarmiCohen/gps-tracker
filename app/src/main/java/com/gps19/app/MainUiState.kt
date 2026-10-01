@@ -6,6 +6,8 @@ import org.osmdroid.util.GeoPoint
 /**
  * MainUiState: Composite UI state partitioned into specialized slices to 
  * minimize recomposition costs and isolate volatile triggers (Issue #1166).
+ * Oct.1.5:
+ * - Issue #MAP-SOT-03: Added isAnchorLocked to MapViewState for visual feedback.
  * Sep.30.42:
  * - Issue #1390: Removed MapTriggers; transitioned to CameraAction SharedFlow.
  * Sep.27.10:
@@ -180,6 +182,7 @@ data class MapViewState(
     val maxDistance: Double = 0.0,
     val isMapLocked: Boolean = false,
     val mapFollowMode: MapFollowMode = MapFollowMode.NONE,
+    val isAnchorLocked: Boolean = false,
     val homePoints: List<GeoPoint> = emptyList(),
     val trackerLat: Double = 0.0,
     val trackerLng: Double = 0.0,

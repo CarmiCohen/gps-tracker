@@ -22,7 +22,8 @@
 
 ## 📺 3. Screen & UI Requirements
 *   **Red Alert Overlay**: High-priority full-screen red overlay for "Special" (Siren-triggering) alarms.
-*   **Z-Index (Issue #1402)**: Must obscure all other UI elements (Logs, Settings, Ribbons).
+*   **System-Wide Overlay (Issue #1402-B)**: Must overlay whatever is on the screen, even if another app is in the foreground.
+*   **Z-Index (Issue #1402)**: Must obscure all other internal UI elements (Logs, Settings, Ribbons).
 *   **Dismissal**: Manual "Stop" acknowledges the alert and starts the lockout period.
 *   **Stealth**: UI suppressed in Tracker mode.
 

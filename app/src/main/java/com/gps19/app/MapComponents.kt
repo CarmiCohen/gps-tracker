@@ -39,6 +39,8 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Oct.1.5:
+ * - Issue #MAP-SOT-03: Implemented AnchorLockedBadge in AppMapContainer.
  * Sep.30.42:
  * - Issue #1390: Integrated CameraAction SharedFlow to handle imperative map commands.
  * Sep.28.6:
@@ -100,6 +102,14 @@ fun AppMapContainer(
                 modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = toggleTopPadding)
             )
         }
+
+        if (state.isAnchorLocked) {
+            AnchorLockedBadge(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = toggleTopPadding + 8.dp)
+            )
+        }
         
         if (state.showToolsOverlay && state.isMapButtonsVisible) {
             Box(Modifier.fillMaxSize()) {
@@ -119,6 +129,35 @@ fun AppMapContainer(
             Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp).background(Amber500.copy(alpha = 0.95f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
                 Text(text = "UNCERTAINTY: ${state.trackerLocPendingReason.name.replace("_", " ")}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
             }
+        }
+    }
+}
+
+@Composable
+fun AnchorLockedBadge(modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(4.dp),
+        color = Color.Black.copy(alpha = 0.75f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, BrandJd)
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Lock,
+                contentDescription = null,
+                tint = BrandJd,
+                modifier = Modifier.size(14.dp)
+            )
+            Text(
+                text = "ANCHOR LOCKED",
+                color = Color.White,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }

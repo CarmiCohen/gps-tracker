@@ -8,6 +8,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.view.HapticFeedbackConstants
 import android.view.MotionEvent
 import android.widget.Toast
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.graphics.toArgb
 import androidx.core.graphics.applyCanvas
 import androidx.core.graphics.drawable.toDrawable
@@ -18,7 +19,6 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.*
 import java.util.*
-import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 import kotlin.math.abs
 import kotlin.math.log10
@@ -26,19 +26,13 @@ import kotlin.math.round
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Oct.1.5:
+ * - Issue #MAP-SOT-01: Migrated legacy ArrayList pools to SnapshotStateList (mutableStateListOf) 
+ *   for Compose stability and snapshot integrity.
  * Sep.22.03:
  * - Issue #1179 Remediation: Fixed Double-Removal bug by removing redundant 
  *   onTap call in marker click listener. Switched to content equality for 
  *   home list comparisons to reduce re-render jitter. (R-ID 400).
- * Sep.09.16:
- * - Issue #942 RESOLVED: Fixed Identity Color Confusion. Updated createTrackerBitmap 
- *   to use Style.FILL for the inner circle, ensuring parity with Viewer icon. 
- *   Strictly enforced BrandJd/ViewerCyan segregation (R942).
- * Sep.01.06:
- * - Issue #881 Hardening: Optimized for datasets >500 items. Increased 
- *   circleCache capacity to 600. Refined yielding to dynamic batching (size 5 
- *   for large sets) to reduce rescheduling overhead while maintaining 
- *   zero-Davey status on A15 hardware (R881).
  */
 class MapOverlayManager(
     private val context: Context,
@@ -68,12 +62,12 @@ class MapOverlayManager(
     private val replayMarker = Marker(mapView).apply { setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); setInfoWindow(null) }
     private val replayCircle = Polygon(mapView).apply { fillPaint.color = 0; outlinePaint.strokeWidth = 2f; setInfoWindow(null) }
 
-    // Pools
-    private val homeMarkerPool = ArrayList<Marker>()
-    private val violationMarkerPool = ArrayList<Marker>()
-    private val violationCirclePool = ArrayList<Polygon>()
-    private val trackerPolylinePool = ArrayList<Polyline>()
-    private val viewerPolylinePool = ArrayList<Polyline>()
+    // Pools: Issue #MAP-SOT-01 - SnapshotStateList for Compose stability
+    private val homeMarkerPool = mutableStateListOf<Marker>()
+    private val violationMarkerPool = mutableStateListOf<Marker>()
+    private val violationCirclePool = mutableStateListOf<Polygon>()
+    private val trackerPolylinePool = mutableStateListOf<Polyline>()
+    private val viewerPolylinePool = mutableStateListOf<Polyline>()
 
     // Icons
     private val trackerIconFresh = createTrackerBitmap(density, true).toDrawable(resources)

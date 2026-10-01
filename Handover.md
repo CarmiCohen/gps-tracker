@@ -1,32 +1,27 @@
-# Forensic Handover (Oct.1.3 - IMPLEMENTATION COMPLETE)
+# Forensic Handover (Oct.1.5 - UI HARDENING)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.1.3` | **Status**: STABLE & ROLE-ISOLATED.
-*   **Thermal State Recovery (#1408)**:
-    *   **Remediation**: Integrated `COOLING_MODE` and `coolingEnteredRt` into the root DataStore schema.
-    *   **Verification**: `IntegrityMonitor` correctly restores thermal state during `init`. Forensic logs now maintain continuity across service restarts during heat mitigation events.
-*   **Prefix Collision Fix (#1408)**:
-    *   **Audit Result**: Identified that `AppRole.VIEWER_SELF` ("V_") was incorrectly matching `VIEWER_REMOTE` ("VR_") keys due to simple string prefixing.
-    *   **Remediation**: Refactored `AppRole.fromKey` to use length-descending matching. `VR_` is now matched with priority over `V_`.
-    *   **Verification**: Verified that local viewer settings no longer leak into remote tracker telemetry caches.
-*   **Alarm Authority Parity (#1408)**:
-    *   **Status**: Unified. `MainRepository.lastAlarmAckTsFlow` now strictly monitors the `VR_` partition in Viewer mode, ensuring the HUD remains in sync with the Remote Tracker's alarm state.
+*   **Version**: `Oct.1.5` | **Status**: HARDENED (Map & UI).
+*   **Map Engine**:
+    *   **Marker Pooling**: Migrated to `SnapshotStateList` for Compose stability.
+    *   **Trail Dimming**: Active (35s stale threshold).
+    *   **Anchor Badge**: Reactive implementation verified.
+*   **Versioning**: Promptly visible in `app/build.gradle` and UI manifests.
 
-## 🚀 Resumption Focus: Forensic Integrity & Performance Tiering
-*   **Target**: Validate forensic ribbon accuracy on `STAGGERED` performance tiers (e.g., A15 hardware) under the new thermal persistence model.
-*   **Immediate Path**:
-    1.  **Backfill Audit**: Verify that `HistoryManager` correctly backfills gaps during thermal throttling using the persistent `coolingEnteredRt` baseline.
-    2.  **Memory Pressure Test**: Observe DataStore write latency during concurrent forensic sampling and thermal state transitions.
+## 🔴 Open Gaps (High Priority)
+*   **Issue #1402-B (System Overlay)**: Red Alert lacks `SYSTEM_ALERT_WINDOW` implementation for backgrounded states.
+*   **Issue #1409 (Siren Mismatch)**: Reports of sirens triggering without Red Screen context for connectivity events.
+*   **Issue #1410 (Viewer Persistence)**: Remote alarms ignoring global mute/ack rules in specific race conditions.
+*   **Issue #1412 (Ribbon Occlusion)**: Time scale legibility issues and drawing overlaps.
 
----
-
-## 🛡️ Core Architecture Blueprint
-1.  **Prefix Safety**: Always use `AppRole.fromKey(key)` when parsing namespaced keys to ensure correct partition routing.
-2.  **Thermal Logic**: `IntegrityMonitor` is the master of thermal state; it must update both local `_health` flow and root persistence.
-3.  **Authority**: Viewer Remote (`VR_`) is the exclusive authority for remote peer state; Viewer Self (`V_`) is for local UI/UX configurations.
+## 🚀 Resumption Focus: Forensic Overlays
+*   **Immediate Path**: 
+    1.  Implement system-level overlay for Red Alert (Issue #1402-B).
+    2.  Audit `AppAlarmManager` vs `MainViewModel` for siren/context mismatch (#1409).
+    3.  Refine Ribbon drawing offsets in `ForensicRibbon.kt`.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.1.3)
-- **Status**: [SOT Count: 235 (Rules: 84), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 9, QA: 325]
-- **Audit Record**: Resolved prefix collision; implemented root thermal persistence; unified alarm authority parity.
+## 📊 Hardening Progress Dashboard (Oct.1.5)
+- **Status**: [SOT Count: 243 (Rules: 92), Open: H:4, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 10, QA: 335]
+- **Audit Record**: Map SOT Hardening completed; stale dimming and anchor badge functional.

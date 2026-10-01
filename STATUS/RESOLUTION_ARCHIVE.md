@@ -1,3 +1,20 @@
+# 🏛️ Resolution Archive - Oct.1.5
+
+## 🏁 Issue #MAP-SOT-01/02/03: Map Engine Hardening (SOT Audit)
+*   **Resolved**: Oct.1.5
+*   **Root Cause**: 
+    1.  Marker pooling used legacy `ArrayList`, risking Compose state desynchronization.
+    2.  Trail segments lacked visual aging, violating R338 (freshness awareness).
+    3.  Stationary Anchor lacked UI visibility.
+*   **Remediation**: 
+    *   **Marker Pooling**: Migrated `MapOverlayManager` to `SnapshotStateList` (`mutableStateListOf`).
+    *   **Trail Freshness**: Injected telemetry age checks into `UiStateCoordinator.computeTrailSegments`; stale points (>35s) now dim to `Slate500`.
+    *   **Anchor Feedback**: Integrated `AnchorLockedBadge` into `AppMapContainer` with reactive binding to `isAnchorLocked`.
+*   **Significance**: High (UI/UX Integrity & Compose Stability).
+*   **SOT ID**: 572, 573, 574
+
+---
+
 # 🏛️ Resolution Archive - Oct.1.3
 
 ## 🏁 Issue #1408: Thermal & Convergence Audit
