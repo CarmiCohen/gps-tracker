@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct.1.2)
+# SOT Master Requirements & Hardening Status (Oct.1.3)
 
-## 🏗️ Architectural Master Rules (81 Rules)
+## 🏗️ Architectural Master Rules (84 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted for brevity)
@@ -12,20 +12,23 @@
 *   **1.66 Persistent Alarm Lockout (R-ID 566/S566)**: Manual siren silences and cooldowns MUST be persisted to the database and remain valid across application restarts and device reboots. The `lastSirenStopRt` must not be wiped upon `boot_id` changes (Issue #1404).
 *   **1.67 Standardized Dismissal Lockout (R-ID 567/S567)**: Manual user dismissal of an alarm MUST engage a minimum 30-second siren lockout period, as defined in the Alarming SOT (Issue #1403).
 *   **1.68 Unified Storage Authority (R-ID 568/S568)**: All namespaced persistent storage operations MUST utilize the `AppRole` enum parameter within the `SettingsRepository` API. Manual string concatenation for role-based key prefixing is strictly prohibited to ensure type safety and namespace integrity (Issue #1407).
+*   **1.69 Root-Level Thermal Persistence (R-ID 569/S569)**: The forced `COOLING_MODE` state and its entry timestamp MUST be persisted to the root `AppSettings` namespace. This ensures that thermal mitigation remains active across service restarts and that recovery latency can be accurately audited from the `coolingEnteredRt` baseline (Issue #1408).
+*   **1.70 Descending Prefix Resolution (R-ID 570/S570)**: The `AppRole.fromKey` resolution MUST utilize descending-length evaluation (checking `VR_` before `V_`) to prevent namespace collisions. Failure to do so risks state leakage between local viewer settings and remote tracker telemetry (Issue #1408).
+*   **1.71 Unified Alarm Authority Parity (R-ID 571/S571)**: The `MainRepository` MUST monitor the `AppRole.VIEWER_REMOTE` partition for alarm acknowledgments when in Viewer mode. This ensures consistency between the HUD's acknowledgment state and the `AppAlarmManager`'s evaluation logic (Issue #1408).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 571**: Unified Alarm Authority Parity - Synced MainRepository acknowledgment flow with VR_ partition. (Resolved Oct.1.3).
+*   **SOT ID 570**: Descending Prefix Resolution - Enforced length-priority in AppRole fromKey mapping. (Resolved Oct.1.3).
+*   **SOT ID 569**: Root-Level Thermal Persistence - Integrated cooling state into root DataStore schema. (Resolved Oct.1.3).
 *   **SOT ID 568**: Unified Storage Authority - Refactored SettingsRepository to utilize AppRole-based API overloads. (Resolved Oct.1.2).
 *   **SOT ID 567**: Standardized Dismissal Lockout - Enforced 30s global lockout in EngineConstants. (Resolved Sep.30.43).
-*   **SOT ID 566**: Persistent Alarm Lockout - Integrated BootLifecycleAuthority with AppAlarmManager for RT recovery. (Resolved Sep.30.43).
-*   **SOT ID 565**: Unified Role Identity Authority - Migrated all modules to AppRole enum contract. (Resolved Sep.30.43).
-*   **SOT ID 564**: Camera Action Event Flow - Migrated imperative map commands to `SharedFlow<CameraAction>`. (Resolved Sep.30.43).
 
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.201 (Thermal Persistence Audit)**: PASSED - Verified COOLING_MODE and coolingEnteredRt are correctly recovered after service restart during simulated heat event. (Oct.1.3)
+*   **Chapter 31.202 (Prefix Isolation Audit)**: PASSED - Verified AppRole.fromKey correctly distinguishes between "V_TEST" and "VR_TEST" using length-descending evaluation. (Oct.1.3)
 *   **Chapter 31.200 (Storage Authority Audit)**: PASSED - Verified all role-prefixed DataStore calls utilize the `AppRole` parameter; manual `"prefix" + key` concatenation eliminated in `MonitorService`, `AlarmManager`, and `HistoryManager`. (Oct.1.2)
 *   **Chapter 31.199 (Role Contract Audit)**: PASSED - Verified all modules utilize AppRole enum; no hardcoded "T_"/"V_"/"VR_" prefixes remain in active code. (Sep.30.43)
-*   **Chapter 31.198 (Lockout Persistence Audit)**: PASSED - Verified that lastSirenStopRt is correctly recovered after simulated process kill via adb shell. (Sep.30.43)
-*   **Chapter 31.197 (Sequential Mute Audit)**: PASSED - Verified that triggering a new alarm type does not interrupt an existing user-initiated lockout. (Sep.30.43)

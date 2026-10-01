@@ -1,3 +1,19 @@
+# 🏛️ Resolution Archive - Oct.1.3
+
+## 🏁 Issue #1408: Thermal & Convergence Audit
+*   **Resolved**: Oct.1.3
+*   **Root Cause**: 
+    1.  `COOLING_MODE` state was memory-only, causing forensic gaps and alert desynchronization after service restarts during thermal events.
+    2.  `AppRole` prefix matching logic (`V_` vs `VR_`) was order-dependent and susceptible to collisions, risking state leakage between local settings and remote telemetry.
+*   **Remediation**: 
+    *   **Prefix Isolation**: Refined `AppRole.fromKey` to use length-descending evaluation, ensuring `VR_` (Remote) is matched before `V_` (Self).
+    *   **Thermal Persistence**: Added `is_cooling_mode_active` and `cooling_entered_rt` to the root Protobuf schema and implemented recovery logic in `IntegrityMonitor`.
+    *   **Authority Unification**: Updated `MainRepository` to use the `AppRole.VIEWER_REMOTE` partition for alarm acknowledgments in Viewer mode, aligning with `AppAlarmManager` logic.
+*   **Significance**: High (Forensic Stability & Multi-Role Integrity).
+*   **SOT ID**: 569, 570, 571
+
+---
+
 # 🏛️ Resolution Archive - Oct.1.2
 
 ## 🏁 Issue #1407: Unified Storage Authority
@@ -10,20 +26,6 @@
     *   **Namespace Integrity**: Eliminated manual prefixing across the codebase, ensuring all role-based state isolation follows a single, verified authority.
 *   **Significance**: High (Structural Integrity).
 *   **SOT ID**: 568 (Unified Storage Authority)
-
----
-
-# 🏛️ Resolution Archive - Sep.30.43
-
-## 🏁 Issue #1406: Role Identity Authority
-*   **Resolved**: Sep.30.43
-*   **Root Cause**: Critical inconsistency between `CommandRouter` (`V_`) and `AppAlarmManager/AlertUseCase` (`VR_`) caused acknowledgments to be saved to orphaned keys, resulting in immediate re-triggering loops.
-*   **Remediation**: 
-    *   **Enum Contract**: Introduced `AppRole` enum in `core:engine` to centralize namespace authority.
-    *   **Global Migration**: Refactored `CommandRouter`, `MainRepository`, `AlertUseCase`, `AppAlarmManager`, `MonitorService`, `MaintenanceWorker`, `HistoryManager`, and `SettingsUseCase` to use `AppRole.prefix`.
-    *   **Traceability**: Eliminated all hardcoded `"T_"` and `"VR_"` string literals from the operational logic.
-*   **Significance**: High (Functional Correctness).
-*   **SOT ID**: 565 (Unified Role Identity Authority)
 
 ...
 *(Full historical records maintained in SOT Archive)*

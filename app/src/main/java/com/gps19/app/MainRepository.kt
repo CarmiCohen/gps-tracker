@@ -29,6 +29,10 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.1.3:
+ * - Issue #1408: Telemetry Convergence. Unified lastAlarmAckTsFlow to utilize 
+ *   AppRole.VIEWER_REMOTE in viewer mode, ensuring parity with AppAlarmManager.
+ *   Added viewerRemoteAlarmAckTs tracking to prevent authority collision (R-ID 565).
  * Oct.1.1:
  * - Issue #1407: Unified Storage Authority. Purged all legacy string-prefixed 
  *   role overloads to resolve compiler ambiguity and enforce AppRole enum 
@@ -153,10 +157,11 @@ class MainRepository @Inject constructor(
     
     val trackerAlarmAckTsFlow = settings.trackerAlarmAckTsFlow
     val viewerAlarmAckTsFlow = settings.viewerAlarmAckTsFlow
+    val viewerRemoteAlarmAckTsFlow = settings.viewerRemoteAlarmAckTsFlow
     
     @OptIn(ExperimentalCoroutinesApi::class)
     val lastAlarmAckTsFlow = appModeFlow.flatMapLatest { mode ->
-        if (mode == "tracker") trackerAlarmAckTsFlow else viewerAlarmAckTsFlow
+        if (mode == "tracker") trackerAlarmAckTsFlow else viewerRemoteAlarmAckTsFlow
     }.distinctUntilChanged()
 
     val homePointsFlow = settings.homePointsFlow
@@ -169,6 +174,7 @@ class MainRepository @Inject constructor(
         scope.launch { lastAlarmAckTsFlow.collect { lastAlarmAckTs = it } }
         scope.launch { trackerAlarmAckTsFlow.collect { trackerAlarmAckTs = it } }
         scope.launch { viewerAlarmAckTsFlow.collect { viewerAlarmAckTs = it } }
+        scope.launch { viewerRemoteAlarmAckTsFlow.collect { viewerRemoteAlarmAckTs = it } }
         scope.launch { homePointsFlow.collect { cachedHomePoints = it } }
         startUiHistoryEmitter()
     }
@@ -439,7 +445,7 @@ class MainRepository @Inject constructor(
                     listOf(false, true).forEach { isViewer ->
                         trailDao.getPruneThreshold(isViewer, PRUNE_LIMIT_TRAIL)?.let { trailDao.pruneByThreshold(isViewer, it, PRUNE_CHUNK_SIZE) }
                     }
-                    violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)?.let { violationDao.pruneByThreshold(it, PRUNE_CHUNK_SIZE) }
+                    violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)?.let { violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)?.let { violationDao.pruneByThreshold(it, PRUNE_CHUNK_SIZE) } }
                 }
             } catch (e: Exception) { Timber.e(e, "Background pruning failed") } finally { metrics.isPruningActive.set(false) }
         }

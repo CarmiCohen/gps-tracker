@@ -9,12 +9,13 @@ import javax.inject.Inject
 
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
+ * Oct.1.3:
+ * - Issue #1408: Telemetry Convergence. Updated loadAllSettings to utilize 
+ *   AppRole.VIEWER_REMOTE for alarm acknowledgment state when in Viewer mode, 
+ *   ensuring parity with AppAlarmManager and HUD visibility (R-ID 571).
  * Sep.30.70:
  * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
  *   API in SettingsRepository, eliminating manual prefixing.
- * Sep.30.60:
- * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
- *   ensure prefix consistency ("V_" authority) (R-ID 453/565).
  */
 class SettingsUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -78,10 +79,11 @@ class SettingsUseCase @Inject constructor(
         val mMode = s.appMode.ifEmpty { null }
         val sSiren = s.selectedSiren.ifEmpty { "Siren" }
         
-        // R-ID 453/565: Standardized Role Identity Authority
+        // R-ID 453/565/571: Standardized Role Identity Authority
+        // In Viewer mode, the primary authority for alarms is the Remote Tracker partition.
         val role = when(mMode) {
             "tracker" -> AppRole.TRACKER
-            "viewer" -> AppRole.VIEWER_SELF
+            "viewer" -> AppRole.VIEWER_REMOTE
             else -> null
         }
         

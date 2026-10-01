@@ -106,6 +106,10 @@ message AppSettings {
     optional int64 last_global_trigger_rt = 80;
     optional int64 forensic_reliability_degradation_start_rt = 81;
 
+    // Issue #1408: Thermal State Recovery
+    optional bool is_cooling_mode_active = 82;
+    optional int64 cooling_entered_rt = 83;
+
     // Namespaced property maps for role-based isolation (Issue #1230, R-ID 453)
     map<string, int64> role_longs = 100;
     map<string, double> role_doubles = 101;

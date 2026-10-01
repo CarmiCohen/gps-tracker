@@ -2,6 +2,9 @@ package com.gps19.app
 
 /**
  * PreferenceKeys: Centralized keys for DataStore and SharedPreferences.
+ * Oct.1.3:
+ * - Issue #1408: Added IS_COOLING_MODE_ACTIVE_KEY and COOLING_ENTERED_RT_KEY 
+ *   for thermal state recovery and forensic audit continuity.
  * Sep.25.07:
  * - Issue #1329: Added LAST_VALID_FIX_RT_KEY for monotonic fix tracking parity.
  * Sep.23.70:
@@ -87,3 +90,6 @@ const val FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY = "forensic_reliability_
 
 // Background Audit Keys
 const val LAST_INTEGRITY_CHECK_TS_KEY = "last_integrity_check_ts"
+
+const val IS_COOLING_MODE_ACTIVE_KEY = "is_cooling_mode_active"
+const val COOLING_ENTERED_RT_KEY = "cooling_entered_rt"

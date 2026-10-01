@@ -55,13 +55,15 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Oct.1.3:
+ * - Issue #1408: Thermal & Convergence Audit. Added IS_COOLING_MODE_ACTIVE_KEY 
+ *   and COOLING_ENTERED_RT_KEY to global persistence. Refactored resetRoleState 
+ *   to utilize AppRole.fromKey, preventing prefix collision where "V_" (Self) 
+ *   was incorrectly matching "VR_" (Remote) keys (R-ID 565).
  * Oct.1.2:
  * - Issue #1407: Unified Storage Authority. Completed implementation by purging 
  *   legacy global field fall-throughs for role-partitioned keys. The compiler 
  *   now enforces AppRole-based isolation for critical forensic and logic states (R-ID 568).
- * Sep.30.70:
- * - Issue #1407: Unified Storage Authority. Refactored to accept AppRole parameter 
- *   for namespaced calls, eliminating manual string concatenation.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -115,6 +117,9 @@ class SettingsRepository @Inject constructor(
     val viewerAlarmAckTsFlow: Flow<Long> = dataStore.data.map { 
         it.roleLongsMap.getOrDefault(AppRole.VIEWER_SELF.prefix + LAST_ALARM_ACK_TS_KEY, 0L) 
     }
+    val viewerRemoteAlarmAckTsFlow: Flow<Long> = dataStore.data.map { 
+        it.roleLongsMap.getOrDefault(AppRole.VIEWER_REMOTE.prefix + LAST_ALARM_ACK_TS_KEY, 0L) 
+    }
     
     val homePointsFlow: Flow<List<GeoPoint>> = dataStore.data.map { it.homePointsList.map { p -> GeoPoint(p.lat, p.lng) } }
     val maxDistanceFlow: Flow<Double> = dataStore.data.map { if (it.maxDistance > 0.0) it.maxDistance else DEFAULT_MAX_DISTANCE }
@@ -130,8 +135,7 @@ class SettingsRepository @Inject constructor(
     suspend fun getAppMode(): String? = dataStore.data.first().appMode.ifEmpty { null }
 
     private fun routeToNamespaced(key: String): Pair<AppRole, String>? {
-        val role = AppRole.entries.find { key.startsWith(it.prefix) } ?: return null
-        return role to key.removePrefix(role.prefix)
+        return AppRole.fromKey(key)
     }
 
     // --- Unified Role-Based API (Namespaced Storage) ---
@@ -179,11 +183,11 @@ class SettingsRepository @Inject constructor(
     suspend fun resetRoleState(role: AppRole) {
         dataStore.mutate {
             val prefix = role.prefix
-            roleLongsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleLongs(it) }
-            roleDoublesMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleDoubles(it) }
-            roleBoolsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleBools(it) }
-            roleIntsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleInts(it) }
-            roleStringsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleStrings(it) }
+            roleLongsMap.keys.filter { AppRole.fromKey(it)?.first == role }.forEach { removeRoleLongs(it) }
+            roleDoublesMap.keys.filter { AppRole.fromKey(it)?.first == role }.forEach { removeRoleDoubles(it) }
+            roleBoolsMap.keys.filter { AppRole.fromKey(it)?.first == role }.forEach { removeRoleBools(it) }
+            roleIntsMap.keys.filter { AppRole.fromKey(it)?.first == role }.forEach { removeRoleInts(it) }
+            roleStringsMap.keys.filter { AppRole.fromKey(it)?.first == role }.forEach { removeRoleStrings(it) }
             removeRoleStates(prefix)
             removeRoleAlarms(prefix)
         }
@@ -287,6 +291,7 @@ class SettingsRepository @Inject constructor(
                 LAST_GPS_TS_KEY -> setLastGpsTs(value)
                 VIOLATION_UPTIME_MS_KEY -> setViolationUptimeMs(value)
                 LAST_SERVICE_TICK_REALTIME_KEY -> setLastServiceTickRt(value)
+                COOLING_ENTERED_RT_KEY -> setCoolingEnteredRt(value)
             }
         }
     }
@@ -308,8 +313,9 @@ class SettingsRepository @Inject constructor(
                 IS_MANUAL_EXIT_KEY -> setIsManualExit(value)
                 IS_MIC_TYPE_STARTED_KEY -> setIsMicTypeStarted(value)
                 IS_XIAOMI_MANUAL_OVERRIDE_KEY -> setIsXiaomiManualOverride(value)
-                IDENTITY_SANITIZED_KEY -> setIdentitySanitized(value)
+                IDENTITY_SANITIZED_KEY -> setIdentitySanitized(true)
                 IS_SYSTEM_ACTIVE_KEY -> setIsSystemActive(value)
+                IS_COOLING_MODE_ACTIVE_KEY -> setIsCoolingModeActive(value)
             }
         }
     }
@@ -355,6 +361,7 @@ class SettingsRepository @Inject constructor(
             LAST_GPS_TS_KEY -> settings.lastGpsTs
             VIOLATION_UPTIME_MS_KEY -> settings.violationUptimeMs
             LAST_SERVICE_TICK_REALTIME_KEY -> settings.lastServiceTickRt
+            COOLING_ENTERED_RT_KEY -> settings.coolingEnteredRt
             else -> 0L
         }
         return if (value == 0L) default else value
@@ -380,6 +387,7 @@ class SettingsRepository @Inject constructor(
             IS_XIAOMI_MANUAL_OVERRIDE_KEY -> settings.isXiaomiManualOverride
             IDENTITY_SANITIZED_KEY -> settings.identitySanitized
             IS_SYSTEM_ACTIVE_KEY -> settings.isSystemActive
+            IS_COOLING_MODE_ACTIVE_KEY -> settings.isCoolingModeActive
             else -> default
         }
     }

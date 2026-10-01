@@ -17,13 +17,13 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Oct.1.3:
+ * - Issue #1408: Thermal State Recovery. Persist cooling mode and entry realtime 
+ *   to SettingsRepository to ensure forensic continuity across restarts.
  * Sep.28.16:
  * - Issue #1362: Implement forensic persistence reliability alerting logic (R715).
  * Sep.27.4:
  * - Issue #1348: Flattened DomainEvent hierarchy, emitting IntegrityEvent directly.
- * Sep.26.12:
- * - Issue #1344: Integrated thermalHeadroom and heapAllocatedMb into 
- *   periodic integrity heartbeat (R-ID 348).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -64,6 +64,17 @@ class IntegrityMonitor @Inject constructor(
 
     init {
         scope.launch {
+            // Restore persistent thermal state
+            val wasCooling = repository.getBoolean(IS_COOLING_MODE_ACTIVE_KEY, false)
+            val coolingEntered = repository.getLong(COOLING_ENTERED_RT_KEY, 0L)
+            if (wasCooling) {
+                updateHealth { 
+                    it.isCoolingModeActive = true
+                    it.isThermalThrottling = true
+                    it.coolingEnteredRt = coolingEntered
+                }
+            }
+
             systemStatusProvider.observeInternetStatus()
                 .onEach { lastInternetUpdateRt = timeProvider.elapsedRealtime() }
                 .distinctUntilChanged()
@@ -343,10 +354,14 @@ class IntegrityMonitor @Inject constructor(
             coolingEnteredTimestamp = nowRt
             domainEventBus.emit(IntegrityEvent.LogEvent("SYSTEM EMERGENCY: Thermal limit reached (${batteryTemp}°C). Entering forced COOLING MODE on this device.", true))
             domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_TRACKER_TEMP))
+            repository.saveBooleanSync(IS_COOLING_MODE_ACTIVE_KEY, true)
+            repository.saveLongSync(COOLING_ENTERED_RT_KEY, coolingEnteredTimestamp)
         } else if (isCooling && batteryTemp < MAX_SAFE_TEMPERATURE_RECOVERY) {
             isCooling = false
             coolingEnteredTimestamp = 0L
             domainEventBus.emit(IntegrityEvent.LogEvent("System Info: Thermal limit recovered (${batteryTemp}°C) on this device.", false))
+            repository.saveBooleanSync(IS_COOLING_MODE_ACTIVE_KEY, false)
+            repository.saveLongSync(COOLING_ENTERED_RT_KEY, 0L)
         }
 
         if (isCharging) onPowerConnected() else onPowerDisconnected()
@@ -525,6 +540,9 @@ class IntegrityMonitor @Inject constructor(
             h.coolingEnteredRt = coolingEnteredTimestamp
             h.isThermalThrottling = active
         }
+
+        repository.saveBooleanSync(IS_COOLING_MODE_ACTIVE_KEY, active)
+        repository.saveLongSync(COOLING_ENTERED_RT_KEY, coolingEnteredTimestamp)
     }
 
     /**
@@ -671,6 +689,9 @@ class IntegrityMonitor @Inject constructor(
         isStorageSimulated.set(false)
         isStorageCriticalSimulated.set(false)
         isMaliAnomalySimulated.set(false)
+        
+        repository.saveBooleanSync(IS_COOLING_MODE_ACTIVE_KEY, false)
+        repository.saveLongSync(COOLING_ENTERED_RT_KEY, 0L)
     }
 
     fun getBatteryLevel(): Int = currentHealth.batteryLevel

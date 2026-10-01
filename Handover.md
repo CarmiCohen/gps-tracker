@@ -1,31 +1,32 @@
-# Forensic Handover (Oct.1.2 - IMPLEMENTATION COMPLETE)
+# Forensic Handover (Oct.1.3 - IMPLEMENTATION COMPLETE)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.1.2` | **Status**: FINALIZED & COMPILER-ENFORCED.
-*   **Unified Storage Authority (#1407)**:
-    *   **Audit Result**: Identified a critical leakage in `MonitorService.kt` where `CLOCK_DRIFT_REF_KEY` was read from the global Protobuf namespace, bypassing role-based partitioning.
-    *   **Remediation**: 
-        1. Migrated `MonitorService` to use the namespaced `AppRole`-aware repository API for all clock and tick recovery keys.
-        2. Purged legacy global field fall-throughs and `routeToNamespaced` routing logic from `SettingsRepository`.
-    *   **Verification**: The compiler now strictly enforces `AppRole` isolation for namespaced keys. Manual prefixing is physically impossible via the repository API for partitioned states. Dynamic role transitions correctly reset and re-hydrate state from the appropriate partition.
-*   **Muted Alarm Visibility (#1405)**:
-    *   **Status**: Verified. Manual silences persist across service restarts, and new triggers during lockout generate visual audit logs without interrupting the silence.
+*   **Version**: `Oct.1.3` | **Status**: STABLE & ROLE-ISOLATED.
+*   **Thermal State Recovery (#1408)**:
+    *   **Remediation**: Integrated `COOLING_MODE` and `coolingEnteredRt` into the root DataStore schema.
+    *   **Verification**: `IntegrityMonitor` correctly restores thermal state during `init`. Forensic logs now maintain continuity across service restarts during heat mitigation events.
+*   **Prefix Collision Fix (#1408)**:
+    *   **Audit Result**: Identified that `AppRole.VIEWER_SELF` ("V_") was incorrectly matching `VIEWER_REMOTE` ("VR_") keys due to simple string prefixing.
+    *   **Remediation**: Refactored `AppRole.fromKey` to use length-descending matching. `VR_` is now matched with priority over `V_`.
+    *   **Verification**: Verified that local viewer settings no longer leak into remote tracker telemetry caches.
+*   **Alarm Authority Parity (#1408)**:
+    *   **Status**: Unified. `MainRepository.lastAlarmAckTsFlow` now strictly monitors the `VR_` partition in Viewer mode, ensuring the HUD remains in sync with the Remote Tracker's alarm state.
 
-## 🚀 Resumption Focus: Field Soak & Stress Testing
-*   **Target**: Validate long-term stability of the `Oct.1.2` build under thermal pressure and high-frequency role transitions.
+## 🚀 Resumption Focus: Forensic Integrity & Performance Tiering
+*   **Target**: Validate forensic ribbon accuracy on `STAGGERED` performance tiers (e.g., A15 hardware) under the new thermal persistence model.
 *   **Immediate Path**:
-    1.  **Thermal Audit**: Monitor forensic logs for `COOLING_MODE` transitions and ensure storage partitions remain intact during low-memory pressure.
-    2.  **Telemetry Convergence**: Verify that `Viewer Remote` (VR_) state updates don't collide with `Viewer Self` (V_) local settings.
+    1.  **Backfill Audit**: Verify that `HistoryManager` correctly backfills gaps during thermal throttling using the persistent `coolingEnteredRt` baseline.
+    2.  **Memory Pressure Test**: Observe DataStore write latency during concurrent forensic sampling and thermal state transitions.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
-1.  **Storage Authority**: Use `repository.save[Type](role, key, value)` exclusively. Global field access for namespaced keys is strictly prohibited and now removed from the API surface where applicable.
-2.  **Clock Integrity**: The `CLOCK_DRIFT_REF_KEY` must be treated as a role-specific forensic metric to prevent timeline skew.
-3.  **Lockout Authority**: `SirenLockoutUseCase` is the source of truth for UI/Audio silence; it must stay synced with `AppAlarmManager` logic.
+1.  **Prefix Safety**: Always use `AppRole.fromKey(key)` when parsing namespaced keys to ensure correct partition routing.
+2.  **Thermal Logic**: `IntegrityMonitor` is the master of thermal state; it must update both local `_health` flow and root persistence.
+3.  **Authority**: Viewer Remote (`VR_`) is the exclusive authority for remote peer state; Viewer Self (`V_`) is for local UI/UX configurations.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.1.2)
-- **Status**: [SOT Count: 232 (Rules: 81), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 8, QA: 322]
-- **Audit Record**: Resolved drift leakage; purged global API fall-throughs; Simplicity Idea #SIMP-1407-1 implemented.
+## 📊 Hardening Progress Dashboard (Oct.1.3)
+- **Status**: [SOT Count: 235 (Rules: 84), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 9, QA: 325]
+- **Audit Record**: Resolved prefix collision; implemented root thermal persistence; unified alarm authority parity.

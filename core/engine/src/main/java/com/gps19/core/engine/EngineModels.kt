@@ -5,6 +5,10 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.1.3:
+ * - Issue #1408: Telemetry Convergence. Reordered AppRole enum and refined fromKey 
+ *   to utilize length-descending evaluation. This prevents prefix collision where 
+ *   "VR_" (Remote) was incorrectly matched by "V_" (Self) (R-ID 565).
  * Oct.1.1:
  * - Issue #1407: Unified Storage Authority. Added AppRole.fromKey helper to 
  *   centralize namespaced key parsing and eliminate redundant routing logic.
@@ -47,16 +51,19 @@ enum class ActivityType { STILL, WALKING, RUNNING, BICYCLING, IN_VEHICLE, TILTIN
 @Serializable
 enum class AppRole(val prefix: String) {
     TRACKER("T_"),
-    VIEWER_SELF("V_"),
-    VIEWER_REMOTE("VR_");
+    VIEWER_REMOTE("VR_"),
+    VIEWER_SELF("V_");
 
     companion object {
         /**
          * fromKey: Decodes a namespaced key into its role and base key.
          * R-ID 568: Central authority for namespace routing.
+         * Note: Longest prefixes (VR_) MUST be checked before sub-prefixes (V_) 
+         * to prevent collision.
          */
         fun fromKey(key: String): Pair<AppRole, String>? {
-            val role = entries.find { key.startsWith(it.prefix) } ?: return null
+            val role = entries.sortedByDescending { it.prefix.length }
+                .find { key.startsWith(it.prefix) } ?: return null
             return role to key.removePrefix(role.prefix)
         }
     }
