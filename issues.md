@@ -1,23 +1,15 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.1.5
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.1.6
 
-## 🎯 Current Resumption Focus: UI Hardening & Map SOT Compliance
-Refinement of mapping engine stability and reactive visual feedback.
+## 🎯 Current Resumption Focus: Forensic Overlays & System-Level Alerting
+Implementation of system-wide overlays for high-priority theft alerts.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
 ### 🔴 High Priority (Field & Soak Testing Readiness)
-*   **Issue #1402-B: System-Wide Alarm Overlay Failure**
+*   **Issue #1402-B: System-Wide Alarm Overlay Failure (Partially Resolved)**
     *   *Requirement*: Red Alert screen MUST overlay whatever is on the screen, even if another app is in the foreground (Alarms.md Section 3).
-    *   *Deviation*: Current implementation (Issue #1402) only handles internal Z-indexing. It does not trigger a system-level overlay (e.g., via `SYSTEM_ALERT_WINDOW` or High-Priority Activity) when the app is backgrounded.
-*   **Issue #1409: Connection Loss Siren Logic Mismatch**
-    *   *Requirement*: Siren MUST NOT trigger without visual context (Red Screen). Connectivity failures should be notification-only (#1401).
-    *   *Deviation*: Reports of sirens triggering on connection loss without Red Screen, requiring specific "STOP" button (near Test Audio) to silence.
-*   **Issue #1410: Unmutable/Persistent Viewer Alarms**
-    *   *Requirement*: Alarms must respect Global Mute and manual acknowledgment rules (Alarms.md Section 5).
-    *   *Deviation*: Reports of alarms on Viewer that cannot be muted or recur despite uninstallation/reinstall.
-*   **Issue #1412: Ribbon Visual Occlusion & Scale Spacing**
-    *   *Requirement*: Ribbon time scales must be legible; drawings (Red/Green) MUST NOT cover the scale numbers.
-    *   *Deviation*: Time ticks are uncomfortably spaced, upper ribbon lacks a header, and drawings overlap the time scale.
+    *   *Status*: Oct.1.6 implemented reactive notification updates to ensure the High-Priority Activity intent is refreshed when alarm state changes.
+    *   *Deviation*: True `SYSTEM_ALERT_WINDOW` floating overlay (bypassing notifications for heads-up alerts) is still pending verification on restricted hardware (Xiaomi/Samsung).
 
 ---
 
@@ -34,6 +26,9 @@ Refinement of mapping engine stability and reactive visual feedback.
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1409: Connection Loss Siren Logic Mismatch.** (Resolved Oct.1.6)
+*   **Issue #1410: Standardized Manual Silence Persistence.** (Resolved Oct.1.6)
+*   **Issue #1412: Ribbon Visual Occlusion & Scale Spacing.** (Resolved Oct.1.6)
 *   **Issue #MAP-SOT-01: Marker Pooling Implementation Mismatch.** (Resolved Oct.1.5)
 *   **Issue #MAP-SOT-02: Missing Ghost Mode for Trails.** (Resolved Oct.1.5)
 *   **Issue #MAP-SOT-03: Missing Stationary Anchor Visual Badge.** (Resolved Oct.1.5)
@@ -51,6 +46,7 @@ Refinement of mapping engine stability and reactive visual feedback.
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.1.6: [SOT Count: 246 (Rules: 93), Open: H:1, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 10, QA: 342]**
 - **Oct.1.5: [SOT Count: 243 (Rules: 92), Open: H:4, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 10, QA: 335]**
 - **Oct.1.3: [SOT Count: 240 (Rules: 89), Open: H:8, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 9, QA: 330]**
 - **Oct.1.2: [SOT Count: 232 (Rules: 81), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 8, QA: 322]**

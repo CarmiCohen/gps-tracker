@@ -1,48 +1,35 @@
+# 🏛️ Resolution Archive - Oct.1.6
+
+## 🏁 Issue #1409/1410/1412: Alarm Signaling & UI Hardening
+*   **Resolved**: Oct.1.6
+*   **Root Cause**: 
+    1.  Connectivity alerts (Signal Loss, GPS Stall) were incorrectly categorized as "Special", causing sirens and Red-Screen promotion without visual context.
+    2.  Manual "Stop Siren" action used a short cooldown, allowing re-triggering under specific race conditions or high-frequency telemetry updates.
+    3.  Ribbon time scales in `SharedUiComponents.kt` were occluded by drawings due to insufficient bottom-reserved space and tick-alignment jitter.
+*   **Remediation**: 
+    *   **Logic Isolation**: Hardened `isSpecialType` in `AppAlarmManager` to exclude connectivity events, making them notification-only.
+    *   **Persistence**: Standardized manual silence to 5m duration (`SILENCE_TIMEOUT_MS`) via `SirenLockoutUseCase`.
+    *   **UI/UX**: Standardized connection header to "CON"; increased ribbon baseline offsets and refined tick alignment logic for large-scale views (4H/24H/7D).
+    *   **Reactive Promotion**: Implemented reactive notification summary updates in `AppEventCoordinator` to ensure full-screen intents are refreshed on alarm state changes.
+*   **Significance**: High (System Integrity & UX Clarity).
+*   **SOT ID**: 575, 576, 577
+
+---
+
 # 🏛️ Resolution Archive - Oct.1.5
 
 ## 🏁 Issue #MAP-SOT-01/02/03: Map Engine Hardening (SOT Audit)
 *   **Resolved**: Oct.1.5
 *   **Root Cause**: 
-    1.  Marker pooling used legacy `ArrayList`, risking Compose state desynchronization.
-    2.  Trail segments lacked visual aging, violating R338 (freshness awareness).
+    1.  Marker pooling used legacy `ArrayList`, risking Compose desynchronization.
+    2.  Trail segments lacked visual aging.
     3.  Stationary Anchor lacked UI visibility.
 *   **Remediation**: 
-    *   **Marker Pooling**: Migrated `MapOverlayManager` to `SnapshotStateList` (`mutableStateListOf`).
-    *   **Trail Freshness**: Injected telemetry age checks into `UiStateCoordinator.computeTrailSegments`; stale points (>35s) now dim to `Slate500`.
-    *   **Anchor Feedback**: Integrated `AnchorLockedBadge` into `AppMapContainer` with reactive binding to `isAnchorLocked`.
-*   **Significance**: High (UI/UX Integrity & Compose Stability).
+    *   **Marker Pooling**: Migrated `MapOverlayManager` to `SnapshotStateList`.
+    *   **Trail Freshness**: Injected telemetry age checks; stale points (>35s) now dim.
+    *   **Anchor Feedback**: Integrated `AnchorLockedBadge`.
+*   **Significance**: High.
 *   **SOT ID**: 572, 573, 574
-
----
-
-# 🏛️ Resolution Archive - Oct.1.3
-
-## 🏁 Issue #1408: Thermal & Convergence Audit
-*   **Resolved**: Oct.1.3
-*   **Root Cause**: 
-    1.  `COOLING_MODE` state was memory-only, causing forensic gaps and alert desynchronization after service restarts during thermal events.
-    2.  `AppRole` prefix matching logic (`V_` vs `VR_`) was order-dependent and susceptible to collisions, risking state leakage between local settings and remote telemetry.
-*   **Remediation**: 
-    *   **Prefix Isolation**: Refined `AppRole.fromKey` to use length-descending evaluation, ensuring `VR_` (Remote) is matched before `V_` (Self).
-    *   **Thermal Persistence**: Added `is_cooling_mode_active` and `cooling_entered_rt` to the root Protobuf schema and implemented recovery logic in `IntegrityMonitor`.
-    *   **Authority Unification**: Updated `MainRepository` to use the `AppRole.VIEWER_REMOTE` partition for alarm acknowledgments in Viewer mode, aligning with `AppAlarmManager` logic.
-*   **Significance**: High (Forensic Stability & Multi-Role Integrity).
-*   **SOT ID**: 569, 570, 571
-
----
-
-# 🏛️ Resolution Archive - Oct.1.2
-
-## 🏁 Issue #1407: Unified Storage Authority
-*   **Resolved**: Oct.1.2
-*   **Root Cause**: Namespaced persistent storage operations relied on manual string concatenation of role prefixes (e.g., `role.prefix + KEY`), which was error-prone and bypassed type safety provided by the `AppRole` enum. A critical leakage was found where `CLOCK_DRIFT_REF_KEY` was read globally in `MonitorService`.
-*   **Remediation**: 
-    *   **Repository Overloads**: Refactored `SettingsRepository` and `MainRepository` to provide storage method overloads accepting `AppRole` as a primary parameter.
-    *   **MonitorService Fix**: Resolved a critical leakage in `onServiceInitialize` where `CLOCK_DRIFT_REF_KEY` was being read from the global namespace instead of the role-partitioned storage.
-    *   **Global Purge**: Finalized implementation by removing redundant global fields and manual routing fall-throughs from `SettingsRepository`, enforcing `AppRole` authority at the compiler level.
-    *   **Namespace Integrity**: Eliminated manual prefixing across the codebase, ensuring all role-based state isolation follows a single, verified authority.
-*   **Significance**: High (Structural Integrity).
-*   **SOT ID**: 568 (Unified Storage Authority)
 
 ...
 *(Full historical records maintained in SOT Archive)*

@@ -13,15 +13,15 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
- * Sep.30.70:
- * - Issue #1407: Unified Storage Authority. Migrated internal storage calls 
- *   to use AppRole overloads, eliminating manual string prefixing.
- * Sep.30.60:
- * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
- *   fix prefix mismatch ("VR_" parity with CommandRouter) (R-ID 453).
- * - Issue #1404: Fixed Alarm Lockout Persistence. Utilizes BootLifecycleAuthority 
- *   to recover lastSirenStopRt across service restarts, preventing immediate 
- *   re-triggering after process recovery.
+ * Oct.1.6:
+ * - Issue #1409: Connectivity Logic Hardening. Removed SIGNAL_LOSS and GPS_STALL 
+ *   from special types to ensure connectivity alerts are notification-only 
+ *   and do not trigger sirens or Red-Screen promotion (R-ID 572).
+ * - Issue #1410: Standardized Manual Silence. Updated notifySirenManualStop 
+ *   to use SILENCE_TIMEOUT_MS (5m) instead of cooldown to ensure persistent 
+ *   muting on user action (R-ID 575).
+ * Oct.1.1:
+ * - Issue #1407: Unified Storage Authority.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -112,8 +112,8 @@ class AppAlarmManager @Inject constructor(
     
     fun notifySirenManualStop() {
         evaluationState.lastSirenStopRt = timeProvider.elapsedRealtime()
-        // Also update the centralized lockout to ensure UI and other components are in sync
-        sirenLockoutUseCase.setSilence(SIREN_RESUME_COOLDOWN_MS)
+        // Issue #1410: Standardize on SILENCE_TIMEOUT_MS (5m) for manual user intervention
+        sirenLockoutUseCase.setSilence(SILENCE_TIMEOUT_MS)
         saveLogicState()
         updateSirenRequirement()
     }
@@ -371,13 +371,17 @@ class AppAlarmManager @Inject constructor(
         }
     }
 
+    /**
+     * Issue #1409: Hardened Special Types.
+     * Connectivity alerts (Signal Loss, GPS Stall) are notification-only.
+     */
     private fun isSpecialType(type: String): Boolean {
         return when (type) {
             ALERT_ID_JUMP_ALERT, ALERT_ID_TRACKER_TAMPER, ALERT_ID_TRACKER_POWER,
             ALERT_ID_TRACKER_TILT, ALERT_ID_TRACKER_ACOUSTIC,
             ALERT_ID_TRACKER_GEOFENCE, ALERT_ID_TRACKER_LIFT, ALERT_ID_SYSTEM_STORAGE_LOW,
             ALERT_ID_SYSTEM_STORAGE_CRITICAL,
-            ALERT_ID_SIGNAL_LOSS, ALERT_ID_GPS_STALL, ALERT_ID_TRACKER_TEMP,
+            ALERT_ID_TRACKER_TEMP,
             ALERT_ID_BATTERY_STEEP_DISCHARGE, ALERT_ID_HARDWARE_CONFIGURATION -> true
             else -> false
         }

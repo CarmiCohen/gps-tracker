@@ -1,27 +1,28 @@
-# Forensic Handover (Oct.1.5 - UI HARDENING)
+# Forensic Handover (Oct.1.6 - ALARM SIGNALING & UI)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.1.5` | **Status**: HARDENED (Map & UI).
-*   **Map Engine**:
-    *   **Marker Pooling**: Migrated to `SnapshotStateList` for Compose stability.
-    *   **Trail Dimming**: Active (35s stale threshold).
-    *   **Anchor Badge**: Reactive implementation verified.
-*   **Versioning**: Promptly visible in `app/build.gradle` and UI manifests.
+*   **Version**: `Oct.1.6` | **Status**: HARDENED (Alarm Logic & Ribbons).
+*   **Alarm Signaling**:
+    *   **Coupled Logic**: Sirens and Red-Screen promotion are now strictly coupled with "Special" alarms.
+    *   **Connectivity Suppression**: `SIGNAL_LOSS` and `GPS_STALL` are removed from `AppAlarmManager.isSpecialType` (Line 245), making them notification-only.
+    *   **Manual Silence**: User-initiated stops now enforce a 5-minute lockout (`SILENCE_TIMEOUT_MS`) via `SirenLockoutUseCase`.
+*   **UI Hardening**:
+    *   **Analytical Ribbons**: Standardized connection header to "CON". Adjusted `baseLineY` (Line 414) and `bottomReserved` (Line 413) in `SharedUiComponents.kt` to prevent drawing overlap with time scale numbers.
+    *   **Tick Spacing**: Refined `tickIntervalMs` and `tickAlignMs` (Lines 378-400) for large-scale ribbons (4H/24H/7D) to ensure legibility.
+*   **Reactive Promotion**: `AppEventCoordinator` reactively updates high-priority notification summary (Line 245) whenever the active special alarm list changes.
 
 ## 🔴 Open Gaps (High Priority)
-*   **Issue #1402-B (System Overlay)**: Red Alert lacks `SYSTEM_ALERT_WINDOW` implementation for backgrounded states.
-*   **Issue #1409 (Siren Mismatch)**: Reports of sirens triggering without Red Screen context for connectivity events.
-*   **Issue #1410 (Viewer Persistence)**: Remote alarms ignoring global mute/ack rules in specific race conditions.
-*   **Issue #1412 (Ribbon Occlusion)**: Time scale legibility issues and drawing overlaps.
+*   **Issue #1402-B (System Overlay)**: The app uses `fullScreenIntent` and `showWhenLocked`. However, true `SYSTEM_ALERT_WINDOW` floating overlay (drawing over other apps while unlocked) is not yet implemented. Audit is needed on Xiaomi/Samsung devices to see if current activity promotion is sufficient.
+*   **Issue #1410 (Viewer Persistence)**: Investigate reports of recurring alarms on Viewer after re-install; check for server-side acknowledge replays.
 
-## 🚀 Resumption Focus: Forensic Overlays
+## 🚀 Resumption Focus: System-Level Alerting
 *   **Immediate Path**: 
-    1.  Implement system-level overlay for Red Alert (Issue #1402-B).
-    2.  Audit `AppAlarmManager` vs `MainViewModel` for siren/context mismatch (#1409).
-    3.  Refine Ribbon drawing offsets in `ForensicRibbon.kt`.
+    1.  Verify `AlarmActivity` visibility when app is backgrounded and device is unlocked.
+    2.  If promotion fails, implement `SYSTEM_ALERT_WINDOW` in `AppNotificationManager` and `AlarmActivity`.
+    3.  Audit `MainViewModel` (Line 383) to ensure `isRedScreenVisible` reactive trigger doesn't conflict with manual dismissals during high-frequency telemetry.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.1.5)
-- **Status**: [SOT Count: 243 (Rules: 92), Open: H:4, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 10, QA: 335]
-- **Audit Record**: Map SOT Hardening completed; stale dimming and anchor badge functional.
+## 📊 Hardening Progress Dashboard (Oct.1.6)
+- **Status**: [SOT Count: 246 (Rules: 93), Open: H:1, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 10, QA: 342]
+- **Audit Record**: Connectivity sirens decoupled; Ribbon spacing refined; 5m lockout enforced.

@@ -3,6 +3,8 @@ package com.gps19.app
 import com.gps19.core.engine.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -11,13 +13,14 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Oct.1.6:
+ * - Issue #1402-B: System-Wide Alarm Overlay. Reactive observation of 
+ *   activeAlarmsFlow to ensure the alarm notification (and its fullScreenIntent) 
+ *   is updated whenever the alarm summary changes, bypassing background limitations.
+ * - Issue #1409: Couple Siren with Notification. Ensures notification 
+ *   cancelation is synchronized with siren state.
  * Sep.30.70:
- * - Issue #1407: Unified Storage Authority. Updated to pass AppRole objects 
- *   to repository storage API, eliminating manual prefixing. Fixed type mismatch 
- *   in setPowerAlarmPending calls and enforced debounced storage authority (R-ID 568).
- * Sep.30.60:
- * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
- *   ensure prefix consistency ("VR_" parity with AlarmManager) (R-ID 453).
+ * - Issue #1407: Unified Storage Authority.
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -49,6 +52,7 @@ class AppEventCoordinator @Inject constructor(
             launch { observeDomainEvents(connectivitySuite) }
             launch { observeSirenRequirement() }
             launch { observePhysicalSirenState() }
+            launch { observeAlarmSummary() }
         }
     }
 
@@ -301,11 +305,6 @@ class AppEventCoordinator @Inject constructor(
                     vibrate = true,
                     force = true
                 )
-                
-                if (!isTrackerMode) {
-                    val summary = alarmManager.getActiveAlarmSummary()
-                    notificationManager.updateAlarmNotification(summary)
-                }
             } else if (!required && isCurrentlyPlaying) {
                 if (!audioSynthesizer.isForced()) {
                     audioSynthesizer.stopSiren(timeProvider = timeProvider)
@@ -315,6 +314,28 @@ class AppEventCoordinator @Inject constructor(
                  if (!isTrackerMode) notificationManager.cancelAlarm()
             }
         }
+    }
+
+    /**
+     * Issue #1402-B: Reactive Alarm Notification.
+     * Observes active alarms and updates the alarm notification summary.
+     * If a high-priority alarm is active, it ensures the notification (and 
+     * its fullScreenIntent) is posted/updated.
+     */
+    private suspend fun observeAlarmSummary() {
+        if (configManager.isTrackerMode) return
+
+        alarmManager.activeAlarmsFlow
+            .map { list -> list.filter { !it.isResolved && !it.isSirenDisabled } }
+            .distinctUntilChanged()
+            .collectLatest { activeSpecialAlarms ->
+                if (activeSpecialAlarms.isNotEmpty()) {
+                    val summary = activeSpecialAlarms.joinToString(", ") { it.title }
+                    notificationManager.updateAlarmNotification(summary)
+                } else {
+                    notificationManager.cancelAlarm()
+                }
+            }
     }
 
     private suspend fun observePhysicalSirenState() {

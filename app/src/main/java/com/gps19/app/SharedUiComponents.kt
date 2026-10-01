@@ -50,18 +50,15 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.1.6:
+ * - Issue #1412: Ribbon Visual Occlusion & Scale Spacing. Standardized connection 
+ *   ribbon title to "CON", improved tick spacing for 4H/24H/7D scales, and 
+ *   adjusted drawing offsets to prevent overlap between connectivity status 
+ *   and time labels (R-ID 574).
  * Sep.22.00:
  * - Issue #1178: Initial GNSS satellite count blanking. Set default satellite 
  *   counts to -1 in StatusRowState and added display logic to show "--" 
  *   for unitialized satellite telemetry (R-ID 399).
- * Sep.16.05:
- * - Issue #1060 Capability Consolidation: Harmonized status indicators to R-ID 348.
- * Sep.16.00:
- * - Issue #1055 Unified Performance Tier: Renamed isA15 badge to isStaggered 
- *   to harmonize UI indicators across budget and sensitive hardware (R-ID 348, formerly R-ID 347).
- * Sep.10.12:
- * - Idea #242: Unified Termination Logic. Implemented SessionTerminationButton 
- *   to centralize exit flows and ensure visual consistency (R-ID 285).
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -226,7 +223,7 @@ fun AnalyticalRibbons(
             }
         }
 
-        ConnectionQualityRibbon(history, selectedScale, isStrictMode, replayCursorTs, onScrub)
+        ConnectionQualityRibbon(history, "CON", selectedScale, isStrictMode, replayCursorTs, onScrub)
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
 
         GenericSensorRibbon(history, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), isStrictMode = isStrictMode, valueSelector = snrSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
@@ -275,12 +272,24 @@ fun ForensicRibbonContainer(
     
     val tickIntervalMs = remember(scale) {
         when(scale) {
-            "7D" -> 2700 * 1000L; "24H" -> 360 * 1000L; "4H" -> 60 * 1000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1000L
+            "7D" -> 24 * 3600 * 1000L
+            "24H" -> 6 * 3600 * 1000L
+            "4H" -> 3600 * 1000L
+            "1H" -> 15 * 60000L
+            "16M" -> 4 * 60000L
+            "4M" -> 60000L
+            else -> 1000L
         }
     }
     val tickAlignMs = remember(scale) {
         when(scale) {
-            "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1L
+            "7D" -> 24 * 3600 * 1000L
+            "24H" -> 6 * 3600 * 1000L
+            "4H" -> 3600 * 1000L
+            "1H" -> 15 * 60000L
+            "16M" -> 4 * 60000L
+            "4M" -> 60000L
+            else -> 1L
         }
     }
 
@@ -322,11 +331,11 @@ fun ForensicRibbonContainer(
             .drawWithCache {
                 val totalPoints = MAX_HISTORY_POINTS_PER_RIBBONS.toFloat()
                 val pointWidth = size.width / totalPoints
-                val isTimeRuler = title == scale
-                val bottomReserved = if (isTimeRuler) (if (isLandscape) 18.dp.toPx() else 16.dp.toPx()) else size.height * 0.1f
+                val isTimeRuler = title == "CON"
+                val bottomReserved = if (isTimeRuler) (if (isLandscape) 22.dp.toPx() else 18.dp.toPx()) else size.height * 0.1f
                 val baseLineY = size.height - bottomReserved
-                val maxHeight = if (isTimeRuler) baseLineY * 0.85f else size.height * 0.8f
-                val tickHeightPx = if (isTimeRuler) 4.dp.toPx() else 2.dp.toPx()
+                val maxHeight = if (isTimeRuler) baseLineY * 0.75f else size.height * 0.8f
+                val tickHeightPx = if (isTimeRuler) 5.dp.toPx() else 2.dp.toPx()
                 
                 val gaps = Path()
                 val strictGaps = Path()
@@ -460,19 +469,19 @@ fun GenericSensorRibbon(
 }
 
 @Composable
-fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStrictMode: Boolean = false, replayCursorTs: Long? = null, onScrub: (Long?) -> Unit = {}) {
+fun ConnectionQualityRibbon(history: List<ConnectionPoint>, title: String, scale: String, isStrictMode: Boolean = false, replayCursorTs: Long? = null, onScrub: (Long?) -> Unit = {}) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
     val dateFormatter = remember { SimpleDateFormat("dd/MM", Locale.getDefault()) }
-    val alignMs = remember(scale) { when(scale) { "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 1L } }
-    val intervalMs = remember(scale) { when(scale) { "7D" -> 2700 * 1000L; "24H" -> 360 * 1000L; "4H" -> 60 * 1000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 1 * 60000L; else -> 0L } }
+    val alignMs = remember(scale) { when(scale) { "7D" -> 24 * 3600000L; "24H" -> 6 * 3600000L; "4H" -> 3600000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 60000L; else -> 1L } }
+    val intervalMs = remember(scale) { when(scale) { "7D" -> 24 * 3600 * 1000L; "24H" -> 6 * 3600 * 1000L; "4H" -> 3600 * 1000L; "1H" -> 15 * 60000L; "16M" -> 4 * 60000L; "4M" -> 60000L; else -> 0L } }
     val density = LocalDensity.current
     val textPaint = remember(isLandscape, density) { android.graphics.Paint().apply { color = android.graphics.Color.WHITE; with(density) { textSize = (if (isLandscape) 10.sp.toPx() else 7.sp.toPx()) }; textAlign = android.graphics.Paint.Align.CENTER; typeface = android.graphics.Typeface.MONOSPACE } }
 
-    ForensicRibbonContainer(scale, Color.Gray, if (isLandscape) 64.dp else 46.dp, history, scale, isStrictMode, replayCursorTs, onScrub) { totalPoints, pointWidth, connectionBaseY, maxHeight, landscape ->
+    ForensicRibbonContainer(title, Color.Gray, if (isLandscape) 68.dp else 50.dp, history, scale, isStrictMode, replayCursorTs, onScrub) { totalPoints, pointWidth, connectionBaseY, maxHeight, landscape ->
         if (history.isEmpty()) return@ForensicRibbonContainer
-        val ribbonMaxHeight = if (landscape) 16.dp.toPx() else 10.dp.toPx()
-        val effectiveBaseY = connectionBaseY - (if (landscape) 4.dp.toPx() else 2.dp.toPx())
+        val ribbonMaxHeight = if (landscape) 14.dp.toPx() else 8.dp.toPx()
+        val effectiveBaseY = connectionBaseY - (if (landscape) 6.dp.toPx() else 4.dp.toPx())
         val startOffset = totalPoints - history.size
         val rectW = maxOf(1f, pointWidth)
         val firstTs = history[0].ts
@@ -506,7 +515,7 @@ fun ConnectionQualityRibbon(history: List<ConnectionPoint>, scale: String, isStr
                 val tickCount = (p.ts - baseTickTs) / intervalMs
                 if (tickCount >= 0 && tickCount > (if (index > 0 && history[index-1].ts >= baseTickTs) (history[index - 1].ts - baseTickTs) / intervalMs else -1L)) {
                     val timeStr = if (scale == "7D") dateFormatter.format(Date(p.ts)) else timeFormatter.format(Date(p.ts))
-                    drawIntoCanvas { it.nativeCanvas.drawText(timeStr, xPos.coerceIn(18.dp.toPx(), size.width - 18.dp.toPx()), size.height - (if (landscape) 4.dp.toPx() else 2.dp.toPx()), textPaint) }
+                    drawIntoCanvas { it.nativeCanvas.drawText(timeStr, xPos.coerceIn(20.dp.toPx(), size.width - 20.dp.toPx()), size.height - (if (landscape) 6.dp.toPx() else 4.dp.toPx()), textPaint) }
                 }
             }
         }
