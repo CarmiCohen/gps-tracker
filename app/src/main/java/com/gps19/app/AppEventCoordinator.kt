@@ -282,7 +282,7 @@ class AppEventCoordinator @Inject constructor(
                 )
             }
             is RevivalEvent.Attempt -> logManager.logServiceEvent(m = "GPS REVIVAL ${roleTag}: Hardware restart attempt ${event.count} triggered.", isImportant = false)
-            is RevivalEvent.SimpleSuccess -> logManager.logServiceEvent(m = "GPS REVIVAL ${roleTag}: Hardware fix restored successfully.", isImportant = true)
+            is RevivalEvent.Success -> logManager.logServiceEvent(m = "GPS REVIVAL ${roleTag}: Hardware fix restored successfully.", isImportant = true)
             is RevivalEvent.RawBurstStarted -> {}
             is RevivalEvent.RawBurstEnded -> {}
             else -> {}

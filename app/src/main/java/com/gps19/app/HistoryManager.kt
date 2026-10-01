@@ -22,9 +22,10 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * Sep.30.70:
+ * Oct.1.1:
  * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
- *   API in SettingsRepository, eliminating manual prefixing.
+ *   API in SettingsRepository, eliminating manual prefixing. Refactored initialize 
+ *   to accept AppRole directly.
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
  *   ensure prefix consistency (R-ID 453/565).
@@ -70,10 +71,10 @@ class HistoryManager @Inject constructor(
     /**
      * initialize: Binds the manager to an active service scope and hydrates role-aware state.
      */
-    suspend fun initialize(scope: CoroutineScope, rolePrefix: String = "") {
+    suspend fun initialize(scope: CoroutineScope, role: AppRole = AppRole.TRACKER) {
         this.scope = scope
         // R-ID 453/565: HistoryManager initialization handles the local role (Tracker or Viewer-Self)
-        this.currentRole = if (rolePrefix == AppRole.VIEWER_SELF.prefix) AppRole.VIEWER_SELF else AppRole.TRACKER
+        this.currentRole = role
         
         withContext(Dispatchers.IO) {
             val lastSitTs = repository.getLong(currentRole, LAST_SIT_TS_KEY, 0L)

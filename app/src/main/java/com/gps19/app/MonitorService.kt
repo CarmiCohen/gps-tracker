@@ -27,7 +27,8 @@ import kotlin.math.*
  * Oct.1.1:
  * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
  *   API in SettingsRepository and updated ForensicAuditor calls to use AppRole enum.
- *   Fixed session reset contract.
+ *   Fixed CLOCK_DRIFT_REF_KEY leakage in onServiceInitialize.
+ *   Fixed session reset contract. Refactored HistoryManager initialization.
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
  *   ensure prefix consistency (R-ID 453/565).
@@ -115,7 +116,7 @@ class MonitorService : BaseMonitorService() {
         
         loadLogicState()
 
-        historyManager.initialize(lifecycleScope, currentRole.prefix)
+        historyManager.initialize(lifecycleScope, currentRole)
         hardwareSuite.start()
 
         commandRouter.register()
@@ -129,7 +130,7 @@ class MonitorService : BaseMonitorService() {
         }
 
         val recoveredTs = repository.getLong(currentRole, LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
-        val recoveredDrift = repository.getLong(CLOCK_DRIFT_REF_KEY, 0L)
+        val recoveredDrift = repository.getLong(currentRole, CLOCK_DRIFT_REF_KEY, 0L)
         
         lastServiceTickTs = recoveredTs
         lastServiceTickRealtime = historyManager.recoverLastRealtime(recoveredTs, recoveredDrift)

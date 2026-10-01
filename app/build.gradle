@@ -8,8 +8,8 @@ plugins {
 }
 
 // FORCE OVERRIDE for Issue #1035 Alignment
-def safeVersionCode = 1070
-def safeVersionName = "Sep.30.70"
+def safeVersionCode = 1072
+def safeVersionName = "Oct.1.2"
 
 android {
     namespace 'com.gps19.app'

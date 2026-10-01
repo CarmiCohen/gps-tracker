@@ -55,14 +55,13 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Oct.1.2:
+ * - Issue #1407: Unified Storage Authority. Completed implementation by purging 
+ *   legacy global field fall-throughs for role-partitioned keys. The compiler 
+ *   now enforces AppRole-based isolation for critical forensic and logic states (R-ID 568).
  * Sep.30.70:
  * - Issue #1407: Unified Storage Authority. Refactored to accept AppRole parameter 
- *   for namespaced calls, eliminating manual string concatenation. Enforced type safety 
- *   by removing ambiguous string-prefixed overloads for role-based state (R-ID 568).
- * - Simplicity Audit: Consolidated namespaced storage routing and removed redundant checks.
- * Sep.30.60:
- * - Issue #1406: Standardized Role Identity Authority. Eliminated remaining 
- *   hardcoded prefix strings ("T_", "V_", "VR_") in favor of AppRole enum (R-ID 565).
+ *   for namespaced calls, eliminating manual string concatenation.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -250,14 +249,12 @@ class SettingsRepository @Inject constructor(
                 putRoleLongs(prefix + LAST_GLOBAL_TRIGGER_RT_KEY, lastGlobalTriggerRt)
                 putRoleLongs(prefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, forensicReliabilityDegradationStartRt)
             } else {
-                setFirstViolationTs(firstViolationTs).setFirstViolationRt(firstViolationRt).setFirstViolationWasJump(firstViolationWasJump)
-                    .setDistanceViolationCounter(distanceViolationCounter).setWasDistanceViolated(wasDistanceViolated).setPowerAlarmPending(powerAlarmPending)
-                    .setLastSirenStopRt(lastSirenStopRt).setLastGlobalTriggerRt(lastGlobalTriggerRt).setForensicReliabilityDegradationStartRt(forensicReliabilityDegradationStartRt)
+                // R-ID 568: Fallback removed to enforce namespaced logic
             }
         }
     }
 
-    // --- Global String-Keyed API (Non-Namespaced or Legacy Routing) ---
+    // --- Global String-Keyed API (Strict Global only) ---
 
     suspend fun saveString(keyName: String, value: String) {
         routeToNamespaced(keyName)?.let { (role, key) -> saveString(role, key, value); return }
@@ -290,13 +287,6 @@ class SettingsRepository @Inject constructor(
                 LAST_GPS_TS_KEY -> setLastGpsTs(value)
                 VIOLATION_UPTIME_MS_KEY -> setViolationUptimeMs(value)
                 LAST_SERVICE_TICK_REALTIME_KEY -> setLastServiceTickRt(value)
-                CLOCK_DRIFT_REF_KEY -> setClockDriftRef(value)
-                LAST_SIT_TS_KEY -> setLastSitTs(value)
-                FIRST_VIOLATION_TS_KEY -> setFirstViolationTs(value)
-                FIRST_VIOLATION_RT_KEY -> setFirstViolationRt(value)
-                LAST_SIREN_STOP_RT_KEY -> setLastSirenStopRt(value)
-                LAST_GLOBAL_TRIGGER_RT_KEY -> setLastGlobalTriggerRt(value)
-                FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY -> setForensicReliabilityDegradationStartRt(value)
             }
         }
     }
@@ -306,11 +296,7 @@ class SettingsRepository @Inject constructor(
         dataStore.mutate {
             when (keyName) {
                 MAX_DISTANCE_STORAGE_KEY -> setMaxDistance(value)
-                MAX_ACCURACY_KEY -> setMaxAccuracy(value)
                 MAX_TEMP_KEY -> setMaxTemp(value)
-                TRACKER_LUX_BASELINE_KEY -> setTrackerLuxBaseline(value)
-                TRACKER_ACOUSTIC_FLOOR_KEY -> setTrackerAcousticFloor(value)
-                CHAIR_BASELINE_TILT_KEY -> setChairBaselineTilt(value)
             }
         }
     }
@@ -324,9 +310,6 @@ class SettingsRepository @Inject constructor(
                 IS_XIAOMI_MANUAL_OVERRIDE_KEY -> setIsXiaomiManualOverride(value)
                 IDENTITY_SANITIZED_KEY -> setIdentitySanitized(value)
                 IS_SYSTEM_ACTIVE_KEY -> setIsSystemActive(value)
-                FIRST_VIOLATION_WAS_JUMP_KEY -> setFirstViolationWasJump(value)
-                WAS_DISTANCE_VIOLATED_KEY -> setWasDistanceViolated(value)
-                POWER_ALARM_PENDING_KEY -> setPowerAlarmPending(value)
             }
         }
     }
@@ -338,7 +321,6 @@ class SettingsRepository @Inject constructor(
                 LAST_AUTO_SAVE_HOUR_KEY -> setLastAutoSaveHour(value)
                 LAST_VERSION_CODE_KEY -> setLastVersionCode(value)
                 RECOVERY_COUNT_KEY -> setRecoveryCount(value)
-                DISTANCE_VIOLATION_COUNTER_KEY -> setDistanceViolationCounter(value)
             }
         }
     }
@@ -373,13 +355,6 @@ class SettingsRepository @Inject constructor(
             LAST_GPS_TS_KEY -> settings.lastGpsTs
             VIOLATION_UPTIME_MS_KEY -> settings.violationUptimeMs
             LAST_SERVICE_TICK_REALTIME_KEY -> settings.lastServiceTickRt
-            CLOCK_DRIFT_REF_KEY -> if (settings.hasClockDriftRef()) settings.clockDriftRef else 0L
-            LAST_SIT_TS_KEY -> if (settings.hasLastSitTs()) settings.lastSitTs else 0L
-            FIRST_VIOLATION_TS_KEY -> settings.firstViolationTs
-            FIRST_VIOLATION_RT_KEY -> settings.firstViolationRt
-            LAST_SIREN_STOP_RT_KEY -> settings.lastSirenStopRt
-            LAST_GLOBAL_TRIGGER_RT_KEY -> settings.lastGlobalTriggerRt
-            FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY -> settings.forensicReliabilityDegradationStartRt
             else -> 0L
         }
         return if (value == 0L) default else value
@@ -390,11 +365,7 @@ class SettingsRepository @Inject constructor(
         routeToNamespaced(keyName)?.let { (role, key) -> return getDouble(role, key, default) }
         val value = when (keyName) {
             MAX_DISTANCE_STORAGE_KEY -> settings.maxDistance
-            MAX_ACCURACY_KEY -> settings.maxAccuracy
             MAX_TEMP_KEY -> settings.maxTemp
-            TRACKER_LUX_BASELINE_KEY -> settings.trackerLuxBaseline
-            TRACKER_ACOUSTIC_FLOOR_KEY -> settings.trackerAcousticFloor
-            CHAIR_BASELINE_TILT_KEY -> settings.chairBaselineTilt
             else -> 0.0
         }
         return if (value == 0.0) default else value
@@ -409,9 +380,6 @@ class SettingsRepository @Inject constructor(
             IS_XIAOMI_MANUAL_OVERRIDE_KEY -> settings.isXiaomiManualOverride
             IDENTITY_SANITIZED_KEY -> settings.identitySanitized
             IS_SYSTEM_ACTIVE_KEY -> settings.isSystemActive
-            FIRST_VIOLATION_WAS_JUMP_KEY -> settings.firstViolationWasJump
-            WAS_DISTANCE_VIOLATED_KEY -> settings.wasDistanceViolated
-            POWER_ALARM_PENDING_KEY -> settings.powerAlarmPending
             else -> default
         }
     }
@@ -423,7 +391,6 @@ class SettingsRepository @Inject constructor(
             LAST_AUTO_SAVE_HOUR_KEY -> settings.lastAutoSaveHour
             LAST_VERSION_CODE_KEY -> settings.lastVersionCode
             RECOVERY_COUNT_KEY -> settings.recoveryCount
-            DISTANCE_VIOLATION_COUNTER_KEY -> settings.distanceViolationCounter
             else -> -1
         }
         return if (value == -1) default else value

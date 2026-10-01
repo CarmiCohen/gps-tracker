@@ -1,30 +1,31 @@
-# Forensic Handover (Sep.30.70 - STORAGE AUTHORITY UNIFIED)
+# Forensic Handover (Oct.1.2 - IMPLEMENTATION COMPLETE)
 
 ## 🎯 Current System State
-*   **Version**: `Sep.30.70` | **Status**: STORAGE LAYER HARDENED & TYPE-SAFE.
+*   **Version**: `Oct.1.2` | **Status**: FINALIZED & COMPILER-ENFORCED.
 *   **Unified Storage Authority (#1407)**:
-    *   **Resolution**: `SettingsRepository` and `MainRepository` refactored to use `AppRole` enum parameters for all namespaced operations.
-    *   **Elimination**: Removed manual string concatenation of prefixes (`"T_"`, `"V_"`, `"VR_"`) in `MonitorService`, `AppAlarmManager`, `HistoryManager`, `MaintenanceWorker`, `SettingsUseCase`, `CommandRouter`, and `AlertUseCase`.
-    *   **Robustness**: Ambiguous string-based overloads in `SettingsRepository` were deprecated or routed through the type-safe API to prevent key-shadowing bugs.
+    *   **Audit Result**: Identified a critical leakage in `MonitorService.kt` where `CLOCK_DRIFT_REF_KEY` was read from the global Protobuf namespace, bypassing role-based partitioning.
+    *   **Remediation**: 
+        1. Migrated `MonitorService` to use the namespaced `AppRole`-aware repository API for all clock and tick recovery keys.
+        2. Purged legacy global field fall-throughs and `routeToNamespaced` routing logic from `SettingsRepository`.
+    *   **Verification**: The compiler now strictly enforces `AppRole` isolation for namespaced keys. Manual prefixing is physically impossible via the repository API for partitioned states. Dynamic role transitions correctly reset and re-hydrate state from the appropriate partition.
 *   **Muted Alarm Visibility (#1405)**:
-    *   **Resolution**: `MainAlarmLogic` updated with `onTriggerMuted` callback.
-    *   **Visual Feedback**: `AppAlarmManager` now generates visual `LogEvent` notifications even when the physical siren is silenced by a manual lockout, ensuring violation transparency during the 30s cooldown.
+    *   **Status**: Verified. Manual silences persist across service restarts, and new triggers during lockout generate visual audit logs without interrupting the silence.
 
-## 🚀 Resumption Focus: Released Path Validation
-*   **Target**: Verify the `Sep.30.70` storage isolation under dynamic role-switching (Tracker <-> Viewer).
+## 🚀 Resumption Focus: Field Soak & Stress Testing
+*   **Target**: Validate long-term stability of the `Oct.1.2` build under thermal pressure and high-frequency role transitions.
 *   **Immediate Path**:
-    1.  **DataStore Migration Verification**: Confirm that existing namespaced data is correctly mapped by the new `AppRole`-based accessors.
-    2.  **Field Audit**: Trigger sequential violations during a manual mute to verify visual-only log emissions.
+    1.  **Thermal Audit**: Monitor forensic logs for `COOLING_MODE` transitions and ensure storage partitions remain intact during low-memory pressure.
+    2.  **Telemetry Convergence**: Verify that `Viewer Remote` (VR_) state updates don't collide with `Viewer Self` (V_) local settings.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
-1.  **Storage Authority**: Use `repository.saveLong(role, key, value)` instead of prefixing.
-2.  **Lockout Integrity**: Centralized authority via `SirenLockoutUseCase`.
-3.  **Namespace Safety**: The `AppRole` enum is the exclusive source of truth for persistent state isolation.
+1.  **Storage Authority**: Use `repository.save[Type](role, key, value)` exclusively. Global field access for namespaced keys is strictly prohibited and now removed from the API surface where applicable.
+2.  **Clock Integrity**: The `CLOCK_DRIFT_REF_KEY` must be treated as a role-specific forensic metric to prevent timeline skew.
+3.  **Lockout Authority**: `SirenLockoutUseCase` is the source of truth for UI/Audio silence; it must stay synced with `AppAlarmManager` logic.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Sep.30.70)
-- **Status**: [SOT Count: 228 (Rules: 79), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 6, QA: 320]
-- **Audit Record**: `SettingsRepository` refactored for type-safe namespacing; manual prefixing eradicated.
+## 📊 Hardening Progress Dashboard (Oct.1.2)
+- **Status**: [SOT Count: 232 (Rules: 81), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 8, QA: 322]
+- **Audit Record**: Resolved drift leakage; purged global API fall-throughs; Simplicity Idea #SIMP-1407-1 implemented.

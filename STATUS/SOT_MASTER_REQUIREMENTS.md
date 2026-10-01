@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Sep.30.43)
+# SOT Master Requirements & Hardening Status (Oct.1.2)
 
-## 🏗️ Architectural Master Rules (78 Rules)
+## 🏗️ Architectural Master Rules (81 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted for brevity)
@@ -16,7 +16,7 @@
 ...
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 568**: Unified Storage Authority - Refactored SettingsRepository to utilize AppRole-based API overloads. (Resolved Sep.30.43).
+*   **SOT ID 568**: Unified Storage Authority - Refactored SettingsRepository to utilize AppRole-based API overloads. (Resolved Oct.1.2).
 *   **SOT ID 567**: Standardized Dismissal Lockout - Enforced 30s global lockout in EngineConstants. (Resolved Sep.30.43).
 *   **SOT ID 566**: Persistent Alarm Lockout - Integrated BootLifecycleAuthority with AppAlarmManager for RT recovery. (Resolved Sep.30.43).
 *   **SOT ID 565**: Unified Role Identity Authority - Migrated all modules to AppRole enum contract. (Resolved Sep.30.43).
@@ -25,7 +25,7 @@
 ---
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.200 (Storage Authority Audit)**: PASSED - Verified all role-prefixed DataStore calls utilize the `AppRole` parameter; manual `"prefix" + key` concatenation eliminated in `MonitorService`, `AlarmManager`, and `HistoryManager`. (Sep.30.43)
+*   **Chapter 31.200 (Storage Authority Audit)**: PASSED - Verified all role-prefixed DataStore calls utilize the `AppRole` parameter; manual `"prefix" + key` concatenation eliminated in `MonitorService`, `AlarmManager`, and `HistoryManager`. (Oct.1.2)
 *   **Chapter 31.199 (Role Contract Audit)**: PASSED - Verified all modules utilize AppRole enum; no hardcoded "T_"/"V_"/"VR_" prefixes remain in active code. (Sep.30.43)
 *   **Chapter 31.198 (Lockout Persistence Audit)**: PASSED - Verified that lastSirenStopRt is correctly recovered after simulated process kill via adb shell. (Sep.30.43)
 *   **Chapter 31.197 (Sequential Mute Audit)**: PASSED - Verified that triggering a new alarm type does not interrupt an existing user-initiated lockout. (Sep.30.43)

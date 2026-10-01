@@ -44,7 +44,7 @@ class SessionLifecycleCoordinator @Inject constructor(
         
         // 2. Reset Role-Specific Shared Hardware State
         forensicAuditor.reset(role)
-        hardwareSuite.resetBaseline(role.prefix.removeSuffix("_"))
+        hardwareSuite.resetBaseline(role)
 
         // 3. Reset Engine State
         processors.forEach { it.resetStats() }

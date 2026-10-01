@@ -190,7 +190,7 @@ class AppAlarmManager @Inject constructor(
         serviceContext: AlarmServiceContext
     ) {
         this.isTrackerMode = serviceContext.isTrackerMode
-        this.currentRole = if (serviceContext.rolePrefix == AppRole.VIEWER_REMOTE.prefix) AppRole.VIEWER_REMOTE else AppRole.TRACKER
+        this.currentRole = serviceContext.role
         val versionTag = "[${BuildConfig.VERSION_NAME}]"
         
         syncEvaluationState(snapshot, serviceContext)
@@ -296,7 +296,7 @@ class AppAlarmManager @Inject constructor(
             nowRt = serviceContext.nowRt, 
             serviceStartTime = serviceContext.serviceStartTs, 
             serviceStartRt = serviceContext.serviceStartRt,
-            lastAlarmAckTs = repository.getLastAlarmAckTsSync(serviceContext.rolePrefix),
+            lastAlarmAckTs = repository.getLastAlarmAckTsSync(serviceContext.role),
             appStartTime = serviceContext.appStartTime,
             isRelayConnected = serviceContext.isRelayConnected, 
             isTrackerConnected = serviceContext.isTrackerConnected,
