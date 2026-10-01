@@ -11,12 +11,12 @@ import javax.inject.Singleton
 
 /**
  * RemoteStatusRepository: Single Source of Truth for Remote Peer Telemetry.
+ * Sep.30.70:
+ * - Issue #1407: Unified Storage Authority. Updated to pass AppRole objects 
+ *   to repository storage API, eliminating manual prefixing (R-ID 568).
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
  *   ensure prefix consistency ("VR_" authority) (R-ID 453/565).
- * Sep.24.90:
- * - Issue #1306 REMEDIATION: Transitioned from "V_" to "VR_" prefix for remote 
- *   telemetry to eliminate namespace collisions with Viewer's self-tracking state.
  */
 @Singleton
 class RemoteStatusRepository @Inject constructor(
@@ -42,8 +42,8 @@ class RemoteStatusRepository @Inject constructor(
         if (isInitialized.getAndSet(true)) return
 
         try {
-            // R-ID 453/565: Standardized Role Identity
-            mainRepository.loadTrackerState(AppRole.VIEWER_REMOTE.prefix)?.let { savedStatus ->
+            // R-ID 453/565: Standardized Role Identity Authority
+            mainRepository.loadTrackerState(AppRole.VIEWER_REMOTE)?.let { savedStatus ->
                 _remoteStatus.value = savedStatus
             }
         } catch (e: Exception) {
@@ -53,13 +53,13 @@ class RemoteStatusRepository @Inject constructor(
 
     fun updateStatus(status: TrackerStatus) {
         _remoteStatus.value = status
-        mainRepository.saveTrackerState(status, AppRole.VIEWER_REMOTE.prefix)
+        mainRepository.saveTrackerState(status, AppRole.VIEWER_REMOTE)
     }
 
     fun updateStatusAtomic(action: (TrackerStatus) -> TrackerStatus) {
         _remoteStatus.update { current ->
             val next = action(current)
-            mainRepository.saveTrackerState(next, AppRole.VIEWER_REMOTE.prefix)
+            mainRepository.saveTrackerState(next, AppRole.VIEWER_REMOTE)
             next
         }
     }

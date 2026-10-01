@@ -22,6 +22,9 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Sep.30.70:
+ * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
+ *   API in SettingsRepository, eliminating manual prefixing.
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
  *   ensure prefix consistency (R-ID 453/565).
@@ -73,11 +76,11 @@ class HistoryManager @Inject constructor(
         this.currentRole = if (rolePrefix == AppRole.VIEWER_SELF.prefix) AppRole.VIEWER_SELF else AppRole.TRACKER
         
         withContext(Dispatchers.IO) {
-            val lastSitTs = repository.getLong(currentRole.prefix + LAST_HISTORY_SIT_TS_KEY, 0L)
+            val lastSitTs = repository.getLong(currentRole, LAST_SIT_TS_KEY, 0L)
             if (lastSitTs > 0) {
                  lastSitDetectedRt = timeProvider.elapsedRealtime() - (timeProvider.currentTimeMillis() - lastSitTs)
             }
-            clockDriftRef = repository.getLong(currentRole.prefix + CLOCK_DRIFT_REF_KEY, 0L)
+            clockDriftRef = repository.getLong(currentRole, CLOCK_DRIFT_REF_KEY, 0L)
             lastProcessedHour = repository.getInt(LAST_AUTO_SAVE_HOUR_KEY, -1)
         }
         isInitialized.set(true)
@@ -356,7 +359,7 @@ class HistoryManager @Inject constructor(
         val currentDrift = nowWall - monotonic
         if (clockDriftRef == 0L) {
             clockDriftRef = currentDrift
-            scope?.launch { repository.saveLong(currentRole.prefix + CLOCK_DRIFT_REF_KEY, currentDrift) }
+            scope?.launch { repository.saveLong(currentRole, CLOCK_DRIFT_REF_KEY, currentDrift) }
             return
         }
         val delta = abs(currentDrift - clockDriftRef)
@@ -364,7 +367,7 @@ class HistoryManager @Inject constructor(
             val direction = if (currentDrift > clockDriftRef) "forward" else "backward"
             emitSanitizedLog("FORENSIC ALERT: System clock jump detected ($direction ${delta / 1000}s).", true)
             clockDriftRef = currentDrift
-            scope?.launch { repository.saveLong(currentRole.prefix + CLOCK_DRIFT_REF_KEY, currentDrift) }
+            scope?.launch { repository.saveLong(currentRole, CLOCK_DRIFT_REF_KEY, currentDrift) }
         }
     }
 
@@ -372,7 +375,7 @@ class HistoryManager @Inject constructor(
         if (!isDetected) return false
         if (abs(rt - lastSitDetectedRt) < SIT_DUPLICATE_GUARD_MS) return false
         lastSitDetectedRt = rt
-        scope?.launch { repository.saveLong(currentRole.prefix + LAST_HISTORY_SIT_TS_KEY, ts) }
+        scope?.launch { repository.saveLong(currentRole, LAST_HISTORY_SIT_TS_KEY, ts) }
         return true
     }
 

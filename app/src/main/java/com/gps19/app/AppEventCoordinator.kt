@@ -11,6 +11,10 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Sep.30.70:
+ * - Issue #1407: Unified Storage Authority. Updated to pass AppRole objects 
+ *   to repository storage API, eliminating manual prefixing. Fixed type mismatch 
+ *   in setPowerAlarmPending calls.
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
  *   ensure prefix consistency ("VR_" parity with AlarmManager) (R-ID 453).
@@ -156,12 +160,12 @@ class AppEventCoordinator @Inject constructor(
         when (event) {
             is IntegrityEvent.ViolationSustained -> {
                 if (event.type == ALERT_ID_TRACKER_POWER && isTrackerMode) {
-                    alarmManager.setPowerAlarmPending(true, localRole.prefix)
+                    alarmManager.setPowerAlarmPending(true, localRole)
                 }
             }
             is IntegrityEvent.ViolationResolved -> {
                 if (event.type == ALERT_ID_TRACKER_POWER && isTrackerMode) {
-                    alarmManager.setPowerAlarmPending(false, localRole.prefix)
+                    alarmManager.setPowerAlarmPending(false, localRole)
                 }
             }
             is IntegrityEvent.LogEvent -> {
@@ -183,8 +187,8 @@ class AppEventCoordinator @Inject constructor(
 
     private fun handleProcessorEvent(event: ProcessorEvent, isPrimary: Boolean) {
         val isTrackerMode = configManager.isTrackerMode
-        // R-ID 453/565: Local processing uses local role prefixes
-        val prefix = if (isTrackerMode) AppRole.TRACKER.prefix else (if (isPrimary) AppRole.VIEWER_SELF.prefix else AppRole.VIEWER_REMOTE.prefix)
+        // R-ID 453/565: Local processing uses local roles
+        val role = if (isTrackerMode) AppRole.TRACKER else (if (isPrimary) AppRole.VIEWER_SELF else AppRole.VIEWER_REMOTE)
         val logPrefix = if (!isTrackerMode && isPrimary) "[Self] " else ""
         
         when (event) {
@@ -201,7 +205,7 @@ class AppEventCoordinator @Inject constructor(
                 )
             }
             is ProcessorEvent.MaxAccuracyChanged -> {
-                repository.saveDoubleSync(prefix + MAX_ACCURACY_KEY, event.accuracy)
+                repository.saveDoubleSync(role, MAX_ACCURACY_KEY, event.accuracy)
             }
             is ProcessorEvent.ChairBaselineChanged -> {
                 val telem = if (isTrackerMode || isPrimary) repository.getLocalLocationSync() else repository.getTrackerLocationSync()
@@ -209,16 +213,16 @@ class AppEventCoordinator @Inject constructor(
                     m = "Passive Zeroing: Chair baseline calibrated to ${event.baseline.roundToOneDecimal()}°", 
                     lat = telem.kinetic.lat, lng = telem.kinetic.lng, accuracy = telem.kinetic.maxAccuracy
                 )
-                repository.saveDoubleSync(prefix + CHAIR_BASELINE_TILT_KEY, event.baseline)
+                repository.saveDoubleSync(role, CHAIR_BASELINE_TILT_KEY, event.baseline)
             }
             is ProcessorEvent.VibrationFloorChanged -> {
-                repository.saveDoubleDebounced(prefix + ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
+                repository.saveDoubleDebounced(role, ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
             }
             is ProcessorEvent.LuxBaselineChanged -> {
-                repository.saveDoubleDebounced(prefix + TRACKER_LUX_BASELINE_KEY, event.baseline)
+                repository.saveDoubleDebounced(role, TRACKER_LUX_BASELINE_KEY, event.baseline)
             }
             is ProcessorEvent.AcousticFloorChanged -> {
-                repository.saveDoubleDebounced(prefix + TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
+                repository.saveDoubleDebounced(role, TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
             }
             is ProcessorEvent.GpsStallDetected -> {
                 if (!isTrackerMode && isPrimary) logManager.logServiceEvent(m = "GPS STALL: Fix unchanged for >1s", isImportant = false)

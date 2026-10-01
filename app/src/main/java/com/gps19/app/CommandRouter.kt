@@ -16,6 +16,9 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Sep.30.70:
+ * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
+ *   API in MainRepository, eliminating manual prefixing (R-ID 565).
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
  *   fix prefix mismatch. StopSiren now updates AppRole.VIEWER_REMOTE in 
@@ -84,8 +87,8 @@ class CommandRouter @Inject constructor(
                             // R-ID 453/565: Local stop command affects the local app's alarm state.
                             // In Viewer mode, the alarm authority is VIEWER_REMOTE ("VR_").
                             val role = if (configManager.isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE
-                            repository.saveLongSync(role.prefix + LAST_ALARM_ACK_TS_KEY, timeProvider.currentTimeMillis())
-                            alarmManager.setPowerAlarmPending(false, role.prefix)
+                            repository.saveLongSync(role, LAST_ALARM_ACK_TS_KEY, timeProvider.currentTimeMillis())
+                            alarmManager.setPowerAlarmPending(false, role)
                             alarmManager.notifySirenManualStop() 
                             alarmManager.dismissResolvedAlarms()
                             integrityMonitor.clearPowerTamper()

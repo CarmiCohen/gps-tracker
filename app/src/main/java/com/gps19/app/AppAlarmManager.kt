@@ -13,15 +13,15 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Sep.30.70:
+ * - Issue #1407: Unified Storage Authority. Migrated internal storage calls 
+ *   to use AppRole overloads, eliminating manual string prefixing.
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
  *   fix prefix mismatch ("VR_" parity with CommandRouter) (R-ID 453).
  * - Issue #1404: Fixed Alarm Lockout Persistence. Utilizes BootLifecycleAuthority 
  *   to recover lastSirenStopRt across service restarts, preventing immediate 
  *   re-triggering after process recovery.
- * Sep.30.44:
- * - Issue #1401: Fixed AlarmInfo mapping to correctly populate isSirenDisabled 
- *   using isSpecialType. Ensures connectivity alerts do not trigger sirens.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -64,12 +64,8 @@ class AppAlarmManager @Inject constructor(
 
     fun getSettings(): AlertSettings = currentSettings
 
-    fun setPowerAlarmPending(pending: Boolean, rolePrefix: String = "") {
-        val targetRole = when (rolePrefix) {
-            AppRole.TRACKER.prefix -> AppRole.TRACKER
-            AppRole.VIEWER_REMOTE.prefix -> AppRole.VIEWER_REMOTE
-            else -> this.currentRole
-        }
+    fun setPowerAlarmPending(pending: Boolean, role: AppRole? = null) {
+        val targetRole = role ?: this.currentRole
         
         if (evaluationState.powerAlarmPending != pending || this.currentRole != targetRole) {
             evaluationState.powerAlarmPending = pending
@@ -131,8 +127,8 @@ class AppAlarmManager @Inject constructor(
         updateSirenRequirement()
     }
 
-    fun restoreLogicState(s: AppSettings, rolePrefix: String = "") {
-        this.currentRole = if (rolePrefix == AppRole.TRACKER.prefix) AppRole.TRACKER else AppRole.VIEWER_REMOTE
+    fun restoreLogicState(s: AppSettings, role: AppRole) {
+        this.currentRole = role
         this.isTrackerMode = (currentRole == AppRole.TRACKER)
         
         val prefix = currentRole.prefix
@@ -183,9 +179,9 @@ class AppAlarmManager @Inject constructor(
                 lastSirenStopRt = evaluationState.lastSirenStopRt,
                 lastGlobalTriggerRt = evaluationState.lastGlobalTriggerRt,
                 forensicReliabilityDegradationStartRt = evaluationState.forensicReliabilityDegradationStartRt,
-                rolePrefix = currentRole.prefix
+                role = currentRole
             )
-            repository.saveString(currentRole.prefix + "boot_id", bootLifecycleAuthority.getCurrentBootId())
+            repository.saveString(currentRole, "boot_id", bootLifecycleAuthority.getCurrentBootId())
         }
     }
 
@@ -227,10 +223,15 @@ class AppAlarmManager @Inject constructor(
             onTrigger = { eval: AlarmEvaluationState.ActiveAlarm ->
                 val isSpecial = isSpecialType(eval.type)
                 val specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
+                
+                // Visual feedback for triggers, noting if they are currently muted
+                val isMuted = sirenLockoutUseCase.isLockedOut() || (evaluationState.lastSirenStopRt > 0L && timeProvider.elapsedRealtime() - evaluationState.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS)
+                val statusTag = if (isMuted && isSpecial) "(MUTED)" else "TRIGGERED"
+
                 domainEventBus.emit(AlarmEvent.LogEvent(
                     type = eval.type,
-                    message = "$versionTag ALARM TRIGGERED: ${eval.title}",
-                    isImportant = true,
+                    message = "$versionTag ALARM $statusTag: ${eval.title}",
+                    isImportant = !isMuted,
                     extremeValue = null,
                     logId = null,
                     durationMs = 0L,
@@ -366,7 +367,7 @@ class AppAlarmManager @Inject constructor(
             evaluationState.activeAlarms.values.toList()
         }
         scope.launch {
-            repository.saveActiveAlarms(alarms, currentRole.prefix)
+            repository.saveActiveAlarms(alarms, currentRole)
         }
     }
 
@@ -382,9 +383,9 @@ class AppAlarmManager @Inject constructor(
         }
     }
 
-    fun resetEvaluation(rolePrefix: String = "") {
-        if (rolePrefix.isNotEmpty()) {
-            this.currentRole = if (rolePrefix == AppRole.VIEWER_REMOTE.prefix) AppRole.VIEWER_REMOTE else AppRole.TRACKER
+    fun resetEvaluation(role: AppRole? = null) {
+        if (role != null) {
+            this.currentRole = role
         }
         synchronized(evaluationState.activeAlarms) { evaluationState.activeAlarms.clear() }
         persistActiveAlarms()

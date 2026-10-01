@@ -9,12 +9,12 @@ import javax.inject.Inject
 
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
+ * Sep.30.70:
+ * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
+ *   API in SettingsRepository, eliminating manual prefixing.
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
  *   ensure prefix consistency ("V_" authority) (R-ID 453/565).
- * Sep.23.70:
- * - Issue #1230 REMEDIATION: Implemented role-aware initial hydration for 
- *   alarm acknowledgment timestamps to prevent cross-role state leakage (R-ID 453).
  */
 class SettingsUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -86,7 +86,7 @@ class SettingsUseCase @Inject constructor(
         }
         
         val lAlarmAck = if (role != null) {
-            s.roleLongsMap.getOrDefault(role.prefix + LAST_ALARM_ACK_TS_KEY, 0L)
+            settingsRepository.getLong(role, LAST_ALARM_ACK_TS_KEY, 0L)
         } else {
             s.lastAlarmAckTs
         }

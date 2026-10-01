@@ -21,11 +21,12 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Sep.30.70:
+ * - Issue #1407: Unified Storage Authority. Updated to pass AppRole objects 
+ *   to repository storage API, eliminating manual prefixing (R-ID 568).
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
  *   ensure prefix consistency ("VR_" authority) (R-ID 453/565).
- * Sep.30.3:
- * - Maintenance: Updated to alignment Sep.30.3.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -420,7 +421,7 @@ class ConnectivitySuite @Inject constructor(
         val success = sendTelemetryInternal(status, SignalingPriority.HIGH)
         if (isTrackerMode) {
             // R-ID 453/565: Standardized Role Identity Authority
-            mainRepository.saveTrackerState(status, AppRole.TRACKER.prefix)
+            mainRepository.saveTrackerState(status, AppRole.TRACKER)
             if (!success) {
                 val entity = TelemetryMapper.mapStatusToPending(status)
                 offlineRepository.addPendingStatusUpdate(entity)
@@ -616,9 +617,9 @@ class ConnectivitySuite @Inject constructor(
         trackerGpsStallStartTs = 0L
         
         // R-ID 453/565: Standardized Role Identity Authority
-        val prefix = if (isTrackerMode) AppRole.TRACKER.prefix else AppRole.VIEWER_REMOTE.prefix
-        mainRepository.saveDoubleSync(prefix + TRACKER_LUX_BASELINE_KEY, 0.0)
-        mainRepository.saveDoubleSync(prefix + TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
+        val role = if (isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE
+        mainRepository.saveDoubleSync(role, TRACKER_LUX_BASELINE_KEY, 0.0)
+        mainRepository.saveDoubleSync(role, TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
     }
 
     fun stop() { 

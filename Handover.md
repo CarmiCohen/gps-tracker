@@ -1,32 +1,30 @@
-# Forensic Handover (Sep.30.60 - ALARM HARDENING COMPLETE)
+# Forensic Handover (Sep.30.70 - STORAGE AUTHORITY UNIFIED)
 
 ## 🎯 Current System State
-*   **Version**: `Sep.30.60` | **Status**: ALARM SYSTEM HARDENED & STANDARDIZED.
-*   **Role Identity Authority (#1406)**:
-    *   **Resolution**: Hardcoded `"T_"` and `"VR_"` prefixes replaced by a centralized `AppRole` enum in `core:engine`.
-    *   **Parity**: All modules (CommandRouter, AlarmManager, ConnectivitySuite, etc.) are perfectly aligned on namespace keys, resolving acknowledgment loops.
-*   **Siren Lockout Compliance (#1403)**:
-    *   **Resolution**: Lockout duration standardized to **30s** (`SIREN_RESUME_COOLDOWN_MS`) in `EngineConstants.kt`.
-*   **Lockout Persistence (#1404)**:
-    *   **Resolution**: `AppAlarmManager` now utilizes `BootLifecycleAuthority` to recover `lastSirenStopRt` across service restarts, ensuring manual mutes survive process recovery.
-*   **Sequential Trigger Protection (#1405)**:
-    *   **Resolution**: `MainAlarmLogic` refactored to prevent new alarm triggers from wiping an existing manual siren lockout.
+*   **Version**: `Sep.30.70` | **Status**: STORAGE LAYER HARDENED & TYPE-SAFE.
+*   **Unified Storage Authority (#1407)**:
+    *   **Resolution**: `SettingsRepository` and `MainRepository` refactored to use `AppRole` enum parameters for all namespaced operations.
+    *   **Elimination**: Removed manual string concatenation of prefixes (`"T_"`, `"V_"`, `"VR_"`) in `MonitorService`, `AppAlarmManager`, `HistoryManager`, `MaintenanceWorker`, `SettingsUseCase`, `CommandRouter`, and `AlertUseCase`.
+    *   **Robustness**: Ambiguous string-based overloads in `SettingsRepository` were deprecated or routed through the type-safe API to prevent key-shadowing bugs.
+*   **Muted Alarm Visibility (#1405)**:
+    *   **Resolution**: `MainAlarmLogic` updated with `onTriggerMuted` callback.
+    *   **Visual Feedback**: `AppAlarmManager` now generates visual `LogEvent` notifications even when the physical siren is silenced by a manual lockout, ensuring violation transparency during the 30s cooldown.
 
-## 🚀 Resumption Focus: Final Integration & Field Validation
-*   **Target**: Verify the `Sep.30.60` baseline under long-term soak conditions.
+## 🚀 Resumption Focus: Released Path Validation
+*   **Target**: Verify the `Sep.30.70` storage isolation under dynamic role-switching (Tracker <-> Viewer).
 *   **Immediate Path**:
-    1.  **Identity Sanitization Check**: Ensure the migration to `AppRole` handles legacy data gracefully in `SettingsRepository`.
-    2.  **Audio Latency Audit**: Verify that the 30s lockout doesn't conflict with physical siren fade-in logic on budget hardware (A15).
+    1.  **DataStore Migration Verification**: Confirm that existing namespaced data is correctly mapped by the new `AppRole`-based accessors.
+    2.  **Field Audit**: Trigger sequential violations during a manual mute to verify visual-only log emissions.
 
 ---
 
 ## 🛡️ Core Architecture Blueprint
-1.  **Enum Authority**: Raw role strings are strictly prohibited. Use `AppRole.prefix`.
+1.  **Storage Authority**: Use `repository.saveLong(role, key, value)` instead of prefixing.
 2.  **Lockout Integrity**: Centralized authority via `SirenLockoutUseCase`.
-3.  **Persistence Safety**: All RT (Real-time) dependent states must be recovered via `BootLifecycleAuthority`.
+3.  **Namespace Safety**: The `AppRole` enum is the exclusive source of truth for persistent state isolation.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Sep.30.60)
-- **Status**: [SOT Count: 227 (Rules: 78), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 6, QA: 316]
-- **Audit Record**: `MainAlarmLogicTest` updated with 30s lockout and sequential trigger regression guards.
+## 📊 Hardening Progress Dashboard (Sep.30.70)
+- **Status**: [SOT Count: 228 (Rules: 79), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 6, QA: 320]
+- **Audit Record**: `SettingsRepository` refactored for type-safe namespacing; manual prefixing eradicated.

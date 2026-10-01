@@ -6,6 +6,9 @@ import javax.inject.Inject
 
 /**
  * AlertUseCase: Handles logic for alarm dismissal and siren control.
+ * Sep.30.70:
+ * - Issue #1407: Unified Storage Authority. Updated to use role-based 
+ *   repository storage API (R-ID 565).
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
  *   ensure prefix consistency ("VR_" authority in Viewer mode) and fix 
@@ -21,7 +24,7 @@ class AlertUseCase @Inject constructor(
 
     suspend fun dismissAlarms(): Long {
         val now = timeProvider.currentTimeMillis()
-        repository.saveLong(getAlarmRole().prefix + LAST_ALARM_ACK_TS_KEY, now)
+        repository.saveLong(getAlarmRole(), LAST_ALARM_ACK_TS_KEY, now)
         repository.sendCommand(UiCommand.StopSiren("User Dismissed"))
         logManager.submitToLogSink("USER ACTION: Alerts acknowledged", "user", isImportant = true)
         return now
@@ -29,7 +32,7 @@ class AlertUseCase @Inject constructor(
 
     suspend fun stopSiren(causes: String?): Long {
         val now = timeProvider.currentTimeMillis()
-        repository.saveLong(getAlarmRole().prefix + LAST_ALARM_ACK_TS_KEY, now)
+        repository.saveLong(getAlarmRole(), LAST_ALARM_ACK_TS_KEY, now)
         repository.sendCommand(UiCommand.StopSiren(causes))
         logManager.submitToLogSink("USER ACTION: Siren stopped ${causes ?: ""}", "user", isImportant = true)
         return now

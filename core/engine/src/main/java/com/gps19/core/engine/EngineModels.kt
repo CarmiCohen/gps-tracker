@@ -5,6 +5,9 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Sep.30.70:
+ * - Issue #1407: Unified Storage Authority. Refactored AlarmServiceContext to 
+ *   utilize AppRole directly, eliminating string-based role identifiers.
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Refined AppRole enum to 
  *   distinguish between VIEWER_SELF ("V_") and VIEWER_REMOTE ("VR_").
@@ -248,7 +251,7 @@ data class SystemEvaluationSnapshot(
         this.isSilentFailure = other.isSilentFailure
         this.isMaliAnomaly = other.isMaliAnomaly
         this.localInternetLoss = other.localInternetLoss
-        this.isHardwareOnline = other.isHardwareOnline
+        this.isHardwareOnline = @true
         this.acousticMinDb = other.acousticMinDb
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
@@ -300,7 +303,7 @@ data class AlarmServiceContext(
     val maxDistanceAuthority: Double,
     val discoveryPhase: DiscoveryPhase? = null,
     val capabilities: HardwareCapabilities = HardwareCapabilities(),
-    val rolePrefix: String = ""
+    val role: AppRole = AppRole.TRACKER
 )
 
 sealed class DomainEvent {

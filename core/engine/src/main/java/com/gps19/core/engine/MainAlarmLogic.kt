@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Sep.30.70:
+ * - Issue #1405/1407: Added onTriggerMuted callback to support visual 
+ *   feedback for alarms that occur during a manual siren lockout.
  * Sep.30.60:
  * - Issue #1405 RESOLVED: Removed siren lockout wipe on new triggers. Ensures 
  *   that a manual "Stop" remains respected for the full SIREN_RESUME_COOLDOWN_MS 
@@ -29,6 +32,7 @@ object MainAlarmLogic {
         onSpike: (message: String, duration: Long) -> Unit,
         onTrigger: (AlarmEvaluationState.ActiveAlarm) -> Unit,
         onResolve: (AlarmEvaluationState.ActiveAlarm, durationMs: Long) -> Unit,
+        onTriggerMuted: (AlarmEvaluationState.ActiveAlarm) -> Unit = {},
         isWarmup: Boolean = false,
         versionTag: String = ""
     ): SystemHealthReport {
@@ -62,7 +66,7 @@ object MainAlarmLogic {
             report.truncate(reportIdx)
 
             // Process Active Alarms State
-            processActiveAlarms(state, report, nowTs, nowRt, onTrigger, onResolve)
+            processActiveAlarms(state, report, nowTs, nowRt, onTrigger, onResolve, onTriggerMuted)
 
             report
         }
@@ -74,7 +78,8 @@ object MainAlarmLogic {
         now: Long,
         nowRt: Long,
         onTrigger: (AlarmEvaluationState.ActiveAlarm) -> Unit,
-        onResolve: (AlarmEvaluationState.ActiveAlarm, durationMs: Long) -> Unit
+        onResolve: (AlarmEvaluationState.ActiveAlarm, durationMs: Long) -> Unit,
+        onTriggerMuted: (AlarmEvaluationState.ActiveAlarm) -> Unit
     ) {
         val newActiveAlarms = mutableMapOf<String, AlarmEvaluationState.ActiveAlarm>()
         var triggerOccurred = false
@@ -91,10 +96,14 @@ object MainAlarmLogic {
                         eval.firstTriggerRt = nowRt
                         eval.isResolved = false
                         triggerOccurred = true
-                        onTrigger(eval)
                         
-                        // Issue #1405: Removed wiping of lastSirenStopRt here.
-                        // Lockout should persist across new alarm types until it naturally expires.
+                        // Check if physical siren is currently locked out
+                        val isMuted = nowRt - state.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS
+                        if (isMuted) {
+                            onTriggerMuted(eval)
+                        } else {
+                            onTrigger(eval)
+                        }
                     }
                 }
                 eval.lastLogTs = now

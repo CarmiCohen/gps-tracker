@@ -24,6 +24,9 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Sep.30.70:
+ * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
+ *   API in SettingsRepository, eliminating manual prefixing.
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
  *   ensure prefix consistency (R-ID 453/565).
@@ -90,8 +93,8 @@ class MonitorService : BaseMonitorService() {
     }
 
     override suspend fun onServiceInitialize() {
-        repository.saveLongSync(currentRole.prefix + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
-        repository.saveLongSync(currentRole.prefix + LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime())
+        repository.saveLongSync(currentRole, LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        repository.saveLongSync(currentRole, LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime())
 
         val trackerId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
         val viewerId = repository.getString(VIEWER_ID_KEY, SettingsRepository.DEFAULT_VIEWER_ID)
@@ -126,7 +129,7 @@ class MonitorService : BaseMonitorService() {
             hardwareSuite.gnssDetailFlow.collectLatest { latestGnssDetail = it }
         }
 
-        val recoveredTs = repository.getLong(currentRole.prefix + LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        val recoveredTs = repository.getLong(currentRole, LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
         val recoveredDrift = repository.getLong(CLOCK_DRIFT_REF_KEY, 0L)
         
         lastServiceTickTs = recoveredTs
@@ -151,11 +154,11 @@ class MonitorService : BaseMonitorService() {
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
         val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
 
-        val primaryState = repository.loadTrackerState(currentRole.prefix)
+        val primaryState = repository.loadTrackerState(currentRole)
         primaryProcessor.loadState(
-            savedMaxAccuracy = repository.getDouble(currentRole.prefix + MAX_ACCURACY_KEY, 0.0),
-            savedLastSitTs = repository.getLong(currentRole.prefix + LAST_SIT_TS_KEY, 0L),
-            savedBaseline = repository.getDouble(currentRole.prefix + CHAIR_BASELINE_TILT_KEY, -1000.0),
+            savedMaxAccuracy = repository.getDouble(currentRole, MAX_ACCURACY_KEY, 0.0),
+            savedLastSitTs = repository.getLong(currentRole, LAST_SIT_TS_KEY, 0L),
+            savedBaseline = repository.getDouble(currentRole, CHAIR_BASELINE_TILT_KEY, -1000.0),
             trackerState = primaryState,
             homePoints = homePoints,
             maxDistance = maxDist,
@@ -166,24 +169,24 @@ class MonitorService : BaseMonitorService() {
             savedSitShock = primaryState?.sitShock ?: 0.0,
             savedSitVzTs = primaryState?.sitVzTs ?: 0L,
             savedSitVzRt = primaryState?.sitVzRt ?: 0L,
-            savedLastValidFixRt = repository.getLong(currentRole.prefix + LAST_VALID_FIX_RT_KEY, 0L),
-            savedVibrationFloor = repository.getDouble(currentRole.prefix + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
-            savedLuxBaseline = repository.getDouble(currentRole.prefix + TRACKER_LUX_BASELINE_KEY, -1.0),
-            savedAcousticFloor = repository.getDouble(currentRole.prefix + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
+            savedLastValidFixRt = repository.getLong(currentRole, LAST_VALID_FIX_RT_KEY, 0L),
+            savedVibrationFloor = repository.getDouble(currentRole, ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
+            savedLuxBaseline = repository.getDouble(currentRole, TRACKER_LUX_BASELINE_KEY, -1.0),
+            savedAcousticFloor = repository.getDouble(currentRole, TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
         )
 
-        val vibeFloor = repository.getDouble(currentRole.prefix + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0)
+        val vibeFloor = repository.getDouble(currentRole, ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0)
         if (vibeFloor >= 0.0 && isTrackerMode) {
             hardwareSuite.setAdaptiveVibrationFloor(vibeFloor)
         }
 
         if (!isTrackerMode) {
             val remoteRole = AppRole.VIEWER_REMOTE
-            val remoteState = repository.loadTrackerState(remoteRole.prefix)
+            val remoteState = repository.loadTrackerState(remoteRole)
             remoteProcessor.loadState(
-                savedMaxAccuracy = repository.getDouble(remoteRole.prefix + MAX_ACCURACY_KEY, 0.0),
-                savedLastSitTs = repository.getLong(remoteRole.prefix + LAST_SIT_TS_KEY, 0L),
-                savedBaseline = repository.getDouble(remoteRole.prefix + CHAIR_BASELINE_TILT_KEY, -1000.0),
+                savedMaxAccuracy = repository.getDouble(remoteRole, MAX_ACCURACY_KEY, 0.0),
+                savedLastSitTs = repository.getLong(remoteRole, LAST_SIT_TS_KEY, 0L),
+                savedBaseline = repository.getDouble(remoteRole, CHAIR_BASELINE_TILT_KEY, -1000.0),
                 trackerState = remoteState,
                 homePoints = homePoints,
                 maxDistance = maxDist,
@@ -195,15 +198,15 @@ class MonitorService : BaseMonitorService() {
                 savedSitVzTs = remoteState?.sitVzTs ?: 0L,
                 savedSitVzRt = remoteState?.sitVzRt ?: 0L,
                 savedLastValidFixRt = remoteState?.lastValidFixRt ?: 0L,
-                savedVibrationFloor = repository.getDouble(remoteRole.prefix + ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
-                savedLuxBaseline = repository.getDouble(remoteRole.prefix + TRACKER_LUX_BASELINE_KEY, -1.0),
-                savedAcousticFloor = repository.getDouble(remoteRole.prefix + TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
+                savedVibrationFloor = repository.getDouble(remoteRole, ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
+                savedLuxBaseline = repository.getDouble(remoteRole, TRACKER_LUX_BASELINE_KEY, -1.0),
+                savedAcousticFloor = repository.getDouble(remoteRole, TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
             )
         }
 
         val alarmRole = if (isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE
-        alarmManager.restoreState(repository.loadActiveAlarms(alarmRole.prefix))
-        alarmManager.restoreLogicState(settingsSnapshot, alarmRole.prefix)
+        alarmManager.restoreState(repository.loadActiveAlarms(alarmRole))
+        alarmManager.restoreLogicState(settingsSnapshot, alarmRole)
     }
 
     private fun setupServiceObservers() {
@@ -554,8 +557,8 @@ class MonitorService : BaseMonitorService() {
         ))
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
-        repository.saveLongSync(currentRole.prefix + LAST_SERVICE_TICK_TS_KEY, now)
-        repository.saveLongSync(currentRole.prefix + LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
+        repository.saveLongSync(currentRole, LAST_SERVICE_TICK_TS_KEY, now)
+        repository.saveLongSync(currentRole, LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
         serviceTickCounter++
         triggerForensicSample()
     }

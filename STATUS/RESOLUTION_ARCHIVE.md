@@ -1,5 +1,19 @@
 # 🏛️ Resolution Archive - Sep.30.43
 
+## 🏁 Issue #1407: Unified Storage Authority
+*   **Resolved**: Sep.30.43
+*   **Root Cause**: Namespaced persistent storage operations relied on manual string concatenation of role prefixes (e.g., `role.prefix + KEY`), which was error-prone and bypassed type safety provided by the `AppRole` enum.
+*   **Remediation**: 
+    *   **Repository Overloads**: Refactored `SettingsRepository` and `MainRepository` to provide storage method overloads accepting `AppRole` as a primary parameter.
+    *   **Global Migration**: Updated `MonitorService`, `AppAlarmManager`, `HistoryManager`, `MaintenanceWorker`, `SettingsUseCase`, `CommandRouter`, and `AlertUseCase` to use the type-safe role-based API.
+    *   **Namespace Integrity**: Eliminated manual prefixing across the codebase, ensuring all role-based state isolation follows a single, verified authority.
+*   **Significance**: Maintenance (Refactoring).
+*   **SOT ID**: 568 (Unified Storage Authority)
+
+---
+
+# 🏛️ Resolution Archive - Sep.30.43
+
 ## 🏁 Issue #1406: Role Identity Authority
 *   **Resolved**: Sep.30.43
 *   **Root Cause**: Critical inconsistency between `CommandRouter` (`V_`) and `AppAlarmManager/AlertUseCase` (`VR_`) caused acknowledgments to be saved to orphaned keys, resulting in immediate re-triggering loops.

@@ -29,6 +29,10 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Sep.30.70:
+ * - Issue #1407: Unified Storage Authority. Added role-based storage overloads 
+ *   to eliminate manual prefixing in namespaced calls. Resolved overload resolution 
+ *   ambiguity by removing legacy string-prefix methods (R-ID 568).
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum for 
  *   acknowledgment tracking and prefix authority (R-ID 453/565).
@@ -107,7 +111,7 @@ class MainRepository @Inject constructor(
     val viewerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(true).map { entities -> 
         entities.map { entity ->
             viewerPointCache.getOrPut(entity.timestamp) {
-                TrailPoint(entity.lat, entity.lng, entity.timestamp, SentinelStatus.valueOf(entity.status), entity.accuracy, entity.maxAccuracy)
+                TrailPoint(entity.lat, entity.lng, entity.timestamp, SentinelStatus.valueOf(entity.status), entity.accuracy, maxAccuracy = entity.maxAccuracy)
             }
         }
     }.flowOn(Dispatchers.Default)
@@ -171,27 +175,46 @@ class MainRepository @Inject constructor(
 
     suspend fun saveString(key: String, value: String) = settings.saveString(key, value)
     fun saveStringSync(key: String, value: String) { scope.launch { settings.saveString(key, value) } }
+    
+    suspend fun saveString(role: AppRole, key: String, value: String) = settings.saveString(role, key, value)
+    fun saveStringSync(role: AppRole, key: String, value: String) { scope.launch { settings.saveString(role, key, value) } }
+
     suspend fun saveLong(key: String, value: Long) {
-        when (key) {
-            LAST_ALARM_ACK_TS_KEY -> lastAlarmAckTs = value
-            AppRole.TRACKER.prefix + LAST_ALARM_ACK_TS_KEY -> trackerAlarmAckTs = value
-            AppRole.VIEWER_SELF.prefix + LAST_ALARM_ACK_TS_KEY -> viewerAlarmAckTs = value
-            AppRole.VIEWER_REMOTE.prefix + LAST_ALARM_ACK_TS_KEY -> viewerRemoteAlarmAckTs = value
-        }
+        if (key == LAST_ALARM_ACK_TS_KEY) lastAlarmAckTs = value
         settings.saveLong(key, value)
     }
     fun saveLongSync(key: String, value: Long) {
-        when (key) {
-            LAST_ALARM_ACK_TS_KEY -> lastAlarmAckTs = value
-            AppRole.TRACKER.prefix + LAST_ALARM_ACK_TS_KEY -> trackerAlarmAckTs = value
-            AppRole.VIEWER_SELF.prefix + LAST_ALARM_ACK_TS_KEY -> viewerAlarmAckTs = value
-            AppRole.VIEWER_REMOTE.prefix + LAST_ALARM_ACK_TS_KEY -> viewerRemoteAlarmAckTs = value
-        }
+        if (key == LAST_ALARM_ACK_TS_KEY) lastAlarmAckTs = value
         scope.launch { settings.saveLong(key, value) }
     }
+
+    suspend fun saveLong(role: AppRole, key: String, value: Long) {
+        if (key == LAST_ALARM_ACK_TS_KEY) {
+            when (role) {
+                AppRole.TRACKER -> trackerAlarmAckTs = value
+                AppRole.VIEWER_SELF -> viewerAlarmAckTs = value
+                AppRole.VIEWER_REMOTE -> viewerRemoteAlarmAckTs = value
+            }
+        }
+        settings.saveLong(role, key, value)
+    }
+    fun saveLongSync(role: AppRole, key: String, value: Long) {
+        if (key == LAST_ALARM_ACK_TS_KEY) {
+            when (role) {
+                AppRole.TRACKER -> trackerAlarmAckTs = value
+                AppRole.VIEWER_SELF -> viewerAlarmAckTs = value
+                AppRole.VIEWER_REMOTE -> viewerRemoteAlarmAckTs = value
+            }
+        }
+        scope.launch { settings.saveLong(role, key, value) }
+    }
+
     suspend fun saveDouble(key: String, value: Double) = settings.saveDouble(key, value)
     fun saveDoubleSync(key: String, value: Double) { scope.launch { settings.saveDouble(key, value) } }
     
+    suspend fun saveDouble(role: AppRole, key: String, value: Double) = settings.saveDouble(role, key, value)
+    fun saveDoubleSync(role: AppRole, key: String, value: Double) { scope.launch { settings.saveDouble(role, key, value) } }
+
     fun saveDoubleDebounced(key: String, value: Double) {
         debounceJobs[key]?.cancel()
         debounceJobs[key] = scope.launch {
@@ -201,16 +224,42 @@ class MainRepository @Inject constructor(
         }
     }
 
+    fun saveDoubleDebounced(role: AppRole, key: String, value: Double) {
+        val compositeKey = role.prefix + key
+        debounceJobs[compositeKey]?.cancel()
+        debounceJobs[compositeKey] = scope.launch {
+            delay(SAVE_DEBOUNCE_MS)
+            settings.saveDouble(role, key, value)
+            debounceJobs.remove(compositeKey)
+        }
+    }
+
     suspend fun saveBoolean(key: String, value: Boolean) = settings.saveBoolean(key, value)
     fun saveBooleanSync(key: String, value: Boolean) { scope.launch { settings.saveBoolean(key, value) } }
+    
+    suspend fun saveBoolean(role: AppRole, key: String, value: Boolean) = settings.saveBoolean(role, key, value)
+    fun saveBooleanSync(role: AppRole, key: String, value: Boolean) { scope.launch { settings.saveBoolean(role, key, value) } }
+
     suspend fun saveInt(key: String, value: Int) = settings.saveInt(key, value)
     fun saveIntSync(key: String, value: Int) { scope.launch { settings.saveInt(key, value) } }
+    
+    suspend fun saveInt(role: AppRole, key: String, value: Int) = settings.saveInt(role, key, value)
+    fun saveIntSync(role: AppRole, key: String, value: Int) { scope.launch { settings.saveInt(role, key, value) } }
 
     suspend fun getString(key: String, default: String) = settings.getString(key, default)
+    suspend fun getString(role: AppRole, key: String, default: String) = settings.getString(role, key, default)
+
     suspend fun getLong(keyName: String, default: Long) = settings.getLong(keyName, default)
+    suspend fun getLong(role: AppRole, key: String, default: Long) = settings.getLong(role, key, default)
+
     suspend fun getDouble(key: String, default: Double) = settings.getDouble(key, default)
+    suspend fun getDouble(role: AppRole, key: String, default: Double) = settings.getDouble(role, key, default)
+
     suspend fun getInt(key: String, default: Int): Int = settings.getInt(key, default)
+    suspend fun getInt(role: AppRole, key: String, default: Int): Int = settings.getInt(role, key, default)
+
     suspend fun getBoolean(key: String, default: Boolean): Boolean = settings.getBoolean(key, default)
+    suspend fun getBoolean(role: AppRole, key: String, default: Boolean): Boolean = settings.getBoolean(role, key, default)
 
     suspend fun getAppMode() = settings.getAppMode()
     suspend fun setAppMode(mode: String?) = settings.setAppMode(mode)
@@ -393,19 +442,20 @@ class MainRepository @Inject constructor(
         }
     }
 
-    fun saveTrackerState(status: TrackerStatus, rolePrefix: String? = null) = settings.saveTrackerState(status, rolePrefix)
-    suspend fun loadTrackerState(rolePrefix: String? = null) = settings.loadTrackerState(rolePrefix)
+    fun saveTrackerState(status: TrackerStatus, role: AppRole? = null) = settings.saveTrackerState(status, role)
+    suspend fun loadTrackerState(role: AppRole? = null) = settings.loadTrackerState(role)
+    
     suspend fun getLastAlarmAckTs(): Long = settings.getLong(LAST_ALARM_ACK_TS_KEY, 0L)
     suspend fun addPendingStatusUpdate(update: PendingStatusEntity) { offlineRepository.addPendingStatusUpdate(update) }
     suspend fun getPendingStatusUpdates(limit: Int): List<PendingStatusEntity> = offlineRepository.getPendingStatusUpdates(limit)
     suspend fun deletePendingStatusUpdate(id: Long) = offlineRepository.deletePendingStatusUpdate(id)
 
-    suspend fun saveActiveAlarms(alarms: List<AlarmEvaluationState.ActiveAlarm>, rolePrefix: String? = null) {
-        settings.saveActiveAlarms(alarms, rolePrefix)
+    suspend fun saveActiveAlarms(alarms: List<AlarmEvaluationState.ActiveAlarm>, role: AppRole? = null) {
+        settings.saveActiveAlarms(alarms, role)
     }
 
-    suspend fun loadActiveAlarms(rolePrefix: String? = null): List<AlarmEvaluationState.ActiveAlarm> {
-        return settings.loadActiveAlarms(rolePrefix)
+    suspend fun loadActiveAlarms(role: AppRole? = null): List<AlarmEvaluationState.ActiveAlarm> {
+        return settings.loadActiveAlarms(role)
     }
 
     private val _logFilterDetails = MutableStateFlow(false)
@@ -429,13 +479,13 @@ class MainRepository @Inject constructor(
         firstViolationTs: Long, firstViolationRt: Long, firstViolationWasJump: Boolean,
         distanceViolationCounter: Int, wasDistanceViolated: Boolean, powerAlarmPending: Boolean,
         lastSirenStopRt: Long, lastGlobalTriggerRt: Long, forensicReliabilityDegradationStartRt: Long,
-        rolePrefix: String? = null
+        role: AppRole? = null
     ) {
-        val p = rolePrefix ?: ""
-        saveLong(p + FIRST_VIOLATION_TS_KEY, firstViolationTs); saveLong(p + FIRST_VIOLATION_RT_KEY, firstViolationRt)
-        saveBoolean(p + FIRST_VIOLATION_WAS_JUMP_KEY, firstViolationWasJump); saveInt(p + DISTANCE_VIOLATION_COUNTER_KEY, distanceViolationCounter)
-        saveBoolean(p + WAS_DISTANCE_VIOLATED_KEY, wasDistanceViolated); saveBoolean(p + POWER_ALARM_PENDING_KEY, powerAlarmPending)
-        saveLong(p + LAST_SIREN_STOP_RT_KEY, lastSirenStopRt); saveLong(p + LAST_GLOBAL_TRIGGER_RT_KEY, lastGlobalTriggerRt)
-        saveLong(p + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, forensicReliabilityDegradationStartRt)
+        settings.saveLogicState(
+            firstViolationTs, firstViolationRt, firstViolationWasJump,
+            distanceViolationCounter, wasDistanceViolated, powerAlarmPending,
+            lastSirenStopRt, lastGlobalTriggerRt, forensicReliabilityDegradationStartRt,
+            role
+        )
     }
 }

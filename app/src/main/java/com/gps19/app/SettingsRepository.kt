@@ -55,11 +55,14 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Sep.30.70:
+ * - Issue #1407: Unified Storage Authority. Refactored to accept AppRole parameter 
+ *   for namespaced calls, eliminating manual string concatenation. Enforced type safety 
+ *   by removing ambiguous string-prefixed overloads for role-based state (R-ID 568).
+ * - Simplicity Audit: Consolidated namespaced storage routing.
  * Sep.30.60:
  * - Issue #1406: Standardized Role Identity Authority. Eliminated remaining 
  *   hardcoded prefix strings ("T_", "V_", "VR_") in favor of AppRole enum (R-ID 565).
- * Sep.27.16:
- * - Issue #1173: Protobuf-First Persistence. Migrated alarm state to Protobuf role_alarms map.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -128,115 +131,225 @@ class SettingsRepository @Inject constructor(
     suspend fun getAppMode(): String? = dataStore.data.first().appMode.ifEmpty { null }
 
     private fun isNamespaced(key: String): Boolean {
-        return key.startsWith(AppRole.TRACKER.prefix) || 
-               key.startsWith(AppRole.VIEWER_SELF.prefix) || 
-               key.startsWith(AppRole.VIEWER_REMOTE.prefix)
+        return AppRole.entries.any { key.startsWith(it.prefix) }
     }
 
-    suspend fun saveString(keyName: String, value: String) {
+    private fun routeToNamespaced(key: String): Pair<AppRole, String>? {
+        val role = AppRole.entries.find { key.startsWith(it.prefix) } ?: return null
+        return role to key.removePrefix(role.prefix)
+    }
+
+    // --- Unified Role-Based API (Namespaced Storage) ---
+
+    suspend fun saveString(role: AppRole, key: String, value: String) {
+        dataStore.mutate { putRoleStrings(role.prefix + key, value) }
+    }
+
+    suspend fun getString(role: AppRole, key: String, default: String): String {
+        return dataStore.data.first().roleStringsMap.getOrDefault(role.prefix + key, default)
+    }
+
+    suspend fun saveLong(role: AppRole, key: String, value: Long) {
+        dataStore.mutate { putRoleLongs(role.prefix + key, value) }
+    }
+
+    suspend fun getLong(role: AppRole, key: String, default: Long): Long {
+        return dataStore.data.first().roleLongsMap.getOrDefault(role.prefix + key, default)
+    }
+
+    suspend fun saveDouble(role: AppRole, key: String, value: Double) {
+        dataStore.mutate { putRoleDoubles(role.prefix + key, value) }
+    }
+
+    suspend fun getDouble(role: AppRole, key: String, default: Double): Double {
+        return dataStore.data.first().roleDoublesMap.getOrDefault(role.prefix + key, default)
+    }
+
+    suspend fun saveBoolean(role: AppRole, key: String, value: Boolean) {
+        dataStore.mutate { putRoleBools(role.prefix + key, value) }
+    }
+
+    suspend fun getBoolean(role: AppRole, key: String, default: Boolean): Boolean {
+        return dataStore.data.first().roleBoolsMap.getOrDefault(role.prefix + key, default)
+    }
+
+    suspend fun saveInt(role: AppRole, key: String, value: Int) {
+        dataStore.mutate { putRoleInts(role.prefix + key, value) }
+    }
+
+    suspend fun getInt(role: AppRole, key: String, default: Int): Int {
+        return dataStore.data.first().roleIntsMap.getOrDefault(role.prefix + key, default)
+    }
+
+    suspend fun resetRoleState(role: AppRole) {
         dataStore.mutate {
-            if (isNamespaced(keyName)) {
-                this.putRoleStrings(keyName, value)
+            val prefix = role.prefix
+            roleLongsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleLongs(it) }
+            roleDoublesMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleDoubles(it) }
+            roleBoolsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleBools(it) }
+            roleIntsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleInts(it) }
+            roleStringsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleStrings(it) }
+            removeRoleStates(prefix)
+            removeRoleAlarms(prefix)
+        }
+    }
+
+    fun saveTrackerState(status: TrackerStatus, role: AppRole? = null) {
+        scope.launch {
+            dataStore.mutate {
+                val proto = SettingsMapper.mapTrackerStatusToProto(status)
+                if (role != null) putRoleStates(role.prefix, proto) else setTrackerState(proto)
+            }
+        }
+    }
+
+    suspend fun loadTrackerState(role: AppRole? = null): TrackerStatus? {
+        val settings = dataStore.data.first()
+        if (role != null) {
+            val proto = settings.roleStatesMap[role.prefix] ?: return null
+            return SettingsMapper.mapTrackerStatusFromProto(proto)
+        }
+        if (!settings.hasTrackerState()) return null
+        return SettingsMapper.mapTrackerStatusFromProto(settings.trackerState)
+    }
+
+    suspend fun saveActiveAlarms(alarms: List<AlarmEvaluationState.ActiveAlarm>, role: AppRole? = null) {
+        dataStore.mutate {
+            val protoAlarms = alarms.map { SettingsMapper.activeAlarmToProto(it) }
+            if (role != null) {
+                val listProto = ActiveAlarmsListProto.newBuilder().addAllAlarms(protoAlarms).build()
+                putRoleAlarms(role.prefix, listProto)
             } else {
-                when (keyName) {
-                    APP_MODE_KEY -> setAppMode(value)
-                    TRACKER_ID_KEY -> setTrackerId(value)
-                    VIEWER_ID_KEY -> setViewerId(value)
-                    RELAY_URL_KEY -> setRelayUrl(value)
-                    SELECTED_SIREN_KEY -> setSelectedSiren(value)
-                }
+                clearActiveAlarms().addAllActiveAlarms(protoAlarms)
+            }
+        }
+    }
+
+    suspend fun loadActiveAlarms(role: AppRole? = null): List<AlarmEvaluationState.ActiveAlarm> {
+        val settings = dataStore.data.first()
+        val protoAlarms = if (role != null) {
+            settings.roleAlarmsMap[role.prefix]?.alarmsList ?: emptyList()
+        } else {
+            settings.activeAlarmsList
+        }
+        return protoAlarms.map { SettingsMapper.activeAlarmFromProto(it) }
+    }
+
+    suspend fun saveLogicState(
+        firstViolationTs: Long, firstViolationRt: Long, firstViolationWasJump: Boolean,
+        distanceViolationCounter: Int, wasDistanceViolated: Boolean, powerAlarmPending: Boolean,
+        lastSirenStopRt: Long, lastGlobalTriggerRt: Long, forensicReliabilityDegradationStartRt: Long,
+        role: AppRole? = null
+    ) {
+        dataStore.mutate {
+            if (role != null) {
+                val prefix = role.prefix
+                putRoleLongs(prefix + FIRST_VIOLATION_TS_KEY, firstViolationTs)
+                putRoleLongs(prefix + FIRST_VIOLATION_RT_KEY, firstViolationRt)
+                putRoleBools(prefix + FIRST_VIOLATION_WAS_JUMP_KEY, firstViolationWasJump)
+                putRoleInts(prefix + DISTANCE_VIOLATION_COUNTER_KEY, distanceViolationCounter)
+                putRoleBools(prefix + WAS_DISTANCE_VIOLATED_KEY, wasDistanceViolated)
+                putRoleBools(prefix + POWER_ALARM_PENDING_KEY, powerAlarmPending)
+                putRoleLongs(prefix + LAST_SIREN_STOP_RT_KEY, lastSirenStopRt)
+                putRoleLongs(prefix + LAST_GLOBAL_TRIGGER_RT_KEY, lastGlobalTriggerRt)
+                putRoleLongs(prefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, forensicReliabilityDegradationStartRt)
+            } else {
+                setFirstViolationTs(firstViolationTs).setFirstViolationRt(firstViolationRt).setFirstViolationWasJump(firstViolationWasJump)
+                    .setDistanceViolationCounter(distanceViolationCounter).setWasDistanceViolated(wasDistanceViolated).setPowerAlarmPending(powerAlarmPending)
+                    .setLastSirenStopRt(lastSirenStopRt).setLastGlobalTriggerRt(lastGlobalTriggerRt).setForensicReliabilityDegradationStartRt(forensicReliabilityDegradationStartRt)
+            }
+        }
+    }
+
+    // --- Global String-Keyed API (Non-Namespaced or Legacy Routing) ---
+
+    suspend fun saveString(keyName: String, value: String) {
+        routeToNamespaced(keyName)?.let { (role, key) -> saveString(role, key, value); return }
+        dataStore.mutate {
+            when (keyName) {
+                APP_MODE_KEY -> setAppMode(value)
+                TRACKER_ID_KEY -> setTrackerId(value)
+                VIEWER_ID_KEY -> setViewerId(value)
+                RELAY_URL_KEY -> setRelayUrl(value)
+                SELECTED_SIREN_KEY -> setSelectedSiren(value)
             }
         }
     }
 
     suspend fun saveLong(keyName: String, value: Long) {
+        routeToNamespaced(keyName)?.let { (role, key) -> saveLong(role, key, value); return }
         dataStore.mutate {
-            if (isNamespaced(keyName)) {
-                this.putRoleLongs(keyName, value)
-            } else {
-                when (keyName) {
-                    LAST_ALARM_ACK_TS_KEY -> setLastAlarmAckTs(value)
-                    HOME_POINTS_TS_KEY -> setHomePointsTs(value)
-                    LAST_SERVICE_TICK_TS_KEY -> setLastServiceTickTs(value)
-                    APP_START_TIME_KEY -> setAppStartTime(value)
-                    TOTAL_CONNECTED_KEY -> setTotalConnected(value)
-                    UPTIME_KEY -> setUptime(value)
-                    LAST_CONNECTION_TS_KEY -> setLastConnectionTs(value)
-                    LAST_DISCONNECTION_TS_KEY -> setLastDisconnectionTs(value)
-                    TOTAL_DROP_KEY -> setTotalDrop(value)
-                    MAX_DROP_KEY -> setMaxDrop(value)
-                    MAX_DROP_TS_KEY -> setMaxDropTs(value)
-                    LAST_GPS_TS_KEY -> setLastGpsTs(value)
-                    VIOLATION_UPTIME_MS_KEY -> setViolationUptimeMs(value)
-                    LAST_SERVICE_TICK_REALTIME_KEY -> setLastServiceTickRt(value)
-                    CLOCK_DRIFT_REF_KEY -> setClockDriftRef(value)
-                    LAST_SIT_TS_KEY -> setLastSitTs(value)
-                    FIRST_VIOLATION_TS_KEY -> setFirstViolationTs(value)
-                    FIRST_VIOLATION_RT_KEY -> setFirstViolationRt(value)
-                    LAST_SIREN_STOP_RT_KEY -> setLastSirenStopRt(value)
-                    LAST_GLOBAL_TRIGGER_RT_KEY -> setLastGlobalTriggerRt(value)
-                    FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY -> setForensicReliabilityDegradationStartRt(value)
-                }
+            when (keyName) {
+                LAST_ALARM_ACK_TS_KEY -> setLastAlarmAckTs(value)
+                HOME_POINTS_TS_KEY -> setHomePointsTs(value)
+                LAST_SERVICE_TICK_TS_KEY -> setLastServiceTickTs(value)
+                APP_START_TIME_KEY -> setAppStartTime(value)
+                TOTAL_CONNECTED_KEY -> setTotalConnected(value)
+                UPTIME_KEY -> setUptime(value)
+                LAST_CONNECTION_TS_KEY -> setLastConnectionTs(value)
+                LAST_DISCONNECTION_TS_KEY -> setLastDisconnectionTs(value)
+                TOTAL_DROP_KEY -> setTotalDrop(value)
+                MAX_DROP_KEY -> setMaxDrop(value)
+                MAX_DROP_TS_KEY -> setMaxDropTs(value)
+                LAST_GPS_TS_KEY -> setLastGpsTs(value)
+                VIOLATION_UPTIME_MS_KEY -> setViolationUptimeMs(value)
+                LAST_SERVICE_TICK_REALTIME_KEY -> setLastServiceTickRt(value)
+                CLOCK_DRIFT_REF_KEY -> setClockDriftRef(value)
+                LAST_SIT_TS_KEY -> setLastSitTs(value)
+                FIRST_VIOLATION_TS_KEY -> setFirstViolationTs(value)
+                FIRST_VIOLATION_RT_KEY -> setFirstViolationRt(value)
+                LAST_SIREN_STOP_RT_KEY -> setLastSirenStopRt(value)
+                LAST_GLOBAL_TRIGGER_RT_KEY -> setLastGlobalTriggerRt(value)
+                FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY -> setForensicReliabilityDegradationStartRt(value)
             }
         }
     }
 
     suspend fun saveDouble(keyName: String, value: Double) {
+        routeToNamespaced(keyName)?.let { (role, key) -> saveDouble(role, key, value); return }
         dataStore.mutate {
-            if (isNamespaced(keyName)) {
-                this.putRoleDoubles(keyName, value)
-            } else {
-                when (keyName) {
-                    MAX_DISTANCE_STORAGE_KEY -> setMaxDistance(value)
-                    MAX_ACCURACY_KEY -> setMaxAccuracy(value)
-                    MAX_TEMP_KEY -> setMaxTemp(value)
-                    TRACKER_LUX_BASELINE_KEY -> setTrackerLuxBaseline(value)
-                    TRACKER_ACOUSTIC_FLOOR_KEY -> setTrackerAcousticFloor(value)
-                    CHAIR_BASELINE_TILT_KEY -> setChairBaselineTilt(value)
-                }
+            when (keyName) {
+                MAX_DISTANCE_STORAGE_KEY -> setMaxDistance(value)
+                MAX_ACCURACY_KEY -> setMaxAccuracy(value)
+                MAX_TEMP_KEY -> setMaxTemp(value)
+                TRACKER_LUX_BASELINE_KEY -> setTrackerLuxBaseline(value)
+                TRACKER_ACOUSTIC_FLOOR_KEY -> setTrackerAcousticFloor(value)
+                CHAIR_BASELINE_TILT_KEY -> setChairBaselineTilt(value)
             }
         }
     }
 
     suspend fun saveBoolean(keyName: String, value: Boolean) {
+        routeToNamespaced(keyName)?.let { (role, key) -> saveBoolean(role, key, value); return }
         dataStore.mutate {
-            if (isNamespaced(keyName)) {
-                this.putRoleBools(keyName, value)
-            } else {
-                when (keyName) {
-                    IS_MANUAL_EXIT_KEY -> setIsManualExit(value)
-                    IS_MIC_TYPE_STARTED_KEY -> setIsMicTypeStarted(value)
-                    IS_XIAOMI_MANUAL_OVERRIDE_KEY -> setIsXiaomiManualOverride(value)
-                    IDENTITY_SANITIZED_KEY -> setIdentitySanitized(value)
-                    IS_SYSTEM_ACTIVE_KEY -> setIsSystemActive(value)
-                    FIRST_VIOLATION_WAS_JUMP_KEY -> setFirstViolationWasJump(value)
-                    WAS_DISTANCE_VIOLATED_KEY -> setWasDistanceViolated(value)
-                    POWER_ALARM_PENDING_KEY -> setPowerAlarmPending(value)
-                }
+            when (keyName) {
+                IS_MANUAL_EXIT_KEY -> setIsManualExit(value)
+                IS_MIC_TYPE_STARTED_KEY -> setIsMicTypeStarted(value)
+                IS_XIAOMI_MANUAL_OVERRIDE_KEY -> setIsXiaomiManualOverride(value)
+                IDENTITY_SANITIZED_KEY -> setIdentitySanitized(value)
+                IS_SYSTEM_ACTIVE_KEY -> setIsSystemActive(value)
+                FIRST_VIOLATION_WAS_JUMP_KEY -> setFirstViolationWasJump(value)
+                WAS_DISTANCE_VIOLATED_KEY -> setWasDistanceViolated(value)
+                POWER_ALARM_PENDING_KEY -> setPowerAlarmPending(value)
             }
         }
     }
 
     suspend fun saveInt(keyName: String, value: Int) {
+        routeToNamespaced(keyName)?.let { (role, key) -> saveInt(role, key, value); return }
         dataStore.mutate {
-            if (isNamespaced(keyName)) {
-                this.putRoleInts(keyName, value)
-            } else {
-                when (keyName) {
-                    LAST_AUTO_SAVE_HOUR_KEY -> setLastAutoSaveHour(value)
-                    LAST_VERSION_CODE_KEY -> setLastVersionCode(value)
-                    RECOVERY_COUNT_KEY -> setRecoveryCount(value)
-                    DISTANCE_VIOLATION_COUNTER_KEY -> setDistanceViolationCounter(value)
-                }
+            when (keyName) {
+                LAST_AUTO_SAVE_HOUR_KEY -> setLastAutoSaveHour(value)
+                LAST_VERSION_CODE_KEY -> setLastVersionCode(value)
+                RECOVERY_COUNT_KEY -> setRecoveryCount(value)
+                DISTANCE_VIOLATION_COUNTER_KEY -> setDistanceViolationCounter(value)
             }
         }
     }
 
     suspend fun getString(keyName: String, default: String): String {
         val settings = dataStore.data.first()
-        if (isNamespaced(keyName)) {
-            return settings.roleStringsMap.getOrDefault(keyName, default)
-        }
+        routeToNamespaced(keyName)?.let { (role, key) -> return getString(role, key, default) }
         val value = when (keyName) {
             TRACKER_ID_KEY -> settings.trackerId
             VIEWER_ID_KEY -> settings.viewerId
@@ -248,9 +361,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getLong(keyName: String, default: Long): Long {
         val settings = dataStore.data.first()
-        if (isNamespaced(keyName)) {
-            return settings.roleLongsMap.getOrDefault(keyName, default)
-        }
+        routeToNamespaced(keyName)?.let { (role, key) -> return getLong(role, key, default) }
         val value = when (keyName) {
             LAST_ALARM_ACK_TS_KEY -> settings.lastAlarmAckTs
             HOME_POINTS_TS_KEY -> settings.homePointsTs
@@ -280,9 +391,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getDouble(keyName: String, default: Double): Double {
         val settings = dataStore.data.first()
-        if (isNamespaced(keyName)) {
-            return settings.roleDoublesMap.getOrDefault(keyName, default)
-        }
+        routeToNamespaced(keyName)?.let { (role, key) -> return getDouble(role, key, default) }
         val value = when (keyName) {
             MAX_DISTANCE_STORAGE_KEY -> settings.maxDistance
             MAX_ACCURACY_KEY -> settings.maxAccuracy
@@ -297,9 +406,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getBoolean(keyName: String, default: Boolean): Boolean {
         val settings = dataStore.data.first()
-        if (isNamespaced(keyName)) {
-            return settings.roleBoolsMap.getOrDefault(keyName, default)
-        }
+        routeToNamespaced(keyName)?.let { (role, key) -> return getBoolean(role, key, default) }
         return when (keyName) {
             IS_MANUAL_EXIT_KEY -> settings.isManualExit
             IS_MIC_TYPE_STARTED_KEY -> settings.isMicTypeStarted
@@ -315,9 +422,7 @@ class SettingsRepository @Inject constructor(
 
     suspend fun getInt(keyName: String, default: Int): Int {
         val settings = dataStore.data.first()
-        if (isNamespaced(keyName)) {
-            return settings.roleIntsMap.getOrDefault(keyName, default)
-        }
+        routeToNamespaced(keyName)?.let { (role, key) -> return getInt(role, key, default) }
         val value = when (keyName) {
             LAST_AUTO_SAVE_HOUR_KEY -> settings.lastAutoSaveHour
             LAST_VERSION_CODE_KEY -> settings.lastVersionCode
@@ -326,18 +431,6 @@ class SettingsRepository @Inject constructor(
             else -> -1
         }
         return if (value == -1) default else value
-    }
-
-    suspend fun resetRoleState(prefix: String) {
-        dataStore.mutate {
-            roleLongsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleLongs(it) }
-            roleDoublesMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleDoubles(it) }
-            roleBoolsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleBools(it) }
-            roleIntsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleInts(it) }
-            roleStringsMap.keys.filter { it.startsWith(prefix) }.forEach { removeRoleStrings(it) }
-            removeRoleStates(prefix)
-            removeRoleAlarms(prefix)
-        }
     }
 
     suspend fun setAppMode(mode: String?) {
@@ -385,72 +478,6 @@ class SettingsRepository @Inject constructor(
         dataStore.mutate {
             setAlertSettings(SettingsMapper.alertSettingsToProto(s))
         }
-    }
-
-    fun saveTrackerState(status: TrackerStatus, rolePrefix: String? = null) {
-        scope.launch {
-            dataStore.mutate {
-                val proto = SettingsMapper.mapTrackerStatusToProto(status)
-                if (rolePrefix != null) putRoleStates(rolePrefix, proto) else setTrackerState(proto)
-            }
-        }
-    }
-
-    suspend fun loadTrackerState(rolePrefix: String? = null): TrackerStatus? {
-        val settings = dataStore.data.first()
-        if (rolePrefix != null) {
-            val proto = settings.roleStatesMap[rolePrefix] ?: return null
-            return SettingsMapper.mapTrackerStatusFromProto(proto)
-        }
-        if (!settings.hasTrackerState()) return null
-        return SettingsMapper.mapTrackerStatusFromProto(settings.trackerState)
-    }
-
-    suspend fun saveLogicState(
-        firstViolationTs: Long, firstViolationRt: Long, firstViolationWasJump: Boolean,
-        distanceViolationCounter: Int, wasDistanceViolated: Boolean, powerAlarmPending: Boolean,
-        lastSirenStopRt: Long, lastGlobalTriggerRt: Long, forensicReliabilityDegradationStartRt: Long,
-        rolePrefix: String? = null
-    ) {
-        dataStore.mutate {
-            if (rolePrefix != null) {
-                putRoleLongs(rolePrefix + FIRST_VIOLATION_TS_KEY, firstViolationTs)
-                putRoleLongs(rolePrefix + FIRST_VIOLATION_RT_KEY, firstViolationRt)
-                putRoleBools(rolePrefix + FIRST_VIOLATION_WAS_JUMP_KEY, firstViolationWasJump)
-                putRoleInts(rolePrefix + DISTANCE_VIOLATION_COUNTER_KEY, distanceViolationCounter)
-                putRoleBools(rolePrefix + WAS_DISTANCE_VIOLATED_KEY, wasDistanceViolated)
-                putRoleBools(rolePrefix + POWER_ALARM_PENDING_KEY, powerAlarmPending)
-                putRoleLongs(rolePrefix + LAST_SIREN_STOP_RT_KEY, lastSirenStopRt)
-                putRoleLongs(rolePrefix + LAST_GLOBAL_TRIGGER_RT_KEY, lastGlobalTriggerRt)
-                putRoleLongs(rolePrefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, forensicReliabilityDegradationStartRt)
-            } else {
-                setFirstViolationTs(firstViolationTs).setFirstViolationRt(firstViolationRt).setFirstViolationWasJump(firstViolationWasJump)
-                    .setDistanceViolationCounter(distanceViolationCounter).setWasDistanceViolated(wasDistanceViolated).setPowerAlarmPending(powerAlarmPending)
-                    .setLastSirenStopRt(lastSirenStopRt).setLastGlobalTriggerRt(lastGlobalTriggerRt).setForensicReliabilityDegradationStartRt(forensicReliabilityDegradationStartRt)
-            }
-        }
-    }
-
-    suspend fun saveActiveAlarms(alarms: List<AlarmEvaluationState.ActiveAlarm>, rolePrefix: String? = null) {
-        dataStore.mutate {
-            val protoAlarms = alarms.map { SettingsMapper.activeAlarmToProto(it) }
-            if (rolePrefix != null) {
-                val listProto = ActiveAlarmsListProto.newBuilder().addAllAlarms(protoAlarms).build()
-                putRoleAlarms(rolePrefix, listProto)
-            } else {
-                clearActiveAlarms().addAllActiveAlarms(protoAlarms)
-            }
-        }
-    }
-
-    suspend fun loadActiveAlarms(rolePrefix: String? = null): List<AlarmEvaluationState.ActiveAlarm> {
-        val settings = dataStore.data.first()
-        val protoAlarms = if (rolePrefix != null) {
-            settings.roleAlarmsMap[rolePrefix]?.alarmsList ?: emptyList()
-        } else {
-            settings.activeAlarmsList
-        }
-        return protoAlarms.map { SettingsMapper.activeAlarmFromProto(it) }
     }
 
     suspend fun saveSettingsBulk(
