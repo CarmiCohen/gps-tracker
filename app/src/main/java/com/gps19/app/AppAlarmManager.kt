@@ -320,6 +320,7 @@ class AppAlarmManager @Inject constructor(
             serviceStartTime = serviceContext.serviceStartTs, 
             serviceStartRt = serviceContext.serviceStartRt,
             lastAlarmAckTs = targetAlarmAckTs,
+            violationStartTs = snapshot.violationStartTs,
             appStartTime = serviceContext.appStartTime,
             isRelayConnected = serviceContext.isRelayConnected, 
             isTrackerConnected = serviceContext.isTrackerConnected,
