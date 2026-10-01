@@ -5,6 +5,10 @@ import kotlinx.serialization.Transient
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.1.8:
+ * - Issue #1410: Viewer Persistence. Added lastAlarmAckTs and violationStartTs 
+ *   to SystemEvaluationSnapshot to ensure alarm acknowledgment state is 
+ *   synchronized and utilized during stateless evaluation (R-ID 575).
  * Oct.1.3:
  * - Issue #1408: Telemetry Convergence. Reordered AppRole enum and refined fromKey 
  *   to utilize length-descending evaluation. This prevents prefix collision where 
@@ -235,7 +239,9 @@ data class SystemEvaluationSnapshot(
     var acousticMinDb: Double = -1.0,
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
-    var activityType: ActivityType = ActivityType.UNKNOWN
+    var activityType: ActivityType = ActivityType.UNKNOWN,
+    var lastAlarmAckTs: Long = 0L,
+    var violationStartTs: Long = 0L
 ) {
     fun copyFrom(other: SystemEvaluationSnapshot) {
         this.kinetic.copyFrom(other.kinetic)
@@ -274,6 +280,8 @@ data class SystemEvaluationSnapshot(
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
         this.activityType = other.activityType
+        this.lastAlarmAckTs = other.lastAlarmAckTs
+        this.violationStartTs = other.violationStartTs
     }
 
     fun reset() {
@@ -289,6 +297,8 @@ data class SystemEvaluationSnapshot(
         maxIoLatency = 0L; isSilentFailure = false; isMaliAnomaly = false; localInternetLoss = false
         isHardwareOnline = true; acousticMinDb = -1.0; thermalHeadroom = 0.0; heapAllocatedMb = 0.0
         activityType = ActivityType.UNKNOWN
+        lastAlarmAckTs = 0L
+        violationStartTs = 0L
     }
 
     fun toLocationUpdate(isMe: Boolean = true): LocationUpdate {
@@ -638,6 +648,7 @@ class AlarmEvaluationState {
     var serviceStartTime: Long = 0L
     var serviceStartRt: Long = 0L
     var lastAlarmAckTs: Long = 0L
+    var violationStartTs: Long = 0L
     var appStartTime: Long = 0L
     var capabilities: HardwareCapabilities = HardwareCapabilities()
     var forensicReliabilityDegradationStartRt: Long = 0L
@@ -676,8 +687,8 @@ class AlarmEvaluationState {
 
     fun update(
         now: Long, nowRt: Long, serviceStartTime: Long, serviceStartRt: Long,
-        lastAlarmAckTs: Long, appStartTime: Long, isRelayConnected: Boolean,
-        isTrackerConnected: Boolean, discoveryPhase: DiscoveryPhase,
+        lastAlarmAckTs: Long, violationStartTs: Long, appStartTime: Long, 
+        isRelayConnected: Boolean, isTrackerConnected: Boolean, discoveryPhase: DiscoveryPhase,
         trackerLat: Double, trackerLng: Double, trackerGpsAccuracy: Double,
         maxTrackerAccuracy: Double, lastGpsPacketTs: Long, lastGpsPacketRt: Long,
         trackerLastValidFixTs: Long, trackerLastValidFixRt: Long,
@@ -693,6 +704,7 @@ class AlarmEvaluationState {
     ) {
         this.now = now; this.nowRt = nowRt; this.serviceStartTime = serviceStartTime
         this.serviceStartRt = serviceStartRt; this.lastAlarmAckTs = lastAlarmAckTs
+        this.violationStartTs = violationStartTs
         this.appStartTime = appStartTime; this.isRelayConnected = isRelayConnected
         this.isTrackerConnected = isTrackerConnected; this.discoveryPhase = discoveryPhase
         this.trackerLat = trackerLat; this.trackerLng = trackerLng; this.trackerGpsAccuracy = trackerGpsAccuracy

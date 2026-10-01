@@ -13,6 +13,10 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Oct.1.8:
+ * - Issue #1410: Viewer Persistence. Added calculation of violationStartTs 
+ *   (earliest trigger) and propagation of lastAlarmAckTs to ensure 
+ *   idempotent alarm evaluation across peers and re-installs (R-ID 575).
  * Oct.1.6:
  * - Issue #1409: Connectivity Logic Hardening. Removed SIGNAL_LOSS and GPS_STALL 
  *   from special types to ensure connectivity alerts are notification-only 
@@ -20,8 +24,6 @@ import javax.inject.Singleton
  * - Issue #1410: Standardized Manual Silence. Updated notifySirenManualStop 
  *   to use SILENCE_TIMEOUT_MS (5m) instead of cooldown to ensure persistent 
  *   muting on user action (R-ID 575).
- * Oct.1.1:
- * - Issue #1407: Unified Storage Authority.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -86,6 +88,19 @@ class AppAlarmManager @Inject constructor(
             return evaluationState.activeAlarms.values
                 .filter { !it.isResolved }
                 .joinToString(", ") { it.title }
+        }
+    }
+
+    /**
+     * Issue #1410: Calculates the timestamp of the earliest currently active 
+     * and unresolved violation.
+     */
+    fun getEarliestViolationTs(): Long {
+        synchronized(evaluationState.activeAlarms) {
+            return evaluationState.activeAlarms.values
+                .filter { !it.isResolved }
+                .map { it.firstTriggerTs }
+                .minOrNull() ?: 0L
         }
     }
 
@@ -291,12 +306,20 @@ class AppAlarmManager @Inject constructor(
         }
         evaluationState.truncateHomePoints(cachedPoints.size)
 
+        // Issue #1410: Use remote acknowledgment if provided in the snapshot 
+        // (carried over peer telemetry), otherwise use local authority.
+        val targetAlarmAckTs = if (snapshot.lastAlarmAckTs > 0) {
+            snapshot.lastAlarmAckTs 
+        } else {
+            repository.getLastAlarmAckTsSync(serviceContext.role)
+        }
+
         evaluationState.update(
             now = serviceContext.now, 
             nowRt = serviceContext.nowRt, 
             serviceStartTime = serviceContext.serviceStartTs, 
             serviceStartRt = serviceContext.serviceStartRt,
-            lastAlarmAckTs = repository.getLastAlarmAckTsSync(serviceContext.role),
+            lastAlarmAckTs = targetAlarmAckTs,
             appStartTime = serviceContext.appStartTime,
             isRelayConnected = serviceContext.isRelayConnected, 
             isTrackerConnected = serviceContext.isTrackerConnected,

@@ -21,12 +21,13 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.1.8:
+ * - Issue #1410: Viewer Persistence. Added global acknowledgment synchronization. 
+ *   Handles "acknowledge_alarm" signals and synchronizes lastAlarmAckTs 
+ *   from remote telemetry to prevent recurring alarms (R-ID 575).
  * Sep.30.70:
  * - Issue #1407: Unified Storage Authority. Updated to pass AppRole objects 
  *   to repository storage API, eliminating manual prefixing (R-ID 568).
- * Sep.30.60:
- * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
- *   ensure prefix consistency ("VR_" authority) (R-ID 453/565).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -477,6 +478,14 @@ class ConnectivitySuite @Inject constructor(
             
             remoteStatusRepository.setPeerSignal((statusProto.snrIdx * 10.0).toInt().coerceIn(0, 10))
 
+            // Issue #1410: Synchronization of global acknowledgment
+            if (!isTrackerMode && statusProto.lastAlarmAckTs > 0) {
+                val currentAck = mainRepository.getLastAlarmAckTsSync(AppRole.VIEWER_REMOTE)
+                if (statusProto.lastAlarmAckTs > currentAck) {
+                    mainRepository.saveLongSync(AppRole.VIEWER_REMOTE, LAST_ALARM_ACK_TS_KEY, statusProto.lastAlarmAckTs)
+                }
+            }
+
             remoteStatusRepository.updateStatusAtomic { current ->
                 TelemetryMapper.mapProtoToSnapshot(statusProto, now, nowRt, snapshotFlyweight)
 
@@ -519,6 +528,21 @@ class ConnectivitySuite @Inject constructor(
                 return
             }
             handleRemoteLog(LogEntry.fromJSONObject(data))
+            return
+        }
+
+        // Issue #1410: Handle remote acknowledgment signal
+        if (isTrackerMode && fromViewer && type == "acknowledge_alarm") {
+            val ackTs = data.optLong("ack_ts", 0L)
+            if (ackTs > 0) {
+                val currentAck = mainRepository.getLastAlarmAckTsSync(AppRole.TRACKER)
+                if (ackTs > currentAck) {
+                    mainRepository.saveLongSync(AppRole.TRACKER, LAST_ALARM_ACK_TS_KEY, ackTs)
+                    logManagerProvider.get().logServiceEvent("REMOTE ACTION: Alerts acknowledged by Viewer $fromViewerId", true)
+                }
+            }
+            domainEventBus.emit(ConnectivityEvent.PeerPulse(peerId))
+            remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt)
             return
         }
 
@@ -575,6 +599,15 @@ class ConnectivitySuite @Inject constructor(
             domainEventBus.emit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt); remoteStatusRepository.setTrackerConnected(true); mainRepository.updateRemoteActivity(nowRt)
             remoteStatusRepository.setPeerSignal(data.optInt("signal", 0))
+
+            // Issue #1410: Global acknowledgement synchronization via JSON
+            val remoteAck = data.optLong("last_alarm_ack_ts", 0L)
+            if (remoteAck > 0) {
+                val currentAck = mainRepository.getLastAlarmAckTsSync(AppRole.VIEWER_REMOTE)
+                if (remoteAck > currentAck) {
+                    mainRepository.saveLongSync(AppRole.VIEWER_REMOTE, LAST_ALARM_ACK_TS_KEY, remoteAck)
+                }
+            }
 
             remoteStatusRepository.updateStatusAtomic { current ->
                 TelemetryMapper.mapJsonToSnapshot(data, current, now, nowRt, snapshotFlyweight)

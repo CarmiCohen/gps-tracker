@@ -1,28 +1,26 @@
-# Forensic Handover (Oct.1.7 - SYSTEM OVERLAY)
+# Forensic Handover (Oct.1.8 - PEER CONVERGENCE)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.1.7` | **Status**: HARDENED (Emergency UI).
-*   **System-Wide Alerting**:
-    *   **Overlay Service**: `AlarmOverlayService` implemented to draw over other apps using `SYSTEM_ALERT_WINDOW` (R578).
-    *   **Permission Awareness**: `AppNotificationManager` reactively prompts for overlay permissions and provides a direct "Fix" action if suppressed.
-    *   **Activity Convergence**: `MainActivity` handles `ACTION_FIX_PERMISSIONS` to streamline user recovery from policy blocks.
-*   **Alarm Signaling**:
-    *   **Coupled Logic**: Sirens and Red-Screen promotion are strictly coupled with "Special" alarms.
-    *   **Manual Silence**: User-initiated stops enforce a 5-minute lockout (`SILENCE_TIMEOUT_MS`) via `SirenLockoutUseCase`.
-*   **Reactive Promotion**: `AppEventCoordinator` reactively updates notification summary; `AppNotificationManager` handles service-level promotion of the overlay.
+*   **Version**: `Oct.1.8` | **Status**: HARDENED (State Persistence).
+*   **Global Alarm Acknowledgment**:
+    *   **Idempotency**: `MainAlarmLogic` now evaluates triggers against a global `lastAlarmAckTs` (R-ID 575/579).
+    *   **Sync Logic**: Tracker broadcasts master acknowledgment state; Viewers inherit state on join/re-install.
+    *   **Remote Loopback**: `CommandRouter` routes remote acknowledgments from Viewers back to the Tracker's authority.
+*   **Protocol Hardening**: Telemetry schema expanded to carry `violation_start_ts` for precise historical suppression.
+*   **Overlay Stability**: `AlarmOverlayService` remains stable; user dismissal now correctly updates global state.
 
 ## 🔴 Open Gaps (High Priority)
-*   **Issue #1410 (Viewer Persistence)**: Investigate reports of recurring alarms on Viewer after re-install; check for server-side acknowledge replays.
-*   **Resource Management**: Monitor for `WindowManager` leaks on extreme low-memory devices during long-duration alerts.
+*   **Resource Management**: Monitor for `WindowManager` leaks on extreme low-memory devices during long-duration overlay alerts.
+*   **Network Jitter**: Investigate occasional 500ms acknowledgment lag on high-latency links.
 
-## 🚀 Resumption Focus: Field Verification & Stability
+## 🚀 Resumption Focus: UI Performance & Leak Mitigation
 *   **Immediate Path**: 
-    1.  Verify `AlarmOverlayService` stability under heavy background load.
-    2.  Audit battery consumption during sustained "Tamper" states where the overlay is active.
-    3.  Confirm cross-role (Tracker -> Viewer) signal convergence for overlay dismissal.
+    1.  Stress test `AlarmOverlayService` for memory leaks during 1-hour sustained alert cycles.
+    2.  Audit `WindowManager` view disposal during service teardown.
+    3.  Verify acknowledgment propagation speed across cross-continental relay links.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.1.7)
-- **Status**: [SOT Count: 247 (Rules: 94), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 10, QA: 345]
-- **Audit Record**: System-wide overlay implemented; Permission recovery streamlined; Build Oct.1.7 successful.
+## 📊 Hardening Progress Dashboard (Oct.1.8)
+- **Status**: [SOT Count: 248 (Rules: 95), Open: H:1, M:0, L:0, Ideas: H:0, M:1, L:1, Testing: 11, QA: 348]
+- **Audit Record**: Global alarm acknowledgment implemented; Viewer persistence resolved; Build Oct.1.8 successful.

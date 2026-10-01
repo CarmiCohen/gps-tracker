@@ -5,16 +5,14 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Oct.1.8:
+ * - Issue #1410: Viewer Persistence. Integrated lastAlarmAckTs check in 
+ *   processActiveAlarms to ensure that violations occurring before the 
+ *   latest acknowledgment are suppressed, preventing recurring alarms on 
+ *   fresh installations (R-ID 575).
  * Sep.30.70:
  * - Issue #1405/1407: Added onTriggerMuted callback to support visual 
  *   feedback for alarms that occur during a manual siren lockout.
- * Sep.30.60:
- * - Issue #1405 RESOLVED: Removed siren lockout wipe on new triggers. Ensures 
- *   that a manual "Stop" remains respected for the full SIREN_RESUME_COOLDOWN_MS 
- *   even if different alarm types trigger sequentially.
- * Sep.24.94:
- * - Issue #1311: Refactored detectViolations to manage ActiveAlarm lifecycle 
- *   directly within AlarmEvaluationState for a stateless evaluation model.
  */
 object MainAlarmLogic {
 
@@ -89,6 +87,18 @@ object MainAlarmLogic {
             val eval = state.activeAlarms[type] ?: AlarmEvaluationState.ActiveAlarm(type, violation.title)
 
             if (violation.conditionMet) {
+                // Issue #1410: Global suppression of historical violations.
+                // If the current time (now) is before the last acknowledgment, or if 
+                // the violation is persisting from before the last acknowledgment, 
+                // we treat it as already handled.
+                val isHistoricallyAcknowledged = state.lastAlarmAckTs > 0 && now <= state.lastAlarmAckTs
+
+                if (isHistoricallyAcknowledged) {
+                    eval.isResolved = true
+                    newActiveAlarms[type] = eval
+                    return@forEach
+                }
+
                 if (!eval.isTriggered || eval.isResolved) {
                     if ((nowRt - state.lastGlobalTriggerRt) >= ALERT_TRIGGER_GRACE_PERIOD_MS) {
                         eval.isTriggered = true

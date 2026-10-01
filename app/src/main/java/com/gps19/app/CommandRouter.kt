@@ -9,20 +9,22 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
+import org.json.JSONObject
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Oct.1.8:
+ * - Issue #1410: Viewer Persistence. Added remote signaling for StopSiren in 
+ *   Viewer mode. Emits "acknowledge_alarm" to ensure the Tracker synchronizes 
+ *   its global acknowledgment state (R-ID 575). Fixed SyncSensors reference.
  * Sep.30.70:
  * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
  *   API in MainRepository, eliminating manual prefixing (R-ID 565).
- * Sep.30.60:
- * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
- *   fix prefix mismatch. StopSiren now updates AppRole.VIEWER_REMOTE in 
- *   Viewer mode to align with AppAlarmManager authority (R-ID 453/565).
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -84,10 +86,21 @@ class CommandRouter @Inject constructor(
                         is UiCommand.SyncRequest -> domainEventBus.emit(CommandEvent.UiPulse)
                         is UiCommand.UiVisibilityChanged -> domainEventBus.emit(CommandEvent.UiVisibilityChanged(command.visible))
                         is UiCommand.StopSiren -> {
-                            // R-ID 453/565: Local stop command affects the local app's alarm state.
-                            // In Viewer mode, the alarm authority is VIEWER_REMOTE ("VR_").
+                            val now = timeProvider.currentTimeMillis()
                             val role = if (configManager.isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE
-                            repository.saveLongSync(role, LAST_ALARM_ACK_TS_KEY, timeProvider.currentTimeMillis())
+                            
+                            repository.saveLongSync(role, LAST_ALARM_ACK_TS_KEY, now)
+                            
+                            // Issue #1410: Remote synchronization
+                            if (!configManager.isTrackerMode) {
+                                connectivitySuite.emit("acknowledge_alarm", JSONObject().apply {
+                                    put("id", configManager.deviceId)
+                                    put("viewer_id", configManager.viewerId)
+                                    put("ack_ts", now)
+                                    put("from", "viewer")
+                                }, SignalingPriority.HIGH)
+                            }
+
                             alarmManager.setPowerAlarmPending(false, role)
                             alarmManager.notifySirenManualStop() 
                             alarmManager.dismissResolvedAlarms()

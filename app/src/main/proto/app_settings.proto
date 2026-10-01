@@ -243,6 +243,11 @@ message RealtimeStatus {
 
     // Issue #1205: Context-Aware Power Optimization
     optional string activity_type = 76;
+
+    // Issue #1410: Viewer Persistence. Carry global acknowledgment timestamp
+    // and earliest violation start time to suppress recurring alarms (R-ID 575).
+    optional int64 last_alarm_ack_ts = 77;
+    optional int64 violation_start_ts = 78;
 }
 
 message GeoPointProto {
@@ -412,6 +417,10 @@ message TrackerStatusProto {
 
     // Issue #1205: Context-Aware Power Optimization
     optional string activity_type = 115;
+
+    // Issue #1410: Viewer Persistence Parity
+    optional int64 last_alarm_ack_ts = 116;
+    optional int64 violation_start_ts = 117;
 }
 
 message ActiveAlarmProto {

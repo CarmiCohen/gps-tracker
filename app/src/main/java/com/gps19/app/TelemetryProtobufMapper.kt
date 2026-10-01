@@ -4,15 +4,13 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.1.8:
+ * - Issue #1410: Viewer Persistence. Added lastAlarmAckTs and violationStartTs 
+ *   mapping to support global acknowledgment synchronization and idempotent 
+ *   alarm evaluation across peers (R-ID 575).
  * Sep.27.18:
  * - Issue #1205: Context-Aware Power Optimization. Integrated activityType mapping 
  *   to ensure context awareness across signaling and persistence (R-ID 503).
- * Sep.15.01:
- * - Forensic Hardening: Added isPowerTamper mapping to support A15-compliant 
- *   signaling resilience (R-ID 338).
- * Sep.10.40:
- * - Issue #946 Visibility RESOLVED: Added tamperNote mapping for forensic 
- *   transparency in both Realtime (binary) and Persistence builders (R-ID 288).
  */
 object TelemetryProtobufMapper {
 
@@ -109,6 +107,10 @@ object TelemetryProtobufMapper {
 
         // Issue #1205: Activity context
         builder.setActivityType(status.activityType.name)
+
+        // Issue #1410: Viewer Persistence
+        builder.setLastAlarmAckTs(status.lastAlarmAckTs)
+        builder.setViolationStartTs(status.violationStartTs)
 
         // Enums
         builder.setState(TrackerStateProto.valueOf("TS_" + status.trackerState.name))
@@ -240,6 +242,10 @@ object TelemetryProtobufMapper {
 
         // Issue #1205: Activity context
         builder.setActivityType(status.activityType.name)
+
+        // Issue #1410: Viewer Persistence
+        builder.setLastAlarmAckTs(status.lastAlarmAckTs)
+        builder.setViolationStartTs(status.violationStartTs)
 
         // Enums
         builder.setTrackerState(status.trackerState.name)

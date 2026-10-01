@@ -10,19 +10,13 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.1.8:
+ * - Issue #1410: Viewer Persistence. Added lastAlarmAckTs and violationStartTs 
+ *   to TrackerStatus to ensure alarm acknowledgment state is synchronized 
+ *   across peers and persisted through re-installs (R-ID 575).
  * Sep.27.18:
  * - Issue #1205: Context-Aware Power Optimization. Added activityType to 
  *   ConnectionPoint and TrackerStatus for full-stack context awareness.
- * Sep.27.17:
- * - Issue #1160: Flyweight & Pooling Expansion. Refactored TrackerStatus to 
- *   support mutable reuse and deep copying to eliminate GC churn.
- * Sep.26.12:
- * - Issue #1344: Added thermalHeadroom and heapAllocatedMb forensic probes 
- *   to TrackerStatus, ConnectionPoint, and LogEntry. Fixed isBatterySteepDischarge typo.
- * Sep.26.0:
- * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence. Refactored 
- *   TrackerStatus to use partitioned states (Kinetic, Atmospheric, Integrity) 
- *   to align with system architecture and eliminate redundant bridging overhead.
  */
 
 @Serializable
@@ -359,7 +353,9 @@ data class TrackerStatus(
     var isClockRegression: Boolean = false,
     var lastValidFixRt: Long = 0L,
     var isSilentFailure: Boolean = false,
-    var isBatteryWhitelisted: Boolean = false
+    var isBatteryWhitelisted: Boolean = false,
+    var lastAlarmAckTs: Long = 0L,
+    var violationStartTs: Long = 0L
 ) : SpatialAnchor {
 
     override val lat: Double get() = kinetic.lat
@@ -480,6 +476,8 @@ data class TrackerStatus(
         this.trackerState = other.trackerState; this.isClockRegression = other.isClockRegression
         this.lastValidFixRt = other.lastValidFixRt; this.isSilentFailure = other.isSilentFailure
         this.isBatteryWhitelisted = other.isBatteryWhitelisted
+        this.lastAlarmAckTs = other.lastAlarmAckTs
+        this.violationStartTs = other.violationStartTs
     }
 
     /**
@@ -488,7 +486,7 @@ data class TrackerStatus(
     fun reset() {
         deviceId = ""; viewerId = ""; status = SentinelStatus.VALID; ts = 0L; rt = 0L
         trackerState = TrackerState.UNKNOWN; isClockRegression = false; lastValidFixRt = 0L
-        isSilentFailure = false; isBatteryWhitelisted = false
+        isSilentFailure = false; isBatteryWhitelisted = false; lastAlarmAckTs = 0L; violationStartTs = 0L
         kinetic.reset()
         atmospheric.reset()
         integrity.reset()
@@ -503,7 +501,7 @@ data class TrackerStatus(
         put("total_drop_ms", totalDropMs); put("max_drop_ms", maxDropMs); put("max_drop_ts", maxDropTs)
         put("total_connected_ms", totalConnectedMs); put("session_connected_ms", sessionConnectedMs); put("battery", battery)
         put("temp", temp); put("max_temp", maxTemp); put("is_charging", isCharging); put("current_ma", this@TrackerStatus.currentMa)
-        put("sats_view", satsView); put("sats_used", satsUsed); put("peak_vibration_shock", peakVibrationShock)
+        put("sats_view", satsView); put("sats_view", satsView); put("sats_used", satsUsed); put("peak_vibration_shock", peakVibrationShock)
         put("peak_shock_ts", peakVibrationShockTs); put("is_power_tamper", isPowerTamper)
         put("violation_uptime_ms", violationUptimeMs); put("violation_percentage", violationPercentage)
         put("status", status.name); put("is_jammer", isJammer); put("is_stalled", isStalled)
@@ -544,6 +542,10 @@ data class TrackerStatus(
         // Issue #1344: Forensic probes
         put("thermal_headroom", thermalHeadroom)
         put("heap_allocated_mb", heapAllocatedMb)
+
+        // Issue #1410: Viewer Persistence synchronization
+        put("last_alarm_ack_ts", lastAlarmAckTs)
+        put("violation_start_ts", violationStartTs)
     }
 
     companion object {

@@ -13,14 +13,14 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Oct.1.8:
+ * - Issue #1410: Viewer Persistence. Injected global acknowledgment 
+ *   and violation start timestamps into peer telemetry. Ensures fresh 
+ *   installations inherit the correct alarm state (R-ID 575).
  * Oct.1.6:
  * - Issue #1402-B: System-Wide Alarm Overlay. Reactive observation of 
  *   activeAlarmsFlow to ensure the alarm notification (and its fullScreenIntent) 
- *   is updated whenever the alarm summary changes, bypassing background limitations.
- * - Issue #1409: Couple Siren with Notification. Ensures notification 
- *   cancelation is synchronized with siren state.
- * Sep.30.70:
- * - Issue #1407: Unified Storage Authority.
+ *   is updated whenever the alarm summary changes.
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -84,6 +84,12 @@ class AppEventCoordinator @Inject constructor(
         val now = event.now
         val nowRt = event.nowRt
         val isTrackerMode = event.isTrackerMode
+
+        // Issue #1410: Inject global alarm state into snapshots for peer propagation.
+        if (isTrackerMode) {
+            snapshot.lastAlarmAckTs = repository.getLastAlarmAckTsSync(AppRole.TRACKER)
+            snapshot.violationStartTs = alarmManager.getEarliestViolationTs()
+        }
 
         // 1. Repository Persistence (Snap-to-Update Monolith)
         TelemetryMapper.mapSnapshotToUpdate(snapshot, proc, isMe = true, ts = now, out = updateFlyweight)

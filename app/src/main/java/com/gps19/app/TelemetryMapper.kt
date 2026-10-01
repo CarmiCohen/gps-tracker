@@ -6,12 +6,13 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.1.8:
+ * - Issue #1410: Viewer Persistence. Propagated lastAlarmAckTs and violationStartTs 
+ *   across all mapping paths to ensure acknowledgment synchronization and 
+ *   idempotent trigger evaluation (R-ID 575).
  * Sep.30.40:
  * - Issue #1386 RESOLVED: Unified TrackerState authority. Mapping now uses 
  *   the definitive state calculated by the engine tick (R-ID 548).
- * Sep.28.1:
- * - Issue #1205: Context-Aware Power Optimization. Propagated activityType 
- *   completely across all mapping paths, including mapSnapshotToHealth.
  */
 object TelemetryMapper {
 
@@ -96,6 +97,10 @@ object TelemetryMapper {
             this.lastValidFixRt = snapshot.lastValidFixRt
             this.isSilentFailure = snapshot.isSilentFailure
             this.isBatteryWhitelisted = snapshot.integrity.battery > 0
+            
+            // Issue #1410: Global sync
+            this.lastAlarmAckTs = snapshot.lastAlarmAckTs
+            this.violationStartTs = snapshot.violationStartTs
         }
     }
 
@@ -149,6 +154,10 @@ object TelemetryMapper {
             activityType = try { 
                 ActivityType.valueOf(proto.activityType) 
             } catch (e: Exception) { ActivityType.UNKNOWN }
+            
+            // Issue #1410: Global acknowledgment synchronization
+            lastAlarmAckTs = proto.lastAlarmAckTs
+            violationStartTs = proto.violationStartTs
         }
     }
 
@@ -237,6 +246,10 @@ object TelemetryMapper {
             trackerState = TrackerStatus.mapProtoToTrackerState(proto.state.name)
             isClockRegression = proto.isClockRegression
             lastValidFixRt = lastFixRt
+            
+            // Issue #1410: Global acknowledgment synchronization
+            lastAlarmAckTs = proto.lastAlarmAckTs
+            violationStartTs = proto.violationStartTs
         }
     }
 
@@ -288,6 +301,9 @@ object TelemetryMapper {
             activityType = try { 
                 ActivityType.valueOf(data.optString("activity_type", current.activityType.name)) 
             } catch (e: Exception) { ActivityType.UNKNOWN }
+            
+            lastAlarmAckTs = data.optLong("last_alarm_ack_ts", 0L)
+            violationStartTs = data.optLong("violation_start_ts", 0L)
         }
     }
 
@@ -406,6 +422,10 @@ object TelemetryMapper {
             this.trackerState = try { TrackerState.valueOf(data.optString("tracker_state", current.trackerState.name)) } catch(e: Exception) { current.trackerState }
             this.isClockRegression = processed.isClockRegression
             this.lastValidFixRt = lastFixRt
+            
+            // Issue #1410: Global acknowledgment synchronization
+            lastAlarmAckTs = data.optLong("last_alarm_ack_ts", 0L)
+            violationStartTs = data.optLong("violation_start_ts", 0L)
         }
     }
 
@@ -525,6 +545,9 @@ object TelemetryMapper {
             heapAllocatedMb = s.integrity.heapAllocatedMb
             this.activityType = s.activityType
             this.trackerState = s.trackerState
+            // Issue #1410: Viewer Persistence
+            this.lastAlarmAckTs = s.lastAlarmAckTs
+            this.violationStartTs = s.violationStartTs
         }
     }
 
