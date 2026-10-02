@@ -5,6 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Oct.2.5:
+ * - Issue #SIMP-1416-1: Native Sensor Pulse Hardening. Remediated build 
+ *   failure by correctly passing cpuLoad to shouldThrottlePolling.
+ * Oct.2.1:
+ * - Issue #1415: Load-Aware IMU Gating (R-ID 590). Passed snapshot.cpuLoad 
+ *   to SentinelValidator for vibration floor updates and tamper checks.
  * Sep.27.6:
  * - Issue #1161: Unified Trajectory & Buffer Management. Adapted to reference 
  *   TrajectoryNode during hindsight mapping.
@@ -129,7 +135,7 @@ object LocationSentinel {
             }
         }
 
-        if (isStationary(state) && !state.forensic.isSitDetected) {
+        if (isStationary(state, snapshot.cpuLoad) && !state.forensic.isSitDetected) {
             if (state.forensic.stationaryStartRt == 0L) state.forensic.stationaryStartRt = snapshot.nowRt
             else if (snapshot.nowRt - state.forensic.stationaryStartRt > PASSIVE_ZEROING_STATIONARY_MS) {
                 if (abs(state.forensic.baselineSitTilt - currentTilt) > 0.1 && !currentTilt.isNaN()) {
@@ -150,7 +156,7 @@ object LocationSentinel {
         state.forensic.currentTiltDegrees = currentTilt
         if (snapshot.atmospheric.acousticDb >= 0.0) state.forensic.currentAcousticDb = safeDouble(snapshot.atmospheric.acousticDb)
 
-        state.forensic.luxBaseline = SentinelValidator.updateLuxBaseline(state.forensic.luxBaseline, snapshot.atmospheric.lux, isStationary(state), snapshot.isWarming)
+        state.forensic.luxBaseline = SentinelValidator.updateLuxBaseline(state.forensic.luxBaseline, snapshot.atmospheric.lux, isStationary(state, snapshot.cpuLoad), snapshot.isWarming)
         state.forensic.baroBaseline = SentinelValidator.updateBaroBaseline(state.forensic.baroBaseline, snapshot.atmospheric.baroAlt, snapshot.isWarming)
 
         // Using SystemEvaluationSnapshot flags
@@ -174,7 +180,7 @@ object LocationSentinel {
         if (snapshot.providedAdaptiveFloor >= 0.0) {
             state.forensic.adaptiveVibrationFloor = snapshot.providedAdaptiveFloor
         } else if (snapshot.atmospheric.vibration >= 0.0) {
-            state.forensic.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(state.forensic.adaptiveVibrationFloor, state.forensic.currentVibrationIndex, snapshot.isWarming)
+            state.forensic.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(state.forensic.adaptiveVibrationFloor, state.forensic.currentVibrationIndex, snapshot.isWarming, snapshot.cpuLoad)
         }
         
         return baselineChanged
@@ -205,6 +211,7 @@ object LocationSentinel {
         isMuzzled: Boolean = false, 
         nowTs: Long,
         nowRt: Long,
+        cpuLoad: Double = 0.0,
         acousticFloorDb: Double = -1.0
     ): SentinelResult {
         state.forensic.lastSnr = snr
@@ -229,7 +236,7 @@ object LocationSentinel {
         }
         
         val altitudeDelta = if (state.forensic.lastValidAlt != 0.0) alt - state.forensic.lastValidAlt else 0.0
-        val isParking = isStationary(state)
+        val isParking = isStationary(state, cpuLoad)
         
         val dist = PhysicsUtils.calculateDistance(state.forensic.lastValidLat, state.forensic.lastValidLng, lat, lng)
         val impliesMotion = dist > ACTIVE_MOVE_THRESHOLD
@@ -302,7 +309,7 @@ object LocationSentinel {
                 return resultFlyweight
             }
 
-            resultFlyweight.status = checkPhysicalTamper(state, nowRt, isMuzzled)
+            resultFlyweight.status = checkPhysicalTamper(state, nowRt, isMuzzled, cpuLoad)
             if (resultFlyweight.status != SentinelStatus.VALID) {
                 return resultFlyweight
             }
@@ -328,7 +335,8 @@ object LocationSentinel {
     fun checkPhysicalTamper(
         state: LocationProcessingState,
         nowRt: Long = 0L,
-        isMuzzled: Boolean = false
+        isMuzzled: Boolean = false,
+        cpuLoad: Double = 0.0
     ): SentinelStatus {
         if (isMuzzled) return SentinelStatus.VALID
 
@@ -344,7 +352,7 @@ object LocationSentinel {
             resultFlyweight.reason = "Tilt detected"
             return SentinelStatus.TAMPER
         }
-        if (SentinelValidator.isShockViolated(state.forensic.peakVibrationShock, state.forensic.adaptiveVibrationFloor)) {
+        if (SentinelValidator.isShockViolated(state.forensic.peakVibrationShock, state.forensic.adaptiveVibrationFloor, cpuLoad = cpuLoad)) {
             resultFlyweight.reason = "Shock detected"
             return SentinelStatus.TAMPER
         }
@@ -380,7 +388,7 @@ object LocationSentinel {
             return SentinelStatus.TAMPER
         }
 
-        if (SentinelValidator.isVibrationSuspicious(state.forensic.currentVibrationIndex, state.forensic.adaptiveVibrationFloor)) {
+        if (SentinelValidator.isVibrationSuspicious(state.forensic.currentVibrationIndex, state.forensic.adaptiveVibrationFloor, cpuLoad = cpuLoad)) {
             resultFlyweight.reason = "Vibration suspicion"
             return SentinelStatus.TAMPER
         }
@@ -393,10 +401,10 @@ object LocationSentinel {
         return SentinelStatus.VALID
     }
 
-    fun isStationary(state: LocationProcessingState): Boolean = SentinelValidator.isStationary(state.forensic.currentVibrationIndex, state.forensic.adaptiveVibrationFloor)
+    fun isStationary(state: LocationProcessingState, cpuLoad: Double = 0.0): Boolean = SentinelValidator.isStationary(state.forensic.currentVibrationIndex, state.forensic.adaptiveVibrationFloor, cpuLoad)
 
-    fun shouldThrottlePolling(state: LocationProcessingState, providedIsStationary: Boolean? = null): Boolean {
-        val stationary = providedIsStationary ?: isStationary(state)
+    fun shouldThrottlePolling(state: LocationProcessingState, providedIsStationary: Boolean? = null, cpuLoad: Double = 0.0): Boolean {
+        val stationary = providedIsStationary ?: isStationary(state, cpuLoad)
         return stationary &&
                abs(state.forensic.currentCompassHeading - state.forensic.lastCompassHeading) < THROTTLE_COMPASS_LIMIT &&
                (if (state.forensic.baroBaseline > -999.0) abs(state.forensic.currentBaroAlt - state.forensic.baroBaseline) < THROTTLE_BARO_LIMIT else true) &&

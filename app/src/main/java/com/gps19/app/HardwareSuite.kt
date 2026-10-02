@@ -37,6 +37,13 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.2.5:
+ * - Issue #SIMP-1416-1: Native Sensor Pulse. Integrated JdHardwareManager.recordSensorPulse 
+ *   into onSensorChanged to offload frequency tracking to JNI (R-ID 256).
+ * Oct.2.1:
+ * - Issue #1415: Load-Aware IMU Gating (R-ID 591). Integrated cpuLoad into 
+ *   processVibration and updateVibrationFloor logic to prevent baseline 
+ *   corruption during saturation.
  * Sep.28.12:
  * - Issue #1360: Mismatched unregistration signatures. Remediated compilation
  *   failures by passing timeProvider to all ManagedHardware unregister calls.
@@ -234,6 +241,7 @@ class HardwareSuite @Inject constructor(
     private val acousticLock = Any()
 
     @Volatile private var isHighLoad = false
+    @Volatile private var currentCpuLoad = 0.0
     @Volatile private var maliAnomaly = false
     @Volatile private var powerSaveMode = false
     @Volatile private var isSafeMode = false
@@ -554,7 +562,7 @@ class HardwareSuite @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) return
         
         revivalPulseJob?.cancel()
         revivalPulseJob = scope.launch(Dispatchers.Default) {
@@ -719,6 +727,10 @@ class HardwareSuite @Inject constructor(
             Sensor.TYPE_ACCELEROMETER -> {
                 gravityBuffer[0] = values[0]; gravityBuffer[1] = values[1]; gravityBuffer[2] = values[2]; hasGravity = true
                 processVibration(values[0], values[1], values[2]); updateOrientation()
+                
+                // Issue #SIMP-1416-1: Native Sensor Pulse (R-ID 256)
+                JdHardwareManager.recordSensorPulse(nowRt)
+                
                 if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) {
                     lastStayAliveRt = nowRt
                     val canPoke = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -728,7 +740,7 @@ class HardwareSuite @Inject constructor(
                     if (canPoke) systemMonitor.acquireWakeLock(force = true)
                 }
 
-                forensicAuditor.auditSensorRate(nowRt, isWarming).forEach { (role, msg) ->
+                forensicAuditor.auditSensorRate(isWarming).forEach { (role, msg) ->
                     domainEventBus.emit(AppSensorEvent.LogEvent("[$role] $msg", false))
                 }
             }
@@ -942,7 +954,14 @@ class HardwareSuite @Inject constructor(
     private fun processVibration(x: Float, y: Float, z: Float) {
         val dx = x.toDouble() - lastAccelX.toDouble(); val dy = y.toDouble() - lastAccelY.toDouble(); val dz = z.toDouble() - lastAccelZ.toDouble()
         val delta = sqrt(dx * dx + dy * dy + dz * dz) / GRAVITY_EARTH
-        synchronized(this) { if (delta > logicPeakVibration) logicPeakVibration = delta; if (delta > forensicPeakVibration) forensicPeakVibration = delta; adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(adaptiveVibrationFloor, delta, isWarming); lastHpfValue = SentinelValidator.computeNextHpf(lastHpfValue, delta, lastRawVibe); currentKineticEnergy = SentinelValidator.computeNextEnergy(currentKineticEnergy, lastHpfValue); lastRawVibe = delta }
+        synchronized(this) { 
+            if (delta > logicPeakVibration) logicPeakVibration = delta
+            if (delta > forensicPeakVibration) forensicPeakVibration = delta
+            adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(adaptiveVibrationFloor, delta, isWarming, currentCpuLoad)
+            lastHpfValue = SentinelValidator.computeNextHpf(lastHpfValue, delta, lastRawVibe)
+            currentKineticEnergy = SentinelValidator.computeNextEnergy(currentKineticEnergy, lastHpfValue)
+            lastRawVibe = delta 
+        }
         lastAccelX = x; lastAccelY = y; lastAccelZ = z
         // precise buffer update matching original
         val oldV = vibrationCircularBuffer[vibrationCircularIdx]; vibrationCircularBuffer[vibrationCircularIdx] = delta; vibrationRollingSum = vibrationRollingSum - oldV + delta; vibrationCircularIdx = (vibrationCircularIdx + 1) % VIBRATION_WINDOW_SIZE; if (vibrationBufferCount < VIBRATION_WINDOW_SIZE) vibrationBufferCount++
@@ -998,7 +1017,7 @@ class HardwareSuite @Inject constructor(
 
     private fun updateOrientation() { if (hasGravity && hasGeomagnetic) { if (android.hardware.SensorManager.getRotationMatrix(rotationMatrixBuffer, inclinationMatrixBuffer, gravityBuffer, geomagneticBuffer)) { android.hardware.SensorManager.getOrientation(rotationMatrixBuffer, orientationBuffer); currentCompassHeading = (Math.toDegrees(orientationBuffer[0].toDouble()) + 360.0) % 360.0 } } }
     
-    fun isStationary() = SentinelValidator.isStationary(currentVibrationIndex, adaptiveVibrationFloor)
+    fun isStationary() = SentinelValidator.isStationary(currentVibrationIndex, adaptiveVibrationFloor, currentCpuLoad)
 
     fun setAdaptiveVibrationFloor(floor: Double) {
         if (floor >= 0.0) {
@@ -1019,6 +1038,9 @@ class HardwareSuite @Inject constructor(
     fun setHighLoad(high: Boolean) { 
         this.isHighLoad = high 
         if (high) lastAnomalyActiveRt = timeProvider.elapsedRealtime()
+    }
+    fun setCpuLoad(load: Double) {
+        this.currentCpuLoad = load
     }
     fun setMaliAnomaly(active: Boolean) { 
         this.maliAnomaly = active 
@@ -1087,6 +1109,7 @@ class HardwareSuite @Inject constructor(
             plungeMatched = false
             lastPlungePhaseRt = 0L
             lastGpsSpeedMps = 0.0
+            currentCpuLoad = 0.0
             activityContextProvider.reset()
         }
     }

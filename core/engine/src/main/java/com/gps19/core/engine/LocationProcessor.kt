@@ -5,6 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Oct.2.5:
+ * - Issue #SIMP-1416-1: Native Sensor Pulse Hardening. Remediated build failure 
+ *   by correctly passing cpuLoad to LocationSentinel.shouldThrottlePolling (R-ID 256).
+ * Oct.2.1:
+ * - Issue #1415: Load-Aware IMU Gating (R-ID 590). Updated checkPhysicalTamper 
+ *   and processGpsPoint to pass cpuLoad for jitter compensation.
  * Sep.28.29:
  * - Issue #071 Hardening: Ensure manual stall injection flag is respected 
  *   during local processing for forensic pipeline verification (R-ID 544).
@@ -133,8 +139,8 @@ class LocationProcessor(
 
     fun consumeSitDetected(): Boolean = LocationSentinel.consumeSitDetected(state)
 
-    fun checkPhysicalTamper(nowRt: Long, isMuzzled: Boolean): SentinelStatus {
-        return LocationSentinel.checkPhysicalTamper(state, nowRt, isMuzzled)
+    fun checkPhysicalTamper(nowRt: Long, isMuzzled: Boolean, cpuLoad: Double = 0.0): SentinelStatus {
+        return LocationSentinel.checkPhysicalTamper(state, nowRt, isMuzzled, cpuLoad)
     }
 
     fun updateExpectedInterval(nowRt: Long, expectedIntervalMs: Long) {
@@ -195,7 +201,7 @@ class LocationProcessor(
         emitEvent(ProcessorEvent.ChairBaselineChanged(state.forensic.baselineSitTilt, isPrimary))
     }
 
-    fun shouldThrottlePolling(providedIsStationary: Boolean? = null): Boolean = LocationSentinel.shouldThrottlePolling(state, providedIsStationary)
+    fun shouldThrottlePolling(providedIsStationary: Boolean? = null, cpuLoad: Double = 0.0): Boolean = LocationSentinel.shouldThrottlePolling(state, providedIsStationary, cpuLoad)
 
     fun updateWindowedAccuracy(acc: Double) {
         if (acc <= 0.0) return
@@ -239,6 +245,7 @@ class LocationProcessor(
         val snr = snapshot.snrSnapshot ?: 0.0
         val nowRt = snapshot.nowRt
         val nowWall = snapshot.nowTs
+        val cpuLoad = snapshot.cpuLoad
 
         return LatencyMonitor.measureAndAudit<ProcessedLocation>(
             timeProvider,
@@ -340,7 +347,7 @@ class LocationProcessor(
                 lat = lat, lng = lng, alt = alt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy, 
                 bearing = bearing, snr = snr, satsUsed = snapshot.integrity.satsUsed, timestamp = effectiveTs,
                 bypassBehavioral = !isLocal, isSuspicious = snapshot.isMuzzled || adaptationMuzzled,
-                isMuzzled = snapshot.isMuzzled, nowTs = nowWall, nowRt = nowRt
+                isMuzzled = snapshot.isMuzzled, nowTs = nowWall, nowRt = nowRt, cpuLoad = cpuLoad
             )
             
             if (sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED) {
@@ -435,14 +442,14 @@ class LocationProcessor(
             state.lastLat = lat; state.lastLng = lng; state.lastTs = effectiveTs; state.lastRt = nowRt; state.lastAcc = accuracy; state.lastMaxAcc = state.accuracy.maxAccuracy
             if (!finalIsStalled) state.lastValidFixRt = nowRt else if (isLocal && !isViewerTrail) emitEvent(ProcessorEvent.GpsStallDetected(nowRt, isPrimary))
             
-            val isThrottled = LocationSentinel.shouldThrottlePolling(state)
+            val isThrottled = LocationSentinel.shouldThrottlePolling(state, cpuLoad = cpuLoad)
             val estimatedSpeed = state.forensic.estimatedSpeedMps
             val stationaryProb = state.forensic.stationaryProb
             
             val anchorResult = AnchorEvaluator.evaluate(
                 state = state,
                 point = persistencePoint,
-                isPhysicallyStationary = LocationSentinel.isStationary(state),
+                isPhysicallyStationary = LocationSentinel.isStationary(state, cpuLoad),
                 stationaryProb = stationaryProb,
                 estimatedSpeed = estimatedSpeed,
                 maxAccuracy = state.accuracy.maxAccuracy,
@@ -504,7 +511,7 @@ class LocationProcessor(
         domainEventBus?.emit(event)
     }
 
-    private fun isStationary(): Boolean = LocationSentinel.isStationary(state)
+    private fun isStationary(cpuLoad: Double = 0.0): Boolean = LocationSentinel.isStationary(state, cpuLoad)
 
     private fun shouldSavePoint(isSuspicious: Boolean, isThrottled: Boolean, distFromLast: Double, timeSinceLastRt: Long, maxAcc: Double, nowRt: Long): Boolean {
         if (isSuspicious) return true

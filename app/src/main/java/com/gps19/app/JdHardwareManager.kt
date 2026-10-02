@@ -27,6 +27,9 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.2.5:
+ * - Issue #SIMP-1416-1: Native Sensor Pulse. Integrated n7/n8/n9 for JNI-based 
+ *   high-frequency sensor auditing to eliminate JVM heap churn.
  * Sep.11.60:
  * - Issue #1007: Simplification Idea #15. Hardware Flag Abstraction. 
  *   Consolidated bitmask flags into type-safe LedStatus object to eliminate 
@@ -204,6 +207,28 @@ object JdHardwareManager {
         }
     }
 
+    /**
+     * recordSensorPulse: Low-latency pulse recording for high-frequency sensor events.
+     * Offloads tracking to JNI to avoid heap churn.
+     */
+    fun recordSensorPulse(nowRt: Long) {
+        if (isLibraryLoaded.get()) n7(nowRt)
+    }
+
+    /**
+     * getSensorAuditHz: Returns the calculated sensor frequency from the native pulse buffer.
+     */
+    fun getSensorAuditHz(): Double {
+        return if (isLibraryLoaded.get()) n8() else 0.0
+    }
+
+    /**
+     * resetSensorAudit: Resets the native pulse trackers.
+     */
+    fun resetSensorAudit() {
+        if (isLibraryLoaded.get()) n9()
+    }
+
     fun isAvailable(): Boolean = isLibraryLoaded.get()
 
     @JvmStatic private external fun n1(buffer: ByteBuffer): Int
@@ -212,4 +237,7 @@ object JdHardwareManager {
     @JvmStatic private external fun n4(): Int
     @JvmStatic private external fun n5(budgetLevel: Int): Int
     @JvmStatic private external fun n6(): Int
+    @JvmStatic private external fun n7(nowRt: Long): Int
+    @JvmStatic private external fun n8(): Double
+    @JvmStatic private external fun n9(): Int
 }

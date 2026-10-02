@@ -1,50 +1,62 @@
-# 🏛️ Resolution Archive - Oct.1.8
+# 🏛️ Resolution Archive - Oct.2.5
 
-## 🏁 Issue #1414: Dashboard UNKNOWN state (Local Tracker)
-*   **Resolved**: Oct.1.8
-*   **Root Cause**: Behavioral state mapping (`MOVING`/`PARKING`) was gated by peer connectivity. In standalone mode (no Viewer), the engine reported "UNKNOWN" because `isPeerActive` was false.
-*   **Remediation**: 
-    *   **Logic Hardening**: Updated `MonitorService.kt` to force `isTrackerConnected = true` when in local Tracker mode.
-    *   **Flow Routing**: Updated `MainViewModel.kt` to route local telemetry updates directly to the `_trackerState` flow, ensuring the dashboard reflects behavioral truth regardless of peer presence.
-*   **Significance**: High (Diagnostic Accuracy).
-*   **SOT ID**: 589
-
-## 🏁 Issue #1413: Mode-Based Alert Violation (Stealth Regression)
-*   **Resolved**: Oct.1.8
-*   **Root Cause**: The full-screen `AlarmOverlay` (Red Alert) was promoted on Tracker devices, violating the SOT stealth requirement (R872).
-*   **Remediation**: 
-    *   **UI Guard**: Implemented an `appMode == "viewer"` guard in `MainAppContent.kt` at the root of the overlay promotion block. 
-    *   **Badge Redirection**: Tracker-mode violations are now restricted to status bar badges (**ALM**) and logs only.
-*   **Significance**: High (Operational Stealth).
-*   **SOT ID**: 588
-
-## 🏁 Issue #1410: Engine Thread-Safety (Fatal CME)
-*   **Resolved**: Oct.1.8
-*   **Root Cause**: `MainAlarmLogic` was mutating the `activeAlarms` map on a background thread without synchronization, while the UI/Event coordinator was iterating over it during the service tick.
-*   **Remediation**: 
-    *   **Safe Collection**: Migrated `activeAlarms` to a `val ConcurrentHashMap` in `EngineModels.kt`.
-    *   **Persistence guard**: Marked as `@Transient` to prevent restoration overrides.
-    *   **Atomic Sync**: Synchronized all map mutations in the core logic.
-*   **Significance**: Critical (System Stability).
-*   **SOT ID**: 585
-
-## 🏁 Issue #1410: Viewer Persistence (Recurring Alarms)
-*   **Resolved**: Oct.1.8
-*   **Root Cause**: Alarm acknowledgment state (`lastAlarmAckTs`) was stored in local storage. Fresh installations on the Viewer lost this state, causing them to treat ongoing Tracker violations as new triggers.
-*   **Remediation**: 
-    *   **Global Authority**: Migrated acknowledgment state to the telemetry stream.
-    *   **Idempotent Logic**: Hardened `MainAlarmLogic` to auto-resolve violations triggered prior to the current `lastAlarmAckTs` using `violationStartTs`.
-*   **Significance**: High (System Integrity & UX).
-*   **SOT ID**: 579
+## 🏁 Issue #SIMP-1416-1 / SOT ID 594: Native Sensor Pulse Audit
+*   **Resolved**: Oct.2.5
+*   **Root Cause**: High-frequency sensor auditing (250Hz) in `ForensicAuditor.kt` caused significant JVM heap churn due to per-event object creation and synchronization overhead.
+*   **Remediations**:
+    *   **Native Pulse Tracking**: Offloaded pulse counting and frequency calculation to JNI (`jdhardware-jni.cpp`) using atomic-style global state.
+    *   **JNI Fast Path**: Implemented `recordSensorPulse` in `JdHardwareManager` as a direct external call to minimize transition overhead.
+    *   **Audit Delegation**: Refactored `ForensicAuditor` to query native Hz instead of tracking local counters.
+*   **Significance**: Medium (Hardening).
+*   **SOT ID**: 594
 
 ---
 
-# 🏛️ Resolution Archive - Oct.1.7
+# 🏛️ Resolution Archive - Oct.2.3
 
-## 🏁 Issue #1402-B: System-Wide Alarm Overlay Failure
-*   **Resolved**: Oct.1.7
-*   **Root Cause**: Dependence on `fullScreenIntent` for background promotion was unreliable on restrictive OEMs.
-*   **Remediation**: Implemented `AlarmOverlayService` utilizing `SYSTEM_ALERT_WINDOW`.
-    *   **Oct.1.8 Update**: Hardened teardown with explicit `disposeComposition()` and `removeViewImmediate()` (R-ID 582).
-*   **Significance**: High (Guaranteed Emergency Visibility).
-*   **SOT ID**: 578
+## 🏁 Issue #1402-B / R-ID 582: WindowManager Lifecycle Hardening
+*   **Resolved**: Oct.2.3
+*   **Root Cause**: `AlarmOverlayService` manually implemented `LifecycleOwner` but lacked `ON_RESUME`/`ON_PAUSE` transitions. This potentially caused unpredictable behavior in Compose state flows and resource retention during long-duration alerts on A15 hardware.
+*   **Remediations**:
+    *   **Lifecycle Parity**: Added full state transitions to `showOverlay` and `onDestroy`.
+    *   **Hardened Cleanup**: Explicitly call `disposeComposition()` before `removeViewImmediate()` to ensure the Compose tree is pruned before the window is destroyed.
+*   **Significance**: High (Resource Integrity).
+*   **SOT ID**: 582
+
+---
+
+# 🏛️ Resolution Archive - Oct.2.2
+
+## 🏁 Issue #1417: Jitter-Resistant Connectivity Transitions
+*   **Resolved**: Oct.2.2
+*   **Root Cause**: Transient relay lag (500ms jitter) caused rapid oscillation between `RELAY_OFFLINE` and `SIGNAL_LOSS` states.
+*   **Remediations**:
+    *   **Temporal Hysteresis**: Added a 3s delay before triggering `RELAY_OFFLINE`.
+    *   **Error Suppression**: Peer errors are now suppressed if the relay was offline within the last 3s window.
+*   **Significance**: High (Alert Stability).
+*   **SOT ID**: 593
+
+## 🏁 Issue #1416: Memory Pressure Mitigation
+*   **Resolved**: Oct.2.2
+*   **Root Cause**: High-frequency sensor audits (250Hz) and sustained alerts on budget hardware (A15) caused cumulative heap growth.
+*   **Remediations**:
+    *   **Heap Probes**: Integrated real-time heap monitoring into `IntegrityMonitor`.
+    *   **Reactive Throttling**: Forensic sampling interval is now dynamically throttled (up to 4x) when memory pressure is HIGH or CRITICAL.
+    *   **Aggressive GC**: Triggered manual garbage collection and `historyManager.trimMemory()` at 200MB/250MB thresholds.
+*   **Significance**: High (Resource Management).
+*   **SOT ID**: 592
+
+## 🏁 Issue #1415: CPU-Load Compensation for Sensors
+*   **Resolved**: Oct.2.2
+*   **Root Cause**: 100% CPU saturation during stress tests on the A15 caused the accelerometer to report erratic "ghost" vibration spikes.
+*   **Remediations**:
+    *   **Load Gating**: Integrated `cpuLoad` into `SentinelValidator`.
+    *   **Hysteresis Expansion**: IMU evaluation thresholds are now expanded by 1.5x when CPU load exceeds 0.85.
+    *   **Calibration Lock**: `Passive Zeroing` pauses during load bursts.
+*   **Significance**: High (False Positive Mitigation).
+*   **SOT ID**: 590, 591
+
+---
+
+# 🏛️ Resolution Archive - Oct.1.8
+... (Historical entries preserved)

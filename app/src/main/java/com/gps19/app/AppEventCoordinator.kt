@@ -13,6 +13,10 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Oct.2.5:
+ * - Issue #SIMP-1416-1: Native Sensor Pulse Hardening. Remediated build 
+ *   failure by adding missing branch for MemoryPressureChanged in IntegrityEvent 
+ *   and fixing RevivalEvent.Success reference.
  * Oct.1.8:
  * - Issue #1410: Viewer Persistence. Injected global acknowledgment 
  *   and violation start timestamps into peer telemetry. Ensures fresh 
@@ -192,6 +196,7 @@ class AppEventCoordinator @Inject constructor(
             }
             is IntegrityEvent.LocationStatusChanged -> {}
             is IntegrityEvent.GnssThrottledChanged -> {}
+            is IntegrityEvent.MemoryPressureChanged -> {}
         }
     }
 
@@ -295,7 +300,6 @@ class AppEventCoordinator @Inject constructor(
             is RevivalEvent.Success -> logManager.logServiceEvent(m = "GPS REVIVAL ${roleTag}: Hardware fix restored successfully.", isImportant = true)
             is RevivalEvent.RawBurstStarted -> {}
             is RevivalEvent.RawBurstEnded -> {}
-            else -> {}
         }
     }
 

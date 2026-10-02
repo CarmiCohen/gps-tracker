@@ -10,6 +10,10 @@ import kotlin.math.round
 
 /**
  * ForensicAuditor: Encapsulates high-assurance hardware audits (Stability, Jitter, Sensor Rates, Energy).
+ * Oct.2.5:
+ * - Issue #SIMP-1416-1: Native Sensor Pulse. Refactored auditSensorRate to use 
+ *   JdHardwareManager native pulses, eliminating JVM heap churn from high-frequency 
+ *   counting (R-ID 256).
  * Oct.1.1:
  * - Issue #1407: Unified Storage Authority. Refactored roleStates to use AppRole 
  *   enum keys, eliminating fragile string-based "T"/"V" tags (R-ID 568).
@@ -29,8 +33,6 @@ class ForensicAuditor @Inject constructor(
         var lastExpectedIntervalMs = 0L
         var lastIntervalChangeRt = 0L
         
-        var accelEventCount = 0
-        var accelAuditStartRt = 0L
         var isSensorRateAudited = false
 
         fun reset() {
@@ -41,8 +43,6 @@ class ForensicAuditor @Inject constructor(
             lastStabilityAuditTs = 0L
             lastExpectedIntervalMs = 0L
             lastIntervalChangeRt = 0L
-            accelEventCount = 0
-            accelAuditStartRt = 0L
             isSensorRateAudited = false
         }
     }
@@ -202,28 +202,22 @@ class ForensicAuditor @Inject constructor(
     }
 
     /**
-     * auditSensorRate: Atomically evaluates sensor frequency per role.
+     * auditSensorRate: Periodically queries the native pulse frequency.
+     * Logic is simplified to avoid high-frequency JVM allocations.
      */
-    fun auditSensorRate(nowRt: Long, isWarming: Boolean): List<Pair<AppRole, String>> {
+    fun auditSensorRate(isWarming: Boolean): List<Pair<AppRole, String>> {
         if (isWarming) return emptyList()
-        val results = mutableListOf<Pair<AppRole, String>>()
         
+        val hz = JdHardwareManager.getSensorAuditHz()
+        if (hz <= 0.0) return emptyList()
+
+        val results = mutableListOf<Pair<AppRole, String>>()
         roleStates.forEach { (role, state) ->
             synchronized(state) {
-                if (state.isSensorRateAudited) return@synchronized
-                
-                if (state.accelAuditStartRt == 0L) {
-                    state.accelAuditStartRt = nowRt
-                }
-                
-                state.accelEventCount++
-                
-                if (nowRt - state.accelAuditStartRt >= 1000L) {
-                    val durationSec = (nowRt - state.accelAuditStartRt) / 1000.0
-                    val hz = state.accelEventCount.toDouble() / durationSec
-                    val isEffective = hz > 200.0
+                if (!state.isSensorRateAudited) {
                     state.isSensorRateAudited = true
-                    val msg = "Sensor Rate Audit (R-ID 256): ${hz.toInt()} Hz. Efficacy: $isEffective"
+                    val isEffective = hz > 200.0
+                    val msg = "Sensor Rate Audit (R-ID 256): ${hz.toInt()} Hz. Efficacy: $isEffective (Native)"
                     Timber.i("ForensicAuditor: [${role.name}] $msg")
                     results.add(role to msg)
                 }
@@ -278,6 +272,7 @@ class ForensicAuditor @Inject constructor(
             roleStates.values.forEach { synchronized(it) { it.reset() } }
             resetGnssJitter()
             clearRevivalState()
+            JdHardwareManager.resetSensorAudit()
         } else {
             roleStates[role]?.let { synchronized(it) { it.reset() } }
             // Reset common jitter source if any role is reset to prevent false restart spike
