@@ -578,7 +578,7 @@ data class LocationUpdate(
     var jumpTier: Int 
         get() = kinetic.jumpTier
         set(value) { kinetic.jumpTier = value }
-    var isAdaptiveJump: Boolean 
+    var isAdaptiveJump: Boolean
         get() = kinetic.isAdaptiveJump
         set(value) { kinetic.isAdaptiveJump = value }
 

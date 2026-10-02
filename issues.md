@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.2.9
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.2.15
 
-## 🎯 Current Resumption Focus: Forensic Stream Optimization
-Hardening of native-offloaded sensor audits and JNI fast-path transitions.
+## 🎯 Current Resumption Focus: UI State Optimization
+Consolidation of state mappers and granular HUD data binding.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -32,8 +32,6 @@ Hardening of native-offloaded sensor audits and JNI fast-path transitions.
     *   *Significance*: **Medium (Decoupling)**. Refactor HUD components to consume slice-based interfaces instead of the full `LocationUpdate` monolith to reduce UI-to-Engine coupling.
 
 ### 🔵 Low Priority
-*   **Issue #1176: Native FastPath**
-    *   *Significance*: **Low**. Offload `HardwareFastPath` (Acoustic/Light spikes) to JNI to further reduce JVM sensor overhead on budget hardware.
 *   **Issue #1293: Lifecycle-Aware Tick Orchestrator**
     *   *Significance*: **Low (Refactoring)**. Refactor background services to use a `TickOrchestrator` that handles initialization gates and heartbeat timing internally.
 *   **Issue #1295: Redundant Stream Observer Audit**
@@ -44,6 +42,7 @@ Hardening of native-offloaded sensor audits and JNI fast-path transitions.
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1176 / SOT ID 599: Native FastPath Transitions.** Resolved Oct.2.15. Offloaded high-frequency sensor spike detection (Acoustic/Light) to JNI to reduce JVM overhead and GC pressure (R-ID 257).
 *   **Issue #1314 / SOT ID 598: TrackerStatus Convergence.** Resolved Oct.2.9. Purged redundant TrackerStatus DTO and consolidated all state into LocationUpdate monolith (R598).
 *   **Issue #1330 / SOT ID 597: Snap-to-Update Monolith.** Resolved Oct.2.8. Merged SystemEvaluationSnapshot into unified LocationUpdate DTO to eliminate bridge mapping layers (R597).
 *   **Issue #1329 / SOT ID 596: Telemetry Mapping Convergence.** Resolved Oct.2.7. Consolidated construction of update DTOs into TelemetryMapper to centralize domain orchestration logic (R-ID 596).
@@ -55,9 +54,19 @@ Hardening of native-offloaded sensor audits and JNI fast-path transitions.
 
 ---
 
+## 💡 Strategic Simplification Ideas (Ideas: 11)
+
+### 🛑 High Priority
+*   (All high-priority simplification ideas resolved).
+
+### 🟡 Medium Priority
+*   **Issue #SIMP-1510-1: Native FastPath Convergence.**
+    *   *Significance*: **Medium (Architecture)**. Now that native evaluation is stable for Acoustic/Light, expand to `SentinelValidator.isStationary` to fully remove floating-point math from the JVM hot-path.
+
+---
+
 ## 📊 Hardening Progress Dashboard
-- **Oct.2.9: [SOT Count: 255 (Rules: 112), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 13, QA: 361]**
+- **Oct.2.15: [SOT Count: 256 (Rules: 113), Open: H:0, M:0, L:0, Ideas: H:0, M:8, L:3, Testing: 15, QA: 362]**
+- **Oct.2.9: [SOT Count: 255 (Rules: 112), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 14, QA: 361]**
 - **Oct.2.8: [SOT Count: 254 (Rules: 111), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 13, QA: 360]**
-- **Oct.2.7: [SOT Count: 253 (Rules: 110), Open: H:0, M:0, L:0, Ideas: H:0, M:8, L:4, Testing: 13, QA: 359]**
-- **Oct.2.6: [SOT Count: 252 (Rules: 109), Open: H:0, M:0, L:0, Ideas: H:1, M:8, L:4, Testing: 13, QA: 358]**
 - **Oct.2.5: [SOT Count: 251 (Rules: 108), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 12, QA: 357]**

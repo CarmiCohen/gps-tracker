@@ -27,6 +27,9 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.2.15:
+ * - Issue #1176: Native FastPath. Integrated n10/n11 for JNI-based high-frequency 
+ *   sensor spike detection (Acoustic/Light) to eliminate JVM overhead (R-ID 257).
  * Oct.2.5:
  * - Issue #SIMP-1416-1: Native Sensor Pulse. Integrated n7/n8/n9 for JNI-based 
  *   high-frequency sensor auditing to eliminate JVM heap churn.
@@ -45,6 +48,10 @@ object JdHardwareManager {
     const val FLAG_INTERNET_LOSS = 0x04
     const val FLAG_RELAY_LOSS = 0x08
     const val FLAG_PEER_STALE = 0x10
+
+    // Issue #1176: FastPath Identifiers
+    const val FASTPATH_ACOUSTIC = 0
+    const val FASTPATH_LIGHT = 1
 
     private val isLibraryLoaded = AtomicBoolean(false)
     private val initializationMutex = Mutex()
@@ -229,6 +236,21 @@ object JdHardwareManager {
         if (isLibraryLoaded.get()) n9()
     }
 
+    /**
+     * updateFastPathConfig: Configures the native FastPath parameters for a specific sensor type.
+     */
+    fun updateFastPathConfig(type: Int, baseline: Double, threshold: Double, minThreshold: Double, debounceMs: Long): Int {
+        return if (isLibraryLoaded.get()) n10(type, baseline, threshold, minThreshold, debounceMs) else -1
+    }
+
+    /**
+     * evaluateFastPath: Evaluates a sensor value against the native FastPath logic.
+     * Returns true if a spike is detected.
+     */
+    fun evaluateFastPath(type: Int, value: Double, nowRt: Long, alpha: Double): Boolean {
+        return if (isLibraryLoaded.get()) n11(type, value, nowRt, alpha) != 0 else false
+    }
+
     fun isAvailable(): Boolean = isLibraryLoaded.get()
 
     @JvmStatic private external fun n1(buffer: ByteBuffer): Int
@@ -240,4 +262,6 @@ object JdHardwareManager {
     @JvmStatic private external fun n7(nowRt: Long): Int
     @JvmStatic private external fun n8(): Double
     @JvmStatic private external fun n9(): Int
+    @JvmStatic private external fun n10(type: Int, baseline: Double, threshold: Double, minThreshold: Double, debounceMs: Long): Int
+    @JvmStatic private external fun n11(type: Int, value: Double, nowRt: Long, alpha: Double): Int
 }

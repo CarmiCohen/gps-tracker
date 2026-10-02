@@ -37,6 +37,10 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.2.15:
+ * - Issue #1176: Native FastPath. Refactored HardwareFastPath to delegate to 
+ *   JdHardwareManager (n10/n11) for Acoustic/Light spike detection (R-ID 257).
+ * - Fixed typo in updateLocationStatus (DEBOBUBCE -> DEBOUNCE).
  * Oct.2.5:
  * - Issue #SIMP-1416-1: Native Sensor Pulse. Integrated JdHardwareManager.recordSensorPulse 
  *   into onSensorChanged to offload frequency tracking to JNI (R-ID 256).
@@ -44,16 +48,6 @@ import kotlin.math.*
  * - Issue #1415: Load-Aware IMU Gating (R-ID 591). Integrated cpuLoad into 
  *   processVibration and updateVibrationFloor logic to prevent baseline 
  *   corruption during saturation.
- * Sep.28.12:
- * - Issue #1360: Mismatched unregistration signatures. Remediated compilation
- *   failures by passing timeProvider to all ManagedHardware unregister calls.
- * Sep.28.2:
- * - Issue #1353: Unified Activity Context Provider. Refactored activity recognition
- *   and heuristic fallback into ActivityContextProvider, offloading HardwareSuite.
- * Sep.28.1:
- * - Issue #1205: Context-Aware Power Optimization. Fully integrated Activity 
- *   Recognition bridge via Google Play Services to supplement heuristic detection.
- *   Added SecurityException handling for runtime permission revocations.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -104,8 +98,10 @@ class HardwareSuite @Inject constructor(
 
     /**
      * HardwareFastPath: Unified structure for high-frequency sensor spike detection.
+     * Updated Oct.2.15 to support native JNI offloading.
      */
     private class HardwareFastPath(
+        val type: Int,
         var baseline: Double = -1.0,
         var spikeThreshold: Double = 0.0,
         var minThreshold: Double = -1.0,
@@ -115,9 +111,10 @@ class HardwareSuite @Inject constructor(
         fun reset() {
             baseline = -1.0; spikeThreshold = 0.0; minThreshold = -1.0
             onSpike = null; lastSpikeRt = 0L
+            JdHardwareManager.updateFastPathConfig(type, -1.0, 0.0, -1.0, 0L)
         }
 
-        fun update(baseline: Double, threshold: Double, min: Double = -1.0, preserveExistingBaseline: Boolean = false, callback: (() -> Unit)? = null) {
+        fun update(baseline: Double, threshold: Double, min: Double = -1.0, debounceMs: Long = 5000L, preserveExistingBaseline: Boolean = false, callback: (() -> Unit)? = null) {
             if (!preserveExistingBaseline || this.baseline < 0) {
                 this.baseline = baseline
             }
@@ -126,12 +123,26 @@ class HardwareSuite @Inject constructor(
             if (callback != null) {
                 this.onSpike = callback
             }
+            JdHardwareManager.updateFastPathConfig(type, this.baseline, threshold, min, debounceMs)
         }
 
         fun evaluate(currentValue: Double, nowRt: Long, isWarming: Boolean, debounceMs: Long, alpha: Double = 0.0): Boolean {
+            if (isWarming || onSpike == null) return false
+
+            // Try native fast-path first
+            if (JdHardwareManager.isAvailable()) {
+                val spike = JdHardwareManager.evaluateFastPath(type, currentValue, nowRt, alpha)
+                if (spike) {
+                    lastSpikeRt = nowRt
+                    onSpike?.invoke()
+                    return true
+                }
+                return false
+            }
+
+            // Fallback to JVM logic
             if (baseline < 0) { baseline = currentValue; return false }
             if (alpha > 0.0) baseline = (baseline * (1.0 - alpha)) + (currentValue * alpha)
-            if (isWarming || onSpike == null) return false
 
             if ((currentValue - baseline) > spikeThreshold && currentValue >= minThreshold) {
                 if (nowRt - lastSpikeRt > debounceMs) {
@@ -258,8 +269,8 @@ class HardwareSuite @Inject constructor(
     private var secPeakLux = 0.0; private var secPeakVibe = 0.0; private var secSumProxIdx = 0.0; private var secProxCount = 0
     private var secPeakTilt = 0.0; private var secPeakLift = 0.0; private var secPeakDb = 0.0; private var secSitDetected = false; private var secPeakKinetic = 0.0
     
-    private val acousticFastPath = HardwareFastPath()
-    private val lightFastPath = HardwareFastPath()
+    private val acousticFastPath = HardwareFastPath(JdHardwareManager.FASTPATH_ACOUSTIC)
+    private val lightFastPath = HardwareFastPath(JdHardwareManager.FASTPATH_LIGHT)
 
     @Volatile var lastAcousticLockoutRt = 0L; private set
     private var sessionStartRt = 0L
@@ -631,7 +642,7 @@ class HardwareSuite @Inject constructor(
         } else if (nextPending) {
             if (recoveryStartRt == 0L) recoveryStartRt = nowRt
             val recoveryDuration = nowRt - recoveryStartRt
-            if (recoveryDuration < LOCATION_RECOVERY_DEBOUNCE_MS) { if (nowRt - pendingEnterRt > 0) lastPendingDuration = nowRt - pendingEnterRt; nextReason = LocationPendingReason.NONE } 
+            if (recoveryDuration < LOCATION_RECOVERY_DEBOUNCE_MS) { if (nowRt - pendingEnterRt > 0) lastPendingDuration = nowRt - pendingEnterRt; nextReason = LocationPendingReason.NONE }
             else { 
                 nextPending = false; nextReason = LocationPendingReason.NONE; recoveryConfirmed = true; recoveryStartRt = 0L 
                 shouldEmitSuccess = true
@@ -1028,11 +1039,11 @@ class HardwareSuite @Inject constructor(
     }
     
     fun setAcousticFastPath(floor: Double, spikeThreshold: Double, minDb: Double, onSpike: (() -> Unit)? = null) { 
-        synchronized(this) { acousticFastPath.update(floor, spikeThreshold, minDb, false, onSpike) } 
+        synchronized(this) { acousticFastPath.update(floor, spikeThreshold, minDb, SPIKE_DEBOUNCE_MS, false, onSpike) } 
     }
 
     fun setLightFastPath(baseline: Double, spikeThreshold: Double, onSpike: (() -> Unit)? = null) {
-        synchronized(this) { lightFastPath.update(baseline, spikeThreshold, -1.0, true, onSpike) }
+        synchronized(this) { lightFastPath.update(baseline, spikeThreshold, -1.0, SPIKE_DEBOUNCE_MS, true, onSpike) }
     }
     
     fun setHighLoad(high: Boolean) { 

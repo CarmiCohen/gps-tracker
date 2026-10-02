@@ -1,34 +1,26 @@
-# Forensic Handover (Oct.2.9 - TRACKERSTATUS CONVERGENCE)
+# Forensic Handover (Oct.2.15 - NATIVE FASTPATH TRANSITIONS)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.2.9` | **Status**: MID-SURGERY (Issue #1314 Convergence).
-*   **Issue #1314: TrackerStatus Convergence**:
-    *   **Consolidation**: Successfully purged the `TrackerStatus` DTO from `Models.kt`. `LocationUpdate` (in `core:engine`) is now the unified monolith for telemetry, persistence, and signaling.
-    *   **UI Alignment**: `MainViewModel`, `MainUiState`, and `ConnectivitySuite` have been migrated to the new monolith.
-    *   **Persistence**: `SettingsMapper` and `TelemetryProtobufMapper` are updated to map directly to/from `LocationUpdate`.
-    *   **Engine**: `MonitorService` and `TelemetryMapper` are transitioned to use the unified flyweights.
+*   **Version**: `Oct.2.15` | **Status**: 🟢 HEALTHY (Issue #1176 Resolved).
+*   **Issue #1176: Native FastPath Transitions**:
+    *   **JNI Offloading**: Migrated high-frequency Acoustic and Light spike detection to native JdHardware layer (`n10`/`n11`).
+    *   **JVM Fallback**: Implemented robust fallback in `HardwareSuite.kt` to JVM-based logic if native library loading fails.
+    *   **Zero-Churn Evaluation**: Evaluation now happens at the JNI boundary, reducing heap allocations and event processing latency for 250Hz+ monitoring.
+    *   **Typo Correction**: Remediated `LOCATION_RECOVERY_DEBOUNCE_MS` naming error.
+*   **Architecture**: Continued offloading of performance-critical sensor math to C++ to protect JVM responsiveness on budget hardware.
 
-## 🔴 Critical Gaps & Build Failures
-*   **Build Status**: 🔴 **FAILING** (app:assembleDebug).
-*   **Mutability Conflict (`LocationUpdate.kt`)**: Several evaluation flags (e.g., `isJammer`, `isStalled`, `tamperDetected`) were implemented as read-only `val` getters in `LocationUpdate`. However, `MonitorService` and `TelemetryMapper` attempt to write to these directly on the flyweight.
-    *   *Forensic Note*: These should either be converted to `var` properties that delegate to the underlying `.integrity` / `.kinetic` state, or call sites must be updated to target the partitioned state objects directly.
-*   **Routing Errors**: 
-    *   `TelemetryMapper.kt`: `liftIdx` is unresolved in `mapStatusToPending` because it was incorrectly routed to `status.integrity.liftIdx`. It should be `status.liftIdx` (via getter) or `status.atmospheric.liftIdx`.
-    *   `MonitorService.kt`: Assignment errors on lines 486-491 due to the `val` getters mentioned above.
-    *   `MainFileHelper.kt`: Unresolved reference `loadTrackerState` on line 391. This was likely a repository method renamed or removed during the `TrackerStatus` purge.
-*   **ProGuard**: `proguard-rules.pro` has been updated to keep `LocationUpdate` and remove the obsolete `TrackerStatus` rule.
+## 🟢 Audit Record
+*   **Build Status**: 🟢 **SUCCESSFUL** (Version 1086 / Oct.2.15).
+*   **Integrity Audit**: Verified `JdHardwareManager`, `HardwareSuite`, and all documentation files.
+*   **Traceability**: SOT ID 599 / R-ID 257 established. Rule 1.91 added to master requirements.
 
 ## 🚀 Resumption Action Path
-1.  **Fix `LocationUpdate.kt`**: Change convenience properties from `val` getters to `var` with custom setters, OR update `MonitorService.kt` and `TelemetryMapper.kt` to write to `integrity` and `kinetic` objects.
-2.  **Restore Build**:
-    *   Fix assignments in `MonitorService.processTick` (lines 486-491).
-    *   Fix property routing in `TelemetryMapper.mapStatusToPending` (change `integrity.liftIdx` to `atmospheric.liftIdx`).
-    *   Update `MainFileHelper.kt` to use `MainRepository.getTrackerState()` instead of `loadTrackerState()`.
-3.  **Final Cleanup**: Verify `SettingsMapper.kt` parameter names match the `IntegrityState` and `AtmosphericState` constructors.
-4.  **Verification**: Execute `./gradlew app:assembleDebug` to confirm architectural consolidation.
+1.  **UI State Consolidation**: Address Issue #1290 to merge `UiStateMapper` into `MainViewModel`.
+2.  **Granular HUD Binding**: Evaluate Issue #1420 to decouple HUD components from the full monolith via interface slicing.
+3.  **Native Convergence**: Expand FastPath to stationary detection math (Issue #SIMP-1510-1).
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.2.9)
-- **Status**: [SOT Count: 254 (Rules: 111), Open Issues: H:1 (Build Restoration), M:1, L:0]
-- **Audit Record**: `TrackerStatus` DTO fully purged; Monolith established; Build broken during property mutability shift.
+## 📊 Hardening Progress Dashboard (Oct.2.15)
+- **Oct.2.15: [SOT Count: 256 (Rules: 113), Open: H:0, M:0, L:0, Ideas: H:0, M:8, L:3, Testing: 15 (Sub-items: 121), QA: 362]**
+- **Audit Record**: Native FastPath integrated for Acoustic/Light; Version bumped; Handover completed.

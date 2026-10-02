@@ -1,3 +1,18 @@
+# 🏛️ Resolution Archive - Oct.2.15
+
+## 🏁 Issue #1176 / SOT ID 599: Native FastPath Transitions
+*   **Resolved**: Oct.2.15
+*   **Root Cause**: High-frequency sensor spike detection (Acoustic and Light) in the JVM layer introduced significant event processing latency and GC pressure during sustained monitoring (250Hz+).
+*   **Remediations**:
+    *   **JNI Offloading**: Migrated the `HardwareFastPath` evaluation logic to native code (`n10`/`n11` in `jdHardware`).
+    *   **JVM Fallback**: Maintained a graceful fallback to JVM-based spike detection in `HardwareSuite` if the native library is unavailable.
+    *   **State Synchronization**: Implemented `updateFastPathConfig` to sync baseline, thresholds, and debounce parameters with the native layer.
+    *   **Lifecycle Integrity**: Ensured native trackers are reset during suite teardown and baseline resets.
+*   **Significance**: Low (Performance Optimization).
+*   **SOT ID**: 599
+
+---
+
 # 🏛️ Resolution Archive - Oct.2.9
 
 ## 🏁 Issue #1314 / SOT ID 598: TrackerStatus Convergence
@@ -115,8 +130,3 @@
     *   **Calibration Lock**: `Passive Zeroing` pauses during load bursts.
 *   **Significance**: High (False Positive Mitigation).
 *   **SOT ID**: 590, 591
-
----
-
-# 🏛️ Resolution Archive - Oct.1.8
-... (Historical entries preserved)
