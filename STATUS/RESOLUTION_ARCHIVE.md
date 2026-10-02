@@ -1,3 +1,17 @@
+# 🏛️ Resolution Archive - Oct.2.7
+
+## 🏁 Issue #1329 / SOT ID 596: Telemetry Mapping Convergence
+*   **Resolved**: Oct.2.7
+*   **Root Cause**: Redundant and manual field injection/mapping logic was scattered across `AppEventCoordinator`, leading to potential inconsistencies and high churn in the domain orchestration layer.
+*   **Remediations**:
+    *   **Consolidated Mapping Authority**: Introduced `TelemetryMapper.mapTickToOutputs` to handle all DTO preparation (LocationUpdate, TrackerStatus) from engine tick events.
+    *   **Centralized Injection**: Moved global alarm state injection (lastAlarmAckTs, violationStartTs) from the coordinator to the mapper.
+    *   **Orchestration Simplification**: Reduced `AppEventCoordinator.handleTickEvaluated` to a clean sequence of Map -> Persist -> Signal.
+*   **Significance**: High (Architecture).
+*   **SOT ID**: 596
+
+---
+
 # 🏛️ Resolution Archive - Oct.2.6
 
 ## 🏁 Issue #1175 / SOT ID 595: Real-time Only Path (Strategic Removal of Forensic Backfilling)

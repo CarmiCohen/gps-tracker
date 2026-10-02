@@ -6,6 +6,9 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.2.7:
+ * - Issue #1329: Consolidated construction of update DTOs (LocationUpdate, 
+ *   TrackerStatus) into mapTickToOutputs to centralize domain orchestration logic.
  * Oct.1.8:
  * - Issue #1410: Viewer Persistence. Propagated lastAlarmAckTs and violationStartTs 
  *   across all mapping paths to ensure acknowledgment synchronization and 
@@ -15,6 +18,51 @@ import timber.log.Timber
  *   the definitive state calculated by the engine tick (R-ID 548).
  */
 object TelemetryMapper {
+
+    /**
+     * mapTickToOutputs: Consolidated authority for preparing persistence and 
+     * signaling DTOs from a tick event. Centralizes field injection and 
+     * mapping convergence (Issue #1329).
+     */
+    fun mapTickToOutputs(
+        event: DomainEvent.TickEvaluated,
+        deviceId: String,
+        viewerId: String,
+        lastAlarmAckTs: Long,
+        violationStartTs: Long,
+        updateOut: LocationUpdate,
+        statusOut: TrackerStatus
+    ) {
+        val snapshot = event.snapshot
+        val proc = event.processed
+        val now = event.now
+        val nowRt = event.nowRt
+
+        // 1. Inject global alarm state into snapshots for peer propagation
+        if (event.isTrackerMode) {
+            snapshot.lastAlarmAckTs = lastAlarmAckTs
+            snapshot.violationStartTs = violationStartTs
+        }
+
+        // 2. Repository Persistence (Snap-to-Update)
+        mapSnapshotToUpdate(snapshot, proc, isMe = true, ts = now, out = updateOut)
+
+        // 3. Peer Signaling (Snap-to-Status)
+        if (event.isTrackerMode) {
+            mapSnapshotToStatus(
+                snapshot = snapshot,
+                processed = proc,
+                deviceId = deviceId,
+                viewerId = viewerId,
+                now = now,
+                nowRt = nowRt,
+                gnssDetail = event.gnssDetail,
+                isSuspiciousMode = event.isSuspiciousMode,
+                lastSitTs = event.lastSitTs,
+                out = statusOut
+            )
+        }
+    }
 
     /**
      * mapSnapshotToUpdate: Authority for converting an engine snapshot into a 

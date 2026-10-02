@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct.2.6)
+# SOT Master Requirements & Hardening Status (Oct.2.7)
 
-## 🏗️ Architectural Master Rules (109 Rules)
+## 🏗️ Architectural Master Rules (110 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -17,10 +17,12 @@
 *   **1.85 WindowManager Lifecycle Hardening (R582)**: Overlay services MUST implement full `Lifecycle` transitions (`ON_RESUME`/`ON_PAUSE`) and explicit `disposeComposition()` to prevent window leaks on budget hardware (A15). (Oct.2.3).
 *   **1.86 Native Sensor Pulse (R256)**: High-frequency sensor pulses (250Hz+) MUST be tracked in native code (JNI) to eliminate JVM heap churn and garbage collection pressure during sustained monitoring. (Oct.2.5 - Issue #SIMP-1416-1).
 *   **1.87 Real-time Only Telemetry (R1175)**: Forensic backfilling and gap-filling logic MUST be excluded from the telemetry pipeline to ensure zero-churn real-time state management and minimize heap pressure. (Oct.2.6 - Issue #1175).
+*   **1.88 Telemetry Mapping Convergence (R596)**: Domain orchestration MUST utilize consolidated mapping authorities (e.g., `TelemetryMapper.mapTickToOutputs`) to prepare persistence and signaling DTOs, ensuring atomic field injection and reducing coordinator complexity. (Oct.2.7 - Issue #1329).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 596**: Telemetry Mapping Convergence - Consolidated construction of update DTOs into TelemetryMapper to centralize domain orchestration logic. (Resolved Oct.2.7).
 *   **SOT ID 595**: Real-time Only Path - Strategically removed forensic backfilling to simplify architectural state. (Resolved Oct.2.6).
 *   **SOT ID 594**: Native Sensor Pulse - Offloaded 250Hz frequency auditing to JNI to eliminate heap churn. (Resolved Oct.2.5).
 *   **SOT ID 582**: WindowManager Hardening - Implemented full lifecycle transitions and explicit disposal. (Resolved Oct.2.3).
@@ -32,6 +34,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.217 (Orchestration Convergence Audit)**: PASSED - Verified that all telemetry DTO construction for tick events is handled by TelemetryMapper, removing manual injection from AppEventCoordinator. (Oct.2.7)
 *   **Chapter 31.216 (Telemetry Stream Audit)**: PASSED - Verified zero heap churn during simulated network gaps via removal of backfill buffers. (Oct.2.6)
 *   **Chapter 31.215 (Native Pulse Audit)**: PASSED - Verified zero heap allocation spikes during 250Hz sensor stream via JNI pulse tracker on A15. (Oct.2.5)
 *   **Chapter 31.214 (Resource Lifecycle Audit)**: PASSED - Verified zero WindowManager leaks during 1-hour sustained overlay alert on A15. (Oct.2.3)

@@ -13,18 +13,14 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Oct.2.7:
+ * - Issue #1329: Telemetry Mapping Convergence. Consolidated tick-to-DTO 
+ *   mapping into TelemetryMapper.mapTickToOutputs to centralize domain 
+ *   orchestration and remove redundant field injection logic.
  * Oct.2.5:
  * - Issue #SIMP-1416-1: Native Sensor Pulse Hardening. Remediated build 
  *   failure by adding missing branch for MemoryPressureChanged in IntegrityEvent 
  *   and fixing RevivalEvent.Success reference.
- * Oct.1.8:
- * - Issue #1410: Viewer Persistence. Injected global acknowledgment 
- *   and violation start timestamps into peer telemetry. Ensures fresh 
- *   installations inherit the correct alarm state (R-ID 575).
- * Oct.1.6:
- * - Issue #1402-B: System-Wide Alarm Overlay. Reactive observation of 
- *   activeAlarmsFlow to ensure the alarm notification (and its fullScreenIntent) 
- *   is updated whenever the alarm summary changes.
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -83,36 +79,22 @@ class AppEventCoordinator @Inject constructor(
     }
 
     private suspend fun handleTickEvaluated(event: DomainEvent.TickEvaluated, connectivitySuite: ConnectivitySuite) {
-        val proc = event.processed
-        val snapshot = event.snapshot
-        val now = event.now
-        val nowRt = event.nowRt
-        val isTrackerMode = event.isTrackerMode
+        // 1. Consolidated Mapping Convergence (Issue #1329)
+        TelemetryMapper.mapTickToOutputs(
+            event = event,
+            deviceId = configManager.deviceId,
+            viewerId = configManager.viewerId,
+            lastAlarmAckTs = repository.getLastAlarmAckTsSync(AppRole.TRACKER),
+            violationStartTs = alarmManager.getEarliestViolationTs(),
+            updateOut = updateFlyweight,
+            statusOut = statusFlyweight
+        )
 
-        // Issue #1410: Inject global alarm state into snapshots for peer propagation.
-        if (isTrackerMode) {
-            snapshot.lastAlarmAckTs = repository.getLastAlarmAckTsSync(AppRole.TRACKER)
-            snapshot.violationStartTs = alarmManager.getEarliestViolationTs()
-        }
-
-        // 1. Repository Persistence (Snap-to-Update Monolith)
-        TelemetryMapper.mapSnapshotToUpdate(snapshot, proc, isMe = true, ts = now, out = updateFlyweight)
+        // 2. Repository Persistence
         repository.updateLocation(updateFlyweight)
         
-        // 2. Peer Signaling (Issue #1314: Convergence)
-        if (isTrackerMode) {
-            TelemetryMapper.mapSnapshotToStatus(
-                snapshot = snapshot,
-                processed = proc,
-                deviceId = configManager.deviceId,
-                viewerId = configManager.viewerId,
-                now = now,
-                nowRt = nowRt,
-                gnssDetail = event.gnssDetail,
-                isSuspiciousMode = event.isSuspiciousMode,
-                lastSitTs = event.lastSitTs,
-                out = statusFlyweight
-            )
+        // 3. Peer Signaling
+        if (event.isTrackerMode) {
             connectivitySuite.updateLocalTelemetry(statusFlyweight)
             
             if (event.isPeerActive || event.serviceTickCounter < 300) {
