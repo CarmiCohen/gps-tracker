@@ -21,13 +21,13 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.2.8:
+ * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
+ *   to unified LocationUpdate DTO (R-ID 596).
  * Oct.1.8:
  * - Issue #1410: Viewer Persistence. Added global acknowledgment synchronization. 
  *   Handles "acknowledge_alarm" signals and synchronizes lastAlarmAckTs 
  *   from remote telemetry to prevent recurring alarms (R-ID 575).
- * Sep.30.70:
- * - Issue #1407: Unified Storage Authority. Updated to pass AppRole objects 
- *   to repository storage API, eliminating manual prefixing (R-ID 568).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -77,7 +77,8 @@ class ConnectivitySuite @Inject constructor(
     val isSyncing = _isSyncing.asStateFlow()
 
     // R-ID 392: Reusable flyweights for zero-allocation packet processing.
-    private val snapshotFlyweight = SystemEvaluationSnapshot()
+    // Issue #1330: snapshotFlyweight now uses unified LocationUpdate DTO.
+    private val snapshotFlyweight = LocationUpdate()
     private val updateFlyweight = LocationUpdate()
     private val statusFlyweight = TrackerStatus()
     private val pendingStatusFlyweight = TrackerStatus()
@@ -490,7 +491,7 @@ class ConnectivitySuite @Inject constructor(
                 TelemetryMapper.mapProtoToSnapshot(statusProto, now, nowRt, snapshotFlyweight)
 
                 val processed = locationProcessor.processGpsPoint(
-                    snapshot = snapshotFlyweight,
+                    update = snapshotFlyweight, // Unified DTO
                     isViewerTrail = false,
                     lastGpsTs = current.gpsTs,
                     isLocal = false
@@ -613,7 +614,7 @@ class ConnectivitySuite @Inject constructor(
                 TelemetryMapper.mapJsonToSnapshot(data, current, now, nowRt, snapshotFlyweight)
 
                 val processed = locationProcessor.processGpsPoint(
-                    snapshot = snapshotFlyweight,
+                    update = snapshotFlyweight, // Unified DTO
                     isViewerTrail = false,
                     lastGpsTs = current.gpsTs,
                     isLocal = false

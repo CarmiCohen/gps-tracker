@@ -1,3 +1,18 @@
+# 🏛️ Resolution Archive - Oct.2.8
+
+## 🏁 Issue #1330 / SOT ID 597: Snap-to-Update Monolith
+*   **Resolved**: Oct.2.8
+*   **Root Cause**: The existence of a bridge layer between `SystemEvaluationSnapshot` (engine-internal) and `LocationUpdate` (persistence/signaling) introduced redundant mapping overhead and object churn.
+*   **Remediations**:
+    *   **DTO Consolidation**: Merged all engine evaluation fields into a unified `LocationUpdate` DTO.
+    *   **Architecture Simplification**: Removed the `SystemEvaluationSnapshot` class entirely.
+    *   **Zero-Allocation Mapping**: Eliminated the `mapSnapshotToUpdate` layer, as the engine now operates directly on the persistence-ready DTO.
+    *   **Logic Refactoring**: Updated `LocationSentinel`, `LocationProcessor`, and `AppAlarmManager` to use the monolithic structure.
+*   **Significance**: Medium (Architecture).
+*   **SOT ID**: 597
+
+---
+
 # 🏛️ Resolution Archive - Oct.2.7
 
 ## 🏁 Issue #1329 / SOT ID 596: Telemetry Mapping Convergence

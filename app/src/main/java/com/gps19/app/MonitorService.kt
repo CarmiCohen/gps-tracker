@@ -24,15 +24,12 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.2.8:
+ * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
+ *   to unified LocationUpdate DTO (R-ID 596).
  * Oct.2.2:
  * - Issue #1416: Memory Pressure Mitigation (R-ID 592). Hardened performMemoryFlush 
  *   to invoke historyManager.trimMemory() during high-pressure cycles.
- *   Fixed typo in RIBBON_NOISE_SCALE_DB reference.
- * Oct.2.1:
- * - Issue #1416: Memory Pressure Mitigation (R-ID 592). Integrated reaction to 
- *   MemoryPressureChanged events, implementing aggressive GC and forensic throttling.
- * - Issue #1415: Load-Aware IMU Gating (R-ID 591). Integrated health.cpuLoad 
- *   delivery to HardwareSuite for sensor jitter compensation.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -79,9 +76,10 @@ class MonitorService : BaseMonitorService() {
     private var isManualJammerActive = false
     private var isManualStallActive = false
 
-    private val evaluationSnapshotFlyweight = SystemEvaluationSnapshot()
-    private val pointSnapshotFlyweight = SystemEvaluationSnapshot()
-    private val alarmSnapshotFlyweight = SystemEvaluationSnapshot()
+    // Issue #1330: Unified flyweights using LocationUpdate
+    private val evaluationSnapshotFlyweight = LocationUpdate()
+    private val pointSnapshotFlyweight = LocationUpdate()
+    private val alarmSnapshotFlyweight = LocationUpdate()
 
     override fun onServicePreInit() {
         runBlocking {
@@ -552,7 +550,7 @@ class MonitorService : BaseMonitorService() {
                 }
                 isMuzzled = if (isTrackerMode) isSuspiciousMode else false
             }
-            lastProcessedLocation = primaryProcessor.processGpsPoint(snapshot = pointSnapshotFlyweight, isViewerTrail = !isTrackerMode, lastGpsTs = sessionManager.lastGpsTs, isLocal = true)
+            lastProcessedLocation = primaryProcessor.processGpsPoint(update = pointSnapshotFlyweight, isViewerTrail = !isTrackerMode, lastGpsTs = sessionManager.lastGpsTs, isLocal = true)
             if (lastProcessedLocation?.isClockRegression == false) { sessionManager.lastGpsTs = loc.time }
             lastGpsBearing = loc.bearing.toDouble(); lastGpsAccuracy = loc.accuracy.toDouble()
         }
@@ -594,7 +592,7 @@ class MonitorService : BaseMonitorService() {
         triggerForensicSample()
     }
 
-    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isPeerActive: Boolean, processed: ProcessedLocation, hSnapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long, evaluationSnapshot: SystemEvaluationSnapshot) {
+    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isPeerActive: Boolean, processed: ProcessedLocation, hSnapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long, evaluationSnapshot: LocationUpdate) {
         if (isTrackerMode) {
             TelemetryMapper.mapProcessedToSnapshot(snapshot = evaluationSnapshot, processed = processed, rawGpsTs = rawGpsTs, lastValidFixRt = primaryProcessor.getLastValidFixRt(), snrSnapshot = hardwareSuite.averageSnr, out = alarmSnapshotFlyweight)
         } else {

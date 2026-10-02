@@ -6,6 +6,10 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.2.8:
+ * - Issue #1330: Snap-to-Update Monolith. Removed redundant 
+ *   SystemEvaluationSnapshot class. Updated TickEvaluated to use 
+ *   LocationUpdate as the unified DTO.
  * Oct.2.1:
  * - Issue #1417: Jitter-Resistant Connectivity (R-ID 593). Added lastRelayOnlineRt 
  *   and lastRelayOfflineRt to track connectivity state duration for hysteresis.
@@ -171,120 +175,6 @@ class EngineConnectionPoint(
 }
 
 @Serializable
-data class SystemEvaluationSnapshot(
-    val kinetic: KineticState = KineticState(),
-    val atmospheric: AtmosphericState = AtmosphericState(),
-    val integrity: IntegrityState = IntegrityState(),
-    var status: SentinelStatus = SentinelStatus.VALID,
-    var lastValidFixRt: Long = 0L,
-    var isStalled: Boolean = false,
-    var isClockRegression: Boolean = false,
-    var isJammer: Boolean = false,
-    var jumpTier: Int = 0,
-    var isAdaptiveJump: Boolean = false,
-    var tamperDetected: Boolean = false,
-    var jammerDetected: Boolean = false,
-    var isAnchorLocked: Boolean = false,
-    var suppressionNote: String? = null,
-    var trackerState: TrackerState = TrackerState.UNKNOWN,
-    var acousticLockoutRt: Long = 0L,
-    var lightSpikeRt: Long = 0L,
-    var isMuzzled: Boolean = false,
-    var providedAdaptiveFloor: Double = -1.0,
-    var nowRt: Long = 0L,
-    var nowTs: Long = 0L,
-    var snrSnapshot: Double? = null,
-    var vibeSnapshot: Double? = null,
-    var isWarming: Boolean = false,
-    var isSirenActive: Boolean = false,
-    var cpuLoad: Double = 0.0,
-    var ioWait: Double = 0.0,
-    var maxIoLatency: Long = 0L,
-    var isSilentFailure: Boolean = false,
-    var isMaliAnomaly: Boolean = false,
-    var localInternetLoss: Boolean = false,
-    var isHardwareOnline: Boolean = true,
-    var acousticMinDb: Double = -1.0,
-    var thermalHeadroom: Double = 0.0,
-    var heapAllocatedMb: Double = 0.0,
-    var activityType: ActivityType = ActivityType.UNKNOWN,
-    var lastAlarmAckTs: Long = 0L,
-    var violationStartTs: Long = 0L
-) {
-    fun copyFrom(other: SystemEvaluationSnapshot) {
-        this.kinetic.copyFrom(other.kinetic)
-        this.atmospheric.copyFrom(other.atmospheric)
-        this.integrity.copyFrom(other.integrity)
-        this.status = other.status
-        this.lastValidFixRt = other.lastValidFixRt
-        this.isStalled = other.isStalled
-        this.isClockRegression = other.isClockRegression
-        this.isJammer = other.isJammer
-        this.jumpTier = other.jumpTier
-        this.isAdaptiveJump = other.isAdaptiveJump
-        this.tamperDetected = other.tamperDetected
-        this.jammerDetected = other.jammerDetected
-        this.isAnchorLocked = other.isAnchorLocked
-        this.suppressionNote = other.suppressionNote
-        this.trackerState = other.trackerState
-        this.acousticLockoutRt = other.acousticLockoutRt
-        this.lightSpikeRt = other.lightSpikeRt
-        this.isMuzzled = other.isMuzzled
-        this.providedAdaptiveFloor = other.providedAdaptiveFloor
-        this.nowRt = other.nowRt
-        this.nowTs = other.nowTs
-        this.snrSnapshot = other.snrSnapshot
-        this.vibeSnapshot = other.vibeSnapshot
-        this.isWarming = other.isWarming
-        this.isSirenActive = other.isSirenActive
-        this.cpuLoad = other.cpuLoad
-        this.ioWait = other.ioWait
-        this.maxIoLatency = other.maxIoLatency
-        this.isSilentFailure = other.isSilentFailure
-        this.isMaliAnomaly = other.isMaliAnomaly
-        this.localInternetLoss = other.localInternetLoss
-        this.isHardwareOnline = other.isHardwareOnline
-        this.acousticMinDb = other.acousticMinDb
-        this.thermalHeadroom = other.thermalHeadroom
-        this.heapAllocatedMb = other.heapAllocatedMb
-        this.activityType = other.activityType
-        this.lastAlarmAckTs = other.lastAlarmAckTs
-        this.violationStartTs = other.violationStartTs
-    }
-
-    fun reset() {
-        kinetic.reset()
-        atmospheric.reset()
-        integrity.reset()
-        status = SentinelStatus.VALID; lastValidFixRt = 0L; isStalled = false; isClockRegression = false
-        isJammer = false; jumpTier = 0; isAdaptiveJump = false; tamperDetected = false; jammerDetected = false
-        isAnchorLocked = false; suppressionNote = null; trackerState = TrackerState.UNKNOWN
-        acousticLockoutRt = 0L; lightSpikeRt = 0L
-        isMuzzled = false; providedAdaptiveFloor = -1.0; nowRt = 0L; nowTs = 0L; snrSnapshot = null
-        vibeSnapshot = null; isWarming = false; isSirenActive = false; cpuLoad = 0.0; ioWait = 0.0
-        maxIoLatency = 0L; isSilentFailure = false; isMaliAnomaly = false; localInternetLoss = false
-        isHardwareOnline = true; acousticMinDb = -1.0; thermalHeadroom = 0.0; heapAllocatedMb = 0.0
-        activityType = ActivityType.UNKNOWN
-        lastAlarmAckTs = 0L
-        violationStartTs = 0L
-    }
-
-    fun toLocationUpdate(isMe: Boolean = true): LocationUpdate {
-        return LocationUpdate(
-            kinetic = kinetic.copy(),
-            atmospheric = atmospheric.copy(),
-            integrity = integrity.copy(),
-            status = status,
-            ts = nowTs,
-            isMe = isMe,
-            isClockRegression = isClockRegression,
-            lastValidFixRt = lastValidFixRt,
-            trackerState = trackerState
-        )
-    }
-}
-
-@Serializable
 data class AlarmServiceContext(
     val now: Long,
     val nowRt: Long,
@@ -307,7 +197,7 @@ sealed class DomainEvent {
         val now: Long,
         val nowRt: Long,
         val isTrackerMode: Boolean,
-        val snapshot: SystemEvaluationSnapshot,
+        val snapshot: LocationUpdate,
         val processed: ProcessedLocation?,
         val health: SystemHealthState,
         val isSocketConnected: Boolean,

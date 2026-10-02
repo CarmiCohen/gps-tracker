@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.2.7
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.2.8
 
 ## 🎯 Current Resumption Focus: Forensic Stream Optimization
 Hardening of native-offloaded sensor audits and JNI fast-path transitions.
@@ -10,16 +10,14 @@ Hardening of native-offloaded sensor audits and JNI fast-path transitions.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 12)
+## 💡 Strategic Simplification Ideas (Ideas: 11)
 
 ### 🛑 High Priority
 *   (All high-priority simplification ideas resolved).
 
 ### 🟡 Medium Priority
-*   **Issue #1330: Snap-to-Update Monolith**
-    *   *Significance*: **Medium (Logic)**. Since `SystemEvaluationSnapshot` carries ~95% of `LocationUpdate` fields, evaluate merging them into a single polymorphic DTO to eliminate the bridge layer.
 *   **Issue #1314: TrackerStatus & Evaluation Snapshot Convergence**
-    *   *Significance*: **Medium (Architecture)**. Evaluate if `TrackerStatus` DTO can be merged into `SystemEvaluationSnapshot` to eliminate the mapping layer in `ConnectivitySuite`.
+    *   *Significance*: **Medium (Architecture)**. Evaluate if `TrackerStatus` DTO can be merged into `LocationUpdate` to eliminate the mapping layer in `ConnectivitySuite`.
 *   **Issue #1290: UI State Mapper Consolidation**
     *   *Significance*: **Medium (Maintainability)**. Merge `UiStateMapper` logic directly into `MainViewModel` now that it is the sole activity-scoped consumer.
 *   **Issue #1172: Smart Signaling Dispatcher**
@@ -46,6 +44,7 @@ Hardening of native-offloaded sensor audits and JNI fast-path transitions.
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1330 / SOT ID 597: Snap-to-Update Monolith.** Resolved Oct.2.8. Merged SystemEvaluationSnapshot into unified LocationUpdate DTO to eliminate bridge mapping layers (R597).
 *   **Issue #1329 / SOT ID 596: Telemetry Mapping Convergence.** Resolved Oct.2.7. Consolidated construction of update DTOs into TelemetryMapper to centralize domain orchestration logic (R-ID 596).
 *   **Issue #1175 / SOT ID 595: Real-time Only Path.** Resolved Oct.2.6. Strategically removed forensic backfilling and gap-filling logic to simplify architectural state and reduce heap churn (R-ID 595).
 *   **Issue #SIMP-1416-1 / SOT ID 594: Native Sensor Pulse Audit.** Resolved Oct.2.5. Offloaded 250Hz frequency auditing to JNI to eliminate heap churn (R-ID 256).
@@ -56,8 +55,8 @@ Hardening of native-offloaded sensor audits and JNI fast-path transitions.
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.2.8: [SOT Count: 254 (Rules: 111), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 13, QA: 360]**
 - **Oct.2.7: [SOT Count: 253 (Rules: 110), Open: H:0, M:0, L:0, Ideas: H:0, M:8, L:4, Testing: 13, QA: 359]**
 - **Oct.2.6: [SOT Count: 252 (Rules: 109), Open: H:0, M:0, L:0, Ideas: H:1, M:8, L:4, Testing: 13, QA: 358]**
 - **Oct.2.5: [SOT Count: 251 (Rules: 108), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 12, QA: 357]**
 - **Oct.2.3: [SOT Count: 251 (Rules: 107), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:1, Testing: 12, QA: 356]**
-- **Oct.2.2: [SOT Count: 251 (Rules: 106), Open: H:1, M:0, L:0, Ideas: H:0, M:2, L:1, Testing: 12, QA: 355]**

@@ -1,25 +1,26 @@
-# Forensic Handover (Oct.2.7 - ORCHESTRATION CONVERGENCE)
+# Forensic Handover (Oct.2.8 - SNAP-TO-UPDATE MONOLITH)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.2.7` | **Status**: ARCHITECTURALLY CONSOLIDATED.
-*   **Telemetry Mapping Convergence (Issue #1329 / SOT ID 596)**:
-    *   **Logic**: Centralized all DTO construction for tick events into `TelemetryMapper.mapTickToOutputs`.
-    *   **Orchestration**: `AppEventCoordinator` now performs a clean Map -> Persist -> Signal sequence, delegating field injection (alarm state) to the mapper.
-    *   **Simplicity**: Removed redundant manual mapping blocks from the tick path.
-*   **Build**: Successfully verified via `assembleDebug`.
+*   **Version**: `Oct.2.8` | **Status**: ARCHITECTURALLY CONSOLIDATED.
+*   **Snap-to-Update Monolith (Issue #1330 / SOT ID 597)**:
+    *   **Consolidation**: Merged `SystemEvaluationSnapshot` into `LocationUpdate`. 
+    *   **Architecture**: Removed the bridge layer and `mapSnapshotToUpdate` logic. The engine now populates the persistence DTO directly.
+    *   **Performance**: Reduced object churn during ticks by reusing a single unified flyweight.
+*   **Tests**: All 4 major engine test suites updated and verified.
+*   **Build**: Verified via `app:assembleDebug`.
 
 ## 🔴 Open Gaps (Strategic Resumption)
-*   **Idea #1330 (M)**: Snap-to-Update Monolith. Evaluate merging `SystemEvaluationSnapshot` and `LocationUpdate`.
-*   **Idea #1314 (M)**: TrackerStatus & Evaluation Snapshot Convergence.
+*   **Issue #1314 (M)**: TrackerStatus Convergence. Evaluate merging the final signaling DTO into the monolith.
+*   **Issue #1290 (M)**: UI State Mapper Consolidation into `MainViewModel`.
 
 ## 🚀 Resumption Action Path
-1.  Deploy `Oct.2.7` to `SM-A155F`.
-2.  Execute: **Diagnostics** -> **"SIMULATE TICK BURST"**.
-3.  Monitor: `AppEventCoordinator` logs for consistent persistence and signaling without field dropouts.
-4.  Verify: Ensure `lastAlarmAckTs` and `violationStartTs` propagate correctly to peers during active alarms.
+1.  Deploy `Oct.2.8` to `SM-A155F`.
+2.  Execute: **Diagnostics** -> **"STRESS TEST"** (CPU/IO).
+3.  Verify: Monitor Logcat for `TickEvaluated` events to ensure no field regression in partitioned states (.kinetic, .integrity).
+4.  Audit: Confirm history ribbons update correctly using the unified DTO.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.2.7)
-- **Status**: [SOT Count: 253 (Rules: 110), Open: H:0, M:0, L:0, Ideas: H:0, M:8, L:4, Testing: 13, QA: 359]
-- **Audit Record**: Telemetry mapping consolidated; Coordinator complexity reduced; Version Oct.2.7 verified.
+## 📊 Hardening Progress Dashboard (Oct.2.8)
+- **Status**: [SOT Count: 254 (Rules: 111), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 13, QA: 360]
+- **Audit Record**: Engine/Persistence DTOs unified; Redundant bridge layers purged; Version Oct.2.8 verified.

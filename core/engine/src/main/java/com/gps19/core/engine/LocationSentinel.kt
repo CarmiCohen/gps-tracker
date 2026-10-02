@@ -5,18 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Oct.2.8:
+ * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
+ *   to unified LocationUpdate DTO (R-ID 596).
  * Oct.2.5:
  * - Issue #SIMP-1416-1: Native Sensor Pulse Hardening. Remediated build 
  *   failure by correctly passing cpuLoad to shouldThrottlePolling.
- * Oct.2.1:
- * - Issue #1415: Load-Aware IMU Gating (R-ID 590). Passed snapshot.cpuLoad 
- *   to SentinelValidator for vibration floor updates and tamper checks.
- * Sep.27.6:
- * - Issue #1161: Unified Trajectory & Buffer Management. Adapted to reference 
- *   TrajectoryNode during hindsight mapping.
- * Sep.27.5:
- * - Issue #1349: Mutability Reduction. Refactored references to use partitioned sub-states 
- *   with cleaned field names (e.g., state.forensic.lastValidLat).
  */
 object LocationSentinel {
 
@@ -92,52 +86,52 @@ object LocationSentinel {
         }
     }
 
-    fun updateSensorState(state: LocationProcessingState, snapshot: SystemEvaluationSnapshot): Boolean {
+    fun updateSensorState(state: LocationProcessingState, update: LocationUpdate): Boolean {
         var baselineChanged = false
         
         state.forensic.lastCompassHeading = state.forensic.currentCompassHeading
-        if (snapshot.atmospheric.vibration >= 0.0) state.forensic.currentVibrationIndex = safeDouble(snapshot.atmospheric.vibration)
-        if (snapshot.acousticLockoutRt > 0) state.forensic.lastFastPathAcousticSpikeRt = snapshot.acousticLockoutRt
-        if (snapshot.lightSpikeRt > 0) state.forensic.lastFastPathLightSpikeRt = snapshot.lightSpikeRt
-        state.kineticEnergy = safeDouble(snapshot.kinetic.kineticEnergy)
+        if (update.atmospheric.vibration >= 0.0) state.forensic.currentVibrationIndex = safeDouble(update.atmospheric.vibration)
+        if (update.acousticLockoutRt > 0) state.forensic.lastFastPathAcousticSpikeRt = update.acousticLockoutRt
+        if (update.lightSpikeRt > 0) state.forensic.lastFastPathLightSpikeRt = update.lightSpikeRt
+        state.kineticEnergy = safeDouble(update.kinetic.kineticEnergy)
         
-        if (snapshot.atmospheric.peakVibrationShock > state.forensic.peakVibrationShock && !snapshot.atmospheric.peakVibrationShock.isNaN()) {
-            state.forensic.peakVibrationShock = snapshot.atmospheric.peakVibrationShock
-            state.forensic.peakVibrationShockRt = snapshot.nowRt
+        if (update.atmospheric.peakVibrationShock > state.forensic.peakVibrationShock && !update.atmospheric.peakVibrationShock.isNaN()) {
+            state.forensic.peakVibrationShock = update.atmospheric.peakVibrationShock
+            state.forensic.peakVibrationShockRt = update.nowRt
         }
 
-        val currentTilt = safeDouble(snapshot.atmospheric.tiltDegrees)
+        val currentTilt = safeDouble(update.atmospheric.tiltDegrees)
         val tiltDelta = if (state.forensic.baselineSitTilt >= 0.0) abs(currentTilt - state.forensic.baselineSitTilt) else 0.0
-        val baroDelta = if (state.forensic.baroBaseline > -999.0) abs(safeDouble(snapshot.atmospheric.baroAlt) - state.forensic.baroBaseline) else 0.0
+        val baroDelta = if (state.forensic.baroBaseline > -999.0) abs(safeDouble(update.atmospheric.baroAlt) - state.forensic.baroBaseline) else 0.0
         
-        if (snapshot.nowRt > state.forensic.sitDetectionCooldownRt && !snapshot.isMuzzled && !snapshot.isWarming) {
+        if (update.nowRt > state.forensic.sitDetectionCooldownRt && !update.isMuzzled && !update.isWarming) {
             val isSpatialTriggered = (tiltDelta > TILT_THRESHOLD_DEGREES) || 
                                      (baroDelta > BARO_LIFT_THRESHOLD_METERS) || 
-                                     (snapshot.integrity.sitDz > BARO_LIFT_THRESHOLD_METERS)
+                                     (update.integrity.sitDz > BARO_LIFT_THRESHOLD_METERS)
             
             if (isSpatialTriggered) {
-                val hasSufficientForce = (snapshot.atmospheric.peakVibrationShock > VIBRATION_SHOCK_THRESHOLD_G) || (abs(snapshot.kinetic.verticalVelocity) > CHAIR_PLUNGE_VELOCITY_THRESHOLD)
+                val hasSufficientForce = (update.atmospheric.peakVibrationShock > VIBRATION_SHOCK_THRESHOLD_G) || (abs(update.kinetic.verticalVelocity) > CHAIR_PLUNGE_VELOCITY_THRESHOLD)
                 
                 if (hasSufficientForce) {
                     state.forensic.isSitDetected = true
-                    state.forensic.lastSitTs = snapshot.nowTs
-                    state.forensic.lastSitRt = snapshot.nowRt
-                    state.forensic.sitDetectionCooldownRt = snapshot.nowRt + SIT_DUPLICATE_GUARD_MS
+                    state.forensic.lastSitTs = update.nowTs
+                    state.forensic.lastSitRt = update.nowRt
+                    state.forensic.sitDetectionCooldownRt = update.nowRt + SIT_DUPLICATE_GUARD_MS
                     
-                    state.forensic.lastSitVz = safeDouble(snapshot.kinetic.verticalVelocity)
-                    state.forensic.lastSitVzTs = if (snapshot.integrity.sitVzTs > 0) snapshot.integrity.sitVzTs else snapshot.nowTs
-                    state.forensic.lastSitVzRt = if (snapshot.integrity.sitVzRt > 0) snapshot.integrity.sitVzRt else snapshot.nowRt
-                    state.forensic.lastSitDz = safeDouble(snapshot.integrity.sitDz)
+                    state.forensic.lastSitVz = safeDouble(update.kinetic.verticalVelocity)
+                    state.forensic.lastSitVzTs = if (update.integrity.sitVzTs > 0) update.integrity.sitVzTs else update.nowTs
+                    state.forensic.lastSitVzRt = if (update.integrity.sitVzRt > 0) update.integrity.sitVzRt else update.nowRt
+                    state.forensic.lastSitDz = safeDouble(update.integrity.sitDz)
                     state.forensic.lastSitBaro = safeDouble(baroDelta)
                     state.forensic.lastSitTilt = safeDouble(tiltDelta)
-                    state.forensic.lastSitShock = safeDouble(snapshot.atmospheric.peakVibrationShock)
+                    state.forensic.lastSitShock = safeDouble(update.atmospheric.peakVibrationShock)
                 }
             }
         }
 
-        if (isStationary(state, snapshot.cpuLoad) && !state.forensic.isSitDetected) {
-            if (state.forensic.stationaryStartRt == 0L) state.forensic.stationaryStartRt = snapshot.nowRt
-            else if (snapshot.nowRt - state.forensic.stationaryStartRt > PASSIVE_ZEROING_STATIONARY_MS) {
+        if (isStationary(state, update.cpuLoad) && !state.forensic.isSitDetected) {
+            if (state.forensic.stationaryStartRt == 0L) state.forensic.stationaryStartRt = update.nowRt
+            else if (update.nowRt - state.forensic.stationaryStartRt > PASSIVE_ZEROING_STATIONARY_MS) {
                 if (abs(state.forensic.baselineSitTilt - currentTilt) > 0.1 && !currentTilt.isNaN()) {
                     state.forensic.baselineSitTilt = currentTilt
                     baselineChanged = true
@@ -148,23 +142,23 @@ object LocationSentinel {
             state.forensic.stationaryStartRt = 0L
         }
 
-        if (snapshot.atmospheric.heading >= 0.0) state.forensic.currentCompassHeading = safeDouble(snapshot.atmospheric.heading)
-        if (snapshot.atmospheric.baroAlt > -999.0) state.forensic.currentBaroAlt = safeDouble(snapshot.atmospheric.baroAlt)
-        if (snapshot.atmospheric.lux >= 0.0) state.forensic.currentLux = safeDouble(snapshot.atmospheric.lux)
-        state.forensic.isNear = snapshot.atmospheric.isNear
-        state.forensic.isPowerTamper = snapshot.integrity.isPowerTamper
+        if (update.atmospheric.heading >= 0.0) state.forensic.currentCompassHeading = safeDouble(update.atmospheric.heading)
+        if (update.atmospheric.baroAlt > -999.0) state.forensic.currentBaroAlt = safeDouble(update.atmospheric.baroAlt)
+        if (update.atmospheric.lux >= 0.0) state.forensic.currentLux = safeDouble(update.atmospheric.lux)
+        state.forensic.isNear = update.atmospheric.isNear
+        state.forensic.isPowerTamper = update.integrity.isPowerTamper
         state.forensic.currentTiltDegrees = currentTilt
-        if (snapshot.atmospheric.acousticDb >= 0.0) state.forensic.currentAcousticDb = safeDouble(snapshot.atmospheric.acousticDb)
+        if (update.atmospheric.acousticDb >= 0.0) state.forensic.currentAcousticDb = safeDouble(update.atmospheric.acousticDb)
 
-        state.forensic.luxBaseline = SentinelValidator.updateLuxBaseline(state.forensic.luxBaseline, snapshot.atmospheric.lux, isStationary(state, snapshot.cpuLoad), snapshot.isWarming)
-        state.forensic.baroBaseline = SentinelValidator.updateBaroBaseline(state.forensic.baroBaseline, snapshot.atmospheric.baroAlt, snapshot.isWarming)
+        state.forensic.luxBaseline = SentinelValidator.updateLuxBaseline(state.forensic.luxBaseline, update.atmospheric.lux, isStationary(state, update.cpuLoad), update.isWarming)
+        state.forensic.baroBaseline = SentinelValidator.updateBaroBaseline(state.forensic.baroBaseline, update.atmospheric.baroAlt, update.isWarming)
 
-        // Using SystemEvaluationSnapshot flags
-        if (!snapshot.isSirenActive) {
-            val updateDb = if (snapshot.acousticMinDb >= 0.0) snapshot.acousticMinDb else if (snapshot.acousticMinDb == -1.0 && snapshot.atmospheric.acousticDb >= 0.0) snapshot.atmospheric.acousticDb else -1.0
-            state.forensic.acousticFloorDb = SentinelValidator.updateAcousticFloor(state.forensic.acousticFloorDb, updateDb, snapshot.isWarming)
+        // Using LocationUpdate flags
+        if (!update.isSirenActive) {
+            val updateDb = if (update.acousticMinDb >= 0.0) update.acousticMinDb else if (update.acousticMinDb == -1.0 && update.atmospheric.acousticDb >= 0.0) update.atmospheric.acousticDb else -1.0
+            state.forensic.acousticFloorDb = SentinelValidator.updateAcousticFloor(state.forensic.acousticFloorDb, updateDb, update.isWarming)
             
-            val contractionElapsedRt = snapshot.nowRt - state.forensic.lastAcousticContractionRt
+            val contractionElapsedRt = update.nowRt - state.forensic.lastAcousticContractionRt
             if (contractionElapsedRt >= 500 || state.forensic.lastAcousticContractionRt == 0L) {
                 if (state.forensic.acousticFloorDb > ACOUSTIC_FLOOR_MIN_DB && state.forensic.lastAcousticContractionRt > 0) {
                     val secondsPassed = contractionElapsedRt / 1000.0
@@ -173,14 +167,14 @@ object LocationSentinel {
                         state.forensic.acousticFloorDb = max(state.forensic.acousticFloorDb * decayFactor, ACOUSTIC_FLOOR_MIN_DB)
                     }
                 }
-                state.forensic.lastAcousticContractionRt = snapshot.nowRt
+                state.forensic.lastAcousticContractionRt = update.nowRt
             }
         }
         
-        if (snapshot.providedAdaptiveFloor >= 0.0) {
-            state.forensic.adaptiveVibrationFloor = snapshot.providedAdaptiveFloor
-        } else if (snapshot.atmospheric.vibration >= 0.0) {
-            state.forensic.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(state.forensic.adaptiveVibrationFloor, state.forensic.currentVibrationIndex, snapshot.isWarming, snapshot.cpuLoad)
+        if (update.providedAdaptiveFloor >= 0.0) {
+            state.forensic.adaptiveVibrationFloor = update.providedAdaptiveFloor
+        } else if (update.atmospheric.vibration >= 0.0) {
+            state.forensic.adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(state.forensic.adaptiveVibrationFloor, state.forensic.currentVibrationIndex, update.isWarming, update.cpuLoad)
         }
         
         return baselineChanged

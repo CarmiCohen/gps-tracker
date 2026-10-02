@@ -225,19 +225,59 @@ data class IntegrityState(
 
 /**
  * LocationUpdate: Aggregated telemetry container.
- * Refactored to data class for backward-compatible deep copy support.
+ * Oct.2.8:
+ * - Issue #1330: Snap-to-Update Monolith. Merged SystemEvaluationSnapshot 
+ *   into LocationUpdate to eliminate bridge layer. Added engine evaluation 
+ *   fields (nowRt, isMuzzled, isWarming, etc.) to support unified tick evaluation.
  */
 @Serializable
 data class LocationUpdate(
-    var kinetic: KineticState = KineticState(),
-    var atmospheric: AtmosphericState = AtmosphericState(),
-    var integrity: IntegrityState = IntegrityState(),
+    val kinetic: KineticState = KineticState(),
+    val atmospheric: AtmosphericState = AtmosphericState(),
+    val integrity: IntegrityState = IntegrityState(),
     var status: SentinelStatus = SentinelStatus.VALID,
     var ts: Long = 0L,
     var isMe: Boolean = true,
     var trackerState: TrackerState = TrackerState.UNKNOWN,
     var isClockRegression: Boolean = false,
-    var lastValidFixRt: Long = 0L
+    var lastValidFixRt: Long = 0L,
+
+    // --- Merged Engine Evaluation Fields (Issue #1330) ---
+    var nowRt: Long = 0L,
+    var nowTs: Long = 0L,
+    var isMuzzled: Boolean = false,
+    var isWarming: Boolean = false,
+    var isSirenActive: Boolean = false,
+    var isHardwareOnline: Boolean = true,
+    var localInternetLoss: Boolean = false,
+    var acousticLockoutRt: Long = 0L,
+    var lightSpikeRt: Long = 0L,
+    var providedAdaptiveFloor: Double = -1.0,
+    var acousticMinDb: Double = -1.0,
+    var lastAlarmAckTs: Long = 0L,
+    var violationStartTs: Long = 0L,
+
+    // Evaluation Scratchpad Fields (Temporary redundancy for engine logic)
+    var snrSnapshot: Double? = null,
+    var vibeSnapshot: Double? = null,
+    
+    // Engine-Direct Flags (Legacy redundancy maintained for logic safety)
+    var isStalled: Boolean = false,
+    var isJammer: Boolean = false,
+    var jumpTier: Int = 0,
+    var isAdaptiveJump: Boolean = false,
+    var tamperDetected: Boolean = false,
+    var jammerDetected: Boolean = false,
+    var isAnchorLocked: Boolean = false,
+    var suppressionNote: String? = null,
+    var cpuLoad: Double = 0.0,
+    var ioWait: Double = 0.0,
+    var maxIoLatency: Long = 0L,
+    var isSilentFailure: Boolean = false,
+    var isMaliAnomaly: Boolean = false,
+    var thermalHeadroom: Double = 0.0,
+    var heapAllocatedMb: Double = 0.0,
+    var activityType: ActivityType = ActivityType.UNKNOWN
 ) {
     fun copyFrom(other: LocationUpdate) {
         this.kinetic.copyFrom(other.kinetic)
@@ -249,6 +289,38 @@ data class LocationUpdate(
         this.trackerState = other.trackerState
         this.isClockRegression = other.isClockRegression
         this.lastValidFixRt = other.lastValidFixRt
+        
+        this.nowRt = other.nowRt
+        this.nowTs = other.nowTs
+        this.isMuzzled = other.isMuzzled
+        this.isWarming = other.isWarming
+        this.isSirenActive = other.isSirenActive
+        this.isHardwareOnline = other.isHardwareOnline
+        this.localInternetLoss = other.localInternetLoss
+        this.acousticLockoutRt = other.acousticLockoutRt
+        this.lightSpikeRt = other.lightSpikeRt
+        this.providedAdaptiveFloor = other.providedAdaptiveFloor
+        this.acousticMinDb = other.acousticMinDb
+        this.lastAlarmAckTs = other.lastAlarmAckTs
+        this.violationStartTs = other.violationStartTs
+        this.snrSnapshot = other.snrSnapshot
+        this.vibeSnapshot = other.vibeSnapshot
+        this.isStalled = other.isStalled
+        this.isJammer = other.isJammer
+        this.jumpTier = other.jumpTier
+        this.isAdaptiveJump = other.isAdaptiveJump
+        this.tamperDetected = other.tamperDetected
+        this.jammerDetected = other.jammerDetected
+        this.isAnchorLocked = other.isAnchorLocked
+        this.suppressionNote = other.suppressionNote
+        this.cpuLoad = other.cpuLoad
+        this.ioWait = other.ioWait
+        this.maxIoLatency = other.maxIoLatency
+        this.isSilentFailure = other.isSilentFailure
+        this.isMaliAnomaly = other.isMaliAnomaly
+        this.thermalHeadroom = other.thermalHeadroom
+        this.heapAllocatedMb = other.heapAllocatedMb
+        this.activityType = other.activityType
     }
 
     /**
@@ -270,5 +342,37 @@ data class LocationUpdate(
         trackerState = TrackerState.UNKNOWN
         isClockRegression = false
         lastValidFixRt = 0L
+        
+        nowRt = 0L
+        nowTs = 0L
+        isMuzzled = false
+        isWarming = false
+        isSirenActive = false
+        isHardwareOnline = true
+        localInternetLoss = false
+        acousticLockoutRt = 0L
+        lightSpikeRt = 0L
+        providedAdaptiveFloor = -1.0
+        acousticMinDb = -1.0
+        lastAlarmAckTs = 0L
+        violationStartTs = 0L
+        snrSnapshot = null
+        vibeSnapshot = null
+        isStalled = false
+        isJammer = false
+        jumpTier = 0
+        isAdaptiveJump = false
+        tamperDetected = false
+        jammerDetected = false
+        isAnchorLocked = false
+        suppressionNote = null
+        cpuLoad = 0.0
+        ioWait = 0.0
+        maxIoLatency = 0L
+        isSilentFailure = false
+        isMaliAnomaly = false
+        thermalHeadroom = 0.0
+        heapAllocatedMb = 0.0
+        activityType = ActivityType.UNKNOWN
     }
 }

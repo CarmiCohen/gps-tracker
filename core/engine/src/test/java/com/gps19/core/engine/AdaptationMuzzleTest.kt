@@ -6,8 +6,9 @@ import org.junit.Test
 
 /**
  * AdaptationMuzzleTest: Validating A15-specific polling stabilization logic.
- * Sep.26.3:
- * - Issue #1334: Updated to SystemEvaluationSnapshot API.
+ * Oct.2.8:
+ * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
+ *   to unified LocationUpdate DTO (R-ID 596).
  */
 class AdaptationMuzzleTest {
 
@@ -30,13 +31,13 @@ class AdaptationMuzzleTest {
         // 1. Establish initial fix and interval
         processor.updateExpectedInterval(timeProvider.elapsedTime, 45000L) 
 
-        val initialSnapshot = SystemEvaluationSnapshot(
+        val initialSnapshot = LocationUpdate(
             kinetic = KineticState(lat = startLat, lng = startLng, alt = 10.0, gpsTs = now, accuracy = 5.0),
             nowRt = timeProvider.elapsedTime,
             nowTs = now
         )
         processor.processGpsPoint(
-            snapshot = initialSnapshot,
+            update = initialSnapshot,
             isViewerTrail = false,
             lastGpsTs = 0L,
             isLocal = true
@@ -51,7 +52,7 @@ class AdaptationMuzzleTest {
         timeProvider.wallTime = jumpTs
         timeProvider.elapsedTime += 2000L
 
-        val jumpSnapshot = SystemEvaluationSnapshot(
+        val jumpSnapshot = LocationUpdate(
             kinetic = KineticState(lat = jumpLat, lng = startLng, alt = 10.0, gpsTs = jumpTs, accuracy = 5.0),
             nowRt = timeProvider.elapsedTime,
             nowTs = jumpTs
@@ -59,7 +60,7 @@ class AdaptationMuzzleTest {
 
         // With internal muzzle active - should be suppressed to VALID
         val resultMuzzled = processor.processGpsPoint(
-            snapshot = jumpSnapshot,
+            update = jumpSnapshot,
             isViewerTrail = false,
             lastGpsTs = now,
             isLocal = true
@@ -75,14 +76,14 @@ class AdaptationMuzzleTest {
         val nextJumpTs = jumpTs + 6000L
         timeProvider.wallTime = nextJumpTs
 
-        val expiredSnapshot = SystemEvaluationSnapshot(
+        val expiredSnapshot = LocationUpdate(
             kinetic = KineticState(lat = nextJumpLat, lng = startLng, alt = 10.0, gpsTs = nextJumpTs, accuracy = 5.0),
             nowRt = timeProvider.elapsedTime,
             nowTs = nextJumpTs
         )
 
         val resultExpired = processor.processGpsPoint(
-            snapshot = expiredSnapshot,
+            update = expiredSnapshot,
             isViewerTrail = false,
             lastGpsTs = jumpTs,
             isLocal = true

@@ -8,8 +8,9 @@ import org.junit.Test
 
 /**
  * ForensicIdentityTest: Verifying signature-based trace deduplication.
- * Sep.26.3:
- * - Issue #1334: Adapted to SystemEvaluationSnapshot API.
+ * Oct.2.8:
+ * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
+ *   to unified LocationUpdate DTO (R-ID 596).
  */
 class ForensicIdentityTest {
 
@@ -30,7 +31,7 @@ class ForensicIdentityTest {
         timeProvider.wallTime = ts
         timeProvider.elapsedTime = 10000L
 
-        val initialSnapshot = SystemEvaluationSnapshot(
+        val initialSnapshot = LocationUpdate(
             kinetic = KineticState(lat = lat, lng = lng, alt = 0.0, speed = 0.0, gpsTs = ts, accuracy = 5.0, bearing = 0.0),
             nowRt = timeProvider.elapsedTime,
             nowTs = ts
@@ -38,13 +39,13 @@ class ForensicIdentityTest {
 
         // 1. Process first point - should be saved
         processor.processGpsPoint(
-            snapshot = initialSnapshot,
+            update = initialSnapshot,
             isViewerTrail = false,
             lastGpsTs = 0L,
             isLocal = true
         )
 
-        val duplicateSnapshot = SystemEvaluationSnapshot(
+        val duplicateSnapshot = LocationUpdate(
             kinetic = KineticState(lat = lat, lng = lng, alt = 0.0, speed = 0.0, gpsTs = ts, accuracy = 5.0, bearing = 0.0),
             nowRt = timeProvider.elapsedTime,
             nowTs = ts
@@ -52,7 +53,7 @@ class ForensicIdentityTest {
 
         // 2. Process same point again after 5s - should be suppressed (within same TS)
         val result = processor.processGpsPoint(
-            snapshot = duplicateSnapshot,
+            update = duplicateSnapshot,
             isViewerTrail = false,
             lastGpsTs = ts,
             isLocal = true

@@ -7,8 +7,9 @@ import kotlin.math.*
 
 /**
  * GeofenceBatteryAuditTest: Verification of R406a Dynamic Polling vs. Geofence Integrity.
- * Sep.26.3:
- * - Issue #1334: Adapted to SystemEvaluationSnapshot and MainAlarmLogic API.
+ * Oct.2.8:
+ * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
+ *   to unified LocationUpdate DTO (R-ID 596).
  */
 class GeofenceBatteryAuditTest {
 
@@ -39,6 +40,7 @@ class GeofenceBatteryAuditTest {
             serviceStartTime = now - 60000,
             serviceStartRt = rt - 60000,
             lastAlarmAckTs = 0L,
+            violationStartTs = 0L,
             appStartTime = now - 60000,
             isRelayConnected = true,
             isTrackerConnected = true,
@@ -66,7 +68,7 @@ class GeofenceBatteryAuditTest {
             isGpsGap = false,
             trackerBaroAltEma = 0.0,
             isTrackerMode = true,
-            capabilities = HardwareCapabilities(isA15Device = true, performanceTier = PerformanceTier.STAGGERED)
+            capabilities = HardwareCapabilities(isA15Device = true, performanceTier = PerformanceTier.STANDARD)
         )
         state.health.apply {
             isHardwareOnline = true
@@ -137,41 +139,41 @@ class GeofenceBatteryAuditTest {
         val nowRt = mockTimeProvider.elapsedRealtime()
         val nowWall = mockTimeProvider.currentTimeMillis()
         
-        val snap1 = SystemEvaluationSnapshot(
+        val snap1 = LocationUpdate(
             kinetic = KineticState(lat = 10.0, lng = 10.0, alt = 0.0, speed = 0.0, accuracy = 5.0, bearing = 0.0, gpsTs = nowWall),
             nowRt = nowRt,
             nowTs = nowWall
         )
-        processor.processGpsPoint(snapshot = snap1, isViewerTrail = false, lastGpsTs = 0L, isLocal = true)
+        processor.processGpsPoint(update = snap1, isViewerTrail = false, lastGpsTs = 0L, isLocal = true)
         
-        val snapSensor1 = SystemEvaluationSnapshot(
+        val snapSensor1 = LocationUpdate(
             atmospheric = AtmosphericState(vibration = 2.0, heading = 0.0, baroAlt = 0.0),
             nowRt = nowRt + 1000,
             nowTs = nowWall + 1000
         )
         processor.updateSensorData(snapSensor1)
         
-        val snap2 = SystemEvaluationSnapshot(
+        val snap2 = LocationUpdate(
             kinetic = KineticState(lat = 10.00005, lng = 10.0, alt = 0.0, speed = 5.0, accuracy = 5.0, bearing = 0.0, gpsTs = nowWall + 2000),
             nowRt = nowRt + 2000,
             nowTs = nowWall + 2000
         )
-        val res2 = processor.processGpsPoint(snapshot = snap2, isViewerTrail = false, lastGpsTs = nowWall, isLocal = true)
+        val res2 = processor.processGpsPoint(update = snap2, isViewerTrail = false, lastGpsTs = nowWall, isLocal = true)
         assertEquals(SentinelStatus.TAMPER, res2.status)
         
-        val snapSensor2 = SystemEvaluationSnapshot(
+        val snapSensor2 = LocationUpdate(
             atmospheric = AtmosphericState(vibration = 0.05, heading = 0.0, baroAlt = 0.0),
             nowRt = nowRt + 3000,
             nowTs = nowWall + 3000
         )
         processor.updateSensorData(snapSensor2)
         
-        val snap3 = SystemEvaluationSnapshot(
+        val snap3 = LocationUpdate(
             kinetic = KineticState(lat = 10.0, lng = 10.0, alt = 0.0, speed = 0.0, accuracy = 5.0, bearing = 0.0, gpsTs = nowWall + 4000),
             nowRt = nowRt + 4000,
             nowTs = nowWall + 4000
         )
-        val res3 = processor.processGpsPoint(snapshot = snap3, isViewerTrail = false, lastGpsTs = nowWall + 2000, isLocal = true)
+        val res3 = processor.processGpsPoint(update = snap3, isViewerTrail = false, lastGpsTs = nowWall + 2000, isLocal = true)
         assertEquals(SentinelStatus.VALID, res3.status)
     }
 
@@ -183,7 +185,7 @@ class GeofenceBatteryAuditTest {
         state.distanceViolationCounter = DISTANCE_ALARM_SAMPLES_REQUIRED
         state.health.apply {
             gpsStalled = true
-            isThermalThrottling = true
+            isCoolingModeActive = true
             cpuLoad = 0.9
             ioWait = 0.5
             maxIoLatency = 1000L

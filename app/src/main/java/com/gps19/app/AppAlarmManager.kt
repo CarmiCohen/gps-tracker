@@ -13,17 +13,13 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Oct.2.8:
+ * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
+ *   to unified LocationUpdate DTO (R-ID 596).
  * Oct.1.8:
  * - Issue #1410: Viewer Persistence. Added calculation of violationStartTs 
  *   (earliest trigger) and propagation of lastAlarmAckTs to ensure 
  *   idempotent alarm evaluation across peers and re-installs (R-ID 575).
- * Oct.1.6:
- * - Issue #1409: Connectivity Logic Hardening. Removed SIGNAL_LOSS and GPS_STALL 
- *   from special types to ensure connectivity alerts are notification-only 
- *   and do not trigger sirens or Red-Screen promotion (R-ID 572).
- * - Issue #1410: Standardized Manual Silence. Updated notifySirenManualStop 
- *   to use SILENCE_TIMEOUT_MS (5m) instead of cooldown to ensure persistent 
- *   muting on user action (R-ID 575).
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -201,14 +197,14 @@ class AppAlarmManager @Inject constructor(
     }
 
     fun evaluateAlarms(
-        snapshot: SystemEvaluationSnapshot,
+        update: LocationUpdate,
         serviceContext: AlarmServiceContext
     ) {
         this.isTrackerMode = serviceContext.isTrackerMode
         this.currentRole = serviceContext.role
         val versionTag = "[${BuildConfig.VERSION_NAME}]"
         
-        syncEvaluationState(snapshot, serviceContext)
+        syncEvaluationState(update, serviceContext)
 
         val oldWasViolated = evaluationState.wasDistanceViolated
         val oldCounter = evaluationState.distanceViolationCounter
@@ -231,8 +227,8 @@ class AppAlarmManager @Inject constructor(
                     durationMs = duration,
                     isSpecial = true,
                     specialColor = FORENSIC_PINK_COLOR,
-                    lat = snapshot.kinetic.lat, lng = snapshot.kinetic.lng, accuracy = snapshot.kinetic.accuracy,
-                    maxAccuracy = snapshot.kinetic.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
+                    lat = update.kinetic.lat, lng = update.kinetic.lng, accuracy = update.kinetic.accuracy,
+                    maxAccuracy = update.kinetic.maxAccuracy, snr = update.snrSnapshot, vibe = update.vibeSnapshot
                 ))
             },
             onTrigger = { eval: AlarmEvaluationState.ActiveAlarm ->
@@ -252,8 +248,8 @@ class AppAlarmManager @Inject constructor(
                     durationMs = 0L,
                     isSpecial = isSpecial,
                     specialColor = specialColor,
-                    lat = snapshot.kinetic.lat, lng = snapshot.kinetic.lng, accuracy = snapshot.kinetic.accuracy,
-                    maxAccuracy = snapshot.kinetic.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
+                    lat = update.kinetic.lat, lng = update.kinetic.lng, accuracy = update.kinetic.accuracy,
+                    maxAccuracy = update.kinetic.maxAccuracy, snr = update.snrSnapshot, vibe = update.vibeSnapshot
                 ))
             },
             onResolve = { eval: AlarmEvaluationState.ActiveAlarm, durationMs: Long ->
@@ -268,8 +264,8 @@ class AppAlarmManager @Inject constructor(
                     durationMs = durationMs,
                     isSpecial = isSpecial,
                     specialColor = specialColor,
-                    lat = snapshot.kinetic.lat, lng = snapshot.kinetic.lng, accuracy = snapshot.kinetic.accuracy,
-                    maxAccuracy = snapshot.kinetic.maxAccuracy, snr = snapshot.snrSnapshot, vibe = snapshot.vibeSnapshot
+                    lat = update.kinetic.lat, lng = update.kinetic.lng, accuracy = update.kinetic.accuracy,
+                    maxAccuracy = update.kinetic.maxAccuracy, snr = update.snrSnapshot, vibe = update.vibeSnapshot
                 ))
             }
         )
@@ -294,10 +290,10 @@ class AppAlarmManager @Inject constructor(
     }
 
     private fun syncEvaluationState(
-        snapshot: SystemEvaluationSnapshot,
+        update: LocationUpdate,
         serviceContext: AlarmServiceContext
     ) {
-        TelemetryMapper.mapSnapshotToHealth(snapshot, evaluationState.health)
+        TelemetryMapper.mapSnapshotToHealth(update, evaluationState.health)
 
         val cachedPoints = repository.getCachedHomePoints()
         for (i in cachedPoints.indices) {
@@ -306,10 +302,10 @@ class AppAlarmManager @Inject constructor(
         }
         evaluationState.truncateHomePoints(cachedPoints.size)
 
-        // Issue #1410: Use remote acknowledgment if provided in the snapshot 
+        // Issue #1410: Use remote acknowledgment if provided in the update 
         // (carried over peer telemetry), otherwise use local authority.
-        val targetAlarmAckTs = if (snapshot.lastAlarmAckTs > 0) {
-            snapshot.lastAlarmAckTs 
+        val targetAlarmAckTs = if (update.lastAlarmAckTs > 0) {
+            update.lastAlarmAckTs 
         } else {
             repository.getLastAlarmAckTsSync(serviceContext.role)
         }
@@ -320,7 +316,7 @@ class AppAlarmManager @Inject constructor(
             serviceStartTime = serviceContext.serviceStartTs, 
             serviceStartRt = serviceContext.serviceStartRt,
             lastAlarmAckTs = targetAlarmAckTs,
-            violationStartTs = snapshot.violationStartTs,
+            violationStartTs = update.violationStartTs,
             appStartTime = serviceContext.appStartTime,
             isRelayConnected = serviceContext.isRelayConnected, 
             isTrackerConnected = serviceContext.isTrackerConnected,
@@ -329,19 +325,19 @@ class AppAlarmManager @Inject constructor(
                 serviceContext.nowRt - serviceContext.serviceStartRt < BOOTSTRAP_PHASE_MS + DISCOVERY_PHASE_MS -> DiscoveryPhase.DISCOVERING
                 else -> DiscoveryPhase.MONITORING
             },
-            trackerLat = snapshot.kinetic.lat, 
-            trackerLng = snapshot.kinetic.lng, 
-            trackerGpsAccuracy = snapshot.kinetic.accuracy,
-            maxTrackerAccuracy = snapshot.kinetic.maxAccuracy, 
-            lastGpsPacketTs = snapshot.kinetic.gpsTs, 
+            trackerLat = update.kinetic.lat, 
+            trackerLng = update.kinetic.lng, 
+            trackerGpsAccuracy = update.kinetic.accuracy,
+            maxTrackerAccuracy = update.kinetic.maxAccuracy, 
+            lastGpsPacketTs = update.kinetic.gpsTs, 
             lastGpsPacketRt = 0L, 
             trackerLastValidFixTs = 0L,
-            trackerLastValidFixRt = snapshot.lastValidFixRt,
-            trackerSpeed = snapshot.kinetic.speed, 
-            jumpTier = snapshot.jumpTier, 
-            isAdaptiveJump = snapshot.isAdaptiveJump, 
-            trackerBattery = snapshot.integrity.battery, 
-            trackerTemp = snapshot.atmospheric.temp,
+            trackerLastValidFixRt = update.lastValidFixRt,
+            trackerSpeed = update.kinetic.speed, 
+            jumpTier = update.jumpTier, 
+            isAdaptiveJump = update.isAdaptiveJump, 
+            trackerBattery = update.integrity.battery, 
+            trackerTemp = update.atmospheric.temp,
             wasDistanceViolated = evaluationState.wasDistanceViolated, 
             distanceViolationCounter = evaluationState.distanceViolationCounter,
             firstViolationTs = evaluationState.firstViolationTs, 
@@ -349,8 +345,8 @@ class AppAlarmManager @Inject constructor(
             firstViolationWasJump = evaluationState.firstViolationWasJump, 
             maxDistance = serviceContext.maxDistanceAuthority, 
             distToHomeAuthority = serviceContext.distToHomeAuthority, 
-            isGpsGap = snapshot.integrity.isLocationPending && snapshot.integrity.locationPendingReason == LocationPendingReason.GPS_GAP, 
-            trackerBaroAltEma = snapshot.atmospheric.baroAlt,
+            isGpsGap = update.integrity.isLocationPending && update.integrity.locationPendingReason == LocationPendingReason.GPS_GAP, 
+            trackerBaroAltEma = update.atmospheric.baroAlt,
             isTrackerMode = serviceContext.isTrackerMode, 
             capabilities = serviceContext.capabilities,
             vibrationSensitivity = currentSettings.vibrationSensitivity,

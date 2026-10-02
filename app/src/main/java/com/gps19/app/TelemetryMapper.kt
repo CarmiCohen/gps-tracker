@@ -6,16 +6,13 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.2.8:
+ * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
+ *   to unified LocationUpdate DTO. Removed mapSnapshotToUpdate as mapping is now 
+ *   inherent in the monolith DTO (R-ID 596).
  * Oct.2.7:
  * - Issue #1329: Consolidated construction of update DTOs (LocationUpdate, 
  *   TrackerStatus) into mapTickToOutputs to centralize domain orchestration logic.
- * Oct.1.8:
- * - Issue #1410: Viewer Persistence. Propagated lastAlarmAckTs and violationStartTs 
- *   across all mapping paths to ensure acknowledgment synchronization and 
- *   idempotent trigger evaluation (R-ID 575).
- * Sep.30.40:
- * - Issue #1386 RESOLVED: Unified TrackerState authority. Mapping now uses 
- *   the definitive state calculated by the engine tick (R-ID 548).
  */
 object TelemetryMapper {
 
@@ -33,7 +30,7 @@ object TelemetryMapper {
         updateOut: LocationUpdate,
         statusOut: TrackerStatus
     ) {
-        val snapshot = event.snapshot
+        val snapshot = event.snapshot // Now a LocationUpdate instance
         val proc = event.processed
         val now = event.now
         val nowRt = event.nowRt
@@ -45,7 +42,10 @@ object TelemetryMapper {
         }
 
         // 2. Repository Persistence (Snap-to-Update)
-        mapSnapshotToUpdate(snapshot, proc, isMe = true, ts = now, out = updateOut)
+        // With Issue #1330, the snapshot IS the update. We just sync metadata.
+        updateOut.copyFrom(snapshot)
+        updateOut.ts = now
+        updateOut.isMe = true
 
         // 3. Peer Signaling (Snap-to-Status)
         if (event.isTrackerMode) {
@@ -65,36 +65,11 @@ object TelemetryMapper {
     }
 
     /**
-     * mapSnapshotToUpdate: Authority for converting an engine snapshot into a 
-     * persistence-ready LocationUpdate.
-     */
-    fun mapSnapshotToUpdate(
-        snapshot: SystemEvaluationSnapshot,
-        processed: ProcessedLocation?,
-        isMe: Boolean,
-        ts: Long,
-        out: LocationUpdate
-    ): LocationUpdate {
-        return out.apply {
-            kinetic.copyFrom(snapshot.kinetic)
-            kinetic.activityType = snapshot.activityType
-            atmospheric.copyFrom(snapshot.atmospheric)
-            integrity.copyFrom(snapshot.integrity)
-            this.status = snapshot.status
-            this.ts = ts
-            this.isMe = isMe
-            this.trackerState = snapshot.trackerState
-            this.isClockRegression = snapshot.isClockRegression
-            this.lastValidFixRt = snapshot.lastValidFixRt
-        }
-    }
-
-    /**
-     * mapSnapshotToStatus: Authority for converting an engine snapshot and 
-     * event context into a signaling-ready TrackerStatus DTO.
+     * mapSnapshotToStatus: Authority for converting an engine update snapshot 
+     * and event context into a signaling-ready TrackerStatus DTO.
      */
     fun mapSnapshotToStatus(
-        snapshot: SystemEvaluationSnapshot,
+        snapshot: LocationUpdate,
         processed: ProcessedLocation?,
         deviceId: String,
         viewerId: String,
@@ -173,7 +148,7 @@ object TelemetryMapper {
     /**
      * mapProtoToSnapshot: Converts an incoming Proto DTO into an engine snapshot.
      */
-    fun mapProtoToSnapshot(proto: RealtimeStatus, now: Long, nowRt: Long, out: SystemEvaluationSnapshot): SystemEvaluationSnapshot {
+    fun mapProtoToSnapshot(proto: RealtimeStatus, now: Long, nowRt: Long, out: LocationUpdate): LocationUpdate {
         return out.apply {
             reset()
             kinetic.apply {
@@ -304,7 +279,7 @@ object TelemetryMapper {
     /**
      * mapJsonToSnapshot: Converts an incoming JSON payload into an engine snapshot.
      */
-    fun mapJsonToSnapshot(data: JSONObject, current: TrackerStatus, now: Long, nowRt: Long, out: SystemEvaluationSnapshot): SystemEvaluationSnapshot {
+    fun mapJsonToSnapshot(data: JSONObject, current: TrackerStatus, now: Long, nowRt: Long, out: LocationUpdate): LocationUpdate {
         val incomingGpsTs = data.optLong("gps_ts", 0L)
         val gpsAgeMs = if (data.has("gps_age_ms")) data.optLong("gps_age_ms") else (if (incomingGpsTs > 0) maxOf(0L, now - incomingGpsTs) else 0L)
         val candidateTs = if (gpsAgeMs > 0 || incomingGpsTs > 0) now - gpsAgeMs else 0L
@@ -480,7 +455,7 @@ object TelemetryMapper {
     /**
      * mapSnapshotToHealth: Synchronizes evaluation health state from engine snapshot.
      */
-    fun mapSnapshotToHealth(snapshot: SystemEvaluationSnapshot, health: SystemHealthState) {
+    fun mapSnapshotToHealth(snapshot: LocationUpdate, health: SystemHealthState) {
         health.update(
             signalLoss = snapshot.integrity.isLocationPending && snapshot.integrity.locationPendingReason == LocationPendingReason.SIGNAL_LOSS, 
             gpsStalled = snapshot.integrity.isStalled, 
@@ -534,13 +509,13 @@ object TelemetryMapper {
      * mapProcessedToSnapshot: Refines engine snapshot with local processor results.
      */
     fun mapProcessedToSnapshot(
-        snapshot: SystemEvaluationSnapshot,
+        snapshot: LocationUpdate,
         processed: ProcessedLocation,
         rawGpsTs: Long,
         lastValidFixRt: Long,
         snrSnapshot: Double?,
-        out: SystemEvaluationSnapshot
-    ): SystemEvaluationSnapshot {
+        out: LocationUpdate
+    ): LocationUpdate {
         out.copyFrom(snapshot)
         return out.apply {
             this.status = processed.status
@@ -570,10 +545,10 @@ object TelemetryMapper {
      */
     fun mapStatusToSnapshot(
         s: TrackerStatus,
-        base: SystemEvaluationSnapshot,
+        base: LocationUpdate,
         nowRt: Long,
-        out: SystemEvaluationSnapshot
-    ): SystemEvaluationSnapshot {
+        out: LocationUpdate
+    ): LocationUpdate {
         out.copyFrom(base)
         return out.apply {
             this.status = s.status

@@ -7,9 +7,9 @@ import org.junit.Test
 
 /**
  * AcousticCalibrationTest: Auditing R810-M (Acoustic Floor Recovery).
- * Sep.27.5:
- * - Issue #1349: Mutability Reduction. Updated references to follow partitioned 
- *   sub-states within LocationProcessingState.
+ * Oct.2.8:
+ * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
+ *   to unified LocationUpdate DTO (R-ID 596).
  */
 class AcousticCalibrationTest {
 
@@ -24,7 +24,7 @@ class AcousticCalibrationTest {
 
     @Test
     fun `acoustic floor initializes to minimum threshold`() {
-        val snap = SystemEvaluationSnapshot(
+        val snap = LocationUpdate(
             atmospheric = AtmosphericState(vibration = 0.0, heading = 0.0, baroAlt = 100.0, acousticDb = 40.0),
             nowRt = INITIAL_TIME,
             nowTs = INITIAL_TIME
@@ -37,7 +37,7 @@ class AcousticCalibrationTest {
     @Test
     fun `acoustic floor climbs during high decibel events`() {
         // Start at 50dB
-        val snapStart = SystemEvaluationSnapshot(
+        val snapStart = LocationUpdate(
             atmospheric = AtmosphericState(vibration = 0.0, heading = 0.0, baroAlt = 100.0, acousticDb = 50.0),
             nowRt = 1000,
             nowTs = 1000
@@ -48,7 +48,7 @@ class AcousticCalibrationTest {
         var currentTime = 1000L
         for (i in 1..10) {
             currentTime += 1000
-            val snap = SystemEvaluationSnapshot(
+            val snap = LocationUpdate(
                 atmospheric = AtmosphericState(vibration = 0.0, heading = 0.0, baroAlt = 100.0, acousticDb = 90.0),
                 nowRt = currentTime,
                 nowTs = currentTime
@@ -67,7 +67,7 @@ class AcousticCalibrationTest {
         var currentTime = 1000L
         for (i in 1..60) { // 60 seconds of 90dB
             currentTime += 1000
-            val snap = SystemEvaluationSnapshot(
+            val snap = LocationUpdate(
                 atmospheric = AtmosphericState(vibration = 0.0, heading = 0.0, baroAlt = 100.0, acousticDb = 90.0),
                 nowRt = currentTime,
                 nowTs = currentTime
@@ -82,7 +82,7 @@ class AcousticCalibrationTest {
         // We simulate a long period to see it return to MIN_FLOOR
         for (i in 1..600) { // 10 minutes of silence
             currentTime += 1000
-            val snap = SystemEvaluationSnapshot(
+            val snap = LocationUpdate(
                 atmospheric = AtmosphericState(vibration = 0.0, heading = 0.0, baroAlt = 100.0, acousticDb = 40.0),
                 nowRt = currentTime,
                 nowTs = currentTime
@@ -97,14 +97,14 @@ class AcousticCalibrationTest {
     @Test
     fun `acoustic floor contraction logic is independent of sampling updates`() {
         // Saturate
-        val snap1 = SystemEvaluationSnapshot(
+        val snap1 = LocationUpdate(
             atmospheric = AtmosphericState(vibration = 0.0, heading = 0.0, baroAlt = 100.0, acousticDb = 90.0),
             nowRt = 1000,
             nowTs = 1000
         )
         LocationSentinel.updateSensorState(state, snap1)
         
-        val snap2 = SystemEvaluationSnapshot(
+        val snap2 = LocationUpdate(
             atmospheric = AtmosphericState(vibration = 0.0, heading = 0.0, baroAlt = 100.0, acousticDb = 90.0),
             nowRt = 5000,
             nowTs = 5000
@@ -115,7 +115,7 @@ class AcousticCalibrationTest {
         
         // Pass time without updateSensorState calls (e.g. duty cycle off)
         // Then call again - contraction should have applied based on time delta
-        val snap3 = SystemEvaluationSnapshot(
+        val snap3 = LocationUpdate(
             atmospheric = AtmosphericState(vibration = 0.0, heading = 0.0, baroAlt = 100.0, acousticDb = 40.0),
             nowRt = 60000,
             nowTs = 60000
