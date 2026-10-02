@@ -388,7 +388,7 @@ object MainFileHelper {
             val logsFile = File(getPublicAppFolder(context), logsFileName)
             FileOutputStream(logsFile).use { it.write(logsJson.toString(4).toByteArray()) }
 
-            val trackerTrail = repository.loadTrackerState()?.let { repository.loadTrailStatic(isViewer = false) } ?: emptyList()
+            val trackerTrail = repository.getTrackerState()?.let { repository.loadTrailStatic(isViewer = false) } ?: emptyList()
             saveTrailDataInternal(context, trackerTrail, "trail", "tracker", deviceId, isAuto = true, timeProvider)
 
             val viewerTrail = repository.loadTrailStatic(isViewer = true)

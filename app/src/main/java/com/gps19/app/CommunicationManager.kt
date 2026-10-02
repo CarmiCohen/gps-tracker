@@ -21,6 +21,9 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Migrated to unified LocationUpdate 
+ *   monolith DTO. Simplified transmit() to use unified container.
  * Sep.30.40:
  * - Issue #1385 Peer Link Hardening: Refactored handleLocationRelayBinary 
  *   to support multi-argument payloads (routingId + data) from the relay. 
@@ -357,7 +360,7 @@ class CommunicationManager @Inject constructor(
     }
 
     @Synchronized
-    override fun transmit(status: TrackerStatus, priority: SignalingPriority, fromViewer: Boolean) {
+    override fun transmit(status: LocationUpdate, priority: SignalingPriority, fromViewer: Boolean) {
         if (isStopped || !isConnected()) return
         markTraffic()
         if (isTrackerMode && !fromViewer) {

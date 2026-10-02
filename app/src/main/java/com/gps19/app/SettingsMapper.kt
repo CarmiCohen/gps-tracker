@@ -4,11 +4,12 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsMapper: Conversion logic between DataStore Protos and Domain Models.
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Migrated from TrackerStatus 
+ *   to unified LocationUpdate monolith DTO.
  * Sep.26.0:
  * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence. Aligned Proto 
  *   mapping with partitioned TrackerStatus structure.
- * Sep.27.16:
- * - Issue #1173: Protobuf-First Persistence. Added mapping for ActiveAlarm fields.
  */
 object SettingsMapper {
 
@@ -68,7 +69,7 @@ object SettingsMapper {
             .build()
     }
 
-    fun mapTrackerStatusFromProto(s: TrackerStatusProto): TrackerStatus {
+    fun mapLocationUpdateFromProto(s: TrackerStatusProto): LocationUpdate {
         val kinetic = KineticState(
             lat = s.lat, lng = s.lng, alt = s.alt,
             speed = s.speed, accuracy = s.accuracy, maxAccuracy = s.maxAccuracy,
@@ -114,10 +115,12 @@ object SettingsMapper {
             lastSitTs = s.lastSitTs, sitVz = s.sitVz, sitDz = s.sitDz,
             sitBaro = s.sitBaro, sitTilt = s.sitTilt, sitShock = s.sitShock,
             isSitDetected = s.isSitDetected, isSitActive = s.isSitActive,
-            lastValidFixRt = s.lastValidFixRt
+            lastValidFixRt = s.lastValidFixRt,
+            isSilentFailure = s.isSilentFailure,
+            isBatteryWhitelisted = s.isBatteryWhitelisted
         )
 
-        return TrackerStatus(
+        return LocationUpdate(
             deviceId = s.deviceId,
             viewerId = s.viewerId,
             kinetic = kinetic,
@@ -128,13 +131,11 @@ object SettingsMapper {
             rt = s.rt,
             trackerState = try { if (s.trackerState.isNullOrBlank()) TrackerState.UNKNOWN else TrackerState.valueOf(s.trackerState) } catch (e: Exception) { TrackerState.UNKNOWN },
             isClockRegression = s.isClockRegression,
-            lastValidFixRt = s.lastValidFixRt,
-            isSilentFailure = s.isSilentFailure,
-            isBatteryWhitelisted = s.isBatteryWhitelisted
+            lastValidFixRt = s.lastValidFixRt
         )
     }
 
-    fun mapTrackerStatusToProto(status: TrackerStatus): TrackerStatusProto {
+    fun mapLocationUpdateToProto(status: LocationUpdate): TrackerStatusProto {
         val builder = TrackerStatusProto.newBuilder()
         TelemetryProtobufMapper.mapToPersistence(status, builder)
         return builder.build()

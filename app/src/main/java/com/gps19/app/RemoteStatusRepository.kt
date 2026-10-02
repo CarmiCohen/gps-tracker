@@ -11,6 +11,9 @@ import javax.inject.Singleton
 
 /**
  * RemoteStatusRepository: Single Source of Truth for Remote Peer Telemetry.
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Migrated from TrackerStatus 
+ *   to unified LocationUpdate monolith.
  * Sep.30.70:
  * - Issue #1407: Unified Storage Authority. Updated to pass AppRole objects 
  *   to repository storage API, eliminating manual prefixing (R-ID 568).
@@ -23,7 +26,7 @@ class RemoteStatusRepository @Inject constructor(
     private val mainRepository: MainRepository,
     private val timeProvider: TimeProvider
 ) {
-    private val _remoteStatus = MutableStateFlow(TrackerStatus())
+    private val _remoteStatus = MutableStateFlow(LocationUpdate())
     val remoteStatus = _remoteStatus.asStateFlow()
 
     private val _isTrackerConnected = MutableStateFlow(false)
@@ -43,7 +46,7 @@ class RemoteStatusRepository @Inject constructor(
 
         try {
             // R-ID 453/565: Standardized Role Identity Authority
-            mainRepository.loadTrackerState(AppRole.VIEWER_REMOTE)?.let { savedStatus ->
+            mainRepository.loadLocationUpdate(AppRole.VIEWER_REMOTE)?.let { savedStatus ->
                 _remoteStatus.value = savedStatus
             }
         } catch (e: Exception) {
@@ -51,15 +54,15 @@ class RemoteStatusRepository @Inject constructor(
         }
     }
 
-    fun updateStatus(status: TrackerStatus) {
+    fun updateStatus(status: LocationUpdate) {
         _remoteStatus.value = status
-        mainRepository.saveTrackerState(status, AppRole.VIEWER_REMOTE)
+        mainRepository.saveLocationUpdate(status, AppRole.VIEWER_REMOTE)
     }
 
-    fun updateStatusAtomic(action: (TrackerStatus) -> TrackerStatus) {
+    fun updateStatusAtomic(action: (LocationUpdate) -> LocationUpdate) {
         _remoteStatus.update { current ->
             val next = action(current)
-            mainRepository.saveTrackerState(next, AppRole.VIEWER_REMOTE)
+            mainRepository.saveLocationUpdate(next, AppRole.VIEWER_REMOTE)
             next
         }
     }
@@ -95,7 +98,7 @@ class RemoteStatusRepository @Inject constructor(
     }
 
     fun reset() {
-        _remoteStatus.value = TrackerStatus()
+        _remoteStatus.value = LocationUpdate()
         _isTrackerConnected.value = false
         _lastPeerActivityTs.value = 0L
         _peerSignal.value = 0

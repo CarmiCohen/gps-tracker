@@ -55,15 +55,15 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Migrated tracker state 
+ *   persistence to unified LocationUpdate monolith. Added saveLocationUpdate 
+ *   and loadLocationUpdate.
  * Oct.1.3:
  * - Issue #1408: Thermal & Convergence Audit. Added IS_COOLING_MODE_ACTIVE_KEY 
  *   and COOLING_ENTERED_RT_KEY to global persistence. Refactored resetRoleState 
  *   to utilize AppRole.fromKey, preventing prefix collision where "V_" (Self) 
  *   was incorrectly matching "VR_" (Remote) keys (R-ID 565).
- * Oct.1.2:
- * - Issue #1407: Unified Storage Authority. Completed implementation by purging 
- *   legacy global field fall-throughs for role-partitioned keys. The compiler 
- *   now enforces AppRole-based isolation for critical forensic and logic states (R-ID 568).
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -193,23 +193,23 @@ class SettingsRepository @Inject constructor(
         }
     }
 
-    fun saveTrackerState(status: TrackerStatus, role: AppRole? = null) {
+    fun saveLocationUpdate(status: LocationUpdate, role: AppRole? = null) {
         scope.launch {
             dataStore.mutate {
-                val proto = SettingsMapper.mapTrackerStatusToProto(status)
+                val proto = SettingsMapper.mapLocationUpdateToProto(status)
                 if (role != null) putRoleStates(role.prefix, proto) else setTrackerState(proto)
             }
         }
     }
 
-    suspend fun loadTrackerState(role: AppRole? = null): TrackerStatus? {
+    suspend fun loadLocationUpdate(role: AppRole? = null): LocationUpdate? {
         val settings = dataStore.data.first()
         if (role != null) {
             val proto = settings.roleStatesMap[role.prefix] ?: return null
-            return SettingsMapper.mapTrackerStatusFromProto(proto)
+            return SettingsMapper.mapLocationUpdateFromProto(proto)
         }
         if (!settings.hasTrackerState()) return null
-        return SettingsMapper.mapTrackerStatusFromProto(settings.trackerState)
+        return SettingsMapper.mapLocationUpdateFromProto(settings.trackerState)
     }
 
     suspend fun saveActiveAlarms(alarms: List<AlarmEvaluationState.ActiveAlarm>, role: AppRole? = null) {
@@ -252,8 +252,6 @@ class SettingsRepository @Inject constructor(
                 putRoleLongs(prefix + LAST_SIREN_STOP_RT_KEY, lastSirenStopRt)
                 putRoleLongs(prefix + LAST_GLOBAL_TRIGGER_RT_KEY, lastGlobalTriggerRt)
                 putRoleLongs(prefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, forensicReliabilityDegradationStartRt)
-            } else {
-                // R-ID 568: Fallback removed to enforce namespaced logic
             }
         }
     }

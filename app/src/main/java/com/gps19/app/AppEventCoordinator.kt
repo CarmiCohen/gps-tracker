@@ -13,14 +13,13 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Migrated statusFlyweight to 
+ *   unified LocationUpdate monolith.
  * Oct.2.7:
  * - Issue #1329: Telemetry Mapping Convergence. Consolidated tick-to-DTO 
  *   mapping into TelemetryMapper.mapTickToOutputs to centralize domain 
  *   orchestration and remove redundant field injection logic.
- * Oct.2.5:
- * - Issue #SIMP-1416-1: Native Sensor Pulse Hardening. Remediated build 
- *   failure by adding missing branch for MemoryPressureChanged in IntegrityEvent 
- *   and fixing RevivalEvent.Success reference.
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -41,8 +40,9 @@ class AppEventCoordinator @Inject constructor(
     private val peerConnectionCache = ConcurrentHashMap<String, Boolean>()
 
     // R-ID 392: Reusable flyweights for zero-allocation event handling.
+    // Issue #1314: Both flyweights now use unified LocationUpdate DTO.
     private val updateFlyweight = LocationUpdate()
-    private val statusFlyweight = TrackerStatus()
+    private val statusFlyweight = LocationUpdate()
 
     fun start(connectivitySuite: ConnectivitySuite) {
         if (isStarted) return
@@ -86,8 +86,7 @@ class AppEventCoordinator @Inject constructor(
             viewerId = configManager.viewerId,
             lastAlarmAckTs = repository.getLastAlarmAckTsSync(AppRole.TRACKER),
             violationStartTs = alarmManager.getEarliestViolationTs(),
-            updateOut = updateFlyweight,
-            statusOut = statusFlyweight
+            updateOut = updateFlyweight
         )
 
         // 2. Repository Persistence
@@ -95,10 +94,10 @@ class AppEventCoordinator @Inject constructor(
         
         // 3. Peer Signaling
         if (event.isTrackerMode) {
-            connectivitySuite.updateLocalTelemetry(statusFlyweight)
+            connectivitySuite.updateLocalTelemetry(updateFlyweight)
             
             if (event.isPeerActive || event.serviceTickCounter < 300) {
-                connectivitySuite.sendTelemetry(statusFlyweight)
+                connectivitySuite.sendTelemetry(updateFlyweight)
             }
         }
 
@@ -219,7 +218,7 @@ class AppEventCoordinator @Inject constructor(
                 repository.saveDoubleDebounced(role, TRACKER_LUX_BASELINE_KEY, event.baseline)
             }
             is ProcessorEvent.AcousticFloorChanged -> {
-                repository.saveDoubleDebounced(role, TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
+                repository.saveDoubleDebounced(role, TRACKER_LUX_BASELINE_KEY, event.floor)
             }
             is ProcessorEvent.GpsStallDetected -> {
                 if (!isTrackerMode && isPrimary) logManager.logServiceEvent(m = "GPS STALL: Fix unchanged for >1s", isImportant = false)

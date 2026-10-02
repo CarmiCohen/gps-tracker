@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct.2.8)
+# SOT Master Requirements & Hardening Status (Oct.2.9)
 
-## 🏗️ Architectural Master Rules (111 Rules)
+## 🏗️ Architectural Master Rules (112 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -19,10 +19,12 @@
 *   **1.87 Real-time Only Telemetry (R1175)**: Forensic backfilling and gap-filling logic MUST be excluded from the telemetry pipeline to ensure zero-churn real-time state management and minimize heap pressure. (Oct.2.6 - Issue #1175).
 *   **1.88 Telemetry Mapping Convergence (R596)**: Domain orchestration MUST utilize consolidated mapping authorities (e.g., `TelemetryMapper.mapTickToOutputs`) to prepare persistence and signaling DTOs, ensuring atomic field injection and reducing coordinator complexity. (Oct.2.7 - Issue #1329).
 *   **1.89 Snap-to-Update Monolith (R597)**: The system MUST utilize a unified `LocationUpdate` DTO for both engine evaluation and telemetry persistence. Redundant bridge layers (e.g. SystemEvaluationSnapshot) MUST be merged to eliminate mapping overhead and object churn. (Oct.2.8 - Issue #1330).
+*   **1.90 TrackerStatus Convergence (R598)**: The system MUST maintain a single telemetry source of truth by merging the `TrackerStatus` DTO into the `LocationUpdate` monolith. All domain, signaling, and persistence layers MUST operate on the unified monolith to ensure architectural consistency and zero-allocation parity. (Oct.2.9 - Issue #1314).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 598**: TrackerStatus Convergence - Purged redundant TrackerStatus DTO and consolidated all state into LocationUpdate monolith. (Resolved Oct.2.9).
 *   **SOT ID 597**: Snap-to-Update Monolith - Merged SystemEvaluationSnapshot into LocationUpdate to eliminate bridge mapping layers. (Resolved Oct.2.8).
 *   **SOT ID 596**: Telemetry Mapping Convergence - Consolidated construction of update DTOs into TelemetryMapper to centralize domain orchestration logic. (Resolved Oct.2.7).
 *   **SOT ID 595**: Real-time Only Path - Strategically removed forensic backfilling to simplify architectural state. (Resolved Oct.2.6).
@@ -36,6 +38,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.219 (TrackerStatus Purge Audit)**: PASSED - Verified complete removal of TrackerStatus DTO and successful migration to LocationUpdate monolith across UI, engine, and persistence. (Oct.2.9)
 *   **Chapter 31.218 (Monolith DTO Audit)**: PASSED - Verified removal of SystemEvaluationSnapshot and unification into LocationUpdate across all engine and signaling modules. (Oct.2.8)
 *   **Chapter 31.217 (Orchestration Convergence Audit)**: PASSED - Verified that all telemetry DTO construction for tick events is handled by TelemetryMapper, removing manual injection from AppEventCoordinator. (Oct.2.7)
 *   **Chapter 31.216 (Telemetry Stream Audit)**: PASSED - Verified zero heap churn during simulated network gaps via removal of backfill buffers. (Oct.2.6)

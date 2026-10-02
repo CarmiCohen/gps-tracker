@@ -9,6 +9,9 @@ import javax.inject.Inject
 
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Migrated InitialSettings to use 
+ *   unified LocationUpdate monolith.
  * Oct.1.3:
  * - Issue #1408: Telemetry Convergence. Updated loadAllSettings to utilize 
  *   AppRole.VIEWER_REMOTE for alarm acknowledgment state when in Viewer mode, 
@@ -114,7 +117,7 @@ class SettingsUseCase @Inject constructor(
             )
         }
 
-        val trackerStatus = if (s.hasTrackerState()) SettingsMapper.mapTrackerStatusFromProto(s.trackerState) else null
+        val trackerStatus = if (s.hasTrackerState()) SettingsMapper.mapLocationUpdateFromProto(s.trackerState) else null
 
         InitialSettings(
             deviceId = dId, viewerId = vId, relayUrl = rUrl, maxDistance = maxDist,
@@ -189,6 +192,6 @@ data class InitialSettings(
     val homePoints: List<org.osmdroid.util.GeoPoint>, val alertSettings: AlertSettings,
     val appMode: String?, val selectedSirenType: String, val lastAlarmAckTs: Long,
     val maxTemp: Double, val appStartTime: Long, val draftSettings: DraftSettings?,
-    val trackerStatus: TrackerStatus?, val identitySanitized: Boolean = false,
+    val trackerStatus: LocationUpdate?, val identitySanitized: Boolean = false,
     val isSystemActive: Boolean = false
 )

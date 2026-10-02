@@ -1,3 +1,19 @@
+# 🏛️ Resolution Archive - Oct.2.9
+
+## 🏁 Issue #1314 / SOT ID 598: TrackerStatus Convergence
+*   **Resolved**: Oct.2.9
+*   **Root Cause**: Redundant telemetry DTOs (`TrackerStatus` and `LocationUpdate`) created mapping overhead, synchronization risks, and increased memory pressure due to constant object allocation in the hot-path.
+*   **Remediations**:
+    *   **Monolith Consolidation**: Merged all `TrackerStatus` fields into the `LocationUpdate` monolith in `core:engine`.
+    *   **Mutability Restoration**: Implemented `var` convenience properties in `LocationUpdate` with custom setters delegating to partitioned internal state objects (`KineticState`, `AtmosphericState`, `IntegrityState`).
+    *   **DTO Purge**: Completely removed the `TrackerStatus` class from `Models.kt`.
+    *   **Mapping Alignment**: Updated `TelemetryMapper`, `MonitorService`, `ConnectivitySuite`, and `SettingsMapper` to consume the unified monolith.
+    *   **Persistence Hardening**: Aligned `TelemetryProtobufMapper` with the new structure to ensure atomic persistence of the unified state.
+*   **Significance**: High (Architecture/Performance).
+*   **SOT ID**: 598
+
+---
+
 # 🏛️ Resolution Archive - Oct.2.8
 
 ## 🏁 Issue #1330 / SOT ID 597: Snap-to-Update Monolith

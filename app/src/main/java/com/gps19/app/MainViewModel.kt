@@ -21,6 +21,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Updated remoteStatus collection 
+ *   to use unified telemetry mapping logic. Removed legacy status mapping calls.
  * Oct.1.8:
  * - Issue #1414: Local State Routing. Updated localLocation collection to 
  *   populate _trackerState when in Tracker mode. Ensures the local dashboard 
@@ -386,6 +389,9 @@ class MainViewModel @Inject constructor(
 
             launch {
                 remoteStatusRepository.remoteStatus.collect { status ->
+                    val nowMs = timeProvider.currentTimeMillis()
+                    val appStartTime = _uiState.value.session.appStartTime
+
                     _remoteSignal.value = remoteStatusRepository.peerSignal.value
                     
                     // Only update from remote if we are NOT the primary tracker.
@@ -395,8 +401,8 @@ class MainViewModel @Inject constructor(
                     
                     _trackerMaxTemp.value = status.maxTemp
                     updateKinematicState { current ->
-                        telemetryUseCase.mapTrackerLocationFromStatus(status, current.trackerLocation)
-                        telemetryUseCase.mapHealthFromStatus(status, current.trackerHealth)
+                        telemetryUseCase.mapTrackerLocation(status, current.trackerLocation, nowMs, appStartTime)
+                        telemetryUseCase.mapHealthFromUpdate(status, current.trackerHealth)
                         current.apply { pulse = timeProvider.elapsedRealtime() }
                     }
                     updateDiagnosticState { current ->

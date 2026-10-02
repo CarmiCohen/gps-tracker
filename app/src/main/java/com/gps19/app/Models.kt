@@ -10,13 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * Oct.1.8:
- * - Issue #1410: Viewer Persistence. Added lastAlarmAckTs and violationStartTs 
- *   to TrackerStatus to ensure alarm acknowledgment state is synchronized 
- *   across peers and persisted through re-installs (R-ID 575).
- * Sep.27.18:
- * - Issue #1205: Context-Aware Power Optimization. Added activityType to 
- *   ConnectionPoint and TrackerStatus for full-stack context awareness.
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Removed TrackerStatus DTO 
+ *   as it has been merged into the LocationUpdate monolith in core:engine.
  */
 
 @Serializable
@@ -339,225 +335,6 @@ data class LogEntry(
     }
 }
 
-@Serializable
-data class TrackerStatus(
-    var deviceId: String = "",
-    var viewerId: String = "",
-    val kinetic: KineticState = KineticState(),
-    val atmospheric: AtmosphericState = AtmosphericState(),
-    val integrity: IntegrityState = IntegrityState(),
-    var status: SentinelStatus = SentinelStatus.VALID,
-    override var ts: Long = 0L,
-    override var rt: Long = 0L,
-    var trackerState: TrackerState = TrackerState.UNKNOWN,
-    var isClockRegression: Boolean = false,
-    var lastValidFixRt: Long = 0L,
-    var isSilentFailure: Boolean = false,
-    var isBatteryWhitelisted: Boolean = false,
-    var lastAlarmAckTs: Long = 0L,
-    var violationStartTs: Long = 0L
-) : SpatialAnchor {
-
-    override val lat: Double get() = kinetic.lat
-    override val lng: Double get() = kinetic.lng
-    override val alt: Double get() = kinetic.alt
-    override val gpsTs: Long get() = kinetic.gpsTs
-
-    val speed: Double get() = kinetic.speed
-    val bearing: Double get() = kinetic.bearing
-    val accuracy: Double get() = kinetic.accuracy
-    val maxAccuracy: Double get() = kinetic.maxAccuracy
-    val activityType: ActivityType get() = kinetic.activityType
-
-    val uptimeMs: Long get() = integrity.uptimeMs
-    val lastConnTs: Long get() = integrity.lastConnTs
-    val lastDiscTs: Long get() = integrity.lastDiscTs
-    val totalDropMs: Long get() = integrity.totalDropMs
-    val maxDropMs: Long get() = integrity.maxDropMs
-    val maxDropTs: Long get() = integrity.maxDropTs
-    val totalConnectedMs: Long get() = integrity.totalConnectedMs
-    val sessionConnectedMs: Long get() = integrity.sessionConnectedMs
-
-    val battery: Int get() = integrity.battery
-    val temp: Double get() = atmospheric.temp
-    val maxTemp: Double get() = atmospheric.maxTemp
-    val isCharging: Boolean get() = integrity.isCharging
-    val currentMa: Int get() = integrity.currentMa
-    val satsView: Int get() = integrity.satsView
-    val satsUsed: Int get() = integrity.satsUsed
-
-    val peakVibrationShock: Double get() = atmospheric.peakVibrationShock
-    val peakVibrationShockTs: Long get() = atmospheric.peakVibrationShockTs
-    val isPowerTamper: Boolean get() = integrity.isPowerTamper
-    val violationUptimeMs: Long get() = integrity.violationUptimeMs
-    val violationPercentage: Double get() = integrity.violationPercentage
-
-    val isJammer: Boolean get() = integrity.isJammer
-    val isStalled: Boolean get() = integrity.isStalled
-    val isTamperDetected: Boolean get() = integrity.isTamperDetected
-    val vibration: Double get() = atmospheric.vibration
-    val heading: Double get() = atmospheric.heading
-    val tiltDegrees: Double get() = atmospheric.tiltDegrees
-    val acousticDb: Double get() = atmospheric.acousticDb
-    val baroAlt: Double get() = atmospheric.baroAlt
-    val lux: Double get() = atmospheric.lux
-    val isNear: Boolean get() = atmospheric.isNear
-    val luxBaseline: Double get() = atmospheric.luxBaseline
-    val acousticFloorDb: Double get() = atmospheric.acousticFloorDb
-    val adaptiveVibrationFloor: Double get() = atmospheric.adaptiveVibrationFloor
-    val proxIdx: Double get() = atmospheric.proxIdx
-    val proximityCm: Double get() = atmospheric.proximityCm
-    val proximityDebounceMs: Long get() = atmospheric.proximityDebounceMs
-    val vibrationRollingSum: Double get() = atmospheric.vibrationRollingSum
-
-    val jumpTier: Int get() = kinetic.jumpTier
-    val isLocationPending: Boolean get() = integrity.isLocationPending
-    val locationPendingReason: LocationPendingReason get() = integrity.locationPendingReason
-
-    val isPowerSaveMode: Boolean get() = integrity.isPowerSaveMode
-    val standbyBucket: Int get() = integrity.standbyBucket
-    val netInterface: String get() = integrity.netInterface
-    val isStorageLow: Boolean get() = integrity.isStorageLow
-    val isStorageCritical: Boolean get() = integrity.isStorageCritical
-    val gnssDetail: GnssDetail? get() = integrity.gnssDetail
-    val isBatterySteepDischarge: Boolean get() = integrity.isBatterySteepDischarge
-    val isCoolingModeActive: Boolean get() = integrity.isCoolingModeActive
-
-    val snrIdx: Double get() = integrity.snrIdx
-    val noiseIdx: Double get() = atmospheric.noiseIdx
-    val luxIdx: Double get() = atmospheric.luxIdx
-    val vibeIdx: Double get() = atmospheric.vibeIdx
-    val liftIdx: Double get() = atmospheric.liftIdx
-    val isAnchorLocked: Boolean get() = integrity.isAnchorLocked
-
-    val isSitDetected: Boolean get() = integrity.isSitDetected
-    val isSitActive: Boolean get() = integrity.isSitActive
-    val lastSitTs: Long get() = integrity.lastSitTs
-    val verticalVelocity: Double get() = kinetic.verticalVelocity
-    val sitVz: Double get() = integrity.sitVz
-    val sitVzTs: Long get() = integrity.sitVzTs
-    val sitVzRt: Long get() = integrity.sitVzRt
-    val sitDz: Double get() = integrity.sitDz
-    val sitBaro: Double get() = integrity.sitBaro
-    val sitTilt: Double get() = integrity.sitTilt
-    val sitShock: Double get() = integrity.sitShock
-    val isJump: Boolean get() = kinetic.isJump
-    val isTrajectoryPromoted: Boolean get() = kinetic.isTrajectoryPromoted
-    val isSuspicious: Boolean get() = integrity.isSuspicious
-    val tiltIdx: Double get() = atmospheric.tiltIdx
-    val baroIdx: Double get() = atmospheric.baroIdx
-    val micPending: Boolean get() = integrity.micPending
-    val kineticEnergy: Double get() = kinetic.kineticEnergy
-    val isAdaptiveJump: Boolean get() = kinetic.isAdaptiveJump
-    val isBatteryLow: Boolean get() = integrity.isBatteryLow
-    val isBatteryCritical: Boolean get() = integrity.isBatteryCritical
-    val isUltraLongStationary: Boolean get() = integrity.isUltraLongStationary
-    val currentProximityCm: Double get() = atmospheric.proximityCm
-    val gpsHardwareLock: Boolean get() = integrity.gpsHardwareLock
-    val isGnssThrottled: Boolean get() = integrity.isGnssThrottled
-
-    val lastEnergyDeltaMa: Int get() = integrity.lastEnergyDeltaMa
-    val lastEnergyDeltaTemp: Double get() = integrity.lastEnergyDeltaTemp
-    val lastEnergyDurationMs: Long get() = integrity.lastEnergyDurationMs
-    val tamperNote: String? get() = integrity.tamperNote
-    
-    val thermalHeadroom: Double get() = integrity.thermalHeadroom
-    val heapAllocatedMb: Double get() = integrity.heapAllocatedMb
-
-    /**
-     * copyFrom: Deep mutable copy to this instance from another (R-ID 392).
-     */
-    fun copyFrom(other: TrackerStatus) {
-        this.deviceId = other.deviceId; this.viewerId = other.viewerId
-        this.kinetic.copyFrom(other.kinetic)
-        this.atmospheric.copyFrom(other.atmospheric)
-        this.integrity.copyFrom(other.integrity)
-        this.status = other.status; this.ts = other.ts; this.rt = other.rt
-        this.trackerState = other.trackerState; this.isClockRegression = other.isClockRegression
-        this.lastValidFixRt = other.lastValidFixRt; this.isSilentFailure = other.isSilentFailure
-        this.isBatteryWhitelisted = other.isBatteryWhitelisted
-        this.lastAlarmAckTs = other.lastAlarmAckTs
-        this.violationStartTs = other.violationStartTs
-    }
-
-    /**
-     * reset: Reverts the instance to default state for reuse (R-ID 392).
-     */
-    fun reset() {
-        deviceId = ""; viewerId = ""; status = SentinelStatus.VALID; ts = 0L; rt = 0L
-        trackerState = TrackerState.UNKNOWN; isClockRegression = false; lastValidFixRt = 0L
-        isSilentFailure = false; isBatteryWhitelisted = false; lastAlarmAckTs = 0L; violationStartTs = 0L
-        kinetic.reset()
-        atmospheric.reset()
-        integrity.reset()
-    }
-
-    fun toMap(fromViewer: Boolean): Map<String, Any?> = mutableMapOf<String, Any?>().apply {
-        put("id", SignalingConstants.getTransmissionId(deviceId)); put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
-        put("from_viewer", fromViewer); put("lat", lat); put("lng", lng); put("alt", alt)
-        put("speed", speed); put("bearing", bearing); put("accuracy", accuracy); put("max_accuracy", maxAccuracy)
-        put("gps_ts", gpsTs); put("ts", ts); put("rt", rt); put("uptime_ms", uptimeMs)
-        put("last_conn_ts", lastConnTs); put("last_disc_ts", lastDiscTs)
-        put("total_drop_ms", totalDropMs); put("max_drop_ms", maxDropMs); put("max_drop_ts", maxDropTs)
-        put("total_connected_ms", totalConnectedMs); put("session_connected_ms", sessionConnectedMs); put("battery", battery)
-        put("temp", temp); put("max_temp", maxTemp); put("is_charging", isCharging); put("current_ma", this@TrackerStatus.currentMa)
-        put("sats_view", satsView); put("sats_view", satsView); put("sats_used", satsUsed); put("peak_vibration_shock", peakVibrationShock)
-        put("peak_shock_ts", peakVibrationShockTs); put("is_power_tamper", isPowerTamper)
-        put("violation_uptime_ms", violationUptimeMs); put("violation_percentage", violationPercentage)
-        put("status", status.name); put("is_jammer", isJammer); put("is_stalled", isStalled)
-        put("is_tamper_detected", isTamperDetected); put("vibration", vibration); put("heading", heading); put("tilt_degrees", tiltDegrees)
-        put("acoustic_db", acousticDb); put("baro_alt", baroAlt); put("lux", lux); put("is_near", isNear)
-        put("lux_baseline", luxBaseline); put("acoustic_floor_db", acousticFloorDb); put("adaptiveVibrationFloor", adaptiveVibrationFloor)
-        put("prox_idx", proxIdx); put("proximity_cm", proximityCm); put("proximity_debounce_ms", proximityDebounceMs)
-        put("vibration_rolling_sum", this@TrackerStatus.vibrationRollingSum); put("is_clock_regression", isClockRegression)
-        put("jump_tier", jumpTier); put("is_location_pending", isLocationPending); put("location_pending_reason", locationPendingReason.name)
-        put("last_valid_fix_rt", lastValidFixRt); put("is_power_save_mode", isPowerSaveMode)
-        put("standby_bucket", standbyBucket)
-
-        // R779: Forensic scrubbing of technical network metadata before transmission.
-        put("net_interface", ForensicSanitizer.scrubHardwareInfo(netInterface))
-
-        put("is_storage_low", isStorageLow); put("is_storage_critical", isStorageCritical)
-        put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_mode_active", isCoolingModeActive)
-        put("tracker_state", trackerState.name); put("is_sit_detected", isSitDetected); put("last_sit_ts", lastSitTs)
-        put("is_jump", isJump); put("mic_pending", micPending); put("snr_idx", snrIdx); put("noise_idx", noiseIdx)
-        put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("lift_idx", liftIdx)
-        put("tilt_idx", tiltIdx); put("baro_idx", baroIdx); put("is_sit_active", isSitActive)
-        put("sit_vz", sitVz); put("sit_vz_ts", sitVzTs); put("sit_vz_rt", sitVzRt)
-        put("sit_dz", sitDz); put("sit_baro", sitBaro); put("sit_tilt", sitTilt); put("sit_shock", sitShock)
-        put("vertical_velocity", verticalVelocity); put("kinetic_energy", kineticEnergy)
-        put("is_adaptive_jump", isAdaptiveJump); put("is_battery_low", isBatteryLow)
-        put("is_battery_critical", isBatteryCritical); put("is_silent_failure", isSilentFailure)
-        put("is_battery_whitelisted", isBatteryWhitelisted)
-        put("is_ultra_long_stationary", isUltraLongStationary)
-        put("gps_hardware_lock", gpsHardwareLock); put("is_gnss_throttled", isGnssThrottled)
-        put("activity_type", activityType.name)
-        
-        // R-ID 259: Energy Footprint mapping for serialization
-        put("last_energy_delta_ma", lastEnergyDeltaMa)
-        put("last_energy_delta_temp", lastEnergyDeltaTemp)
-        put("last_energy_duration_ms", lastEnergyDurationMs)
-        put("tamper_note", tamperNote)
-        
-        // Issue #1344: Forensic probes
-        put("thermal_headroom", thermalHeadroom)
-        put("heap_allocated_mb", heapAllocatedMb)
-
-        // Issue #1410: Viewer Persistence synchronization
-        put("last_alarm_ack_ts", lastAlarmAckTs)
-        put("violation_start_ts", violationStartTs)
-    }
-
-    companion object {
-        fun mapProtoToPendingReason(proto: String): LocationPendingReason {
-            return try { LocationPendingReason.valueOf(proto) } catch (e: Exception) { LocationPendingReason.NONE }
-        }
-        fun mapProtoToTrackerState(proto: String): TrackerState {
-            return try { TrackerState.valueOf(proto) } catch (e: Exception) { TrackerState.UNKNOWN }
-        }
-    }
-}
-
 /**
  * Dashboard Component States: Segmented for performance.
  */
@@ -647,15 +424,15 @@ data class DashboardHealthState(
     val cpuLoad: Double = 0.0,
     val ioWait: Double = 0.0,
     val maxIoLatency: Long = 0L,
-    val isSilentFailure: Boolean = false,
-    val isMaliAnomaly: Boolean = false,
-    val isGnssThrottled: Boolean = false,
-    val lastEnergyDeltaMa: Int = 0,
-    val lastEnergyDeltaTemp: Double = 0.0,
-    val lastEnergyDurationMs: Long = 0L,
-    val systemPulse: Long = 0L,
-    val thermalHeadroom: Double = 0.0,
-    val heapAllocatedMb: Double = 0.0
+    var isSilentFailure: Boolean = false,
+    var isMaliAnomaly: Boolean = false,
+    var isGnssThrottled: Boolean = false,
+    var lastEnergyDeltaMa: Int = 0,
+    var lastEnergyDeltaTemp: Double = 0.0,
+    var lastEnergyDurationMs: Long = 0L,
+    var systemPulse: Long = 0L,
+    var thermalHeadroom: Double = 0.0,
+    var heapAllocatedMb: Double = 0.0
 )
 
 /**

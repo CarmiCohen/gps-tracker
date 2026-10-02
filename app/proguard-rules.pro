@@ -27,7 +27,6 @@
 
 # --- Models & Telemetry (Reflection/JSON) ---
 # Ensuring telemetry and UI state models are not obfuscated to prevent serialization failures.
--keep class com.gps19.app.TrackerStatus { *; }
 -keep class com.gps19.core.engine.LocationUpdate { *; }
 -keep class com.gps19.app.LogEntry { *; }
 -keep class com.gps19.app.ConnectionPoint { *; }

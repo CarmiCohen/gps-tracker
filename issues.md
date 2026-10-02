@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.2.8
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.2.9
 
 ## 🎯 Current Resumption Focus: Forensic Stream Optimization
 Hardening of native-offloaded sensor audits and JNI fast-path transitions.
@@ -16,8 +16,6 @@ Hardening of native-offloaded sensor audits and JNI fast-path transitions.
 *   (All high-priority simplification ideas resolved).
 
 ### 🟡 Medium Priority
-*   **Issue #1314: TrackerStatus & Evaluation Snapshot Convergence**
-    *   *Significance*: **Medium (Architecture)**. Evaluate if `TrackerStatus` DTO can be merged into `LocationUpdate` to eliminate the mapping layer in `ConnectivitySuite`.
 *   **Issue #1290: UI State Mapper Consolidation**
     *   *Significance*: **Medium (Maintainability)**. Merge `UiStateMapper` logic directly into `MainViewModel` now that it is the sole activity-scoped consumer.
 *   **Issue #1172: Smart Signaling Dispatcher**
@@ -30,6 +28,8 @@ Hardening of native-offloaded sensor audits and JNI fast-path transitions.
     *   *Significance*: **Medium (Domain Logic)**. Decouple siren cooldown and lockout logic from audio generation by moving it into a dedicated domain UseCase.
 *   **Issue #1202: UI Event Routing Unification**
     *   *Significance*: **Medium (Architecture)**. Refactor navigation and global UI commands into a single coordinator to decouple ViewModels from Compose-specific implementation.
+*   **Issue #1420: Granular HUD Data Binding**
+    *   *Significance*: **Medium (Decoupling)**. Refactor HUD components to consume slice-based interfaces instead of the full `LocationUpdate` monolith to reduce UI-to-Engine coupling.
 
 ### 🔵 Low Priority
 *   **Issue #1176: Native FastPath**
@@ -44,6 +44,7 @@ Hardening of native-offloaded sensor audits and JNI fast-path transitions.
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1314 / SOT ID 598: TrackerStatus Convergence.** Resolved Oct.2.9. Purged redundant TrackerStatus DTO and consolidated all state into LocationUpdate monolith (R598).
 *   **Issue #1330 / SOT ID 597: Snap-to-Update Monolith.** Resolved Oct.2.8. Merged SystemEvaluationSnapshot into unified LocationUpdate DTO to eliminate bridge mapping layers (R597).
 *   **Issue #1329 / SOT ID 596: Telemetry Mapping Convergence.** Resolved Oct.2.7. Consolidated construction of update DTOs into TelemetryMapper to centralize domain orchestration logic (R-ID 596).
 *   **Issue #1175 / SOT ID 595: Real-time Only Path.** Resolved Oct.2.6. Strategically removed forensic backfilling and gap-filling logic to simplify architectural state and reduce heap churn (R-ID 595).
@@ -55,8 +56,8 @@ Hardening of native-offloaded sensor audits and JNI fast-path transitions.
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.2.9: [SOT Count: 255 (Rules: 112), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 13, QA: 361]**
 - **Oct.2.8: [SOT Count: 254 (Rules: 111), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 13, QA: 360]**
 - **Oct.2.7: [SOT Count: 253 (Rules: 110), Open: H:0, M:0, L:0, Ideas: H:0, M:8, L:4, Testing: 13, QA: 359]**
 - **Oct.2.6: [SOT Count: 252 (Rules: 109), Open: H:0, M:0, L:0, Ideas: H:1, M:8, L:4, Testing: 13, QA: 358]**
 - **Oct.2.5: [SOT Count: 251 (Rules: 108), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 12, QA: 357]**
-- **Oct.2.3: [SOT Count: 251 (Rules: 107), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:1, Testing: 12, QA: 356]**

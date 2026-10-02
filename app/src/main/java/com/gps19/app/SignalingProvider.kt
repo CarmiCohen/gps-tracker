@@ -1,5 +1,6 @@
 package com.gps19.app
 
+import com.gps19.core.engine.LocationUpdate
 import com.gps19.core.engine.SignalingConstants
 import com.gps19.core.engine.SignalingPriority
 import kotlinx.coroutines.flow.SharedFlow
@@ -18,6 +19,9 @@ sealed class SignalingEvent {
 
 /**
  * Interface for signaling implementations (Socket.io, MQTT, etc.)
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Migrated transmit() to 
+ *   unified LocationUpdate monolith to eliminate redundant mapping layers.
  * Sep.02.70:
  * - Idea #239: Signaling Interface Consolidation. Removed redundant emitMap 
  *   and emitBinary overloads in favor of a unified transmit(TrackerStatus) 
@@ -43,7 +47,7 @@ interface SignalingProvider {
      * transmit: Unified telemetry transmission. 
      * Handles internal serialization (Protobuf/JSON) and routing.
      */
-    fun transmit(status: TrackerStatus, priority: SignalingPriority = SignalingPriority.NORMAL, fromViewer: Boolean = false)
+    fun transmit(status: LocationUpdate, priority: SignalingPriority = SignalingPriority.NORMAL, fromViewer: Boolean = false)
 
     fun getLastRelayTrafficTs(): Long
     fun setConnectionLostCallback(callback: () -> Unit)

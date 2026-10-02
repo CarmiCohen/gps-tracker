@@ -6,6 +6,9 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Converged all mapping logic 
+ *   into the unified LocationUpdate monolith. Purged TrackerStatus references.
  * Oct.2.8:
  * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
  *   to unified LocationUpdate DTO. Removed mapSnapshotToUpdate as mapping is now 
@@ -27,180 +30,73 @@ object TelemetryMapper {
         viewerId: String,
         lastAlarmAckTs: Long,
         violationStartTs: Long,
-        updateOut: LocationUpdate,
-        statusOut: TrackerStatus
+        updateOut: LocationUpdate
     ) {
         val snapshot = event.snapshot // Now a LocationUpdate instance
         val proc = event.processed
         val now = event.now
         val nowRt = event.nowRt
 
-        // 1. Inject global alarm state into snapshots for peer propagation
-        if (event.isTrackerMode) {
-            snapshot.lastAlarmAckTs = lastAlarmAckTs
-            snapshot.violationStartTs = violationStartTs
-        }
-
-        // 2. Repository Persistence (Snap-to-Update)
-        // With Issue #1330, the snapshot IS the update. We just sync metadata.
-        updateOut.copyFrom(snapshot)
-        updateOut.ts = now
-        updateOut.isMe = true
-
-        // 3. Peer Signaling (Snap-to-Status)
-        if (event.isTrackerMode) {
-            mapSnapshotToStatus(
-                snapshot = snapshot,
-                processed = proc,
-                deviceId = deviceId,
-                viewerId = viewerId,
-                now = now,
-                nowRt = nowRt,
-                gnssDetail = event.gnssDetail,
-                isSuspiciousMode = event.isSuspiciousMode,
-                lastSitTs = event.lastSitTs,
-                out = statusOut
-            )
-        }
-    }
-
-    /**
-     * mapSnapshotToStatus: Authority for converting an engine update snapshot 
-     * and event context into a signaling-ready TrackerStatus DTO.
-     */
-    fun mapSnapshotToStatus(
-        snapshot: LocationUpdate,
-        processed: ProcessedLocation?,
-        deviceId: String,
-        viewerId: String,
-        now: Long,
-        nowRt: Long,
-        gnssDetail: GnssDetail? = null,
-        isSuspiciousMode: Boolean = false,
-        lastSitTs: Long = 0L,
-        out: TrackerStatus
-    ): TrackerStatus {
-        return out.apply {
-            this.deviceId = deviceId
-            this.viewerId = viewerId
-            
-            kinetic.apply {
-                copyFrom(snapshot.kinetic)
-                lat = processed?.optimizedPoint?.lat ?: snapshot.kinetic.lat
-                lng = processed?.optimizedPoint?.lng ?: snapshot.kinetic.lng
-                alt = processed?.optimizedPoint?.alt ?: snapshot.kinetic.alt
-                this.speed = processed?.filteredSpeed ?: snapshot.kinetic.speed
-                accuracy = processed?.currentAccuracy ?: snapshot.kinetic.accuracy
-                maxAccuracy = processed?.maxAccuracy ?: snapshot.kinetic.maxAccuracy
-                gpsTs = processed?.timestamp ?: snapshot.kinetic.gpsTs
-                isJump = snapshot.kinetic.isJump
-                kineticEnergy = snapshot.kinetic.kineticEnergy
-                isAdaptiveJump = snapshot.isAdaptiveJump
-                this.activityType = snapshot.activityType
-            }
-
-            atmospheric.copyFrom(snapshot.atmospheric)
-
-            integrity.apply {
-                copyFrom(snapshot.integrity)
-                this.gnssDetail = gnssDetail ?: snapshot.integrity.gnssDetail
-                isSitActive = snapshot.integrity.isSitActive
-                isSitDetected = isSuspiciousMode
-                this.lastSitTs = lastSitTs
-                tamperNote = snapshot.suppressionNote
-                thermalHeadroom = snapshot.thermalHeadroom
-                heapAllocatedMb = snapshot.heapAllocatedMb
-            }
-
-            this.status = snapshot.status
+        // 1. Inject global alarm state and IDs into snapshot
+        snapshot.apply {
             this.ts = now
             this.rt = nowRt
+            this.deviceId = deviceId
+            this.viewerId = viewerId
+            this.isMe = true
+            
+            if (event.isTrackerMode) {
+                this.lastAlarmAckTs = lastAlarmAckTs
+                this.violationStartTs = violationStartTs
+            }
+
+            // Refine with processor results
+            proc?.let {
+                kinetic.lat = it.optimizedPoint.lat
+                kinetic.lng = it.optimizedPoint.lng
+                kinetic.alt = it.optimizedPoint.alt
+                kinetic.speed = it.filteredSpeed
+                kinetic.accuracy = it.currentAccuracy
+                kinetic.maxAccuracy = it.maxAccuracy
+                kinetic.gpsTs = it.timestamp
+                this.status = it.status
+            }
+
+            integrity.gnssDetail = event.gnssDetail ?: integrity.gnssDetail
+            integrity.isSitDetected = event.isSuspiciousMode
+            integrity.lastSitTs = event.lastSitTs
+            
             this.trackerState = snapshot.trackerState
             this.isClockRegression = snapshot.isClockRegression
             this.lastValidFixRt = snapshot.lastValidFixRt
-            this.isSilentFailure = snapshot.isSilentFailure
-            this.isBatteryWhitelisted = snapshot.integrity.battery > 0
-            
-            // Issue #1410: Global sync
-            this.lastAlarmAckTs = snapshot.lastAlarmAckTs
-            this.violationStartTs = snapshot.violationStartTs
+            this.integrity.isSilentFailure = snapshot.integrity.isSilentFailure
+            this.integrity.isBatteryWhitelisted = integrity.battery > 0
         }
+
+        // 2. Repository Persistence & Signaling DTO is now just the updated snapshot
+        updateOut.copyFrom(snapshot)
     }
 
     /**
-     * mapStatusToUpdate: Authority for converting a TrackerStatus DTO into a 
-     * persistence-ready LocationUpdate.
-     */
-    fun mapStatusToUpdate(s: TrackerStatus, isMe: Boolean, out: LocationUpdate): LocationUpdate {
-        return out.apply {
-            kinetic.copyFrom(s.kinetic)
-            atmospheric.copyFrom(s.atmospheric)
-            integrity.copyFrom(s.integrity)
-            status = s.status
-            ts = s.ts
-            this.isMe = isMe
-            trackerState = s.trackerState
-            isClockRegression = s.isClockRegression
-            lastValidFixRt = s.lastValidFixRt
-        }
-    }
-
-    /**
-     * mapProtoToSnapshot: Converts an incoming Proto DTO into an engine snapshot.
-     */
-    fun mapProtoToSnapshot(proto: RealtimeStatus, now: Long, nowRt: Long, out: LocationUpdate): LocationUpdate {
-        return out.apply {
-            reset()
-            kinetic.apply {
-                lat = proto.lat; lng = proto.lng; alt = proto.alt
-                speed = proto.speed.coerceAtLeast(0.0)
-                gpsTs = proto.gpsTs; accuracy = proto.accuracy.coerceAtLeast(0.0)
-                bearing = proto.bearing; maxAccuracy = proto.maxAccuracy
-                kineticEnergy = proto.kineticEnergy
-            }
-            integrity.apply {
-                isJammer = proto.isJammer
-                isStalled = proto.isStalled
-                isTamperDetected = proto.isTamperDetected || proto.isLocationPending
-                satsUsed = proto.satsUsed
-                satsView = proto.satsView
-                snrIdx = proto.snrIdx
-            }
-            snrSnapshot = proto.snrIdx * 5.0
-            jumpTier = proto.jumpTier
-            isJammer = proto.isJammer
-            isStalled = proto.isStalled
-            tamperDetected = proto.isTamperDetected || proto.isLocationPending
-            nowTs = now; this.nowRt = nowRt
-            trackerState = TrackerStatus.mapProtoToTrackerState(proto.state.name)
-            
-            activityType = try { 
-                ActivityType.valueOf(proto.activityType) 
-            } catch (e: Exception) { ActivityType.UNKNOWN }
-            
-            // Issue #1410: Global acknowledgment synchronization
-            lastAlarmAckTs = proto.lastAlarmAckTs
-            violationStartTs = proto.violationStartTs
-        }
-    }
-
-    /**
-     * mapProtoToStatus: Updates tracker status with Proto data and processor results.
+     * mapProtoToStatus: Updates location update with Proto data and processor results.
      */
     fun mapProtoToStatus(
         proto: RealtimeStatus,
-        current: TrackerStatus,
+        current: LocationUpdate,
         processed: ProcessedLocation,
         now: Long,
         lastFixRt: Long,
-        out: TrackerStatus
-    ): TrackerStatus {
+        out: LocationUpdate
+    ): LocationUpdate {
         out.copyFrom(current)
         return out.apply {
+            deviceId = proto.id
+            viewerId = proto.viewerId
+            
             kinetic.apply {
-                lat = if (processed.optimizedPoint.lat != 0.0) processed.optimizedPoint.lat else current.lat
-                lng = if (processed.optimizedPoint.lng != 0.0) processed.optimizedPoint.lng else current.lng
-                gpsTs = if (processed.optimizedPoint.ts != 0L) processed.optimizedPoint.ts else current.gpsTs
+                lat = if (processed.optimizedPoint.lat != 0.0) processed.optimizedPoint.lat else current.kinetic.lat
+                lng = if (processed.optimizedPoint.lng != 0.0) processed.optimizedPoint.lng else current.kinetic.lng
+                gpsTs = if (processed.optimizedPoint.ts != 0L) processed.optimizedPoint.ts else current.kinetic.gpsTs
                 speed = processed.filteredSpeed
                 bearing = proto.bearing
                 accuracy = proto.accuracy
@@ -231,7 +127,7 @@ object TelemetryMapper {
                 satsUsed = proto.satsUsed
                 snrIdx = proto.snrIdx
                 isLocationPending = proto.isLocationPending
-                locationPendingReason = TrackerStatus.mapProtoToPendingReason(proto.pendingReason.name)
+                locationPendingReason = LocationUpdate.mapProtoToPendingReason(proto.pendingReason.name)
                 isBatterySteepDischarge = proto.isBatterySteepDischarge
                 isCoolingModeActive = proto.isCoolingModeActive
                 isBatteryLow = proto.isBatteryLow
@@ -266,7 +162,7 @@ object TelemetryMapper {
 
             status = processed.status
             ts = now
-            trackerState = TrackerStatus.mapProtoToTrackerState(proto.state.name)
+            trackerState = LocationUpdate.mapProtoToTrackerState(proto.state.name)
             isClockRegression = proto.isClockRegression
             lastValidFixRt = lastFixRt
             
@@ -277,164 +173,113 @@ object TelemetryMapper {
     }
 
     /**
-     * mapJsonToSnapshot: Converts an incoming JSON payload into an engine snapshot.
-     */
-    fun mapJsonToSnapshot(data: JSONObject, current: TrackerStatus, now: Long, nowRt: Long, out: LocationUpdate): LocationUpdate {
-        val incomingGpsTs = data.optLong("gps_ts", 0L)
-        val gpsAgeMs = if (data.has("gps_age_ms")) data.optLong("gps_age_ms") else (if (incomingGpsTs > 0) maxOf(0L, now - incomingGpsTs) else 0L)
-        val candidateTs = if (gpsAgeMs > 0 || incomingGpsTs > 0) now - gpsAgeMs else 0L
-        
-        val statusStr = data.optString("status", current.status.name)
-        val statusVar = try { SentinelStatus.valueOf(statusStr) } catch(e: Exception) { current.status }
-
-        return out.apply {
-            reset()
-            kinetic.apply {
-                lat = data.optDouble("lat", 0.0); lng = data.optDouble("lng", 0.0); alt = data.optDouble("alt", 0.0)
-                speed = data.optDouble("speed", 0.0).coerceAtLeast(0.0)
-                gpsTs = candidateTs; accuracy = data.optDouble("accuracy", 0.0).coerceAtLeast(0.0)
-                bearing = data.optDouble("bearing", 0.0)
-                maxAccuracy = data.optDouble("max_accuracy", 0.0)
-                kineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy)
-            }
-            integrity.apply {
-                satsUsed = data.optInt("sats_used", -1)
-                satsView = data.optInt("sats_view", -1)
-                snrIdx = data.optDouble("snr_idx", current.snrIdx)
-            }
-            atmospheric.apply {
-                noiseIdx = data.optDouble("noise_idx", current.noiseIdx)
-                luxIdx = data.optDouble("lux_idx", current.luxIdx)
-                vibeIdx = data.optDouble("vibe_idx", current.vibeIdx)
-                liftIdx = data.optDouble("lift_idx", current.liftIdx)
-                tiltIdx = data.optDouble("tilt_idx", current.tiltIdx)
-                baroIdx = data.optDouble("baro_idx", current.baroIdx)
-            }
-            jumpTier = data.optInt("jump_tier", 0)
-            isJammer = data.optBoolean("is_jammer", false)
-            isStalled = data.optDouble("is_stalled", 0.0) != 0.0 || data.optBoolean("is_stalled", false)
-            tamperDetected = data.optBoolean("is_tamper_detected", current.isTamperDetected) || 
-                             data.optBoolean("is_location_pending", false) || 
-                             statusVar == SentinelStatus.TAMPER
-            nowTs = now; this.nowRt = nowRt
-            thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
-            heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
-            trackerState = try { TrackerState.valueOf(data.optString("tracker_state", current.trackerState.name)) } catch(e: Exception) { current.trackerState }
-            
-            activityType = try { 
-                ActivityType.valueOf(data.optString("activity_type", current.activityType.name)) 
-            } catch (e: Exception) { ActivityType.UNKNOWN }
-            
-            lastAlarmAckTs = data.optLong("last_alarm_ack_ts", 0L)
-            violationStartTs = data.optLong("violation_start_ts", 0L)
-        }
-    }
-
-    /**
-     * mapJsonToStatus: Updates tracker status with JSON data and processor results.
+     * mapJsonToStatus: Updates location update with JSON data and processor results.
      */
     fun mapJsonToStatus(
         data: JSONObject,
-        current: TrackerStatus,
+        current: LocationUpdate,
         processed: ProcessedLocation,
         now: Long,
         lastFixRt: Long,
         gnssDetail: GnssDetail?,
-        out: TrackerStatus
-    ): TrackerStatus {
+        out: LocationUpdate
+    ): LocationUpdate {
         val statusStr = data.optString("status", current.status.name)
         val statusVar = try { SentinelStatus.valueOf(statusStr) } catch(e: Exception) { current.status }
 
         out.copyFrom(current)
         return out.apply {
+            deviceId = data.optString("id", current.deviceId)
+            viewerId = data.optString("viewer_id", current.viewerId)
+
             kinetic.apply {
-                lat = if (processed.optimizedPoint.lat != 0.0) processed.optimizedPoint.lat else current.lat
-                lng = if (processed.optimizedPoint.lng != 0.0) processed.optimizedPoint.lng else current.lng
-                gpsTs = if (processed.optimizedPoint.ts != 0L) processed.optimizedPoint.ts else current.gpsTs
+                lat = if (processed.optimizedPoint.lat != 0.0) processed.optimizedPoint.lat else current.kinetic.lat
+                lng = if (processed.optimizedPoint.lng != 0.0) processed.optimizedPoint.lng else current.kinetic.lng
+                gpsTs = if (processed.optimizedPoint.ts != 0L) processed.optimizedPoint.ts else current.kinetic.gpsTs
                 speed = processed.filteredSpeed
-                bearing = data.optDouble("bearing", current.bearing)
-                accuracy = data.optDouble("accuracy", current.accuracy)
-                maxAccuracy = data.optDouble("max_accuracy", current.maxAccuracy)
+                bearing = data.optDouble("bearing", current.kinetic.bearing)
+                accuracy = data.optDouble("accuracy", current.kinetic.accuracy)
+                maxAccuracy = data.optDouble("max_accuracy", current.kinetic.maxAccuracy)
                 isJump = processed.status == SentinelStatus.JUMP
-                kineticEnergy = data.optDouble("kinetic_energy", current.kineticEnergy)
-                isAdaptiveJump = data.optBoolean("is_adaptive_jump", current.isAdaptiveJump)
-                jumpTier = data.optInt("jump_tier", current.jumpTier)
-                verticalVelocity = data.optDouble("vertical_velocity", current.verticalVelocity)
+                kineticEnergy = data.optDouble("kinetic_energy", current.kinetic.kineticEnergy)
+                isAdaptiveJump = data.optBoolean("is_adaptive_jump", current.kinetic.isAdaptiveJump)
+                jumpTier = data.optInt("jump_tier", current.kinetic.jumpTier)
+                verticalVelocity = data.optDouble("vertical_velocity", current.kinetic.verticalVelocity)
                 activityType = try { 
-                    ActivityType.valueOf(data.optString("activity_type", current.activityType.name)) 
+                    ActivityType.valueOf(data.optString("activity_type", current.kinetic.activityType.name)) 
                 } catch (e: Exception) { ActivityType.UNKNOWN }
             }
 
             atmospheric.apply {
-                temp = data.optDouble("temp", current.temp)
-                maxTemp = data.optDouble("max_temp", current.maxTemp)
-                vibration = data.optDouble("vibration", current.vibration)
-                heading = data.optDouble("heading", current.heading)
-                baroAlt = data.optDouble("baro_alt", current.baroAlt)
-                lux = data.optDouble("lux", current.lux)
-                isNear = data.optBoolean("is_near", current.isNear)
-                tiltDegrees = data.optDouble("tilt_degrees", current.tiltDegrees)
-                acousticDb = data.optDouble("acoustic_db", current.acousticDb)
-                peakVibrationShock = data.optDouble("peak_vibration_shock", current.peakVibrationShock)
-                peakVibrationShockTs = data.optLong("peak_shock_ts", current.peakVibrationShockTs)
-                luxBaseline = data.optDouble("lux_baseline", current.luxBaseline)
-                acousticFloorDb = data.optDouble("acoustic_floor_db", current.acousticFloorDb)
-                adaptiveVibrationFloor = data.optDouble("adaptive_vibration_floor", current.adaptiveVibrationFloor)
-                proxIdx = data.optDouble("prox_idx", current.proxIdx)
-                proximityCm = data.optDouble("proximity_cm", current.proximityCm)
-                proximityDebounceMs = data.optLong("proximity_debounce_ms", current.proximityDebounceMs)
-                vibrationRollingSum = data.optDouble("vibration_rolling_sum", current.vibrationRollingSum)
-                noiseIdx = data.optDouble("noise_idx", current.noiseIdx)
-                luxIdx = data.optDouble("lux_idx", current.luxIdx)
-                vibeIdx = data.optDouble("vibe_idx", current.vibeIdx)
-                liftIdx = data.optDouble("lift_idx", current.liftIdx)
-                tiltIdx = data.optDouble("tilt_idx", current.tiltIdx)
-                baroIdx = data.optDouble("baro_idx", current.baroIdx)
+                temp = data.optDouble("temp", current.atmospheric.temp)
+                maxTemp = data.optDouble("max_temp", current.atmospheric.maxTemp)
+                vibration = data.optDouble("vibration", current.atmospheric.vibration)
+                heading = data.optDouble("heading", current.atmospheric.heading)
+                baroAlt = data.optDouble("baro_alt", current.atmospheric.baroAlt)
+                lux = data.optDouble("lux", current.atmospheric.lux)
+                isNear = data.optBoolean("is_near", current.atmospheric.isNear)
+                tiltDegrees = data.optDouble("tilt_degrees", current.atmospheric.tiltDegrees)
+                acousticDb = data.optDouble("acoustic_db", current.atmospheric.acousticDb)
+                peakVibrationShock = data.optDouble("peak_vibration_shock", current.atmospheric.peakVibrationShock)
+                peakVibrationShockTs = data.optLong("peak_shock_ts", current.atmospheric.peakVibrationShockTs)
+                luxBaseline = data.optDouble("lux_baseline", current.atmospheric.luxBaseline)
+                acousticFloorDb = data.optDouble("acoustic_floor_db", current.atmospheric.acousticFloorDb)
+                adaptiveVibrationFloor = data.optDouble("adaptive_vibration_floor", current.atmospheric.adaptiveVibrationFloor)
+                proxIdx = data.optDouble("prox_idx", current.atmospheric.proxIdx)
+                proximityCm = data.optDouble("proximity_cm", current.atmospheric.proximityCm)
+                proximityDebounceMs = data.optLong("proximity_debounce_ms", current.atmospheric.proximityDebounceMs)
+                vibrationRollingSum = data.optDouble("vibration_rolling_sum", current.atmospheric.vibrationRollingSum)
+                noiseIdx = data.optDouble("noise_idx", current.atmospheric.noiseIdx)
+                luxIdx = data.optDouble("lux_idx", current.atmospheric.luxIdx)
+                vibeIdx = data.optDouble("vibe_idx", current.atmospheric.vibeIdx)
+                liftIdx = data.optDouble("lift_idx", current.atmospheric.liftIdx)
+                tiltIdx = data.optDouble("tilt_idx", current.atmospheric.tiltIdx)
+                baroIdx = data.optDouble("baro_idx", current.atmospheric.baroIdx)
             }
 
             integrity.apply {
-                battery = data.optInt("battery", current.battery)
-                currentMa = data.optInt("current_ma", current.currentMa)
-                isCharging = data.optBoolean("is_charging", current.isCharging)
-                satsView = data.optInt("sats_view", current.satsView)
-                satsUsed = data.optInt("sats_used", current.satsUsed)
-                isTamperDetected = data.optBoolean("is_tamper_detected", current.isTamperDetected)
-                isPowerTamper = data.optBoolean("is_power_tamper", current.isPowerTamper)
+                battery = data.optInt("battery", current.integrity.battery)
+                currentMa = data.optInt("current_ma", current.integrity.currentMa)
+                isCharging = data.optBoolean("is_charging", current.integrity.isCharging)
+                satsView = data.optInt("sats_view", current.integrity.satsView)
+                satsUsed = data.optInt("sats_used", current.integrity.satsUsed)
+                isTamperDetected = data.optBoolean("is_tamper_detected", current.integrity.isTamperDetected)
+                isPowerTamper = data.optBoolean("is_power_tamper", current.integrity.isPowerTamper)
                 isLocationPending = data.optBoolean("is_location_pending", false)
                 locationPendingReason = try { LocationPendingReason.valueOf(data.optString("location_pending_reason", "NONE")) } catch(e: Exception) { LocationPendingReason.NONE }
                 isBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false)
                 isCoolingModeActive = data.optBoolean("is_cooling_mode_active", false)
                 isBatteryLow = data.optBoolean("is_battery_low", false)
                 isBatteryCritical = data.optBoolean("is_battery_critical", false)
-                isPowerSaveMode = data.optBoolean("is_power_save_mode", current.isPowerSaveMode)
-                standbyBucket = data.optInt("standby_bucket", current.standbyBucket)
-                netInterface = data.optString("net_interface", current.netInterface)
-                isStorageLow = data.optBoolean("is_storage_low", current.isStorageLow)
-                isStorageCritical = data.optBoolean("is_storage_critical", current.isStorageCritical)
+                isPowerSaveMode = data.optBoolean("is_power_save_mode", current.integrity.isPowerSaveMode)
+                standbyBucket = data.optInt("standby_bucket", current.integrity.standbyBucket)
+                netInterface = data.optString("net_interface", current.integrity.netInterface)
+                isStorageLow = data.optBoolean("is_storage_low", current.integrity.isStorageLow)
+                isStorageCritical = data.optBoolean("is_storage_critical", current.integrity.isStorageCritical)
                 this.gnssDetail = gnssDetail
-                uptimeMs = data.optLong("uptime_ms", current.uptimeMs)
-                totalDropMs = data.optLong("total_drop_ms", current.totalDropMs)
-                maxDropMs = data.optLong("max_drop_ms", current.maxDropMs)
-                maxDropTs = data.optLong("max_drop_ts", current.maxDropTs)
-                totalConnectedMs = data.optLong("total_connected_ms", current.totalConnectedMs)
-                sessionConnectedMs = data.optLong("session_connected_ms", current.sessionConnectedMs)
-                lastConnTs = data.optLong("last_conn_ts", current.lastConnTs)
-                lastDiscTs = data.optLong("last_disc_ts", current.lastDiscTs)
-                snrIdx = data.optDouble("snr_idx", current.snrIdx)
-                isSitDetected = data.optBoolean("is_sit_detected", current.isSitDetected)
-                lastSitTs = data.optLong("last_sit_ts", current.lastSitTs)
-                isSuspicious = data.optBoolean("is_suspicious", current.isSuspicious)
-                isAnchorLocked = data.optBoolean("is_anchor_locked", current.isAnchorLocked)
-                sitVz = data.optDouble("sit_vz", current.sitVz)
-                sitDz = data.optDouble("sit_dz", current.sitDz)
-                sitBaro = data.optDouble("sit_baro", current.sitBaro)
-                sitTilt = data.optDouble("sit_tilt", current.sitTilt)
-                sitShock = data.optDouble("sit_shock", current.sitShock)
-                isSitActive = data.optBoolean("is_sit_active", current.isSitActive)
-                violationUptimeMs = data.optLong("violation_uptime_ms", current.violationUptimeMs)
-                isUltraLongStationary = data.optBoolean("is_ultra_long_stationary", current.isUltraLongStationary)
-                gpsHardwareLock = data.optBoolean("gps_hw_lock", current.gpsHardwareLock)
-                isGnssThrottled = data.optBoolean("is_gnss_throttled", current.isGnssThrottled)
+                uptimeMs = data.optLong("uptime_ms", current.integrity.uptimeMs)
+                totalDropMs = data.optLong("total_drop_ms", current.integrity.totalDropMs)
+                maxDropMs = data.optLong("max_drop_ms", current.integrity.maxDropMs)
+                maxDropTs = data.optLong("max_drop_ts", current.integrity.maxDropTs)
+                totalConnectedMs = data.optLong("total_connected_ms", current.integrity.totalConnectedMs)
+                sessionConnectedMs = data.optLong("session_connected_ms", current.integrity.sessionConnectedMs)
+                lastConnTs = data.optLong("last_conn_ts", current.integrity.lastConnTs)
+                lastDiscTs = data.optLong("last_disc_ts", current.integrity.lastDiscTs)
+                snrIdx = data.optDouble("snr_idx", current.integrity.snrIdx)
+                isSitDetected = data.optBoolean("is_sit_detected", current.integrity.isSitDetected)
+                lastSitTs = data.optLong("last_sit_ts", current.integrity.lastSitTs)
+                isSuspicious = data.optBoolean("is_suspicious", current.integrity.isSuspicious)
+                isAnchorLocked = data.optBoolean("is_anchor_locked", current.integrity.isAnchorLocked)
+                sitVz = data.optDouble("sit_vz", current.integrity.sitVz)
+                sitDz = data.optDouble("sit_dz", current.integrity.sitDz)
+                sitBaro = data.optDouble("sit_baro", current.integrity.sitBaro)
+                sitTilt = data.optDouble("sit_tilt", current.integrity.sitTilt)
+                sitShock = data.optDouble("sit_shock", current.integrity.sitShock)
+                isSitActive = data.optBoolean("is_sit_active", current.integrity.isSitActive)
+                violationUptimeMs = data.optLong("violation_uptime_ms", current.integrity.violationUptimeMs)
+                isUltraLongStationary = data.optBoolean("is_ultra_long_stationary", current.integrity.isUltraLongStationary)
+                gpsHardwareLock = data.optBoolean("gps_hw_lock", current.integrity.gpsHardwareLock)
+                isGnssThrottled = data.optBoolean("is_gnss_throttled", current.integrity.isGnssThrottled)
                 tamperNote = if (data.has("tamper_note")) data.getString("tamper_note") else null
                 thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
                 heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
@@ -447,6 +292,105 @@ object TelemetryMapper {
             this.lastValidFixRt = lastFixRt
             
             // Issue #1410: Global acknowledgment synchronization
+            lastAlarmAckTs = data.optLong("last_alarm_ack_ts", 0L)
+            violationStartTs = data.optLong("violation_start_ts", 0L)
+        }
+    }
+
+    /**
+     * mapProtoToSnapshot: Converts an incoming Proto DTO into an engine snapshot.
+     */
+    fun mapProtoToSnapshot(proto: RealtimeStatus, now: Long, nowRt: Long, out: LocationUpdate): LocationUpdate {
+        return out.apply {
+            reset()
+            deviceId = proto.id
+            viewerId = proto.viewerId
+            
+            kinetic.apply {
+                lat = proto.lat; lng = proto.lng; alt = proto.alt
+                speed = proto.speed.coerceAtLeast(0.0)
+                gpsTs = proto.gpsTs; accuracy = proto.accuracy.coerceAtLeast(0.0)
+                bearing = proto.bearing; maxAccuracy = proto.maxAccuracy
+                kineticEnergy = proto.kineticEnergy
+            }
+            integrity.apply {
+                isJammer = proto.isJammer
+                isStalled = proto.isStalled
+                isTamperDetected = proto.isTamperDetected || proto.isLocationPending
+                satsUsed = proto.satsUsed
+                satsView = proto.satsView
+                snrIdx = proto.snrIdx
+            }
+            snrSnapshot = proto.snrIdx * 5.0
+            kinetic.jumpTier = proto.jumpTier
+            integrity.isJammer = proto.isJammer
+            integrity.isStalled = proto.isStalled
+            integrity.isTamperDetected = proto.isTamperDetected || proto.isLocationPending
+            nowTs = now; this.nowRt = nowRt
+            trackerState = LocationUpdate.mapProtoToTrackerState(proto.state.name)
+            
+            kinetic.activityType = try { 
+                ActivityType.valueOf(proto.activityType) 
+            } catch (e: Exception) { ActivityType.UNKNOWN }
+            
+            // Issue #1410: Global acknowledgment synchronization
+            lastAlarmAckTs = proto.lastAlarmAckTs
+            violationStartTs = proto.violationStartTs
+        }
+    }
+
+    /**
+     * mapJsonToSnapshot: Converts an incoming JSON payload into an engine snapshot.
+     */
+    fun mapJsonToSnapshot(data: JSONObject, current: LocationUpdate, now: Long, nowRt: Long, out: LocationUpdate): LocationUpdate {
+        val incomingGpsTs = data.optLong("gps_ts", 0L)
+        val gpsAgeMs = if (data.has("gps_age_ms")) data.optLong("gps_age_ms") else (if (incomingGpsTs > 0) maxOf(0L, now - incomingGpsTs) else 0L)
+        val candidateTs = if (gpsAgeMs > 0 || incomingGpsTs > 0) now - gpsAgeMs else 0L
+        
+        val statusStr = data.optString("status", current.status.name)
+        val statusVar = try { SentinelStatus.valueOf(statusStr) } catch(e: Exception) { current.status }
+
+        return out.apply {
+            reset()
+            deviceId = data.optString("id", current.deviceId)
+            viewerId = data.optString("viewer_id", current.viewerId)
+
+            kinetic.apply {
+                lat = data.optDouble("lat", 0.0); lng = data.optDouble("lng", 0.0); alt = data.optDouble("alt", 0.0)
+                speed = data.optDouble("speed", 0.0).coerceAtLeast(0.0)
+                gpsTs = candidateTs; accuracy = data.optDouble("accuracy", 0.0).coerceAtLeast(0.0)
+                bearing = data.optDouble("bearing", 0.0)
+                maxAccuracy = data.optDouble("max_accuracy", 0.0)
+                kineticEnergy = data.optDouble("kinetic_energy", current.kinetic.kineticEnergy)
+            }
+            integrity.apply {
+                satsUsed = data.optInt("sats_used", -1)
+                satsView = data.optInt("sats_view", -1)
+                snrIdx = data.optDouble("snr_idx", current.integrity.snrIdx)
+            }
+            atmospheric.apply {
+                noiseIdx = data.optDouble("noise_idx", current.atmospheric.noiseIdx)
+                luxIdx = data.optDouble("lux_idx", current.atmospheric.luxIdx)
+                vibeIdx = data.optDouble("vibe_idx", current.atmospheric.vibeIdx)
+                liftIdx = data.optDouble("lift_idx", current.atmospheric.liftIdx)
+                tiltIdx = data.optDouble("tilt_idx", current.atmospheric.tiltIdx)
+                baroIdx = data.optDouble("baro_idx", current.atmospheric.baroIdx)
+            }
+            kinetic.jumpTier = data.optInt("jump_tier", 0)
+            integrity.isJammer = data.optBoolean("is_jammer", false)
+            integrity.isStalled = data.optDouble("is_stalled", 0.0) != 0.0 || data.optBoolean("is_stalled", false)
+            integrity.isTamperDetected = data.optBoolean("is_tamper_detected", current.integrity.isTamperDetected) || 
+                             data.optBoolean("is_location_pending", false) || 
+                             statusVar == SentinelStatus.TAMPER
+            nowTs = now; this.nowRt = nowRt
+            integrity.thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
+            integrity.heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
+            trackerState = try { TrackerState.valueOf(data.optString("tracker_state", current.trackerState.name)) } catch(e: Exception) { current.trackerState }
+            
+            kinetic.activityType = try { 
+                ActivityType.valueOf(data.optString("activity_type", current.kinetic.activityType.name)) 
+            } catch (e: Exception) { ActivityType.UNKNOWN }
+            
             lastAlarmAckTs = data.optLong("last_alarm_ack_ts", 0L)
             violationStartTs = data.optLong("violation_start_ts", 0L)
         }
@@ -468,7 +412,7 @@ object TelemetryMapper {
             currentMa = snapshot.integrity.currentMa, 
             status = snapshot.status, 
             isJammer = snapshot.integrity.isJammer,
-            isTamperDetected = snapshot.tamperDetected,
+            isTamperDetected = snapshot.integrity.isTamperDetected,
             tiltDegrees = snapshot.atmospheric.tiltDegrees, 
             acousticDb = snapshot.atmospheric.acousticDb, 
             baroAlt = snapshot.atmospheric.baroAlt, 
@@ -485,12 +429,12 @@ object TelemetryMapper {
             isStorageCritical = snapshot.integrity.isStorageCritical,
             isBatterySteepDischarge = snapshot.integrity.isBatterySteepDischarge, 
             isCoolingModeActive = snapshot.integrity.isCoolingModeActive,
-            vibration = snapshot.vibeSnapshot ?: snapshot.atmospheric.vibration, 
-            cpuLoad = snapshot.cpuLoad, 
-            ioWait = snapshot.ioWait, 
-            maxIoLatency = snapshot.maxIoLatency, 
-            isSilentFailure = snapshot.isSilentFailure, 
-            isMaliAnomaly = snapshot.isMaliAnomaly, 
+            vibration = snapshot.snrSnapshot ?: snapshot.atmospheric.vibration, 
+            cpuLoad = snapshot.integrity.cpuLoad, 
+            ioWait = snapshot.integrity.ioWait, 
+            maxIoLatency = snapshot.integrity.maxIoLatency, 
+            isSilentFailure = snapshot.integrity.isSilentFailure, 
+            isMaliAnomaly = snapshot.integrity.isMaliAnomaly, 
             isUltraLongStationary = snapshot.integrity.isUltraLongStationary,
             isBatteryLow = snapshot.integrity.isBatteryLow, 
             isBatteryCritical = snapshot.integrity.isBatteryCritical,
@@ -499,8 +443,8 @@ object TelemetryMapper {
             isLocationPending = snapshot.integrity.isLocationPending,
             locationPendingReason = snapshot.integrity.locationPendingReason,
             coolingEnteredRt = snapshot.nowRt,
-            thermalHeadroom = snapshot.thermalHeadroom,
-            heapAllocatedMb = snapshot.heapAllocatedMb,
+            thermalHeadroom = snapshot.integrity.thermalHeadroom,
+            heapAllocatedMb = snapshot.integrity.heapAllocatedMb,
             activityType = snapshot.activityType
         )
     }
@@ -519,9 +463,9 @@ object TelemetryMapper {
         out.copyFrom(snapshot)
         return out.apply {
             this.status = processed.status
-            this.isJammer = processed.jammerDetected
-            this.jumpTier = processed.jumpTier
-            this.isAdaptiveJump = processed.isAdaptiveJump
+            this.integrity.isJammer = processed.jammerDetected
+            this.kinetic.jumpTier = processed.jumpTier
+            this.kinetic.isAdaptiveJump = processed.isAdaptiveJump
             kinetic.apply {
                 lat = processed.optimizedPoint.lat
                 lng = processed.optimizedPoint.lng
@@ -533,18 +477,18 @@ object TelemetryMapper {
                 this.activityType = snapshot.activityType
             }
             this.lastValidFixRt = lastValidFixRt
-            tamperDetected = processed.tamperDetected
+            this.integrity.isTamperDetected = processed.tamperDetected
             suppressionNote = processed.suppressionNote
             this.snrSnapshot = snrSnapshot
         }
     }
 
     /**
-     * mapStatusToSnapshot: Authority for converting remote tracker status into 
+     * mapStatusToSnapshot: Authority for converting remote tracker update into 
      * a local evaluation snapshot.
      */
     fun mapStatusToSnapshot(
-        s: TrackerStatus,
+        s: LocationUpdate,
         base: LocationUpdate,
         nowRt: Long,
         out: LocationUpdate
@@ -552,21 +496,21 @@ object TelemetryMapper {
         out.copyFrom(base)
         return out.apply {
             this.status = s.status
-            this.isJammer = s.isJammer
-            this.jumpTier = s.jumpTier
-            this.isAdaptiveJump = s.isAdaptiveJump
+            this.integrity.isJammer = s.integrity.isJammer
+            this.kinetic.jumpTier = s.kinetic.jumpTier
+            this.kinetic.isAdaptiveJump = s.kinetic.isAdaptiveJump
             kinetic.copyFrom(s.kinetic)
             integrity.copyFrom(s.integrity)
             atmospheric.copyFrom(s.atmospheric)
             this.lastValidFixRt = s.lastValidFixRt
-            tamperDetected = s.isTamperDetected
-            suppressionNote = s.tamperNote
-            this.isStalled = s.isStalled
+            this.integrity.isTamperDetected = s.integrity.isTamperDetected
+            suppressionNote = s.integrity.tamperNote
+            this.integrity.isStalled = s.integrity.isStalled
             this.isClockRegression = s.isClockRegression || (nowRt - s.lastValidFixRt > 30000L)
-            snrSnapshot = s.snrIdx * 5.0
-            thermalHeadroom = s.integrity.thermalHeadroom
-            heapAllocatedMb = s.integrity.heapAllocatedMb
-            this.activityType = s.activityType
+            snrSnapshot = s.integrity.snrIdx * 5.0
+            this.integrity.thermalHeadroom = s.integrity.thermalHeadroom
+            this.integrity.heapAllocatedMb = s.integrity.heapAllocatedMb
+            this.kinetic.activityType = s.activityType
             this.trackerState = s.trackerState
             // Issue #1410: Viewer Persistence
             this.lastAlarmAckTs = s.lastAlarmAckTs
@@ -657,10 +601,10 @@ object TelemetryMapper {
     }
 
     /**
-     * mapStatusToPending: Authority for converting a TrackerStatus into a 
+     * mapStatusToPending: Authority for converting a LocationUpdate into a 
      * persistence-ready PendingStatusEntity.
      */
-    fun mapStatusToPending(status: TrackerStatus): PendingStatusEntity {
+    fun mapStatusToPending(status: LocationUpdate): PendingStatusEntity {
         return PendingStatusEntity(
             lat = status.lat, lng = status.lng, speed = status.speed, accuracy = status.accuracy,
             bearing = status.bearing, battery = status.battery, temp = status.temp,
@@ -668,16 +612,16 @@ object TelemetryMapper {
             gpsTs = status.gpsTs, satsView = status.satsView, satsUsed = status.satsUsed,
             maxAccuracy = status.maxAccuracy, snrIdx = status.snrIdx, noiseIdx = status.noiseIdx,
             luxIdx = status.luxIdx, vibeIdx = status.vibeIdx, proxIdx = status.proxIdx,
-            liftIdx = status.liftIdx, tiltIdx = status.tiltIdx, baroIdx = status.baroIdx,
+            liftIdx = status.atmospheric.liftIdx, tiltIdx = status.tiltIdx, baroIdx = status.baroIdx,
             isBatterySteepDischarge = status.isBatterySteepDischarge, isCoolingModeActive = status.isCoolingModeActive,
             isSitDetected = status.isSitDetected, isSitActive = status.isSitActive, sitVz = status.sitVz,
-            sitVzTs = status.sitVzTs, sitVzRt = status.sitVzRt, sitDz = status.sitDz,
+            sitVzTs = status.integrity.sitVzTs, sitVzRt = status.integrity.sitVzRt, sitDz = status.sitDz,
             verticalVelocity = status.verticalVelocity, sitBaro = status.sitBaro, sitTilt = status.sitTilt,
             sitShock = status.sitShock, isStorageLow = status.isStorageLow,
             isStorageCritical = status.isStorageCritical, isPowerSaveMode = status.isPowerSaveMode,
             standbyBucket = status.standbyBucket, netInterface = status.netInterface,
             lastValidFixRt = status.lastValidFixRt, locationPendingReason = status.locationPendingReason.name,
-            isAnchorLocked = status.isAnchorLocked, trackerState = status.trackerState.name,
+            isAnchorLocked = status.integrity.isAnchorLocked, trackerState = status.trackerState.name,
             status = status.status.name, isBatteryLow = status.isBatteryLow,
             isBatteryCritical = status.isBatteryCritical, isUltraLongStationary = status.isUltraLongStationary,
             violationUptimeMs = status.violationUptimeMs, gpsHardwareLock = status.gpsHardwareLock,
@@ -688,9 +632,9 @@ object TelemetryMapper {
 
     /**
      * mapPendingToStatus: Authority for converting a PendingStatusEntity back 
-     * into a domain TrackerStatus.
+     * into a domain LocationUpdate.
      */
-    fun mapPendingToStatus(entity: PendingStatusEntity, deviceId: String, viewerId: String, out: TrackerStatus): TrackerStatus {
+    fun mapPendingToStatus(entity: PendingStatusEntity, deviceId: String, viewerId: String, out: LocationUpdate): LocationUpdate {
         out.apply {
             reset()
             this.deviceId = deviceId

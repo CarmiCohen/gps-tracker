@@ -4,20 +4,16 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
- * Oct.1.8:
- * - Issue #1410: Viewer Persistence. Added lastAlarmAckTs and violationStartTs 
- *   mapping to support global acknowledgment synchronization and idempotent 
- *   alarm evaluation across peers (R-ID 575).
- * Sep.27.18:
- * - Issue #1205: Context-Aware Power Optimization. Integrated activityType mapping 
- *   to ensure context awareness across signaling and persistence (R-ID 503).
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Migrated to unified LocationUpdate 
+ *   monolith DTO. Fixed liftIdx and battery flag references.
  */
 object TelemetryProtobufMapper {
 
     /**
-     * mapToRealtime: Maps TrackerStatus to RealtimeStatus (Signaling/Relay).
+     * mapToRealtime: Maps LocationUpdate to RealtimeStatus (Signaling/Relay).
      */
-    fun mapToRealtime(status: TrackerStatus, builder: RealtimeStatus.Builder, fromViewer: Boolean) {
+    fun mapToRealtime(status: LocationUpdate, builder: RealtimeStatus.Builder, fromViewer: Boolean) {
         // R907: Ensure transmission IDs are aliased for relay room compatibility.
         builder.setId(SignalingConstants.getTransmissionId(status.deviceId))
         builder.setViewerId(SignalingConstants.getTransmissionId(status.viewerId))
@@ -36,13 +32,13 @@ object TelemetryProtobufMapper {
         builder.setGpsTs(status.gpsTs)
         builder.setTs(status.ts)
         builder.setRt(status.rt)
-        builder.setUptimeMs(status.uptimeMs)
-        builder.setTotalConnectedMs(status.totalConnectedMs)
-        builder.setSessionConnectedMs(status.sessionConnectedMs)
-        builder.setTotalDropMs(status.totalDropMs)
-        builder.setMaxDropMs(status.maxDropMs)
-        builder.setLastConnTs(status.lastConnTs)
-        builder.setLastDiscTs(status.lastDiscTs)
+        builder.setUptimeMs(status.integrity.uptimeMs)
+        builder.setTotalConnectedMs(status.integrity.totalConnectedMs)
+        builder.setSessionConnectedMs(status.integrity.sessionConnectedMs)
+        builder.setTotalDropMs(status.integrity.totalDropMs)
+        builder.setMaxDropMs(status.integrity.maxDropMs)
+        builder.setLastConnTs(status.integrity.lastConnTs)
+        builder.setLastDiscTs(status.integrity.lastDiscTs)
         
         // Common Health
         builder.setBattery(status.battery)
@@ -52,9 +48,9 @@ object TelemetryProtobufMapper {
         builder.setSatsUsed(status.satsUsed)
         
         // Behavioral Flags
-        builder.setIsJammer(status.isJammer)
-        builder.setIsStalled(status.isStalled)
-        builder.setIsTamperDetected(status.isTamperDetected)
+        builder.setIsJammer(status.integrity.isJammer)
+        builder.setIsStalled(status.integrity.isStalled)
+        builder.setIsTamperDetected(status.integrity.isTamperDetected)
         builder.setJumpTier(status.jumpTier)
         builder.setIsLocationPending(status.isLocationPending)
         builder.setLastValidFixRt(status.lastValidFixRt)
@@ -67,7 +63,7 @@ object TelemetryProtobufMapper {
         builder.setNoiseIdx(status.noiseIdx)
         builder.setLuxIdx(status.luxIdx)
         builder.setVibeIdx(status.vibeIdx)
-        builder.setLiftIdx(status.liftIdx)
+        builder.setLiftIdx(status.atmospheric.liftIdx)
         builder.setTiltIdx(status.tiltIdx)
         builder.setBaroIdx(status.baroIdx)
         builder.setProxIdx(status.proxIdx)
@@ -86,8 +82,8 @@ object TelemetryProtobufMapper {
         // Extended Forensic
         builder.setIsClockRegression(status.isClockRegression)
         builder.setKineticEnergy(status.kineticEnergy)
-        builder.setSitVzTs(status.sitVzTs)
-        builder.setSitVzRt(status.sitVzRt)
+        builder.setSitVzTs(status.integrity.sitVzTs)
+        builder.setSitVzRt(status.integrity.sitVzRt)
         builder.setIsAdaptiveJump(status.isAdaptiveJump)
         builder.setIsBatteryLow(status.isBatteryLow)
         builder.setIsBatteryCritical(status.isBatteryCritical)
@@ -98,9 +94,9 @@ object TelemetryProtobufMapper {
 
         // Issue #924 & R-ID 259
         builder.setIsGnssThrottled(status.isGnssThrottled)
-        builder.setEnergyDeltaMa(status.lastEnergyDeltaMa)
-        builder.setEnergyDeltaTemp(status.lastEnergyDeltaTemp)
-        builder.setEnergyDurationMs(status.lastEnergyDurationMs)
+        builder.setEnergyDeltaMa(status.integrity.lastEnergyDeltaMa)
+        builder.setEnergyDeltaTemp(status.integrity.lastEnergyDeltaTemp)
+        builder.setEnergyDurationMs(status.integrity.lastEnergyDurationMs)
         
         // Issue #946: Forensic Reason propagation
         status.tamperNote?.let { builder.setTamperNote(it) }
@@ -118,9 +114,9 @@ object TelemetryProtobufMapper {
     }
 
     /**
-     * mapToPersistence: Maps TrackerStatus to TrackerStatusProto (Local DataStore).
+     * mapToPersistence: Maps LocationUpdate to TrackerStatusProto (Local DataStore).
      */
-    fun mapToPersistence(status: TrackerStatus, builder: TrackerStatusProto.Builder) {
+    fun mapToPersistence(status: LocationUpdate, builder: TrackerStatusProto.Builder) {
         // Common Geometry & Physics
         builder.setLat(status.lat)
         builder.setLng(status.lng)
@@ -134,14 +130,14 @@ object TelemetryProtobufMapper {
         builder.setGpsTs(status.gpsTs)
         builder.setTs(status.ts)
         builder.setRt(status.rt)
-        builder.setUptimeMs(status.uptimeMs)
-        builder.setTotalConnectedMs(status.totalConnectedMs)
-        builder.setSessionConnectedMs(status.sessionConnectedMs)
-        builder.setTotalDropMs(status.totalDropMs)
-        builder.setMaxDropMs(status.maxDropMs)
-        builder.setMaxDropTs(status.maxDropTs)
-        builder.setLastConnTs(status.lastConnTs)
-        builder.setLastDiscTs(status.lastDiscTs)
+        builder.setUptimeMs(status.integrity.uptimeMs)
+        builder.setTotalConnectedMs(status.integrity.totalConnectedMs)
+        builder.setSessionConnectedMs(status.integrity.sessionConnectedMs)
+        builder.setTotalDropMs(status.integrity.totalDropMs)
+        builder.setMaxDropMs(status.integrity.maxDropMs)
+        builder.setMaxDropTs(status.integrity.maxDropTs)
+        builder.setLastConnTs(status.integrity.lastConnTs)
+        builder.setLastDiscTs(status.integrity.lastDiscTs)
         
         // Common Health
         builder.setBattery(status.battery)
@@ -153,9 +149,9 @@ object TelemetryProtobufMapper {
         builder.setCurrentMa(status.currentMa)
         
         // Behavioral Flags
-        builder.setIsJammer(status.isJammer)
-        builder.setIsStalled(status.isStalled)
-        builder.setIsTamperDetected(status.isTamperDetected)
+        builder.setIsJammer(status.integrity.isJammer)
+        builder.setIsStalled(status.integrity.isStalled)
+        builder.setIsTamperDetected(status.integrity.isTamperDetected)
         builder.setJumpTier(status.jumpTier)
         builder.setIsLocationPending(status.isLocationPending)
         builder.setLastValidFixRt(status.lastValidFixRt)
@@ -166,14 +162,14 @@ object TelemetryProtobufMapper {
         builder.setIsStorageLow(status.isStorageLow)
         builder.setIsStorageCritical(status.isStorageCritical)
         builder.setIsPowerTamper(status.isPowerTamper)
-        builder.setMicPending(status.micPending)
+        builder.setMicPending(status.integrity.micPending)
 
         // Forensic Indices
         builder.setSnrIdx(status.snrIdx)
         builder.setNoiseIdx(status.noiseIdx)
         builder.setLuxIdx(status.luxIdx)
         builder.setVibeIdx(status.vibeIdx)
-        builder.setLiftIdx(status.liftIdx)
+        builder.setLiftIdx(status.atmospheric.liftIdx)
         builder.setTiltIdx(status.tiltIdx)
         builder.setBaroIdx(status.baroIdx)
         builder.setProxIdx(status.proxIdx)
@@ -192,8 +188,8 @@ object TelemetryProtobufMapper {
         // Extended Forensic
         builder.setIsClockRegression(status.isClockRegression)
         builder.setKineticEnergy(status.kineticEnergy)
-        builder.setSitVzTs(status.sitVzTs)
-        builder.setSitVzRt(status.sitVzRt)
+        builder.setSitVzTs(status.integrity.sitVzTs)
+        builder.setSitVzRt(status.integrity.sitVzRt)
         builder.setIsAdaptiveJump(status.isAdaptiveJump)
         builder.setIsBatteryLow(status.isBatteryLow)
         builder.setIsBatteryCritical(status.isBatteryCritical)
@@ -233,9 +229,9 @@ object TelemetryProtobufMapper {
 
         // Issue #924 & R-ID 259
         builder.setIsGnssThrottled(status.isGnssThrottled)
-        builder.setEnergyDeltaMa(status.lastEnergyDeltaMa)
-        builder.setEnergyDeltaTemp(status.lastEnergyDeltaTemp)
-        builder.setEnergyDurationMs(status.lastEnergyDurationMs)
+        builder.setEnergyDeltaMa(status.integrity.lastEnergyDeltaMa)
+        builder.setEnergyDeltaTemp(status.integrity.lastEnergyDeltaTemp)
+        builder.setEnergyDurationMs(status.integrity.lastEnergyDurationMs)
         
         // Issue #946: Forensic Reason propagation
         status.tamperNote?.let { builder.setTamperNote(it) }

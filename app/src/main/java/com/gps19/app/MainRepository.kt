@@ -29,17 +29,14 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Migrated tracker state 
+ *   persistence to unified LocationUpdate monolith.
  * Oct.2.6:
  * - Issue #1175: Real-time Only Path. Removed addHistoryPoints (plural) 
  *   as it was exclusively used for forensic backfilling. Simplified 
  *   telemetry ingestion to real-time streams only. Fixed saveBooleanSync 
  *   reference to use suspend saveBoolean inside scope.
- * Oct.1.3:
- * - Issue #1408: Telemetry Convergence.
- * Oct.1.1:
- * - Issue #1407: Unified Storage Authority.
- * Sep.30.60:
- * - Issue #1406: Standardized Role Identity.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -441,13 +438,14 @@ class MainRepository @Inject constructor(
         }
     }
 
-    fun saveTrackerState(status: TrackerStatus, role: AppRole? = null) = settings.saveTrackerState(status, role)
-    suspend fun loadTrackerState(role: AppRole? = null) = settings.loadTrackerState(role)
+    fun saveLocationUpdate(status: LocationUpdate, role: AppRole? = null) = settings.saveLocationUpdate(status, role)
+    suspend fun loadLocationUpdate(role: AppRole? = null) = settings.loadLocationUpdate(role)
     
     suspend fun getLastAlarmAckTs(): Long = settings.getLong(LAST_ALARM_ACK_TS_KEY, 0L)
     suspend fun addPendingStatusUpdate(update: PendingStatusEntity) { offlineRepository.addPendingStatusUpdate(update) }
     suspend fun getPendingStatusUpdates(limit: Int): List<PendingStatusEntity> = offlineRepository.getPendingStatusUpdates(limit)
     suspend fun addPendingStatusUpdateSync(update: PendingStatusEntity) { scope.launch { offlineRepository.addPendingStatusUpdate(update) } }
+    suspend fun getTrackerState(role: AppRole? = null): LocationUpdate? = loadLocationUpdate(role)
     suspend fun deletePendingStatusUpdate(id: Long) = offlineRepository.deletePendingStatusUpdate(id)
 
     suspend fun saveActiveAlarms(alarms: List<AlarmEvaluationState.ActiveAlarm>, role: AppRole? = null) {

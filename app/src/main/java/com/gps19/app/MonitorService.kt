@@ -20,16 +20,17 @@ import java.io.FileOutputStream
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
 import javax.inject.Inject
+import javax.inject.Singleton
 import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Migrated evaluateAlarmsInternal 
+ *   to use unified LocationUpdate monolith.
  * Oct.2.8:
  * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
  *   to unified LocationUpdate DTO (R-ID 596).
- * Oct.2.2:
- * - Issue #1416: Memory Pressure Mitigation (R-ID 592). Hardened performMemoryFlush 
- *   to invoke historyManager.trimMemory() during high-pressure cycles.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -155,7 +156,7 @@ class MonitorService : BaseMonitorService() {
         val homePoints = repository.loadHomePoints().map { EngineGeoPoint(it.latitude, it.longitude) }
         val maxDist = repository.getDouble(MAX_DISTANCE_STORAGE_KEY, 60.0)
 
-        val primaryState = repository.loadTrackerState(currentRole)
+        val primaryState = repository.loadLocationUpdate(currentRole)
         primaryProcessor.loadState(
             savedMaxAccuracy = repository.getDouble(currentRole, MAX_ACCURACY_KEY, 0.0),
             savedLastSitTs = repository.getLong(currentRole, LAST_SIT_TS_KEY, 0L),
@@ -163,13 +164,13 @@ class MonitorService : BaseMonitorService() {
             trackerState = primaryState,
             homePoints = homePoints,
             maxDistance = maxDist,
-            savedSitVz = primaryState?.sitVz ?: 0.0,
-            savedSitDz = primaryState?.sitDz ?: 0.0,
-            savedSitBaro = primaryState?.sitBaro ?: 0.0,
-            savedSitTilt = primaryState?.sitTilt ?: 0.0,
-            savedSitShock = primaryState?.sitShock ?: 0.0,
-            savedSitVzTs = primaryState?.sitVzTs ?: 0L,
-            savedSitVzRt = primaryState?.sitVzRt ?: 0L,
+            savedSitVz = primaryState?.integrity?.sitVz ?: 0.0,
+            savedSitDz = primaryState?.integrity?.sitDz ?: 0.0,
+            savedSitBaro = primaryState?.integrity?.sitBaro ?: 0.0,
+            savedSitTilt = primaryState?.integrity?.sitTilt ?: 0.0,
+            savedSitShock = primaryState?.integrity?.sitShock ?: 0.0,
+            savedSitVzTs = primaryState?.integrity?.sitVzTs ?: 0L,
+            savedSitVzRt = primaryState?.integrity?.sitVzRt ?: 0L,
             savedLastValidFixRt = repository.getLong(currentRole, LAST_VALID_FIX_RT_KEY, 0L),
             savedVibrationFloor = repository.getDouble(currentRole, ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
             savedLuxBaseline = repository.getDouble(currentRole, TRACKER_LUX_BASELINE_KEY, -1.0),
@@ -183,7 +184,7 @@ class MonitorService : BaseMonitorService() {
 
         if (!isTrackerMode) {
             val remoteRole = AppRole.VIEWER_REMOTE
-            val remoteState = repository.loadTrackerState(remoteRole)
+            val remoteState = repository.loadLocationUpdate(remoteRole)
             remoteProcessor.loadState(
                 savedMaxAccuracy = repository.getDouble(remoteRole, MAX_ACCURACY_KEY, 0.0),
                 savedLastSitTs = repository.getLong(remoteRole, LAST_SIT_TS_KEY, 0L),
@@ -191,13 +192,13 @@ class MonitorService : BaseMonitorService() {
                 trackerState = remoteState,
                 homePoints = homePoints,
                 maxDistance = maxDist,
-                savedSitVz = remoteState?.sitVz ?: 0.0,
-                savedSitDz = remoteState?.sitDz ?: 0.0,
-                savedSitBaro = remoteState?.sitBaro ?: 0.0,
-                savedSitTilt = remoteState?.sitTilt ?: 0.0,
-                savedSitShock = remoteState?.sitShock ?: 0.0,
-                savedSitVzTs = remoteState?.sitVzTs ?: 0L,
-                savedSitVzRt = remoteState?.sitVzRt ?: 0L,
+                savedSitVz = remoteState?.integrity?.sitVz ?: 0.0,
+                savedSitDz = remoteState?.integrity?.sitDz ?: 0.0,
+                savedSitBaro = remoteState?.integrity?.sitBaro ?: 0.0,
+                savedSitTilt = remoteState?.integrity?.sitTilt ?: 0.0,
+                savedSitShock = remoteState?.integrity?.sitShock ?: 0.0,
+                savedSitVzTs = remoteState?.integrity?.sitVzTs ?: 0L,
+                savedSitVzRt = remoteState?.integrity?.sitVzRt ?: 0L,
                 savedLastValidFixRt = remoteState?.lastValidFixRt ?: 0L,
                 savedVibrationFloor = repository.getDouble(remoteRole, ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
                 savedLuxBaseline = repository.getDouble(remoteRole, TRACKER_LUX_BASELINE_KEY, -1.0),
@@ -483,11 +484,11 @@ class MonitorService : BaseMonitorService() {
             lightSpikeRt = if (isTrackerMode) lastFastPathLightSpikeTs else 0L
             providedAdaptiveFloor = hSnapshot.adaptiveVibrationFloor
             cpuLoad = health.cpuLoad; ioWait = health.ioWait; maxIoLatency = health.maxIoLatency 
-            isSilentFailure = health.isSilentFailure; isMaliAnomaly = health.isMaliAnomaly
+            integrity.isSilentFailure = health.isSilentFailure; integrity.isMaliAnomaly = health.isMaliAnomaly
             localInternetLoss = health.localInternetLoss; isHardwareOnline = health.isHardwareOnline
             acousticMinDb = hSnapshot.acousticPeakMin
-            thermalHeadroom = health.thermalHeadroom; heapAllocatedMb = health.heapAllocatedMb
-            activityType = hSnapshot.activityType
+            integrity.thermalHeadroom = health.thermalHeadroom; integrity.heapAllocatedMb = health.heapAllocatedMb
+            kinetic.activityType = hSnapshot.activityType
         }
         
         if (isTrackerMode) {
@@ -496,7 +497,7 @@ class MonitorService : BaseMonitorService() {
             hardwareSuite.setHighLoad(evaluationSnapshotFlyweight.integrity.isCoolingModeActive)
             hardwareSuite.setCpuLoad(health.cpuLoad)
             isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(isSuspiciousMode, primaryProcessor.checkPhysicalTamper(nowRt, false, health.cpuLoad) == SentinelStatus.TAMPER, primaryProcessor.consumeSitDetected(), nowRt)
-            val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(evaluationSnapshotFlyweight.integrity.isCoolingModeActive, isSuspiciousMode, hardwareSuite.isStationary(), hardwareSuite.isScreenOn(), primaryProcessor.getMaxDistanceAuthority() > 0.0, evaluationSnapshotFlyweight.activityType, nowRt, capabilities)
+            val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(evaluationSnapshotFlyweight.integrity.isCoolingModeActive, isSuspiciousMode, hardwareSuite.isStationary(), hardwareSuite.isScreenOn(), primaryProcessor.getMaxDistanceAuthority() > 0.0, evaluationSnapshotFlyweight.kinetic.activityType, nowRt, capabilities)
             if (targetGpsInterval != currentIntervalMs) {
                 currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, currentRole); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)
             }

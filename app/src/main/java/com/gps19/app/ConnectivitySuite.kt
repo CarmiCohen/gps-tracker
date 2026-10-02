@@ -21,13 +21,12 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.2.9:
+ * - Issue #1314: TrackerStatus Convergence. Migrated all signaling 
+ *   flyweights and mapping calls to unified LocationUpdate monolith.
  * Oct.2.8:
  * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
  *   to unified LocationUpdate DTO (R-ID 596).
- * Oct.1.8:
- * - Issue #1410: Viewer Persistence. Added global acknowledgment synchronization. 
- *   Handles "acknowledge_alarm" signals and synchronizes lastAlarmAckTs 
- *   from remote telemetry to prevent recurring alarms (R-ID 575).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -77,13 +76,13 @@ class ConnectivitySuite @Inject constructor(
     val isSyncing = _isSyncing.asStateFlow()
 
     // R-ID 392: Reusable flyweights for zero-allocation packet processing.
-    // Issue #1330: snapshotFlyweight now uses unified LocationUpdate DTO.
+    // Issue #1314: Flyweights converged to unified LocationUpdate monolith.
     private val snapshotFlyweight = LocationUpdate()
     private val updateFlyweight = LocationUpdate()
-    private val statusFlyweight = TrackerStatus()
-    private val pendingStatusFlyweight = TrackerStatus()
+    private val statusFlyweight = LocationUpdate()
+    private val pendingStatusFlyweight = LocationUpdate()
     
-    private val localStatusFlyweight = TrackerStatus()
+    private val localStatusFlyweight = LocationUpdate()
 
     val trackerStatus get() = remoteStatusRepository.remoteStatus.value
     val isTrackerConnected get() = remoteStatusRepository.isTrackerConnected.value
@@ -105,15 +104,15 @@ class ConnectivitySuite @Inject constructor(
     val trackerSatsView get() = trackerStatus.satsView
     val trackerSatsUsed get() = trackerStatus.satsUsed
     val isTrackerCharging get() = trackerStatus.isCharging
-    val isTrackerJammerSuspicion get() = trackerStatus.isJammer
+    val isTrackerJammerSuspicion get() = trackerStatus.integrity.isJammer
     val isTrackerVisualJump get() = trackerStatus.isJump
     val isTrackerAdaptiveJump get() = trackerStatus.isAdaptiveJump
     val trackerJumpTier get() = trackerStatus.jumpTier
-    val isTrackerTamperDetected get() = trackerStatus.isTamperDetected
+    val isTrackerTamperDetected get() = trackerStatus.integrity.isTamperDetected
     val isTrackerPowerTamper get() = trackerStatus.isPowerTamper
     val isTrackerLocationPending get() = trackerStatus.isLocationPending
     val trackerLocationPendingReason get() = trackerStatus.locationPendingReason
-    val trackerLocationDetail get() = trackerStatus.gnssDetail
+    val trackerLocationDetail get() = trackerStatus.integrity.gnssDetail
     val isTrackerBatteryWhitelisted get() = trackerStatus.isBatteryWhitelisted
     val isTrackerBatterySteepDischarge get() = trackerStatus.isBatterySteepDischarge
     val isTrackerCoolingModeActive get() = trackerStatus.isCoolingModeActive
@@ -415,15 +414,15 @@ class ConnectivitySuite @Inject constructor(
         }
     }
 
-    fun updateLocalTelemetry(status: TrackerStatus) {
+    fun updateLocalTelemetry(status: LocationUpdate) {
         localStatusFlyweight.copyFrom(status)
     }
 
-    suspend fun sendTelemetry(status: TrackerStatus): Boolean {
+    suspend fun sendTelemetry(status: LocationUpdate): Boolean {
         val success = sendTelemetryInternal(status, SignalingPriority.HIGH)
         if (isTrackerMode) {
             // R-ID 453/565: Standardized Role Identity Authority
-            mainRepository.saveTrackerState(status, AppRole.TRACKER)
+            mainRepository.saveLocationUpdate(status, AppRole.TRACKER)
             if (!success) {
                 val entity = TelemetryMapper.mapStatusToPending(status)
                 offlineRepository.addPendingStatusUpdate(entity)
@@ -437,7 +436,7 @@ class ConnectivitySuite @Inject constructor(
         return success
     }
 
-    private fun sendTelemetryInternal(status: TrackerStatus, priority: SignalingPriority): Boolean {
+    private fun sendTelemetryInternal(status: LocationUpdate, priority: SignalingPriority): Boolean {
         if (!isConnected()) return false
         if (hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) return false
         signalingProvider.transmit(status, priority, fromViewer = !isTrackerMode)
@@ -500,8 +499,7 @@ class ConnectivitySuite @Inject constructor(
                 val lastFixRt = if (processed.optimizedPoint.lat != 0.0 && processed.optimizedPoint.lng != 0.0) nowRt else statusProto.lastValidFixRt
                 TelemetryMapper.mapProtoToStatus(statusProto, current, processed, now, lastFixRt, statusFlyweight)
 
-                TelemetryMapper.mapStatusToUpdate(statusFlyweight, isMe = false, out = updateFlyweight)
-                domainEventBus.emit(DomainEvent.PeerStatusReceived(updateFlyweight.copy()))
+                domainEventBus.emit(DomainEvent.PeerStatusReceived(statusFlyweight.duplicate()))
                 
                 statusFlyweight
             }
@@ -622,7 +620,7 @@ class ConnectivitySuite @Inject constructor(
 
                 val lastFixRt = if (processed.optimizedPoint.lat != 0.0 && processed.optimizedPoint.lng != 0.0 && !processed.isStalled) nowRt else current.lastValidFixRt
                 
-                var gnssDetail = current.gnssDetail
+                var gnssDetail = current.integrity.gnssDetail
                 if (data.has("gnss_detail")) {
                     try {
                         val array = data.getJSONArray("gnss_detail")
@@ -637,8 +635,7 @@ class ConnectivitySuite @Inject constructor(
 
                 TelemetryMapper.mapJsonToStatus(data, current, processed, now, lastFixRt, gnssDetail, statusFlyweight)
 
-                TelemetryMapper.mapStatusToUpdate(statusFlyweight, isMe = false, out = updateFlyweight)
-                domainEventBus.emit(DomainEvent.PeerStatusReceived(updateFlyweight.copy()))
+                domainEventBus.emit(DomainEvent.PeerStatusReceived(statusFlyweight.duplicate()))
 
                 statusFlyweight
             }
