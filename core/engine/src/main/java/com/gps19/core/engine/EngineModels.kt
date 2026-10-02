@@ -6,6 +6,11 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.2.1:
+ * - Issue #1417: Jitter-Resistant Connectivity (R-ID 593). Added lastRelayOnlineRt 
+ *   and lastRelayOfflineRt to track connectivity state duration for hysteresis.
+ * - Issue #1416: Memory Pressure Mitigation. Added MemoryPressureLevel and 
+ *   MemoryPressureChanged event to support heap management on A15 hardware.
  * Oct.1.8:
  * - Issue #1410: Forced activeAlarms to val ConcurrentHashMap to ensure 
  *   thread-safety and prevent replacement with non-thread-safe maps 
@@ -60,6 +65,9 @@ enum class CapabilityStatus { GRANTED, DENIED, UNKNOWN }
 
 @Serializable
 enum class PerformanceTier { STANDARD, STAGGERED }
+
+@Serializable
+enum class MemoryPressureLevel { NORMAL, HIGH, CRITICAL }
 
 @Serializable
 data class HardwareCapabilities(
@@ -318,7 +326,7 @@ sealed class DomainEvent {
     data class PeerStatusReceived(val status: LocationUpdate) : DomainEvent()
     data class PeerConnectionChanged(val isConnected: Boolean, val peerId: String) : DomainEvent()
     data class HeuristicRecovery(val message: String, val gapMs: Long, val lat: Double, val lng: Double, val accuracy: Double) : DomainEvent()
-    data class StabilityViolation(val message: String, val isJitter: Boolean, val lat: Double, val lng: Double, val accuracy: Double) : DomainEvent()
+    class StabilityViolation(val message: String, val isJitter: Boolean, val lat: Double, val lng: Double, val accuracy: Double) : DomainEvent()
     data class ServiceStatus(val message: String, val isImportant: Boolean = false) : DomainEvent()
 }
 
@@ -338,6 +346,7 @@ sealed class IntegrityEvent : DomainEvent() {
     data class LogEvent(val message: String, val isImportant: Boolean) : IntegrityEvent()
     data class LocationStatusChanged(val status: LocationStatus) : IntegrityEvent()
     data class GnssThrottledChanged(val throttled: Boolean) : IntegrityEvent()
+    data class MemoryPressureChanged(val level: MemoryPressureLevel, val heapMb: Double) : IntegrityEvent()
 }
 
 sealed class ProcessorEvent(open val isPrimary: Boolean) : DomainEvent() {
@@ -373,6 +382,7 @@ sealed class CommandEvent : DomainEvent() {
     object ExecuteStressTest : CommandEvent()
     object ExecuteNetworkStressTest : CommandEvent()
     data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : CommandEvent()
+    object TriggerMemoryFlush : CommandEvent()
 }
 
 sealed class RevivalEvent : DomainEvent() {
@@ -616,6 +626,10 @@ class AlarmEvaluationState {
     var lastSirenStopRt: Long = 0L
     var lastGlobalTriggerRt: Long = 0L
     
+    // Issue #1417: Connectivity Hysteresis
+    var lastRelayOnlineRt: Long = 0L
+    var lastRelayOfflineRt: Long = 0L
+    
     /**
      * Issue #1410: Forced val ConcurrentHashMap to resolve CME.
      * Note: Marked as @Transient to ensure Kotlin Serialization doesn't replace 
@@ -687,6 +701,8 @@ class AlarmEvaluationState {
         this.capabilities = capabilities; this.vibrationSensitivity = vibrationSensitivity
         this.tiltSensitivity = tiltSensitivity; this.powerAlarmPending = powerAlarmPending
         this.lastSirenStopRt = lastSirenStopRt; this.lastGlobalTriggerRt = lastGlobalTriggerRt
+        
+        // Internal state updates for hysteresis are handled in MainAlarmLogic or AppAlarmManager
     }
 }
 

@@ -5,6 +5,12 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Oct.2.1:
+ * - Issue #1417: Jitter-Resistant Connectivity (R-ID 593). Integrated 3s temporal 
+ *   hysteresis for RELAY_OFFLINE and Peer Error suppression.
+ * - Issue #1415: Load-Aware IMU Gating (R-ID 590). Integrated health.cpuLoad 
+ *   into isShockViolated and isVibrationSuspicious calls to prevent false 
+ *   positives during A15 CPU saturation.
  * Oct.1.8:
  * - Issue #1410: Fixed ConcurrentModificationException by synchronizing 
  *   activeAlarms mutations (R-ID 585).
@@ -44,6 +50,13 @@ object MainAlarmLogic {
             val uptimeRt = nowRt - state.serviceStartRt
             val isGpsWarmupActive = uptimeRt < GPS_WARMUP_GRACE_MS || isWarmup
             
+            // Issue #1417: Track connectivity state duration for hysteresis
+            if (state.isRelayConnected) {
+                state.lastRelayOnlineRt = nowRt
+            } else {
+                state.lastRelayOfflineRt = nowRt
+            }
+
             var reportIdx = 0
 
             // 1. Connectivity & Peer Status
@@ -151,11 +164,16 @@ object MainAlarmLogic {
     ): Int {
         var idx = startIdx
         val health = state.health
+        val nowRt = state.nowRt
         val phase = state.discoveryPhase
         val canCheckPeerErrors = phase == DiscoveryPhase.MONITORING
         val isInternetHardwareOk = health.isHardwareOnline
         val isRelayConnected = state.isRelayConnected
-        val shouldSuppressPeerErrors = !isInternetHardwareOk || !isRelayConnected
+        
+        // Issue #1417: Connectivity Hysteresis.
+        // Suppression: If relay was offline within the last 3s, suppress peer errors to avoid oscillation.
+        val wasRelayOfflineRecently = (state.lastRelayOfflineRt > 0 && nowRt - state.lastRelayOfflineRt < CONNECTIVITY_HYSTERESIS_MS)
+        val shouldSuppressPeerErrors = !isInternetHardwareOk || !isRelayConnected || wasRelayOfflineRecently
 
         report.getOrCreate(idx++).update(
             type = ALERT_ID_LOCAL_INTERNET,
@@ -164,11 +182,15 @@ object MainAlarmLogic {
             conditionMet = health.localInternetLoss
         )
 
+        // Issue #1417: Delayed triggering of RELAY_OFFLINE to ignore blips.
+        val relayOfflineSustained = !isRelayConnected && isInternetHardwareOk && 
+                                   (state.lastRelayOnlineRt > 0 && nowRt - state.lastRelayOnlineRt >= CONNECTIVITY_HYSTERESIS_MS)
+
         report.getOrCreate(idx++).update(
             type = ALERT_ID_RELAY_OFFLINE,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_RELAY_OFFLINE),
             subtitle = "Internet is OK but relay unreachable",
-            conditionMet = !isRelayConnected && isInternetHardwareOk
+            conditionMet = relayOfflineSustained
         )
 
         report.getOrCreate(idx++).update(
@@ -245,7 +267,7 @@ object MainAlarmLogic {
             conditionMet = isPowerViolation
         )
 
-        val isShock = SentinelValidator.isShockViolated(health.peakVibrationShock, health.adaptiveVibrationFloor, state.vibrationSensitivity)
+        val isShock = SentinelValidator.isShockViolated(health.peakVibrationShock, health.adaptiveVibrationFloor, state.vibrationSensitivity, health.cpuLoad)
         val isTilt = SentinelValidator.isTiltViolated(health.tiltDegrees, state.tiltSensitivity)
         val isAcousticMet = SentinelValidator.isAcousticViolated(health.acousticDb, health.acousticFloorDb)
         val liftDelta = if (state.trackerBaroAltEma > -999.0) health.baroAlt - state.trackerBaroAltEma else 0.0
@@ -470,7 +492,7 @@ object MainAlarmLogic {
             extremeValue = (100.0 - health.batteryLevel)
         )
 
-        val isHighSensorActivity = SentinelValidator.isVibrationSuspicious(health.vibration, health.adaptiveVibrationFloor, state.vibrationSensitivity)
+        val isHighSensorActivity = SentinelValidator.isVibrationSuspicious(health.vibration, health.adaptiveVibrationFloor, state.vibrationSensitivity, health.cpuLoad)
         val isHighSystemLoad = health.cpuLoad > 0.7
         val steepConditionMet = health.isBatterySteepDischarge
         report.getOrCreate(idx++).update(

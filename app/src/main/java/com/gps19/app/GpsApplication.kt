@@ -22,17 +22,17 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 import com.gps19.core.engine.ShadowCache
+import com.gps19.core.engine.DomainEventBus
+import com.gps19.core.engine.CommandEvent
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Oct.2.2:
+ * - Issue #1416: Memory Pressure Mitigation (R-ID 592). Integrated CommandEvent.TriggerMemoryFlush 
+ *   emission into onTrimMemory to ensure the engine flushes its caches under system pressure.
  * Sep.15.04:
  * - Context Shadowing Automation (#1047): Integrated getOpPackageName shadowing 
- *   directly into the application lifecycle. This automates IPC optimization 
- *   for all @ApplicationContext consumers, eliminating the need for 
- *   manual @ShadowContext qualifiers (R-ID 240).
- * Sep.14.00:
- * - Forensic Audit Cleanup: Removed getPackageName PKG_TRACE. Confirmed ShadowCache 
- *   hits via logcat; remaining logs are framework-level diagnostic noise (R759).
+ *   directly into the application lifecycle.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -40,6 +40,7 @@ class GpsApplication : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
     @Inject lateinit var logManager: LogManager
+    @Inject lateinit var domainEventBus: DomainEventBus
 
     companion object {
         private val stringCache = ShadowCache<String, String>(100)
@@ -162,6 +163,9 @@ class GpsApplication : Application(), Configuration.Provider {
     private fun trimCaches() {
         applicationScope.launch(Dispatchers.IO) {
             try {
+                // Issue #1416: Trigger global engine flush
+                domainEventBus.emit(CommandEvent.TriggerMemoryFlush)
+
                 val pkg = stringCache.get("pkg")
                 val uid = intCache.get("uid")
                 

@@ -21,6 +21,10 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.2.1:
+ * - Issue #1416: Memory Pressure Mitigation. Integrated heap-aware pruning 
+ *   logic. Thresholds are lowered to ADAPTIVE_PRUNE_THRESHOLD_CRITICAL and 
+ *   chunk counts increased when memory pressure is HIGH/CRITICAL.
  * Sep.28.13:
  * - Issue #1361 Hardening: Migrated liveReliability EMA calculation to 
  *   BigDecimal to ensure absolute precision during high-frequency bursts (R714).
@@ -431,20 +435,24 @@ class LogRepository @Inject constructor(
                 val health = telemetry.systemHealth.value
                 val count = logDao.getCount()
                 
+                // Issue #1416: Heap-aware threshold adjustments
+                val memoryCritical = health.heapAllocatedMb >= MEMORY_CRITICAL_THRESHOLD_MB
+                val memoryHigh = health.heapAllocatedMb >= MEMORY_PRESSURE_THRESHOLD_MB
+
                 val threshold = when {
-                    health.isStorageCritical -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
-                    health.isStorageLow -> ADAPTIVE_PRUNE_THRESHOLD_LOW
+                    health.isStorageCritical || memoryCritical -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
+                    health.isStorageLow || memoryHigh -> ADAPTIVE_PRUNE_THRESHOLD_LOW
                     health.isBatteryCritical -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL 
                     health.isCharging -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING 
                     else -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL
                 }
 
                 if (count > threshold) {
-                    val heartbeatTarget = if (health.isStorageLow) 100 else 500
-                    val generalTarget = if (health.isStorageLow) 1000 else 2000 
-                    val forensicTarget = if (health.isStorageCritical) FORENSIC_PRUNE_LIMIT_CRITICAL else if (health.isStorageLow) FORENSIC_PRUNE_LIMIT_LOW else if (health.isCharging) FORENSIC_PRUNE_LIMIT_CHARGING else FORENSIC_PRUNE_LIMIT_NORMAL
+                    val heartbeatTarget = if (health.isStorageLow || memoryHigh) 100 else 500
+                    val generalTarget = if (health.isStorageLow || memoryHigh) 1000 else 2000 
+                    val forensicTarget = if (health.isStorageCritical || memoryCritical) FORENSIC_PRUNE_LIMIT_CRITICAL else if (health.isStorageLow || memoryHigh) FORENSIC_PRUNE_LIMIT_LOW else if (health.isCharging) FORENSIC_PRUNE_LIMIT_CHARGING else FORENSIC_PRUNE_LIMIT_NORMAL
                     
-                    val maxChunks = if (health.isStorageCritical) 30 else 15
+                    val maxChunks = if (health.isStorageCritical || memoryCritical) 30 else 15
                     val hT = logDao.getHeartbeatPruneThreshold(heartbeatTarget)
                     val gT = logDao.getGeneralPruneThreshold(generalTarget)
                     val iT = logDao.getImportantPruneThreshold(2000)

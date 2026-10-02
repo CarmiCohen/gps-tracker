@@ -6,6 +6,9 @@ import kotlin.math.min
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * Oct.2.1:
+ * - Issue #1415: Load-Aware IMU Gating (R-ID 590/591). Integrated cpuLoad into 
+ *   vibration and shock evaluation to compensate for LIS2DLC12 jitter under saturation.
  * Sep.02.01:
  * - Issue #897: Added sensitivity mapping for Tilt and Vibration (R2.3).
  *   Tilt range: 5° to 25° (0.5 -> 15°).
@@ -30,22 +33,40 @@ object SentinelValidator {
     
     fun isLiftViolated(relativeAltitude: Double): Boolean = isAltitudeViolated(relativeAltitude)
 
-    fun isShockViolated(peakShock: Double, adaptiveFloor: Double = INITIAL_VIBRATION_FLOOR, sensitivity: Float = 0.5f): Boolean {
+    fun isShockViolated(
+        peakShock: Double, 
+        adaptiveFloor: Double = INITIAL_VIBRATION_FLOOR, 
+        sensitivity: Float = 0.5f,
+        cpuLoad: Double = 0.0
+    ): Boolean {
+        // Issue #1415: Expand threshold under high CPU load to ignore jitter (R-ID 590)
+        val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 1.5 else 1.0
+        
         // Map 0.0..1.0 to 1.4g..0.2g (Higher sensitivity = Lower threshold)
-        val baseThreshold = 0.2 + (1.4 - 0.2) * (1.0 - sensitivity)
-        val dynamicThreshold = maxOf(baseThreshold, adaptiveFloor * VIBRATION_SHOCK_MULTIPLIER)
+        val baseThreshold = (0.2 + (1.4 - 0.2) * (1.0 - sensitivity)) * loadFactor
+        val dynamicThreshold = maxOf(baseThreshold, adaptiveFloor * VIBRATION_SHOCK_MULTIPLIER * loadFactor)
         return peakShock > dynamicThreshold
     }
 
-    fun isVibrationSuspicious(vibration: Double, adaptiveFloor: Double = INITIAL_VIBRATION_FLOOR, sensitivity: Float = 0.5f): Boolean {
+    fun isVibrationSuspicious(
+        vibration: Double, 
+        adaptiveFloor: Double = INITIAL_VIBRATION_FLOOR, 
+        sensitivity: Float = 0.5f,
+        cpuLoad: Double = 0.0
+    ): Boolean {
+        // Issue #1415: Expand threshold under high CPU load to ignore jitter (R-ID 590)
+        val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 1.5 else 1.0
+        
         // Map 0.0..1.0 to 0.45g..0.05g (Higher sensitivity = Lower threshold)
-        val baseThreshold = 0.05 + (0.45 - 0.05) * (1.0 - sensitivity)
-        val dynamicThreshold = maxOf(baseThreshold, adaptiveFloor * VIBRATION_SUSPICIOUS_MULTIPLIER)
+        val baseThreshold = (0.05 + (0.45 - 0.05) * (1.0 - sensitivity)) * loadFactor
+        val dynamicThreshold = maxOf(baseThreshold, adaptiveFloor * VIBRATION_SUSPICIOUS_MULTIPLIER * loadFactor)
         return vibration > dynamicThreshold
     }
 
-    fun isStationary(vibration: Double, adaptiveFloor: Double): Boolean {
-        val dynamicGate = (adaptiveFloor * STATIONARY_FLOOR_MULT).coerceIn(INITIAL_VIBRATION_FLOOR, VIBRATION_STATIONARY_THRESHOLD)
+    fun isStationary(vibration: Double, adaptiveFloor: Double, cpuLoad: Double = 0.0): Boolean {
+        // Issue #1415: Increase stationary floor multiplier during load saturation to maintain state (R-ID 590)
+        val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 2.0 else 1.0
+        val dynamicGate = (adaptiveFloor * STATIONARY_FLOOR_MULT * loadFactor).coerceIn(INITIAL_VIBRATION_FLOOR, VIBRATION_STATIONARY_THRESHOLD * loadFactor)
         return vibration < dynamicGate
     }
 
@@ -89,8 +110,12 @@ object SentinelValidator {
     /**
      * R730: Unified Vibration Floor Update (EMA).
      */
-    fun updateVibrationFloor(currentFloor: Double, vibration: Double, isWarming: Boolean): Double {
+    fun updateVibrationFloor(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double = 0.0): Double {
         if (vibration.isNaN() || vibration <= 0.0) return currentFloor
+        
+        // Issue #1415: Stable Load Gate (R-ID 591). Pause recalibration during CPU saturation bursts
+        // to prevent baseline corruption from hardware jitter.
+        if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) return currentFloor
         
         return if (vibration < currentFloor) {
             val alpha = accelerateAlpha(VIBRATION_EMA_DOWN_FAST, isWarming, 0.5)

@@ -29,17 +29,17 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.2.6:
+ * - Issue #1175: Real-time Only Path. Removed addHistoryPoints (plural) 
+ *   as it was exclusively used for forensic backfilling. Simplified 
+ *   telemetry ingestion to real-time streams only. Fixed saveBooleanSync 
+ *   reference to use suspend saveBoolean inside scope.
  * Oct.1.3:
- * - Issue #1408: Telemetry Convergence. Unified lastAlarmAckTsFlow to utilize 
- *   AppRole.VIEWER_REMOTE in viewer mode, ensuring parity with AppAlarmManager.
- *   Added viewerRemoteAlarmAckTs tracking to prevent authority collision (R-ID 565).
+ * - Issue #1408: Telemetry Convergence.
  * Oct.1.1:
- * - Issue #1407: Unified Storage Authority. Purged all legacy string-prefixed 
- *   role overloads to resolve compiler ambiguity and enforce AppRole enum 
- *   as the exclusive authority for persistent state isolation (R-ID 568).
+ * - Issue #1407: Unified Storage Authority.
  * Sep.30.60:
- * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum for 
- *   acknowledgment tracking and prefix authority (R-ID 453/565).
+ * - Issue #1406: Standardized Role Identity.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -230,7 +230,7 @@ class MainRepository @Inject constructor(
     suspend fun getInt(role: AppRole, key: String, default: Int): Int = settings.getInt(role, key, default)
     suspend fun getBoolean(role: AppRole, key: String, default: Boolean): Boolean = settings.getBoolean(role, key, default)
 
-    // --- Global String-Keyed API (Non-Namespaced only) ---
+    // --- Global String-Keyed API ---
 
     suspend fun saveString(key: String, value: String) = settings.saveString(key, value)
     fun saveStringSync(key: String, value: String) { scope.launch { settings.saveString(key, value) } }
@@ -393,16 +393,6 @@ class MainRepository @Inject constructor(
         }
     }
 
-    fun addHistoryPoints(ribbonKey: String, points: List<ConnectionPoint>) {
-        scope.launch { _liveHistoryFlow.emit(ribbonKey to points.map { p -> ConnectionPoint().apply { copyFrom(p) } }) }
-        if (!PersistencePolicy.shouldSaveHistoryPoint(telemetry.systemHealth.value)) return
-        points.forEach { historyBuffer.add(TelemetryMapper.mapAppToEntity(it, ribbonKey)) }
-        val nowRt = timeProvider.elapsedRealtime()
-        if ((nowRt - lastBatchWriteRealtime > HISTORY_BATCH_WRITE_INTERVAL_MS) || (historyBuffer.size >= HISTORY_BUFFER_MAX_SIZE)) {
-            scope.launch { flushHistoryBufferInternal(nowRt) }
-        }
-    }
-
     private fun startUiHistoryEmitter() {
         scope.launch {
             while (isActive) {
@@ -457,6 +447,7 @@ class MainRepository @Inject constructor(
     suspend fun getLastAlarmAckTs(): Long = settings.getLong(LAST_ALARM_ACK_TS_KEY, 0L)
     suspend fun addPendingStatusUpdate(update: PendingStatusEntity) { offlineRepository.addPendingStatusUpdate(update) }
     suspend fun getPendingStatusUpdates(limit: Int): List<PendingStatusEntity> = offlineRepository.getPendingStatusUpdates(limit)
+    suspend fun addPendingStatusUpdateSync(update: PendingStatusEntity) { scope.launch { offlineRepository.addPendingStatusUpdate(update) } }
     suspend fun deletePendingStatusUpdate(id: Long) = offlineRepository.deletePendingStatusUpdate(id)
 
     suspend fun saveActiveAlarms(alarms: List<AlarmEvaluationState.ActiveAlarm>, role: AppRole? = null) {

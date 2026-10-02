@@ -17,6 +17,9 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Oct.2.1:
+ * - Issue #1416: Memory Pressure Mitigation (R-ID 592). Integrated heap-aware 
+ *   MemoryPressureChanged event emission to trigger aggressive flushing on A15.
  * Oct.1.3:
  * - Issue #1408: Thermal State Recovery. Persist cooling mode and entry realtime 
  *   to SettingsRepository to ensure forensic continuity across restarts.
@@ -56,6 +59,8 @@ class IntegrityMonitor @Inject constructor(
 
     private var lastInternetCheckRt = 0L
     private val INTERNET_CHECK_TTL_MS = 5000L
+    
+    private var lastMemoryPressure = MemoryPressureLevel.NORMAL
 
     private val _health = MutableStateFlow(SystemHealthState())
     val healthFlow: StateFlow<SystemHealthState> = _health.asStateFlow()
@@ -244,6 +249,21 @@ class IntegrityMonitor @Inject constructor(
         }
 
         hardwareSuite.setMaliAnomaly(maliAnomaly)
+        
+        // Issue #1416: Memory Pressure Audit
+        val currentPressure = when {
+            heap >= MEMORY_CRITICAL_THRESHOLD_MB -> MemoryPressureLevel.CRITICAL
+            heap >= MEMORY_PRESSURE_THRESHOLD_MB -> MemoryPressureLevel.HIGH
+            else -> MemoryPressureLevel.NORMAL
+        }
+        
+        if (currentPressure != lastMemoryPressure) {
+            lastMemoryPressure = currentPressure
+            domainEventBus.emit(IntegrityEvent.MemoryPressureChanged(currentPressure, heap))
+            if (currentPressure != MemoryPressureLevel.NORMAL) {
+                Timber.w("Memory Pressure Warning: Level $currentPressure (Heap: %.1f MB)".format(heap))
+            }
+        }
 
         updateHealth { h ->
             h.lastIntegrityHeartbeatRt = nowRt
@@ -517,6 +537,19 @@ class IntegrityMonitor @Inject constructor(
         return isSteep
     }
 
+    private fun updateMemoryPressure(heap: Double) {
+        val currentPressure = when {
+            heap >= MEMORY_CRITICAL_THRESHOLD_MB -> MemoryPressureLevel.CRITICAL
+            heap >= MEMORY_PRESSURE_THRESHOLD_MB -> MemoryPressureLevel.HIGH
+            else -> MemoryPressureLevel.NORMAL
+        }
+        
+        if (currentPressure != lastMemoryPressure) {
+            lastMemoryPressure = currentPressure
+            domainEventBus.emit(IntegrityEvent.MemoryPressureChanged(currentPressure, heap))
+        }
+    }
+
     fun setMaxTemperature(temp: Double) {
         updateHealth { it.maxTemp = temp }
     }
@@ -692,6 +725,7 @@ class IntegrityMonitor @Inject constructor(
         
         repository.saveBooleanSync(IS_COOLING_MODE_ACTIVE_KEY, false)
         repository.saveLongSync(COOLING_ENTERED_RT_KEY, 0L)
+        lastMemoryPressure = MemoryPressureLevel.NORMAL
     }
 
     fun getBatteryLevel(): Int = currentHealth.batteryLevel

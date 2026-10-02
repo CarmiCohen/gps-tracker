@@ -1,3 +1,18 @@
+# 🏛️ Resolution Archive - Oct.2.6
+
+## 🏁 Issue #1175 / SOT ID 595: Real-time Only Path (Strategic Removal of Forensic Backfilling)
+*   **Resolved**: Oct.2.6
+*   **Root Cause**: Legacy telemetry backfilling logic introduced significant architectural complexity, required large memory buffers (`backfillPool`, `backfillBuffer`), and increased synchronization risks during jitter-heavy connectivity transitions.
+*   **Remediations**:
+    *   **Architecture Simplification**: Purged all gap-filling and forensic backfilling logic from `HistoryManager`.
+    *   **Memory Footprint Reduction**: Eliminated 1000-point backfill pools and supporting data sequences, reducing heap pressure on budget hardware (A15).
+    *   **Dependency Pruning**: Removed `HardwareSuite` and `LocationProcessor` dependencies from `HistoryManager`, as history recording is now strictly event-driven.
+    *   **Interface Hardening**: Removed plural `addHistoryPoints` from `MainRepository` to enforce single-point real-time ingestion.
+*   **Significance**: Strategic (Simplification).
+*   **SOT ID**: 595
+
+---
+
 # 🏛️ Resolution Archive - Oct.2.5
 
 ## 🏁 Issue #SIMP-1416-1 / SOT ID 594: Native Sensor Pulse Audit

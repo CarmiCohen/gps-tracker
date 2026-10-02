@@ -2,23 +2,13 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * Sep.30.60:
- * - Issue #1403: Standardized Siren Lockout to 30s as per SOT mandate.
- * Sep.30.4:
- * - Alignment: Updated to alignment Sep.30.4.
- * Sep.29.6:
- * - Issue #1378 Hardening: Renamed FORENSIC_SPILL_ENTRY_SIZE to ..._V5 to 
- *   force compilation cache invalidation across hardware-specific builds.
- * Sep.29.3:
- * - Issue #1378: Increased FORENSIC_SPILL_ENTRY_SIZE to 128 bytes to provide 
- *   ample headroom for forensic probes and technical metadata on high-performance 
- *   hardware tiers (S21).
- * Sep.27.6:
- * - Issue #1161: Added unified TRAJECTORY_BUFFER_MAX_SIZE and TRAJECTORY_HINDSIGHT_MAX_AGE_MS constants.
- * Sep.20.12:
- * - Issue #1149: Added LIGHT_LOCKOUT_MS (5s) for fast-path tamper persistence.
- * Sep.19.06:
- * - Issue #1111: Added DISPLAY_FLICKER_TIMEOUT_MS (3s) for proximity hysteresis decay.
+ * Oct.2.6:
+ * - Issue #1175: Real-time Only Path. Purged obsolete backfill constants: 
+ *   REAL_TIME_GAP_LIMIT_MS, SENSOR_SAMPLE_BUFFER_MAX_AGE_MS, and MAX_BACKFILL_POINTS.
+ * Oct.2.1:
+ * - Issue #1417: Added CONNECTIVITY_HYSTERESIS_MS (3s).
+ * - Issue #1416: Memory Pressure Mitigation. Added heap thresholds.
+ * - Issue #1415: Added SENSOR_LOAD_GATE_CPU_THRESHOLD (0.85).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -48,6 +38,16 @@ const val LOG_LIMIT_STRICT = 5000
 const val SILENT_FAILURE_CPU_THRESHOLD = 0.85
 const val SILENT_FAILURE_IOW_THRESHOLD = 0.40
 const val SILENT_FAILURE_LATENCY_THRESHOLD_MS = 800L
+
+// Issue #1415: Sensor Load Gating
+const val SENSOR_LOAD_GATE_CPU_THRESHOLD = 0.85
+
+// Issue #1416: Memory Pressure Thresholds (MB)
+const val MEMORY_PRESSURE_THRESHOLD_MB = 200.0
+const val MEMORY_CRITICAL_THRESHOLD_MB = 250.0
+
+// Issue #1417: Connectivity Jitter
+const val CONNECTIVITY_HYSTERESIS_MS = 3000L
 
 // Issue #660: Forensic Audit: Log Buffer Pressure
 const val LOG_BATCH_SIZE = 100 
@@ -158,6 +158,7 @@ const val SCATTER_ANGLE_THRESHOLD = 120.0
 const val BREACH_THRESHOLD_DB_JUMP = 40.0 
 const val ACOUSTIC_THRESHOLD_DB_JUMP = 40.0 
 const val ACOUSTIC_SUSPICIOUS_THRESHOLD_DB_JUMP = 20.0
+const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L
 const val ACOUSTIC_MIN_THRESHOLD_DB = 50.0
 const val ACOUSTIC_FLOOR_MIN_DB = 50.0 
 const val ACOUSTIC_FLOOR_CONTRACTION_EMA = 0.995
@@ -361,9 +362,6 @@ const val RIBBON_CPU_LOAD_SCALE = 1.0
 const val RIBBON_IO_WAIT_SCALE = 1.0
 const val RIBBON_LATENCY_SCALE_MS = 1000.0
 
-const val SENSOR_SAMPLE_BUFFER_MAX_AGE_MS = 30000L
-const val MAX_BACKFILL_POINTS = 1000
-
 const val SIGNALING_EMIT_DELAY_MS = 50L
 const val SIGNALING_EMIT_DELAY_VIOLATION_MS = 20L
 const val SIGNALING_CONFLATION_DELAY_MS = 100L
@@ -452,7 +450,6 @@ const val ALERT_TITLE_JUMP_ALERT = "Jammer Alert"
 const val ALERT_TITLE_VISUAL_JUMP = "Visual Jump"
 
 // System Watchdog & Grace Periods
-const val ALERT_TRIGGER_GRACE_PERIOD_MS = 2000L
 const val SYSTEM_WATCHDOG_INTERVAL_MS = 90000L
 const val SYSTEM_WATCHDOG_THROTTLE_MS = 60000L
 const val WATCHDOG_DANGER_WINDOW_MS = 20000L
@@ -489,7 +486,6 @@ const val PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR = 2000L
 const val DISPLAY_FLICKER_TIMEOUT_MS = 3000L
 
 // History & Persistence Logic
-const val REAL_TIME_GAP_LIMIT_MS = 10000L
 const val DRIFT_TOLERANCE_MS = 5000L
 const val DAILY_CLEANUP_HOUR = 2
 const val DAILY_CLEANUP_MINUTE = 5

@@ -5,10 +5,6 @@ import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -22,23 +18,25 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Oct.2.6:
+ * - Issue #1175: Real-time Only Path. Strategically removed forensic backfilling 
+ *   and gap-filling logic to simplify architectural state management. Removed 
+ *   dependencies on HardwareSuite and LocationProcessor.
+ * Oct.2.2:
+ * - Issue #1416: Memory Pressure Mitigation (R-ID 592). Added trimMemory.
  * Oct.1.1:
  * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
- *   API in SettingsRepository, eliminating manual prefixing. Refactored initialize 
- *   to accept AppRole directly.
+ *   API in SettingsRepository.
  * Sep.30.60:
- * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
- *   ensure prefix consistency (R-ID 453/565).
+ * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum.
  * Sep.27.4:
- * - Issue #1348: Flattened DomainEvent hierarchy, emitting HistoryEvent directly.
+ * - Issue #1348: Flattened DomainEvent hierarchy.
  */
 @Singleton
 class HistoryManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val repository: MainRepository,
     private val timeProvider: TimeProvider,
-    private val hardwareSuite: HardwareSuite,
-    private val locationProcessor: LocationProcessor,
     private val domainEventBus: DomainEventBus
 ) {
     private var scope: CoroutineScope? = null
@@ -52,16 +50,8 @@ class HistoryManager @Inject constructor(
     private val aggregator = TelemetryAggregator()
     
     private val currentPointFlyweight = EngineConnectionPoint()
-    private val baseTemplateFlyweight = EngineConnectionPoint()
-    
     private val appPointPool = Array(RibbonScale.entries.size) { ConnectionPoint() }
     
-    private val backfillPool = Array(MAX_BACKFILL_POINTS) { ConnectionPoint() }
-    private val backfillBuffer = ArrayList<ConnectionPoint>(MAX_BACKFILL_POINTS)
-
-    private var backfillAuditCount = 0
-    private var hourlyBackfillTotal = 0
-    private var lastAuditTs = 0L
     private var lastTimeTriggerTs = 0L
     private var lastSitDetectedRt = 0L
     private var currentRole: AppRole = AppRole.TRACKER
@@ -73,7 +63,6 @@ class HistoryManager @Inject constructor(
      */
     suspend fun initialize(scope: CoroutineScope, role: AppRole = AppRole.TRACKER) {
         this.scope = scope
-        // R-ID 453/565: HistoryManager initialization handles the local role (Tracker or Viewer-Self)
         this.currentRole = role
         
         withContext(Dispatchers.IO) {
@@ -111,11 +100,15 @@ class HistoryManager @Inject constructor(
         lastProcessedHour = -1
         lastCleanupDate = ""
         lastArchiveDate = ""
-        backfillAuditCount = 0
-        hourlyBackfillTotal = 0
-        lastAuditTs = 0L
         lastTimeTriggerTs = 0L
         aggregator.reset()
+    }
+    
+    /**
+     * trimMemory: Issue #1416 Hardening.
+     */
+    suspend fun trimMemory() = ribbonMutex.withLock {
+        appPointPool.forEach { it.reset() }
     }
 
     private fun emitSanitizedLog(message: String, isImportant: Boolean = false) {
@@ -204,28 +197,6 @@ class HistoryManager @Inject constructor(
         isUltraLongStationary: Boolean = false
     ) = ribbonMutex.withLock {
         detectClockTampering(now)
-        val deltaRt = if (lastTickRt > 0) nowRt - lastTickRt else 0L
-        
-        if (now - lastAuditTs > 60000L) {
-            if (backfillAuditCount > 0) {
-                emitSanitizedLog("Forensic: 4M Continuity Audit - Backfilled $backfillAuditCount points")
-                backfillAuditCount = 0
-            }
-            lastAuditTs = now
-        }
-
-        if (lastTickRt > 0 && deltaRt > REAL_TIME_GAP_LIMIT_MS) {
-            fillRealGap(lastTickTs, lastTickRt, now, nowRt, isTrackerMode)
-        } else if (lastTickRt > 0 && deltaRt > 1500L) {
-            backfillAnalyticalGaps(
-                lastTickTs, lastTickRt, now, nowRt, rtt, peerSignal, peerAvail, hasGps, isTrackerMode,
-                accuracy, maxAccuracy, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, snrIdx, tiltIdx, baroIdx,
-                verticalVelocity, sitVz, sitVzTs, sitVzRt, sitDz, sitBaro, sitTilt, sitShock,
-                isBatterySteepDischarge, isCoolingModeActive, speed, bearing, isSitDetected, isSitActive,
-                currentMa, locationPendingReason, kineticEnergy, isRecoveryEvent,
-                cpuLoad, ioWait, maxIoLatency, isSilentFailure, isBatteryLow, isBatteryCritical, isUltraLongStationary
-            )
-        }
 
         currentPointFlyweight.apply {
             ts = now; rt = nowRt; this.rtt = rtt; remoteSig = peerSignal; isConnected = peerAvail; isGap = false
@@ -261,100 +232,6 @@ class HistoryManager @Inject constructor(
         }
     }
 
-    private fun backfillAnalyticalGaps(
-        lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, rtt: Int,
-        peerSignal: Int, peerAvail: Boolean, hasGps: Boolean, isTrackerMode: Boolean,
-        accuracy: Double, maxAccuracy: Double, noiseIdx: Double, luxIdx: Double,
-        vibeIdx: Double, proxIdx: Double, liftIdx: Double, snrIdx: Double,
-        tiltIdx: Double, baroIdx: Double, verticalVelocity: Double, sitVz: Double,
-        sitVzTs: Long, sitVzRt: Long, sitDz: Double, sitBaro: Double,
-        sitTilt: Double, sitShock: Double, isBatterySteepDischarge: Boolean,
-        isCoolingModeActive: Boolean, speed: Double, bearing: Double,
-        isSitDetected: Boolean, isSitActive: Boolean, currentMa: Int,
-        locationPendingReason: LocationPendingReason, kineticEnergy: Double,
-        isRecoveryEvent: Boolean, cpuLoad: Double, ioWait: Double, maxIoLatency: Long,
-        isSilentFailure: Boolean, isBatteryLow: Boolean, isBatteryCritical: Boolean,
-        isUltraLongStationary: Boolean
-    ) {
-        val snrSamples = if (isTrackerMode) hardwareSuite.getSnrSamples(lastTickRt + 1, nowRt) else emptySequence()
-        val sensorSamples = if (isTrackerMode) hardwareSuite.getSensorSamples(lastTickRt + 1, nowRt) else emptySequence()
-        val acousticSamples = if (isTrackerMode) hardwareSuite.getAcousticSamples(lastTickRt + 1, nowRt) else emptySequence()
-        
-        baseTemplateFlyweight.apply {
-            ts = 0L; rt = 0L; this.rtt = rtt; remoteSig = peerSignal; isConnected = peerAvail; this.hasGps = hasGps
-            this.isRecoveryEvent = isRecoveryEvent
-            this.accuracy = accuracy; this.maxAccuracy = maxAccuracy
-            this.isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt)
-            this.isSitActive = isSitActive; this.isBatterySteepDischarge = isBatterySteepDischarge
-            this.isCoolingModeActive = isCoolingModeActive; this.speed = speed; this.bearing = bearing
-            this.currentMa = currentMa; this.locationPendingReason = locationPendingReason; this.kineticEnergy = kineticEnergy
-            this.cpuLoad = cpuLoad; this.ioWait = ioWait; this.maxIoLatency = maxIoLatency; this.isSilentFailure = isSilentFailure
-            this.isBatteryLow = isBatteryLow; this.isBatteryCritical = isBatteryCritical
-            this.noiseIdx = noiseIdx; this.luxIdx = luxIdx; this.vibeIdx = vibeIdx; this.proxIdx = proxIdx
-            this.initLiftIdx(liftIdx); this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
-            this.sitVz = sitVz; this.sitVzTs = sitVzTs; this.sitVzRt = sitVzRt; this.sitDz = sitDz
-            this.sitBaro = sitBaro; this.sitTilt = sitTilt; this.sitShock = sitShock; this.verticalVelocity = verticalVelocity
-            this.isUltraLongStationary = isUltraLongStationary
-        }
-        
-        backfillBuffer.clear()
-        var poolIdx = 0
-        
-        aggregator.backfillGaps(
-            lastTickRt, nowRt, lastTickTs, now, snrSamples, sensorSamples, acousticSamples,
-            locationProcessor.getAcousticFloorDb(), baseTemplateFlyweight
-        ) { scale, point ->
-            if (poolIdx >= MAX_BACKFILL_POINTS) return@backfillGaps
-            
-            val appPoint = backfillPool[poolIdx++]
-            appPoint.reset()
-            TelemetryMapper.mapEngineToApp(point, appPoint)
-            
-            if (scale == RibbonScale.FOUR_MIN) { 
-                backfillBuffer.add(appPoint) 
-            } else { 
-                repository.addHistoryPoint(scale.key, appPoint) 
-            }
-        }
-        
-        if (backfillBuffer.isNotEmpty()) {
-            repository.addHistoryPoints("4M", backfillBuffer)
-            backfillAuditCount += backfillBuffer.size
-            hourlyBackfillTotal += backfillBuffer.size
-        }
-    }
-
-    private fun fillRealGap(lastTickTs: Long, lastTickRt: Long, now: Long, nowRt: Long, isTrackerMode: Boolean) {
-        val snrSamples = if (isTrackerMode) hardwareSuite.getSnrSamples(lastTickRt, nowRt) else emptySequence()
-        val sensorSamples = if (isTrackerMode) hardwareSuite.getSensorSamples(lastTickRt, nowRt) else emptySequence()
-        val acousticSamples = if (isTrackerMode) hardwareSuite.getAcousticSamples(lastTickRt, nowRt) else emptySequence()
-        
-        RibbonScale.entries.forEach { scale ->
-            backfillBuffer.clear()
-            var poolIdx = 0
-            
-            aggregator.fillRealGap(
-                scale, lastTickRt, nowRt, lastTickTs, snrSamples, sensorSamples, acousticSamples,
-                locationProcessor.getAcousticFloorDb()
-            ) { point ->
-                if (poolIdx >= MAX_BACKFILL_POINTS) return@fillRealGap
-
-                val appPoint = backfillPool[poolIdx++]
-                appPoint.reset()
-                TelemetryMapper.mapEngineToApp(point, appPoint)
-                backfillBuffer.add(appPoint)
-            }
-            
-            if (backfillBuffer.isNotEmpty()) { 
-                repository.addHistoryPoints(scale.key, backfillBuffer)
-                if (scale == RibbonScale.FOUR_MIN) {
-                    backfillAuditCount += backfillBuffer.size
-                    hourlyBackfillTotal += backfillBuffer.size
-                }
-            }
-        }
-    }
-
     private fun detectClockTampering(nowWall: Long) {
         val monotonic = timeProvider.elapsedRealtime()
         val currentDrift = nowWall - monotonic
@@ -386,10 +263,6 @@ class HistoryManager @Inject constructor(
                 if (repository.getInt(LAST_AUTO_SAVE_HOUR_KEY, -1) != hour) {
                     lastProcessedHour = hour
                     repository.saveIntSync(LAST_AUTO_SAVE_HOUR_KEY, hour)
-                    if (hourlyBackfillTotal > 0) {
-                        emitSanitizedLog("Forensic: Hourly Continuity Audit - Backfilled $hourlyBackfillTotal points.")
-                        hourlyBackfillTotal = 0
-                    }
                     emitSanitizedLog("Hourly auto-export")
                     scope?.launch(Dispatchers.IO) { 
                         MainFileHelper.autoExportData(context, repository, timeProvider) 

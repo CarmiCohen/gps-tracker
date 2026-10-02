@@ -24,6 +24,9 @@ import javax.inject.Inject
 /**
  * AlarmOverlayService: Implements SYSTEM_ALERT_WINDOW to ensure alarm visibility 
  * even when the app is in background and device is unlocked.
+ * Oct.2.2:
+ * - Issue #1402-B Hardening: Added ON_RESUME/ON_PAUSE lifecycle transitions to 
+ *   ensure Compose state flows are fully active and properly paused (R-ID 582).
  * Oct.1.8:
  * - Issue #1402-B: Hardened teardown to prevent WindowManager leaks (R-ID 582).
  */
@@ -88,7 +91,7 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
             gravity = Gravity.CENTER
         }
 
-        composeView = ComposeView(this).apply {
+        val view = ComposeView(this).apply {
             setViewTreeLifecycleOwner(this@AlarmOverlayService)
             setViewTreeViewModelStoreOwner(this@AlarmOverlayService)
             setViewTreeSavedStateRegistryOwner(this@AlarmOverlayService)
@@ -139,22 +142,26 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
                 )
             }
         }
+        
+        composeView = view
 
         try {
-            windowManager.addView(composeView, layoutParams)
+            windowManager.addView(view, layoutParams)
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         } catch (e: Exception) {
             stopSelf()
         }
     }
 
     override fun onDestroy() {
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
         composeView?.let { 
             it.disposeComposition()
             try {
                 windowManager.removeViewImmediate(it)
             } catch (e: Exception) {
-                // View might already be detached
+                // View might already be detached or window manager closed
             }
         }
         composeView = null

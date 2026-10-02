@@ -4,20 +4,13 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * Oct.2.6:
+ * - Issue #1175: Real-time Only Path. Removed backfillGaps and fillRealGap 
+ *   as part of the strategic simplification of the telemetry pipeline.
  * Sep.21.127:
- * - Issue #1156/1157: Telemetry Abstraction Integration. Refactored backfillGaps 
- *   and fillRealGap to consume EngineAcousticSample directly from HardwareSuite, 
- *   ensuring environmental noise is semantically decoupled from SNR (R-ID 393).
+ * - Issue #1156/1157: Telemetry Abstraction Integration.
  * Sep.13.30:
- * - Issue #1017 Hardening: Added reset() method to clear forensic counters 
- *   and transient state during role transitions (R-ID 317).
- * Aug.31.00:
- * - Issue #782: Protocol Audit - Binary Schema Expansion. Added 
- *   violationUptimeMs and isUltraLongStationary to aggregation logic (R782).
- * Aug.14.03:
- * - Issue #171: Forensic Jitter Audit. Hardened processPoint with a 
- *   monotonicity guard to prevent "Ghost Spikes" and "Replay Snap-backs" 
- *   when out-of-order packets arrive within the jitter window (R171).
+ * - Issue #1017 Hardening: Added reset().
  */
 class TelemetryAggregator {
 
@@ -197,6 +190,8 @@ class TelemetryAggregator {
     }
 
     private companion object {
+        private const val MONOTONIC_JITTER_TOLERANCE_MS = 2000L
+
         private fun getReasonPriority(reason: LocationPendingReason): Int {
             return when (reason) {
                 LocationPendingReason.NONE -> 0
@@ -213,6 +208,17 @@ class TelemetryAggregator {
             val p2 = getReasonPriority(r2)
             return if (p2 >= p1) r2 else r1
         }
+
+        private fun isScaleTick(scale: RibbonScale, totalSeconds: Int): Boolean {
+            return when (scale) {
+                RibbonScale.FOUR_MIN -> totalSeconds % 60 == 0
+                RibbonScale.SIXTEEN_MIN -> totalSeconds % 240 == 0
+                RibbonScale.ONE_HOUR -> totalSeconds % 900 == 0
+                RibbonScale.FOUR_HOUR -> totalSeconds % 3600 == 0
+                RibbonScale.TWENTY_FOUR_HOUR -> totalSeconds % 21600 == 0
+                RibbonScale.SEVEN_DAY -> totalSeconds % 86400 == 0
+            }
+        }
     }
 
     /**
@@ -228,16 +234,12 @@ class TelemetryAggregator {
 
     /**
      * processPoint: Main entry for telemetry points.
-     * R171: Added monotonicity guard. Packets arriving "from the past" (due to jitter) 
-     * are merged into the current bucket if valid, but never trigger out-of-order 
-     * emissions for higher scales.
      */
     fun processPoint(point: EngineConnectionPoint, onResult: (RibbonScale, EngineConnectionPoint) -> Unit) {
         val timeRef = if (point.rt > 0) point.rt else point.ts
         val totalSeconds = (timeRef / TICK_INTERVAL_MS).toInt()
 
         // 1. FOUR_MIN (Index 0): High-fidelity pass-through.
-        // R171: Allow slight regressions for 4M to avoid data loss, but mark them as jitter.
         val flyweight4M = resultFlyweights[0]
         flyweight4M.copyFrom(point)
         flyweight4M.isTick = totalSeconds % 60 == 0
@@ -247,12 +249,11 @@ class TelemetryAggregator {
             if (timeRef > lastProcessedTs[0]) lastProcessedTs[0] = timeRef
         }
 
-        // 2. Other scales: Aggregated to prevent "Aggregation Storms".
+        // 2. Other scales: Aggregated.
         for (i in 1 until scales.size) {
             val scale = scales[i]
             val acc = accumulators[i]
             
-            // Jitter Guard: If point is older than the last emitted bucket, it's too late to merge.
             if (lastEmittedTick[i] != -1 && totalSeconds < lastEmittedTick[i]) continue
 
             if (totalSeconds % scale.intervalSeconds == 0) {
@@ -273,137 +274,6 @@ class TelemetryAggregator {
             } else {
                 acc.merge(point)
             }
-        }
-    }
-
-    /**
-     * backfillGaps: Refactored to consume specialized EngineAcousticSample sequence.
-     * Issue #1156: Unused Forensic Abstraction.
-     */
-    fun backfillGaps(
-        lastTickRt: Long, nowRt: Long, lastTickTs: Long, nowTs: Long,
-        snrSamples: Sequence<EngineSnrSample>, 
-        sensorSamples: Sequence<EngineSensorSnapshot>,
-        acousticSamples: Sequence<EngineAcousticSample>,
-        acousticFloor: Double, baseTemplate: EngineConnectionPoint,
-        onResult: (RibbonScale, EngineConnectionPoint) -> Unit
-    ) {
-        val fillPointFlyweight = EngineConnectionPoint()
-        var fillRt = lastTickRt + TICK_INTERVAL_MS
-        var fillTs = lastTickTs + TICK_INTERVAL_MS
-        var pointsGenerated = 0
-        val snrIter = snrSamples.iterator()
-        val sensorIter = sensorSamples.iterator()
-        val acousticIter = acousticSamples.iterator()
-        
-        var nextSnr = if (snrIter.hasNext()) snrIter.next() else null
-        var nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
-        var nextAcoustic = if (acousticIter.hasNext()) acousticIter.next() else null
-
-        while (fillRt < nowRt && pointsGenerated < MAX_BACKFILL_POINTS) {
-            val windowEndRt = fillRt + TICK_INTERVAL_MS - 1
-            while (nextSnr != null && nextSnr.rt < fillRt) nextSnr = if (snrIter.hasNext()) snrIter.next() else null
-            while (nextSensor != null && nextSensor.rt < fillRt) nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
-            while (nextAcoustic != null && nextAcoustic.rt < fillRt) nextAcoustic = if (acousticIter.hasNext()) acousticIter.next() else null
-
-            val resolvedSnr = if (nextSnr != null && nextSnr.rt <= windowEndRt) (nextSnr.snr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) else baseTemplate.snrIdx
-            val snapshot = if (nextSensor != null && nextSensor.rt <= windowEndRt) nextSensor else null
-            val resolvedAcoustic = if (nextAcoustic != null && nextAcoustic.rt <= windowEndRt) nextAcoustic.db else (snapshot?.acoustic ?: baseTemplate.noiseIdx * RIBBON_NOISE_SCALE_DB + acousticFloor)
-            
-            fillPointFlyweight.apply {
-                copyFrom(baseTemplate)
-                ts = fillTs; rt = fillRt; isGap = false; isRecoveryEvent = false 
-                snrIdx = resolvedSnr
-                noiseIdx = ((resolvedAcoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB)
-                luxIdx = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: baseTemplate.luxIdx
-                vibeIdx = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) } ?: baseTemplate.vibeIdx
-                proxIdx = snapshot?.proxIdx ?: baseTemplate.proxIdx
-                liftIdx = snapshot?.let { (it.lift / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.liftIdx
-                tiltIdx = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: baseTemplate.tiltIdx
-                baroIdx = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: baseTemplate.baroIdx
-                isSitDetected = snapshot?.isSitDetected ?: false
-                sitVzTs = snapshot?.sitVzTs ?: baseTemplate.sitVzTs
-                sitVzRt = snapshot?.sitVzRt ?: baseTemplate.sitVzRt
-                sitShock = snapshot?.sitShock ?: baseTemplate.sitShock
-                kineticEnergy = snapshot?.kineticEnergy ?: baseTemplate.kineticEnergy
-            }
-            processPoint(fillPointFlyweight, onResult)
-            fillRt += TICK_INTERVAL_MS; fillTs += TICK_INTERVAL_MS; pointsGenerated++
-        }
-    }
-
-    /**
-     * fillRealGap: Refactored to consume specialized EngineAcousticSample sequence.
-     * Issue #1157: Telemetry Abstraction Integration.
-     */
-    fun fillRealGap(
-        ribbonScale: RibbonScale, lastTickRt: Long, nowRt: Long, lastTickTs: Long,
-        snrSamples: Sequence<EngineSnrSample>, 
-        sensorSamples: Sequence<EngineSensorSnapshot>,
-        acousticSamples: Sequence<EngineAcousticSample>,
-        acousticFloor: Double, onResult: (EngineConnectionPoint) -> Unit
-    ) {
-        val intervalMs = ribbonScale.intervalSeconds * TICK_INTERVAL_MS
-        val maxGapMs = intervalMs * 240
-        val effectiveStartRt = maxOf(lastTickRt, nowRt - maxGapMs)
-        val rtToTsOffset = lastTickTs - lastTickRt
-        var currentRt = alignToInterval(effectiveStartRt, ribbonScale.intervalSeconds)
-        if (currentRt <= lastTickRt) currentRt += intervalMs
-
-        val flyweight = EngineConnectionPoint()
-        var pointsGenerated = 0
-        val snrIter = snrSamples.iterator()
-        val sensorIter = sensorSamples.iterator()
-        val acousticIter = acousticSamples.iterator()
-        
-        var nextSnr = if (snrIter.hasNext()) snrIter.next() else null
-        var nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
-        var nextAcoustic = if (acousticIter.hasNext()) acousticIter.next() else null
-        
-        while (currentRt < nowRt && pointsGenerated < MAX_BACKFILL_POINTS) {
-            val totalSeconds = (currentRt / TICK_INTERVAL_MS).toInt()
-            val windowEndRt = currentRt + intervalMs - 1
-            while (nextSnr != null && nextSnr.rt < currentRt) nextSnr = if (snrIter.hasNext()) snrIter.next() else null
-            while (nextSensor != null && nextSensor.rt < currentRt) nextSensor = if (sensorIter.hasNext()) sensorIter.next() else null
-            while (nextAcoustic != null && nextAcoustic.rt < currentRt) nextAcoustic = if (acousticIter.hasNext()) acousticIter.next() else null
-
-            flyweight.apply {
-                ts = currentRt + rtToTsOffset; rt = currentRt; rtt = 0; remoteSig = 0; isConnected = false; isGap = true
-                isUltraLongStationary = false; violationUptimeMs = 0L
-                snrIdx = if (nextSnr != null && nextSnr.rt <= windowEndRt) (nextSnr.snr / RIBBON_SNR_SCALE_DB).coerceIn(0.0, 1.0) else 0.0
-                val snapshot = if (nextSensor != null && nextSensor.rt <= windowEndRt) nextSensor else null
-                val resolvedAcoustic = if (nextAcoustic != null && nextAcoustic.rt <= windowEndRt) nextAcoustic.db else (snapshot?.acoustic ?: acousticFloor)
-                noiseIdx = ((resolvedAcoustic - acousticFloor).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB)
-                luxIdx = snapshot?.let { (log10(it.lux + 1.0) / RIBBON_LUX_LOG_SCALE).coerceIn(0.0, 1.0) } ?: 0.0
-                vibeIdx = snapshot?.let { (it.vibe / RIBBON_VIBRATION_SCALE_G).coerceIn(0.0, 1.0) } ?: 0.0
-                proxIdx = snapshot?.proxIdx ?: 0.0
-                liftIdx = snapshot?.let { (it.lift / RIBBON_LIFT_SCALE_METERS).coerceIn(0.0, 1.0) } ?: 0.0
-                tiltIdx = snapshot?.let { (it.tilt / RIBBON_SIT_TILT_SCALE_DEG).coerceIn(0.0, 1.0) } ?: 0.0
-                baroIdx = snapshot?.let { (it.lift / RIBBON_SIT_BARO_SCALE_METERS).coerceIn(0.0, 1.0) } ?: 0.0
-                isSitDetected = snapshot?.isSitDetected ?: false
-                sitVzTs = snapshot?.sitVzTs ?: 0L; sitVzRt = snapshot?.sitVzRt ?: 0L
-                sitShock = snapshot?.sitShock ?: 0.0; kineticEnergy = snapshot?.kineticEnergy ?: 0.0
-                isTick = isScaleTick(ribbonScale, totalSeconds); locationPendingReason = LocationPendingReason.NONE
-            }
-            onResult(flyweight)
-            currentRt += intervalMs; pointsGenerated++
-        }
-    }
-
-    private fun alignToInterval(timestamp: Long, intervalSeconds: Int): Long {
-        val totalSec = (timestamp / TICK_INTERVAL_MS).toInt()
-        val secondsToNextAlignment = (intervalSeconds - (totalSec % intervalSeconds)) % intervalSeconds
-        return timestamp + (secondsToNextAlignment * TICK_INTERVAL_MS)
-    }
-
-    private fun isScaleTick(scale: RibbonScale, totalSeconds: Int): Boolean {
-        return when (scale) {
-            RibbonScale.FOUR_MIN -> totalSeconds % 60 == 0
-            RibbonScale.SIXTEEN_MIN -> totalSeconds % 240 == 0
-            RibbonScale.ONE_HOUR -> totalSeconds % 900 == 0
-            RibbonScale.FOUR_HOUR -> totalSeconds % 3600 == 0
-            RibbonScale.TWENTY_FOUR_HOUR -> totalSeconds % 21600 == 0
-            RibbonScale.SEVEN_DAY -> totalSeconds % 86400 == 0
         }
     }
 }

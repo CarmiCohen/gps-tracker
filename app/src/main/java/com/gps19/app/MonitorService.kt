@@ -24,11 +24,15 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
- * Oct.1.8:
- * - Issue #1414: Dashboard UNKNOWN Fix. Ensured that TrackerStateManager 
- *   receives isTrackerConnected=true in local Tracker mode regardless of peer 
- *   connectivity. This ensures the local dashboard reflects behavioral states 
- *   (MOVING/PARKING) during standalone stress tests (R-ID 589).
+ * Oct.2.2:
+ * - Issue #1416: Memory Pressure Mitigation (R-ID 592). Hardened performMemoryFlush 
+ *   to invoke historyManager.trimMemory() during high-pressure cycles.
+ *   Fixed typo in RIBBON_NOISE_SCALE_DB reference.
+ * Oct.2.1:
+ * - Issue #1416: Memory Pressure Mitigation (R-ID 592). Integrated reaction to 
+ *   MemoryPressureChanged events, implementing aggressive GC and forensic throttling.
+ * - Issue #1415: Load-Aware IMU Gating (R-ID 591). Integrated health.cpuLoad 
+ *   delivery to HardwareSuite for sensor jitter compensation.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -60,6 +64,8 @@ class MonitorService : BaseMonitorService() {
     private var lastPowerSaveCheckRt = 0L
     private var isSuspiciousMode = false
     private var currentIntervalMs = TICK_INTERVAL_MS
+    
+    private var memoryPressureLevel = MemoryPressureLevel.NORMAL
 
     private var lastForensicLat = 0.0
     private var lastForensicLng = 0.0
@@ -211,6 +217,7 @@ class MonitorService : BaseMonitorService() {
             launch { observeConnectivityEvents() }
             launch { observeCommandEvents() }
             launch { observeSettingsChanges() }
+            launch { observeIntegrityEvents() }
             launch {
                 repository.appModeFlow.collectLatest { mode ->
                     if (mode != null && mode != activeMode) {
@@ -292,8 +299,33 @@ class MonitorService : BaseMonitorService() {
                     is CommandEvent.ExecuteStressTest -> if (isTrackerMode) executeAutomatedStressTest()
                     is CommandEvent.ExecuteNetworkStressTest -> connectivitySuite.executeFlappingStressTest()
                     is CommandEvent.SimulateStoragePressure -> {}
+                    is CommandEvent.TriggerMemoryFlush -> performMemoryFlush()
                 }
             }
+    }
+    
+    private suspend fun observeIntegrityEvents() {
+        domainEventBus.events
+            .filterIsInstance<IntegrityEvent.MemoryPressureChanged>()
+            .collect { event ->
+                memoryPressureLevel = event.level
+                if (event.level != MemoryPressureLevel.NORMAL) {
+                    performMemoryFlush()
+                }
+            }
+    }
+    
+    private fun performMemoryFlush() {
+        Timber.w("Memory Flush Triggered: Pressure level $memoryPressureLevel. Executing aggressive recovery.")
+        
+        // Issue #1416: Explicit cache trimming
+        lifecycleScope.launch(Dispatchers.IO) {
+            historyManager.trimMemory()
+        }
+        
+        System.gc()
+        System.runFinalization()
+        System.gc()
     }
 
     private suspend fun observeSettingsChanges() {
@@ -464,7 +496,8 @@ class MonitorService : BaseMonitorService() {
             hardwareSuite.setLightFastPath(baseline = primaryProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP)
             hardwareSuite.setAcousticFastPath(floor = primaryProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0)
             hardwareSuite.setHighLoad(evaluationSnapshotFlyweight.integrity.isCoolingModeActive)
-            isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(isSuspiciousMode, primaryProcessor.checkPhysicalTamper(nowRt, false) == SentinelStatus.TAMPER, primaryProcessor.consumeSitDetected(), nowRt)
+            hardwareSuite.setCpuLoad(health.cpuLoad)
+            isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(isSuspiciousMode, primaryProcessor.checkPhysicalTamper(nowRt, false, health.cpuLoad) == SentinelStatus.TAMPER, primaryProcessor.consumeSitDetected(), nowRt)
             val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(evaluationSnapshotFlyweight.integrity.isCoolingModeActive, isSuspiciousMode, hardwareSuite.isStationary(), hardwareSuite.isScreenOn(), primaryProcessor.getMaxDistanceAuthority() > 0.0, evaluationSnapshotFlyweight.activityType, nowRt, capabilities)
             if (targetGpsInterval != currentIntervalMs) {
                 currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, currentRole); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)
@@ -609,8 +642,24 @@ class MonitorService : BaseMonitorService() {
                 }
                 if (health.isCoolingModeActive && !lastWasCooling) cachedCoolingEnteredRt = health.coolingEnteredRt
                 lastWasCooling = health.isCoolingModeActive
-                val delayMs = when { health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS; logManager.isForensicBufferUnderPressure() -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS; health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS; else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS }
-                val trigger = withTimeoutOrNull(delayMs) { forensicTriggerChannel.receive() }
+                
+                // Issue #1416: Aggressive throttling under memory pressure
+                val pressureIntervalMult = when (memoryPressureLevel) {
+                    MemoryPressureLevel.CRITICAL -> 4.0
+                    MemoryPressureLevel.HIGH -> 2.0
+                    else -> 1.0
+                }
+                
+                val delayMs = when { 
+                    health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS 
+                    logManager.isForensicBufferUnderPressure() -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS 
+                    health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS 
+                    else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS 
+                }
+                
+                val finalDelayMs = (delayMs * pressureIntervalMult).toLong()
+                
+                val trigger = withTimeoutOrNull(finalDelayMs) { forensicTriggerChannel.receive() }
                 performForensicCapture(isSpike = (trigger == true))
             }
         }
