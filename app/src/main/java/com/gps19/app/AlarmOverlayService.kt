@@ -24,9 +24,8 @@ import javax.inject.Inject
 /**
  * AlarmOverlayService: Implements SYSTEM_ALERT_WINDOW to ensure alarm visibility 
  * even when the app is in background and device is unlocked.
- * Oct.1.7:
- * - Issue #1402-B: System-Wide Alarm Overlay. Renders AlarmOverlay via WindowManager.
- *   Integrated SystemStatusProvider for reactive permission and hardware policy badges.
+ * Oct.1.8:
+ * - Issue #1402-B: Hardened teardown to prevent WindowManager leaks (R-ID 582).
  */
 @AndroidEntryPoint
 class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
@@ -53,7 +52,6 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         
-        // Auto-dismiss when all special alarms are resolved
         alarmManager.activeAlarmsFlow
             .onEach { list ->
                 if (list.none { !it.isResolved && !it.isSirenDisabled }) {
@@ -115,7 +113,6 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
                     backgroundStatus = perms.backgroundStatus,
                     hasBackgroundRestriction = perms.hasBackgroundRestriction,
                     onHardwarePermissionClick = {
-                        // Forward to settings via MainActivity
                         val intent = Intent(this@AlarmOverlayService, MainActivity::class.java).apply {
                             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                             action = "com.gps19.app.ACTION_FIX_PERMISSIONS"
@@ -153,7 +150,12 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
     override fun onDestroy() {
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
         composeView?.let { 
-            windowManager.removeView(it)
+            it.disposeComposition()
+            try {
+                windowManager.removeViewImmediate(it)
+            } catch (e: Exception) {
+                // View might already be detached
+            }
         }
         composeView = null
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)

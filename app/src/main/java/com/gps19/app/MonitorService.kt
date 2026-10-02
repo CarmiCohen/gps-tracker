@@ -24,14 +24,11 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
- * Oct.1.1:
- * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
- *   API in SettingsRepository and updated ForensicAuditor calls to use AppRole enum.
- *   Fixed CLOCK_DRIFT_REF_KEY leakage in onServiceInitialize.
- *   Fixed session reset contract. Refactored HistoryManager initialization.
- * Sep.30.60:
- * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
- *   ensure prefix consistency (R-ID 453/565).
+ * Oct.1.8:
+ * - Issue #1414: Dashboard UNKNOWN Fix. Ensured that TrackerStateManager 
+ *   receives isTrackerConnected=true in local Tracker mode regardless of peer 
+ *   connectivity. This ensures the local dashboard reflects behavioral states 
+ *   (MOVING/PARKING) during standalone stress tests (R-ID 589).
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -529,8 +526,11 @@ class MonitorService : BaseMonitorService() {
 
         val proc = lastProcessedLocation
         if (proc != null) {
+            // R-ID 589: In local Tracker mode, the state is always considered "connected" to itself.
+            val stateManagerConnected = if (isTrackerMode) true else (isSocketConnected && isPeerActive)
+            
             evaluationSnapshotFlyweight.trackerState = if (isTrackerMode) {
-                TrackerStateManager.updateState(status = proc.status, speed = proc.filteredSpeed, vibration = evaluationSnapshotFlyweight.atmospheric.vibration, vibrationFloor = primaryProcessor.getAdaptiveVibrationFloor(), isTrackerConnected = isSocketConnected && isPeerActive, systemTimePulse = nowRt)
+                TrackerStateManager.updateState(status = proc.status, speed = proc.filteredSpeed, vibration = evaluationSnapshotFlyweight.atmospheric.vibration, vibrationFloor = primaryProcessor.getAdaptiveVibrationFloor(), isTrackerConnected = stateManagerConnected, systemTimePulse = nowRt)
             } else TrackerState.UNKNOWN
             evaluateAlarmsInternal(now, nowRt, isSocketConnected, isPeerActive, proc, hSnapshot, proc.timestamp, evaluationSnapshotFlyweight)
         }

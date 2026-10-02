@@ -40,12 +40,10 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
- * Sep.30.45:
- * - Issue #1402: Relocated AlarmOverlay to the end of the Box hierarchy to 
- *   ensure it renders on top of all other shared overlays (Settings, Logs, Ribbons).
- * Sep.29.01:
- * - Issue #S071 Stress Test UI Consolidation: Routed stress test execution to 
- *   DiagnosticsScreen and removed obsolete callback from PhoneSetupOverlay.
+ * Oct.1.8:
+ * - Issue #1413: Mode-Based Alert Restriction. Restricted AlarmOverlay promotion 
+ *   to Viewer Mode only. Tracker mode remains on dashboard/map during violations 
+ *   to maintain stealth/operational continuity (R-ID 588).
  */
 @Composable
 fun MainAppContent(
@@ -433,8 +431,8 @@ fun MainAppContent(
                     activity = activity
                 )
                 
-                // Issue #1402: Renders AlarmOverlay at the root level to ensure highest Z-index visibility.
-                if (diagnosticState.isRedScreenVisible && sessionState.appMode != null && sessionState.hydrationLevel >= 3) {
+                // Issue #1413: Restricted AlarmOverlay promotion to Viewer Mode only (R-ID 588).
+                if (diagnosticState.isRedScreenVisible && sessionState.appMode == "viewer" && sessionState.hydrationLevel >= 3) {
                     AlarmOverlay(
                         alarms = diagnosticState.activeAlarms, isMuted = diagnosticState.isAlarmSilenced,
                         isLocationPending = kinematicState.trackerHealth.isLocationPending,

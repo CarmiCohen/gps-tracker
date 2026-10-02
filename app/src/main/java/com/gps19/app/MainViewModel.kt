@@ -21,14 +21,10 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
- * Sep.30.44:
- * - Issue #1401: Suppressed Red-Screen promotion for non-critical (siren-disabled) 
- *   alarms. Ensures connectivity alerts do not block navigation.
- * Sep.30.42:
- * - Issue #1390: Replaced cumulative map triggers with CameraAction SharedFlow.
- * Sep.30.40:
- * - Issue #1391 RESOLVED: Enforced R872 (Stealth Authority). Guarded Red-Screen 
- *   promotion to ensure it only triggers in Viewer mode.
+ * Oct.1.8:
+ * - Issue #1414: Local State Routing. Updated localLocation collection to 
+ *   populate _trackerState when in Tracker mode. Ensures the local dashboard 
+ *   reflects MOVING/PARKING during solo stress tests (R-ID 589).
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -344,9 +340,6 @@ class MainViewModel @Inject constructor(
                     updateDiagnosticState { current -> 
                         current.activeAlarms = update.activeAlarms
                         
-                        // Issue #1389: Reactive Red-Screen Promotion
-                        // Issue #1391: R872 (Stealth Authority) Enforced. Guard promotion by appMode.
-                        // Issue #1401: Only promote for non-siren-disabled (Special) alarms.
                         if (update.activeAlarms.any { !it.isResolved && !it.isSirenDisabled } && 
                             _uiState.value.session.isSystemActive && 
                             _uiState.value.session.appMode == "viewer") {
@@ -383,13 +376,23 @@ class MainViewModel @Inject constructor(
                         current.apply { pulse = nowRt }
                     }
                     _gpsIndexData.value = GpsIndexData(update.integrity.snrIdx, update.integrity.satsUsed.toDouble(), update.integrity.satsView.toDouble(), 0.0)
+                    
+                    // Issue #1414: Update local tracker state for local dashboard.
+                    if (_uiState.value.session.appMode == "tracker") {
+                        _trackerState.value = update.trackerState
+                    }
                 }
             }
 
             launch {
                 remoteStatusRepository.remoteStatus.collect { status ->
                     _remoteSignal.value = remoteStatusRepository.peerSignal.value
-                    _trackerState.value = status.trackerState
+                    
+                    // Only update from remote if we are NOT the primary tracker.
+                    if (_uiState.value.session.appMode != "tracker") {
+                        _trackerState.value = status.trackerState
+                    }
+                    
                     _trackerMaxTemp.value = status.maxTemp
                     updateKinematicState { current ->
                         telemetryUseCase.mapTrackerLocationFromStatus(status, current.trackerLocation)
@@ -411,10 +414,6 @@ class MainViewModel @Inject constructor(
                 audioSynthesizer.isSirenPlaying.collect { playing ->
                     updateDiagnosticState { it.apply { isSirenPlaying = playing } }
                     
-                    // Issue #1389: Promotion on siren engagement
-                    // Issue #1391: R872 (Stealth Authority) Enforced. Guard promotion by appMode.
-                    // Issue #1401: Promotion will only happen if shouldPlaySiren() was true, 
-                    // which now requires a non-siren-disabled alarm.
                     if (playing && 
                         _uiState.value.session.isSystemActive && 
                         _uiState.value.session.appMode == "viewer") {

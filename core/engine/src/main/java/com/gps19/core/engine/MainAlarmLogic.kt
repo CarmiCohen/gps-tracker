@@ -6,13 +6,10 @@ import kotlin.math.*
 /**
  * MainAlarmLogic: Detection logic for system violations.
  * Oct.1.8:
+ * - Issue #1410: Fixed ConcurrentModificationException by synchronizing 
+ *   activeAlarms mutations (R-ID 585).
  * - Issue #1410: Viewer Persistence. Integrated lastAlarmAckTs check in 
- *   processActiveAlarms to ensure that violations occurring before the 
- *   latest acknowledgment are suppressed, preventing recurring alarms on 
- *   fresh installations (R-ID 575).
- * Sep.30.70:
- * - Issue #1405/1407: Added onTriggerMuted callback to support visual 
- *   feedback for alarms that occur during a manual siren lockout.
+ *   processActiveAlarms to ensure historical suppression using violationStartTs.
  */
 object MainAlarmLogic {
 
@@ -84,14 +81,17 @@ object MainAlarmLogic {
 
         report.reports.forEach { violation ->
             val type = violation.type
-            val eval = state.activeAlarms[type] ?: AlarmEvaluationState.ActiveAlarm(type, violation.title)
+            
+            // Thread-safe access to existing alarm state
+            val eval = synchronized(state.activeAlarms) { 
+                state.activeAlarms[type] 
+            } ?: AlarmEvaluationState.ActiveAlarm(type, violation.title)
 
             if (violation.conditionMet) {
                 // Issue #1410: Global suppression of historical violations.
-                // If the current time (now) is before the last acknowledgment, or if 
-                // the violation is persisting from before the last acknowledgment, 
-                // we treat it as already handled.
-                val isHistoricallyAcknowledged = state.lastAlarmAckTs > 0 && now <= state.lastAlarmAckTs
+                // If the violation started before the last acknowledgment, treat it as handled.
+                val violationStart = if (state.violationStartTs > 0) state.violationStartTs else now
+                val isHistoricallyAcknowledged = state.lastAlarmAckTs > 0 && violationStart <= state.lastAlarmAckTs
 
                 if (isHistoricallyAcknowledged) {
                     eval.isResolved = true
@@ -107,7 +107,6 @@ object MainAlarmLogic {
                         eval.isResolved = false
                         triggerOccurred = true
                         
-                        // Check if physical siren is currently locked out
                         val isMuted = nowRt - state.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS
                         if (isMuted) {
                             onTriggerMuted(eval)
@@ -135,8 +134,11 @@ object MainAlarmLogic {
             state.lastGlobalTriggerRt = nowRt
         }
         
-        state.activeAlarms.clear()
-        state.activeAlarms.putAll(newActiveAlarms)
+        // Critical synchronization for map replacement (R-ID 585)
+        synchronized(state.activeAlarms) {
+            state.activeAlarms.clear()
+            state.activeAlarms.putAll(newActiveAlarms)
+        }
     }
 
     private fun evaluateConnectivity(
@@ -155,7 +157,6 @@ object MainAlarmLogic {
         val isRelayConnected = state.isRelayConnected
         val shouldSuppressPeerErrors = !isInternetHardwareOk || !isRelayConnected
 
-        // Local Internet
         report.getOrCreate(idx++).update(
             type = ALERT_ID_LOCAL_INTERNET,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_LOCAL_INTERNET),
@@ -163,7 +164,6 @@ object MainAlarmLogic {
             conditionMet = health.localInternetLoss
         )
 
-        // Relay Offline
         report.getOrCreate(idx++).update(
             type = ALERT_ID_RELAY_OFFLINE,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_RELAY_OFFLINE),
@@ -171,7 +171,6 @@ object MainAlarmLogic {
             conditionMet = !isRelayConnected && isInternetHardwareOk
         )
 
-        // Peer Connection (Tracker/Viewer Offline)
         report.getOrCreate(idx++).update(
             type = ALERT_ID_TRACKER_OFFLINE,
             title = getTrackerTitleCached(isTracker, if (isTracker) ALERT_TITLE_VIEWER_OFFLINE else ALERT_TITLE_TRACKER_OFFLINE),
@@ -179,7 +178,6 @@ object MainAlarmLogic {
             conditionMet = canCheckPeerErrors && !state.isTrackerConnected && !shouldSuppressPeerErrors
         )
 
-        // Signal Quality & Stalls
         report.getOrCreate(idx++).update(
             type = ALERT_ID_JUMP_ALERT,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_JUMP_ALERT),
@@ -239,7 +237,6 @@ object MainAlarmLogic {
         var idx = startIdx
         val health = state.health
 
-        // Power Tamper
         val isPowerViolation = health.isPowerTamper && health.currentMa <= 0
         report.getOrCreate(idx++).update(
             type = ALERT_ID_TRACKER_POWER,
@@ -248,7 +245,6 @@ object MainAlarmLogic {
             conditionMet = isPowerViolation
         )
 
-        // Sensors (Tilt, Shock, Acoustic, Lift, Light)
         val isShock = SentinelValidator.isShockViolated(health.peakVibrationShock, health.adaptiveVibrationFloor, state.vibrationSensitivity)
         val isTilt = SentinelValidator.isTiltViolated(health.tiltDegrees, state.tiltSensitivity)
         val isAcousticMet = SentinelValidator.isAcousticViolated(health.acousticDb, health.acousticFloorDb)
@@ -256,11 +252,9 @@ object MainAlarmLogic {
         val isLift = SentinelValidator.isLiftViolated(liftDelta)
         val isLightMet = SentinelValidator.isLightViolated(health.lux, health.luxBaseline)
 
-        // Aggregated Tamper
         val isTamperCondition = health.status == SentinelStatus.TAMPER || health.isTamperDetected || (!health.isNear) || 
                                 isLightMet || isShock || isTilt || isAcousticMet || isLift || health.isPowerTamper
 
-        // R-ID 312: Sync calculated tamper status back to health state for downstream suppression (e.g., Silent Failure).
         health.isTamperDetected = isTamperCondition
 
         val tamperSubtitle = if (isTamperCondition) {
@@ -464,7 +458,6 @@ object MainAlarmLogic {
         val health = state.health
         val isPowerViolation = health.isPowerTamper && health.currentMa <= 0
 
-        // Battery
         val isBatteryBelowThreshold = health.batteryLevel < BATTERY_ALARM_THRESHOLD && health.batteryLevel != -1
         val isCriticalBattery = health.batteryLevel <= CRITICAL_BATTERY_THRESHOLD && health.batteryLevel != -1
         val batteryConditionMet = if (isPowerViolation) isCriticalBattery else isBatteryBelowThreshold
@@ -477,7 +470,6 @@ object MainAlarmLogic {
             extremeValue = (100.0 - health.batteryLevel)
         )
 
-        // Steep Discharge
         val isHighSensorActivity = SentinelValidator.isVibrationSuspicious(health.vibration, health.adaptiveVibrationFloor, state.vibrationSensitivity)
         val isHighSystemLoad = health.cpuLoad > 0.7
         val steepConditionMet = health.isBatterySteepDischarge
@@ -489,7 +481,6 @@ object MainAlarmLogic {
             technicalDetails = if (steepConditionMet) "Vibe: %.2fG, CPU: %.1f, Temp: %.1f°C".format(health.vibration, health.cpuLoad, health.batteryTemp) else null
         )
 
-        // Temperature
         val tempCondition = health.batteryTemp > MAX_SAFE_TEMPERATURE_CELSIUS || health.isCoolingModeActive
         report.getOrCreate(idx++).update(
             type = ALERT_ID_TRACKER_TEMP,
@@ -499,7 +490,6 @@ object MainAlarmLogic {
             extremeValue = health.batteryTemp
         )
         
-        // Storage
         report.getOrCreate(idx++).update(
             type = ALERT_ID_SYSTEM_STORAGE_LOW,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_SYSTEM_STORAGE_LOW),
@@ -513,7 +503,6 @@ object MainAlarmLogic {
             conditionMet = health.isStorageCritical
         )
 
-        // Hardware Configuration
         val caps = state.capabilities
         val uptimeRt = nowRt - state.serviceStartRt
         val isBootGraceActive = uptimeRt < HARDWARE_BOOT_GRACE_MS
@@ -541,7 +530,6 @@ object MainAlarmLogic {
             conditionMet = configViolation
         )
 
-        // Forensic Reliability
         val isReliabilityDegraded = health.forensicReliability < FORENSIC_RELIABILITY_THRESHOLD
         if (isReliabilityDegraded) {
             if (state.forensicReliabilityDegradationStartRt == 0L) state.forensicReliabilityDegradationStartRt = nowRt
@@ -551,12 +539,11 @@ object MainAlarmLogic {
         report.getOrCreate(idx++).update(
             type = ALERT_ID_PERFORMANCE_SPIKE,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_PERFORMANCE_SPIKE),
-            subtitle = if (isForensicSustained) "Forensic persistence reliability on this device is low (${String.format(Locale.getDefault(), "%.2f", health.forensicReliability)})" else "Forensic persistence on this device is OK",
+            subtitle = if (isForensicSustained) String.format(Locale.getDefault(), "Forensic persistence reliability on this device is low (%.2f)", health.forensicReliability) else "Forensic persistence on this device is OK",
             conditionMet = isForensicSustained,
             extremeValue = 1.0 - health.forensicReliability
         )
 
-        // Silent Failure
         val isSilentFailure = SentinelValidator.isSilentFailure(health.gpsStalled, health.isTamperDetected, health.cpuLoad, health.ioWait, health.maxIoLatency, health.isThermalThrottling)
         report.getOrCreate(idx++).update(
             type = ALERT_ID_SILENT_FAILURE,

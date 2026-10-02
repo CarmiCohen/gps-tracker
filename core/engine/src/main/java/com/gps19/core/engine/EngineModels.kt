@@ -2,24 +2,14 @@ package com.gps19.core.engine
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
  * Oct.1.8:
- * - Issue #1410: Viewer Persistence. Added lastAlarmAckTs and violationStartTs 
- *   to SystemEvaluationSnapshot to ensure alarm acknowledgment state is 
- *   synchronized and utilized during stateless evaluation (R-ID 575).
- * Oct.1.3:
- * - Issue #1408: Telemetry Convergence. Reordered AppRole enum and refined fromKey 
- *   to utilize length-descending evaluation. This prevents prefix collision where 
- *   "VR_" (Remote) was incorrectly matched by "V_" (Self) (R-ID 565).
- * Oct.1.1:
- * - Issue #1407: Unified Storage Authority. Added AppRole.fromKey helper to 
- *   centralize namespaced key parsing and eliminate redundant routing logic.
- * Sep.30.60:
- * - Issue #1406: Standardized Role Identity. Refined AppRole enum to 
- *   distinguish between VIEWER_SELF ("V_") and VIEWER_REMOTE ("VR_").
- * - Fixed LogEvent data class properties (missing val).
+ * - Issue #1410: Forced activeAlarms to val ConcurrentHashMap to ensure 
+ *   thread-safety and prevent replacement with non-thread-safe maps 
+ *   during deserialization (R-ID 585).
  */
 
 @Serializable
@@ -48,10 +38,6 @@ enum class TrackerState { MOVING, PARKING, JUMPING, OFFLINE, UNKNOWN }
 @Serializable
 enum class ActivityType { STILL, WALKING, RUNNING, BICYCLING, IN_VEHICLE, TILTING, UNKNOWN }
 
-/**
- * AppRole: Unified role identity for prefixing and state isolation.
- * Standardizes namespace to prevent acknowledgment loops (Issue #1406).
- */
 @Serializable
 enum class AppRole(val prefix: String) {
     TRACKER("T_"),
@@ -59,12 +45,6 @@ enum class AppRole(val prefix: String) {
     VIEWER_SELF("V_");
 
     companion object {
-        /**
-         * fromKey: Decodes a namespaced key into its role and base key.
-         * R-ID 568: Central authority for namespace routing.
-         * Note: Longest prefixes (VR_) MUST be checked before sub-prefixes (V_) 
-         * to prevent collision.
-         */
         fun fromKey(key: String): Pair<AppRole, String>? {
             val role = entries.sortedByDescending { it.prefix.length }
                 .find { key.startsWith(it.prefix) } ?: return null
@@ -73,27 +53,13 @@ enum class AppRole(val prefix: String) {
     }
 }
 
-enum class DiscoveryPhase {
-    BOOTSTRAP, DISCOVERING, MONITORING
-}
-
-enum class SentinelStatus {
-    VALID, JUMP, TAMPER, TRAJECTORY_PROMOTED, OUTLIER, JITTER, JAMMER_SUSPICION
-}
-
-enum class SignalingPriority {
-    HIGH, NORMAL
-}
-
-enum class CapabilityStatus {
-    GRANTED, DENIED, UNKNOWN
-}
+enum class DiscoveryPhase { BOOTSTRAP, DISCOVERING, MONITORING }
+enum class SentinelStatus { VALID, JUMP, TAMPER, TRAJECTORY_PROMOTED, OUTLIER, JITTER, JAMMER_SUSPICION }
+enum class SignalingPriority { HIGH, NORMAL }
+enum class CapabilityStatus { GRANTED, DENIED, UNKNOWN }
 
 @Serializable
-enum class PerformanceTier {
-    STANDARD,
-    STAGGERED
-}
+enum class PerformanceTier { STANDARD, STAGGERED }
 
 @Serializable
 data class HardwareCapabilities(
@@ -110,13 +76,7 @@ data class HardwareCapabilities(
     val performanceTier: PerformanceTier = PerformanceTier.STANDARD
 )
 
-enum class LocationPendingReason {
-    NONE,
-    GPS_STALL,
-    GPS_GAP,
-    ACOUSTIC_VIOLATION, SIGNAL_LOSS,
-    JAMMER_SUSPICION
-}
+enum class LocationPendingReason { NONE, GPS_STALL, GPS_GAP, ACOUSTIC_VIOLATION, SIGNAL_LOSS, JAMMER_SUSPICION }
 
 @Serializable
 data class LocationStatus(
@@ -655,7 +615,14 @@ class AlarmEvaluationState {
     var powerAlarmPending: Boolean = false
     var lastSirenStopRt: Long = 0L
     var lastGlobalTriggerRt: Long = 0L
-    var activeAlarms: MutableMap<String, ActiveAlarm> = mutableMapOf()
+    
+    /**
+     * Issue #1410: Forced val ConcurrentHashMap to resolve CME.
+     * Note: Marked as @Transient to ensure Kotlin Serialization doesn't replace 
+     * it with a default LinkedHashMap instance during deserialization.
+     */
+    @Transient
+    val activeAlarms: MutableMap<String, ActiveAlarm> = ConcurrentHashMap()
 
     @Serializable
     data class ActiveAlarm(
