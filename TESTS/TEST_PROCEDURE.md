@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vSep.30.6)
+# Test Procedure - GPS Tracker (vOct.1.8)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -65,6 +65,10 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **3.6 HUD Velocity Logic (Issue #1386):**
     *   **Action:** Observe HUD state while stationary.
     *   **Verification:** Verify "MOVING" status is not displayed when speed is 0.0 km/h.
+*   **3.7 Dashboard Continuity (Issue #1414):**
+    *   **Action:** Run Tracker mode without any connected Viewers.
+    *   **Verification:** Confirm behavioral state (MOVING/PARKING) is displayed on the local dashboard. Bypasses peer connectivity gate for local-only diagnostic sessions.
+    *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 4 - Viewer Mode & Remote Sync
 **Goal:** Validate real-time synchronization.
@@ -90,6 +94,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **4.8 Alarm Overlay Z-Index (Issue #1402):**
     *   **Action:** Trigger a security alarm (e.g., Tamper) while Settings or Logs overlay is open.
     *   **Verification:** Confirm Red Alert screen appears ABOVE the Settings/Logs overlay, completely covering the UI as a priority sentinel.
+*   **4.9 Mode-Based Alert Restriction (Issue #1413):**
+    *   **Action:** Induce violations while in Tracker Mode.
+    *   **Verification:** Confirm the Red Alert Screen (AlarmOverlay) is NEVER promoted on the Tracker. Only status bar badges (ALM) and logs should reflect the violation to preserve stealth.
+    *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **4.10 Alarm Acknowledgment Idempotency (Issue #1410):**
+    *   **Action:** Acknowledge an alert on the Viewer during a 500ms network jitter event.
+    *   **Verification:** Confirm the alert does not "re-trigger" on the Tracker. Uses `violationStartTs` to ensure stale telemetry cannot revive a resolved alarm.
+    *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 5 - Recovery and Edge Cases
 **Goal:** Verify system resilience against signal loss.
@@ -103,8 +115,18 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **6.2 Heat Mitigation Validation:** Simulate thermal limit (COOLING MODE).
 
 ## Chapter 7 - Architectural Integrity & Performance
+**Goal:** Verify thread safety and resource management under high load.
+
 *   **7.1 UI Performance Audit:** Check for Davey events during 100Hz bursts.
 *   **7.2 DI/Hilt Stability:** Cold-start service after process death.
+*   **7.3 Engine Thread Safety (Issue #1410 / R-ID 585):**
+    *   **Action:** Run Automated Stress Test (250Hz sensor audit).
+    *   **Verification:** Confirm zero `ConcurrentModificationException` crashes. Map mutations in `MainAlarmLogic` must be synchronized with `AppAlarmManager` iteration.
+    *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **7.4 WindowManager Resource Lifecycle (Issue #1402-B / R-ID 582):**
+    *   **Action:** Sustained 1-hour alert cycle on low-memory device (A15).
+    *   **Verification:** Confirm `AlarmOverlayService` cleans up all views on `stopSelf()`. No cumulative memory growth from orphaned `ComposeView` instances.
+    *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 8 - Validation Hooks & Aggregation
 *   **8.1 Forensic Stall Simulation:** EMA reliability drop check.
@@ -118,4 +140,4 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ---
 **Total Testing Chapters: 100**
-*(Full historical procedure synchronized Sep.30.6)*
+*(Full historical procedure synchronized Oct.1.8)*
