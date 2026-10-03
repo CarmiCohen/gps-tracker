@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.3.1
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.3.2
 
-## 🎯 Current Resumption Focus: Architectural Decoupling
-Finalizing HUD interface slicing and native math convergence.
+## 🎯 Current Resumption Focus: Stabilization & Build Recovery
+Finalizing post-refactor UI alignment and verifying physical deployment logic.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -38,6 +38,7 @@ Finalizing HUD interface slicing and native math convergence.
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1420-S / SOT ID 603: HUD Stabilization.** Resolved Oct.3.2. Synchronized UI call sites with new slice-based interfaces; resolved legacy property mismatches (R1420-S).
 *   **Issue #1420 / SOT ID 601: Granular HUD Binding.** Resolved Oct.3.1. Decoupled UI components from `LocationUpdate` monolith via interface slicing (R1420).
 *   **Issue #SIMP-1510-1 / SOT ID 602: Native Stationary Convergence.** Resolved Oct.3.1. Offloaded stationary detection and vibration floor EMA to JNI to eliminate JVM math overhead (R1510).
 *   **Issue #1290 / SOT ID 600: UI State Mapper Consolidation.** Resolved Oct.2.15. Merged `UiStateCoordinator` logic into `MainViewModel` to reduce architectural complexity and dependency layers (R1290).
@@ -54,6 +55,7 @@ Finalizing HUD interface slicing and native math convergence.
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.3.2: [SOT Count: 259 (Rules: 116), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 20, QA: 368]**
 - **Oct.3.1: [SOT Count: 259 (Rules: 116), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 18, QA: 365]**
 - **Oct.2.15: [SOT Count: 257 (Rules: 114), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:3, Testing: 16, QA: 363]**
 - **Oct.2.9: [SOT Count: 255 (Rules: 112), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 14, QA: 361]**

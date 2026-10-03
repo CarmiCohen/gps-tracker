@@ -1,3 +1,18 @@
+# 🏛️ Resolution Archive - Oct.3.2
+
+## 🏁 Issue #1420-S / SOT ID 603: HUD Stabilization & Build Recovery
+*   **Resolved**: Oct.3.2
+*   **Root Cause**: The granular interface slicing introduced in Issue #1420 caused multiple compilation failures across the UI layer due to naming mismatches (`trackerLocPendingReason` vs `locationPendingReason`) and deprecated method signatures in `AlarmOverlay`.
+*   **Remediations**:
+    *   **Interface Compliance**: Updated `SystemHealthState` to explicitly implement the `Locatable` interface.
+    *   **UI Alignment**: Synchronized `MainViewModel.kt`, `UiStateCoordinator.kt`, and `SharedUiComponents.kt` to use the standardized `locationPendingReason` property.
+    *   **Call Site Refactor**: Updated `AlarmOverlay` consumers in `AlarmActivity` and `MainAppContent` to pass the `locatable` health slice instead of raw booleans.
+    *   **Build Recovery**: Verified full project compilation via `:app:assembleDebug`.
+*   **Significance**: High (Build Integrity).
+*   **SOT ID**: 603
+
+---
+
 # 🏛️ Resolution Archive - Oct.3.1
 
 ## 🏁 Issue #1420 / SOT ID 601: Granular HUD Binding

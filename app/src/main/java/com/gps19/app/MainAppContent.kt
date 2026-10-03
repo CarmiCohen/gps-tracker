@@ -40,6 +40,9 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.3.2:
+ * - Issue #1420: Granular HUD Binding. Updated AlarmOverlay call to use 
+ *   locatable parameter instead of deprecated isLocationPending.
  * Oct.1.8:
  * - Issue #1413: Mode-Based Alert Restriction. Restricted AlarmOverlay promotion 
  *   to Viewer Mode only. Tracker mode remains on dashboard/map during violations 
@@ -435,7 +438,7 @@ fun MainAppContent(
                 if (diagnosticState.isRedScreenVisible && sessionState.appMode == "viewer" && sessionState.hydrationLevel >= 3) {
                     AlarmOverlay(
                         alarms = diagnosticState.activeAlarms, isMuted = diagnosticState.isAlarmSilenced,
-                        isLocationPending = kinematicState.trackerHealth.isLocationPending,
+                        locatable = kinematicState.trackerHealth,
                         backgroundStatus = sessionState.permissions.backgroundStatus, hasBackgroundRestriction = sessionState.permissions.hasBackgroundRestriction,
                         onHardwarePermissionClick = { onRequestHardwarePermission() },
                         onMute = { 

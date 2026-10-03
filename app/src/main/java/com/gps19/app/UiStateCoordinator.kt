@@ -240,7 +240,7 @@ class UiStateCoordinator @Inject constructor(
             viewerGpsTs = kinematicState.localLocation.kinetic.gpsTs,
             trackerState = trackerState,
             isTrackerLocPending = kinematicState.trackerHealth.isLocationPending,
-            trackerLocPendingReason = kinematicState.trackerHealth.locationPendingReason,
+            locationPendingReason = kinematicState.trackerHealth.locationPendingReason,
             isViewerLocPending = kinematicState.localHealth.isLocationPending,
             viewerLocPendingReason = kinematicState.localHealth.locationPendingReason,
             isUltraLongStationary = isUltra,

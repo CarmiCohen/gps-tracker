@@ -50,15 +50,14 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.3.2:
+ * - Issue #1420: Granular HUD Binding. Aligned StatusRowState and StatusBar 
+ *   with Locatable interface (renamed trackerLocPendingReason -> locationPendingReason).
  * Oct.1.6:
  * - Issue #1412: Ribbon Visual Occlusion & Scale Spacing. Standardized connection 
  *   ribbon title to "CON", improved tick spacing for 4H/24H/7D scales, and 
  *   adjusted drawing offsets to prevent overlap between connectivity status 
  *   and time labels (R-ID 574).
- * Sep.22.00:
- * - Issue #1178: Initial GNSS satellite count blanking. Set default satellite 
- *   counts to -1 in StatusRowState and added display logic to show "--" 
- *   for unitialized satellite telemetry (R-ID 399).
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -705,7 +704,7 @@ fun StatusBar(
                         }
                         val tAge = if(lastGpsTs > 0) health.systemPulse - lastGpsTs else -1L
                         Box(modifier = Modifier.weight(1f)) { 
-                            StatusRowData(StatusRowState(label = trkIdLabel, battery = health.battery, commIndex = if(isPeerActive) connectivity.remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = health.remoteCharging, accuracy = telemetry.trackerAccuracy, maxAccuracy = telemetry.maxTrackerAccuracy, satsView = telemetry.satsView, satsUsed = telemetry.satsUsed, gpsAgeMs = tAge, temp = health.trackerTemp, distance = telemetry.distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = telemetry.isTrackerLocPending, locPendingReason = telemetry.trackerLocPendingReason, isTelemetryFresh = isPeerActive, isGpsFresh = isTrackerGpsActive, isUltraLongStationary = telemetry.isUltraLongStationary, isThrottled = isThrottled)) 
+                            StatusRowData(StatusRowState(label = trkIdLabel, battery = health.battery, commIndex = if(isPeerActive) connectivity.remoteCommIndex else 0, color = if(isPeerActive) BrandJd else Slate500, isCharging = health.remoteCharging, accuracy = telemetry.trackerAccuracy, maxAccuracy = telemetry.maxTrackerAccuracy, satsView = telemetry.satsView, satsUsed = telemetry.satsUsed, gpsAgeMs = tAge, temp = health.trackerTemp, distance = telemetry.distToHome, isRemote = true, isPeerActive = isPeerActive, isLocPending = telemetry.isTrackerLocPending, locPendingReason = telemetry.locationPendingReason, isTelemetryFresh = isPeerActive, isGpsFresh = isTrackerGpsActive, isUltraLongStationary = telemetry.isUltraLongStationary, isThrottled = isThrottled)) 
                         }
                     }
                 } else {
@@ -715,7 +714,7 @@ fun StatusBar(
                         Spacer(modifier = Modifier.height(3.dp))
                     }
                     val tAge = if(lastGpsTs > 0) health.systemPulse - lastGpsTs else -1L
-                    StatusRowData(StatusRowState(label = trkIdLabel, battery = if (mode == "viewer") health.remoteBattery else health.battery, commIndex = if (mode == "viewer") (if(isPeerActive) connectivity.remoteCommIndex else 0) else connectivity.commIndex, color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, isCharging = if (mode == "viewer") health.remoteCharging else health.isCharging, accuracy = if (mode == "viewer") telemetry.trackerAccuracy else telemetry.trackerAccuracy, maxAccuracy = if (mode == "viewer") telemetry.maxTrackerAccuracy else telemetry.maxTrackerAccuracy, satsView = telemetry.satsView, satsUsed = telemetry.satsUsed, gpsAgeMs = tAge, temp = health.trackerTemp, distance = telemetry.distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = telemetry.isTrackerLocPending, locPendingReason = telemetry.trackerLocPendingReason, isTelemetryFresh = if (mode == "tracker") (telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isPeerActive, isGpsFresh = isTrackerGpsActive, isUltraLongStationary = telemetry.isUltraLongStationary, isThrottled = isThrottled))
+                    StatusRowData(StatusRowState(label = trkIdLabel, battery = if (mode == "viewer") health.remoteBattery else health.battery, commIndex = if (mode == "viewer") (if(isPeerActive) connectivity.remoteCommIndex else 0) else connectivity.commIndex, color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, isCharging = if (mode == "viewer") health.remoteCharging else health.isCharging, accuracy = if (mode == "viewer") telemetry.trackerAccuracy else telemetry.trackerAccuracy, maxAccuracy = if (mode == "viewer") telemetry.maxTrackerAccuracy else telemetry.maxTrackerAccuracy, satsView = telemetry.satsView, satsUsed = telemetry.satsUsed, gpsAgeMs = tAge, temp = health.trackerTemp, distance = telemetry.distToHome, horizontalPadding = 8.dp, isRemote = mode == "viewer", isPeerActive = if(mode == "viewer") isPeerActive else true, isLocPending = telemetry.isTrackerLocPending, locPendingReason = telemetry.locationPendingReason, isTelemetryFresh = if (mode == "tracker") (telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isPeerActive, isGpsFresh = isTrackerGpsActive, isUltraLongStationary = telemetry.isUltraLongStationary, isThrottled = isThrottled))
                 }
             }
         }

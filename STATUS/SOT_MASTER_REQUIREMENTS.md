@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct.3.1)
+# SOT Master Requirements & Hardening Status (Oct.3.2)
 
-## 🏗️ Architectural Master Rules (116 Rules)
+## 🏗️ Architectural Master Rules (117 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -24,10 +24,12 @@
 *   **1.92 UI State Consolidation (R1290)**: Activity-scoped UI state projection logic MUST be consolidated within the `MainViewModel` to minimize dependency layers and simplify the state transformation pipeline. (Oct.2.15 - Issue #1290).
 *   **1.93 Granular HUD Binding (R1420)**: UI components and services MUST consume granular, slice-based interfaces (e.g., `Locatable`, `BatteryProvider`) rather than the monolithic `LocationUpdate` object to reduce engine-to-UI coupling and prevent redundant recompositions. (Oct.3.1 - Issue #1420).
 *   **1.94 Native Stationary Convergence (R1510)**: Stationary detection math and vibration floor EMA calculations MUST be offloaded to native code (JNI) via the `NativeFastPathProvider` to eliminate JVM floating-point overhead on high-frequency hot paths. (Oct.3.1 - Issue #SIMP-1510-1).
+*   **1.95 HUD Stabilization (R1420-S)**: UI components MUST utilize standardized interface properties (e.g., `locationPendingReason`) to ensure type safety and architectural alignment with slice-based data models. (Oct.3.2 - Issue #1420-S).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 603**: HUD Stabilization - Resolved post-refactor compilation failures and property naming mismatches. (Resolved Oct.3.2).
 *   **SOT ID 602**: Native Stationary Convergence - Offloaded stationary detection and vibration floor EMA to JNI. (Resolved Oct.3.1).
 *   **SOT ID 601**: Granular HUD Binding - Decoupled UI components from LocationUpdate monolith via interface slicing. (Resolved Oct.3.1).
 *   **SOT ID 600**: UI State Mapper Consolidation - Merged UiStateCoordinator into MainViewModel to reduce architectural complexity. (Resolved Oct.2.15).
@@ -46,6 +48,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.224 (HUD Stabilization Audit)**: PASSED - Verified full project compilation. Confirmed all UI call sites utilize interface-compliant properties (`locationPendingReason`). (Oct.3.2)
 *   **Chapter 31.223 (Native Convergence Audit)**: PASSED - Verified zero JVM math overhead for stationary detection and vibration floor recalibration via JNI offloading. (Oct.3.1)
 *   **Chapter 31.222 (HUD Decoupling Audit)**: PASSED - Confirmed AlarmOverlay and StatusBar consume granular interfaces. Verified zero redundant recompositions in AlarmOverlayService during telemetry-only updates. (Oct.3.1)
 *   **Chapter 31.221 (UI State Consolidation Audit)**: PASSED - Verified successful merge of UiStateCoordinator into MainViewModel and removal of redundant dependency layer. All dashboard and map state transformations validated. (Oct.2.15)

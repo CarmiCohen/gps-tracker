@@ -23,9 +23,9 @@ import kotlinx.coroutines.flow.onEach
 
 /**
  * AlarmActivity: Full-screen alarm overlay that bypasses the lock screen.
- * July.28.24:
- * - Issue #620: State Partitioning Audit. Migrated to partitioned KinematicState 
- *   and DiagnosticState for architectural consistency.
+ * Oct.3.2:
+ * - Issue #1420: Granular HUD Binding. Updated AlarmOverlay call to use 
+ *   locatable parameter instead of deprecated isLocationPending.
  */
 @AndroidEntryPoint
 class AlarmActivity : ComponentActivity() {
@@ -77,7 +77,7 @@ class AlarmActivity : ComponentActivity() {
                     AlarmOverlay(
                         alarms = diagnosticState.activeAlarms,
                         isMuted = diagnosticState.isAlarmSilenced,
-                        isLocationPending = kinematicState.trackerHealth.isLocationPending,
+                        locatable = kinematicState.trackerHealth,
                         backgroundStatus = uiState.permissions.backgroundStatus,
                         hasBackgroundRestriction = uiState.permissions.hasBackgroundRestriction,
                         onHardwarePermissionClick = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },

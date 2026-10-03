@@ -4,19 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Oct.3.1:
+ * - Issue #1420: Granular HUD Binding. Implemented Locatable interface to 
+ *   support decoupled UI slicing and automated HUD status projection.
  * Sep.28.1:
  * - Issue #1205: Context-Aware Power Optimization. Integrated activityType 
  *   into the health state model for context-aware background logic.
- * Sep.26.12:
- * - Issue #1344: Added thermalHeadroom and heapAllocatedMb forensic probes.
- * Sep.24.91:
- * - Issue #1244 Hardening: Added coolingEnteredRt for precise Thermal Recovery Latency auditing.
- * Sep.10.40:
- * - Issue #946 Visibility: Added tamperNote for header-level forensic 
- *   transparency (R-ID 288).
- * Sep.08.12:
- * - Issue #924 Visibility: Added isGnssThrottled for A15 Hysteresis transparency.
- * - R-ID 259: Added structured Energy Footprint fields (deltaMa, deltaTemp, durationMs).
  */
 @Serializable
 class SystemHealthState(
@@ -37,8 +30,8 @@ class SystemHealthState(
     var micPending: Boolean = false,
     var isPowerTamper: Boolean = false,
     var isClockRegression: Boolean = false,
-    var isLocationPending: Boolean = false,
-    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    override var isLocationPending: Boolean = false,
+    override var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     var lastValidFixRt: Long = 0L,
     var lastLocationPendingDurationMs: Long = 0L,
     var isPowerSaveMode: Boolean = false,
@@ -60,7 +53,7 @@ class SystemHealthState(
     var tiltIdx: Double = 0.0,
     var baroIdx: Double = 0.0,
     
-    // Performance & Load Correlation (Issue #711/R711)
+    // Performance & Load Correlation
     var cpuLoad: Double = 0.0,
     var ioWait: Double = 0.0,
     var maxIoLatency: Long = 0L, 
@@ -68,7 +61,7 @@ class SystemHealthState(
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
 
-    // Forensic Persistence Health (Issue #714/R714)
+    // Forensic Persistence Health
     var forensicReliability: Double = 1.0,
 
     // Connectivity Stats
@@ -103,7 +96,7 @@ class SystemHealthState(
     var vibrationRollingSum: Double = 0.0,
     var kineticEnergy: Double = 0.0,
 
-    // Forensic Sit Detection (Issue #102/R990)
+    // Forensic Sit Detection
     var isSitDetected: Boolean = false,
     var isSitActive: Boolean = false,
     var lastSitTs: Long = 0L,
@@ -114,23 +107,20 @@ class SystemHealthState(
     var sitTilt: Double = 0.0,
     var sitShock: Double = 0.0,
 
-    // Issue #129: Adaptive Pruning Sensitivity
     var isBatteryLow: Boolean = false,
     var isBatteryCritical: Boolean = false,
 
-    // Issue #133: Forensic Anomaly Correlation
     var isSilentFailure: Boolean = false,
     var isUltraLongStationary: Boolean = false,
     var isMaliAnomaly: Boolean = false,
     var isGnssThrottled: Boolean = false,
 
-    // R-ID 259: Energy Footprint Verdicts
     var lastEnergyDeltaMa: Int = 0,
     var lastEnergyDeltaTemp: Double = 0.0,
     var lastEnergyDurationMs: Long = 0L,
     var tamperNote: String? = null,
     var activityType: ActivityType = ActivityType.UNKNOWN
-) {
+) : Locatable {
     fun copyFrom(other: SystemHealthState) {
         this.signalLoss = other.signalLoss
         this.gpsStalled = other.gpsStalled
