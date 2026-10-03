@@ -1,5 +1,17 @@
 # 🏛️ Resolution Archive - Oct.2.15
 
+## 🏁 Issue #1290 / SOT ID 600: UI State Mapper Consolidation
+*   **Resolved**: Oct.2.15
+*   **Root Cause**: The `UiStateCoordinator` (or `UiStateMapper`) introduced an unnecessary layer of indirection for activity-scoped state projection, increasing dependency complexity without providing multi-consumer utility.
+*   **Remediations**:
+    *   **Logic Merging**: Transferred all mapping functions (`mapDashboardConnectivity`, `mapDashboardTelemetry`, `mapDashboardHealth`, `mapHudConnectivity`, `mapHudTelemetry`, `mapHudHealth`, `mapMapViewState`, `computeTrailSegments`) into `MainViewModel`.
+    *   **State Migration**: Moved coordinate smoothing variables (`sTrkLat`, `sTrkLng`, etc.) to private properties within `MainViewModel`.
+    *   **Dependency Pruning**: Removed `UiStateCoordinator` from the Hilt injection graph. Note: File remains on disk as dead code due to environment limitations.
+*   **Significance**: Medium (Maintainability).
+*   **SOT ID**: 600
+
+---
+
 ## 🏁 Issue #1176 / SOT ID 599: Native FastPath Transitions
 *   **Resolved**: Oct.2.15
 *   **Root Cause**: High-frequency sensor spike detection (Acoustic and Light) in the JVM layer introduced significant event processing latency and GC pressure during sustained monitoring (250Hz+).

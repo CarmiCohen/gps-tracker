@@ -1,6 +1,6 @@
 # SOT Master Requirements & Hardening Status (Oct.2.15)
 
-## 🏗️ Architectural Master Rules (113 Rules)
+## 🏗️ Architectural Master Rules (114 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -21,10 +21,12 @@
 *   **1.89 Snap-to-Update Monolith (R597)**: The system MUST utilize a unified `LocationUpdate` DTO for both engine evaluation and telemetry persistence. Redundant bridge layers (e.g. SystemEvaluationSnapshot) MUST be merged to eliminate mapping overhead and object churn. (Oct.2.8 - Issue #1330).
 *   **1.90 TrackerStatus Convergence (R598)**: The system MUST maintain a single telemetry source of truth by merging the `TrackerStatus` DTO into the `LocationUpdate` monolith. All domain, signaling, and persistence layers MUST operate on the unified monolith to ensure architectural consistency and zero-allocation parity. (Oct.2.9 - Issue #1314).
 *   **1.91 Native FastPath (R257)**: High-frequency sensor spike detection (Acoustic/Light) MUST be offloaded to native code (JNI) to minimize JVM event processing latency and eliminate heap churn during sustained monitoring. The system MUST maintain a JVM fallback to ensure functional parity on hardware where the native library fails to load. (Oct.2.15 - Issue #1176).
+*   **1.92 UI State Consolidation (R1290)**: Activity-scoped UI state projection logic MUST be consolidated within the `MainViewModel` to minimize dependency layers and simplify the state transformation pipeline. (Oct.2.15 - Issue #1290).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 600**: UI State Mapper Consolidation - Merged UiStateCoordinator into MainViewModel to reduce architectural complexity. (Resolved Oct.2.15).
 *   **SOT ID 599**: Native FastPath Transitions - Offloaded Acoustic and Light spike detection to JNI to reduce JVM overhead and GC pressure. (Resolved Oct.2.15).
 *   **SOT ID 598**: TrackerStatus Convergence - Purged redundant TrackerStatus DTO and consolidated all state into LocationUpdate monolith. (Resolved Oct.2.9).
 *   **SOT ID 597**: Snap-to-Update Monolith - Merged SystemEvaluationSnapshot into LocationUpdate to eliminate bridge mapping layers. (Resolved Oct.2.8).
@@ -40,6 +42,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.221 (UI State Consolidation Audit)**: PASSED - Verified successful merge of UiStateCoordinator into MainViewModel and removal of redundant dependency layer. All dashboard and map state transformations validated. (Oct.2.15)
 *   **Chapter 31.220 (Native FastPath Audit)**: PASSED - Verified zero heap churn and reduced CPU latency for high-frequency acoustic/light spike detection via JNI FastPath on A15 hardware. (Oct.2.15)
 *   **Chapter 31.219 (TrackerStatus Purge Audit)**: PASSED - Verified complete removal of TrackerStatus DTO and successful migration to LocationUpdate monolith across UI, engine, and persistence. (Oct.2.9)
 *   **Chapter 31.218 (Monolith DTO Audit)**: PASSED - Verified removal of SystemEvaluationSnapshot and unification into LocationUpdate across all engine and signaling modules. (Oct.2.8)
