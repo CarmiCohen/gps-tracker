@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vOct.1.8)
+# Test Procedure - GPS Tracker (vOct.3.7)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -44,6 +44,10 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   **Action:** Invoke map overlays, geofence mutations, and spatial events simultaneously under rapid screen interactions.
     *   **Verification:** Verify that all calls flow flawlessly into `SpatialLogicUseCase` without any race conditions, data inconsistencies, or behavioral regression compared to old standalone models.
     *   **Status (Sep.22.05):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **2.7 Connection Sticky-State (Issue #1422):**
+    *   **Action:** Change Relay URL or Device IDs while the app is actively connected (SRV green).
+    *   **Verification:** Confirm the app immediately disconnects and attempts a new connection with the updated parameters. Verify `CommunicationManager` does not "stick" to the previous configuration.
+    *   **Status (Oct.03.6):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 3 - Tracker Mode Operation
 **Goal:** Verify telemetry accuracy and sentinel logic.
@@ -69,6 +73,10 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   **Action:** Run Tracker mode without any connected Viewers.
     *   **Verification:** Confirm behavioral state (MOVING/PARKING) is displayed on the local dashboard. Bypasses peer connectivity gate for local-only diagnostic sessions.
     *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **3.8 StatusBar Visual & Logic Hardening (Issue #1423):**
+    *   **Action:** Switch to Portrait mode and observe the StatusBar telemetry rows.
+    *   **Verification:** Confirm that "Viewer" and "Tracker" sub-rows are stacked vertically with clear spacing. Confirm speed text color matches tracker state color (Gray when `UNKNOWN`). Verify GPS age is a positive number (e.g., "5s") and not negative.
+    *   **Status (Oct.03.7):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 4 - Viewer Mode & Remote Sync
 **Goal:** Validate real-time synchronization.
@@ -102,6 +110,10 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   **Action:** Acknowledge an alert on the Viewer during a 500ms network jitter event.
     *   **Verification:** Confirm the alert does not "re-trigger" on the Tracker. Uses `violationStartTs` to ensure stale telemetry cannot revive a resolved alarm.
     *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **4.11 HUD Visibility & Occlusion (Issue #1421):**
+    *   **Action:** Open Settings or Log overlays in Portrait mode.
+    *   **Verification:** Confirm that the Header and HUD (StatusBar) hide automatically to prevent overlapping with overlay controls. Confirm the map remains visible behind the HUD surface (alpha 0.4).
+    *   **Status (Oct.03.5):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 5 - Recovery and Edge Cases
 **Goal:** Verify system resilience against signal loss.
@@ -127,6 +139,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   **Action:** Sustained 1-hour alert cycle on low-memory device (A15).
     *   **Verification:** Confirm `AlarmOverlayService` cleans up all views on `stopSelf()`. No cumulative memory growth from orphaned `ComposeView` instances.
     *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **7.5 Native Stationary Convergence (Issue #SIMP-1510-1):**
+    *   **Action:** Monitor sensor diagnostics while the device is stationary on a desk.
+    *   **Verification:** Confirm stationary detection and vibration floor EMA calculations are handled by JNI (no JVM floating point errors). Verify zero lag in "STATIONARY" status update.
+    *   **Status (Oct.03.1):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
+*   **7.6 Granular HUD Binding (Issue #1420):**
+    *   **Action:** Update remote battery level and observe HUD recomposition counts via Layout Inspector.
+    *   **Verification:** Confirm that only the battery-related sub-components recompose. The map and other telemetry slices must remain unaffected due to granular interface slicing.
+    *   **Status (Oct.03.1):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 8 - Validation Hooks & Aggregation
 *   **8.1 Forensic Stall Simulation:** EMA reliability drop check.
@@ -140,4 +160,4 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ---
 **Total Testing Chapters: 100**
-*(Full historical procedure synchronized Oct.1.8)*
+*(Full historical procedure synchronized Oct.3.7)*

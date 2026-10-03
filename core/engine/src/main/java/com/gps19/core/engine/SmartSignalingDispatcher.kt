@@ -6,9 +6,12 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
- * Sep.27.7:
- * - Issue #1172: Smart Signaling Dispatcher. Merged conflation, queue processing, 
- *   and adaptive throttling into a transport-agnostic coordination layer.
+ * Oct.3.8:
+ * - Issue #1172: Smart Signaling Dispatcher. Completed migration of ALL signaling 
+ *   triggers. Removed HIGH priority bypass to ensure connection-aware ordered 
+ *   delivery for all commands (R-ID 510).
+ * - Throttling Hardening: Adjusted processor to allow burst delivery for HIGH 
+ *   priority commands while maintaining inter-frame delays for telemetry.
  */
 class SmartSignalingDispatcher(
     private val scope: CoroutineScope,
@@ -35,17 +38,28 @@ class SmartSignalingDispatcher(
         processorJob?.cancel()
         processorJob = scope.launch(Dispatchers.Default) {
             for (command in queue) {
-                while (!isConnectedProvider()) {
+                // Connection Guard: Ensure we only attempt emission when the transport is ready.
+                while (!isConnectedProvider() && isActive) {
                     delay(1000)
                 }
+                if (!isActive) break
                 
+                val priority = when(command) {
+                    is Command.Json -> command.priority
+                    is Command.Binary -> command.priority
+                }
+
                 when (command) {
                     is Command.Json -> jsonSink(command.event, command.data)
                     is Command.Binary -> binarySink(command.event, command.routingId, command.data)
                 }
 
-                val delayMs = if (isViolationProvider()) SIGNALING_EMIT_DELAY_VIOLATION_MS else SIGNALING_EMIT_DELAY_MS
-                delay(delayMs)
+                // Adaptive Throttling: High priority commands (joins, pings, immediate alerts)
+                // bypass the inter-frame delay to ensure system responsiveness.
+                if (priority != SignalingPriority.HIGH) {
+                    val delayMs = if (isViolationProvider()) SIGNALING_EMIT_DELAY_VIOLATION_MS else SIGNALING_EMIT_DELAY_MS
+                    delay(delayMs)
+                }
             }
         }
     }
@@ -53,25 +67,18 @@ class SmartSignalingDispatcher(
     fun dispatch(command: Command) {
         when (command) {
             is Command.Json -> {
-                if (command.priority == SignalingPriority.HIGH) {
-                    // High priority JSON (Pings, Commands) bypasses the queue for minimum latency
-                    // but still respects connection state via the sink implementation if needed.
-                    // However, we want ordered delivery for some things.
-                    // Requirement #1172 says "Merge conflation and throttling".
-                    // CommunicationManager previously sent HIGH priority immediately.
-                    jsonSink(command.event, command.data)
-                } else if (command.event == "location_update") {
+                // location_update is subject to conflation if priority is NORMAL/LOW.
+                if (command.event == "location_update" && command.priority != SignalingPriority.HIGH) {
                     dispatchConflated(command.data)
                 } else {
+                    // All other JSON commands (including HIGH priority) are queued to maintain order
+                    // and ensure connectivity checks.
                     queue.trySend(command)
                 }
             }
             is Command.Binary -> {
-                if (command.priority == SignalingPriority.HIGH) {
-                    binarySink(command.event, command.routingId, command.data)
-                } else {
-                    queue.trySend(command)
-                }
+                // Binary telemetry currently bypasses conflation but respects the queue/throttling.
+                queue.trySend(command)
             }
         }
     }

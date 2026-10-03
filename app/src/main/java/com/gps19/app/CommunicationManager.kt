@@ -21,10 +21,15 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Oct.3.8:
+ * - Issue #1172: Smart Signaling Dispatcher. Migrated ALL signaling triggers 
+ *   (including join/leave handshakes) to the dispatcher to ensure ordered, 
+ *   connection-aware delivery. 
+ * - Payload Optimization: Converted payload generators to use Maps to avoid 
+ *   redundant JSONObject conversions (R-ID 510).
  * Oct.3.6:
  * - Connection Logic Hardening: Simplified connect() to prioritize URL/ID changes 
- *   over existing connection state to resolve "Stuck SRV" issues.
- * - Transport Fix: Forced "websocket" only transport to resolve Render.com polling issues (R1422).
+ *   over existing connection state (R1422).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -94,12 +99,12 @@ class CommunicationManager @Inject constructor(
 
     private fun markTraffic() { lastRelayTrafficTs = timeProvider.elapsedRealtime() }
 
-    private fun createJoinPayload(): JSONObject {
-        return JSONObject().apply {
-            put("id", SignalingConstants.getTransmissionId(deviceId))
-            put("role", if (isTrackerMode) "tracker" else "viewer")
-            put("ver", BuildConfig.VERSION_NAME)
-        }
+    private fun createJoinPayload(): Map<String, Any?> {
+        return mapOf(
+            "id" to SignalingConstants.getTransmissionId(deviceId),
+            "role" to if (isTrackerMode) "tracker" else "viewer",
+            "ver" to BuildConfig.VERSION_NAME
+        )
     }
 
     override fun updateIdentity(deviceId: String, viewerId: String, isTracker: Boolean, force: Boolean) {
@@ -122,13 +127,12 @@ class CommunicationManager @Inject constructor(
         this.viewerId = cleanedViewerId
         this.isTrackerMode = isTracker
         
-        if ((idChanged || roleChanged || force) && isConnected()) {
+        if (idChanged || roleChanged || force) {
             if (idChanged && oldId.isNotEmpty()) {
-                socket?.emit("leave", SignalingConstants.getTransmissionId(oldId))
+                emitInternal("leave", mapOf("id" to SignalingConstants.getTransmissionId(oldId)), SignalingPriority.HIGH)
             }
             if (this.deviceId.isNotEmpty()) {
-                socket?.emit("join", createJoinPayload())
-                markTraffic()
+                emitInternal("join", createJoinPayload(), SignalingPriority.HIGH)
             }
         }
     }
@@ -166,7 +170,6 @@ class CommunicationManager @Inject constructor(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
         }
 
-        // Issue #1422: Reconnect if URL, Role, or ID changed, regardless of current state.
         if (!roleChanged && !urlChanged && !idChanged && (isConnectingInternal.get() || isConnected())) return
 
         val sessionId = currentSessionId.incrementAndGet()
@@ -178,7 +181,6 @@ class CommunicationManager @Inject constructor(
         markTraffic() 
 
         val opts = IO.Options().apply {
-            // Issue #1422: Use websocket only for stability on Render.com
             transports = arrayOf("websocket")
             timeout = 60000
             reconnection = true; reconnectionAttempts = Int.MAX_VALUE
@@ -212,7 +214,8 @@ class CommunicationManager @Inject constructor(
                     logToApp("Connected to relay [Session $sessionId]", true)
                     markTraffic()
                     telemetryRepository.updateRelayStatus(true)
-                    if (deviceId.isNotEmpty()) s.emit("join", createJoinPayload())
+                    // Issue #1172: Dispatched through coordinator to ensure ordering with other commands
+                    if (deviceId.isNotEmpty()) emitInternal("join", createJoinPayload(), SignalingPriority.HIGH)
                 }
             }
         }
@@ -231,7 +234,7 @@ class CommunicationManager @Inject constructor(
                     logToApp("Relay Reconnected [Session $sessionId]", true)
                     markTraffic()
                     telemetryRepository.updateRelayStatus(true)
-                    if (deviceId.isNotEmpty()) s.emit("join", createJoinPayload())
+                    if (deviceId.isNotEmpty()) emitInternal("join", createJoinPayload(), SignalingPriority.HIGH)
                 }
             }
         }
@@ -273,7 +276,6 @@ class CommunicationManager @Inject constructor(
 
     private fun handleLocationRelayBinary(args: Array<Any>) {
         try {
-            // R-ID 392: Binary relay might include routingId as the first argument.
             val data = if (args.size > 1 && args[1] is ByteArray) args[1] as ByteArray 
                        else args[0] as ByteArray
             _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(data))
