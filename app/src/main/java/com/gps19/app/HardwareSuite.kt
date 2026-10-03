@@ -37,17 +37,13 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.3.1:
+ * - Issue #SIMP-1510-1: Native FastPath Convergence. Implemented NativeFastPathProvider 
+ *   delegate to offload stationary detection and vibration floor EMA to JNI via 
+ *   JdHardwareManager.
  * Oct.2.15:
  * - Issue #1176: Native FastPath. Refactored HardwareFastPath to delegate to 
  *   JdHardwareManager (n10/n11) for Acoustic/Light spike detection (R-ID 257).
- * - Fixed typo in updateLocationStatus (DEBOBUBCE -> DEBOUNCE).
- * Oct.2.5:
- * - Issue #SIMP-1416-1: Native Sensor Pulse. Integrated JdHardwareManager.recordSensorPulse 
- *   into onSensorChanged to offload frequency tracking to JNI (R-ID 256).
- * Oct.2.1:
- * - Issue #1415: Load-Aware IMU Gating (R-ID 591). Integrated cpuLoad into 
- *   processVibration and updateVibrationFloor logic to prevent baseline 
- *   corruption during saturation.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -61,6 +57,16 @@ class HardwareSuite @Inject constructor(
     private val domainEventBus: DomainEventBus,
     private val activityContextProvider: ActivityContextProvider
 ) : ManagedSensorListener() {
+
+    private val nativeFastPathProvider = object : NativeFastPathProvider {
+        override fun isStationary(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean {
+            return JdHardwareManager.isStationaryNative(vibration, adaptiveFloor, cpuLoad)
+        }
+
+        override fun updateVibrationFloor(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double): Double {
+            return JdHardwareManager.updateVibrationFloorNative(currentFloor, vibration, isWarming, cpuLoad)
+        }
+    }
 
     class ForensicSnapshot {
         var vibration: Double = 0.0
@@ -96,10 +102,6 @@ class HardwareSuite @Inject constructor(
         }
     }
 
-    /**
-     * HardwareFastPath: Unified structure for high-frequency sensor spike detection.
-     * Updated Oct.2.15 to support native JNI offloading.
-     */
     private class HardwareFastPath(
         val type: Int,
         var baseline: Double = -1.0,
@@ -129,7 +131,6 @@ class HardwareSuite @Inject constructor(
         fun evaluate(currentValue: Double, nowRt: Long, isWarming: Boolean, debounceMs: Long, alpha: Double = 0.0): Boolean {
             if (isWarming || onSpike == null) return false
 
-            // Try native fast-path first
             if (JdHardwareManager.isAvailable()) {
                 val spike = JdHardwareManager.evaluateFastPath(type, currentValue, nowRt, alpha)
                 if (spike) {
@@ -140,7 +141,6 @@ class HardwareSuite @Inject constructor(
                 return false
             }
 
-            // Fallback to JVM logic
             if (baseline < 0) { baseline = currentValue; return false }
             if (alpha > 0.0) baseline = (baseline * (1.0 - alpha)) + (currentValue * alpha)
 
@@ -305,7 +305,6 @@ class HardwareSuite @Inject constructor(
     val isUltraLongStationaryFlow: SharedFlow<Boolean> = _isUltraLongStationary.asSharedFlow()
     private var isUltraLongStationary = false
 
-    // Issue #1205 & #1353: Activity Detection
     @Volatile private var lastGpsSpeedMps = 0.0
 
     private val gnssPolicyEngine = GnssPolicyEngine()
@@ -399,6 +398,7 @@ class HardwareSuite @Inject constructor(
     }
 
     init {
+        SentinelValidator.setNativeProvider(nativeFastPathProvider)
         scope.launch {
             _locationStatus.tryEmit(currentLocationStatus)
             _isUltraLongStationary.tryEmit(isUltraLongStationary)
@@ -739,7 +739,6 @@ class HardwareSuite @Inject constructor(
                 gravityBuffer[0] = values[0]; gravityBuffer[1] = values[1]; gravityBuffer[2] = values[2]; hasGravity = true
                 processVibration(values[0], values[1], values[2]); updateOrientation()
                 
-                // Issue #SIMP-1416-1: Native Sensor Pulse (R-ID 256)
                 JdHardwareManager.recordSensorPulse(nowRt)
                 
                 if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) {
@@ -974,7 +973,6 @@ class HardwareSuite @Inject constructor(
             lastRawVibe = delta 
         }
         lastAccelX = x; lastAccelY = y; lastAccelZ = z
-        // precise buffer update matching original
         val oldV = vibrationCircularBuffer[vibrationCircularIdx]; vibrationCircularBuffer[vibrationCircularIdx] = delta; vibrationRollingSum = vibrationRollingSum - oldV + delta; vibrationCircularIdx = (vibrationCircularIdx + 1) % VIBRATION_WINDOW_SIZE; if (vibrationBufferCount < VIBRATION_WINDOW_SIZE) vibrationBufferCount++
         currentVibrationIndex = if (vibrationBufferCount > 0) vibrationRollingSum / vibrationBufferCount else 0.0
         if (currentVibrationIndex > secPeakVibe) secPeakVibe = currentVibrationIndex

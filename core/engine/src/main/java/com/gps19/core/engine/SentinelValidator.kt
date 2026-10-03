@@ -6,20 +6,22 @@ import kotlin.math.min
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * Oct.3.1:
+ * - Issue #SIMP-1510-1: Native FastPath Convergence. Integrated NativeFastPathProvider 
+ *   to offload stationary detection and vibration floor EMA to JNI, eliminating 
+ *   JVM math overhead on hot paths.
  * Oct.2.1:
  * - Issue #1415: Load-Aware IMU Gating (R-ID 590/591). Integrated cpuLoad into 
  *   vibration and shock evaluation to compensate for LIS2DLC12 jitter under saturation.
- * Sep.02.01:
- * - Issue #897: Added sensitivity mapping for Tilt and Vibration (R2.3).
- *   Tilt range: 5° to 25° (0.5 -> 15°).
- *   Vibration range: 0.2g to 1.4g (0.5 -> 0.8g).
- * Aug.29.11:
- * - Acoustic Refinement (R762b): Encapsulated adaptive acoustic duty-cycle 
- *   logic into computeAdaptiveAcousticOffCycle.
- * Aug.11.08:
- * - Issue #143: Forensic Integrity Verification.
  */
 object SentinelValidator {
+
+    @Volatile
+    private var nativeProvider: NativeFastPathProvider? = null
+
+    fun setNativeProvider(provider: NativeFastPathProvider) {
+        this.nativeProvider = provider
+    }
 
     fun isTiltViolated(tiltDegrees: Double, sensitivity: Float = 0.5f): Boolean {
         // Map 0.0..1.0 to 25.0..5.0 degrees (Higher sensitivity = Lower threshold)
@@ -64,7 +66,12 @@ object SentinelValidator {
     }
 
     fun isStationary(vibration: Double, adaptiveFloor: Double, cpuLoad: Double = 0.0): Boolean {
-        // Issue #1415: Increase stationary floor multiplier during load saturation to maintain state (R-ID 590)
+        // Issue #SIMP-1510-1: Try native offloading first
+        nativeProvider?.let {
+            return it.isStationary(vibration, adaptiveFloor, cpuLoad)
+        }
+
+        // JVM Fallback
         val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 2.0 else 1.0
         val dynamicGate = (adaptiveFloor * STATIONARY_FLOOR_MULT * loadFactor).coerceIn(INITIAL_VIBRATION_FLOOR, VIBRATION_STATIONARY_THRESHOLD * loadFactor)
         return vibration < dynamicGate
@@ -113,6 +120,11 @@ object SentinelValidator {
     fun updateVibrationFloor(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double = 0.0): Double {
         if (vibration.isNaN() || vibration <= 0.0) return currentFloor
         
+        // Issue #SIMP-1510-1: Try native offloading first
+        nativeProvider?.let {
+            return it.updateVibrationFloor(currentFloor, vibration, isWarming, cpuLoad)
+        }
+
         // Issue #1415: Stable Load Gate (R-ID 591). Pause recalibration during CPU saturation bursts
         // to prevent baseline corruption from hardware jitter.
         if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) return currentFloor

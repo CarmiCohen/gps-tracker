@@ -223,6 +223,9 @@ data class IntegrityState(
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
+ * Oct.3.1:
+ * - Issue #1420: Granular HUD Binding. Implements Locatable, BatteryProvider, 
+ *   and DeviceIdentity interfaces to allow UI slicing and reduce coupling.
  * Oct.2.9:
  * - Issue #1314: TrackerStatus Convergence. Merged TrackerStatus into 
  *   LocationUpdate to eliminate mapping layers. Added deviceId, viewerId, 
@@ -240,7 +243,7 @@ data class LocationUpdate(
     override var rt: Long = 0L,
     var isMe: Boolean = true,
     var deviceId: String = "",
-    var viewerId: String = "",
+    override var viewerId: String = "",
     var trackerState: TrackerState = TrackerState.UNKNOWN,
     var isClockRegression: Boolean = false,
     var lastValidFixRt: Long = 0L,
@@ -266,7 +269,7 @@ data class LocationUpdate(
     
     // Engine-Direct Flags (Converged)
     var suppressionNote: String? = null
-) : SpatialAnchor {
+) : SpatialAnchor, Locatable, BatteryProvider, DeviceIdentity {
 
     override var lat: Double 
         get() = kinetic.lat
@@ -294,7 +297,7 @@ data class LocationUpdate(
         get() = kinetic.maxAccuracy
         set(value) { kinetic.maxAccuracy = value }
 
-    var battery: Int 
+    override var battery: Int 
         get() = integrity.battery
         set(value) { integrity.battery = value }
     var temp: Double 
@@ -303,7 +306,7 @@ data class LocationUpdate(
     var maxTemp: Double 
         get() = atmospheric.maxTemp
         set(value) { atmospheric.maxTemp = value }
-    var isCharging: Boolean 
+    override var isCharging: Boolean 
         get() = integrity.isCharging
         set(value) { integrity.isCharging = value }
     var currentMa: Int 
@@ -372,10 +375,10 @@ data class LocationUpdate(
         get() = atmospheric.vibrationRollingSum
         set(value) { atmospheric.vibrationRollingSum = value }
 
-    var isLocationPending: Boolean 
+    override var isLocationPending: Boolean 
         get() = integrity.isLocationPending
         set(value) { integrity.isLocationPending = value }
-    var locationPendingReason: LocationPendingReason 
+    override var locationPendingReason: LocationPendingReason 
         get() = integrity.locationPendingReason
         set(value) { integrity.locationPendingReason = value }
 
@@ -582,6 +585,10 @@ data class LocationUpdate(
         get() = kinetic.isAdaptiveJump
         set(value) { kinetic.isAdaptiveJump = value }
 
+    override var trackerId: String 
+        get() = deviceId
+        set(value) { deviceId = value }
+
     fun copyFrom(other: LocationUpdate) {
         this.kinetic.copyFrom(other.kinetic)
         this.atmospheric.copyFrom(other.atmospheric)
@@ -697,7 +704,7 @@ data class LocationUpdate(
         put("activity_type", activityType.name)
         put("last_energy_delta_ma", lastEnergyDeltaMa)
         put("last_energy_delta_temp", lastEnergyDeltaTemp)
-        put("last_energy_duration_ms", lastEnergyDurationMs)
+        put("last_energy_durationMs", lastEnergyDurationMs)
         put("tamper_note", tamperNote)
         put("thermal_headroom", thermalHeadroom)
         put("heap_allocated_mb", heapAllocatedMb)

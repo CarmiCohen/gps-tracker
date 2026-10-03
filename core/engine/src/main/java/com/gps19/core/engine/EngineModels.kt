@@ -6,19 +6,11 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * Oct.2.8:
- * - Issue #1330: Snap-to-Update Monolith. Removed redundant 
- *   SystemEvaluationSnapshot class. Updated TickEvaluated to use 
- *   LocationUpdate as the unified DTO.
- * Oct.2.1:
- * - Issue #1417: Jitter-Resistant Connectivity (R-ID 593). Added lastRelayOnlineRt 
- *   and lastRelayOfflineRt to track connectivity state duration for hysteresis.
- * - Issue #1416: Memory Pressure Mitigation. Added MemoryPressureLevel and 
- *   MemoryPressureChanged event to support heap management on A15 hardware.
- * Oct.1.8:
- * - Issue #1410: Forced activeAlarms to val ConcurrentHashMap to ensure 
- *   thread-safety and prevent replacement with non-thread-safe maps 
- *   during deserialization (R-ID 585).
+ * Oct.3.1:
+ * - Issue #SIMP-1510-1: Native FastPath Convergence. Added NativeFastPathProvider 
+ *   to allow SentinelValidator to offload math to JNI.
+ * - Issue #1420: Granular HUD Binding. Added slice-based interfaces (Locatable, 
+ *   BatteryProvider, DeviceIdentity) to decouple UI from LocationUpdate monolith.
  */
 
 @Serializable
@@ -170,7 +162,7 @@ class EngineConnectionPoint(
         this.isSilentFailure = other.isSilentFailure; this.isBatteryLow = other.isBatteryLow; this.isBatteryCritical = other.isBatteryCritical
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
         this.thermalHeadroom = other.thermalHeadroom; this.heapAllocatedMb = other.heapAllocatedMb
-        this.activityType = other.activityType
+        this.activityType = activityType
     }
 }
 
@@ -291,6 +283,32 @@ interface SpatialAnchor {
     val gpsTs: Long
     val ts: Long
     val rt: Long
+}
+
+/**
+ * Slice-based interfaces to decouple UI from LocationUpdate monolith (Issue #1420).
+ */
+interface Locatable {
+    val isLocationPending: Boolean
+    val locationPendingReason: LocationPendingReason
+}
+
+interface BatteryProvider {
+    val battery: Int
+    val isCharging: Boolean
+}
+
+interface DeviceIdentity {
+    val trackerId: String
+    val viewerId: String
+}
+
+/**
+ * NativeFastPathProvider: Interface for offloading math to JNI (Issue #SIMP-1510-1).
+ */
+interface NativeFastPathProvider {
+    fun isStationary(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean
+    fun updateVibrationFloor(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double): Double
 }
 
 @Serializable
@@ -591,8 +609,6 @@ class AlarmEvaluationState {
         this.capabilities = capabilities; this.vibrationSensitivity = vibrationSensitivity
         this.tiltSensitivity = tiltSensitivity; this.powerAlarmPending = powerAlarmPending
         this.lastSirenStopRt = lastSirenStopRt; this.lastGlobalTriggerRt = lastGlobalTriggerRt
-        
-        // Internal state updates for hysteresis are handled in MainAlarmLogic or AppAlarmManager
     }
 }
 

@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.2.15
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.3.1
 
-## 🎯 Current Resumption Focus: UI State Optimization
-Consolidation of state mappers and granular HUD data binding.
+## 🎯 Current Resumption Focus: Architectural Decoupling
+Finalizing HUD interface slicing and native math convergence.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -10,7 +10,7 @@ Consolidation of state mappers and granular HUD data binding.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 10)
+## 💡 Strategic Simplification Ideas (Ideas: 8)
 
 ### 🛑 High Priority
 *   (All high-priority simplification ideas resolved).
@@ -26,10 +26,6 @@ Consolidation of state mappers and granular HUD data binding.
     *   *Significance*: **Medium (Domain Logic)**. Decouple siren cooldown and lockout logic from audio generation by moving it into a dedicated domain UseCase.
 *   **Issue #1202: UI Event Routing Unification**
     *   *Significance*: **Medium (Architecture)**. Refactor navigation and global UI commands into a single coordinator to decouple ViewModels from Compose-specific implementation.
-*   **Issue #1420: Granular HUD Data Binding**
-    *   *Significance*: **Medium (Decoupling)**. Refactor HUD components to consume slice-based interfaces instead of the full `LocationUpdate` monolith to reduce UI-to-Engine coupling.
-*   **Issue #SIMP-1510-1: Native FastPath Convergence.**
-    *   *Significance*: **Medium (Architecture)**. Now that native evaluation is stable for Acoustic/Light, expand to `SentinelValidator.isStationary` to fully remove floating-point math from the JVM hot-path.
 
 ### 🔵 Low Priority
 *   **Issue #1293: Lifecycle-Aware Tick Orchestrator**
@@ -42,6 +38,8 @@ Consolidation of state mappers and granular HUD data binding.
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1420 / SOT ID 601: Granular HUD Binding.** Resolved Oct.3.1. Decoupled UI components from `LocationUpdate` monolith via interface slicing (R1420).
+*   **Issue #SIMP-1510-1 / SOT ID 602: Native Stationary Convergence.** Resolved Oct.3.1. Offloaded stationary detection and vibration floor EMA to JNI to eliminate JVM math overhead (R1510).
 *   **Issue #1290 / SOT ID 600: UI State Mapper Consolidation.** Resolved Oct.2.15. Merged `UiStateCoordinator` logic into `MainViewModel` to reduce architectural complexity and dependency layers (R1290).
 *   **Issue #1176 / SOT ID 599: Native FastPath Transitions.** Resolved Oct.2.15. Offloaded high-frequency sensor spike detection (Acoustic/Light) to JNI to reduce JVM overhead and GC pressure (R-ID 257).
 *   **Issue #1314 / SOT ID 598: TrackerStatus Convergence.** Resolved Oct.2.9. Purged redundant TrackerStatus DTO and consolidated all state into LocationUpdate monolith (R598).
@@ -56,6 +54,7 @@ Consolidation of state mappers and granular HUD data binding.
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.3.1: [SOT Count: 259 (Rules: 116), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 18, QA: 365]**
 - **Oct.2.15: [SOT Count: 257 (Rules: 114), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:3, Testing: 16, QA: 363]**
 - **Oct.2.9: [SOT Count: 255 (Rules: 112), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 14, QA: 361]**
 - **Oct.2.8: [SOT Count: 254 (Rules: 111), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 13, QA: 360]**

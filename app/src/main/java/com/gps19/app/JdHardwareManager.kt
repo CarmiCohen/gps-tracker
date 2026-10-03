@@ -27,18 +27,13 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.3.1:
+ * - Issue #SIMP-1510-1: Native FastPath Convergence. Added n12/n13 for 
+ *   stationary detection and vibration floor EMA offloading to eliminate 
+ *   JVM floating-point math from hot paths.
  * Oct.2.15:
  * - Issue #1176: Native FastPath. Integrated n10/n11 for JNI-based high-frequency 
  *   sensor spike detection (Acoustic/Light) to eliminate JVM overhead (R-ID 257).
- * Oct.2.5:
- * - Issue #SIMP-1416-1: Native Sensor Pulse. Integrated n7/n8/n9 for JNI-based 
- *   high-frequency sensor auditing to eliminate JVM heap churn.
- * Sep.11.60:
- * - Issue #1007: Simplification Idea #15. Hardware Flag Abstraction. 
- *   Consolidated bitmask flags into type-safe LedStatus object to eliminate 
- *   manual bitwise operations in Services (R-ID 263).
- * - Issue #917 Hardening (Part B): Implemented HUD LED Specification compliance (R960/R972). 
- *   Added FLAG_PEER_STALE (0x10) and consolidated flag logic into syncHardwareState().
  */
 object JdHardwareManager {
 
@@ -52,12 +47,13 @@ object JdHardwareManager {
     // Issue #1176: FastPath Identifiers
     const val FASTPATH_ACOUSTIC = 0
     const val FASTPATH_LIGHT = 1
+    const val FASTPATH_STATIONARY = 2
 
     private val isLibraryLoaded = AtomicBoolean(false)
     private val initializationMutex = Mutex()
     private val jniLock = ReentrantLock()
     private const val MAX_JNI_RETRIES = 3
-    private const val JNI_WATCHDOG_TIMEOUT_MS = 2000L
+    private const val JNI_WATCH_DOG_TIMEOUT_MS = 2000L
     
     // Issue #319: Initialization retry parameters
     private const val MAX_INIT_RETRIES = 5
@@ -99,7 +95,7 @@ object JdHardwareManager {
             
             while (attempt < MAX_INIT_RETRIES) {
                 try {
-                    val success = withTimeout(JNI_WATCHDOG_TIMEOUT_MS) {
+                    val success = withTimeout(JNI_WATCH_DOG_TIMEOUT_MS) {
                         if (!isLibraryLoaded.get()) {
                             System.loadLibrary("jdHardware")
                             n1(sharedStateBuffer)
@@ -157,8 +153,8 @@ object JdHardwareManager {
         if (!isLibraryLoaded.get()) return JNI_RET_NOT_INITIALIZED
         
         return try {
-            withTimeout(JNI_WATCHDOG_TIMEOUT_MS) {
-                val acquired = jniLock.tryLock(JNI_WATCHDOG_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+            withTimeout(JNI_WATCH_DOG_TIMEOUT_MS) {
+                val acquired = jniLock.tryLock(JNI_WATCH_DOG_TIMEOUT_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
                 if (!acquired) {
                     Timber.e("jdHardware: Watchdog triggered for $operation (Lock contention)")
                     return@withTimeout -1
@@ -251,6 +247,34 @@ object JdHardwareManager {
         return if (isLibraryLoaded.get()) n11(type, value, nowRt, alpha) != 0 else false
     }
 
+    /**
+     * isStationaryNative: Native offloading of stationary detection math (Issue #SIMP-1510-1).
+     */
+    fun isStationaryNative(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean {
+        return if (isLibraryLoaded.get()) n12(vibration, adaptiveFloor, cpuLoad) != 0 else {
+            // Fallback to JVM logic if native is unavailable
+            val loadFactor = if (cpuLoad > 0.85) 2.0 else 1.0
+            val dynamicGate = (adaptiveFloor * 1.5 * loadFactor).coerceIn(0.05, 0.12 * loadFactor)
+            vibration < dynamicGate
+        }
+    }
+
+    /**
+     * updateVibrationFloorNative: Native offloading of vibration floor EMA (Issue #SIMP-1510-1).
+     */
+    fun updateVibrationFloorNative(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double): Double {
+        return if (isLibraryLoaded.get()) n13(currentFloor, vibration, if (isWarming) 1 else 0, cpuLoad) else {
+            // Fallback to JVM logic if native is unavailable
+            if (vibration.isNaN() || vibration <= 0.0 || cpuLoad > 0.85) return currentFloor
+            val alpha = if (vibration < currentFloor) {
+                if (isWarming) 0.5 else 0.01 // Simplified for fallback
+            } else if (vibration < 1.0) {
+                if (isWarming) 0.1 else 0.001
+            } else 0.0
+            (currentFloor * (1.0 - alpha)) + (vibration * alpha)
+        }
+    }
+
     fun isAvailable(): Boolean = isLibraryLoaded.get()
 
     @JvmStatic private external fun n1(buffer: ByteBuffer): Int
@@ -264,4 +288,6 @@ object JdHardwareManager {
     @JvmStatic private external fun n9(): Int
     @JvmStatic private external fun n10(type: Int, baseline: Double, threshold: Double, minThreshold: Double, debounceMs: Long): Int
     @JvmStatic private external fun n11(type: Int, value: Double, nowRt: Long, alpha: Double): Int
+    @JvmStatic private external fun n12(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Int
+    @JvmStatic private external fun n13(currentFloor: Double, vibration: Double, isWarming: Int, cpuLoad: Double): Double
 }

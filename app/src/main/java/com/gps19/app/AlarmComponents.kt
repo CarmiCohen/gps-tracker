@@ -27,10 +27,12 @@ import com.gps19.core.engine.*
 
 /**
  * AlarmComponents: Overlay for active alarm states and sirens.
+ * Oct.3.1:
+ * - Issue #1420: Granular HUD Binding. Refactored AlarmOverlay to consume 
+ *   Locatable interface instead of a raw boolean, aligning with the 
+ *   monolith decoupling strategy.
  * v9.4.0:
  * - Issue #502: Device Independency. Genericized hardware configuration alerts.
- * v9.4.1:
- * - Issue #510: Removed Chair Sit Detection.
  */
 
 @Composable
@@ -40,7 +42,7 @@ fun AlarmOverlay(
     onMute: () -> Unit, 
     onClose: () -> Unit, 
     onGoToMap: () -> Unit = onClose, 
-    isLocationPending: Boolean = false,
+    locatable: Locatable? = null,
     backgroundStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
     hasBackgroundRestriction: Boolean = false,
     onHardwarePermissionClick: () -> Unit = {}
@@ -48,6 +50,7 @@ fun AlarmOverlay(
     val unresolvedAlarms = alarms.filter { !it.isResolved }
     val hasUnresolved = unresolvedAlarms.isNotEmpty()
     val isSirenPlaying = unresolvedAlarms.any { !it.isSirenDisabled } && !isMuted
+    val isLocationPending = locatable?.isLocationPending ?: false
     
     val alarmCategories = listOf(
         ALERT_TITLE_LOCAL_INTERNET, ALERT_TITLE_RELAY_OFFLINE, ALERT_TITLE_TRACKER_OFFLINE,

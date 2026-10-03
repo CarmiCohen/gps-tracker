@@ -24,11 +24,12 @@ import javax.inject.Inject
 /**
  * AlarmOverlayService: Implements SYSTEM_ALERT_WINDOW to ensure alarm visibility 
  * even when the app is in background and device is unlocked.
+ * Oct.3.1:
+ * - Issue #1420: Granular HUD Binding. Refactored to use Locatable interface 
+ *   for AlarmOverlay, decoupling service from specific LocationUpdate details.
  * Oct.2.2:
  * - Issue #1402-B Hardening: Added ON_RESUME/ON_PAUSE lifecycle transitions to 
  *   ensure Compose state flows are fully active and properly paused (R-ID 582).
- * Oct.1.8:
- * - Issue #1402-B: Hardened teardown to prevent WindowManager leaks (R-ID 582).
  */
 @AndroidEntryPoint
 class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
@@ -112,7 +113,7 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
                 AlarmOverlay(
                     alarms = alarms,
                     isMuted = isMuted,
-                    isLocationPending = locationUpdate.integrity.isLocationPending,
+                    locatable = locationUpdate,
                     backgroundStatus = perms.backgroundStatus,
                     hasBackgroundRestriction = perms.hasBackgroundRestriction,
                     onHardwarePermissionClick = {

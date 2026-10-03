@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct.2.15)
+# SOT Master Requirements & Hardening Status (Oct.3.1)
 
-## 🏗️ Architectural Master Rules (114 Rules)
+## 🏗️ Architectural Master Rules (116 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -22,10 +22,14 @@
 *   **1.90 TrackerStatus Convergence (R598)**: The system MUST maintain a single telemetry source of truth by merging the `TrackerStatus` DTO into the `LocationUpdate` monolith. All domain, signaling, and persistence layers MUST operate on the unified monolith to ensure architectural consistency and zero-allocation parity. (Oct.2.9 - Issue #1314).
 *   **1.91 Native FastPath (R257)**: High-frequency sensor spike detection (Acoustic/Light) MUST be offloaded to native code (JNI) to minimize JVM event processing latency and eliminate heap churn during sustained monitoring. The system MUST maintain a JVM fallback to ensure functional parity on hardware where the native library fails to load. (Oct.2.15 - Issue #1176).
 *   **1.92 UI State Consolidation (R1290)**: Activity-scoped UI state projection logic MUST be consolidated within the `MainViewModel` to minimize dependency layers and simplify the state transformation pipeline. (Oct.2.15 - Issue #1290).
+*   **1.93 Granular HUD Binding (R1420)**: UI components and services MUST consume granular, slice-based interfaces (e.g., `Locatable`, `BatteryProvider`) rather than the monolithic `LocationUpdate` object to reduce engine-to-UI coupling and prevent redundant recompositions. (Oct.3.1 - Issue #1420).
+*   **1.94 Native Stationary Convergence (R1510)**: Stationary detection math and vibration floor EMA calculations MUST be offloaded to native code (JNI) via the `NativeFastPathProvider` to eliminate JVM floating-point overhead on high-frequency hot paths. (Oct.3.1 - Issue #SIMP-1510-1).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 602**: Native Stationary Convergence - Offloaded stationary detection and vibration floor EMA to JNI. (Resolved Oct.3.1).
+*   **SOT ID 601**: Granular HUD Binding - Decoupled UI components from LocationUpdate monolith via interface slicing. (Resolved Oct.3.1).
 *   **SOT ID 600**: UI State Mapper Consolidation - Merged UiStateCoordinator into MainViewModel to reduce architectural complexity. (Resolved Oct.2.15).
 *   **SOT ID 599**: Native FastPath Transitions - Offloaded Acoustic and Light spike detection to JNI to reduce JVM overhead and GC pressure. (Resolved Oct.2.15).
 *   **SOT ID 598**: TrackerStatus Convergence - Purged redundant TrackerStatus DTO and consolidated all state into LocationUpdate monolith. (Resolved Oct.2.9).
@@ -42,6 +46,8 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.223 (Native Convergence Audit)**: PASSED - Verified zero JVM math overhead for stationary detection and vibration floor recalibration via JNI offloading. (Oct.3.1)
+*   **Chapter 31.222 (HUD Decoupling Audit)**: PASSED - Confirmed AlarmOverlay and StatusBar consume granular interfaces. Verified zero redundant recompositions in AlarmOverlayService during telemetry-only updates. (Oct.3.1)
 *   **Chapter 31.221 (UI State Consolidation Audit)**: PASSED - Verified successful merge of UiStateCoordinator into MainViewModel and removal of redundant dependency layer. All dashboard and map state transformations validated. (Oct.2.15)
 *   **Chapter 31.220 (Native FastPath Audit)**: PASSED - Verified zero heap churn and reduced CPU latency for high-frequency acoustic/light spike detection via JNI FastPath on A15 hardware. (Oct.2.15)
 *   **Chapter 31.219 (TrackerStatus Purge Audit)**: PASSED - Verified complete removal of TrackerStatus DTO and successful migration to LocationUpdate monolith across UI, engine, and persistence. (Oct.2.9)

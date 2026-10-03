@@ -10,6 +10,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.3.1:
+ * - Issue #1420: Granular HUD Binding. Refactored HUD component states to 
+ *   implement slice-based interfaces (Locatable, DeviceIdentity, BatteryProvider).
  * Oct.2.9:
  * - Issue #1314: TrackerStatus Convergence. Removed TrackerStatus DTO 
  *   as it has been merged into the LocationUpdate monolith in core:engine.
@@ -374,8 +377,8 @@ data class DashboardTelemetryState(
     val isGpsFresh: Boolean = true,
     val isTelemetryFresh: Boolean = true,
     val isLinkFresh: Boolean = true,
-    val isLocationPending: Boolean = false,
-    val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    override val isLocationPending: Boolean = false,
+    override val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val trackerState: TrackerState = TrackerState.UNKNOWN,
     val status: SentinelStatus = SentinelStatus.VALID,
     val tamperReason: String? = null,
@@ -383,7 +386,7 @@ data class DashboardTelemetryState(
     val isUltraLongStationary: Boolean = false,
     val systemPulse: Long = 0L,
     val activityType: ActivityType = ActivityType.UNKNOWN
-)
+) : Locatable
 
 @Serializable
 data class DashboardHealthState(
@@ -433,7 +436,10 @@ data class DashboardHealthState(
     var systemPulse: Long = 0L,
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0
-)
+) : BatteryProvider {
+    override val battery: Int get() = batteryLevel
+    override val isCharging: Boolean get() = trackerCurrentMa < 0
+}
 
 /**
  * Monolithic DashboardState facade for legacy compatibility.
@@ -604,8 +610,8 @@ data class HudConnectivityState(
     val isDataHealthy: Boolean = false,
     val commIndex: Int = 0,
     val remoteCommIndex: Int = 0,
-    val trackerId: String = "TRK",
-    val viewerId: String = "VIEW",
+    override val trackerId: String = "TRK",
+    override val viewerId: String = "VIEW",
     val watchdogOk: Boolean = true,
     val rtt: Int = 0,
     val remoteSignal: Int = 0,
@@ -614,7 +620,7 @@ data class HudConnectivityState(
     val isStaggered: Boolean = false,
     val isGnssThrottled: Boolean = false,
     val systemPulse: Long = 0L
-)
+) : DeviceIdentity
 
 @Serializable
 data class HudTelemetryState(
@@ -635,19 +641,21 @@ data class HudTelemetryState(
     val viewerGpsTs: Long = 0L,
     val trackerState: TrackerState = TrackerState.UNKNOWN,
     val isTrackerLocPending: Boolean = false,
-    val trackerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    override val locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val isViewerLocPending: Boolean = false,
     val viewerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val isUltraLongStationary: Boolean = false,
     val systemPulse: Long = 0L,
     val activityType: ActivityType = ActivityType.UNKNOWN
-)
+) : Locatable {
+    override val isLocationPending: Boolean get() = isTrackerLocPending
+}
 
 @Serializable
 data class HudHealthState(
-    val battery: Int = 100,
+    override val battery: Int = 100,
     val remoteBattery: Int = -1,
-    val isCharging: Boolean = false,
+    override val isCharging: Boolean = false,
     val remoteCharging: Boolean = false,
     val trackerTemp: Float = 0f,
     val viewerTemp: Float = 0f,
@@ -659,4 +667,4 @@ data class HudHealthState(
     val progressPulse: Float = 0f,
     val systemPulse: Long = 0L,
     val isMaliAnomaly: Boolean = false
-)
+) : BatteryProvider

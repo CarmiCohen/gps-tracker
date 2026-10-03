@@ -1,3 +1,30 @@
+# 🏛️ Resolution Archive - Oct.3.1
+
+## 🏁 Issue #1420 / SOT ID 601: Granular HUD Binding
+*   **Resolved**: Oct.3.1
+*   **Root Cause**: UI components and services were directly dependent on the monolithic `LocationUpdate` object, causing unnecessary coupling and redundant recompositions whenever any field in the monolith changed.
+*   **Remediations**:
+    *   **Interface Slicing**: Introduced `Locatable`, `BatteryProvider`, and `DeviceIdentity` interfaces in `core:engine`.
+    *   **Implementation**: Updated `LocationUpdate` to implement these granular interfaces.
+    *   **UI Refactoring**: Refactored `AlarmOverlay` and HUD state models to consume these interfaces.
+    *   **Service Optimization**: Updated `AlarmOverlayService` to collect and pass only the required slice to the overlay.
+*   **Significance**: Medium (Decoupling).
+*   **SOT ID**: 601
+
+---
+
+## 🏁 Issue #SIMP-1510-1 / SOT ID 602: Native Stationary Convergence
+*   **Resolved**: Oct.3.1
+*   **Root Cause**: Performing high-frequency stationary detection and vibration floor EMA math in the JVM hot-path introduced overhead.
+*   **Remediations**:
+    *   **Native Offloading**: Expanded `JdHardwareManager` and native bridge (`n12`/`n13`) to handle stationary logic in C++.
+    *   **Validator Integration**: Refactored `SentinelValidator` to utilize a `NativeFastPathProvider` delegate.
+    *   **Fallback Integrity**: Maintained JVM implementation as a fallback for non-supported hardware.
+*   **Significance**: Medium (Performance).
+*   **SOT ID**: 602
+
+---
+
 # 🏛️ Resolution Archive - Oct.2.15
 
 ## 🏁 Issue #1290 / SOT ID 600: UI State Mapper Consolidation
@@ -135,7 +162,7 @@
 
 ## 🏁 Issue #1415: CPU-Load Compensation for Sensors
 *   **Resolved**: Oct.2.2
-*   **Root Cause**: 100% CPU saturation during stress tests on the A15 caused the accelerometer to report erratic "ghost" vibration spikes.
+*   **Root Cause**: 100% CPU saturation during stress tests on the A15 caused the accelerometer to report erratic \"ghost\" vibration spikes.
 *   **Remediations**:
     *   **Load Gating**: Integrated `cpuLoad` into `SentinelValidator`.
     *   **Hysteresis Expansion**: IMU evaluation thresholds are now expanded by 1.5x when CPU load exceeds 0.85.
