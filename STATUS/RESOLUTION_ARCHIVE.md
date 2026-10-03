@@ -1,3 +1,22 @@
+# 🏛️ Resolution Archive - Oct.3.7
+
+## 🏁 Issue #1423 / SOT ID 607: StatusBar Visual & Logic Hardening
+*   **Resolved**: Oct.3.7
+*   **Root Cause**: 
+    *   **Layout**: `Row(modifier = Modifier.weight(1f))` in portrait caused sub-rows to attempt a 50/50 horizontal split that exceeded screen width, leading to vertical clipping/stacking anomalies.
+    *   **Color**: Kinematic speed and tracker state used independent color logic, leading to green speed labels next to gray state labels.
+    *   **GPS Logic**: `isLocalGpsActive` mapping in `MainViewModel` relied on a stale evaluation pulse rather than checking for a non-zero GPS timestamp.
+    *   **Age Display**: `lastGpsTs` was being compared to an incompatible clock source (Unix vs Realtime), resulting in negative age values.
+*   **Remediations**:
+    *   **Portrait Layout**: Switched StatusBar details to a `Column` layout in portrait to prevent overflow and ensure clean vertical separation (R1424).
+    *   **Color Unification**: Implemented `stateColor` authority to synchronize state labels and speed colors based on GPS freshness.
+    *   **Telemetry Mapping**: Corrected `MainViewModel.mapHudTelemetry` to use `loc.kinetic.rt` (elapsed realtime) for GPS age evaluation, ensuring compatibility with `health.systemPulse`.
+    *   **Fix Verification**: Validated correct GPS badge activation and positive age reporting.
+*   **Significance**: Medium (UX/Logic).
+*   **SOT ID**: 607
+
+---
+
 # 🏛️ Resolution Archive - Oct.3.2
 
 ## 🏁 Issue #1420-S / SOT ID 603: HUD Stabilization & Build Recovery

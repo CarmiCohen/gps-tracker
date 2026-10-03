@@ -15,14 +15,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -39,6 +40,9 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Oct.3.6:
+ * - Layout Hardening: Wrapped container in LTR provider to ensure consistent tool 
+ *   positioning on RTL devices (Samsung Hebrew mode fix).
  * Oct.1.5:
  * - Issue #MAP-SOT-03: Implemented AnchorLockedBadge in AppMapContainer.
  * Sep.30.42:
@@ -71,63 +75,66 @@ fun AppMapContainer(
 
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        OsmMap(
-            state = state,
-            cameraActions = cameraActions,
-            initialCenter = initialCenter,
-            onTap = { onEvent(UiEvent.MapTap(it)) },
-            onRemoveMarker = { if (!isTrackerMode) onEvent(UiEvent.RemoveHomePoint(it)) },
-            onLockChange = { onLockChange -> onEvent(UiEvent.SetMapLocked(onLockChange)) },
-            mapViewRef = mapViewRef
-        )
-
-        Text(
-            text = BuildConfig.VERSION_NAME, 
-            color = Color.White, 
-            fontSize = 9.sp, 
-            fontWeight = FontWeight.Black, 
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .navigationBarsPadding()
-                .padding(end = 4.dp, bottom = 2.dp)
-                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(2.dp))
-                .padding(horizontal = 4.dp, vertical = 1.dp)
-        )
-
-        if (state.showSettingsButton) {
-            MapSettingsToggle(
-                isMapButtonsVisible = state.isMapButtonsVisible, 
-                onToggle = { onEvent(UiEvent.SetMapButtonsVisible(!state.isMapButtonsVisible)) }, 
-                modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = toggleTopPadding)
+    // Forced LTR for technical dashboard consistency (R-ID 1422 Consistency)
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            OsmMap(
+                state = state,
+                cameraActions = cameraActions,
+                initialCenter = initialCenter,
+                onTap = { onEvent(UiEvent.MapTap(it)) },
+                onRemoveMarker = { if (!isTrackerMode) onEvent(UiEvent.RemoveHomePoint(it)) },
+                onLockChange = { onLockChange -> onEvent(UiEvent.SetMapLocked(onLockChange)) },
+                mapViewRef = mapViewRef
             )
-        }
 
-        if (state.isAnchorLocked) {
-            AnchorLockedBadge(
+            Text(
+                text = BuildConfig.VERSION_NAME, 
+                color = Color.White, 
+                fontSize = 9.sp, 
+                fontWeight = FontWeight.Black, 
                 modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = toggleTopPadding + 8.dp)
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = 4.dp, bottom = 2.dp)
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(2.dp))
+                    .padding(horizontal = 4.dp, vertical = 1.dp)
             )
-        }
-        
-        if (state.showToolsOverlay && state.isMapButtonsVisible) {
-            Box(Modifier.fillMaxSize()) {
-                Box(Modifier.align(Alignment.CenterStart).padding(start = 8.dp).fillMaxHeight(0.85f).width(140.dp)) { 
-                    MapToolsOverlay(
-                        state = state,
-                        onClear = onClearTrails, 
-                        onSave = onSaveTrail, 
-                        onLoad = onLoadTrail, 
-                        onEvent = onEvent
-                    ) 
+
+            if (state.showSettingsButton) {
+                MapSettingsToggle(
+                    isMapButtonsVisible = state.isMapButtonsVisible, 
+                    onToggle = { onEvent(UiEvent.SetMapButtonsVisible(!state.isMapButtonsVisible)) }, 
+                    modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = toggleTopPadding)
+                )
+            }
+
+            if (state.isAnchorLocked) {
+                AnchorLockedBadge(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = toggleTopPadding + 8.dp)
+                )
+            }
+            
+            if (state.showToolsOverlay && state.isMapButtonsVisible) {
+                Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.align(Alignment.CenterStart).padding(start = 8.dp).fillMaxHeight(0.85f).width(140.dp)) { 
+                        MapToolsOverlay(
+                            state = state,
+                            onClear = onClearTrails, 
+                            onSave = onSaveTrail, 
+                            onLoad = onLoadTrail, 
+                            onEvent = onEvent
+                        ) 
+                    }
                 }
             }
-        }
 
-        if (state.trackerLocPending && state.trackerLocPendingReason != LocationPendingReason.NONE) {
-            Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp).background(Amber500.copy(alpha = 0.95f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
-                Text(text = "UNCERTAINTY: ${state.trackerLocPendingReason.name.replace("_", " ")}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
+            if (state.trackerLocPending && state.trackerLocPendingReason != LocationPendingReason.NONE) {
+                Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp).background(Amber500.copy(alpha = 0.95f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                    Text(text = "UNCERTAINTY: ${state.trackerLocPendingReason.name.replace("_", " ")}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                }
             }
         }
     }

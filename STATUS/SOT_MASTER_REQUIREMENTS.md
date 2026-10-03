@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct.3.6)
+# SOT Master Requirements & Hardening Status (Oct.3.7)
 
-## 🏗️ Architectural Master Rules (120 Rules)
+## 🏗️ Architectural Master Rules (121 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -28,10 +28,12 @@
 *   **1.96 HUD Transparency & Viewport Maximization (R1421)**: The HUD background MUST maintain an alpha <= 0.6 and utilize a consolidated, single-row layout in portrait mode to ensure maximum map visibility and prevent occlusion of overlay controls (Settings/Logs). (Oct.3.5 - Issue #1421).
 *   **1.97 Reactive Connection Re-Binding (R1422)**: Signaling parameters (Relay URL, Device IDs) MUST be observed reactively. The transport layer MUST force immediate reconnection upon configuration changes, bypassing "already connected" cache states to resolve sticky-link issues. (Oct.3.6 - Issue #1422).
 *   **1.98 WebSocket Transport Priority (R1423)**: The system MUST prioritize `websocket` transport over `polling` to ensure session persistence on cloud-relay environments (Render/Heroku) and prevent SRV status deadlock. (Oct.3.6 - Issue #1422).
+*   **1.99 StatusBar Portrait Logic (R1424)**: Technical telemetry details MUST be displayed in a vertical `Column` in portrait mode to prevent horizontal overflow and layout stacking anomalies. (Oct.3.7 - Issue #1423).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 607**: StatusBar Visual & Logic Hardening - Fixed portrait overflow, color inconsistency, and clock source mismatch. (Resolved Oct.3.7).
 *   **SOT ID 605**: Connection Sticky-State & Validation - Fixed bug where CommunicationManager would ignore URL/ID changes; corrected log relay validator. (Resolved Oct.3.6).
 *   **SOT ID 604**: HUD Visibility & Occlusion - Consolidated portrait HUD; reduced background opacity; ensured map visibility behind overlays. (Resolved Oct.3.5).
 *   **SOT ID 603**: HUD Stabilization - Resolved post-refactor compilation failures and property naming mismatches. (Resolved Oct.3.2).
@@ -53,6 +55,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.227 (StatusBar Hardening Audit)**: PASSED - Verified vertical stacking in portrait. Confirmed unified color logic and compatible clock sources for GPS age. (Oct.3.7)
 *   **Chapter 31.226 (Connectivity Hardening Audit)**: PASSED - Verified immediate SRV reconnection upon URL/ID change. Confirmed tracker logs are correctly processed by the viewer following validator fix. (Oct.3.6)
 *   **Chapter 31.225 (HUD Visibility Audit)**: PASSED - Confirmed compact single-row HUD in portrait. Verified transparency allows map viewing through HUD background. Verified Settings overlay accessibility. (Oct.3.5)
 *   **Chapter 31.224 (HUD Stabilization Audit)**: PASSED - Verified full project compilation. Confirmed all UI call sites utilize interface-compliant properties (`locationPendingReason`). (Oct.3.2)

@@ -741,7 +741,7 @@ class MainViewModel @Inject constructor(
         val isGpsFresh = (nowRt - loc.kinetic.rt) < GPS_UI_FAIL_THRESHOLD_MS && loc.kinetic.gpsTs > 0
 
         return HudTelemetryState(
-            isLocalGpsActive = if (appMode == "tracker") isGpsFresh else (nowRt - kinematicState.localLocation.kinetic.rt < GPS_UI_FAIL_THRESHOLD_MS),
+            isLocalGpsActive = if (appMode == "tracker") isGpsFresh else (nowRt - kinematicState.localLocation.kinetic.rt < GPS_UI_FAIL_THRESHOLD_MS && kinematicState.localLocation.kinetic.gpsTs > 0),
             isGpsFresh = isGpsFresh,
             speedMps = (if (appMode == "viewer") kinematicState.trackerLocation.kinetic.speed else 0.0).toFloat(),
             trackerAccuracy = kinematicState.trackerLocation.kinetic.accuracy.toFloat(),
@@ -754,8 +754,8 @@ class MainViewModel @Inject constructor(
             viewerSatsView = kinematicState.localLocation.integrity.satsView,
             distToHome = kinematicState.distanceTrackerToHome,
             distToViewer = kinematicState.distanceTrackerToViewer,
-            lastGpsTs = loc.kinetic.gpsTs,
-            viewerGpsTs = kinematicState.localLocation.kinetic.gpsTs,
+            lastGpsTs = if (loc.kinetic.gpsTs > 0) loc.kinetic.rt else 0L,
+            viewerGpsTs = if (kinematicState.localLocation.kinetic.gpsTs > 0) kinematicState.localLocation.kinetic.rt else 0L,
             trackerState = trackerState,
             isTrackerLocPending = kinematicState.trackerHealth.isLocationPending,
             locationPendingReason = kinematicState.trackerHealth.locationPendingReason,

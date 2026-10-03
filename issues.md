@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.3.6
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.3.7
 
-## 🎯 Current Resumption Focus: Physical Verification & Hardening
-Verifying connection stability and log relay logic following successful Oct.3.6 deployment (SRV connection fix).
+## 🎯 Current Resumption Focus: Network Optimization & Signaling Hardening
+Physical verification of SRV connectivity successful. Transitioning to Issue #1172 (Smart Signaling Dispatcher) to consolidate reactive throttling and conflation logic.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -10,7 +10,7 @@ Verifying connection stability and log relay logic following successful Oct.3.6 
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 8)
+## 💡 Strategic Simplification Ideas (Ideas: 9)
 
 ### 🛑 High Priority
 *   (All high-priority simplification ideas resolved).
@@ -26,6 +26,8 @@ Verifying connection stability and log relay logic following successful Oct.3.6 
     *   *Significance*: **Medium (Domain Logic)**. Decouple siren cooldown and lockout logic from audio generation by moving it into a dedicated domain UseCase.
 *   **Issue #1202: UI Event Routing Unification**
     *   *Significance*: **Medium (Architecture)**. Refactor navigation and global UI commands into a single coordinator to decouple ViewModels from Compose-specific implementation.
+*   **Issue #1425: Unified Clock Authority**
+    *   *Significance*: **Medium (Logic)**. Standardize all telemetry and HUD age evaluations to strictly use `SystemClock.elapsedRealtime()` to eliminate drift and arithmetic errors caused by mixing with Unix `System.currentTimeMillis()`.
 
 ### 🔵 Low Priority
 *   **Issue #1293: Lifecycle-Aware Tick Orchestrator**
@@ -38,8 +40,10 @@ Verifying connection stability and log relay logic following successful Oct.3.6 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1423 / SOT ID 607: StatusBar Visual & Logic Hardening.** Resolved Oct.3.7. Switched details row to vertical column in portrait to fix layout stacking; unified color authority between speed and state labels; corrected `isLocalGpsActive` logic and synchronized GPS age with Realtime clock source (R1424).
+*   **Issue #1421 / SOT ID 604: HUD Visibility & Hardening.** Resolved Oct.3.6. Forced LTR layout for technical HUD elements to fix RTL mirroring on Hebrew devices; implemented weight-based balancing in `StatusRowData` to prevent telemetry text jumbling in portrait; reduced `HeaderBar` vertical height (R1421).
+*   **Issue #910 / SOT ID 606: JNI Implementation Completeness.** Resolved Oct.3.6. Fixed `UnsatisfiedLinkError` by implementing missing native methods (n7-n13) for sensor auditing and stationary detection convergence; verified via successful SRV deployment (R606).
 *   **Issue #1422 / SOT ID 605: Connection Sticky-State & Validation.** Resolved Oct.3.6. Fixed bug where `CommunicationManager` would ignore URL/ID changes if already connected; corrected log relay validator logic to prevent tracker logs from being dropped by the viewer; added `ACCESS_NETWORK_STATE` to manifest (R1422).
-*   **Issue #1421 / SOT ID 604: HUD Visibility & Occlusion.** Resolved Oct.3.5. Consolidated multi-row portrait HUD into a single compact overlay; reduced background opacity (0.9 -> 0.4); removed redundant status bar padding; ensured map remains visible behind settings/logs (R1421).
 *   **Issue #1420-S / SOT ID 603: HUD Stabilization.** Resolved Oct.3.2. Synchronized UI call sites with new slice-based interfaces; resolved legacy property mismatches (R1420-S).
 *   **Issue #1420 / SOT ID 601: Granular HUD Binding.** Resolved Oct.3.1. Decoupled UI components from `LocationUpdate` monolith via interface slicing (R1420).
 *   **Issue #SIMP-1510-1 / SOT ID 602: Native Stationary Convergence.** Resolved Oct.3.1. Offloaded stationary detection and vibration floor EMA to JNI to eliminate JVM math overhead (R1510).
@@ -57,12 +61,13 @@ Verifying connection stability and log relay logic following successful Oct.3.6 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct.3.6: [SOT Count: 261 (Rules: 120), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 24, QA: 371]**
+- **Oct.3.7: [SOT Count: 263 (Rules: 122), Open: H:0, M:0, L:0, Ideas: H:0, M:6, L:3, Testing: 26, QA: 380]**
+- **Oct.3.6: [SOT Count: 262 (Rules: 121), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 25, QA: 375]**
 - **Oct.3.5: [SOT Count: 260 (Rules: 118), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 23, QA: 370]**
 - **Oct.3.4: [SOT Count: 260 (Rules: 118), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 22, QA: 369]**
 - **Oct.3.2: [SOT Count: 259 (Rules: 116), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 21, QA: 368]**
 - **Oct.3.1: [SOT Count: 259 (Rules: 116), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 18, QA: 365]**
 - **Oct.2.15: [SOT Count: 257 (Rules: 114), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:3, Testing: 16, QA: 363]**
-- **Oct.2.9: [SOT Count: 255 (Rules: 112), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 14, QA: 361]**
+- **Oct.2.9: [SOT Count: 255 (Rules: 112), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:3, Testing: 14, QA: 361]**
 - **Oct.2.8: [SOT Count: 254 (Rules: 111), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 13, QA: 360]**
 - **Oct.2.5: [SOT Count: 251 (Rules: 108), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 12, QA: 357]**
