@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct.3.2)
+# SOT Master Requirements & Hardening Status (Oct.3.6)
 
-## 🏗️ Architectural Master Rules (117 Rules)
+## 🏗️ Architectural Master Rules (120 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -25,10 +25,15 @@
 *   **1.93 Granular HUD Binding (R1420)**: UI components and services MUST consume granular, slice-based interfaces (e.g., `Locatable`, `BatteryProvider`) rather than the monolithic `LocationUpdate` object to reduce engine-to-UI coupling and prevent redundant recompositions. (Oct.3.1 - Issue #1420).
 *   **1.94 Native Stationary Convergence (R1510)**: Stationary detection math and vibration floor EMA calculations MUST be offloaded to native code (JNI) via the `NativeFastPathProvider` to eliminate JVM floating-point overhead on high-frequency hot paths. (Oct.3.1 - Issue #SIMP-1510-1).
 *   **1.95 HUD Stabilization (R1420-S)**: UI components MUST utilize standardized interface properties (e.g., `locationPendingReason`) to ensure type safety and architectural alignment with slice-based data models. (Oct.3.2 - Issue #1420-S).
+*   **1.96 HUD Transparency & Viewport Maximization (R1421)**: The HUD background MUST maintain an alpha <= 0.6 and utilize a consolidated, single-row layout in portrait mode to ensure maximum map visibility and prevent occlusion of overlay controls (Settings/Logs). (Oct.3.5 - Issue #1421).
+*   **1.97 Reactive Connection Re-Binding (R1422)**: Signaling parameters (Relay URL, Device IDs) MUST be observed reactively. The transport layer MUST force immediate reconnection upon configuration changes, bypassing "already connected" cache states to resolve sticky-link issues. (Oct.3.6 - Issue #1422).
+*   **1.98 WebSocket Transport Priority (R1423)**: The system MUST prioritize `websocket` transport over `polling` to ensure session persistence on cloud-relay environments (Render/Heroku) and prevent SRV status deadlock. (Oct.3.6 - Issue #1422).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 605**: Connection Sticky-State & Validation - Fixed bug where CommunicationManager would ignore URL/ID changes; corrected log relay validator. (Resolved Oct.3.6).
+*   **SOT ID 604**: HUD Visibility & Occlusion - Consolidated portrait HUD; reduced background opacity; ensured map visibility behind overlays. (Resolved Oct.3.5).
 *   **SOT ID 603**: HUD Stabilization - Resolved post-refactor compilation failures and property naming mismatches. (Resolved Oct.3.2).
 *   **SOT ID 602**: Native Stationary Convergence - Offloaded stationary detection and vibration floor EMA to JNI. (Resolved Oct.3.1).
 *   **SOT ID 601**: Granular HUD Binding - Decoupled UI components from LocationUpdate monolith via interface slicing. (Resolved Oct.3.1).
@@ -48,6 +53,8 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.226 (Connectivity Hardening Audit)**: PASSED - Verified immediate SRV reconnection upon URL/ID change. Confirmed tracker logs are correctly processed by the viewer following validator fix. (Oct.3.6)
+*   **Chapter 31.225 (HUD Visibility Audit)**: PASSED - Confirmed compact single-row HUD in portrait. Verified transparency allows map viewing through HUD background. Verified Settings overlay accessibility. (Oct.3.5)
 *   **Chapter 31.224 (HUD Stabilization Audit)**: PASSED - Verified full project compilation. Confirmed all UI call sites utilize interface-compliant properties (`locationPendingReason`). (Oct.3.2)
 *   **Chapter 31.223 (Native Convergence Audit)**: PASSED - Verified zero JVM math overhead for stationary detection and vibration floor recalibration via JNI offloading. (Oct.3.1)
 *   **Chapter 31.222 (HUD Decoupling Audit)**: PASSED - Confirmed AlarmOverlay and StatusBar consume granular interfaces. Verified zero redundant recompositions in AlarmOverlayService during telemetry-only updates. (Oct.3.1)

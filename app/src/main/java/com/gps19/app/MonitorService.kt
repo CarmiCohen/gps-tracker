@@ -11,6 +11,7 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -25,12 +26,10 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
- * Oct.2.9:
- * - Issue #1314: TrackerStatus Convergence. Migrated evaluateAlarmsInternal 
- *   to use unified LocationUpdate monolith.
- * Oct.2.8:
- * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
- *   to unified LocationUpdate DTO (R-ID 596).
+ * Oct.3.6:
+ * - Connection Hardening: Integrated reactive settings observation (Relay URL, 
+ *   Tracker ID, Viewer ID) to ensure connectivity parameters update in real-time.
+ * - Compilation Fix: Added missing combine import and explicit type parameters.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -223,6 +222,23 @@ class MonitorService : BaseMonitorService() {
                         withContext(Dispatchers.Main) {
                             handleRoleTransition(mode)
                         }
+                    }
+                }
+            }
+            // Issue #1422: Reactive Settings Observation for connectivity parameters
+            launch {
+                combine(
+                    repository.relayUrlFlow,
+                    repository.trackerIdFlow,
+                    repository.viewerIdFlow
+                ) { url, tid, vid -> Triple(url, tid, vid) }
+                .collectLatest { (url: String, tid: String, vid: String) ->
+                    if (url != configManager.relayUrl || tid != configManager.deviceId || vid != configManager.viewerId) {
+                        Timber.i("MonitorService: Connection settings changed. Updating engine.")
+                        configManager.relayUrl = url
+                        configManager.deviceId = tid
+                        configManager.viewerId = vid
+                        connectivitySuite.start(url, tid, vid, isTrackerMode)
                     }
                 }
             }
@@ -483,11 +499,10 @@ class MonitorService : BaseMonitorService() {
             acousticLockoutRt = if (isTrackerMode) lastFastPathAcousticSpikeTs else 0L 
             lightSpikeRt = if (isTrackerMode) lastFastPathLightSpikeTs else 0L
             providedAdaptiveFloor = hSnapshot.adaptiveVibrationFloor
-            cpuLoad = health.cpuLoad; ioWait = health.ioWait; maxIoLatency = health.maxIoLatency 
+            acousticMinDb = hSnapshot.acousticPeakMin
             integrity.isSilentFailure = health.isSilentFailure; integrity.isMaliAnomaly = health.isMaliAnomaly
             localInternetLoss = health.localInternetLoss; isHardwareOnline = health.isHardwareOnline
-            acousticMinDb = hSnapshot.acousticPeakMin
-            integrity.thermalHeadroom = health.thermalHeadroom; integrity.heapAllocatedMb = health.heapAllocatedMb
+            cpuLoad = health.cpuLoad; ioWait = health.ioWait; maxIoLatency = health.maxIoLatency
             kinetic.activityType = hSnapshot.activityType
         }
         

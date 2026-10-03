@@ -2,15 +2,10 @@ package com.gps19.core.engine
 
 /**
  * SignalingValidator: Pure logic for enforcing role-based message filtering.
- * Sep.30.4:
- * - Alignment: Updated to alignment Sep.30.4.
- * Sep.29.31:
- * - Handshake Hardening (#LinkFix): Relaxed validation for empty coordinates 
- *   during initial discovery. A packet with 0.0/0.0 lat/lng is now accepted 
- *   as a "Presence Heartbeat" to turn the TRK/VWR LEDs green before GPS lock.
- * Sep.14.10:
- * - Forensic Visibility (#1020): Refined getDropReason to distinguish between 
- *   self-echoes and packets from other trackers.
+ * Oct.3.6:
+ * - Bug Fix: Corrected inverted logic in shouldProcessLogRelay which was 
+ *   dropping legitimate tracker logs on the viewer.
+ * - Forensic Alignment: Aligned getDropReason with new Log Relay rules (R1422).
  */
 object SignalingValidator {
 
@@ -87,13 +82,18 @@ object SignalingValidator {
         ownDeviceId: String,
         incomingViewerId: String,
         ownViewerId: String,
-        isTrackerMode: Boolean
+        isTrackerMode: Boolean,
+        isFromViewer: Boolean
     ): Boolean {
         if (!SignalingConstants.isTrackerMatch(incomingId, ownDeviceId)) return false
+        
         if (isTrackerMode) {
-            return SignalingConstants.isViewerMatch(incomingViewerId, ownViewerId) || isDefault(ownViewerId)
+            // Tracker only processes logs from its authorized viewer
+            return isFromViewer && (SignalingConstants.isViewerMatch(incomingViewerId, ownViewerId) || isDefault(ownViewerId))
+        } else {
+            // Viewer processes all logs for its tracker, except self-echoes
+            if (isFromViewer && SignalingConstants.isViewerMatch(incomingViewerId, ownViewerId)) return false
+            return true
         }
-        if (SignalingConstants.isViewerMatch(incomingViewerId, ownViewerId)) return false
-        return true
     }
 }

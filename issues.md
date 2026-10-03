@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.3.2
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.3.6
 
-## 🎯 Current Resumption Focus: Stabilization & Build Recovery
-Finalizing post-refactor UI alignment and verifying physical deployment logic.
+## 🎯 Current Resumption Focus: Physical Verification & Hardening
+Verifying connection stability and log relay logic following successful Oct.3.6 deployment (SRV connection fix).
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -38,6 +38,8 @@ Finalizing post-refactor UI alignment and verifying physical deployment logic.
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1422 / SOT ID 605: Connection Sticky-State & Validation.** Resolved Oct.3.6. Fixed bug where `CommunicationManager` would ignore URL/ID changes if already connected; corrected log relay validator logic to prevent tracker logs from being dropped by the viewer; added `ACCESS_NETWORK_STATE` to manifest (R1422).
+*   **Issue #1421 / SOT ID 604: HUD Visibility & Occlusion.** Resolved Oct.3.5. Consolidated multi-row portrait HUD into a single compact overlay; reduced background opacity (0.9 -> 0.4); removed redundant status bar padding; ensured map remains visible behind settings/logs (R1421).
 *   **Issue #1420-S / SOT ID 603: HUD Stabilization.** Resolved Oct.3.2. Synchronized UI call sites with new slice-based interfaces; resolved legacy property mismatches (R1420-S).
 *   **Issue #1420 / SOT ID 601: Granular HUD Binding.** Resolved Oct.3.1. Decoupled UI components from `LocationUpdate` monolith via interface slicing (R1420).
 *   **Issue #SIMP-1510-1 / SOT ID 602: Native Stationary Convergence.** Resolved Oct.3.1. Offloaded stationary detection and vibration floor EMA to JNI to eliminate JVM math overhead (R1510).
@@ -55,7 +57,10 @@ Finalizing post-refactor UI alignment and verifying physical deployment logic.
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct.3.2: [SOT Count: 259 (Rules: 116), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 20, QA: 368]**
+- **Oct.3.6: [SOT Count: 261 (Rules: 120), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 24, QA: 371]**
+- **Oct.3.5: [SOT Count: 260 (Rules: 118), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 23, QA: 370]**
+- **Oct.3.4: [SOT Count: 260 (Rules: 118), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 22, QA: 369]**
+- **Oct.3.2: [SOT Count: 259 (Rules: 116), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 21, QA: 368]**
 - **Oct.3.1: [SOT Count: 259 (Rules: 116), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 18, QA: 365]**
 - **Oct.2.15: [SOT Count: 257 (Rules: 114), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:3, Testing: 16, QA: 363]**
 - **Oct.2.9: [SOT Count: 255 (Rules: 112), Open: H:0, M:0, L:0, Ideas: H:0, M:7, L:4, Testing: 14, QA: 361]**

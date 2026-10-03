@@ -25,10 +25,10 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Viewer-mode UI.
- * Sep.30.42:
- * - Issue #1390: Passed cameraActions Flow to AppMapContainer.
- * Sep.23.50:
- * - Issue #1203 RESOLVED: Unified ViewModel scope. (R-ID 419).
+ * Oct.3.5:
+ * - HUD & Overlay De-confliction: Hid main HeaderBar when overlays (Settings/Logs) 
+ *   are open to prevent visual overlap; ensured HUD Surface is transparent 
+ *   when map is visible to maximize viewport (R1421).
  */
 
 @Composable
@@ -159,17 +159,17 @@ fun ViewerScreen(
         } else {
             if (isLandscape) {
                 Row(modifier = Modifier.fillMaxSize()) {
-                    if (sessionState.hydrationLevel >= 4) {
+                    if (sessionState.hydrationLevel >= 4 && !isAnyOverlayOpen) {
                         header()
                     }
                     
                     Column(modifier = Modifier.weight(1f).navigationBarsPadding()) {
-                        if (sessionState.hydrationLevel >= 5) {
+                        if (sessionState.hydrationLevel >= 5 && !isAnyOverlayOpen) {
                             statusBar()
                         }
                         
                         Box(modifier = Modifier.weight(1f)) {
-                            if (sessionState.hydrationLevel >= 6 && isMapVisible && !isAnyOverlayOpen) {
+                            if (sessionState.hydrationLevel >= 6 && isMapVisible) {
                                 AppMapContainer(
                                     state = mapViewState,
                                     cameraActions = viewModel.cameraActions,
@@ -199,7 +199,7 @@ fun ViewerScreen(
                     }
                 }
             } else {
-                if (sessionState.hydrationLevel >= 6 && isMapVisible && !isAnyOverlayOpen) {
+                if (sessionState.hydrationLevel >= 6 && isMapVisible) {
                     AppMapContainer(
                         state = mapViewState,
                         cameraActions = viewModel.cameraActions,
@@ -210,41 +210,39 @@ fun ViewerScreen(
                     )
                 }
 
-                if (!isAnyOverlayOpen) {
-                    Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
-                        Surface(
-                            color = MaterialTheme.colorScheme.background,
-                            modifier = Modifier.fillMaxWidth().zIndex(10f)
-                        ) {
-                            Column {
-                                Box(Modifier.statusBarsPadding()) {
-                                    if (sessionState.hydrationLevel >= 4) {
-                                        header()
-                                    }
-                                }
-                                if (sessionState.hydrationLevel >= 5) {
-                                    statusBar()
-                                }
+                // HUD Layer
+                Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
+                    Surface(
+                        color = if (isAnyOverlayOpen || isMapVisible) Color.Transparent else MaterialTheme.colorScheme.background,
+                        modifier = Modifier.fillMaxWidth().zIndex(10f)
+                    ) {
+                        Column {
+                            // Issue #1421: Hid header when overlays are open to prevent overlap.
+                            if (sessionState.hydrationLevel >= 4 && !isAnyOverlayOpen) {
+                                header()
+                            }
+                            if (sessionState.hydrationLevel >= 5 && !isAnyOverlayOpen) {
+                                statusBar()
                             }
                         }
-                        
-                        if (sessionState.hydrationLevel >= 4 && !isMapVisible) {
-                            ViewerDashboard(
-                                appMode = sessionState.appMode ?: "viewer",
-                                isDashboardExpanded = nav.isDashboardExpanded,
-                                isBatteryWhitelisted = sessionState.permissions.isBatteryWhitelisted,
-                                isLocalOnline = diagnosticState.connectivity.isLocalOnline,
-                                isRelayConnected = diagnosticState.connectivity.isRelayConnected,
-                                lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
-                                trackerLocationTs = kinematicState.trackerLocation.kinetic.gpsTs,
-                                dashboardState = dashboardState,
-                                gpsIdx = gpsIndexData,
-                                rttValue = rtt,
-                                trackerCurrentMa = currentMa,
-                                systemPulse = mapViewState.systemPulseRt,
-                                onEvent = { event -> onMainEvent(event) }
-                            )
-                        }
+                    }
+                    
+                    if (sessionState.hydrationLevel >= 4 && !isMapVisible) {
+                        ViewerDashboard(
+                            appMode = sessionState.appMode ?: "viewer",
+                            isDashboardExpanded = nav.isDashboardExpanded,
+                            isBatteryWhitelisted = sessionState.permissions.isBatteryWhitelisted,
+                            isLocalOnline = diagnosticState.connectivity.isLocalOnline,
+                            isRelayConnected = diagnosticState.connectivity.isRelayConnected,
+                            lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
+                            trackerLocationTs = kinematicState.trackerLocation.kinetic.gpsTs,
+                            dashboardState = dashboardState,
+                            gpsIdx = gpsIndexData,
+                            rttValue = rtt,
+                            trackerCurrentMa = currentMa,
+                            systemPulse = mapViewState.systemPulseRt,
+                            onEvent = { event -> onMainEvent(event) }
+                        )
                     }
                 }
             }

@@ -21,16 +21,10 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * Oct.2.9:
- * - Issue #1314: TrackerStatus Convergence. Migrated to unified LocationUpdate 
- *   monolith DTO. Simplified transmit() to use unified container.
- * Sep.30.40:
- * - Issue #1385 Peer Link Hardening: Refactored handleLocationRelayBinary 
- *   to support multi-argument payloads (routingId + data) from the relay. 
- *   Ensures binary telemetry is correctly extracted even if relayed with sender context.
- * Sep.27.7:
- * - Issue #1172: Smart Signaling Dispatcher. Refactored to utilize the reactive 
- *   SmartSignalingDispatcher for unified conflation and adaptive throttling.
+ * Oct.3.6:
+ * - Connection Logic Hardening: Simplified connect() to prioritize URL/ID changes 
+ *   over existing connection state to resolve "Stuck SRV" issues.
+ * - Transport Fix: Forced "websocket" only transport to resolve Render.com polling issues (R1422).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -142,11 +136,21 @@ class CommunicationManager @Inject constructor(
     override fun connect(url: String, deviceId: String, viewerId: String, isTracker: Boolean) {
         this.isStopped = false
         val oldIsTracker = this.isTrackerMode
-        val roleChanged = oldIsTracker != isTracker && this.deviceId.isNotEmpty()
+        val oldUrl = this.relayUrl
+        val oldDeviceId = this.deviceId
+        val oldViewerId = this.viewerId
 
-        this.relayUrl = url.trim()
-        this.deviceId = deviceId.trim()
-        this.viewerId = viewerId.trim()
+        val newUrl = url.trim()
+        val newDeviceId = deviceId.trim()
+        val newViewerId = viewerId.trim()
+        
+        val roleChanged = oldIsTracker != isTracker && oldDeviceId.isNotEmpty()
+        val urlChanged = oldUrl != newUrl
+        val idChanged = (oldDeviceId != newDeviceId || oldViewerId != newViewerId) && oldDeviceId.isNotEmpty()
+
+        this.relayUrl = newUrl
+        this.deviceId = newDeviceId
+        this.viewerId = newViewerId
         this.isTrackerMode = isTracker
         
         if (telemetryRepository.isSafeMode.value) {
@@ -162,7 +166,8 @@ class CommunicationManager @Inject constructor(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
         }
 
-        if (!roleChanged && (isConnectingInternal.get() || isConnected())) return
+        // Issue #1422: Reconnect if URL, Role, or ID changed, regardless of current state.
+        if (!roleChanged && !urlChanged && !idChanged && (isConnectingInternal.get() || isConnected())) return
 
         val sessionId = currentSessionId.incrementAndGet()
         
@@ -173,7 +178,8 @@ class CommunicationManager @Inject constructor(
         markTraffic() 
 
         val opts = IO.Options().apply {
-            transports = arrayOf("polling", "websocket")
+            // Issue #1422: Use websocket only for stability on Render.com
+            transports = arrayOf("websocket")
             timeout = 60000
             reconnection = true; reconnectionAttempts = Int.MAX_VALUE
             reconnectionDelay = 2000; reconnectionDelayMax = 10000; randomizationFactor = 0.5; forceNew = true 

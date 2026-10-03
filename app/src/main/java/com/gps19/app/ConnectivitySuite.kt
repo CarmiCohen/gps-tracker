@@ -21,12 +21,10 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
- * Oct.2.9:
- * - Issue #1314: TrackerStatus Convergence. Migrated all signaling 
- *   flyweights and mapping calls to unified LocationUpdate monolith.
- * Oct.2.8:
- * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
- *   to unified LocationUpdate DTO (R-ID 596).
+ * Oct.3.6:
+ * - Connection Logic Hardening: Removed redundant isConnected/isConnecting gates 
+ *   from connect() calls to allow CommunicationManager to handle URL changes (R1422).
+ * - Log Relay Fix: Updated shouldProcessLogRelay call with isFromViewer context (R1422).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -160,7 +158,8 @@ class ConnectivitySuite @Inject constructor(
             scope.launch {
                 val nowRt = timeProvider.elapsedRealtime()
                 if (lastReconnectTs > 0L && nowRt - lastReconnectTs < 3000L) return@launch
-                if (signalingProvider.isConnected() || signalingProvider.isConnecting()) return@launch
+                
+                // Issue #1422: Trust signalingProvider to handle URL/Role comparison inside connect()
                 if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) return@launch
 
                 forensicLogger.logHandover("Interface Available. Reconnecting.", "active")
@@ -186,9 +185,8 @@ class ConnectivitySuite @Inject constructor(
     fun start(url: String, dId: String, vId: String, isTracker: Boolean) {
         if (isStarted.getAndSet(true)) {
             this.relayUrl = url; this.deviceId = dId; this.viewerId = vId; this.isTrackerMode = isTracker
-            if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
-                signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
-            }
+            // Issue #1422: Always call connect() to let CommunicationManager evaluate URL changes
+            signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
             return
         }
 
@@ -215,10 +213,8 @@ class ConnectivitySuite @Inject constructor(
 
         scope.launch {
             if (relayUrl.isNotEmpty() && SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
-                if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
-                    signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
-                    wakeUpRelay()
-                }
+                signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
+                wakeUpRelay()
             }
         }
 
@@ -521,7 +517,7 @@ class ConnectivitySuite @Inject constructor(
         val peerId = if (isTrackerMode) (if (fromViewerId.isNotEmpty()) fromViewerId else fromId) else fromId
 
         if (type == "remote_log") {
-            if (!SignalingValidator.shouldProcessLogRelay(fromId, deviceId, fromViewerId, viewerId, isTrackerMode)) {
+            if (!SignalingValidator.shouldProcessLogRelay(fromId, deviceId, fromViewerId, viewerId, isTrackerMode, fromViewer)) {
                 val reason = SignalingValidator.getDropReason(fromId, deviceId, fromViewer, fromViewerId, viewerId, isTrackerMode) ?: "Unauthorized Log Relay"
                 forensicLogger.logDrop("Log", reason, fromId, fromViewerId, if (isTrackerMode) "TRK" else "VWR", deviceId, viewerId)
                 return
@@ -705,11 +701,10 @@ class ConnectivitySuite @Inject constructor(
         if (isStopped.get()) return
         this.relayUrl = url; this.lastReconnectTs = timeProvider.elapsedRealtime()
         if (SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
-            if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
-                reconnectAttempt = 0
-                signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
-                wakeUpRelay()
-            }
+            // Issue #1422: Always call connect() to allow SignalingProvider to evaluate URL/Identity change
+            reconnectAttempt = 0
+            signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
+            wakeUpRelay()
         }
     }
 

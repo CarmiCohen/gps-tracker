@@ -1,28 +1,40 @@
-# Forensic Handover (Oct.3.2 - STABILIZATION & BUILD RECOVERY)
+# Forensic Handover (Oct.3.6 - CONNECTIVITY & HUD OPTIMIZATION)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.3.2` | **Status**: 🟢 **SOLIDIFIED**.
-*   **Post-Refactor Stabilization (Issue #1420)**:
-    *   **Recovery**: Resolved multiple compilation failures in the UI layer following the HUD interface slicing refactor.
-    *   **Interface Alignment**: `SystemHealthState` now explicitly implements `Locatable` in the `:core:engine` module.
-    *   **Parameter Synchronization**: Renamed legacy `trackerLocPendingReason` to `locationPendingReason` across `MainViewModel.kt`, `UiStateCoordinator.kt`, and `SharedUiComponents.kt`.
-    *   **UI Component Fixes**: Updated `AlarmOverlay` calls in `AlarmActivity.kt` and `MainAppContent.kt` to pass the `locatable` health slice.
-*   **Issue #SIMP-1510-1: Native FastPath Convergence**: JNI offloading for stationary detection and vibration floor EMA is operational.
+*   **Version**: `Oct.3.6` | **Status**: 🟢 **OPERATIONAL**.
+*   **Connectivity Hardening (Issue #1422)**:
+    *   **WebSocket Priority**: Forced `websocket` transport in `CommunicationManager.kt` to resolve Render.com long-polling timeouts.
+    *   **Reactive Re-binding**: `MonitorService.kt` now uses a `combine` flow to observe `relayUrl`, `deviceId`, and `viewerId`, triggering immediate reconnection on change.
+    *   **Validator Fix**: Corrected inverted logic in `SignalingValidator.shouldProcessLogRelay` that was dropping tracker logs on the viewer.
+    *   **Permissions**: Added `ACCESS_NETWORK_STATE` to `AndroidManifest.xml` to enable reliable handover between Wi-Fi and Data.
+*   **HUD Optimization (Issue #1421)**:
+    *   **Consolidation**: Merged badge row and telemetry row in portrait mode to reduce vertical footprint by ~40%.
+    *   **Transparency**: Reduced HUD surface alpha to `0.4` for map visibility.
+    *   **De-confliction**: Header and HUD now hide when Settings/Logs overlays are active.
+*   **JNI Integration**: Native stationary convergence (`n12`/`n13`) and pulse auditing are active.
 
 ## 🟢 Audit Record
-*   **Build Status**: 🟢 **SUCCESSFUL** (Oct.3.2). Verified via `:app:assembleDebug`.
-*   **Integrity Audit**: UI state mapping logic and HUD bindings are now type-safe and interface-compliant.
-*   **Traceability**: SOT IDs 601, 602, 603 / Rules 1.93, 1.94, 1.95 established.
+*   **Build Status**: 🟢 **SUCCESSFUL**. Verified via `:app:assembleDebug`.
+*   **Integrity Audit**: Connectivity parameters are now reactive; UI occlusion resolved.
+*   **Traceability**: SOT IDs 604, 605 / Rules 1.96, 1.97, 1.98 established.
 
-## 🚀 Resumption Action Path
-1.  **Deploy and Test**: Perform a physical test on Samsung A15 to verify the `AlarmOverlay` promotion in Viewer Mode and stationary convergence logic.
-2.  **Smart Signaling Dispatcher (Issue #1172)**:
-    *   **Objective**: Merge signaling conflation and throttling into a single reactive dispatcher.
-3.  **Flyweight Expansion (Issue #1160)**:
-    *   Extend ring-buffer pooling to all telemetry entities to eliminate GC spikes during high-load alerts.
+## 🚀 Resumption Action Path (Next Chat)
+1.  **Reactive Siren Lockout (Issue #1201)**:
+    *   Decouple siren cooldown logic from audio generation into a domain UseCase.
+2.  **UI Event Routing (Issue #1202)**:
+    *   Consolidate navigation and global UI commands into a single coordinator to decouple ViewModels from Compose.
+3.  **Smart Signaling Dispatcher (Issue #1172)**:
+    *   Complete the migration of all signaling triggers to the `SmartSignalingDispatcher`.
+
+## 🧪 Latest Bug Test Procedure
+*   **Version Check**: Verify footer text shows `Oct.3.6`.
+*   **SRV Badge**: Verify SRV turns Green within 3s of saving valid Relay URL.
+*   **Log Relay**: In Viewer mode, open Logs and verify "REMOTE" entries from the tracker are visible.
+*   **HUD Transparency**: Verify map is clearly visible behind the status row in portrait.
+*   **Settings Access**: Verify settings menu is fully accessible without overlapping badges.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.3.2)
-- **Oct.3.2: [SOT Count: 260 (Rules: 117), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 20, QA: 368]**
-- **Audit Record**: UI recovery complete; HUD interface compliance verified; Build healthy.
+## 📊 Hardening Progress Dashboard (Oct.3.6)
+- **Oct.3.6: [SOT Count: 261 (Rules: 120), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 24, QA: 371]**
+- **Audit Record**: Connectivity sticky-state resolved; HUD visibility optimized; Manifest aligned.
