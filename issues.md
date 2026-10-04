@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.3.9
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.4.1
 
 ## 🎯 Current Resumption Focus: UI Orchestration & Domain Hardening
-Reactive Siren Lockout integrated. Transitioning to Issue #1202 (UI Event Routing Unification) and Issue #1425 (Unified Clock Authority) to finish the domain/UI decoupling cycle.
+UI Event Routing Unification integrated. Transitioning to Issue #1425 (Unified Clock Authority) to finish the domain/UI decoupling cycle.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -10,7 +10,7 @@ Reactive Siren Lockout integrated. Transitioning to Issue #1202 (UI Event Routin
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 8)
+## 💡 Strategic Simplification Ideas (Ideas: 9)
 
 ### 🛑 High Priority
 *   (All high-priority simplification ideas resolved).
@@ -20,8 +20,6 @@ Reactive Siren Lockout integrated. Transitioning to Issue #1202 (UI Event Routin
     *   *Significance*: **Medium (Performance)**. Expand flyweight patterns to all telemetry entities and use ring buffers to eliminate GC churn during long-duration alerts.
 *   **Issue #1173: Protobuf-First Persistence**
     *   *Significance*: **Medium (Disk I/O)**. Substitute JSON mapping with pure Protobuf binary pipelines straight into Room BLOB objects for high-frequency history storage.
-*   **Issue #1202: UI Event Routing Unification**
-    *   *Significance*: **Medium (Architecture)**. Refactor navigation and global UI commands into a single coordinator to decouple ViewModels from Compose-specific implementation.
 *   **Issue #1425: Unified Clock Authority**
     *   *Significance*: **Medium (Logic)**. Standardize all telemetry and HUD age evaluations to strictly use `SystemClock.elapsedRealtime()` to eliminate drift and arithmetic errors caused by mixing with Unix `System.currentTimeMillis()`.
 
@@ -32,10 +30,13 @@ Reactive Siren Lockout integrated. Transitioning to Issue #1202 (UI Event Routin
     *   *Significance*: **Low (CPU)**. Audit all `MonitorService` descendants to ensure no redundant reactive streams are active during stationary periods.
 *   **Issue #1328: Event Bus Backpressure Risk**
     *   *Significance*: **Low (Robustness)**. Increase `DomainEventBus` capacity and implement a prioritized drop strategy for non-critical telemetry events during high-load bursts.
+*   **Issue #1426: Composable Effect Aggregator**
+    *   *Significance*: **Low (Simplicity)**. Centralize all `LaunchedEffect(Unit)` observers in `MainAppContent` into a single wrapper to reduce boilerplate in the root UI file.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1202 / SOT ID 612: UI Event Routing Unification.** Resolved Oct.4.1. Refactored navigation and procedural UI logic (service startup, permission orchestration) into `UiEventCoordinator`. Introduced `UiEffect` stream to decouple ViewModels and Composables from imperative commands. Centralized mode transition authority in the domain layer (R1202).
 *   **Issue #1201 / SOT ID 610: Reactive Siren Lockout.** Resolved Oct.3.9. Decoupled siren cooldown and lockout logic from audio generation and violation detection. Centralized authority in `SirenLockoutUseCase` and purged redundant `lastSirenStopRt` state from engine modules; implemented reactive requirement refreshing in `AppAlarmManager` (R1201).
 *   **Issue #1172 / SOT ID 608: Smart Signaling Dispatcher.** Resolved Oct.3.8. Consolidated all signaling triggers (joins, leaves, pings, telemetry) into a reactive coordination layer. Implemented connection-aware delivery and adaptive throttling to allow handshake bursts while maintaining inter-frame delays for telemetry; optimized payloads to native Maps (R1172).
 *   **Issue #1423 / SOT ID 607: StatusBar Visual & Logic Hardening.** Resolved Oct.3.7. Switched details row to vertical column in portrait to fix layout stacking; unified color authority between speed and state labels; corrected `isLocalGpsActive` logic and synchronized GPS age with Realtime clock source (R1424).
@@ -59,6 +60,7 @@ Reactive Siren Lockout integrated. Transitioning to Issue #1202 (UI Event Routin
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.4.1: [SOT Count: 266 (Rules: 125), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:4, Testing: 29, QA: 387]**
 - **Oct.3.9: [SOT Count: 265 (Rules: 124), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:3, Testing: 28, QA: 386]**
 - **Oct.3.8: [SOT Count: 264 (Rules: 123), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 27, QA: 385]**
 - **Oct.3.7: [SOT Count: 263 (Rules: 122), Open: H:0, M:0, L:0, Ideas: H:0, M:6, L:3, Testing: 26, QA: 380]**

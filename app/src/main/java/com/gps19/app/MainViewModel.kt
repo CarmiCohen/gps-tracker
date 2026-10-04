@@ -21,13 +21,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.4.1:
+ * - Issue #1202: Unified UI event routing. Integrated UiEffect SharedFlow 
+ *   to decouple imperative UI commands from business logic.
  * Oct.2.15:
  * - Issue #1290: UI State Mapper Consolidation. Merged UiStateCoordinator 
- *   logic into MainViewModel. Purged external coordinator to simplify 
- *   dependency graph and centralize activity-scoped state projection.
- * Oct.2.9:
- * - Issue #1314: TrackerStatus Convergence. Updated remoteStatus collection 
- *   to use unified telemetry mapping logic. Removed legacy status mapping calls.
+ *   logic into MainViewModel.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -58,6 +57,9 @@ class MainViewModel @Inject constructor(
 
     private val _cameraActions = MutableSharedFlow<CameraAction>(extraBufferCapacity = 16)
     val cameraActions: SharedFlow<CameraAction> = _cameraActions.asSharedFlow()
+
+    private val _uiEffects = MutableSharedFlow<UiEffect>(extraBufferCapacity = 64)
+    val uiEffects: SharedFlow<UiEffect> = _uiEffects.asSharedFlow()
 
     // Coordinate Smoothing State (Issue #1290)
     private var sTrkLat = 0.0; private var sTrkLng = 0.0
@@ -470,6 +472,9 @@ class MainViewModel @Inject constructor(
             onReplayRequest = { ts: Long? -> replayCursorRequest.value = ts },
             onCameraAction = { action: CameraAction -> 
                 viewModelScope.launch { _cameraActions.emit(action) }
+            },
+            onUiEffect = { effect: UiEffect ->
+                viewModelScope.launch { _uiEffects.emit(effect) }
             }
         )
     }

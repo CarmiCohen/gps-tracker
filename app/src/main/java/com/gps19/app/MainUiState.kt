@@ -6,14 +6,11 @@ import org.osmdroid.util.GeoPoint
 /**
  * MainUiState: Composite UI state partitioned into specialized slices to 
  * minimize recomposition costs and isolate volatile triggers (Issue #1166).
+ * Oct.4.1:
+ * - Issue #1202: Unified UI event routing. Added InitiateMode and 
+ *   ConfirmBackgroundDisclosure events. Added Navigate and ShowBackgroundDisclosure effects.
  * Oct.1.5:
  * - Issue #MAP-SOT-03: Added isAnchorLocked to MapViewState for visual feedback.
- * Sep.30.42:
- * - Issue #1390: Removed MapTriggers; transitioned to CameraAction SharedFlow.
- * Sep.27.10:
- * - Issue #1201: Added silencedUntilRt to DiagnosticState for reactive lockout transparency.
- * Sep.27.2:
- * - Issue #1345: Added ExecuteNetworkStressTest to UiCommand and UiEvent.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -501,6 +498,23 @@ sealed class UiEvent {
     data class SetManualSelection(val active: Boolean) : UiEvent()
     data class SetSettlingActive(val active: Boolean) : UiEvent()
     data class ToggleSetupBypass(val active: Boolean) : UiEvent()
+    data class RequestProceedToMode(val mode: String) : UiEvent()
+    object RefreshNavigation : UiEvent()
+    data class InitiateMode(val mode: String) : UiEvent()
+    data class ConfirmBackgroundDisclosure(val confirmed: Boolean, val mode: String) : UiEvent()
+}
+
+/**
+ * UiEffect: Imperative UI commands emitted by the coordinator (Issue #1202).
+ */
+sealed class UiEffect {
+    data class Navigate(val route: String, val popUpTo: String? = null, val inclusive: Boolean = false) : UiEffect()
+    data class StartService(val mode: String) : UiEffect()
+    object CleanupAndExit : UiEffect()
+    object StopTracking : UiEffect()
+    data class RequestPermissions(val permissions: List<String>, val mode: String) : UiEffect()
+    data class ShowToast(val message: String) : UiEffect()
+    data class ShowBackgroundDisclosure(val mode: String) : UiEffect()
 }
 
 sealed class UiCommand {

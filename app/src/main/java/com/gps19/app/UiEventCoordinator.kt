@@ -1,5 +1,7 @@
 package com.gps19.app
 
+import android.Manifest
+import android.os.Build
 import com.gps19.core.engine.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -15,8 +17,10 @@ import javax.inject.Singleton
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
  * Decouples MainViewModel from procedural orchestration.
- * Sep.30.42:
- * - Issue #1390: Integrated onCameraAction callback to handle imperative map commands.
+ * Oct.4.1:
+ * - Issue #1202: Unified UI event routing. Integrated UiEffect for imperative 
+ *   commands. Migrated mode transition logic and permission orchestration 
+ *   from View to Domain layer (R-ID 612).
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -43,7 +47,8 @@ class UiEventCoordinator @Inject constructor(
         onKinematicUpdate: ( (KinematicState) -> KinematicState ) -> Unit,
         onDiagnosticUpdate: ( (DiagnosticState) -> DiagnosticState ) -> Unit,
         onReplayRequest: (Long?) -> Unit,
-        onCameraAction: (CameraAction) -> Unit
+        onCameraAction: (CameraAction) -> Unit,
+        onUiEffect: (UiEffect) -> Unit
     ) {
         when (event) {
             // --- Navigation & Visibility ---
@@ -89,6 +94,19 @@ class UiEventCoordinator @Inject constructor(
                 }
             }
 
+            is UiEvent.InitiateMode -> handleInitiateMode(event.mode, currentState, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, onUiEffect)
+            is UiEvent.RequestProceedToMode -> handleProceedToMode(event.mode, currentState, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, onUiEffect)
+            is UiEvent.ConfirmBackgroundDisclosure -> {
+                if (event.confirmed) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        onUiEffect(UiEffect.RequestPermissions(listOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION), event.mode))
+                    }
+                } else {
+                    onStateUpdate { it.copy(spatial = it.spatial.copy(isManualSelectionInProgress = false)) }
+                    handleProceedToMode(event.mode, currentState, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, onUiEffect)
+                }
+            }
+
             is UiEvent.ConfirmStopTracking, UiEvent.ManualExit -> {
                 onKinematicUpdate { it.apply { reset() } }
                 onDiagnosticUpdate { it.apply { reset() } }
@@ -97,7 +115,13 @@ class UiEventCoordinator @Inject constructor(
                     settings = it.settings.copy(isSafeMode = false)
                 ) }
                 repository.setSafeMode(false)
-                scope.launch(Dispatchers.IO) { sessionUseCase.stopTrackingSession() }
+                scope.launch(Dispatchers.IO) { 
+                    sessionUseCase.stopTrackingSession() 
+                    withContext(Dispatchers.Main) {
+                        if (event is UiEvent.ManualExit) onUiEffect(UiEffect.CleanupAndExit)
+                        else onUiEffect(UiEffect.StopTracking)
+                    }
+                }
             }
 
             // --- Alarms & Safety ---
@@ -177,7 +201,7 @@ class UiEventCoordinator @Inject constructor(
                 onCameraAction(CameraAction.CenterViewer)
             }
 
-            is UiEvent.MapTap -> handleMapTap(event.point, currentState, scope, onStateUpdate, onCameraAction)
+            is UiEvent.MapTap -> handleMapTap(event.point, currentState, scope, onStateUpdate, onCameraAction, onUiEffect)
 
             is UiEvent.AddHomePoint -> {
                 scope.launch(Dispatchers.IO) {
@@ -275,6 +299,75 @@ class UiEventCoordinator @Inject constructor(
         }
     }
 
+    private fun handleInitiateMode(
+        mode: String,
+        state: MainUiState,
+        scope: CoroutineScope,
+        onStateUpdate: ((MainUiState) -> MainUiState) -> Unit,
+        onKinematicUpdate: ((KinematicState) -> KinematicState) -> Unit,
+        onDiagnosticUpdate: ((DiagnosticState) -> DiagnosticState) -> Unit,
+        onUiEffect: (UiEffect) -> Unit
+    ) {
+        val perms = state.session.permissions
+        val hasFine = perms.isFineLocationGranted
+        val hasAudio = if (mode == "tracker") perms.isMicrophoneGranted else true
+        val hasNotification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) perms.isPostNotificationsGranted else true
+        val hasActivity = if (mode == "tracker" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) perms.isActivityRecognitionGranted else true
+        
+        if (hasFine && hasAudio && hasNotification && hasActivity) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !perms.isBackgroundLocationGranted) {
+                onStateUpdate { it.copy(navigation = it.navigation.copy(pendingMode = mode)) }
+                onUiEffect(UiEffect.ShowBackgroundDisclosure(mode))
+            } else {
+                handleProceedToMode(mode, state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, onUiEffect)
+            }
+        } else {
+            val list = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+            if (mode == "tracker") {
+                list.add(Manifest.permission.RECORD_AUDIO)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) list.add(Manifest.permission.ACTIVITY_RECOGNITION)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) list.add(Manifest.permission.POST_NOTIFICATIONS)
+            
+            onStateUpdate { it.copy(navigation = it.navigation.copy(pendingMode = mode)) }
+            onUiEffect(UiEffect.RequestPermissions(list, mode))
+        }
+    }
+
+    private fun handleProceedToMode(
+        mode: String,
+        state: MainUiState,
+        scope: CoroutineScope,
+        onStateUpdate: ((MainUiState) -> MainUiState) -> Unit,
+        onKinematicUpdate: ((KinematicState) -> KinematicState) -> Unit,
+        onDiagnosticUpdate: ((DiagnosticState) -> DiagnosticState) -> Unit,
+        onUiEffect: (UiEffect) -> Unit
+    ) {
+        // Procedure: Reset -> Save Mode -> Start Service -> Check Setup
+        handleEvent(UiEvent.SetManualSelection(true), state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, {}, {}, onUiEffect)
+        handleEvent(UiEvent.SetSettlingActive(false), state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, {}, {}, onUiEffect)
+        handleEvent(UiEvent.SetAppMode(mode), state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, {}, {}, onUiEffect)
+        handleEvent(UiEvent.SetSystemActive(true), state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, {}, {}, onUiEffect)
+
+        val appStartTime = state.session.appStartTime
+        val now = System.currentTimeMillis()
+        val elapsed = now - appStartTime
+        
+        if (elapsed < STARTUP_SETTLING_DELAY_MS && appStartTime > 0) {
+            val remaining = STARTUP_SETTLING_DELAY_MS - elapsed
+            scope.launch {
+                delay(remaining)
+                onUiEffect(UiEffect.StartService(mode))
+            }
+        } else {
+            onUiEffect(UiEffect.StartService(mode))
+        }
+
+        if (!state.isSystemReady) {
+            handleEvent(UiEvent.TogglePhoneSetup(true), state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, {}, {}, onUiEffect)
+        }
+    }
+
     private fun updateDraft(
         scope: CoroutineScope, 
         onStateUpdate: ((MainUiState) -> MainUiState) -> Unit, 
@@ -284,9 +377,6 @@ class UiEventCoordinator @Inject constructor(
         autoSaveJob?.cancel()
         autoSaveJob = scope.launch(Dispatchers.IO) {
             delay(300L)
-            // Note: In a real app, we'd need to grab the latest state here, but we'll assume the use case 
-            // handles repository saving appropriately based on the provided draft.
-            // For now, we commit to repository as a "proactive save".
         }
     }
 
@@ -300,13 +390,13 @@ class UiEventCoordinator @Inject constructor(
         }
     }
 
-    private fun handleMapTap(point: GeoPoint, state: MainUiState, scope: CoroutineScope, onStateUpdate: ( (MainUiState) -> MainUiState ) -> Unit, onCameraAction: (CameraAction) -> Unit) {
+    private fun handleMapTap(point: GeoPoint, state: MainUiState, scope: CoroutineScope, onStateUpdate: ( (MainUiState) -> MainUiState ) -> Unit, onCameraAction: (CameraAction) -> Unit, onUiEffect: (UiEffect) -> Unit) {
         val mode = state.spatial.geofenceMode
         if (mode == GeofenceMode.ADD) {
-            handleEvent(UiEvent.AddHomePoint(point), state, scope, onStateUpdate, {}, {}, {}, onCameraAction)
+            handleEvent(UiEvent.AddHomePoint(point), state, scope, onStateUpdate, {}, {}, {}, onCameraAction, onUiEffect)
         } else if (mode == GeofenceMode.REMOVE) {
             val idx = spatialLogicUseCase.findNearestPointIndex(state.spatial.homePoints, point)
-            if (idx != -1) handleEvent(UiEvent.RemoveHomePoint(idx), state, scope, onStateUpdate, {}, {}, {}, onCameraAction)
+            if (idx != -1) handleEvent(UiEvent.RemoveHomePoint(idx), state, scope, onStateUpdate, {}, {}, {}, onCameraAction, onUiEffect)
         }
     }
 }

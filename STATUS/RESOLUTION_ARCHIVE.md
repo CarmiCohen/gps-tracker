@@ -1,3 +1,19 @@
+# 🏛️ Resolution Archive - Oct.4.1
+
+## 🏁 Issue #1202 / SOT ID 612: UI Event Routing Unification
+*   **Resolved**: Oct.4.1
+*   **Root Cause**: Procedural UI logic (permission checks, service startup delays) and navigation triggers were scattered across View and ViewModel layers, creating tight coupling and making the system harder to test.
+*   **Remediations**:
+    *   **Effect Stream**: Introduced `UiEffect` SharedFlow in `MainViewModel` to deliver imperative commands to the UI.
+    *   **Coordinator Authority**: Migrated all procedural orchestration from `MainAppContent` and `MainViewModel` into `UiEventCoordinator`.
+    *   **Domain Ownership**: Migrated mode transition logic (`InitiateMode`, `RequestProceedToMode`) and permission request logic into the domain layer.
+    *   **Passive View**: Refactored `MainAppContent` to act as a passive receiver of `UiEffect`, handling navigation and system intents without maintaining internal procedural state.
+    *   **Decoupling**: Removed all direct references to screen routes from `MainViewModel`, delegating to `NavigationUseCase` via the coordinator.
+*   **Significance**: Medium (Architecture).
+*   **SOT ID**: 612
+
+---
+
 # 🏛️ Resolution Archive - Oct.3.9
 
 ## 🏁 Issue #1201 / SOT ID 610: Reactive Siren Lockout

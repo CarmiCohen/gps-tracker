@@ -35,18 +35,18 @@ import androidx.navigation.compose.rememberNavController
 import com.gps19.core.engine.STARTUP_SETTLING_DELAY_MS
 import com.gps19.core.engine.CapabilityStatus
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.4.1:
+ * - Issue #1202: UI Event Routing Unification. Refactored navigation and 
+ *   procedural logic to observe UiEffect stream. Decoupled View from 
+ *   service startup and permission orchestration (R-ID 612).
  * Oct.3.2:
- * - Issue #1420: Granular HUD Binding. Updated AlarmOverlay call to use 
- *   locatable parameter instead of deprecated isLocationPending.
- * Oct.1.8:
- * - Issue #1413: Mode-Based Alert Restriction. Restricted AlarmOverlay promotion 
- *   to Viewer Mode only. Tracker mode remains on dashboard/map during violations 
- *   to maintain stealth/operational continuity (R-ID 588).
+ * - Issue #1420: Granular HUD Binding.
  */
 @Composable
 fun MainAppContent(
@@ -88,51 +88,11 @@ fun MainAppContent(
     }
 
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
-    val startupTime = remember { System.currentTimeMillis() }
-
-    val isSystemReady = sessionState.isSetupBypassActive || (
-            sessionState.permissions.isFineLocationGranted &&
-            sessionState.permissions.isBatteryWhitelisted && 
-            sessionState.permissions.isAutoStartGranted &&
-            sessionState.permissions.isOverlayGranted &&
-            sessionState.permissions.isMicrophoneGranted &&
-            sessionState.permissions.isExactAlarmGranted && 
-            sessionState.permissions.isPostNotificationsGranted &&
-            sessionState.permissions.isBackgroundLocationGranted &&
-            sessionState.permissions.isActivityRecognitionGranted &&
-            (sessionState.appMode != null) &&
-            (sessionState.appMode != "tracker" || sessionState.permissions.isMicrophoneGranted) &&
-            (sessionState.appMode == "tracker" || spatialState.homePoints.isNotEmpty()) &&
-            (!sessionState.permissions.hasBackgroundRestriction || 
-             (sessionState.permissions.backgroundStatus == CapabilityStatus.GRANTED && sessionState.permissions.autostartStatus == CapabilityStatus.GRANTED) || 
-             (sessionState.permissions.backgroundStatus == CapabilityStatus.UNKNOWN && sessionState.permissions.isManualOverride)))
-
-    fun proceedToMode(mode: String) {
-        viewModel.onEvent(UiEvent.SetManualSelection(true))
-        viewModel.onEvent(UiEvent.SetSettlingActive(false))
-        viewModel.onEvent(UiEvent.SetAppMode(mode))
-        viewModel.onEvent(UiEvent.SetSystemActive(true))
-        
-        val elapsed = System.currentTimeMillis() - startupTime
-        if (elapsed < STARTUP_SETTLING_DELAY_MS) {
-            val remaining = STARTUP_SETTLING_DELAY_MS - elapsed
-            scope.launch {
-                delay(remaining)
-                onStartService(mode)
-            }
-        } else {
-            onStartService(mode)
-        }
-        
-        if (!isSystemReady) {
-            viewModel.onEvent(UiEvent.TogglePhoneSetup(true))
-        }
-    }
 
     val backgroundPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
         if (isGranted) {
             navigationState.pendingMode?.let { mode ->
-                proceedToMode(mode)
+                viewModel.onEvent(UiEvent.RequestProceedToMode(mode))
                 viewModel.onEvent(UiEvent.SetPendingMode(null))
             }
         } else {
@@ -144,39 +104,30 @@ fun MainAppContent(
     val requestPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         viewModel.onEvent(UiEvent.RefreshPermissionStatus)
         navigationState.pendingMode?.let { mode ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !sessionState.permissions.isBackgroundLocationGranted) {
-                showBackgroundDisclosure = true
-            } else {
-                proceedToMode(mode)
-                viewModel.onEvent(UiEvent.SetPendingMode(null))
-            }
+            viewModel.onEvent(UiEvent.InitiateMode(mode))
         }
     }
 
-    fun checkAndRequestPermissions(mode: String) {
-        val permissions = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-        if (mode == "tracker") {
-            permissions.add(Manifest.permission.RECORD_AUDIO)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                permissions.add(Manifest.permission.ACTIVITY_RECOGNITION)
+    // Effect Observer (Issue #1202)
+    LaunchedEffect(Unit) {
+        viewModel.uiEffects.collectLatest { effect ->
+            when (effect) {
+                is UiEffect.Navigate -> {
+                    navController.navigate(effect.route) {
+                        effect.popUpTo?.let { popUpTo(it) { inclusive = effect.inclusive } }
+                        launchSingleTop = true
+                    }
+                }
+                is UiEffect.StartService -> onStartService(effect.mode)
+                UiEffect.CleanupAndExit -> onCleanupAndExit()
+                UiEffect.StopTracking -> onStopTracking()
+                is UiEffect.RequestPermissions -> requestPermissionLauncher.launch(effect.permissions.toTypedArray())
+                is UiEffect.ShowToast -> Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
+                is UiEffect.ShowBackgroundDisclosure -> {
+                    showBackgroundDisclosure = true
+                }
             }
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-        }
-        
-        viewModel.onEvent(UiEvent.SetPendingMode(mode))
-        requestPermissionLauncher.launch(permissions.toTypedArray())
-    }
-
-    fun hasRequiredPermissions(mode: String): Boolean {
-        val fineLocation = sessionState.permissions.isFineLocationGranted
-        val audio = if (mode == "tracker") sessionState.permissions.isMicrophoneGranted else true
-        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) sessionState.permissions.isPostNotificationsGranted else true
-        val activityRec = if (mode == "tracker" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            sessionState.permissions.isActivityRecognitionGranted
-        } else true
-        return fineLocation && audio && notification && activityRec
     }
 
     LaunchedEffect(sessionState.isInitialized, sessionState.appMode, navigationState.isDiagnosticsVisible, spatialState.isManualSelectionInProgress, sessionState.isSettlingActive, sessionState.isSystemActive) {
@@ -196,13 +147,7 @@ fun MainAppContent(
             if (navController.currentDestination?.route == Screen.Landing.route) {
                 delay(STARTUP_SETTLING_DELAY_MS)
                 viewModel.onEvent(UiEvent.SetSettlingActive(false))
-                
-                if (hasRequiredPermissions(mode)) {
-                    viewModel.onEvent(UiEvent.SetSystemActive(true))
-                    onStartService(mode)
-                } else {
-                    checkAndRequestPermissions(mode)
-                }
+                viewModel.onEvent(UiEvent.InitiateMode(mode))
             }
         }
 
@@ -259,23 +204,22 @@ fun MainAppContent(
 
     if (showBackgroundDisclosure) {
         AlertDialog(
-            onDismissRequest = { showBackgroundDisclosure = false; viewModel.onEvent(UiEvent.SetManualSelection(false)) },
+            onDismissRequest = { 
+                showBackgroundDisclosure = false
+                viewModel.onEvent(UiEvent.ConfirmBackgroundDisclosure(false, navigationState.pendingMode ?: ""))
+            },
             title = { Text(stringResource(R.string.perm_background_title)) },
             text = { Text(stringResource(R.string.perm_background_desc)) },
             confirmButton = {
                 Button(onClick = {
                     showBackgroundDisclosure = false
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                        backgroundPermissionLauncher.launch(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                    }
+                    viewModel.onEvent(UiEvent.ConfirmBackgroundDisclosure(true, navigationState.pendingMode ?: ""))
                 }) { Text(stringResource(R.string.perm_background_btn_accept)) }
             },
             dismissButton = { 
                 Button(onClick = { 
                     showBackgroundDisclosure = false
-                    viewModel.onEvent(UiEvent.SetManualSelection(false))
-                    navigationState.pendingMode?.let { proceedToMode(it) }
-                    viewModel.onEvent(UiEvent.SetPendingMode(null))
+                    viewModel.onEvent(UiEvent.ConfirmBackgroundDisclosure(false, navigationState.pendingMode ?: ""))
                 }) { Text(stringResource(R.string.perm_background_btn_reject)) } 
             }
         )
@@ -301,14 +245,10 @@ fun MainAppContent(
                 if (sessionState.hydrationLevel >= 2) {
                     NavHost(navController = navController, startDestination = Screen.Landing.route) {
                         composable(Screen.Landing.route) {
-                            BackHandler { onCleanupAndExit() }
+                            BackHandler { viewModel.onEvent(UiEvent.ManualExit) }
                             if (sessionState.hydrationLevel >= 3) {
                                 LandingScreen(isPeerActive = sessionState.isPeerActive) { mode ->
-                                    if (hasRequiredPermissions(mode)) { 
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !sessionState.permissions.isBackgroundLocationGranted) {
-                                            viewModel.onEvent(UiEvent.SetPendingMode(mode)); showBackgroundDisclosure = true
-                                        } else proceedToMode(mode)
-                                    } else checkAndRequestPermissions(mode)
+                                    viewModel.onEvent(UiEvent.InitiateMode(mode))
                                 }
                             }
                         }
@@ -323,7 +263,7 @@ fun MainAppContent(
                                     nav.isLogVisible -> viewModel.onEvent(UiEvent.ToggleLog(false))
                                     nav.isRibbonsVisible -> viewModel.onEvent(UiEvent.ToggleRibbons(false))
                                     !nav.isMapVisible -> viewModel.onEvent(UiEvent.ToggleMap(true))
-                                    else -> onCleanupAndExit()
+                                    else -> viewModel.onEvent(UiEvent.ManualExit)
                                 }
                             }
                             if (sessionState.hydrationLevel >= 3) {
@@ -333,7 +273,7 @@ fun MainAppContent(
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) }, 
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
-                                    onExit = onCleanupAndExit, onMainEvent = { viewModel.onEvent(it) }, onFullInitialization = { viewModel.fullInitialization(context) },
+                                    onExit = { viewModel.onEvent(UiEvent.ManualExit) }, onMainEvent = { viewModel.onEvent(it) }, onFullInitialization = { viewModel.fullInitialization(context) },
                                     onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
                                     onImportConfig = { importLauncher.launch("application/json") }, onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
                                     onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, onLoadTrail = { importTrailLauncher.launch("application/json") }
@@ -351,7 +291,7 @@ fun MainAppContent(
                                     nav.isLogVisible -> viewModel.onEvent(UiEvent.ToggleLog(false))
                                     nav.isRibbonsVisible -> viewModel.onEvent(UiEvent.ToggleRibbons(false))
                                     !nav.isMapVisible -> viewModel.onEvent(UiEvent.ToggleMap(true))
-                                    else -> onCleanupAndExit()
+                                    else -> viewModel.onEvent(UiEvent.ManualExit)
                                 }
                             }
                             if (sessionState.hydrationLevel >= 3) {
@@ -361,7 +301,7 @@ fun MainAppContent(
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) },
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
-                                    onExit = onCleanupAndExit, onMainEvent = { viewModel.onEvent(it) }, onFullInitialization = { viewModel.fullInitialization(context) },
+                                    onExit = { viewModel.onEvent(UiEvent.ManualExit) }, onMainEvent = { viewModel.onEvent(it) }, onFullInitialization = { viewModel.fullInitialization(context) },
                                     onImportConfig = { importLauncher.launch("application/json") }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) },
                                     onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
                                     onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, onLoadTrail = { importTrailLauncher.launch("application/json") }
@@ -418,12 +358,12 @@ fun MainAppContent(
                         onDismissRequest = { viewModel.onEvent(UiEvent.ShowStopTrackingConfirmation(false)) },
                         title = { Text(stringResource(R.string.stop_tracking_title)) },
                         text = { Text(stringResource(R.string.stop_tracking_desc, timeLeft)) },
-                        confirmButton = { Button(onClick = { viewModel.onEvent(UiEvent.ConfirmStopTracking); onStopTracking() }) { Text(stringResource(R.string.btn_stop_tracking)) } },
+                        confirmButton = { Button(onClick = { viewModel.onEvent(UiEvent.ConfirmStopTracking) }) { Text(stringResource(R.string.btn_stop_tracking)) } },
                         dismissButton = { Button(onClick = { viewModel.onEvent(UiEvent.ShowStopTrackingConfirmation(false)) }) { Text(stringResource(R.string.btn_cancel)) } }
                     )
                 }
 
-                // Centralized OverlayHost for Shared Overlays (Issue #1200)
+                // Centralized OverlayHost for Shared Overlays
                 OverlayHost(
                     viewModel = viewModel,
                     navigationState = navigationState,
@@ -434,7 +374,6 @@ fun MainAppContent(
                     activity = activity
                 )
                 
-                // Issue #1413: Restricted AlarmOverlay promotion to Viewer Mode only (R-ID 588).
                 if (diagnosticState.isRedScreenVisible && sessionState.appMode == "viewer" && sessionState.hydrationLevel >= 3) {
                     AlarmOverlay(
                         alarms = diagnosticState.activeAlarms, isMuted = diagnosticState.isAlarmSilenced,
