@@ -55,15 +55,12 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Oct.3.9:
+ * - Issue #1201 RESOLVED: Decoupled siren lockout authority. Removed redundant 
+ *   lastSirenStopRt from saveLogicState (R-ID 510).
  * Oct.2.9:
  * - Issue #1314: TrackerStatus Convergence. Migrated tracker state 
- *   persistence to unified LocationUpdate monolith. Added saveLocationUpdate 
- *   and loadLocationUpdate.
- * Oct.1.3:
- * - Issue #1408: Thermal & Convergence Audit. Added IS_COOLING_MODE_ACTIVE_KEY 
- *   and COOLING_ENTERED_RT_KEY to global persistence. Refactored resetRoleState 
- *   to utilize AppRole.fromKey, preventing prefix collision where "V_" (Self) 
- *   was incorrectly matching "VR_" (Remote) keys (R-ID 565).
+ *   persistence to unified LocationUpdate monolith.
  */
 @Singleton
 class SettingsRepository @Inject constructor(

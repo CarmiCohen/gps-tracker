@@ -7,6 +7,9 @@ import kotlin.math.*
 
 /**
  * GeofenceBatteryAuditTest: Verification of R406a Dynamic Polling vs. Geofence Integrity.
+ * Oct.3.9:
+ * - Issue #1201 RESOLVED: Updated detectViolations calls to match new signature 
+ *   with explicit isLockedOut parameter (R-ID 510).
  * Oct.2.8:
  * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
  *   to unified LocationUpdate DTO (R-ID 596).
@@ -93,7 +96,7 @@ class GeofenceBatteryAuditTest {
         state.trackerLat = 10.0011 // ~120m away
         state.trackerSpeed = 5.0
         state.lastGpsPacketRt = state.nowRt
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, false, spikeLogger, onTrigger, onResolve)
         val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
         assertTrue("Geofence should trigger immediately on throttled fix due to predictive exit", geofence?.conditionMet == true)
     }
@@ -108,7 +111,7 @@ class GeofenceBatteryAuditTest {
         state.health.isBatterySteepDischarge = true
         state.health.cpuLoad = 0.8
         state.trackerBattery = 19
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, false, spikeLogger, onTrigger, onResolve)
         val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
         val battery = report.reports.find { it.type == ALERT_ID_BATTERY_STEEP_DISCHARGE }
         assertTrue("Geofence breach must be active", geofence?.conditionMet == true)
@@ -128,7 +131,7 @@ class GeofenceBatteryAuditTest {
         state.nowRt = mockTimeProvider.elapsedRealtime()
         state.health.isLocationPending = true
         state.trackerSpeed = 20.0
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, false, spikeLogger, onTrigger, onResolve)
         assertTrue("Violation must NOT clear during GPS gap uncertainty expansion", state.wasDistanceViolated)
     }
 
@@ -190,7 +193,7 @@ class GeofenceBatteryAuditTest {
             ioWait = 0.5
             maxIoLatency = 1000L
         }
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, false, spikeLogger, onTrigger, onResolve)
         val silentFailure = report.reports.find { it.type == ALERT_ID_SILENT_FAILURE }
         assertTrue("Silent Failure should trigger due to thermal-correlated stall", silentFailure?.conditionMet == true)
     }

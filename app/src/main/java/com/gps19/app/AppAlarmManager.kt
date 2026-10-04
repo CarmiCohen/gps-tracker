@@ -13,13 +13,12 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Oct.3.9:
+ * - Issue #1201 RESOLVED: Decoupled siren lockout authority. Purged lastSirenStopRt 
+ *   logic in favor of reactive SirenLockoutUseCase (R-ID 510).
  * Oct.2.8:
  * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
  *   to unified LocationUpdate DTO (R-ID 596).
- * Oct.1.8:
- * - Issue #1410: Viewer Persistence. Added calculation of violationStartTs 
- *   (earliest trigger) and propagation of lastAlarmAckTs to ensure 
- *   idempotent alarm evaluation across peers and re-installs (R-ID 575).
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -114,15 +113,10 @@ class AppAlarmManager @Inject constructor(
         // Centralized Lockout Check
         if (sirenLockoutUseCase.isLockedOut()) return false
         
-        // Additional engine-level safety (e.g. recent manual stop)
-        val nowRt = timeProvider.elapsedRealtime()
-        if (evaluationState.lastSirenStopRt > 0L && nowRt - evaluationState.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS) return false
-        
         return true
     }
     
     fun notifySirenManualStop() {
-        evaluationState.lastSirenStopRt = timeProvider.elapsedRealtime()
         // Issue #1410: Standardize on SILENCE_TIMEOUT_MS (5m) for manual user intervention
         sirenLockoutUseCase.setSilence(SILENCE_TIMEOUT_MS)
         saveLogicState()
@@ -149,7 +143,6 @@ class AppAlarmManager @Inject constructor(
         evaluationState.distanceViolationCounter = s.roleIntsMap.getOrDefault(prefix + DISTANCE_VIOLATION_COUNTER_KEY, 0)
         evaluationState.wasDistanceViolated = s.roleBoolsMap.getOrDefault(prefix + WAS_DISTANCE_VIOLATED_KEY, false)
         evaluationState.powerAlarmPending = s.roleBoolsMap.getOrDefault(prefix + POWER_ALARM_PENDING_KEY, false)
-        evaluationState.lastSirenStopRt = s.roleLongsMap.getOrDefault(prefix + LAST_SIREN_STOP_RT_KEY, 0L)
         evaluationState.lastGlobalTriggerRt = s.roleLongsMap.getOrDefault(prefix + LAST_GLOBAL_TRIGGER_RT_KEY, 0L)
         evaluationState.forensicReliabilityDegradationStartRt = s.roleLongsMap.getOrDefault(prefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, 0L)
 
@@ -157,20 +150,22 @@ class AppAlarmManager @Inject constructor(
         if (!bootLifecycleAuthority.isSessionValid(savedBootId)) {
             // Full Reboot: Monotonic clock reset, wipe RT dependent states
             evaluationState.firstViolationRt = 0L
-            evaluationState.lastSirenStopRt = 0L
             evaluationState.lastGlobalTriggerRt = 0L
             evaluationState.forensicReliabilityDegradationStartRt = 0L
             saveLogicState()
         } else {
             // Service Restart: Recover monotonic timestamps to preserve lockout
-            evaluationState.lastSirenStopRt = bootLifecycleAuthority.recoverMonotonicTime(evaluationState.lastSirenStopRt, savedBootId)
             evaluationState.lastGlobalTriggerRt = bootLifecycleAuthority.recoverMonotonicTime(evaluationState.lastGlobalTriggerRt, savedBootId)
             
-            // Sync the centralized lockout use case with the recovered state
-            val nowRt = timeProvider.elapsedRealtime()
-            if (evaluationState.lastSirenStopRt > 0 && nowRt - evaluationState.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS) {
-                val remaining = SIREN_RESUME_COOLDOWN_MS - (nowRt - evaluationState.lastSirenStopRt)
-                sirenLockoutUseCase.setSilence(remaining)
+            // Centralized Lockout Recovery
+            val recoveredStopRt = s.roleLongsMap.getOrDefault(prefix + LAST_SIREN_STOP_RT_KEY, 0L)
+            if (recoveredStopRt > 0) {
+                val absoluteStopRt = bootLifecycleAuthority.recoverMonotonicTime(recoveredStopRt, savedBootId)
+                val nowRt = timeProvider.elapsedRealtime()
+                if (nowRt - absoluteStopRt < SIREN_RESUME_COOLDOWN_MS) {
+                    val remaining = SIREN_RESUME_COOLDOWN_MS - (nowRt - absoluteStopRt)
+                    sirenLockoutUseCase.setSilence(remaining)
+                }
             }
         }
         
@@ -187,7 +182,7 @@ class AppAlarmManager @Inject constructor(
                 distanceViolationCounter = evaluationState.distanceViolationCounter,
                 wasDistanceViolated = evaluationState.wasDistanceViolated,
                 powerAlarmPending = evaluationState.powerAlarmPending,
-                lastSirenStopRt = evaluationState.lastSirenStopRt,
+                lastSirenStopRt = sirenLockoutUseCase.getSilencedUntilRt() - SIREN_RESUME_COOLDOWN_MS, // Heuristic for recovery
                 lastGlobalTriggerRt = evaluationState.lastGlobalTriggerRt,
                 forensicReliabilityDegradationStartRt = evaluationState.forensicReliabilityDegradationStartRt,
                 role = currentRole
@@ -216,6 +211,7 @@ class AppAlarmManager @Inject constructor(
             state = evaluationState,
             timeProvider = timeProvider,
             report = evaluationReport,
+            isLockedOut = sirenLockoutUseCase.isLockedOut(),
             versionTag = versionTag,
             onSpike = { message: String, duration: Long ->
                 domainEventBus.emit(AlarmEvent.LogEvent(
@@ -235,14 +231,10 @@ class AppAlarmManager @Inject constructor(
                 val isSpecial = isSpecialType(eval.type)
                 val specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
                 
-                // Visual feedback for triggers, noting if they are currently muted
-                val isMuted = sirenLockoutUseCase.isLockedOut() || (evaluationState.lastSirenStopRt > 0L && timeProvider.elapsedRealtime() - evaluationState.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS)
-                val statusTag = if (isMuted && isSpecial) "(MUTED)" else "TRIGGERED"
-
                 domainEventBus.emit(AlarmEvent.LogEvent(
                     type = eval.type,
-                    message = "$versionTag ALARM $statusTag: ${eval.title}",
-                    isImportant = !isMuted,
+                    message = "$versionTag ALARM TRIGGERED: ${eval.title}",
+                    isImportant = true,
                     extremeValue = null,
                     logId = null,
                     durationMs = 0L,
@@ -262,6 +254,22 @@ class AppAlarmManager @Inject constructor(
                     extremeValue = null,
                     logId = null,
                     durationMs = durationMs,
+                    isSpecial = isSpecial,
+                    specialColor = specialColor,
+                    lat = update.kinetic.lat, lng = update.kinetic.lng, accuracy = update.kinetic.accuracy,
+                    maxAccuracy = update.kinetic.maxAccuracy, snr = update.snrSnapshot, vibe = update.vibeSnapshot
+                ))
+            },
+            onTriggerMuted = { eval: AlarmEvaluationState.ActiveAlarm ->
+                val isSpecial = isSpecialType(eval.type)
+                val specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
+                domainEventBus.emit(AlarmEvent.LogEvent(
+                    type = eval.type,
+                    message = "$versionTag ALARM (MUTED): ${eval.title}",
+                    isImportant = false,
+                    extremeValue = null,
+                    logId = null,
+                    durationMs = 0L,
                     isSpecial = isSpecial,
                     specialColor = specialColor,
                     lat = update.kinetic.lat, lng = update.kinetic.lng, accuracy = update.kinetic.accuracy,
@@ -352,7 +360,6 @@ class AppAlarmManager @Inject constructor(
             vibrationSensitivity = currentSettings.vibrationSensitivity,
             tiltSensitivity = currentSettings.tiltSensitivity,
             powerAlarmPending = evaluationState.powerAlarmPending,
-            lastSirenStopRt = evaluationState.lastSirenStopRt,
             lastGlobalTriggerRt = evaluationState.lastGlobalTriggerRt
         )
     }
@@ -414,11 +421,6 @@ class AppAlarmManager @Inject constructor(
         synchronized(evaluationState.activeAlarms) { evaluationState.activeAlarms.clear() }
         persistActiveAlarms()
         evaluationState.firstViolationTs = 0L; evaluationState.firstViolationRt = 0L; evaluationState.wasDistanceViolated = false; evaluationState.distanceViolationCounter = 0
-        
-        val nowRt = timeProvider.elapsedRealtime()
-        if (nowRt - evaluationState.lastSirenStopRt > SIREN_RESUME_COOLDOWN_MS) {
-            evaluationState.lastSirenStopRt = 0L
-        }
         
         evaluationState.lastGlobalTriggerRt = 0L
         saveLogicState()

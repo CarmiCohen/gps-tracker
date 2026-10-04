@@ -29,14 +29,12 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.3.9:
+ * - Issue #1201 RESOLVED: Decoupled siren lockout authority. Removed redundant 
+ *   lastSirenStopRt from saveLogicState (R-ID 510).
  * Oct.2.9:
  * - Issue #1314: TrackerStatus Convergence. Migrated tracker state 
  *   persistence to unified LocationUpdate monolith.
- * Oct.2.6:
- * - Issue #1175: Real-time Only Path. Removed addHistoryPoints (plural) 
- *   as it was exclusively used for forensic backfilling. Simplified 
- *   telemetry ingestion to real-time streams only. Fixed saveBooleanSync 
- *   reference to use suspend saveBoolean inside scope.
  */
 @Singleton
 class MainRepository @Inject constructor(

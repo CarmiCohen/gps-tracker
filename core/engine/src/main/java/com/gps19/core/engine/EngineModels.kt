@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.3.9:
+ * - Issue #1201 RESOLVED: Decoupled siren lockout authority. Removed redundant 
+ *   lastSirenStopRt from AlarmEvaluationState (R-ID 510).
  * Oct.3.1:
  * - Issue #SIMP-1510-1: Native FastPath Convergence. Added NativeFastPathProvider 
  *   to allow SentinelValidator to offload math to JNI.
@@ -531,7 +534,6 @@ class AlarmEvaluationState {
     var capabilities: HardwareCapabilities = HardwareCapabilities()
     var forensicReliabilityDegradationStartRt: Long = 0L
     var powerAlarmPending: Boolean = false
-    var lastSirenStopRt: Long = 0L
     var lastGlobalTriggerRt: Long = 0L
     
     // Issue #1417: Connectivity Hysteresis
@@ -588,8 +590,7 @@ class AlarmEvaluationState {
         distToHomeAuthority: Double?, isGpsGap: Boolean, trackerBaroAltEma: Double,
         isTrackerMode: Boolean, capabilities: HardwareCapabilities,
         vibrationSensitivity: Float = 0.5f, tiltSensitivity: Float = 0.5f,
-        powerAlarmPending: Boolean = false, lastSirenStopRt: Long = 0L,
-        lastGlobalTriggerRt: Long = 0L
+        powerAlarmPending: Boolean = false, lastGlobalTriggerRt: Long = 0L
     ) {
         this.now = now; this.nowRt = nowRt; this.serviceStartTime = serviceStartTime
         this.serviceStartRt = serviceStartRt; this.lastAlarmAckTs = lastAlarmAckTs
@@ -608,7 +609,7 @@ class AlarmEvaluationState {
         this.trackerBaroAltEma = trackerBaroAltEma; this.isTrackerMode = isTrackerMode
         this.capabilities = capabilities; this.vibrationSensitivity = vibrationSensitivity
         this.tiltSensitivity = tiltSensitivity; this.powerAlarmPending = powerAlarmPending
-        this.lastSirenStopRt = lastSirenStopRt; this.lastGlobalTriggerRt = lastGlobalTriggerRt
+        this.lastGlobalTriggerRt = lastGlobalTriggerRt
     }
 }
 

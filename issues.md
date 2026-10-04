@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.3.8
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.3.9
 
-## 🎯 Current Resumption Focus: UI Orchestration & Siren Hardening
-Smart Signaling Dispatcher integrated and verified. Transitioning to Issue #1201 (Reactive Siren Lockout) and Issue #1202 (UI Event Routing Unification) to complete domain decoupling.
+## 🎯 Current Resumption Focus: UI Orchestration & Domain Hardening
+Reactive Siren Lockout integrated. Transitioning to Issue #1202 (UI Event Routing Unification) and Issue #1425 (Unified Clock Authority) to finish the domain/UI decoupling cycle.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -20,8 +20,6 @@ Smart Signaling Dispatcher integrated and verified. Transitioning to Issue #1201
     *   *Significance*: **Medium (Performance)**. Expand flyweight patterns to all telemetry entities and use ring buffers to eliminate GC churn during long-duration alerts.
 *   **Issue #1173: Protobuf-First Persistence**
     *   *Significance*: **Medium (Disk I/O)**. Substitute JSON mapping with pure Protobuf binary pipelines straight into Room BLOB objects for high-frequency history storage.
-*   **Issue #1201: Reactive Siren Lockout**
-    *   *Significance*: **Medium (Domain Logic)**. Decouple siren cooldown and lockout logic from audio generation by moving it into a dedicated domain UseCase.
 *   **Issue #1202: UI Event Routing Unification**
     *   *Significance*: **Medium (Architecture)**. Refactor navigation and global UI commands into a single coordinator to decouple ViewModels from Compose-specific implementation.
 *   **Issue #1425: Unified Clock Authority**
@@ -38,6 +36,7 @@ Smart Signaling Dispatcher integrated and verified. Transitioning to Issue #1201
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1201 / SOT ID 610: Reactive Siren Lockout.** Resolved Oct.3.9. Decoupled siren cooldown and lockout logic from audio generation and violation detection. Centralized authority in `SirenLockoutUseCase` and purged redundant `lastSirenStopRt` state from engine modules; implemented reactive requirement refreshing in `AppAlarmManager` (R1201).
 *   **Issue #1172 / SOT ID 608: Smart Signaling Dispatcher.** Resolved Oct.3.8. Consolidated all signaling triggers (joins, leaves, pings, telemetry) into a reactive coordination layer. Implemented connection-aware delivery and adaptive throttling to allow handshake bursts while maintaining inter-frame delays for telemetry; optimized payloads to native Maps (R1172).
 *   **Issue #1423 / SOT ID 607: StatusBar Visual & Logic Hardening.** Resolved Oct.3.7. Switched details row to vertical column in portrait to fix layout stacking; unified color authority between speed and state labels; corrected `isLocalGpsActive` logic and synchronized GPS age with Realtime clock source (R1424).
 *   **Issue #1421 / SOT ID 604: HUD Visibility & Hardening.** Resolved Oct.3.6. Forced LTR layout for technical HUD elements to fix RTL mirroring on Hebrew devices; implemented weight-based balancing in `StatusRowData` to prevent telemetry text jumbling in portrait; reduced `HeaderBar` vertical height (R1421).
@@ -60,6 +59,7 @@ Smart Signaling Dispatcher integrated and verified. Transitioning to Issue #1201
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.3.9: [SOT Count: 265 (Rules: 124), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:3, Testing: 28, QA: 386]**
 - **Oct.3.8: [SOT Count: 264 (Rules: 123), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 27, QA: 385]**
 - **Oct.3.7: [SOT Count: 263 (Rules: 122), Open: H:0, M:0, L:0, Ideas: H:0, M:6, L:3, Testing: 26, QA: 380]**
 - **Oct.3.6: [SOT Count: 262 (Rules: 121), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 25, QA: 375]**

@@ -5,17 +5,15 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Oct.3.9:
+ * - Issue #1201 RESOLVED: Decoupled siren lockout authority. DetectViolations now 
+ *   accepts external isLockedOut state instead of tracking lastSirenStopRt (R-ID 510).
  * Oct.2.1:
  * - Issue #1417: Jitter-Resistant Connectivity (R-ID 593). Integrated 3s temporal 
  *   hysteresis for RELAY_OFFLINE and Peer Error suppression.
  * - Issue #1415: Load-Aware IMU Gating (R-ID 590). Integrated health.cpuLoad 
  *   into isShockViolated and isVibrationSuspicious calls to prevent false 
  *   positives during A15 CPU saturation.
- * Oct.1.8:
- * - Issue #1410: Fixed ConcurrentModificationException by synchronizing 
- *   activeAlarms mutations (R-ID 585).
- * - Issue #1410: Viewer Persistence. Integrated lastAlarmAckTs check in 
- *   processActiveAlarms to ensure historical suppression using violationStartTs.
  */
 object MainAlarmLogic {
 
@@ -30,6 +28,7 @@ object MainAlarmLogic {
         state: AlarmEvaluationState,
         timeProvider: TimeProvider,
         report: SystemHealthReport,
+        isLockedOut: Boolean,
         onSpike: (message: String, duration: Long) -> Unit,
         onTrigger: (AlarmEvaluationState.ActiveAlarm) -> Unit,
         onResolve: (AlarmEvaluationState.ActiveAlarm, durationMs: Long) -> Unit,
@@ -74,7 +73,7 @@ object MainAlarmLogic {
             report.truncate(reportIdx)
 
             // Process Active Alarms State
-            processActiveAlarms(state, report, nowTs, nowRt, onTrigger, onResolve, onTriggerMuted)
+            processActiveAlarms(state, report, nowTs, nowRt, isLockedOut, onTrigger, onResolve, onTriggerMuted)
 
             report
         }
@@ -85,6 +84,7 @@ object MainAlarmLogic {
         report: SystemHealthReport,
         now: Long,
         nowRt: Long,
+        isLockedOut: Boolean,
         onTrigger: (AlarmEvaluationState.ActiveAlarm) -> Unit,
         onResolve: (AlarmEvaluationState.ActiveAlarm, durationMs: Long) -> Unit,
         onTriggerMuted: (AlarmEvaluationState.ActiveAlarm) -> Unit
@@ -120,8 +120,7 @@ object MainAlarmLogic {
                         eval.isResolved = false
                         triggerOccurred = true
                         
-                        val isMuted = nowRt - state.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS
-                        if (isMuted) {
+                        if (isLockedOut) {
                             onTriggerMuted(eval)
                         } else {
                             onTrigger(eval)

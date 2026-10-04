@@ -1,3 +1,19 @@
+# 🏛️ Resolution Archive - Oct.3.9
+
+## 🏁 Issue #1201 / SOT ID 610: Reactive Siren Lockout
+*   **Resolved**: Oct.3.9
+*   **Root Cause**: Siren cooldown and lockout logic were coupled with audio generation and violation detection, leading to redundant state management (`lastSirenStopRt`) in multiple layers.
+*   **Remediations**:
+    *   **Decoupling**: Centralized siren lockout authority in `SirenLockoutUseCase`.
+    *   **Engine Refactor**: Purged `lastSirenStopRt` from `AlarmEvaluationState` and updated `MainAlarmLogic.detectViolations` to accept an external `isLockedOut` boolean.
+    *   **Reactive Flow**: Configured `AppAlarmManager` to reactively observe `SirenLockoutUseCase.silencedUntilRt` to refresh siren requirements.
+    *   **State Recovery**: Refactored `AppAlarmManager.restoreLogicState` to recover siren lockout status from persistence via the centralized UseCase.
+    *   **Persistence Cleanup**: Removed redundant `lastSirenStopRt` parameters from `MainRepository` and `SettingsRepository`.
+*   **Significance**: Medium (Domain Logic).
+*   **SOT ID**: 610
+
+---
+
 # 🏛️ Resolution Archive - Oct.3.8
 
 ## 🏁 Issue #1172 / SOT ID 608: Smart Signaling Dispatcher

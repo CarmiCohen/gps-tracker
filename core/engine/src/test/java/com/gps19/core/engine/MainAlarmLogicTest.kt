@@ -8,11 +8,12 @@ import java.util.*
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
+ * Oct.3.9:
+ * - Issue #1201 RESOLVED: Updated detectViolations calls to match new signature 
+ *   with explicit isLockedOut parameter (R-ID 510).
  * Sep.30.60:
  * - Issue #1403 & #1405 Hardening: Added tests for 30s siren lockout 
  *   and sequential trigger mute protection.
- * Sep.26.3:
- * - Issue #1334: Adapted to stateless detectViolations API with lifecycle callbacks.
  */
 class MainAlarmLogicTest {
 
@@ -99,24 +100,22 @@ class MainAlarmLogicTest {
     fun `Verify healthy state has no violations`() {
         val state = createDefaultState()
         val report = SystemHealthReport()
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, false, spikeLogger, onTrigger, onResolve)
         assertTrue(report.reports.none { it.conditionMet })
     }
 
     @Test
-    fun `Verify Siren Lockout Duration is 30s (Issue 1403)`() {
-        val state = createDefaultState().apply {
-            lastSirenStopRt = 100000L
-        }
+    fun `Verify Siren Lockout Duration logic (Issue 1403)`() {
+        val lastSirenStopRt = 100000L
         
         // 1. Check at 15s - should still be locked out
-        state.nowRt = 115000L
-        assertTrue("Siren should be locked out at 15s", state.nowRt - state.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS)
+        val nowRt1 = 115000L
+        assertTrue("Siren should be locked out at 15s", nowRt1 - lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS)
         assertEquals(30000L, SIREN_RESUME_COOLDOWN_MS)
         
         // 2. Check at 31s - should be cleared
-        state.nowRt = 131000L
-        assertFalse("Siren lockout should expire after 30s", state.nowRt - state.lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS)
+        val nowRt2 = 131000L
+        assertFalse("Siren lockout should expire after 30s", nowRt2 - lastSirenStopRt < SIREN_RESUME_COOLDOWN_MS)
     }
 
     @Test
@@ -124,19 +123,23 @@ class MainAlarmLogicTest {
         val now = 1700000000000L
         val baseNowRt = 100000L
         val state = createDefaultState(now).apply {
-            lastSirenStopRt = baseNowRt // User just muted
             nowRt = baseNowRt + 5000     // 5s into lockout
         }
 
-        // 1. Trigger Power Alarm
-        state.health.isPowerTamper = true
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, SystemHealthReport(), spikeLogger, onTrigger, onResolve)
-        assertEquals("Lockout must NOT be wiped by new trigger", baseNowRt, state.lastSirenStopRt)
+        var triggerCount = 0
+        var muteCount = 0
 
-        // 2. Trigger Tilt Alarm
+        // 1. Trigger Power Alarm while muted
+        state.health.isPowerTamper = true
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, SystemHealthReport(), true, spikeLogger, { triggerCount++ }, onResolve, { muteCount++ })
+        assertEquals(0, triggerCount)
+        assertEquals(1, muteCount)
+
+        // 2. Trigger Tilt Alarm while muted
         state.health.tiltDegrees = 45.0
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, SystemHealthReport(), spikeLogger, onTrigger, onResolve)
-        assertEquals("Lockout must persist across multiple trigger types", baseNowRt, state.lastSirenStopRt)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, SystemHealthReport(), true, spikeLogger, { triggerCount++ }, onResolve, { muteCount++ })
+        assertEquals(0, triggerCount)
+        assertEquals(2, muteCount)
     }
 
     @Test
@@ -150,7 +153,7 @@ class MainAlarmLogicTest {
         }
         
         val report = SystemHealthReport()
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, false, spikeLogger, onTrigger, onResolve)
         val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
         assertTrue("Geofence should be violated", geofence?.conditionMet == true)
     }
@@ -170,7 +173,7 @@ class MainAlarmLogicTest {
         }
         
         val report = SystemHealthReport()
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report, false, spikeLogger, onTrigger, onResolve)
         val geofence = report.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }
         
         assertFalse("Geofence should be suppressed by Bayesian expansion during gap", geofence?.conditionMet == true)
@@ -192,12 +195,12 @@ class MainAlarmLogicTest {
 
         state.trackerLat = 10.00114 
         val report1 = SystemHealthReport()
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report1, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report1, false, spikeLogger, onTrigger, onResolve)
         assertTrue("Violation should persist in hysteresis zone", state.wasDistanceViolated)
 
         state.trackerLat = 10.00108 
         val report2 = SystemHealthReport()
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, false, spikeLogger, onTrigger, onResolve)
         assertFalse("Violation should clear inside hysteresis zone", state.wasDistanceViolated)
     }
 
@@ -217,14 +220,14 @@ class MainAlarmLogicTest {
         state.now = now + 120000
         state.nowRt = baseNowRt + 120000
         val report1 = SystemHealthReport()
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report1, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report1, false, spikeLogger, onTrigger, onResolve)
         assertFalse("Jump should be held", 
             report1.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }?.conditionMet == true)
 
         state.now = now + 420000
         state.nowRt = baseNowRt + 420000
         val report2 = SystemHealthReport()
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, false, spikeLogger, onTrigger, onResolve)
         assertTrue("Jump hold should expire", 
             report2.reports.find { it.type == ALERT_ID_TRACKER_GEOFENCE }?.conditionMet == true)
     }
@@ -239,12 +242,12 @@ class MainAlarmLogicTest {
         }
 
         val report1 = SystemHealthReport()
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report1, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report1, false, spikeLogger, onTrigger, onResolve)
         assertFalse("Alert should not trigger immediately", report1.reports.find { it.type == ALERT_ID_PERFORMANCE_SPIKE }?.conditionMet == true)
 
         state.nowRt = testNowRt + 31000
         val report2 = SystemHealthReport()
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, false, spikeLogger, onTrigger, onResolve)
         assertTrue("Alert should trigger after 30s", report2.reports.find { it.type == ALERT_ID_PERFORMANCE_SPIKE }?.conditionMet == true)
     }
 
@@ -256,12 +259,12 @@ class MainAlarmLogicTest {
         }
         
         val report1 = SystemHealthReport()
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report1, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report1, false, spikeLogger, onTrigger, onResolve)
         assertTrue("Silent Failure should trigger due to high CPU", report1.reports.find { it.type == ALERT_ID_SILENT_FAILURE }?.conditionMet == true)
 
         state.health.isTamperDetected = true
         val report2 = SystemHealthReport()
-        MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, spikeLogger, onTrigger, onResolve)
+        MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, false, spikeLogger, onTrigger, onResolve)
         assertFalse("Silent Failure should be suppressed if tamper is detected", report2.reports.find { it.type == ALERT_ID_SILENT_FAILURE }?.conditionMet == true)
     }
 }
