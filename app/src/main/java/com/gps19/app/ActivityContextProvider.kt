@@ -20,7 +20,10 @@ import javax.inject.Singleton
 
 /**
  * ActivityContextProvider: Unified authority for tracking user activity context.
- * Consolidates Google Play Services Activity Recognition and GPS/Vibration heuristics fallback.
+ * Oct.4.5:
+ * - Issue #1425: Unified Clock Authority. Migrated lastActivityUpdateRt to 
+ *   monotonic time (elapsedRealtime) to prevent heuristic fallback errors 
+ *   during clock drift.
  */
 @Singleton
 class ActivityContextProvider @Inject constructor(
@@ -30,7 +33,7 @@ class ActivityContextProvider @Inject constructor(
     @Volatile var currentActivityType: ActivityType = ActivityType.UNKNOWN
         private set
 
-    @Volatile private var lastActivityUpdateTs = 0L
+    @Volatile private var lastActivityUpdateRt = 0L
     private val activityRecognitionClient by lazy { ActivityRecognition.getClient(context) }
     private val ACTIVITY_RECEIVER_ACTION = "com.gps19.app.ACTION_ACTIVITY_UPDATE"
     private var activityPendingIntent: PendingIntent? = null
@@ -53,7 +56,7 @@ class ActivityContextProvider @Inject constructor(
                 
                 if (nextActivity != ActivityType.UNKNOWN) {
                     currentActivityType = nextActivity
-                    lastActivityUpdateTs = timeProvider.currentTimeMillis()
+                    lastActivityUpdateRt = timeProvider.elapsedRealtime()
                     Timber.d("ActivityContextProvider: Activity Recognition Update: $nextActivity (${mostProbable.confidence}%)")
                 }
             }
@@ -105,7 +108,7 @@ class ActivityContextProvider @Inject constructor(
 
     fun updateActivityHeuristic(speedMps: Double, vibe: Double, isStationary: Boolean, adaptiveVibrationFloor: Double) {
         // If we haven't had an Activity Recognition update in 2 minutes, fallback to heuristics
-        if (timeProvider.currentTimeMillis() - lastActivityUpdateTs < 120000L) return
+        if (timeProvider.elapsedRealtime() - lastActivityUpdateRt < 120000L) return
 
         currentActivityType = when {
             speedMps > 10.0 -> ActivityType.IN_VEHICLE
@@ -118,6 +121,6 @@ class ActivityContextProvider @Inject constructor(
 
     fun reset() {
         currentActivityType = ActivityType.UNKNOWN
-        lastActivityUpdateTs = 0L
+        lastActivityUpdateRt = 0L
     }
 }

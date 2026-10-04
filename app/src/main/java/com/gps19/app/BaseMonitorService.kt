@@ -18,11 +18,12 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Oct.4.5:
+ * - Issue #1425: Unified Clock Authority. Migrated lastUiPulseRt to monotonic 
+ *   time (elapsedRealtime) to prevent logic errors during clock drift/sync.
  * Sep.28.11:
  * - Issue #1359: Temporal Precision & Service Logic Hardening. Migrated 
  *   foreground service throttling to use centralized timeProvider.
- * Sep.27.15:
- * - Issue #1352: Extended TickOrchestrator for unified job management.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -62,7 +63,7 @@ abstract class BaseMonitorService : LifecycleService() {
     protected var serviceTickCounter = 0L
     
     protected val isUiForeground = AtomicBoolean(false)
-    protected var lastUiPulseTs = 0L
+    protected var lastUiPulseRt = 0L
     
     protected val tickOrchestrator = TickOrchestrator()
     
@@ -156,11 +157,11 @@ abstract class BaseMonitorService : LifecycleService() {
     }
 
     protected fun isUiVisible(): Boolean {
-        return isUiForeground.get() && (timeProvider.currentTimeMillis() - lastUiPulseTs < UI_PULSE_TIMEOUT_MS)
+        return isUiForeground.get() && (timeProvider.elapsedRealtime() - lastUiPulseRt < UI_PULSE_TIMEOUT_MS)
     }
 
     protected fun isRecentUiPulse(): Boolean {
-        return (timeProvider.currentTimeMillis() - lastUiPulseTs < UI_PULSE_TIMEOUT_MS)
+        return (timeProvider.elapsedRealtime() - lastUiPulseRt < UI_PULSE_TIMEOUT_MS)
     }
 
     protected fun safeStartForeground(id: Int, notification: Notification, type: Int = 0, force: Boolean = false) {

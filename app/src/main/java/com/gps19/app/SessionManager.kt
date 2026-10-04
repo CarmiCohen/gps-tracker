@@ -6,27 +6,29 @@ import javax.inject.Singleton
 
 /**
  * SessionManager: Tracks session-level state and uptime metrics.
- * Sep.15.01:
- * - Forensic Hardening: Added isInViolation property to support A15-compliant 
- *   signaling deferral (R-ID 338).
- * Sep.05.27:
- * - Issue #918 RESOLVED: Pulse Source Consistency. Standardized onViewerPulse 
- *   and onTrackerPulse to strictly use monotonic nowRt to prevent HUD 
- *   staleness logic failures (R-ID 257).
+ * Oct.4.5:
+ * - Issue #1425: Unified Clock Authority. Added appStartRt for monotonic 
+ *   duration checks (e.g. startup settling delay).
+ * - Rename currentDropStartTs to currentDropStartRt for source clarity.
  */
 @Singleton
 class SessionManager @Inject constructor(
     private val repository: MainRepository,
     private val timeProvider: TimeProvider
 ) {
+    // appStartTime remains Wall Clock for absolute audit logs and UI display.
     var appStartTime: Long = timeProvider.currentTimeMillis()
+        private set
+
+    // appStartRt is the monotonic reference for duration logic (R-ID 1425).
+    var appStartRt: Long = timeProvider.elapsedRealtime()
         private set
 
     var lastGpsTs: Long = 0L
     var violationUptimeMs: Long = 0L
     private var totalUptimeMs: Long = 0L
     
-    private var currentDropStartTs = 0L
+    private var currentDropStartRt = 0L
     
     var isInViolation: Boolean = false
         private set
@@ -45,17 +47,17 @@ class SessionManager @Inject constructor(
             violationUptimeMs += increment
         }
 
-        if (!isPeerAvailable && currentDropStartTs == 0L) {
-            currentDropStartTs = nowRt
-        } else if (isPeerAvailable && currentDropStartTs > 0L) {
-            currentDropStartTs = 0L
+        if (!isPeerAvailable && currentDropStartRt == 0L) {
+            currentDropStartRt = nowRt
+        } else if (isPeerAvailable && currentDropStartRt > 0L) {
+            currentDropStartRt = 0L
         }
         
         cleanupOldPulses(nowRt)
     }
 
     fun notifyTamperCleared() {
-        currentDropStartTs = 0L
+        currentDropStartRt = 0L
     }
 
     fun onViewerPulse(id: String, nowRt: Long): Boolean {
@@ -91,9 +93,10 @@ class SessionManager @Inject constructor(
 
     fun reset() {
         appStartTime = timeProvider.currentTimeMillis()
+        appStartRt = timeProvider.elapsedRealtime()
         violationUptimeMs = 0L
         totalUptimeMs = 0L
-        currentDropStartTs = 0L
+        currentDropStartRt = 0L
         isInViolation = false
         viewerPulseMap.clear()
         trackerPulseMap.clear()

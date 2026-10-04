@@ -26,10 +26,12 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.4.5:
+ * - Issue #1425: Unified Clock Authority. Migrated UI pulse logic and 
+ *   forensic spikes to monotonic time (elapsedRealtime).
  * Oct.3.6:
  * - Connection Hardening: Integrated reactive settings observation (Relay URL, 
  *   Tracker ID, Viewer ID) to ensure connectivity parameters update in real-time.
- * - Compilation Fix: Added missing combine import and explicit type parameters.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -55,8 +57,8 @@ class MonitorService : BaseMonitorService() {
     private var lastHardwareRecoveryTs = 0L
     private var capabilities = HardwareCapabilities()
 
-    private var lastFastPathAcousticSpikeTs = 0L
-    private var lastFastPathLightSpikeTs = 0L
+    private var lastFastPathAcousticSpikeRt = 0L
+    private var lastFastPathLightSpikeRt = 0L
     private var isPowerSaveActive = false
     private var lastPowerSaveCheckRt = 0L
     private var isSuspiciousMode = false
@@ -307,7 +309,7 @@ class MonitorService : BaseMonitorService() {
             .collect { event ->
                 when (event) {
                     is CommandEvent.WatchdogTrigger -> { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
-                    is CommandEvent.UiPulse -> { lastUiPulseTs = timeProvider.currentTimeMillis(); updateForegroundServiceType() }
+                    is CommandEvent.UiPulse -> { lastUiPulseRt = timeProvider.elapsedRealtime(); updateForegroundServiceType() }
                     is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); lifecycleScope.launch { hardwareSuite.start() } }
@@ -412,7 +414,7 @@ class MonitorService : BaseMonitorService() {
             serviceStartWall = timeProvider.currentTimeMillis()
             lastHardwareRecoveryTs = 0L; lastForensicLat = 0.0; lastForensicLng = 0.0; lastForensicVibe = 0.0; lastForensicTilt = 0.0; lastWasCooling = false
             if (isTrackerMode) {
-                lastFastPathAcousticSpikeTs = 0L; lastFastPathLightSpikeTs = 0L
+                lastFastPathAcousticSpikeRt = 0L; lastFastPathLightSpikeRt = 0L
                 setupPhysicalFastPaths()
                 locationBuffer.clear()
             }
@@ -496,8 +498,8 @@ class MonitorService : BaseMonitorService() {
                 if (isManualStallActive) isStalled = true
             }
             this.nowRt = nowRt; this.nowTs = now; snrSnapshot = hardwareSuite.averageSnr
-            acousticLockoutRt = if (isTrackerMode) lastFastPathAcousticSpikeTs else 0L 
-            lightSpikeRt = if (isTrackerMode) lastFastPathLightSpikeTs else 0L
+            acousticLockoutRt = if (isTrackerMode) lastFastPathAcousticSpikeRt else 0L 
+            lightSpikeRt = if (isTrackerMode) lastFastPathLightSpikeRt else 0L
             providedAdaptiveFloor = hSnapshot.adaptiveVibrationFloor
             acousticMinDb = hSnapshot.acousticPeakMin
             integrity.isSilentFailure = health.isSilentFailure; integrity.isMaliAnomaly = health.isMaliAnomaly
@@ -682,8 +684,8 @@ class MonitorService : BaseMonitorService() {
     private fun triggerForensicSample(isSpike: Boolean = false) { forensicTriggerChannel.trySend(isSpike) }
 
     private fun setupPhysicalFastPaths() {
-        hardwareSuite.setAcousticFastPath(floor = primaryProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0, onSpike = { lastFastPathAcousticSpikeTs = timeProvider.elapsedRealtime(); triggerForensicSample(isSpike = true) })
-        hardwareSuite.setLightFastPath(baseline = primaryProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP, onSpike = { lastFastPathLightSpikeTs = timeProvider.elapsedRealtime(); triggerForensicSample(isSpike = true) })
+        hardwareSuite.setAcousticFastPath(floor = primaryProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0, onSpike = { lastFastPathAcousticSpikeRt = timeProvider.elapsedRealtime(); triggerForensicSample(isSpike = true) })
+        hardwareSuite.setLightFastPath(baseline = primaryProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP, onSpike = { lastFastPathLightSpikeRt = timeProvider.elapsedRealtime(); triggerForensicSample(isSpike = true) })
     }
 
     private suspend fun refreshCapabilitiesInternal() {

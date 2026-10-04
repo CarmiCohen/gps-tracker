@@ -12,9 +12,12 @@ import javax.inject.Singleton
 
 /**
  * GpsStatusManager: Centralized reactive Flow for the GPS-Index.
+ * Oct.4.5:
+ * - Issue #1425: Unified Clock Authority. Migrated GPS age calculation to 
+ *   monotonic time (elapsedRealtime) to prevent index jitter during clock sync.
  * Sep.09.10:
  * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .integrity)
- *   in LocationUpdate to support bridge removal (R-ID 284).
+ *   in LocationUpdate to support bridge removal.
  */
 @Singleton
 class GpsStatusManager @Inject constructor(
@@ -23,7 +26,7 @@ class GpsStatusManager @Inject constructor(
     private val timeProvider: TimeProvider,
     @ApplicationScope private val externalScope: CoroutineScope
 ) {
-    private data class IndexParams(val gpsTs: Long, val maxAccuracy: Double, val satsUsed: Int)
+    private data class IndexParams(val rt: Long, val maxAccuracy: Double, val satsUsed: Int)
 
     /**
      * gpsIndexFlow: Standardized SharedFlow for GPS Index updates.
@@ -33,10 +36,10 @@ class GpsStatusManager @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
     val gpsIndexFlow: SharedFlow<GpsIndexData> = flow {
         while (true) {
-            emit(timeProvider.currentTimeMillis())
+            emit(timeProvider.elapsedRealtime())
             delay(TICK_INTERVAL_MS)
         }
-    }.flatMapLatest { now ->
+    }.flatMapLatest { nowRt ->
         combine(
             settingsRepository.appModeFlow,
             telemetryRepository.isRelayConnected,
@@ -47,17 +50,17 @@ class GpsStatusManager @Inject constructor(
             val effectiveUpdate = if (isTracker) localUpdate else if (isRelayConnected) trackerUpdate else null
             
             val params = if (effectiveUpdate != null && 
-                effectiveUpdate.kinetic.gpsTs > 0 && 
+                effectiveUpdate.rt > 0 && 
                 PhysicsUtils.isValidLocation(effectiveUpdate.kinetic.lat, effectiveUpdate.kinetic.lng)) {
-                IndexParams(effectiveUpdate.kinetic.gpsTs, effectiveUpdate.kinetic.maxAccuracy, effectiveUpdate.integrity.satsUsed)
+                IndexParams(effectiveUpdate.rt, effectiveUpdate.kinetic.maxAccuracy, effectiveUpdate.integrity.satsUsed)
             } else null
             
-            params to now
+            params to nowRt
         }
-    }.sample(500L) // Issue #219: Throttle UI churn during high-frequency bursts
-     .scan(GpsIndexData(0.0, 0.0, 0.0, 0.0) to (null as IndexParams?)) { state, (params, now) ->
+    }.sample(500L)
+     .scan(GpsIndexData(0.0, 0.0, 0.0, 0.0) to (null as IndexParams?)) { state, (params, nowRt) ->
         val lastParams = state.second
-        val activeParams = if (params != null && (lastParams == null || params.gpsTs >= lastParams.gpsTs)) {
+        val activeParams = if (params != null && (lastParams == null || params.rt >= lastParams.rt)) {
             params
         } else {
             lastParams
@@ -65,7 +68,7 @@ class GpsStatusManager @Inject constructor(
         
         if (activeParams != null) {
             val index = TelemetryUtils.calculateGpsIndex(
-                gpsAgeMs = now - activeParams.gpsTs,
+                gpsAgeMs = nowRt - activeParams.rt,
                 maxAccuracy = activeParams.maxAccuracy,
                 satsUsed = activeParams.satsUsed
             )
@@ -75,7 +78,7 @@ class GpsStatusManager @Inject constructor(
         }
     }.map { it.first }
      .distinctUntilChanged()
-     .flowOn(Dispatchers.Default) // Issue #219: Ensure math logic runs off-UI
+     .flowOn(Dispatchers.Default)
      .shareIn(
         scope = externalScope,
         started = SharingStarted.WhileSubscribed(5000),

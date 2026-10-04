@@ -1,6 +1,7 @@
 package com.gps19.app
 
 import android.content.Context
+import android.os.SystemClock
 import androidx.compose.runtime.snapshots.Snapshot
 import com.gps19.core.engine.*
 import org.osmdroid.util.BoundingBox
@@ -9,6 +10,10 @@ import org.osmdroid.views.MapView
 
 /**
  * MapController: Decouples imperative osmdroid manipulation from Compose UI.
+ * Oct.4.5:
+ * - Issue #1425: Unified Clock Authority. Migrated manual trigger pulse to 
+ *   monotonic time (SystemClock.elapsedRealtime) to prevent follow-logic 
+ *   lockout glitches during clock sync.
  * Sep.30.42:
  * - Issue #1390: Transitioned from cumulative triggers to explicit camera action methods.
  */
@@ -18,7 +23,7 @@ class MapController(
     density: Float
 ) {
     private val overlayManager = MapOverlayManager(context, mapView, density)
-    private var lastTriggerPulse = 0L
+    private var lastTriggerPulseRt = 0L
 
     fun update(state: MapViewState, onTap: (GeoPoint) -> Unit, onRemoveMarker: (Int) -> Unit) {
         Snapshot.withoutReadObservation {
@@ -69,7 +74,7 @@ class MapController(
 
     fun centerTracker(pos: GeoPoint?) {
         if (pos != null) {
-            lastTriggerPulse = System.currentTimeMillis() // Approximate pulse for follow logic lockout
+            lastTriggerPulseRt = SystemClock.elapsedRealtime() // Monotonic lockout
             mapView.controller.animateTo(pos)
             mapView.controller.setZoom(18.0)
         }
@@ -77,7 +82,7 @@ class MapController(
 
     fun centerViewer(pos: GeoPoint?) {
         if (pos != null) {
-            lastTriggerPulse = System.currentTimeMillis()
+            lastTriggerPulseRt = SystemClock.elapsedRealtime()
             mapView.controller.animateTo(pos)
             mapView.controller.setZoom(18.0)
         }
@@ -93,8 +98,8 @@ class MapController(
 
     private fun handleFollowLogic(state: MapViewState) {
         if (!state.isMapLocked) return
-        // Lockout following if a manual trigger happened recently
-        if (System.currentTimeMillis() - lastTriggerPulse < 500) return
+        // Lockout following if a manual trigger happened recently (Issue #1425)
+        if (SystemClock.elapsedRealtime() - lastTriggerPulseRt < 500) return
 
         val sTrk = state.smoothedTrackerPos
         val sVwr = state.smoothedViewerPos

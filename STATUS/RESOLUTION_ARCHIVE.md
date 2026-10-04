@@ -1,3 +1,19 @@
+# 🏛️ Resolution Archive - Oct.4.5
+
+## 🏁 Issue #1425 / SOT ID 613: Unified Clock Authority
+*   **Resolved**: Oct.4.5
+*   **Root Cause**: Mixed use of `System.currentTimeMillis()` (Wall Clock) and `SystemClock.elapsedRealtime()` (Monotonic) for duration and "freshness" logic led to arithmetic errors and UI jitter during NTP synchronization or manual clock adjustments.
+*   **Remediations**:
+    *   **Monotonic Logic**: Standardized all logic-bound temporal deltas (UI pulses, forensic sampling intervals, GPS age calculation, background service heartbeats) to strictly use `elapsedRealtime()` via the `TimeProvider` interface.
+    *   **Service Hardening**: Migrated `BaseMonitorService` and `MonitorService` pulse timers to monotonic sources.
+    *   **UI Synchronization**: Refactored `MainViewModel` state mapping and `GpsStatusManager` to use `pulseRt` for all freshness evaluations.
+    *   **Orchestration Fix**: Updated `UiEventCoordinator` to use `appStartRt` (monotonic) for calculating the startup settling delay (2000ms), ensuring reliable service startup regardless of wall-clock drift.
+    *   **Repository Interval Fix**: Migrated `LogRepository` batch and drain timers to monotonic time to prevent skipping or double-flushing log batches.
+*   **Significance**: Medium (Logic/Robustness).
+*   **SOT ID**: 613
+
+---
+
 # 🏛️ Resolution Archive - Oct.4.1
 
 ## 🏁 Issue #1202 / SOT ID 612: UI Event Routing Unification

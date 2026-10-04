@@ -21,12 +21,13 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.4.5:
+ * - Issue #1425: Unified Clock Authority. Migrated HUD and Map freshness 
+ *   calculations to monotonic time (systemPulseRt) to prevent UI jitter during 
+ *   clock syncs. Refactored mapMapViewState to use monotonic fix age.
  * Oct.4.1:
  * - Issue #1202: Unified UI event routing. Integrated UiEffect SharedFlow 
  *   to decouple imperative UI commands from business logic.
- * Oct.2.15:
- * - Issue #1290: UI State Mapper Consolidation. Merged UiStateCoordinator 
- *   logic into MainViewModel.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -587,10 +588,11 @@ class MainViewModel @Inject constructor(
         val isViewer = appMode == "viewer"
         val loc = if (isViewer) kinematicState.trackerLocation else kinematicState.localLocation
         
+        val fixAgeRt = if (loc.kinetic.rt > 0) nowRt - loc.kinetic.rt else Long.MAX_VALUE
+        val isGpsActive = fixAgeRt < GPS_UI_FAIL_THRESHOLD_MS && loc.kinetic.gpsTs > 0
+        
         val telemetryAge = if (kinematicState.pulse > 0) nowRt - kinematicState.pulse else Long.MAX_VALUE
         val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
-        
-        val isGpsActive = (nowRt - loc.kinetic.rt) < GPS_UI_FAIL_THRESHOLD_MS && loc.kinetic.gpsTs > 0
 
         val gnss = loc.integrity.gnssDetail
         val avgCn0 = gnss?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0
@@ -829,6 +831,9 @@ class MainViewModel @Inject constructor(
             }
         }
         
+        val fixAgeRt = if (loc.kinetic.rt > 0) pulseRt - loc.kinetic.rt else Long.MAX_VALUE
+        val isTrackerFresh = fixAgeRt < GPS_UI_FAIL_THRESHOLD_MS && tTs > 0
+
         return MapViewState(
             appMode = m, hydrationLevel = hydration, isMapButtonsVisible = spatial.isMapButtonsVisible, isFenceVisible = spatial.isFenceVisible, 
             geofenceMode = spatial.geofenceMode, isViolationsVisible = spatial.isViolationsVisible, isGeofenceViolationsVisible = spatial.isGeofenceViolationsVisible, 
@@ -838,7 +843,7 @@ class MainViewModel @Inject constructor(
             trackerLat = tLat, trackerLng = tLng, trackerGpsTs = tTs, trackerTelemetryTs = tTel,
             viewerLat = vLat, viewerLng = vLng, systemPulse = pulse, systemPulseRt = pulseRt,
             trackerSegments = trkSegs, viewerSegments = vwrSegs, violations = vios,
-            isTrackerFresh = tTs > 0 && (pulse - tTel + kotlin.math.max(0L, tTel - tTs)) < GPS_UI_FAIL_THRESHOLD_MS,
+            isTrackerFresh = isTrackerFresh,
             isTrackerValid = PhysicsUtils.isValidLocation(tLat, tLng),
             smoothedTrackerLat = sTrkLat, smoothedTrackerLng = sTrkLng
         )

@@ -1,35 +1,41 @@
-# Forensic Handover (Oct.4.1 - UI EVENT ROUTING)
+# Forensic Handover (Oct.4.5 - UNIFIED CLOCK AUTHORITY)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.4.1` | **Status**: 🟢 **OPERATIONAL**.
-*   **UI Event Routing Unification (Issue #1202)**:
-    *   **Coordinator Authority**: Migrated navigation and procedural logic (permission checks, service startup delays) from `MainAppContent` and `MainViewModel` into `UiEventCoordinator`.
-    *   **Reactive Effect Stream**: Introduced `UiEffect` SharedFlow to decouple View/ViewModel from imperative commands.
-    *   **Domain Orchestration**: Mode transitions (`InitiateMode`, `RequestProceedToMode`) are now handled by the coordinator, ensuring business policy governs UI state.
-    *   **Passive View**: `MainAppContent` refactored to observe effects and act as a passive executor for navigation and system intents.
-*   **Clock Authority Preparation**: Preliminary audit for Issue #1425 identified mixing of `currentTimeMillis` and `elapsedRealtime` in telemetry mapping; remediations pending next session.
+*   **Version**: `Oct.4.5` | **Status**: 🟢 **OPERATIONAL**.
+*   **Unified Clock Authority (Issue #1425)**:
+    *   **Core Architecture**: Standardized `SystemClock.elapsedRealtime()` (via `TimeProvider`) as the exclusive monotonic authority for all internal logic, durations, and "freshness" arithmetic.
+    *   **Service Hardening**:
+        *   `BaseMonitorService.kt`: Refactored `lastUiPulseRt` (L46) and `isUiVisible()` (L120) to utilize monotonic time.
+        *   `MonitorService.kt`: Migrated forensic spike lockout (`lastFastPathAcousticSpikeRt`, `lastFastPathLightSpikeRt`) (L49-50) and triggers (L527, L534, L535) to monotonic time.
+        *   `LogRepository.kt`: Migrated batch flush (`lastFlushRt`) (L91) and forensic drain (`lastDrainRt`) (L133) timers. Resolved `it` vs `entry` reference bug in `flushBatch` (L330).
+        *   `ActivityContextProvider.kt`: Fallback heuristic timer (`lastActivityUpdateRt`) (L28) and update logic (L88) migrated to monotonic time.
+    *   **UI & HUD Synchronization**:
+        *   `MainViewModel.kt`: Refactored `isGpsFresh` and `isTelemetryFresh` in `mapDashboardTelemetry` (L826), `mapHudTelemetry` (L885), and `mapMapViewState` (L924) to use monotonic age (`pulseRt - loc.kinetic.rt`).
+        *   `GpsStatusManager.kt`: Updated `gpsIndexFlow` (L35) to use `elapsedRealtime()` for `gpsAgeMs` calculation.
+        *   `MapController.kt`: Manual trigger lockout (`lastTriggerPulseRt`) (L21, L63, L71, L88) migrated to monotonic time.
+    *   **Session & Startup Integrity**:
+        *   `SessionManager.kt`: Introduced `appStartRt` (L23) for monotonic reference. Renamed `currentDropStartRt` (L27).
+        *   `UiEventCoordinator.kt`: Updated `handleProceedToMode` (L283) to utilize `appStartRt` for enforcing the 2000ms service startup delay.
+*   **Traceability**: SOT Rule 1.103 established; SOT ID 613 resolved.
 
 ## 🟢 Audit Record
 *   **Build Status**: 🟢 **SUCCESSFUL**. Verified via `:app:assembleDebug`.
-*   **Integrity Audit**: MD files synchronized; version incremented to `Oct.4.1`.
-*   **Traceability**: SOT ID 612 / Rule 1.102 established.
+*   **Versioning**: Incremented to `Oct.4.5` (Code 1095) in `app/build.gradle`.
+*   **Metric Delta**: SOT Count: 267 (Rules: 126), Open Issues: 0, Ideas: 9.
 
 ## 🚀 Resumption Action Path (Next Chat)
-1.  **Unified Clock Authority (Issue #1425)**:
-    *   Standardize all telemetry and HUD age evaluations to strictly use `SystemClock.elapsedRealtime()`.
-    *   Eliminate wall-clock drift from "freshness" calculations.
-2.  **Flyweight & Pooling Expansion (Issue #1160)**:
+1.  **Flyweight & Pooling Expansion (Issue #1160)**:
     *   Expand flyweight patterns to remaining telemetry entities.
-3.  **Protobuf-First Persistence (Issue #1173)**:
-    *   Begin mapping Room BLOB pipelines for Protobuf storage.
+    *   Implement ring-buffered object pools to eliminate GC pressure during high-load violation bursts.
+2.  **Protobuf-First Persistence (Issue #1173)**:
+    *   Substitute JSON mapping in `OfflineRepository` and `HistoryManager` with binary Protobuf pipelines straight into Room BLOB objects.
 
 ## 🧪 Latest Bug Test Procedure
-*   **Version Check**: Verify footer text shows `Oct.4.1`.
-*   **Mode Transition**: Switch between Tracker and Viewer modes; verify that permission disclosure dialogs appear and service starts only after the required settling delay (2000ms).
-*   **Navigation Integrity**: Verify Back buttons correctly delegate through the coordinator to handle nested settings levels.
+*   **Clock Drift Resistance**: Manually advance system clock by 1 hour while tracking; verify HUD GPS "Age" badge remains accurate and monotonic (no resets or negative values).
+*   **Startup Delay**: Verify Tracker/Viewer services start exactly 2000ms after mode selection, regardless of wall-clock jumps.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.4.1)
-- **Oct.4.1: [SOT Count: 266 (Rules: 125), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:4, Testing: 29, QA: 387]**
-- **Audit Record**: UI Event Routing Unification integrated; Coordinator authority established; ViewModel decoupled from routes.
+## 📊 Hardening Progress Dashboard (Oct.4.5)
+- **Oct.4.5: [SOT Count: 267 (Rules: 126), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:4, Testing: 30, QA: 390]**
+- **Audit Record**: Unified Clock Authority established; internal logic decoupled from wall-clock drift; HUD freshness synchronized; build verified.

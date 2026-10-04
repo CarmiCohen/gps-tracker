@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.4.1
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.4.5
 
-## 🎯 Current Resumption Focus: UI Orchestration & Domain Hardening
-UI Event Routing Unification integrated. Transitioning to Issue #1425 (Unified Clock Authority) to finish the domain/UI decoupling cycle.
+## 🎯 Current Resumption Focus: Flyweight & Pooling Expansion
+Unified Clock Authority integrated; standardizing all telemetry and HUD age evaluations to monotonic time. Transitioning to Issue #1160 (Flyweight & Pooling Expansion) in next cycle.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -20,8 +20,8 @@ UI Event Routing Unification integrated. Transitioning to Issue #1425 (Unified C
     *   *Significance*: **Medium (Performance)**. Expand flyweight patterns to all telemetry entities and use ring buffers to eliminate GC churn during long-duration alerts.
 *   **Issue #1173: Protobuf-First Persistence**
     *   *Significance*: **Medium (Disk I/O)**. Substitute JSON mapping with pure Protobuf binary pipelines straight into Room BLOB objects for high-frequency history storage.
-*   **Issue #1425: Unified Clock Authority**
-    *   *Significance*: **Medium (Logic)**. Standardize all telemetry and HUD age evaluations to strictly use `SystemClock.elapsedRealtime()` to eliminate drift and arithmetic errors caused by mixing with Unix `System.currentTimeMillis()`.
+*   **Issue #SIMP-1201-1: Logic State Serialization Expansion**
+    *   *Significance*: **Medium (Simplicity)**. Refactor `saveLogicState` in `SettingsRepository` to accept a structured `AlarmEvaluationState` fragment rather than 10 individual parameters, utilizing Protobuf's native mapping to reduce boilerplate.
 
 ### 🔵 Low Priority
 *   **Issue #1293: Lifecycle-Aware Tick Orchestrator**
@@ -36,6 +36,7 @@ UI Event Routing Unification integrated. Transitioning to Issue #1425 (Unified C
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1425 / SOT ID 613: Unified Clock Authority.** Resolved Oct.4.5. Standardized all telemetry, HUD, and map "freshness" evaluations to strictly use `SystemClock.elapsedRealtime()` via `TimeProvider`. Eliminated wall-clock arithmetic in service triggers, log flush intervals, and user-activity heuristics to prevent logic corruption during NTP syncs (R1425).
 *   **Issue #1202 / SOT ID 612: UI Event Routing Unification.** Resolved Oct.4.1. Refactored navigation and procedural UI logic (service startup, permission orchestration) into `UiEventCoordinator`. Introduced `UiEffect` stream to decouple ViewModels and Composables from imperative commands. Centralized mode transition authority in the domain layer (R1202).
 *   **Issue #1201 / SOT ID 610: Reactive Siren Lockout.** Resolved Oct.3.9. Decoupled siren cooldown and lockout logic from audio generation and violation detection. Centralized authority in `SirenLockoutUseCase` and purged redundant `lastSirenStopRt` state from engine modules; implemented reactive requirement refreshing in `AppAlarmManager` (R1201).
 *   **Issue #1172 / SOT ID 608: Smart Signaling Dispatcher.** Resolved Oct.3.8. Consolidated all signaling triggers (joins, leaves, pings, telemetry) into a reactive coordination layer. Implemented connection-aware delivery and adaptive throttling to allow handshake bursts while maintaining inter-frame delays for telemetry; optimized payloads to native Maps (R1172).
@@ -60,7 +61,8 @@ UI Event Routing Unification integrated. Transitioning to Issue #1425 (Unified C
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct.4.1: [SOT Count: 266 (Rules: 125), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:4, Testing: 29, QA: 387]**
+- **Oct.4.5: [SOT Count: 267 (Rules: 126), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:4, Testing: 30, QA: 390]**
+- **Oct.4.1: [SOT Count: 266 (Rules: 125), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:4, Testing: 29, QA: 387]**
 - **Oct.3.9: [SOT Count: 265 (Rules: 124), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:3, Testing: 28, QA: 386]**
 - **Oct.3.8: [SOT Count: 264 (Rules: 123), Open: H:0, M:0, L:0, Ideas: H:0, M:5, L:3, Testing: 27, QA: 385]**
 - **Oct.3.7: [SOT Count: 263 (Rules: 122), Open: H:0, M:0, L:0, Ideas: H:0, M:6, L:3, Testing: 26, QA: 380]**

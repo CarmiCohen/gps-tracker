@@ -21,20 +21,13 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.4.5:
+ * - Issue #1425: Unified Clock Authority. Migrated batch flush and forensic 
+ *   drain timers to monotonic time (elapsedRealtime). Fixed unresolved 
+ *   references in flushBatch (it -> entry).
  * Oct.2.1:
  * - Issue #1416: Memory Pressure Mitigation. Integrated heap-aware pruning 
- *   logic. Thresholds are lowered to ADAPTIVE_PRUNE_THRESHOLD_CRITICAL and 
- *   chunk counts increased when memory pressure is HIGH/CRITICAL.
- * Sep.28.13:
- * - Issue #1361 Hardening: Migrated liveReliability EMA calculation to 
- *   BigDecimal to ensure absolute precision during high-frequency bursts (R714).
- * Aug.21.06:
- * - Issue #196 Hardening: Added setForensicStallSimulation for urban multipath 
- *   validation. performForensicDrain now supports simulated failures to verify 
- *   EMA reliability degradation and alarm triggers (R196-V).
- * Aug.21.05:
- * - Issue #196 Hardening: Implemented range-based signature deduplication in 
- *   performForensicDrain to reduce query overhead during 100Hz bursts (R197).
+ *   logic.
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -94,7 +87,7 @@ class LogRepository @Inject constructor(
     private fun startBatchProcessor() {
         scope.launch(Dispatchers.IO) {
             val batch = mutableListOf<BufferedLog>()
-            var lastFlushTime = timeProvider.currentTimeMillis()
+            var lastFlushRt = timeProvider.elapsedRealtime()
 
             while (isActive) {
                 try {
@@ -106,11 +99,11 @@ class LogRepository @Inject constructor(
                         batch.add(log)
                     }
 
-                    val now = timeProvider.currentTimeMillis()
-                    if (batch.size >= LOG_BATCH_SIZE || (batch.isNotEmpty() && now - lastFlushTime >= LOG_BATCH_DELAY_MS)) {
+                    val nowRt = timeProvider.elapsedRealtime()
+                    if (batch.size >= LOG_BATCH_SIZE || (batch.isNotEmpty() && nowRt - lastFlushRt >= LOG_BATCH_DELAY_MS)) {
                         flushBatch(batch)
                         batch.clear()
-                        lastFlushTime = now
+                        lastFlushRt = nowRt
                     }
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
@@ -133,7 +126,7 @@ class LogRepository @Inject constructor(
 
     private fun startForensicDrainer() {
         scope.launch(Dispatchers.IO) {
-            var lastDrainTime = timeProvider.currentTimeMillis()
+            var lastDrainRt = timeProvider.elapsedRealtime()
             
             while (isActive) {
                 try {
@@ -145,7 +138,7 @@ class LogRepository @Inject constructor(
                     
                     delay(dynamicDelay)
                     
-                    val now = timeProvider.currentTimeMillis()
+                    val nowRt = timeProvider.elapsedRealtime()
                     val buffer = forensicSpillBufferProvider.get()
                     val pendingAtStart = buffer.getPendingCount()
                     val fillLevel = pendingAtStart.toDouble() / FORENSIC_SPILL_CAPACITY
@@ -154,7 +147,7 @@ class LogRepository @Inject constructor(
                     val shouldDrain = isEmergency || 
                                     buffer.isHighPressure() ||
                                     (pendingAtStart >= FORENSIC_FILL_THRESHOLD && loadFactor < 0.8) || 
-                                    (pendingAtStart > 0 && now - lastDrainTime >= FORENSIC_DRAIN_INTERVAL_MS) ||
+                                    (pendingAtStart > 0 && nowRt - lastDrainRt >= FORENSIC_DRAIN_INTERVAL_MS) ||
                                     isForensicStallSimulated.get()
                     
                     if (shouldDrain) {
@@ -166,7 +159,7 @@ class LogRepository @Inject constructor(
                             .coerceIn(FORENSIC_BATCH_SIZE_MIN, FORENSIC_BATCH_SIZE_MAX)
 
                         if (performForensicDrain(limit = dynamicBatchSize, isRecovery = false)) {
-                            lastDrainTime = now
+                            lastDrainRt = nowRt
                         }
                     }
                 } catch (e: Exception) {
@@ -193,7 +186,6 @@ class LogRepository @Inject constructor(
             return false
         }
 
-        // Issue #196: Optimized range-based deduplication (R197)
         val minTs = entities.minOf { it.timestamp }
         val maxTs = entities.maxOf { it.timestamp }
         
@@ -216,9 +208,10 @@ class LogRepository @Inject constructor(
             updateReliability(true)
             
             if (isRecovery && filteredEntities.isNotEmpty()) {
+                val recoveryTs = timeProvider.currentTimeMillis()
                 addLog(LogEntry(
-                    localId = "RECOVERY-${timeProvider.currentTimeMillis()}",
-                    timestamp = timeProvider.currentTimeMillis(),
+                    localId = "RECOVERY-$recoveryTs",
+                    timestamp = recoveryTs,
                     message = "Forensic Recovery Successful: ${filteredEntities.size} traces replayed.", 
                     type = "SYSTEM", isImportant = true, id = "SYSTEM", viewerId = "SYSTEM", 
                     isSpecial = true, specialColor = FORENSIC_PINK_COLOR
@@ -265,9 +258,10 @@ class LogRepository @Inject constructor(
                 val h = telemetry.systemHealth.value
                 val msg = "Forensic Stall Correlated: Backfill not converging ($pendingAfter pending). System: [CPU: ${h.cpuLoad}, IOW: ${h.ioWait}]"
                 Timber.w(msg)
+                val stallTs = timeProvider.currentTimeMillis()
                 addLog(LogEntry(
-                    localId = "STALL-${timeProvider.currentTimeMillis()}",
-                    timestamp = timeProvider.currentTimeMillis(),
+                    localId = "STALL-$stallTs",
+                    timestamp = stallTs,
                     message = msg, type = "SYSTEM", isImportant = true,
                     id = "SYSTEM", viewerId = "SYSTEM", isSpecial = true,
                     specialColor = FORENSIC_PINK_COLOR
@@ -318,7 +312,6 @@ class LogRepository @Inject constructor(
                                 continue
                             }
 
-                            // Issue #207: Optimized deduplication cache to minimize redundant queries
                             val metaKey = "${entry.type}|${entry.role}|${entry.id}"
                             val last = if (metaKey == lastEntityMetadata) lastEntityCached else logDao.getLastLogByMetadata(entry.type, entry.role, entry.id)
                             
@@ -409,16 +402,15 @@ class LogRepository @Inject constructor(
             }
             return
         }
-        // Issue #207: Move regex work to addLog call site (off-transaction)
         val result = logBuffer.trySend(BufferedLog(entry, initiallySynced, stripLogVariableParts(entry.message)))
         if (result.isFailure) Timber.w("Log buffer full, dropping log: ${entry.message}")
     }
 
     private fun triggerAsyncPruning() {
-        val now = timeProvider.elapsedRealtime()
-        if (now - lastPruneTime.get() < PRUNE_COOLDOWN_MS) return
+        val nowRt = timeProvider.elapsedRealtime()
+        if (nowRt - lastPruneTime.get() < PRUNE_COOLDOWN_MS) return
         if (isPruning.compareAndSet(false, true)) {
-            lastPruneTime.set(now)
+            lastPruneTime.set(nowRt)
             scope.launch(Dispatchers.IO) { try { proactivePruning() } finally { isPruning.set(false) } }
         }
     }
@@ -435,7 +427,6 @@ class LogRepository @Inject constructor(
                 val health = telemetry.systemHealth.value
                 val count = logDao.getCount()
                 
-                // Issue #1416: Heap-aware threshold adjustments
                 val memoryCritical = health.heapAllocatedMb >= MEMORY_CRITICAL_THRESHOLD_MB
                 val memoryHigh = health.heapAllocatedMb >= MEMORY_PRESSURE_THRESHOLD_MB
 

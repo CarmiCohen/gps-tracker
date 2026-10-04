@@ -18,19 +18,13 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Oct.4.5:
+ * - Issue #1425: Unified Clock Authority. Migrated periodic trigger to 
+ *   monotonic time (lastTimeTriggerRt) to prevent task skipping/double-triggers 
+ *   during NTP syncs.
  * Oct.2.6:
  * - Issue #1175: Real-time Only Path. Strategically removed forensic backfilling 
- *   and gap-filling logic to simplify architectural state management. Removed 
- *   dependencies on HardwareSuite and LocationProcessor.
- * Oct.2.2:
- * - Issue #1416: Memory Pressure Mitigation (R-ID 592). Added trimMemory.
- * Oct.1.1:
- * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
- *   API in SettingsRepository.
- * Sep.30.60:
- * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum.
- * Sep.27.4:
- * - Issue #1348: Flattened DomainEvent hierarchy.
+ *   and gap-filling logic to simplify architectural state management.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -52,7 +46,7 @@ class HistoryManager @Inject constructor(
     private val currentPointFlyweight = EngineConnectionPoint()
     private val appPointPool = Array(RibbonScale.entries.size) { ConnectionPoint() }
     
-    private var lastTimeTriggerTs = 0L
+    private var lastTimeTriggerRt = 0L
     private var lastSitDetectedRt = 0L
     private var currentRole: AppRole = AppRole.TRACKER
 
@@ -100,7 +94,7 @@ class HistoryManager @Inject constructor(
         lastProcessedHour = -1
         lastCleanupDate = ""
         lastArchiveDate = ""
-        lastTimeTriggerTs = 0L
+        lastTimeTriggerRt = 0L
         aggregator.reset()
     }
     
@@ -221,8 +215,8 @@ class HistoryManager @Inject constructor(
             repository.addHistoryPoint(scale.key, flyweight)
         }
 
-        if (now - lastTimeTriggerTs >= 60000L || lastTimeTriggerTs == 0L) {
-            lastTimeTriggerTs = now
+        if (nowRt - lastTimeTriggerRt >= 60000L || lastTimeTriggerRt == 0L) {
+            lastTimeTriggerRt = nowRt
             val calendar = Calendar.getInstance().apply { timeInMillis = now }
             val hour = calendar.get(Calendar.HOUR_OF_DAY)
             val minute = calendar.get(Calendar.MINUTE)

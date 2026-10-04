@@ -17,6 +17,10 @@ import javax.inject.Singleton
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
  * Decouples MainViewModel from procedural orchestration.
+ * Oct.4.5:
+ * - Issue #1425: Unified Clock Authority. Migrated startup settling delay 
+ *   to monotonic time (appStartRt) to prevent service startup glitches 
+ *   during clock drift (R-ID 1425).
  * Oct.4.1:
  * - Issue #1202: Unified UI event routing. Integrated UiEffect for imperative 
  *   commands. Migrated mode transition logic and permission orchestration 
@@ -34,7 +38,8 @@ class UiEventCoordinator @Inject constructor(
     private val timeProvider: TimeProvider,
     private val audioSynthesizer: AudioSynthesizer,
     private val sirenLockoutUseCase: SirenLockoutUseCase,
-    private val systemStatusProvider: SystemStatusProvider
+    private val systemStatusProvider: SystemStatusProvider,
+    private val sessionManager: SessionManager
 ) {
 
     private var autoSaveJob: Job? = null
@@ -349,11 +354,11 @@ class UiEventCoordinator @Inject constructor(
         handleEvent(UiEvent.SetAppMode(mode), state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, {}, {}, onUiEffect)
         handleEvent(UiEvent.SetSystemActive(true), state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, {}, {}, onUiEffect)
 
-        val appStartTime = state.session.appStartTime
-        val now = System.currentTimeMillis()
-        val elapsed = now - appStartTime
+        val appStartRt = sessionManager.appStartRt
+        val nowRt = timeProvider.elapsedRealtime()
+        val elapsed = nowRt - appStartRt
         
-        if (elapsed < STARTUP_SETTLING_DELAY_MS && appStartTime > 0) {
+        if (elapsed < STARTUP_SETTLING_DELAY_MS && appStartRt > 0) {
             val remaining = STARTUP_SETTLING_DELAY_MS - elapsed
             scope.launch {
                 delay(remaining)
