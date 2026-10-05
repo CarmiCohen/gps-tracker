@@ -21,10 +21,12 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.5.9:
+ * - Issue #1295: Redundant Stream Observer Audit. Relaxed heartbeat loop 
+ *   to 5 minutes during ultra-long stationary periods (R1295).
  * Oct.3.6:
  * - Connection Logic Hardening: Removed redundant isConnected/isConnecting gates 
- *   from connect() calls to allow CommunicationManager to handle URL changes (R1422).
- * - Log Relay Fix: Updated shouldProcessLogRelay call with isFromViewer context (R1422).
+ *   from connect() calls (R1422).
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -264,7 +266,11 @@ class ConnectivitySuite @Inject constructor(
         heartbeatJob?.cancel()
         heartbeatJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
-                delay(30000)
+                // Issue #1295: Relax heartbeat loop significantly during ultra-long stationary states.
+                val isUltra = if (isTrackerMode) localStatusFlyweight.isUltraLongStationary else trackerStatus.isUltraLongStationary
+                val delayMs = if (isUltra) 300000L else 30000L
+                delay(delayMs)
+
                 if (isTrackerMode && isConnected() && !isStopped.get()) {
                     if (localStatusFlyweight.ts > 0 && !hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) {
                         Timber.d("ConnectivitySuite: Issuing Bypass Heartbeat to stabilize peer link.")

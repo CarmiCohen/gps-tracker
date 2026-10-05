@@ -1,5 +1,12 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct.5.9
+*   **Issue #1295: Redundant Stream Observer Audit.** Implemented stationary-aware resource relaxation to minimize CPU wakeups and radio activity during long-term immobility.
+    *   **Loop Relaxation**: Throttled `MonitorService` tick loop and forensic background sampling to match the 5-minute relaxed GPS polling interval during `isUltraLongStationary` (4+ hours immobility).
+    *   **Health Heartbeat**: Relaxed `IntegrityMonitor` hardware health polling from 10s to 60s when stationary.
+    *   **Peer Pulse**: Relaxed `ConnectivitySuite` peer-link heartbeat from 30s to 300s during ultra-stationary periods.
+    *   **Reactive Integrity**: Maintained real-time reactivity to acoustic and light spikes via the `forensicTriggerChannel`, ensuring security is not compromised by polling relaxation (R1295, R1113).
+
 ## 🟢 Resolved in Oct.5.8
 *   **Issue #1293: Lifecycle-Aware Tick Orchestrator.** Refactored `BaseMonitorService` tick and heartbeat loops into a unified `TickOrchestrator`. Centralized initialization gating via `awaitInitialization()` and implemented periodic loop management with monotonic pacing (`SystemClock.elapsedRealtime`). This eliminates manual loop boilerplate and ensures background tasks respect the service lifecycle and clock authority (R1293).
 

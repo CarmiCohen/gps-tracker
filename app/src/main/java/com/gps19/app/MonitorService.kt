@@ -26,13 +26,14 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.5.9:
+ * - Issue #1295: Redundant Stream Observer Audit. Implemented interval relaxation 
+ *   for forensic sampling and tick loops during ultra-long stationary periods. 
+ *   Throttled background sampling to 5s while maintaining spike reactivity (R1295).
+ * Oct.5.8:
+ * - Issue #1293: Tick Orchestration. Replaced manual loops with TickOrchestrator.
  * Oct.4.6:
- * - Issue #1160: Flyweight & Pooling Expansion. Integrated EnginePools for zero-allocation 
- *   tick evaluation and forensic sampling. Replaced manual flyweights with ring-buffered 
- *   acquisition to eliminate GC churn and thread-safety risks during event emission (R1160).
- * Oct.4.5:
- * - Issue #1425: Unified Clock Authority. Migrated UI pulse logic and 
- *   forensic spikes to monotonic time (elapsedRealtime).
+ * - Issue #1160: Flyweight & Pooling Expansion. Integrated EnginePools.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -448,7 +449,20 @@ class MonitorService : BaseMonitorService() {
         return type
     }
 
-    override fun getRequiredTickInterval(): Long = if (isTrackerMode && isPowerSaveActive) POWER_SAVE_TICK_INTERVAL_MS else TICK_INTERVAL_MS
+    /**
+     * getRequiredTickInterval: Unified interval authority.
+     * Issue #1295: Relaxed loop timing during ultra-long stationary states (R1295).
+     */
+    override fun getRequiredTickInterval(): Long {
+        if (!isTrackerMode) return if (isUiVisible()) HIGH_FREQUENCY_GPS_POLLING_MS else VIEWER_GPS_POLLING_MS
+        
+        val health = integrityMonitor.currentHealth
+        return when {
+            health.isUltraLongStationary -> currentIntervalMs.coerceAtLeast(POWER_SAVE_TICK_INTERVAL_MS)
+            isPowerSaveActive -> POWER_SAVE_TICK_INTERVAL_MS
+            else -> TICK_INTERVAL_MS
+        }
+    }
 
     override suspend fun processTick(now: Long, nowRt: Long): Unit = withContext(Dispatchers.Default) {
         integrityMonitor.pollSystemStatus(now, nowRt); integrityMonitor.checkInternetIntegrity(nowRt)
@@ -662,6 +676,9 @@ class MonitorService : BaseMonitorService() {
                     health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS 
                     logManager.isForensicBufferUnderPressure() -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS 
                     health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS 
+                    // Issue #1295: Relax periodic sampling significantly during ultra-long stationary states.
+                    // Channel remains reactive to spikes via triggerForensicSample.
+                    health.isUltraLongStationary -> 5000L
                     else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS 
                 }
                 

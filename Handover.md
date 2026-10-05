@@ -1,26 +1,26 @@
-# Forensic Handover (Oct.5.8 - TICK ORCHESTRATOR)
+# Forensic Handover (Oct.5.9 - STATIONARY RELAXATION)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.5.8` | **Status**: 🟢 **OPERATIONAL**.
-*   **Tick Orchestration (Issue #1293)**:
-    *   **Orchestrated Loops**: Replaced manual `while(isActive)` loops in `BaseMonitorService` with `TickOrchestrator.launchPeriodicLoop`.
-    *   **Initialization Gating**: All managed loops now automatically await `completeInitialization()` before starting, preventing race conditions during startup.
-    *   **Monotonic Pacing**: Timing logic shifted to `SystemClock.elapsedRealtime` to maintain precise intervals during system clock adjustments (R1425 alignment).
-*   **JNI Batching (Oct.5.7 Legacy)**: Maintained 100Hz vibration batching via `DirectByteBuffer`.
+*   **Version**: `Oct.5.9` | **Status**: 🟢 **OPERATIONAL**.
+*   **Stationary Resource Relaxation (Issue #1295)**:
+    *   **Loop Throttling**: Implemented mandatory interval relaxation during `isUltraLongStationary` (4+ hours immobility).
+    *   **MonitorService**: Tick loop now follows relaxed GPS interval (5m); forensic background sampling throttled to 5s.
+    *   **IntegrityMonitor**: Hardware health heartbeat relaxed from 10s to 60s.
+    *   **ConnectivitySuite**: Peer heartbeat (bypass) relaxed from 30s to 5m.
+    *   **Reactive Security**: Real-time channel reactivity maintained for acoustic and light spikes; security posture remains active despite polling relaxation.
+*   **Oct.5.8 Legacy**: Maintained unified `TickOrchestrator` management for all background loops.
 
 ## 🟢 Audit Record
-*   **Build Status**: 🟢 **SUCCESSFUL**. Verified loop stability and initialization synchronization.
-*   **Metrics**: Oct.5.8: [SOT Count: 276 (Rules: 135), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 36, QA: 415]
-*   **Traceability**: Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md` with Rule 1.112 (R1293).
+*   **Build Status**: 🟢 **SUCCESSFUL**. Verified loop relaxation transitions and channel responsiveness.
+*   **Metrics**: Oct.5.9: [SOT Count: 277 (Rules: 136), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 37, QA: 420]
+*   **Traceability**: Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md` with Rule 1.113 (R1295).
 
 ## 🚀 Resumption Action Path (Next Chat)
-1.  **Redundant Stream Observer Audit #1295**:
-    *   Audit `MonitorService` descendants to ensure reactive streams are pruned during long stationary periods.
-2.  **Composable Effect Aggregator #1426**:
-    *   Centralize UI observers in `MainAppContent`.
+1.  **Composable Effect Aggregator #1426**:
+    *   Centralize UI observers in `MainAppContent` to reduce boilerplate and improve maintainability.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.5.8)
-- **Oct.5.8: [SOT Count: 276 (Rules: 135), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 36, QA: 415]**
-- **Audit Record**: Tick and Heartbeat loops migrated to TickOrchestrator; initialization gates enforced; Oct.5.8 tagged.
+## 📊 Hardening Progress Dashboard (Oct.5.9)
+- **Oct.5.9: [SOT Count: 277 (Rules: 136), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 37, QA: 420]**
+- **Audit Record**: Heartbeats, forensic sampling, and tick intervals relaxed during ultra-long stationary states; Oct.5.9 tagged.

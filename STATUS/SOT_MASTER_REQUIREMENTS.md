@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct.5.8)
+# SOT Master Requirements & Hardening Status (Oct.5.9)
 
-## 🏗️ Architectural Master Rules (135 Rules)
+## 🏗️ Architectural Master Rules (136 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -10,10 +10,12 @@
 *   **1.110 Granular UI State Collection (R1422)**: High-frequency transient UI states (KinematicState, DiagnosticState) MUST be collected at the leaf screen level (e.g., TrackerScreen) rather than the root (MainAppContent). Root state collection MUST be limited to low-frequency navigation and session metadata to prevent redundant recompositions of the entire UI tree during 100Hz sensor bursts. (Oct.5.6 - Issue #1328).
 *   **1.111 JNI Math Batching (R1450)**: High-frequency JNI transitions (100Hz+) MUST be consolidated into batched transactions using `DirectByteBuffer`. Granular math calls (magnitude, HPF, energy) MUST be performed within a single native context to minimize JNI bridge overhead and CPU context switching during sensor bursts. (Oct.5.7 - Issue #1450).
 *   **1.112 Lifecycle-Aware Tick Orchestrator (R1293)**: Background service loops MUST be managed by a centralized `TickOrchestrator` to ensure initialization gating and monotonic pacing. Manual `while(isActive)` loops in services are deprecated in favor of orchestrated periodic management that respects service initialization state. (Oct.5.8 - Issue #1293).
+*   **1.113 Stationary Resource Relaxation (R1295)**: Periodic background tasks and reactive stream observers MUST implement interval relaxation during verified stationary periods, specifically targeting the `isUltraLongStationary` state (4+ hours). Heartbeat loops, forensic sampling timeouts, and telemetry synchronization MUST transition to low-power intervals (e.g., 60s to 300s) to minimize CPU wakeups and radio activity when state delta is negligible. (Oct.5.9 - Issue #1295).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 623**: Stationary Resource Relaxation - Implemented interval relaxation for heartbeats, forensic sampling, and telemetry sync during ultra-long stationary states to conserve system resources. (Resolved Oct.5.9).
 *   **SOT ID 622**: Lifecycle-Aware Tick Orchestrator - Migrated service loops to managed periodic orchestration to ensure initialization gating and monotonic pacing. (Resolved Oct.5.8).
 *   **SOT ID 621**: JNI Math Batching - Consolidated granular vibration math into a single 256-byte DirectByteBuffer transaction to reduce JNI bridge overhead. (Resolved Oct.5.7).
 *   **SOT ID 620**: Granular UI State Collection - Moved high-frequency state observers from MainAppContent to specialized screens to eliminate UI-induced backpressure. (Resolved Oct.5.6).
@@ -24,6 +26,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.242 (Stationary Relaxation Audit)**: PASSED - Verified relaxation of Integrity heartbeat (60s), forensic sampling (5s), and Connectivity heartbeat (300s) during `isUltraLongStationary`. Confirmed real-time spike reactivity remains active via `forensicTriggerChannel`. (Oct.5.9)
 *   **Chapter 31.241 (Tick Orchestrator Audit)**: PASSED - Verified that heartbeat and tick loops await initialization automatically. Confirmed monotonic pacing stability via `SystemClock.elapsedRealtime`. (Oct.5.8)
 *   **Chapter 31.240 (JNI Batching Audit)**: PASSED - Verified reduction of JNI calls from 5 to 1 per vibration tick. Confirmed math parity for HPF and Energy EMA between batched native and JVM fallback. (Oct.5.7)
 *   **Chapter 31.239 (UI Recomposition Audit)**: PASSED - Verified that `MainAppContent` no longer recomposes on RTT or battery updates. Confirmed specialized dashboard components only recompose when their specific state slice (e.g., `KinematicState`) changes. (Oct.5.6)

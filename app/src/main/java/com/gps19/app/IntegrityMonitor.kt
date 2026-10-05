@@ -17,6 +17,9 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Oct.5.9:
+ * - Issue #1295: Redundant Stream Observer Audit. Relaxed heartbeat loop 
+ *   interval during ultra-long stationary periods to conserve CPU (R1295).
  * Oct.5.2:
  * - Issue #1344: Forensic Diagnostic Expansion. Explicitly populating 
  *   thermalSnapshot and heapSnapshot in health state (R1344).
@@ -197,7 +200,13 @@ class IntegrityMonitor @Inject constructor(
             delay(BOOTSTRAP_PHASE_MS)
             while (isActive) {
                 performIntegrityHeartbeat()
-                delay(FORENSIC_PULSE_INTERVAL_MS)
+                
+                val interval = if (currentHealth.isUltraLongStationary) {
+                    INTEGRITY_HEARTBEAT_INTERVAL_MS // 60s relaxation
+                } else {
+                    FORENSIC_PULSE_INTERVAL_MS // 10s default
+                }
+                delay(interval)
             }
         }
     }
