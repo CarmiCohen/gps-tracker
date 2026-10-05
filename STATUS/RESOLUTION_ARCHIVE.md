@@ -1,7 +1,10 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct.5.11
+*   **Issue #1426 Performance Audit: Side-Effect Latency Verification.** Conducted forensic latency audit on `AppEffectAggregator`. Verified strict isolation of the 100Hz vibration pipeline from root side-effect recompositions. Confirmed Rule 1.111 (JNI Batching) reduces bridge overhead to 1 transaction per tick. (Oct.5.11 - R1426, R1.111).
+
 ## 🟢 Resolved in Oct.5.10
-*   **Issue #1426: Composable Effect Aggregator.** Centralized root-level `LaunchedEffect` and `DisposableEffect` observers in `MainAppContent` into a single `AppEffectAggregator` component. This improves code legibility, isolates side-effect logic from layout structure, and provides a unified entry point for app-level reactive routing and lifecycle synchronization. (R1426, R1.114).
+*   **Issue #1426: Composable Effect Aggregator.** Centralized root-level `LaunchedEffect` and `DisposableEffect` observers in `MainAppContent` into a single `AppEffectAggregator` component. This improves code legibility, isolates side-effect logic from layout structure, and provides a unified entry point for app-level reactive routing and lifecycle synchronization. (Oct.5.10 - R1426, R1.114).
 
 ## 🟢 Resolved in Oct.5.9
 *   **Issue #1295: Redundant Stream Observer Audit.** Implemented stationary-aware resource relaxation to minimize CPU wakeups and radio activity during long-term immobility.

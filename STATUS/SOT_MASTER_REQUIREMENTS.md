@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct.5.10)
+# SOT Master Requirements & Hardening Status (Oct.5.11)
 
 ## 🏗️ Architectural Master Rules (137 Rules)
 
@@ -16,6 +16,7 @@
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 625**: Side-Effect Latency Audit - Verified isolation of 100Hz vibration pipeline from root UI side-effects in `AppEffectAggregator`. (Resolved Oct.5.11).
 *   **SOT ID 624**: Composable Effect Aggregator - Centralized root side-effects into `AppEffectAggregator` to improve maintainability and separate logic from layout. (Resolved Oct.5.10).
 *   **SOT ID 623**: Stationary Resource Relaxation - Implemented interval relaxation for heartbeats, forensic sampling, and telemetry sync during ultra-long stationary states to conserve system resources. (Resolved Oct.5.9).
 *   **SOT ID 622**: Lifecycle-Aware Tick Orchestrator - Migrated service loops to managed periodic orchestration to ensure initialization gating and monotonic pacing. (Resolved Oct.5.8).
@@ -28,6 +29,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.244 (Latency Audit)**: PASSED - Verified that `AppEffectAggregator` recomposition is strictly decoupled from the 100Hz vibration pipeline. Confirmed batched JNI transactions (R1.111) are active. (Oct.5.11)
 *   **Chapter 31.243 (Effect Aggregation Audit)**: PASSED - Verified centralization of UI effects, lifecycle observers, and navigation logic into `AppEffectAggregator`. Confirmed no functional regressions in navigation or orientation handling. (Oct.5.10)
 *   **Chapter 31.242 (Stationary Relaxation Audit)**: PASSED - Verified relaxation of Integrity heartbeat (60s), forensic sampling (5s), and Connectivity heartbeat (300s) during `isUltraLongStationary`. (Oct.5.9)
 *   **Chapter 31.241 (Tick Orchestrator Audit)**: PASSED - Verified that heartbeat and tick loops await initialization automatically. (Oct.5.8)
