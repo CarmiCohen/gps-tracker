@@ -21,15 +21,14 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.5.15:
+ * - Issue #SIMP-1426-2: Added isSirenPlayingFlow to support leaf-level 
+ *   state collection in SettingsOverlay. (R1426-2).
  * Oct.5.6:
  * - Issue #1328: Phase 2 - UI Performance Hardening. Refactored state mapping 
  *   to allow granular binding in MainAppContent. Added isRedScreenVisible 
  *   and isAlarmSilenced to hudHealthState to decouple AlarmOverlay from root 
  *   DiagnosticState collection.
- * Oct.4.5:
- * - Issue #1425: Unified Clock Authority. Migrated HUD and Map freshness 
- *   calculations to monotonic time (systemPulseRt) to prevent UI jitter during 
- *   clock syncs. Refactored mapMapViewState to use monotonic fix age.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -98,6 +97,11 @@ class MainViewModel @Inject constructor(
 
     private val _diagnosticState = MutableStateFlow(DiagnosticState())
     val diagnosticState: StateFlow<DiagnosticState> = _diagnosticState.asStateFlow()
+
+    val isSirenPlayingFlow: StateFlow<Boolean> = _diagnosticState
+        .map { it.isSirenPlaying }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _systemPulseRt = MutableStateFlow(timeProvider.elapsedRealtime())
     val systemPulseRt: StateFlow<Long> = _systemPulseRt.asStateFlow()

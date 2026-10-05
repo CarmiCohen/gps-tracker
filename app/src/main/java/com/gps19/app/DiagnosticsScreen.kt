@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -15,34 +16,26 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gps19.core.engine.CapabilityStatus
 import com.gps19.core.engine.PerformanceTier
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Oct.5.15:
+ * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored DiagnosticsScreen to 
+ *   collect its own state from flows, removing observers from MainAppContent NavHost 
+ *   to align with Rule 1.110 (R1426-2).
  * Sep.29.01:
- * - Issue #S071 Stress Test UI Consolidation: Moved "Trigger Forensic Stress Test" 
- *   button from PhoneSetupOverlay to Diagnostics validation hooks.
- * Sep.16.05:
- * - Issue #1060 Capability Consolidation: Checked performanceTier enum directly (R-ID 348).
- * Sep.16.00:
- * - Issue #1055 Unified Performance Tier: Broadened GNSS status visibility 
- *   to all staggered performance devices (A15, S21FE) (R-ID 348, formerly R-ID 347).
- * Sep.08.12:
- * - Issue #924 Visibility: Added GNSS Throttling (THR) status to the hardware 
- *   capabilities section for A15 Hysteresis transparency (R-ID 267).
+ * - Issue #S071 Stress Test UI Consolidation: Moved stress test trigger here.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticsScreen(
-    permissions: PermissionState,
-    recoveryCount: Int,
-    cumulativeRecoveryBlackoutMs: Long,
-    isForensicStallSimulated: Boolean,
-    isStorageSimulated: Boolean,
-    isStorageCriticalSimulated: Boolean,
-    isSetupBypassActive: Boolean = false,
-    isGnssThrottled: Boolean = false,
+    sessionUiStateFlow: StateFlow<SessionUiState>,
+    diagnosticStateFlow: StateFlow<DiagnosticState>,
+    simulationUiStateFlow: StateFlow<SimulationUiState>,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onToggleManualOverride: () -> Unit,
@@ -57,6 +50,19 @@ fun DiagnosticsScreen(
     onRequestExactAlarm: () -> Unit,
     onRequestHardwarePermission: () -> Unit
 ) {
+    val sessionState by sessionUiStateFlow.collectAsStateWithLifecycle()
+    val diagnosticState by diagnosticStateFlow.collectAsStateWithLifecycle()
+    val simulationState by simulationUiStateFlow.collectAsStateWithLifecycle()
+
+    val permissions = sessionState.permissions
+    val isSetupBypassActive = sessionState.isSetupBypassActive
+    val recoveryCount = diagnosticState.recoveryCount
+    val cumulativeRecoveryBlackoutMs = diagnosticState.cumulativeRecoveryBlackoutMs
+    val isForensicStallSimulated = simulationState.isForensicStallSimulated
+    val isStorageSimulated = simulationState.isStorageSimulated
+    val isStorageCriticalSimulated = simulationState.isStorageCriticalSimulated
+    val isGnssThrottled = diagnosticState.isGnssThrottled
+
     Scaffold(
         topBar = {
             TopAppBar(

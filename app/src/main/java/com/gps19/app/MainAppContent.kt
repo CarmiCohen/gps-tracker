@@ -39,12 +39,12 @@ import kotlinx.coroutines.flow.collectLatest
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.5.15:
+ * - Issue #SIMP-1426-2: Leaf-Level Convergence. Optimized root recomposition by 
+ *   moving AlarmOverlay into OverlayHost and removing high-frequency 
+ *   hudHealthState observer from root. (R1426-2, R1110).
  * Oct.5.10:
- * - Issue #1426: Composable Effect Aggregator. Centralized root-level side-effects 
- *   (Lifecycle, UI Effects, Navigation Logic, Orientation) into AppEffectAggregator 
- *   to reduce boilerplate and improve maintainability. (R1426).
- * Oct.5.6:
- * - Issue #1328: UI Performance Hardening. (R1328).
+ * - Issue #1426: Composable Effect Aggregator. Centralized root-level side-effects.
  */
 @Composable
 fun MainAppContent(
@@ -64,7 +64,6 @@ fun MainAppContent(
     val settingsState by viewModel.settingsUiState.collectAsStateWithLifecycle()
     val spatialState by viewModel.spatialUiState.collectAsStateWithLifecycle()
     val navigationState by viewModel.navigationState.collectAsStateWithLifecycle()
-    val hudHealth by viewModel.hudHealthState.collectAsStateWithLifecycle()
     
     val navController = rememberNavController()
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
@@ -74,7 +73,6 @@ fun MainAppContent(
         navigationState.pendingMode?.let { mode -> viewModel.onEvent(UiEvent.InitiateMode(mode)) }
     }
 
-    // Issue #1426: Centralized Aggregator for root side-effects.
     AppEffectAggregator(
         viewModel = viewModel,
         navController = navController,
@@ -131,8 +129,6 @@ fun MainAppContent(
     
     GpsTrackerTheme(appMode = sessionState.appMode) {
         Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding(), color = MaterialTheme.colorScheme.background) {
-            BackHandler(enabled = hudHealth.isRedScreenVisible && sessionState.appMode != null) { viewModel.onEvent(UiEvent.DismissAlarms) }
-
             Box(modifier = Modifier.fillMaxSize()) {
                 if (sessionState.hydrationLevel >= 2) {
                     NavHost(navController = navController, startDestination = Screen.Landing.route) {
@@ -201,18 +197,12 @@ fun MainAppContent(
                             }
                         }
                         composable(Screen.Diagnostics.route) {
-                            val simulationState by viewModel.simulationUiState.collectAsStateWithLifecycle()
-                            val diagnosticState by viewModel.diagnosticState.collectAsStateWithLifecycle()
                             BackHandler { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) }
                             if (sessionState.hydrationLevel >= 3) {
                                 DiagnosticsScreen(
-                                    permissions = sessionState.permissions,
-                                    recoveryCount = diagnosticState.recoveryCount,
-                                    cumulativeRecoveryBlackoutMs = diagnosticState.cumulativeRecoveryBlackoutMs,
-                                    isForensicStallSimulated = simulationState.isForensicStallSimulated,
-                                    isStorageSimulated = simulationState.isStorageSimulated,
-                                    isStorageCriticalSimulated = simulationState.isStorageCriticalSimulated,
-                                    isSetupBypassActive = sessionState.isSetupBypassActive,
+                                    sessionUiStateFlow = viewModel.sessionUiState,
+                                    diagnosticStateFlow = viewModel.diagnosticState,
+                                    simulationUiStateFlow = viewModel.simulationUiState,
                                     onBack = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) },
                                     onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) },
                                     onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
@@ -233,14 +223,15 @@ fun MainAppContent(
                 
                 if (navigationState.isPhoneSetupVisible && sessionState.hydrationLevel >= 3) {
                     PhoneSetupOverlay(
+                        sessionStateFlow = viewModel.sessionUiState,
+                        spatialUiStateFlow = viewModel.spatialUiState,
                         onClose = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)) }, onWhitelist = { onRequestBatteryExemption() },
                         onOverlay = { onRequestOverlayPermission() }, onAppInfo = { onRequestAppInfo() },
                         onExactAlarm = { onRequestExactAlarm() }, onHardwarePermission = { onRequestHardwarePermission() },
                         onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                         onTestAlarm = { viewModel.onEvent(UiEvent.RequestTestAlarm) },
                         onNavigateToDiagnostics = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
-                        isSetupBypassActive = sessionState.isSetupBypassActive, permissions = sessionState.permissions, homePointsCount = spatialState.homePoints.size,
-                        isTrackerMode = sessionState.appMode == "tracker", onGoToMap = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.ToggleMap(true)) }
+                        onGoToMap = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.ToggleMap(true)) }
                     )
                 }
 
@@ -259,27 +250,9 @@ fun MainAppContent(
                 OverlayHost(
                     viewModel = viewModel,
                     navigationState = navigationState,
-                    settingsState = settingsState,
-                    sessionState = sessionState,
                     importLauncher = importLauncher,
                     activity = activity
                 )
-                
-                if (hudHealth.isRedScreenVisible && sessionState.appMode == "viewer" && sessionState.hydrationLevel >= 3) {
-                    val kinematicState by viewModel.kinematicState.collectAsStateWithLifecycle()
-                    AlarmOverlay(
-                        alarms = hudHealth.activeAlarms, isMuted = hudHealth.isAlarmSilenced,
-                        locatable = kinematicState.trackerHealth,
-                        backgroundStatus = sessionState.permissions.backgroundStatus, hasBackgroundRestriction = sessionState.permissions.hasBackgroundRestriction,
-                        onHardwarePermissionClick = { onRequestHardwarePermission() },
-                        onMute = { 
-                            val currentCauses = hudHealth.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { activity.getString(R.string.status_muted) }
-                            viewModel.onEvent(UiEvent.StopSiren(currentCauses))
-                        },
-                        onClose = { viewModel.onEvent(UiEvent.DismissAlarms) },
-                        onGoToMap = { viewModel.onEvent(UiEvent.DismissAlarms); viewModel.onEvent(UiEvent.ToggleMap(true)) }
-                    )
-                }
             }
         }
     }
@@ -412,36 +385,22 @@ private fun AppEffectAggregator(
 fun OverlayHost(
     viewModel: MainViewModel,
     navigationState: NavigationState,
-    settingsState: SettingsUiState,
-    sessionState: SessionUiState,
     importLauncher: ActivityResultLauncher<String>,
     activity: ComponentActivity
 ) {
+    val hudHealth by viewModel.hudHealthState.collectAsStateWithLifecycle()
+    val sessionState by viewModel.sessionUiState.collectAsStateWithLifecycle()
+
     if (navigationState.isSettingsOpen) {
-        val diagnosticState by viewModel.diagnosticState.collectAsStateWithLifecycle()
         SettingsOverlay(
-            activeSubSettings = navigationState.activeSubSettings,
-            draftDeviceId = settingsState.draftSettings.deviceId,
-            draftViewerId = settingsState.draftSettings.viewerId,
-            draftRelayUrl = settingsState.draftSettings.relayUrl,
-            draftMaxDistance = settingsState.draftSettings.maxDistance,
-            draftAlertSettings = settingsState.draftSettings.alertSettings,
-            selectedSirenType = settingsState.selectedSirenType,
-            isSirenPlaying = diagnosticState.isSirenPlaying,
-            onClose = { viewModel.onEvent(UiEvent.ToggleSettings(false)) }, 
+            settingsUiStateFlow = viewModel.settingsUiState,
+            navigationStateFlow = viewModel.navigationState,
+            isSirenPlayingFlow = viewModel.isSirenPlayingFlow,
             onReset = { viewModel.onEvent(UiEvent.ResetStats) },
             onExport = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
             onClear = { viewModel.onEvent(UiEvent.ClearHomePoints) }, 
             onImportConfig = { importLauncher.launch("application/json") },
             onFullInitialization = { viewModel.fullInitialization(activity) },
-            onUpdateDeviceId = { id -> viewModel.onEvent(UiEvent.UpdateDraftDeviceId(id)) },
-            onUpdateViewerId = { id -> viewModel.onEvent(UiEvent.UpdateDraftViewerId(id)) },
-            onUpdateRelayUrl = { url -> viewModel.onEvent(UiEvent.UpdateDraftRelayUrl(url)) },
-            onUpdateMaxDistance = { dist -> viewModel.onEvent(UiEvent.UpdateDraftMaxDistance(dist)) },
-            onUpdateAlertSettings = { settings -> viewModel.onEvent(UiEvent.UpdateDraftAlertSettings(settings)) },
-            onUpdateSirenType = { type -> viewModel.onEvent(UiEvent.SetSirenType(type)) },
-            onUpdateAlarmVolume = { vol -> viewModel.onEvent(UiEvent.UpdateDraftAlarmVolume(vol)) },
-            onTestSiren = { viewModel.onEvent(UiEvent.ToggleTestSiren) },
             onShowPhoneSetup = { 
                 viewModel.onEvent(UiEvent.ToggleSettings(false))
                 viewModel.onEvent(UiEvent.TogglePhoneSetup(true))
@@ -449,20 +408,18 @@ fun OverlayHost(
             onEvent = { event -> viewModel.onEvent(event) }
         )
     } else if (navigationState.isLogVisible) {
-        val showDetails by viewModel.repository.logFilterDetails.collectAsStateWithLifecycle()
-        val showRecovered by viewModel.repository.logFilterRecovered.collectAsStateWithLifecycle()
         LogOverlay(
             logsFlow = viewModel.eventLogsFlow, 
+            showDetailsFlow = viewModel.repository.logFilterDetails,
+            showRecoveredFlow = viewModel.repository.logFilterRecovered,
+            systemPulseRtFlow = viewModel.systemPulseRt,
+            sessionUiStateFlow = viewModel.sessionUiState,
+            isTelemetryFresh = true,
             onExport = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
             onToggle = { viewModel.onEvent(UiEvent.ToggleLog(false)) }, 
             onClear = { viewModel.onEvent(UiEvent.ClearLogs) },
-            showDetails = showDetails, 
-            showRecovered = showRecovered, 
             onSetShowDetails = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowDetails(show)) }, 
             onSetShowRecovered = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowRecovered(show)) },
-            appStartTime = sessionState.appStartTime,
-            systemPulse = viewModel.timeProvider.currentTimeMillis(),
-            isTelemetryFresh = true,
             onHistLink = { ts -> 
                 viewModel.onEvent(UiEvent.SetReplayCursor(ts))
                 viewModel.onEvent(UiEvent.ToggleRibbons(true))
@@ -471,8 +428,7 @@ fun OverlayHost(
         )
     } else if (navigationState.isRibbonsVisible) {
         RibbonsOverlay(
-            isStrictMode = navigationState.isStrictMode,
-            replayCursorTs = navigationState.replayCursorTs,
+            navigationStateFlow = viewModel.navigationState,
             history4MFlow = viewModel.history4MFlow,
             history16MFlow = viewModel.history16MFlow,
             history1HFlow = viewModel.history1HFlow,
@@ -487,6 +443,23 @@ fun OverlayHost(
         GnssDetailOverlay(
             gnssDetailFlow = viewModel.activeGnssDetail,
             onClose = { viewModel.onEvent(UiEvent.ToggleGnssDetail(false)) }
+        )
+    }
+
+    // Leaf-level AlarmOverlay collection
+    if (hudHealth.isRedScreenVisible && sessionState.appMode == "viewer" && sessionState.hydrationLevel >= 3) {
+        BackHandler { viewModel.onEvent(UiEvent.DismissAlarms) }
+        AlarmOverlay(
+            hudHealthFlow = viewModel.hudHealthState,
+            kinematicFlow = viewModel.kinematicState,
+            sessionStateFlow = viewModel.sessionUiState,
+            onHardwarePermissionClick = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
+            onMute = { 
+                val currentCauses = hudHealth.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { activity.getString(R.string.status_muted) }
+                viewModel.onEvent(UiEvent.StopSiren(currentCauses))
+            },
+            onClose = { viewModel.onEvent(UiEvent.DismissAlarms) },
+            onGoToMap = { viewModel.onEvent(UiEvent.DismissAlarms); viewModel.onEvent(UiEvent.ToggleMap(true)) }
         )
     }
 }

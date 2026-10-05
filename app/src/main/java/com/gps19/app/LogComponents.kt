@@ -32,35 +32,43 @@ import java.util.*
 
 /**
  * LogComponents: UI for system logs and diagnostic history.
+ * Oct.5.15:
+ * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored LogOverlay to collect 
+ *   its own state from flows (logs, filters, pulse, session) to align with Rule 1.110 
+ *   and prevent root-level recomposition pressure. (R1426-2).
  * Sep.06.35:
  * - Issue #930 RESOLVED: Deep-Linking. Added HIST and DIAG buttons to 
  *   LogDetailPane to support forensic navigation to ribbons and diagnostics (R-ID 930).
- * July.27.04:
- * - Issue #598: UI Performance under Signaling Stress. De-coupled log collection 
- *   from top-level screens.
  */
 
 @Composable
 fun LogOverlay(
     logsFlow: StateFlow<List<LogEntry>>, 
+    showDetailsFlow: StateFlow<Boolean>,
+    showRecoveredFlow: StateFlow<Boolean>,
+    systemPulseRtFlow: StateFlow<Long>,
+    sessionUiStateFlow: StateFlow<SessionUiState>,
+    isTelemetryFresh: Boolean = true,
     onExport: () -> Unit, 
     onToggle: () -> Unit, 
     onClear: () -> Unit,
-    showDetails: Boolean, 
-    showRecovered: Boolean, 
     onSetShowDetails: (Boolean) -> Unit,
     onSetShowRecovered: (Boolean) -> Unit, 
-    appStartTime: Long, 
-    systemPulse: Long,
-    isTelemetryFresh: Boolean = true,
     onHistLink: (Long) -> Unit = {},
     onDetailsLink: () -> Unit = {}
 ) {
     val logs by logsFlow.collectAsStateWithLifecycle()
-    val timeFormatter = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
-    val now = systemPulse
+    val showDetails by showDetailsFlow.collectAsStateWithLifecycle()
+    val showRecovered by showRecoveredFlow.collectAsStateWithLifecycle()
+    val nowRt by systemPulseRtFlow.collectAsStateWithLifecycle()
+    val sessionState by sessionUiStateFlow.collectAsStateWithLifecycle()
     
-    val filteredLogs by remember(showDetails, showRecovered, logs, appStartTime) {
+    val appStartTime = sessionState.appStartTime
+    // Convert pulse to wall time for history age calculations.
+    val now = remember(nowRt) { System.currentTimeMillis() }
+    val timeFormatter = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
+    
+    val filteredLogs by remember(showDetails, showRecovered, logs, appStartTime, now) {
         derivedStateOf { 
             logs.filter { log -> 
                 val isRecovered = (log.timestamp < appStartTime) || (log.timestamp < now - 43200000L)
@@ -91,7 +99,7 @@ fun LogOverlay(
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     items(filteredLogs, key = { it.localId }) { log ->
                         val time = remember(log.timestamp) { try { timeFormatter.format(Date(log.timestamp)) } catch(e: Exception) { "--:--:--" } }
-                        val isRecovered = remember(log.timestamp, appStartTime) { (log.timestamp < appStartTime) || (log.timestamp < now - 43200000L) }
+                        val isRecovered = remember(log.timestamp, appStartTime, now) { (log.timestamp < appStartTime) || (log.timestamp < now - 43200000L) }
                         val msgPrefix = if (isRecovered) stringResource(R.string.log_hist_prefix) else ""
                         val renderingConfig = remember(log.message, log.isImportant, log.isSpecial, log.specialColor, isTelemetryFresh) { 
                             getLogRenderingConfig(log, isTelemetryFresh) 

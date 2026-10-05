@@ -23,9 +23,10 @@ import kotlinx.coroutines.flow.onEach
 
 /**
  * AlarmActivity: Full-screen alarm overlay that bypasses the lock screen.
- * Oct.3.2:
- * - Issue #1420: Granular HUD Binding. Updated AlarmOverlay call to use 
- *   locatable parameter instead of deprecated isLocationPending.
+ * Oct.5.15:
+ * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored AlarmOverlay call 
+ *   to pass Flows from MainViewModel, ensuring state collection happens 
+ *   within the leaf component (Rule 1.110). (R1426-2).
  */
 @AndroidEntryPoint
 class AlarmActivity : ComponentActivity() {
@@ -63,11 +64,9 @@ class AlarmActivity : ComponentActivity() {
             .launchIn(lifecycleScope)
 
         setContent {
-            val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-            val kinematicState by viewModel.kinematicState.collectAsStateWithLifecycle()
-            val diagnosticState by viewModel.diagnosticState.collectAsStateWithLifecycle()
+            val sessionState by viewModel.sessionUiState.collectAsStateWithLifecycle()
 
-            GpsTrackerTheme(appMode = uiState.appMode) {
+            GpsTrackerTheme(appMode = sessionState.appMode) {
                 BackHandler {
                     viewModel.onEvent(UiEvent.DismissAlarms)
                     finish()
@@ -75,14 +74,12 @@ class AlarmActivity : ComponentActivity() {
 
                 Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
                     AlarmOverlay(
-                        alarms = diagnosticState.activeAlarms,
-                        isMuted = diagnosticState.isAlarmSilenced,
-                        locatable = kinematicState.trackerHealth,
-                        backgroundStatus = uiState.permissions.backgroundStatus,
-                        hasBackgroundRestriction = uiState.permissions.hasBackgroundRestriction,
-                        onHardwarePermissionClick = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
+                        hudHealthFlow = viewModel.hudHealthState,
+                        kinematicFlow = viewModel.kinematicState,
+                        sessionStateFlow = viewModel.sessionUiState,
                         onMute = {
-                            val currentCauses = diagnosticState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
+                            val currentAlarms = viewModel.hudHealthState.value.activeAlarms
+                            val currentCauses = currentAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
                             viewModel.onEvent(UiEvent.StopSiren(currentCauses))
                         },
                         onClose = {
@@ -92,12 +89,22 @@ class AlarmActivity : ComponentActivity() {
                         onGoToMap = {
                             viewModel.onEvent(UiEvent.DismissAlarms)
                             
-                            val currentCauses = diagnosticState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Map Navigation" }
+                            val currentAlarms = viewModel.hudHealthState.value.activeAlarms
+                            val currentCauses = currentAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Map Navigation" }
                             viewModel.onEvent(UiEvent.StopSiren(currentCauses))
                             
                             val intent = Intent(this, MainActivity::class.java).apply {
                                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
                                 action = ACTION_NAVIGATE_TO_MAP
+                            }
+                            startActivity(intent)
+                            finish()
+                        },
+                        onHardwarePermissionClick = {
+                            viewModel.onEvent(UiEvent.NavigateToDiagnostics(true))
+                            val intent = Intent(this, MainActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                                action = "com.gps19.app.ACTION_VIEW_DIAGNOSTICS"
                             }
                             startActivity(intent)
                             finish()

@@ -1,23 +1,25 @@
-# Forensic Handover (Oct.5.12 - READINESS CONVERGENCE)
+# Forensic Handover (Oct.5.15 - LEAF CONVERGENCE)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.5.12` | **Status**: 🟢 **OPERATIONAL**.
-*   **Leaf Effect Convergence (Issue #SIMP-1426-1)**:
-    *   **Convergence Result**: SUCCESSFUL. Centralized "System Readiness" and "Issue Count" logic in `SessionUiState`.
-    *   **Cleanup**: Removed ~100 lines of duplicated logic from `TrackerScreen.kt` and `ViewerScreen.kt`.
-    *   **Consistency**: Ensured all leaf screens consume the same criteria for system health, preventing logic drift.
+*   **Version**: `Oct.5.15` | **Status**: 🟢 **OPERATIONAL**.
+*   **Leaf-Level Convergence (Issue #SIMP-1426-2)**:
+    *   **Convergence Result**: SUCCESSFUL. Shifted all high-frequency telemetry and diagnostic state collection from `MainAppContent` and screen-level components to leaf components.
+    *   **Decoupling**: `MainAppContent` no longer observes `hudHealthState` or `settingsUiState.draftSettings`, isolating the root UI tree from 10Hz+ telemetry/pulse recompositions.
+    *   **Build Remediation**: Declared missing `ProcessorEvent` types (`LuxBaselineChanged`, `AcousticFloorChanged`, `GpsStallDetected`) in `EngineModels.kt` to restore build integrity after logic migration.
 
 ## 🟢 Audit Record
-*   **Build Status**: 🟢 **SUCCESSFUL**. Version incremented to `Oct.5.12`.
-*   **Metrics**: Oct.5.12: [SOT Count: 280 (Rules: 137), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 39, QA: 430]
-*   **Traceability**: Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md` with Chapter 31.245.
+*   **Build Status**: 🟢 **SUCCESSFUL**. Version incremented to `Oct.5.15`.
+*   **Metrics**: Oct.5.15: [SOT Count: 281 (Rules: 138), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 39, QA: 445]
+*   **Traceability**: Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md` with Chapter 31.246.
 
 ## 🚀 Resumption Action Path (Next Chat)
-1.  **UI Hardening**:
-    *   Continue scanning for redundant state observers in smaller overlays (e.g., `SettingsOverlay`) to align with Rule 1.110.
+1.  **Map Hardening**:
+    *   Audit `AppMapContainer` for redundant calculations performed inside the composition scope that could be moved to the `MapViewState` mapping logic in `MainViewModel`.
+2.  **Boilerplate Reduction**:
+    *   Explore **SIMP-1426-3** to create a unified flow provider for overlays.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.5.12)
-- **Oct.5.12: [SOT Count: 280 (Rules: 137), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 39, QA: 430]**
-- **Audit Record**: Centralized readiness logic; Oct.5.12 tagged.
+## 📊 Hardening Progress Dashboard (Oct.5.15)
+- **Oct.5.15: [SOT Count: 281 (Rules: 138), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 39, QA: 445]**
+- **Audit Record**: Leaf-level state hoisting finalized; Oct.5.15 tagged.

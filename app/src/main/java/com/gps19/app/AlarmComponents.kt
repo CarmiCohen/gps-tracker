@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,34 +24,45 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gps19.core.engine.*
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * AlarmComponents: Overlay for active alarm states and sirens.
+ * Oct.5.15:
+ * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored AlarmOverlay to collect 
+ *   its own state from flows, decoupling root-level MainAppContent from 10Hz+ 
+ *   kinematic/diagnostic updates (Rule 1.110). (R1426-2).
  * Oct.3.1:
  * - Issue #1420: Granular HUD Binding. Refactored AlarmOverlay to consume 
- *   Locatable interface instead of a raw boolean, aligning with the 
- *   monolith decoupling strategy.
- * v9.4.0:
- * - Issue #502: Device Independency. Genericized hardware configuration alerts.
+ *   Locatable interface instead of a raw boolean.
  */
 
 @Composable
 fun AlarmOverlay(
-    alarms: List<AlarmInfo>, 
-    isMuted: Boolean, 
+    hudHealthFlow: StateFlow<HudHealthState>,
+    kinematicFlow: StateFlow<KinematicState>,
+    sessionStateFlow: StateFlow<SessionUiState>,
     onMute: () -> Unit, 
     onClose: () -> Unit, 
     onGoToMap: () -> Unit = onClose, 
-    locatable: Locatable? = null,
-    backgroundStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
-    hasBackgroundRestriction: Boolean = false,
     onHardwarePermissionClick: () -> Unit = {}
 ) {
+    val hudHealth by hudHealthFlow.collectAsStateWithLifecycle()
+    val kinematicState by kinematicFlow.collectAsStateWithLifecycle()
+    val sessionState by sessionStateFlow.collectAsStateWithLifecycle()
+
+    val alarms = hudHealth.activeAlarms
+    val isMuted = hudHealth.isAlarmSilenced
+    val locatable = kinematicState.trackerHealth
+    val backgroundStatus = sessionState.permissions.backgroundStatus
+    val hasBackgroundRestriction = sessionState.permissions.hasBackgroundRestriction
+
     val unresolvedAlarms = alarms.filter { !it.isResolved }
     val hasUnresolved = unresolvedAlarms.isNotEmpty()
     val isSirenPlaying = unresolvedAlarms.any { !it.isSirenDisabled } && !isMuted
-    val isLocationPending = locatable?.isLocationPending ?: false
+    val isLocationPending = locatable.isLocationPending
     
     val alarmCategories = listOf(
         ALERT_TITLE_LOCAL_INTERNET, ALERT_TITLE_RELAY_OFFLINE, ALERT_TITLE_TRACKER_OFFLINE,

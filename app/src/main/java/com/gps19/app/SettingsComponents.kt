@@ -26,50 +26,43 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gps19.core.engine.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.StateFlow
 import timber.log.Timber
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Oct.5.15:
+ * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored SettingsOverlay and 
+ *   PhoneSetupOverlay to collect their own state from flows, reducing 
+ *   root-level recomposition pressure. (R1426-2).
  * Sep.29.01:
  * - Issue #S071 Stress Test UI Consolidation: Removed "Trigger Forensic Stress Test" 
  *   button and onExecuteStressTest from PhoneSetupOverlay.
- * Sep.04.18:
- * - Issue #900/904 Hardening: Enhanced PhoneSetupOverlay with explicit Samsung 
- *   "Unrestricted" and "Precise Location" instructions for A15 hardware (R900).
- * Sep.01.08:
- * - Issue #882 Hardening: Implemented 8-level staggered hydration for 
- *   PhoneSetupOverlay to remediate 751ms Davey on SM-A155F.
  */
 
 @Composable
 fun SettingsOverlay(
-    activeSubSettings: SubSettings?,
-    draftDeviceId: String,
-    draftViewerId: String,
-    draftRelayUrl: String,
-    draftMaxDistance: String,
-    draftAlertSettings: AlertSettings,
-    selectedSirenType: String,
-    isSirenPlaying: Boolean,
-    onClose: () -> Unit, 
+    settingsUiStateFlow: StateFlow<SettingsUiState>,
+    navigationStateFlow: StateFlow<NavigationState>,
+    isSirenPlayingFlow: StateFlow<Boolean>,
     onReset: (() -> Unit)?=null, 
     onExport: (() -> Unit)?=null, 
     onClear: (() -> Unit)?=null, 
     onImportConfig: () -> Unit, 
     onFullInitialization: () -> Unit,
-    onUpdateDeviceId: (String) -> Unit, 
-    onUpdateViewerId: (String) -> Unit, 
-    onUpdateRelayUrl: (String) -> Unit,
-    onUpdateMaxDistance: (String) -> Unit, 
-    onUpdateAlertSettings: (AlertSettings) -> Unit, 
-    onUpdateSirenType: (String) -> Unit,
-    onUpdateAlarmVolume: (Float) -> Unit, 
-    onTestSiren: () -> Unit, 
     onShowPhoneSetup: () -> Unit = {}, 
     onEvent: (UiEvent) -> Unit
 ) { 
+    val settingsState by settingsUiStateFlow.collectAsStateWithLifecycle()
+    val navState by navigationStateFlow.collectAsStateWithLifecycle()
+    val isSirenPlaying by isSirenPlayingFlow.collectAsStateWithLifecycle()
+
+    val draft = settingsState.draftSettings
+    val activeSubSettings = navState.activeSubSettings
+
     var isHydrated by remember { mutableStateOf(false) }
     var visibleCount by remember { mutableIntStateOf(0) }
     
@@ -92,8 +85,8 @@ fun SettingsOverlay(
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             OutlinedTextField(
-                                value = draftDeviceId, 
-                                onValueChange = onUpdateDeviceId, 
+                                value = draft.deviceId, 
+                                onValueChange = { onEvent(UiEvent.UpdateDraftDeviceId(it)) }, 
                                 label = { Text(stringResource(R.string.settings_label_tracker_id), fontSize = 12.sp) }, 
                                 leadingIcon = { Icon(Icons.Default.Agriculture, null, tint = BrandJd, modifier = Modifier.size(18.dp)) }, 
                                 modifier = Modifier.weight(1f), 
@@ -110,8 +103,8 @@ fun SettingsOverlay(
                                 textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                             )
                             OutlinedTextField(
-                                value = draftViewerId, 
-                                onValueChange = onUpdateViewerId, 
+                                value = draft.viewerId, 
+                                onValueChange = { onEvent(UiEvent.UpdateDraftViewerId(it)) }, 
                                 label = { Text(stringResource(R.string.settings_label_viewer_id), fontSize = 12.sp) }, 
                                 leadingIcon = { Icon(Icons.Default.Person, null, tint = ViewerCyan, modifier = Modifier.size(18.dp)) }, 
                                 modifier = Modifier.weight(1f), 
@@ -132,7 +125,7 @@ fun SettingsOverlay(
                     }
 
                     if (visibleCount >= 2) {
-                        OutlinedTextField(value = draftMaxDistance, onValueChange = onUpdateMaxDistance, label = { Text(stringResource(R.string.settings_label_geofence), fontSize = 12.sp) }, placeholder = { Text(stringResource(R.string.settings_placeholder_radius), color = Slate500) }, leadingIcon = { Icon(Icons.Default.RadioButtonChecked, null, tint = Color.White, modifier = Modifier.size(18.dp)) }, trailingIcon = { Text(stringResource(R.string.settings_unit_meters), color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(end = 8.dp)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.White, unfocusedBorderColor = Color.White.copy(alpha = 0.3f), focusedLabelColor = Color.White, unfocusedLabelColor = Slate500, focusedTextColor = Color.White, unfocusedTextColor = Color.White), singleLine = true, textStyle = LocalTextStyle.current.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace))
+                        OutlinedTextField(value = draft.maxDistance, onValueChange = { onEvent(UiEvent.UpdateDraftMaxDistance(it)) }, label = { Text(stringResource(R.string.settings_label_geofence), fontSize = 12.sp) }, placeholder = { Text(stringResource(R.string.settings_placeholder_radius), color = Slate500) }, leadingIcon = { Icon(Icons.Default.RadioButtonChecked, null, tint = Color.White, modifier = Modifier.size(18.dp)) }, trailingIcon = { Text(stringResource(R.string.settings_unit_meters), color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(end = 8.dp)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.White, unfocusedBorderColor = Color.White.copy(alpha = 0.3f), focusedLabelColor = Color.White, unfocusedLabelColor = Slate500, focusedTextColor = Color.White, unfocusedTextColor = Color.White), singleLine = true, textStyle = LocalTextStyle.current.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace))
                         Spacer(Modifier.height(24.dp))
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -169,7 +162,7 @@ fun SettingsOverlay(
 
                     if (visibleCount >= 5) {
                         Spacer(Modifier.height(24.dp))
-                        OutlinedTextField(value = draftRelayUrl, onValueChange = onUpdateRelayUrl, label = { Text(stringResource(R.string.settings_label_relay_url)) }, modifier = Modifier.fillMaxWidth())
+                        OutlinedTextField(value = draft.relayUrl, onValueChange = { onEvent(UiEvent.UpdateDraftRelayUrl(it)) }, label = { Text(stringResource(R.string.settings_label_relay_url)) }, modifier = Modifier.fillMaxWidth())
                         Spacer(Modifier.height(56.dp))
                     }
                 } 
@@ -182,8 +175,8 @@ fun SettingsOverlay(
         if (isHydrated && visibleCount >= 5) {
             when (activeSubSettings) {
                 SubSettings.CLEAN -> CleanSetupOverlay(onClear = onClear, onReset = onReset, onFullInitialization = onFullInitialization, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
-                SubSettings.ALERTS -> AlertManagementOverlay(draftAlertSettings = draftAlertSettings, onUpdateAlertSettings = onUpdateAlertSettings, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
-                SubSettings.SOUND -> AlarmSoundOverlay(draftAlertSettings = draftAlertSettings, selectedSirenType = selectedSirenType, isSirenPlaying = isSirenPlaying, onUpdateAlertSettings = onUpdateAlertSettings, onUpdateSirenType = onUpdateSirenType, onUpdateAlarmVolume = onUpdateAlarmVolume, onTestSiren = onTestSiren, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
+                SubSettings.ALERTS -> AlertManagementOverlay(draftAlertSettings = draft.alertSettings, onUpdateAlertSettings = { onEvent(UiEvent.UpdateDraftAlertSettings(it)) }, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
+                SubSettings.SOUND -> AlarmSoundOverlay(draftAlertSettings = draft.alertSettings, selectedSirenType = settingsState.selectedSirenType, isSirenPlaying = isSirenPlaying, onUpdateAlertSettings = { onEvent(UiEvent.UpdateDraftAlertSettings(it)) }, onUpdateSirenType = { onEvent(UiEvent.SetSirenType(it)) }, onUpdateAlarmVolume = { onEvent(UiEvent.UpdateDraftAlarmVolume(it)) }, onTestSiren = { onEvent(UiEvent.ToggleTestSiren) }, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
                 else -> {}
             }
         }
@@ -288,15 +281,23 @@ fun AlarmSoundOverlay(draftAlertSettings: AlertSettings, selectedSirenType: Stri
 
 @Composable
 fun PhoneSetupOverlay(
+    sessionStateFlow: StateFlow<SessionUiState>,
+    spatialUiStateFlow: StateFlow<SpatialUiState>,
     onClose: () -> Unit, onWhitelist: () -> Unit, onOverlay: () -> Unit, onAppInfo: () -> Unit, 
     onExactAlarm: () -> Unit, onHardwarePermission: () -> Unit, onRefresh: () -> Unit, 
     onToggleManualOverride: () -> Unit = {},
     onTestAlarm: () -> Unit,
     onNavigateToDiagnostics: () -> Unit = {},
-    isSetupBypassActive: Boolean = false,
-    permissions: PermissionState,
-    homePointsCount: Int, isTrackerMode: Boolean, onGoToMap: () -> Unit = {}
+    onGoToMap: () -> Unit = {}
 ) {
+    val sessionState by sessionStateFlow.collectAsStateWithLifecycle()
+    val spatialState by spatialUiStateFlow.collectAsStateWithLifecycle()
+
+    val permissions = sessionState.permissions
+    val isSetupBypassActive = sessionState.isSetupBypassActive
+    val homePointsCount = spatialState.homePoints.size
+    val isTrackerMode = sessionState.appMode == "tracker"
+
     var isHydrated by remember { mutableStateOf(false) }
     var visibleCount by remember { mutableIntStateOf(0) }
     
@@ -470,53 +471,4 @@ fun GuideSection(title: String, description: String, onClick: () -> Unit, button
             Button(onClick = onClick, modifier = Modifier.padding(start = 28.dp).heightIn(min = 36.dp), contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp)) { Text(buttonText, fontSize = 11.sp) }
         }
     }
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF000000)
-@Composable
-fun SettingsOverlayPreview() {
-    SettingsOverlay(
-        activeSubSettings = null,
-        draftDeviceId = "TRK-001",
-        draftViewerId = "VIEW-001",
-        draftRelayUrl = "wss://relay.example.com",
-        draftMaxDistance = "100",
-        draftAlertSettings = AlertSettings(),
-        selectedSirenType = "Siren",
-        isSirenPlaying = false,
-        onClose = {},
-        onImportConfig = {},
-        onFullInitialization = {},
-        onUpdateDeviceId = {},
-        onUpdateViewerId = {},
-        onUpdateRelayUrl = {},
-        onUpdateMaxDistance = {},
-        onUpdateAlertSettings = {},
-        onUpdateSirenType = {},
-        onUpdateAlarmVolume = {},
-        onTestSiren = {},
-        onEvent = {}
-    )
-}
-
-@Preview(showBackground = true, backgroundColor = 0xFF020617)
-@Composable
-fun PhoneSetupOverlayPreview() {
-    PhoneSetupOverlay(
-        onClose = {},
-        onWhitelist = {},
-        onOverlay = {},
-        onAppInfo = {},
-        onExactAlarm = {},
-        onHardwarePermission = {},
-        onRefresh = {},
-        onTestAlarm = {},
-        permissions = PermissionState(
-            isFineLocationGranted = true,
-            isBatteryWhitelisted = false,
-            isOverlayGranted = true
-        ),
-        homePointsCount = 0,
-        isTrackerMode = true
-    )
 }

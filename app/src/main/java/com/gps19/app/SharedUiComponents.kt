@@ -50,13 +50,13 @@ import com.gps19.core.engine.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.5.15:
+ * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored GlobalStatusBar and 
+ *   RibbonsOverlay to collect their own state from flows, decoupling root/screen 
+ *   components from high-frequency telemetry updates (Rule 1.110). (R1426-2).
  * Oct.3.6:
  * - Layout Hardening: Balanced StatusRowData with explicit internal weights to 
  *   prevent telemetry jumbling in portrait; reduced HeaderBar vertical height (R1422).
- * Oct.3.4:
- * - HUD Consolidation & Compactness: Merged badge and telemetry rows in portrait 
- *   to minimize vertical footprint; unified "Waiting for Telemetry" into status 
- *   label to resolve UI occlusion (R1421).
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -92,8 +92,7 @@ data class StatusRowState(
 
 @Composable
 fun RibbonsOverlay(
-    isStrictMode: Boolean,
-    replayCursorTs: Long?,
+    navigationStateFlow: StateFlow<NavigationState>,
     history4MFlow: StateFlow<List<ConnectionPoint>>,
     history16MFlow: StateFlow<List<ConnectionPoint>>,
     history1HFlow: StateFlow<List<ConnectionPoint>>,
@@ -104,6 +103,8 @@ fun RibbonsOverlay(
     onScrub: (Long?) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val navState by navigationStateFlow.collectAsStateWithLifecycle()
+    
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -115,8 +116,8 @@ fun RibbonsOverlay(
             Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                 Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
                     AnalyticalRibbons(
-                        isStrictMode = isStrictMode,
-                        replayCursorTs = replayCursorTs,
+                        isStrictMode = navState.isStrictMode,
+                        replayCursorTs = navState.replayCursorTs,
                         history4MFlow = history4MFlow,
                         history16MFlow = history16MFlow,
                         history1HFlow = history1HFlow,
@@ -612,11 +613,15 @@ fun HeaderBar(
 
 @Composable
 fun GlobalStatusBar(
-    connectivity: HudConnectivityState,
-    telemetry: HudTelemetryState,
-    health: HudHealthState,
+    connectivityFlow: StateFlow<HudConnectivityState>,
+    telemetryFlow: StateFlow<HudTelemetryState>,
+    healthFlow: StateFlow<HudHealthState>,
     modifier: Modifier = Modifier
 ) {
+    val connectivity by connectivityFlow.collectAsStateWithLifecycle()
+    val telemetry by telemetryFlow.collectAsStateWithLifecycle()
+    val health by healthFlow.collectAsStateWithLifecycle()
+
     StatusBar(connectivity = connectivity, telemetry = telemetry, health = health, modifier = modifier)
 }
 

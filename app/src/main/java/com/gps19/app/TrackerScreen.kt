@@ -25,11 +25,12 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Oct.5.15:
+ * - Issue #SIMP-1426-2: Leaf-Level Convergence. Removed redundant mapViewState 
+ *   collection from screen level; now fully delegated to AppMapContainer 
+ *   via Flow (Rule 1.110). (R1426-2).
  * Oct.5.12:
- * - Issue #SIMP-1426-1: Eliminated duplicated System Readiness logic. 
- *   Now consumes centralized state from SessionUiState (R1426).
- * Oct.5.6:
- * - Issue #1328: Phase 2 - UI Performance Hardening. (R1328).
+ * - Issue #SIMP-1426-1: Eliminated duplicated System Readiness logic.
  */
 
 @Composable
@@ -65,22 +66,6 @@ fun TrackerScreen(
     val isAnyOverlayOpen = isSettingsOpen || isLogVisible || isRibbonsVisible || isGnssDetailVisible || isPhoneSetupVisible
     
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val context = LocalContext.current
-    
-    // R1328: High-frequency states collected here to isolate MainAppContent.
-    val dashboardState by viewModel.dashboardState.collectAsStateWithLifecycle()
-    val kinematicState by viewModel.kinematicState.collectAsStateWithLifecycle()
-    val diagnosticState by viewModel.diagnosticState.collectAsStateWithLifecycle()
-
-    val gpsIndexData by viewModel.gpsIndexData.collectAsStateWithLifecycle()
-    val rttValue by viewModel.rtt.collectAsStateWithLifecycle()
-    val currentMa by viewModel.currentMa.collectAsStateWithLifecycle()
-    
-    val hudConnectivity by viewModel.hudConnectivityState.collectAsStateWithLifecycle()
-    val hudTelemetry by viewModel.hudTelemetryState.collectAsStateWithLifecycle()
-    val hudHealth by viewModel.hudHealthState.collectAsStateWithLifecycle()
-
-    val mapViewState by viewModel.mapViewState.collectAsStateWithLifecycle()
 
     val onDashboard = {
         if (isMapVisible) onToggleMap()
@@ -91,7 +76,6 @@ fun TrackerScreen(
         if (isPhoneSetupVisible) onMainEvent(UiEvent.TogglePhoneSetup(false))
     }
 
-    // Issue #SIMP-1426-1: Centralized logic usage.
     val isSystemReady = sessionState.isSystemReady(spatialState.homePoints.size)
     val systemIssuesCount = sessionState.systemIssuesCount(spatialState.homePoints.size)
 
@@ -116,9 +100,9 @@ fun TrackerScreen(
 
     val statusBar = @Composable {
         GlobalStatusBar(
-            connectivity = hudConnectivity,
-            telemetry = hudTelemetry,
-            health = hudHealth,
+            connectivityFlow = viewModel.hudConnectivityState,
+            telemetryFlow = viewModel.hudTelemetryState,
+            healthFlow = viewModel.hudHealthState,
             modifier = Modifier.pointerInput(Unit) {
                 detectTapGestures(onTap = { onMainEvent(UiEvent.SetRedScreenVisible(true)) })
             }
@@ -141,7 +125,7 @@ fun TrackerScreen(
                         Box(modifier = Modifier.weight(1f)) {
                             if (sessionState.hydrationLevel >= 4 && isMapVisible && !isAnyOverlayOpen) {
                                 AppMapContainer(
-                                    state = mapViewState,
+                                    mapViewStateFlow = viewModel.mapViewState,
                                     cameraActions = viewModel.cameraActions,
                                     onEvent = { event -> viewModel.onEvent(event) },
                                     onClearTrails = { viewModel.clearTrails() },
@@ -154,16 +138,13 @@ fun TrackerScreen(
                                     isSystemActive = sessionState.isSystemActive,
                                     isDashboardExpanded = nav.isDashboardExpanded,
                                     isBatteryWhitelisted = sessionState.permissions.isBatteryWhitelisted,
-                                    isLocalOnline = diagnosticState.connectivity.isLocalOnline,
-                                    isRelayConnected = diagnosticState.connectivity.isRelayConnected,
-                                    lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
-                                    localLat = kinematicState.localLocation.kinetic.lat,
-                                    localLocationTs = kinematicState.localLocation.kinetic.gpsTs,
-                                    dashboardState = dashboardState,
-                                    gpsIdx = gpsIndexData,
-                                    rttValue = rttValue,
-                                    currentMaValue = currentMa,
-                                    systemPulse = mapViewState.systemPulseRt,
+                                    dashboardFlow = viewModel.dashboardState,
+                                    kinematicFlow = viewModel.kinematicState,
+                                    diagnosticFlow = viewModel.diagnosticState,
+                                    gpsIdxFlow = viewModel.gpsIndexData,
+                                    rttFlow = viewModel.rtt,
+                                    currentMaFlow = viewModel.currentMa,
+                                    systemPulseFlow = viewModel.systemPulseRt,
                                     onEvent = { event -> onMainEvent(event) }
                                 )
                             }
@@ -173,7 +154,7 @@ fun TrackerScreen(
             } else {
                 if (sessionState.hydrationLevel >= 4 && isMapVisible && !isAnyOverlayOpen) {
                     AppMapContainer(
-                        state = mapViewState,
+                        mapViewStateFlow = viewModel.mapViewState,
                         cameraActions = viewModel.cameraActions,
                         onEvent = { event -> viewModel.onEvent(event) },
                         onClearTrails = { viewModel.clearTrails() },
@@ -202,16 +183,13 @@ fun TrackerScreen(
                                 isSystemActive = sessionState.isSystemActive,
                                 isDashboardExpanded = nav.isDashboardExpanded,
                                 isBatteryWhitelisted = sessionState.permissions.isBatteryWhitelisted,
-                                isLocalOnline = diagnosticState.connectivity.isLocalOnline,
-                                isRelayConnected = diagnosticState.connectivity.isRelayConnected,
-                                lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
-                                localLat = kinematicState.localLocation.kinetic.lat,
-                                localLocationTs = kinematicState.localLocation.kinetic.gpsTs,
-                                dashboardState = dashboardState,
-                                gpsIdx = gpsIndexData,
-                                rttValue = rttValue,
-                                currentMaValue = currentMa,
-                                systemPulse = mapViewState.systemPulseRt,
+                                dashboardFlow = viewModel.dashboardState,
+                                kinematicFlow = viewModel.kinematicState,
+                                diagnosticFlow = viewModel.diagnosticState,
+                                gpsIdxFlow = viewModel.gpsIndexData,
+                                rttFlow = viewModel.rtt,
+                                currentMaFlow = viewModel.currentMa,
+                                systemPulseFlow = viewModel.systemPulseRt,
                                 onEvent = { event -> onMainEvent(event) }
                             )
                         }
@@ -228,18 +206,23 @@ fun TrackerDashboard(
     isSystemActive: Boolean,
     isDashboardExpanded: Boolean,
     isBatteryWhitelisted: Boolean,
-    isLocalOnline: Boolean,
-    isRelayConnected: Boolean,
-    lastRemoteActivityTs: Long,
-    localLat: Double,
-    localLocationTs: Long,
-    dashboardState: DashboardState,
-    gpsIdx: GpsIndexData,
-    rttValue: Int,
-    currentMaValue: Int,
-    systemPulse: Long,
+    dashboardFlow: StateFlow<DashboardState>,
+    kinematicFlow: StateFlow<KinematicState>,
+    diagnosticFlow: StateFlow<DiagnosticState>,
+    gpsIdxFlow: StateFlow<GpsIndexData>,
+    rttFlow: StateFlow<Int>,
+    currentMaFlow: StateFlow<Int>,
+    systemPulseFlow: StateFlow<Long>,
     onEvent: (UiEvent) -> Unit
 ) {
+    val dashboardState by dashboardFlow.collectAsStateWithLifecycle()
+    val kinematicState by kinematicFlow.collectAsStateWithLifecycle()
+    val diagnosticState by diagnosticFlow.collectAsStateWithLifecycle()
+    val gpsIdx by gpsIdxFlow.collectAsStateWithLifecycle()
+    val rttValue by rttFlow.collectAsStateWithLifecycle()
+    val currentMaValue by currentMaFlow.collectAsStateWithLifecycle()
+    val systemPulse by systemPulseFlow.collectAsStateWithLifecycle()
+
     LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         item {
             if (isDashboardExpanded) {
@@ -251,9 +234,9 @@ fun TrackerDashboard(
                 TelemetryBox(
                     appMode = appMode,
                     isBatteryWhitelisted = isBatteryWhitelisted,
-                    isLocalOnline = isLocalOnline,
-                    isRelayConnected = isRelayConnected,
-                    lastRemoteActivityTs = lastRemoteActivityTs,
+                    isLocalOnline = diagnosticState.connectivity.isLocalOnline,
+                    isRelayConnected = diagnosticState.connectivity.isRelayConnected,
+                    lastRemoteActivityTs = diagnosticState.connectivity.lastRemoteActivityTs,
                     systemPulse = systemPulse,
                     isGpsFresh = dashboardState.isGpsFresh,
                     isTelemetryFresh = dashboardState.isTelemetryFresh,
@@ -326,7 +309,7 @@ fun TrackerDashboard(
                     isTelemetryFresh = dashboardState.isTelemetryFresh,
                     isGpsFresh = dashboardState.isGpsFresh,
                     trackerStateName = dashboardState.trackerState.name,
-                    gpsAgeSec = if (localLocationTs > 0) (systemPulse - localLocationTs) / 1000 else -1L,
+                    gpsAgeSec = if (kinematicState.localLocation.kinetic.gpsTs > 0) (systemPulse - kinematicState.localLocation.kinetic.gpsTs) / 1000 else -1L,
                     rtt = rttValue,
                     currentMa = currentMaValue
                 )

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
@@ -37,30 +38,29 @@ import org.osmdroid.views.overlay.ScaleBarOverlay
 import org.osmdroid.views.overlay.Overlay
 import com.gps19.app.BuildConfig
 import com.gps19.core.engine.*
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Oct.5.15:
+ * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored AppMapContainer to 
+ *   collect its own state from flows, decoupling screen-level components from 
+ *   periodic map state updates (Rule 1.110). (R1426-2).
  * Oct.3.6:
- * - Layout Hardening: Wrapped container in LTR provider to ensure consistent tool 
- *   positioning on RTL devices (Samsung Hebrew mode fix).
- * Oct.1.5:
- * - Issue #MAP-SOT-03: Implemented AnchorLockedBadge in AppMapContainer.
- * Sep.30.42:
- * - Issue #1390: Integrated CameraAction SharedFlow to handle imperative map commands.
- * Sep.28.6:
- * - Issue #1167 RESOLVED: Extracted osmdroid management and imperative coordination 
- *   into MapController. (R-ID 522).
+ * - Layout Hardening: Wrapped container in LTR provider for RTL device fixes.
  */
 
 @Composable
 fun AppMapContainer(
-    state: MapViewState,
+    mapViewStateFlow: StateFlow<MapViewState>,
     cameraActions: kotlinx.coroutines.flow.SharedFlow<CameraAction>? = null,
     onEvent: (UiEvent) -> Unit,
     onClearTrails: () -> Unit,
     onSaveTrail: () -> Unit,
     onLoadTrail: () -> Unit
 ) {
+    val state by mapViewStateFlow.collectAsStateWithLifecycle()
+    
     val isTrackerMode = state.appMode == "tracker"
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val toggleTopPadding = if (isLandscape) 12.dp else 110.dp
@@ -75,7 +75,6 @@ fun AppMapContainer(
 
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
 
-    // Forced LTR for technical dashboard consistency (R-ID 1422 Consistency)
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Box(modifier = Modifier.fillMaxSize()) {
             OsmMap(

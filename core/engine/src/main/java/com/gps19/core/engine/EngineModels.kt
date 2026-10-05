@@ -6,15 +6,12 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.5.15:
+ * - Issue #SIMP-1426-2: Leaf-Level Convergence. Added missing ProcessorEvent 
+ *   definitions (LuxBaselineChanged, AcousticFloorChanged, GpsStallDetected) 
+ *   to remediate build failure. (R1426-2).
  * Oct.5.7:
- * - Issue #1450: JNI Math Batching. Added VibrationBatch to NativeFastPathProvider 
- *   to consolidate 100Hz JNI calls into a single buffer transaction (R-ID 610).
- * Oct.5.5:
- * - Issue #1328: Event Bus Backpressure Risk. Introduced EventPriority to 
- *   DomainEvent hierarchy to support prioritized drop strategies in the 
- *   reactive bus.
- * - Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2). Finalized 
- *   NativeFastPathProvider with 100Hz vibration primitives.
+ * - Issue #1450: JNI Math Batching.
  */
 
 @Serializable
@@ -251,7 +248,9 @@ sealed class ProcessorEvent(open val isPrimary: Boolean, override val priority: 
     data class MaxAccuracyChanged(val accuracy: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
     data class ChairBaselineChanged(val baseline: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
     data class VibrationFloorChanged(val floor: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
-    var vibrationBatch: VibrationBatch = VibrationBatch()
+    data class LuxBaselineChanged(val baseline: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
+    data class AcousticFloorChanged(val floor: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
+    data class GpsStallDetected(val rt: Long, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.HIGH)
 }
 
 sealed class ConnectivityEvent(override val priority: EventPriority = EventPriority.NORMAL) : DomainEvent(priority) {

@@ -1,5 +1,8 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct.5.15
+*   **Issue #SIMP-1426-2: Leaf-Level State Hoisting Convergence.** Completed the migration of high-frequency state collection (Kinematic, Diagnostic, Dashboard) from `MainAppContent` and screen-level components to leaf components (`LogOverlay`, `SettingsOverlay`, `PhoneSetupOverlay`, `AlarmOverlay`, `GlobalStatusBar`, `RibbonsOverlay`, `TrackerDashboard`, `ViewerDashboard`, `AppMapContainer`). Adhered to Rule 1.110 (R1422) to isolate the root UI tree from 10Hz+ telemetry bursts and minimize redundant recompositions. (Oct.5.15 - R1426-2, R1.115).
+
 ## 🟢 Resolved in Oct.5.12
 *   **Issue #SIMP-1426-1: Leaf Effect Convergence.** Eliminated ~100 lines of duplicated "System Readiness" and "Issue Count" logic across `TrackerScreen.kt` and `ViewerScreen.kt`. Centralized calculation logic in `SessionUiState` within `MainUiState.kt` to ensure architectural consistency and reduce UI tree footprint. (Oct.5.12 - R1426).
 
