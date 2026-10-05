@@ -4,9 +4,10 @@ import kotlin.math.*
 
 /**
  * GtoEngine: Graph Trajectory Optimization.
- * Sep.27.6:
- * - Issue #1161: Unified Trajectory & Buffer Management. Refactored to use 
- *   TrajectoryBuffer and TrajectoryNode from EngineModels.kt.
+ * Oct.4.6:
+ * - Issue #1160: Flyweight & Pooling Expansion. Refactored getWindow to utilize 
+ *   EnginePools.TRAJECTORY_NODE to eliminate allocation churn during trajectory 
+ *   promotion (R1160).
  */
 object GtoEngine {
 
@@ -122,11 +123,13 @@ object GtoEngine {
         val result = mutableListOf<TrajectoryNode>()
         for (i in 0 until buffer.size) {
             val idx = (buffer.head - buffer.size + i + TRAJECTORY_BUFFER_MAX_SIZE) % TRAJECTORY_BUFFER_MAX_SIZE
-            result.add(TrajectoryNode(
+            val node = EnginePools.TRAJECTORY_NODE.acquire()
+            node.update(
                 buffer.latBuffer[idx], buffer.lngBuffer[idx], buffer.altBuffer[idx],
                 buffer.accBuffer[idx], buffer.maxAccBuffer[idx], buffer.bearingBuffer[idx],
                 buffer.speedBuffer[idx], buffer.tsBuffer[idx], buffer.rtBuffer[idx], buffer.vibeBuffer[idx]
-            ))
+            )
+            result.add(node)
         }
         return result
     }

@@ -1,41 +1,41 @@
-# Forensic Handover (Oct.4.5 - UNIFIED CLOCK AUTHORITY)
+# Forensic Handover (Oct.4.6 - TELEMETRY POOLING & BINARY PERSISTENCE)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.4.5` | **Status**: 🟢 **OPERATIONAL**.
-*   **Unified Clock Authority (Issue #1425)**:
-    *   **Core Architecture**: Standardized `SystemClock.elapsedRealtime()` (via `TimeProvider`) as the exclusive monotonic authority for all internal logic, durations, and "freshness" arithmetic.
-    *   **Service Hardening**:
-        *   `BaseMonitorService.kt`: Refactored `lastUiPulseRt` (L46) and `isUiVisible()` (L120) to utilize monotonic time.
-        *   `MonitorService.kt`: Migrated forensic spike lockout (`lastFastPathAcousticSpikeRt`, `lastFastPathLightSpikeRt`) (L49-50) and triggers (L527, L534, L535) to monotonic time.
-        *   `LogRepository.kt`: Migrated batch flush (`lastFlushRt`) (L91) and forensic drain (`lastDrainRt`) (L133) timers. Resolved `it` vs `entry` reference bug in `flushBatch` (L330).
-        *   `ActivityContextProvider.kt`: Fallback heuristic timer (`lastActivityUpdateRt`) (L28) and update logic (L88) migrated to monotonic time.
-    *   **UI & HUD Synchronization**:
-        *   `MainViewModel.kt`: Refactored `isGpsFresh` and `isTelemetryFresh` in `mapDashboardTelemetry` (L826), `mapHudTelemetry` (L885), and `mapMapViewState` (L924) to use monotonic age (`pulseRt - loc.kinetic.rt`).
-        *   `GpsStatusManager.kt`: Updated `gpsIndexFlow` (L35) to use `elapsedRealtime()` for `gpsAgeMs` calculation.
-        *   `MapController.kt`: Manual trigger lockout (`lastTriggerPulseRt`) (L21, L63, L71, L88) migrated to monotonic time.
-    *   **Session & Startup Integrity**:
-        *   `SessionManager.kt`: Introduced `appStartRt` (L23) for monotonic reference. Renamed `currentDropStartRt` (L27).
-        *   `UiEventCoordinator.kt`: Updated `handleProceedToMode` (L283) to utilize `appStartRt` for enforcing the 2000ms service startup delay.
-*   **Traceability**: SOT Rule 1.103 established; SOT ID 613 resolved.
+*   **Version**: `Oct.4.6` | **Status**: 🟢 **OPERATIONAL**.
+*   **Telemetry Pooling & Flyweight Expansion (Issue #1160)**:
+    *   **Infrastructure**: Created `RingBufferPool.kt` (Generic thread-safe circular pool) and `EnginePools.kt` (Centralized registry).
+    *   **Engine Integration**: 
+        *   `LocationSentinel.kt`: Migrated from static flyweight to `EnginePools.SENTINEL_RESULT` (L157, L241, L251), resolving thread-safety and contention risks.
+        *   `LocationProcessor.kt`: Refactored `processGpsPoint` (L158) to use pooled `PROCESSED_LOCATION` and `GEO_POINT` entities for intermediate and fallback calculations.
+        *   `GtoEngine.kt`: Updated `getWindow()` (L108) to acquire `TRAJECTORY_NODE` from `EnginePools`, eliminating `List` allocation churn during promotions.
+        *   `MonitorService.kt`: Migrated evaluation loops (`processTick` L357, `evaluateAlarmsInternal` L420) to utilize `EnginePools.LOCATION_UPDATE` snapshots.
+*   **Protobuf-First Persistence (Issue #1173 - Phase 1)**:
+    *   **Schema Evolution**: `Database.kt` incremented to **Version 81** (L281). Added `payload` (BLOB) columns to `HistoryEntity` (L113) and `PendingStatusEntity` (L165) with safe migration (MIGRATION_80_81).
+    *   **Mapping Layer**: `TelemetryMapper.kt` updated with high-performance binary pipelines:
+        *   `mapStatusToProto` (L63): Direct conversion of `LocationUpdate` to `RealtimeStatus` bytes.
+        *   `mapAppToProto` (L146): Conversion of `ConnectionPoint` to `TrackerStatusProto` for ribbon history.
+        *   `mapEntityToApp` (L353): Added binary restoration fallback in history retrieval.
+    *   **Repository Hardening**: `OfflineRepository.kt` (L38) now supports direct `LocationUpdate` binary insertion via `TelemetryMapper.mapStatusToPending`.
+*   **Traceability**: SOT Rule 1.104 established; SOT ID 614 resolved.
 
 ## 🟢 Audit Record
 *   **Build Status**: 🟢 **SUCCESSFUL**. Verified via `:app:assembleDebug`.
-*   **Versioning**: Incremented to `Oct.4.5` (Code 1095) in `app/build.gradle`.
-*   **Metric Delta**: SOT Count: 267 (Rules: 126), Open Issues: 0, Ideas: 9.
+*   **Versioning**: Incremented to `Oct.4.6` (Code 1096) in `app/build.gradle`.
+*   **Metric Delta**: SOT Count: 268 (Rules: 127), Open Issues: 0, Ideas: 9.
 
 ## 🚀 Resumption Action Path (Next Chat)
-1.  **Flyweight & Pooling Expansion (Issue #1160)**:
-    *   Expand flyweight patterns to remaining telemetry entities.
-    *   Implement ring-buffered object pools to eliminate GC pressure during high-load violation bursts.
-2.  **Protobuf-First Persistence (Issue #1173)**:
-    *   Substitute JSON mapping in `OfflineRepository` and `HistoryManager` with binary Protobuf pipelines straight into Room BLOB objects.
+1.  **Protobuf-First Persistence (Issue #1173 - Phase 2)**:
+    *   Refactor `HistoryDao` and `PendingStatusDao` queries to prioritize the `payload` BLOB, treating legacy columns purely as metadata for indexing/pruning.
+    *   Implement binary migration of existing JSON entries in `OfflineRepository`.
+2.  **Logic State Serialization (Issue #SIMP-1201-1)**:
+    *   Consolidate `AlarmEvaluationState` into a single Protobuf binary blob in `DataStore` to eliminate `saveLogicState` parameter bloat.
 
 ## 🧪 Latest Bug Test Procedure
-*   **Clock Drift Resistance**: Manually advance system clock by 1 hour while tracking; verify HUD GPS "Age" badge remains accurate and monotonic (no resets or negative values).
-*   **Startup Delay**: Verify Tracker/Viewer services start exactly 2000ms after mode selection, regardless of wall-clock jumps.
+*   **GC Churn Audit**: Run Android Studio Profiler during a 10-minute simulated "Jammer Alert" burst; verify zero `LocationUpdate` or `ProcessedLocation` allocations in the heap summary.
+*   **Binary Recovery**: Simulate network loss; trigger 10 status updates; reconnect and verify `ConnectivitySuite` successfully recovers and transmits binary payloads from `PendingStatusEntity`.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.4.5)
-- **Oct.4.5: [SOT Count: 267 (Rules: 126), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:4, Testing: 30, QA: 390]**
-- **Audit Record**: Unified Clock Authority established; internal logic decoupled from wall-clock drift; HUD freshness synchronized; build verified.
+## 📊 Hardening Progress Dashboard (Oct.4.6)
+- **Oct.4.6: [SOT Count: 268 (Rules: 127), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:4, Testing: 31, QA: 395]**
+- **Audit Record**: Engine entities pooled; binary persistence infrastructure established; version 81 migration complete; build verified.

@@ -6,14 +6,10 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * Oct.3.9:
- * - Issue #1201 RESOLVED: Decoupled siren lockout authority. Removed redundant 
- *   lastSirenStopRt from AlarmEvaluationState (R-ID 510).
- * Oct.3.1:
- * - Issue #SIMP-1510-1: Native FastPath Convergence. Added NativeFastPathProvider 
- *   to allow SentinelValidator to offload math to JNI.
- * - Issue #1420: Granular HUD Binding. Added slice-based interfaces (Locatable, 
- *   BatteryProvider, DeviceIdentity) to decouple UI from LocationUpdate monolith.
+ * Oct.4.6:
+ * - Issue #1160: Flyweight & Pooling Expansion. Converted TrajectoryNode, 
+ *   SentinelResult, and JumpConfidence to mutable classes and optimized 
+ *   ProcessedLocation.reset() to prevent internal point allocations (R1160).
  */
 
 @Serializable
@@ -165,7 +161,7 @@ class EngineConnectionPoint(
         this.isSilentFailure = other.isSilentFailure; this.isBatteryLow = other.isBatteryLow; this.isBatteryCritical = other.isBatteryCritical
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
         this.thermalHeadroom = other.thermalHeadroom; this.heapAllocatedMb = other.heapAllocatedMb
-        this.activityType = activityType
+        this.activityType = other.activityType
     }
 }
 
@@ -321,11 +317,27 @@ data class RejectedPoint(
 )
 
 @Serializable
-data class TrajectoryNode(
-    val lat: Double, val lng: Double, val alt: Double, val accuracy: Double, 
-    val maxAccuracy: Double, val bearing: Double, val speedMps: Double, 
-    val ts: Long, val rt: Long, val vibrationIndex: Double
-)
+class TrajectoryNode(
+    var lat: Double = 0.0, 
+    var lng: Double = 0.0, 
+    var alt: Double = 0.0, 
+    var accuracy: Double = 0.0, 
+    var maxAccuracy: Double = 0.0, 
+    var bearing: Double = 0.0, 
+    var speedMps: Double = 0.0, 
+    var ts: Long = 0L, 
+    var rt: Long = 0L, 
+    var vibrationIndex: Double = 0.0
+) {
+    fun update(
+        lat: Double, lng: Double, alt: Double, accuracy: Double, maxAccuracy: Double, 
+        bearing: Double, speedMps: Double, ts: Long, rt: Long, vibrationIndex: Double
+    ) {
+        this.lat = lat; this.lng = lng; this.alt = alt; this.accuracy = accuracy; this.maxAccuracy = maxAccuracy
+        this.bearing = bearing; this.speedMps = speedMps; this.ts = ts; this.rt = rt; this.vibrationIndex = vibrationIndex
+    }
+    fun reset() { update(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0L, 0L, 0.0) }
+}
 
 @Serializable
 class ProcessedLocation {
@@ -373,6 +385,33 @@ class ProcessedLocation {
         isAnchorLocked = false
         suppressionNote = null
         kineticEnergy = 0.0
+        rawPoint.update(0.0, 0.0)
+        optimizedPoint.update(0.0, 0.0)
+    }
+
+    fun copyFrom(other: ProcessedLocation) {
+        this.rawPoint.copyFrom(other.rawPoint)
+        this.optimizedPoint.copyFrom(other.optimizedPoint)
+        this.status = other.status
+        this.maxAccuracy = other.maxAccuracy
+        this.currentAccuracy = other.currentAccuracy
+        this.filteredSpeed = other.filteredSpeed
+        this.timestamp = other.timestamp
+        this.rt = other.rt
+        this.isStalled = other.isStalled
+        this.isClockRegression = other.isClockRegression
+        this.receiptRt = other.receiptRt
+        this.isTrajectoryPromoted = other.isTrajectoryPromoted
+        this.jumpTier = other.jumpTier
+        this.isAdaptiveJump = other.isAdaptiveJump
+        this.distToHome = other.distToHome
+        this.isSpatiallyValid = other.isSpatiallyValid
+        this.geofenceViolationDetected = other.geofenceViolationDetected
+        this.tamperDetected = other.tamperDetected
+        this.jammerDetected = other.jammerDetected
+        this.isAnchorLocked = other.isAnchorLocked
+        this.suppressionNote = other.suppressionNote
+        this.kineticEnergy = other.kineticEnergy
     }
 }
 
@@ -644,6 +683,19 @@ class SentinelResult(
     fun reset(status: SentinelStatus = SentinelStatus.VALID) {
         this.status = status; this.reason = ""; this.optimizedPoint = null
         this.jumpConfidence?.reset(); this.suppressionNote = null; this.promotedPoints = null
+    }
+
+    fun copyFrom(other: SentinelResult) {
+        this.status = other.status
+        this.reason = other.reason
+        this.optimizedPoint = other.optimizedPoint?.let { 
+            (this.optimizedPoint ?: EngineGeoPoint()).apply { copyFrom(it) } 
+        }
+        this.jumpConfidence = other.jumpConfidence?.let {
+            (this.jumpConfidence ?: JumpConfidence()).apply { copyFrom(it) }
+        }
+        this.suppressionNote = other.suppressionNote
+        this.promotedPoints = other.promotedPoints?.toList()
     }
 }
 

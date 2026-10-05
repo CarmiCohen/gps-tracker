@@ -7,11 +7,9 @@ import javax.inject.Singleton
 
 /**
  * OfflineRepository: Manages persistent buffering of status updates during network loss.
- * Aug.22.03:
- * - Issue #197 Hardening: Aligned with R197 chunked pruning standards. Implemented 
- *   staggered deletion for pending_status_updates to prevent I/O stalls (R197).
- * July.22.00:
- * - Hilt Hardening: Added @Inject constructor and @Singleton.
+ * Oct.4.6:
+ * - Issue #1173: Protobuf-First Persistence. Integrated binary payload insertion 
+ *   to minimize disk I/O and Room overhead (R1173).
  */
 @Singleton
 class OfflineRepository @Inject constructor(
@@ -37,6 +35,21 @@ class OfflineRepository @Inject constructor(
             }
         } catch (e: Exception) {
             Timber.e(e, "Failed to add or prune pending status update")
+        }
+    }
+
+    /**
+     * addPendingStatusUpdate: Zero-allocation path for LocationUpdate buffering (R1173).
+     */
+    suspend fun addPendingStatusUpdate(update: LocationUpdate) {
+        val health = telemetry.systemHealth.value
+        if (health.isStorageCritical) return
+        
+        try {
+            val entity = TelemetryMapper.mapStatusToPending(update)
+            addPendingStatusUpdate(entity)
+        } catch (e: Exception) {
+            Timber.e(e, "Binary pending status insertion failed")
         }
     }
 

@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.4.5
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.4.6
 
-## 🎯 Current Resumption Focus: Flyweight & Pooling Expansion
-Unified Clock Authority integrated; standardizing all telemetry and HUD age evaluations to monotonic time. Transitioning to Issue #1160 (Flyweight & Pooling Expansion) in next cycle.
+## 🎯 Current Resumption Focus: Protobuf-First Persistence
+Flyweight & Pooling Expansion complete; binary persistence pipeline established. Transitioning to full binary migration in `HistoryManager` and `OfflineRepository` in next cycle.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -16,10 +16,8 @@ Unified Clock Authority integrated; standardizing all telemetry and HUD age eval
 *   (All high-priority simplification ideas resolved).
 
 ### 🟡 Medium Priority
-*   **Issue #1160: Flyweight & Pooling Expansion**
-    *   *Significance*: **Medium (Performance)**. Expand flyweight patterns to all telemetry entities and use ring buffers to eliminate GC churn during long-duration alerts.
 *   **Issue #1173: Protobuf-First Persistence**
-    *   *Significance*: **Medium (Disk I/O)**. Substitute JSON mapping with pure Protobuf binary pipelines straight into Room BLOB objects for high-frequency history storage.
+    *   *Significance*: **Medium (Disk I/O)**. Substitute JSON mapping with pure Protobuf binary pipelines straight into Room BLOB objects for high-frequency history storage. (Schema & Mapper Complete).
 *   **Issue #SIMP-1201-1: Logic State Serialization Expansion**
     *   *Significance*: **Medium (Simplicity)**. Refactor `saveLogicState` in `SettingsRepository` to accept a structured `AlarmEvaluationState` fragment rather than 10 individual parameters, utilizing Protobuf's native mapping to reduce boilerplate.
 
@@ -36,6 +34,7 @@ Unified Clock Authority integrated; standardizing all telemetry and HUD age eval
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1160: Flyweight & Pooling Expansion.** Resolved Oct.4.6. Implemented `RingBufferPool` and centralized `EnginePools` for `LocationUpdate`, `ProcessedLocation`, `SystemHealthState`, and `TrajectoryNode`. Refactored high-frequency paths in `MonitorService` and `LocationProcessor` to use pooled acquisition, eliminating GC churn during long-duration alerts and 100Hz sampling (R1160).
 *   **Issue #1425 / SOT ID 613: Unified Clock Authority.** Resolved Oct.4.5. Standardized all telemetry, HUD, and map "freshness" evaluations to strictly use `SystemClock.elapsedRealtime()` via `TimeProvider`. Eliminated wall-clock arithmetic in service triggers, log flush intervals, and user-activity heuristics to prevent logic corruption during NTP syncs (R1425).
 *   **Issue #1202 / SOT ID 612: UI Event Routing Unification.** Resolved Oct.4.1. Refactored navigation and procedural UI logic (service startup, permission orchestration) into `UiEventCoordinator`. Introduced `UiEffect` stream to decouple ViewModels and Composables from imperative commands. Centralized mode transition authority in the domain layer (R1202).
 *   **Issue #1201 / SOT ID 610: Reactive Siren Lockout.** Resolved Oct.3.9. Decoupled siren cooldown and lockout logic from audio generation and violation detection. Centralized authority in `SirenLockoutUseCase` and purged redundant `lastSirenStopRt` state from engine modules; implemented reactive requirement refreshing in `AppAlarmManager` (R1201).
@@ -61,6 +60,7 @@ Unified Clock Authority integrated; standardizing all telemetry and HUD age eval
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.4.6: [SOT Count: 268 (Rules: 127), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:4, Testing: 31, QA: 395]**
 - **Oct.4.5: [SOT Count: 267 (Rules: 126), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:4, Testing: 30, QA: 390]**
 - **Oct.4.1: [SOT Count: 266 (Rules: 125), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:4, Testing: 29, QA: 387]**
 - **Oct.3.9: [SOT Count: 265 (Rules: 124), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:3, Testing: 28, QA: 386]**

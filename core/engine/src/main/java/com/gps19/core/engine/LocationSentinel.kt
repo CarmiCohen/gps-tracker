@@ -5,18 +5,11 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
- * Oct.2.8:
- * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
- *   to unified LocationUpdate DTO (R-ID 596).
- * Oct.2.5:
- * - Issue #SIMP-1416-1: Native Sensor Pulse Hardening. Remediated build 
- *   failure by correctly passing cpuLoad to shouldThrottlePolling.
+ * Oct.4.6:
+ * - Issue #1160: Flyweight & Pooling Expansion. Migrated to EnginePools.SENTINEL_RESULT 
+ *   to eliminate static flyweight contention and JVM heap churn (R1160).
  */
 object LocationSentinel {
-
-    private val resultFlyweight = SentinelResult().apply { 
-        jumpConfidence = JumpConfidence() 
-    }
 
     fun loadForensicState(
         state: LocationProcessingState,
@@ -215,18 +208,20 @@ object LocationSentinel {
             state.forensic.acousticFloorDb = max(acousticFloorDb, ACOUSTIC_FLOOR_MIN_DB)
         }
         
+        val result = EnginePools.SENTINEL_RESULT.acquire()
+
         if (state.forensic.lastValidTs == 0L) {
             updateLastValid(state, lat, lng, alt, timestamp, nowRt, 0.0, bearing, accuracy)
             updateFilters(state, lat, lng, timestamp, 1.0)
-            resultFlyweight.reset(SentinelStatus.VALID)
-            resultFlyweight.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
-            return resultFlyweight
+            result.reset(SentinelStatus.VALID)
+            result.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
+            return result
         }
 
         val timeDeltaMs = timestamp - state.forensic.lastValidTs
         if (timeDeltaMs <= 0 && timestamp != 0L) {
-            resultFlyweight.reset(SentinelStatus.VALID)
-            return resultFlyweight
+            result.reset(SentinelStatus.VALID)
+            return result
         }
         
         val altitudeDelta = if (state.forensic.lastValidAlt != 0.0) alt - state.forensic.lastValidAlt else 0.0
@@ -244,8 +239,8 @@ object LocationSentinel {
         val isTractorSlowOverride = state.forensic.gpsMotionStartRt > 0 && (nowRt - state.forensic.gpsMotionStartRt > 10000L)
         val hasPhysicalMotion = if (isMuzzled) false else (state.forensic.currentVibrationIndex > (state.forensic.adaptiveVibrationFloor * 1.5) || isTractorSlowOverride)
 
-        resultFlyweight.reset()
-        val conf = resultFlyweight.jumpConfidence!!
+        result.reset()
+        val conf = result.jumpConfidence!!
         PhysicsUtils.isVisualJump(
             lastLat = state.forensic.lastValidLat, lastLng = state.forensic.lastValidLng,
             newLat = lat, newLng = lng,
@@ -269,9 +264,9 @@ object LocationSentinel {
         conf.isJump = augmentedScore >= 50 || conf.isJump
 
         if (conf.isOutlier) {
-            resultFlyweight.status = SentinelStatus.JUMP
-            resultFlyweight.reason = conf.reason
-            return resultFlyweight
+            result.status = SentinelStatus.JUMP
+            result.reason = conf.reason
+            return result
         }
         
         var behavioralStatus = if (conf.isJump) SentinelStatus.JUMP else SentinelStatus.VALID
@@ -289,41 +284,41 @@ object LocationSentinel {
                 updateFilters(state, lat, lng, timestamp, SUSPICIOUS_Q_SCALE)
                 updateLastValid(state, lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
                 
-                resultFlyweight.status = SentinelStatus.TRAJECTORY_PROMOTED
-                resultFlyweight.reason = "Trajectory Promoted (GTO)"
-                resultFlyweight.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
-                resultFlyweight.promotedPoints = promoted
-                return resultFlyweight
+                result.status = SentinelStatus.TRAJECTORY_PROMOTED
+                result.reason = "Trajectory Promoted (GTO)"
+                result.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
+                result.promotedPoints = promoted
+                return result
             }
 
             if (behavioralStatus == SentinelStatus.JUMP) {
                 GtoEngine.addPoint(state, lat, lng, alt, accuracy, maxAccuracy, bearing, currentSpeedMps, timestamp, nowRt, state.forensic.currentVibrationIndex)
-                resultFlyweight.status = behavioralStatus
-                resultFlyweight.reason = behavioralReason
-                return resultFlyweight
+                result.status = behavioralStatus
+                result.reason = behavioralReason
+                return result
             }
 
-            resultFlyweight.status = checkPhysicalTamper(state, nowRt, isMuzzled, cpuLoad)
-            if (resultFlyweight.status != SentinelStatus.VALID) {
-                return resultFlyweight
+            result.status = checkPhysicalTamperInternal(state, result, nowRt, isMuzzled, cpuLoad)
+            if (result.status != SentinelStatus.VALID) {
+                return result
             }
             
-            if (resultFlyweight.status == SentinelStatus.VALID && resultFlyweight.suppressionNote != null) {
+            if (result.status == SentinelStatus.VALID && result.suppressionNote != null) {
                 updateFilters(state, lat, lng, timestamp, if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0)
                 updateLastValid(state, lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
                 GtoEngine.clear(state)
-                resultFlyweight.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
-                return resultFlyweight
+                result.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
+                return result
             }
         }
 
         updateFilters(state, lat, lng, timestamp, if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0)
         updateLastValid(state, lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
         GtoEngine.clear(state)
-        resultFlyweight.status = behavioralStatus
-        resultFlyweight.reason = behavioralReason
-        resultFlyweight.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
-        return resultFlyweight
+        result.status = behavioralStatus
+        result.reason = behavioralReason
+        result.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
+        return result
     }
 
     fun checkPhysicalTamper(
@@ -332,22 +327,33 @@ object LocationSentinel {
         isMuzzled: Boolean = false,
         cpuLoad: Double = 0.0
     ): SentinelStatus {
+        val result = EnginePools.SENTINEL_RESULT.acquire()
+        return checkPhysicalTamperInternal(state, result, nowRt, isMuzzled, cpuLoad)
+    }
+
+    private fun checkPhysicalTamperInternal(
+        state: LocationProcessingState,
+        result: SentinelResult,
+        nowRt: Long = 0L,
+        isMuzzled: Boolean = false,
+        cpuLoad: Double = 0.0
+    ): SentinelStatus {
         if (isMuzzled) return SentinelStatus.VALID
 
         if (!state.forensic.isNear) {
-            resultFlyweight.reason = "Proximity Far"
+            result.reason = "Proximity Far"
             return SentinelStatus.TAMPER
         }
         if (state.forensic.isPowerTamper) {
-            resultFlyweight.reason = "Power disconnected"
+            result.reason = "Power disconnected"
             return SentinelStatus.TAMPER
         }
         if (SentinelValidator.isTiltViolated(state.forensic.currentTiltDegrees)) {
-            resultFlyweight.reason = "Tilt detected"
+            result.reason = "Tilt detected"
             return SentinelStatus.TAMPER
         }
         if (SentinelValidator.isShockViolated(state.forensic.peakVibrationShock, state.forensic.adaptiveVibrationFloor, cpuLoad = cpuLoad)) {
-            resultFlyweight.reason = "Shock detected"
+            result.reason = "Shock detected"
             return SentinelStatus.TAMPER
         }
         
@@ -355,40 +361,40 @@ object LocationSentinel {
             val liftDelta = state.forensic.currentBaroAlt - state.forensic.baroBaseline
             if (SentinelValidator.isLiftViolated(liftDelta)) {
                 if (state.forensic.currentVibrationIndex > VIBRATION_STATIONARY_THRESHOLD) {
-                    resultFlyweight.reason = "Lift detected"
+                    result.reason = "Lift detected"
                     return SentinelStatus.TAMPER
                 } else {
-                    resultFlyweight.reason = "Barometric drift suspicion (No vibration)"
+                    result.reason = "Barometric drift suspicion (No vibration)"
                     return SentinelStatus.TAMPER
                 }
             }
         }
         
         if (SentinelValidator.isLightViolated(state.forensic.currentLux, state.forensic.luxBaseline)) {
-            resultFlyweight.reason = "Light jump"
+            result.reason = "Light jump"
             return SentinelStatus.TAMPER
         }
 
         val isLightSpikeRecently = (state.forensic.lastFastPathLightSpikeRt > 0 && (nowRt - state.forensic.lastFastPathLightSpikeRt < LIGHT_LOCKOUT_MS))
         if (isLightSpikeRecently) {
-            resultFlyweight.reason = "Light jump (FastPath)"
+            result.reason = "Light jump (FastPath)"
             return SentinelStatus.TAMPER
         }
 
         val isAcousticLockedOut = (state.forensic.lastFastPathAcousticSpikeRt > 0 && (nowRt - state.forensic.lastFastPathAcousticSpikeRt < LIGHT_LOCKOUT_MS))
         
         if (!isAcousticLockedOut && SentinelValidator.isAcousticViolated(state.forensic.currentAcousticDb, state.forensic.acousticFloorDb)) {
-            resultFlyweight.reason = "Acoustic alarm"
+            result.reason = "Acoustic alarm"
             return SentinelStatus.TAMPER
         }
 
         if (SentinelValidator.isVibrationSuspicious(state.forensic.currentVibrationIndex, state.forensic.adaptiveVibrationFloor, cpuLoad = cpuLoad)) {
-            resultFlyweight.reason = "Vibration suspicion"
+            result.reason = "Vibration suspicion"
             return SentinelStatus.TAMPER
         }
         
         if (!isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(state.forensic.currentAcousticDb, state.forensic.acousticFloorDb, state.forensic.currentVibrationIndex)) {
-            resultFlyweight.reason = "Acoustic suspicion"
+            result.reason = "Acoustic suspicion"
             return SentinelStatus.TAMPER
         }
 
@@ -456,6 +462,5 @@ object LocationSentinel {
         state.forensic.lastValidAccuracy = 0.0
         state.kineticEnergy = 0.0
         GtoEngine.clear(state)
-        resultFlyweight.reset()
     }
 }

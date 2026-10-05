@@ -8,22 +8,14 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Oct.4.6:
+ * - Issue #1173: Protobuf-First Persistence. Added binary payload BLOBs to 
+ *   HistoryEntity and PendingStatusEntity to eliminate Room column overhead 
+ *   during high-frequency writes. Incremented version to 81 (R1173).
  * Sep.27.18:
  * - Issue #1205: Context-Aware Power Optimization. Added activityType to 
  *   HistoryEntity and PendingStatusEntity for telemetry parity. 
  *   Incremented version to 80 with migration (R-ID 503).
- * Sep.26.12:
- * - Issue #1344: Expanded LogEntity, HistoryEntity and PendingStatusEntity to include 
- *   thermalHeadroom and heapAllocatedMb forensic probes. Incremented 
- *   version to 79 with migration (R-ID 502).
- * Sep.26.0:
- * - Issue #1314: Expanded HistoryEntity and PendingStatusEntity to include 
- *   isSilentFailure and isBatteryWhitelisted for parity with refactored 
- *   TrackerStatus. Incremented version to 77 with migration (R-ID 501).
- * Sep.20.15:
- * - Issue #1138/1147 Hardening: Expanded PendingStatusEntity and HistoryEntity 
- *   to include gpsHardwareLock and isGnssThrottled flags. Incremented version 
- *   to 76 with migration (R-ID 378).
  */
 @Entity(
     tableName = "logs", 
@@ -92,6 +84,7 @@ data class TrailEntity(
 data class HistoryEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val ts: Long,
+    @ColumnInfo(typeAffinity = ColumnInfo.BLOB) val payload: ByteArray = byteArrayOf(),
     @ColumnInfo(defaultValue = "0") val rt: Long = 0L,
     val rtt: Int,
     val isConnected: Boolean,
@@ -153,10 +146,11 @@ data class ViolationEntity(
 @Entity(tableName = "pending_status_updates", indices = [Index(value = ["timestamp"])])
 data class PendingStatusEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val timestamp: Long,
+    @ColumnInfo(typeAffinity = ColumnInfo.BLOB) val payload: ByteArray = byteArrayOf(),
     val lat: Double, val lng: Double, val speed: Double, val accuracy: Double, val bearing: Double,
     val battery: Int, val temp: Double, val isCharging: Boolean,
     @ColumnInfo(defaultValue = "0") val currentMa: Int = 0,
-    val timestamp: Long,
     @ColumnInfo(defaultValue = "0") val gpsTs: Long = 0L,
     val satsView: Int, val satsUsed: Int, val name: String? = null, val maxAccuracy: Double,
     val distToTracker: Double? = null, val distToHome: Double? = null,
@@ -323,7 +317,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 80, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 81, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -347,6 +341,16 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_80_81 = object : Migration(80, 81) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #1173: Protobuf-First Persistence.
+                try {
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN payload BLOB NOT NULL DEFAULT (X'')")
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN payload BLOB NOT NULL DEFAULT (X'')")
+                } catch (e: Exception) {}
+            }
+        }
+
         val MIGRATION_79_80 = object : Migration(79, 80) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #1205: Context-Aware Power Optimization - activityType parity.

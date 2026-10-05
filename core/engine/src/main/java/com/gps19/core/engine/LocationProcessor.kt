@@ -5,19 +5,16 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
- * Oct.2.8:
- * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
- *   to unified LocationUpdate DTO (R-ID 596).
- * Oct.2.5:
- * - Issue #SIMP-1416-1: Native Sensor Pulse Hardening. Remediated build failure 
- *   by correctly passing cpuLoad to LocationSentinel.shouldThrottlePolling (R-ID 256).
+ * Oct.4.6:
+ * - Issue #1160: Flyweight & Pooling Expansion. Migrated processed location 
+ *   generation to EnginePools.PROCESSED_LOCATION and EnginePools.GEO_POINT 
+ *   to eliminate per-tick allocations (R1160).
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider,
     private val domainEventBus: DomainEventBus? = null, // Optional for unit tests
     private val isPrimary: Boolean = true
 ) {
-    private val processedLocationFlyweight = ProcessedLocation()
     val state = LocationProcessingState()
 
     fun loadState(
@@ -239,7 +236,7 @@ class LocationProcessor(
         val snr = update.snrSnapshot ?: 0.0
         val nowRt = update.nowRt
         val nowWall = update.nowTs
-        val cpuLoad = update.cpuLoad
+        val cpuLoad = update.integrity.cpuLoad
 
         return LatencyMonitor.measureAndAudit<ProcessedLocation>(
             timeProvider,
@@ -250,7 +247,7 @@ class LocationProcessor(
                 emitEvent(ProcessorEvent.LogAdded(message, "system", false, true, lat, lng, accuracy, snr, state.forensic.currentVibrationIndex, isPrimary))
             }
         ) {
-            processedLocationFlyweight.reset()
+            val res = EnginePools.PROCESSED_LOCATION.acquire()
             val effectiveTs = if (gpsTs > 0) gpsTs else nowWall
             val adaptationMuzzled = isAdaptationMuzzled(nowRt)
 
@@ -261,9 +258,9 @@ class LocationProcessor(
                     if (delta > 86400000L) { state.lastTs = 0L; state.lastRt = 0L; LocationSentinel.reset(state) }
                 }
                 val status = update.status
-                val fallbackCoordPoint = EngineGeoPoint(if (state.lastLat != 0.0) state.lastLat else lat, if (state.lastLng != 0.0) state.lastLng else lng, alt = alt, ts = if (state.lastTs != 0L) state.lastTs else effectiveTs, rt = if (state.lastRt != 0L) state.lastRt else nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy)
-                return@measureAndAudit processedLocationFlyweight.apply {
-                    this.rawPoint = fallbackCoordPoint
+                val fallbackCoordPoint = EnginePools.GEO_POINT.acquire().apply { update(if (state.lastLat != 0.0) state.lastLat else lat, if (state.lastLng != 0.0) state.lastLng else lng, alt = alt, ts = if (state.lastTs != 0L) state.lastTs else effectiveTs, rt = if (state.lastRt != 0L) state.lastRt else nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy) }
+                return@measureAndAudit res.apply {
+                    this.rawPoint = EnginePools.GEO_POINT.acquire().apply { update(lat, lng, alt, effectiveTs, nowRt, accuracy, state.accuracy.maxAccuracy) }
                     this.optimizedPoint = fallbackCoordPoint
                     this.status = status
                     this.maxAccuracy = state.accuracy.maxAccuracy
@@ -275,11 +272,11 @@ class LocationProcessor(
                     this.isClockRegression = true
                     this.receiptRt = nowRt
                     this.isTrajectoryPromoted = false
-                    this.jumpTier = update.jumpTier
-                    this.isAdaptiveJump = update.isAdaptiveJump
+                    this.jumpTier = update.kinetic.jumpTier
+                    this.isAdaptiveJump = update.kinetic.isAdaptiveJump
                     this.distToHome = state.lastNearestHomeDistance
                     this.isSpatiallyValid = true
-                    this.tamperDetected = update.tamperDetected
+                    this.tamperDetected = update.integrity.isTamperDetected
                     this.jammerDetected = update.integrity.isJammer
                     this.kineticEnergy = update.kinetic.kineticEnergy
                 }
@@ -288,9 +285,9 @@ class LocationProcessor(
             val TRAJECTORY_PROMOTION_WINDOW_MS = 60000L
             if (accuracy > HIGH_ACCURACY_THRESHOLD_METERS * TRAJECTORY_REJECTION_ACCURACY_MULT && state.lastHighAccRt > 0 && nowRt - state.lastHighAccRt < TRAJECTORY_PROMOTION_WINDOW_MS) {
                 if (PhysicsUtils.calculateDistance(lat, lng, state.lastHighAccLat, state.lastHighAccLng) > accuracy) {
-                    val fallbackCoordPoint = EngineGeoPoint(if (state.lastLat != 0.0) state.lastLat else lat, if (state.lastLng != 0.0) state.lastLng else lng, alt = alt, ts = if (state.lastTs != 0L) state.lastTs else effectiveTs, rt = if (state.lastRt != 0L) state.lastRt else nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy)
-                    return@measureAndAudit processedLocationFlyweight.apply {
-                        this.rawPoint = EngineGeoPoint(lat, lng, alt = alt, ts = effectiveTs, rt = nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy)
+                    val fallbackCoordPoint = EnginePools.GEO_POINT.acquire().apply { update(if (state.lastLat != 0.0) state.lastLat else lat, if (state.lastLng != 0.0) state.lastLng else lng, alt = alt, ts = if (state.lastTs != 0L) state.lastTs else effectiveTs, rt = if (state.lastRt != 0L) state.lastRt else nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy) }
+                    return@measureAndAudit res.apply {
+                        this.rawPoint = EnginePools.GEO_POINT.acquire().apply { update(lat, lng, alt = alt, ts = effectiveTs, rt = nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy) }
                         this.optimizedPoint = fallbackCoordPoint
                         this.status = SentinelStatus.VALID
                         this.maxAccuracy = state.accuracy.maxAccuracy
@@ -298,13 +295,13 @@ class LocationProcessor(
                         this.filteredSpeed = state.forensic.estimatedSpeedMps
                         this.timestamp = effectiveTs
                         this.rt = nowRt
-                        this.isStalled = if (isLocal) update.integrity.isStalled else update.integrity.isStalled
+                        this.isStalled = update.integrity.isStalled
                         this.receiptRt = nowRt
-                        this.jumpTier = update.jumpTier
-                        this.isAdaptiveJump = update.isAdaptiveJump
+                        this.jumpTier = update.kinetic.jumpTier
+                        this.isAdaptiveJump = update.kinetic.isAdaptiveJump
                         this.distToHome = state.lastNearestHomeDistance
                         this.isSpatiallyValid = false
-                        this.tamperDetected = update.tamperDetected
+                        this.tamperDetected = update.integrity.isTamperDetected
                         this.jammerDetected = update.integrity.isJammer
                         this.kineticEnergy = update.kinetic.kineticEnergy
                     }
@@ -368,22 +365,22 @@ class LocationProcessor(
             val isActualJammer = (sentinelResult.status == SentinelStatus.JAMMER_SUSPICION || (sentinelResult.jumpConfidence?.isOutlier == true))
             val finalIsJump = (isActualJump && !isMuzzledJump) || update.integrity.isJammer
             val finalIsTrajectoryPromoted = sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED
-            val finalJumpTier = maxOf(sentinelResult.jumpConfidence?.tier ?: 0, update.jumpTier)
-            val finalIsAdaptiveJump = (sentinelResult.jumpConfidence?.isAdaptiveJump == true) || update.isAdaptiveJump
-            val finalIsTamper = sentinelResult.status == SentinelStatus.TAMPER || update.tamperDetected
+            val finalJumpTier = maxOf(sentinelResult.jumpConfidence?.tier ?: 0, update.kinetic.jumpTier)
+            val finalIsAdaptiveJump = (sentinelResult.jumpConfidence?.isAdaptiveJump == true) || update.kinetic.isAdaptiveJump
+            val finalIsTamper = sentinelResult.status == SentinelStatus.TAMPER || update.integrity.isTamperDetected
             val finalIsJammer = finalIsJump || finalIsTamper || isActualJammer || update.integrity.isJammer
             // R-ID 544: Explicitly check manual injection flag for stalls even in local mode.
             val finalIsStalled = update.integrity.isStalled || (isLocal && (gpsTs != 0L && gpsTs == lastGpsTs))
             val isSpatiallyValid = !finalIsJump && !finalIsTamper && finalStatus != SentinelStatus.OUTLIER
             
-            val fallbackPoint = EngineGeoPoint(if (state.lastLat != 0.0) state.lastLat else lat, if (state.lastLng != 0.0) state.lastLng else lng, alt = alt, ts = if (state.lastTs != 0L) state.lastTs else effectiveTs, rt = if (state.lastRt != 0L) state.lastRt else nowRt, accuracy = state.lastAcc, maxAccuracy = state.lastMaxAcc)
+            val fallbackPoint = EnginePools.GEO_POINT.acquire().apply { update(if (state.lastLat != 0.0) state.lastLat else lat, if (state.lastLng != 0.0) state.lastLng else lng, alt = alt, ts = if (state.lastTs != 0L) state.lastTs else effectiveTs, rt = if (state.lastRt != 0L) state.lastRt else nowRt, accuracy = state.lastAcc, maxAccuracy = state.lastMaxAcc) }
 
             if (!isSpatiallyValid) {
                 if (shouldSavePoint(update.isMuzzled || adaptationMuzzled, true, PhysicsUtils.calculateDistance(state.lastSavedLat, state.lastSavedLng, lat, lng), 0L, state.accuracy.maxAccuracy, nowRt)) {
                     emitEvent(ProcessorEvent.TrailPointSaved(lat, lng, isViewerTrail, finalStatus, effectiveTs, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy, isPrimary = isPrimary))
                 }
-                return@measureAndAudit processedLocationFlyweight.apply {
-                    this.rawPoint = EngineGeoPoint(lat, lng, alt = alt, ts = effectiveTs, rt = nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy)
+                return@measureAndAudit res.apply {
+                    this.rawPoint = EnginePools.GEO_POINT.acquire().apply { update(lat, lng, alt = alt, ts = effectiveTs, rt = nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy) }
                     this.optimizedPoint = fallbackPoint
                     this.status = finalStatus
                     this.maxAccuracy = state.accuracy.maxAccuracy
@@ -405,8 +402,8 @@ class LocationProcessor(
                 }
             }
 
-            val optimizedPoint = sentinelResult.optimizedPoint ?: EngineGeoPoint(lat, lng, alt = alt, ts = effectiveTs, rt = nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy)
-            val persistencePoint = if (isLocal) optimizedPoint else EngineGeoPoint(lat, lng, alt = alt, ts = effectiveTs, rt = nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy)
+            val optimizedPoint = sentinelResult.optimizedPoint ?: EnginePools.GEO_POINT.acquire().apply { update(lat, lng, alt = alt, ts = effectiveTs, rt = nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy) }
+            val persistencePoint = if (isLocal) optimizedPoint else EnginePools.GEO_POINT.acquire().apply { update(lat, lng, alt = alt, ts = effectiveTs, rt = nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy) }
             
             var geofenceViolation = false
             val home = state.cachedHomePoints
@@ -474,8 +471,8 @@ class LocationProcessor(
                 optimizedPoint
             }
 
-            processedLocationFlyweight.apply {
-                this.rawPoint = EngineGeoPoint(lat, lng, alt = alt, ts = effectiveTs, rt = nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy)
+            return@measureAndAudit res.apply {
+                this.rawPoint = EnginePools.GEO_POINT.acquire().apply { update(lat, lng, alt = alt, ts = effectiveTs, rt = nowRt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy) }
                 this.optimizedPoint = finalOptimized
                 this.status = finalStatus
                 this.maxAccuracy = state.accuracy.maxAccuracy

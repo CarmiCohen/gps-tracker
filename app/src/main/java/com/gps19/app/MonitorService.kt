@@ -26,12 +26,13 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.4.6:
+ * - Issue #1160: Flyweight & Pooling Expansion. Integrated EnginePools for zero-allocation 
+ *   tick evaluation and forensic sampling. Replaced manual flyweights with ring-buffered 
+ *   acquisition to eliminate GC churn and thread-safety risks during event emission (R1160).
  * Oct.4.5:
  * - Issue #1425: Unified Clock Authority. Migrated UI pulse logic and 
  *   forensic spikes to monotonic time (elapsedRealtime).
- * Oct.3.6:
- * - Connection Hardening: Integrated reactive settings observation (Relay URL, 
- *   Tracker ID, Viewer ID) to ensure connectivity parameters update in real-time.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -77,11 +78,6 @@ class MonitorService : BaseMonitorService() {
 
     private var isManualJammerActive = false
     private var isManualStallActive = false
-
-    // Issue #1330: Unified flyweights using LocationUpdate
-    private val evaluationSnapshotFlyweight = LocationUpdate()
-    private val pointSnapshotFlyweight = LocationUpdate()
-    private val alarmSnapshotFlyweight = LocationUpdate()
 
     override fun onServicePreInit() {
         runBlocking {
@@ -227,7 +223,6 @@ class MonitorService : BaseMonitorService() {
                     }
                 }
             }
-            // Issue #1422: Reactive Settings Observation for connectivity parameters
             launch {
                 combine(
                     repository.relayUrlFlow,
@@ -334,12 +329,9 @@ class MonitorService : BaseMonitorService() {
     
     private fun performMemoryFlush() {
         Timber.w("Memory Flush Triggered: Pressure level $memoryPressureLevel. Executing aggressive recovery.")
-        
-        // Issue #1416: Explicit cache trimming
         lifecycleScope.launch(Dispatchers.IO) {
             historyManager.trimMemory()
         }
-        
         System.gc()
         System.runFinalization()
         System.gc()
@@ -465,8 +457,7 @@ class MonitorService : BaseMonitorService() {
         val isSocketConnected = connectivitySuite.isConnected(); connectivitySuite.updateRelayStatus(isSocketConnected)
         val isPeerActive = if (isTrackerMode) (sessionManager.getViewerCount() > 0 || isRecentUiPulse()) else (connectivitySuite.lastPeerActivityTs > 0 && (nowRt - connectivitySuite.lastPeerActivityTs < WATCH_TIMEOUT_MS))
 
-        evaluationSnapshotFlyweight.apply {
-            reset()
+        val evaluationSnapshot = EnginePools.LOCATION_UPDATE.acquire().apply {
             kinetic.apply {
                 kineticEnergy = hSnapshot.kineticEnergy
                 rt = nowRt
@@ -511,10 +502,10 @@ class MonitorService : BaseMonitorService() {
         if (isTrackerMode) {
             hardwareSuite.setLightFastPath(baseline = primaryProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP)
             hardwareSuite.setAcousticFastPath(floor = primaryProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0)
-            hardwareSuite.setHighLoad(evaluationSnapshotFlyweight.integrity.isCoolingModeActive)
+            hardwareSuite.setHighLoad(evaluationSnapshot.integrity.isCoolingModeActive)
             hardwareSuite.setCpuLoad(health.cpuLoad)
             isSuspiciousMode = serviceBehaviorUseCase.updateSuspiciousMode(isSuspiciousMode, primaryProcessor.checkPhysicalTamper(nowRt, false, health.cpuLoad) == SentinelStatus.TAMPER, primaryProcessor.consumeSitDetected(), nowRt)
-            val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(evaluationSnapshotFlyweight.integrity.isCoolingModeActive, isSuspiciousMode, hardwareSuite.isStationary(), hardwareSuite.isScreenOn(), primaryProcessor.getMaxDistanceAuthority() > 0.0, evaluationSnapshotFlyweight.kinetic.activityType, nowRt, capabilities)
+            val targetGpsInterval = serviceBehaviorUseCase.calculateGpsInterval(evaluationSnapshot.integrity.isCoolingModeActive, isSuspiciousMode, hardwareSuite.isStationary(), hardwareSuite.isScreenOn(), primaryProcessor.getMaxDistanceAuthority() > 0.0, evaluationSnapshot.kinetic.activityType, nowRt, capabilities)
             if (targetGpsInterval != currentIntervalMs) {
                 currentIntervalMs = targetGpsInterval; forensicAuditor.updateExpectedInterval(nowRt, targetGpsInterval, currentRole); primaryProcessor.updateExpectedInterval(nowRt, targetGpsInterval); hardwareSuite.setPollingInterval(targetGpsInterval)
             }
@@ -526,7 +517,7 @@ class MonitorService : BaseMonitorService() {
         }
 
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isPeerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
-        deviceProfileManager.executeContinuityTweaks(capabilities, nowRt, serviceTickCounter, primaryProcessor.getLastValidFixRt(), evaluationSnapshotFlyweight.integrity.isPowerSaveMode, evaluationSnapshotFlyweight.localInternetLoss, isSocketConnected, isPeerActive)
+        deviceProfileManager.executeContinuityTweaks(capabilities, nowRt, serviceTickCounter, primaryProcessor.getLastValidFixRt(), evaluationSnapshot.integrity.isPowerSaveMode, evaluationSnapshot.localInternetLoss, isSocketConnected, isPeerActive)
 
         var recoveryFlagged = false
         if (lastServiceTickRealtime > 0) {
@@ -544,10 +535,10 @@ class MonitorService : BaseMonitorService() {
             domainEventBus.emit(DomainEvent.StabilityViolation(message = verdict.message, isJitter = verdict.isJitterViolation, lat = proc?.optimizedPoint?.lat ?: 0.0, lng = proc?.optimizedPoint?.lng ?: 0.0, accuracy = lastGpsAccuracy))
         }
         
-        primaryProcessor.updateSensorData(evaluationSnapshotFlyweight)
+        primaryProcessor.updateSensorData(evaluationSnapshot)
 
         if (nowRt - lastPowerSaveCheckRt > 5000L) {
-            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(hardwareSuite.isStationary(), evaluationSnapshotFlyweight.integrity.isStalled, alarmManager.hasUnresolvedAlarms(), isUiVisible())
+            val shouldBePowerSave = serviceBehaviorUseCase.evaluatePowerSaveMode(hardwareSuite.isStationary(), evaluationSnapshot.integrity.isStalled, alarmManager.hasUnresolvedAlarms(), isUiVisible())
             if (shouldBePowerSave != isPowerSaveActive) {
                 isPowerSaveActive = shouldBePowerSave; hardwareSuite.setPowerSaveMode(shouldBePowerSave); 
                 domainEventBus.emit(DomainEvent.PowerSaveTransition(shouldBePowerSave))
@@ -559,8 +550,9 @@ class MonitorService : BaseMonitorService() {
         while (locationBuffer.isNotEmpty()) {
             val loc = locationBuffer.poll() ?: break
             forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, currentRole)
-            pointSnapshotFlyweight.apply {
-                copyFrom(evaluationSnapshotFlyweight)
+            
+            val pointSnapshot = EnginePools.LOCATION_UPDATE.acquire().apply {
+                copyFrom(evaluationSnapshot)
                 kinetic.apply {
                     lat = loc.latitude; lng = loc.longitude; alt = loc.altitude 
                     speed = loc.speed.toDouble(); gpsTs = loc.time 
@@ -568,23 +560,22 @@ class MonitorService : BaseMonitorService() {
                 }
                 isMuzzled = if (isTrackerMode) isSuspiciousMode else false
             }
-            lastProcessedLocation = primaryProcessor.processGpsPoint(update = pointSnapshotFlyweight, isViewerTrail = !isTrackerMode, lastGpsTs = sessionManager.lastGpsTs, isLocal = true)
+            lastProcessedLocation = primaryProcessor.processGpsPoint(update = pointSnapshot, isViewerTrail = !isTrackerMode, lastGpsTs = sessionManager.lastGpsTs, isLocal = true)
             if (lastProcessedLocation?.isClockRegression == false) { sessionManager.lastGpsTs = loc.time }
             lastGpsBearing = loc.bearing.toDouble(); lastGpsAccuracy = loc.accuracy.toDouble()
         }
 
         val proc = lastProcessedLocation
         if (proc != null) {
-            // R-ID 589: In local Tracker mode, the state is always considered "connected" to itself.
             val stateManagerConnected = if (isTrackerMode) true else (isSocketConnected && isPeerActive)
             
-            evaluationSnapshotFlyweight.trackerState = if (isTrackerMode) {
-                TrackerStateManager.updateState(status = proc.status, speed = proc.filteredSpeed, vibration = evaluationSnapshotFlyweight.atmospheric.vibration, vibrationFloor = primaryProcessor.getAdaptiveVibrationFloor(), isTrackerConnected = stateManagerConnected, systemTimePulse = nowRt)
+            evaluationSnapshot.trackerState = if (isTrackerMode) {
+                TrackerStateManager.updateState(status = proc.status, speed = proc.filteredSpeed, vibration = evaluationSnapshot.atmospheric.vibration, vibrationFloor = primaryProcessor.getAdaptiveVibrationFloor(), isTrackerConnected = stateManagerConnected, systemTimePulse = nowRt)
             } else TrackerState.UNKNOWN
-            evaluateAlarmsInternal(now, nowRt, isSocketConnected, isPeerActive, proc, hSnapshot, proc.timestamp, evaluationSnapshotFlyweight)
+            evaluateAlarmsInternal(now, nowRt, isSocketConnected, isPeerActive, proc, hSnapshot, proc.timestamp, evaluationSnapshot)
         }
 
-        evaluationSnapshotFlyweight.atmospheric.apply {
+        evaluationSnapshot.atmospheric.apply {
             noiseIdx = (acousticDb - primaryProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB
             luxIdx = log10(lux + 1.0) / RIBBON_LUX_LOG_SCALE
             vibeIdx = vibration / RIBBON_VIBRATION_SCALE_G
@@ -592,12 +583,11 @@ class MonitorService : BaseMonitorService() {
             tiltIdx = abs(tiltDegrees - primaryProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG
             baroIdx = (baroAlt - primaryProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS
         }
-        evaluationSnapshotFlyweight.integrity.snrIdx = (latestGnssDetail?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0) / RIBBON_SNR_SCALE_DB
+        evaluationSnapshot.integrity.snrIdx = (latestGnssDetail?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0) / RIBBON_SNR_SCALE_DB
 
-        val finalProc = lastProcessedLocation
         domainEventBus.emit(DomainEvent.TickEvaluated(
-            now = now, nowRt = nowRt, isTrackerMode = isTrackerMode, snapshot = evaluationSnapshotFlyweight,
-            processed = finalProc, health = health, isSocketConnected = isSocketConnected, isPeerActive = isPeerActive,
+            now = now, nowRt = nowRt, isTrackerMode = isTrackerMode, snapshot = evaluationSnapshot,
+            processed = lastProcessedLocation, health = health, isSocketConnected = isSocketConnected, isPeerActive = isPeerActive,
             serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), recoveryFlagged = recoveryFlagged,
             gnssDetail = latestGnssDetail, isSuspiciousMode = isSuspiciousMode,
             lastSitTs = primaryProcessor.getLastSitTs(), lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime
@@ -611,15 +601,18 @@ class MonitorService : BaseMonitorService() {
     }
 
     private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isPeerActive: Boolean, processed: ProcessedLocation, hSnapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long, evaluationSnapshot: LocationUpdate) {
+        val alarmSnapshot = EnginePools.LOCATION_UPDATE.acquire()
         if (isTrackerMode) {
-            TelemetryMapper.mapProcessedToSnapshot(snapshot = evaluationSnapshot, processed = processed, rawGpsTs = rawGpsTs, lastValidFixRt = primaryProcessor.getLastValidFixRt(), snrSnapshot = hardwareSuite.averageSnr, out = alarmSnapshotFlyweight)
+            TelemetryMapper.mapProcessedToSnapshot(snapshot = evaluationSnapshot, processed = processed, rawGpsTs = rawGpsTs, lastValidFixRt = primaryProcessor.getLastValidFixRt(), snrSnapshot = hardwareSuite.averageSnr, out = alarmSnapshot)
         } else {
-            TelemetryMapper.mapStatusToSnapshot(s = connectivitySuite.trackerStatus, base = evaluationSnapshot, nowRt = nowRt, out = alarmSnapshotFlyweight)
+            TelemetryMapper.mapStatusToSnapshot(s = connectivitySuite.trackerStatus, base = evaluationSnapshot, nowRt = nowRt, out = alarmSnapshot)
         }
 
-        val serviceContext = AlarmServiceContext(now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = isTrackerMode, isRelayConnected = isSocketConnected, isTrackerConnected = if (isTrackerMode) true else isPeerActive, isUiVisible = isUiVisible(), distToHomeAuthority = if (isTrackerMode) processed.distToHome else (if (isSocketConnected && isPeerActive) PhysicsUtils.calculateDistance(alarmSnapshotFlyweight.kinetic.lat, alarmSnapshotFlyweight.kinetic.lng, (repository.getCachedHomePoints().firstOrNull()?.latitude ?: 0.0), (repository.getCachedHomePoints().firstOrNull()?.longitude ?: 0.0)) else null), maxDistanceAuthority = (if (isTrackerMode) primaryProcessor else remoteProcessor).getMaxDistanceAuthority(), capabilities = capabilities, role = if (isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE)
+        val serviceContext = AlarmServiceContext(now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = isTrackerMode, isRelayConnected = isSocketConnected, isTrackerConnected = if (isTrackerMode) true else isPeerActive, isUiVisible = isUiVisible(), distToHomeAuthority = if (isTrackerMode) processed.distToHome else (if (isSocketConnected && isPeerActive) PhysicsUtils.calculateDistance(alarmSnapshot.kinetic.lat, alarmSnapshot.kinetic.lng, (repository.getCachedHomePoints().firstOrNull()?.latitude ?: 0.0), (repository.getCachedHomePoints().firstOrNull()?.longitude ?: 0.0)) else null), maxDistanceAuthority = (if (isTrackerMode) primaryProcessor else remoteProcessor).getMaxDistanceAuthority(), capabilities = capabilities, role = if (isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE)
         tickOrchestrator.launchJob("alarm_evaluation", lifecycleScope + Dispatchers.Default) {
-            alarmManager.evaluateAlarms(alarmSnapshotFlyweight.copy(), serviceContext)
+            // R1160: Alarms now use a pooled snapshot. Note: evaluateAlarms should NOT 
+            // store this reference long-term as it belongs to a circular pool.
+            alarmManager.evaluateAlarms(alarmSnapshot, serviceContext)
         }
     }
 
@@ -659,7 +652,6 @@ class MonitorService : BaseMonitorService() {
                 if (health.isCoolingModeActive && !lastWasCooling) cachedCoolingEnteredRt = health.coolingEnteredRt
                 lastWasCooling = health.isCoolingModeActive
                 
-                // Issue #1416: Aggressive throttling under memory pressure
                 val pressureIntervalMult = when (memoryPressureLevel) {
                     MemoryPressureLevel.CRITICAL -> 4.0
                     MemoryPressureLevel.HIGH -> 2.0

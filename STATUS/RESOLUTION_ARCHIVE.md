@@ -1,3 +1,19 @@
+# 🏛️ Resolution Archive - Oct.4.6
+
+## 🏁 Issue #1160 / SOT ID 614: Telemetry Pooling & Flyweight Expansion
+*   **Resolved**: Oct.4.6
+*   **Root Cause**: High-frequency telemetry evaluation (10Hz GPS + 100Hz IMU) was generating excessive object allocations (LocationUpdate, ProcessedLocation), leading to GC pressure and potential thread-safety risks during event emission from the evaluation loop.
+*   **Remediations**:
+    *   **Pooling Infrastructure**: Implemented `RingBufferPool` (thread-safe, zero-allocation circular pool) and centralized `EnginePools` registry.
+    *   **Mutability Hardening**: Refactored `ProcessedLocation`, `TrajectoryNode`, `SentinelResult`, and `JumpConfidence` to support `reset()` and `copyFrom()` for safe reuse.
+    *   **Engine Migration**: Migrated `LocationProcessor.processGpsPoint` and `LocationSentinel` to acquire pooled results, eliminating per-tick allocation.
+    *   **GTO Optimization**: Refactored `GtoEngine.getWindow()` to utilize pooled `TRAJECTORY_NODE` objects, resolving a major allocation hotspot during trajectory promotion.
+    *   **Service Integration**: Updated `MonitorService` to use pooled snapshots for alarm evaluation and forensic capture.
+*   **Significance**: Medium (Performance).
+*   **SOT ID**: 614
+
+---
+
 # 🏛️ Resolution Archive - Oct.4.5
 
 ## 🏁 Issue #1425 / SOT ID 613: Unified Clock Authority
