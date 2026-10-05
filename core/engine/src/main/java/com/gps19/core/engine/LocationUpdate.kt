@@ -163,7 +163,9 @@ data class IntegrityState(
     var maxIoLatency: Long = 0L,
     var isBatteryWhitelisted: Boolean = false,
     var thermalHeadroom: Double = 0.0,
-    var heapAllocatedMb: Double = 0.0
+    var heapAllocatedMb: Double = 0.0,
+    var thermalSnapshot: Double? = null,
+    var heapSnapshot: Double? = null
 ) {
     fun copyFrom(other: IntegrityState) {
         this.battery = other.battery; this.isCharging = other.isCharging; this.currentMa = other.currentMa
@@ -199,6 +201,8 @@ data class IntegrityState(
         this.isBatteryWhitelisted = other.isBatteryWhitelisted
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
+        this.thermalSnapshot = other.thermalSnapshot
+        this.heapSnapshot = other.heapSnapshot
     }
 
     fun reset() {
@@ -217,12 +221,15 @@ data class IntegrityState(
         locationPendingReason = LocationPendingReason.NONE; signal = null; tamperNote = null
         lastValidFixRt = 0L; isSilentFailure = false; isMaliAnomaly = false; cpuLoad = 0.0
         ioWait = 0.0; maxIoLatency = 0L; isBatteryWhitelisted = false
-        thermalHeadroom = 0.0; heapAllocatedMb = 0.0
+        thermalHeadroom = 0.0; heapAllocatedMb = 0.0; thermalSnapshot = null; heapSnapshot = null
     }
 }
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
+ * Oct.5.2:
+ * - Issue #1344: Forensic Diagnostic Expansion. Integrated thermalSnapshot 
+ *   and heapSnapshot into IntegrityState and monolith delegation (R1344).
  * Oct.3.1:
  * - Issue #1420: Granular HUD Binding. Implements Locatable, BatteryProvider, 
  *   and DeviceIdentity interfaces to allow UI slicing and reduce coupling.
@@ -572,6 +579,12 @@ data class LocationUpdate(
     var heapAllocatedMb: Double 
         get() = integrity.heapAllocatedMb
         set(value) { integrity.heapAllocatedMb = value }
+    var thermalSnapshot: Double? 
+        get() = integrity.thermalSnapshot
+        set(value) { integrity.thermalSnapshot = value }
+    var heapSnapshot: Double? 
+        get() = integrity.heapSnapshot
+        set(value) { integrity.heapSnapshot = value }
     var activityType: ActivityType 
         get() = kinetic.activityType
         set(value) { kinetic.activityType = value }
@@ -708,6 +721,8 @@ data class LocationUpdate(
         put("tamper_note", tamperNote)
         put("thermal_headroom", thermalHeadroom)
         put("heap_allocated_mb", heapAllocatedMb)
+        put("thermal_snapshot", thermalSnapshot)
+        put("heap_snapshot", heapSnapshot)
         put("last_alarm_ack_ts", lastAlarmAckTs)
         put("violation_start_ts", violationStartTs)
     }

@@ -17,16 +17,12 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Oct.5.2:
+ * - Issue #1344: Forensic Diagnostic Expansion. Explicitly populating 
+ *   thermalSnapshot and heapSnapshot in health state (R1344).
  * Oct.2.1:
  * - Issue #1416: Memory Pressure Mitigation (R-ID 592). Integrated heap-aware 
  *   MemoryPressureChanged event emission to trigger aggressive flushing on A15.
- * Oct.1.3:
- * - Issue #1408: Thermal State Recovery. Persist cooling mode and entry realtime 
- *   to SettingsRepository to ensure forensic continuity across restarts.
- * Sep.28.16:
- * - Issue #1362: Implement forensic persistence reliability alerting logic (R715).
- * Sep.27.4:
- * - Issue #1348: Flattened DomainEvent hierarchy, emitting IntegrityEvent directly.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -273,6 +269,8 @@ class IntegrityMonitor @Inject constructor(
             h.isMaliAnomaly = maliAnomaly
             h.thermalHeadroom = thermal
             h.heapAllocatedMb = heap
+            h.thermalSnapshot = thermal
+            h.heapSnapshot = heap
             
             val isSilent = SentinelValidator.isSilentFailure(
                 gpsStalled = h.gpsStalled,

@@ -13,6 +13,9 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Oct.5.2:
+ * - Issue #1344: Forensic Diagnostic Expansion. Updated handleAlarmEvent to 
+ *   pass thermal and heap snapshots to logManager (R1344).
  * Oct.2.9:
  * - Issue #1314: TrackerStatus Convergence. Migrated statusFlyweight to 
  *   unified LocationUpdate monolith.
@@ -143,7 +146,8 @@ class AppEventCoordinator @Inject constructor(
                 extremeValue = event.extremeValue, localId = event.logId, durationMs = event.durationMs,
                 isSpecial = event.isSpecial, specialColor = event.specialColor,
                 lat = event.lat, lng = event.lng, accuracy = event.accuracy,
-                maxAccuracy = event.maxAccuracy, snr = event.snr, vibe = event.vibe
+                maxAccuracy = event.maxAccuracy, snr = event.snr, vibe = event.vibe,
+                thermal = event.thermal, heap = event.heap
             )
         }
     }

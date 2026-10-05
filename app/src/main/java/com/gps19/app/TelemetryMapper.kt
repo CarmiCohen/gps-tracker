@@ -6,13 +6,14 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.5.2:
+ * - Issue #1344: Forensic Diagnostic Expansion. Restored accidentally removed 
+ *   mapping functions and integrated thermalSnapshot/heapSnapshot into 
+ *   all restoration and health projection paths (R1344).
  * Oct.5.1:
  * - Issue #1173: Protobuf-First Persistence (Phase 2). Updated restoration paths 
  *   in mapEntityToApp and mapPendingToStatus to prioritize binary payloads. 
  *   Added mapProtoToApp for connection history restoration (R1173).
- * Oct.2.9:
- * - Issue #1314: TrackerStatus Convergence. Converged all mapping logic 
- *   into the unified LocationUpdate monolith. Purged TrackerStatus references.
  */
 object TelemetryMapper {
 
@@ -124,7 +125,7 @@ object TelemetryMapper {
                 satsUsed = proto.satsUsed
                 snrIdx = proto.snrIdx
                 isLocationPending = proto.isLocationPending
-                locationPendingReason = LocationUpdate.mapProtoToPendingReason(proto.pendingReason.name)
+                locationPendingReason = try { LocationPendingReason.valueOf(proto.pendingReason.name.removePrefix("LPR_")) } catch(e: Exception) { LocationPendingReason.NONE }
                 isBatterySteepDischarge = proto.isBatterySteepDischarge
                 isCoolingModeActive = proto.isCoolingModeActive
                 isBatteryLow = proto.isBatteryLow
@@ -157,11 +158,13 @@ object TelemetryMapper {
                 tamperNote = if (proto.hasTamperNote()) proto.tamperNote else null
                 thermalHeadroom = proto.thermalHeadroom
                 heapAllocatedMb = proto.heapAllocatedMb
+                thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
+                heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
             }
 
             status = processed.status
             ts = now
-            trackerState = LocationUpdate.mapProtoToTrackerState(proto.state.name)
+            trackerState = try { TrackerState.valueOf(proto.state.name.removePrefix("TS_")) } catch(e: Exception) { TrackerState.UNKNOWN }
             isClockRegression = proto.isClockRegression
             lastValidFixRt = lastFixRt
             
@@ -282,6 +285,8 @@ object TelemetryMapper {
                 tamperNote = if (data.has("tamper_note")) data.getString("tamper_note") else null
                 thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
                 heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
+                thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else null
+                heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else null
             }
 
             this.status = statusVar
@@ -322,6 +327,8 @@ object TelemetryMapper {
                 currentMa = proto.currentMa
                 thermalHeadroom = proto.thermalHeadroom
                 heapAllocatedMb = proto.heapAllocatedMb
+                thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
+                heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
             }
             snrSnapshot = proto.snrIdx * 5.0
             kinetic.jumpTier = proto.jumpTier
@@ -329,7 +336,7 @@ object TelemetryMapper {
             integrity.isStalled = proto.isStalled
             integrity.isTamperDetected = proto.isTamperDetected || proto.isLocationPending
             nowTs = now; this.nowRt = nowRt
-            trackerState = LocationUpdate.mapProtoToTrackerState(proto.state.name)
+            trackerState = try { TrackerState.valueOf(proto.state.name.removePrefix("TS_")) } catch(e: Exception) { TrackerState.UNKNOWN }
             
             kinetic.activityType = try { 
                 ActivityType.valueOf(proto.activityType) 
@@ -387,6 +394,9 @@ object TelemetryMapper {
             nowTs = now; this.nowRt = nowRt
             integrity.thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
             integrity.heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
+            integrity.thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else null
+            integrity.heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else null
+
             trackerState = try { TrackerState.valueOf(data.optString("tracker_state", current.trackerState.name)) } catch(e: Exception) { current.trackerState }
             
             kinetic.activityType = try { 
@@ -447,6 +457,8 @@ object TelemetryMapper {
             coolingEnteredRt = snapshot.nowRt,
             thermalHeadroom = snapshot.integrity.thermalHeadroom,
             heapAllocatedMb = snapshot.integrity.heapAllocatedMb,
+            thermalSnapshot = snapshot.integrity.thermalSnapshot,
+            heapSnapshot = snapshot.integrity.heapSnapshot,
             activityType = snapshot.activityType
         )
     }
@@ -512,6 +524,8 @@ object TelemetryMapper {
             snrSnapshot = s.integrity.snrIdx * 5.0
             this.integrity.thermalHeadroom = s.integrity.thermalHeadroom
             this.integrity.heapAllocatedMb = s.integrity.heapAllocatedMb
+            this.integrity.thermalSnapshot = s.integrity.thermalSnapshot
+            this.integrity.heapSnapshot = s.integrity.heapSnapshot
             this.kinetic.activityType = s.activityType
             this.trackerState = s.trackerState
             // Issue #1410: Viewer Persistence
@@ -543,6 +557,8 @@ object TelemetryMapper {
             ioWait = p.ioWait; maxIoLatency = p.maxIoLatency; isSilentFailure = p.isSilentFailure
             thermalHeadroom = p.thermalHeadroom; heapAllocatedMb = p.heapAllocatedMb
             activityType = p.activityType
+            thermalSnapshot = p.thermalSnapshot
+            heapSnapshot = p.heapSnapshot
         }
     }
 
@@ -556,7 +572,7 @@ object TelemetryMapper {
             isGap = false; isRecoveryEvent = false; hasGps = proto.accuracy > 0
             isTick = false; gpsAccuracy = proto.accuracy; maxAccuracy = proto.maxAccuracy
             speed = proto.speed; bearing = proto.bearing; currentMa = proto.currentMa
-            locationPendingReason = LocationUpdate.mapProtoToPendingReason(proto.locationPendingReason.name)
+            locationPendingReason = try { LocationPendingReason.valueOf(proto.locationPendingReason.name.removePrefix("LPR_")) } catch(e: Exception) { LocationPendingReason.NONE }
 
             // Forensic Parity
             snrIdx = proto.snrIdx; noiseIdx = proto.noiseIdx; luxIdx = proto.luxIdx; vibeIdx = proto.vibeIdx
@@ -570,9 +586,9 @@ object TelemetryMapper {
             violationUptimeMs = proto.violationUptimeMs; isUltraLongStationary = proto.isUltraLongStationary
             gpsHardwareLock = proto.gpsHardwareLock; isAnchorLocked = proto.isAnchorLocked
             thermalHeadroom = proto.thermalHeadroom; heapAllocatedMb = proto.heapAllocatedMb
-            activityType = try { 
-                ActivityType.valueOf(proto.activityType) 
-            } catch (e: Exception) { ActivityType.UNKNOWN }
+            activityType = try { ActivityType.valueOf(proto.activityType) } catch (e: Exception) { ActivityType.UNKNOWN }
+            thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
+            heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
         }
     }
 
@@ -614,6 +630,8 @@ object TelemetryMapper {
             activityType = try { 
                 ActivityType.valueOf(entity.activityType) 
             } catch (e: Exception) { ActivityType.UNKNOWN }
+            thermalSnapshot = null
+            heapSnapshot = null
         }
     }
 
@@ -683,7 +701,7 @@ object TelemetryMapper {
             try {
                 val proto = RealtimeStatus.parseFrom(entity.payload)
                 mapProtoToSnapshot(proto, entity.timestamp, proto.rt, out)
-                out.status = SentinelStatus.valueOf(proto.sentinelStatus)
+                out.status = try { SentinelStatus.valueOf(proto.sentinelStatus) } catch(e: Exception) { SentinelStatus.VALID }
                 return out
             } catch (e: Exception) {
                 Timber.e(e, "Binary pending status restoration failed, falling back to columns")
@@ -732,6 +750,8 @@ object TelemetryMapper {
                 isGnssThrottled = entity.isGnssThrottled
                 thermalHeadroom = entity.thermalHeadroom
                 heapAllocatedMb = entity.heapAllocatedMb
+                thermalSnapshot = null
+                heapSnapshot = null
             }
 
             ts = entity.timestamp

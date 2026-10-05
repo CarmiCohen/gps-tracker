@@ -9,6 +9,10 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Oct.5.2:
+ * - Issue #1344: Forensic Diagnostic Expansion. Updated logForensicTrace, 
+ *   logForensicTraceOptimized, and submitToLogSink to include thermalSnapshot 
+ *   and heapSnapshot forensic probes (R1344).
  * Sep.26.12:
  * - Issue #1344: Expanded logForensicTraceOptimized to include thermalHeadroom 
  *   and heapAllocatedMb forensic probes.
@@ -50,6 +54,7 @@ class LogManager @Inject constructor(
     fun logForensicTrace(message: String, lat: Double = 0.0, lng: Double = 0.0, accuracy: Double = 0.0) {
         val buffer = forensicSpillBufferProvider.get()
         val now = timeProvider.currentTimeMillis()
+        val health = telemetry.systemHealth.value
         
         // R779: Scrub metadata at the edge
         val sanitizedMsg = ForensicSanitizer.sanitizeMessage(message)
@@ -66,7 +71,12 @@ class LogManager @Inject constructor(
             role = if (configManager.isTrackerMode) "tracker" else "viewer",
             lat = lat,
             lng = lng,
-            accuracy = accuracy
+            accuracy = accuracy,
+            thermalSnapshot = health.thermalHeadroom,
+            heapSnapshot = health.heapAllocatedMb,
+            tempSnapshot = health.batteryTemp,
+            battSnapshot = health.batteryLevel,
+            chargingSnapshot = health.isCharging
         )
         
         if (!buffer.writeTrace(log)) {
@@ -134,7 +144,9 @@ class LogManager @Inject constructor(
         accuracy: Double = 0.0,
         maxAccuracy: Double = 0.0,
         snr: Double? = null,
-        vibe: Double? = null
+        vibe: Double? = null,
+        thermal: Double? = null,
+        heap: Double? = null
     ) {
         val now = timeProvider.currentTimeMillis()
         val health = telemetry.systemHealth.value
@@ -208,8 +220,8 @@ class LogManager @Inject constructor(
             tempSnapshot = health.batteryTemp,
             battSnapshot = health.batteryLevel,
             chargingSnapshot = health.isCharging,
-            thermalSnapshot = health.thermalHeadroom,
-            heapSnapshot = health.heapAllocatedMb
+            thermalSnapshot = thermal ?: health.thermalHeadroom,
+            heapSnapshot = heap ?: health.heapAllocatedMb
         )
         
         val suite = connectivitySuite

@@ -18,13 +18,13 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Oct.5.2:
+ * - Issue #1344: Forensic Diagnostic Expansion. Integrated thermalSnapshot 
+ *   and heapSnapshot into ribbon aggregation (R1344).
  * Oct.4.5:
  * - Issue #1425: Unified Clock Authority. Migrated periodic trigger to 
  *   monotonic time (lastTimeTriggerRt) to prevent task skipping/double-triggers 
  *   during NTP syncs.
- * Oct.2.6:
- * - Issue #1175: Real-time Only Path. Strategically removed forensic backfilling 
- *   and gap-filling logic to simplify architectural state management.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -162,7 +162,9 @@ class HistoryManager @Inject constructor(
             isSilentFailure = snapshot.integrity.isSilentFailure,
             isBatteryLow = snapshot.integrity.isBatteryLow,
             isBatteryCritical = snapshot.integrity.isBatteryCritical,
-            isUltraLongStationary = snapshot.integrity.isUltraLongStationary
+            isUltraLongStationary = snapshot.integrity.isUltraLongStationary,
+            thermalSnapshot = snapshot.integrity.thermalSnapshot,
+            heapSnapshot = snapshot.integrity.heapSnapshot
         )
     }
 
@@ -188,7 +190,9 @@ class HistoryManager @Inject constructor(
         isSilentFailure: Boolean = false,
         isBatteryLow: Boolean = false,
         isBatteryCritical: Boolean = false,
-        isUltraLongStationary: Boolean = false
+        isUltraLongStationary: Boolean = false,
+        thermalSnapshot: Double? = null,
+        heapSnapshot: Double? = null
     ) = ribbonMutex.withLock {
         detectClockTampering(now)
 
@@ -207,6 +211,8 @@ class HistoryManager @Inject constructor(
             this.noiseIdx = noiseIdx; this.luxIdx = luxIdx; this.vibeIdx = vibeIdx; this.proxIdx = proxIdx
             this.initLiftIdx(liftIdx); this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
             this.isUltraLongStationary = isUltraLongStationary
+            this.thermalSnapshot = thermalSnapshot
+            this.heapSnapshot = heapSnapshot
         }
         
         aggregator.processPoint(currentPointFlyweight) { scale, point ->

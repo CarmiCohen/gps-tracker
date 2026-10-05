@@ -6,13 +6,12 @@ import kotlin.math.min
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * Oct.5.5:
+ * - Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2). Offloaded 
+ *   isShockViolated and isVibrationSuspicious to JNI to complete the 100Hz 
+ *   vibration path hardening. Eliminated remaining JVM floating-point math.
  * Oct.3.1:
- * - Issue #SIMP-1510-1: Native FastPath Convergence. Integrated NativeFastPathProvider 
- *   to offload stationary detection and vibration floor EMA to JNI, eliminating 
- *   JVM math overhead on hot paths.
- * Oct.2.1:
- * - Issue #1415: Load-Aware IMU Gating (R-ID 590/591). Integrated cpuLoad into 
- *   vibration and shock evaluation to compensate for LIS2DLC12 jitter under saturation.
+ * - Issue #SIMP-1510-1: Native FastPath Convergence. Integrated NativeFastPathProvider.
  */
 object SentinelValidator {
 
@@ -41,6 +40,11 @@ object SentinelValidator {
         sensitivity: Float = 0.5f,
         cpuLoad: Double = 0.0
     ): Boolean {
+        // Issue #SIMP-1510-1: Try native offloading first
+        nativeProvider?.let {
+            return it.isShockViolated(peakShock, adaptiveFloor, sensitivity, cpuLoad)
+        }
+
         // Issue #1415: Expand threshold under high CPU load to ignore jitter (R-ID 590)
         val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 1.5 else 1.0
         
@@ -56,6 +60,11 @@ object SentinelValidator {
         sensitivity: Float = 0.5f,
         cpuLoad: Double = 0.0
     ): Boolean {
+        // Issue #SIMP-1510-1: Try native offloading first
+        nativeProvider?.let {
+            return it.isVibrationSuspicious(vibration, adaptiveFloor, sensitivity, cpuLoad)
+        }
+
         // Issue #1415: Expand threshold under high CPU load to ignore jitter (R-ID 590)
         val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 1.5 else 1.0
         
@@ -126,7 +135,6 @@ object SentinelValidator {
         }
 
         // Issue #1415: Stable Load Gate (R-ID 591). Pause recalibration during CPU saturation bursts
-        // to prevent baseline corruption from hardware jitter.
         if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) return currentFloor
         
         return if (vibration < currentFloor) {
@@ -144,6 +152,11 @@ object SentinelValidator {
      * computeNextHpf: Part of Issue #601/653. High-Pass Filter primitive.
      */
     fun computeNextHpf(lastHpfValue: Double, currentRawVibe: Double, lastRawVibe: Double): Double {
+        // Issue #SIMP-1510-1: Try native offloading first
+        nativeProvider?.let {
+            return it.computeNextHpf(lastHpfValue, currentRawVibe, lastRawVibe)
+        }
+        
         return VIBRATION_HPF_ALPHA * (lastHpfValue + currentRawVibe - lastRawVibe)
     }
 
@@ -151,6 +164,11 @@ object SentinelValidator {
      * computeNextEnergy: Part of Issue #601/653. Energy EMA primitive.
      */
     fun computeNextEnergy(currentEnergy: Double, hpfValue: Double): Double {
+        // Issue #SIMP-1510-1: Try native offloading first
+        nativeProvider?.let {
+            return it.computeNextEnergy(currentEnergy, hpfValue)
+        }
+
         val instantEnergy = abs(hpfValue)
         val alphaEnergy = VIBRATION_ENERGY_EMA_ALPHA
         return (currentEnergy * (1.0 - alphaEnergy)) + (instantEnergy * alphaEnergy)
@@ -202,7 +220,6 @@ object SentinelValidator {
 
     /**
      * computeAdaptiveAcousticOffCycle: Part of Issue #762 (R762b). 
-     * Calculates the acoustic monitor off-cycle duration based on stationary duration.
      */
     fun computeAdaptiveAcousticOffCycle(
         isStationary: Boolean,
@@ -211,7 +228,6 @@ object SentinelValidator {
     ): Long {
         if (!isStationary || stationaryStartRt == 0L) return ACOUSTIC_DUTY_CYCLE_OFF_MS
         val durationMs = nowRt - stationaryStartRt
-        // Scale linearly from 8s up to 32s (8s * 4) based on minutes of immobility.
         return min(ACOUSTIC_DUTY_CYCLE_OFF_MS * 4, ACOUSTIC_DUTY_CYCLE_OFF_MS + (durationMs / 60000) * 1000L)
     }
 

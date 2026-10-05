@@ -27,13 +27,10 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
- * Oct.3.1:
- * - Issue #SIMP-1510-1: Native FastPath Convergence. Added n12/n13 for 
- *   stationary detection and vibration floor EMA offloading to eliminate 
- *   JVM floating-point math from hot paths.
- * Oct.2.15:
- * - Issue #1176: Native FastPath. Integrated n10/n11 for JNI-based high-frequency 
- *   sensor spike detection (Acoustic/Light) to eliminate JVM overhead (R-ID 257).
+ * Oct.5.5:
+ * - Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2). Finalized vibration 
+ *   hot-path offloading: vector magnitude, HPF, Energy, and Violation Gates. 
+ *   Eliminated JVM floating-point overhead on 100Hz paths (R-ID 590/591).
  */
 object JdHardwareManager {
 
@@ -210,68 +207,89 @@ object JdHardwareManager {
         }
     }
 
-    /**
-     * recordSensorPulse: Low-latency pulse recording for high-frequency sensor events.
-     * Offloads tracking to JNI to avoid heap churn.
-     */
     fun recordSensorPulse(nowRt: Long) {
         if (isLibraryLoaded.get()) n7(nowRt)
     }
 
-    /**
-     * getSensorAuditHz: Returns the calculated sensor frequency from the native pulse buffer.
-     */
     fun getSensorAuditHz(): Double {
         return if (isLibraryLoaded.get()) n8() else 0.0
     }
 
-    /**
-     * resetSensorAudit: Resets the native pulse trackers.
-     */
     fun resetSensorAudit() {
         if (isLibraryLoaded.get()) n9()
     }
 
-    /**
-     * updateFastPathConfig: Configures the native FastPath parameters for a specific sensor type.
-     */
     fun updateFastPathConfig(type: Int, baseline: Double, threshold: Double, minThreshold: Double, debounceMs: Long): Int {
         return if (isLibraryLoaded.get()) n10(type, baseline, threshold, minThreshold, debounceMs) else -1
     }
 
-    /**
-     * evaluateFastPath: Evaluates a sensor value against the native FastPath logic.
-     * Returns true if a spike is detected.
-     */
     fun evaluateFastPath(type: Int, value: Double, nowRt: Long, alpha: Double): Boolean {
         return if (isLibraryLoaded.get()) n11(type, value, nowRt, alpha) != 0 else false
     }
 
-    /**
-     * isStationaryNative: Native offloading of stationary detection math (Issue #SIMP-1510-1).
-     */
     fun isStationaryNative(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean {
         return if (isLibraryLoaded.get()) n12(vibration, adaptiveFloor, cpuLoad) != 0 else {
-            // Fallback to JVM logic if native is unavailable
             val loadFactor = if (cpuLoad > 0.85) 2.0 else 1.0
             val dynamicGate = (adaptiveFloor * 1.5 * loadFactor).coerceIn(0.05, 0.12 * loadFactor)
             vibration < dynamicGate
         }
     }
 
-    /**
-     * updateVibrationFloorNative: Native offloading of vibration floor EMA (Issue #SIMP-1510-1).
-     */
     fun updateVibrationFloorNative(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double): Double {
         return if (isLibraryLoaded.get()) n13(currentFloor, vibration, if (isWarming) 1 else 0, cpuLoad) else {
-            // Fallback to JVM logic if native is unavailable
             if (vibration.isNaN() || vibration <= 0.0 || cpuLoad > 0.85) return currentFloor
             val alpha = if (vibration < currentFloor) {
-                if (isWarming) 0.5 else 0.01 // Simplified for fallback
+                if (isWarming) 0.5 else 0.1
             } else if (vibration < 1.0) {
-                if (isWarming) 0.1 else 0.001
+                if (isWarming) 0.1 else 0.01
             } else 0.0
             (currentFloor * (1.0 - alpha)) + (vibration * alpha)
+        }
+    }
+
+    fun computeNextHpfNative(lastHpfValue: Double, currentRawVibe: Double, lastRawVibe: Double): Double {
+        return if (isLibraryLoaded.get()) n14(lastHpfValue, currentRawVibe, lastRawVibe) else {
+            0.9 * (lastHpfValue + currentRawVibe - lastRawVibe)
+        }
+    }
+
+    fun computeNextEnergyNative(currentEnergy: Double, hpfValue: Double): Double {
+        return if (isLibraryLoaded.get()) n15(currentEnergy, hpfValue) else {
+            (currentEnergy * (1.0 - 0.1)) + (Math.abs(hpfValue) * 0.1)
+        }
+    }
+
+    /**
+     * calculateVibrationDeltaNative: Native vector magnitude offloading (Issue #SIMP-1510-1).
+     */
+    fun calculateVibrationDeltaNative(x: Double, y: Double, z: Double, lx: Double, ly: Double, lz: Double): Double {
+        return if (isLibraryLoaded.get()) n16(x, y, z, lx, ly, lz) else {
+            val dx = x - lx; val dy = y - ly; val dz = z - lz
+            Math.sqrt(dx * dx + dy * dy + dz * dz) / 9.80665
+        }
+    }
+
+    /**
+     * isShockViolatedNative: Native Shock Gate (Issue #SIMP-1510-1).
+     */
+    fun isShockViolatedNative(peakShock: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
+        return if (isLibraryLoaded.get()) n17(peakShock, adaptiveFloor, sensitivity, cpuLoad) != 0 else {
+            val loadFactor = if (cpuLoad > 0.85) 1.5 else 1.0
+            val baseThreshold = (0.2 + (1.4 - 0.2) * (1.0 - sensitivity)) * loadFactor
+            val dynamicThreshold = Math.max(baseThreshold, adaptiveFloor * 7.0 * loadFactor)
+            peakShock > dynamicThreshold
+        }
+    }
+
+    /**
+     * isVibrationSuspiciousNative: Native Suspicious Gate (Issue #SIMP-1510-1).
+     */
+    fun isVibrationSuspiciousNative(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
+        return if (isLibraryLoaded.get()) n18(vibration, adaptiveFloor, sensitivity, cpuLoad) != 0 else {
+            val loadFactor = if (cpuLoad > 0.85) 1.5 else 1.0
+            val baseThreshold = (0.05 + (0.45 - 0.05) * (1.0 - sensitivity)) * loadFactor
+            val dynamicThreshold = Math.max(baseThreshold, adaptiveFloor * 2.5 * loadFactor)
+            vibration > dynamicThreshold
         }
     }
 
@@ -290,4 +308,9 @@ object JdHardwareManager {
     @JvmStatic private external fun n11(type: Int, value: Double, nowRt: Long, alpha: Double): Int
     @JvmStatic private external fun n12(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Int
     @JvmStatic private external fun n13(currentFloor: Double, vibration: Double, isWarming: Int, cpuLoad: Double): Double
+    @JvmStatic private external fun n14(lastHpfValue: Double, currentRawVibe: Double, lastRawVibe: Double): Double
+    @JvmStatic private external fun n15(currentEnergy: Double, hpfValue: Double): Double
+    @JvmStatic private external fun n16(x: Double, y: Double, z: Double, lx: Double, ly: Double, lz: Double): Double
+    @JvmStatic private external fun n17(peak: Double, floor: Double, sens: Float, cpu: Double): Int
+    @JvmStatic private external fun n18(vibe: Double, floor: Double, sens: Float, cpu: Double): Int
 }

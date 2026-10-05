@@ -4,6 +4,9 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * Oct.5.2:
+ * - Issue #1344: Forensic Diagnostic Expansion. Integrated thermalHeadroom, 
+ *   heapAllocatedMb, and ActivityType into aggregation logic (R1344).
  * Oct.2.6:
  * - Issue #1175: Real-time Only Path. Removed backfillGaps and fillRealGap 
  *   as part of the strategic simplification of the telemetry pipeline.
@@ -62,6 +65,13 @@ class TelemetryAggregator {
         var isSilentFailure: Boolean = false
         var isUltraLongStationary: Boolean = false
         var violationUptimeMs: Long = 0L
+        var isBatteryLow: Boolean = false
+        var isBatteryCritical: Boolean = false
+        var thermalHeadroom: Double = 0.0
+        var heapAllocatedMb: Double = 0.0
+        var activityType: ActivityType = ActivityType.UNKNOWN
+        var thermalSnapshot: Double? = null
+        var heapSnapshot: Double? = null
 
         fun reset(point: EngineConnectionPoint) {
             rtt = point.rtt
@@ -102,6 +112,13 @@ class TelemetryAggregator {
             isSilentFailure = point.isSilentFailure
             isUltraLongStationary = point.isUltraLongStationary
             violationUptimeMs = point.violationUptimeMs
+            isBatteryLow = point.isBatteryLow
+            isBatteryCritical = point.isBatteryCritical
+            thermalHeadroom = point.thermalHeadroom
+            heapAllocatedMb = point.heapAllocatedMb
+            activityType = point.activityType
+            thermalSnapshot = point.thermalSnapshot
+            heapSnapshot = point.heapSnapshot
         }
 
         fun merge(cur: EngineConnectionPoint) {
@@ -144,6 +161,14 @@ class TelemetryAggregator {
             isSilentFailure = isSilentFailure || cur.isSilentFailure
             isUltraLongStationary = isUltraLongStationary || cur.isUltraLongStationary
             violationUptimeMs = max(violationUptimeMs, cur.violationUptimeMs)
+            isBatteryLow = isBatteryLow || cur.isBatteryLow
+            isBatteryCritical = isBatteryCritical || cur.isBatteryCritical
+            thermalHeadroom = max(thermalHeadroom, cur.thermalHeadroom)
+            heapAllocatedMb = max(heapAllocatedMb, cur.heapAllocatedMb)
+            if (cur.activityType != ActivityType.UNKNOWN) activityType = cur.activityType
+            
+            cur.thermalSnapshot?.let { thermalSnapshot = max(thermalSnapshot ?: 0.0, it) }
+            cur.heapSnapshot?.let { heapSnapshot = max(heapSnapshot ?: 0.0, it) }
         }
 
         fun writeTo(target: EngineConnectionPoint, base: EngineConnectionPoint, isTick: Boolean) {
@@ -185,6 +210,13 @@ class TelemetryAggregator {
             target.isSilentFailure = this.isSilentFailure
             target.isUltraLongStationary = this.isUltraLongStationary
             target.violationUptimeMs = this.violationUptimeMs
+            target.isBatteryLow = this.isBatteryLow
+            target.isBatteryCritical = this.isBatteryCritical
+            target.thermalHeadroom = this.thermalHeadroom
+            target.heapAllocatedMb = this.heapAllocatedMb
+            target.activityType = this.activityType
+            target.thermalSnapshot = this.thermalSnapshot
+            target.heapSnapshot = this.heapSnapshot
             target.isTick = isTick
         }
     }

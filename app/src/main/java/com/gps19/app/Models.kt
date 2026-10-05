@@ -10,12 +10,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.5.2:
+ * - Issue #1344: Forensic Diagnostic Expansion. Added thermalSnapshot and 
+ *   heapSnapshot to ConnectionPoint for history restoration parity (R1344).
  * Oct.3.1:
  * - Issue #1420: Granular HUD Binding. Refactored HUD component states to 
  *   implement slice-based interfaces (Locatable, DeviceIdentity, BatteryProvider).
- * Oct.2.9:
- * - Issue #1314: TrackerStatus Convergence. Removed TrackerStatus DTO 
- *   as it has been merged into the LocationUpdate monolith in core:engine.
  */
 
 @Serializable
@@ -148,7 +148,9 @@ class ConnectionPoint(
     var isGnssThrottled: Boolean = false,
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
-    var activityType: ActivityType = ActivityType.UNKNOWN
+    var activityType: ActivityType = ActivityType.UNKNOWN,
+    var thermalSnapshot: Double? = null,
+    var heapSnapshot: Double? = null
 ) {
     fun copyFrom(other: ConnectionPoint) {
         this.localId = other.localId; this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt
@@ -174,6 +176,8 @@ class ConnectionPoint(
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
         this.activityType = other.activityType
+        this.thermalSnapshot = other.thermalSnapshot
+        this.heapSnapshot = other.heapSnapshot
     }
 
     /**
@@ -189,7 +193,8 @@ class ConnectionPoint(
                isUltraLongStationary == other.isUltraLongStationary && violationUptimeMs == other.violationUptimeMs &&
                gpsHardwareLock == other.gpsHardwareLock && isAnchorLocked == other.isAnchorLocked &&
                isGnssThrottled == other.isGnssThrottled && thermalHeadroom == other.thermalHeadroom && 
-               heapAllocatedMb == other.heapAllocatedMb && activityType == other.activityType
+               heapAllocatedMb == other.heapAllocatedMb && activityType == other.activityType &&
+               thermalSnapshot == other.thermalSnapshot && heapSnapshot == other.heapSnapshot
     }
 
     fun reset() {
@@ -206,6 +211,7 @@ class ConnectionPoint(
         isSilentFailure = false; isUltraLongStationary = false; violationUptimeMs = 0L
         gpsHardwareLock = false; isAnchorLocked = false; isGnssThrottled = false
         thermalHeadroom = 0.0; heapAllocatedMb = 0.0; activityType = ActivityType.UNKNOWN
+        thermalSnapshot = null; heapSnapshot = null
     }
 }
 

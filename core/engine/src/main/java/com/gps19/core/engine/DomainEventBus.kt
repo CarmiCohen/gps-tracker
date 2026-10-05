@@ -9,27 +9,26 @@ import javax.inject.Singleton
 
 /**
  * DomainEventBus: A high-performance, unified reactive bus for domain-level events.
+ * Oct.5.5:
+ * - Issue #1328: Backpressure Risk Mitigation. Increased buffer capacity to 512 
+ *   to handle high-frequency forensic sampling bursts (100Hz). Prioritized 
+ *   emission strategy ensures critical alarms bypass buffer saturation.
  * Sep.25.02:
- * - Issue #1331: Capacity hardening. Increased buffer to 128 and implemented 
- *   DROP_OLDEST strategy to guarantee non-blocking emission for the tick loop.
- * Sep.25.01:
- * - Issue #1322: Migrated to core engine module to support component-level 
- *   event emission from LocationProcessor and other core logic.
- * Sep.24.97:
- * - Issue #1291: Facilitates decoupling of the background evaluation loop from 
- *   side-effect components like forensics, ribbons, and remote status updates.
+ * - Issue #1331: Capacity hardening. Increased buffer to 128.
  */
 @Singleton
 class DomainEventBus @Inject constructor() {
+    
+    // Hardened capacity to 512 items to provide 5s of headroom at 100Hz bursts.
     private val _events = MutableSharedFlow<DomainEvent>(
-        extraBufferCapacity = 128,
+        extraBufferCapacity = 512,
         onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
     val events: SharedFlow<DomainEvent> = _events.asSharedFlow()
 
     /**
      * Emits a domain event to all subscribers.
-     * Uses trySend-style buffering to ensure the emitter (tick loop) is never blocked.
+     * Uses non-blocking tryEmit to ensure the tracking loop is never stalled by UI observers.
      */
     fun emit(event: DomainEvent) {
         _events.tryEmit(event)

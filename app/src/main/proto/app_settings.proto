@@ -283,6 +283,10 @@ message RealtimeStatus {
     double dist_to_tracker = 90;
     double dist_to_home = 91;
     string sentinel_status_enum = 92;
+
+    // Issue #1344: Forensic Diagnostic Expansion
+    optional double thermal_snapshot = 93;
+    optional double heap_snapshot = 94;
 }
 
 message GeoPointProto {
@@ -464,6 +468,10 @@ message TrackerStatusProto {
     optional string name = 120;
     double dist_to_tracker = 121;
     double dist_to_home = 122;
+
+    // Issue #1344: Forensic Diagnostic Expansion
+    optional double thermal_snapshot = 123;
+    optional double heap_snapshot = 124;
 }
 
 message ActiveAlarmProto {

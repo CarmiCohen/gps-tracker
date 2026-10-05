@@ -4,13 +4,13 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.5.2:
+ * - Issue #1344: Forensic Diagnostic Expansion. Integrated thermalSnapshot 
+ *   and heapSnapshot into binary serialization for remote correlation (R1344).
  * Oct.5.1:
  * - Issue #1173: Protobuf-First Persistence (Phase 2). Expanded parity fields 
  *   for RealtimeStatus and TrackerStatusProto. Added binary entry points 
  *   for persistence BLOBs.
- * Oct.2.9:
- * - Issue #1314: TrackerStatus Convergence. Migrated to unified LocationUpdate 
- *   monolith DTO. Fixed liftIdx and battery flag references.
  */
 object TelemetryProtobufMapper {
 
@@ -141,6 +141,10 @@ object TelemetryProtobufMapper {
         builder.setIsPowerSaveMode(status.isPowerSaveMode)
         builder.setStandbyBucket(status.standbyBucket)
         builder.setNetInterface(status.netInterface)
+
+        // Issue #1344: Forensic Diagnostic Expansion
+        status.thermalSnapshot?.let { builder.setThermalSnapshot(it) }
+        status.heapSnapshot?.let { builder.setHeapSnapshot(it) }
 
         // Enums
         builder.setState(TrackerStateProto.valueOf("TS_" + status.trackerState.name))
@@ -281,6 +285,10 @@ object TelemetryProtobufMapper {
         builder.setThermalHeadroom(status.integrity.thermalHeadroom)
         builder.setHeapAllocatedMb(status.integrity.heapAllocatedMb)
 
+        // Issue #1344: Forensic Diagnostic Expansion
+        status.thermalSnapshot?.let { builder.setThermalSnapshot(it) }
+        status.heapSnapshot?.let { builder.setHeapSnapshot(it) }
+
         // Enums
         builder.setTrackerState(status.trackerState.name)
         builder.setStatus(status.status.name)
@@ -313,6 +321,10 @@ object TelemetryProtobufMapper {
         builder.setThermalHeadroom(p.thermalHeadroom).setHeapAllocatedMb(p.heapAllocatedMb)
         builder.setActivityType(p.activityType.name)
         
+        // Issue #1344: Forensic Diagnostic Expansion
+        p.thermalSnapshot?.let { builder.setThermalSnapshot(it) }
+        p.heapSnapshot?.let { builder.setHeapSnapshot(it) }
+
         builder.setStatus(p.status.name)
         builder.setLocationPendingReason(LocationPendingReasonProto.valueOf("LPR_" + p.locationPendingReason.name))
     }

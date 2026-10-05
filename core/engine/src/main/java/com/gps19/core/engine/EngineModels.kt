@@ -6,13 +6,12 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * Oct.5.1:
- * - Issue #SIMP-1201-1: Logic State Serialization. Added lastSirenStopRt 
- *   and bootId to AlarmEvaluationState for unified binary persistence (R1201).
- * Oct.4.6:
- * - Issue #1160: Flyweight & Pooling Expansion. Converted TrajectoryNode, 
- *   SentinelResult, and JumpConfidence to mutable classes and optimized 
- *   ProcessedLocation.reset() to prevent internal point allocations (R1160).
+ * Oct.5.5:
+ * - Issue #1328: Event Bus Backpressure Risk. Introduced EventPriority to 
+ *   DomainEvent hierarchy to support prioritized drop strategies in the 
+ *   reactive bus.
+ * - Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2). Finalized 
+ *   NativeFastPathProvider with 100Hz vibration primitives.
  */
 
 @Serializable
@@ -143,7 +142,9 @@ class EngineConnectionPoint(
     var violationUptimeMs: Long = 0L,
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
-    var activityType: ActivityType = ActivityType.UNKNOWN
+    var activityType: ActivityType = ActivityType.UNKNOWN,
+    var thermalSnapshot: Double? = null,
+    var heapSnapshot: Double? = null
 ) {
     fun copyFrom(other: EngineConnectionPoint) {
         this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt; this.remoteSig = other.remoteSig
@@ -165,6 +166,8 @@ class EngineConnectionPoint(
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
         this.thermalHeadroom = other.thermalHeadroom; this.heapAllocatedMb = other.heapAllocatedMb
         this.activityType = other.activityType
+        this.thermalSnapshot = other.thermalSnapshot
+        this.heapSnapshot = other.heapSnapshot
     }
 }
 
@@ -186,7 +189,12 @@ data class AlarmServiceContext(
     val role: AppRole = AppRole.TRACKER
 )
 
-sealed class DomainEvent {
+/**
+ * EventPriority: Defines the criticality of domain events for backpressure handling.
+ */
+enum class EventPriority { LOW, NORMAL, HIGH, CRITICAL }
+
+sealed class DomainEvent(open val priority: EventPriority = EventPriority.NORMAL) {
     data class TickEvaluated(
         val now: Long,
         val nowRt: Long,
@@ -204,78 +212,79 @@ sealed class DomainEvent {
         val lastSitTs: Long = 0L,
         val lastTickTs: Long = 0L,
         val lastTickRt: Long = 0L
-    ) : DomainEvent()
+    ) : DomainEvent(EventPriority.NORMAL)
 
-    data class PowerSaveTransition(val isEngaged: Boolean) : DomainEvent()
-    data class PeerStatusReceived(val status: LocationUpdate) : DomainEvent()
-    data class PeerConnectionChanged(val isConnected: Boolean, val peerId: String) : DomainEvent()
-    data class HeuristicRecovery(val message: String, val gapMs: Long, val lat: Double, val lng: Double, val accuracy: Double) : DomainEvent()
-    class StabilityViolation(val message: String, val isJitter: Boolean, val lat: Double, val lng: Double, val accuracy: Double) : DomainEvent()
-    data class ServiceStatus(val message: String, val isImportant: Boolean = false) : DomainEvent()
+    data class PowerSaveTransition(val isEngaged: Boolean) : DomainEvent(EventPriority.HIGH)
+    data class PeerStatusReceived(val status: LocationUpdate) : DomainEvent(EventPriority.NORMAL)
+    data class PeerConnectionChanged(val isConnected: Boolean, val peerId: String) : DomainEvent(EventPriority.HIGH)
+    data class HeuristicRecovery(val message: String, val gapMs: Long, val lat: Double, val lng: Double, val accuracy: Double) : DomainEvent(EventPriority.HIGH)
+    class StabilityViolation(val message: String, val isJitter: Boolean, val lat: Double, val lng: Double, val accuracy: Double) : DomainEvent(EventPriority.HIGH)
+    data class ServiceStatus(val message: String, val isImportant: Boolean = false) : DomainEvent(if (isImportant) EventPriority.NORMAL else EventPriority.LOW)
 }
 
-sealed class AlarmEvent : DomainEvent() {
+sealed class AlarmEvent(override val priority: EventPriority = EventPriority.CRITICAL) : DomainEvent(priority) {
     data class LogEvent(
         val type: String, val message: String, val isImportant: Boolean, 
         val extremeValue: Double?, val logId: String?, val durationMs: Long, 
         val isSpecial: Boolean, val specialColor: Int?, 
         val lat: Double, val lng: Double, val accuracy: Double, 
-        val maxAccuracy: Double, val snr: Double?, val vibe: Double?
-    ) : AlarmEvent()
+        val maxAccuracy: Double, val snr: Double?, val vibe: Double?,
+        val thermal: Double? = null, val heap: Double? = null
+    ) : AlarmEvent(if (isImportant) EventPriority.CRITICAL else EventPriority.HIGH)
 }
 
-sealed class IntegrityEvent : DomainEvent() {
-    data class ViolationSustained(val type: String) : IntegrityEvent()
-    data class ViolationResolved(val type: String) : IntegrityEvent()
-    data class LogEvent(val message: String, val isImportant: Boolean) : IntegrityEvent()
-    data class LocationStatusChanged(val status: LocationStatus) : IntegrityEvent()
-    data class GnssThrottledChanged(val throttled: Boolean) : IntegrityEvent()
-    data class MemoryPressureChanged(val level: MemoryPressureLevel, val heapMb: Double) : IntegrityEvent()
+sealed class IntegrityEvent(override val priority: EventPriority = EventPriority.HIGH) : DomainEvent(priority) {
+    data class ViolationSustained(val type: String) : IntegrityEvent(EventPriority.CRITICAL)
+    data class ViolationResolved(val type: String) : IntegrityEvent(EventPriority.CRITICAL)
+    data class LogEvent(val message: String, val isImportant: Boolean) : IntegrityEvent(if (isImportant) EventPriority.HIGH else EventPriority.NORMAL)
+    data class LocationStatusChanged(val status: LocationStatus) : IntegrityEvent(EventPriority.HIGH)
+    data class GnssThrottledChanged(val throttled: Boolean) : IntegrityEvent(EventPriority.NORMAL)
+    data class MemoryPressureChanged(val level: MemoryPressureLevel, val heapMb: Double) : IntegrityEvent(EventPriority.HIGH)
 }
 
-sealed class ProcessorEvent(open val isPrimary: Boolean) : DomainEvent() {
-    data class TrailPointSaved(val lat: Double, val lng: Double, val isViewerTrail: Boolean, val status: SentinelStatus, val timestamp: Long, val accuracy: Double, val maxAccuracy: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary)
-    data class LogAdded(val message: String, val type: String, val isImportant: Boolean, val isSpecial: Boolean, val lat: Double, val lng: Double, val accuracy: Double, val snr: Double?, val vibe: Double?, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary)
-    data class MaxAccuracyChanged(val accuracy: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary)
-    data class ChairBaselineChanged(val baseline: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary)
-    data class VibrationFloorChanged(val floor: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary)
-    data class LuxBaselineChanged(val baseline: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary)
-    data class AcousticFloorChanged(val floor: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary)
-    data class GpsStallDetected(val rt: Long, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary)
+sealed class ProcessorEvent(open val isPrimary: Boolean, override val priority: EventPriority = EventPriority.NORMAL) : DomainEvent(priority) {
+    data class TrailPointSaved(val lat: Double, val lng: Double, val isViewerTrail: Boolean, val status: SentinelStatus, val timestamp: Long, val accuracy: Double, val maxAccuracy: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.NORMAL)
+    data class LogAdded(val message: String, val type: String, val isImportant: Boolean, val isSpecial: Boolean, val lat: Double, val lng: Double, val accuracy: Double, val snr: Double?, val vibe: Double?, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, if (isImportant) EventPriority.HIGH else EventPriority.LOW)
+    data class MaxAccuracyChanged(val accuracy: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
+    data class ChairBaselineChanged(val baseline: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
+    data class VibrationFloorChanged(val floor: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
+    data class LuxBaselineChanged(val baseline: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
+    data class AcousticFloorChanged(val floor: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
+    data class GpsStallDetected(val rt: Long, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.HIGH)
 }
 
-sealed class ConnectivityEvent : DomainEvent() {
-    data class PeerPulse(val id: String) : ConnectivityEvent()
+sealed class ConnectivityEvent(override val priority: EventPriority = EventPriority.NORMAL) : DomainEvent(priority) {
+    data class PeerPulse(val id: String) : ConnectivityEvent(EventPriority.NORMAL)
 }
 
-sealed class HistoryEvent : DomainEvent() {
-    data class LogEvent(val message: String, val isImportant: Boolean) : HistoryEvent()
+sealed class HistoryEvent(override val priority: EventPriority = EventPriority.LOW) : DomainEvent(priority) {
+    data class LogEvent(val message: String, val isImportant: Boolean) : HistoryEvent(if (isImportant) EventPriority.NORMAL else EventPriority.LOW)
 }
 
-sealed class AppSensorEvent : DomainEvent() {
-    data class HardwareFailure(val reason: String) : AppSensorEvent()
-    data class LogEvent(val message: String, val isImportant: Boolean) : AppSensorEvent()
+sealed class AppSensorEvent(override val priority: EventPriority = EventPriority.NORMAL) : DomainEvent(priority) {
+    data class HardwareFailure(val reason: String) : AppSensorEvent(EventPriority.HIGH)
+    data class LogEvent(val message: String, val isImportant: Boolean) : AppSensorEvent(if (isImportant) EventPriority.NORMAL else EventPriority.LOW)
 }
 
-sealed class CommandEvent : DomainEvent() {
-    object WatchdogTrigger : CommandEvent()
-    object UiPulse : CommandEvent()
-    data class UiVisibilityChanged(val visible: Boolean) : CommandEvent()
-    object ResetTimers : CommandEvent()
-    object SyncSensors : CommandEvent()
-    object ExecuteStressTest : CommandEvent()
-    object ExecuteNetworkStressTest : CommandEvent()
-    data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : CommandEvent()
-    object TriggerMemoryFlush : CommandEvent()
+sealed class CommandEvent(override val priority: EventPriority = EventPriority.HIGH) : DomainEvent(priority) {
+    object WatchdogTrigger : CommandEvent(EventPriority.CRITICAL)
+    object UiPulse : CommandEvent(EventPriority.NORMAL)
+    data class UiVisibilityChanged(val visible: Boolean) : CommandEvent(EventPriority.NORMAL)
+    object ResetTimers : CommandEvent(EventPriority.HIGH)
+    object SyncSensors : CommandEvent(EventPriority.NORMAL)
+    object ExecuteStressTest : CommandEvent(EventPriority.NORMAL)
+    object ExecuteNetworkStressTest : CommandEvent(EventPriority.NORMAL)
+    data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : CommandEvent(EventPriority.HIGH)
+    object TriggerMemoryFlush : CommandEvent(EventPriority.HIGH)
 }
 
-sealed class RevivalEvent : DomainEvent() {
-    data class Attempt(val count: Int) : RevivalEvent()
-    object HardwareLock : RevivalEvent()
-    object Success : RevivalEvent()
-    object RawBurstStarted : RevivalEvent()
-    object RawBurstEnded : RevivalEvent()
-    data class Footprint(val deltaMa: Int, val deltaTemp: Double, val durationMs: Long) : RevivalEvent()
+sealed class RevivalEvent(override val priority: EventPriority = EventPriority.NORMAL) : DomainEvent(priority) {
+    data class Attempt(val count: Int) : RevivalEvent(EventPriority.HIGH)
+    object HardwareLock : RevivalEvent(EventPriority.CRITICAL)
+    object Success : RevivalEvent(EventPriority.HIGH)
+    object RawBurstStarted : RevivalEvent(EventPriority.NORMAL)
+    object RawBurstEnded : RevivalEvent(EventPriority.NORMAL)
+    data class Footprint(val deltaMa: Int, val deltaTemp: Double, val durationMs: Long) : RevivalEvent(EventPriority.LOW)
 }
 
 interface SpatialAnchor {
@@ -287,9 +296,6 @@ interface SpatialAnchor {
     val rt: Long
 }
 
-/**
- * Slice-based interfaces to decouple UI from LocationUpdate monolith (Issue #1420).
- */
 interface Locatable {
     val isLocationPending: Boolean
     val locationPendingReason: LocationPendingReason
@@ -311,6 +317,11 @@ interface DeviceIdentity {
 interface NativeFastPathProvider {
     fun isStationary(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean
     fun updateVibrationFloor(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double): Double
+    fun computeNextHpf(lastHpfValue: Double, currentRawVibe: Double, lastRawVibe: Double): Double
+    fun computeNextEnergy(currentEnergy: Double, hpfValue: Double): Double
+    fun calculateVibrationDelta(x: Double, y: Double, z: Double, lx: Double, ly: Double, lz: Double): Double
+    fun isShockViolated(peakShock: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean
+    fun isVibrationSuspicious(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean
 }
 
 @Serializable
@@ -586,11 +597,6 @@ class AlarmEvaluationState {
     var lastSirenStopRt: Long = 0L
     var bootId: String = ""
     
-    /**
-     * Issue #1410: Forced val ConcurrentHashMap to resolve CME.
-     * Note: Marked as @Transient to ensure Kotlin Serialization doesn't replace 
-     * it with a default LinkedHashMap instance during deserialization.
-     */
     @Transient
     val activeAlarms: MutableMap<String, ActiveAlarm> = ConcurrentHashMap()
 

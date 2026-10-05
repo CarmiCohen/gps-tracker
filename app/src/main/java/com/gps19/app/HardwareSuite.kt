@@ -37,13 +37,10 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
- * Oct.3.1:
- * - Issue #SIMP-1510-1: Native FastPath Convergence. Implemented NativeFastPathProvider 
- *   delegate to offload stationary detection and vibration floor EMA to JNI via 
- *   JdHardwareManager.
- * Oct.2.15:
- * - Issue #1176: Native FastPath. Refactored HardwareFastPath to delegate to 
- *   JdHardwareManager (n10/n11) for Acoustic/Light spike detection (R-ID 257).
+ * Oct.5.5:
+ * - Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2). Offloaded vibration 
+ *   vector magnitude calculation to JNI via JdHardwareManager. Fully hardened 
+ *   the 100Hz sensor path against JVM floating-point overhead.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -65,6 +62,26 @@ class HardwareSuite @Inject constructor(
 
         override fun updateVibrationFloor(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double): Double {
             return JdHardwareManager.updateVibrationFloorNative(currentFloor, vibration, isWarming, cpuLoad)
+        }
+
+        override fun computeNextHpf(lastHpfValue: Double, currentRawVibe: Double, lastRawVibe: Double): Double {
+            return JdHardwareManager.computeNextHpfNative(lastHpfValue, currentRawVibe, lastRawVibe)
+        }
+
+        override fun computeNextEnergy(currentEnergy: Double, hpfValue: Double): Double {
+            return JdHardwareManager.computeNextEnergyNative(currentEnergy, hpfValue)
+        }
+
+        override fun calculateVibrationDelta(x: Double, y: Double, z: Double, lx: Double, ly: Double, lz: Double): Double {
+            return JdHardwareManager.calculateVibrationDeltaNative(x, y, z, lx, ly, lz)
+        }
+
+        override fun isShockViolated(peakShock: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
+            return JdHardwareManager.isShockViolatedNative(peakShock, adaptiveFloor, sensitivity, cpuLoad)
+        }
+
+        override fun isVibrationSuspicious(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
+            return JdHardwareManager.isVibrationSuspiciousNative(vibration, adaptiveFloor, sensitivity, cpuLoad)
         }
     }
 
@@ -962,8 +979,12 @@ class HardwareSuite @Inject constructor(
         )
 
     private fun processVibration(x: Float, y: Float, z: Float) {
-        val dx = x.toDouble() - lastAccelX.toDouble(); val dy = y.toDouble() - lastAccelY.toDouble(); val dz = z.toDouble() - lastAccelZ.toDouble()
-        val delta = sqrt(dx * dx + dy * dy + dz * dz) / GRAVITY_EARTH
+        val dx = x.toDouble(); val dy = y.toDouble(); val dz = z.toDouble()
+        val lx = lastAccelX.toDouble(); val ly = lastAccelY.toDouble(); val lz = lastAccelZ.toDouble()
+        
+        // Issue #SIMP-1510-1: Offload vector magnitude calculation to JNI
+        val delta = nativeFastPathProvider.calculateVibrationDelta(dx, dy, dz, lx, ly, lz)
+
         synchronized(this) { 
             if (delta > logicPeakVibration) logicPeakVibration = delta
             if (delta > forensicPeakVibration) forensicPeakVibration = delta
