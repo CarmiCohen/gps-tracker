@@ -25,10 +25,12 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Oct.5.6:
+ * - Issue #1328: Phase 2 - UI Performance Hardening. Refactored to collect 
+ *   high-frequency states (kinematic, diagnostic, dashboard) internally 
+ *   to isolate recompositions from MainAppContent (R1328).
  * Sep.30.42:
  * - Issue #1390: Passed cameraActions Flow to AppMapContainer.
- * Sep.23.50:
- * - Issue #1203 RESOLVED: Unified ViewModel scope. (R-ID 419).
  */
 
 @Composable
@@ -37,8 +39,6 @@ fun TrackerScreen(
     settingsState: SettingsUiState,
     spatialState: SpatialUiState,
     navigationState: NavigationState,
-    kinematicState: KinematicState,
-    diagnosticState: DiagnosticState,
     viewModel: MainViewModel,
     logsFlow: StateFlow<List<LogEntry>>,
     onToggleMap: () -> Unit,
@@ -68,7 +68,11 @@ fun TrackerScreen(
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
     
+    // R1328: High-frequency states collected here to isolate MainAppContent.
     val dashboardState by viewModel.dashboardState.collectAsStateWithLifecycle()
+    val kinematicState by viewModel.kinematicState.collectAsStateWithLifecycle()
+    val diagnosticState by viewModel.diagnosticState.collectAsStateWithLifecycle()
+
     val gpsIndexData by viewModel.gpsIndexData.collectAsStateWithLifecycle()
     val rttValue by viewModel.rtt.collectAsStateWithLifecycle()
     val currentMa by viewModel.currentMa.collectAsStateWithLifecycle()

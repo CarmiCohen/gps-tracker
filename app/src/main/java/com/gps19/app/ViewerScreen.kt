@@ -25,6 +25,10 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Viewer-mode UI.
+ * Oct.5.6:
+ * - Issue #1328: Phase 2 - UI Performance Hardening. Refactored to collect 
+ *   high-frequency states (kinematic, diagnostic, dashboard) internally 
+ *   to isolate recompositions from MainAppContent (R1328).
  * Oct.3.5:
  * - HUD & Overlay De-confliction: Hid main HeaderBar when overlays (Settings/Logs) 
  *   are open to prevent visual overlap; ensured HUD Surface is transparent 
@@ -37,8 +41,6 @@ fun ViewerScreen(
     settingsState: SettingsUiState,
     spatialState: SpatialUiState,
     navigationState: NavigationState,
-    kinematicState: KinematicState,
-    diagnosticState: DiagnosticState,
     viewModel: MainViewModel,
     logsFlow: StateFlow<List<LogEntry>>,
     onToggleMap: () -> Unit,
@@ -66,7 +68,11 @@ fun ViewerScreen(
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val context = LocalContext.current
 
+    // R1328: High-frequency states collected here to isolate MainAppContent.
     val dashboardState by viewModel.dashboardState.collectAsStateWithLifecycle()
+    val kinematicState by viewModel.kinematicState.collectAsStateWithLifecycle()
+    val diagnosticState by viewModel.diagnosticState.collectAsStateWithLifecycle()
+
     val gpsIndexData by viewModel.gpsIndexData.collectAsStateWithLifecycle()
     val rtt by viewModel.rtt.collectAsStateWithLifecycle()
     val currentMa by viewModel.currentMa.collectAsStateWithLifecycle()

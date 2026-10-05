@@ -21,13 +21,15 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.5.6:
+ * - Issue #1328: Phase 2 - UI Performance Hardening. Refactored state mapping 
+ *   to allow granular binding in MainAppContent. Added isRedScreenVisible 
+ *   and isAlarmSilenced to hudHealthState to decouple AlarmOverlay from root 
+ *   DiagnosticState collection.
  * Oct.4.5:
  * - Issue #1425: Unified Clock Authority. Migrated HUD and Map freshness 
  *   calculations to monotonic time (systemPulseRt) to prevent UI jitter during 
  *   clock syncs. Refactored mapMapViewState to use monotonic fix age.
- * Oct.4.1:
- * - Issue #1202: Unified UI event routing. Integrated UiEffect SharedFlow 
- *   to decouple imperative UI commands from business logic.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -574,7 +576,9 @@ class MainViewModel @Inject constructor(
             maxDropMs = activeStats.maxDropMs,
             engineVersion = BuildConfig.VERSION_NAME,
             netInterface = diag.connectivity.netInterface,
-            systemPulse = nowRt
+            systemPulse = nowRt,
+            isLocalOnline = diag.connectivity.isLocalOnline,
+            isRelayConnected = diag.connectivity.isRelayConnected
         )
     }
 
@@ -618,7 +622,8 @@ class MainViewModel @Inject constructor(
             status = loc.status,
             tamperReason = if (isViewer) kinematicState.trackerHealth.tamperNote else kinematicState.localHealth.tamperNote,
             isUltraLongStationary = isUltra,
-            systemPulse = nowRt
+            systemPulse = nowRt,
+            gpsTs = loc.kinetic.gpsTs
         )
     }
 
@@ -677,7 +682,9 @@ class MainViewModel @Inject constructor(
             lastEnergyDeltaMa = health.lastEnergyDeltaMa,
             lastEnergyDeltaTemp = health.lastEnergyDeltaTemp,
             lastEnergyDurationMs = health.lastEnergyDurationMs,
-            systemPulse = nowRt
+            systemPulse = nowRt,
+            thermalHeadroom = health.thermalHeadroom,
+            heapAllocatedMb = health.heapAllocatedMb
         )
     }
 
@@ -793,6 +800,8 @@ class MainViewModel @Inject constructor(
             viewerTemp = diag.battery.temp.toFloat(),
             hasActiveAlarms = diag.activeAlarms.any { !it.isResolved },
             isRedScreenSuppressed = (diag.activeAlarms.any { !it.isResolved } && !diag.isRedScreenVisible),
+            isRedScreenVisible = diag.isRedScreenVisible,
+            isAlarmSilenced = diag.isAlarmSilenced,
             isSirenPlaying = diag.isSirenPlaying,
             activeAlarms = diag.activeAlarms,
             progressPulse = progressValue,

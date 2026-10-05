@@ -49,6 +49,10 @@ const val MEMORY_CRITICAL_THRESHOLD_MB = 250.0
 // Issue #1417: Connectivity Jitter
 const val CONNECTIVITY_HYSTERESIS_MS = 3000L
 
+// Issue #1328: Event Bus Hardening
+const val DOMAIN_EVENT_BUS_CAPACITY = 512
+const val DOMAIN_EVENT_BUS_HIGH_SUBSCRIPTION_THRESHOLD = 5
+
 // Issue #660: Forensic Audit: Log Buffer Pressure
 const val LOG_BATCH_SIZE = 100 
 const val LOG_BATCH_DELAY_MS = 2000L

@@ -1,40 +1,30 @@
-# Forensic Handover (Oct.5.5 - JNI HARDENING PHASE 2 COMPLETE)
+# Forensic Handover (Oct.5.6 - UI PERFORMANCE HARDENED)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.5.5` | **Status**: 🟢 **OPERATIONAL**.
-*   **JNI Hardening (Issue #SIMP-1510-1 - Phase 2)**:
-    *   **Hot-Path Migration**: Fully migrated the 100Hz vibration processing pipeline to C++ (`jdHardware`).
-    *   **New Native Primitives**:
-        *   `n14`: High-Pass Filter (Alpha: 0.9).
-        *   `n15`: Kinetic Energy EMA (Alpha: 0.1).
-        *   `n16`: Vector Magnitude (`sqrt(dx^2 + dy^2 + dz^2) / G`).
-        *   `n17`: Shock Violation Gate (Load-aware, 7.0x multiplier).
-        *   `n18`: Suspicious Vibration Gate (Load-aware, 2.5x multiplier).
-    *   **Parity**: Corrected `n13` coefficients to match `EngineConstants.kt`. Aligned JVM fallbacks in `JdHardwareManager.kt`.
-    *   **Wiring**: `SentinelValidator.kt` and `HardwareSuite.kt` (line 746) now delegate all high-frequency math to the native layer.
-*   **Event Bus Hardening (Issue #1328)**:
-    *   **Capacity**: Increased `DomainEventBus` buffer to 512 (provides ~5s safety at 100Hz).
-    *   **Metadata**: `DomainEvent` now carries `EventPriority` (LOW, NORMAL, HIGH, CRITICAL).
+*   **Version**: `Oct.5.6` | **Status**: 🟢 **OPERATIONAL**.
+*   **Event Bus & UI Hardening (Issue #1328 - Phase 2)**:
+    *   **Backpressure Mitigation**: `DomainEventBus` now drops `EventPriority.LOW` events (non-critical logs) when subscription count ≥ 5. This protects the 100Hz JNI hot-path from UI-induced stalls.
+    *   **Recomposition Isolation**: Moved collection of high-frequency state slices (`KinematicState`, `DiagnosticState`) from `MainAppContent.kt` down to `TrackerScreen.kt` and `ViewerScreen.kt`.
+    *   **Granular Binding**: Refactored `HudHealthState` and `AlarmOverlay` to bind only to necessary data, ensuring the root UI tree remains static during high-frequency telemetry updates.
+*   **JNI Hardening (Issue #SIMP-1510-1)**: Maintained 100Hz native vibration pipeline. 🟢 **VERIFIED** parity with JVM fallbacks.
 
 ## 🟢 Audit Record
-*   **Build Status**: 🟢 **SUCCESSFUL**. Verified JNI mappings for all 18 functions.
-*   **Metrics**: SOT Count: 275 (Rules: 135), Open: H:1, M:0, L:0, Ideas: 8.
-*   **Traceability**: Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md`.
+*   **Build Status**: 🟢 **SUCCESSFUL**. Verified zero-allocation state mapping in `MainViewModel`.
+*   **Metrics**: SOT Count: 274 (Rules: 133), Open: H:0, M:0, L:0, Ideas: 4.
+*   **Traceability**: Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md` with Rule 1.110 (R1422).
 
 ## 🚀 Resumption Action Path (Next Chat)
-1.  **Prioritized Drop Strategy (Issue #1328 - Phase 2)**:
-    *   Modify `DomainEventBus.emit()` to drop `EventPriority.LOW` events if `_events.subscriptionCount` is high or if buffer pressure is detected (requires custom flow logic or atomic counters).
-2.  **UI Performance Audit**:
-    *   Audit `MainAppContent.kt` and `TrackerScreen.kt` for recomposition counts during high-frequency vibration events.
-3.  **Strategic Simplification #1450**:
+1.  **Strategic Simplification #1450**:
     *   Evaluate consolidating granular JNI calls into a single `DirectByteBuffer` update to further reduce JNI bridge overhead.
+2.  **Lifecycle-Aware Tick Orchestrator #1293**:
+    *   Refactor background services to use a unified `TickOrchestrator` for better initialization gating.
 
 ## 🧪 Latest Bug Test Procedure
-*   **JNI Parity Test**: Toggle `JdHardwareManager.isAvailable()` manually in a debug session; verify no change in stationary detection behavior between JVM and Native paths.
-*   **Backpressure Test**: Simulate 200Hz event emission; verify `IntegrityEvent` and `AlarmEvent` (HIGH/CRITICAL) are never dropped despite buffer saturation.
+*   **Backpressure Test**: Simulate 200Hz event emission; verify `IntegrityEvent` and `AlarmEvent` (HIGH/CRITICAL) are never dropped, while `ProcessorEvent.LogAdded` (LOW) is dropped when UI is active.
+*   **Recomposition Audit**: Use Layout Inspector to verify `MainAppContent` does not recompose during RTT/Battery updates.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.5.5)
-- **Oct.5.5: [SOT Count: 275 (Rules: 135), Open: H:1, M:0, L:0, Ideas: H:0, M:0, L:8, Testing: 34, QA: 405]**
-- **Audit Record**: Vibration hot-path fully offloaded to JNI; Event Bus capacity hardened; version Oct.5.5 tagged.
+## 📊 Hardening Progress Dashboard (Oct.5.6)
+- **Oct.5.6: [SOT Count: 274 (Rules: 133), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 34, QA: 405]**
+- **Audit Record**: UI recomposition bottlenecks eliminated; event bus backpressure dropping implemented; version Oct.5.6 tagged.

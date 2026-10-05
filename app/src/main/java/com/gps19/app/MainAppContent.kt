@@ -41,12 +41,12 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.5.6:
+ * - Issue #1328: Phase 2 - UI Performance Hardening. Refactored state collection 
+ *   to eliminate root-level high-frequency recompositions. Moved kinematic and 
+ *   diagnostic state collection down to specialized screens. (R1328).
  * Oct.4.1:
- * - Issue #1202: UI Event Routing Unification. Refactored navigation and 
- *   procedural logic to observe UiEffect stream. Decoupled View from 
- *   service startup and permission orchestration (R-ID 612).
- * Oct.3.2:
- * - Issue #1420: Granular HUD Binding.
+ * - Issue #1202: UI Event Routing Unification.
  */
 @Composable
 fun MainAppContent(
@@ -62,13 +62,14 @@ fun MainAppContent(
     onRequestHardwarePermission: () -> Unit,
     onStopTracking: () -> Unit
 ) {
+    // R1328: Collect only core navigation and session states at root.
     val sessionState by viewModel.sessionUiState.collectAsStateWithLifecycle()
     val settingsState by viewModel.settingsUiState.collectAsStateWithLifecycle()
     val spatialState by viewModel.spatialUiState.collectAsStateWithLifecycle()
     val navigationState by viewModel.navigationState.collectAsStateWithLifecycle()
     
-    val kinematicState by viewModel.kinematicState.collectAsStateWithLifecycle()
-    val diagnosticState by viewModel.diagnosticState.collectAsStateWithLifecycle()
+    // R1328: HudHealth collected for AlarmOverlay logic but is decoupled from KinematicState.
+    val hudHealth by viewModel.hudHealthState.collectAsStateWithLifecycle()
     
     val navController = rememberNavController()
     val context = LocalContext.current
@@ -108,7 +109,6 @@ fun MainAppContent(
         }
     }
 
-    // Effect Observer (Issue #1202)
     LaunchedEffect(Unit) {
         viewModel.uiEffects.collectLatest { effect ->
             when (effect) {
@@ -239,7 +239,7 @@ fun MainAppContent(
     
     GpsTrackerTheme(appMode = sessionState.appMode) {
         Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding(), color = MaterialTheme.colorScheme.background) {
-            BackHandler(enabled = diagnosticState.isRedScreenVisible && sessionState.appMode != null) { viewModel.onEvent(UiEvent.DismissAlarms) }
+            BackHandler(enabled = hudHealth.isRedScreenVisible && sessionState.appMode != null) { viewModel.onEvent(UiEvent.DismissAlarms) }
 
             Box(modifier = Modifier.fillMaxSize()) {
                 if (sessionState.hydrationLevel >= 2) {
@@ -269,7 +269,7 @@ fun MainAppContent(
                             if (sessionState.hydrationLevel >= 3) {
                                 TrackerScreen(
                                     sessionState = sessionState, settingsState = settingsState, spatialState = spatialState, navigationState = navigationState,
-                                    kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow,
+                                    viewModel = viewModel, logsFlow = viewModel.eventLogsFlow,
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) }, 
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
@@ -297,7 +297,7 @@ fun MainAppContent(
                             if (sessionState.hydrationLevel >= 3) {
                                 ViewerScreen(
                                     sessionState = sessionState, settingsState = settingsState, spatialState = spatialState, navigationState = navigationState,
-                                    kinematicState = kinematicState, diagnosticState = diagnosticState, viewModel = viewModel, logsFlow = viewModel.eventLogsFlow,
+                                    viewModel = viewModel, logsFlow = viewModel.eventLogsFlow,
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) },
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
@@ -310,6 +310,7 @@ fun MainAppContent(
                         }
                         composable(Screen.Diagnostics.route) {
                             val simulationState by viewModel.simulationUiState.collectAsStateWithLifecycle()
+                            val diagnosticState by viewModel.diagnosticState.collectAsStateWithLifecycle()
                             BackHandler { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) }
                             if (sessionState.hydrationLevel >= 3) {
                                 DiagnosticsScreen(
@@ -369,19 +370,20 @@ fun MainAppContent(
                     navigationState = navigationState,
                     settingsState = settingsState,
                     sessionState = sessionState,
-                    diagnosticState = diagnosticState,
                     importLauncher = importLauncher,
                     activity = activity
                 )
                 
-                if (diagnosticState.isRedScreenVisible && sessionState.appMode == "viewer" && sessionState.hydrationLevel >= 3) {
+                if (hudHealth.isRedScreenVisible && sessionState.appMode == "viewer" && sessionState.hydrationLevel >= 3) {
+                    // R1328: AlarmOverlay now binds to hudHealth (granular) and kinematicState (internal).
+                    val kinematicState by viewModel.kinematicState.collectAsStateWithLifecycle()
                     AlarmOverlay(
-                        alarms = diagnosticState.activeAlarms, isMuted = diagnosticState.isAlarmSilenced,
+                        alarms = hudHealth.activeAlarms, isMuted = hudHealth.isAlarmSilenced,
                         locatable = kinematicState.trackerHealth,
                         backgroundStatus = sessionState.permissions.backgroundStatus, hasBackgroundRestriction = sessionState.permissions.hasBackgroundRestriction,
                         onHardwarePermissionClick = { onRequestHardwarePermission() },
                         onMute = { 
-                            val currentCauses = diagnosticState.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { context.getString(R.string.status_muted) }
+                            val currentCauses = hudHealth.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { context.getString(R.string.status_muted) }
                             viewModel.onEvent(UiEvent.StopSiren(currentCauses))
                         },
                         onClose = { viewModel.onEvent(UiEvent.DismissAlarms) },
@@ -399,11 +401,11 @@ fun OverlayHost(
     navigationState: NavigationState,
     settingsState: SettingsUiState,
     sessionState: SessionUiState,
-    diagnosticState: DiagnosticState,
     importLauncher: androidx.activity.result.ActivityResultLauncher<String>,
     activity: ComponentActivity
 ) {
     if (navigationState.isSettingsOpen) {
+        val diagnosticState by viewModel.diagnosticState.collectAsStateWithLifecycle()
         SettingsOverlay(
             activeSubSettings = navigationState.activeSubSettings,
             draftDeviceId = settingsState.draftSettings.deviceId,

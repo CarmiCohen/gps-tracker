@@ -10,6 +10,10 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.5.6:
+ * - Issue #1328: Phase 2 - UI Performance Hardening. Consolidated Dashboard state 
+ *   to eliminate high-frequency root recompositions. Added isRedScreenVisible and 
+ *   isAlarmSilenced to HudHealthState for granular binding.
  * Oct.5.2:
  * - Issue #1344: Forensic Diagnostic Expansion. Added thermalSnapshot and 
  *   heapSnapshot to ConnectionPoint for history restoration parity (R1344).
@@ -362,7 +366,9 @@ data class DashboardConnectivityState(
     val trackerConnIndex: Int = 0,
     val viewerConnIndex: Int = 0,
     val netInterface: String = "UNKNOWN",
-    val systemPulse: Long = 0L
+    val systemPulse: Long = 0L,
+    val isLocalOnline: Boolean = false,
+    val isRelayConnected: Boolean = false
 )
 
 @Serializable
@@ -391,7 +397,8 @@ data class DashboardTelemetryState(
     val isTamperDetected: Boolean = false,
     val isUltraLongStationary: Boolean = false,
     val systemPulse: Long = 0L,
-    val activityType: ActivityType = ActivityType.UNKNOWN
+    val activityType: ActivityType = ActivityType.UNKNOWN,
+    val gpsTs: Long = 0L
 ) : Locatable
 
 @Serializable
@@ -492,6 +499,7 @@ data class DashboardState(
     val isTamperDetected get() = telemetry.isTamperDetected
     val isUltraLongStationary get() = telemetry.isUltraLongStationary
     val activityType get() = telemetry.activityType
+    val gpsTs get() = telemetry.gpsTs
 
     val vibration get() = health.vibration
     val heading get() = health.heading
@@ -667,6 +675,8 @@ data class HudHealthState(
     val viewerTemp: Float = 0f,
     val hasActiveAlarms: Boolean = false,
     val isRedScreenSuppressed: Boolean = false,
+    val isRedScreenVisible: Boolean = false,
+    val isAlarmSilenced: Boolean = false,
     val isSirenPlaying: Boolean = false,
     val activityType: ActivityType = ActivityType.UNKNOWN,
     val activeAlarms: List<AlarmInfo> = emptyList(),

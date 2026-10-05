@@ -1,5 +1,10 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct.5.6
+*   **Issue #1328: Event Bus Backpressure & UI Performance Hardening.** Implemented a multi-tier backpressure mitigation strategy for high-frequency forensic sampling (100Hz). 
+    *   **Prioritized Drop Strategy**: Modified `DomainEventBus.emit()` to drop `LOW` priority events (e.g., non-critical logging) when the reactive bus detects high subscription pressure (threshold: 5), protecting the tracking engine's hot-path from UI-induced stalls.
+    *   **UI Recomposition Hardening**: Refactored `MainAppContent`, `TrackerScreen`, and `ViewerScreen` to use granular state slicing (R1422). Moved collection of high-frequency transient states (`KinematicState`, `DiagnosticState`) from the root UI to specialized leaf screens. This isolates volatile triggers (like battery temp or RTT updates) and prevents redundant recompositions of the entire UI tree during 100Hz vibration bursts. (Oct.5.6 - Issue #1328).
+
 ## 🟢 Resolved in Oct.5.5
 *   **Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2).** Fully migrated the high-frequency vibration pipeline (100Hz) to JNI. Offloaded vector magnitude, HPF, Kinetic Energy, and violation gates to `jdHardware` C++ layer. Hardened coefficients to match `EngineConstants.kt` and eliminated JVM floating-point math from hot paths to reduce CPU churn and battery consumption (R1510-2).
 

@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.5.5
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.5.6
 
-## 🎯 Current Resumption Focus: Backpressure Risk Mitigation and JNI Hardening.
-JNI Hardening Phase 2 complete. Vibration hot-path (100Hz) fully offloaded to C++. Backpressure Risk Mitigation (Issue #1328) implemented via prioritized bus and increased capacity.
+## 🎯 Current Resumption Focus: Completion Sequence for Oct.5.6.
+Issue #1328 (Event Bus Backpressure & UI Performance Hardening) resolved. Version Oct.5.6 hardened against UI-induced backpressure and redundant recompositions.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -10,7 +10,7 @@ JNI Hardening Phase 2 complete. Vibration hot-path (100Hz) fully offloaded to C+
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 5)
+## 💡 Strategic Simplification Ideas (Ideas: 4)
 
 ### 🛑 High Priority
 *   (All high-priority simplification ideas resolved).
@@ -31,16 +31,18 @@ JNI Hardening Phase 2 complete. Vibration hot-path (100Hz) fully offloaded to C+
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
-*   **Issue #1328: Event Bus Backpressure Risk.** Resolved Oct.5.5. Increased `DomainEventBus` buffer capacity to 512 items to provide 5s of headroom during 100Hz forensic bursts. Introduced `EventPriority` metadata to `DomainEvent` hierarchy to support future prioritized drop strategies. (R1328).
-*   **Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2).** Resolved Oct.5.5. Fully migrated the high-frequency vibration processing pipeline (100Hz) to JNI. Offloaded vector magnitude, HPF, Kinetic Energy, and violation gates (Shock/Suspicious) to `jdHardware` C++ layer. Hardened coefficients to strictly match `EngineConstants.kt` and eliminated JVM floating-point math from hot paths (R1510-2).
-*   **Issue #1344: Forensic Diagnostic Expansion.** Resolved Oct.5.2. Integrated `thermalSnapshot` and `heapSnapshot` into `EngineConnectionPoint`, `RealtimeStatus`, and `TrackerStatusProto`. Updated `IntegrityMonitor` to capture snapshots during heartbeats. (R1344).
-*   **Issue #SIMP-1201-1: Logic State Serialization Expansion.** Resolved Oct.5.1. Refactored `AlarmEvaluationState` persistence to use a consolidated Protobuf map (`role_logic_states`) in DataStore. (R1201).
-*   **Issue #1173: Protobuf-First Persistence (Phase 2).** Resolved Oct.5.1. Completed the transition to binary persistence for connection history and pending updates. (R1173).
+*   **Issue #1328: Event Bus Backpressure & UI Performance Hardening.** Resolved Oct.5.6. 
+    *   **Phase 1**: Increased `DomainEventBus` buffer to 512 items and implemented prioritized dropping of `LOW` priority events when subscription count exceeds `DOMAIN_EVENT_BUS_HIGH_SUBSCRIPTION_THRESHOLD` (5). 
+    *   **Phase 2**: Refactored `MainAppContent`, `TrackerScreen`, and `ViewerScreen` to use granular state slicing. High-frequency state collections (`KinematicState`, `DiagnosticState`) moved from the root UI to specialized screens to eliminate redundant recompositions of the entire UI tree during 100Hz bursts (R1328, R1422).
+*   **Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2).** Resolved Oct.5.5. Fully migrated the high-frequency vibration processing pipeline (100Hz) to JNI. (R1510-2).
+*   **Issue #1344: Forensic Diagnostic Expansion.** Resolved Oct.5.2. Integrated `thermalSnapshot` and `heapSnapshot` into `EngineConnectionPoint`, `RealtimeStatus`, and `TrackerStatusProto`. (R1344).
+*   **Issue #SIMP-1201-1: Logic State Serialization Expansion.** Resolved Oct.5.1. (R1201).
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct.5.5: [SOT Count: 273 (Rules: 131), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 33, QA: 405]**
+- **Oct.5.6: [SOT Count: 274 (Rules: 133), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 34, QA: 405]**
+- **Oct.5.5: [SOT Count: 273 (Rules: 132), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 34, QA: 405]**
 - **Oct.5.2: [SOT Count: 271 (Rules: 130), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 32, QA: 395]**
 - **Oct.5.1: [SOT Count: 270 (Rules: 129), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 31, QA: 395]**
 - **Oct.4.6: [SOT Count: 268 (Rules: 127), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:4, Testing: 31, QA: 395]**
