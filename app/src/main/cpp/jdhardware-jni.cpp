@@ -181,4 +181,68 @@ Java_com_gps19_app_JdHardwareManager_n18(JNIEnv* env, jclass clazz, jdouble vibe
     return (vibe > dynamicThreshold) ? 1 : 0;
 }
 
+/**
+ * n19: processVibrationBatch (Issue #1450)
+ * Consolidates all granular vibration math into one call.
+ */
+JNIEXPORT jint JNICALL
+Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
+    if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 256) return -1;
+
+    uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
+
+    // Inputs (Offset 0)
+    double x = *(double*)(ptr + 0);
+    double y = *(double*)(ptr + 8);
+    double z = *(double*)(ptr + 16);
+    double lx = *(double*)(ptr + 24);
+    double ly = *(double*)(ptr + 32);
+    double lz = *(double*)(ptr + 40);
+    double floor = *(double*)(ptr + 48);
+    double cpu = *(double*)(ptr + 56);
+    int isWarming = *(int*)(ptr + 64);
+    double lastRaw = *(double*)(ptr + 68);
+    double lastHpf = *(double*)(ptr + 76);
+    double energy = *(double*)(ptr + 84);
+
+    // 1. Delta (n16 equivalent)
+    double dx = x - lx, dy = y - ly, dz = z - lz;
+    double delta = std::sqrt(dx * dx + dy * dy + dz * dz) / 9.80665;
+
+    // 2. Floor Update (n13 equivalent)
+    double nextFloor = floor;
+    if (!std::isnan(delta) && delta > 0.0 && cpu <= 0.85) {
+        double alpha = 0.0;
+        if (delta < floor) {
+            alpha = (isWarming ? 0.5 : 0.1);
+        } else if (delta < 1.0) {
+            alpha = (isWarming ? 0.1 : 0.01);
+        }
+        nextFloor = (floor * (1.0 - alpha)) + (delta * alpha);
+    }
+
+    // 3. HPF (n14 equivalent)
+    double nextHpf = 0.9 * (lastHpf + delta - lastRaw);
+
+    // 4. Energy (n15 equivalent)
+    double nextEnergy = (energy * 0.9) + (std::abs(nextHpf) * 0.1);
+
+    // 5. Stationary Check (n12 equivalent)
+    double loadFactor = (cpu > 0.85) ? 2.0 : 1.0;
+    double dynamicGate = nextFloor * 1.5 * loadFactor;
+    double lower = 0.05, upper = 0.12 * loadFactor;
+    if (dynamicGate < lower) dynamicGate = lower;
+    if (dynamicGate > upper) dynamicGate = upper;
+    int isStationary = (delta < dynamicGate) ? 1 : 0;
+
+    // Outputs (Offset 128)
+    *(double*)(ptr + 128) = delta;
+    *(double*)(ptr + 136) = nextFloor;
+    *(double*)(ptr + 144) = nextHpf;
+    *(double*)(ptr + 152) = nextEnergy;
+    *(int*)(ptr + 160) = isStationary;
+
+    return 0;
+}
+
 }

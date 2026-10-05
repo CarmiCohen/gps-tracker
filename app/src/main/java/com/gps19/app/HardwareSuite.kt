@@ -37,6 +37,10 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.5.7:
+ * - Issue #1450: JNI Math Batching. Implemented processVibrationBatch to 
+ *   consolidate 5 granular JNI calls into one. This reduces the 100Hz bridge 
+ *   overhead significantly (R-ID 610).
  * Oct.5.5:
  * - Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2). Offloaded vibration 
  *   vector magnitude calculation to JNI via JdHardwareManager. Fully hardened 
@@ -82,6 +86,10 @@ class HardwareSuite @Inject constructor(
 
         override fun isVibrationSuspicious(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
             return JdHardwareManager.isVibrationSuspiciousNative(vibration, adaptiveFloor, sensitivity, cpuLoad)
+        }
+
+        override fun processVibrationBatch(batch: VibrationBatch): Boolean {
+            return JdHardwareManager.processVibrationBatchNative(batch)
         }
     }
 
@@ -325,6 +333,8 @@ class HardwareSuite @Inject constructor(
     @Volatile private var lastGpsSpeedMps = 0.0
 
     private val gnssPolicyEngine = GnssPolicyEngine()
+
+    private val vibrationBatch = VibrationBatch()
 
     private inner class GnssPolicyEngine {
         fun evaluateInterval(nowRt: Long): Long {
@@ -982,23 +992,49 @@ class HardwareSuite @Inject constructor(
         val dx = x.toDouble(); val dy = y.toDouble(); val dz = z.toDouble()
         val lx = lastAccelX.toDouble(); val ly = lastAccelY.toDouble(); val lz = lastAccelZ.toDouble()
         
-        // Issue #SIMP-1510-1: Offload vector magnitude calculation to JNI
-        val delta = nativeFastPathProvider.calculateVibrationDelta(dx, dy, dz, lx, ly, lz)
-
         synchronized(this) { 
+            // Issue #1450: Batched JNI offloading
+            vibrationBatch.apply {
+                this.x = dx; this.y = dy; this.z = dz
+                this.lx = lx; this.ly = ly; this.lz = lz
+                this.adaptiveFloor = this@HardwareSuite.adaptiveVibrationFloor
+                this.isWarming = this@HardwareSuite.isWarming
+                this.cpuLoad = this@HardwareSuite.currentCpuLoad
+                this.lastRawVibe = this@HardwareSuite.lastRawVibe
+                this.lastHpfValue = this@HardwareSuite.lastHpfValue
+                this.currentEnergy = this@HardwareSuite.currentKineticEnergy
+            }
+
+            val batched = nativeFastPathProvider.processVibrationBatch(vibrationBatch)
+            
+            val delta: Double
+            if (batched) {
+                delta = vibrationBatch.delta
+                adaptiveVibrationFloor = vibrationBatch.nextFloor
+                lastHpfValue = vibrationBatch.nextHpf
+                currentKineticEnergy = vibrationBatch.nextEnergy
+                lastRawVibe = delta
+            } else {
+                // Fallback to granular calls (Legacy/Audit)
+                delta = nativeFastPathProvider.calculateVibrationDelta(dx, dy, dz, lx, ly, lz)
+                adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(adaptiveVibrationFloor, delta, isWarming, currentCpuLoad)
+                lastHpfValue = SentinelValidator.computeNextHpf(lastHpfValue, delta, lastRawVibe)
+                currentKineticEnergy = SentinelValidator.computeNextEnergy(currentKineticEnergy, lastHpfValue)
+                lastRawVibe = delta 
+            }
+
             if (delta > logicPeakVibration) logicPeakVibration = delta
             if (delta > forensicPeakVibration) forensicPeakVibration = delta
-            adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(adaptiveVibrationFloor, delta, isWarming, currentCpuLoad)
-            lastHpfValue = SentinelValidator.computeNextHpf(lastHpfValue, delta, lastRawVibe)
-            currentKineticEnergy = SentinelValidator.computeNextEnergy(currentKineticEnergy, lastHpfValue)
-            lastRawVibe = delta 
         }
+        
         lastAccelX = x; lastAccelY = y; lastAccelZ = z
-        val oldV = vibrationCircularBuffer[vibrationCircularIdx]; vibrationCircularBuffer[vibrationCircularIdx] = delta; vibrationRollingSum = vibrationRollingSum - oldV + delta; vibrationCircularIdx = (vibrationCircularIdx + 1) % VIBRATION_WINDOW_SIZE; if (vibrationBufferCount < VIBRATION_WINDOW_SIZE) vibrationBufferCount++
+        val oldV = vibrationCircularBuffer[vibrationCircularIdx]; vibrationCircularBuffer[vibrationCircularIdx] = lastRawVibe; vibrationRollingSum = vibrationRollingSum - oldV + lastRawVibe; vibrationCircularIdx = (vibrationCircularIdx + 1) % VIBRATION_WINDOW_SIZE; if (vibrationBufferCount < VIBRATION_WINDOW_SIZE) vibrationBufferCount++
         currentVibrationIndex = if (vibrationBufferCount > 0) vibrationRollingSum / vibrationBufferCount else 0.0
         if (currentVibrationIndex > secPeakVibe) secPeakVibe = currentVibrationIndex
         if (currentKineticEnergy > secPeakKinetic) secPeakKinetic = currentKineticEnergy
         val nowRt = timeProvider.elapsedRealtime()
+        
+        // Plunge phase depends on isStationary() which now uses the batched result or fallback
         if (plungePhase == 2) { if (isStationary()) { synchronized(this) { plungeMatched = true; secSitDetected = true }; plungePhase = 0 } else if (nowRt - lastPlungePhaseRt > CHAIR_PLUNGE_PHASE_TIMEOUT_MS) plungePhase = 0 }
         if (isStationary()) { if (stationaryStartRt == 0L) stationaryStartRt = nowRt else if (nowRt - stationaryStartRt > MUZZLE_HYSTERESIS_MS) { currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; if (plungePhase != 2) plungePhase = 0 } } else { stationaryStartRt = 0L }
     }

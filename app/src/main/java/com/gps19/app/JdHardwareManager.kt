@@ -5,6 +5,7 @@ import com.gps19.core.engine.JNI_RET_NOT_INITIALIZED
 import com.gps19.core.engine.LATENCY_THRESHOLD_JNI_MS
 import com.gps19.core.engine.LatencyMonitor
 import com.gps19.core.engine.TimeProvider
+import com.gps19.core.engine.VibrationBatch
 import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -27,6 +28,10 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.5.7:
+ * - Issue #1450: JNI Math Batching. Consolidated granular vibration calls 
+ *   into a single 256-byte DirectByteBuffer transaction (n19). This minimizes 
+ *   JNI bridge transitions during 100Hz bursts (R-ID 610).
  * Oct.5.5:
  * - Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2). Finalized vibration 
  *   hot-path offloading: vector magnitude, HPF, Energy, and Violation Gates. 
@@ -56,7 +61,8 @@ object JdHardwareManager {
     private const val MAX_INIT_RETRIES = 5
     private const val INITIAL_RETRY_DELAY_MS = 1000L
 
-    private val sharedStateBuffer: ByteBuffer = ByteBuffer.allocateDirect(64).apply {
+    // Issue #1450: Expanded to 256 bytes for vibration batching
+    private val sharedStateBuffer: ByteBuffer = ByteBuffer.allocateDirect(256).apply {
         order(ByteOrder.nativeOrder())
     }
 
@@ -227,6 +233,41 @@ object JdHardwareManager {
         return if (isLibraryLoaded.get()) n11(type, value, nowRt, alpha) != 0 else false
     }
 
+    /**
+     * processVibrationBatchNative: Consolidated 100Hz JNI call (Issue #1450).
+     */
+    fun processVibrationBatchNative(batch: VibrationBatch): Boolean {
+        if (!isLibraryLoaded.get()) return false
+        
+        synchronized(sharedStateBuffer) {
+            sharedStateBuffer.clear()
+            sharedStateBuffer.putDouble(batch.x)
+            sharedStateBuffer.putDouble(batch.y)
+            sharedStateBuffer.putDouble(batch.z)
+            sharedStateBuffer.putDouble(batch.lx)
+            sharedStateBuffer.putDouble(batch.ly)
+            sharedStateBuffer.putDouble(batch.lz)
+            sharedStateBuffer.putDouble(batch.adaptiveFloor)
+            sharedStateBuffer.putDouble(batch.cpuLoad)
+            sharedStateBuffer.putInt(if (batch.isWarming) 1 else 0)
+            sharedStateBuffer.putDouble(batch.lastRawVibe)
+            sharedStateBuffer.putDouble(batch.lastHpfValue)
+            sharedStateBuffer.putDouble(batch.currentEnergy)
+            
+            val res = n19()
+            if (res == 0) {
+                // Read outputs from offset 128
+                batch.delta = sharedStateBuffer.getDouble(128)
+                batch.nextFloor = sharedStateBuffer.getDouble(136)
+                batch.nextHpf = sharedStateBuffer.getDouble(144)
+                batch.nextEnergy = sharedStateBuffer.getDouble(152)
+                batch.isStationary = sharedStateBuffer.getInt(160) != 0
+                return true
+            }
+        }
+        return false
+    }
+
     fun isStationaryNative(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean {
         return if (isLibraryLoaded.get()) n12(vibration, adaptiveFloor, cpuLoad) != 0 else {
             val loadFactor = if (cpuLoad > 0.85) 2.0 else 1.0
@@ -313,4 +354,5 @@ object JdHardwareManager {
     @JvmStatic private external fun n16(x: Double, y: Double, z: Double, lx: Double, ly: Double, lz: Double): Double
     @JvmStatic private external fun n17(peak: Double, floor: Double, sens: Float, cpu: Double): Int
     @JvmStatic private external fun n18(vibe: Double, floor: Double, sens: Float, cpu: Double): Int
+    @JvmStatic private external fun n19(): Int
 }

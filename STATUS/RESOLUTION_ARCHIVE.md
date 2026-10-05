@@ -1,5 +1,8 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct.5.7
+*   **Issue #1450: JNI Math Batching.** Consolidated granular vibration math calls (magnitude, HPF, energy, floor update, stationary gate) into a single 256-byte `DirectByteBuffer` transaction (`n19`). This minimizes JNI bridge transitions from 5 calls per tick to 1, significantly hardening the 100Hz hot-path and reducing CPU context switching overhead (R1450).
+
 ## 🟢 Resolved in Oct.5.6
 *   **Issue #1328: Event Bus Backpressure & UI Performance Hardening.** Implemented a multi-tier backpressure mitigation strategy for high-frequency forensic sampling (100Hz). 
     *   **Prioritized Drop Strategy**: Modified `DomainEventBus.emit()` to drop `LOW` priority events (e.g., non-critical logging) when the reactive bus detects high subscription pressure (threshold: 5), protecting the tracking engine's hot-path from UI-induced stalls.

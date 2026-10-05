@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.5.7:
+ * - Issue #1450: JNI Math Batching. Added VibrationBatch to NativeFastPathProvider 
+ *   to consolidate 100Hz JNI calls into a single buffer transaction (R-ID 610).
  * Oct.5.5:
  * - Issue #1328: Event Bus Backpressure Risk. Introduced EventPriority to 
  *   DomainEvent hierarchy to support prioritized drop strategies in the 
@@ -248,9 +251,7 @@ sealed class ProcessorEvent(open val isPrimary: Boolean, override val priority: 
     data class MaxAccuracyChanged(val accuracy: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
     data class ChairBaselineChanged(val baseline: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
     data class VibrationFloorChanged(val floor: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
-    data class LuxBaselineChanged(val baseline: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
-    data class AcousticFloorChanged(val floor: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
-    data class GpsStallDetected(val rt: Long, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.HIGH)
+    var vibrationBatch: VibrationBatch = VibrationBatch()
 }
 
 sealed class ConnectivityEvent(override val priority: EventPriority = EventPriority.NORMAL) : DomainEvent(priority) {
@@ -312,6 +313,29 @@ interface DeviceIdentity {
 }
 
 /**
+ * VibrationBatch: Data transfer object for JNI batching (Issue #1450).
+ */
+@Serializable
+class VibrationBatch {
+    // Inputs
+    var x: Double = 0.0; var y: Double = 0.0; var z: Double = 0.0
+    var lx: Double = 0.0; var ly: Double = 0.0; var lz: Double = 0.0
+    var adaptiveFloor: Double = 0.0
+    var isWarming: Boolean = false
+    var cpuLoad: Double = 0.0
+    var lastRawVibe: Double = 0.0
+    var lastHpfValue: Double = 0.0
+    var currentEnergy: Double = 0.0
+    
+    // Outputs
+    var delta: Double = 0.0
+    var nextFloor: Double = 0.0
+    var nextHpf: Double = 0.0
+    var nextEnergy: Double = 0.0
+    var isStationary: Boolean = false
+}
+
+/**
  * NativeFastPathProvider: Interface for offloading math to JNI (Issue #SIMP-1510-1).
  */
 interface NativeFastPathProvider {
@@ -322,6 +346,9 @@ interface NativeFastPathProvider {
     fun calculateVibrationDelta(x: Double, y: Double, z: Double, lx: Double, ly: Double, lz: Double): Double
     fun isShockViolated(peakShock: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean
     fun isVibrationSuspicious(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean
+    
+    // Issue #1450: Batched Vibration Processing
+    fun processVibrationBatch(batch: VibrationBatch): Boolean
 }
 
 @Serializable

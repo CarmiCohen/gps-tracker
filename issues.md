@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.5.6
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.5.7
 
-## 🎯 Current Resumption Focus: Completion Sequence for Oct.5.6.
-Issue #1328 (Event Bus Backpressure & UI Performance Hardening) resolved. Version Oct.5.6 hardened against UI-induced backpressure and redundant recompositions.
+## 🎯 Current Resumption Focus: Completion Sequence for Oct.5.7.
+Issue #1450 (JNI Math Batching) resolved. Version Oct.5.7 hardened against JNI bridge overhead during high-frequency sensor bursts.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -10,7 +10,7 @@ Issue #1328 (Event Bus Backpressure & UI Performance Hardening) resolved. Versio
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 4)
+## 💡 Strategic Simplification Ideas (Ideas: 3)
 
 ### 🛑 High Priority
 *   (All high-priority simplification ideas resolved).
@@ -25,12 +25,11 @@ Issue #1328 (Event Bus Backpressure & UI Performance Hardening) resolved. Versio
     *   *Significance*: **Low (CPU)**. Audit all `MonitorService` descendants to ensure no redundant reactive streams are active during stationary periods.
 *   **Issue #1426: Composable Effect Aggregator**
     *   *Significance*: **Low (Simplicity)**. Centralize all `LaunchedEffect(Unit)` observers in `MainAppContent` into a single wrapper to reduce boilerplate in the root UI file.
-*   **Issue #1450: JNI Math Batching**
-    *   *Significance*: **Low (JNI)**. Consolidate granular vibration JNI calls (magnitude, HPF, energy) into a single shared-memory buffer update to minimize JNI transition overhead during 100Hz bursts.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1450: JNI Math Batching.** Resolved Oct.5.7. Consolidated granular vibration calls (magnitude, HPF, energy, floor update, stationary gate) into a single 256-byte `DirectByteBuffer` transaction (`n19`). Reduced JNI transition overhead from 5 calls per tick to 1, significantly hardening the 100Hz hot-path. (R1450).
 *   **Issue #1328: Event Bus Backpressure & UI Performance Hardening.** Resolved Oct.5.6. 
     *   **Phase 1**: Increased `DomainEventBus` buffer to 512 items and implemented prioritized dropping of `LOW` priority events when subscription count exceeds `DOMAIN_EVENT_BUS_HIGH_SUBSCRIPTION_THRESHOLD` (5). 
     *   **Phase 2**: Refactored `MainAppContent`, `TrackerScreen`, and `ViewerScreen` to use granular state slicing. High-frequency state collections (`KinematicState`, `DiagnosticState`) moved from the root UI to specialized screens to eliminate redundant recompositions of the entire UI tree during 100Hz bursts (R1328, R1422).
@@ -41,6 +40,7 @@ Issue #1328 (Event Bus Backpressure & UI Performance Hardening) resolved. Versio
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.5.7: [SOT Count: 275 (Rules: 134), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:3, Testing: 35, QA: 410]**
 - **Oct.5.6: [SOT Count: 274 (Rules: 133), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 34, QA: 405]**
 - **Oct.5.5: [SOT Count: 273 (Rules: 132), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 34, QA: 405]**
 - **Oct.5.2: [SOT Count: 271 (Rules: 130), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 32, QA: 395]**
