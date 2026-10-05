@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct.5.9)
+# SOT Master Requirements & Hardening Status (Oct.5.10)
 
-## 🏗️ Architectural Master Rules (136 Rules)
+## 🏗️ Architectural Master Rules (137 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -11,10 +11,12 @@
 *   **1.111 JNI Math Batching (R1450)**: High-frequency JNI transitions (100Hz+) MUST be consolidated into batched transactions using `DirectByteBuffer`. Granular math calls (magnitude, HPF, energy) MUST be performed within a single native context to minimize JNI bridge overhead and CPU context switching during sensor bursts. (Oct.5.7 - Issue #1450).
 *   **1.112 Lifecycle-Aware Tick Orchestrator (R1293)**: Background service loops MUST be managed by a centralized `TickOrchestrator` to ensure initialization gating and monotonic pacing. Manual `while(isActive)` loops in services are deprecated in favor of orchestrated periodic management that respects service initialization state. (Oct.5.8 - Issue #1293).
 *   **1.113 Stationary Resource Relaxation (R1295)**: Periodic background tasks and reactive stream observers MUST implement interval relaxation during verified stationary periods, specifically targeting the `isUltraLongStationary` state (4+ hours). Heartbeat loops, forensic sampling timeouts, and telemetry synchronization MUST transition to low-power intervals (e.g., 60s to 300s) to minimize CPU wakeups and radio activity when state delta is negligible. (Oct.5.9 - Issue #1295).
+*   **1.114 Composable Effect Aggregation (R1426)**: Root-level side-effects, including `LaunchedEffect(Unit)` observers, lifecycle events, and global UI effect routing, MUST be centralized into a dedicated aggregator component (e.g., `AppEffectAggregator`). This ensures a clean separation between UI layout and side-effect logic, prevents boilerplate duplication in the root Composable, and provides a unified entry point for application-level event orchestration. (Oct.5.10 - Issue #1426).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 624**: Composable Effect Aggregator - Centralized root side-effects into `AppEffectAggregator` to improve maintainability and separate logic from layout. (Resolved Oct.5.10).
 *   **SOT ID 623**: Stationary Resource Relaxation - Implemented interval relaxation for heartbeats, forensic sampling, and telemetry sync during ultra-long stationary states to conserve system resources. (Resolved Oct.5.9).
 *   **SOT ID 622**: Lifecycle-Aware Tick Orchestrator - Migrated service loops to managed periodic orchestration to ensure initialization gating and monotonic pacing. (Resolved Oct.5.8).
 *   **SOT ID 621**: JNI Math Batching - Consolidated granular vibration math into a single 256-byte DirectByteBuffer transaction to reduce JNI bridge overhead. (Resolved Oct.5.7).
@@ -26,9 +28,9 @@
 ---
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.242 (Stationary Relaxation Audit)**: PASSED - Verified relaxation of Integrity heartbeat (60s), forensic sampling (5s), and Connectivity heartbeat (300s) during `isUltraLongStationary`. Confirmed real-time spike reactivity remains active via `forensicTriggerChannel`. (Oct.5.9)
-*   **Chapter 31.241 (Tick Orchestrator Audit)**: PASSED - Verified that heartbeat and tick loops await initialization automatically. Confirmed monotonic pacing stability via `SystemClock.elapsedRealtime`. (Oct.5.8)
-*   **Chapter 31.240 (JNI Batching Audit)**: PASSED - Verified reduction of JNI calls from 5 to 1 per vibration tick. Confirmed math parity for HPF and Energy EMA between batched native and JVM fallback. (Oct.5.7)
-*   **Chapter 31.239 (UI Recomposition Audit)**: PASSED - Verified that `MainAppContent` no longer recomposes on RTT or battery updates. Confirmed specialized dashboard components only recompose when their specific state slice (e.g., `KinematicState`) changes. (Oct.5.6)
-*   **Chapter 31.238 (Event Bus Backpressure Audit)**: PASSED - Verified buffer expansion to 512 items in `DomainEventBus`. Confirmed `EventPriority` implementation in `EngineModels.kt` for all event types. Validated non-blocking emission during simulated 100Hz bursts. (Oct.5.5)
-*   **Chapter 31.237 (JNI Vibration Audit)**: PASSED - Verified native offloading of magnitude, HPF, and energy math at 100Hz in `HardwareSuite`. Confirmed violation gate parity between JVM and C++ in `SentinelValidator`. (Oct.5.5)
+*   **Chapter 31.243 (Effect Aggregation Audit)**: PASSED - Verified centralization of UI effects, lifecycle observers, and navigation logic into `AppEffectAggregator`. Confirmed no functional regressions in navigation or orientation handling. (Oct.5.10)
+*   **Chapter 31.242 (Stationary Relaxation Audit)**: PASSED - Verified relaxation of Integrity heartbeat (60s), forensic sampling (5s), and Connectivity heartbeat (300s) during `isUltraLongStationary`. (Oct.5.9)
+*   **Chapter 31.241 (Tick Orchestrator Audit)**: PASSED - Verified that heartbeat and tick loops await initialization automatically. (Oct.5.8)
+*   **Chapter 31.240 (JNI Batching Audit)**: PASSED - Verified reduction of JNI calls from 5 to 1 per vibration tick. (Oct.5.7)
+*   **Chapter 31.239 (UI Recomposition Audit)**: PASSED - Verified that `MainAppContent` no longer recomposes on RTT or battery updates. (Oct.5.6)
+*   **Chapter 31.238 (Event Bus Backpressure Audit)**: PASSED - Verified buffer expansion to 512 items in `DomainEventBus`. (Oct.5.5)

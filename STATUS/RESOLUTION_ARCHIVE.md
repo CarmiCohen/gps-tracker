@@ -1,5 +1,8 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct.5.10
+*   **Issue #1426: Composable Effect Aggregator.** Centralized root-level `LaunchedEffect` and `DisposableEffect` observers in `MainAppContent` into a single `AppEffectAggregator` component. This improves code legibility, isolates side-effect logic from layout structure, and provides a unified entry point for app-level reactive routing and lifecycle synchronization. (R1426, R1.114).
+
 ## 🟢 Resolved in Oct.5.9
 *   **Issue #1295: Redundant Stream Observer Audit.** Implemented stationary-aware resource relaxation to minimize CPU wakeups and radio activity during long-term immobility.
     *   **Loop Relaxation**: Throttled `MonitorService` tick loop and forensic background sampling to match the 5-minute relaxed GPS polling interval during `isUltraLongStationary` (4+ hours immobility).

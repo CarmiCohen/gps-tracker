@@ -1,26 +1,23 @@
-# Forensic Handover (Oct.5.9 - STATIONARY RELAXATION)
+# Forensic Handover (Oct.5.10 - EFFECT AGGREGATION)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.5.9` | **Status**: 🟢 **OPERATIONAL**.
-*   **Stationary Resource Relaxation (Issue #1295)**:
-    *   **Loop Throttling**: Implemented mandatory interval relaxation during `isUltraLongStationary` (4+ hours immobility).
-    *   **MonitorService**: Tick loop now follows relaxed GPS interval (5m); forensic background sampling throttled to 5s.
-    *   **IntegrityMonitor**: Hardware health heartbeat relaxed from 10s to 60s.
-    *   **ConnectivitySuite**: Peer heartbeat (bypass) relaxed from 30s to 5m.
-    *   **Reactive Security**: Real-time channel reactivity maintained for acoustic and light spikes; security posture remains active despite polling relaxation.
-*   **Oct.5.8 Legacy**: Maintained unified `TickOrchestrator` management for all background loops.
+*   **Version**: `Oct.5.10` | **Status**: 🟢 **OPERATIONAL**.
+*   **Composable Effect Aggregator (Issue #1426)**:
+    *   **MainAppContent**: Root-level side-effects (Lifecycle, UI Effects, Navigation mapping, Orientation logic) centralized into `AppEffectAggregator`.
+    *   **Architecture**: Logic isolated from layout, reducing root-level boilerplate.
+*   **Oct.5.9 Legacy**: Maintained stationary resource relaxation (Issue #1295).
 
 ## 🟢 Audit Record
-*   **Build Status**: 🟢 **SUCCESSFUL**. Verified loop relaxation transitions and channel responsiveness.
-*   **Metrics**: Oct.5.9: [SOT Count: 277 (Rules: 136), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 37, QA: 420]
-*   **Traceability**: Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md` with Rule 1.113 (R1295).
+*   **Build Status**: 🟢 **SUCCESSFUL**. Verified navigation routing and orientation transitions.
+*   **Metrics**: Oct.5.10: [SOT Count: 278 (Rules: 137), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 37, QA: 420]
+*   **Traceability**: Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md` with Rule 1.114 (R1426).
 
 ## 🚀 Resumption Action Path (Next Chat)
-1.  **Composable Effect Aggregator #1426**:
-    *   Centralize UI observers in `MainAppContent` to reduce boilerplate and improve maintainability.
+1.  **Monitor Performance Baseline**:
+    *   Verify if the consolidation of effects impacts UI thread latency during high-frequency vibration events.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.5.9)
-- **Oct.5.9: [SOT Count: 277 (Rules: 136), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 37, QA: 420]**
-- **Audit Record**: Heartbeats, forensic sampling, and tick intervals relaxed during ultra-long stationary states; Oct.5.9 tagged.
+## 📊 Hardening Progress Dashboard (Oct.5.10)
+- **Oct.5.10: [SOT Count: 278 (Rules: 137), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 37, QA: 420]**
+- **Audit Record**: Centralized root UI side-effects; Oct.5.10 tagged.
