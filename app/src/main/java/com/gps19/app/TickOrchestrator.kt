@@ -1,15 +1,20 @@
 package com.gps19.app
 
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
+import android.os.SystemClock
+import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.max
 
 /**
  * TickOrchestrator: Centralized lifecycle authority for background services.
  * Encapsulates initialization state gates and manages lifecycle-bound jobs
  * to maintain strict structured concurrency and simplify background task lifecycles.
+ * 
+ * Oct.5.8:
+ * - Issue #1293: Enhanced with internal periodic loop management and 
+ *   dynamic interval support to reduce service-level boilerplate.
+ * - Issue #1425 Consistency: Timing logic uses monotonic elapsedRealtime 
+ *   to ensure interval stability during system clock adjustments.
  */
 class TickOrchestrator {
     private val initializationDeferred = CompletableDeferred<Unit>()
@@ -48,7 +53,43 @@ class TickOrchestrator {
     }
 
     /**
-     * Alias for launchJob, specifically for periodic loops.
+     * Launches a periodic loop with dynamic interval support.
+     * 
+     * @param name Unique identifier for the loop.
+     * @param scope CoroutineScope to launch in.
+     * @param intervalProvider Function returning the interval in ms for the next tick.
+     * @param initialDelay Delay before the first execution.
+     * @param block The work to perform on each tick.
+     */
+    fun launchPeriodicLoop(
+        name: String,
+        scope: CoroutineScope,
+        initialDelay: Long = 0L,
+        intervalProvider: () -> Long,
+        block: suspend CoroutineScope.() -> Unit
+    ): Job {
+        managedJobs[name]?.cancel()
+        val job = scope.launch {
+            initializationDeferred.await()
+            if (initialDelay > 0) delay(initialDelay)
+            
+            while (isActive) {
+                val startTime = SystemClock.elapsedRealtime()
+                block()
+                
+                val elapsed = SystemClock.elapsedRealtime() - startTime
+                val nextInterval = intervalProvider()
+                val remaining = max(10L, nextInterval - elapsed)
+                delay(remaining)
+            }
+        }
+        managedJobs[name] = job
+        return job
+    }
+
+    /**
+     * Alias for launchJob, specifically for legacy periodic loops.
+     * @deprecated Use [launchPeriodicLoop] for managed timing.
      */
     fun launchLoop(
         name: String,

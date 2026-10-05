@@ -18,12 +18,12 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Oct.5.8:
+ * - Issue #1293: Migrated tick and heartbeat loops to unified TickOrchestrator
+ *   periodic loop management. Centralized initialization gates and timing logic.
  * Oct.4.5:
  * - Issue #1425: Unified Clock Authority. Migrated lastUiPulseRt to monotonic 
  *   time (elapsedRealtime) to prevent logic errors during clock drift/sync.
- * Sep.28.11:
- * - Issue #1359: Temporal Precision & Service Logic Hardening. Migrated 
- *   foreground service throttling to use centralized timeProvider.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -128,31 +128,28 @@ abstract class BaseMonitorService : LifecycleService() {
     protected abstract suspend fun onServiceInitialize()
 
     protected fun startTickLoop() {
-        tickOrchestrator.launchLoop("tick_loop", lifecycleScope + serviceExceptionHandler) {
-            while (isActive) { 
-                val startTime = timeProvider.elapsedRealtime()
-                val now = timeProvider.currentTimeMillis()
-                val nowRt = timeProvider.elapsedRealtime()
-                
-                systemMonitor.scheduleWatchdogAlarm()
-                processTick(now, nowRt) 
-                
-                val elapsed = timeProvider.elapsedRealtime() - startTime
-                val interval = getRequiredTickInterval()
-                val remaining = max(50L, interval - elapsed)
-                delay(remaining) 
-            } 
+        tickOrchestrator.launchPeriodicLoop(
+            name = "tick_loop",
+            scope = lifecycleScope + serviceExceptionHandler,
+            intervalProvider = { getRequiredTickInterval() }
+        ) {
+            val now = timeProvider.currentTimeMillis()
+            val nowRt = timeProvider.elapsedRealtime()
+            
+            systemMonitor.scheduleWatchdogAlarm()
+            processTick(now, nowRt) 
         }
     }
 
     protected fun startHeartbeatLoop() {
-        tickOrchestrator.launchLoop("heartbeat_loop", lifecycleScope + serviceExceptionHandler) {
-            while (isActive) {
-                val now = timeProvider.currentTimeMillis()
-                val nowRt = timeProvider.elapsedRealtime()
-                onHeartbeat(now, nowRt)
-                delay(NOTIFICATION_THROTTLE_MS)
-            }
+        tickOrchestrator.launchPeriodicLoop(
+            name = "heartbeat_loop",
+            scope = lifecycleScope + serviceExceptionHandler,
+            intervalProvider = { NOTIFICATION_THROTTLE_MS }
+        ) {
+            val now = timeProvider.currentTimeMillis()
+            val nowRt = timeProvider.elapsedRealtime()
+            onHeartbeat(now, nowRt)
         }
     }
 

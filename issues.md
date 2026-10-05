@@ -1,7 +1,6 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.5.7
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.5.8
 
-## 🎯 Current Resumption Focus: Completion Sequence for Oct.5.7.
-Issue #1450 (JNI Math Batching) resolved. Version Oct.5.7 hardened against JNI bridge overhead during high-frequency sensor bursts.
+## 🎯 Current Resumption Focus: Issue #1295 Audit.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -10,7 +9,7 @@ Issue #1450 (JNI Math Batching) resolved. Version Oct.5.7 hardened against JNI b
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 3)
+## 💡 Strategic Simplification Ideas (Ideas: 2)
 
 ### 🛑 High Priority
 *   (All high-priority simplification ideas resolved).
@@ -19,8 +18,6 @@ Issue #1450 (JNI Math Batching) resolved. Version Oct.5.7 hardened against JNI b
 *   (All medium-priority simplification ideas resolved).
 
 ### 🔵 Low Priority
-*   **Issue #1293: Lifecycle-Aware Tick Orchestrator**
-    *   *Significance*: **Low (Refactoring)**. Refactor background services to use a `TickOrchestrator` that handles initialization gates and heartbeat timing internally.
 *   **Issue #1295: Redundant Stream Observer Audit**
     *   *Significance*: **Low (CPU)**. Audit all `MonitorService` descendants to ensure no redundant reactive streams are active during stationary periods.
 *   **Issue #1426: Composable Effect Aggregator**
@@ -29,6 +26,7 @@ Issue #1450 (JNI Math Batching) resolved. Version Oct.5.7 hardened against JNI b
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #1293: Lifecycle-Aware Tick Orchestrator.** Resolved Oct.5.8. Refactored `BaseMonitorService` tick and heartbeat loops into `TickOrchestrator`. Centralized initialization gating and monotonic pacing. (R1293).
 *   **Issue #1450: JNI Math Batching.** Resolved Oct.5.7. Consolidated granular vibration calls (magnitude, HPF, energy, floor update, stationary gate) into a single 256-byte `DirectByteBuffer` transaction (`n19`). Reduced JNI transition overhead from 5 calls per tick to 1, significantly hardening the 100Hz hot-path. (R1450).
 *   **Issue #1328: Event Bus Backpressure & UI Performance Hardening.** Resolved Oct.5.6. 
     *   **Phase 1**: Increased `DomainEventBus` buffer to 512 items and implemented prioritized dropping of `LOW` priority events when subscription count exceeds `DOMAIN_EVENT_BUS_HIGH_SUBSCRIPTION_THRESHOLD` (5). 
@@ -40,6 +38,7 @@ Issue #1450 (JNI Math Batching) resolved. Version Oct.5.7 hardened against JNI b
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.5.8: [SOT Count: 276 (Rules: 135), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 36, QA: 415]**
 - **Oct.5.7: [SOT Count: 275 (Rules: 134), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:3, Testing: 35, QA: 410]**
 - **Oct.5.6: [SOT Count: 274 (Rules: 133), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 34, QA: 405]**
 - **Oct.5.5: [SOT Count: 273 (Rules: 132), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 34, QA: 405]**
