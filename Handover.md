@@ -1,23 +1,23 @@
-# Forensic Handover (Oct.5.11 - LATENCY AUDIT)
+# Forensic Handover (Oct.5.12 - READINESS CONVERGENCE)
 
 ## 🎯 Current System State
-*   **Version**: `Oct.5.11` | **Status**: 🟢 **OPERATIONAL**.
-*   **Side-Effect Latency Audit (Issue #1426)**:
-    *   **Audit Result**: PASSED. Verified that `AppEffectAggregator` recomposition is strictly decoupled from the 100Hz vibration pipeline.
-    *   **Pipeline Verification**: Confirmed batched JNI transactions (Rule 1.111) are correctly offloading 100Hz math to native C++, preventing UI-thread stalls.
-    *   **Performance**: Root UI remains synced to low-frequency pulse (2-5s) while tracking engine maintains 100Hz forensic fidelity.
+*   **Version**: `Oct.5.12` | **Status**: 🟢 **OPERATIONAL**.
+*   **Leaf Effect Convergence (Issue #SIMP-1426-1)**:
+    *   **Convergence Result**: SUCCESSFUL. Centralized "System Readiness" and "Issue Count" logic in `SessionUiState`.
+    *   **Cleanup**: Removed ~100 lines of duplicated logic from `TrackerScreen.kt` and `ViewerScreen.kt`.
+    *   **Consistency**: Ensured all leaf screens consume the same criteria for system health, preventing logic drift.
 
 ## 🟢 Audit Record
-*   **Build Status**: 🟢 **SUCCESSFUL**. Verified isolation of KinematicState from root aggregator.
-*   **Metrics**: Oct.5.11: [SOT Count: 278 (Rules: 137), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 38, QA: 425]
-*   **Traceability**: Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md` with Chapter 31.244 (R1426/R1.111).
+*   **Build Status**: 🟢 **SUCCESSFUL**. Version incremented to `Oct.5.12`.
+*   **Metrics**: Oct.5.12: [SOT Count: 280 (Rules: 137), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 39, QA: 430]
+*   **Traceability**: Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md` with Chapter 31.245.
 
 ## 🚀 Resumption Action Path (Next Chat)
-1.  **Maintenance & Simplicity**:
-    *   Scan for redundant `LaunchedEffect` or `DisposableEffect` patterns in leaf screens that could be migrated to the aggregator or simplified via specialized state holders.
+1.  **UI Hardening**:
+    *   Continue scanning for redundant state observers in smaller overlays (e.g., `SettingsOverlay`) to align with Rule 1.110.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct.5.11)
-- **Oct.5.11: [SOT Count: 278 (Rules: 137), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 38, QA: 425]**
-- **Audit Record**: Verified side-effect latency and JNI batching integrity; Oct.5.11 tagged.
+## 📊 Hardening Progress Dashboard (Oct.5.12)
+- **Oct.5.12: [SOT Count: 280 (Rules: 137), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 39, QA: 430]**
+- **Audit Record**: Centralized readiness logic; Oct.5.12 tagged.

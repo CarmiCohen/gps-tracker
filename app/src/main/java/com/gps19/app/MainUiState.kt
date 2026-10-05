@@ -6,11 +6,12 @@ import org.osmdroid.util.GeoPoint
 /**
  * MainUiState: Composite UI state partitioned into specialized slices to 
  * minimize recomposition costs and isolate volatile triggers (Issue #1166).
+ * Oct.5.11:
+ * - Issue #SIMP-1426-1: Refactored System Readiness logic into reusable 
+ *   static methods to eliminate duplication in leaf screens.
  * Oct.4.1:
  * - Issue #1202: Unified UI event routing. Added InitiateMode and 
  *   ConfirmBackgroundDisclosure events. Added Navigate and ShowBackgroundDisclosure effects.
- * Oct.1.5:
- * - Issue #MAP-SOT-03: Added isAnchorLocked to MapViewState for visual feedback.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -56,47 +57,8 @@ data class MainUiState(
     val isFullyHydrated: Boolean get() = hydrationLevel >= 3
     val isMapHydrated: Boolean get() = hydrationLevel >= 4
 
-    val isSystemReady: Boolean
-        get() = isSetupBypassActive || (
-                permissions.isFineLocationGranted &&
-                permissions.isBatteryWhitelisted && 
-                permissions.isAutoStartGranted &&
-                permissions.isOverlayGranted &&
-                permissions.isMicrophoneGranted &&
-                permissions.isExactAlarmGranted && 
-                permissions.isPostNotificationsGranted &&
-                permissions.isBackgroundLocationGranted &&
-                permissions.isActivityRecognitionGranted &&
-                (appMode != null) &&
-                (appMode != "tracker" || permissions.isMicrophoneGranted) &&
-                (appMode == "tracker" || homePoints.isNotEmpty()) &&
-                (!permissions.hasBackgroundRestriction || 
-                 (permissions.backgroundStatus == CapabilityStatus.GRANTED && permissions.autostartStatus == CapabilityStatus.GRANTED) || 
-                 (permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride)))
-
-    val systemIssuesCount: Int
-        get() {
-            if (isSetupBypassActive) return 0
-            var count = 0
-            if (!permissions.isFineLocationGranted) count++
-            if (!permissions.isBatteryWhitelisted) count++
-            if (!permissions.isAutoStartGranted) count++
-            if (!permissions.isExactAlarmGranted) count++
-            if (!permissions.isOverlayGranted) count++
-            if (!permissions.isPostNotificationsGranted) count++
-            if (!permissions.isBackgroundLocationGranted) count++
-            if (!permissions.isActivityRecognitionGranted) count++
-            if (appMode == "tracker" && !permissions.isMicrophoneGranted) count++
-            if (appMode != "tracker" && homePoints.isEmpty()) count++
-            
-            val configIssue = permissions.hasBackgroundRestriction && 
-                             (permissions.backgroundStatus == CapabilityStatus.GRANTED || 
-                              permissions.autostartStatus == CapabilityStatus.GRANTED) &&
-                             !(permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride)
-            if (configIssue) count++
-            
-            return count
-        }
+    val isSystemReady: Boolean get() = session.isSystemReady(spatial.homePoints.size)
+    val systemIssuesCount: Int get() = session.systemIssuesCount(spatial.homePoints.size)
 }
 
 /**
@@ -112,7 +74,55 @@ data class SessionUiState(
     val isSetupBypassActive: Boolean = false,
     val isPeerActive: Boolean = false,
     val permissions: PermissionState = PermissionState()
-)
+) {
+    /**
+     * Issue #SIMP-1426-1: Centralized System Readiness calculation.
+     */
+    fun isSystemReady(homePointsCount: Int): Boolean {
+        if (isSetupBypassActive) return true
+        return permissions.isFineLocationGranted &&
+                permissions.isBatteryWhitelisted && 
+                permissions.isAutoStartGranted &&
+                permissions.isOverlayGranted &&
+                permissions.isMicrophoneGranted &&
+                permissions.isExactAlarmGranted && 
+                permissions.isPostNotificationsGranted &&
+                permissions.isBackgroundLocationGranted &&
+                permissions.isActivityRecognitionGranted &&
+                (appMode != null) &&
+                (appMode != "tracker" || permissions.isMicrophoneGranted) &&
+                (appMode == "tracker" || homePointsCount > 0) &&
+                (!permissions.hasBackgroundRestriction || 
+                 (permissions.backgroundStatus == CapabilityStatus.GRANTED && permissions.autostartStatus == CapabilityStatus.GRANTED) || 
+                 (permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride))
+    }
+
+    /**
+     * Issue #SIMP-1426-1: Centralized System Issues counter.
+     */
+    fun systemIssuesCount(homePointsCount: Int): Int {
+        if (isSetupBypassActive) return 0
+        var count = 0
+        if (!permissions.isFineLocationGranted) count++
+        if (!permissions.isBatteryWhitelisted) count++
+        if (!permissions.isAutoStartGranted) count++
+        if (!permissions.isExactAlarmGranted) count++
+        if (!permissions.isOverlayGranted) count++
+        if (!permissions.isPostNotificationsGranted) count++
+        if (!permissions.isBackgroundLocationGranted) count++
+        if (!permissions.isActivityRecognitionGranted) count++
+        if (appMode == "tracker" && !permissions.isMicrophoneGranted) count++
+        if (appMode != "tracker" && homePointsCount == 0) count++
+        
+        val configIssue = permissions.hasBackgroundRestriction && 
+                         (permissions.backgroundStatus == CapabilityStatus.GRANTED || 
+                          permissions.autostartStatus == CapabilityStatus.GRANTED) &&
+                         !(permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride)
+        if (configIssue) count++
+        
+        return count
+    }
+}
 
 /**
  * SettingsUiState: Persistent identity and configuration parameters.

@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.5.11
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.5.12
 
 ## 🎯 Current Resumption Focus: (All current audit targets resolved).
 
@@ -9,13 +9,13 @@
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 1)
+## 💡 Strategic Simplification Ideas (Ideas: 0)
 
 ### 🛑 High Priority
 *   (All high-priority simplification ideas resolved).
 
 ### 🟡 Medium Priority
-*   **SIMP-1426-1: Leaf Effect Convergence.** Evaluate migrating side-effects from leaf screens (e.g., `TrackerScreen` orientation logic or log visibility triggers) into the central `AppEffectAggregator` to further reduce UI tree depth and redundant state collection. (Significance: Medium).
+*   (All medium-priority simplification ideas resolved).
 
 ### 🔵 Low Priority
 *   (All low-priority simplification ideas resolved).
@@ -23,8 +23,9 @@
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
-*   **Issue #1426 Performance Audit: Side-Effect Latency Verification.** Resolved Oct.5.11. Conducted forensic latency audit on `AppEffectAggregator`. Verified strict isolation of the 100Hz vibration pipeline from root side-effect recompositions. Confirmed Rule 1.111 (JNI Batching) reduces bridge overhead to 1 transaction per tick. (R1426, R1.111).
-*   **Issue #1426: Composable Effect Aggregator.** Resolved Oct.5.10. Centralized root-level `LaunchedEffect` and `DisposableEffect` observers in `MainAppContent` into a single `AppEffectAggregator` component. (R1426, R1.114).
+*   **Issue #SIMP-1426-1: Leaf Effect Convergence.** Resolved Oct.5.12. Centralized "System Readiness" and "Issue Count" logic in `SessionUiState` to eliminate duplication in `TrackerScreen` and `ViewerScreen`. Ensured architectural consistency and reduced UI tree footprint. (R1426).
+*   **Issue #1426 Performance Audit: Side-Effect Latency Verification.** Resolved Oct.5.11. Conducted forensic latency audit on `AppEffectAggregator`. (R1426, R1.111).
+*   **Issue #1426: Composable Effect Aggregator.** Resolved Oct.5.10. Centralized root-level `LaunchedEffect` and `DisposableEffect` observers into `AppEffectAggregator`. (R1426, R1.114).
 *   **Issue #1295: Redundant Stream Observer Audit.** Resolved Oct.5.9. (R1295).
 *   **Issue #1293: Lifecycle-Aware Tick Orchestrator.** Resolved Oct.5.8. (R1293).
 *   **Issue #1450: JNI Math Batching.** Resolved Oct.5.7. (R1450).
@@ -35,8 +36,8 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.5.12: [SOT Count: 280 (Rules: 137), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 39, QA: 430]**
 - **Oct.5.11: [SOT Count: 279 (Rules: 137), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 38, QA: 425]**
 - **Oct.5.10: [SOT Count: 278 (Rules: 137), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 37, QA: 420]**
 - **Oct.5.9: [SOT Count: 277 (Rules: 136), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 37, QA: 420]**
 - **Oct.5.8: [SOT Count: 276 (Rules: 135), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:2, Testing: 36, QA: 415]**
-- **Oct.5.7: [SOT Count: 275 (Rules: 134), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:3, Testing: 35, QA: 410]**

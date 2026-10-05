@@ -25,14 +25,11 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Viewer-mode UI.
+ * Oct.5.12:
+ * - Issue #SIMP-1426-1: Eliminated duplicated System Readiness logic. 
+ *   Now consumes centralized state from SessionUiState (R1426).
  * Oct.5.6:
- * - Issue #1328: Phase 2 - UI Performance Hardening. Refactored to collect 
- *   high-frequency states (kinematic, diagnostic, dashboard) internally 
- *   to isolate recompositions from MainAppContent (R1328).
- * Oct.3.5:
- * - HUD & Overlay De-confliction: Hid main HeaderBar when overlays (Settings/Logs) 
- *   are open to prevent visual overlap; ensured HUD Surface is transparent 
- *   when map is visible to maximize viewport (R1421).
+ * - Issue #1328: Phase 2 - UI Performance Hardening. (R1328).
  */
 
 @Composable
@@ -91,42 +88,9 @@ fun ViewerScreen(
         if (isGnssDetailVisible) onMainEvent(UiEvent.ToggleGnssDetail(false))
     }
 
-    val isSystemReady = sessionState.isSetupBypassActive || (
-            sessionState.permissions.isFineLocationGranted &&
-            sessionState.permissions.isBatteryWhitelisted && 
-            sessionState.permissions.isAutoStartGranted &&
-            sessionState.permissions.isOverlayGranted &&
-            sessionState.permissions.isMicrophoneGranted &&
-            sessionState.permissions.isExactAlarmGranted && 
-            sessionState.permissions.isPostNotificationsGranted &&
-            sessionState.permissions.isBackgroundLocationGranted &&
-            sessionState.permissions.isActivityRecognitionGranted &&
-            (sessionState.appMode != null) &&
-            (sessionState.appMode != "tracker" || sessionState.permissions.isMicrophoneGranted) &&
-            (sessionState.appMode == "tracker" || spatialState.homePoints.isNotEmpty()) &&
-            (!sessionState.permissions.hasBackgroundRestriction || 
-             (sessionState.permissions.backgroundStatus == CapabilityStatus.GRANTED && sessionState.permissions.autostartStatus == CapabilityStatus.GRANTED) || 
-             (sessionState.permissions.backgroundStatus == CapabilityStatus.UNKNOWN && sessionState.permissions.isManualOverride)))
-
-    val systemIssuesCount = if (sessionState.isSetupBypassActive) 0 else {
-        var count = 0
-        if (!sessionState.permissions.isFineLocationGranted) count++
-        if (!sessionState.permissions.isBatteryWhitelisted) count++
-        if (!sessionState.permissions.isAutoStartGranted) count++
-        if (!sessionState.permissions.isExactAlarmGranted) count++
-        if (!sessionState.permissions.isOverlayGranted) count++
-        if (!sessionState.permissions.isPostNotificationsGranted) count++
-        if (!sessionState.permissions.isBackgroundLocationGranted) count++
-        if (!sessionState.permissions.isActivityRecognitionGranted) count++
-        if (sessionState.appMode == "tracker" && !sessionState.permissions.isMicrophoneGranted) count++
-        if (sessionState.appMode != "tracker" && spatialState.homePoints.isEmpty()) count++
-        val configIssue = sessionState.permissions.hasBackgroundRestriction && 
-                         (sessionState.permissions.backgroundStatus == CapabilityStatus.GRANTED || 
-                          sessionState.permissions.autostartStatus == CapabilityStatus.GRANTED) &&
-                         !(sessionState.permissions.backgroundStatus == CapabilityStatus.UNKNOWN && sessionState.permissions.isManualOverride)
-        if (configIssue) count++
-        count
-    }
+    // Issue #SIMP-1426-1: Centralized logic usage.
+    val isSystemReady = sessionState.isSystemReady(spatialState.homePoints.size)
+    val systemIssuesCount = sessionState.systemIssuesCount(spatialState.homePoints.size)
 
     val header = @Composable {
         HeaderBar(
