@@ -4,11 +4,33 @@ import com.gps19.core.engine.*
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.5.1:
+ * - Issue #1173: Protobuf-First Persistence (Phase 2). Expanded parity fields 
+ *   for RealtimeStatus and TrackerStatusProto. Added binary entry points 
+ *   for persistence BLOBs.
  * Oct.2.9:
  * - Issue #1314: TrackerStatus Convergence. Migrated to unified LocationUpdate 
  *   monolith DTO. Fixed liftIdx and battery flag references.
  */
 object TelemetryProtobufMapper {
+
+    /**
+     * mapStatusToBinary: Direct serialization of LocationUpdate for offline buffering.
+     */
+    fun mapStatusToBinary(status: LocationUpdate): ByteArray {
+        val builder = RealtimeStatus.newBuilder()
+        mapToRealtime(status, builder, false)
+        return builder.build().toByteArray()
+    }
+
+    /**
+     * mapAppToBinary: Direct serialization of ConnectionPoint for ribbon history.
+     */
+    fun mapAppToBinary(p: ConnectionPoint): ByteArray {
+        val builder = TrackerStatusProto.newBuilder()
+        mapAppToPersistence(p, builder)
+        return builder.build().toByteArray()
+    }
 
     /**
      * mapToRealtime: Maps LocationUpdate to RealtimeStatus (Signaling/Relay).
@@ -107,6 +129,18 @@ object TelemetryProtobufMapper {
         // Issue #1410: Viewer Persistence
         builder.setLastAlarmAckTs(status.lastAlarmAckTs)
         builder.setViolationStartTs(status.violationStartTs)
+
+        // Issue #1173: Persistence Parity
+        builder.setCurrentMa(status.currentMa)
+        builder.setThermalHeadroom(status.integrity.thermalHeadroom)
+        builder.setHeapAllocatedMb(status.integrity.heapAllocatedMb)
+        builder.setIsAnchorLocked(status.integrity.isAnchorLocked)
+        builder.setIsBatteryWhitelisted(status.isBatteryWhitelisted)
+        builder.setIsStorageLow(status.isStorageLow)
+        builder.setIsStorageCritical(status.isStorageCritical)
+        builder.setIsPowerSaveMode(status.isPowerSaveMode)
+        builder.setStandbyBucket(status.standbyBucket)
+        builder.setNetInterface(status.netInterface)
 
         // Enums
         builder.setState(TrackerStateProto.valueOf("TS_" + status.trackerState.name))
@@ -243,9 +277,43 @@ object TelemetryProtobufMapper {
         builder.setLastAlarmAckTs(status.lastAlarmAckTs)
         builder.setViolationStartTs(status.violationStartTs)
 
+        // Issue #1173: Parity Expansion
+        builder.setThermalHeadroom(status.integrity.thermalHeadroom)
+        builder.setHeapAllocatedMb(status.integrity.heapAllocatedMb)
+
         // Enums
         builder.setTrackerState(status.trackerState.name)
         builder.setStatus(status.status.name)
         builder.setLocationPendingReason(LocationPendingReasonProto.valueOf("LPR_" + status.locationPendingReason.name))
+    }
+
+    /**
+     * mapAppToPersistence: Maps app-level ConnectionPoint to TrackerStatusProto.
+     */
+    fun mapAppToPersistence(p: ConnectionPoint, builder: TrackerStatusProto.Builder) {
+        builder.setTs(p.ts).setRt(p.rt).setRtt(p.rtt).setTotalConnectedMs(0) // Dummy for ribbon
+        builder.setBattery(p.isBatteryLow.let { if (it) 15 else 50 }) // Rough approximation if needed
+        builder.setAccuracy(p.gpsAccuracy).setMaxAccuracy(p.maxAccuracy)
+        builder.setSpeed(p.speed).setBearing(p.bearing)
+        
+        // Forensic
+        builder.setSnrIdx(p.snrIdx).setNoiseIdx(p.noiseIdx).setLuxIdx(p.luxIdx).setVibeIdx(p.vibeIdx)
+        builder.setProxIdx(p.proxIdx).setLiftIdx(p.liftIdx).setTiltIdx(p.tiltIdx).setBaroIdx(p.baroIdx)
+        builder.setVerticalVelocity(p.verticalVelocity)
+        builder.setIsSitDetected(p.isSitDetected).setIsSitActive(p.isSitActive)
+        builder.setSitVz(p.sitVz).setSitVzTs(p.sitVzTs).setSitVzRt(p.sitVzRt).setSitDz(p.sitDz)
+        builder.setSitBaro(p.sitBaro).setSitTilt(p.sitTilt).setSitShock(p.sitShock)
+        
+        builder.setIsBatterySteepDischarge(p.isBatterySteepDischarge)
+        builder.setIsCoolingModeActive(p.isCoolingModeActive)
+        builder.setIsBatteryLow(p.isBatteryLow).setIsBatteryCritical(p.isBatteryCritical)
+        builder.setViolationUptimeMs(p.violationUptimeMs).setIsUltraLongStationary(p.isUltraLongStationary)
+        builder.setGpsHardwareLock(p.gpsHardwareLock).setIsAnchorLocked(p.isAnchorLocked)
+        builder.setIsGnssThrottled(p.isGnssThrottled)
+        builder.setThermalHeadroom(p.thermalHeadroom).setHeapAllocatedMb(p.heapAllocatedMb)
+        builder.setActivityType(p.activityType.name)
+        
+        builder.setStatus(p.status.name)
+        builder.setLocationPendingReason(LocationPendingReasonProto.valueOf("LPR_" + p.locationPendingReason.name))
     }
 }

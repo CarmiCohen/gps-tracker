@@ -6,16 +6,13 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.5.1:
+ * - Issue #1173: Protobuf-First Persistence (Phase 2). Updated restoration paths 
+ *   in mapEntityToApp and mapPendingToStatus to prioritize binary payloads. 
+ *   Added mapProtoToApp for connection history restoration (R1173).
  * Oct.2.9:
  * - Issue #1314: TrackerStatus Convergence. Converged all mapping logic 
  *   into the unified LocationUpdate monolith. Purged TrackerStatus references.
- * Oct.2.8:
- * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
- *   to unified LocationUpdate DTO. Removed mapSnapshotToUpdate as mapping is now 
- *   inherent in the monolith DTO (R-ID 596).
- * Oct.2.7:
- * - Issue #1329: Consolidated construction of update DTOs (LocationUpdate, 
- *   TrackerStatus) into mapTickToOutputs to centralize domain orchestration logic.
  */
 object TelemetryMapper {
 
@@ -158,6 +155,8 @@ object TelemetryMapper {
                 gpsHardwareLock = proto.gpsHardwareLock
                 isGnssThrottled = proto.isGnssThrottled
                 tamperNote = if (proto.hasTamperNote()) proto.tamperNote else null
+                thermalHeadroom = proto.thermalHeadroom
+                heapAllocatedMb = proto.heapAllocatedMb
             }
 
             status = processed.status
@@ -320,6 +319,9 @@ object TelemetryMapper {
                 satsUsed = proto.satsUsed
                 satsView = proto.satsView
                 snrIdx = proto.snrIdx
+                currentMa = proto.currentMa
+                thermalHeadroom = proto.thermalHeadroom
+                heapAllocatedMb = proto.heapAllocatedMb
             }
             snrSnapshot = proto.snrIdx * 5.0
             kinetic.jumpTier = proto.jumpTier
@@ -545,10 +547,50 @@ object TelemetryMapper {
     }
 
     /**
-     * mapEntityToApp: Authority for converting a HistoryEntity into a 
+     * mapProtoToApp: Authority for converting a TrackerStatusProto into a 
      * UI-ready ConnectionPoint.
      */
+    fun mapProtoToApp(proto: TrackerStatusProto, out: ConnectionPoint) {
+        out.apply {
+            ts = proto.ts; rt = proto.rt; rtt = proto.rtt; isConnected = true
+            isGap = false; isRecoveryEvent = false; hasGps = proto.accuracy > 0
+            isTick = false; gpsAccuracy = proto.accuracy; maxAccuracy = proto.maxAccuracy
+            speed = proto.speed; bearing = proto.bearing; currentMa = proto.currentMa
+            locationPendingReason = LocationUpdate.mapProtoToPendingReason(proto.locationPendingReason.name)
+
+            // Forensic Parity
+            snrIdx = proto.snrIdx; noiseIdx = proto.noiseIdx; luxIdx = proto.luxIdx; vibeIdx = proto.vibeIdx
+            proxIdx = proto.proxIdx; liftIdx = proto.liftIdx; tiltIdx = proto.tiltIdx; baroIdx = proto.baroIdx
+            isSitDetected = proto.isSitDetected; isSitActive = proto.isSitActive
+            verticalVelocity = proto.verticalVelocity; sitVz = proto.sitVz; sitVzTs = proto.sitVzTs
+            sitVzRt = proto.sitVzRt; sitDz = proto.sitDz; sitBaro = proto.sitBaro
+            sitTilt = proto.sitTilt; sitShock = proto.sitShock
+            isBatterySteepDischarge = proto.isBatterySteepDischarge; isCoolingModeActive = proto.isCoolingModeActive
+            isBatteryLow = proto.isBatteryLow; isBatteryCritical = proto.isBatteryCritical
+            violationUptimeMs = proto.violationUptimeMs; isUltraLongStationary = proto.isUltraLongStationary
+            gpsHardwareLock = proto.gpsHardwareLock; isAnchorLocked = proto.isAnchorLocked
+            thermalHeadroom = proto.thermalHeadroom; heapAllocatedMb = proto.heapAllocatedMb
+            activityType = try { 
+                ActivityType.valueOf(proto.activityType) 
+            } catch (e: Exception) { ActivityType.UNKNOWN }
+        }
+    }
+
+    /**
+     * mapEntityToApp: Authority for converting a HistoryEntity into a 
+     * UI-ready ConnectionPoint. Restores from binary payload if available (R1173).
+     */
     fun mapEntityToApp(entity: HistoryEntity, out: ConnectionPoint) {
+        if (entity.payload.isNotEmpty()) {
+            try {
+                val proto = TrackerStatusProto.parseFrom(entity.payload)
+                mapProtoToApp(proto, out)
+                return
+            } catch (e: Exception) {
+                Timber.e(e, "Binary history restoration failed, falling back to columns")
+            }
+        }
+
         out.apply {
             ts = entity.ts; rt = entity.rt; rtt = entity.rtt; isConnected = entity.isConnected
             isGap = entity.isGap; isRecoveryEvent = entity.isRecoveryEvent; hasGps = entity.hasGps
@@ -596,7 +638,8 @@ object TelemetryMapper {
             isBatteryCritical = p.isBatteryCritical, violationUptimeMs = p.violationUptimeMs,
             isUltraLongStationary = p.isUltraLongStationary, gpsHardwareLock = p.gpsHardwareLock,
             thermalHeadroom = p.thermalHeadroom, heapAllocatedMb = p.heapAllocatedMb,
-            activityType = p.activityType.name
+            activityType = p.activityType.name,
+            payload = TelemetryProtobufMapper.mapAppToBinary(p)
         )
     }
 
@@ -626,15 +669,27 @@ object TelemetryMapper {
             isBatteryCritical = status.isBatteryCritical, isUltraLongStationary = status.isUltraLongStationary,
             violationUptimeMs = status.violationUptimeMs, gpsHardwareLock = status.gpsHardwareLock,
             isGnssThrottled = status.isGnssThrottled, thermalHeadroom = status.integrity.thermalHeadroom,
-            heapAllocatedMb = status.integrity.heapAllocatedMb, activityType = status.activityType.name
+            heapAllocatedMb = status.integrity.heapAllocatedMb, activityType = status.activityType.name,
+            payload = TelemetryProtobufMapper.mapStatusToBinary(status)
         )
     }
 
     /**
      * mapPendingToStatus: Authority for converting a PendingStatusEntity back 
-     * into a domain LocationUpdate.
+     * into a domain LocationUpdate. Restores from binary payload if available (R1173).
      */
     fun mapPendingToStatus(entity: PendingStatusEntity, deviceId: String, viewerId: String, out: LocationUpdate): LocationUpdate {
+        if (entity.payload.isNotEmpty()) {
+            try {
+                val proto = RealtimeStatus.parseFrom(entity.payload)
+                mapProtoToSnapshot(proto, entity.timestamp, proto.rt, out)
+                out.status = SentinelStatus.valueOf(proto.sentinelStatus)
+                return out
+            } catch (e: Exception) {
+                Timber.e(e, "Binary pending status restoration failed, falling back to columns")
+            }
+        }
+
         out.apply {
             reset()
             this.deviceId = deviceId

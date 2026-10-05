@@ -7,6 +7,9 @@ import javax.inject.Singleton
 
 /**
  * OfflineRepository: Manages persistent buffering of status updates during network loss.
+ * Oct.5.1:
+ * - Issue #1173: Protobuf-First Persistence (Phase 2). Implemented on-the-fly 
+ *   binary migration for legacy pending updates to ensure schema parity (R1173).
  * Oct.4.6:
  * - Issue #1173: Protobuf-First Persistence. Integrated binary payload insertion 
  *   to minimize disk I/O and Room overhead (R1173).
@@ -53,8 +56,28 @@ class OfflineRepository @Inject constructor(
         }
     }
 
-    suspend fun getPendingStatusUpdates(limit: Int): List<PendingStatusEntity> = 
-        pendingStatusDao.getOldestPending(limit)
+    /**
+     * getPendingStatusUpdates: Retrieves oldest updates with on-the-fly binary migration (R1173).
+     */
+    suspend fun getPendingStatusUpdates(limit: Int): List<PendingStatusEntity> {
+        val entities = pendingStatusDao.getOldestPending(limit)
+        
+        // Migrate legacy entries without payloads to binary format to ensure parity
+        entities.filter { it.payload.isEmpty() }.forEach { legacy ->
+            try {
+                // Reuse mapper to generate binary payload from existing columns
+                val flyweight = LocationUpdate()
+                TelemetryMapper.mapPendingToStatus(legacy, "", "", flyweight)
+                val updated = legacy.copy(payload = TelemetryProtobufMapper.mapStatusToBinary(flyweight))
+                pendingStatusDao.insert(updated) // REPLACE conflict strategy will update it
+                Timber.d("Migrated legacy pending update ${legacy.id} to binary")
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to migrate legacy pending update ${legacy.id}")
+            }
+        }
+        
+        return entities
+    }
 
     suspend fun deletePendingStatusUpdate(id: Long) = 
         pendingStatusDao.deletePending(longArrayOf(id))

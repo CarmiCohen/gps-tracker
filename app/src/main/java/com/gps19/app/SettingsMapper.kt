@@ -4,12 +4,13 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsMapper: Conversion logic between DataStore Protos and Domain Models.
+ * Oct.5.1:
+ * - Issue #SIMP-1201-1: Logic State Serialization. Added logicStateToProto 
+ *   and applyLogicStateFromProto to consolidate alarm evaluation state 
+ *   into a single binary blob (R-ID 510).
  * Oct.2.9:
  * - Issue #1314: TrackerStatus Convergence. Migrated from TrackerStatus 
  *   to unified LocationUpdate monolith DTO.
- * Sep.26.0:
- * - Issue #1314: TrackerStatus & Evaluation Snapshot Convergence. Aligned Proto 
- *   mapping with partitioned TrackerStatus structure.
  */
 object SettingsMapper {
 
@@ -117,7 +118,9 @@ object SettingsMapper {
             isSitDetected = s.isSitDetected, isSitActive = s.isSitActive,
             lastValidFixRt = s.lastValidFixRt,
             isSilentFailure = s.isSilentFailure,
-            isBatteryWhitelisted = s.isBatteryWhitelisted
+            isBatteryWhitelisted = s.isBatteryWhitelisted,
+            thermalHeadroom = s.thermalHeadroom,
+            heapAllocatedMb = s.heapAllocatedMb
         )
 
         return LocationUpdate(
@@ -167,5 +170,33 @@ object SettingsMapper {
             lastLogRt = p.lastLogRt,
             isResolved = p.isResolved
         )
+    }
+
+    fun logicStateToProto(state: AlarmEvaluationState): LogicStateProto {
+        return LogicStateProto.newBuilder()
+            .setFirstViolationTs(state.firstViolationTs)
+            .setFirstViolationRt(state.firstViolationRt)
+            .setFirstViolationWasJump(state.firstViolationWasJump)
+            .setDistanceViolationCounter(state.distanceViolationCounter)
+            .setWasDistanceViolated(state.wasDistanceViolated)
+            .setPowerAlarmPending(state.powerAlarmPending)
+            .setLastGlobalTriggerRt(state.lastGlobalTriggerRt)
+            .setForensicReliabilityDegradationStartRt(state.forensicReliabilityDegradationStartRt)
+            .setLastRelayOnlineRt(state.lastRelayOnlineRt)
+            .setLastRelayOfflineRt(state.lastRelayOfflineRt)
+            .build()
+    }
+
+    fun applyLogicStateFromProto(p: LogicStateProto, state: AlarmEvaluationState) {
+        state.firstViolationTs = p.firstViolationTs
+        state.firstViolationRt = p.firstViolationRt
+        state.firstViolationWasJump = p.firstViolationWasJump
+        state.distanceViolationCounter = p.distanceViolationCounter
+        state.wasDistanceViolated = p.wasDistanceViolated
+        state.powerAlarmPending = p.powerAlarmPending
+        state.lastGlobalTriggerRt = p.lastGlobalTriggerRt
+        state.forensicReliabilityDegradationStartRt = p.forensicReliabilityDegradationStartRt
+        state.lastRelayOnlineRt = p.lastRelayOnlineRt
+        state.lastRelayOfflineRt = p.lastRelayOfflineRt
     }
 }

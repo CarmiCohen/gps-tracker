@@ -1,3 +1,29 @@
+# 🏛️ Resolution Archive - Oct.5.1
+
+## 🏁 Issue #SIMP-1201-1 / SOT ID 615: Logic State Serialization Expansion
+*   **Resolved**: Oct.5.1
+*   **Root Cause**: Alarm evaluation state (geofence counters, violation timestamps, lockout heuristics) was stored as scattered individual properties in DataStore, leading to parameter bloat in repository methods and potential state desynchronization during service restarts.
+*   **Remediations**:
+    *   **Unified Schema**: Defined `LogicStateProto` in `app_settings.proto` and added `role_logic_states` map to `AppSettings`.
+    *   **Consolidated Persistence**: Refactored `SettingsRepository.saveLogicState` and `AppAlarmManager.saveLogicState` to serialize the entire `AlarmEvaluationState` into a single binary blob.
+    *   **Forensic Continuity**: Implemented binary-safe recovery of monotonic timestamps and siren lockout states, keyed by `boot_id` to handle full reboots vs. service restarts correctly.
+    *   **API Simplification**: Eliminated 10 individual parameters from `saveLogicState` across the repository chain.
+*   **Significance**: Medium (Simplicity/Robustness).
+*   **SOT ID**: 615
+
+## 🏁 Issue #1173 / SOT ID 616: Protobuf-First Persistence (Phase 2)
+*   **Resolved**: Oct.5.1
+*   **Root Cause**: Phase 1 established the schema and mapping, but the system still relied on Room columns for history restoration and lacked a migration path for legacy JSON/Column-based entries in the offline buffer.
+*   **Remediations**:
+    *   **Binary Restoration**: Updated `TelemetryMapper` (`mapEntityToApp`, `mapPendingToStatus`) to prioritize restoration from the `payload` BLOB, treating legacy columns purely as metadata for indexing.
+    *   **On-the-fly Migration**: Implemented a "repair" strategy in `OfflineRepository.getPendingStatusUpdates` that converts legacy SQLite entries into binary Protobuf payloads upon first read.
+    *   **History Serialization**: Integrated `mapAppToBinary` into `TelemetryMapper.mapAppToEntity` to ensure all new ribbon history entries are persisted as binary-first.
+    *   **Schema Parity**: Expanded `TrackerStatusProto` and `RealtimeStatus` to include 100% field parity with the `LocationUpdate` monolith.
+*   **Significance**: Medium (Performance).
+*   **SOT ID**: 616
+
+---
+
 # 🏛️ Resolution Archive - Oct.4.6
 
 ## 🏁 Issue #1160 / SOT ID 614: Telemetry Pooling & Flyweight Expansion
@@ -116,7 +142,7 @@
 
 ## 🏁 Issue #1420 / SOT ID 601: Granular HUD Binding
 *   **Resolved**: Oct.3.1
-*   **Root Cause**: UI components and services were directly dependent on the monolithic `LocationUpdate` object, causing unnecessary coupling and redundant recompositions whenever any field in the monolith changed.
+*   **Root Cause**: UI components and services were directly dependent on the monolith `LocationUpdate` object, causing unnecessary coupling and redundant recompositions whenever any field in the monolith changed.
 *   **Remediations**:
     *   **Interface Slicing**: Introduced `Locatable`, `BatteryProvider`, and `DeviceIdentity` interfaces in `core:engine`.
     *   **Implementation**: Updated `LocationUpdate` to implement these granular interfaces.

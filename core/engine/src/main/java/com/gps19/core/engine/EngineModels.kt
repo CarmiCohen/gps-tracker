@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.5.1:
+ * - Issue #SIMP-1201-1: Logic State Serialization. Added lastSirenStopRt 
+ *   and bootId to AlarmEvaluationState for unified binary persistence (R1201).
  * Oct.4.6:
  * - Issue #1160: Flyweight & Pooling Expansion. Converted TrajectoryNode, 
  *   SentinelResult, and JumpConfidence to mutable classes and optimized 
@@ -578,6 +581,10 @@ class AlarmEvaluationState {
     // Issue #1417: Connectivity Hysteresis
     var lastRelayOnlineRt: Long = 0L
     var lastRelayOfflineRt: Long = 0L
+
+    // Issue #SIMP-1201-1: Serialization Parity
+    var lastSirenStopRt: Long = 0L
+    var bootId: String = ""
     
     /**
      * Issue #1410: Forced val ConcurrentHashMap to resolve CME.

@@ -121,6 +121,9 @@ message AppSettings {
     // Issue #1173: Protobuf-First Persistence
     repeated ActiveAlarmProto active_alarms = 106;
     map<string, ActiveAlarmsListProto> role_alarms = 107;
+
+    // Issue #SIMP-1201-1: Logic State Serialization
+    map<string, LogicStateProto> role_logic_states = 108;
 }
 
 enum TrackerStateProto {
@@ -138,6 +141,21 @@ enum LocationPendingReasonProto {
     LPR_ACOUSTIC_VIOLATION = 3;
     LPR_SIGNAL_LOSS = 4;
     LPR_JAMMER_SUSPICION = 5;
+}
+
+message LogicStateProto {
+    int64 first_violation_ts = 1;
+    int64 first_violation_rt = 2;
+    bool first_violation_was_jump = 3;
+    int32 distance_violation_counter = 4;
+    bool was_distance_violated = 5;
+    bool power_alarm_pending = 6;
+    int64 last_global_trigger_rt = 7;
+    int64 forensic_reliability_degradation_start_rt = 8;
+    int64 last_siren_stop_rt = 9;
+    int64 last_relay_online_rt = 10;
+    int64 last_relay_offline_rt = 11;
+    string boot_id = 12;
 }
 
 message RealtimeStatus {
@@ -158,6 +176,7 @@ message RealtimeStatus {
     int32 sats_view = 15;
     int32 sats_used = 16;
     int64 uptime_ms = 17;
+    int32 rtt = 18;
     int64 total_connected_ms = 19;
     int64 session_connected_ms = 20;
     int64 total_drop_ms = 21;
@@ -248,6 +267,22 @@ message RealtimeStatus {
     // and earliest violation start time to suppress recurring alarms (R-ID 575).
     optional int64 last_alarm_ack_ts = 77;
     optional int64 violation_start_ts = 78;
+
+    // Issue #1173: Protobuf-First Persistence Parity
+    int32 current_ma = 79;
+    double thermal_headroom = 80;
+    double heap_allocated_mb = 81;
+    bool is_anchor_locked = 82;
+    bool is_battery_whitelisted = 83;
+    bool is_storage_low = 84;
+    bool is_storage_critical = 85;
+    bool is_power_save_mode = 86;
+    int32 standby_bucket = 87;
+    string net_interface = 88;
+    optional string name = 89;
+    double dist_to_tracker = 90;
+    double dist_to_home = 91;
+    string sentinel_status_enum = 92;
 }
 
 message GeoPointProto {
@@ -296,6 +331,7 @@ message TrackerStatusProto {
     int64 last_disc_ts = 10;
     int64 total_drop_ms = 11;
     int64 max_drop_ms = 12;
+    int32 rtt = 13;
     int64 total_connected_ms = 15;
     int64 session_connected_ms = 16;
     int32 battery = 17;
@@ -421,6 +457,13 @@ message TrackerStatusProto {
     // Issue #1410: Viewer Persistence Parity
     optional int64 last_alarm_ack_ts = 116;
     optional int64 violation_start_ts = 117;
+
+    // Issue #1173: Protobuf-First Persistence Parity Expansion
+    double thermal_headroom = 118;
+    double heap_allocated_mb = 119;
+    optional string name = 120;
+    double dist_to_tracker = 121;
+    double dist_to_home = 122;
 }
 
 message ActiveAlarmProto {

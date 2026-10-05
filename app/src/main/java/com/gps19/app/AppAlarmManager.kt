@@ -13,12 +13,13 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Oct.5.1:
+ * - Issue #SIMP-1201-1: Logic State Serialization. Refactored saveLogicState 
+ *   to utilize the unified evaluation state object and restored monotonic 
+ *   recovery using the consolidated binary map (R-ID 510).
  * Oct.3.9:
  * - Issue #1201 RESOLVED: Decoupled siren lockout authority. Purged lastSirenStopRt 
  *   logic in favor of reactive SirenLockoutUseCase (R-ID 510).
- * Oct.2.8:
- * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
- *   to unified LocationUpdate DTO (R-ID 596).
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -137,36 +138,43 @@ class AppAlarmManager @Inject constructor(
         this.isTrackerMode = (currentRole == AppRole.TRACKER)
         
         val prefix = currentRole.prefix
-        evaluationState.firstViolationTs = s.roleLongsMap.getOrDefault(prefix + FIRST_VIOLATION_TS_KEY, 0L)
-        evaluationState.firstViolationRt = s.roleLongsMap.getOrDefault(prefix + FIRST_VIOLATION_RT_KEY, 0L)
-        evaluationState.firstViolationWasJump = s.roleBoolsMap.getOrDefault(prefix + FIRST_VIOLATION_WAS_JUMP_KEY, false)
-        evaluationState.distanceViolationCounter = s.roleIntsMap.getOrDefault(prefix + DISTANCE_VIOLATION_COUNTER_KEY, 0)
-        evaluationState.wasDistanceViolated = s.roleBoolsMap.getOrDefault(prefix + WAS_DISTANCE_VIOLATED_KEY, false)
-        evaluationState.powerAlarmPending = s.roleBoolsMap.getOrDefault(prefix + POWER_ALARM_PENDING_KEY, false)
-        evaluationState.lastGlobalTriggerRt = s.roleLongsMap.getOrDefault(prefix + LAST_GLOBAL_TRIGGER_RT_KEY, 0L)
-        evaluationState.forensicReliabilityDegradationStartRt = s.roleLongsMap.getOrDefault(prefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, 0L)
-
-        val savedBootId = s.roleStringsMap.getOrDefault(prefix + "boot_id", "")
-        if (!bootLifecycleAuthority.isSessionValid(savedBootId)) {
-            // Full Reboot: Monotonic clock reset, wipe RT dependent states
-            evaluationState.firstViolationRt = 0L
-            evaluationState.lastGlobalTriggerRt = 0L
-            evaluationState.forensicReliabilityDegradationStartRt = 0L
-            saveLogicState()
-        } else {
-            // Service Restart: Recover monotonic timestamps to preserve lockout
-            evaluationState.lastGlobalTriggerRt = bootLifecycleAuthority.recoverMonotonicTime(evaluationState.lastGlobalTriggerRt, savedBootId)
+        val logicProto = s.roleLogicStatesMap[prefix]
+        
+        if (logicProto != null) {
+            SettingsMapper.applyLogicStateFromProto(logicProto, evaluationState)
             
-            // Centralized Lockout Recovery
-            val recoveredStopRt = s.roleLongsMap.getOrDefault(prefix + LAST_SIREN_STOP_RT_KEY, 0L)
-            if (recoveredStopRt > 0) {
-                val absoluteStopRt = bootLifecycleAuthority.recoverMonotonicTime(recoveredStopRt, savedBootId)
-                val nowRt = timeProvider.elapsedRealtime()
-                if (nowRt - absoluteStopRt < SIREN_RESUME_COOLDOWN_MS) {
-                    val remaining = SIREN_RESUME_COOLDOWN_MS - (nowRt - absoluteStopRt)
-                    sirenLockoutUseCase.setSilence(remaining)
+            if (!bootLifecycleAuthority.isSessionValid(logicProto.bootId)) {
+                // Full Reboot: Monotonic clock reset, wipe RT dependent states
+                evaluationState.firstViolationRt = 0L
+                evaluationState.lastGlobalTriggerRt = 0L
+                evaluationState.forensicReliabilityDegradationStartRt = 0L
+                evaluationState.lastRelayOnlineRt = 0L
+                evaluationState.lastRelayOfflineRt = 0L
+                saveLogicState()
+            } else {
+                // Service Restart: Recover monotonic timestamps to preserve lockout
+                evaluationState.lastGlobalTriggerRt = bootLifecycleAuthority.recoverMonotonicTime(evaluationState.lastGlobalTriggerRt, logicProto.bootId)
+                
+                // Centralized Lockout Recovery
+                if (logicProto.lastSirenStopRt > 0) {
+                    val absoluteStopRt = bootLifecycleAuthority.recoverMonotonicTime(logicProto.lastSirenStopRt, logicProto.bootId)
+                    val nowRt = timeProvider.elapsedRealtime()
+                    if (nowRt - absoluteStopRt < SIREN_RESUME_COOLDOWN_MS) {
+                        val remaining = SIREN_RESUME_COOLDOWN_MS - (nowRt - absoluteStopRt)
+                        sirenLockoutUseCase.setSilence(remaining)
+                    }
                 }
             }
+        } else {
+            // Legacy/Fallback restoration path
+            evaluationState.firstViolationTs = s.roleLongsMap.getOrDefault(prefix + FIRST_VIOLATION_TS_KEY, 0L)
+            evaluationState.firstViolationRt = s.roleLongsMap.getOrDefault(prefix + FIRST_VIOLATION_RT_KEY, 0L)
+            evaluationState.firstViolationWasJump = s.roleBoolsMap.getOrDefault(prefix + FIRST_VIOLATION_WAS_JUMP_KEY, false)
+            evaluationState.distanceViolationCounter = s.roleIntsMap.getOrDefault(prefix + DISTANCE_VIOLATION_COUNTER_KEY, 0)
+            evaluationState.wasDistanceViolated = s.roleBoolsMap.getOrDefault(prefix + WAS_DISTANCE_VIOLATED_KEY, false)
+            evaluationState.powerAlarmPending = s.roleBoolsMap.getOrDefault(prefix + POWER_ALARM_PENDING_KEY, false)
+            evaluationState.lastGlobalTriggerRt = s.roleLongsMap.getOrDefault(prefix + LAST_GLOBAL_TRIGGER_RT_KEY, 0L)
+            evaluationState.forensicReliabilityDegradationStartRt = s.roleLongsMap.getOrDefault(prefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, 0L)
         }
         
         syncActiveAlarmsFlow()
@@ -175,19 +183,13 @@ class AppAlarmManager @Inject constructor(
 
     private fun saveLogicState() {
         scope.launch {
-            repository.saveLogicState(
-                firstViolationTs = evaluationState.firstViolationTs,
-                firstViolationRt = evaluationState.firstViolationRt,
-                firstViolationWasJump = evaluationState.firstViolationWasJump,
-                distanceViolationCounter = evaluationState.distanceViolationCounter,
-                wasDistanceViolated = evaluationState.wasDistanceViolated,
-                powerAlarmPending = evaluationState.powerAlarmPending,
-                lastSirenStopRt = sirenLockoutUseCase.getSilencedUntilRt() - SIREN_RESUME_COOLDOWN_MS, // Heuristic for recovery
-                lastGlobalTriggerRt = evaluationState.lastGlobalTriggerRt,
-                forensicReliabilityDegradationStartRt = evaluationState.forensicReliabilityDegradationStartRt,
-                role = currentRole
-            )
-            repository.saveString(currentRole, "boot_id", bootLifecycleAuthority.getCurrentBootId())
+            // Heuristic for manual stop recovery: save relative offset from silence timeout
+            evaluationState.lastSirenStopRt = if (sirenLockoutUseCase.isLockedOut()) {
+                timeProvider.elapsedRealtime() - (SIREN_RESUME_COOLDOWN_MS / 2) 
+            } else 0L
+            
+            evaluationState.bootId = bootLifecycleAuthority.getCurrentBootId()
+            repository.saveLogicState(evaluationState, currentRole)
         }
     }
 

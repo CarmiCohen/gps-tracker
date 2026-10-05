@@ -1,7 +1,7 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.4.6
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.5.1
 
-## 🎯 Current Resumption Focus: Protobuf-First Persistence
-Flyweight & Pooling Expansion complete; binary persistence pipeline established. Transitioning to full binary migration in `HistoryManager` and `OfflineRepository` in next cycle.
+## 🎯 Current Resumption Focus: Forensic diagnostic expansion and JNI hardening.
+Logic state serialization and Protobuf persistence Phase 2 complete.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -10,16 +10,13 @@ Flyweight & Pooling Expansion complete; binary persistence pipeline established.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 9)
+## 💡 Strategic Simplification Ideas (Ideas: 8)
 
 ### 🛑 High Priority
 *   (All high-priority simplification ideas resolved).
 
 ### 🟡 Medium Priority
-*   **Issue #1173: Protobuf-First Persistence**
-    *   *Significance*: **Medium (Disk I/O)**. Substitute JSON mapping with pure Protobuf binary pipelines straight into Room BLOB objects for high-frequency history storage. (Schema & Mapper Complete).
-*   **Issue #SIMP-1201-1: Logic State Serialization Expansion**
-    *   *Significance*: **Medium (Simplicity)**. Refactor `saveLogicState` in `SettingsRepository` to accept a structured `AlarmEvaluationState` fragment rather than 10 individual parameters, utilizing Protobuf's native mapping to reduce boilerplate.
+*   (All medium-priority simplification ideas resolved).
 
 ### 🔵 Low Priority
 *   **Issue #1293: Lifecycle-Aware Tick Orchestrator**
@@ -34,6 +31,8 @@ Flyweight & Pooling Expansion complete; binary persistence pipeline established.
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #SIMP-1201-1: Logic State Serialization Expansion.** Resolved Oct.5.1. Refactored `AlarmEvaluationState` persistence to use a consolidated Protobuf map (`role_logic_states`) in DataStore. Eliminated parameter bloat in `saveLogicState` and implemented binary-safe recovery for monotonic timestamps and siren lockout states, ensuring forensic continuity across service restarts (R1201).
+*   **Issue #1173: Protobuf-First Persistence (Phase 2).** Resolved Oct.5.1. Completed the transition to binary persistence for connection history and pending updates. Implemented high-performance binary restoration fallbacks in `TelemetryMapper` and on-the-fly migration for legacy SQLite columns in `OfflineRepository`. Fully decoupled storage from Room schema complexity (R1173).
 *   **Issue #1160: Flyweight & Pooling Expansion.** Resolved Oct.4.6. Implemented `RingBufferPool` and centralized `EnginePools` for `LocationUpdate`, `ProcessedLocation`, `SystemHealthState`, and `TrajectoryNode`. Refactored high-frequency paths in `MonitorService` and `LocationProcessor` to use pooled acquisition, eliminating GC churn during long-duration alerts and 100Hz sampling (R1160).
 *   **Issue #1425 / SOT ID 613: Unified Clock Authority.** Resolved Oct.4.5. Standardized all telemetry, HUD, and map "freshness" evaluations to strictly use `SystemClock.elapsedRealtime()` via `TimeProvider`. Eliminated wall-clock arithmetic in service triggers, log flush intervals, and user-activity heuristics to prevent logic corruption during NTP syncs (R1425).
 *   **Issue #1202 / SOT ID 612: UI Event Routing Unification.** Resolved Oct.4.1. Refactored navigation and procedural UI logic (service startup, permission orchestration) into `UiEventCoordinator`. Introduced `UiEffect` stream to decouple ViewModels and Composables from imperative commands. Centralized mode transition authority in the domain layer (R1202).
@@ -60,6 +59,7 @@ Flyweight & Pooling Expansion complete; binary persistence pipeline established.
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.5.1: [SOT Count: 270 (Rules: 127), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: 31, QA: 395]**
 - **Oct.4.6: [SOT Count: 268 (Rules: 127), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:4, Testing: 31, QA: 395]**
 - **Oct.4.5: [SOT Count: 267 (Rules: 126), Open: H:0, M:0, L:0, Ideas: H:0, M:3, L:4, Testing: 30, QA: 390]**
 - **Oct.4.1: [SOT Count: 266 (Rules: 125), Open: H:0, M:0, L:0, Ideas: H:0, M:4, L:4, Testing: 29, QA: 387]**

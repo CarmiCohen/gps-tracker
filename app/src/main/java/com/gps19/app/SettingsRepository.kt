@@ -55,12 +55,12 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Oct.5.1:
+ * - Issue #SIMP-1201-1: Logic State Serialization. Refactored saveLogicState 
+ *   to utilize binary LogicStateProto map, eliminating parameter bloat.
  * Oct.3.9:
  * - Issue #1201 RESOLVED: Decoupled siren lockout authority. Removed redundant 
  *   lastSirenStopRt from saveLogicState (R-ID 510).
- * Oct.2.9:
- * - Issue #1314: TrackerStatus Convergence. Migrated tracker state 
- *   persistence to unified LocationUpdate monolith.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -187,6 +187,7 @@ class SettingsRepository @Inject constructor(
             roleStringsMap.keys.filter { AppRole.fromKey(it)?.first == role }.forEach { removeRoleStrings(it) }
             removeRoleStates(prefix)
             removeRoleAlarms(prefix)
+            removeRoleLogicStates(prefix)
         }
     }
 
@@ -231,25 +232,10 @@ class SettingsRepository @Inject constructor(
         return protoAlarms.map { SettingsMapper.activeAlarmFromProto(it) }
     }
 
-    suspend fun saveLogicState(
-        firstViolationTs: Long, firstViolationRt: Long, firstViolationWasJump: Boolean,
-        distanceViolationCounter: Int, wasDistanceViolated: Boolean, powerAlarmPending: Boolean,
-        lastSirenStopRt: Long, lastGlobalTriggerRt: Long, forensicReliabilityDegradationStartRt: Long,
-        role: AppRole? = null
-    ) {
+    suspend fun saveLogicState(state: AlarmEvaluationState, role: AppRole) {
         dataStore.mutate {
-            if (role != null) {
-                val prefix = role.prefix
-                putRoleLongs(prefix + FIRST_VIOLATION_TS_KEY, firstViolationTs)
-                putRoleLongs(prefix + FIRST_VIOLATION_RT_KEY, firstViolationRt)
-                putRoleBools(prefix + FIRST_VIOLATION_WAS_JUMP_KEY, firstViolationWasJump)
-                putRoleInts(prefix + DISTANCE_VIOLATION_COUNTER_KEY, distanceViolationCounter)
-                putRoleBools(prefix + WAS_DISTANCE_VIOLATED_KEY, wasDistanceViolated)
-                putRoleBools(prefix + POWER_ALARM_PENDING_KEY, powerAlarmPending)
-                putRoleLongs(prefix + LAST_SIREN_STOP_RT_KEY, lastSirenStopRt)
-                putRoleLongs(prefix + LAST_GLOBAL_TRIGGER_RT_KEY, lastGlobalTriggerRt)
-                putRoleLongs(prefix + FORENSIC_RELIABILITY_DEGRADATION_START_RT_KEY, forensicReliabilityDegradationStartRt)
-            }
+            val proto = SettingsMapper.logicStateToProto(state)
+            putRoleLogicStates(role.prefix, proto)
         }
     }
 

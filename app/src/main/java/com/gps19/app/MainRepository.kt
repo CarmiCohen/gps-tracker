@@ -29,12 +29,10 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
- * Oct.3.9:
- * - Issue #1201 RESOLVED: Decoupled siren lockout authority. Removed redundant 
- *   lastSirenStopRt from saveLogicState (R-ID 510).
- * Oct.2.9:
- * - Issue #1314: TrackerStatus Convergence. Migrated tracker state 
- *   persistence to unified LocationUpdate monolith.
+ * Oct.5.1:
+ * - Issue #SIMP-1201-1: Logic State Serialization. Refactored saveLogicState 
+ *   to pass the unified evaluation state object (R1201).
+ * - Fixed eventLogsFlow return type mismatch (LogEntity -> LogEntry).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -471,17 +469,7 @@ class MainRepository @Inject constructor(
     suspend fun commitDraftSettings(): CommitResult { return settings.commitDraftSettings() }
     suspend fun clearDraftSettings() { settings.clearDraftSettings() }
 
-    suspend fun saveLogicState(
-        firstViolationTs: Long, firstViolationRt: Long, firstViolationWasJump: Boolean,
-        distanceViolationCounter: Int, wasDistanceViolated: Boolean, powerAlarmPending: Boolean,
-        lastSirenStopRt: Long, lastGlobalTriggerRt: Long, forensicReliabilityDegradationStartRt: Long,
-        role: AppRole? = null
-    ) {
-        settings.saveLogicState(
-            firstViolationTs, firstViolationRt, firstViolationWasJump,
-            distanceViolationCounter, wasDistanceViolated, powerAlarmPending,
-            lastSirenStopRt, lastGlobalTriggerRt, forensicReliabilityDegradationStartRt,
-            role
-        )
+    suspend fun saveLogicState(state: AlarmEvaluationState, role: AppRole) {
+        settings.saveLogicState(state, role)
     }
 }
