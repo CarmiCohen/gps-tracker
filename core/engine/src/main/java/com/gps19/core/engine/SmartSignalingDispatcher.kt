@@ -6,12 +6,12 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
- * Oct.3.8:
- * - Issue #1172: Smart Signaling Dispatcher. Completed migration of ALL signaling 
- *   triggers. Removed HIGH priority bypass to ensure connection-aware ordered 
- *   delivery for all commands (R-ID 510).
- * - Throttling Hardening: Adjusted processor to allow burst delivery for HIGH 
- *   priority commands while maintaining inter-frame delays for telemetry.
+ * Oct.6.4:
+ * - Issue #AUDIT-1006-7: Telemetry Conflation Audit. Integrated Log Conflation 
+ *   to merge high-frequency normal-priority logs. Enhanced Location conflation 
+ *   to use deep-merge to prevent telemetry fidelity loss (R-ID 511).
+ * - Log Conflation Logic: Implemented immediate flush on message change to 
+ *   ensure forensic sequence integrity while still merging identical bursts.
  */
 class SmartSignalingDispatcher(
     private val scope: CoroutineScope,
@@ -26,8 +26,13 @@ class SmartSignalingDispatcher(
     }
 
     private val queue = Channel<Command>(capacity = Channel.UNLIMITED)
+    
     private val pendingLocationMap = AtomicReference<Map<String, Any?>?>(null)
-    private var conflationJob: Job? = null
+    private var locationConflationJob: Job? = null
+    
+    private val pendingLogMap = AtomicReference<Map<String, Any?>?>(null)
+    private var logConflationJob: Job? = null
+
     private var processorJob: Job? = null
 
     init {
@@ -67,13 +72,17 @@ class SmartSignalingDispatcher(
     fun dispatch(command: Command) {
         when (command) {
             is Command.Json -> {
-                // location_update is subject to conflation if priority is NORMAL/LOW.
-                if (command.event == "location_update" && command.priority != SignalingPriority.HIGH) {
-                    dispatchConflated(command.data)
-                } else {
-                    // All other JSON commands (including HIGH priority) are queued to maintain order
-                    // and ensure connectivity checks.
-                    queue.trySend(command)
+                when {
+                    command.event == "location_update" && command.priority != SignalingPriority.HIGH -> {
+                        dispatchConflatedLocation(command.data)
+                    }
+                    command.event == "log_update" && command.priority == SignalingPriority.NORMAL -> {
+                        dispatchConflatedLog(command.data)
+                    }
+                    else -> {
+                        // All other JSON commands (including HIGH priority) are queued to maintain order.
+                        queue.trySend(command)
+                    }
                 }
             }
             is Command.Binary -> {
@@ -83,13 +92,13 @@ class SmartSignalingDispatcher(
         }
     }
 
-    private fun dispatchConflated(incoming: Map<String, Any?>) {
+    private fun dispatchConflatedLocation(incoming: Map<String, Any?>) {
         pendingLocationMap.updateAndGet { current ->
             SignalingMessageConflator.conflate(current, incoming)
         }
 
-        if (conflationJob == null || !conflationJob!!.isActive) {
-            conflationJob = scope.launch(Dispatchers.Default) {
+        if (locationConflationJob == null || !locationConflationJob!!.isActive) {
+            locationConflationJob = scope.launch(Dispatchers.Default) {
                 val delayMs = if (isViolationProvider()) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
                 delay(delayMs)
                 
@@ -101,9 +110,50 @@ class SmartSignalingDispatcher(
         }
     }
 
+    private fun dispatchConflatedLog(incoming: Map<String, Any?>) {
+        // R-ID 511: Log Conflation Audit.
+        // If the incoming log differs from the pending one, flush the pending one 
+        // immediately to maintain sequence integrity.
+        val current = pendingLogMap.get()
+        if (current != null) {
+            val pendingMsg = current["message"] as? String
+            val incomingMsg = incoming["message"] as? String
+            if (pendingMsg != incomingMsg) {
+                val toSend = pendingLogMap.getAndSet(null)
+                if (toSend != null) {
+                    queue.trySend(Command.Json("log_update", toSend, SignalingPriority.NORMAL))
+                }
+            }
+        }
+
+        pendingLogMap.updateAndGet { cur ->
+            SignalingMessageConflator.conflateLogs(cur, incoming)
+        }
+
+        if (logConflationJob == null || !logConflationJob!!.isActive) {
+            logConflationJob = scope.launch(Dispatchers.Default) {
+                // Log conflation uses a slightly longer delay to catch bursts.
+                delay(SIGNALING_CONFLATION_DELAY_MS * 2)
+                
+                val toSend = pendingLogMap.getAndSet(null)
+                if (toSend != null) {
+                    queue.trySend(Command.Json("log_update", toSend, SignalingPriority.NORMAL))
+                }
+            }
+        }
+    }
+
     fun shutdown() {
         processorJob?.cancel()
-        conflationJob?.cancel()
+        locationConflationJob?.cancel()
+        logConflationJob?.cancel()
         queue.close()
+    }
+    
+    companion object {
+        private const val SIGNALING_EMIT_DELAY_MS = 100L
+        private const val SIGNALING_EMIT_DELAY_VIOLATION_MS = 50L
+        private const val SIGNALING_CONFLATION_DELAY_MS = 250L
+        private const val SIGNALING_CONFLATION_DELAY_VIOLATION_MS = 100L
     }
 }

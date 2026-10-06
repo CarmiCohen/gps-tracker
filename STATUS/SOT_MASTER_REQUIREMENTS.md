@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct6.3)
+# SOT Master Requirements & Hardening Status (Oct6.4)
 
-## 🏗️ Architectural Master Rules (144 Rules)
+## 🏗️ Architectural Master Rules (145 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -19,10 +19,12 @@
 *   **1.119 Zero-Drop Safety Telemetry (R660-H)**: Critical safety alerts (`isImportant = true`) MUST NOT be dropped due to log buffer backpressure; implementations MUST provide async fallback paths to await buffer capacity. (Oct6.2 - Issue #AUDIT-1006-5).
 *   **1.120 Memory-Aware Loop Throttling (R-ID 592-M)**: Background loops MUST implement aggressive interval relaxation (up to 15s) when `MemoryPressureLevel.CRITICAL` is detected to prevent background OOM. (Oct6.2 - Issue #AUDIT-1006-6).
 *   **1.121 Tick Preemption (R-ID 289-H)**: Background services MUST implement a tick preemption mechanism to allow safety-critical fast-path triggers (Acoustic/Light) to bypass relaxed intervals and force immediate alarm evaluation. (Oct6.3 - Issue #AUDIT-1006-2).
+*   **1.122 Adaptive Telemetry Conflation (R-ID 511)**: Signaling dispatchers MUST implement adaptive conflation for high-frequency location and log bursts to minimize radio usage while preserving forensic sequence integrity via sequence-break flushes. (Oct6.4 - Issue #AUDIT-1006-7).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 634**: Telemetry Conflation - Integrated deep-merge and log burst conflation in `SmartSignalingDispatcher` and `SignalingMessageConflator`. (Resolved Oct6.4).
 *   **SOT ID 633**: Tick Preemption - Implemented `preemptLoop` in `TickOrchestrator` to ensure zero-latency alarm detection during memory pressure. (Resolved Oct6.3).
 *   **SOT ID 632**: Memory Throttling - Enhanced `MonitorService` to relax tick intervals to 15s during critical memory pressure. (Resolved Oct6.2).
 *   **SOT ID 631**: Log Reliability - Hardened `LogRepository` to ensure important telemetry bypasses buffer overflow drops via async fallback. (Resolved Oct6.2).
@@ -31,6 +33,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.252 (Telemetry Conflation Audit)**: PASSED - Verified that identical log bursts are merged and location updates preserve telemetry snapshots via deep-merge. (Oct6.4)
 *   **Chapter 31.251 (Tick Preemption Audit)**: PASSED - Verified that acoustic spikes force immediate ticks, bypassing the 15s relaxation during critical memory pressure. (Oct6.3)
 *   **Chapter 31.250 (Telemetry Pressure Audit)**: PASSED - Verified 100Hz log burst integrity and zero-drop behavior for important alerts. (Oct6.2)
 *   **Chapter 31.249 (Background Transition Audit)**: PASSED - Verified zero-latency UI appearance for `AlarmOverlayService`. Confirmed stable flow lifecycle via service scope. (Oct6.1)
