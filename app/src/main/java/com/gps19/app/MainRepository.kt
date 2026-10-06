@@ -8,11 +8,11 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
 import timber.log.Timber
-import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 import org.osmdroid.util.GeoPoint
@@ -29,10 +29,12 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.6.7:
+ * - Issue #AUDIT-1006-8: Signaling Metrics Audit. Added getDispatcherMetrics() 
+ *   to expose SmartSignalingDispatcher telemetry to the ViewModel (Rule 1.123).
  * Oct.5.1:
  * - Issue #SIMP-1201-1: Logic State Serialization. Refactored saveLogicState 
  *   to pass the unified evaluation state object (R1201).
- * - Fixed eventLogsFlow return type mismatch (LogEntity -> LogEntry).
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -46,7 +48,8 @@ class MainRepository @Inject constructor(
     private val telemetry: TelemetryRepository,
     private val logRepository: LogRepository,
     private val offlineRepository: OfflineRepository,
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val signalingProvider: SignalingProvider
 ) {
     private val repositoryExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         Timber.e(throwable, "Repository Coroutine Exception")
@@ -136,6 +139,8 @@ class MainRepository @Inject constructor(
 
     fun getLocalLocationSync(): LocationUpdate = telemetry.localLocation.value
     fun getTrackerLocationSync(): LocationUpdate = telemetry.trackerLocation.value
+
+    fun getDispatcherMetrics(): SmartSignalingDispatcher.Metrics = signalingProvider.getDispatcherMetrics()
 
     fun clear() { telemetry.clear() }
 
@@ -428,7 +433,7 @@ class MainRepository @Inject constructor(
                     listOf(false, true).forEach { isViewer ->
                         trailDao.getPruneThreshold(isViewer, PRUNE_LIMIT_TRAIL)?.let { trailDao.pruneByThreshold(isViewer, it, PRUNE_CHUNK_SIZE) }
                     }
-                    violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)?.let { violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)?.let { violationDao.pruneByThreshold(it, PRUNE_CHUNK_SIZE) } }
+                    violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)?.let { violationDao.pruneByThreshold(it, PRUNE_CHUNK_SIZE) }
                 }
             } catch (e: Exception) { Timber.e(e, "Background pruning failed") } finally { metrics.isPruningActive.set(false) }
         }

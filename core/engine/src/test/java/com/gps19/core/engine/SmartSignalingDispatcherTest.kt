@@ -28,6 +28,7 @@ class SmartSignalingDispatcherTest {
                 }
             },
             binarySink = { _, _, _ -> },
+            objectSink = { _, _ -> },
             isConnectedProvider = { true },
             timeProvider = testTimeProvider,
             dispatcher = testDispatcher
@@ -59,6 +60,41 @@ class SmartSignalingDispatcherTest {
         // Rule 1.119: HIGH priority must bypass the backlog immediately.
         // Expected delay is 0ms because of preemption.
         assertTrue("High priority message delayed by $delay ms, expected < 50ms", delay < 50)
+        
+        dispatcher.shutdown()
+    }
+
+    @Test
+    fun `Metrics should track frames received emitted and conflated`() = runTest {
+        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
+        val dispatcher = SmartSignalingDispatcher(
+            scope = this,
+            isViolationProvider = { false },
+            jsonSink = { _, _ -> },
+            binarySink = { _, _, _ -> },
+            objectSink = { _, _ -> },
+            isConnectedProvider = { true },
+            dispatcher = testDispatcher
+        )
+
+        // Dispatch 3 identical logs (should result in 2 conflations)
+        repeat(3) {
+            dispatcher.dispatch(SmartSignalingDispatcher.Command.Json(
+                "log_update",
+                mapOf("message" to "test"),
+                SignalingPriority.NORMAL
+            ))
+        }
+
+        advanceUntilIdle()
+
+        val metrics = dispatcher.getMetrics()
+        // received: 3, emitted: 1 (after conflation delay), conflated: 2
+        // Wait, conflation delay is 500ms for logs in SmartSignalingDispatcher
+        // Actually logConflationJob delays by SIGNALING_CONFLATION_DELAY_MS * 2 (500ms)
+        
+        assertTrue("Expected 3 frames received, got ${metrics.received}", metrics.received == 3L)
+        assertTrue("Expected 2 frames conflated, got ${metrics.conflated}", metrics.conflated == 2L)
         
         dispatcher.shutdown()
     }

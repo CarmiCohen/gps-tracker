@@ -2,8 +2,8 @@ package com.gps19.app
 
 import android.os.SystemClock
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 
 /**
@@ -11,19 +11,19 @@ import kotlin.math.max
  * Encapsulates initialization state gates and manages lifecycle-bound jobs
  * to maintain strict structured concurrency and simplify background task lifecycles.
  * 
+ * Oct.6.7:
+ * - Issue #AUDIT-1006-8: SIMP-1426-5 (Strategic Simplification). Migrated 
+ *   preemption logic from AtomicBoolean polling to Channel-based signals. 
+ *   This eliminates the 10ms polling loop in periodic tasks, improving 
+ *   hot-path CPU efficiency and responsiveness (Rule 2.3).
  * Oct.6.3:
  * - Issue #AUDIT-1006-2: Added preemptLoop() to force immediate tick by 
  *   canceling current delay in periodic loops.
- * Oct.5.8:
- * - Issue #1293: Enhanced with internal periodic loop management and 
- *   dynamic interval support to reduce service-level boilerplate.
- * - Issue #1425 Consistency: Timing logic uses monotonic elapsedRealtime 
- *   to ensure interval stability during system clock adjustments.
  */
 class TickOrchestrator {
     private val initializationDeferred = CompletableDeferred<Unit>()
     private val managedJobs = ConcurrentHashMap<String, Job>()
-    private val preemptionTriggers = ConcurrentHashMap<String, AtomicBoolean>()
+    private val preemptionSignals = ConcurrentHashMap<String, Channel<Unit>>()
 
     /**
      * Signal that the parent service has finished its pre-initialization setup.
@@ -74,8 +74,10 @@ class TickOrchestrator {
         block: suspend CoroutineScope.() -> Unit
     ): Job {
         managedJobs[name]?.cancel()
-        val trigger = AtomicBoolean(false)
-        preemptionTriggers[name] = trigger
+        
+        // Issue #AUDIT-1006-8: Efficient signaling channel
+        val signal = Channel<Unit>(capacity = Channel.CONFLATED)
+        preemptionSignals[name] = signal
 
         val job = scope.launch {
             initializationDeferred.await()
@@ -89,17 +91,9 @@ class TickOrchestrator {
                 val nextInterval = intervalProvider()
                 val remaining = max(10L, nextInterval - elapsed)
                 
-                // Issue #AUDIT-1006-2: Preemptible delay
-                try {
-                    withTimeout(remaining) {
-                        while (!trigger.get()) {
-                            delay(10)
-                        }
-                    }
-                } catch (e: TimeoutCancellationException) {
-                    // Normal timeout
-                } finally {
-                    trigger.set(false)
+                // Issue #AUDIT-1006-8: Efficient wait with preemption support
+                withTimeoutOrNull(remaining) {
+                    signal.receive()
                 }
             }
         }
@@ -111,7 +105,7 @@ class TickOrchestrator {
      * preemptLoop: Forces the specified loop to wake up and execute its next tick immediately.
      */
     fun preemptLoop(name: String) {
-        preemptionTriggers[name]?.set(true)
+        preemptionSignals[name]?.trySend(Unit)
     }
 
     /**
@@ -131,7 +125,7 @@ class TickOrchestrator {
      */
     fun cancelJob(name: String) {
         managedJobs.remove(name)?.cancel()
-        preemptionTriggers.remove(name)
+        preemptionSignals.remove(name)
     }
 
     /**
@@ -161,6 +155,6 @@ class TickOrchestrator {
     fun cancelAll() {
         managedJobs.values.forEach { it.cancel() }
         managedJobs.clear()
-        preemptionTriggers.clear()
+        preemptionSignals.clear()
     }
 }

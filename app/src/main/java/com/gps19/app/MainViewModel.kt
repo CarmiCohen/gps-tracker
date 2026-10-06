@@ -21,12 +21,15 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.6.7:
+ * - Issue #AUDIT-1006-8: Signaling Metrics Integration. Added periodic polling 
+ *   of dispatcher metrics in the global timer to update DiagnosticState, 
+ *   providing real-time visibility into conflation efficiency (Rule 1.123).
+ * - Fixed compilation errors in mapHudTelemetry and getDispatcherMetrics linkage.
  * Oct.5.20:
  * - SIMP-1426-3: Completed implementation of UiStateProvider. Unified all 
  *   high-frequency, history, and diagnostic flows to support leaf-level 
  *   state convergence and reduce composable parameter overhead.
- * - Map Hardening (Oct.5.20 Phase 2): Migrated initialCenter logic from 
- *   AppMapContainer to mapMapViewState.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -413,7 +416,16 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) { 
             while (true) { 
                 val nowRt = timeProvider.elapsedRealtime()
-                if (_uiState.value.isInitialized && _uiState.value.session.appMode != null) repository.sendCommand(UiCommand.SyncRequest)
+                if (_uiState.value.isInitialized && _uiState.value.session.appMode != null) {
+                    repository.sendCommand(UiCommand.SyncRequest)
+                    
+                    // Issue #AUDIT-1006-8: Update signaling metrics for field audit
+                    val metrics = repository.getDispatcherMetrics()
+                    updateDiagnosticState { it.apply { 
+                        signalingMetrics = metrics
+                        pulse = nowRt 
+                    } }
+                }
                 val lastActivity = repository.lastRemoteActivityTs.value
                 val isPeerActive = lastActivity > 0 && (nowRt - lastActivity) < TELEMETRY_UI_STALE_THRESHOLD_MS
                 if (_uiState.value.session.isPeerActive != isPeerActive) {

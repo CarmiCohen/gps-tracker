@@ -8,6 +8,9 @@ import org.osmdroid.util.GeoPoint
 /**
  * MainUiState: Composite UI state partitioned into specialized slices to 
  * minimize recomposition costs and isolate volatile triggers (Issue #1166).
+ * Oct.6.7:
+ * - Issue #AUDIT-1006-8: Signaling Stability & Conflation Metrics. Added 
+ *   SignalingMetrics to DiagnosticState to expose radio efficiency (R-ID 511).
  * Oct.6.2:
  * - Issue #AUDIT-1006-6: Added SetMemoryPressureSimulation to UiEvent and UiCommand.
  * - Issue #AUDIT-1006-5: Added ExecuteLogPressureTest to UiEvent and UiCommand.
@@ -342,6 +345,7 @@ class DiagnosticState(
     var trackerSatsView: Int = -1,
     var trackerSatsUsed: Int = -1,
     var connectivity: ConnectivityState = ConnectivityState(),
+    var signalingMetrics: SmartSignalingDispatcher.Metrics = SmartSignalingDispatcher.Metrics(0, 0, 0),
     var activeAlarms: List<AlarmInfo> = emptyList(),
     var isNewViolationDetected: Boolean = false,
     var powerAlarmPending: Boolean = false,
@@ -373,6 +377,7 @@ class DiagnosticState(
         this.trackerSatsView = other.trackerSatsView
         this.trackerSatsUsed = other.trackerSatsUsed
         this.connectivity.copyFrom(other.connectivity)
+        this.signalingMetrics = other.signalingMetrics
         this.activeAlarms = other.activeAlarms
         this.isNewViolationDetected = other.isNewViolationDetected
         this.powerAlarmPending = other.powerAlarmPending
@@ -404,6 +409,7 @@ class DiagnosticState(
         trackerSatsView = -1
         trackerSatsUsed = -1
         connectivity.reset()
+        signalingMetrics = SmartSignalingDispatcher.Metrics(0, 0, 0)
         activeAlarms = emptyList()
         isNewViolationDetected = false
         powerAlarmPending = false

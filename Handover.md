@@ -1,28 +1,28 @@
-# Forensic Handover (Oct6.5 - PRIORITY PREEMPTION & BINARY CONFLATION)
+# Forensic Handover (Oct6.7 - METRICS & EFFICIENCY HARDENED)
 
 ## 🎯 Current System State
-*   **Version**: `Oct6.5` | **Status**: 🟢 **OPERATIONAL**.
-*   **Smart Signaling Priority (Issue #AUDIT-1006-5)**:
-    *   **Root Cause**: Single FIFO queue caused `HIGH` priority safety alerts to wait behind `NORMAL` telemetry backlogs and inter-frame delays (Rule 1.119).
-    *   **Remediation**: Implemented dual-channel (`highQueue`, `normalQueue`) dispatching in `SmartSignalingDispatcher`. 
-    *   **Preemption Logic**: Added a `withTimeoutOrNull` preemption window. If a `HIGH` priority message arrives while a `NORMAL` delay is active, the dispatcher interrupts the wait, emits the alert immediately, and then resumes normal flow.
-*   **Binary Conflation (Issue #AUDIT-1006-7)**:
-    *   **Status**: IMPLEMENTED. `SmartSignalingDispatcher` now supports a `Command.Object` type for `LocationUpdate` instances. 
-    *   **Fidelity Logic**: `SignalingMessageConflator.conflateLocationUpdate` performs a field-level deep-merge, preserving forensic snapshots (thermal, heap, vibe) across conflatable binary bursts (Rule 1.122 / R-ID 511).
+*   **Version**: `Oct6.7` | **Status**: 🟢 **OPERATIONAL**.
+*   **Signaling Metrics (Issue #AUDIT-1006-8)**:
+    *   **Remediation**: Integrated `AtomicLong` counters into `SmartSignalingDispatcher` to track radio efficiency.
+    *   **Observability**: System now tracks `framesReceived`, `framesEmitted`, and `framesConflated`. This allows for quantitative verification of conflation savings (e.g., 50 log updates conflated into 1 emit).
+*   **Efficient Preemption (SIMP-1426-5)**:
+    *   **Remediation**: Refactored `TickOrchestrator` to use `Channel<Unit>` for loop preemption.
+    *   **Architecture**: Eliminated the 10ms polling delay loop. The `launchPeriodicLoop` now performs a non-blocking `signal.receive()` with a timeout, ensuring zero CPU overhead while waiting for the next tick or a preemption signal (Rule 1.124).
+*   **Binary Conflation**: Fully integrated and verified via unit tests. Deferred serialization ensures that merged objects are only serialized once before wire emission.
 
 ## 🟢 Audit Record
-*   **Build Status**: 🟢 **SUCCESSFUL**. Version advanced to `Oct6.5` in `app/build.gradle`.
-*   **Metrics**: Oct6.5: [SOT Count: 290 (Rules: 147), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 46, QA: 495]
-*   **Test Status**: `SmartSignalingDispatcherTest` verified with `UnconfinedTestDispatcher` and `testScheduler` clock (38 tests passed).
+*   **Build Status**: 🟢 **SUCCESSFUL**. Version advanced to `Oct6.7` in `app/build.gradle`.
+*   **Metrics**: Oct6.7: [SOT Count: 294 (Rules: 150), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 42, QA: 510]
+*   **Test Status**: Added `Metrics should track frames received emitted and conflated` to `SmartSignalingDispatcherTest`.
 
 ## 🚀 Resumption Action Path (Next Chat)
-1.  **CommunicationManager Integration**:
-    *   Update `CommunicationManager.transmit()` to use `dispatcher.dispatch(SmartSignalingDispatcher.Command.Object(...))` instead of immediate Protobuf serialization. This will enable the dispatcher to conflate binary telemetry objects before they hit the wire.
-2.  **Binary Serialization Sink Verification**:
-    *   Ensure the `objectSink` in `CommunicationManager` correctly maps the final (conflated) `LocationUpdate` to the pre-allocated Protobuf serialization buffer.
+1.  **Field Audit**:
+    *   Expose `SmartSignalingDispatcher.Metrics` to the `DiagnosticsScreen` to allow real-time monitoring of radio efficiency gains.
+2.  **Protocol Buffers**:
+    *   Check for further Protobuf field optimizations (e.g., using `sint32` for delta coordinates) to further reduce payload size.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct6.5)
-- **Oct6.5: [SOT Count: 290 (Rules: 147), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 46, QA: 495]**
-- **Audit Record**: Priority-aware preemption (R-ID 511) and Binary Conflation (R660-H) implemented; Oct6.5 verified for safety-critical latency bounds.
+## 📊 Hardening Progress Dashboard (Oct6.7)
+- **Oct6.7: [SOT Count: 294 (Rules: 150), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 42, QA: 510]**
+- **Audit Record**: Implemented Signal Efficiency Metrics and Channel-based Preemption (R-ID 511, R-ID 289-M).

@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct6.5
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct6.7
 
-## 🎯 Current Resumption Focus: Binary Protocol Serialization Alignment.
+## 🎯 Current Resumption Focus: Forensic Fidelity & Radio Efficiency.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -9,17 +9,17 @@
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 1)
-
-### 🔵 Low Priority
-*   **SIMP-1426-5: Tick Orchestrator Preemption Logic.** Consider migrating preemption state to a specialized `PreemptionSignal` wrapper to reduce `ConcurrentHashMap` lookups in the hot path. (Significance: Low).
+## 💡 Strategic Simplification Ideas (Ideas: 0)
+*   *(None)*
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
-*   **Issue #AUDIT-1006-5: Forensic Log Pressure Hardening.** Resolved Oct6.5. Refactored `SmartSignalingDispatcher` with dual-channel priority queuing and preemption. HIGH priority safety alerts now bypass NORMAL telemetry backlog and inter-frame delays (Rule 1.119 / R-ID 511).
-*   **Issue #AUDIT-1006-7: Binary Telemetry Optimization.** Resolved Oct6.5. Integrated object-level conflation for `LocationUpdate` in `SmartSignalingDispatcher`. Binary (Protobuf) telemetry now supports field-level merging to match JSON radio efficiency (Rule 1.122).
-*   **Issue #AUDIT-1006-7: Telemetry Conflation Audit.** Resolved Oct6.4. Enhanced `SignalingMessageConflator` with deep-merge logic and implemented log burst conflation.
+*   **Issue #AUDIT-1006-8: Signaling Stability & Conflation Metrics Audit.** Resolved Oct6.7. Integrated telemetry counters into `SmartSignalingDispatcher` to track radio efficiency (frames received vs. emitted vs. conflated). Implemented `SIMP-1426-5` to refactor `TickOrchestrator` preemption logic, replacing polling loops with efficient channel-based signals to reduce hot-path overhead (Rule 1.123, 1.124).
+*   **Issue #AUDIT-1006-7: Binary Telemetry Conflation Integration.** Resolved Oct6.6. Completed the end-to-end integration by routing `LocationUpdate` objects from `CommunicationManager` through the `SmartSignalingDispatcher` (Rule 1.122 / R-ID 511).
+*   **Issue #AUDIT-1006-5: Forensic Log Pressure Hardening.** Resolved Oct6.5. Refactored `SmartSignalingDispatcher` with dual-channel priority queuing and preemption (Rule 1.119).
+*   **Issue #AUDIT-1006-7: Binary Telemetry Optimization.** Resolved Oct6.5. Integrated object-level conflation for `LocationUpdate` (Rule 1.122).
+*   **Issue #AUDIT-1006-7: Telemetry Conflation Audit.** Resolved Oct6.4. Enhanced `SignalingMessageConflator` with deep-merge logic.
 *   **Issue #AUDIT-1006-2: Background Service Transition Latency.** Resolved Oct6.3. (Rule 1.121).
 *   **Issue #AUDIT-1006-5: Forensic Log Pressure Hardening (Persistence).** Resolved Oct6.2. (Rule 1.119).
 *   **Issue #AUDIT-1006-6: Memory Pressure Throttling.** Resolved Oct6.2. (Rule 1.120).
@@ -28,6 +28,8 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct6.7: [SOT Count: 294 (Rules: 150), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 42, QA: 510]**
+- **Oct6.6: [SOT Count: 292 (Rules: 148), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 40, QA: 502]**
 - **Oct6.5: [SOT Count: 290 (Rules: 147), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 46, QA: 495]**
 - **Oct6.4: [SOT Count: 288 (Rules: 145), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 45, QA: 485]**
 - **Oct6.3: [SOT Count: 287 (Rules: 144), Open: H:1, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 44, QA: 475]**

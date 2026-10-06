@@ -3,10 +3,14 @@ package com.gps19.core.engine
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.selects.select
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
+ * Oct.6.6:
+ * - Issue #AUDIT-1006-8: Conflation Metrics Audit. Added AtomicLong counters for 
+ *   received, emitted, and conflated frames to monitor radio efficiency (R-ID 511).
  * Oct.6.5:
  * - Issue #AUDIT-1006-7: Binary Telemetry Conflation. Added Object-based 
  *   LocationUpdate command to allow conflation of Protobuf telemetry before 
@@ -46,6 +50,10 @@ class SmartSignalingDispatcher(
     
     private val pendingLogMap = AtomicReference<Map<String, Any?>?>(null)
     private var logConflationJob: Job? = null
+
+    private val framesReceived = AtomicLong(0)
+    private val framesEmitted = AtomicLong(0)
+    private val framesConflated = AtomicLong(0)
 
     private var processorJob: Job? = null
     
@@ -95,6 +103,7 @@ class SmartSignalingDispatcher(
     }
 
     private fun emit(command: Command) {
+        framesEmitted.incrementAndGet()
         when (command) {
             is Command.Json -> jsonSink(command.event, command.data)
             is Command.Binary -> binarySink(command.event, command.routingId, command.data)
@@ -103,6 +112,7 @@ class SmartSignalingDispatcher(
     }
 
     fun dispatch(command: Command) {
+        framesReceived.incrementAndGet()
         when (command) {
             is Command.Json -> {
                 if (command.event == "location_update" && command.priority != SignalingPriority.HIGH) {
@@ -133,9 +143,12 @@ class SmartSignalingDispatcher(
     }
 
     private fun dispatchConflatedLocationMap(incoming: Map<String, Any?>) {
+        var wasConflated = false
         pendingLocationMap.updateAndGet { current ->
+            if (current != null) wasConflated = true
             SignalingMessageConflator.conflate(current, incoming)
         }
+        if (wasConflated) framesConflated.incrementAndGet()
 
         if (locationConflationJob == null || !locationConflationJob!!.isActive) {
             locationConflationJob = scope.launch(dispatcher) {
@@ -151,9 +164,12 @@ class SmartSignalingDispatcher(
     }
 
     private fun dispatchConflatedLocationObject(incoming: LocationUpdate) {
+        var wasConflated = false
         pendingLocationObject.updateAndGet { current ->
+            if (current != null) wasConflated = true
             SignalingMessageConflator.conflateLocationUpdate(current, incoming)
         }
+        if (wasConflated) framesConflated.incrementAndGet()
 
         if (locationObjectConflationJob == null || !locationObjectConflationJob!!.isActive) {
             locationObjectConflationJob = scope.launch(dispatcher) {
@@ -178,6 +194,8 @@ class SmartSignalingDispatcher(
                 if (toSend != null) {
                     enqueue(Command.Json("log_update", toSend, SignalingPriority.NORMAL))
                 }
+            } else {
+                framesConflated.incrementAndGet()
             }
         }
 
@@ -196,6 +214,14 @@ class SmartSignalingDispatcher(
             }
         }
     }
+
+    data class Metrics(val received: Long, val emitted: Long, val conflated: Long)
+
+    fun getMetrics() = Metrics(
+        received = framesReceived.get(),
+        emitted = framesEmitted.get(),
+        conflated = framesConflated.get()
+    )
 
     fun shutdown() {
         processorJob?.cancel()

@@ -21,15 +21,13 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * Oct.3.8:
- * - Issue #1172: Smart Signaling Dispatcher. Migrated ALL signaling triggers 
- *   (including join/leave handshakes) to the dispatcher to ensure ordered, 
- *   connection-aware delivery. 
- * - Payload Optimization: Converted payload generators to use Maps to avoid 
- *   redundant JSONObject conversions (R-ID 510).
- * Oct.3.6:
- * - Connection Logic Hardening: Simplified connect() to prioritize URL/ID changes 
- *   over existing connection state (R1422).
+ * Oct.6.7:
+ * - Issue #AUDIT-1006-8: Signaling Stability & Conflation Metrics. Implemented 
+ *   getDispatcherMetrics() to expose conflation savings to the UI (Rule 1.123).
+ * Oct.6.6:
+ * - Issue #AUDIT-1006-7: Binary Telemetry Conflation. Completed integration by 
+ *   routing LocationUpdate objects through the SmartSignalingDispatcher. Serialization 
+ *   now occurs at the sink level, enabling pre-wire conflation of binary data.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -83,6 +81,9 @@ class CommunicationManager @Inject constructor(
         },
         binarySink = { event, routingId, data ->
             if (!isStopped) socket?.emit(event, routingId, data)
+        },
+        objectSink = { event, status ->
+            serializeAndEmitBinary(event, status)
         },
         isConnectedProvider = { isConnected() }
     )
@@ -372,8 +373,17 @@ class CommunicationManager @Inject constructor(
         if (isStopped || !isConnected()) return
         markTraffic()
         if (isTrackerMode && !fromViewer) {
+            dispatcher.dispatch(SmartSignalingDispatcher.Command.Object("location_update_bin", status, priority))
+        } else {
+            emitInternal("location_update", status.toMap(fromViewer), priority)
+        }
+    }
+
+    private fun serializeAndEmitBinary(event: String, status: LocationUpdate) {
+        if (isStopped || !isConnected()) return
+        synchronized(statusBuilder) {
             statusBuilder.clear()
-            TelemetryProtobufMapper.mapToRealtime(status, statusBuilder, fromViewer)
+            TelemetryProtobufMapper.mapToRealtime(status, statusBuilder, false)
             val message = statusBuilder.buildPartial()
             val size = message.serializedSize
             if (size > serializationBuffer.size && size <= MAX_SERIALIZATION_BUFFER_SIZE) {
@@ -384,14 +394,16 @@ class CommunicationManager @Inject constructor(
                     val cos = CodedOutputStream.newInstance(serializationBuffer, 0, size)
                     message.writeTo(cos); cos.checkNoSpaceLeft()
                     val payload = Arrays.copyOf(serializationBuffer, size)
-                    dispatcher.dispatch(SmartSignalingDispatcher.Command.Binary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), payload, priority))
+                    socket?.emit(event, SignalingConstants.getTransmissionId(deviceId), payload)
                     return
                 } catch (e: Exception) { Timber.e(e, "Pre-allocated serialization failed") }
             }
-            dispatcher.dispatch(SmartSignalingDispatcher.Command.Binary("location_update_bin", SignalingConstants.getTransmissionId(deviceId), message.toByteArray(), priority))
-        } else {
-            emitInternal("location_update", status.toMap(fromViewer), priority)
+            socket?.emit(event, SignalingConstants.getTransmissionId(deviceId), message.toByteArray())
         }
+    }
+
+    override fun getDispatcherMetrics(): SmartSignalingDispatcher.Metrics {
+        return dispatcher.getMetrics()
     }
 
     private fun emitInternal(event: String, data: Map<String, Any?>, priority: SignalingPriority) {
