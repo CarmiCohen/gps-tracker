@@ -26,14 +26,15 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.6.3:
+ * - Issue #AUDIT-1006-2: Implemented triggerImmediateTick() to allow Fast-Path 
+ *   triggers (Acoustic/Light) to preempt relaxed memory-throttled intervals.
+ *   Ensures zero-latency alarm detection even during MemoryPressureLevel.HIGH/CRITICAL.
  * Oct.6.2:
  * - Issue #AUDIT-1006-6: Integrated memory pressure throttling in getRequiredTickInterval.
  *   Aggressively relaxes loops during MemoryPressureLevel.CRITICAL to prevent OOM.
  * - Issue #AUDIT-1006-5: Implemented executeLogPressureTest to simulate 100Hz 
  *   telemetry bursts for backpressure verification.
- * Oct.5.9:
- * - Issue #1295: Redundant Stream Observer Audit. Implemented interval relaxation 
- *   for forensic sampling and tick loops during ultra-long stationary periods. 
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -681,8 +682,6 @@ class MonitorService : BaseMonitorService() {
                     health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS 
                     logManager.isForensicBufferUnderPressure() -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS 
                     health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS 
-                    // Issue #1295: Relax periodic sampling significantly during ultra-long stationary states.
-                    // Channel remains reactive to spikes via triggerForensicSample.
                     health.isUltraLongStationary -> 5000L
                     else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS 
                 }
@@ -697,9 +696,36 @@ class MonitorService : BaseMonitorService() {
 
     private fun triggerForensicSample(isSpike: Boolean = false) { forensicTriggerChannel.trySend(isSpike) }
 
+    /**
+     * Issue #AUDIT-1006-2: Preempts the current tick loop delay to process 
+     * a tick immediately. Used for safety-critical sensor spikes.
+     */
+    private fun triggerImmediateTick() {
+        tickOrchestrator.preemptLoop("tick_loop")
+    }
+
     private fun setupPhysicalFastPaths() {
-        hardwareSuite.setAcousticFastPath(floor = primaryProcessor.getAcousticFloorDb(), spikeThreshold = 15.0, minDb = 40.0, onSpike = { lastFastPathAcousticSpikeRt = timeProvider.elapsedRealtime(); triggerForensicSample(isSpike = true) })
-        hardwareSuite.setLightFastPath(baseline = primaryProcessor.getLuxBaseline(), spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP, onSpike = { lastFastPathLightSpikeRt = timeProvider.elapsedRealtime(); triggerForensicSample(isSpike = true) })
+        hardwareSuite.setAcousticFastPath(
+            floor = primaryProcessor.getAcousticFloorDb(), 
+            spikeThreshold = 15.0, 
+            minDb = 40.0, 
+            onSpike = { 
+                lastFastPathAcousticSpikeRt = timeProvider.elapsedRealtime()
+                triggerForensicSample(isSpike = true)
+                // R-ID 289: Force immediate tick to evaluate potential alarm
+                triggerImmediateTick()
+            }
+        )
+        hardwareSuite.setLightFastPath(
+            baseline = primaryProcessor.getLuxBaseline(), 
+            spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP, 
+            onSpike = { 
+                lastFastPathLightSpikeRt = timeProvider.elapsedRealtime()
+                triggerForensicSample(isSpike = true)
+                // R-ID 289: Force immediate tick to evaluate potential alarm
+                triggerImmediateTick()
+            }
+        )
     }
 
     private suspend fun refreshCapabilitiesInternal() {

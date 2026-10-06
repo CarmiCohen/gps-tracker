@@ -6,6 +6,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.6.3:
+ * - Restored RevivalEvent definition (accidentally purged in Oct6.2).
  * Oct.6.2:
  * - Issue #AUDIT-1006-5: Added ExecuteLogPressureTest to CommandEvent.
  * Oct.5.15:
@@ -277,6 +279,15 @@ sealed class CommandEvent(override val priority: EventPriority = EventPriority.H
     object ExecuteNetworkStressTest : CommandEvent(EventPriority.NORMAL)
     data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : CommandEvent(EventPriority.HIGH)
     object TriggerMemoryFlush : CommandEvent(EventPriority.HIGH)
+}
+
+sealed class RevivalEvent(override val priority: EventPriority = EventPriority.NORMAL) : DomainEvent(priority) {
+    data class Attempt(val count: Int) : RevivalEvent(EventPriority.HIGH)
+    object HardwareLock : RevivalEvent(EventPriority.CRITICAL)
+    object Success : RevivalEvent(EventPriority.HIGH)
+    object RawBurstStarted : RevivalEvent(EventPriority.NORMAL)
+    object RawBurstEnded : RevivalEvent(EventPriority.NORMAL)
+    data class Footprint(val deltaMa: Int, val deltaTemp: Double, val durationMs: Long) : RevivalEvent(EventPriority.LOW)
 }
 
 interface SpatialAnchor {

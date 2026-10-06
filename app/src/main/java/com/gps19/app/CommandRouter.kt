@@ -18,15 +18,14 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Oct.6.3:
+ * - Issue #AUDIT-1006-6: Added routing for SimulateMemoryPressure.
  * Oct.6.2:
  * - Issue #AUDIT-1006-5: Added ExecuteLogPressureTest routing.
  * Oct.1.8:
  * - Issue #1410: Viewer Persistence. Added remote signaling for StopSiren in 
  *   Viewer mode. Emits "acknowledge_alarm" to ensure the Tracker synchronizes 
  *   its global acknowledgment state (R-ID 575). Fixed SyncSensors reference.
- * Sep.30.70:
- * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
- *   API in MainRepository, eliminating manual prefixing (R-ID 565).
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -177,6 +176,9 @@ class CommandRouter @Inject constructor(
                         }
                         is UiCommand.SimulateStoragePressure -> {
                             integrityMonitor.simulateStoragePressure(command.active, command.isCritical)
+                        }
+                        is UiCommand.SimulateMemoryPressure -> {
+                            integrityMonitor.simulateMemoryPressure(command.active, command.level)
                         }
                     }
                 } catch (e: Exception) {
