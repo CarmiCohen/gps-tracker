@@ -23,10 +23,9 @@ import kotlinx.coroutines.flow.onEach
 
 /**
  * AlarmActivity: Full-screen alarm overlay that bypasses the lock screen.
- * Oct.5.15:
- * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored AlarmOverlay call 
- *   to pass Flows from MainViewModel, ensuring state collection happens 
- *   within the leaf component (Rule 1.110). (R1426-2).
+ * Oct.5.20:
+ * - SIMP-1426-3: Updated AlarmOverlay call to use unified UiStateProvider (viewModel).
+ *   Corrected property references to use 'session' flow.
  */
 @AndroidEntryPoint
 class AlarmActivity : ComponentActivity() {
@@ -64,7 +63,7 @@ class AlarmActivity : ComponentActivity() {
             .launchIn(lifecycleScope)
 
         setContent {
-            val sessionState by viewModel.sessionUiState.collectAsStateWithLifecycle()
+            val sessionState by viewModel.session.collectAsStateWithLifecycle()
 
             GpsTrackerTheme(appMode = sessionState.appMode) {
                 BackHandler {
@@ -74,9 +73,7 @@ class AlarmActivity : ComponentActivity() {
 
                 Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
                     AlarmOverlay(
-                        hudHealthFlow = viewModel.hudHealthState,
-                        kinematicFlow = viewModel.kinematicState,
-                        sessionStateFlow = viewModel.sessionUiState,
+                        stateProvider = viewModel,
                         onMute = {
                             val currentAlarms = viewModel.hudHealthState.value.activeAlarms
                             val currentCauses = currentAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }

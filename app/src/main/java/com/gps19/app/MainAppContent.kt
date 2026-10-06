@@ -16,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
@@ -39,12 +40,12 @@ import kotlinx.coroutines.flow.collectLatest
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.5.20:
+ * - SIMP-1426-3: Refactored leaf components to consume unified UiStateProvider 
+ *   (viewModel). Reduced parameter distribution boilerplate in NavHost and 
+ *   OverlayHost. (R1426-3).
  * Oct.5.15:
- * - Issue #SIMP-1426-2: Leaf-Level Convergence. Optimized root recomposition by 
- *   moving AlarmOverlay into OverlayHost and removing high-frequency 
- *   hudHealthState observer from root. (R1426-2, R1110).
- * Oct.5.10:
- * - Issue #1426: Composable Effect Aggregator. Centralized root-level side-effects.
+ * - Issue #SIMP-1426-2: Leaf-Level Convergence.
  */
 @Composable
 fun MainAppContent(
@@ -60,10 +61,10 @@ fun MainAppContent(
     onRequestHardwarePermission: () -> Unit,
     onStopTracking: () -> Unit
 ) {
-    val sessionState by viewModel.sessionUiState.collectAsStateWithLifecycle()
-    val settingsState by viewModel.settingsUiState.collectAsStateWithLifecycle()
-    val spatialState by viewModel.spatialUiState.collectAsStateWithLifecycle()
-    val navigationState by viewModel.navigationState.collectAsStateWithLifecycle()
+    val sessionState by viewModel.session.collectAsStateWithLifecycle()
+    val settingsState by viewModel.settings.collectAsStateWithLifecycle()
+    val spatialState by viewModel.spatial.collectAsStateWithLifecycle()
+    val navigationState by viewModel.navigation.collectAsStateWithLifecycle()
     
     val navController = rememberNavController()
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
@@ -156,15 +157,24 @@ fun MainAppContent(
                             }
                             if (sessionState.hydrationLevel >= 3) {
                                 TrackerScreen(
-                                    sessionState = sessionState, settingsState = settingsState, spatialState = spatialState, navigationState = navigationState,
-                                    viewModel = viewModel, logsFlow = viewModel.eventLogsFlow,
+                                    sessionState = sessionState, 
+                                    settingsState = settingsState, 
+                                    spatialState = spatialState, 
+                                    navigationState = navigationState,
+                                    viewModel = viewModel,
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) }, 
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
-                                    onExit = { viewModel.onEvent(UiEvent.ManualExit) }, onMainEvent = { viewModel.onEvent(it) }, onFullInitialization = { viewModel.fullInitialization(activity) },
-                                    onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
-                                    onImportConfig = { importLauncher.launch("application/json") }, onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
-                                    onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, onLoadTrail = { importTrailLauncher.launch("application/json") }
+                                    onExit = { viewModel.onEvent(UiEvent.ManualExit) }, 
+                                    onMainEvent = { viewModel.onEvent(it) }, 
+                                    onFullInitialization = { viewModel.fullInitialization(activity) },
+                                    onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, 
+                                    onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
+                                    onImportConfig = { importLauncher.launch("application/json") }, 
+                                    onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, 
+                                    onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
+                                    onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, 
+                                    onLoadTrail = { importTrailLauncher.launch("application/json") }
                                 )
                             }
                         }
@@ -184,15 +194,24 @@ fun MainAppContent(
                             }
                             if (sessionState.hydrationLevel >= 3) {
                                 ViewerScreen(
-                                    sessionState = sessionState, settingsState = settingsState, spatialState = spatialState, navigationState = navigationState,
-                                    viewModel = viewModel, logsFlow = viewModel.eventLogsFlow,
+                                    sessionState = sessionState, 
+                                    settingsState = settingsState, 
+                                    spatialState = spatialState, 
+                                    navigationState = navigationState,
+                                    viewModel = viewModel,
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) },
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
-                                    onExit = { viewModel.onEvent(UiEvent.ManualExit) }, onMainEvent = { viewModel.onEvent(it) }, onFullInitialization = { viewModel.fullInitialization(activity) },
-                                    onImportConfig = { importLauncher.launch("application/json") }, onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) },
-                                    onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
-                                    onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, onLoadTrail = { importTrailLauncher.launch("application/json") }
+                                    onExit = { viewModel.onEvent(UiEvent.ManualExit) }, 
+                                    onMainEvent = { viewModel.onEvent(it) }, 
+                                    onFullInitialization = { viewModel.fullInitialization(activity) },
+                                    onImportConfig = { importLauncher.launch("application/json") }, 
+                                    onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) },
+                                    onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, 
+                                    onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, 
+                                    onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
+                                    onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, 
+                                    onLoadTrail = { importTrailLauncher.launch("application/json") }
                                 )
                             }
                         }
@@ -200,9 +219,7 @@ fun MainAppContent(
                             BackHandler { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) }
                             if (sessionState.hydrationLevel >= 3) {
                                 DiagnosticsScreen(
-                                    sessionUiStateFlow = viewModel.sessionUiState,
-                                    diagnosticStateFlow = viewModel.diagnosticState,
-                                    simulationUiStateFlow = viewModel.simulationUiState,
+                                    stateProvider = viewModel,
                                     onBack = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) },
                                     onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) },
                                     onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
@@ -223,12 +240,15 @@ fun MainAppContent(
                 
                 if (navigationState.isPhoneSetupVisible && sessionState.hydrationLevel >= 3) {
                     PhoneSetupOverlay(
-                        sessionStateFlow = viewModel.sessionUiState,
-                        spatialUiStateFlow = viewModel.spatialUiState,
-                        onClose = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)) }, onWhitelist = { onRequestBatteryExemption() },
-                        onOverlay = { onRequestOverlayPermission() }, onAppInfo = { onRequestAppInfo() },
-                        onExactAlarm = { onRequestExactAlarm() }, onHardwarePermission = { onRequestHardwarePermission() },
-                        onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
+                        stateProvider = viewModel,
+                        onClose = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)) }, 
+                        onWhitelist = { onRequestBatteryExemption() },
+                        onOverlay = { onRequestOverlayPermission() }, 
+                        onAppInfo = { onRequestAppInfo() },
+                        onExactAlarm = { onRequestExactAlarm() }, 
+                        onHardwarePermission = { onRequestHardwarePermission() },
+                        onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) }, 
+                        onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
                         onTestAlarm = { viewModel.onEvent(UiEvent.RequestTestAlarm) },
                         onNavigateToDiagnostics = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
                         onGoToMap = { viewModel.onEvent(UiEvent.TogglePhoneSetup(false)); viewModel.onEvent(UiEvent.ToggleMap(true)) }
@@ -389,13 +409,11 @@ fun OverlayHost(
     activity: ComponentActivity
 ) {
     val hudHealth by viewModel.hudHealthState.collectAsStateWithLifecycle()
-    val sessionState by viewModel.sessionUiState.collectAsStateWithLifecycle()
+    val sessionState by viewModel.session.collectAsStateWithLifecycle()
 
     if (navigationState.isSettingsOpen) {
         SettingsOverlay(
-            settingsUiStateFlow = viewModel.settingsUiState,
-            navigationStateFlow = viewModel.navigationState,
-            isSirenPlayingFlow = viewModel.isSirenPlayingFlow,
+            stateProvider = viewModel,
             onReset = { viewModel.onEvent(UiEvent.ResetStats) },
             onExport = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
             onClear = { viewModel.onEvent(UiEvent.ClearHomePoints) }, 
@@ -409,12 +427,7 @@ fun OverlayHost(
         )
     } else if (navigationState.isLogVisible) {
         LogOverlay(
-            logsFlow = viewModel.eventLogsFlow, 
-            showDetailsFlow = viewModel.repository.logFilterDetails,
-            showRecoveredFlow = viewModel.repository.logFilterRecovered,
-            systemPulseRtFlow = viewModel.systemPulseRt,
-            sessionUiStateFlow = viewModel.sessionUiState,
-            isTelemetryFresh = true,
+            stateProvider = viewModel,
             onExport = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
             onToggle = { viewModel.onEvent(UiEvent.ToggleLog(false)) }, 
             onClear = { viewModel.onEvent(UiEvent.ClearLogs) },
@@ -428,13 +441,7 @@ fun OverlayHost(
         )
     } else if (navigationState.isRibbonsVisible) {
         RibbonsOverlay(
-            navigationStateFlow = viewModel.navigationState,
-            history4MFlow = viewModel.history4MFlow,
-            history16MFlow = viewModel.history16MFlow,
-            history1HFlow = viewModel.history1HFlow,
-            history4HFlow = viewModel.history4HFlow,
-            history24HFlow = viewModel.history24HFlow,
-            history7DFlow = viewModel.history7DFlow,
+            stateProvider = viewModel,
             onToggleStrictMode = { strict -> viewModel.onEvent(UiEvent.ToggleStrictMode(strict)) },
             onScrub = { ts -> viewModel.onEvent(UiEvent.SetReplayCursor(ts)) },
             onDismiss = { viewModel.onEvent(UiEvent.ToggleRibbons(false)) }
@@ -450,9 +457,7 @@ fun OverlayHost(
     if (hudHealth.isRedScreenVisible && sessionState.appMode == "viewer" && sessionState.hydrationLevel >= 3) {
         BackHandler { viewModel.onEvent(UiEvent.DismissAlarms) }
         AlarmOverlay(
-            hudHealthFlow = viewModel.hudHealthState,
-            kinematicFlow = viewModel.kinematicState,
-            sessionStateFlow = viewModel.sessionUiState,
+            stateProvider = viewModel,
             onHardwarePermissionClick = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
             onMute = { 
                 val currentCauses = hudHealth.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { activity.getString(R.string.status_muted) }

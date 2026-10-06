@@ -30,28 +30,25 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * AlarmComponents: Overlay for active alarm states and sirens.
+ * Oct.5.20:
+ * - SIMP-1426-3: Refactored AlarmOverlay to consume unified UiStateProvider. 
+ *   Reduced parameter overhead and unified state collection. (R1426-3).
  * Oct.5.15:
  * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored AlarmOverlay to collect 
- *   its own state from flows, decoupling root-level MainAppContent from 10Hz+ 
- *   kinematic/diagnostic updates (Rule 1.110). (R1426-2).
- * Oct.3.1:
- * - Issue #1420: Granular HUD Binding. Refactored AlarmOverlay to consume 
- *   Locatable interface instead of a raw boolean.
+ *   its own state from flows.
  */
 
 @Composable
 fun AlarmOverlay(
-    hudHealthFlow: StateFlow<HudHealthState>,
-    kinematicFlow: StateFlow<KinematicState>,
-    sessionStateFlow: StateFlow<SessionUiState>,
+    stateProvider: UiStateProvider,
     onMute: () -> Unit, 
     onClose: () -> Unit, 
     onGoToMap: () -> Unit = onClose, 
     onHardwarePermissionClick: () -> Unit = {}
 ) {
-    val hudHealth by hudHealthFlow.collectAsStateWithLifecycle()
-    val kinematicState by kinematicFlow.collectAsStateWithLifecycle()
-    val sessionState by sessionStateFlow.collectAsStateWithLifecycle()
+    val hudHealth by stateProvider.hudHealthState.collectAsStateWithLifecycle()
+    val kinematicState by stateProvider.kinematic.collectAsStateWithLifecycle()
+    val sessionState by stateProvider.session.collectAsStateWithLifecycle()
 
     val alarms = hudHealth.activeAlarms
     val isMuted = hudHealth.isAlarmSilenced

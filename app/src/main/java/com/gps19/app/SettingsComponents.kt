@@ -25,29 +25,25 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gps19.core.engine.*
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.StateFlow
 import timber.log.Timber
+import java.util.Date
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Oct.5.20:
+ * - SIMP-1426-3: Refactored SettingsOverlay and PhoneSetupOverlay to consume 
+ *   unified UiStateProvider. (R1426-3).
  * Oct.5.15:
  * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored SettingsOverlay and 
- *   PhoneSetupOverlay to collect their own state from flows, reducing 
- *   root-level recomposition pressure. (R1426-2).
- * Sep.29.01:
- * - Issue #S071 Stress Test UI Consolidation: Removed "Trigger Forensic Stress Test" 
- *   button and onExecuteStressTest from PhoneSetupOverlay.
+ *   PhoneSetupOverlay to collect their own state from flows.
  */
 
 @Composable
 fun SettingsOverlay(
-    settingsUiStateFlow: StateFlow<SettingsUiState>,
-    navigationStateFlow: StateFlow<NavigationState>,
-    isSirenPlayingFlow: StateFlow<Boolean>,
+    stateProvider: UiStateProvider,
     onReset: (() -> Unit)?=null, 
     onExport: (() -> Unit)?=null, 
     onClear: (() -> Unit)?=null, 
@@ -56,9 +52,9 @@ fun SettingsOverlay(
     onShowPhoneSetup: () -> Unit = {}, 
     onEvent: (UiEvent) -> Unit
 ) { 
-    val settingsState by settingsUiStateFlow.collectAsStateWithLifecycle()
-    val navState by navigationStateFlow.collectAsStateWithLifecycle()
-    val isSirenPlaying by isSirenPlayingFlow.collectAsStateWithLifecycle()
+    val settingsState by stateProvider.settings.collectAsStateWithLifecycle()
+    val navState by stateProvider.navigation.collectAsStateWithLifecycle()
+    val isSirenPlaying by stateProvider.isSirenPlaying.collectAsStateWithLifecycle()
 
     val draft = settingsState.draftSettings
     val activeSubSettings = navState.activeSubSettings
@@ -91,13 +87,9 @@ fun SettingsOverlay(
                                 leadingIcon = { Icon(Icons.Default.Agriculture, null, tint = BrandJd, modifier = Modifier.size(18.dp)) }, 
                                 modifier = Modifier.weight(1f), 
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = BrandJd, 
-                                    unfocusedBorderColor = BrandJd.copy(alpha = 0.5f), 
-                                    focusedLabelColor = BrandJd, 
-                                    unfocusedLabelColor = BrandJd.copy(alpha = 0.7f), 
-                                    focusedTextColor = BrandJd, 
-                                    unfocusedTextColor = BrandJd,
-                                    cursorColor = BrandJd
+                                    focusedBorderColor = BrandJd, unfocusedBorderColor = BrandJd.copy(alpha = 0.5f), 
+                                    focusedLabelColor = BrandJd, unfocusedLabelColor = BrandJd.copy(alpha = 0.7f), 
+                                    focusedTextColor = BrandJd, unfocusedTextColor = BrandJd, cursorColor = BrandJd
                                 ), 
                                 singleLine = true, 
                                 textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
@@ -109,13 +101,9 @@ fun SettingsOverlay(
                                 leadingIcon = { Icon(Icons.Default.Person, null, tint = ViewerCyan, modifier = Modifier.size(18.dp)) }, 
                                 modifier = Modifier.weight(1f), 
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = ViewerCyan, 
-                                    unfocusedBorderColor = ViewerCyan.copy(alpha = 0.5f), 
-                                    focusedLabelColor = ViewerCyan, 
-                                    unfocusedLabelColor = ViewerCyan.copy(alpha = 0.7f), 
-                                    focusedTextColor = ViewerCyan, 
-                                    unfocusedTextColor = ViewerCyan,
-                                    cursorColor = ViewerCyan
+                                    focusedBorderColor = ViewerCyan, unfocusedBorderColor = ViewerCyan.copy(alpha = 0.5f), 
+                                    focusedLabelColor = ViewerCyan, unfocusedLabelColor = ViewerCyan.copy(alpha = 0.7f), 
+                                    focusedTextColor = ViewerCyan, unfocusedTextColor = ViewerCyan, cursorColor = ViewerCyan
                                 ), 
                                 singleLine = true, 
                                 textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
@@ -144,14 +132,7 @@ fun SettingsOverlay(
                     }
 
                     if (visibleCount >= 4) {
-                        Button(
-                            onClick = { 
-                                onEvent(UiEvent.ToggleSettings(false))
-                                onEvent(UiEvent.NavigateToDiagnostics(true))
-                            }, 
-                            modifier = Modifier.fillMaxWidth(), 
-                            colors = ButtonDefaults.buttonColors(containerColor = Slate700)
-                        ) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_diagnostics)) }
+                        Button(onClick = { onEvent(UiEvent.ToggleSettings(false)); onEvent(UiEvent.NavigateToDiagnostics(true)) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Slate700)) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_diagnostics)) }
                         Spacer(Modifier.height(24.dp))
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -167,9 +148,7 @@ fun SettingsOverlay(
                     }
                 } 
             } else {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp, modifier = Modifier.size(32.dp))
-                }
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp, modifier = Modifier.size(32.dp)) }
             }
         }
         if (isHydrated && visibleCount >= 5) {
@@ -281,8 +260,7 @@ fun AlarmSoundOverlay(draftAlertSettings: AlertSettings, selectedSirenType: Stri
 
 @Composable
 fun PhoneSetupOverlay(
-    sessionStateFlow: StateFlow<SessionUiState>,
-    spatialUiStateFlow: StateFlow<SpatialUiState>,
+    stateProvider: UiStateProvider,
     onClose: () -> Unit, onWhitelist: () -> Unit, onOverlay: () -> Unit, onAppInfo: () -> Unit, 
     onExactAlarm: () -> Unit, onHardwarePermission: () -> Unit, onRefresh: () -> Unit, 
     onToggleManualOverride: () -> Unit = {},
@@ -290,8 +268,8 @@ fun PhoneSetupOverlay(
     onNavigateToDiagnostics: () -> Unit = {},
     onGoToMap: () -> Unit = {}
 ) {
-    val sessionState by sessionStateFlow.collectAsStateWithLifecycle()
-    val spatialState by spatialUiStateFlow.collectAsStateWithLifecycle()
+    val sessionState by stateProvider.session.collectAsStateWithLifecycle()
+    val spatialState by stateProvider.spatial.collectAsStateWithLifecycle()
 
     val permissions = sessionState.permissions
     val isSetupBypassActive = sessionState.isSetupBypassActive
@@ -302,7 +280,6 @@ fun PhoneSetupOverlay(
     var visibleCount by remember { mutableIntStateOf(0) }
     
     LaunchedEffect(Unit) {
-        Timber.d("PhoneSetupOverlay: Initializing hydration sequence (R882)")
         delay(150) 
         isHydrated = true
         repeat(8) { 
@@ -377,12 +354,9 @@ fun PhoneSetupOverlay(
                                 CapabilityStatus.UNKNOWN -> permissions.isManualOverride
                             }
                             GuideSection(
-                                title = "Background Service Lock", 
-                                description = "Required to ensure the tracking service remains active on this hardware.", 
-                                onClick = onHardwarePermission, 
-                                buttonText = stringResource(R.string.btn_miui_permissions), 
-                                isCompleted = isCompleted, 
-                                icon = Icons.Default.Security, 
+                                title = "Background Service Lock", description = "Required to ensure the tracking service remains active on this hardware.", 
+                                onClick = onHardwarePermission, buttonText = stringResource(R.string.btn_miui_permissions), 
+                                isCompleted = isCompleted, icon = Icons.Default.Security, 
                                 reason = if (permissions.backgroundStatus == CapabilityStatus.DENIED) "Hardware Policy: Required for Lock Screen alerts" else if (permissions.backgroundStatus == CapabilityStatus.UNKNOWN && !permissions.isManualOverride) "Hardware Policy: Automatic verification failed. Please check manually." else null
                             )
                             if (permissions.backgroundStatus == CapabilityStatus.UNKNOWN) {
@@ -398,16 +372,7 @@ fun PhoneSetupOverlay(
 
                     if (visibleCount >= 8) {
                         Spacer(Modifier.height(16.dp))
-                        Button(
-                            onClick = onNavigateToDiagnostics,
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Slate700)
-                        ) {
-                            Icon(Icons.Default.HealthAndSafety, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text(stringResource(R.string.btn_view_diagnostics), fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-
+                        Button(onClick = onNavigateToDiagnostics, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Slate700)) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_view_diagnostics), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                         Spacer(Modifier.height(16.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = onRefresh, modifier = Modifier.weight(1f).heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh), fontSize = 13.sp) }
@@ -416,24 +381,13 @@ fun PhoneSetupOverlay(
                         
                         if (isSetupBypassActive) {
                             Spacer(Modifier.height(16.dp))
-                            Button(
-                                onClick = onClose,
-                                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Color.Green.copy(alpha = 0.6f))
-                            ) {
-                                Icon(Icons.Default.Close, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text("DISMISS (BYPASS ACTIVE)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            }
+                            Button(onClick = onClose, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.Green.copy(alpha = 0.6f))) { Icon(Icons.Default.Close, null); Spacer(Modifier.width(8.dp)); Text("DISMISS (BYPASS ACTIVE)", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                         }
-
                         Spacer(Modifier.height(88.dp)) 
                     }
                 }
             } else {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp, modifier = Modifier.size(32.dp))
-                }
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp, modifier = Modifier.size(32.dp)) }
             }
         }
     }
@@ -449,12 +403,7 @@ fun AlarmToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> U
 fun SensitivitySlider(label: String, value: Float, onValueChange: (Float) -> Unit) {
     Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
         Text(label + ": ${(value * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = 0f..1f,
-            colors = SliderDefaults.colors(thumbColor = BrandJd, activeTrackColor = BrandJd)
-        )
+        Slider(value = value, onValueChange = onValueChange, valueRange = 0f..1f, colors = SliderDefaults.colors(thumbColor = BrandJd, activeTrackColor = BrandJd))
     }
 }
 

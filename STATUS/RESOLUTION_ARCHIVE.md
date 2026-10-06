@@ -1,5 +1,11 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct.5.21
+*   **Issue #SIMP-1426-4: Map Hardening & Boilerplate Reduction.** Migrated `initialCenter` calculation and coordinate smoothing triggers from composition scope (`AppMapContainer`) to `MainViewModel`. Refactored `TrackerScreen` and `ViewerScreen` signatures to accept `MainViewModel` directly, eliminating redundant parameter distribution logic. (Oct.5.21 - R1426-4, R-ID 287).
+
+## 🟢 Resolved in Oct.5.20
+*   **Issue #SIMP-1426-3: Unified State Provider.** Introduced `UiStateProvider` interface in `MainUiState.kt` and implemented it in `MainViewModel`. Refactored all leaf components to consume the unified provider, eliminating ~150 lines of redundant parameter distribution logic. (Oct.5.20 - R1426-3, R1.116).
+
 ## 🟢 Resolved in Oct.5.15
 *   **Issue #SIMP-1426-2: Leaf-Level State Hoisting Convergence.** Completed the migration of high-frequency state collection (Kinematic, Diagnostic, Dashboard) from `MainAppContent` and screen-level components to leaf components (`LogOverlay`, `SettingsOverlay`, `PhoneSetupOverlay`, `AlarmOverlay`, `GlobalStatusBar`, `RibbonsOverlay`, `TrackerDashboard`, `ViewerDashboard`, `AppMapContainer`). Adhered to Rule 1.110 (R1422) to isolate the root UI tree from 10Hz+ telemetry bursts and minimize redundant recompositions. (Oct.5.15 - R1426-2, R1.115).
 

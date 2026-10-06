@@ -23,19 +23,17 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Oct.5.20:
+ * - SIMP-1426-3: Refactored DiagnosticsScreen to consume unified UiStateProvider. 
+ *   Reduced parameter overhead and unified state collection. (R1426-3).
  * Oct.5.15:
  * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored DiagnosticsScreen to 
- *   collect its own state from flows, removing observers from MainAppContent NavHost 
- *   to align with Rule 1.110 (R1426-2).
- * Sep.29.01:
- * - Issue #S071 Stress Test UI Consolidation: Moved stress test trigger here.
+ *   collect its own state from flows.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticsScreen(
-    sessionUiStateFlow: StateFlow<SessionUiState>,
-    diagnosticStateFlow: StateFlow<DiagnosticState>,
-    simulationUiStateFlow: StateFlow<SimulationUiState>,
+    stateProvider: UiStateProvider,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
     onToggleManualOverride: () -> Unit,
@@ -50,9 +48,9 @@ fun DiagnosticsScreen(
     onRequestExactAlarm: () -> Unit,
     onRequestHardwarePermission: () -> Unit
 ) {
-    val sessionState by sessionUiStateFlow.collectAsStateWithLifecycle()
-    val diagnosticState by diagnosticStateFlow.collectAsStateWithLifecycle()
-    val simulationState by simulationUiStateFlow.collectAsStateWithLifecycle()
+    val sessionState by stateProvider.session.collectAsStateWithLifecycle()
+    val diagnosticState by stateProvider.diagnostic.collectAsStateWithLifecycle()
+    val simulationState by stateProvider.simulation.collectAsStateWithLifecycle()
 
     val permissions = sessionState.permissions
     val isSetupBypassActive = sessionState.isSetupBypassActive
@@ -92,7 +90,6 @@ fun DiagnosticsScreen(
                 fontWeight = FontWeight.Bold
             )
 
-            // Critical Permissions
             DiagnosticItem(
                 title = "Battery Optimization",
                 status = if (permissions.isBatteryWhitelisted) "UNRESTRICTED" else "OPTIMIZED",
@@ -125,14 +122,13 @@ fun DiagnosticsScreen(
                 fontWeight = FontWeight.Bold
             )
 
-            val totalRecoveries = recoveryCount
-            val avgBlackout = if (totalRecoveries > 0) {
-                cumulativeRecoveryBlackoutMs / totalRecoveries
+            val avgBlackout = if (recoveryCount > 0) {
+                cumulativeRecoveryBlackoutMs / recoveryCount
             } else 0L
 
             DiagnosticItem(
                 title = "Total Recovery Events",
-                status = "$totalRecoveries",
+                status = "$recoveryCount",
                 isOk = true,
                 icon = Icons.Default.History,
                 onClick = {}
@@ -141,7 +137,7 @@ fun DiagnosticsScreen(
             DiagnosticItem(
                 title = "Average Blackout Duration",
                 status = "${avgBlackout}ms",
-                isOk = avgBlackout < 30000L, // Warn if average is > 30s
+                isOk = avgBlackout < 30000L,
                 icon = Icons.Default.Timer,
                 onClick = {}
             )
@@ -188,19 +184,11 @@ fun DiagnosticsScreen(
                     }
                 }
             } else {
-                Text(
-                    text = "Standard background policy detected.",
-                    color = Color.Gray,
-                    fontSize = 12.sp
-                )
+                Text(text = "Standard background policy detected.", color = Color.Gray, fontSize = 12.sp)
             }
 
             if (permissions.requiresWakeLockRenewal) {
-                Text(
-                    text = "Hardware Tuning: WAKELOCK_RENEWAL active",
-                    color = Color.Cyan,
-                    fontSize = 12.sp
-                )
+                Text(text = "Hardware Tuning: WAKELOCK_RENEWAL active", color = Color.Cyan, fontSize = 12.sp)
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -211,93 +199,55 @@ fun DiagnosticsScreen(
                 fontWeight = FontWeight.Bold
             )
 
-            // Issue #S071: Consolidated Forensic Stress Test trigger
             Button(
                 onClick = onExecuteStressTest,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = ForensicPink)
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF00FF)) // ForensicPink
             ) {
                 Icon(Icons.Default.Speed, null)
                 Spacer(Modifier.width(8.dp))
                 Text("TRIGGER FORENSIC STRESS TEST", fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
 
-            // Setup Overlay Bypass (Issue #735)
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small)
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small).padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Setup Overlay Bypass", color = Color.White, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Skips permission check for soak tests",
-                        color = if (isSetupBypassActive) Color.Green else Color.Gray,
-                        fontSize = 12.sp
-                    )
+                    Text("Skips permission check for soak tests", color = if (isSetupBypassActive) Color.Green else Color.Gray, fontSize = 12.sp)
                 }
-                Switch(
-                    checked = isSetupBypassActive,
-                    onCheckedChange = { onToggleSetupBypass(it) },
-                    colors = SwitchDefaults.colors(checkedThumbColor = Color.Green, checkedTrackColor = Color.Green.copy(alpha = 0.5f))
-                )
+                Switch(checked = isSetupBypassActive, onCheckedChange = { onToggleSetupBypass(it) }, colors = SwitchDefaults.colors(checkedThumbColor = Color.Green, checkedTrackColor = Color.Green.copy(alpha = 0.5f)))
             }
 
-            // Forensic Stall Simulation
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small)
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small).padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Forensic Stall Simulation", color = Color.White, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        "Simulates Urban Multipath / IO Latency",
-                        color = if (isForensicStallSimulated) Color.Yellow else Color.Gray,
-                        fontSize = 12.sp
-                    )
+                    Text("Simulates Urban Multipath / IO Latency", color = if (isForensicStallSimulated) Color.Yellow else Color.Gray, fontSize = 12.sp)
                 }
-                Switch(
-                    checked = isForensicStallSimulated,
-                    onCheckedChange = { onToggleForensicSimulation(it) }
-                )
+                Switch(checked = isForensicStallSimulated, onCheckedChange = { onToggleForensicSimulation(it) })
             }
 
-            // Storage Pressure Simulation
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small)
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small).padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Storage Pressure Simulation", color = Color.White, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        if (isStorageSimulated) (if (isStorageCriticalSimulated) "CRITICAL (99% full)" else "LOW (95% full)") else "Simulate Disk Exhaustion",
-                        color = if (isStorageSimulated) Color.Yellow else Color.Gray,
-                        fontSize = 12.sp
-                    )
+                    Text(if (isStorageSimulated) (if (isStorageCriticalSimulated) "CRITICAL (99% full)" else "LOW (95% full)") else "Simulate Disk Exhaustion", color = if (isStorageSimulated) Color.Yellow else Color.Gray, fontSize = 12.sp)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isStorageSimulated) {
                         Text("CRIT", color = if (isStorageCriticalSimulated) Color.Red else Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(end = 4.dp))
-                        Checkbox(
-                            checked = isStorageCriticalSimulated,
-                            onCheckedChange = { onToggleStorageSimulation(true, it) }
-                        )
+                        Checkbox(checked = isStorageCriticalSimulated, onCheckedChange = { onToggleStorageSimulation(true, it) })
                     }
-                    Switch(
-                        checked = isStorageSimulated,
-                        onCheckedChange = { onToggleStorageSimulation(it, isStorageCriticalSimulated) }
-                    )
+                    Switch(checked = isStorageSimulated, onCheckedChange = { onToggleStorageSimulation(it, isStorageCriticalSimulated) })
                 }
             }
 
@@ -309,75 +259,23 @@ fun DiagnosticsScreen(
                 fontWeight = FontWeight.Bold
             )
 
-            DiagnosticItem(
-                title = "Background Location",
-                status = if (permissions.isBackgroundLocationGranted) "GRANTED" else "DENIED",
-                isOk = permissions.isBackgroundLocationGranted,
-                icon = Icons.Default.LocationOn,
-                onClick = onRequestAppInfo
-            )
-
-            DiagnosticItem(
-                title = "Microphone (Acoustic)",
-                status = if (permissions.isMicrophoneGranted) "GRANTED" else "DENIED",
-                isOk = permissions.isMicrophoneGranted,
-                icon = Icons.Default.Mic,
-                onClick = onRequestAppInfo
-            )
-
-            DiagnosticItem(
-                title = "Notifications",
-                status = if (permissions.isPostNotificationsGranted) "GRANTED" else "DENIED",
-                isOk = permissions.isPostNotificationsGranted,
-                icon = Icons.Default.Notifications,
-                onClick = onRequestAppInfo
-            )
+            DiagnosticItem(title = "Background Location", status = if (permissions.isBackgroundLocationGranted) "GRANTED" else "DENIED", isOk = permissions.isBackgroundLocationGranted, icon = Icons.Default.LocationOn, onClick = onRequestAppInfo)
+            DiagnosticItem(title = "Microphone (Acoustic)", status = if (permissions.isMicrophoneGranted) "GRANTED" else "DENIED", isOk = permissions.isMicrophoneGranted, icon = Icons.Default.Mic, onClick = onRequestAppInfo)
+            DiagnosticItem(title = "Notifications", status = if (permissions.isPostNotificationsGranted) "GRANTED" else "DENIED", isOk = permissions.isPostNotificationsGranted, icon = Icons.Default.Notifications, onClick = onRequestAppInfo)
 
             Spacer(modifier = Modifier.height(24.dp))
-            
-            Button(
-                onClick = onRefresh,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-            ) {
-                Text("REFRESH STATUS")
-            }
+            Button(onClick = onRefresh, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)) { Text("REFRESH STATUS") }
         }
     }
 }
 
 @Composable
-fun DiagnosticItem(
-    title: String,
-    status: String,
-    isOk: Boolean,
-    icon: ImageVector,
-    onClick: () -> Unit
-) {
-    Card(
-        onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (isOk) Color.Green else Color.Red,
-                modifier = Modifier.size(24.dp)
-            )
+fun DiagnosticItem(title: String, status: String, isOk: Boolean, icon: ImageVector, onClick: () -> Unit) {
+    Card(onClick = onClick, colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A1A)), modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(imageVector = icon, contentDescription = null, tint = if (isOk) Color.Green else Color.Red, modifier = Modifier.size(24.dp))
             Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(text = title, color = Color.White, fontWeight = FontWeight.SemiBold)
-                Text(
-                    text = status,
-                    color = if (isOk) Color.Green else Color.Red,
-                    fontSize = 12.sp
-                )
-            }
+            Column { Text(text = title, color = Color.White, fontWeight = FontWeight.SemiBold); Text(text = status, color = if (isOk) Color.Green else Color.Red, fontSize = 12.sp) }
             Spacer(modifier = Modifier.weight(1f))
             Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Color.Gray)
         }

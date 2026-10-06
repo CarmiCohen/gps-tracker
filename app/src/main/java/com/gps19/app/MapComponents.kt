@@ -38,40 +38,29 @@ import org.osmdroid.views.overlay.ScaleBarOverlay
 import org.osmdroid.views.overlay.Overlay
 import com.gps19.app.BuildConfig
 import com.gps19.core.engine.*
-import kotlinx.coroutines.flow.StateFlow
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * Oct.5.15:
- * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored AppMapContainer to 
- *   collect its own state from flows, decoupling screen-level components from 
- *   periodic map state updates (Rule 1.110). (R1426-2).
- * Oct.3.6:
- * - Layout Hardening: Wrapped container in LTR provider for RTL device fixes.
+ * Oct.5.21:
+ * - SIMP-1426-4: Boilerplate Reduction. Refactored AppMapContainer to consume 
+ *   unified UiStateProvider. Eliminated manual parameter passing for trails 
+ *   and camera actions. (R1426-4).
+ * Oct.5.20:
+ * - Map Hardening (Phase 3): Migrated initialCenter logic to ViewModel. (R-ID 287).
  */
 
 @Composable
 fun AppMapContainer(
-    mapViewStateFlow: StateFlow<MapViewState>,
-    cameraActions: kotlinx.coroutines.flow.SharedFlow<CameraAction>? = null,
-    onEvent: (UiEvent) -> Unit,
-    onClearTrails: () -> Unit,
-    onSaveTrail: () -> Unit,
-    onLoadTrail: () -> Unit
+    stateProvider: UiStateProvider,
+    onSaveTrail: () -> Unit = {},
+    onLoadTrail: () -> Unit = {}
 ) {
-    val state by mapViewStateFlow.collectAsStateWithLifecycle()
+    val state by stateProvider.mapViewState.collectAsStateWithLifecycle()
+    val cameraActions = (stateProvider as? MainViewModel)?.cameraActions
     
     val isTrackerMode = state.appMode == "tracker"
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val toggleTopPadding = if (isLandscape) 12.dp else 110.dp
-
-    val initialCenter = remember(state.trackerLat, state.trackerLng) {
-        when {
-            state.isTrackerValid -> GeoPoint(state.trackerLat, state.trackerLng)
-            state.isViewerValid -> GeoPoint(state.viewerLat, state.viewerLng)
-            else -> GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
-        }
-    }
 
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
 
@@ -80,10 +69,10 @@ fun AppMapContainer(
             OsmMap(
                 state = state,
                 cameraActions = cameraActions,
-                initialCenter = initialCenter,
-                onTap = { onEvent(UiEvent.MapTap(it)) },
-                onRemoveMarker = { if (!isTrackerMode) onEvent(UiEvent.RemoveHomePoint(it)) },
-                onLockChange = { onLockChange -> onEvent(UiEvent.SetMapLocked(onLockChange)) },
+                initialCenter = state.initialCenter,
+                onTap = { (stateProvider as? MainViewModel)?.onEvent(UiEvent.MapTap(it)) },
+                onRemoveMarker = { if (!isTrackerMode) (stateProvider as? MainViewModel)?.onEvent(UiEvent.RemoveHomePoint(it)) },
+                onLockChange = { onLockChange -> (stateProvider as? MainViewModel)?.onEvent(UiEvent.SetMapLocked(onLockChange)) },
                 mapViewRef = mapViewRef
             )
 
@@ -103,7 +92,7 @@ fun AppMapContainer(
             if (state.showSettingsButton) {
                 MapSettingsToggle(
                     isMapButtonsVisible = state.isMapButtonsVisible, 
-                    onToggle = { onEvent(UiEvent.SetMapButtonsVisible(!state.isMapButtonsVisible)) }, 
+                    onToggle = { (stateProvider as? MainViewModel)?.onEvent(UiEvent.SetMapButtonsVisible(!state.isMapButtonsVisible)) }, 
                     modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = toggleTopPadding)
                 )
             }
@@ -121,10 +110,10 @@ fun AppMapContainer(
                     Box(Modifier.align(Alignment.CenterStart).padding(start = 8.dp).fillMaxHeight(0.85f).width(140.dp)) { 
                         MapToolsOverlay(
                             state = state,
-                            onClear = onClearTrails, 
+                            onClear = { (stateProvider as? MainViewModel)?.clearTrails() }, 
                             onSave = onSaveTrail, 
                             onLoad = onLoadTrail, 
-                            onEvent = onEvent
+                            onEvent = { (stateProvider as? MainViewModel)?.onEvent(it) }
                         ) 
                     }
                 }
@@ -233,7 +222,7 @@ fun OsmMap(
         MapView(context).apply { 
             mapViewRef.value = this; setTileSource(TileSourceFactory.MAPNIK); setMultiTouchControls(true); isClickable = true
             zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-            val sp = if (initialCenter != null) initialCenter else GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
+            val sp = initialCenter ?: GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
             controller.setZoom(18.0); controller.setCenter(sp)
             
             val scaleBar = ScaleBarOverlay(this).apply { 
@@ -245,7 +234,8 @@ fun OsmMap(
             
             overlays.add(MapEventsOverlay(object : MapEventsReceiver {
                 override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
-                    if (state.appMode != "tracker") { performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY); onTap(p) }
+                    performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
+                    onTap(p)
                     return true
                 }
                 override fun longPressHelper(p: GeoPoint): Boolean = true

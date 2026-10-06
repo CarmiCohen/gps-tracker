@@ -26,29 +26,22 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gps19.core.engine.*
-import kotlinx.coroutines.flow.StateFlow
 import java.text.SimpleDateFormat
 import java.util.*
 
 /**
  * LogComponents: UI for system logs and diagnostic history.
+ * Oct.5.20:
+ * - SIMP-1426-3: Refactored LogOverlay to consume unified UiStateProvider. 
+ *   Reduced parameter count and unified state collection. (R1426-3).
  * Oct.5.15:
  * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored LogOverlay to collect 
- *   its own state from flows (logs, filters, pulse, session) to align with Rule 1.110 
- *   and prevent root-level recomposition pressure. (R1426-2).
- * Sep.06.35:
- * - Issue #930 RESOLVED: Deep-Linking. Added HIST and DIAG buttons to 
- *   LogDetailPane to support forensic navigation to ribbons and diagnostics (R-ID 930).
+ *   its own state from flows.
  */
 
 @Composable
 fun LogOverlay(
-    logsFlow: StateFlow<List<LogEntry>>, 
-    showDetailsFlow: StateFlow<Boolean>,
-    showRecoveredFlow: StateFlow<Boolean>,
-    systemPulseRtFlow: StateFlow<Long>,
-    sessionUiStateFlow: StateFlow<SessionUiState>,
-    isTelemetryFresh: Boolean = true,
+    stateProvider: UiStateProvider,
     onExport: () -> Unit, 
     onToggle: () -> Unit, 
     onClear: () -> Unit,
@@ -57,14 +50,13 @@ fun LogOverlay(
     onHistLink: (Long) -> Unit = {},
     onDetailsLink: () -> Unit = {}
 ) {
-    val logs by logsFlow.collectAsStateWithLifecycle()
-    val showDetails by showDetailsFlow.collectAsStateWithLifecycle()
-    val showRecovered by showRecoveredFlow.collectAsStateWithLifecycle()
-    val nowRt by systemPulseRtFlow.collectAsStateWithLifecycle()
-    val sessionState by sessionUiStateFlow.collectAsStateWithLifecycle()
+    val logs by stateProvider.eventLogs.collectAsStateWithLifecycle()
+    val showDetails by stateProvider.logFilterDetails.collectAsStateWithLifecycle()
+    val showRecovered by stateProvider.logFilterRecovered.collectAsStateWithLifecycle()
+    val nowRt by stateProvider.systemPulseRt.collectAsStateWithLifecycle()
+    val sessionState by stateProvider.session.collectAsStateWithLifecycle()
     
     val appStartTime = sessionState.appStartTime
-    // Convert pulse to wall time for history age calculations.
     val now = remember(nowRt) { System.currentTimeMillis() }
     val timeFormatter = remember { SimpleDateFormat("HH:mm:ss", Locale.getDefault()) }
     
@@ -86,7 +78,7 @@ fun LogOverlay(
         Column(modifier = Modifier.fillMaxSize()) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) { 
-                    Text("${filteredLogs.size} / ${logs.size}", color = if (isTelemetryFresh) Slate500 else Slate500.copy(alpha = 0.5f), fontSize = 9.sp, fontWeight = FontWeight.Normal) 
+                    Text("${filteredLogs.size} / ${logs.size}", color = Slate500, fontSize = 9.sp, fontWeight = FontWeight.Normal) 
                 }
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     LogFilterButton(stringResource(R.string.log_filter_details), showDetails, BrandJd, onSetShowDetails)
@@ -101,15 +93,14 @@ fun LogOverlay(
                         val time = remember(log.timestamp) { try { timeFormatter.format(Date(log.timestamp)) } catch(e: Exception) { "--:--:--" } }
                         val isRecovered = remember(log.timestamp, appStartTime, now) { (log.timestamp < appStartTime) || (log.timestamp < now - 43200000L) }
                         val msgPrefix = if (isRecovered) stringResource(R.string.log_hist_prefix) else ""
-                        val renderingConfig = remember(log.message, log.isImportant, log.isSpecial, log.specialColor, isTelemetryFresh) { 
-                            getLogRenderingConfig(log, isTelemetryFresh) 
+                        val renderingConfig = remember(log.message, log.isImportant, log.isSpecial, log.specialColor) { 
+                            getLogRenderingConfig(log, true) 
                         }
                         val isHebrewMsg = remember(log.message) { log.message.any { it in '\u0590'..'\u05FF' } }
                         val cleanMsg = remember(log.message) { FormatterUtils.cleanLogDisplayMessage(log.message) }
                         
-                        val baseMsg = remember(log.count, log.durationMs, log.firstSeenTs, log.timestamp, cleanMsg, now, appStartTime) {
+                        val baseMsg = remember(log.count, log.durationMs, log.firstSeenTs, log.timestamp, cleanMsg) {
                             val countText = if (log.count > 1) " (x${log.count})" else ""
-                            
                             val durationText = if (log.count > 1 && log.durationMs > 0) {
                                 val windowMs = maxOf(1000L, log.timestamp - log.firstSeenTs)
                                 val pct = (log.durationMs * 100.0 / windowMs).coerceIn(0.0, 100.0)
@@ -118,177 +109,66 @@ fun LogOverlay(
                             } else if (log.durationMs > 0) {
                                 " [${FormatterUtils.formatDurationSimple(log.durationMs)}]"
                             } else ""
-
                             "$cleanMsg$countText$durationText"
                         }
                         val displayMessage = "$msgPrefix$baseMsg"
-
                         val isSelected = selectedLog?.localId == log.localId
-                        Row(modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 0.5.dp, horizontal = 8.dp)
-                            .background(if (isSelected) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.02f))
-                            .clickable { selectedLog = if (isSelected) null else log }, 
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = time, 
-                                color = if (isTelemetryFresh) Color.White.copy(alpha = 0.6f) else Slate500, 
-                                fontSize = 10.sp, 
-                                fontFamily = FontFamily.Monospace, 
-                                modifier = Modifier.requiredWidth(95.dp), 
-                                maxLines = 1, 
-                                softWrap = false,
-                                overflow = TextOverflow.Clip
-                            )
+
+                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 0.5.dp, horizontal = 8.dp).background(if (isSelected) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.02f)).clickable { selectedLog = if (isSelected) null else log }, verticalAlignment = Alignment.CenterVertically) {
+                            Text(text = time, color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.requiredWidth(95.dp), maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
                             Spacer(Modifier.width(4.dp))
                             CompositionLocalProvider(LocalLayoutDirection provides if (isHebrewMsg) LayoutDirection.Rtl else LayoutDirection.Ltr) { 
-                                Text(
-                                    text = displayMessage, 
-                                    color = renderingConfig.color, 
-                                    fontSize = 11.sp, 
-                                    fontWeight = renderingConfig.fontWeight, 
-                                    fontFamily = FontFamily.Monospace, 
-                                    modifier = Modifier.weight(1f)
-                                ) 
+                                Text(text = displayMessage, color = renderingConfig.color, fontSize = 11.sp, fontWeight = renderingConfig.fontWeight, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f)) 
                             }
                         }
                     }
                 }
             }
-
-            if (selectedLog != null) {
-                LogDetailPane(
-                    log = selectedLog!!, 
-                    onClose = { selectedLog = null },
-                    onHistLink = onHistLink,
-                    onDetailsLink = onDetailsLink
-                )
-            }
+            if (selectedLog != null) { LogDetailPane(log = selectedLog!!, onClose = { selectedLog = null }, onHistLink = onHistLink, onDetailsLink = onDetailsLink) }
         }
     }
 }
 
 @Composable
-fun LogDetailPane(
-    log: LogEntry, 
-    onClose: () -> Unit,
-    onHistLink: (Long) -> Unit = {},
-    onDetailsLink: () -> Unit = {}
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth().padding(8.dp),
-        colors = CardDefaults.cardColors(containerColor = Slate900.copy(alpha = 0.95f)),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-        shape = RoundedCornerShape(12.dp)
-    ) {
+fun LogDetailPane(log: LogEntry, onClose: () -> Unit, onHistLink: (Long) -> Unit = {}, onDetailsLink: () -> Unit = {}) {
+    Card(modifier = Modifier.fillMaxWidth().padding(8.dp), colors = CardDefaults.cardColors(containerColor = Slate900.copy(alpha = 0.95f)), border = BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)), shape = RoundedCornerShape(12.dp)) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("FORENSIC DETAIL", color = Teal500, fontSize = 10.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
                     Spacer(Modifier.width(12.dp))
-                    
-                    // Issue #930: Deep-linking buttons
-                    Text(
-                        text = "HIST",
-                        color = Amber500,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Amber500.copy(alpha = 0.2f))
-                            .clickable { onHistLink(log.timestamp) }
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+                    Text(text = "HIST", color = Amber500, fontSize = 10.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Amber500.copy(alpha = 0.2f)).clickable { onHistLink(log.timestamp) }.padding(horizontal = 6.dp, vertical = 2.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = "DIAG",
-                        color = Teal500,
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Black,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Teal500.copy(alpha = 0.2f))
-                            .clickable { onDetailsLink() }
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    )
+                    Text(text = "DIAG", color = Teal500, fontSize = 10.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace, modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Teal500.copy(alpha = 0.2f)).clickable { onDetailsLink() }.padding(horizontal = 6.dp, vertical = 2.dp))
                 }
-
-                IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) {
-                    Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(16.dp))
-                }
+                IconButton(onClick = onClose, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(16.dp)) }
             }
-            Spacer(Modifier.height(8.dp))
-            Text(log.message, color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium)
-            Spacer(Modifier.height(8.dp))
-            HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
-            Spacer(Modifier.height(8.dp))
-            
-            DetailRow(
-                label1 = "SNR-SNAPSHOT", val1 = log.snrSnapshot?.let { "%.1f dB".format(it) } ?: "--", color1 = Color(0xFF38BDF8),
-                label2 = "VIBE-SNAPSHOT", val2 = log.vibeSnapshot?.let { "%.2f g".format(it) } ?: "--", color2 = Color.Magenta
-            )
-            
-            DetailRow(
-                label1 = "LATITUDE", val1 = if (log.lat != 0.0) "%.6f".format(log.lat) else "--", color1 = Color.White,
-                label2 = "LONGITUDE", val2 = if (log.lng != 0.0) "%.6f".format(log.lng) else "--", color2 = Color.White
-            )
-            
-            val accText = if (log.accuracy > 0) "%.1fm".format(log.accuracy) else "--"
-            val maxAccText = if (log.maxAccuracy > 0) "%.1fm".format(log.maxAccuracy) else "--"
-            
-            DetailRow(
-                label1 = "RAW ACCURACY", val1 = accText, color1 = Amber500,
-                label2 = "UNCERTAINTY (MAX)", val2 = maxAccText, color2 = Teal500
-            )
-
-            DetailRow(
-                label1 = "ROLE", val1 = log.role.uppercase(), color1 = if(log.role == "tracker") BrandJd else ViewerCyan,
-                label2 = "EXTREME VALUE", val2 = log.extremeValue?.let { "%.2f".format(it) } ?: "--", color2 = Rose500
-            )
+            Spacer(Modifier.height(8.dp)); Text(log.message, color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(8.dp)); HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp); Spacer(Modifier.height(8.dp))
+            DetailRow(label1 = "SNR-SNAPSHOT", val1 = log.snrSnapshot?.let { "%.1f dB".format(it) } ?: "--", color1 = Color(0xFF38BDF8), label2 = "VIBE-SNAPSHOT", val2 = log.vibeSnapshot?.let { "%.2f g".format(it) } ?: "--", color2 = Color.Magenta)
+            DetailRow(label1 = "LATITUDE", val1 = if (log.lat != 0.0) "%.6f".format(log.lat) else "--", color1 = Color.White, label2 = "LONGITUDE", val2 = if (log.lng != 0.0) "%.6f".format(log.lng) else "--", color2 = Color.White)
+            DetailRow(label1 = "RAW ACCURACY", val1 = if (log.accuracy > 0) "%.1fm".format(log.accuracy) else "--", color1 = Amber500, label2 = "UNCERTAINTY (MAX)", val2 = if (log.maxAccuracy > 0) "%.1fm".format(log.maxAccuracy) else "--", color2 = Teal500)
+            DetailRow(label1 = "ROLE", val1 = log.role.uppercase(), color1 = if(log.role == "tracker") BrandJd else ViewerCyan, label2 = "EXTREME VALUE", val2 = log.extremeValue?.let { "%.2f".format(it) } ?: "--", color2 = Rose500)
         }
     }
 }
 
 @Composable
-private fun DetailRow(label1: String, val1: String, color1: Color, label2: String, val2: String, color2: Color) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label1, color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-            Text(val1, color = color1, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(label2, color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-            Text(val2, color = color2, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-        }
-    }
-}
+private fun DetailRow(label1: String, val1: String, color1: Color, label2: String, val2: String, color2: Color) { Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) { Column(modifier = Modifier.weight(1f)) { Text(label1, color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold); Text(val1, color = color1, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold) }; Column(modifier = Modifier.weight(1f)) { Text(label2, color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold); Text(val2, color = color2, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold) } } }
 
 @Composable
-fun LogFilterButton(label: String, active: Boolean, activeColor: Color, onClick: (Boolean) -> Unit) {
-    Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (active) activeColor.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f)).border(1.dp, if (active) activeColor else Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp)).clickable { onClick(!active) }.padding(horizontal = 8.dp, vertical = 4.dp)) { Text(label, color = if (active) activeColor else Slate500, fontSize = 10.sp, fontWeight = FontWeight.Normal) }
-}
+fun LogFilterButton(label: String, active: Boolean, activeColor: Color, onClick: (Boolean) -> Unit) { Box(modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (active) activeColor.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.05f)).border(1.dp, if (active) activeColor else Color.White.copy(alpha = 0.1f), RoundedCornerShape(8.dp)).clickable { onClick(!active) }.padding(horizontal = 8.dp, vertical = 4.dp)) { Text(label, color = if (active) activeColor else Slate500, fontSize = 10.sp, fontWeight = FontWeight.Normal) } }
 
 @Stable
 data class LogRenderingConfig(val color: Color, val fontWeight: FontWeight)
 
 fun getLogRenderingConfig(log: LogEntry, isTelemetryFresh: Boolean = true): LogRenderingConfig {
-    if (!isTelemetryFresh) {
-        return LogRenderingConfig(Slate500, FontWeight.Normal)
-    }
-
-    if (log.isSpecial) {
-        val color = log.specialColor?.let { Color(it) } ?: Color(FORENSIC_PINK_COLOR) 
-        return LogRenderingConfig(color, FontWeight.Bold)
-    }
-    val message = log.message
-    val isImportant = log.isImportant
-    val msg = message.uppercase()
+    if (!isTelemetryFresh) return LogRenderingConfig(Slate500, FontWeight.Normal)
+    if (log.isSpecial) return LogRenderingConfig(log.specialColor?.let { Color(it) } ?: Color(FORENSIC_PINK_COLOR), FontWeight.Bold)
+    val msg = log.message.uppercase()
     if (msg.contains("CRITICAL") || msg.contains("ERROR") || msg.contains("[SIREN]") || msg.contains("VIOLATION")) return LogRenderingConfig(Rose500, FontWeight.Bold)
     if (msg.contains("CONNECTED") || msg.contains("RESTORED")) return LogRenderingConfig(BrandJd, FontWeight.Bold)
     if (msg.contains("USER ACTION") || msg.contains("VIEWER CONNECTED")) return LogRenderingConfig(ViewerCyan, FontWeight.Normal)
     if (msg.contains("TRACKER STATE") || msg.contains("TRACKER IS")) return LogRenderingConfig(Amber500, FontWeight.Bold)
-    if (isImportant) return LogRenderingConfig(BrandJd, FontWeight.Bold)
-    return LogRenderingConfig(BrandJd, FontWeight.Normal)
+    return LogRenderingConfig(BrandJd, if (log.isImportant) FontWeight.Bold else FontWeight.Normal)
 }

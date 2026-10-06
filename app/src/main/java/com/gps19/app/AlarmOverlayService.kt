@@ -23,12 +23,9 @@ import javax.inject.Inject
 /**
  * AlarmOverlayService: Implements SYSTEM_ALERT_WINDOW to ensure alarm visibility 
  * even when the app is in background and device is unlocked.
- * Oct.5.15:
- * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored AlarmOverlay call 
- *   to pass ViewModel-equivalent flows, ensuring state collection happens 
- *   within the leaf component (Rule 1.110). (R1426-2).
- * Oct.3.1:
- * - Issue #1420: Granular HUD Binding.
+ * Oct.5.20:
+ * - SIMP-1426-3: Updated AlarmOverlay call to use SimpleUiStateProvider. 
+ *   Reduced parameter overhead and aligned with unified state provider model.
  */
 @AndroidEntryPoint
 class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
@@ -97,9 +94,8 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
             setViewTreeSavedStateRegistryOwner(this@AlarmOverlayService)
             
             setContent {
-                // R1426-2: Construct equivalent flows for AlarmOverlay leaf collection
-                val hudHealthFlow = remember {
-                    combine(
+                val stateProvider = remember {
+                    val hudHealthFlow = combine(
                         alarmManager.activeAlarmsFlow,
                         sirenLockoutUseCase.silencedUntilRt
                     ) { alarms, _ ->
@@ -108,55 +104,57 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
                             isAlarmSilenced = sirenLockoutUseCase.isLockedOut()
                         )
                     }.stateIn(lifecycleScope, SharingStarted.Eagerly, HudHealthState())
-                }
 
-                val kinematicFlow = remember {
-                    repository.trackerLocation.map { update ->
+                    val kinematicFlow = repository.trackerLocation.map { update ->
                         KinematicState().apply {
                             trackerHealth.isLocationPending = update.integrity.isLocationPending
                             trackerHealth.locationPendingReason = update.integrity.locationPendingReason
                         }
                     }.stateIn(lifecycleScope, SharingStarted.Eagerly, KinematicState())
-                }
 
-                val sessionStateFlow = remember {
-                    flow {
+                    val sessionStateFlow = flow {
                         while(true) {
                             emit(SessionUiState(permissions = systemStatusProvider.getPermissionState()))
                             kotlinx.coroutines.delay(30000)
                         }
                     }.stateIn(lifecycleScope, SharingStarted.Eagerly, SessionUiState())
+
+                    SimpleUiStateProvider(
+                        session = sessionStateFlow,
+                        kinematic = kinematicFlow,
+                        hudHealthState = hudHealthFlow
+                    )
                 }
 
-                AlarmOverlay(
-                    hudHealthFlow = hudHealthFlow,
-                    kinematicFlow = kinematicFlow,
-                    sessionStateFlow = sessionStateFlow,
-                    onHardwarePermissionClick = {
-                        val intent = Intent(this@AlarmOverlayService, MainActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                            action = "com.gps19.app.ACTION_VIEW_DIAGNOSTICS"
+                GpsTrackerTheme(appMode = "viewer") {
+                    AlarmOverlay(
+                        stateProvider = stateProvider,
+                        onHardwarePermissionClick = {
+                            val intent = Intent(this@AlarmOverlayService, MainActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                                action = "com.gps19.app.ACTION_VIEW_DIAGNOSTICS"
+                            }
+                            startActivity(intent)
+                            stopSelf()
+                        },
+                        onMute = {
+                            val summary = alarmManager.getActiveAlarmSummary().ifBlank { "Muted" }
+                            repository.sendCommand(UiCommand.StopSiren(summary))
+                            alarmManager.notifySirenManualStop()
+                        },
+                        onClose = {
+                            stopSelf()
+                        },
+                        onGoToMap = {
+                            val intent = Intent(this@AlarmOverlayService, MainActivity::class.java).apply {
+                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                                action = ACTION_NAVIGATE_TO_MAP
+                            }
+                            startActivity(intent)
+                            stopSelf()
                         }
-                        startActivity(intent)
-                        stopSelf()
-                    },
-                    onMute = {
-                        val summary = alarmManager.getActiveAlarmSummary().ifBlank { "Muted" }
-                        repository.sendCommand(UiCommand.StopSiren(summary))
-                        alarmManager.notifySirenManualStop()
-                    },
-                    onClose = {
-                        stopSelf()
-                    },
-                    onGoToMap = {
-                        val intent = Intent(this@AlarmOverlayService, MainActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                            action = ACTION_NAVIGATE_TO_MAP
-                        }
-                        startActivity(intent)
-                        stopSelf()
-                    }
-                )
+                    )
+                }
             }
         }
         

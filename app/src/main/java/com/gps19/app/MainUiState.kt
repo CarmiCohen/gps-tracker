@@ -1,17 +1,19 @@
 package com.gps19.app
 
 import com.gps19.core.engine.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Composite UI state partitioned into specialized slices to 
  * minimize recomposition costs and isolate volatile triggers (Issue #1166).
- * Oct.5.11:
- * - Issue #SIMP-1426-1: Refactored System Readiness logic into reusable 
- *   static methods to eliminate duplication in leaf screens.
- * Oct.4.1:
- * - Issue #1202: Unified UI event routing. Added InitiateMode and 
- *   ConfirmBackgroundDisclosure events. Added Navigate and ShowBackgroundDisclosure effects.
+ * Oct.5.20:
+ * - SIMP-1426-3: Expanded UiStateProvider to include history, log, and 
+ *   dashboard flows. Refactored provider to support total leaf-level 
+ *   convergence.
+ * - Map Hardening (Oct.5.20 Phase 1): Migrated initialCenter logic from 
+ *   AppMapContainer to MapViewState.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -20,7 +22,7 @@ data class MainUiState(
     val navigation: NavigationState = NavigationState(isMapVisible = true),
     val simulation: SimulationUiState = SimulationUiState()
 ) {
-    // Top-level property accessors for backward compatibility and simplicity in logic checks
+    // Top-level property accessors for backward compatibility
     val isInitialized: Boolean get() = session.isInitialized
     val hydrationLevel: Int get() = session.hydrationLevel
     val appMode: String? get() = session.appMode
@@ -62,6 +64,76 @@ data class MainUiState(
 }
 
 /**
+ * UiStateProvider: SIMP-1426-3 unified flow container to reduce boilerplate 
+ * in leaf component signatures.
+ */
+interface UiStateProvider {
+    val session: StateFlow<SessionUiState>
+    val settings: StateFlow<SettingsUiState>
+    val spatial: StateFlow<SpatialUiState>
+    val navigation: StateFlow<NavigationState>
+    val simulation: StateFlow<SimulationUiState>
+    val kinematic: StateFlow<KinematicState>
+    val diagnostic: StateFlow<DiagnosticState>
+    val systemPulseRt: StateFlow<Long>
+    val mapViewState: StateFlow<MapViewState>
+    val hudHealthState: StateFlow<HudHealthState>
+    val hudConnectivityState: StateFlow<HudConnectivityState>
+    val hudTelemetryState: StateFlow<HudTelemetryState>
+    val dashboardState: StateFlow<DashboardState>
+    val isSirenPlaying: StateFlow<Boolean>
+    val eventLogs: StateFlow<List<LogEntry>>
+    val logFilterDetails: StateFlow<Boolean>
+    val logFilterRecovered: StateFlow<Boolean>
+    val history4M: StateFlow<List<ConnectionPoint>>
+    val history16M: StateFlow<List<ConnectionPoint>>
+    val history1H: StateFlow<List<ConnectionPoint>>
+    val history4H: StateFlow<List<ConnectionPoint>>
+    val history24H: StateFlow<List<ConnectionPoint>>
+    val history7D: StateFlow<List<ConnectionPoint>>
+    val gpsIndexData: StateFlow<GpsIndexData>
+    val rtt: StateFlow<Int>
+    val remoteSignal: StateFlow<Int>
+    val currentMa: StateFlow<Int>
+    val activeGnssDetail: StateFlow<GnssDetail?>
+}
+
+/**
+ * SimpleUiStateProvider: A concrete implementation of [UiStateProvider] used in 
+ * contexts where a full ViewModel is unavailable (e.g., Background Services).
+ */
+class SimpleUiStateProvider(
+    override val session: StateFlow<SessionUiState>,
+    override val settings: StateFlow<SettingsUiState> = MutableStateFlow(SettingsUiState()),
+    override val spatial: StateFlow<SpatialUiState> = MutableStateFlow(SpatialUiState()),
+    override val navigation: StateFlow<NavigationState> = MutableStateFlow(NavigationState()),
+    override val simulation: StateFlow<SimulationUiState> = MutableStateFlow(SimulationUiState()),
+    override val kinematic: StateFlow<KinematicState>,
+    override val diagnostic: StateFlow<DiagnosticState> = MutableStateFlow(DiagnosticState()),
+    override val systemPulseRt: StateFlow<Long> = MutableStateFlow(0L),
+    override val mapViewState: StateFlow<MapViewState> = MutableStateFlow(MapViewState()),
+    override val hudHealthState: StateFlow<HudHealthState>,
+    override val hudConnectivityState: StateFlow<HudConnectivityState> = MutableStateFlow(HudConnectivityState()),
+    override val hudTelemetryState: StateFlow<HudTelemetryState> = MutableStateFlow(HudTelemetryState()),
+    override val dashboardState: StateFlow<DashboardState> = MutableStateFlow(DashboardState()),
+    override val isSirenPlaying: StateFlow<Boolean> = MutableStateFlow(false),
+    override val eventLogs: StateFlow<List<LogEntry>> = MutableStateFlow(emptyList()),
+    override val logFilterDetails: StateFlow<Boolean> = MutableStateFlow(false),
+    override val logFilterRecovered: StateFlow<Boolean> = MutableStateFlow(false),
+    override val history4M: StateFlow<List<ConnectionPoint>> = MutableStateFlow(emptyList()),
+    override val history16M: StateFlow<List<ConnectionPoint>> = MutableStateFlow(emptyList()),
+    override val history1H: StateFlow<List<ConnectionPoint>> = MutableStateFlow(emptyList()),
+    override val history4H: StateFlow<List<ConnectionPoint>> = MutableStateFlow(emptyList()),
+    override val history24H: StateFlow<List<ConnectionPoint>> = MutableStateFlow(emptyList()),
+    override val history7D: StateFlow<List<ConnectionPoint>> = MutableStateFlow(emptyList()),
+    override val gpsIndexData: StateFlow<GpsIndexData> = MutableStateFlow(GpsIndexData(0.0, 0.0, 0.0, 0.0)),
+    override val rtt: StateFlow<Int> = MutableStateFlow(0),
+    override val remoteSignal: StateFlow<Int> = MutableStateFlow(0),
+    override val currentMa: StateFlow<Int> = MutableStateFlow(0),
+    override val activeGnssDetail: StateFlow<GnssDetail?> = MutableStateFlow(null)
+) : UiStateProvider
+
+/**
  * SessionUiState: Core application lifecycle and permission states.
  */
 data class SessionUiState(
@@ -75,9 +147,6 @@ data class SessionUiState(
     val isPeerActive: Boolean = false,
     val permissions: PermissionState = PermissionState()
 ) {
-    /**
-     * Issue #SIMP-1426-1: Centralized System Readiness calculation.
-     */
     fun isSystemReady(homePointsCount: Int): Boolean {
         if (isSetupBypassActive) return true
         return permissions.isFineLocationGranted &&
@@ -97,9 +166,6 @@ data class SessionUiState(
                  (permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride))
     }
 
-    /**
-     * Issue #SIMP-1426-1: Centralized System Issues counter.
-     */
     fun systemIssuesCount(homePointsCount: Int): Int {
         if (isSetupBypassActive) return 0
         var count = 0
@@ -118,7 +184,7 @@ data class SessionUiState(
                          (permissions.backgroundStatus == CapabilityStatus.GRANTED || 
                           permissions.autostartStatus == CapabilityStatus.GRANTED) &&
                          !(permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride)
-        if (configIssue) count++
+        if (count == 0 && configIssue) count++
         
         return count
     }
@@ -155,9 +221,6 @@ data class SpatialUiState(
     val isManualSelectionInProgress: Boolean = false
 )
 
-/**
- * CameraAction: Imperative map commands delivered via SharedFlow (Issue #1390).
- */
 sealed class CameraAction {
     object CenterTracker : CameraAction()
     object CenterViewer : CameraAction()
@@ -165,9 +228,6 @@ sealed class CameraAction {
     object ZoomOut : CameraAction()
 }
 
-/**
- * SimulationUiState: Flags for forensic auditing and stress simulations.
- */
 data class SimulationUiState(
     val isRecoveryPending: Boolean = false,
     val isForensicStallSimulated: Boolean = false,
@@ -224,20 +284,16 @@ data class MapViewState(
     val isViewerFresh: Boolean = false,
     val isTrackerValid: Boolean = false,
     val isViewerValid: Boolean = false,
-    
-    // R-ID 287: Smoothed positions moved to ViewModel
     val smoothedTrackerLat: Double = 0.0,
     val smoothedTrackerLng: Double = 0.0,
     val smoothedViewerLat: Double = 0.0,
-    val smoothedViewerLng: Double = 0.0
+    val smoothedViewerLng: Double = 0.0,
+    val initialCenter: GeoPoint = GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
 ) {
     val smoothedTrackerPos: GeoPoint? get() = if (isTrackerValid) GeoPoint(smoothedTrackerLat, smoothedTrackerLng) else null
     val smoothedViewerPos: GeoPoint? get() = if (isViewerValid) GeoPoint(smoothedViewerLat, smoothedViewerLng) else null
 }
 
-/**
- * KinematicState: High-frequency transient state.
- */
 data class KinematicState(
     var localLocation: LocationUpdate = LocationUpdate(),
     var trackerLocation: LocationUpdate = LocationUpdate(),
@@ -277,9 +333,6 @@ data class KinematicState(
     }
 }
 
-/**
- * DiagnosticState: Low-frequency scalar state.
- */
 class DiagnosticState(
     var battery: BatteryState = BatteryState(),
     var stats: StatsState = StatsState(),
@@ -337,7 +390,6 @@ class DiagnosticState(
         this.trackerIsGnssThrottled = other.trackerIsGnssThrottled
         this.pulse = other.pulse
         this.lastEnergyDeltaMa = other.lastEnergyDeltaMa
-        this.lastEnergyDeltaTemp = other.lastEnergyDeltaTemp
         this.lastEnergyDurationMs = other.lastEnergyDurationMs
         this.localMaxTemp = other.localMaxTemp
         this.trackerMaxTemp = other.trackerMaxTemp
@@ -377,7 +429,6 @@ class DiagnosticState(
 }
 
 enum class MapFollowMode { TRACKER, VIEWER, AUTO, NONE }
-
 enum class GeofenceMode { IDLE, ADD, REMOVE }
 
 @kotlinx.serialization.Serializable
@@ -514,9 +565,6 @@ sealed class UiEvent {
     data class ConfirmBackgroundDisclosure(val confirmed: Boolean, val mode: String) : UiEvent()
 }
 
-/**
- * UiEffect: Imperative UI commands emitted by the coordinator (Issue #1202).
- */
 sealed class UiEffect {
     data class Navigate(val route: String, val popUpTo: String? = null, val inclusive: Boolean = false) : UiEffect()
     data class StartService(val mode: String) : UiEffect()
