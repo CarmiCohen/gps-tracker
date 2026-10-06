@@ -8,12 +8,12 @@ import org.osmdroid.util.GeoPoint
 /**
  * MainUiState: Composite UI state partitioned into specialized slices to 
  * minimize recomposition costs and isolate volatile triggers (Issue #1166).
+ * Oct.6.20:
+ * - Issue #SIGN-1006-12: SignalingPipeline Abstraction. Updated DiagnosticState 
+ *   to use SignalingPipeline.Metrics for radio efficiency tracking.
  * Oct.6.7:
  * - Issue #AUDIT-1006-8: Signaling Stability & Conflation Metrics. Added 
  *   SignalingMetrics to DiagnosticState to expose radio efficiency (R-ID 511).
- * Oct.6.2:
- * - Issue #AUDIT-1006-6: Added SetMemoryPressureSimulation to UiEvent and UiCommand.
- * - Issue #AUDIT-1006-5: Added ExecuteLogPressureTest to UiEvent and UiCommand.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -290,7 +290,7 @@ data class MapViewState(
     val smoothedTrackerLng: Double = 0.0,
     val smoothedViewerLat: Double = 0.0,
     val smoothedViewerLng: Double = 0.0,
-    val initialCenter: GeoPoint = GeoPoint(DEFAULT_LAT, DEFAULT_LNG)
+    val initialCenter: GeoPoint = GeoPoint(0.0, 0.0)
 ) {
     val smoothedTrackerPos: GeoPoint? get() = if (isTrackerValid) GeoPoint(smoothedTrackerLat, smoothedTrackerLng) else null
     val smoothedViewerPos: GeoPoint? get() = if (isViewerValid) GeoPoint(smoothedViewerLat, smoothedViewerLng) else null
@@ -345,7 +345,7 @@ class DiagnosticState(
     var trackerSatsView: Int = -1,
     var trackerSatsUsed: Int = -1,
     var connectivity: ConnectivityState = ConnectivityState(),
-    var signalingMetrics: SmartSignalingDispatcher.Metrics = SmartSignalingDispatcher.Metrics(0, 0, 0),
+    var signalingMetrics: SignalingPipeline.Metrics = SignalingPipeline.Metrics(0, 0, 0),
     var activeAlarms: List<AlarmInfo> = emptyList(),
     var isNewViolationDetected: Boolean = false,
     var powerAlarmPending: Boolean = false,
@@ -409,7 +409,7 @@ class DiagnosticState(
         trackerSatsView = -1
         trackerSatsUsed = -1
         connectivity.reset()
-        signalingMetrics = SmartSignalingDispatcher.Metrics(0, 0, 0)
+        signalingMetrics = SignalingPipeline.Metrics(0, 0, 0)
         activeAlarms = emptyList()
         isNewViolationDetected = false
         powerAlarmPending = false

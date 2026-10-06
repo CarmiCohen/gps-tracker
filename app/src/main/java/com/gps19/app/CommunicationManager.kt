@@ -1,7 +1,6 @@
 package com.gps19.app
 
 import android.content.Context
-import com.google.protobuf.CodedOutputStream
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import io.socket.client.IO
@@ -14,7 +13,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.json.JSONObject
 import timber.log.Timber
-import java.util.Arrays
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
@@ -23,13 +21,11 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * Oct.6.15:
- * - Issue #AUDIT-1006-11: Protobuf Stream Compression. Integrated CompressionUtils 
- *   to compress binary payloads exceeding 512 bytes, reducing radio duty cycles (Rule 1.130).
- * - Fixed binary relay handlers to transparently decompress incoming telemetry.
- * Oct.6.11:
- * - Issue #AUDIT-1006-10: Dispatcher Lifecycle Hardening. Integrated dispatcher.reinitialize() 
- *   within connect() to ensure signaling resumes after network-driven disconnects. 
+ * Oct.6.20:
+ * - Issue #SIGN-1006-12: SignalingPipeline Abstraction. Delegated all transmission, 
+ *   encoding, and compression to SmartSignalingDispatcher (SignalingPipeline).
+ *   Removed manual Protobuf serialization and Gzip logic from this class.
+ * - Centralized delta-state reset via dispatcher.reset() (Rule 1.125).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -57,10 +53,6 @@ class CommunicationManager @Inject constructor(
 
     private var onConnectionLost: (() -> Unit)? = null
 
-    private val statusBuilder = RealtimeStatus.newBuilder()
-    private var serializationBuffer = ByteArray(4096)
-    private val MAX_SERIALIZATION_BUFFER_SIZE = 65536
-
     private val _signalingFlow = MutableSharedFlow<SignalingEvent>(
         extraBufferCapacity = 128, 
         onBufferOverflow = BufferOverflow.DROP_OLDEST
@@ -75,22 +67,22 @@ class CommunicationManager @Inject constructor(
 
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
     
-    private val dispatcher = SmartSignalingDispatcher(
+    private val dispatcher: SignalingPipeline = SmartSignalingDispatcher(
         scope = scope,
         isViolationProvider = { sessionManagerProvider.get().isInViolation },
-        jsonSink = { event, data -> 
-            if (!isStopped) socket?.emit(event, JSONObject(data))
+        wireSink = object : SignalingWireSink {
+            override fun emitJson(event: String, data: Map<String, Any?>) {
+                if (!isStopped) socket?.emit(event, JSONObject(data))
+            }
+            override fun emitBinary(event: String, routingId: String, data: ByteArray) {
+                if (!isStopped) socket?.emit(event, routingId, data)
+            }
         },
-        binarySink = { event, routingId, data ->
-            if (!isStopped) socket?.emit(event, routingId, CompressionUtils.compressIfNeeded(data))
-        },
-        objectSink = { event, status ->
-            serializeAndEmitBinary(event, status)
-        },
+        encoder = AppSignalingEncoder(),
         isConnectedProvider = { isConnected() }
     )
 
-    override val signalingMetrics: StateFlow<SmartSignalingDispatcher.Metrics> = dispatcher.metricsFlow
+    override val signalingMetrics: StateFlow<SignalingPipeline.Metrics> = dispatcher.metricsFlow
 
     private fun isDefaultViewer(id: String) = id == SignalingConstants.DEFAULT_VIEWER_ID || id.isEmpty()
 
@@ -209,7 +201,7 @@ class CommunicationManager @Inject constructor(
                     logToApp("Connected to relay [Session $sessionId]", true)
                     markTraffic()
                     telemetryRepository.updateRelayStatus(true)
-                    TelemetryProtobufMapper.resetDeltaState()
+                    dispatcher.reset()
                     if (deviceId.isNotEmpty()) emitInternal("join", createJoinPayload(), SignalingPriority.HIGH)
                 }
             }
@@ -222,7 +214,7 @@ class CommunicationManager @Inject constructor(
                     logToApp("Relay Reconnected [Session $sessionId]", true)
                     markTraffic()
                     telemetryRepository.updateRelayStatus(true)
-                    TelemetryProtobufMapper.resetDeltaState()
+                    dispatcher.reset()
                     if (deviceId.isNotEmpty()) emitInternal("join", createJoinPayload(), SignalingPriority.HIGH)
                 }
             }
@@ -353,43 +345,13 @@ class CommunicationManager @Inject constructor(
     override fun transmit(status: LocationUpdate, priority: SignalingPriority, fromViewer: Boolean) {
         if (isStopped || !isConnected()) return
         markTraffic()
-        if (isTrackerMode && !fromViewer) {
-            dispatcher.dispatch(SmartSignalingDispatcher.Command.Object("location_update_bin", status, priority))
-        } else {
-            emitInternal("location_update", status.toMap(fromViewer), priority)
-        }
-    }
-
-    private fun serializeAndEmitBinary(event: String, status: LocationUpdate) {
-        if (isStopped || !isConnected()) return
-        synchronized(statusBuilder) {
-            statusBuilder.clear()
-            TelemetryProtobufMapper.mapToRealtime(status, statusBuilder, fromViewer = false, useDeltaEncoding = true)
-            val message = statusBuilder.buildPartial()
-            val size = message.serializedSize
-            if (size > serializationBuffer.size && size <= MAX_SERIALIZATION_BUFFER_SIZE) {
-                serializationBuffer = ByteArray((serializationBuffer.size * 2).coerceAtLeast(size).coerceAtMost(MAX_SERIALIZATION_BUFFER_SIZE))
-            }
-            if (size <= serializationBuffer.size) {
-                try {
-                    val cos = CodedOutputStream.newInstance(serializationBuffer, 0, size)
-                    message.writeTo(cos); cos.checkNoSpaceLeft()
-                    val rawData = Arrays.copyOf(serializationBuffer, size)
-                    // Issue #AUDIT-1006-11: Apply compression to manual binary emits
-                    val payload = CompressionUtils.compressIfNeeded(rawData)
-                    socket?.emit(event, SignalingConstants.getTransmissionId(deviceId), payload)
-                    return
-                } catch (e: Exception) { Timber.e(e, "Pre-allocated serialization failed") }
-            }
-            val payload = CompressionUtils.compressIfNeeded(message.toByteArray())
-            socket?.emit(event, SignalingConstants.getTransmissionId(deviceId), payload)
-        }
+        dispatcher.dispatchObject("location_update_bin", status, priority, fromViewer)
     }
 
     private fun emitInternal(event: String, data: Map<String, Any?>, priority: SignalingPriority) {
         if (isStopped) return
         markTraffic()
-        dispatcher.dispatch(SmartSignalingDispatcher.Command.Json(event, data, priority))
+        dispatcher.dispatchJson(event, data, priority)
     }
 
     private fun JSONObject.toMap(): Map<String, Any?> {

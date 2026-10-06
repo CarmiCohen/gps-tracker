@@ -5,26 +5,11 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
- * Oct.6.10:
- * - Issue #AUDIT-1006-9: Fixed Protocol Optimization. Now explicitly clears 
- *   lat/lng doubles when sending deltas to ensure wire-level savings.
- * - Issue #AUDIT-1006-9: Isolated Signaling Delta State. Added resetDeltaState() 
- *   and ensured that mapStatusToBinary (persistence) does not interfere with 
- *   signaling delta references (Rule 1.125).
+ * Oct.6.20:
+ * - Issue #SIGN-1006-12: Removed static signaling delta state. mapToRealtime now 
+ *   requires a SignalingDeltaState instance (Rule 1.125).
  */
 object TelemetryProtobufMapper {
-
-    private val signalingLatE7 = AtomicInteger(0)
-    private val signalingLngE7 = AtomicInteger(0)
-
-    /**
-     * resetDeltaState: Resets the reference coordinates for delta encoding.
-     * Should be called on new connections to ensure the first packet is absolute.
-     */
-    fun resetDeltaState() {
-        signalingLatE7.set(0)
-        signalingLngE7.set(0)
-    }
 
     /**
      * mapStatusToBinary: Direct serialization for offline buffering.
@@ -32,7 +17,7 @@ object TelemetryProtobufMapper {
      */
     fun mapStatusToBinary(status: LocationUpdate): ByteArray {
         val builder = RealtimeStatus.newBuilder()
-        mapToRealtime(status, builder, fromViewer = false, useDeltaEncoding = false)
+        mapToRealtime(status, builder, fromViewer = false, deltaState = null)
         return builder.build().toByteArray()
     }
 
@@ -47,12 +32,13 @@ object TelemetryProtobufMapper {
 
     /**
      * mapToRealtime: Maps LocationUpdate to RealtimeStatus (Signaling/Relay).
+     * If deltaState is null, absolute coordinates are used.
      */
     fun mapToRealtime(
         status: LocationUpdate, 
         builder: RealtimeStatus.Builder, 
         fromViewer: Boolean,
-        useDeltaEncoding: Boolean = true
+        deltaState: SignalingDeltaState? = null
     ) {
         builder.setId(SignalingConstants.getTransmissionId(status.deviceId))
         builder.setViewerId(SignalingConstants.getTransmissionId(status.viewerId))
@@ -64,12 +50,12 @@ object TelemetryProtobufMapper {
         builder.setAccuracy(status.accuracy)
         builder.setMaxAccuracy(status.maxAccuracy)
         
-        if (useDeltaEncoding) {
+        if (deltaState != null) {
             val currentLatE7 = (status.lat * 1e7).toInt()
             val currentLngE7 = (status.lng * 1e7).toInt()
             
-            val prevLat = signalingLatE7.getAndSet(currentLatE7)
-            val prevLng = signalingLngE7.getAndSet(currentLngE7)
+            val prevLat = deltaState.getAndSetLat(currentLatE7)
+            val prevLng = deltaState.getAndSetLng(currentLngE7)
             
             // If it's the first update or a large jump (> 1 deg), send absolute
             if (prevLat == 0 || Math.abs(currentLatE7 - prevLat) > 10000000) {

@@ -1,5 +1,10 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct6.20
+*   **Issue #SIGN-1006-12: SignalingPipeline Abstraction.**
+    *   **Root Cause Remediation**: Decoupled Protobuf serialization, delta-encoding state, and Gzip compression from `CommunicationManager` by creating a dedicated `SignalingPipeline` component.
+    *   **Architectural Hardening**: Created `SignalingPipeline` interface and `SignalingDeltaState` in `:core:engine`. Implemented `AppSignalingEncoder` in `:app` to encapsulate wire-level transformations. Refactored `SmartSignalingDispatcher` to manage the unified pipeline lifecycle, ensuring delta-state is reset on reconnection (Rule 1.131).
+
 ## 🟢 Resolved in Oct6.15
 *   **Issue #AUDIT-1006-11: Protobuf Stream Compression.**
     *   **Root Cause Remediation**: Implemented a wire-level compression layer for binary signaling payloads to minimize radio duty cycles.

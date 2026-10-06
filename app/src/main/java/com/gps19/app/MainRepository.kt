@@ -12,7 +12,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
@@ -30,13 +29,9 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
- * Oct.6.9:
- * - Issue #AUDIT-1006-9: Dependency Cycle Remediation. Migrated to Provider<T> for 
- *   SignalingProvider to break the initialization loop with CommunicationManager 
- *   (Rule 2.1).
- * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics. Integrated signalingMetrics 
- *   flow from signalingProvider.
- * - Build Fix: Corrected trail pruning logic in triggerBackgroundPruning.
+ * Oct.6.20:
+ * - Issue #SIGN-1006-12: Updated signalingMetrics to use SignalingPipeline.Metrics.
+ * - Fixed typo in UI history emitter delay.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -88,6 +83,15 @@ class MainRepository @Inject constructor(
         private const val PRUNE_LIMIT_VIOLATIONS = 1000
         private const val PRUNE_CHUNK_SIZE = 500
         private const val SAVE_DEBOUNCE_MS = 1000L
+        
+        private const val HISTORY_BATCH_WRITE_INTERVAL_MS = 5000L
+        private const val HISTORY_BUFFER_MAX_SIZE = 50
+        private const val LOG_LIMIT_STANDARD = 1000
+        
+        private const val APP_START_TIME_KEY = "app_start_time"
+        private const val LAST_ALARM_ACK_TS_KEY = "last_alarm_ack_ts"
+        private const val TRACKER_ID_KEY = "tracker_id"
+        private const val VIEWER_ID_KEY = "viewer_id"
     }
 
     val isRelayConnected = telemetry.isRelayConnected
@@ -100,8 +104,8 @@ class MainRepository @Inject constructor(
     val lastRemoteActivityTs = telemetry.lastRemoteActivityTs
     val gnssDetail = telemetry.gnssDetail
     
-    // Issue #AUDIT-1006-9: Reactive signaling metrics
-    val signalingMetrics: StateFlow<SmartSignalingDispatcher.Metrics> 
+    // Issue #SIGN-1006-12: Reactive signaling pipeline metrics
+    val signalingMetrics: StateFlow<SignalingPipeline.Metrics> 
         get() = signalingProvider.get().signalingMetrics
 
     fun eventLogsFlow(limit: Int): Flow<List<LogEntry>> = logRepository.eventLogsFlow(limit)

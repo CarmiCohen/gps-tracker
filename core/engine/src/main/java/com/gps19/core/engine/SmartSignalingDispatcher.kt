@@ -14,34 +14,32 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
- * Oct.6.14:
- * - Issue #SIMP-1426-9: Conflation State Consolidation. Consolidated individual 
- *   atomic fields into a unified ConflationBucket structure to simplify state 
- *   management and reinitialization. Hardened conflationSignal lifecycle.
- * Oct.6.13:
- * - Issue #SIMP-1426-8: Dynamic Conflation Pressure Adaptation. Implemented 
- *   dynamic scaling of conflation delays based on telemetry density.
- * Oct.6.12:
- * - SIMP-1426-7: Consolidated conflation jobs into a single unified conflation loop.
+ * Oct.6.20:
+ * - Issue #SIGN-1006-12: SignalingPipeline Implementation. Implements the 
+ *   SignalingPipeline interface, encapsulating conflation and delegating 
+ *   encoding/wire-emission to specialized providers.
+ * - Unified sink architecture: Replaced multiple functional sinks with 
+ *   SignalingWireSink and SignalingEncoder.
+ * - Integrated SignalingDeltaState for instance-bound delta tracking.
  */
 class SmartSignalingDispatcher(
     private var scope: CoroutineScope,
     private val isViolationProvider: () -> Boolean,
-    private val jsonSink: (String, Map<String, Any?>) -> Unit,
-    private val binarySink: (String, String, ByteArray) -> Unit,
-    private val objectSink: (String, LocationUpdate) -> Unit,
+    private val wireSink: SignalingWireSink,
+    private val encoder: SignalingEncoder,
     private val isConnectedProvider: () -> Boolean,
     private val timeProvider: TimeProvider = object : TimeProvider {
         override fun currentTimeMillis() = System.currentTimeMillis()
         override fun elapsedRealtime() = System.currentTimeMillis()
     },
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default
-) {
+) : SignalingPipeline {
+
     sealed class Command {
         abstract val priority: SignalingPriority
         data class Json(val event: String, val data: Map<String, Any?>, override val priority: SignalingPriority) : Command()
         data class Binary(val event: String, val routingId: String, val data: ByteArray, override val priority: SignalingPriority) : Command()
-        data class Object(val event: String, val update: LocationUpdate, override val priority: SignalingPriority) : Command()
+        data class Object(val event: String, val update: LocationUpdate, val fromViewer: Boolean, override val priority: SignalingPriority) : Command()
     }
 
     private class ConflationBucket<T> {
@@ -70,8 +68,10 @@ class SmartSignalingDispatcher(
     private val framesEmitted = AtomicLong(0)
     private val framesConflated = AtomicLong(0)
 
-    private val _metricsFlow = MutableStateFlow(Metrics(0, 0, 0))
-    val metricsFlow: StateFlow<Metrics> = _metricsFlow.asStateFlow()
+    private val deltaState = SignalingDeltaState()
+
+    private val _metricsFlow = MutableStateFlow(SignalingPipeline.Metrics(0, 0, 0))
+    override val metricsFlow: StateFlow<SignalingPipeline.Metrics> = _metricsFlow.asStateFlow()
 
     private var processorJob: Job? = null
     
@@ -83,11 +83,11 @@ class SmartSignalingDispatcher(
         startConflationLoop()
     }
 
-    fun reinitialize(newScope: CoroutineScope) {
+    override fun reinitialize(scope: CoroutineScope) {
         if (processorJob?.isActive == true && !highQueue.isClosedForSend) return
         
         shutdown()
-        this.scope = newScope
+        this.scope = scope
         highQueue = Channel(capacity = Channel.UNLIMITED)
         normalQueue = Channel(capacity = Channel.UNLIMITED)
         conflationSignal = Channel(capacity = Channel.CONFLATED)
@@ -98,6 +98,10 @@ class SmartSignalingDispatcher(
         
         startProcessor()
         startConflationLoop()
+    }
+
+    override fun reset() {
+        deltaState.reset()
     }
 
     private fun startProcessor() {
@@ -162,7 +166,7 @@ class SmartSignalingDispatcher(
 
                         // Check Location Object
                         nextCheck = minOf(nextCheck, checkBucket(locObjBucket, now) { 
-                            Command.Object("location_update_bin", it, SignalingPriority.NORMAL) 
+                            Command.Object("location_update_bin", it, false, SignalingPriority.NORMAL) 
                         })
 
                         // Check Log Map
@@ -204,13 +208,28 @@ class SmartSignalingDispatcher(
         val emitted = framesEmitted.incrementAndGet()
         updateMetrics(emitted = emitted)
         when (command) {
-            is Command.Json -> jsonSink(command.event, command.data)
-            is Command.Binary -> binarySink(command.event, command.routingId, command.data)
-            is Command.Object -> objectSink(command.event, command.update)
+            is Command.Json -> wireSink.emitJson(command.event, command.data)
+            is Command.Binary -> wireSink.emitBinary(command.event, command.routingId, command.data)
+            is Command.Object -> {
+                val payload = encoder.encodeObject(command.update, deltaState, command.fromViewer)
+                wireSink.emitBinary(command.event, SignalingConstants.getTransmissionId(command.update.deviceId), payload)
+            }
         }
     }
 
-    fun dispatch(command: Command) {
+    override fun dispatchJson(event: String, data: Map<String, Any?>, priority: SignalingPriority) {
+        dispatch(Command.Json(event, data, priority))
+    }
+
+    override fun dispatchBinary(event: String, routingId: String, data: ByteArray, priority: SignalingPriority) {
+        dispatch(Command.Binary(event, routingId, data, priority))
+    }
+
+    override fun dispatchObject(event: String, update: LocationUpdate, priority: SignalingPriority, fromViewer: Boolean) {
+        dispatch(Command.Object(event, update, fromViewer, priority))
+    }
+
+    private fun dispatch(command: Command) {
         if (highQueue.isClosedForSend) return
 
         val received = framesReceived.incrementAndGet()
@@ -246,7 +265,7 @@ class SmartSignalingDispatcher(
 
     private fun updateMetrics(received: Long? = null, emitted: Long? = null, conflated: Long? = null) {
         _metricsFlow.update { current ->
-            Metrics(
+            SignalingPipeline.Metrics(
                 received = received ?: current.received,
                 emitted = emitted ?: current.emitted,
                 conflated = conflated ?: current.conflated
@@ -338,11 +357,7 @@ class SmartSignalingDispatcher(
         return minOf(baseDelay + pressureBonus, MAX_CONFLATION_DELAY_MS)
     }
 
-    data class Metrics(val received: Long, val emitted: Long, val conflated: Long)
-
-    fun getMetrics() = _metricsFlow.value
-
-    fun shutdown() {
+    override fun shutdown() {
         processorJob?.cancel()
         conflationJob?.cancel()
         highQueue.close()

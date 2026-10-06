@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct6.15)
+# SOT Master Requirements & Hardening Status (Oct6.20)
 
-## 🏗️ Architectural Master Rules (158 Rules)
+## 🏗️ Architectural Master Rules (159 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -14,18 +14,17 @@
 *   **1.128 Dynamic Conflation Scaling (R-ID 511-P)**: Signaling conflation delays MUST scale dynamically during high-pressure bursts. When telemetry density exceeds a specific threshold (e.g., 5 frames), the dispatcher MUST extend the conflation window to maximize per-packet data density and reduce radio duty cycles. (Oct6.13 - Issue #SIMP-1426-8).
 *   **1.129 Conflation State Consolidation (R-ID 511-Q)**: Conflation state (pending payloads, scheduled timestamps, burst counts) MUST be encapsulated in a unified container (e.g., ConflationBucket) to ensure atomic state transitions, simplify lifecycle reinitialization, and reduce boilerplate in scheduling logic. (Oct6.14 - Issue #SIMP-1426-9).
 *   **1.130 Protobuf Stream Compression (R-ID 511-R)**: Binary signaling payloads exceeding 512 bytes SHOULD be compressed (e.g., using Gzip) before transmission. The relay protocol MUST include a compression flag in the header to allow transparent decompression at the viewer or server. (Oct6.15 - Issue #AUDIT-1006-11).
+*   **1.131 SignalingPipeline Abstraction (R-ID 511-S)**: Wire-level optimizations (Protobuf serialization, delta-encoding state, compression) MUST be encapsulated in a dedicated SignalingPipeline abstraction. Transport providers (e.g., CommunicationManager) MUST delegate transmission to the pipeline to ensure separation of concerns and instance-bound state management. (Oct6.20 - Issue #SIGN-1006-12).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 645**: SignalingPipeline Abstraction - Decoupled wire-level optimizations from `CommunicationManager` by creating a dedicated `SignalingPipeline` and instance-bound `SignalingDeltaState`. (Oct6.20 - Issue #SIGN-1006-12).
 *   **SOT ID 644**: Protobuf Stream Compression - Initiated implementation of wire-level compression for large binary payloads. (Oct6.15 - Issue #AUDIT-1006-11).
 *   **SOT ID 643**: Conflation State Consolidation - Refactored `SmartSignalingDispatcher` to use a unified `ConflationBucket` structure. Hardened lifecycle by ensuring signal channels are recreated during reinitialization. (Resolved Oct6.14 - Issue #SIMP-1426-9).
-*   **SOT ID 642**: Dynamic Conflation Pressure Adaptation - Implemented dynamic scaling of conflation delays in `SmartSignalingDispatcher`. (Resolved Oct6.13 - Issue #SIMP-1426-8).
-*   **SOT ID 641**: Unified Conflation Loop - Replaced individual conflation jobs with a single signal-driven loop in `SmartSignalingDispatcher`. (Resolved Oct6.12 - SIMP-1426-7).
 
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.262 (Pipeline Architecture Audit)**: PASSED - Verified that `CommunicationManager` no longer contains serialization or compression logic. Confirmed that `SignalingDeltaState` is correctly bound to the pipeline instance and reset on reconnection. (Oct6.20 - Issue #SIGN-1006-12).
 *   **Chapter 31.261 (Signaling Stress Audit)**: PASSED - Verified that `SmartSignalingDispatcher` correctly handles interleaved bursts of all telemetry types without state collisions or message loss. Confirmed memory safety of `ConflationBucket` reset logic. (Oct6.15 - Issue #TEST-1006-1).
-*   **Chapter 31.260 (Conflation Architecture Audit)**: PASSED - Verified that `ConflationBucket` correctly encapsulates state and that `reinitialize()` successfully clears and restarts the signaling pipeline. Confirmed that pressure adaptation remains active and correct. (Oct6.14)
-*   **Chapter 31.259 (Dynamic Conflation Audit)**: PASSED - Verified that conflation delays correctly scale during high-frequency bursts. (Oct6.13)
