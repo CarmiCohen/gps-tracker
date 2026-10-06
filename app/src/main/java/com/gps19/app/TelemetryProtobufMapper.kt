@@ -1,21 +1,22 @@
 package com.gps19.app
 
 import com.gps19.core.engine.*
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.6.9:
+ * - Issue #AUDIT-1006-9: Protocol Optimization. Implemented E7 delta-encoding for 
+ *   lat/lng in RealtimeStatus. Transmitting deltas in sint32 fields leverages 
+ *   Protobuf's zigzag encoding to significantly reduce payload size for 
+ *   incremental movements. Added isDelta flag to signify relative updates (Rule 1.125).
  * Oct.6.8:
- * - Issue #AUDIT-1006-8: Protocol Efficiency Optimization. Implemented E7 fixed-point 
- *   coordinate mapping for lat/lng to reduce radio payload size (Rule 1.123).
- * Oct.5.2:
- * - Issue #1344: Forensic Diagnostic Expansion. Integrated thermalSnapshot 
- *   and heapSnapshot into binary serialization for remote correlation (R1344).
- * Oct.5.1:
- * - Issue #1173: Protobuf-First Persistence (Phase 2). Expanded parity fields 
- *   for RealtimeStatus and TrackerStatusProto. Added binary entry points 
- *   for persistence BLOBs.
+ * - Issue #AUDIT-1006-8: Protocol Efficiency Optimization.
  */
 object TelemetryProtobufMapper {
+
+    private val lastLatE7 = AtomicInteger(0)
+    private val lastLngE7 = AtomicInteger(0)
 
     /**
      * mapStatusToBinary: Direct serialization of LocationUpdate for offline buffering.
@@ -39,12 +40,10 @@ object TelemetryProtobufMapper {
      * mapToRealtime: Maps LocationUpdate to RealtimeStatus (Signaling/Relay).
      */
     fun mapToRealtime(status: LocationUpdate, builder: RealtimeStatus.Builder, fromViewer: Boolean) {
-        // R907: Ensure transmission IDs are aliased for relay room compatibility.
         builder.setId(SignalingConstants.getTransmissionId(status.deviceId))
         builder.setViewerId(SignalingConstants.getTransmissionId(status.viewerId))
         builder.setFromViewer(fromViewer)
         
-        // Common Geometry & Physics
         builder.setLat(status.lat)
         builder.setLng(status.lng)
         builder.setAlt(status.alt)
@@ -53,11 +52,24 @@ object TelemetryProtobufMapper {
         builder.setAccuracy(status.accuracy)
         builder.setMaxAccuracy(status.maxAccuracy)
         
-        // Issue #AUDIT-1006-8: E7 Coordinate Optimization
-        builder.setLatE7((status.lat * 1e7).toInt())
-        builder.setLngE7((status.lng * 1e7).toInt())
+        // Issue #AUDIT-1006-9: sint32 Delta-Encoding for E7 Coordinates
+        val currentLatE7 = (status.lat * 1e7).toInt()
+        val currentLngE7 = (status.lng * 1e7).toInt()
         
-        // Common Lifecycle
+        val prevLat = lastLatE7.getAndSet(currentLatE7)
+        val prevLng = lastLngE7.getAndSet(currentLngE7)
+        
+        // If it's the first update or a large jump (> 1 deg), send absolute
+        if (prevLat == 0 || Math.abs(currentLatE7 - prevLat) > 10000000) {
+            builder.setLatE7(currentLatE7)
+            builder.setLngE7(currentLngE7)
+            builder.setIsDelta(false)
+        } else {
+            builder.setLatE7(currentLatE7 - prevLat)
+            builder.setLngE7(currentLngE7 - prevLng)
+            builder.setIsDelta(true)
+        }
+        
         builder.setGpsTs(status.gpsTs)
         builder.setTs(status.ts)
         builder.setRt(status.rt)
@@ -69,14 +81,12 @@ object TelemetryProtobufMapper {
         builder.setLastConnTs(status.integrity.lastConnTs)
         builder.setLastDiscTs(status.integrity.lastDiscTs)
         
-        // Common Health
         builder.setBattery(status.battery)
         builder.setTemp(status.temp)
         builder.setIsCharging(status.isCharging)
         builder.setSatsView(status.satsView)
         builder.setSatsUsed(status.satsUsed)
         
-        // Behavioral Flags
         builder.setIsJammer(status.integrity.isJammer)
         builder.setIsStalled(status.integrity.isStalled)
         builder.setIsTamperDetected(status.integrity.isTamperDetected)
@@ -87,7 +97,6 @@ object TelemetryProtobufMapper {
         builder.setIsCoolingModeActive(status.isCoolingModeActive)
         builder.setIsPowerTamper(status.isPowerTamper)
         
-        // Forensic Indices
         builder.setSnrIdx(status.snrIdx)
         builder.setNoiseIdx(status.noiseIdx)
         builder.setLuxIdx(status.luxIdx)
@@ -97,7 +106,6 @@ object TelemetryProtobufMapper {
         builder.setBaroIdx(status.baroIdx)
         builder.setProxIdx(status.proxIdx)
         
-        // SIT States
         builder.setIsSitDetected(status.isSitDetected)
         builder.setIsSitActive(status.isSitActive)
         builder.setLastSitTs(status.lastSitTs)
@@ -108,7 +116,6 @@ object TelemetryProtobufMapper {
         builder.setSitShock(status.sitShock)
         builder.setVerticalVelocity(status.verticalVelocity)
         
-        // Extended Forensic
         builder.setIsClockRegression(status.isClockRegression)
         builder.setKineticEnergy(status.kineticEnergy)
         builder.setSitVzTs(status.integrity.sitVzTs)
@@ -121,23 +128,16 @@ object TelemetryProtobufMapper {
         builder.setIsUltraLongStationary(status.isUltraLongStationary)
         builder.setGpsHardwareLock(status.gpsHardwareLock)
 
-        // Issue #924 & R-ID 259
         builder.setIsGnssThrottled(status.isGnssThrottled)
         builder.setEnergyDeltaMa(status.integrity.lastEnergyDeltaMa)
         builder.setEnergyDeltaTemp(status.integrity.lastEnergyDeltaTemp)
         builder.setEnergyDurationMs(status.integrity.lastEnergyDurationMs)
         
-        // Issue #946: Forensic Reason propagation
         status.tamperNote?.let { builder.setTamperNote(it) }
-
-        // Issue #1205: Activity context
         builder.setActivityType(status.activityType.name)
-
-        // Issue #1410: Viewer Persistence
         builder.setLastAlarmAckTs(status.lastAlarmAckTs)
         builder.setViolationStartTs(status.violationStartTs)
 
-        // Issue #1173: Persistence Parity
         builder.setCurrentMa(status.currentMa)
         builder.setThermalHeadroom(status.integrity.thermalHeadroom)
         builder.setHeapAllocatedMb(status.integrity.heapAllocatedMb)
@@ -149,11 +149,9 @@ object TelemetryProtobufMapper {
         builder.setStandbyBucket(status.standbyBucket)
         builder.setNetInterface(status.netInterface)
 
-        // Issue #1344: Forensic Diagnostic Expansion
         status.thermalSnapshot?.let { builder.setThermalSnapshot(it) }
         status.heapSnapshot?.let { builder.setHeapSnapshot(it) }
 
-        // Enums
         builder.setState(TrackerStateProto.valueOf("TS_" + status.trackerState.name))
         builder.setPendingReason(LocationPendingReasonProto.valueOf("LPR_" + status.locationPendingReason.name))
     }
@@ -162,7 +160,6 @@ object TelemetryProtobufMapper {
      * mapToPersistence: Maps LocationUpdate to TrackerStatusProto (Local DataStore).
      */
     fun mapToPersistence(status: LocationUpdate, builder: TrackerStatusProto.Builder) {
-        // Common Geometry & Physics
         builder.setLat(status.lat)
         builder.setLng(status.lng)
         builder.setAlt(status.alt)
@@ -171,11 +168,9 @@ object TelemetryProtobufMapper {
         builder.setAccuracy(status.accuracy)
         builder.setMaxAccuracy(status.maxAccuracy)
         
-        // Issue #AUDIT-1006-8: E7 Coordinate Optimization
         builder.setLatE7((status.lat * 1e7).toInt())
         builder.setLngE7((status.lng * 1e7).toInt())
         
-        // Common Lifecycle
         builder.setGpsTs(status.gpsTs)
         builder.setTs(status.ts)
         builder.setRt(status.rt)
@@ -188,7 +183,6 @@ object TelemetryProtobufMapper {
         builder.setLastConnTs(status.integrity.lastConnTs)
         builder.setLastDiscTs(status.integrity.lastDiscTs)
         
-        // Common Health
         builder.setBattery(status.battery)
         builder.setTemp(status.temp)
         builder.setMaxTemp(status.maxTemp)
@@ -197,7 +191,6 @@ object TelemetryProtobufMapper {
         builder.setSatsUsed(status.satsUsed)
         builder.setCurrentMa(status.currentMa)
         
-        // Behavioral Flags
         builder.setIsJammer(status.integrity.isJammer)
         builder.setIsStalled(status.integrity.isStalled)
         builder.setIsTamperDetected(status.integrity.isTamperDetected)
@@ -213,7 +206,6 @@ object TelemetryProtobufMapper {
         builder.setIsPowerTamper(status.isPowerTamper)
         builder.setMicPending(status.integrity.micPending)
 
-        // Forensic Indices
         builder.setSnrIdx(status.snrIdx)
         builder.setNoiseIdx(status.noiseIdx)
         builder.setLuxIdx(status.luxIdx)
@@ -223,7 +215,6 @@ object TelemetryProtobufMapper {
         builder.setBaroIdx(status.baroIdx)
         builder.setProxIdx(status.proxIdx)
         
-        // SIT States
         builder.setIsSitDetected(status.isSitDetected)
         builder.setIsSitActive(status.isSitActive)
         builder.setLastSitTs(status.lastSitTs)
@@ -234,7 +225,6 @@ object TelemetryProtobufMapper {
         builder.setSitShock(status.sitShock)
         builder.setVerticalVelocity(status.verticalVelocity)
         
-        // Extended Forensic
         builder.setIsClockRegression(status.isClockRegression)
         builder.setKineticEnergy(status.kineticEnergy)
         builder.setSitVzTs(status.integrity.sitVzTs)
@@ -248,7 +238,6 @@ object TelemetryProtobufMapper {
         builder.setIsUltraLongStationary(status.isUltraLongStationary)
         builder.setIsJump(status.isJump)
 
-        // High-res Raw Sensors (Persistence Only)
         builder.setVibration(status.vibration)
         builder.setHeading(status.heading)
         builder.setBaroAlt(status.baroAlt)
@@ -264,7 +253,6 @@ object TelemetryProtobufMapper {
         builder.setNetInterface(status.netInterface)
         builder.setVer(BuildConfig.VERSION_NAME)
         
-        // Idea #241: Persistence Parity Completion
         builder.setDeviceId(status.deviceId)
         builder.setViewerId(status.viewerId)
         builder.setProximityCm(status.currentProximityCm)
@@ -276,31 +264,22 @@ object TelemetryProtobufMapper {
         builder.setIsBatteryWhitelisted(status.isBatteryWhitelisted)
         builder.setGpsHardwareLock(status.gpsHardwareLock)
 
-        // Issue #924 & R-ID 259
         builder.setIsGnssThrottled(status.isGnssThrottled)
         builder.setEnergyDeltaMa(status.integrity.lastEnergyDeltaMa)
         builder.setEnergyDeltaTemp(status.integrity.lastEnergyDeltaTemp)
         builder.setEnergyDurationMs(status.integrity.lastEnergyDurationMs)
         
-        // Issue #946: Forensic Reason propagation
         status.tamperNote?.let { builder.setTamperNote(it) }
-
-        // Issue #1205: Activity context
         builder.setActivityType(status.activityType.name)
-
-        // Issue #1410: Viewer Persistence
         builder.setLastAlarmAckTs(status.lastAlarmAckTs)
         builder.setViolationStartTs(status.violationStartTs)
 
-        // Issue #1173: Parity Expansion
         builder.setThermalHeadroom(status.integrity.thermalHeadroom)
         builder.setHeapAllocatedMb(status.integrity.heapAllocatedMb)
 
-        // Issue #1344: Forensic Diagnostic Expansion
         status.thermalSnapshot?.let { builder.setThermalSnapshot(it) }
         status.heapSnapshot?.let { builder.setHeapSnapshot(it) }
 
-        // Enums
         builder.setTrackerState(status.trackerState.name)
         builder.setStatus(status.status.name)
         builder.setLocationPendingReason(LocationPendingReasonProto.valueOf("LPR_" + status.locationPendingReason.name))
@@ -310,19 +289,11 @@ object TelemetryProtobufMapper {
      * mapAppToPersistence: Maps app-level ConnectionPoint to TrackerStatusProto.
      */
     fun mapAppToPersistence(p: ConnectionPoint, builder: TrackerStatusProto.Builder) {
-        builder.setTs(p.ts).setRt(p.rt).setRtt(p.rtt).setTotalConnectedMs(0) // Dummy for ribbon
-        builder.setBattery(p.isBatteryLow.let { if (it) 15 else 50 }) // Rough approximation if needed
+        builder.setTs(p.ts).setRt(p.rt).setRtt(p.rtt).setTotalConnectedMs(0) 
+        builder.setBattery(p.isBatteryLow.let { if (it) 15 else 50 }) 
         builder.setAccuracy(p.gpsAccuracy).setMaxAccuracy(p.maxAccuracy)
         builder.setSpeed(p.speed).setBearing(p.bearing)
         
-        // Issue #AUDIT-1006-8: E7 Coordinate Optimization
-        // Assuming ConnectionPoint has lat/lng if we are mapping it
-        // Check if ConnectionPoint has coordinates (some history points might not have them if they are gaps)
-        // ConnectionPoint doesn't seem to have lat/lng in the snippet but it might in reality.
-        // Let's check ConnectionPoint definition if possible or skip for now if unsure.
-        // Actually, if it is for "ribbon history", it might not need high-res coordinates.
-        
-        // Forensic
         builder.setSnrIdx(p.snrIdx).setNoiseIdx(p.noiseIdx).setLuxIdx(p.luxIdx).setVibeIdx(p.vibeIdx)
         builder.setProxIdx(p.proxIdx).setLiftIdx(p.liftIdx).setTiltIdx(p.tiltIdx).setBaroIdx(p.baroIdx)
         builder.setVerticalVelocity(p.verticalVelocity)
@@ -339,7 +310,6 @@ object TelemetryProtobufMapper {
         builder.setThermalHeadroom(p.thermalHeadroom).setHeapAllocatedMb(p.heapAllocatedMb)
         builder.setActivityType(p.activityType.name)
         
-        // Issue #1344: Forensic Diagnostic Expansion
         p.thermalSnapshot?.let { builder.setThermalSnapshot(it) }
         p.heapSnapshot?.let { builder.setHeapSnapshot(it) }
 

@@ -5,6 +5,7 @@ import com.gps19.core.engine.SignalingConstants
 import com.gps19.core.engine.SignalingPriority
 import com.gps19.core.engine.SmartSignalingDispatcher
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONObject
 
 /**
@@ -17,12 +18,13 @@ sealed class SignalingEvent {
 
 /**
  * Interface for signaling implementations (Socket.io, MQTT, etc.)
- * Oct.6.7:
- * - Issue #AUDIT-1006-8: Added getDispatcherMetrics() to expose conflation 
- *   efficiency to the UI for field auditing (Rule 1.123).
+ * Oct.6.9:
+ * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics. Replaced getDispatcherMetrics() 
+ *   with signalingMetrics StateFlow for efficient UI updates (Rule 2.1).
  */
 interface SignalingProvider {
     val signalingFlow: SharedFlow<SignalingEvent>
+    val signalingMetrics: StateFlow<SmartSignalingDispatcher.Metrics>
 
     fun connect(url: String, deviceId: String, viewerId: String, isTracker: Boolean)
     fun disconnect()
@@ -35,7 +37,6 @@ interface SignalingProvider {
     fun emit(event: String, data: JSONObject, priority: SignalingPriority = SignalingPriority.NORMAL)
     fun transmit(status: LocationUpdate, priority: SignalingPriority = SignalingPriority.NORMAL, fromViewer: Boolean = false)
 
-    fun getDispatcherMetrics(): SmartSignalingDispatcher.Metrics
     fun getLastRelayTrafficTs(): Long
     fun setConnectionLostCallback(callback: () -> Unit)
 }

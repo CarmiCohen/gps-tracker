@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct6.8
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct6.9
 
 ## 🎯 Current Resumption Focus: Forensic Fidelity & Protocol Optimization.
 
@@ -9,12 +9,15 @@
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 1)
-*   **SIMP-1426-6: Unified Signaling Metrics Flow (Low)**: Replace periodic polling of signaling metrics in `MainViewModel` with a `StateFlow` exposed directly from `SmartSignalingDispatcher` to reduce binder traffic and ensure reactive UI updates.
+## 💡 Strategic Simplification Ideas (Ideas: 0)
+*   *(None)*
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #AUDIT-1006-9: RealtimeStatus Protocol Optimization & Reactive Metrics.** Resolved Oct6.9. 
+    *   **Protocol Optimization**: Implemented E7 delta-encoding in `TelemetryProtobufMapper`. By transmitting `sint32` differences relative to the previous frame, we leverage Protobuf zigzag encoding to significantly shrink the binary payload for typical movement patterns (Rule 1.125).
+    *   **Reactive Metrics (SIMP-1426-6)**: Refactored signaling telemetry from polling to a `StateFlow` architecture across `SmartSignalingDispatcher`, `CommunicationManager`, and `MainViewModel`. This ensures zero-latency UI updates in `DiagnosticsScreen` while reducing binder overhead.
 *   **Issue #AUDIT-1006-8: Signaling Stability & Conflation Metrics Audit.** Resolved Oct6.8. Integrated telemetry counters into `SmartSignalingDispatcher` to track radio efficiency and exposed real-time conflation savings in the `DiagnosticsScreen` (Rule 1.123). Implemented `SIMP-1426-5` to refactor `TickOrchestrator` preemption logic using channel-based signals (Rule 1.124).
 *   **Issue #AUDIT-1006-7: Binary Telemetry Conflation Integration.** Resolved Oct6.6. Completed the end-to-end integration by routing `LocationUpdate` objects from `CommunicationManager` through the `SmartSignalingDispatcher` (Rule 1.122 / R-ID 511).
 *   **Issue #AUDIT-1006-5: Forensic Log Pressure Hardening.** Resolved Oct6.5. Refactored `SmartSignalingDispatcher` with dual-channel priority queuing and preemption (Rule 1.119).
@@ -28,6 +31,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct6.9: [SOT Count: 296 (Rules: 152), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 44, QA: 520]**
 - **Oct6.8: [SOT Count: 295 (Rules: 151), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 43, QA: 515]**
 - **Oct6.7: [SOT Count: 294 (Rules: 150), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 42, QA: 510]**
 - **Oct6.6: [SOT Count: 292 (Rules: 148), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 40, QA: 502]**

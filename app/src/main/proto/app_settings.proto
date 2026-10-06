@@ -58,15 +58,11 @@ message AppSettings {
     optional double draft_max_distance = 40;
     optional AlertSettingsProto draft_alert_settings = 41;
 
-    reserved 42, 43;
-
     optional int64 violation_uptime_ms = 44;
     optional int64 last_service_tick_rt = 45;
     optional string last_daily_archive_date = 46;
 
     optional bool is_xiaomi_manual_override = 47;
-
-    reserved 48, 49;
 
     optional int64 clock_drift_ref = 50;
 
@@ -82,20 +78,13 @@ message AppSettings {
     optional double chair_baseline_tilt = 66;
     optional int64 last_history_sit_ts = 67;
 
-    // optional string last_alarms_json = 68; // Removed in Sep.27.16
     reserved 68;
 
-    // Issue #626: Foreground Service Start Hardening
     optional bool is_recovery_pending = 69;
-
-    // Issue #629: Deferred Recovery Latency Audit
     optional int64 recovery_blocked_ts = 70;
-
-    // Issue #630: Forensic Recovery Log Aggregation
     optional int64 cumulative_recovery_blackout_ms = 71;
     optional int32 recovery_count = 72;
 
-    // Issue #1164: Logic State Persistence (Geofence Debounce & Power Latches)
     optional int64 first_violation_ts = 73;
     optional int64 first_violation_rt = 74;
     optional bool first_violation_was_jump = 75;
@@ -106,11 +95,9 @@ message AppSettings {
     optional int64 last_global_trigger_rt = 80;
     optional int64 forensic_reliability_degradation_start_rt = 81;
 
-    // Issue #1408: Thermal State Recovery
     optional bool is_cooling_mode_active = 82;
     optional int64 cooling_entered_rt = 83;
 
-    // Namespaced property maps for role-based isolation (Issue #1230, R-ID 453)
     map<string, int64> role_longs = 100;
     map<string, double> role_doubles = 101;
     map<string, bool> role_bools = 102;
@@ -118,11 +105,9 @@ message AppSettings {
     map<string, string> role_strings = 104;
     map<string, TrackerStatusProto> role_states = 105;
 
-    // Issue #1173: Protobuf-First Persistence
     repeated ActiveAlarmProto active_alarms = 106;
     map<string, ActiveAlarmsListProto> role_alarms = 107;
 
-    // Issue #SIMP-1201-1: Logic State Serialization
     map<string, LogicStateProto> role_logic_states = 108;
 }
 
@@ -214,7 +199,6 @@ message RealtimeStatus {
     double sit_shock = 50;
     double vertical_velocity = 51;
 
-    // Issue #541: Missing behavioral fields for hot-path binary updates
     bool is_jammer = 52;
     bool is_stalled = 53;
     bool is_tamper_detected = 54;
@@ -222,53 +206,39 @@ message RealtimeStatus {
     int64 gps_age_ms = 56;
     string sentinel_status = 57;
 
-    // Issue #560c: Signaling Pressure Audit - Carry regression flag in binary payloads
     bool is_clock_regression = 58;
 
-    // Issue #601: Kinetic Energy Anomaly Detection
     double kinetic_energy = 59;
 
-    // Forensic Parity (R118): Added missing SIT timestamps
     int64 sit_vz_ts = 60;
     int64 sit_vz_rt = 61;
 
-    // Issue #669: Forensic Parity for Adaptive Jump
     bool is_adaptive_jump = 62;
 
-    // Issue #130: Proto Health Parity
     bool is_battery_low = 63;
     bool is_battery_critical = 64;
 
-    // Issue #133: Forensic Anomaly Correlation
     bool is_silent_failure = 65;
 
-    // Issue #782: Protocol Audit - Binary Schema Expansion
     int64 violation_uptime_ms = 66;
     bool is_ultra_long_stationary = 67;
     bool gps_hardware_lock = 68;
 
-    // Issue #935: Monotonic Signaling Hardening
     int64 rt = 69;
 
-    // Issue #924: A15 Hysteresis Visibility
     bool is_gnss_throttled = 70;
 
-    // R-ID 259: Energy Footprint Verdicts
     int32 energy_delta_ma = 71;
     double energy_delta_temp = 72;
     int64 energy_duration_ms = 73;
     optional string tamper_note = 74;
     bool is_power_tamper = 75;
 
-    // Issue #1205: Context-Aware Power Optimization
     optional string activity_type = 76;
 
-    // Issue #1410: Viewer Persistence. Carry global acknowledgment timestamp
-    // and earliest violation start time to suppress recurring alarms (R-ID 575).
     optional int64 last_alarm_ack_ts = 77;
     optional int64 violation_start_ts = 78;
 
-    // Issue #1173: Protobuf-First Persistence Parity
     int32 current_ma = 79;
     double thermal_headroom = 80;
     double heap_allocated_mb = 81;
@@ -284,13 +254,13 @@ message RealtimeStatus {
     double dist_to_home = 91;
     string sentinel_status_enum = 92;
 
-    // Issue #1344: Forensic Diagnostic Expansion
     optional double thermal_snapshot = 93;
     optional double heap_snapshot = 94;
 
-    // Issue #AUDIT-1006-8: Protocol Efficiency Optimization
+    // Issue #AUDIT-1006-9: Protocol Efficiency Optimization
     sint32 lat_e7 = 95;
     sint32 lng_e7 = 96;
+    optional bool is_delta = 97;
 }
 
 message GeoPointProto {
@@ -390,24 +360,18 @@ message TrackerStatusProto {
     string tracker_state = 64;
     optional string status = 65;
 
-    // Issue #601: Kinetic Energy Anomaly Detection
     double kinetic_energy = 66;
 
-    // Forensic Parity (R118): Added missing SIT timestamps
     int64 sit_vz_ts = 67;
     int64 sit_vz_rt = 68;
 
-    // Issue #669: Forensic Parity for Adaptive Jump
     bool is_adaptive_jump = 69;
 
-    // Issue #130: Proto Health Parity
     bool is_battery_low = 70;
     bool is_battery_critical = 71;
 
-    // Issue #133: Forensic Anomaly Correlation
     bool is_silent_failure = 72;
 
-    // Forensic Parity R172: Restored SIT state fields
     int64 last_sit_ts = 73;
     double sit_vz = 74;
     double sit_dz = 75;
@@ -416,7 +380,6 @@ message TrackerStatusProto {
     double sit_shock = 78;
     double vertical_velocity = 79;
 
-    // Issue #180: Mirror Parity Expansion
     int64 rt = 80;
     bool is_jammer = 81;
     bool is_stalled = 82;
@@ -438,7 +401,6 @@ message TrackerStatusProto {
     bool is_jump = 98;
     bool mic_pending = 99;
 
-    // Idea #241: Persistence Parity Expansion
     string device_id = 100;
     string viewer_id = 101;
     double proximity_cm = 102;
@@ -450,34 +412,27 @@ message TrackerStatusProto {
     bool is_battery_whitelisted = 108;
     bool gps_hardware_lock = 109;
 
-    // Issue #924: A15 Hysteresis Visibility
     bool is_gnss_throttled = 110;
 
-    // R-ID 259: Energy Footprint Verdicts
     int32 energy_delta_ma = 111;
     double energy_delta_temp = 112;
     int64 energy_duration_ms = 113;
     optional string tamper_note = 114;
 
-    // Issue #1205: Context-Aware Power Optimization
     optional string activity_type = 115;
 
-    // Issue #1410: Viewer Persistence Parity
     optional int64 last_alarm_ack_ts = 116;
     optional int64 violation_start_ts = 117;
 
-    // Issue #1173: Protobuf-First Persistence Parity Expansion
     double thermal_headroom = 118;
     double heap_allocated_mb = 119;
     optional string name = 120;
     double dist_to_tracker = 121;
     double dist_to_home = 122;
 
-    // Issue #1344: Forensic Diagnostic Expansion
     optional double thermal_snapshot = 123;
     optional double heap_snapshot = 124;
 
-    // Issue #AUDIT-1006-8: Protocol Efficiency Optimization
     sint32 lat_e7 = 125;
     sint32 lng_e7 = 126;
 }

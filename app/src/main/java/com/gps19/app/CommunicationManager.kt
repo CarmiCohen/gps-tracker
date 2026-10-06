@@ -10,6 +10,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.json.JSONObject
 import timber.log.Timber
@@ -17,26 +18,25 @@ import java.util.Arrays
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * Oct.6.7:
- * - Issue #AUDIT-1006-8: Signaling Stability & Conflation Metrics. Implemented 
- *   getDispatcherMetrics() to expose conflation savings to the UI (Rule 1.123).
- * Oct.6.6:
- * - Issue #AUDIT-1006-7: Binary Telemetry Conflation. Completed integration by 
- *   routing LocationUpdate objects through the SmartSignalingDispatcher. Serialization 
- *   now occurs at the sink level, enabling pre-wire conflation of binary data.
+ * Oct.6.9:
+ * - Issue #AUDIT-1006-9: Dependency Cycle Remediation. Migrated to Provider<T> for 
+ *   LogManager, ConfigManager, and SessionManager to break initialization circularity.
+ * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics. Integrated signalingMetrics 
+ *   StateFlow from dispatcher (Rule 2.1).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val configManager: ConfigManager,
-    private val logManager: LogManager,
+    private val configManagerProvider: Provider<ConfigManager>,
+    private val logManagerProvider: Provider<LogManager>,
     private val telemetryRepository: TelemetryRepository,
     private val timeProvider: TimeProvider,
-    private val sessionManager: SessionManager
+    private val sessionManagerProvider: Provider<SessionManager>
 ) : SignalingProvider {
 
     private var socket: Socket? = null
@@ -68,14 +68,14 @@ class CommunicationManager @Inject constructor(
     private val commExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped) return@CoroutineExceptionHandler
         Timber.e(throwable, "CRITICAL: Communication failure")
-        logManager.logServiceEvent("CRITICAL: Communication failure: ${throwable.message}", true)
+        logManagerProvider.get().logServiceEvent("CRITICAL: Communication failure: ${throwable.message}", true)
     }
 
     private var scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
     
     private val dispatcher = SmartSignalingDispatcher(
         scope = scope,
-        isViolationProvider = { sessionManager.isInViolation },
+        isViolationProvider = { sessionManagerProvider.get().isInViolation },
         jsonSink = { event, data -> 
             if (!isStopped) socket?.emit(event, JSONObject(data))
         },
@@ -88,12 +88,14 @@ class CommunicationManager @Inject constructor(
         isConnectedProvider = { isConnected() }
     )
 
+    override val signalingMetrics: StateFlow<SmartSignalingDispatcher.Metrics> = dispatcher.metricsFlow
+
     private fun isDefaultViewer(id: String) = id == SignalingConstants.DEFAULT_VIEWER_ID || id.isEmpty()
 
     private fun logToApp(message: String, important: Boolean = false) {
         if (isStopped) return
         Timber.tag("GPS19_COMM").i(message)
-        logManager.submitToLogSink(message, "system", important)
+        logManagerProvider.get().submitToLogSink(message, "system", important)
     }
 
     override fun getLastRelayTrafficTs(): Long = lastRelayTrafficTs
@@ -215,7 +217,6 @@ class CommunicationManager @Inject constructor(
                     logToApp("Connected to relay [Session $sessionId]", true)
                     markTraffic()
                     telemetryRepository.updateRelayStatus(true)
-                    // Issue #1172: Dispatched through coordinator to ensure ordering with other commands
                     if (deviceId.isNotEmpty()) emitInternal("join", createJoinPayload(), SignalingPriority.HIGH)
                 }
             }
@@ -400,10 +401,6 @@ class CommunicationManager @Inject constructor(
             }
             socket?.emit(event, SignalingConstants.getTransmissionId(deviceId), message.toByteArray())
         }
-    }
-
-    override fun getDispatcherMetrics(): SmartSignalingDispatcher.Metrics {
-        return dispatcher.getMetrics()
     }
 
     private fun emitInternal(event: String, data: Map<String, Any?>, priority: SignalingPriority) {

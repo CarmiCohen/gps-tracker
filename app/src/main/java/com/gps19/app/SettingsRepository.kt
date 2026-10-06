@@ -55,12 +55,11 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Oct.6.9:
+ * - Issue #AUDIT-1006-9: Protocol Optimization. Restored missing Protobuf accessors 
+ *   to resolve compilation errors (Rule 1.1).
  * Oct.5.1:
- * - Issue #SIMP-1201-1: Logic State Serialization. Refactored saveLogicState 
- *   to utilize binary LogicStateProto map, eliminating parameter bloat.
- * Oct.3.9:
- * - Issue #1201 RESOLVED: Decoupled siren lockout authority. Removed redundant 
- *   lastSirenStopRt from saveLogicState (R-ID 510).
+ * - Issue #SIMP-1201-1: Logic State Serialization.
  */
 @Singleton
 class SettingsRepository @Inject constructor(

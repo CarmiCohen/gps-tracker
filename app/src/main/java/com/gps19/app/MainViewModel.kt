@@ -21,15 +21,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.6.9:
+ * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics. Replaced periodic polling 
+ *   of signaling metrics with a reactive observation of repository.signalingMetrics 
+ *   to reduce binder traffic and improve UI reactivity (Rule 2.1).
  * Oct.6.7:
- * - Issue #AUDIT-1006-8: Signaling Metrics Integration. Added periodic polling 
- *   of dispatcher metrics in the global timer to update DiagnosticState, 
- *   providing real-time visibility into conflation efficiency (Rule 1.123).
- * - Fixed compilation errors in mapHudTelemetry and getDispatcherMetrics linkage.
- * Oct.5.20:
- * - SIMP-1426-3: Completed implementation of UiStateProvider. Unified all 
- *   high-frequency, history, and diagnostic flows to support leaf-level 
- *   state convergence and reduce composable parameter overhead.
+ * - Issue #AUDIT-1006-8: Signaling Metrics Integration.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -214,11 +211,11 @@ class MainViewModel @Inject constructor(
         kinematic,
         systemPulseRt, 
         _trackerState
-    ) { mode, kin, pulseRt, state ->
+    ) { mode, kinematic, pulseRt, state ->
         val m = mode ?: "tracker"
         mapHudTelemetry(
-            m, kin, pulseRt, state, 
-            if (m == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
+            m, kinematic, pulseRt, state, 
+            if (m == "viewer") kinematic.trackerHealth.isUltraLongStationary else kinematic.localHealth.isUltraLongStationary
         )
     }
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudTelemetryState())
@@ -391,6 +388,15 @@ class MainViewModel @Inject constructor(
                     updateDiagnosticState { it.apply { silencedUntilRt = ts; isAlarmSilenced = sirenLockoutUseCase.isLockedOut(); pulse = timeProvider.elapsedRealtime() } } 
                 } 
             }
+            // Issue #AUDIT-1006-9: Reactive signaling metrics
+            launch {
+                repository.signalingMetrics.collect { metrics ->
+                    updateDiagnosticState { it.apply { 
+                        signalingMetrics = metrics
+                        pulse = timeProvider.elapsedRealtime() 
+                    } }
+                }
+            }
             launch(Dispatchers.IO) { 
                 while(true) { 
                     val refreshFast = _uiState.value.navigation.isPhoneSetupVisible || _uiState.value.navigation.isDiagnosticsVisible
@@ -418,13 +424,6 @@ class MainViewModel @Inject constructor(
                 val nowRt = timeProvider.elapsedRealtime()
                 if (_uiState.value.isInitialized && _uiState.value.session.appMode != null) {
                     repository.sendCommand(UiCommand.SyncRequest)
-                    
-                    // Issue #AUDIT-1006-8: Update signaling metrics for field audit
-                    val metrics = repository.getDispatcherMetrics()
-                    updateDiagnosticState { it.apply { 
-                        signalingMetrics = metrics
-                        pulse = nowRt 
-                    } }
                 }
                 val lastActivity = repository.lastRemoteActivityTs.value
                 val isPeerActive = lastActivity > 0 && (nowRt - lastActivity) < TELEMETRY_UI_STALE_THRESHOLD_MS
@@ -577,18 +576,18 @@ class MainViewModel @Inject constructor(
         )
     }
 
-    private fun mapMapViewState(mode: String?, hydration: Int, spatial: SpatialUiState, kin: KinematicState, pulseRt: Long, trkSegs: List<MapTrailSegment>, vwrSegs: List<MapTrailSegment>, vios: List<ViolationPoint>): MapViewState {
+    private fun mapMapViewState(mode: String?, hydration: Int, spatial: SpatialUiState, kinematic: KinematicState, pulseRt: Long, trkSegs: List<MapTrailSegment>, vwrSegs: List<MapTrailSegment>, vios: List<ViolationPoint>): MapViewState {
         val m = mode ?: "tracker"
         val pulse = timeProvider.currentTimeMillis()
-        val loc = if (m == "tracker") kin.localLocation else kin.trackerLocation
+        val loc = if (m == "tracker") kinematic.localLocation else kinematic.trackerLocation
         val tLat = loc.kinetic.lat
         val tLng = loc.kinetic.lng
         val tTs = loc.kinetic.gpsTs
         val tTel = loc.ts
-        val vLat = if (m == "viewer") kin.localLocation.kinetic.lat else 0.0
-        val vLng = if (m == "viewer") kin.localLocation.kinetic.lng else 0.0
+        val vLat = if (m == "viewer") kinematic.localLocation.kinetic.lat else 0.0
+        val vLng = if (m == "viewer") kinematic.localLocation.kinetic.lng else 0.0
         if (PhysicsUtils.isValidLocation(tLat, tLng)) { 
-            val alpha = if (kin.localLocation.kinetic.speed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
+            val alpha = if (kinematic.localLocation.kinetic.speed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
             if (sTrkLat == 0.0 || PhysicsUtils.calculateDistance(sTrkLat, sTrkLng, tLat, tLng) > 100.0) { sTrkLat = tLat; sTrkLng = tLng } 
             else { sTrkLat = PhysicsUtils.smoothCoordinate(sTrkLat, tLat, alpha); sTrkLng = PhysicsUtils.smoothCoordinate(sTrkLng, tLng, alpha) } 
         }

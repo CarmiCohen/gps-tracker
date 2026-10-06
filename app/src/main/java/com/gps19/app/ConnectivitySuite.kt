@@ -21,12 +21,13 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.6.9:
+ * - Issue #AUDIT-1006-9: Protocol Optimization. Implemented reconstruction of 
+ *   absolute coordinates from E7 deltas in handleBinaryUpdate. This allows 
+ *   the UI to correctly display high-resolution movements while benefiting 
+ *   from reduced radio payloads (Rule 1.125).
  * Oct.5.9:
- * - Issue #1295: Redundant Stream Observer Audit. Relaxed heartbeat loop 
- *   to 5 minutes during ultra-long stationary periods (R1295).
- * Oct.3.6:
- * - Connection Logic Hardening: Removed redundant isConnected/isConnecting gates 
- *   from connect() calls (R1422).
+ * - Issue #1295: Redundant Stream Observer Audit. Relaxed heartbeat loop.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -58,6 +59,10 @@ class ConnectivitySuite @Inject constructor(
     private var lastReconnectTs = 0L 
     private var reconnectAttempt = 0
 
+    // Coordinate Reconstruction State
+    private var remoteLastLatE7 = 0
+    private var remoteLastLngE7 = 0
+
     private val suiteExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped.get()) return@CoroutineExceptionHandler
         Timber.e(throwable, "ConnectivitySuite CRITICAL error")
@@ -75,8 +80,6 @@ class ConnectivitySuite @Inject constructor(
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
 
-    // R-ID 392: Reusable flyweights for zero-allocation packet processing.
-    // Issue #1314: Flyweights converged to unified LocationUpdate monolith.
     private val snapshotFlyweight = LocationUpdate()
     private val updateFlyweight = LocationUpdate()
     private val statusFlyweight = LocationUpdate()
@@ -161,7 +164,6 @@ class ConnectivitySuite @Inject constructor(
                 val nowRt = timeProvider.elapsedRealtime()
                 if (lastReconnectTs > 0L && nowRt - lastReconnectTs < 3000L) return@launch
                 
-                // Issue #1422: Trust signalingProvider to handle URL/Role comparison inside connect()
                 if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) return@launch
 
                 forensicLogger.logHandover("Interface Available. Reconnecting.", "active")
@@ -187,7 +189,6 @@ class ConnectivitySuite @Inject constructor(
     fun start(url: String, dId: String, vId: String, isTracker: Boolean) {
         if (isStarted.getAndSet(true)) {
             this.relayUrl = url; this.deviceId = dId; this.viewerId = vId; this.isTrackerMode = isTracker
-            // Issue #1422: Always call connect() to let CommunicationManager evaluate URL changes
             signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
             return
         }
@@ -266,7 +267,6 @@ class ConnectivitySuite @Inject constructor(
         heartbeatJob?.cancel()
         heartbeatJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
-                // Issue #1295: Relax heartbeat loop significantly during ultra-long stationary states.
                 val isUltra = if (isTrackerMode) localStatusFlyweight.isUltraLongStationary else trackerStatus.isUltraLongStationary
                 val delayMs = if (isUltra) 300000L else 30000L
                 delay(delayMs)
@@ -423,7 +423,6 @@ class ConnectivitySuite @Inject constructor(
     suspend fun sendTelemetry(status: LocationUpdate): Boolean {
         val success = sendTelemetryInternal(status, SignalingPriority.HIGH)
         if (isTrackerMode) {
-            // R-ID 453/565: Standardized Role Identity Authority
             mainRepository.saveLocationUpdate(status, AppRole.TRACKER)
             if (!success) {
                 val entity = TelemetryMapper.mapStatusToPending(status)
@@ -454,7 +453,25 @@ class ConnectivitySuite @Inject constructor(
     private fun handleBinaryUpdate(data: ByteArray) {
         if (isStopped.get()) return
         try {
-            val statusProto = RealtimeStatus.parseFrom(data)
+            val rawProto = RealtimeStatus.parseFrom(data)
+            
+            // Issue #AUDIT-1006-9: Coordinate Reconstruction logic
+            val builder = rawProto.toBuilder()
+            if (rawProto.isDelta) {
+                remoteLastLatE7 += rawProto.latE7
+                remoteLastLngE7 += rawProto.lngE7
+                builder.setLat(remoteLastLatE7 / 1e7)
+                builder.setLng(remoteLastLngE7 / 1e7)
+            } else {
+                remoteLastLatE7 = rawProto.latE7
+                remoteLastLngE7 = rawProto.lngE7
+                // If lat/lng doubles are 0 (optimized out in transit), use e7 absolute
+                if (rawProto.lat == 0.0 && rawProto.lng == 0.0 && (remoteLastLatE7 != 0 || remoteLastLngE7 != 0)) {
+                    builder.setLat(remoteLastLatE7 / 1e7)
+                    builder.setLng(remoteLastLngE7 / 1e7)
+                }
+            }
+            val statusProto = builder.build()
             
             if (!SignalingValidator.shouldProcessLocationUpdate(
                     incomingId = statusProto.id,
@@ -480,7 +497,6 @@ class ConnectivitySuite @Inject constructor(
             
             remoteStatusRepository.setPeerSignal((statusProto.snrIdx * 10.0).toInt().coerceIn(0, 10))
 
-            // Issue #1410: Synchronization of global acknowledgment
             if (!isTrackerMode && statusProto.lastAlarmAckTs > 0) {
                 val currentAck = mainRepository.getLastAlarmAckTsSync(AppRole.VIEWER_REMOTE)
                 if (statusProto.lastAlarmAckTs > currentAck) {
@@ -492,7 +508,7 @@ class ConnectivitySuite @Inject constructor(
                 TelemetryMapper.mapProtoToSnapshot(statusProto, now, nowRt, snapshotFlyweight)
 
                 val processed = locationProcessor.processGpsPoint(
-                    update = snapshotFlyweight, // Unified DTO
+                    update = snapshotFlyweight, 
                     isViewerTrail = false,
                     lastGpsTs = current.gpsTs,
                     isLocal = false
@@ -532,7 +548,6 @@ class ConnectivitySuite @Inject constructor(
             return
         }
 
-        // Issue #1410: Handle remote acknowledgment signal
         if (isTrackerMode && fromViewer && type == "acknowledge_alarm") {
             val ackTs = data.optLong("ack_ts", 0L)
             if (ackTs > 0) {
@@ -601,7 +616,6 @@ class ConnectivitySuite @Inject constructor(
             remoteStatusRepository.updatePeerActivity(nowRt); remoteStatusRepository.setTrackerConnected(true); mainRepository.updateRemoteActivity(nowRt)
             remoteStatusRepository.setPeerSignal(data.optInt("signal", 0))
 
-            // Issue #1410: Global acknowledgement synchronization via JSON
             val remoteAck = data.optLong("last_alarm_ack_ts", 0L)
             if (remoteAck > 0) {
                 val currentAck = mainRepository.getLastAlarmAckTsSync(AppRole.VIEWER_REMOTE)
@@ -614,7 +628,7 @@ class ConnectivitySuite @Inject constructor(
                 TelemetryMapper.mapJsonToSnapshot(data, current, now, nowRt, snapshotFlyweight)
 
                 val processed = locationProcessor.processGpsPoint(
-                    update = snapshotFlyweight, // Unified DTO
+                    update = snapshotFlyweight, 
                     isViewerTrail = false,
                     lastGpsTs = current.gpsTs,
                     isLocal = false
@@ -648,8 +662,9 @@ class ConnectivitySuite @Inject constructor(
         remoteStatusRepository.reset()
         mainRepository.updateRemoteActivity(0L) 
         trackerGpsStallStartTs = 0L
+        remoteLastLatE7 = 0
+        remoteLastLngE7 = 0
         
-        // R-ID 453/565: Standardized Role Identity Authority
         val role = if (isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE
         mainRepository.saveDoubleSync(role, TRACKER_LUX_BASELINE_KEY, 0.0)
         mainRepository.saveDoubleSync(role, TRACKER_ACOUSTIC_FLOOR_KEY, 0.0)
@@ -707,7 +722,6 @@ class ConnectivitySuite @Inject constructor(
         if (isStopped.get()) return
         this.relayUrl = url; this.lastReconnectTs = timeProvider.elapsedRealtime()
         if (SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
-            // Issue #1422: Always call connect() to allow SignalingProvider to evaluate URL/Identity change
             reconnectAttempt = 0
             signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
             wakeUpRelay()

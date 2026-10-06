@@ -14,6 +14,7 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.UUID
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 import org.osmdroid.util.GeoPoint
 
@@ -29,12 +30,13 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
- * Oct.6.7:
- * - Issue #AUDIT-1006-8: Signaling Metrics Audit. Added getDispatcherMetrics() 
- *   to expose SmartSignalingDispatcher telemetry to the ViewModel (Rule 1.123).
- * Oct.5.1:
- * - Issue #SIMP-1201-1: Logic State Serialization. Refactored saveLogicState 
- *   to pass the unified evaluation state object (R1201).
+ * Oct.6.9:
+ * - Issue #AUDIT-1006-9: Dependency Cycle Remediation. Migrated to Provider<T> for 
+ *   SignalingProvider to break the initialization loop with CommunicationManager 
+ *   (Rule 2.1).
+ * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics. Integrated signalingMetrics 
+ *   flow from signalingProvider.
+ * - Build Fix: Corrected trail pruning logic in triggerBackgroundPruning.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -49,7 +51,7 @@ class MainRepository @Inject constructor(
     private val logRepository: LogRepository,
     private val offlineRepository: OfflineRepository,
     private val timeProvider: TimeProvider,
-    private val signalingProvider: SignalingProvider
+    private val signalingProvider: Provider<SignalingProvider>
 ) {
     private val repositoryExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         Timber.e(throwable, "Repository Coroutine Exception")
@@ -97,6 +99,10 @@ class MainRepository @Inject constructor(
     val connectedViewers = telemetry.connectedViewers
     val lastRemoteActivityTs = telemetry.lastRemoteActivityTs
     val gnssDetail = telemetry.gnssDetail
+    
+    // Issue #AUDIT-1006-9: Reactive signaling metrics
+    val signalingMetrics: StateFlow<SmartSignalingDispatcher.Metrics> 
+        get() = signalingProvider.get().signalingMetrics
 
     fun eventLogsFlow(limit: Int): Flow<List<LogEntry>> = logRepository.eventLogsFlow(limit)
 
@@ -139,8 +145,6 @@ class MainRepository @Inject constructor(
 
     fun getLocalLocationSync(): LocationUpdate = telemetry.localLocation.value
     fun getTrackerLocationSync(): LocationUpdate = telemetry.trackerLocation.value
-
-    fun getDispatcherMetrics(): SmartSignalingDispatcher.Metrics = signalingProvider.getDispatcherMetrics()
 
     fun clear() { telemetry.clear() }
 
@@ -431,7 +435,9 @@ class MainRepository @Inject constructor(
                         historyDao.getPruneThreshold(key, PRUNE_LIMIT_HISTORY)?.let { historyDao.pruneByThreshold(key, it, PRUNE_CHUNK_SIZE) }
                     }
                     listOf(false, true).forEach { isViewer ->
-                        trailDao.getPruneThreshold(isViewer, PRUNE_LIMIT_TRAIL)?.let { trailDao.pruneByThreshold(isViewer, it, PRUNE_CHUNK_SIZE) }
+                        trailDao.getPruneThreshold(isViewer, PRUNE_LIMIT_TRAIL)?.let { threshold ->
+                            trailDao.pruneByThreshold(isViewer, threshold, PRUNE_CHUNK_SIZE)
+                        }
                     }
                     violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)?.let { violationDao.pruneByThreshold(it, PRUNE_CHUNK_SIZE) }
                 }
@@ -472,6 +478,7 @@ class MainRepository @Inject constructor(
     fun setForensicStallSimulation(active: Boolean) { logRepository.setForensicStallSimulation(active) }
     suspend fun saveDraftSettings(deviceId: String, viewerId: String, relayUrl: String, maxDistance: Double, alertSettings: AlertSettings) { settings.saveDraftSettings(deviceId, viewerId, relayUrl, maxDistance, alertSettings) }
     suspend fun commitDraftSettings(): CommitResult { return settings.commitDraftSettings() }
+    suspend fun resetPeerStats() { telemetry.updateRemoteActivity(0L) }
     suspend fun clearDraftSettings() { settings.clearDraftSettings() }
 
     suspend fun saveLogicState(state: AlarmEvaluationState, role: AppRole) {

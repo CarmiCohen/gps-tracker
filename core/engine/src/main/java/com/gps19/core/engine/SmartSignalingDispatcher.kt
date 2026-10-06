@@ -2,22 +2,23 @@ package com.gps19.core.engine
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.selects.select
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
+ * Oct.6.9:
+ * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics. Replaced polling with 
+ *   metricsFlow (StateFlow) for real-time observability. This reduces binder traffic 
+ *   and ensures zero-latency UI updates in DiagnosticsScreen (Rule 2.1).
  * Oct.6.6:
  * - Issue #AUDIT-1006-8: Conflation Metrics Audit. Added AtomicLong counters for 
- *   received, emitted, and conflated frames to monitor radio efficiency (R-ID 511).
- * Oct.6.5:
- * - Issue #AUDIT-1006-7: Binary Telemetry Conflation. Added Object-based 
- *   LocationUpdate command to allow conflation of Protobuf telemetry before 
- *   serialization, matching JSON efficiency (Rule 1.122).
- * - Issue #AUDIT-1006-5: Zero-Latency High Priority Dispatch. Refactored the 
- *   processor to ensure HIGH priority messages bypass the inter-frame delay 
- *   of preceding NORMAL messages (Rule 1.119).
+ *   received, emitted, and conflated frames (R-ID 511).
  */
 class SmartSignalingDispatcher(
     private val scope: CoroutineScope,
@@ -54,6 +55,9 @@ class SmartSignalingDispatcher(
     private val framesReceived = AtomicLong(0)
     private val framesEmitted = AtomicLong(0)
     private val framesConflated = AtomicLong(0)
+
+    private val _metricsFlow = MutableStateFlow(Metrics(0, 0, 0))
+    val metricsFlow: StateFlow<Metrics> = _metricsFlow.asStateFlow()
 
     private var processorJob: Job? = null
     
@@ -103,7 +107,8 @@ class SmartSignalingDispatcher(
     }
 
     private fun emit(command: Command) {
-        framesEmitted.incrementAndGet()
+        val emitted = framesEmitted.incrementAndGet()
+        updateMetrics(emitted = emitted)
         when (command) {
             is Command.Json -> jsonSink(command.event, command.data)
             is Command.Binary -> binarySink(command.event, command.routingId, command.data)
@@ -112,7 +117,8 @@ class SmartSignalingDispatcher(
     }
 
     fun dispatch(command: Command) {
-        framesReceived.incrementAndGet()
+        val received = framesReceived.incrementAndGet()
+        updateMetrics(received = received)
         when (command) {
             is Command.Json -> {
                 if (command.event == "location_update" && command.priority != SignalingPriority.HIGH) {
@@ -142,13 +148,26 @@ class SmartSignalingDispatcher(
         }
     }
 
+    private fun updateMetrics(received: Long? = null, emitted: Long? = null, conflated: Long? = null) {
+        _metricsFlow.update { current ->
+            Metrics(
+                received = received ?: current.received,
+                emitted = emitted ?: current.emitted,
+                conflated = conflated ?: current.conflated
+            )
+        }
+    }
+
     private fun dispatchConflatedLocationMap(incoming: Map<String, Any?>) {
         var wasConflated = false
         pendingLocationMap.updateAndGet { current ->
             if (current != null) wasConflated = true
             SignalingMessageConflator.conflate(current, incoming)
         }
-        if (wasConflated) framesConflated.incrementAndGet()
+        if (wasConflated) {
+            val conf = framesConflated.incrementAndGet()
+            updateMetrics(conflated = conf)
+        }
 
         if (locationConflationJob == null || !locationConflationJob!!.isActive) {
             locationConflationJob = scope.launch(dispatcher) {
@@ -169,7 +188,10 @@ class SmartSignalingDispatcher(
             if (current != null) wasConflated = true
             SignalingMessageConflator.conflateLocationUpdate(current, incoming)
         }
-        if (wasConflated) framesConflated.incrementAndGet()
+        if (wasConflated) {
+            val conf = framesConflated.incrementAndGet()
+            updateMetrics(conflated = conf)
+        }
 
         if (locationObjectConflationJob == null || !locationObjectConflationJob!!.isActive) {
             locationObjectConflationJob = scope.launch(dispatcher) {
@@ -195,7 +217,8 @@ class SmartSignalingDispatcher(
                     enqueue(Command.Json("log_update", toSend, SignalingPriority.NORMAL))
                 }
             } else {
-                framesConflated.incrementAndGet()
+                val conf = framesConflated.incrementAndGet()
+                updateMetrics(conflated = conf)
             }
         }
 
@@ -217,11 +240,7 @@ class SmartSignalingDispatcher(
 
     data class Metrics(val received: Long, val emitted: Long, val conflated: Long)
 
-    fun getMetrics() = Metrics(
-        received = framesReceived.get(),
-        emitted = framesEmitted.get(),
-        conflated = framesConflated.get()
-    )
+    fun getMetrics() = _metricsFlow.value
 
     fun shutdown() {
         processorJob?.cancel()
