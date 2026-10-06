@@ -2,8 +2,10 @@ package com.gps19.core.engine
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.*
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -35,7 +37,6 @@ class SmartSignalingDispatcherTest {
         )
 
         // 1. Inject 50 Normal logs. 
-        // With 100ms delay each, 50 logs would take 5000ms if HIGH was stuck in FIFO.
         repeat(50) {
             dispatcher.dispatch(SmartSignalingDispatcher.Command.Json(
                 "log_update", 
@@ -58,7 +59,6 @@ class SmartSignalingDispatcherTest {
         val delay = highPriorityReceivedTs.get() - highSendTs
         
         // Rule 1.119: HIGH priority must bypass the backlog immediately.
-        // Expected delay is 0ms because of preemption.
         assertTrue("High priority message delayed by $delay ms, expected < 50ms", delay < 50)
         
         dispatcher.shutdown()
@@ -89,13 +89,67 @@ class SmartSignalingDispatcherTest {
         advanceUntilIdle()
 
         val metrics = dispatcher.getMetrics()
-        // received: 3, emitted: 1 (after conflation delay), conflated: 2
-        // Wait, conflation delay is 500ms for logs in SmartSignalingDispatcher
-        // Actually logConflationJob delays by SIGNALING_CONFLATION_DELAY_MS * 2 (500ms)
-        
         assertTrue("Expected 3 frames received, got ${metrics.received}", metrics.received == 3L)
         assertTrue("Expected 2 frames conflated, got ${metrics.conflated}", metrics.conflated == 2L)
         
+        dispatcher.shutdown()
+    }
+
+    @Test
+    fun `Stress test with interleaved telemetry bursts should conflate correctly`() = runTest {
+        val emitCount = AtomicInteger(0)
+        val testDispatcher = UnconfinedTestDispatcher(testScheduler)
+        val testTimeProvider = object : TimeProvider {
+            override fun currentTimeMillis() = testScheduler.currentTime
+            override fun elapsedRealtime() = testScheduler.currentTime
+        }
+
+        val dispatcher = SmartSignalingDispatcher(
+            scope = this,
+            isViolationProvider = { false },
+            jsonSink = { _, _ -> emitCount.incrementAndGet() },
+            binarySink = { _, _, _ -> emitCount.incrementAndGet() },
+            objectSink = { _, _ -> emitCount.incrementAndGet() },
+            isConnectedProvider = { true },
+            timeProvider = testTimeProvider,
+            dispatcher = testDispatcher
+        )
+
+        // Simultaneous burst of 10 Location Maps, 10 Location Objects, and 10 Logs
+        repeat(10) { i ->
+            dispatcher.dispatch(SmartSignalingDispatcher.Command.Json(
+                "location_update",
+                mapOf("lat" to 1.0, "lon" to i.toDouble()),
+                SignalingPriority.NORMAL
+            ))
+            dispatcher.dispatch(SmartSignalingDispatcher.Command.Object(
+                "location_update_bin",
+                LocationUpdate().apply {
+                    lat = 1.0
+                    lng = i.toDouble()
+                },
+                SignalingPriority.NORMAL
+            ))
+            dispatcher.dispatch(SmartSignalingDispatcher.Command.Json(
+                "log_update",
+                mapOf("message" to "stress_log"),
+                SignalingPriority.NORMAL
+            ))
+        }
+
+        // Expected results:
+        // Received: 30 (10+10+10)
+        // Conflated: 27 (9 per bucket, since each bucket flushes 1)
+        // Emitted: 3 (1 per telemetry type)
+        
+        advanceUntilIdle()
+
+        val metrics = dispatcher.getMetrics()
+        assertEquals("Received frames mismatch", 30L, metrics.received)
+        assertEquals("Conflated frames mismatch", 27L, metrics.conflated)
+        assertEquals("Emitted frames mismatch", 3L, metrics.emitted)
+        assertEquals("Sink calls mismatch", 3, emitCount.get())
+
         dispatcher.shutdown()
     }
 }

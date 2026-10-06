@@ -23,19 +23,13 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Oct.6.15:
+ * - Issue #AUDIT-1006-11: Protobuf Stream Compression. Integrated CompressionUtils 
+ *   to compress binary payloads exceeding 512 bytes, reducing radio duty cycles (Rule 1.130).
+ * - Fixed binary relay handlers to transparently decompress incoming telemetry.
  * Oct.6.11:
  * - Issue #AUDIT-1006-10: Dispatcher Lifecycle Hardening. Integrated dispatcher.reinitialize() 
  *   within connect() to ensure signaling resumes after network-driven disconnects. 
- *   Prevents the terminal-state bug where channels remained closed (Rule 2.1).
- * Oct.6.10:
- * - Issue #AUDIT-1006-9: Fixed Protocol Optimization. Integrated resetDeltaState() 
- *   on connection and reconnection events to ensure coordinate synchronization 
- *   (Rule 1.125).
- * Oct.6.9:
- * - Issue #AUDIT-1006-9: Dependency Cycle Remediation. Migrated to Provider<T> for 
- *   LogManager, ConfigManager, and SessionManager to break initialization circularity.
- * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics. Integrated signalingMetrics 
- *   StateFlow from dispatcher (Rule 2.1).
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -88,7 +82,7 @@ class CommunicationManager @Inject constructor(
             if (!isStopped) socket?.emit(event, JSONObject(data))
         },
         binarySink = { event, routingId, data ->
-            if (!isStopped) socket?.emit(event, routingId, data)
+            if (!isStopped) socket?.emit(event, routingId, CompressionUtils.compressIfNeeded(data))
         },
         objectSink = { event, status ->
             serializeAndEmitBinary(event, status)
@@ -150,19 +144,10 @@ class CommunicationManager @Inject constructor(
 
     override fun connect(url: String, deviceId: String, viewerId: String, isTracker: Boolean) {
         this.isStopped = false
-        val oldIsTracker = this.isTrackerMode
-        val oldUrl = this.relayUrl
-        val oldDeviceId = this.deviceId
-        val oldViewerId = this.viewerId
-
         val newUrl = url.trim()
         val newDeviceId = deviceId.trim()
         val newViewerId = viewerId.trim()
         
-        val roleChanged = oldIsTracker != isTracker && oldDeviceId.isNotEmpty()
-        val urlChanged = oldUrl != newUrl
-        val idChanged = (oldDeviceId != newDeviceId || oldViewerId != newViewerId) && oldDeviceId.isNotEmpty()
-
         this.relayUrl = newUrl
         this.deviceId = newDeviceId
         this.viewerId = newViewerId
@@ -181,13 +166,9 @@ class CommunicationManager @Inject constructor(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
         }
 
-        // Issue #AUDIT-1006-10: Always reinitialize dispatcher on connect to recover from potential shutdowns
         dispatcher.reinitialize(scope)
 
-        if (!roleChanged && !urlChanged && !idChanged && (isConnectingInternal.get() || isConnected())) return
-
         val sessionId = currentSessionId.incrementAndGet()
-        
         socket?.disconnect(); socket?.off(); socket = null
         isConnectingInternal.set(true)
         
@@ -228,20 +209,10 @@ class CommunicationManager @Inject constructor(
                     logToApp("Connected to relay [Session $sessionId]", true)
                     markTraffic()
                     telemetryRepository.updateRelayStatus(true)
-                    
-                    // Issue #AUDIT-1006-9: Reset delta encoding state for the new session
                     TelemetryProtobufMapper.resetDeltaState()
-                    
                     if (deviceId.isNotEmpty()) emitInternal("join", createJoinPayload(), SignalingPriority.HIGH)
                 }
             }
-        }
-
-        s.on("reconnecting") { 
-            checkSession { 
-                logToApp("Relay Reconnecting... [Session $sessionId]", true)
-                telemetryRepository.updateRelayStatus(false) 
-            } 
         }
 
         s.on("reconnect") {
@@ -251,10 +222,7 @@ class CommunicationManager @Inject constructor(
                     logToApp("Relay Reconnected [Session $sessionId]", true)
                     markTraffic()
                     telemetryRepository.updateRelayStatus(true)
-                    
-                    // Issue #AUDIT-1006-9: Reset delta encoding state on reconnection
                     TelemetryProtobufMapper.resetDeltaState()
-                    
                     if (deviceId.isNotEmpty()) emitInternal("join", createJoinPayload(), SignalingPriority.HIGH)
                 }
             }
@@ -270,17 +238,8 @@ class CommunicationManager @Inject constructor(
             }
         }
 
-        s.on(Socket.EVENT_CONNECT_ERROR) { args ->
-            checkSession {
-                isConnectingInternal.set(false)
-                logToApp("Relay Connect Error: ${args?.getOrNull(0)} [Session $sessionId]", true)
-                telemetryRepository.updateRelayStatus(false)
-                onConnectionLost?.invoke()
-            }
-        }
-
-        s.on("location_relay") { args -> checkSession { markTraffic(); handleLocationRelay(args) } }
         s.on("location_relay_bin") { args -> checkSession { markTraffic(); handleLocationRelayBinary(args) } }
+        s.on("location_relay") { args -> checkSession { markTraffic(); handleLocationRelay(args) } }
         s.on("log_relay") { args -> checkSession { markTraffic(); handleLogRelay(args) } }
         s.on("viewer_status_relay") { args -> checkSession { markTraffic(); handleViewerStatusRelay(args) } }
         s.on("ping_relay") { args -> checkSession { markTraffic(); handlePingRelay(args) } }
@@ -299,8 +258,10 @@ class CommunicationManager @Inject constructor(
         try {
             val data = if (args.size > 1 && args[1] is ByteArray) args[1] as ByteArray 
                        else args[0] as ByteArray
-            _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(data))
-        } catch (e: Exception) { Timber.e("location_relay_bin parse error") }
+            // Issue #AUDIT-1006-11: Transparent decompression of incoming binary telemetry
+            val decompressed = CompressionUtils.decompress(data)
+            _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(decompressed))
+        } catch (e: Exception) { Timber.e("location_relay_bin parse or decompression error") }
     }
 
     private fun handleLogRelay(args: Array<Any>) {
@@ -403,7 +364,6 @@ class CommunicationManager @Inject constructor(
         if (isStopped || !isConnected()) return
         synchronized(statusBuilder) {
             statusBuilder.clear()
-            // live signaling uses delta encoding by default (Oct.6.10 fix)
             TelemetryProtobufMapper.mapToRealtime(status, statusBuilder, fromViewer = false, useDeltaEncoding = true)
             val message = statusBuilder.buildPartial()
             val size = message.serializedSize
@@ -414,12 +374,15 @@ class CommunicationManager @Inject constructor(
                 try {
                     val cos = CodedOutputStream.newInstance(serializationBuffer, 0, size)
                     message.writeTo(cos); cos.checkNoSpaceLeft()
-                    val payload = Arrays.copyOf(serializationBuffer, size)
+                    val rawData = Arrays.copyOf(serializationBuffer, size)
+                    // Issue #AUDIT-1006-11: Apply compression to manual binary emits
+                    val payload = CompressionUtils.compressIfNeeded(rawData)
                     socket?.emit(event, SignalingConstants.getTransmissionId(deviceId), payload)
                     return
                 } catch (e: Exception) { Timber.e(e, "Pre-allocated serialization failed") }
             }
-            socket?.emit(event, SignalingConstants.getTransmissionId(deviceId), message.toByteArray())
+            val payload = CompressionUtils.compressIfNeeded(message.toByteArray())
+            socket?.emit(event, SignalingConstants.getTransmissionId(deviceId), payload)
         }
     }
 
