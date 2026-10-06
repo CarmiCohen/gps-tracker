@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct6.7
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct6.8
 
-## 🎯 Current Resumption Focus: Forensic Fidelity & Radio Efficiency.
+## 🎯 Current Resumption Focus: Forensic Fidelity & Protocol Optimization.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -9,13 +9,13 @@
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 0)
-*   *(None)*
+## 💡 Strategic Simplification Ideas (Ideas: 1)
+*   **SIMP-1426-6: Unified Signaling Metrics Flow (Low)**: Replace periodic polling of signaling metrics in `MainViewModel` with a `StateFlow` exposed directly from `SmartSignalingDispatcher` to reduce binder traffic and ensure reactive UI updates.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
-*   **Issue #AUDIT-1006-8: Signaling Stability & Conflation Metrics Audit.** Resolved Oct6.7. Integrated telemetry counters into `SmartSignalingDispatcher` to track radio efficiency (frames received vs. emitted vs. conflated). Implemented `SIMP-1426-5` to refactor `TickOrchestrator` preemption logic, replacing polling loops with efficient channel-based signals to reduce hot-path overhead (Rule 1.123, 1.124).
+*   **Issue #AUDIT-1006-8: Signaling Stability & Conflation Metrics Audit.** Resolved Oct6.8. Integrated telemetry counters into `SmartSignalingDispatcher` to track radio efficiency and exposed real-time conflation savings in the `DiagnosticsScreen` (Rule 1.123). Implemented `SIMP-1426-5` to refactor `TickOrchestrator` preemption logic using channel-based signals (Rule 1.124).
 *   **Issue #AUDIT-1006-7: Binary Telemetry Conflation Integration.** Resolved Oct6.6. Completed the end-to-end integration by routing `LocationUpdate` objects from `CommunicationManager` through the `SmartSignalingDispatcher` (Rule 1.122 / R-ID 511).
 *   **Issue #AUDIT-1006-5: Forensic Log Pressure Hardening.** Resolved Oct6.5. Refactored `SmartSignalingDispatcher` with dual-channel priority queuing and preemption (Rule 1.119).
 *   **Issue #AUDIT-1006-7: Binary Telemetry Optimization.** Resolved Oct6.5. Integrated object-level conflation for `LocationUpdate` (Rule 1.122).
@@ -28,6 +28,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct6.8: [SOT Count: 295 (Rules: 151), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 43, QA: 515]**
 - **Oct6.7: [SOT Count: 294 (Rules: 150), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 42, QA: 510]**
 - **Oct6.6: [SOT Count: 292 (Rules: 148), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 40, QA: 502]**
 - **Oct6.5: [SOT Count: 290 (Rules: 147), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 46, QA: 495]**

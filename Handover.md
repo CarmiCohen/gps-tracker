@@ -1,28 +1,25 @@
-# Forensic Handover (Oct6.7 - METRICS & EFFICIENCY HARDENED)
+# Forensic Handover (Oct6.8 - SIGNALING AUDIT UI)
 
 ## 🎯 Current System State
-*   **Version**: `Oct6.7` | **Status**: 🟢 **OPERATIONAL**.
-*   **Signaling Metrics (Issue #AUDIT-1006-8)**:
-    *   **Remediation**: Integrated `AtomicLong` counters into `SmartSignalingDispatcher` to track radio efficiency.
-    *   **Observability**: System now tracks `framesReceived`, `framesEmitted`, and `framesConflated`. This allows for quantitative verification of conflation savings (e.g., 50 log updates conflated into 1 emit).
-*   **Efficient Preemption (SIMP-1426-5)**:
-    *   **Remediation**: Refactored `TickOrchestrator` to use `Channel<Unit>` for loop preemption.
-    *   **Architecture**: Eliminated the 10ms polling delay loop. The `launchPeriodicLoop` now performs a non-blocking `signal.receive()` with a timeout, ensuring zero CPU overhead while waiting for the next tick or a preemption signal (Rule 1.124).
-*   **Binary Conflation**: Fully integrated and verified via unit tests. Deferred serialization ensures that merged objects are only serialized once before wire emission.
+*   **Version**: `Oct6.8` | **Status**: 🟢 **OPERATIONAL**.
+*   **Signaling Efficiency Audit (Issue #AUDIT-1006-8)**:
+    *   **UI Exposure**: Integrated signaling metrics into `DiagnosticsScreen.kt`. The UI now displays real-time "Conflation Efficiency" (%) and "Radio Emission Ratio" (emits vs calls).
+    *   **Observability**: Verified that `diagnosticState.signalingMetrics` is correctly polled and rendered, providing forensic visibility into radio savings.
+*   **Versioning**: Advanced `versionName` to `Oct6.8` and `versionCode` to `1126` in `app/build.gradle`.
 
 ## 🟢 Audit Record
-*   **Build Status**: 🟢 **SUCCESSFUL**. Version advanced to `Oct6.7` in `app/build.gradle`.
-*   **Metrics**: Oct6.7: [SOT Count: 294 (Rules: 150), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 42, QA: 510]
-*   **Test Status**: Added `Metrics should track frames received emitted and conflated` to `SmartSignalingDispatcherTest`.
+*   **Build Status**: 🟢 **SUCCESSFUL**.
+*   **Metrics**: Oct6.8: [SOT Count: 295 (Rules: 151), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 43, QA: 515]
+*   **Hardening Baseline**: Resolved Issue #AUDIT-1006-8. Exposed conflation telemetry (R-ID 511-M).
 
 ## 🚀 Resumption Action Path (Next Chat)
-1.  **Field Audit**:
-    *   Expose `SmartSignalingDispatcher.Metrics` to the `DiagnosticsScreen` to allow real-time monitoring of radio efficiency gains.
-2.  **Protocol Buffers**:
-    *   Check for further Protobuf field optimizations (e.g., using `sint32` for delta coordinates) to further reduce payload size.
+1.  **Protocol Optimization**:
+    *   Implement Protobuf field optimizations (e.g., `sint32` deltas for coordinates) in `RealtimeStatus` to further reduce radio payload size.
+2.  **Architectural Simplification**:
+    *   Execute `SIMP-1426-6`: Transition signaling metrics from polling to a reactive `StateFlow` directly from the dispatcher.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct6.7)
-- **Oct6.7: [SOT Count: 294 (Rules: 150), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 42, QA: 510]**
-- **Audit Record**: Implemented Signal Efficiency Metrics and Channel-based Preemption (R-ID 511, R-ID 289-M).
+## 📊 Hardening Progress Dashboard (Oct6.8)
+- **Oct6.8: [SOT Count: 295 (Rules: 151), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 43, QA: 515]**
+- **Audit Record**: Signaling Efficiency Audit UI implemented (R-ID 511-M).

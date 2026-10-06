@@ -23,6 +23,9 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Oct.6.8:
+ * - Issue #AUDIT-1006-8: Signaling Efficiency Audit. Added signaling metrics section 
+ *   to expose real-time conflation efficiency and radio emission counts (Rule 1.123).
  * Oct.6.2:
  * - Issue #AUDIT-1006-5: Added TRIGGER LOG PRESSURE TEST button to simulate 
  *   high-frequency telemetry bursts.
@@ -61,6 +64,7 @@ fun DiagnosticsScreen(
     val isStorageSimulated = simulationState.isStorageSimulated
     val isStorageCriticalSimulated = simulationState.isStorageCriticalSimulated
     val isGnssThrottled = diagnosticState.isGnssThrottled
+    val signaling = diagnosticState.signalingMetrics
 
     Scaffold(
         topBar = {
@@ -113,6 +117,34 @@ fun DiagnosticsScreen(
                 isOk = permissions.isExactAlarmGranted,
                 icon = Icons.Default.Alarm,
                 onClick = onRequestExactAlarm
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Signaling Efficiency Audit",
+                style = MaterialTheme.typography.titleMedium,
+                color = Color.Gray,
+                fontWeight = FontWeight.Bold
+            )
+
+            val savings = if (signaling.received > 0) {
+                ((signaling.conflated.toDouble() / signaling.received.toDouble()) * 100).toInt()
+            } else 0
+
+            DiagnosticItem(
+                title = "Conflation Efficiency",
+                status = "$savings% Savings (${signaling.conflated} frames)",
+                isOk = savings > 0 || signaling.received < 10,
+                icon = Icons.Default.Compress,
+                onClick = {}
+            )
+
+            DiagnosticItem(
+                title = "Radio Emission Ratio",
+                status = "${signaling.emitted} emits / ${signaling.received} calls",
+                isOk = signaling.emitted <= signaling.received,
+                icon = Icons.Default.WifiTethering,
+                onClick = {}
             )
 
             Spacer(modifier = Modifier.height(8.dp))

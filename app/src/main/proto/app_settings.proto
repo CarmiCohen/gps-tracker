@@ -287,6 +287,10 @@ message RealtimeStatus {
     // Issue #1344: Forensic Diagnostic Expansion
     optional double thermal_snapshot = 93;
     optional double heap_snapshot = 94;
+
+    // Issue #AUDIT-1006-8: Protocol Efficiency Optimization
+    sint32 lat_e7 = 95;
+    sint32 lng_e7 = 96;
 }
 
 message GeoPointProto {
@@ -472,6 +476,10 @@ message TrackerStatusProto {
     // Issue #1344: Forensic Diagnostic Expansion
     optional double thermal_snapshot = 123;
     optional double heap_snapshot = 124;
+
+    // Issue #AUDIT-1006-8: Protocol Efficiency Optimization
+    sint32 lat_e7 = 125;
+    sint32 lng_e7 = 126;
 }
 
 message ActiveAlarmProto {
