@@ -8,21 +8,22 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.selects.select
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
+ * Oct.6.13:
+ * - Issue #SIMP-1426-8: Dynamic Conflation Pressure Adaptation. Implemented 
+ *   dynamic scaling of conflation delays based on telemetry density to optimize 
+ *   radio duty cycles during bursts.
  * Oct.6.12:
  * - SIMP-1426-7: Consolidated conflation jobs into a single unified conflation loop.
- *   Replaced individual location and log conflation jobs with a signal-driven 
- *   conflation loop to reduce coroutine overhead and simplify lifecycle management.
  * Oct.6.11:
- * - Issue #AUDIT-1006-10: Dispatcher Lifecycle Hardening. Added reinitialize() to 
- *   recreate channels and restart the processor loop after a shutdown.
+ * - Issue #AUDIT-1006-10: Dispatcher Lifecycle Hardening. Added reinitialize().
  * Oct.6.9:
- * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics. Replaced polling with 
- *   metricsFlow (StateFlow) for real-time observability.
+ * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics.
  */
 class SmartSignalingDispatcher(
     private var scope: CoroutineScope,
@@ -49,12 +50,15 @@ class SmartSignalingDispatcher(
     
     private val pendingLocationMap = AtomicReference<Map<String, Any?>?>(null)
     private val locationMapScheduledTs = AtomicLong(0)
+    private val locationMapBurstCount = AtomicInteger(0)
     
     private val pendingLocationObject = AtomicReference<LocationUpdate?>(null)
     private val locationObjectScheduledTs = AtomicLong(0)
+    private val locationObjectBurstCount = AtomicInteger(0)
     
     private val pendingLogMap = AtomicReference<Map<String, Any?>?>(null)
     private val logScheduledTs = AtomicLong(0)
+    private val logBurstCount = AtomicInteger(0)
 
     private val conflationSignal = Channel<Unit>(capacity = Channel.CONFLATED)
     private var conflationJob: Job? = null
@@ -76,10 +80,6 @@ class SmartSignalingDispatcher(
         startConflationLoop()
     }
 
-    /**
-     * reinitialize: Restores the dispatcher to an operational state after shutdown.
-     * Recreates channels and restarts the processing loops.
-     */
     fun reinitialize(newScope: CoroutineScope) {
         if (processorJob?.isActive == true && !highQueue.isClosedForSend) return
         
@@ -90,10 +90,13 @@ class SmartSignalingDispatcher(
         
         pendingLocationMap.set(null)
         locationMapScheduledTs.set(0)
+        locationMapBurstCount.set(0)
         pendingLocationObject.set(null)
         locationObjectScheduledTs.set(0)
+        locationObjectBurstCount.set(0)
         pendingLogMap.set(null)
         logScheduledTs.set(0)
+        logBurstCount.set(0)
         
         startProcessor()
         startConflationLoop()
@@ -159,6 +162,7 @@ class SmartSignalingDispatcher(
                         if (locMapTs > 0) {
                             if (now >= locMapTs) {
                                 locationMapScheduledTs.set(0)
+                                locationMapBurstCount.set(0)
                                 pendingLocationMap.getAndSet(null)?.let {
                                     enqueue(Command.Json("location_update", it, SignalingPriority.NORMAL))
                                 }
@@ -172,6 +176,7 @@ class SmartSignalingDispatcher(
                         if (locObjTs > 0) {
                             if (now >= locObjTs) {
                                 locationObjectScheduledTs.set(0)
+                                locationObjectBurstCount.set(0)
                                 pendingLocationObject.getAndSet(null)?.let {
                                     enqueue(Command.Object("location_update_bin", it, SignalingPriority.NORMAL))
                                 }
@@ -185,6 +190,7 @@ class SmartSignalingDispatcher(
                         if (logTs > 0) {
                             if (now >= logTs) {
                                 logScheduledTs.set(0)
+                                logBurstCount.set(0)
                                 pendingLogMap.getAndSet(null)?.let {
                                     enqueue(Command.Json("log_update", it, SignalingPriority.NORMAL))
                                 }
@@ -270,12 +276,21 @@ class SmartSignalingDispatcher(
         if (wasConflated) {
             val conf = framesConflated.incrementAndGet()
             updateMetrics(conflated = conf)
+            locationMapBurstCount.incrementAndGet()
         }
 
         if (locationMapScheduledTs.get() == 0L) {
-            val delayMs = if (isViolationProvider()) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
+            val delayMs = calculateDelay(locationMapBurstCount.get())
             locationMapScheduledTs.set(timeProvider.currentTimeMillis() + delayMs)
             conflationSignal.trySend(Unit)
+        } else {
+            // Adjust schedule if pressure is high
+            val currentScheduled = locationMapScheduledTs.get()
+            val now = timeProvider.currentTimeMillis()
+            val newDelay = calculateDelay(locationMapBurstCount.get())
+            if (currentScheduled - now < newDelay / 2) { // Only extend if we're early in the window
+                 locationMapScheduledTs.compareAndSet(currentScheduled, now + newDelay)
+            }
         }
     }
 
@@ -288,12 +303,20 @@ class SmartSignalingDispatcher(
         if (wasConflated) {
             val conf = framesConflated.incrementAndGet()
             updateMetrics(conflated = conf)
+            locationObjectBurstCount.incrementAndGet()
         }
 
         if (locationObjectScheduledTs.get() == 0L) {
-            val delayMs = if (isViolationProvider()) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
+            val delayMs = calculateDelay(locationObjectBurstCount.get())
             locationObjectScheduledTs.set(timeProvider.currentTimeMillis() + delayMs)
             conflationSignal.trySend(Unit)
+        } else {
+            val currentScheduled = locationObjectScheduledTs.get()
+            val now = timeProvider.currentTimeMillis()
+            val newDelay = calculateDelay(locationObjectBurstCount.get())
+            if (currentScheduled - now < newDelay / 2) {
+                 locationObjectScheduledTs.compareAndSet(currentScheduled, now + newDelay)
+            }
         }
     }
 
@@ -303,14 +326,17 @@ class SmartSignalingDispatcher(
             val pendingMsg = current["message"] as? String
             val incomingMsg = incoming["message"] as? String
             if (pendingMsg != incomingMsg) {
+                // Sequence break: Flush immediately
                 val toSend = pendingLogMap.getAndSet(null)
                 if (toSend != null) {
                     enqueue(Command.Json("log_update", toSend, SignalingPriority.NORMAL))
                     logScheduledTs.set(0)
+                    logBurstCount.set(0)
                 }
             } else {
                 val conf = framesConflated.incrementAndGet()
                 updateMetrics(conflated = conf)
+                logBurstCount.incrementAndGet()
             }
         }
 
@@ -319,10 +345,19 @@ class SmartSignalingDispatcher(
         }
 
         if (logScheduledTs.get() == 0L && pendingLogMap.get() != null) {
-            val delayMs = SIGNALING_CONFLATION_DELAY_MS * 2
+            val delayMs = calculateDelay(logBurstCount.get()) * 2 // Logs can afford more delay
             logScheduledTs.set(timeProvider.currentTimeMillis() + delayMs)
             conflationSignal.trySend(Unit)
         }
+    }
+
+    private fun calculateDelay(burstCount: Int): Long {
+        val baseDelay = if (isViolationProvider()) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
+        if (burstCount < BURST_PRESSURE_THRESHOLD) return baseDelay
+        
+        // Dynamic scaling: extend delay by 100ms per frame over threshold, up to cap.
+        val pressureBonus = (burstCount - BURST_PRESSURE_THRESHOLD) * 100L
+        return minOf(baseDelay + pressureBonus, MAX_CONFLATION_DELAY_MS)
     }
 
     data class Metrics(val received: Long, val emitted: Long, val conflated: Long)
@@ -342,5 +377,8 @@ class SmartSignalingDispatcher(
         private const val SIGNALING_EMIT_DELAY_VIOLATION_MS = 50L
         private const val SIGNALING_CONFLATION_DELAY_MS = 250L
         private const val SIGNALING_CONFLATION_DELAY_VIOLATION_MS = 100L
+        
+        private const val BURST_PRESSURE_THRESHOLD = 5
+        private const val MAX_CONFLATION_DELAY_MS = 2000L
     }
 }

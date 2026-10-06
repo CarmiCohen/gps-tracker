@@ -1,5 +1,10 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct6.13
+*   **Issue #SIMP-1426-8: Dynamic Conflation Pressure Adaptation.**
+    *   **Root Cause Remediation**: Implemented dynamic scaling of conflation delays in `SmartSignalingDispatcher` to optimize radio duty cycles during high-frequency telemetry bursts.
+    *   **Architectural Optimization**: Introduced a "pressure-aware" scheduling mechanism that extends dispatch windows up to 2 seconds when telemetry density exceeds a threshold (5 frames). Maintained forensic integrity through sequence-break flushes for diverse log messages (Rule 1.128).
+
 ## 🟢 Resolved in Oct6.12
 *   **Issue #SIMP-1426-7: Unified Conflation Management.**
     *   **Root Cause Remediation**: Replaced multiple independent conflation jobs for location updates and logs with a single, signal-driven background loop in `SmartSignalingDispatcher`.
