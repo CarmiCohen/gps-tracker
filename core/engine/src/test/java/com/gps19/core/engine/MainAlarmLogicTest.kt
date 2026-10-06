@@ -5,15 +5,19 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.*
+import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.roundToInt
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
+ * Oct.6.5:
+ * - Fixed build failure: Added missing violationStartTs to state.update() call.
+ * - Issue #1405 AUDIT: Adjusted muteCount expectations. PowerTamper triggers 
+ *   ALERT_ID_TRACKER_POWER and ALERT_ID_TRACKER_TAMPER (R-ID 510).
  * Oct.3.9:
  * - Issue #1201 RESOLVED: Updated detectViolations calls to match new signature 
  *   with explicit isLockedOut parameter (R-ID 510).
- * Sep.30.60:
- * - Issue #1403 & #1405 Hardening: Added tests for 30s siren lockout 
- *   and sequential trigger mute protection.
  */
 class MainAlarmLogicTest {
 
@@ -35,6 +39,7 @@ class MainAlarmLogicTest {
             serviceStartTime = now - 60000, 
             serviceStartRt = baseNowRt - 60000,
             lastAlarmAckTs = 0L,
+            violationStartTs = 0L,
             appStartTime = now - 60000,
             isRelayConnected = true,
             isTrackerConnected = true,
@@ -129,17 +134,21 @@ class MainAlarmLogicTest {
         var triggerCount = 0
         var muteCount = 0
 
-        // 1. Trigger Power Alarm while muted
+        // 1. Trigger Power Alarm while muted. 
+        // PowerTamper triggers ALERT_ID_TRACKER_POWER AND ALERT_ID_TRACKER_TAMPER.
         state.health.isPowerTamper = true
         MainAlarmLogic.detectViolations(state, mockTimeProvider, SystemHealthReport(), true, spikeLogger, { triggerCount++ }, onResolve, { muteCount++ })
         assertEquals(0, triggerCount)
-        assertEquals(1, muteCount)
+        assertEquals(2, muteCount)
 
-        // 2. Trigger Tilt Alarm while muted
+        // 2. Trigger Tilt Alarm while muted.
+        // Advance time and satisfy ALERT_TRIGGER_GRACE_PERIOD_MS (2000ms)
+        state.now += 5000
+        state.nowRt += 5000
         state.health.tiltDegrees = 45.0
         MainAlarmLogic.detectViolations(state, mockTimeProvider, SystemHealthReport(), true, spikeLogger, { triggerCount++ }, onResolve, { muteCount++ })
         assertEquals(0, triggerCount)
-        assertEquals(2, muteCount)
+        assertEquals(3, muteCount)
     }
 
     @Test
@@ -267,4 +276,6 @@ class MainAlarmLogicTest {
         MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, false, spikeLogger, onTrigger, onResolve)
         assertFalse("Silent Failure should be suppressed if tamper is detected", report2.reports.find { it.type == ALERT_ID_SILENT_FAILURE }?.conditionMet == true)
     }
+
+    private fun isDefaultLocation(lat: Double, lng: Double) = abs(lat - DEFAULT_LAT) < 0.0001 && abs(lng - DEFAULT_LNG) < 0.0001
 }

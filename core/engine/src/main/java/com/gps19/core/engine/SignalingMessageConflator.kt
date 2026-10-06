@@ -2,10 +2,13 @@ package com.gps19.core.engine
 
 /**
  * SignalingMessageConflator: Logic for merging partial signaling updates.
+ * Oct.6.5:
+ * - Issue #AUDIT-1006-7: Binary Telemetry Conflation. Implemented deep-merge 
+ *   for LocationUpdate objects to allow Protobuf conflation before serialization.
+ *   This preserves forensic fidelity (Rule 1.122 / R-ID 511).
  * Oct.6.4:
  * - Issue #AUDIT-1006-7: Enhanced Conflation Logic. Implemented full map merge 
- *   to ensure telemetry fidelity (e.g., preserving battery/thermal snapshots 
- *   when location updates arrive).
+ *   for JSON telemetry.
  */
 object SignalingMessageConflator {
 
@@ -23,6 +26,40 @@ object SignalingMessageConflator {
         val merged = pending.toMutableMap()
         merged.putAll(incoming)
         return merged
+    }
+
+    /**
+     * Deep-merges two LocationUpdate objects.
+     * Preserves forensic snapshots (thermal, heap, vibe) from the pending object 
+     * if the incoming one has default/null values.
+     */
+    fun conflateLocationUpdate(
+        pending: LocationUpdate?,
+        incoming: LocationUpdate
+    ): LocationUpdate {
+        if (pending == null) return incoming
+
+        // R-ID 511: Preserve fidelity across the burst.
+        // If incoming has no thermal snapshot but pending does, keep pending's.
+        if (incoming.thermalSnapshot == null && pending.thermalSnapshot != null) {
+            incoming.thermalSnapshot = pending.thermalSnapshot
+        }
+        if (incoming.heapSnapshot == null && pending.heapSnapshot != null) {
+            incoming.heapSnapshot = pending.heapSnapshot
+        }
+        if (incoming.snrSnapshot == null && pending.snrSnapshot != null) {
+            incoming.snrSnapshot = pending.snrSnapshot
+        }
+        if (incoming.vibeSnapshot == null && pending.vibeSnapshot != null) {
+            incoming.vibeSnapshot = pending.vibeSnapshot
+        }
+
+        // Preserve accumulated integrity stats if incoming hasn't updated them
+        if (incoming.integrity.uptimeMs == 0L && pending.integrity.uptimeMs > 0) {
+            incoming.integrity.uptimeMs = pending.integrity.uptimeMs
+        }
+
+        return incoming
     }
     
     /**
