@@ -23,6 +23,10 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Oct.6.11:
+ * - Issue #AUDIT-1006-10: Dispatcher Lifecycle Hardening. Integrated dispatcher.reinitialize() 
+ *   within connect() to ensure signaling resumes after network-driven disconnects. 
+ *   Prevents the terminal-state bug where channels remained closed (Rule 2.1).
  * Oct.6.10:
  * - Issue #AUDIT-1006-9: Fixed Protocol Optimization. Integrated resetDeltaState() 
  *   on connection and reconnection events to ensure coordinate synchronization 
@@ -176,6 +180,9 @@ class CommunicationManager @Inject constructor(
         if (!scope.isActive) {
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)
         }
+
+        // Issue #AUDIT-1006-10: Always reinitialize dispatcher on connect to recover from potential shutdowns
+        dispatcher.reinitialize(scope)
 
         if (!roleChanged && !urlChanged && !idChanged && (isConnectingInternal.get() || isConnected())) return
 

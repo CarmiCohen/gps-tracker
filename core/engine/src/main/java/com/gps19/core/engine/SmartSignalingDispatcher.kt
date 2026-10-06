@@ -12,16 +12,17 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
+ * Oct.6.11:
+ * - Issue #AUDIT-1006-10: Dispatcher Lifecycle Hardening. Added reinitialize() to 
+ *   recreate channels and restart the processor loop after a shutdown. This prevents 
+ *   terminal state after network disconnects (Rule 2.1).
  * Oct.6.9:
  * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics. Replaced polling with 
  *   metricsFlow (StateFlow) for real-time observability. This reduces binder traffic 
  *   and ensures zero-latency UI updates in DiagnosticsScreen (Rule 2.1).
- * Oct.6.6:
- * - Issue #AUDIT-1006-8: Conflation Metrics Audit. Added AtomicLong counters for 
- *   received, emitted, and conflated frames (R-ID 511).
  */
 class SmartSignalingDispatcher(
-    private val scope: CoroutineScope,
+    private var scope: CoroutineScope,
     private val isViolationProvider: () -> Boolean,
     private val jsonSink: (String, Map<String, Any?>) -> Unit,
     private val binarySink: (String, String, ByteArray) -> Unit,
@@ -40,8 +41,8 @@ class SmartSignalingDispatcher(
         data class Object(val event: String, val update: LocationUpdate, override val priority: SignalingPriority) : Command()
     }
 
-    private val highQueue = Channel<Command>(capacity = Channel.UNLIMITED)
-    private val normalQueue = Channel<Command>(capacity = Channel.UNLIMITED)
+    private var highQueue = Channel<Command>(capacity = Channel.UNLIMITED)
+    private var normalQueue = Channel<Command>(capacity = Channel.UNLIMITED)
     
     private val pendingLocationMap = AtomicReference<Map<String, Any?>?>(null)
     private var locationConflationJob: Job? = null
@@ -68,6 +69,25 @@ class SmartSignalingDispatcher(
         startProcessor()
     }
 
+    /**
+     * reinitialize: Restores the dispatcher to an operational state after shutdown.
+     * Recreates channels and restarts the processing loop.
+     */
+    fun reinitialize(newScope: CoroutineScope) {
+        if (processorJob?.isActive == true && !highQueue.isClosedForSend) return
+        
+        shutdown()
+        this.scope = newScope
+        highQueue = Channel(capacity = Channel.UNLIMITED)
+        normalQueue = Channel(capacity = Channel.UNLIMITED)
+        
+        pendingLocationMap.set(null)
+        pendingLocationObject.set(null)
+        pendingLogMap.set(null)
+        
+        startProcessor()
+    }
+
     private fun startProcessor() {
         processorJob?.cancel()
         processorJob = scope.launch(dispatcher) {
@@ -77,31 +97,38 @@ class SmartSignalingDispatcher(
                 }
                 if (!isActive) break
 
-                val command = highQueue.tryReceive().getOrNull() ?: select<Command> {
-                    highQueue.onReceive { it }
-                    normalQueue.onReceive { it }
-                }
-
-                if (command.priority == SignalingPriority.NORMAL) {
-                    val now = timeProvider.currentTimeMillis()
-                    val delayMs = if (isViolationProvider()) SIGNALING_EMIT_DELAY_VIOLATION_MS else SIGNALING_EMIT_DELAY_MS
-                    val elapsed = now - lastNormalEmitTs
-                    if (elapsed < delayMs) {
-                        val waitTime = delayMs - elapsed
-                        val highReady = withTimeoutOrNull(waitTime) {
-                            highQueue.receive()
-                        }
-                        
-                        if (highReady != null) {
-                            emit(highReady)
-                            highQueue.trySend(command) 
-                            continue
-                        }
+                try {
+                    val command = highQueue.tryReceive().getOrNull() ?: select<Command> {
+                        highQueue.onReceive { it }
+                        normalQueue.onReceive { it }
                     }
-                    lastNormalEmitTs = timeProvider.currentTimeMillis()
-                }
 
-                emit(command)
+                    if (command.priority == SignalingPriority.NORMAL) {
+                        val now = timeProvider.currentTimeMillis()
+                        val delayMs = if (isViolationProvider()) SIGNALING_EMIT_DELAY_VIOLATION_MS else SIGNALING_EMIT_DELAY_MS
+                        val elapsed = now - lastNormalEmitTs
+                        if (elapsed < delayMs) {
+                            val waitTime = delayMs - elapsed
+                            val highReady = withTimeoutOrNull(waitTime) {
+                                highQueue.receive()
+                            }
+                            
+                            if (highReady != null) {
+                                emit(highReady)
+                                normalQueue.trySend(command) // Re-queue original normal priority
+                                continue
+                            }
+                        }
+                        lastNormalEmitTs = timeProvider.currentTimeMillis()
+                    }
+
+                    emit(command)
+                } catch (e: Exception) {
+                    if (e is CancellationException) throw e
+                    // Prevent tight loop on channel closure
+                    if (highQueue.isClosedForReceive || normalQueue.isClosedForReceive) break
+                    delay(100)
+                }
             }
         }
     }
@@ -117,6 +144,8 @@ class SmartSignalingDispatcher(
     }
 
     fun dispatch(command: Command) {
+        if (highQueue.isClosedForSend) return
+
         val received = framesReceived.incrementAndGet()
         updateMetrics(received = received)
         when (command) {
