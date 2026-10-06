@@ -14,16 +14,15 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
+ * Oct.6.14:
+ * - Issue #SIMP-1426-9: Conflation State Consolidation. Consolidated individual 
+ *   atomic fields into a unified ConflationBucket structure to simplify state 
+ *   management and reinitialization. Hardened conflationSignal lifecycle.
  * Oct.6.13:
  * - Issue #SIMP-1426-8: Dynamic Conflation Pressure Adaptation. Implemented 
- *   dynamic scaling of conflation delays based on telemetry density to optimize 
- *   radio duty cycles during bursts.
+ *   dynamic scaling of conflation delays based on telemetry density.
  * Oct.6.12:
  * - SIMP-1426-7: Consolidated conflation jobs into a single unified conflation loop.
- * Oct.6.11:
- * - Issue #AUDIT-1006-10: Dispatcher Lifecycle Hardening. Added reinitialize().
- * Oct.6.9:
- * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics.
  */
 class SmartSignalingDispatcher(
     private var scope: CoroutineScope,
@@ -45,22 +44,26 @@ class SmartSignalingDispatcher(
         data class Object(val event: String, val update: LocationUpdate, override val priority: SignalingPriority) : Command()
     }
 
+    private class ConflationBucket<T> {
+        val pending = AtomicReference<T?>(null)
+        val scheduledTs = AtomicLong(0)
+        val burstCount = AtomicInteger(0)
+
+        fun reset() {
+            pending.set(null)
+            scheduledTs.set(0)
+            burstCount.set(0)
+        }
+    }
+
     private var highQueue = Channel<Command>(capacity = Channel.UNLIMITED)
     private var normalQueue = Channel<Command>(capacity = Channel.UNLIMITED)
     
-    private val pendingLocationMap = AtomicReference<Map<String, Any?>?>(null)
-    private val locationMapScheduledTs = AtomicLong(0)
-    private val locationMapBurstCount = AtomicInteger(0)
-    
-    private val pendingLocationObject = AtomicReference<LocationUpdate?>(null)
-    private val locationObjectScheduledTs = AtomicLong(0)
-    private val locationObjectBurstCount = AtomicInteger(0)
-    
-    private val pendingLogMap = AtomicReference<Map<String, Any?>?>(null)
-    private val logScheduledTs = AtomicLong(0)
-    private val logBurstCount = AtomicInteger(0)
+    private val locMapBucket = ConflationBucket<Map<String, Any?>>()
+    private val locObjBucket = ConflationBucket<LocationUpdate>()
+    private val logBucket = ConflationBucket<Map<String, Any?>>()
 
-    private val conflationSignal = Channel<Unit>(capacity = Channel.CONFLATED)
+    private var conflationSignal = Channel<Unit>(capacity = Channel.CONFLATED)
     private var conflationJob: Job? = null
 
     private val framesReceived = AtomicLong(0)
@@ -87,16 +90,11 @@ class SmartSignalingDispatcher(
         this.scope = newScope
         highQueue = Channel(capacity = Channel.UNLIMITED)
         normalQueue = Channel(capacity = Channel.UNLIMITED)
+        conflationSignal = Channel(capacity = Channel.CONFLATED)
         
-        pendingLocationMap.set(null)
-        locationMapScheduledTs.set(0)
-        locationMapBurstCount.set(0)
-        pendingLocationObject.set(null)
-        locationObjectScheduledTs.set(0)
-        locationObjectBurstCount.set(0)
-        pendingLogMap.set(null)
-        logScheduledTs.set(0)
-        logBurstCount.set(0)
+        locMapBucket.reset()
+        locObjBucket.reset()
+        logBucket.reset()
         
         startProcessor()
         startConflationLoop()
@@ -158,46 +156,19 @@ class SmartSignalingDispatcher(
                         var nextCheck = Long.MAX_VALUE
                         
                         // Check Location Map
-                        val locMapTs = locationMapScheduledTs.get()
-                        if (locMapTs > 0) {
-                            if (now >= locMapTs) {
-                                locationMapScheduledTs.set(0)
-                                locationMapBurstCount.set(0)
-                                pendingLocationMap.getAndSet(null)?.let {
-                                    enqueue(Command.Json("location_update", it, SignalingPriority.NORMAL))
-                                }
-                            } else {
-                                nextCheck = minOf(nextCheck, locMapTs - now)
-                            }
-                        }
+                        nextCheck = minOf(nextCheck, checkBucket(locMapBucket, now) { 
+                            Command.Json("location_update", it, SignalingPriority.NORMAL) 
+                        })
 
                         // Check Location Object
-                        val locObjTs = locationObjectScheduledTs.get()
-                        if (locObjTs > 0) {
-                            if (now >= locObjTs) {
-                                locationObjectScheduledTs.set(0)
-                                locationObjectBurstCount.set(0)
-                                pendingLocationObject.getAndSet(null)?.let {
-                                    enqueue(Command.Object("location_update_bin", it, SignalingPriority.NORMAL))
-                                }
-                            } else {
-                                nextCheck = minOf(nextCheck, locObjTs - now)
-                            }
-                        }
+                        nextCheck = minOf(nextCheck, checkBucket(locObjBucket, now) { 
+                            Command.Object("location_update_bin", it, SignalingPriority.NORMAL) 
+                        })
 
                         // Check Log Map
-                        val logTs = logScheduledTs.get()
-                        if (logTs > 0) {
-                            if (now >= logTs) {
-                                logScheduledTs.set(0)
-                                logBurstCount.set(0)
-                                pendingLogMap.getAndSet(null)?.let {
-                                    enqueue(Command.Json("log_update", it, SignalingPriority.NORMAL))
-                                }
-                            } else {
-                                nextCheck = minOf(nextCheck, logTs - now)
-                            }
-                        }
+                        nextCheck = minOf(nextCheck, checkBucket(logBucket, now) { 
+                            Command.Json("log_update", it, SignalingPriority.NORMAL) 
+                        })
 
                         if (nextCheck == Long.MAX_VALUE) break
                         
@@ -211,6 +182,22 @@ class SmartSignalingDispatcher(
                 delay(1000) // Recovery
             }
         }
+    }
+
+    private fun <T> checkBucket(bucket: ConflationBucket<T>, now: Long, commandFactory: (T) -> Command): Long {
+        val ts = bucket.scheduledTs.get()
+        if (ts > 0) {
+            if (now >= ts) {
+                bucket.scheduledTs.set(0)
+                bucket.burstCount.set(0)
+                bucket.pending.getAndSet(null)?.let {
+                    enqueue(commandFactory(it))
+                }
+            } else {
+                return ts - now
+            }
+        }
+        return Long.MAX_VALUE
     }
 
     private fun emit(command: Command) {
@@ -269,85 +256,76 @@ class SmartSignalingDispatcher(
 
     private fun dispatchConflatedLocationMap(incoming: Map<String, Any?>) {
         var wasConflated = false
-        pendingLocationMap.updateAndGet { current ->
+        locMapBucket.pending.updateAndGet { current ->
             if (current != null) wasConflated = true
             SignalingMessageConflator.conflate(current, incoming)
         }
         if (wasConflated) {
             val conf = framesConflated.incrementAndGet()
             updateMetrics(conflated = conf)
-            locationMapBurstCount.incrementAndGet()
+            locMapBucket.burstCount.incrementAndGet()
         }
 
-        if (locationMapScheduledTs.get() == 0L) {
-            val delayMs = calculateDelay(locationMapBurstCount.get())
-            locationMapScheduledTs.set(timeProvider.currentTimeMillis() + delayMs)
-            conflationSignal.trySend(Unit)
-        } else {
-            // Adjust schedule if pressure is high
-            val currentScheduled = locationMapScheduledTs.get()
-            val now = timeProvider.currentTimeMillis()
-            val newDelay = calculateDelay(locationMapBurstCount.get())
-            if (currentScheduled - now < newDelay / 2) { // Only extend if we're early in the window
-                 locationMapScheduledTs.compareAndSet(currentScheduled, now + newDelay)
-            }
-        }
+        updateBucketSchedule(locMapBucket)
     }
 
     private fun dispatchConflatedLocationObject(incoming: LocationUpdate) {
         var wasConflated = false
-        pendingLocationObject.updateAndGet { current ->
+        locObjBucket.pending.updateAndGet { current ->
             if (current != null) wasConflated = true
             SignalingMessageConflator.conflateLocationUpdate(current, incoming)
         }
         if (wasConflated) {
             val conf = framesConflated.incrementAndGet()
             updateMetrics(conflated = conf)
-            locationObjectBurstCount.incrementAndGet()
+            locObjBucket.burstCount.incrementAndGet()
         }
 
-        if (locationObjectScheduledTs.get() == 0L) {
-            val delayMs = calculateDelay(locationObjectBurstCount.get())
-            locationObjectScheduledTs.set(timeProvider.currentTimeMillis() + delayMs)
-            conflationSignal.trySend(Unit)
-        } else {
-            val currentScheduled = locationObjectScheduledTs.get()
-            val now = timeProvider.currentTimeMillis()
-            val newDelay = calculateDelay(locationObjectBurstCount.get())
-            if (currentScheduled - now < newDelay / 2) {
-                 locationObjectScheduledTs.compareAndSet(currentScheduled, now + newDelay)
-            }
-        }
+        updateBucketSchedule(locObjBucket)
     }
 
     private fun dispatchConflatedLog(incoming: Map<String, Any?>) {
-        val current = pendingLogMap.get()
+        val current = logBucket.pending.get()
         if (current != null) {
             val pendingMsg = current["message"] as? String
             val incomingMsg = incoming["message"] as? String
             if (pendingMsg != incomingMsg) {
                 // Sequence break: Flush immediately
-                val toSend = pendingLogMap.getAndSet(null)
-                if (toSend != null) {
-                    enqueue(Command.Json("log_update", toSend, SignalingPriority.NORMAL))
-                    logScheduledTs.set(0)
-                    logBurstCount.set(0)
+                logBucket.pending.getAndSet(null)?.let {
+                    enqueue(Command.Json("log_update", it, SignalingPriority.NORMAL))
                 }
+                logBucket.scheduledTs.set(0)
+                logBucket.burstCount.set(0)
             } else {
                 val conf = framesConflated.incrementAndGet()
                 updateMetrics(conflated = conf)
-                logBurstCount.incrementAndGet()
+                logBucket.burstCount.incrementAndGet()
             }
         }
 
-        pendingLogMap.updateAndGet { cur ->
+        logBucket.pending.updateAndGet { cur ->
             SignalingMessageConflator.conflateLogs(cur, incoming)
         }
 
-        if (logScheduledTs.get() == 0L && pendingLogMap.get() != null) {
-            val delayMs = calculateDelay(logBurstCount.get()) * 2 // Logs can afford more delay
-            logScheduledTs.set(timeProvider.currentTimeMillis() + delayMs)
+        if (logBucket.scheduledTs.get() == 0L && logBucket.pending.get() != null) {
+            val delayMs = calculateDelay(logBucket.burstCount.get()) * 2 // Logs can afford more delay
+            logBucket.scheduledTs.set(timeProvider.currentTimeMillis() + delayMs)
             conflationSignal.trySend(Unit)
+        }
+    }
+
+    private fun <T> updateBucketSchedule(bucket: ConflationBucket<T>, delayMultiplier: Int = 1) {
+        if (bucket.scheduledTs.get() == 0L) {
+            val delayMs = calculateDelay(bucket.burstCount.get()) * delayMultiplier
+            bucket.scheduledTs.set(timeProvider.currentTimeMillis() + delayMs)
+            conflationSignal.trySend(Unit)
+        } else {
+            val currentScheduled = bucket.scheduledTs.get()
+            val now = timeProvider.currentTimeMillis()
+            val newDelay = calculateDelay(bucket.burstCount.get()) * delayMultiplier
+            if (currentScheduled - now < newDelay / 2) { // Only extend if we're early in the window
+                 bucket.scheduledTs.compareAndSet(currentScheduled, now + newDelay)
+            }
         }
     }
 
