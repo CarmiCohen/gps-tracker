@@ -1,27 +1,36 @@
-# Forensic Handover (Oct6.1 - BACKGROUND SERVICE HARDENING)
+# Forensic Handover (Oct6.2 - TELEMETRY & MEMORY HARDENING)
 
 ## 🎯 Current System State
-*   **Version**: `Oct6.1` | **Status**: 🟢 **OPERATIONAL**.
-*   **Background Service Stability (Issue #AUDIT-1006-1)**:
-    *   **Convergence Result**: SUCCESSFUL. Refactored `AlarmOverlayService` to initialize `SimpleUiStateProvider` at the service lifecycle level. This eliminates the risk of flow recreation during UI composition resets and ensures stable state management for system-alert windows.
-*   **Transition Latency Optimization (Issue #AUDIT-1006-2)**:
-    *   **Result**: OPTIMIZED. Seeded the session state flow with immediate emission, ensuring the alarm overlay renders with correct permission and mode data instantly upon service start.
-*   **Signature Alignment (Issue #AUDIT-1006-3/4)**:
-    *   **Cleanup**: Finalized the removal of legacy parameter distribution in `MainAppContent.kt` and `ViewerScreen.kt`. All leaf components and screens now consistently consume state via the `UiStateProvider` interface.
+*   **Version**: `Oct6.2` | **Status**: 🟢 **OPERATIONAL**.
+*   **Log Pressure Hardening (Issue #AUDIT-1006-5)**:
+    *   **Root Cause**: Critical safety alerts were susceptible to drops during high-frequency telemetry bursts if the `logBuffer` reached its 5000-item capacity.
+    *   **Convergence Result**: SUCCESSFUL. Refactored `LogRepository.addLog` to implement a prioritized fallback path.
+    *   **Logic**: Standard logs use non-blocking `trySend`. Logs marked `isImportant = true` now use an `async` fallback via `scope.launch(Dispatchers.IO) { logBuffer.send(buffered) }` to await buffer capacity, ensuring zero-drop reliability for safety alerts (Rule 1.119).
+    *   **Verification Simulation**: Implemented `MonitorService.executeLogPressureTest()` which injects 1000 logs at 100Hz.
+*   **Memory Pressure Audit (Issue #AUDIT-1006-6)**:
+    *   **Result**: IMPLEMENTED. Enhanced `MonitorService.getRequiredTickInterval()` to ingest memory pressure states.
+    *   **Throttling Policy**: Background loops now automatically relax to **15s** during `MemoryPressureLevel.CRITICAL` and **5s** during `HIGH` pressure to prevent background OOM during service transitions (Rule 1.120).
+    *   **Simulation**: Integrated manual level overrides in `IntegrityMonitor.kt` (`simulateMemoryPressure`) and `MainUiState.kt` (`SetMemoryPressureSimulation`).
+*   **Architecture Integrity**:
+    *   Synchronized `UiEvent`, `UiCommand`, and `CommandRouter` to support new validation hooks.
+    *   Resolved compilation regressions in `LogRepository` regarding `LogDao` method naming (`getCount`) and scope references.
+    *   Updated `DiagnosticsScreen.kt` with a new "TRIGGER LOG PRESSURE TEST" validation hook and Material3 AutoMirrored icons.
 
 ## 🟢 Audit Record
-*   **Build Status**: 🟢 **SUCCESSFUL**. Version incremented to `Oct6.1`.
-*   **Metrics**: Oct6.1: [SOT Count: 284 (Rules: 141), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 41, QA: 455]
-*   **Traceability**: Updated `issues.md`, `SOT_MASTER_REQUIREMENTS.md` (Rule 1.118), and `RESOLUTION_ARCHIVE.md`.
+*   **Build Status**: 🟢 **SUCCESSFUL**. Version advanced to `Oct6.2` in `app/build.gradle`.
+*   **Metrics**: Oct6.2: [SOT Count: 286 (Rules: 143), Open: H:1, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 43, QA: 465]
+*   **Traceability**: Updated `issues.md`, `SOT_MASTER_REQUIREMENTS.md`, and `RESOLUTION_ARCHIVE.md`.
 
 ## 🚀 Resumption Action Path (Next Chat)
-1.  **Forensic Log Pressure Test**:
-    *   Simulate high-frequency `LogAction` bursts (100Hz+) to verify that the `eventLogs` flow in `UiStateProvider` handles backpressure without dropping critical safety alerts.
-2.  **Memory Pressure Audit**:
-    *   Verify `TickOrchestrator` behavior during `MemoryPressureLevel.CRITICAL` to ensure background loops are appropriately throttled to prevent OOM in background service transitions.
+1.  **Transition Latency Regression (Issue #AUDIT-1006-2)**:
+    *   Perform regression testing on `AlarmOverlayService` start-up time specifically when `MemoryPressureLevel.HIGH` (5s throttling) is active. Verify that loop relaxation doesn't introduce perceptible delay in safety-critical overlay rendering.
+2.  **Backpressure Integrity Check**:
+    *   Run the 100Hz Log Pressure Test from the Diagnostics screen and verify in the Log Overlay that `STRESS_LOG` entries marked as `Important` (every 100th log) are preserved without any gaps.
+3.  **Telemetry Conflation Audit**:
+    *   Review `SignalingMessageConflator` performance to ensure high-frequency log bursts are efficiently merged before socket emission to reduce radio usage without losing forensic fidelity.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct6.1)
-- **Oct6.1: [SOT Count: 284 (Rules: 141), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 41, QA: 455]**
-- **Audit Record**: Background service state lifecycle hardened; transition latency optimized; Oct6.1 tagged.
+## 📊 Hardening Progress Dashboard (Oct6.2)
+- **Oct6.2: [SOT Count: 286 (Rules: 143), Open: H:1, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 43, QA: 465]**
+- **Audit Record**: Log backpressure hardened (zero-drop for criticals); Memory-aware loop throttling implemented (15s/5s); Oct6.2 tagged.

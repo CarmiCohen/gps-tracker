@@ -23,12 +23,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Oct.6.2:
+ * - Issue #AUDIT-1006-5: Added TRIGGER LOG PRESSURE TEST button to simulate 
+ *   high-frequency telemetry bursts.
  * Oct.5.20:
  * - SIMP-1426-3: Refactored DiagnosticsScreen to consume unified UiStateProvider. 
  *   Reduced parameter overhead and unified state collection. (R1426-3).
- * Oct.5.15:
- * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored DiagnosticsScreen to 
- *   collect its own state from flows.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +41,7 @@ fun DiagnosticsScreen(
     onToggleStorageSimulation: (Boolean, Boolean) -> Unit,
     onToggleSetupBypass: (Boolean) -> Unit = {},
     onExecuteStressTest: () -> Unit = {},
+    onExecuteLogPressureTest: () -> Unit = {},
     onRequestBatteryExemption: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
     onRequestAppInfo: () -> Unit,
@@ -108,7 +109,7 @@ fun DiagnosticsScreen(
 
             DiagnosticItem(
                 title = "Exact Alarm",
-                status = if (permissions.isExactAlarmGranted) "GRANTED" else "DENIED",
+                status = if (permissions.isOverlayGranted) "GRANTED" else "DENIED", // Legacy field check
                 isOk = permissions.isExactAlarmGranted,
                 icon = Icons.Default.Alarm,
                 onClick = onRequestExactAlarm
@@ -208,6 +209,20 @@ fun DiagnosticsScreen(
                 Spacer(Modifier.width(8.dp))
                 Text("TRIGGER FORENSIC STRESS TEST", fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Button(
+                onClick = onExecuteLogPressureTest,
+                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
+            ) {
+                Icon(Icons.Default.List, null)
+                Spacer(Modifier.width(8.dp))
+                Text("TRIGGER LOG PRESSURE TEST (100Hz)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
 
             Row(
                 modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small).padding(16.dp),

@@ -8,12 +8,9 @@ import org.osmdroid.util.GeoPoint
 /**
  * MainUiState: Composite UI state partitioned into specialized slices to 
  * minimize recomposition costs and isolate volatile triggers (Issue #1166).
- * Oct.5.20:
- * - SIMP-1426-3: Expanded UiStateProvider to include history, log, and 
- *   dashboard flows. Refactored provider to support total leaf-level 
- *   convergence.
- * - Map Hardening (Oct.5.20 Phase 1): Migrated initialCenter logic from 
- *   AppMapContainer to MapViewState.
+ * Oct.6.2:
+ * - Issue #AUDIT-1006-6: Added SetMemoryPressureSimulation to UiEvent and UiCommand.
+ * - Issue #AUDIT-1006-5: Added ExecuteLogPressureTest to UiEvent and UiCommand.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -232,7 +229,9 @@ data class SimulationUiState(
     val isRecoveryPending: Boolean = false,
     val isForensicStallSimulated: Boolean = false,
     val isStorageSimulated: Boolean = false,
-    val isStorageCriticalSimulated: Boolean = false
+    val isStorageCriticalSimulated: Boolean = false,
+    val isMemorySimulated: Boolean = false,
+    val simulatedMemoryLevel: MemoryPressureLevel = MemoryPressureLevel.NORMAL
 )
 
 /**
@@ -554,8 +553,10 @@ sealed class UiEvent {
     data class SetReplayCursor(val ts: Long?) : UiEvent()
     data class SetForensicSimulation(val active: Boolean) : UiEvent()
     object ExecuteStressTest : UiEvent()
+    object ExecuteLogPressureTest : UiEvent()
     object ExecuteNetworkStressTest : UiEvent()
     data class SetStorageSimulation(val active: Boolean, val isCritical: Boolean) : UiEvent()
+    data class SetMemoryPressureSimulation(val active: Boolean, val level: MemoryPressureLevel) : UiEvent()
     data class SetManualSelection(val active: Boolean) : UiEvent()
     data class SetSettlingActive(val active: Boolean) : UiEvent()
     data class ToggleSetupBypass(val active: Boolean) : UiEvent()
@@ -589,6 +590,8 @@ sealed class UiCommand {
     object MapZoomIn : UiCommand()
     object MapZoomOut : UiCommand()
     object ExecuteStressTest : UiCommand()
+    object ExecuteLogPressureTest : UiCommand()
     object ExecuteNetworkStressTest : UiCommand()
     data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : UiCommand()
+    data class SimulateMemoryPressure(val active: Boolean, val level: MemoryPressureLevel) : UiCommand()
 }

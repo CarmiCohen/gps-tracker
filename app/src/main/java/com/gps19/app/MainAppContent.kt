@@ -40,11 +40,11 @@ import kotlinx.coroutines.flow.collectLatest
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.6.2:
+ * - Issue #AUDIT-1006-5: Integrated ExecuteLogPressureTest in DiagnosticsScreen call site.
  * Oct.6.1:
  * - AUDIT-1006-4: Fixed compilation errors in TrackerScreen and ViewerScreen 
  *   call sites. Finalized signature alignment with UiStateProvider pattern.
- * Oct.5.20:
- * - SIMP-1426-3: Refactored leaf components to consume unified UiStateProvider.
  */
 @Composable
 fun MainAppContent(
@@ -206,6 +206,7 @@ fun MainAppContent(
                                     onToggleStorageSimulation = { active, critical -> viewModel.onEvent(UiEvent.SetStorageSimulation(active, critical)) },
                                     onToggleSetupBypass = { active -> viewModel.onEvent(UiEvent.ToggleSetupBypass(active)) },
                                     onExecuteStressTest = { viewModel.onEvent(UiEvent.ExecuteStressTest) },
+                                    onExecuteLogPressureTest = { viewModel.onEvent(UiEvent.ExecuteLogPressureTest) },
                                     onRequestBatteryExemption = onRequestBatteryExemption,
                                     onRequestOverlayPermission = onRequestOverlayPermission,
                                     onRequestAppInfo = onRequestAppInfo,

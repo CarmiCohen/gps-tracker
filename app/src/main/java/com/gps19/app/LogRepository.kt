@@ -21,13 +21,14 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.6.2:
+ * - Issue #AUDIT-1006-5: Forensic Log Pressure Test. Hardened addLog to prevent 
+ *   dropping important safety alerts when the log buffer is full. Implemented 
+ *   async fallback for isImportant logs. Fixed reference errors (it -> entry, 
+ *   getLogCount -> getCount).
  * Oct.4.5:
  * - Issue #1425: Unified Clock Authority. Migrated batch flush and forensic 
- *   drain timers to monotonic time (elapsedRealtime). Fixed unresolved 
- *   references in flushBatch (it -> entry).
- * Oct.2.1:
- * - Issue #1416: Memory Pressure Mitigation. Integrated heap-aware pruning 
- *   logic.
+ *   drain timers to monotonic time (elapsedRealtime).
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -395,6 +396,10 @@ class LogRepository @Inject constructor(
             }
         }.flowOn(Dispatchers.Default)
 
+    /**
+     * addLog: Routes logs to the batch buffer.
+     * Oct.6.2: Hardened against backpressure for important logs.
+     */
     fun addLog(entry: LogEntry, initiallySynced: Boolean = false) {
         if (entry.type == "FORENSIC_TRACE") {
             scope.launch(Dispatchers.Default) {
@@ -402,8 +407,20 @@ class LogRepository @Inject constructor(
             }
             return
         }
-        val result = logBuffer.trySend(BufferedLog(entry, initiallySynced, stripLogVariableParts(entry.message)))
-        if (result.isFailure) Timber.w("Log buffer full, dropping log: ${entry.message}")
+        
+        val buffered = BufferedLog(entry, initiallySynced, stripLogVariableParts(entry.message))
+        val result = logBuffer.trySend(buffered)
+        
+        if (result.isFailure) {
+            if (entry.isImportant) {
+                // R660: Critical alerts MUST NOT be dropped. Use async fallback to await space.
+                scope.launch(Dispatchers.IO) {
+                    logBuffer.send(buffered)
+                }
+            } else {
+                Timber.w("Log buffer full, dropping log: ${entry.message}")
+            }
+        }
     }
 
     private fun triggerAsyncPruning() {

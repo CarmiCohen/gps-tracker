@@ -12,20 +12,17 @@ import kotlinx.coroutines.flow.*
 import timber.log.Timber
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Oct.6.2:
+ * - Issue #AUDIT-1006-6: Added Memory Pressure simulation hooks.
  * Oct.5.9:
  * - Issue #1295: Redundant Stream Observer Audit. Relaxed heartbeat loop 
  *   interval during ultra-long stationary periods to conserve CPU (R1295).
- * Oct.5.2:
- * - Issue #1344: Forensic Diagnostic Expansion. Explicitly populating 
- *   thermalSnapshot and heapSnapshot in health state (R1344).
- * Oct.2.1:
- * - Issue #1416: Memory Pressure Mitigation (R-ID 592). Integrated heap-aware 
- *   MemoryPressureChanged event emission to trigger aggressive flushing on A15.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -48,6 +45,8 @@ class IntegrityMonitor @Inject constructor(
     private val isStorageSimulated = AtomicBoolean(false)
     private val isStorageCriticalSimulated = AtomicBoolean(false)
     private val isMaliAnomalySimulated = AtomicBoolean(false)
+    private val isMemorySimulated = AtomicBoolean(false)
+    private val simulatedMemoryLevel = AtomicReference<MemoryPressureLevel>(MemoryPressureLevel.NORMAL)
 
     // Vitality Tracking
     private var lastInternetUpdateRt = 0L
@@ -256,10 +255,14 @@ class IntegrityMonitor @Inject constructor(
         hardwareSuite.setMaliAnomaly(maliAnomaly)
         
         // Issue #1416: Memory Pressure Audit
-        val currentPressure = when {
-            heap >= MEMORY_CRITICAL_THRESHOLD_MB -> MemoryPressureLevel.CRITICAL
-            heap >= MEMORY_PRESSURE_THRESHOLD_MB -> MemoryPressureLevel.HIGH
-            else -> MemoryPressureLevel.NORMAL
+        val currentPressure = if (isMemorySimulated.get()) {
+            simulatedMemoryLevel.get()
+        } else {
+            when {
+                heap >= MEMORY_CRITICAL_THRESHOLD_MB -> MemoryPressureLevel.CRITICAL
+                heap >= MEMORY_PRESSURE_THRESHOLD_MB -> MemoryPressureLevel.HIGH
+                else -> MemoryPressureLevel.NORMAL
+            }
         }
         
         if (currentPressure != lastMemoryPressure) {
@@ -544,19 +547,6 @@ class IntegrityMonitor @Inject constructor(
         return isSteep
     }
 
-    private fun updateMemoryPressure(heap: Double) {
-        val currentPressure = when {
-            heap >= MEMORY_CRITICAL_THRESHOLD_MB -> MemoryPressureLevel.CRITICAL
-            heap >= MEMORY_PRESSURE_THRESHOLD_MB -> MemoryPressureLevel.HIGH
-            else -> MemoryPressureLevel.NORMAL
-        }
-        
-        if (currentPressure != lastMemoryPressure) {
-            lastMemoryPressure = currentPressure
-            domainEventBus.emit(IntegrityEvent.MemoryPressureChanged(currentPressure, heap))
-        }
-    }
-
     fun setMaxTemperature(temp: Double) {
         updateHealth { it.maxTemp = temp }
     }
@@ -612,6 +602,21 @@ class IntegrityMonitor @Inject constructor(
             h.isStorageLow = active
             h.isStorageCritical = active && critical
         }
+    }
+
+    /**
+     * simulateMemoryPressure: Simulation hook for Issue #AUDIT-1006-6.
+     */
+    fun simulateMemoryPressure(active: Boolean, level: MemoryPressureLevel) {
+        isMemorySimulated.set(active)
+        simulatedMemoryLevel.set(level)
+        
+        val msg = if (active) "SYSTEM ALERT: Simulated Memory Pressure level set to $level."
+                  else "System Info: Simulated Memory Pressure recovered."
+        domainEventBus.emit(IntegrityEvent.LogEvent(msg, active))
+        
+        // Immediate update to trigger event emission
+        runBlocking { performIntegrityHeartbeat() }
     }
 
     /**
@@ -729,6 +734,7 @@ class IntegrityMonitor @Inject constructor(
         isStorageSimulated.set(false)
         isStorageCriticalSimulated.set(false)
         isMaliAnomalySimulated.set(false)
+        isMemorySimulated.set(false)
         
         repository.saveBooleanSync(IS_COOLING_MODE_ACTIVE_KEY, false)
         repository.saveLongSync(COOLING_ENTERED_RT_KEY, 0L)

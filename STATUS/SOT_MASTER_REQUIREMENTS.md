@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct6.1)
+# SOT Master Requirements & Hardening Status (Oct6.2)
 
-## 🏗️ Architectural Master Rules (141 Rules)
+## 🏗️ Architectural Master Rules (143 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -16,17 +16,18 @@
 *   **1.116 Unified State Provider (R1426-3)**: ALL leaf UI components MUST consume state via a unified `UiStateProvider` interface to eliminate parameter-passing boilerplate. (Oct.5.20 - Issue #SIMP-1426-3).
 *   **1.117 Map Logic Offloading (R1426-4)**: Computational map state (center calculation, coordinate smoothing triggers) MUST be processed in the ViewModel's state mapping logic to prevent per-frame composition overhead. (Oct.5.21 - Issue #SIMP-1426-4).
 *   **1.118 Stable Background State Management (R-ID 288)**: Background UI services MUST initialize state providers and associated flows at the service lifecycle level (onCreate) to ensure stability, prevent memory leaks, and optimize transition latency. (Oct6.1 - Issue #AUDIT-1006-1).
+*   **1.119 Zero-Drop Safety Telemetry (R660-H)**: Critical safety alerts (`isImportant = true`) MUST NOT be dropped due to log buffer backpressure; implementations MUST provide async fallback paths to await buffer capacity. (Oct6.2 - Issue #AUDIT-1006-5).
+*   **1.120 Memory-Aware Loop Throttling (R-ID 592-M)**: Background loops MUST implement aggressive interval relaxation (up to 15s) when `MemoryPressureLevel.CRITICAL` is detected to prevent background OOM. (Oct6.2 - Issue #AUDIT-1006-6).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 632**: Memory Throttling - Enhanced `MonitorService` to relax tick intervals to 15s during critical memory pressure. (Resolved Oct6.2).
+*   **SOT ID 631**: Log Reliability - Hardened `LogRepository` to ensure important telemetry bypasses buffer overflow drops via async fallback. (Resolved Oct6.2).
 *   **SOT ID 630**: Background Overlay Hardening - Refactored `AlarmOverlayService` to use service-level flow initialization and seeded session state for zero-latency transitions. (Resolved Oct6.1).
-*   **SOT ID 629**: Map Hardening & Boilerplate Reduction - Refactored `TrackerScreen` and `ViewerScreen` to use `UiStateProvider`. Migrated `initialCenter` and coordinate smoothing triggers to `MainViewModel`. (Resolved Oct.5.21).
-*   **SOT ID 628**: Unified State Convergence - Implemented `UiStateProvider` in `MainViewModel` and refactored all leaf components to consume it. (Resolved Oct.5.20).
-*   **SOT ID 627**: Leaf-Level Convergence - Migrated state collection for all overlays and the map container to leaf-level Flow collection. (Resolved Oct.5.15).
 
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.250 (Telemetry Pressure Audit)**: PASSED - Verified 100Hz log burst integrity and zero-drop behavior for important alerts. (Oct6.2)
 *   **Chapter 31.249 (Background Transition Audit)**: PASSED - Verified zero-latency UI appearance for `AlarmOverlayService`. Confirmed stable flow lifecycle via service scope. (Oct6.1)
-*   **Chapter 31.248 (Map Hardening Audit)**: PASSED - Verified offloading of map computational logic to ViewModel. (Oct.5.21)

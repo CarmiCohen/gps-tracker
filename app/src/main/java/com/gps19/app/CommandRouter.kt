@@ -18,6 +18,8 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Oct.6.2:
+ * - Issue #AUDIT-1006-5: Added ExecuteLogPressureTest routing.
  * Oct.1.8:
  * - Issue #1410: Viewer Persistence. Added remote signaling for StopSiren in 
  *   Viewer mode. Emits "acknowledge_alarm" to ensure the Tracker synchronizes 
@@ -165,6 +167,10 @@ class CommandRouter @Inject constructor(
                         is UiCommand.ExecuteStressTest -> {
                             Timber.i("CommandRouter: Routing ExecuteStressTest to domain event bus.")
                             domainEventBus.emit(CommandEvent.ExecuteStressTest)
+                        }
+                        is UiCommand.ExecuteLogPressureTest -> {
+                            Timber.i("CommandRouter: Routing ExecuteLogPressureTest to domain event bus.")
+                            domainEventBus.emit(CommandEvent.ExecuteLogPressureTest)
                         }
                         is UiCommand.ExecuteNetworkStressTest -> {
                             domainEventBus.emit(CommandEvent.ExecuteNetworkStressTest)

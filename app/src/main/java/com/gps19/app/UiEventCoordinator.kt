@@ -17,6 +17,9 @@ import javax.inject.Singleton
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
  * Decouples MainViewModel from procedural orchestration.
+ * Oct.6.2:
+ * - Issue #AUDIT-1006-5: Added ExecuteLogPressureTest routing.
+ * - Issue #AUDIT-1006-6: Added SetMemoryPressureSimulation routing.
  * Oct.4.5:
  * - Issue #1425: Unified Clock Authority. Migrated startup settling delay 
  *   to monotonic time (appStartRt) to prevent service startup glitches 
@@ -251,7 +254,12 @@ class UiEventCoordinator @Inject constructor(
                 onStateUpdate { it.copy(simulation = it.simulation.copy(isStorageSimulated = event.active, isStorageCriticalSimulated = event.isCritical)) }
                 repository.sendCommand(UiCommand.SimulateStoragePressure(event.active, event.isCritical))
             }
+            is UiEvent.SetMemoryPressureSimulation -> {
+                onStateUpdate { it.copy(simulation = it.simulation.copy(isMemorySimulated = event.active, simulatedMemoryLevel = event.level)) }
+                repository.sendCommand(UiCommand.SimulateMemoryPressure(event.active, event.level))
+            }
             is UiEvent.ExecuteStressTest -> repository.sendCommand(UiCommand.ExecuteStressTest)
+            is UiEvent.ExecuteLogPressureTest -> repository.sendCommand(UiCommand.ExecuteLogPressureTest)
             is UiEvent.ExecuteNetworkStressTest -> repository.sendCommand(UiCommand.ExecuteNetworkStressTest)
 
             // --- Logging & Stats ---

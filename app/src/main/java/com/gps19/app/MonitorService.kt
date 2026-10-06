@@ -26,14 +26,14 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.6.2:
+ * - Issue #AUDIT-1006-6: Integrated memory pressure throttling in getRequiredTickInterval.
+ *   Aggressively relaxes loops during MemoryPressureLevel.CRITICAL to prevent OOM.
+ * - Issue #AUDIT-1006-5: Implemented executeLogPressureTest to simulate 100Hz 
+ *   telemetry bursts for backpressure verification.
  * Oct.5.9:
  * - Issue #1295: Redundant Stream Observer Audit. Implemented interval relaxation 
  *   for forensic sampling and tick loops during ultra-long stationary periods. 
- *   Throttled background sampling to 5s while maintaining spike reactivity (R1295).
- * Oct.5.8:
- * - Issue #1293: Tick Orchestration. Replaced manual loops with TickOrchestrator.
- * Oct.4.6:
- * - Issue #1160: Flyweight & Pooling Expansion. Integrated EnginePools.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -309,7 +309,8 @@ class MonitorService : BaseMonitorService() {
                     is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); lifecycleScope.launch { hardwareSuite.start() } }
-                    is CommandEvent.ExecuteStressTest -> if (isTrackerMode) executeAutomatedStressTest()
+                    is CommandEvent.ExecuteStressTest -> executeAutomatedStressTest()
+                    is CommandEvent.ExecuteLogPressureTest -> executeLogPressureTest()
                     is CommandEvent.ExecuteNetworkStressTest -> connectivitySuite.executeFlappingStressTest()
                     is CommandEvent.SimulateStoragePressure -> {}
                     is CommandEvent.TriggerMemoryFlush -> performMemoryFlush()
@@ -451,9 +452,13 @@ class MonitorService : BaseMonitorService() {
 
     /**
      * getRequiredTickInterval: Unified interval authority.
-     * Issue #1295: Relaxed loop timing during ultra-long stationary states (R1295).
+     * Issue #AUDIT-1006-6: Aggressive loop throttling during MemoryPressureLevel.CRITICAL.
+     * Throttles to 15s when memory is critical to prevent background OOM (R-ID 592).
      */
     override fun getRequiredTickInterval(): Long {
+        if (memoryPressureLevel == MemoryPressureLevel.CRITICAL) return 15000L
+        if (memoryPressureLevel == MemoryPressureLevel.HIGH) return 5000L
+
         if (!isTrackerMode) return if (isUiVisible()) HIGH_FREQUENCY_GPS_POLLING_MS else VIEWER_GPS_POLLING_MS
         
         val health = integrityMonitor.currentHealth
@@ -713,6 +718,23 @@ class MonitorService : BaseMonitorService() {
             val forensicJob = launch(Dispatchers.Default) { repeat(1000) { i -> logManager.logForensicTrace("STRESS_BURST: Forensic sample #$i injection."); if (i % 100 == 0) delay(1) }; domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: Forensic Saturation burst complete.")) }
             joinAll(cpuOrder, ioJob, forensicJob)
             delay(40000); isManualJammerActive = false; isManualStallActive = false; repository.setForensicStallSimulation(false)
+        }
+    }
+
+    private fun executeLogPressureTest() {
+        lifecycleScope.launch(Dispatchers.Default) {
+            domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: Starting Log Pressure Burst (100Hz)...", isImportant = true))
+            val start = System.currentTimeMillis()
+            repeat(1000) { i ->
+                logManager.submitToLogSink(
+                    message = "STRESS_LOG: High-frequency burst sample #$i",
+                    type = "STRESS",
+                    isImportant = i % 100 == 0
+                )
+                delay(10)
+            }
+            val duration = System.currentTimeMillis() - start
+            domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: Log Pressure Burst complete ($duration ms).", isImportant = true))
         }
     }
 

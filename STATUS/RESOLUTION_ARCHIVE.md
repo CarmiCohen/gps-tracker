@@ -1,5 +1,10 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct6.2
+*   **Issue #AUDIT-1006-5: Forensic Log Pressure Hardening.** Refactored `LogRepository.addLog` to prevent dropping critical safety alerts (`isImportant = true`) when the `logBuffer` is full. Implemented a non-blocking `trySend` for standard logs and an async `send` fallback for critical alerts. (Oct6.2 - Rule 1.119).
+*   **Issue #AUDIT-1006-6: Memory Pressure Throttling.** Enhanced `MonitorService.getRequiredTickInterval()` to respect `MemoryPressureLevel`. Background loops now throttle to 15s during `CRITICAL` pressure and 5s during `HIGH` pressure to prevent background OOM. (Oct6.2 - Rule 1.120).
+*   **Architecture & Simulation Hooks.** Added `ExecuteLogPressureTest` and `SetMemoryPressureSimulation` to `UiEvent` and `UiCommand`. Updated `DiagnosticsScreen` with validation hooks for forensic auditing of OOM-prevention and log integrity logic. (Oct6.2).
+
 ## 🟢 Resolved in Oct6.1
 *   **Issue #AUDIT-1006-1: AlarmOverlayService State Leak Audit & Refinement.** Refactored `AlarmOverlayService` to initialize `SimpleUiStateProvider` and its associated flows at the service lifecycle level (`onCreate`). This prevents flow instability and potential memory leaks during service transitions. Seeded `sessionStateFlow` with an immediate value to eliminate initial black frames. (Oct6.1 - R-ID 288).
 *   **Issue #AUDIT-1006-2: Background Service Transition Latency Audit.** Verified and optimized the transition to the background `AlarmOverlayService`. Ensured immediate emission of critical state to maintain safety-critical responsiveness after root-level UI invalidation removal. (Oct6.1).
@@ -17,7 +22,7 @@
 *   **Issue #SIMP-1426-1: Leaf Effect Convergence.** Eliminated ~100 lines of duplicated "System Readiness" and "Issue Count" logic across `TrackerScreen.kt` and `ViewerScreen.kt`. Centralized calculation logic in `SessionUiState` within `MainUiState.kt` to ensure architectural consistency and reduce UI tree footprint. (Oct.5.12 - R1426).
 
 ## 🟢 Resolved in Oct.5.11
-*   **Issue #1426 Performance Audit: Side-Effect Latency Verification.** Conducted forensic latency audit on `AppEffectAggregator`. Verified strict isolation of the 100Hz vibration pipeline from root side-effect recompositions. Confirmed Rule 1.111 (JNI Batching) reduces bridge overhead to 1 transaction per tick. (Oct.5.11 - R1426, R1.111).
+*   **Issue #1426 Performance Audit: Side-Effect Latency Verification.** Conducted forensic latency audit on `AppEffectAggregator`. Verified strict isolation of the 100Hz vibration pipeline from root side-effect recompositions. Confirmed Rule 1.111 (JNI Math Batching) reduces bridge overhead to 1 transaction per tick. (Oct.5.11 - R1426, R1.111).
 
 ## 🟢 Resolved in Oct.5.10
 *   **Issue #1426: Composable Effect Aggregator.** Centralized root-level `LaunchedEffect` and `DisposableEffect` observers in `MainAppContent` into a single `AppEffectAggregator` component. (Oct.5.10 - R1426, R1.114).
