@@ -1,27 +1,26 @@
-# Forensic Handover (Oct6.10 - PROTOCOL REFINEMENT)
+# Forensic Handover (Oct6.12 - UNIFIED CONFLATION)
 
 ## 🎯 Current System State
-*   **Version**: `Oct6.10` | **Status**: 🟢 **OPERATIONAL**.
-*   **Protocol Optimization (Issue #AUDIT-1006-9 Refinement)**:
-    *   **Wire Efficiency**: Fixed `TelemetryProtobufMapper.kt` to clear `double` lat/lng fields during delta frames. This ensures Proto3 actually omits them, achieving the intended payload reduction.
-    *   **State Isolation**: Signaling delta references are now isolated from persistence mapping. Persistence always uses absolute coordinates to prevent reference corruption during background buffering.
-    *   **Precision Fix**: Corrected E7 reconstruction in `ConnectivitySuite.kt` using floating-point math. This restores full 7-decimal place precision for remote coordinates.
-    *   **Sync Logic**: Added `resetDeltaState()` to `CommunicationManager.kt` triggered on `EVENT_CONNECT` and `reconnect` to ensure coordinate synchronization.
-*   **Reactive Metrics (SIMP-1426-6)**:
-    *   Verified `MainViewModel.kt` reactively observes `repository.signalingMetrics`. Polling overhead is removed while keeping `DiagnosticsScreen` updated in real-time.
-*   **Versioning**: Advanced `versionName` to `Oct6.10` and `versionCode` to `1128` in `app/build.gradle`.
+*   **Version**: `Oct6.12` | **Status**: 🟢 **OPERATIONAL**.
+*   **Unified Conflation (Issue #SIMP-1426-7)**:
+    *   **Consolidation**: Replaced three individual location and log conflation jobs in `SmartSignalingDispatcher.kt` with a single, unified signal-driven loop.
+    *   **Efficiency**: Used a `conflated` Channel (`conflationSignal`) and atomic timestamps to schedule dispatches, reducing coroutine lifecycle management complexity and CPU overhead.
+*   **Lifecycle Hardening (Issue #AUDIT-1006-10)**:
+    *   **Dispatcher Recovery**: Verified `reinitialize()` logic restarts both the processor and conflation loops upon reconnection.
+*   **Versioning**: Advanced `versionName` to `Oct6.12` and `versionCode` to `1130`.
 
 ## 🟢 Audit Record
 *   **Build Status**: 🟢 **SUCCESSFUL**.
-*   **Metrics**: Oct6.10: [SOT Count: 297 (Rules: 153), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 45, QA: 525]
-*   **Hardening Baseline**: Refined Issue #AUDIT-1006-9. Fixed coordinate delta fidelity and wire-level efficiency.
+*   **Metrics**: Oct6.12: [SOT Count: 299 (Rules: 155), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 47, QA: 535]
+*   **Hardening Baseline**: Consolidated telemetry conflation into a single signal-driven loop.
 
 ## 🚀 Resumption Action Path (Next Chat)
-1.  **Field verification**: Run the application and verify that remote coordinates on the map show high-precision movement without jitter or "snap-to-grid" behavior.
-2.  **Metrics Audit**: Check the Diagnostics screen to confirm "Signaling Savings" are reported correctly based on the new delta-encoding.
+1.  **Field verification**: Run the application and verify that remote coordinates on the map show high-precision movement without jitter.
+2.  **Metrics Audit**: Check the Diagnostics screen to confirm "Signaling Savings" are reported correctly.
+3.  **Stress Test**: Induce high-frequency log and location bursts simultaneously to verify the unified conflation loop handles the load without dropped frames.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct6.10)
-- **Oct6.10: [SOT Count: 297 (Rules: 153), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 45, QA: 525]**
-- **Audit Record**: Fixed E7 delta precision and wire optimization. Isolated signaling state. Advanced version to Oct6.10.
+## 📊 Hardening Progress Dashboard (Oct6.12)
+- **Oct6.12: [SOT Count: 299 (Rules: 155), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 47, QA: 535]**
+- **Audit Record**: Unified signaling conflation loop. Advanced version to Oct6.12.

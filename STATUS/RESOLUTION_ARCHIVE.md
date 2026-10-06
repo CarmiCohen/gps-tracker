@@ -1,5 +1,10 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct6.12
+*   **Issue #SIMP-1426-7: Unified Conflation Management.**
+    *   **Root Cause Remediation**: Replaced multiple independent conflation jobs for location updates and logs with a single, signal-driven background loop in `SmartSignalingDispatcher`.
+    *   **Architectural Optimization**: Implemented a non-polling scheduling mechanism using a `conflated` Channel and atomic timestamps. This reduces coroutine lifecycle management overhead and ensures consistent dispatch timing across all telemetry streams (Rule 1.127).
+
 ## 🟢 Resolved in Oct6.11
 *   **Issue #AUDIT-1006-10: Dispatcher Lifecycle Recovery.**
     *   **Root Cause Remediation**: Fixed a terminal-state bug where `SmartSignalingDispatcher` channels remained closed after a network-driven disconnect cycle, causing telemetry delivery to stall.

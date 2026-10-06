@@ -2,6 +2,7 @@ package com.gps19.core.engine
 
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -12,14 +13,16 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
+ * Oct.6.12:
+ * - SIMP-1426-7: Consolidated conflation jobs into a single unified conflation loop.
+ *   Replaced individual location and log conflation jobs with a signal-driven 
+ *   conflation loop to reduce coroutine overhead and simplify lifecycle management.
  * Oct.6.11:
  * - Issue #AUDIT-1006-10: Dispatcher Lifecycle Hardening. Added reinitialize() to 
- *   recreate channels and restart the processor loop after a shutdown. This prevents 
- *   terminal state after network disconnects (Rule 2.1).
+ *   recreate channels and restart the processor loop after a shutdown.
  * Oct.6.9:
  * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics. Replaced polling with 
- *   metricsFlow (StateFlow) for real-time observability. This reduces binder traffic 
- *   and ensures zero-latency UI updates in DiagnosticsScreen (Rule 2.1).
+ *   metricsFlow (StateFlow) for real-time observability.
  */
 class SmartSignalingDispatcher(
     private var scope: CoroutineScope,
@@ -45,13 +48,16 @@ class SmartSignalingDispatcher(
     private var normalQueue = Channel<Command>(capacity = Channel.UNLIMITED)
     
     private val pendingLocationMap = AtomicReference<Map<String, Any?>?>(null)
-    private var locationConflationJob: Job? = null
+    private val locationMapScheduledTs = AtomicLong(0)
     
     private val pendingLocationObject = AtomicReference<LocationUpdate?>(null)
-    private var locationObjectConflationJob: Job? = null
+    private val locationObjectScheduledTs = AtomicLong(0)
     
     private val pendingLogMap = AtomicReference<Map<String, Any?>?>(null)
-    private var logConflationJob: Job? = null
+    private val logScheduledTs = AtomicLong(0)
+
+    private val conflationSignal = Channel<Unit>(capacity = Channel.CONFLATED)
+    private var conflationJob: Job? = null
 
     private val framesReceived = AtomicLong(0)
     private val framesEmitted = AtomicLong(0)
@@ -67,11 +73,12 @@ class SmartSignalingDispatcher(
 
     init {
         startProcessor()
+        startConflationLoop()
     }
 
     /**
      * reinitialize: Restores the dispatcher to an operational state after shutdown.
-     * Recreates channels and restarts the processing loop.
+     * Recreates channels and restarts the processing loops.
      */
     fun reinitialize(newScope: CoroutineScope) {
         if (processorJob?.isActive == true && !highQueue.isClosedForSend) return
@@ -82,10 +89,14 @@ class SmartSignalingDispatcher(
         normalQueue = Channel(capacity = Channel.UNLIMITED)
         
         pendingLocationMap.set(null)
+        locationMapScheduledTs.set(0)
         pendingLocationObject.set(null)
+        locationObjectScheduledTs.set(0)
         pendingLogMap.set(null)
+        logScheduledTs.set(0)
         
         startProcessor()
+        startConflationLoop()
     }
 
     private fun startProcessor() {
@@ -125,10 +136,73 @@ class SmartSignalingDispatcher(
                     emit(command)
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
-                    // Prevent tight loop on channel closure
                     if (highQueue.isClosedForReceive || normalQueue.isClosedForReceive) break
                     delay(100)
                 }
+            }
+        }
+    }
+
+    private fun startConflationLoop() {
+        conflationJob?.cancel()
+        conflationJob = scope.launch(dispatcher) {
+            try {
+                while (isActive) {
+                    conflationSignal.receive()
+                    
+                    while (isActive) {
+                        val now = timeProvider.currentTimeMillis()
+                        var nextCheck = Long.MAX_VALUE
+                        
+                        // Check Location Map
+                        val locMapTs = locationMapScheduledTs.get()
+                        if (locMapTs > 0) {
+                            if (now >= locMapTs) {
+                                locationMapScheduledTs.set(0)
+                                pendingLocationMap.getAndSet(null)?.let {
+                                    enqueue(Command.Json("location_update", it, SignalingPriority.NORMAL))
+                                }
+                            } else {
+                                nextCheck = minOf(nextCheck, locMapTs - now)
+                            }
+                        }
+
+                        // Check Location Object
+                        val locObjTs = locationObjectScheduledTs.get()
+                        if (locObjTs > 0) {
+                            if (now >= locObjTs) {
+                                locationObjectScheduledTs.set(0)
+                                pendingLocationObject.getAndSet(null)?.let {
+                                    enqueue(Command.Object("location_update_bin", it, SignalingPriority.NORMAL))
+                                }
+                            } else {
+                                nextCheck = minOf(nextCheck, locObjTs - now)
+                            }
+                        }
+
+                        // Check Log Map
+                        val logTs = logScheduledTs.get()
+                        if (logTs > 0) {
+                            if (now >= logTs) {
+                                logScheduledTs.set(0)
+                                pendingLogMap.getAndSet(null)?.let {
+                                    enqueue(Command.Json("log_update", it, SignalingPriority.NORMAL))
+                                }
+                            } else {
+                                nextCheck = minOf(nextCheck, logTs - now)
+                            }
+                        }
+
+                        if (nextCheck == Long.MAX_VALUE) break
+                        
+                        withTimeoutOrNull(nextCheck) {
+                            conflationSignal.receive()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException || e is ClosedReceiveChannelException) return@launch
+                delay(1000) // Recovery
             }
         }
     }
@@ -198,16 +272,10 @@ class SmartSignalingDispatcher(
             updateMetrics(conflated = conf)
         }
 
-        if (locationConflationJob == null || !locationConflationJob!!.isActive) {
-            locationConflationJob = scope.launch(dispatcher) {
-                val delayMs = if (isViolationProvider()) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
-                delay(delayMs)
-                
-                val toSend = pendingLocationMap.getAndSet(null)
-                if (toSend != null) {
-                    enqueue(Command.Json("location_update", toSend, SignalingPriority.NORMAL))
-                }
-            }
+        if (locationMapScheduledTs.get() == 0L) {
+            val delayMs = if (isViolationProvider()) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
+            locationMapScheduledTs.set(timeProvider.currentTimeMillis() + delayMs)
+            conflationSignal.trySend(Unit)
         }
     }
 
@@ -222,16 +290,10 @@ class SmartSignalingDispatcher(
             updateMetrics(conflated = conf)
         }
 
-        if (locationObjectConflationJob == null || !locationObjectConflationJob!!.isActive) {
-            locationObjectConflationJob = scope.launch(dispatcher) {
-                val delayMs = if (isViolationProvider()) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
-                delay(delayMs)
-                
-                val toSend = pendingLocationObject.getAndSet(null)
-                if (toSend != null) {
-                    enqueue(Command.Object("location_update_bin", toSend, SignalingPriority.NORMAL))
-                }
-            }
+        if (locationObjectScheduledTs.get() == 0L) {
+            val delayMs = if (isViolationProvider()) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
+            locationObjectScheduledTs.set(timeProvider.currentTimeMillis() + delayMs)
+            conflationSignal.trySend(Unit)
         }
     }
 
@@ -244,6 +306,7 @@ class SmartSignalingDispatcher(
                 val toSend = pendingLogMap.getAndSet(null)
                 if (toSend != null) {
                     enqueue(Command.Json("log_update", toSend, SignalingPriority.NORMAL))
+                    logScheduledTs.set(0)
                 }
             } else {
                 val conf = framesConflated.incrementAndGet()
@@ -255,15 +318,10 @@ class SmartSignalingDispatcher(
             SignalingMessageConflator.conflateLogs(cur, incoming)
         }
 
-        if (logConflationJob == null || !logConflationJob!!.isActive) {
-            logConflationJob = scope.launch(dispatcher) {
-                delay(SIGNALING_CONFLATION_DELAY_MS * 2)
-                
-                val toSend = pendingLogMap.getAndSet(null)
-                if (toSend != null) {
-                    enqueue(Command.Json("log_update", toSend, SignalingPriority.NORMAL))
-                }
-            }
+        if (logScheduledTs.get() == 0L && pendingLogMap.get() != null) {
+            val delayMs = SIGNALING_CONFLATION_DELAY_MS * 2
+            logScheduledTs.set(timeProvider.currentTimeMillis() + delayMs)
+            conflationSignal.trySend(Unit)
         }
     }
 
@@ -273,11 +331,10 @@ class SmartSignalingDispatcher(
 
     fun shutdown() {
         processorJob?.cancel()
-        locationConflationJob?.cancel()
-        locationObjectConflationJob?.cancel()
-        logConflationJob?.cancel()
+        conflationJob?.cancel()
         highQueue.close()
         normalQueue.close()
+        conflationSignal.close()
     }
     
     companion object {
