@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct.5.21)
+# SOT Master Requirements & Hardening Status (Oct6.1)
 
-## 🏗️ Architectural Master Rules (140 Rules)
+## 🏗️ Architectural Master Rules (141 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -15,19 +15,18 @@
 *   **1.115 Leaf-Level Convergence (R1426-2)**: ALL UI overlays and high-frequency components MUST collect their own state from Flows to isolate the root UI tree from telemetry bursts. (Oct.5.15 - Issue #SIMP-1426-2).
 *   **1.116 Unified State Provider (R1426-3)**: ALL leaf UI components MUST consume state via a unified `UiStateProvider` interface to eliminate parameter-passing boilerplate. (Oct.5.20 - Issue #SIMP-1426-3).
 *   **1.117 Map Logic Offloading (R1426-4)**: Computational map state (center calculation, coordinate smoothing triggers) MUST be processed in the ViewModel's state mapping logic to prevent per-frame composition overhead. (Oct.5.21 - Issue #SIMP-1426-4).
+*   **1.118 Stable Background State Management (R-ID 288)**: Background UI services MUST initialize state providers and associated flows at the service lifecycle level (onCreate) to ensure stability, prevent memory leaks, and optimize transition latency. (Oct6.1 - Issue #AUDIT-1006-1).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 630**: Background Overlay Hardening - Refactored `AlarmOverlayService` to use service-level flow initialization and seeded session state for zero-latency transitions. (Resolved Oct6.1).
 *   **SOT ID 629**: Map Hardening & Boilerplate Reduction - Refactored `TrackerScreen` and `ViewerScreen` to use `UiStateProvider`. Migrated `initialCenter` and coordinate smoothing triggers to `MainViewModel`. (Resolved Oct.5.21).
 *   **SOT ID 628**: Unified State Convergence - Implemented `UiStateProvider` in `MainViewModel` and refactored all leaf components to consume it. (Resolved Oct.5.20).
 *   **SOT ID 627**: Leaf-Level Convergence - Migrated state collection for all overlays and the map container to leaf-level Flow collection. (Resolved Oct.5.15).
-*   **SOT ID 626**: Readiness Logic Convergence - Centralized "System Readiness" logic in `SessionUiState`. (Resolved Oct.5.12).
-*   **SOT ID 625**: Side-Effect Latency Audit - Verified isolation of 100Hz vibration pipeline. (Resolved Oct.5.11).
 
 ---
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.248 (Map Hardening Audit)**: PASSED - Verified offloading of map computational logic to ViewModel. Confirmed elimination of ~80 lines of boilerplate in Screen signatures. (Oct.5.21)
-*   **Chapter 31.247 (State Provider Audit)**: PASSED - Verified unification of state distribution across 10 leaf components. (Oct.5.20)
-*   **Chapter 31.246 (Leaf Convergence Audit)**: PASSED - Verified migration of state collection to leaf components. (Oct.5.15)
+*   **Chapter 31.249 (Background Transition Audit)**: PASSED - Verified zero-latency UI appearance for `AlarmOverlayService`. Confirmed stable flow lifecycle via service scope. (Oct6.1)
+*   **Chapter 31.248 (Map Hardening Audit)**: PASSED - Verified offloading of map computational logic to ViewModel. (Oct.5.21)

@@ -24,10 +24,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Viewer-mode UI.
- * Oct.5.20:
+ * Oct.6.1:
+ * - AUDIT-1006-3: Fixed compilation errors in AppMapContainer call sites. 
+ *   Aligned with unified UiStateProvider pattern (SIMP-1426-4).
+ * Oct.5.21:
  * - SIMP-1426-4: Boilerplate Reduction. Refactored signature to use unified 
  *   UiStateProvider, eliminating redundant state parameter passing.
- * - SIMP-1426-3: Refactored to consume unified UiStateProvider. (R1426-3).
  */
 
 @Composable
@@ -89,7 +91,7 @@ fun ViewerScreen(
                         if (session.hydrationLevel >= 5 && !isAnyOverlayOpen) statusBar()
                         Box(modifier = Modifier.weight(1f)) {
                             if (session.hydrationLevel >= 6 && isMapVisible) {
-                                AppMapContainer(mapViewStateFlow = stateProvider.mapViewState, cameraActions = (stateProvider as? MainViewModel)?.cameraActions, onEvent = { onMainEvent(it) }, onClearTrails = { (stateProvider as? MainViewModel)?.clearTrails() }, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail)
+                                AppMapContainer(stateProvider = stateProvider, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail)
                             } else if (session.hydrationLevel >= 4 && !isMapVisible) {
                                 ViewerDashboard(stateProvider = stateProvider, isDashboardExpanded = nav.isDashboardExpanded, onEvent = { onMainEvent(it) })
                             }
@@ -98,7 +100,7 @@ fun ViewerScreen(
                 }
             } else {
                 if (session.hydrationLevel >= 6 && isMapVisible) {
-                    AppMapContainer(mapViewStateFlow = stateProvider.mapViewState, cameraActions = (stateProvider as? MainViewModel)?.cameraActions, onEvent = { onMainEvent(it) }, onClearTrails = { (stateProvider as? MainViewModel)?.clearTrails() }, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail)
+                    AppMapContainer(stateProvider = stateProvider, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail)
                 }
                 Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
                     Surface(color = if (isAnyOverlayOpen || isMapVisible) Color.Transparent else MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxWidth().zIndex(10f)) { Column { if (session.hydrationLevel >= 4 && !isAnyOverlayOpen) header(); if (session.hydrationLevel >= 5 && !isAnyOverlayOpen) statusBar() } }

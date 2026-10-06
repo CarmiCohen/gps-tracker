@@ -40,12 +40,11 @@ import kotlinx.coroutines.flow.collectLatest
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.6.1:
+ * - AUDIT-1006-4: Fixed compilation errors in TrackerScreen and ViewerScreen 
+ *   call sites. Finalized signature alignment with UiStateProvider pattern.
  * Oct.5.20:
- * - SIMP-1426-3: Refactored leaf components to consume unified UiStateProvider 
- *   (viewModel). Reduced parameter distribution boilerplate in NavHost and 
- *   OverlayHost. (R1426-3).
- * Oct.5.15:
- * - Issue #SIMP-1426-2: Leaf-Level Convergence.
+ * - SIMP-1426-3: Refactored leaf components to consume unified UiStateProvider.
  */
 @Composable
 fun MainAppContent(
@@ -157,24 +156,8 @@ fun MainAppContent(
                             }
                             if (sessionState.hydrationLevel >= 3) {
                                 TrackerScreen(
-                                    sessionState = sessionState, 
-                                    settingsState = settingsState, 
-                                    spatialState = spatialState, 
-                                    navigationState = navigationState,
-                                    viewModel = viewModel,
-                                    onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
-                                    onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) }, 
-                                    onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },
-                                    onExit = { viewModel.onEvent(UiEvent.ManualExit) }, 
-                                    onMainEvent = { viewModel.onEvent(it) }, 
-                                    onFullInitialization = { viewModel.fullInitialization(activity) },
-                                    onResetStats = { viewModel.onEvent(UiEvent.ResetStats) }, 
-                                    onExportLogs = { MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider) }, 
-                                    onImportConfig = { importLauncher.launch("application/json") }, 
-                                    onClearLogs = { viewModel.onEvent(UiEvent.ClearLogs) }, 
-                                    onClearHome = { viewModel.onEvent(UiEvent.ClearHomePoints) },
-                                    onSaveTrail = { MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider) }, 
-                                    onLoadTrail = { importTrailLauncher.launch("application/json") }
+                                    activity = activity,
+                                    viewModel = viewModel
                                 )
                             }
                         }
@@ -194,11 +177,7 @@ fun MainAppContent(
                             }
                             if (sessionState.hydrationLevel >= 3) {
                                 ViewerScreen(
-                                    sessionState = sessionState, 
-                                    settingsState = settingsState, 
-                                    spatialState = spatialState, 
-                                    navigationState = navigationState,
-                                    viewModel = viewModel,
+                                    stateProvider = viewModel,
                                     onToggleMap = { viewModel.onEvent(UiEvent.ToggleMap(!navigationState.isMapVisible)) }, 
                                     onToggleLog = { viewModel.onEvent(UiEvent.ToggleLog(!navigationState.isLogVisible)) },
                                     onToggleSettings = { viewModel.onEvent(UiEvent.ToggleSettings(!navigationState.isSettingsOpen)) },

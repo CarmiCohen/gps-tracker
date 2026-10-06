@@ -1,11 +1,11 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.5.21
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct6.1
 
-## 🎯 Current Resumption Focus: (All current audit targets resolved).
+## 🎯 Current Resumption Focus: Issue #AUDIT-1006-2: Background Service Transition Latency Audit.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
 ### 🔴 High Priority
-*   (All current high-priority gaps resolved).
+*   **Issue #AUDIT-1006-2: Background Service Transition Latency Audit.** Perform regression testing on background service transition latency following the removal of root-level UI invalidation triggers. Ensure the app transitions to/from background services (like AlarmOverlayService) without perceptible lag or state desync. (Target: Oct6.1).
 
 ---
 
@@ -23,6 +23,7 @@
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #AUDIT-1006-1: AlarmOverlayService State Leak Audit & Refinement.** Resolved Oct6.1. Refactored `AlarmOverlayService` to initialize `SimpleUiStateProvider` and its associated flows at the service level rather than inside the composition. This prevents flow instability and potential memory leaks during service lifecycle transitions. (R-ID 288).
 *   **Issue #SIMP-1426-4: Map Hardening & Boilerplate Reduction.** Resolved Oct.5.21. Migrated `initialCenter` and coordinate smoothing triggers into `MainViewModel`'s `mapMapViewState` logic. Refactored `TrackerScreen` and `ViewerScreen` signatures to accept `UiStateProvider`, further reducing parameter distribution boilerplate by ~80 lines. Verified all leaf components collect from specialized flows to prevent root-level invalidation. (R1426-4, R-ID 287).
 *   **Issue #SIMP-1426-3: Unified State Provider.** Resolved Oct.5.20. Introduced `UiStateProvider` interface in `MainUiState.kt` and implemented it in `MainViewModel`. Refactored all leaf components (`LogOverlay`, `SettingsOverlay`, `PhoneSetupOverlay`, `AlarmOverlay`, `GlobalStatusBar`, `RibbonsOverlay`, `TrackerDashboard`, `ViewerDashboard`, `AppMapContainer`, `DiagnosticsScreen`) to consume the unified provider. Eliminated ~150 lines of redundant parameter distribution logic. (R1426-3, R1.116).
 *   **Issue #SIMP-1426-2: Leaf-Level Convergence.** Resolved Oct.5.15. Migrated state collection for all overlays and dashboards to leaf-level Flow collection. Adhered to Rule 1.110 to isolate root-level UI from telemetry bursts. (R1426-2, R1.115).
@@ -39,6 +40,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct6.1: [SOT Count: 284 (Rules: 141), Open: H:1, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 41, QA: 455]**
 - **Oct.5.21: [SOT Count: 283 (Rules: 140), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 40, QA: 450]**
 - **Oct.5.20: [SOT Count: 282 (Rules: 139), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 40, QA: 450]**
 - **Oct.5.15: [SOT Count: 281 (Rules: 138), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 39, QA: 445]**

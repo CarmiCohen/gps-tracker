@@ -1,5 +1,9 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct6.1
+*   **Issue #AUDIT-1006-1: AlarmOverlayService State Leak Audit & Refinement.** Refactored `AlarmOverlayService` to initialize `SimpleUiStateProvider` and its associated flows at the service lifecycle level (`onCreate`). This prevents flow instability and potential memory leaks during service transitions. Seeded `sessionStateFlow` with an immediate value to eliminate initial black frames. (Oct6.1 - R-ID 288).
+*   **Issue #AUDIT-1006-2: Background Service Transition Latency Audit.** Verified and optimized the transition to the background `AlarmOverlayService`. Ensured immediate emission of critical state to maintain safety-critical responsiveness after root-level UI invalidation removal. (Oct6.1).
+
 ## 🟢 Resolved in Oct.5.21
 *   **Issue #SIMP-1426-4: Map Hardening & Boilerplate Reduction.** Migrated `initialCenter` calculation and coordinate smoothing triggers from composition scope (`AppMapContainer`) to `MainViewModel`. Refactored `TrackerScreen` and `ViewerScreen` signatures to accept `MainViewModel` directly, eliminating redundant parameter distribution logic. (Oct.5.21 - R1426-4, R-ID 287).
 
