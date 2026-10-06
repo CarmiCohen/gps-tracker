@@ -21,13 +21,12 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.6.10:
+ * - Issue #AUDIT-1006-9: Fixed Coordinate Reconstruction. Ensured floating-point 
+ *   precision when converting E7 deltas back to doubles (Rule 1.125).
  * Oct.6.9:
  * - Issue #AUDIT-1006-9: Protocol Optimization. Implemented reconstruction of 
- *   absolute coordinates from E7 deltas in handleBinaryUpdate. This allows 
- *   the UI to correctly display high-resolution movements while benefiting 
- *   from reduced radio payloads (Rule 1.125).
- * Oct.5.9:
- * - Issue #1295: Redundant Stream Observer Audit. Relaxed heartbeat loop.
+ *   absolute coordinates from E7 deltas in handleBinaryUpdate.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -460,15 +459,16 @@ class ConnectivitySuite @Inject constructor(
             if (rawProto.isDelta) {
                 remoteLastLatE7 += rawProto.latE7
                 remoteLastLngE7 += rawProto.lngE7
-                builder.setLat(remoteLastLatE7 / 1e7)
-                builder.setLng(remoteLastLngE7 / 1e7)
+                // Fix Oct.6.10: Use floating-point division for precision
+                builder.setLat(remoteLastLatE7.toDouble() / 1e7)
+                builder.setLng(remoteLastLngE7.toDouble() / 1e7)
             } else {
                 remoteLastLatE7 = rawProto.latE7
                 remoteLastLngE7 = rawProto.lngE7
                 // If lat/lng doubles are 0 (optimized out in transit), use e7 absolute
                 if (rawProto.lat == 0.0 && rawProto.lng == 0.0 && (remoteLastLatE7 != 0 || remoteLastLngE7 != 0)) {
-                    builder.setLat(remoteLastLatE7 / 1e7)
-                    builder.setLng(remoteLastLngE7 / 1e7)
+                    builder.setLat(remoteLastLatE7.toDouble() / 1e7)
+                    builder.setLng(remoteLastLngE7.toDouble() / 1e7)
                 }
             }
             val statusProto = builder.build()

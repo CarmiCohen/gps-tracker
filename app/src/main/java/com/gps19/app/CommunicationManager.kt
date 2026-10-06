@@ -23,6 +23,10 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Oct.6.10:
+ * - Issue #AUDIT-1006-9: Fixed Protocol Optimization. Integrated resetDeltaState() 
+ *   on connection and reconnection events to ensure coordinate synchronization 
+ *   (Rule 1.125).
  * Oct.6.9:
  * - Issue #AUDIT-1006-9: Dependency Cycle Remediation. Migrated to Provider<T> for 
  *   LogManager, ConfigManager, and SessionManager to break initialization circularity.
@@ -217,6 +221,10 @@ class CommunicationManager @Inject constructor(
                     logToApp("Connected to relay [Session $sessionId]", true)
                     markTraffic()
                     telemetryRepository.updateRelayStatus(true)
+                    
+                    // Issue #AUDIT-1006-9: Reset delta encoding state for the new session
+                    TelemetryProtobufMapper.resetDeltaState()
+                    
                     if (deviceId.isNotEmpty()) emitInternal("join", createJoinPayload(), SignalingPriority.HIGH)
                 }
             }
@@ -236,6 +244,10 @@ class CommunicationManager @Inject constructor(
                     logToApp("Relay Reconnected [Session $sessionId]", true)
                     markTraffic()
                     telemetryRepository.updateRelayStatus(true)
+                    
+                    // Issue #AUDIT-1006-9: Reset delta encoding state on reconnection
+                    TelemetryProtobufMapper.resetDeltaState()
+                    
                     if (deviceId.isNotEmpty()) emitInternal("join", createJoinPayload(), SignalingPriority.HIGH)
                 }
             }
@@ -384,7 +396,8 @@ class CommunicationManager @Inject constructor(
         if (isStopped || !isConnected()) return
         synchronized(statusBuilder) {
             statusBuilder.clear()
-            TelemetryProtobufMapper.mapToRealtime(status, statusBuilder, false)
+            // live signaling uses delta encoding by default (Oct.6.10 fix)
+            TelemetryProtobufMapper.mapToRealtime(status, statusBuilder, fromViewer = false, useDeltaEncoding = true)
             val message = statusBuilder.buildPartial()
             val size = message.serializedSize
             if (size > serializationBuffer.size && size <= MAX_SERIALIZATION_BUFFER_SIZE) {

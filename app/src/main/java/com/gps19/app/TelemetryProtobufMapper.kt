@@ -5,25 +5,34 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
- * Oct.6.9:
- * - Issue #AUDIT-1006-9: Protocol Optimization. Implemented E7 delta-encoding for 
- *   lat/lng in RealtimeStatus. Transmitting deltas in sint32 fields leverages 
- *   Protobuf's zigzag encoding to significantly reduce payload size for 
- *   incremental movements. Added isDelta flag to signify relative updates (Rule 1.125).
- * Oct.6.8:
- * - Issue #AUDIT-1006-8: Protocol Efficiency Optimization.
+ * Oct.6.10:
+ * - Issue #AUDIT-1006-9: Fixed Protocol Optimization. Now explicitly clears 
+ *   lat/lng doubles when sending deltas to ensure wire-level savings.
+ * - Issue #AUDIT-1006-9: Isolated Signaling Delta State. Added resetDeltaState() 
+ *   and ensured that mapStatusToBinary (persistence) does not interfere with 
+ *   signaling delta references (Rule 1.125).
  */
 object TelemetryProtobufMapper {
 
-    private val lastLatE7 = AtomicInteger(0)
-    private val lastLngE7 = AtomicInteger(0)
+    private val signalingLatE7 = AtomicInteger(0)
+    private val signalingLngE7 = AtomicInteger(0)
 
     /**
-     * mapStatusToBinary: Direct serialization of LocationUpdate for offline buffering.
+     * resetDeltaState: Resets the reference coordinates for delta encoding.
+     * Should be called on new connections to ensure the first packet is absolute.
+     */
+    fun resetDeltaState() {
+        signalingLatE7.set(0)
+        signalingLngE7.set(0)
+    }
+
+    /**
+     * mapStatusToBinary: Direct serialization for offline buffering.
+     * Always uses absolute coordinates to ensure independent restoration.
      */
     fun mapStatusToBinary(status: LocationUpdate): ByteArray {
         val builder = RealtimeStatus.newBuilder()
-        mapToRealtime(status, builder, false)
+        mapToRealtime(status, builder, fromViewer = false, useDeltaEncoding = false)
         return builder.build().toByteArray()
     }
 
@@ -39,35 +48,50 @@ object TelemetryProtobufMapper {
     /**
      * mapToRealtime: Maps LocationUpdate to RealtimeStatus (Signaling/Relay).
      */
-    fun mapToRealtime(status: LocationUpdate, builder: RealtimeStatus.Builder, fromViewer: Boolean) {
+    fun mapToRealtime(
+        status: LocationUpdate, 
+        builder: RealtimeStatus.Builder, 
+        fromViewer: Boolean,
+        useDeltaEncoding: Boolean = true
+    ) {
         builder.setId(SignalingConstants.getTransmissionId(status.deviceId))
         builder.setViewerId(SignalingConstants.getTransmissionId(status.viewerId))
         builder.setFromViewer(fromViewer)
         
-        builder.setLat(status.lat)
-        builder.setLng(status.lng)
         builder.setAlt(status.alt)
         builder.setSpeed(status.speed)
         builder.setBearing(status.bearing)
         builder.setAccuracy(status.accuracy)
         builder.setMaxAccuracy(status.maxAccuracy)
         
-        // Issue #AUDIT-1006-9: sint32 Delta-Encoding for E7 Coordinates
-        val currentLatE7 = (status.lat * 1e7).toInt()
-        val currentLngE7 = (status.lng * 1e7).toInt()
-        
-        val prevLat = lastLatE7.getAndSet(currentLatE7)
-        val prevLng = lastLngE7.getAndSet(currentLngE7)
-        
-        // If it's the first update or a large jump (> 1 deg), send absolute
-        if (prevLat == 0 || Math.abs(currentLatE7 - prevLat) > 10000000) {
-            builder.setLatE7(currentLatE7)
-            builder.setLngE7(currentLngE7)
-            builder.setIsDelta(false)
+        if (useDeltaEncoding) {
+            val currentLatE7 = (status.lat * 1e7).toInt()
+            val currentLngE7 = (status.lng * 1e7).toInt()
+            
+            val prevLat = signalingLatE7.getAndSet(currentLatE7)
+            val prevLng = signalingLngE7.getAndSet(currentLngE7)
+            
+            // If it's the first update or a large jump (> 1 deg), send absolute
+            if (prevLat == 0 || Math.abs(currentLatE7 - prevLat) > 10000000) {
+                builder.setLat(status.lat)
+                builder.setLng(status.lng)
+                builder.setLatE7(currentLatE7)
+                builder.setLngE7(currentLngE7)
+                builder.setIsDelta(false)
+            } else {
+                // Optimization: Set doubles to 0.0 so they are omitted from the wire in Proto3
+                builder.setLat(0.0)
+                builder.setLng(0.0)
+                builder.setLatE7(currentLatE7 - prevLat)
+                builder.setLngE7(currentLngE7 - prevLng)
+                builder.setIsDelta(true)
+            }
         } else {
-            builder.setLatE7(currentLatE7 - prevLat)
-            builder.setLngE7(currentLngE7 - prevLng)
-            builder.setIsDelta(true)
+            builder.setLat(status.lat)
+            builder.setLng(status.lng)
+            builder.setLatE7((status.lat * 1e7).toInt())
+            builder.setLngE7((status.lng * 1e7).toInt())
+            builder.setIsDelta(false)
         }
         
         builder.setGpsTs(status.gpsTs)
