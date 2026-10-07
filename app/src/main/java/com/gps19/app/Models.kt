@@ -11,6 +11,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.7.5:
+ * - Issue #SIMP-1007-15: Unified Snapshot Container. Completed migration of 
+ *   ConnectionPoint and LogEntry to use unified ForensicSnapshot for all probes (snr, vibe, thermal, heap).
  * Oct.7.4:
  * - Issue #SIMP-1007-15: Unified Snapshot Container. Migrated snrSnapshot, 
  *   vibeSnapshot, thermalSnapshot, and heapSnapshot into ForensicSnapshot container 
@@ -156,6 +159,12 @@ class ConnectionPoint(
     var activityType: ActivityType = ActivityType.UNKNOWN,
     val forensic: ForensicSnapshot = ForensicSnapshot()
 ) {
+    var snrSnapshot: Double?
+        get() = forensic.snr
+        set(value) { forensic.snr = value }
+    var vibeSnapshot: Double?
+        get() = forensic.vibe
+        set(value) { forensic.vibe = value }
     var thermalSnapshot: Double?
         get() = forensic.thermal
         set(value) { forensic.thermal = value }
@@ -204,7 +213,8 @@ class ConnectionPoint(
                gpsHardwareLock == other.gpsHardwareLock && isAnchorLocked == other.isAnchorLocked &&
                isGnssThrottled == other.isGnssThrottled && thermalHeadroom == other.thermalHeadroom && 
                heapAllocatedMb == other.heapAllocatedMb && activityType == other.activityType &&
-               thermalSnapshot == other.thermalSnapshot && heapSnapshot == other.heapSnapshot
+               forensic.snr == other.forensic.snr && forensic.vibe == other.forensic.vibe &&
+               forensic.thermal == other.forensic.thermal && forensic.heap == other.forensic.heap
     }
 
     fun reset() {
@@ -299,8 +309,8 @@ data class LogEntry(
         return timestamp == other.timestamp && message == other.message && 
                count == other.count && durationMs == other.durationMs &&
                lat == other.lat && lng == other.lng && accuracy == other.accuracy &&
-               snrSnapshot == other.snrSnapshot && vibeSnapshot == other.vibeSnapshot &&
-               thermalSnapshot == other.thermalSnapshot && heapSnapshot == other.heapSnapshot
+               forensic.snr == other.forensic.snr && forensic.vibe == other.forensic.vibe &&
+               forensic.thermal == other.forensic.thermal && forensic.heap == other.forensic.heap
     }
 
     fun toJSONObject(): JSONObject {

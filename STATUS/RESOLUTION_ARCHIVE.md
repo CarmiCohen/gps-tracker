@@ -1,5 +1,18 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct7.5
+*   **Issue #SIMP-1007-15: Unified Snapshot Container (Completion).**
+    *   **Engine Parity**: Completed migration of `EngineConnectionPoint` and `AlarmEvent` to use the unified `ForensicSnapshot` container.
+    *   **App Parity**: Refactored `ConnectionPoint` and `LogEntry` in `Models.kt` to utilize the unified container for diagnostic probes.
+    *   **Logic Consolidation**: Updated `contentEquals`, `reset`, and `duplicate` methods across all telemetry models to ensure atomic snapshot handling and prevent data loss during pipeline emission.
+    *   **Persistence Mapping**: Verified Room entity mapping in `LogRepository` and `TelemetryMapper` to ensure flat database columns correctly interface with the domain container.
+
+## 🟢 Resolved in Oct7.4
+*   **Issue #SIMP-1007-15: Unified Snapshot Container (Architecture).**
+    *   **Architecture**: Introduced `ForensicSnapshot` data class in `LocationUpdate.kt` to group `snr`, `vibe`, `thermal`, and `heap` probes.
+    *   **IntegrityState Hardening**: Refactored `IntegrityState` to own a `forensic: ForensicSnapshot` property, simplifying `copyFrom()` and `reset()` logic.
+    *   **Monolith Delegation**: Updated `LocationUpdate` property delegates to route through `integrity.forensic`, maintaining API compatibility for the engine and UI while reducing internal complexity.
+
 ## 🟢 Resolved in Oct7.3
 *   **Issue #QA-1007-1: Telemetry Forensic Expansion & Radio Soak Validation.**
     *   **Protobuf Expansion**: Promoted 12 internal engine flags (muzzled, siren, hardware health, environmental lockouts, snapshots) to Protobuf for remote diagnostics.
@@ -13,13 +26,4 @@
     *   **A15 Compliance**: Verified `safeDouble` protection and FGS Special Use attributes for Android 15 compatibility.
 
 ## 🟢 Resolved in Oct7.1
-*   **Issue #SIMP-1006-14: Telemetry Field Pruning.**
-    *   **Root Cause Remediation**: Separated engine-internal evaluation state from transmission state in the `LocationUpdate` monolith.
-    *   **Architectural Hardening**: Marked scratchpad fields (`snrSnapshot`, `vibeSnapshot`, `suppressionNote`) and tick-local synchronization fields (`nowRt`, `nowTs`, `isMuzzled`, etc.) as `@Transient`. This ensures they are excluded from JSON serialization (used in signaling and secondary logging), reducing wire payload size and clarifying the API boundary for external consumers.
-
-## 🟢 Resolved in Oct6.23
-*   **Issue #QA-1006-12: Signaling Efficiency Hardening.**
-    *   **Root Cause Remediation**: Identified that log conflation windows were fixed and did not adapt to burst pressure, causing premature flushes.
-    *   **Architectural Hardening**: Refactored `SmartSignalingDispatcher` to implement dynamic conflation window scaling for logs, synchronized with the telemetry bucket strategy. This ensures 100Hz bursts are correctly conflated into high-density packets.
-*   **Issue #SIGN-1006-13: Conflation Strategy Consolidation.**
 ...

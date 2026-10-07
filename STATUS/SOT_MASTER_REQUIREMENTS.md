@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct7.3)
+# SOT Master Requirements & Hardening Status (Oct7.5)
 
-## 🏗️ Architectural Master Rules (162 Rules)
+## 🏗️ Architectural Master Rules (163 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -18,10 +18,12 @@
 *   **1.132 Conflation Strategy Consolidation (R-ID 511-T)**: Field-level conflation strategies for various data types (Maps, LocationUpdates, Logs) MUST be encapsulated within the `SignalingPipeline` implementation to minimize cross-module coupling and centralize protocol optimization logic. (Oct6.23 - Issue #SIGN-1006-13).
 *   **1.133 Telemetry Pruning & Serialization Scoping (R-ID 511-U)**: Data models shared between engine evaluation and signaling MUST use serialization-level scoping (e.g., `@Transient`) to exclude internal evaluation scratchpad fields from wire payloads. This ensures minimal radio overhead for JSON-based metadata channels while maintaining a unified domain monolith. (Oct7.1 - Issue #SIMP-1006-14).
 *   **1.134 Conflation Starvation Protection (R-ID 511-V)**: Signaling dispatchers MUST implement a starvation cap for dynamic conflation windows. The transmission deadline MUST be calculated relative to the arrival of the FIRST message in a burst to ensure a deterministic maximum latency (e.g., 2000ms) regardless of subsequent burst density. (Oct7.3 - Issue #QA-1007-1).
+*   **1.135 Unified Diagnostic Snapshots (R-ID 651)**: Diagnostic sensor probes (SNR, Vibration, Thermal, Heap) MUST be grouped into a unified immutable-friendly container (e.g., `ForensicSnapshot`) across all domain and UI models. This ensures atomic updates, simplifies state duplication (`duplicate()`), and reduces delegation boilerplate in the telemetry monolith. (Oct7.5 - Issue #SIMP-1007-15).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 651**: Unified Snapshot Container - Migrated all engine and app-level diagnostic probes into a grouped `ForensicSnapshot` container for architectural parity. (Oct7.5 - Issue #SIMP-1007-15).
 *   **SOT ID 650**: Forensic Telemetry Expansion - Promoted internal engine flags (muzzled, siren, hardware health, environmental lockouts) to Protobuf for remote diagnostics. (Oct7.3 - Issue #QA-1007-1).
 *   **SOT ID 649**: Conflation Starvation Protection - Implemented first-entry relative deadlines in `SmartSignalingDispatcher`. (Oct7.3 - Issue #QA-1007-1).
 *   **SOT ID 648**: Diagnostic UI Hardening - Corrected label mapping for Exact Alarms and verified signaling efficiency metrics. (Oct7.2 - Issue #QA-1006-12).
@@ -30,6 +32,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.267 (Forensic Container Parity Audit)**: PASSED - Verified that `EngineConnectionPoint`, `ConnectionPoint`, and `LogEntry` all delegate correctly to the unified `ForensicSnapshot`. Verified that `duplicate()` and `reset()` logic preserves snapshot integrity. (Oct7.5 - Issue #SIMP-1007-15).
 *   **Chapter 31.266 (Forensic Fidelity Audit)**: PASSED - Verified that internal engine flags (muzzled, siren, snapshots) are preserved during pipeline emission and correctly mapped to Protobuf. (Oct7.3 - Issue #QA-1007-1).
 *   **Chapter 31.265 (Diagnostic Label Audit)**: PASSED - Verified that the "Exact Alarm" item in the Diagnostics UI correctly reports the system permission state. (Oct7.2 - Issue #QA-1006-12).
 *   **Chapter 31.264 (Wire Payload Optimization Audit)**: PASSED - Verified that `nowRt`, `nowTs`, and evaluation scratchpad fields are excluded from JSON serialization in `LocationUpdate`. Payload size reduced by ~15% for metadata updates. (Oct7.1 - Issue #SIMP-1006-14).

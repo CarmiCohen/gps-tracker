@@ -5,6 +5,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.7.5:
+ * - Issue #SIMP-1007-15: Unified Snapshot Container. Ensured snr and vibe 
+ *   snapshots are included in ConnectionPoint persistence mapping.
  * Oct.7.3:
  * - Issue #QA-1007-1: Forensic Expansion. Promoted internal engine flags 
  *   (muzzled, siren, hardware, snapshots, acoustic/light environmental states) 
@@ -357,8 +360,10 @@ object TelemetryProtobufMapper {
         builder.setThermalHeadroom(PhysicsUtils.safeDouble(p.thermalHeadroom)).setHeapAllocatedMb(PhysicsUtils.safeDouble(p.heapAllocatedMb))
         builder.setActivityType(p.activityType.name)
         
+        p.snrSnapshot?.let { builder.setSnrSnapshot(PhysicsUtils.safeDouble(it)) }
+        p.vibeSnapshot?.let { builder.setVibeSnapshot(PhysicsUtils.safeDouble(it)) }
         p.thermalSnapshot?.let { builder.setThermalSnapshot(PhysicsUtils.safeDouble(it)) }
-        p.heapSnapshot?.let { builder.setHeapSnapshot(PhysicsUtils.safeDouble(p.heapSnapshot ?: 0.0)) }
+        p.heapSnapshot?.let { builder.setHeapSnapshot(PhysicsUtils.safeDouble(it)) }
 
         builder.setStatus(p.status.name)
         builder.setLocationPendingReason(LocationPendingReasonProto.valueOf("LPR_" + p.locationPendingReason.name))

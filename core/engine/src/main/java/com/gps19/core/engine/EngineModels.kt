@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.7.5:
+ * - Issue #SIMP-1007-15: Unified Snapshot Container. Completed migration of 
+ *   EngineConnectionPoint to use unified ForensicSnapshot for all probes (snr, vibe, thermal, heap).
  * Oct.7.4:
  * - Issue #SIMP-1007-15: Unified Snapshot Container. Migrated thermalSnapshot 
  *   and heapSnapshot into ForensicSnapshot container.
@@ -144,6 +147,12 @@ class EngineConnectionPoint(
     var activityType: ActivityType = ActivityType.UNKNOWN,
     val forensic: ForensicSnapshot = ForensicSnapshot()
 ) {
+    var snrSnapshot: Double?
+        get() = forensic.snr
+        set(value) { forensic.snr = value }
+    var vibeSnapshot: Double?
+        get() = forensic.vibe
+        set(value) { forensic.vibe = value }
     var thermalSnapshot: Double?
         get() = forensic.thermal
         set(value) { forensic.thermal = value }

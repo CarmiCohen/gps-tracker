@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct7.3
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct7.5
 
 ## 🎯 Current Resumption Focus: Radio Duty Cycle Analysis & Persistence Optimization.
 
@@ -9,12 +9,16 @@
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 1)
-*   **SIMP-1007-15: Unified Snapshot Container.** (Medium) - Consider moving snrSnapshot, vibeSnapshot, thermalSnapshot, and heapSnapshot into a single `ForensicSnapshot` data class within `IntegrityState` to simplify property delegation and copying logic.
+## 💡 Strategic Simplification Ideas (Ideas: 0)
+*   *(No simplification ideas pending)*
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #SIMP-1007-15: Unified Snapshot Container.** Resolved Oct7.5.
+    *   **Architecture**: Completed migration of `EngineConnectionPoint`, `ConnectionPoint`, and `LogEntry` to use unified `ForensicSnapshot`.
+    *   **Integrity**: Ensured `contentEquals`, `duplicate`, and `reset` methods across all models handle the unified container correctly.
+    *   **Persistence**: Verified flat Room column mapping in `LogEntity` and `HistoryEntity` correctly interfaces with the `ForensicSnapshot` domain object.
 *   **Issue #QA-1007-1: Telemetry Forensic Expansion & Radio Soak Validation.** Resolved Oct7.3.
     *   **Protobuf Expansion**: Promoted 12 internal engine flags (muzzled, siren, environmental lockouts, snapshots) to Protobuf for remote diagnostics.
     *   **Dispatcher Hardening**: Implemented first-entry starvation cap in `SmartSignalingDispatcher` to prevent indefinite conflation delays.
@@ -25,6 +29,6 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct7.5: [SOT Count: 312 (Rules: 163), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 58, QA: 586]**
+- **Oct7.4: [SOT Count: 310 (Rules: 162), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 58, QA: 584]**
 - **Oct7.3: [SOT Count: 308 (Rules: 162), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 58, QA: 582]**
-- **Oct7.2: [SOT Count: 306 (Rules: 161), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 57, QA: 578]**
-- **Oct7.1: [SOT Count: 306 (Rules: 161), Open: H:1, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 57, QA: 577]**
