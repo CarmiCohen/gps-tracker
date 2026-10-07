@@ -23,6 +23,8 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Oct.7.2:
+ * - Issue #QA-1006-12: Fixed status label for Exact Alarm (was using isOverlayGranted).
  * Oct.6.8:
  * - Issue #AUDIT-1006-8: Signaling Efficiency Audit. Added signaling metrics section 
  *   to expose real-time conflation efficiency and radio emission counts (Rule 1.123).
@@ -113,7 +115,7 @@ fun DiagnosticsScreen(
 
             DiagnosticItem(
                 title = "Exact Alarm",
-                status = if (permissions.isOverlayGranted) "GRANTED" else "DENIED", // Legacy field check
+                status = if (permissions.isExactAlarmGranted) "GRANTED" else "DENIED",
                 isOk = permissions.isExactAlarmGranted,
                 icon = Icons.Default.Alarm,
                 onClick = onRequestExactAlarm

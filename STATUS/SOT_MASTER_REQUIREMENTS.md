@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct7.1)
+# SOT Master Requirements & Hardening Status (Oct7.2)
 
 ## 🏗️ Architectural Master Rules (161 Rules)
 
@@ -21,14 +21,14 @@
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 648**: Diagnostic UI Hardening - Corrected label mapping for Exact Alarms and verified signaling efficiency metrics. (Oct7.2 - Issue #QA-1006-12).
 *   **SOT ID 647**: Telemetry Pruning - Marked internal engine evaluation fields as transient to optimize JSON wire payloads. (Oct7.1 - Issue #SIMP-1006-14).
 *   **SOT ID 646**: Conflation Strategy Consolidation - Migrated logic from `SignalingMessageConflator` to `SmartSignalingDispatcher` to centralize optimization. (Oct6.23 - Issue #SIGN-1006-13).
 *   **SOT ID 645**: SignalingPipeline Abstraction - Decoupled wire-level optimizations from `CommunicationManager`. (Oct6.20 - Issue #SIGN-1006-12).
-*   **SOT ID 644**: Protobuf Stream Compression - Initiated implementation of wire-level compression for large binary payloads. (Oct6.15 - Issue #AUDIT-1006-11).
 
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.265 (Diagnostic Label Audit)**: PASSED - Verified that the "Exact Alarm" item in the Diagnostics UI correctly reports the system permission state. (Oct7.2 - Issue #QA-1006-12).
 *   **Chapter 31.264 (Wire Payload Optimization Audit)**: PASSED - Verified that `nowRt`, `nowTs`, and evaluation scratchpad fields are excluded from JSON serialization in `LocationUpdate`. Payload size reduced by ~15% for metadata updates. (Oct7.1 - Issue #SIMP-1006-14).
 *   **Chapter 31.263 (Conflation Efficiency Audit)**: PASSED - Verified that high-frequency log bursts (100Hz) trigger dynamic conflation window extension. Fixed 0% conflation savings defect reported in audit. (Oct6.23 - Issue #QA-1006-12).
-*   **Chapter 31.262 (Pipeline Architecture Audit)**: PASSED - Verified that `CommunicationManager` no longer contains serialization or compression logic. (Oct6.20 - Issue #SIGN-1006-12).
