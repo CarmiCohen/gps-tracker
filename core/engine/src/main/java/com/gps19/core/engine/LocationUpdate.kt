@@ -1,6 +1,7 @@
 package com.gps19.core.engine
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 
 /**
  * KineticState: Spatial and motion telemetry.
@@ -227,18 +228,15 @@ data class IntegrityState(
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
+ * Oct.7.1:
+ * - Issue #SIMP-1006-14: Telemetry Field Pruning. Marked internal evaluation 
+ *   scratchpad and tick-local fields as @Transient to reduce JSON wire size.
+ * Oct.6.23:
+ * - Issue #SIGN-1006-13: Logic Consolidation. Convenience getters for engine-direct 
+ *   flags refined to ensure parity with internalized conflation handlers.
  * Oct.5.2:
  * - Issue #1344: Forensic Diagnostic Expansion. Integrated thermalSnapshot 
  *   and heapSnapshot into IntegrityState and monolith delegation (R1344).
- * Oct.3.1:
- * - Issue #1420: Granular HUD Binding. Implements Locatable, BatteryProvider, 
- *   and DeviceIdentity interfaces to allow UI slicing and reduce coupling.
- * Oct.2.9:
- * - Issue #1314: TrackerStatus Convergence. Merged TrackerStatus into 
- *   LocationUpdate to eliminate mapping layers. Added deviceId, viewerId, 
- *   rt, and convenience getters for signaling compatibility. Implements SpatialAnchor.
- * - Restored Mutability: Converted convenience properties to var with custom setters 
- *   to allow engine-direct assignment on flyweights.
  */
 @Serializable
 data class LocationUpdate(
@@ -248,33 +246,51 @@ data class LocationUpdate(
     var status: SentinelStatus = SentinelStatus.VALID,
     override var ts: Long = 0L,
     override var rt: Long = 0L,
+    
+    @Transient
     var isMe: Boolean = true,
+    
     var deviceId: String = "",
     override var viewerId: String = "",
     var trackerState: TrackerState = TrackerState.UNKNOWN,
     var isClockRegression: Boolean = false,
     var lastValidFixRt: Long = 0L,
 
-    // --- Merged Engine Evaluation Fields ---
+    // --- Merged Engine Evaluation Fields (Internal) ---
+    @Transient
     var nowRt: Long = 0L,
+    @Transient
     var nowTs: Long = 0L,
+    @Transient
     var isMuzzled: Boolean = false,
+    @Transient
     var isWarming: Boolean = false,
+    @Transient
     var isSirenActive: Boolean = false,
+    @Transient
     var isHardwareOnline: Boolean = true,
+    @Transient
     var localInternetLoss: Boolean = false,
+    @Transient
     var acousticLockoutRt: Long = 0L,
+    @Transient
     var lightSpikeRt: Long = 0L,
+    @Transient
     var providedAdaptiveFloor: Double = -1.0,
+    @Transient
     var acousticMinDb: Double = -1.0,
+    
     var lastAlarmAckTs: Long = 0L,
     var violationStartTs: Long = 0L,
 
-    // Evaluation Scratchpad Fields
+    // Evaluation Scratchpad Fields (Internal)
+    @Transient
     var snrSnapshot: Double? = null,
+    @Transient
     var vibeSnapshot: Double? = null,
     
-    // Engine-Direct Flags (Converged)
+    // Engine-Direct Flags (Internal)
+    @Transient
     var suppressionNote: String? = null
 ) : SpatialAnchor, Locatable, BatteryProvider, DeviceIdentity {
 

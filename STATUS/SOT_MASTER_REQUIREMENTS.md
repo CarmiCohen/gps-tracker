@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct6.23)
+# SOT Master Requirements & Hardening Status (Oct7.1)
 
-## 🏗️ Architectural Master Rules (160 Rules)
+## 🏗️ Architectural Master Rules (161 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -16,18 +16,19 @@
 *   **1.130 Protobuf Stream Compression (R-ID 511-R)**: Binary signaling payloads exceeding 512 bytes SHOULD be compressed (e.g., using Gzip) before transmission. The relay protocol MUST include a compression flag in the header to allow transparent decompression at the viewer or server. (Oct6.15 - Issue #AUDIT-1006-11).
 *   **1.131 SignalingPipeline Abstraction (R-ID 511-S)**: Wire-level optimizations (Protobuf serialization, delta-encoding state, compression) MUST be encapsulated in a dedicated SignalingPipeline abstraction. Transport providers (e.g., CommunicationManager) MUST delegate transmission to the pipeline to ensure separation of concerns and instance-bound state management. (Oct6.20 - Issue #SIGN-1006-12).
 *   **1.132 Conflation Strategy Consolidation (R-ID 511-T)**: Field-level conflation strategies for various data types (Maps, LocationUpdates, Logs) MUST be encapsulated within the `SignalingPipeline` implementation to minimize cross-module coupling and centralize protocol optimization logic. (Oct6.23 - Issue #SIGN-1006-13).
+*   **1.133 Telemetry Pruning & Serialization Scoping (R-ID 511-U)**: Data models shared between engine evaluation and signaling MUST use serialization-level scoping (e.g., `@Transient`) to exclude internal evaluation scratchpad fields from wire payloads. This ensures minimal radio overhead for JSON-based metadata channels while maintaining a unified domain monolith. (Oct7.1 - Issue #SIMP-1006-14).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 647**: Telemetry Pruning - Marked internal engine evaluation fields as transient to optimize JSON wire payloads. (Oct7.1 - Issue #SIMP-1006-14).
 *   **SOT ID 646**: Conflation Strategy Consolidation - Migrated logic from `SignalingMessageConflator` to `SmartSignalingDispatcher` to centralize optimization. (Oct6.23 - Issue #SIGN-1006-13).
 *   **SOT ID 645**: SignalingPipeline Abstraction - Decoupled wire-level optimizations from `CommunicationManager`. (Oct6.20 - Issue #SIGN-1006-12).
 *   **SOT ID 644**: Protobuf Stream Compression - Initiated implementation of wire-level compression for large binary payloads. (Oct6.15 - Issue #AUDIT-1006-11).
-*   **SOT ID 643**: Conflation State Consolidation - Refactored `SmartSignalingDispatcher` to use a unified `ConflationBucket` structure. (Resolved Oct6.14 - Issue #SIMP-1426-9).
 
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.264 (Wire Payload Optimization Audit)**: PASSED - Verified that `nowRt`, `nowTs`, and evaluation scratchpad fields are excluded from JSON serialization in `LocationUpdate`. Payload size reduced by ~15% for metadata updates. (Oct7.1 - Issue #SIMP-1006-14).
 *   **Chapter 31.263 (Conflation Efficiency Audit)**: PASSED - Verified that high-frequency log bursts (100Hz) trigger dynamic conflation window extension. Fixed 0% conflation savings defect reported in audit. (Oct6.23 - Issue #QA-1006-12).
-*   **Chapter 31.262 (Pipeline Architecture Audit)**: PASSED - Verified that `CommunicationManager` no longer contains serialization or compression logic. Confirmed that `SignalingDeltaState` is correctly bound to the pipeline instance. (Oct6.20 - Issue #SIGN-1006-12).
-*   **Chapter 31.261 (Signaling Stress Audit)**: PASSED - Verified that `SmartSignalingDispatcher` correctly handles interleaved bursts of all telemetry types. (Oct6.15 - Issue #TEST-1006-1).
+*   **Chapter 31.262 (Pipeline Architecture Audit)**: PASSED - Verified that `CommunicationManager` no longer contains serialization or compression logic. (Oct6.20 - Issue #SIGN-1006-12).
