@@ -18,13 +18,13 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Oct.6.21:
+ * - Issue #QA-1006-12: Forensic Hardening. Integrated PhysicsUtils.safeDouble 
+ *   into currentPointFlyweight assignments to prevent SQLiteConstraintExceptions 
+ *   (NaN/Infinity) during high-pressure bursts. Fixed typo in archive key.
  * Oct.5.2:
  * - Issue #1344: Forensic Diagnostic Expansion. Integrated thermalSnapshot 
  *   and heapSnapshot into ribbon aggregation (R1344).
- * Oct.4.5:
- * - Issue #1425: Unified Clock Authority. Migrated periodic trigger to 
- *   monotonic time (lastTimeTriggerRt) to prevent task skipping/double-triggers 
- *   during NTP syncs.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -199,20 +199,40 @@ class HistoryManager @Inject constructor(
         currentPointFlyweight.apply {
             ts = now; rt = nowRt; this.rtt = rtt; remoteSig = peerSignal; isConnected = peerAvail; isGap = false
             this.isRecoveryEvent = isRecoveryEvent
-            this.hasGps = hasGps; this.accuracy = accuracy; this.maxAccuracy = maxAccuracy
+            this.hasGps = hasGps; 
+            this.accuracy = PhysicsUtils.safeDouble(accuracy)
+            this.maxAccuracy = PhysicsUtils.safeDouble(maxAccuracy)
             this.isSitDetected = applySitDuplicateGuard(isSitDetected, now, nowRt)
-            this.isSitActive = isSitActive; this.verticalVelocity = verticalVelocity; this.sitVz = sitVz
-            this.sitVzTs = sitVzTs; this.sitVzRt = sitVzRt; this.sitDz = sitDz; this.sitBaro = sitBaro
-            this.sitTilt = sitTilt; this.sitShock = sitShock; this.isBatterySteepDischarge = isBatterySteepDischarge
-            this.isCoolingModeActive = isCoolingModeActive; this.speed = speed; this.bearing = bearing; isTick = false
-            this.currentMa = currentMa; this.locationPendingReason = locationPendingReason; this.kineticEnergy = kineticEnergy
-            this.cpuLoad = cpuLoad; this.ioWait = ioWait; this.maxIoLatency = maxIoLatency; this.isSilentFailure = isSilentFailure
+            this.isSitActive = isSitActive; 
+            this.verticalVelocity = PhysicsUtils.safeDouble(verticalVelocity)
+            this.sitVz = PhysicsUtils.safeDouble(sitVz)
+            this.sitVzTs = sitVzTs; this.sitVzRt = sitVzRt; 
+            this.sitDz = PhysicsUtils.safeDouble(sitDz)
+            this.sitBaro = PhysicsUtils.safeDouble(sitBaro)
+            this.sitTilt = PhysicsUtils.safeDouble(sitTilt)
+            this.sitShock = PhysicsUtils.safeDouble(sitShock)
+            this.isBatterySteepDischarge = isBatterySteepDischarge
+            this.isCoolingModeActive = isCoolingModeActive; 
+            this.speed = PhysicsUtils.safeDouble(speed)
+            this.bearing = PhysicsUtils.safeDouble(bearing)
+            isTick = false
+            this.currentMa = currentMa; this.locationPendingReason = locationPendingReason; 
+            this.kineticEnergy = PhysicsUtils.safeDouble(kineticEnergy)
+            this.cpuLoad = PhysicsUtils.safeDouble(cpuLoad)
+            this.ioWait = PhysicsUtils.safeDouble(ioWait)
+            this.maxIoLatency = maxIoLatency; this.isSilentFailure = isSilentFailure
             this.isBatteryLow = isBatteryLow; this.isBatteryCritical = isBatteryCritical
-            this.noiseIdx = noiseIdx; this.luxIdx = luxIdx; this.vibeIdx = vibeIdx; this.proxIdx = proxIdx
-            this.initLiftIdx(liftIdx); this.snrIdx = snrIdx; this.tiltIdx = tiltIdx; this.baroIdx = baroIdx
+            this.noiseIdx = PhysicsUtils.safeDouble(noiseIdx)
+            this.luxIdx = PhysicsUtils.safeDouble(luxIdx)
+            this.vibeIdx = PhysicsUtils.safeDouble(vibeIdx)
+            this.proxIdx = PhysicsUtils.safeDouble(proxIdx)
+            this.initLiftIdx(PhysicsUtils.safeDouble(liftIdx))
+            this.snrIdx = PhysicsUtils.safeDouble(snrIdx)
+            this.tiltIdx = PhysicsUtils.safeDouble(tiltIdx)
+            this.baroIdx = PhysicsUtils.safeDouble(baroIdx)
             this.isUltraLongStationary = isUltraLongStationary
-            this.thermalSnapshot = thermalSnapshot
-            this.heapSnapshot = heapSnapshot
+            this.thermalSnapshot = thermalSnapshot?.let { PhysicsUtils.safeDouble(it) }
+            this.heapSnapshot = heapSnapshot?.let { PhysicsUtils.safeDouble(it) }
         }
         
         aggregator.processPoint(currentPointFlyweight) { scale, point ->

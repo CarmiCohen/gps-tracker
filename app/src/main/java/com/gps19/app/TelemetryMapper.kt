@@ -6,14 +6,14 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.6.21:
+ * - Issue #QA-1006-12: Forensic Hardening. Integrated PhysicsUtils.safeDouble 
+ *   into mapAppToEntity and mapStatusToPending to ensure NaN/Infinity values 
+ *   do not trigger SQLiteConstraintExceptions in the persistence layer.
  * Oct.5.2:
  * - Issue #1344: Forensic Diagnostic Expansion. Restored accidentally removed 
  *   mapping functions and integrated thermalSnapshot/heapSnapshot into 
  *   all restoration and health projection paths (R1344).
- * Oct.5.1:
- * - Issue #1173: Protobuf-First Persistence (Phase 2). Updated restoration paths 
- *   in mapEntityToApp and mapPendingToStatus to prioritize binary payloads. 
- *   Added mapProtoToApp for connection history restoration (R1173).
  */
 object TelemetryMapper {
 
@@ -547,8 +547,15 @@ object TelemetryMapper {
             violationUptimeMs = p.violationUptimeMs; gpsHardwareLock = p.gpsHardwareLock
 
             // Forensic Parity
-            snrIdx = p.snrIdx; noiseIdx = p.noiseIdx; luxIdx = p.luxIdx; vibeIdx = p.vibeIdx
-            proxIdx = p.proxIdx; liftIdx = p.liftIdx; tiltIdx = p.tiltIdx; baroIdx = p.baroIdx
+            snrIdx = PhysicsUtils.safeDouble(p.snrIdx)
+            noiseIdx = PhysicsUtils.safeDouble(p.noiseIdx)
+            luxIdx = PhysicsUtils.safeDouble(p.luxIdx)
+            vibeIdx = PhysicsUtils.safeDouble(p.vibeIdx)
+            proxIdx = PhysicsUtils.safeDouble(p.proxIdx)
+            liftIdx = PhysicsUtils.safeDouble(p.liftIdx)
+            tiltIdx = PhysicsUtils.safeDouble(p.tiltIdx)
+            baroIdx = PhysicsUtils.safeDouble(p.baroIdx)
+            
             isSitDetected = p.isSitDetected; isSitActive = p.isSitActive; verticalVelocity = p.verticalVelocity
             sitVz = p.sitVz; sitVzTs = p.sitVzTs; sitVzRt = p.sitVzRt; sitDz = p.sitDz
             sitBaro = p.sitBaro; sitTilt = p.sitTilt; sitShock = p.sitShock; kineticEnergy = p.kineticEnergy
@@ -575,8 +582,15 @@ object TelemetryMapper {
             locationPendingReason = try { LocationPendingReason.valueOf(proto.locationPendingReason.name.removePrefix("LPR_")) } catch(e: Exception) { LocationPendingReason.NONE }
 
             // Forensic Parity
-            snrIdx = proto.snrIdx; noiseIdx = proto.noiseIdx; luxIdx = proto.luxIdx; vibeIdx = proto.vibeIdx
-            proxIdx = proto.proxIdx; liftIdx = proto.liftIdx; tiltIdx = proto.tiltIdx; baroIdx = proto.baroIdx
+            snrIdx = PhysicsUtils.safeDouble(proto.snrIdx)
+            noiseIdx = PhysicsUtils.safeDouble(proto.noiseIdx)
+            luxIdx = PhysicsUtils.safeDouble(proto.luxIdx)
+            vibeIdx = PhysicsUtils.safeDouble(proto.vibeIdx)
+            proxIdx = PhysicsUtils.safeDouble(proto.proxIdx)
+            liftIdx = PhysicsUtils.safeDouble(proto.liftIdx)
+            tiltIdx = PhysicsUtils.safeDouble(proto.tiltIdx)
+            baroIdx = PhysicsUtils.safeDouble(proto.baroIdx)
+
             isSitDetected = proto.isSitDetected; isSitActive = proto.isSitActive
             verticalVelocity = proto.verticalVelocity; sitVz = proto.sitVz; sitVzTs = proto.sitVzTs
             sitVzRt = proto.sitVzRt; sitDz = proto.sitDz; sitBaro = proto.sitBaro
@@ -615,9 +629,16 @@ object TelemetryMapper {
             locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE }
 
             // Forensic Parity
-            gpsIndex = entity.gpsIndex; snrIdx = entity.snrIdx; noiseIdx = entity.noiseIdx
-            luxIdx = entity.luxIdx; vibeIdx = entity.vibeIdx; proxIdx = entity.proxIdx
-            liftIdx = entity.liftIdx; tiltIdx = entity.tiltIdx; baroIdx = entity.baroIdx
+            gpsIndex = entity.gpsIndex
+            snrIdx = PhysicsUtils.safeDouble(entity.snrIdx)
+            noiseIdx = PhysicsUtils.safeDouble(entity.noiseIdx)
+            luxIdx = PhysicsUtils.safeDouble(entity.luxIdx)
+            vibeIdx = PhysicsUtils.safeDouble(entity.vibeIdx)
+            proxIdx = PhysicsUtils.safeDouble(entity.proxIdx)
+            liftIdx = PhysicsUtils.safeDouble(entity.liftIdx)
+            tiltIdx = PhysicsUtils.safeDouble(entity.tiltIdx)
+            baroIdx = PhysicsUtils.safeDouble(entity.baroIdx)
+
             isSitDetected = entity.isSitDetected; isSitActive = entity.isSitActive
             verticalVelocity = entity.verticalVelocity; sitVz = entity.sitVz; sitVzTs = entity.sitVzTs
             sitVzRt = entity.sitVzRt; sitDz = entity.sitDz; sitBaro = entity.sitBaro
@@ -643,19 +664,32 @@ object TelemetryMapper {
         return HistoryEntity(
             ts = p.ts, rt = p.rt, rtt = p.rtt, isConnected = p.isConnected, isGap = p.isGap,
             isRecoveryEvent = p.isRecoveryEvent, hasGps = p.hasGps, isTick = p.isTick, ribbonKey = ribbonKey,
-            gpsIndex = p.gpsIndex, noiseIdx = p.noiseIdx, luxIdx = p.luxIdx, vibeIdx = p.vibeIdx,
-            proxIdx = p.proxIdx, liftIdx = p.liftIdx, snrIdx = p.snrIdx, tiltIdx = p.tiltIdx,
-            baroIdx = p.baroIdx, verticalVelocity = p.verticalVelocity, sitVz = p.sitVz,
-            sitVzTs = p.sitVzTs, sitVzRt = p.sitVzRt, sitDz = p.sitDz,
+            gpsIndex = PhysicsUtils.safeDouble(p.gpsIndex), 
+            noiseIdx = PhysicsUtils.safeDouble(p.noiseIdx), 
+            luxIdx = PhysicsUtils.safeDouble(p.luxIdx), 
+            vibeIdx = PhysicsUtils.safeDouble(p.vibeIdx),
+            proxIdx = PhysicsUtils.safeDouble(p.proxIdx), 
+            liftIdx = PhysicsUtils.safeDouble(p.liftIdx), 
+            snrIdx = PhysicsUtils.safeDouble(p.snrIdx), 
+            tiltIdx = PhysicsUtils.safeDouble(p.tiltIdx),
+            baroIdx = PhysicsUtils.safeDouble(p.baroIdx), 
+            verticalVelocity = PhysicsUtils.safeDouble(p.verticalVelocity), 
+            sitVz = PhysicsUtils.safeDouble(p.sitVz),
+            sitVzTs = p.sitVzTs, sitVzRt = p.sitVzRt, sitDz = PhysicsUtils.safeDouble(p.sitDz),
             isBatterySteepDischarge = p.isBatterySteepDischarge, remoteSig = p.remoteSig,
-            isCoolingModeActive = p.isCoolingModeActive, speed = p.speed, bearing = p.bearing,
-            isSitDetected = p.isSitDetected, isSitActive = p.isSitActive, sitBaro = p.sitBaro,
-            sitTilt = p.sitTilt, sitShock = p.sitShock, currentMa = p.currentMa,
-            locationPendingReason = p.locationPendingReason.name, accuracy = p.gpsAccuracy,
-            maxAccuracy = p.maxAccuracy, isAnchorLocked = p.isAnchorLocked, isBatteryLow = p.isBatteryLow,
+            isCoolingModeActive = p.isCoolingModeActive, speed = PhysicsUtils.safeDouble(p.speed), 
+            bearing = PhysicsUtils.safeDouble(p.bearing),
+            isSitDetected = p.isSitDetected, isSitActive = p.isSitActive, 
+            sitBaro = PhysicsUtils.safeDouble(p.sitBaro),
+            sitTilt = PhysicsUtils.safeDouble(p.sitTilt), 
+            sitShock = PhysicsUtils.safeDouble(p.sitShock), 
+            currentMa = p.currentMa,
+            locationPendingReason = p.locationPendingReason.name, accuracy = PhysicsUtils.safeDouble(p.gpsAccuracy),
+            maxAccuracy = PhysicsUtils.safeDouble(p.maxAccuracy), isAnchorLocked = p.isAnchorLocked, isBatteryLow = p.isBatteryLow,
             isBatteryCritical = p.isBatteryCritical, violationUptimeMs = p.violationUptimeMs,
             isUltraLongStationary = p.isUltraLongStationary, gpsHardwareLock = p.gpsHardwareLock,
-            thermalHeadroom = p.thermalHeadroom, heapAllocatedMb = p.heapAllocatedMb,
+            thermalHeadroom = PhysicsUtils.safeDouble(p.thermalHeadroom), 
+            heapAllocatedMb = PhysicsUtils.safeDouble(p.heapAllocatedMb),
             activityType = p.activityType.name,
             payload = TelemetryProtobufMapper.mapAppToBinary(p)
         )
@@ -667,18 +701,28 @@ object TelemetryMapper {
      */
     fun mapStatusToPending(status: LocationUpdate): PendingStatusEntity {
         return PendingStatusEntity(
-            lat = status.lat, lng = status.lng, speed = status.speed, accuracy = status.accuracy,
-            bearing = status.bearing, battery = status.battery, temp = status.temp,
+            lat = status.lat, lng = status.lng, speed = PhysicsUtils.safeDouble(status.speed), 
+            accuracy = PhysicsUtils.safeDouble(status.accuracy),
+            bearing = PhysicsUtils.safeDouble(status.bearing), battery = status.battery, 
+            temp = PhysicsUtils.safeDouble(status.temp),
             isCharging = status.isCharging, currentMa = status.currentMa, timestamp = status.ts,
             gpsTs = status.gpsTs, satsView = status.satsView, satsUsed = status.satsUsed,
-            maxAccuracy = status.maxAccuracy, snrIdx = status.snrIdx, noiseIdx = status.noiseIdx,
-            luxIdx = status.luxIdx, vibeIdx = status.vibeIdx, proxIdx = status.proxIdx,
-            liftIdx = status.atmospheric.liftIdx, tiltIdx = status.tiltIdx, baroIdx = status.baroIdx,
+            maxAccuracy = PhysicsUtils.safeDouble(status.maxAccuracy), 
+            snrIdx = PhysicsUtils.safeDouble(status.snrIdx), 
+            noiseIdx = PhysicsUtils.safeDouble(status.noiseIdx),
+            luxIdx = PhysicsUtils.safeDouble(status.luxIdx), 
+            vibeIdx = PhysicsUtils.safeDouble(status.vibeIdx), 
+            proxIdx = PhysicsUtils.safeDouble(status.proxIdx),
+            liftIdx = PhysicsUtils.safeDouble(status.atmospheric.liftIdx), 
+            tiltIdx = PhysicsUtils.safeDouble(status.tiltIdx), 
+            baroIdx = PhysicsUtils.safeDouble(status.baroIdx),
             isBatterySteepDischarge = status.isBatterySteepDischarge, isCoolingModeActive = status.isCoolingModeActive,
-            isSitDetected = status.isSitDetected, isSitActive = status.isSitActive, sitVz = status.sitVz,
-            sitVzTs = status.integrity.sitVzTs, sitVzRt = status.integrity.sitVzRt, sitDz = status.sitDz,
-            verticalVelocity = status.verticalVelocity, sitBaro = status.sitBaro, sitTilt = status.sitTilt,
-            sitShock = status.sitShock, isStorageLow = status.isStorageLow,
+            isSitDetected = status.isSitDetected, isSitActive = status.isSitActive, sitVz = PhysicsUtils.safeDouble(status.sitVz),
+            sitVzTs = status.integrity.sitVzTs, sitVzRt = status.integrity.sitVzRt, sitDz = PhysicsUtils.safeDouble(status.sitDz),
+            verticalVelocity = PhysicsUtils.safeDouble(status.verticalVelocity), 
+            sitBaro = PhysicsUtils.safeDouble(status.sitBaro), 
+            sitTilt = PhysicsUtils.safeDouble(status.sitTilt),
+            sitShock = PhysicsUtils.safeDouble(status.sitShock), isStorageLow = status.isStorageLow,
             isStorageCritical = status.isStorageCritical, isPowerSaveMode = status.isPowerSaveMode,
             standbyBucket = status.standbyBucket, netInterface = status.netInterface,
             lastValidFixRt = status.lastValidFixRt, locationPendingReason = status.locationPendingReason.name,
@@ -686,8 +730,8 @@ object TelemetryMapper {
             status = status.status.name, isBatteryLow = status.isBatteryLow,
             isBatteryCritical = status.isBatteryCritical, isUltraLongStationary = status.isUltraLongStationary,
             violationUptimeMs = status.violationUptimeMs, gpsHardwareLock = status.gpsHardwareLock,
-            isGnssThrottled = status.isGnssThrottled, thermalHeadroom = status.integrity.thermalHeadroom,
-            heapAllocatedMb = status.integrity.heapAllocatedMb, activityType = status.activityType.name,
+            isGnssThrottled = status.isGnssThrottled, thermalHeadroom = PhysicsUtils.safeDouble(status.integrity.thermalHeadroom),
+            heapAllocatedMb = PhysicsUtils.safeDouble(status.integrity.heapAllocatedMb), activityType = status.activityType.name,
             payload = TelemetryProtobufMapper.mapStatusToBinary(status)
         )
     }

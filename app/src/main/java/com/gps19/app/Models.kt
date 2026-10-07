@@ -1,6 +1,7 @@
 package com.gps19.app
 
 import com.gps19.core.engine.*
+import com.gps19.core.engine.PhysicsUtils.safeDouble
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
 import org.json.JSONObject
@@ -10,16 +11,10 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * Oct.5.6:
- * - Issue #1328: Phase 2 - UI Performance Hardening. Consolidated Dashboard state 
- *   to eliminate high-frequency root recompositions. Added isRedScreenVisible and 
- *   isAlarmSilenced to HudHealthState for granular binding.
- * Oct.5.2:
- * - Issue #1344: Forensic Diagnostic Expansion. Added thermalSnapshot and 
- *   heapSnapshot to ConnectionPoint for history restoration parity (R1344).
- * Oct.3.1:
- * - Issue #1420: Granular HUD Binding. Refactored HUD component states to 
- *   implement slice-based interfaces (Locatable, DeviceIdentity, BatteryProvider).
+ * Oct.6.21:
+ * - Issue #QA-1006-12: Forensic Hardening. Integrated safeDouble into 
+ *   LogEntry.toJSONObject to prevent JSONExceptions (NaN/Infinity) during 
+ *   high-pressure telemetry bursts. Ensures stability under stress test.
  */
 
 @Serializable
@@ -302,21 +297,24 @@ data class LogEntry(
             put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
             put("count", count); put("duration_ms", durationMs); put("is_special", isSpecial)
             put("first_seen_ts", if (firstSeenTs == 0L) timestamp else firstSeenTs); put("role", role)
-            if (lat != 0.0) put("lat", lat)
-            if (lng != 0.0) put("lng", lng)
-            if (accuracy != 0.0) put("accuracy", accuracy)
-            if (maxAccuracy != 0.0) put("max_accuracy", maxAccuracy)
+            
+            // Oct.6.21: Hardened numeric puts to prevent JSONExceptions (Rule 1.125)
+            if (lat != 0.0) put("lat", safeDouble(lat))
+            if (lng != 0.0) put("lng", safeDouble(lng))
+            if (accuracy != 0.0) put("accuracy", safeDouble(accuracy))
+            if (maxAccuracy != 0.0) put("max_accuracy", safeDouble(maxAccuracy))
+            
             specialColor?.let { put("special_color", it) }
-            extremeValue?.let { if (!it.isNaN() && !it.isInfinite()) put("extreme_value", it) }
-            snrSnapshot?.let { put("snr_snapshot", it) }
-            vibeSnapshot?.let { put("vibe_snapshot", it) }
+            extremeValue?.let { put("extreme_value", safeDouble(it)) }
+            snrSnapshot?.let { put("snr_snapshot", safeDouble(it)) }
+            vibeSnapshot?.let { put("vibe_snapshot", safeDouble(it)) }
             if (spillIdx != -1) put("spill_idx", spillIdx)
             if (gpsHardwareLock) put("gps_hw_lock", true)
-            tempSnapshot?.let { put("temp_snapshot", it) }
+            tempSnapshot?.let { put("temp_snapshot", safeDouble(it)) }
             battSnapshot?.let { put("batt_snapshot", it) }
             chargingSnapshot?.let { put("charging_snapshot", it) }
-            thermalSnapshot?.let { put("thermal_snapshot", it) }
-            heapSnapshot?.let { put("heap_snapshot", it) }
+            thermalSnapshot?.let { put("thermal_snapshot", safeDouble(it)) }
+            heapSnapshot?.let { put("heap_snapshot", safeDouble(it)) }
         }
     }
 

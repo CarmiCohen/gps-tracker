@@ -1,19 +1,17 @@
 package com.gps19.core.engine
 
+import com.gps19.core.engine.PhysicsUtils.safeDouble
 import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * Oct.6.21:
+ * - Issue #QA-1006-12: Forensic Hardening. Integrated safeDouble into 
+ *   MutableAggregationPoint to ensure NaN/Infinity values are sanitized 
+ *   during aggregation and final write-out to connection history entities.
  * Oct.5.2:
  * - Issue #1344: Forensic Diagnostic Expansion. Integrated thermalHeadroom, 
  *   heapAllocatedMb, and ActivityType into aggregation logic (R1344).
- * Oct.2.6:
- * - Issue #1175: Real-time Only Path. Removed backfillGaps and fillRealGap 
- *   as part of the strategic simplification of the telemetry pipeline.
- * Sep.21.127:
- * - Issue #1156/1157: Telemetry Abstraction Integration.
- * Sep.13.30:
- * - Issue #1017 Hardening: Added reset().
  */
 class TelemetryAggregator {
 
@@ -79,46 +77,46 @@ class TelemetryAggregator {
             isConnected = point.isConnected
             hasGps = point.hasGps
             isRecoveryEvent = point.isRecoveryEvent
-            accuracy = point.accuracy
-            maxAccuracy = point.maxAccuracy
+            accuracy = safeDouble(point.accuracy)
+            maxAccuracy = safeDouble(point.maxAccuracy)
             isBatterySteepDischarge = point.isBatterySteepDischarge
             isCoolingModeActive = point.isCoolingModeActive
-            speed = point.speed
-            bearing = point.bearing
+            speed = safeDouble(point.speed)
+            bearing = safeDouble(point.bearing)
             currentMa = point.currentMa
             locationPendingReason = point.locationPendingReason
-            gpsIndex = point.gpsIndex
-            noiseIdx = point.noiseIdx
-            luxIdx = point.luxIdx
-            vibeIdx = point.vibeIdx
-            proxIdx = point.proxIdx
-            proxSum = point.proxIdx
+            gpsIndex = safeDouble(point.gpsIndex)
+            noiseIdx = safeDouble(point.noiseIdx)
+            luxIdx = safeDouble(point.luxIdx)
+            vibeIdx = safeDouble(point.vibeIdx)
+            proxIdx = safeDouble(point.proxIdx)
+            proxSum = safeDouble(point.proxIdx)
             proxCount = 1
-            liftIdx = point.liftIdx
-            snrIdx = point.snrIdx
-            tiltIdx = point.tiltIdx
-            baroIdx = point.baroIdx
+            liftIdx = safeDouble(point.liftIdx)
+            snrIdx = safeDouble(point.snrIdx)
+            tiltIdx = safeDouble(point.tiltIdx)
+            baroIdx = safeDouble(point.baroIdx)
             isSitDetected = point.isSitDetected
             isSitActive = point.isSitActive
-            sitVz = point.sitVz
+            sitVz = safeDouble(point.sitVz)
             sitVzTs = point.sitVzTs
             sitVzRt = point.sitVzRt
-            sitShock = point.sitShock
-            kineticEnergy = point.kineticEnergy
+            sitShock = safeDouble(point.sitShock)
+            kineticEnergy = safeDouble(point.kineticEnergy)
             gpsHardwareLock = point.gpsHardwareLock
-            cpuLoad = point.cpuLoad
-            ioWait = point.ioWait
+            cpuLoad = safeDouble(point.cpuLoad)
+            ioWait = safeDouble(point.ioWait)
             maxIoLatency = point.maxIoLatency
             isSilentFailure = point.isSilentFailure
             isUltraLongStationary = point.isUltraLongStationary
             violationUptimeMs = point.violationUptimeMs
             isBatteryLow = point.isBatteryLow
             isBatteryCritical = point.isBatteryCritical
-            thermalHeadroom = point.thermalHeadroom
-            heapAllocatedMb = point.heapAllocatedMb
+            thermalHeadroom = safeDouble(point.thermalHeadroom)
+            heapAllocatedMb = safeDouble(point.heapAllocatedMb)
             activityType = point.activityType
-            thermalSnapshot = point.thermalSnapshot
-            heapSnapshot = point.heapSnapshot
+            thermalSnapshot = point.thermalSnapshot?.let { safeDouble(it) }
+            heapSnapshot = point.heapSnapshot?.let { safeDouble(it) }
         }
 
         fun merge(cur: EngineConnectionPoint) {
@@ -127,48 +125,48 @@ class TelemetryAggregator {
             isConnected = isConnected && cur.isConnected
             hasGps = hasGps && cur.hasGps
             isRecoveryEvent = isRecoveryEvent || cur.isRecoveryEvent
-            accuracy = max(accuracy, cur.accuracy)
-            maxAccuracy = max(maxAccuracy, cur.maxAccuracy)
+            accuracy = safeDouble(max(accuracy, cur.accuracy))
+            maxAccuracy = safeDouble(max(maxAccuracy, cur.maxAccuracy))
             isBatterySteepDischarge = isBatterySteepDischarge || cur.isBatterySteepDischarge
             isCoolingModeActive = isCoolingModeActive || cur.isCoolingModeActive
-            speed = max(speed, cur.speed)
-            if (cur.hasGps) bearing = cur.bearing
+            speed = safeDouble(max(speed, cur.speed))
+            if (cur.hasGps) bearing = safeDouble(cur.bearing)
             currentMa = min(currentMa, cur.currentMa)
             locationPendingReason = getHigherPriorityReason(locationPendingReason, cur.locationPendingReason)
-            gpsIndex = min(gpsIndex, cur.gpsIndex)
-            noiseIdx = max(noiseIdx, cur.noiseIdx)
-            luxIdx = max(luxIdx, cur.luxIdx)
-            vibeIdx = max(vibeIdx, cur.vibeIdx)
-            proxSum += cur.proxIdx
+            gpsIndex = safeDouble(min(gpsIndex, cur.gpsIndex))
+            noiseIdx = safeDouble(max(noiseIdx, cur.noiseIdx))
+            luxIdx = safeDouble(max(luxIdx, cur.luxIdx))
+            vibeIdx = safeDouble(max(vibeIdx, cur.vibeIdx))
+            proxSum += safeDouble(cur.proxIdx)
             proxCount++
-            liftIdx = max(liftIdx, cur.liftIdx)
-            snrIdx = min(snrIdx, cur.snrIdx)
-            tiltIdx = max(tiltIdx, cur.tiltIdx)
-            baroIdx = max(baroIdx, cur.baroIdx)
+            liftIdx = safeDouble(max(liftIdx, cur.liftIdx))
+            snrIdx = safeDouble(min(snrIdx, cur.snrIdx))
+            tiltIdx = safeDouble(max(tiltIdx, cur.tiltIdx))
+            baroIdx = safeDouble(max(baroIdx, cur.baroIdx))
             isSitDetected = isSitDetected || cur.isSitDetected
             isSitActive = isSitActive || cur.isSitActive
             if (abs(cur.sitVz) > abs(sitVz)) {
-                sitVz = cur.sitVz
+                sitVz = safeDouble(cur.sitVz)
                 sitVzTs = cur.sitVzTs
                 sitVzRt = cur.sitVzRt
             }
-            sitShock = max(sitShock, cur.sitShock)
-            kineticEnergy = max(kineticEnergy, cur.kineticEnergy)
+            sitShock = safeDouble(max(sitShock, cur.sitShock))
+            kineticEnergy = safeDouble(max(kineticEnergy, cur.kineticEnergy))
             gpsHardwareLock = gpsHardwareLock || cur.gpsHardwareLock
-            cpuLoad = max(cpuLoad, cur.cpuLoad)
-            ioWait = max(ioWait, cur.ioWait)
+            cpuLoad = safeDouble(max(cpuLoad, cur.cpuLoad))
+            ioWait = safeDouble(max(ioWait, cur.ioWait))
             maxIoLatency = max(maxIoLatency, cur.maxIoLatency)
             isSilentFailure = isSilentFailure || cur.isSilentFailure
             isUltraLongStationary = isUltraLongStationary || cur.isUltraLongStationary
             violationUptimeMs = max(violationUptimeMs, cur.violationUptimeMs)
             isBatteryLow = isBatteryLow || cur.isBatteryLow
             isBatteryCritical = isBatteryCritical || cur.isBatteryCritical
-            thermalHeadroom = max(thermalHeadroom, cur.thermalHeadroom)
-            heapAllocatedMb = max(heapAllocatedMb, cur.heapAllocatedMb)
+            thermalHeadroom = safeDouble(max(thermalHeadroom, cur.thermalHeadroom))
+            heapAllocatedMb = safeDouble(max(heapAllocatedMb, cur.heapAllocatedMb))
             if (cur.activityType != ActivityType.UNKNOWN) activityType = cur.activityType
             
-            cur.thermalSnapshot?.let { thermalSnapshot = max(thermalSnapshot ?: 0.0, it) }
-            cur.heapSnapshot?.let { heapSnapshot = max(heapSnapshot ?: 0.0, it) }
+            cur.thermalSnapshot?.let { thermalSnapshot = safeDouble(max(thermalSnapshot ?: 0.0, it)) }
+            cur.heapSnapshot?.let { heapSnapshot = safeDouble(max(heapSnapshot ?: 0.0, it)) }
         }
 
         fun writeTo(target: EngineConnectionPoint, base: EngineConnectionPoint, isTick: Boolean) {
@@ -178,45 +176,45 @@ class TelemetryAggregator {
             target.isConnected = this.isConnected
             target.hasGps = this.hasGps
             target.isRecoveryEvent = this.isRecoveryEvent
-            target.accuracy = this.accuracy
-            target.maxAccuracy = this.maxAccuracy
+            target.accuracy = safeDouble(this.accuracy)
+            target.maxAccuracy = safeDouble(this.maxAccuracy)
             target.isBatterySteepDischarge = this.isBatterySteepDischarge
             target.isCoolingModeActive = this.isCoolingModeActive
-            target.speed = this.speed
-            target.bearing = this.bearing
+            target.speed = safeDouble(this.speed)
+            target.bearing = safeDouble(this.bearing)
             target.currentMa = this.currentMa
             target.locationPendingReason = this.locationPendingReason
-            target.gpsIndex = this.gpsIndex
-            target.noiseIdx = this.noiseIdx
-            target.luxIdx = this.luxIdx
-            target.vibeIdx = this.vibeIdx
-            if (proxCount > 0) { this.proxIdx = proxSum / proxCount }
-            target.proxIdx = this.proxIdx
-            target.liftIdx = this.liftIdx
-            target.snrIdx = this.snrIdx
-            target.tiltIdx = this.tiltIdx
-            target.baroIdx = this.baroIdx
+            target.gpsIndex = safeDouble(this.gpsIndex)
+            target.noiseIdx = safeDouble(this.noiseIdx)
+            target.luxIdx = safeDouble(this.luxIdx)
+            target.vibeIdx = safeDouble(this.vibeIdx)
+            if (proxCount > 0) { this.proxIdx = safeDouble(proxSum / proxCount) }
+            target.proxIdx = safeDouble(this.proxIdx)
+            target.liftIdx = safeDouble(this.liftIdx)
+            target.snrIdx = safeDouble(this.snrIdx)
+            target.tiltIdx = safeDouble(this.tiltIdx)
+            target.baroIdx = safeDouble(this.baroIdx)
             target.isSitDetected = this.isSitDetected
             target.isSitActive = this.isSitActive
-            target.sitVz = this.sitVz
+            target.sitVz = safeDouble(this.sitVz)
             target.sitVzTs = this.sitVzTs
             target.sitVzRt = this.sitVzRt
-            target.sitShock = this.sitShock
-            target.kineticEnergy = this.kineticEnergy
+            target.sitShock = safeDouble(this.sitShock)
+            target.kineticEnergy = safeDouble(this.kineticEnergy)
             target.gpsHardwareLock = this.gpsHardwareLock
-            target.cpuLoad = this.cpuLoad
-            target.ioWait = this.ioWait
+            target.cpuLoad = safeDouble(this.cpuLoad)
+            target.ioWait = safeDouble(this.ioWait)
             target.maxIoLatency = this.maxIoLatency
             target.isSilentFailure = this.isSilentFailure
             target.isUltraLongStationary = this.isUltraLongStationary
             target.violationUptimeMs = this.violationUptimeMs
             target.isBatteryLow = this.isBatteryLow
             target.isBatteryCritical = this.isBatteryCritical
-            target.thermalHeadroom = this.thermalHeadroom
-            target.heapAllocatedMb = this.heapAllocatedMb
+            target.thermalHeadroom = safeDouble(this.thermalHeadroom)
+            target.heapAllocatedMb = safeDouble(this.heapAllocatedMb)
             target.activityType = this.activityType
-            target.thermalSnapshot = this.thermalSnapshot
-            target.heapSnapshot = this.heapSnapshot
+            target.thermalSnapshot = this.thermalSnapshot?.let { safeDouble(it) }
+            target.heapSnapshot = this.heapSnapshot?.let { safeDouble(it) }
             target.isTick = isTick
         }
     }

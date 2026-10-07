@@ -5,6 +5,10 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.6.21:
+ * - Issue #QA-1006-12: Forensic Hardening. Wrapped all floating-point fields 
+ *   in PhysicsUtils.safeDouble during mapping to prevent SQLiteConstraintExceptions 
+ *   (NaN/Infinity) in binary persistence blobs.
  * Oct.6.20:
  * - Issue #SIGN-1006-12: Removed static signaling delta state. mapToRealtime now 
  *   requires a SignalingDeltaState instance (Rule 1.125).
@@ -44,11 +48,11 @@ object TelemetryProtobufMapper {
         builder.setViewerId(SignalingConstants.getTransmissionId(status.viewerId))
         builder.setFromViewer(fromViewer)
         
-        builder.setAlt(status.alt)
-        builder.setSpeed(status.speed)
-        builder.setBearing(status.bearing)
-        builder.setAccuracy(status.accuracy)
-        builder.setMaxAccuracy(status.maxAccuracy)
+        builder.setAlt(PhysicsUtils.safeDouble(status.alt))
+        builder.setSpeed(PhysicsUtils.safeDouble(status.speed))
+        builder.setBearing(PhysicsUtils.safeDouble(status.bearing))
+        builder.setAccuracy(PhysicsUtils.safeDouble(status.accuracy))
+        builder.setMaxAccuracy(PhysicsUtils.safeDouble(status.maxAccuracy))
         
         if (deltaState != null) {
             val currentLatE7 = (status.lat * 1e7).toInt()
@@ -59,8 +63,8 @@ object TelemetryProtobufMapper {
             
             // If it's the first update or a large jump (> 1 deg), send absolute
             if (prevLat == 0 || Math.abs(currentLatE7 - prevLat) > 10000000) {
-                builder.setLat(status.lat)
-                builder.setLng(status.lng)
+                builder.setLat(PhysicsUtils.safeDouble(status.lat))
+                builder.setLng(PhysicsUtils.safeDouble(status.lng))
                 builder.setLatE7(currentLatE7)
                 builder.setLngE7(currentLngE7)
                 builder.setIsDelta(false)
@@ -73,8 +77,8 @@ object TelemetryProtobufMapper {
                 builder.setIsDelta(true)
             }
         } else {
-            builder.setLat(status.lat)
-            builder.setLng(status.lng)
+            builder.setLat(PhysicsUtils.safeDouble(status.lat))
+            builder.setLng(PhysicsUtils.safeDouble(status.lng))
             builder.setLatE7((status.lat * 1e7).toInt())
             builder.setLngE7((status.lng * 1e7).toInt())
             builder.setIsDelta(false)
@@ -92,7 +96,7 @@ object TelemetryProtobufMapper {
         builder.setLastDiscTs(status.integrity.lastDiscTs)
         
         builder.setBattery(status.battery)
-        builder.setTemp(status.temp)
+        builder.setTemp(PhysicsUtils.safeDouble(status.temp))
         builder.setIsCharging(status.isCharging)
         builder.setSatsView(status.satsView)
         builder.setSatsUsed(status.satsUsed)
@@ -107,27 +111,27 @@ object TelemetryProtobufMapper {
         builder.setIsCoolingModeActive(status.isCoolingModeActive)
         builder.setIsPowerTamper(status.isPowerTamper)
         
-        builder.setSnrIdx(status.snrIdx)
-        builder.setNoiseIdx(status.noiseIdx)
-        builder.setLuxIdx(status.luxIdx)
-        builder.setVibeIdx(status.vibeIdx)
-        builder.setLiftIdx(status.atmospheric.liftIdx)
-        builder.setTiltIdx(status.tiltIdx)
-        builder.setBaroIdx(status.baroIdx)
-        builder.setProxIdx(status.proxIdx)
+        builder.setSnrIdx(PhysicsUtils.safeDouble(status.snrIdx))
+        builder.setNoiseIdx(PhysicsUtils.safeDouble(status.noiseIdx))
+        builder.setLuxIdx(PhysicsUtils.safeDouble(status.luxIdx))
+        builder.setVibeIdx(PhysicsUtils.safeDouble(status.vibeIdx))
+        builder.setLiftIdx(PhysicsUtils.safeDouble(status.atmospheric.liftIdx))
+        builder.setTiltIdx(PhysicsUtils.safeDouble(status.tiltIdx))
+        builder.setBaroIdx(PhysicsUtils.safeDouble(status.baroIdx))
+        builder.setProxIdx(PhysicsUtils.safeDouble(status.proxIdx))
         
         builder.setIsSitDetected(status.isSitDetected)
         builder.setIsSitActive(status.isSitActive)
         builder.setLastSitTs(status.lastSitTs)
-        builder.setSitVz(status.sitVz)
-        builder.setSitDz(status.sitDz)
-        builder.setSitBaro(status.sitBaro)
-        builder.setSitTilt(status.sitTilt)
-        builder.setSitShock(status.sitShock)
-        builder.setVerticalVelocity(status.verticalVelocity)
+        builder.setSitVz(PhysicsUtils.safeDouble(status.sitVz))
+        builder.setSitDz(PhysicsUtils.safeDouble(status.sitDz))
+        builder.setSitBaro(PhysicsUtils.safeDouble(status.sitBaro))
+        builder.setSitTilt(PhysicsUtils.safeDouble(status.sitTilt))
+        builder.setSitShock(PhysicsUtils.safeDouble(status.sitShock))
+        builder.setVerticalVelocity(PhysicsUtils.safeDouble(status.verticalVelocity))
         
         builder.setIsClockRegression(status.isClockRegression)
-        builder.setKineticEnergy(status.kineticEnergy)
+        builder.setKineticEnergy(PhysicsUtils.safeDouble(status.kineticEnergy))
         builder.setSitVzTs(status.integrity.sitVzTs)
         builder.setSitVzRt(status.integrity.sitVzRt)
         builder.setIsAdaptiveJump(status.isAdaptiveJump)
@@ -140,7 +144,7 @@ object TelemetryProtobufMapper {
 
         builder.setIsGnssThrottled(status.isGnssThrottled)
         builder.setEnergyDeltaMa(status.integrity.lastEnergyDeltaMa)
-        builder.setEnergyDeltaTemp(status.integrity.lastEnergyDeltaTemp)
+        builder.setEnergyDeltaTemp(PhysicsUtils.safeDouble(status.integrity.lastEnergyDeltaTemp))
         builder.setEnergyDurationMs(status.integrity.lastEnergyDurationMs)
         
         status.tamperNote?.let { builder.setTamperNote(it) }
@@ -149,8 +153,8 @@ object TelemetryProtobufMapper {
         builder.setViolationStartTs(status.violationStartTs)
 
         builder.setCurrentMa(status.currentMa)
-        builder.setThermalHeadroom(status.integrity.thermalHeadroom)
-        builder.setHeapAllocatedMb(status.integrity.heapAllocatedMb)
+        builder.setThermalHeadroom(PhysicsUtils.safeDouble(status.integrity.thermalHeadroom))
+        builder.setHeapAllocatedMb(PhysicsUtils.safeDouble(status.integrity.heapAllocatedMb))
         builder.setIsAnchorLocked(status.integrity.isAnchorLocked)
         builder.setIsBatteryWhitelisted(status.isBatteryWhitelisted)
         builder.setIsStorageLow(status.isStorageLow)
@@ -159,8 +163,8 @@ object TelemetryProtobufMapper {
         builder.setStandbyBucket(status.standbyBucket)
         builder.setNetInterface(status.netInterface)
 
-        status.thermalSnapshot?.let { builder.setThermalSnapshot(it) }
-        status.heapSnapshot?.let { builder.setHeapSnapshot(it) }
+        status.thermalSnapshot?.let { builder.setThermalSnapshot(PhysicsUtils.safeDouble(it)) }
+        status.heapSnapshot?.let { builder.setHeapSnapshot(PhysicsUtils.safeDouble(it)) }
 
         builder.setState(TrackerStateProto.valueOf("TS_" + status.trackerState.name))
         builder.setPendingReason(LocationPendingReasonProto.valueOf("LPR_" + status.locationPendingReason.name))
@@ -170,13 +174,13 @@ object TelemetryProtobufMapper {
      * mapToPersistence: Maps LocationUpdate to TrackerStatusProto (Local DataStore).
      */
     fun mapToPersistence(status: LocationUpdate, builder: TrackerStatusProto.Builder) {
-        builder.setLat(status.lat)
-        builder.setLng(status.lng)
-        builder.setAlt(status.alt)
-        builder.setSpeed(status.speed)
-        builder.setBearing(status.bearing)
-        builder.setAccuracy(status.accuracy)
-        builder.setMaxAccuracy(status.maxAccuracy)
+        builder.setLat(PhysicsUtils.safeDouble(status.lat))
+        builder.setLng(PhysicsUtils.safeDouble(status.lng))
+        builder.setAlt(PhysicsUtils.safeDouble(status.alt))
+        builder.setSpeed(PhysicsUtils.safeDouble(status.speed))
+        builder.setBearing(PhysicsUtils.safeDouble(status.bearing))
+        builder.setAccuracy(PhysicsUtils.safeDouble(status.accuracy))
+        builder.setMaxAccuracy(PhysicsUtils.safeDouble(status.maxAccuracy))
         
         builder.setLatE7((status.lat * 1e7).toInt())
         builder.setLngE7((status.lng * 1e7).toInt())
@@ -194,8 +198,8 @@ object TelemetryProtobufMapper {
         builder.setLastDiscTs(status.integrity.lastDiscTs)
         
         builder.setBattery(status.battery)
-        builder.setTemp(status.temp)
-        builder.setMaxTemp(status.maxTemp)
+        builder.setTemp(PhysicsUtils.safeDouble(status.temp))
+        builder.setMaxTemp(PhysicsUtils.safeDouble(status.maxTemp))
         builder.setIsCharging(status.isCharging)
         builder.setSatsView(status.satsView)
         builder.setSatsUsed(status.satsUsed)
@@ -216,27 +220,27 @@ object TelemetryProtobufMapper {
         builder.setIsPowerTamper(status.isPowerTamper)
         builder.setMicPending(status.integrity.micPending)
 
-        builder.setSnrIdx(status.snrIdx)
-        builder.setNoiseIdx(status.noiseIdx)
-        builder.setLuxIdx(status.luxIdx)
-        builder.setVibeIdx(status.vibeIdx)
-        builder.setLiftIdx(status.atmospheric.liftIdx)
-        builder.setTiltIdx(status.tiltIdx)
-        builder.setBaroIdx(status.baroIdx)
-        builder.setProxIdx(status.proxIdx)
+        builder.setSnrIdx(PhysicsUtils.safeDouble(status.snrIdx))
+        builder.setNoiseIdx(PhysicsUtils.safeDouble(status.noiseIdx))
+        builder.setLuxIdx(PhysicsUtils.safeDouble(status.luxIdx))
+        builder.setVibeIdx(PhysicsUtils.safeDouble(status.vibeIdx))
+        builder.setLiftIdx(PhysicsUtils.safeDouble(status.atmospheric.liftIdx))
+        builder.setTiltIdx(PhysicsUtils.safeDouble(status.tiltIdx))
+        builder.setBaroIdx(PhysicsUtils.safeDouble(status.baroIdx))
+        builder.setProxIdx(PhysicsUtils.safeDouble(status.proxIdx))
         
         builder.setIsSitDetected(status.isSitDetected)
         builder.setIsSitActive(status.isSitActive)
         builder.setLastSitTs(status.lastSitTs)
-        builder.setSitVz(status.sitVz)
-        builder.setSitDz(status.sitDz)
-        builder.setSitBaro(status.sitBaro)
-        builder.setSitTilt(status.sitTilt)
-        builder.setSitShock(status.sitShock)
-        builder.setVerticalVelocity(status.verticalVelocity)
+        builder.setSitVz(PhysicsUtils.safeDouble(status.sitVz))
+        builder.setSitDz(PhysicsUtils.safeDouble(status.sitDz))
+        builder.setSitBaro(PhysicsUtils.safeDouble(status.sitBaro))
+        builder.setSitTilt(PhysicsUtils.safeDouble(status.sitTilt))
+        builder.setSitShock(PhysicsUtils.safeDouble(status.sitShock))
+        builder.setVerticalVelocity(PhysicsUtils.safeDouble(status.verticalVelocity))
         
         builder.setIsClockRegression(status.isClockRegression)
-        builder.setKineticEnergy(status.kineticEnergy)
+        builder.setKineticEnergy(PhysicsUtils.safeDouble(status.kineticEnergy))
         builder.setSitVzTs(status.integrity.sitVzTs)
         builder.setSitVzRt(status.integrity.sitVzRt)
         builder.setIsAdaptiveJump(status.isAdaptiveJump)
@@ -244,30 +248,30 @@ object TelemetryProtobufMapper {
         builder.setIsBatteryCritical(status.isBatteryCritical)
         builder.setIsSilentFailure(status.isSilentFailure)
         builder.setViolationUptimeMs(status.violationUptimeMs)
-        builder.setViolationPercentage(status.violationPercentage)
+        builder.setViolationPercentage(PhysicsUtils.safeDouble(status.violationPercentage))
         builder.setIsUltraLongStationary(status.isUltraLongStationary)
         builder.setIsJump(status.isJump)
 
-        builder.setVibration(status.vibration)
-        builder.setHeading(status.heading)
-        builder.setBaroAlt(status.baroAlt)
-        builder.setLux(status.lux)
+        builder.setVibration(PhysicsUtils.safeDouble(status.vibration))
+        builder.setHeading(PhysicsUtils.safeDouble(status.heading))
+        builder.setBaroAlt(PhysicsUtils.safeDouble(status.baroAlt))
+        builder.setLux(PhysicsUtils.safeDouble(status.lux))
         builder.setIsNear(status.isNear)
-        builder.setTiltDegrees(status.tiltDegrees)
-        builder.setAcousticDb(status.acousticDb)
-        builder.setPeakShock(status.peakVibrationShock)
+        builder.setTiltDegrees(PhysicsUtils.safeDouble(status.tiltDegrees))
+        builder.setAcousticDb(PhysicsUtils.safeDouble(status.acousticDb))
+        builder.setPeakShock(PhysicsUtils.safeDouble(status.peakVibrationShock))
         builder.setPeakShockTs(status.peakVibrationShockTs)
-        builder.setLuxBaseline(status.luxBaseline)
-        builder.setAcousticFloor(status.acousticFloorDb)
-        builder.setAdaptiveVibrationFloor(status.adaptiveVibrationFloor)
+        builder.setLuxBaseline(PhysicsUtils.safeDouble(status.luxBaseline))
+        builder.setAcousticFloor(PhysicsUtils.safeDouble(status.acousticFloorDb))
+        builder.setAdaptiveVibrationFloor(PhysicsUtils.safeDouble(status.adaptiveVibrationFloor))
         builder.setNetInterface(status.netInterface)
         builder.setVer(BuildConfig.VERSION_NAME)
         
         builder.setDeviceId(status.deviceId)
         builder.setViewerId(status.viewerId)
-        builder.setProximityCm(status.currentProximityCm)
+        builder.setProximityCm(PhysicsUtils.safeDouble(status.currentProximityCm))
         builder.setProximityDebounceMs(status.proximityDebounceMs)
-        builder.setVibrationRollingSum(status.vibrationRollingSum)
+        builder.setVibrationRollingSum(PhysicsUtils.safeDouble(status.vibrationRollingSum))
         builder.setIsTrajectoryPromoted(status.isTrajectoryPromoted)
         builder.setIsSuspicious(status.isSuspicious)
         builder.setIsAnchorLocked(status.isAnchorLocked)
@@ -276,7 +280,7 @@ object TelemetryProtobufMapper {
 
         builder.setIsGnssThrottled(status.isGnssThrottled)
         builder.setEnergyDeltaMa(status.integrity.lastEnergyDeltaMa)
-        builder.setEnergyDeltaTemp(status.integrity.lastEnergyDeltaTemp)
+        builder.setEnergyDeltaTemp(PhysicsUtils.safeDouble(status.integrity.lastEnergyDeltaTemp))
         builder.setEnergyDurationMs(status.integrity.lastEnergyDurationMs)
         
         status.tamperNote?.let { builder.setTamperNote(it) }
@@ -284,11 +288,11 @@ object TelemetryProtobufMapper {
         builder.setLastAlarmAckTs(status.lastAlarmAckTs)
         builder.setViolationStartTs(status.violationStartTs)
 
-        builder.setThermalHeadroom(status.integrity.thermalHeadroom)
-        builder.setHeapAllocatedMb(status.integrity.heapAllocatedMb)
+        builder.setThermalHeadroom(PhysicsUtils.safeDouble(status.integrity.thermalHeadroom))
+        builder.setHeapAllocatedMb(PhysicsUtils.safeDouble(status.integrity.heapAllocatedMb))
 
-        status.thermalSnapshot?.let { builder.setThermalSnapshot(it) }
-        status.heapSnapshot?.let { builder.setHeapSnapshot(it) }
+        status.thermalSnapshot?.let { builder.setThermalSnapshot(PhysicsUtils.safeDouble(it)) }
+        status.heapSnapshot?.let { builder.setHeapSnapshot(PhysicsUtils.safeDouble(it)) }
 
         builder.setTrackerState(status.trackerState.name)
         builder.setStatus(status.status.name)
@@ -301,15 +305,21 @@ object TelemetryProtobufMapper {
     fun mapAppToPersistence(p: ConnectionPoint, builder: TrackerStatusProto.Builder) {
         builder.setTs(p.ts).setRt(p.rt).setRtt(p.rtt).setTotalConnectedMs(0) 
         builder.setBattery(p.isBatteryLow.let { if (it) 15 else 50 }) 
-        builder.setAccuracy(p.gpsAccuracy).setMaxAccuracy(p.maxAccuracy)
-        builder.setSpeed(p.speed).setBearing(p.bearing)
+        builder.setAccuracy(PhysicsUtils.safeDouble(p.gpsAccuracy)).setMaxAccuracy(PhysicsUtils.safeDouble(p.maxAccuracy))
+        builder.setSpeed(PhysicsUtils.safeDouble(p.speed)).setBearing(PhysicsUtils.safeDouble(p.bearing))
         
-        builder.setSnrIdx(p.snrIdx).setNoiseIdx(p.noiseIdx).setLuxIdx(p.luxIdx).setVibeIdx(p.vibeIdx)
-        builder.setProxIdx(p.proxIdx).setLiftIdx(p.liftIdx).setTiltIdx(p.tiltIdx).setBaroIdx(p.baroIdx)
-        builder.setVerticalVelocity(p.verticalVelocity)
+        builder.setSnrIdx(PhysicsUtils.safeDouble(p.snrIdx))
+        builder.setNoiseIdx(PhysicsUtils.safeDouble(p.noiseIdx))
+        builder.setLuxIdx(PhysicsUtils.safeDouble(p.luxIdx))
+        builder.setVibeIdx(PhysicsUtils.safeDouble(p.vibeIdx))
+        builder.setProxIdx(PhysicsUtils.safeDouble(p.proxIdx))
+        builder.setLiftIdx(PhysicsUtils.safeDouble(p.liftIdx))
+        builder.setTiltIdx(PhysicsUtils.safeDouble(p.tiltIdx))
+        builder.setBaroIdx(PhysicsUtils.safeDouble(p.baroIdx))
+        builder.setVerticalVelocity(PhysicsUtils.safeDouble(p.verticalVelocity))
         builder.setIsSitDetected(p.isSitDetected).setIsSitActive(p.isSitActive)
-        builder.setSitVz(p.sitVz).setSitVzTs(p.sitVzTs).setSitVzRt(p.sitVzRt).setSitDz(p.sitDz)
-        builder.setSitBaro(p.sitBaro).setSitTilt(p.sitTilt).setSitShock(p.sitShock)
+        builder.setSitVz(PhysicsUtils.safeDouble(p.sitVz)).setSitVzTs(p.sitVzTs).setSitVzRt(p.sitVzRt).setSitDz(PhysicsUtils.safeDouble(p.sitDz))
+        builder.setSitBaro(PhysicsUtils.safeDouble(p.sitBaro)).setSitTilt(PhysicsUtils.safeDouble(p.sitTilt)).setSitShock(PhysicsUtils.safeDouble(p.sitShock))
         
         builder.setIsBatterySteepDischarge(p.isBatterySteepDischarge)
         builder.setIsCoolingModeActive(p.isCoolingModeActive)
@@ -317,11 +327,11 @@ object TelemetryProtobufMapper {
         builder.setViolationUptimeMs(p.violationUptimeMs).setIsUltraLongStationary(p.isUltraLongStationary)
         builder.setGpsHardwareLock(p.gpsHardwareLock).setIsAnchorLocked(p.isAnchorLocked)
         builder.setIsGnssThrottled(p.isGnssThrottled)
-        builder.setThermalHeadroom(p.thermalHeadroom).setHeapAllocatedMb(p.heapAllocatedMb)
+        builder.setThermalHeadroom(PhysicsUtils.safeDouble(p.thermalHeadroom)).setHeapAllocatedMb(PhysicsUtils.safeDouble(p.heapAllocatedMb))
         builder.setActivityType(p.activityType.name)
         
-        p.thermalSnapshot?.let { builder.setThermalSnapshot(it) }
-        p.heapSnapshot?.let { builder.setHeapSnapshot(it) }
+        p.thermalSnapshot?.let { builder.setThermalSnapshot(PhysicsUtils.safeDouble(it)) }
+        p.heapSnapshot?.let { builder.setHeapSnapshot(PhysicsUtils.safeDouble(it)) }
 
         builder.setStatus(p.status.name)
         builder.setLocationPendingReason(LocationPendingReasonProto.valueOf("LPR_" + p.locationPendingReason.name))

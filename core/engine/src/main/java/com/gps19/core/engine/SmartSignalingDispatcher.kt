@@ -14,13 +14,12 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
- * Oct.6.20:
- * - Issue #SIGN-1006-12: SignalingPipeline Implementation. Implements the 
- *   SignalingPipeline interface, encapsulating conflation and delegating 
- *   encoding/wire-emission to specialized providers.
- * - Unified sink architecture: Replaced multiple functional sinks with 
- *   SignalingWireSink and SignalingEncoder.
- * - Integrated SignalingDeltaState for instance-bound delta tracking.
+ * Oct.6.23:
+ * - Issue #SIGN-1006-13: Consolidated Conflation Logic. Migrated field-level 
+ *   conflation strategies from SignalingMessageConflator into internal handlers. 
+ *   Reduced cross-module coupling and improved pipeline encapsulation.
+ * - Issue #QA-1006-12: Signaling Efficiency Hardening. Refactored log conflation 
+ *   to use dynamic window extension.
  */
 class SmartSignalingDispatcher(
     private var scope: CoroutineScope,
@@ -176,7 +175,8 @@ class SmartSignalingDispatcher(
 
                         if (nextCheck == Long.MAX_VALUE) break
                         
-                        withTimeoutOrNull(nextCheck) {
+                        val waitTime = nextCheck.coerceAtLeast(10L)
+                        withTimeoutOrNull(waitTime) {
                             conflationSignal.receive()
                         }
                     }
@@ -277,7 +277,7 @@ class SmartSignalingDispatcher(
         var wasConflated = false
         locMapBucket.pending.updateAndGet { current ->
             if (current != null) wasConflated = true
-            SignalingMessageConflator.conflate(current, incoming)
+            conflateMaps(current, incoming)
         }
         if (wasConflated) {
             val conf = framesConflated.incrementAndGet()
@@ -292,7 +292,7 @@ class SmartSignalingDispatcher(
         var wasConflated = false
         locObjBucket.pending.updateAndGet { current ->
             if (current != null) wasConflated = true
-            SignalingMessageConflator.conflateLocationUpdate(current, incoming)
+            conflateLocationUpdates(current, incoming)
         }
         if (wasConflated) {
             val conf = framesConflated.incrementAndGet()
@@ -323,14 +323,10 @@ class SmartSignalingDispatcher(
         }
 
         logBucket.pending.updateAndGet { cur ->
-            SignalingMessageConflator.conflateLogs(cur, incoming)
+            conflateLogMaps(cur, incoming)
         }
 
-        if (logBucket.scheduledTs.get() == 0L && logBucket.pending.get() != null) {
-            val delayMs = calculateDelay(logBucket.burstCount.get()) * 2 // Logs can afford more delay
-            logBucket.scheduledTs.set(timeProvider.currentTimeMillis() + delayMs)
-            conflationSignal.trySend(Unit)
-        }
+        updateBucketSchedule(logBucket, delayMultiplier = 2)
     }
 
     private fun <T> updateBucketSchedule(bucket: ConflationBucket<T>, delayMultiplier: Int = 1) {
@@ -342,7 +338,7 @@ class SmartSignalingDispatcher(
             val currentScheduled = bucket.scheduledTs.get()
             val now = timeProvider.currentTimeMillis()
             val newDelay = calculateDelay(bucket.burstCount.get()) * delayMultiplier
-            if (currentScheduled - now < newDelay / 2) { // Only extend if we're early in the window
+            if (currentScheduled - now < newDelay / 2) {
                  bucket.scheduledTs.compareAndSet(currentScheduled, now + newDelay)
             }
         }
@@ -352,9 +348,56 @@ class SmartSignalingDispatcher(
         val baseDelay = if (isViolationProvider()) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
         if (burstCount < BURST_PRESSURE_THRESHOLD) return baseDelay
         
-        // Dynamic scaling: extend delay by 100ms per frame over threshold, up to cap.
         val pressureBonus = (burstCount - BURST_PRESSURE_THRESHOLD) * 100L
         return minOf(baseDelay + pressureBonus, MAX_CONFLATION_DELAY_MS)
+    }
+
+    // --- Conflation Strategies (Issue #SIGN-1006-13 Consolidation) ---
+
+    private fun conflateMaps(pending: Map<String, Any?>?, incoming: Map<String, Any?>): Map<String, Any?> {
+        if (pending == null) return incoming
+        val merged = pending.toMutableMap()
+        merged.putAll(incoming)
+        return merged
+    }
+
+    private fun conflateLocationUpdates(pending: LocationUpdate?, incoming: LocationUpdate): LocationUpdate {
+        if (pending == null) return incoming
+        
+        // R-ID 511: Preserve fidelity across the burst.
+        if (incoming.thermalSnapshot == null && pending.thermalSnapshot != null) {
+            incoming.thermalSnapshot = pending.thermalSnapshot
+        }
+        if (incoming.heapSnapshot == null && pending.heapSnapshot != null) {
+            incoming.heapSnapshot = pending.heapSnapshot
+        }
+        if (incoming.snrSnapshot == null && pending.snrSnapshot != null) {
+            incoming.snrSnapshot = pending.snrSnapshot
+        }
+        if (incoming.vibeSnapshot == null && pending.vibeSnapshot != null) {
+            incoming.vibeSnapshot = pending.vibeSnapshot
+        }
+        if (incoming.integrity.uptimeMs == 0L && pending.integrity.uptimeMs > 0) {
+            incoming.integrity.uptimeMs = pending.integrity.uptimeMs
+        }
+        return incoming
+    }
+
+    private fun conflateLogMaps(pending: Map<String, Any?>?, incoming: Map<String, Any?>): Map<String, Any?> {
+        if (pending == null) return incoming
+        
+        val pendingMsg = pending["message"] as? String
+        val incomingMsg = incoming["message"] as? String
+        
+        return if (pendingMsg != null && pendingMsg == incomingMsg) {
+            val merged = pending.toMutableMap()
+            val currentCount = (merged["burst_count"] as? Int) ?: 1
+            merged["burst_count"] = currentCount + 1
+            merged["timestamp"] = incoming["timestamp"]
+            merged
+        } else {
+            incoming
+        }
     }
 
     override fun shutdown() {

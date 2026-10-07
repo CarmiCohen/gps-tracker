@@ -26,15 +26,16 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.6.21:
+ * - Issue #QA-1006-12: Forensic Hardening. Wrapped all environmental indices 
+ *   in PhysicsUtils.safeDouble to prevent SQLiteConstraintException (NaN/Inf) 
+ *   during high-pressure bursts.
+ * - Updated executeLogPressureTest to send constant messages to verify 
+ *   conflation efficiency (Rule 1.123).
  * Oct.6.3:
  * - Issue #AUDIT-1006-2: Implemented triggerImmediateTick() to allow Fast-Path 
  *   triggers (Acoustic/Light) to preempt relaxed memory-throttled intervals.
  *   Ensures zero-latency alarm detection even during MemoryPressureLevel.HIGH/CRITICAL.
- * Oct.6.2:
- * - Issue #AUDIT-1006-6: Integrated memory pressure throttling in getRequiredTickInterval.
- *   Aggressively relaxes loops during MemoryPressureLevel.CRITICAL to prevent OOM.
- * - Issue #AUDIT-1006-5: Implemented executeLogPressureTest to simulate 100Hz 
- *   telemetry bursts for backpressure verification.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -200,8 +201,8 @@ class MonitorService : BaseMonitorService() {
                 savedSitVzRt = remoteState?.integrity?.sitVzRt ?: 0L,
                 savedLastValidFixRt = remoteState?.lastValidFixRt ?: 0L,
                 savedVibrationFloor = repository.getDouble(remoteRole, ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
-                savedLuxBaseline = repository.getDouble(remoteRole, TRACKER_LUX_BASELINE_KEY, -1.0),
-                savedAcousticFloor = repository.getDouble(remoteRole, TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
+                savedLuxBaseline = repository.getDouble(currentRole, TRACKER_LUX_BASELINE_KEY, -1.0),
+                savedAcousticFloor = repository.getDouble(currentRole, TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
             )
         }
 
@@ -596,14 +597,14 @@ class MonitorService : BaseMonitorService() {
         }
 
         evaluationSnapshot.atmospheric.apply {
-            noiseIdx = (acousticDb - primaryProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB
-            luxIdx = log10(lux + 1.0) / RIBBON_LUX_LOG_SCALE
-            vibeIdx = vibration / RIBBON_VIBRATION_SCALE_G
-            liftIdx = (baroAlt - primaryProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS
-            tiltIdx = abs(tiltDegrees - primaryProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG
-            baroIdx = (baroAlt - primaryProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS
+            noiseIdx = PhysicsUtils.safeDouble((acousticDb - primaryProcessor.getAcousticFloorDb()).coerceIn(0.0, RIBBON_NOISE_SCALE_DB) / RIBBON_NOISE_SCALE_DB)
+            luxIdx = PhysicsUtils.safeDouble(log10(lux + 1.0) / RIBBON_LUX_LOG_SCALE)
+            vibeIdx = PhysicsUtils.safeDouble(vibration / RIBBON_VIBRATION_SCALE_G)
+            liftIdx = PhysicsUtils.safeDouble((baroAlt - primaryProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_LIFT_SCALE_METERS) / RIBBON_LIFT_SCALE_METERS)
+            tiltIdx = PhysicsUtils.safeDouble(abs(tiltDegrees - primaryProcessor.getChairBaselineTilt()).coerceIn(0.0, RIBBON_SIT_TILT_SCALE_DEG) / RIBBON_SIT_TILT_SCALE_DEG)
+            baroIdx = PhysicsUtils.safeDouble((baroAlt - primaryProcessor.getBaroBaseline()).coerceIn(0.0, RIBBON_SIT_BARO_SCALE_METERS) / RIBBON_SIT_BARO_SCALE_METERS)
         }
-        evaluationSnapshot.integrity.snrIdx = (latestGnssDetail?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0) / RIBBON_SNR_SCALE_DB
+        evaluationSnapshot.integrity.snrIdx = PhysicsUtils.safeDouble((latestGnssDetail?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0) / RIBBON_SNR_SCALE_DB)
 
         domainEventBus.emit(DomainEvent.TickEvaluated(
             now = now, nowRt = nowRt, isTrackerMode = isTrackerMode, snapshot = evaluationSnapshot,
@@ -753,7 +754,7 @@ class MonitorService : BaseMonitorService() {
             val start = System.currentTimeMillis()
             repeat(1000) { i ->
                 logManager.submitToLogSink(
-                    message = "STRESS_LOG: High-frequency burst sample #$i",
+                    message = "STRESS_LOG: High-frequency pressure sample",
                     type = "STRESS",
                     isImportant = i % 100 == 0
                 )
