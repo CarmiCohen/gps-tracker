@@ -5,12 +5,10 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
- * Oct.7.7:
- * - Issue #SIMP-1007-16: Flag Propagation. Updated updateSensorState and 
- *   shouldThrottlePolling to integrate native anomaly and memory flags.
- * Oct.4.6:
- * - Issue #1160: Flyweight & Pooling Expansion. Migrated to EnginePools.SENTINEL_RESULT 
- *   to eliminate static flyweight contention and JVM heap churn (R1160).
+ * Oct.7.9:
+ * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Migrated stationary 
+ *   duration logic to use native-provided duration from LocationUpdate. 
+ *   Eliminated remaining JVM stationaryStartRt calculations.
  */
 object LocationSentinel {
 
@@ -91,9 +89,9 @@ object LocationSentinel {
         if (update.lightSpikeRt > 0) state.forensic.lastFastPathLightSpikeRt = update.lightSpikeRt
         state.kineticEnergy = safeDouble(update.kinetic.kineticEnergy)
         
-        // Oct.7.7: Capture native anomaly flags
         state.forensic.isSuspiciousNoise = update.isSuspiciousNoise
         state.forensic.isMemoryPressureThrottled = update.isMemoryPressureThrottled
+        state.forensic.stationaryDurationMs = update.stationaryDuration
 
         if (update.atmospheric.peakVibrationShock > state.forensic.peakVibrationShock && !update.atmospheric.peakVibrationShock.isNaN()) {
             state.forensic.peakVibrationShock = update.atmospheric.peakVibrationShock
@@ -129,17 +127,14 @@ object LocationSentinel {
             }
         }
 
+        // Oct.7.9: Use native stationary duration for tilt recalibration
         if (isStationary(state, update.cpuLoad) && !state.forensic.isSitDetected) {
-            if (state.forensic.stationaryStartRt == 0L) state.forensic.stationaryStartRt = update.nowRt
-            else if (update.nowRt - state.forensic.stationaryStartRt > PASSIVE_ZEROING_STATIONARY_MS) {
+            if (state.forensic.stationaryDurationMs > PASSIVE_ZEROING_STATIONARY_MS) {
                 if (abs(state.forensic.baselineSitTilt - currentTilt) > 0.1 && !currentTilt.isNaN()) {
                     state.forensic.baselineSitTilt = currentTilt
                     baselineChanged = true
                 }
-                state.forensic.stationaryStartRt = 0L
             }
-        } else {
-            state.forensic.stationaryStartRt = 0L
         }
 
         if (update.atmospheric.heading >= 0.0) state.forensic.currentCompassHeading = safeDouble(update.atmospheric.heading)
@@ -153,7 +148,6 @@ object LocationSentinel {
         state.forensic.luxBaseline = SentinelValidator.updateLuxBaseline(state.forensic.luxBaseline, update.atmospheric.lux, isStationary(state, update.cpuLoad), update.isWarming)
         state.forensic.baroBaseline = SentinelValidator.updateBaroBaseline(state.forensic.baroBaseline, update.atmospheric.baroAlt, update.isWarming)
 
-        // Using LocationUpdate flags
         if (!update.isSirenActive) {
             val updateDb = if (update.acousticMinDb >= 0.0) update.acousticMinDb else if (update.acousticMinDb == -1.0 && update.atmospheric.acousticDb >= 0.0) update.atmospheric.acousticDb else -1.0
             state.forensic.acousticFloorDb = SentinelValidator.updateAcousticFloor(state.forensic.acousticFloorDb, updateDb, update.isWarming)
@@ -411,7 +405,6 @@ object LocationSentinel {
     fun isStationary(state: LocationProcessingState, cpuLoad: Double = 0.0): Boolean = SentinelValidator.isStationary(state.forensic.currentVibrationIndex, state.forensic.adaptiveVibrationFloor, cpuLoad)
 
     fun shouldThrottlePolling(state: LocationProcessingState, providedIsStationary: Boolean? = null, cpuLoad: Double = 0.0): Boolean {
-        // Oct.7.7: Force throttling if native memory pressure is detected
         if (state.forensic.isMemoryPressureThrottled) return true
 
         val stationary = providedIsStationary ?: isStationary(state, cpuLoad)
@@ -455,7 +448,7 @@ object LocationSentinel {
         state.forensic.lastSitRt = 0L
         state.forensic.baselineSitTilt = -1.0
         state.forensic.sitDetectionCooldownRt = 0L
-        state.forensic.stationaryStartRt = 0L
+        state.forensic.stationaryDurationMs = 0L
         state.forensic.lastSitVz = 0.0
         state.forensic.lastSitVzTs = 0L
         state.forensic.lastSitVzRt = 0L

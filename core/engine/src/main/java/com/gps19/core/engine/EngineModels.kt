@@ -6,18 +6,13 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.7.9:
+ * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Added nowRt to 
+ *   VibrationBatch inputs and stationaryDuration, muzzleResetTriggered to outputs.
+ * - Replaced stationaryStartRt with stationaryDurationMs in SentinelForensicState.
  * Oct.7.7:
  * - Issue #SIMP-1007-16: Flag Propagation. Added isSuspiciousNoise and 
  *   isMemoryPressureThrottled to SentinelForensicState.
- * Oct.7.6:
- * - Issue #SIMP-1007-16: JNI FastPath Expansion. Expanded VibrationBatch to 
- *   include anomaly flags (isSuspiciousNoise, isMemoryPressureThrottled).
- * Oct.7.5:
- * - Issue #SIMP-1007-15: Unified Snapshot Container. Completed migration of 
- *   EngineConnectionPoint to use unified ForensicSnapshot for all probes (snr, vibe, thermal, heap).
- * Oct.7.4:
- * - Issue #SIMP-1007-15: Unified Snapshot Container. Migrated thermalSnapshot 
- *   and heapSnapshot into ForensicSnapshot container.
  */
 
 @Serializable
@@ -330,7 +325,12 @@ interface DeviceIdentity {
 
 /**
  * VibrationBatch: Data transfer object for JNI batching (Issue #1450).
- * Oct.7.6: Expanded with forensic snapshots for native correlation (#SIMP-1007-16).
+ * Oct.7.9:
+ * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Added nowRt to 
+ *   inputs and stationaryDuration, muzzleResetTriggered to outputs.
+ * Oct.7.6:
+ * - Issue #SIMP-1007-16: JNI FastPath Expansion. Expanded VibrationBatch to 
+ *   include anomaly flags (isSuspiciousNoise, isMemoryPressureThrottled).
  */
 @Serializable
 class VibrationBatch {
@@ -348,6 +348,9 @@ class VibrationBatch {
     var snr: Double = -1.0
     var thermal: Double = -1.0
     var heap: Double = -1.0
+
+    // Oct.7.9: Time context for native hysteresis
+    var nowRt: Long = 0L
     
     // Outputs
     var delta: Double = 0.0
@@ -359,6 +362,10 @@ class VibrationBatch {
     // Oct.7.6 Anomaly Flags
     var isSuspiciousNoise: Boolean = false
     var isMemoryPressureThrottled: Boolean = false
+
+    // Oct.7.9 Native Hysteresis Outputs
+    var stationaryDuration: Long = 0L
+    var muzzleResetTriggered: Boolean = false
 }
 
 /**
@@ -530,7 +537,7 @@ class SentinelForensicState {
     var lastSitTilt: Double = 0.0
     var lastSitShock: Double = 0.0
     var sitDetectionCooldownRt: Long = 0L
-    var stationaryStartRt: Long = 0L
+    var stationaryDurationMs: Long = 0L
     var gpsMotionStartRt: Long = 0L
     var luxBaseline: Double = -1.0
     var baroBaseline: Double = -1000.0

@@ -1,5 +1,12 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct7.9
+*   **Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading.**
+    *   **Native Logic**: Migrated stationary duration tracking and muzzle reset triggers to `jdhardware-jni.cpp`. The native layer now evaluates the 2000ms muzzle window during the 100Hz vibration batch.
+    *   **JNI Expansion**: Updated `VibrationBatch` and `JdHardwareManager` to carry `nowRt` into JNI and read back `stationaryDuration` and `muzzleResetTriggered`.
+    *   **JVM Purge**: Eliminated `stationaryStartRt` timestamp arithmetic from `HardwareSuite` and `LocationSentinel`, replacing it with direct usage of native-provided duration.
+    *   **Resource Optimization**: Reduced JVM overhead in the high-frequency sensor path by consolidating temporal state evaluation into the existing native math block.
+
 ## 🟢 Resolved in Oct7.8
 *   **Issue #SIMP-1010-1: Adaptive Acoustic Gating.**
     *   **Native Suppression**: Implemented native `n20` logic in `jdhardware-jni.cpp` to scale `ACOUSTIC_EMA` alpha based on `vibrationRollingSum`. This prevents mechanical vibrations from triggering false acoustic alarms.

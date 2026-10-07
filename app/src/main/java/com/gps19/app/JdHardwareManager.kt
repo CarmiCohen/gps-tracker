@@ -28,15 +28,16 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.7.9:
+ * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Updated 
+ *   processVibrationBatchNative to pack nowRt (offset 116) and read muzzle 
+ *   outputs (offsets 172/180).
  * Oct.7.8:
  * - Issue #SIMP-1010-1: Adaptive Acoustic Gating. Implemented n20 to calculate 
  *   adaptive alpha based on vibrationRollingSum.
  * Oct.7.6:
  * - Issue #SIMP-1007-16: JNI FastPath Expansion. Expanded processVibrationBatchNative 
  *   to pack forensic snapshots and read back native anomaly flags (offsets 164/168).
- * Oct.5.7:
- * - Issue #1450: JNI Math Batching. Consolidated granular vibration calls 
- *   into a single 256-byte DirectByteBuffer transaction (n19).
  */
 object JdHardwareManager {
 
@@ -240,7 +241,7 @@ object JdHardwareManager {
 
     /**
      * processVibrationBatchNative: Consolidated 100Hz JNI call (Issue #1450).
-     * Oct.7.6: Expanded with forensic snapshots (snr, thermal, heap) and anomaly flags (164/168).
+     * Oct.7.9: Added nowRt (offset 116) and read muzzle outputs (offsets 172/180).
      */
     fun processVibrationBatchNative(batch: VibrationBatch): Boolean {
         if (!isLibraryLoaded.get()) return false
@@ -264,6 +265,9 @@ object JdHardwareManager {
             sharedStateBuffer.putDouble(batch.snr)
             sharedStateBuffer.putDouble(batch.thermal)
             sharedStateBuffer.putDouble(batch.heap)
+
+            // Oct.7.9: Time context (Offset 116)
+            sharedStateBuffer.putLong(batch.nowRt)
             
             val res = n19()
             if (res == 0) {
@@ -277,6 +281,10 @@ object JdHardwareManager {
                 // Oct.7.6 Anomaly Flags (Offset 164)
                 batch.isSuspiciousNoise = sharedStateBuffer.getInt(164) != 0
                 batch.isMemoryPressureThrottled = sharedStateBuffer.getInt(168) != 0
+
+                // Oct.7.9 Native Hysteresis (Offset 172)
+                batch.stationaryDuration = sharedStateBuffer.getLong(172)
+                batch.muzzleResetTriggered = sharedStateBuffer.getInt(180) != 0
                 return true
             }
         }

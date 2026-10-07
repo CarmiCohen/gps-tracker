@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct7.8)
+# SOT Master Requirements & Hardening Status (Oct7.9)
 
-## 🏗️ Architectural Master Rules (167 Rules)
+## 🏗️ Architectural Master Rules (168 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -10,10 +10,12 @@
 *   **1.137 Native Anomaly Propagation (R-ID 612)**: Anomaly flags generated in the native layer (e.g., `isSuspiciousNoise`, `isMemoryPressureThrottled`) MUST be propagated through the `ForensicSnapshot` container into the evaluation monolith. These flags MUST influence system decisions, such as forcing throttled polling intervals during memory stress to ensure background stability. (Oct7.7 - Issue #SIMP-1007-16).
 *   **1.138 Memory-Agnostic Polling Stability (R-ID 592)**: The engine MUST force a staggered performance tier (stretching GPS/Sensor intervals) when native heap usage exceeds critical thresholds (e.g., 256MB). This protection MUST be evaluated in the `SentinelValidator` to preempt OOM conditions in restricted background contexts. (Oct7.7 - Issue #SIMP-1007-17).
 *   **1.139 Adaptive Acoustic Gating (R-ID 655)**: Environmental acoustic monitoring MUST dynamically adjust its sensitivity (EMA alpha) based on physical vibration intensity. High-motion events MUST automatically suppress acoustic triggers in the native layer to prevent false tamper alerts induced by chassis vibration or mechanical noise. (Oct7.8 - Issue #SIMP-1010-1).
+*   **1.140 Muzzle Hysteresis Native Offloading (R-ID 660)**: Stationary muzzle logic and hysteresis (e.g., `stationaryDuration`, vertical signal resetting) MUST be evaluated in the JNI layer during the 100Hz vibration batch. The JVM SHOULD only react to native-triggered reset flags to eliminate high-frequency timestamp arithmetic in the main sensor path. (Oct7.9 - Issue #SIMP-1010-2).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 656**: Muzzle Hysteresis Native Offloading - Migrated stationary duration tracking and muzzle reset triggers to JNI to eliminate JVM-side 100Hz timestamp tracking. (Oct7.9 - Issue #SIMP-1010-2).
 *   **SOT ID 655**: Adaptive Acoustic Gating - Implemented native motion-aware alpha adjustment to suppress acoustic triggers during high-vibration intervals. (Oct7.8 - Issue #SIMP-1010-1).
 *   **SOT ID 654**: Native Anomaly Propagation - Instrumented the telemetry pipeline to propagate `isSuspiciousNoise` and `isMemoryPressureThrottled` flags from JNI to UI. (Oct7.7 - Issue #SIMP-1007-16).
 *   **SOT ID 653**: Memory-Agnostic Polling Stability - Integrated native memory pressure flags from JNI into the `SentinelValidator` polling decision logic. (Oct7.7 - Issue #SIMP-1007-17).
@@ -24,6 +26,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.271 (Native Hysteresis Audit)**: PASSED - Verified that `VibrationBatch` correctly returns `stationaryDuration` and `muzzleResetTriggered` flags. Verified that `HardwareSuite` resets vertical velocity/displacement only when native-triggered, and `LocationSentinel` uses native duration for tilt recalibration. (Oct7.9 - Issue #SIMP-1010-2).
 *   **Chapter 31.270 (Adaptive Acoustic Audit)**: PASSED - Verified that acoustic EMA alpha scales down correctly in response to `vibrationRollingSum` via native `n20` method. Verified that `isSuspiciousNoise` badges appear on HUD during concurrent SNR/Vibration anomalies. (Oct7.8 - Issue #SIMP-1010-1).
 *   **Chapter 31.269 (Anomaly Propagation Audit)**: PASSED - Verified that `isSuspiciousNoise` and `isMemoryPressureThrottled` are correctly copied from `VibrationBatch` to `LocationUpdate`. Verified that `LocationSentinel` forces throttled polling when memory pressure is detected. (Oct7.7 - Issue #SIMP-1007-16).
 *   **Chapter 31.268 (Native Correlation Audit)**: PASSED - Verified that `VibrationBatch` correctly carries correlated SNR and Thermal snapshots into the native layer. Verified that thermal and heap probes use a 2-second caching interval to protect the 100Hz path from system call overhead. (Oct7.6 - Issue #SIMP-1007-16).

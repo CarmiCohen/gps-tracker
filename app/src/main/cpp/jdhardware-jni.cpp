@@ -20,6 +20,10 @@ static int64_t g_accelAuditStartRt = 0;
 static int32_t g_accelEventCount = 0;
 static double g_lastCalculatedHz = 0.0;
 
+// Muzzle Hysteresis State (Issue #SIMP-1010-2)
+static int64_t g_stationaryStartRt = 0;
+static const int64_t MUZZLE_HYSTERESIS_MS = 2000;
+
 // FastPath State (Issue #1176)
 struct FastPathConfig {
     double baseline;
@@ -80,6 +84,7 @@ Java_com_gps19_app_JdHardwareManager_n9(JNIEnv* env, jclass clazz) {
     g_accelAuditStartRt = 0;
     g_accelEventCount = 0;
     g_lastCalculatedHz = 0.0;
+    g_stationaryStartRt = 0; // Oct.7.9: Reset muzzle hysteresis state
     return 0;
 }
 
@@ -184,6 +189,7 @@ Java_com_gps19_app_JdHardwareManager_n18(JNIEnv* env, jclass clazz, jdouble vibe
 /**
  * n19: processVibrationBatch (Issue #1450)
  * Consolidates all granular vibration math into one call.
+ * Oct.7.9: Added muzzle hysteresis offloading (#SIMP-1010-2).
  * Oct.7.6: Expanded with forensic snapshots (snr, thermal, heap) for multi-sensor
  * correlation logic and memory pressure evaluation (#SIMP-1007-16).
  */
@@ -211,6 +217,9 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     double snr = *(double*)(ptr + 92);
     double thermal = *(double*)(ptr + 100);
     double heapMb = *(double*)(ptr + 108);
+
+    // Oct.7.9 Time Context (Offset 116)
+    int64_t nowRt = *(int64_t*)(ptr + 116);
 
     // 1. Delta (n16 equivalent)
     double dx = x - lx, dy = y - ly, dz = z - lz;
@@ -243,11 +252,21 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     int isStationary = (delta < dynamicGate) ? 1 : 0;
 
     // 6. Native Anomaly Detection (Oct.7.6)
-    // Rule: Suspicious noise if SNR is low but physical vibration is high (R-ID 610).
     int isSuspiciousNoise = (snr > 0.0 && snr < 20.0 && delta > 0.5) ? 1 : 0;
-
-    // Memory Pressure Throttling: Flag if native-observed heap usage exceeds threshold.
     int isMemoryThrottled = (heapMb > 256.0) ? 1 : 0;
+
+    // 7. Muzzle Hysteresis (Oct.7.9, #SIMP-1010-2)
+    int64_t stationaryDuration = 0;
+    int muzzleResetTriggered = 0;
+    if (isStationary) {
+        if (g_stationaryStartRt == 0) g_stationaryStartRt = nowRt;
+        stationaryDuration = nowRt - g_stationaryStartRt;
+        if (stationaryDuration > MUZZLE_HYSTERESIS_MS) {
+            muzzleResetTriggered = 1;
+        }
+    } else {
+        g_stationaryStartRt = 0;
+    }
 
     // Outputs (Offset 128)
     *(double*)(ptr + 128) = delta;
@@ -260,13 +279,15 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     *(int*)(ptr + 164) = isSuspiciousNoise;
     *(int*)(ptr + 168) = isMemoryThrottled;
 
+    // Oct.7.9 Outputs (Offset 172)
+    *(int64_t*)(ptr + 172) = stationaryDuration;
+    *(int*)(ptr + 180) = muzzleResetTriggered;
+
     return 0;
 }
 
 /**
  * n20: computeAdaptiveAcousticAlphaNative (Issue #SIMP-1010-1)
- * Scales the base alpha down as vibrationRollingSum increases to suppress motion-induced noise.
- * Baseline: 0.5G vibration starts suppression. 1.5G vibration hits floor alpha (0.01).
  */
 JNIEXPORT jdouble JNICALL
 Java_com_gps19_app_JdHardwareManager_n20(JNIEnv* env, jclass clazz, jdouble baseAlpha, jdouble vibrationRollingSum) {

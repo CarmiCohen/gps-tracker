@@ -6,12 +6,14 @@ import kotlin.math.min
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * Oct.7.9:
+ * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Updated 
+ *   computeAdaptiveAcousticOffCycle to take duration instead of absolute timestamp 
+ *   to align with native offloading.
  * Oct.5.5:
  * - Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2). Offloaded 
  *   isShockViolated and isVibrationSuspicious to JNI to complete the 100Hz 
  *   vibration path hardening. Eliminated remaining JVM floating-point math.
- * Oct.3.1:
- * - Issue #SIMP-1510-1: Native FastPath Convergence. Integrated NativeFastPathProvider.
  */
 object SentinelValidator {
 
@@ -23,7 +25,6 @@ object SentinelValidator {
     }
 
     fun isTiltViolated(tiltDegrees: Double, sensitivity: Float = 0.5f): Boolean {
-        // Map 0.0..1.0 to 25.0..5.0 degrees (Higher sensitivity = Lower threshold)
         val threshold = 5.0 + (25.0 - 5.0) * (1.0 - sensitivity)
         return tiltDegrees > threshold
     }
@@ -40,15 +41,11 @@ object SentinelValidator {
         sensitivity: Float = 0.5f,
         cpuLoad: Double = 0.0
     ): Boolean {
-        // Issue #SIMP-1510-1: Try native offloading first
         nativeProvider?.let {
             return it.isShockViolated(peakShock, adaptiveFloor, sensitivity, cpuLoad)
         }
 
-        // Issue #1415: Expand threshold under high CPU load to ignore jitter (R-ID 590)
         val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 1.5 else 1.0
-        
-        // Map 0.0..1.0 to 1.4g..0.2g (Higher sensitivity = Lower threshold)
         val baseThreshold = (0.2 + (1.4 - 0.2) * (1.0 - sensitivity)) * loadFactor
         val dynamicThreshold = maxOf(baseThreshold, adaptiveFloor * VIBRATION_SHOCK_MULTIPLIER * loadFactor)
         return peakShock > dynamicThreshold
@@ -60,27 +57,21 @@ object SentinelValidator {
         sensitivity: Float = 0.5f,
         cpuLoad: Double = 0.0
     ): Boolean {
-        // Issue #SIMP-1510-1: Try native offloading first
         nativeProvider?.let {
             return it.isVibrationSuspicious(vibration, adaptiveFloor, sensitivity, cpuLoad)
         }
 
-        // Issue #1415: Expand threshold under high CPU load to ignore jitter (R-ID 590)
         val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 1.5 else 1.0
-        
-        // Map 0.0..1.0 to 0.45g..0.05g (Higher sensitivity = Lower threshold)
         val baseThreshold = (0.05 + (0.45 - 0.05) * (1.0 - sensitivity)) * loadFactor
         val dynamicThreshold = maxOf(baseThreshold, adaptiveFloor * VIBRATION_SUSPICIOUS_MULTIPLIER * loadFactor)
         return vibration > dynamicThreshold
     }
 
     fun isStationary(vibration: Double, adaptiveFloor: Double, cpuLoad: Double = 0.0): Boolean {
-        // Issue #SIMP-1510-1: Try native offloading first
         nativeProvider?.let {
             return it.isStationary(vibration, adaptiveFloor, cpuLoad)
         }
 
-        // JVM Fallback
         val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 2.0 else 1.0
         val dynamicGate = (adaptiveFloor * STATIONARY_FLOOR_MULT * loadFactor).coerceIn(INITIAL_VIBRATION_FLOOR, VIBRATION_STATIONARY_THRESHOLD * loadFactor)
         return vibration < dynamicGate
@@ -123,18 +114,13 @@ object SentinelValidator {
                isThermalThrottling
     }
 
-    /**
-     * R730: Unified Vibration Floor Update (EMA).
-     */
     fun updateVibrationFloor(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double = 0.0): Double {
         if (vibration.isNaN() || vibration <= 0.0) return currentFloor
         
-        // Issue #SIMP-1510-1: Try native offloading first
         nativeProvider?.let {
             return it.updateVibrationFloor(currentFloor, vibration, isWarming, cpuLoad)
         }
 
-        // Issue #1415: Stable Load Gate (R-ID 591). Pause recalibration during CPU saturation bursts
         if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) return currentFloor
         
         return if (vibration < currentFloor) {
@@ -148,11 +134,7 @@ object SentinelValidator {
         }
     }
 
-    /**
-     * computeNextHpf: Part of Issue #601/653. High-Pass Filter primitive.
-     */
     fun computeNextHpf(lastHpfValue: Double, currentRawVibe: Double, lastRawVibe: Double): Double {
-        // Issue #SIMP-1510-1: Try native offloading first
         nativeProvider?.let {
             return it.computeNextHpf(lastHpfValue, currentRawVibe, lastRawVibe)
         }
@@ -160,11 +142,7 @@ object SentinelValidator {
         return VIBRATION_HPF_ALPHA * (lastHpfValue + currentRawVibe - lastRawVibe)
     }
 
-    /**
-     * computeNextEnergy: Part of Issue #601/653. Energy EMA primitive.
-     */
     fun computeNextEnergy(currentEnergy: Double, hpfValue: Double): Double {
-        // Issue #SIMP-1510-1: Try native offloading first
         nativeProvider?.let {
             return it.computeNextEnergy(currentEnergy, hpfValue)
         }
@@ -174,9 +152,6 @@ object SentinelValidator {
         return (currentEnergy * (1.0 - alphaEnergy)) + (instantEnergy * alphaEnergy)
     }
 
-    /**
-     * Centralized Lux Baseline Update logic.
-     */
     fun updateLuxBaseline(currentBaseline: Double, lux: Double, isStationary: Boolean, isWarming: Boolean): Double {
         if (lux.isNaN()) return currentBaseline
         if (currentBaseline < 0) return lux
@@ -190,9 +165,6 @@ object SentinelValidator {
         return applyEma(currentBaseline, lux, alpha)
     }
 
-    /**
-     * Centralized Barometric Baseline Update logic.
-     */
     fun updateBaroBaseline(currentBaseline: Double, baroAlt: Double, isWarming: Boolean): Double {
         if (baroAlt.isNaN()) return currentBaseline
         if (currentBaseline < -999.0) return baroAlt
@@ -201,9 +173,6 @@ object SentinelValidator {
         return applyEma(currentBaseline, baroAlt, alpha)
     }
 
-    /**
-     * Centralized Acoustic Floor Update logic.
-     */
     fun updateAcousticFloor(currentFloor: Double, updateDb: Double, isWarming: Boolean): Double {
         if (updateDb.isNaN() || updateDb < 0.0) return currentFloor
         if (currentFloor < 0) return max(updateDb, ACOUSTIC_FLOOR_MIN_DB)
@@ -220,20 +189,16 @@ object SentinelValidator {
 
     /**
      * computeAdaptiveAcousticOffCycle: Part of Issue #762 (R762b). 
+     * Oct.7.9: Updated to take durationMs directly for JNI offloading parity.
      */
     fun computeAdaptiveAcousticOffCycle(
         isStationary: Boolean,
-        stationaryStartRt: Long,
-        nowRt: Long
+        stationaryDurationMs: Long
     ): Long {
-        if (!isStationary || stationaryStartRt == 0L) return ACOUSTIC_DUTY_CYCLE_OFF_MS
-        val durationMs = nowRt - stationaryStartRt
-        return min(ACOUSTIC_DUTY_CYCLE_OFF_MS * 4, ACOUSTIC_DUTY_CYCLE_OFF_MS + (durationMs / 60000) * 1000L)
+        if (!isStationary || stationaryDurationMs == 0L) return ACOUSTIC_DUTY_CYCLE_OFF_MS
+        return min(ACOUSTIC_DUTY_CYCLE_OFF_MS * 4, ACOUSTIC_DUTY_CYCLE_OFF_MS + (stationaryDurationMs / 60000) * 1000L)
     }
 
-    /**
-     * SOT 6.230: Centralized EMA alpha acceleration for the 5s warming phase.
-     */
     fun accelerateAlpha(baseAlpha: Double, isWarming: Boolean, limit: Double = 0.5): Double {
         val multiplier = if (isWarming) 10.0 else 1.0
         return (baseAlpha * multiplier).coerceAtMost(limit)

@@ -74,7 +74,10 @@ data class AtmosphericState(
     var proximityDebounceMs: Long = 0L,
     var isNear: Boolean = true,
     var liftIdx: Double = 0.0,
-    var tiltIdx: Double = 0.0
+    var tiltIdx: Double = 0.0,
+    
+    // Oct.7.9: Native Hysteresis
+    var stationaryDurationMs: Long = 0L
 ) {
     fun copyFrom(other: AtmosphericState) {
         this.temp = other.temp; this.maxTemp = other.maxTemp; this.baroAlt = other.baroAlt
@@ -87,6 +90,7 @@ data class AtmosphericState(
         this.proxIdx = other.proxIdx; this.proximityCm = other.proximityCm
         this.proximityDebounceMs = other.proximityDebounceMs; this.isNear = other.isNear
         this.liftIdx = other.liftIdx; this.tiltIdx = other.tiltIdx
+        this.stationaryDurationMs = other.stationaryDurationMs
     }
 
     fun reset() {
@@ -95,12 +99,12 @@ data class AtmosphericState(
         vibration = 0.0; vibrationRollingSum = 0.0; vibeIdx = 0.0; peakVibrationShock = 0.0
         peakVibrationShockTs = 0L; adaptiveVibrationFloor = 0.0; proxIdx = 0.0; proximityCm = -1.0
         proximityDebounceMs = 0L; isNear = true; liftIdx = 0.0; tiltIdx = 0.0
+        stationaryDurationMs = 0L
     }
 }
 
 /**
  * ForensicSnapshot: Unified container for diagnostic sensor probes.
- * Oct.7.7: Added anomaly flags (isSuspiciousNoise, isMemoryPressureThrottled).
  */
 @Serializable
 data class ForensicSnapshot(
@@ -253,26 +257,9 @@ data class IntegrityState(
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
- * Oct.7.7:
- * - Issue #SIMP-1007-16: Flag Propagation. Added isSuspiciousNoise and 
- *   isMemoryPressureThrottled delegates to ForensicSnapshot container.
- * Oct.7.4:
- * - Issue #SIMP-1007-15: Unified Snapshot Container. Grouped snrSnapshot, 
- *   vibeSnapshot, thermalSnapshot, and heapSnapshot into ForensicSnapshot within IntegrityState.
- * Oct.7.3:
- * - Issue #QA-1007-1: Forensic Expansion. Fixed duplicate() to ensure forensic 
- *   body properties (muzzled, siren, snapshots) are preserved during pipeline emission.
- * - Promoted distToTracker and distToHome to monolith delegation and toMap.
- * - Included extended forensic sensors in toMap for JSON consistency.
- * Oct.7.1:
- * - Issue #SIMP-1006-14: Telemetry Field Pruning. Marked internal evaluation 
- *   scratchpad and tick-local fields as @Transient to reduce JSON wire size.
- * Oct.6.23:
- * - Issue #SIGN-1006-13: Logic Consolidation. Convenience getters for engine-direct 
- *   flags refined to ensure parity with internalized conflation handlers.
- * Oct.5.2:
- * - Issue #1344: Forensic Diagnostic Expansion. Integrated thermalSnapshot 
- *   and heapSnapshot into IntegrityState and monolith delegation (R1344).
+ * Oct.7.9:
+ * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Added 
+ *   stationaryDuration delegate to AtmosphericState.
  */
 @Serializable
 data class LocationUpdate(
@@ -654,6 +641,11 @@ data class LocationUpdate(
         get() = integrity.forensic.isMemoryPressureThrottled
         set(value) { integrity.forensic.isMemoryPressureThrottled = value }
 
+    // Oct.7.9 Native Hysteresis
+    var stationaryDuration: Long
+        get() = atmospheric.stationaryDurationMs
+        set(value) { atmospheric.stationaryDurationMs = value }
+
     var activityType: ActivityType 
         get() = kinetic.activityType
         set(value) { kinetic.activityType = value }
@@ -703,7 +695,6 @@ data class LocationUpdate(
 
     /**
      * duplicate: Performs a deep copy to ensure thread safety during event emission (R-ID 392).
-     * Oct.7.4: Optimized to use unified forensic container within integrity.copy().
      */
     fun duplicate(): LocationUpdate = copy(
         kinetic = kinetic.copy(),
@@ -789,7 +780,7 @@ data class LocationUpdate(
         put("standby_bucket", standbyBucket)
         put("net_interface", netInterface)
         put("is_storage_low", isStorageLow); put("is_storage_critical", isStorageCritical)
-        put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_mode_active", isCoolingModeActive)
+        put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_modeActive", isCoolingModeActive)
         put("tracker_state", trackerState.name); put("is_sit_detected", isSitDetected); put("last_sit_ts", lastSitTs)
         put("is_jump", isJump); put("mic_pending", micPending); put("snr_idx", snrIdx); put("noise_idx", noiseIdx)
         put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("lift_idx", liftIdx)
@@ -833,6 +824,9 @@ data class LocationUpdate(
         // Oct.7.7 Anomaly Flags
         put("is_suspicious_noise", isSuspiciousNoise)
         put("is_memory_pressure_throttled", isMemoryPressureThrottled)
+        
+        // Oct.7.9 Native Hysteresis
+        put("stationary_duration_ms", stationaryDuration)
     }
 
     companion object {
