@@ -6,20 +6,18 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.7.7:
+ * - Issue #SIMP-1007-16: Flag Propagation. Updated mapping to handle 
+ *   isSuspiciousNoise and isMemoryPressureThrottled across Proto and JSON layers.
  * Oct.7.6:
  * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated mapping functions 
- *   to utilize the unified ForensicSnapshot container properties, resolving 
- *   compilation regressions from Oct7.5 container migration.
- * Oct.6.21:
- * - Issue #QA-1006-12: Forensic Hardening. Integrated PhysicsUtils.safeDouble 
- *   into mapAppToEntity and mapStatusToPending.
+ *   to utilize the unified ForensicSnapshot container properties.
  */
 object TelemetryMapper {
 
     /**
      * mapTickToOutputs: Consolidated authority for preparing persistence and 
-     * signaling DTOs from a tick event. Centralizes field injection and 
-     * mapping convergence (Issue #1329).
+     * signaling DTOs from a tick event.
      */
     fun mapTickToOutputs(
         event: DomainEvent.TickEvaluated,
@@ -29,12 +27,11 @@ object TelemetryMapper {
         violationStartTs: Long,
         updateOut: LocationUpdate
     ) {
-        val snapshot = event.snapshot // Now a LocationUpdate instance
+        val snapshot = event.snapshot
         val proc = event.processed
         val now = event.now
         val nowRt = event.nowRt
 
-        // 1. Inject global alarm state and IDs into snapshot
         snapshot.apply {
             this.ts = now
             this.rt = nowRt
@@ -47,7 +44,6 @@ object TelemetryMapper {
                 this.violationStartTs = violationStartTs
             }
 
-            // Refine with processor results
             proc?.let {
                 kinetic.lat = it.optimizedPoint.lat
                 kinetic.lng = it.optimizedPoint.lng
@@ -70,7 +66,6 @@ object TelemetryMapper {
             this.integrity.isBatteryWhitelisted = integrity.battery > 0
         }
 
-        // 2. Repository Persistence & Signaling DTO is now just the updated snapshot
         updateOut.copyFrom(snapshot)
     }
 
@@ -161,14 +156,16 @@ object TelemetryMapper {
 
             this.thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
             this.heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
+            
+            // Oct.7.7 Anomaly Flags
+            this.isSuspiciousNoise = proto.isSuspiciousNoise
+            this.isMemoryPressureThrottled = proto.isMemoryPressureThrottled
 
             status = processed.status
             ts = now
             trackerState = try { TrackerState.valueOf(proto.state.name.removePrefix("TS_")) } catch(e: Exception) { TrackerState.UNKNOWN }
             isClockRegression = proto.isClockRegression
             lastValidFixRt = lastFixRt
-            
-            // Issue #1410: Global acknowledgment synchronization
             lastAlarmAckTs = proto.lastAlarmAckTs
             violationStartTs = proto.violationStartTs
         }
@@ -289,14 +286,16 @@ object TelemetryMapper {
 
             this.thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else null
             this.heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else null
+            
+            // Oct.7.7 Anomaly Flags
+            this.isSuspiciousNoise = data.optBoolean("is_suspicious_noise", current.isSuspiciousNoise)
+            this.isMemoryPressureThrottled = data.optBoolean("is_memory_pressure_throttled", current.isMemoryPressureThrottled)
 
             this.status = statusVar
             this.ts = now
             this.trackerState = try { TrackerState.valueOf(data.optString("tracker_state", current.trackerState.name)) } catch(e: Exception) { current.trackerState }
             this.isClockRegression = processed.isClockRegression
             this.lastValidFixRt = lastFixRt
-            
-            // Issue #1410: Global acknowledgment synchronization
             lastAlarmAckTs = data.optLong("last_alarm_ack_ts", 0L)
             violationStartTs = data.optLong("violation_start_ts", 0L)
         }
@@ -332,6 +331,10 @@ object TelemetryMapper {
             
             this.thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
             this.heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
+            
+            // Oct.7.7 Anomaly Flags
+            this.isSuspiciousNoise = proto.isSuspiciousNoise
+            this.isMemoryPressureThrottled = proto.isMemoryPressureThrottled
 
             snrSnapshot = proto.snrIdx * 5.0
             kinetic.jumpTier = proto.jumpTier
@@ -345,7 +348,6 @@ object TelemetryMapper {
                 ActivityType.valueOf(proto.activityType) 
             } catch (e: Exception) { ActivityType.UNKNOWN }
             
-            // Issue #1410: Global acknowledgment synchronization
             lastAlarmAckTs = proto.lastAlarmAckTs
             violationStartTs = proto.violationStartTs
         }
@@ -400,6 +402,10 @@ object TelemetryMapper {
             
             this.thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else null
             this.heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else null
+            
+            // Oct.7.7 Anomaly Flags
+            this.isSuspiciousNoise = data.optBoolean("is_suspicious_noise", false)
+            this.isMemoryPressureThrottled = data.optBoolean("is_memory_pressure_throttled", false)
 
             trackerState = try { TrackerState.valueOf(data.optString("tracker_state", current.trackerState.name)) } catch(e: Exception) { current.trackerState }
             
@@ -463,6 +469,8 @@ object TelemetryMapper {
             heapAllocatedMb = snapshot.integrity.heapAllocatedMb,
             thermalSnapshot = snapshot.thermalSnapshot,
             heapSnapshot = snapshot.heapSnapshot,
+            isSuspiciousNoise = snapshot.isSuspiciousNoise,
+            isMemoryPressureThrottled = snapshot.isMemoryPressureThrottled,
             activityType = snapshot.activityType
         )
     }
@@ -530,9 +538,10 @@ object TelemetryMapper {
             this.integrity.heapAllocatedMb = s.integrity.heapAllocatedMb
             this.thermalSnapshot = s.thermalSnapshot
             this.heapSnapshot = s.heapSnapshot
+            this.isSuspiciousNoise = s.isSuspiciousNoise
+            this.isMemoryPressureThrottled = s.isMemoryPressureThrottled
             this.kinetic.activityType = s.activityType
             this.trackerState = s.trackerState
-            // Issue #1410: Viewer Persistence
             this.lastAlarmAckTs = s.lastAlarmAckTs
             this.violationStartTs = s.violationStartTs
         }
@@ -550,7 +559,6 @@ object TelemetryMapper {
             locationPendingReason = p.locationPendingReason; isUltraLongStationary = p.isUltraLongStationary
             violationUptimeMs = p.violationUptimeMs; gpsHardwareLock = p.gpsHardwareLock
 
-            // Forensic Parity
             snrIdx = PhysicsUtils.safeDouble(p.snrIdx)
             noiseIdx = PhysicsUtils.safeDouble(p.noiseIdx)
             luxIdx = PhysicsUtils.safeDouble(p.luxIdx)
@@ -570,6 +578,10 @@ object TelemetryMapper {
             activityType = p.activityType
             thermalSnapshot = p.thermalSnapshot
             heapSnapshot = p.heapSnapshot
+            
+            // Oct.7.7 Anomaly Flags
+            isSuspiciousNoise = p.forensic.isSuspiciousNoise
+            isMemoryPressureThrottled = p.forensic.isMemoryPressureThrottled
         }
     }
 
@@ -585,7 +597,6 @@ object TelemetryMapper {
             speed = proto.speed; bearing = proto.bearing; currentMa = proto.currentMa
             locationPendingReason = try { LocationPendingReason.valueOf(proto.locationPendingReason.name.removePrefix("LPR_")) } catch(e: Exception) { LocationPendingReason.NONE }
 
-            // Forensic Parity
             snrIdx = PhysicsUtils.safeDouble(proto.snrIdx)
             noiseIdx = PhysicsUtils.safeDouble(proto.noiseIdx)
             luxIdx = PhysicsUtils.safeDouble(proto.luxIdx)
@@ -607,12 +618,16 @@ object TelemetryMapper {
             activityType = try { ActivityType.valueOf(proto.activityType) } catch (e: Exception) { ActivityType.UNKNOWN }
             thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
             heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
+            
+            // Oct.7.7 Anomaly Flags
+            isSuspiciousNoise = proto.isSuspiciousNoise
+            isMemoryPressureThrottled = proto.isMemoryPressureThrottled
         }
     }
 
     /**
      * mapEntityToApp: Authority for converting a HistoryEntity into a 
-     * UI-ready ConnectionPoint. Restores from binary payload if available (R1173).
+     * UI-ready ConnectionPoint.
      */
     fun mapEntityToApp(entity: HistoryEntity, out: ConnectionPoint) {
         if (entity.payload.isNotEmpty()) {
@@ -621,7 +636,7 @@ object TelemetryMapper {
                 mapProtoToApp(proto, out)
                 return
             } catch (e: Exception) {
-                Timber.e(e, "Binary history restoration failed, falling back to columns")
+                Timber.e(e, "Binary history restoration failed")
             }
         }
 
@@ -632,7 +647,6 @@ object TelemetryMapper {
             speed = entity.speed; bearing = entity.bearing; currentMa = entity.currentMa
             locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE }
 
-            // Forensic Parity
             gpsIndex = entity.gpsIndex
             snrIdx = PhysicsUtils.safeDouble(entity.snrIdx)
             noiseIdx = PhysicsUtils.safeDouble(entity.noiseIdx)
@@ -657,6 +671,8 @@ object TelemetryMapper {
             } catch (e: Exception) { ActivityType.UNKNOWN }
             thermalSnapshot = null
             heapSnapshot = null
+            isSuspiciousNoise = false
+            isMemoryPressureThrottled = false
         }
     }
 
@@ -742,7 +758,7 @@ object TelemetryMapper {
 
     /**
      * mapPendingToStatus: Authority for converting a PendingStatusEntity back 
-     * into a domain LocationUpdate. Restores from binary payload if available (R1173).
+     * into a domain LocationUpdate.
      */
     fun mapPendingToStatus(entity: PendingStatusEntity, deviceId: String, viewerId: String, out: LocationUpdate): LocationUpdate {
         if (entity.payload.isNotEmpty()) {
@@ -752,7 +768,7 @@ object TelemetryMapper {
                 out.status = try { SentinelStatus.valueOf(proto.sentinelStatus) } catch(e: Exception) { SentinelStatus.VALID }
                 return out
             } catch (e: Exception) {
-                Timber.e(e, "Binary pending status restoration failed, falling back to columns")
+                Timber.e(e, "Binary pending status restoration failed")
             }
         }
 
@@ -800,6 +816,8 @@ object TelemetryMapper {
                 heapAllocatedMb = entity.heapAllocatedMb
                 thermalSnapshot = null
                 heapSnapshot = null
+                isSuspiciousNoise = false
+                isMemoryPressureThrottled = false
             }
 
             ts = entity.timestamp

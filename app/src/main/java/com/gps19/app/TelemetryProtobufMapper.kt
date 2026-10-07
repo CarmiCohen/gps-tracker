@@ -5,17 +5,12 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.7.7:
+ * - Issue #SIMP-1007-16: Flag Propagation. Integrated isSuspiciousNoise and 
+ *   isMemoryPressureThrottled into all serialization paths (Realtime & Persistence).
  * Oct.7.5:
  * - Issue #SIMP-1007-15: Unified Snapshot Container. Ensured snr and vibe 
  *   snapshots are included in ConnectionPoint persistence mapping.
- * Oct.7.3:
- * - Issue #QA-1007-1: Forensic Expansion. Promoted internal engine flags 
- *   (muzzled, siren, hardware, snapshots, acoustic/light environmental states) 
- *   to Protobuf for remote diagnostics.
- * Oct.6.21:
- * - Issue #QA-1006-12: Forensic Hardening. Wrapped all floating-point fields 
- *   in PhysicsUtils.safeDouble during mapping to prevent SQLiteConstraintExceptions 
- *   (NaN/Infinity) in binary persistence blobs.
  */
 object TelemetryProtobufMapper {
 
@@ -184,6 +179,10 @@ object TelemetryProtobufMapper {
         builder.setLightSpikeRt(status.lightSpikeRt)
         builder.setProvidedAdaptiveFloor(PhysicsUtils.safeDouble(status.providedAdaptiveFloor))
         builder.setAcousticMinDb(PhysicsUtils.safeDouble(status.acousticMinDb))
+        
+        // Oct.7.7 Anomaly Flags
+        builder.setIsSuspiciousNoise(status.isSuspiciousNoise)
+        builder.setIsMemoryPressureThrottled(status.isMemoryPressureThrottled)
     }
 
     /**
@@ -281,7 +280,7 @@ object TelemetryProtobufMapper {
         builder.setAcousticFloor(PhysicsUtils.safeDouble(status.acousticFloorDb))
         builder.setAdaptiveVibrationFloor(PhysicsUtils.safeDouble(status.adaptiveVibrationFloor))
         builder.setNetInterface(status.netInterface)
-        builder.setVer("Oct7.3")
+        builder.setVer("Oct7.7")
         
         builder.setDeviceId(status.deviceId)
         builder.setViewerId(status.viewerId)
@@ -327,6 +326,10 @@ object TelemetryProtobufMapper {
         builder.setLightSpikeRt(status.lightSpikeRt)
         builder.setProvidedAdaptiveFloor(PhysicsUtils.safeDouble(status.providedAdaptiveFloor))
         builder.setAcousticMinDb(PhysicsUtils.safeDouble(status.acousticMinDb))
+        
+        // Oct.7.7 Anomaly Flags
+        builder.setIsSuspiciousNoise(status.isSuspiciousNoise)
+        builder.setIsMemoryPressureThrottled(status.isMemoryPressureThrottled)
     }
 
     /**
@@ -364,6 +367,10 @@ object TelemetryProtobufMapper {
         p.vibeSnapshot?.let { builder.setVibeSnapshot(PhysicsUtils.safeDouble(it)) }
         p.thermalSnapshot?.let { builder.setThermalSnapshot(PhysicsUtils.safeDouble(it)) }
         p.heapSnapshot?.let { builder.setHeapSnapshot(PhysicsUtils.safeDouble(it)) }
+
+        // Oct.7.7 Anomaly Flags
+        builder.setIsSuspiciousNoise(p.isSuspiciousNoise)
+        builder.setIsMemoryPressureThrottled(p.isMemoryPressureThrottled)
 
         builder.setStatus(p.status.name)
         builder.setLocationPendingReason(LocationPendingReasonProto.valueOf("LPR_" + p.locationPendingReason.name))

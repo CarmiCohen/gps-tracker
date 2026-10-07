@@ -275,6 +275,10 @@ message RealtimeStatus {
     int64 light_spike_rt = 107;
     double provided_adaptive_floor = 108;
     double acoustic_min_db = 109;
+
+    // Oct.7.7 Anomaly Flags
+    bool is_suspicious_noise = 110;
+    bool is_memory_pressure_throttled = 111;
 }
 
 message GeoPointProto {
@@ -463,6 +467,10 @@ message TrackerStatusProto {
     int64 light_spike_rt = 136;
     double provided_adaptive_floor = 137;
     double acoustic_min_db = 138;
+
+    // Oct.7.7 Anomaly Flags
+    bool is_suspicious_noise = 139;
+    bool is_memory_pressure_throttled = 140;
 }
 
 message ActiveAlarmProto {

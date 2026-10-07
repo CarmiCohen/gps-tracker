@@ -37,6 +37,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.7.7:
+ * - Issue #SIMP-1007-16: Flag Propagation. Integrated native isSuspiciousNoise and 
+ *   isMemoryPressureThrottled flags into ForensicSnapshot and processing pipeline.
  * Oct.7.6:
  * - Issue #SIMP-1007-16: JNI FastPath Expansion. Integrated snr, thermal, and 
  *   heap snapshots into VibrationBatch for native-layer correlation logic (R-ID 610).
@@ -114,6 +117,10 @@ class HardwareSuite @Inject constructor(
         var kineticEnergy: Double = 0.0
         var adaptiveVibrationFloor: Double = 0.0
         var activityType: ActivityType = ActivityType.UNKNOWN
+        
+        // Oct.7.7 Anomaly Flags
+        var isSuspiciousNoise: Boolean = false
+        var isMemoryPressureThrottled: Boolean = false
 
         fun reset() {
             vibration = 0.0; heading = 0.0; baroAlt = 0.0; lux = 0.0; isNear = false
@@ -122,6 +129,7 @@ class HardwareSuite @Inject constructor(
             plungeMatched = false; proximityIdx = 0.0; proximityCm = -1.0; proximityDebounceMs = 0L
             vibrationRollingSum = 0.0; acousticPeak = 0.0; acousticPeakMin = -1.0; kineticEnergy = 0.0
             adaptiveVibrationFloor = 0.0; activityType = ActivityType.UNKNOWN
+            isSuspiciousNoise = false; isMemoryPressureThrottled = false
         }
     }
 
@@ -283,6 +291,10 @@ class HardwareSuite @Inject constructor(
 
     @Volatile private var cachedThermalHeadroom = 0.0
     @Volatile private var cachedHeapAllocatedMb = 0.0
+    
+    // Oct.7.7 Anomaly Flags
+    @Volatile var isSuspiciousNoise = false; private set
+    @Volatile var isMemoryPressureThrottled = false; private set
 
     private val logicSnapshotBuffer = CircularStateBuffer(2, { ForensicSnapshot() }, { it.reset() })
     private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
@@ -341,7 +353,7 @@ class HardwareSuite @Inject constructor(
         fun evaluateInterval(nowRt: Long): Long {
             if (isHighLoad || maliAnomaly) lastAnomalyActiveRt = nowRt
             val shouldThrottle = systemStatusProvider.isStaggeredPerformanceTier() &&
-                    (isHighLoad || maliAnomaly || (nowRt - lastAnomalyActiveRt < GNSS_THROTTLING_HYSTERESIS_MS))
+                    (isHighLoad || maliAnomaly || isMemoryPressureThrottled || (nowRt - lastAnomalyActiveRt < GNSS_THROTTLING_HYSTERESIS_MS))
             
             if (isGnssThrottled != shouldThrottle) {
                 isGnssThrottled = shouldThrottle
@@ -939,6 +951,8 @@ class HardwareSuite @Inject constructor(
                     kineticEnergy = this@HardwareSuite.currentKineticEnergy
                     adaptiveVibrationFloor = this@HardwareSuite.adaptiveVibrationFloor
                     activityType = activityContextProvider.currentActivityType
+                    isSuspiciousNoise = this@HardwareSuite.isSuspiciousNoise
+                    isMemoryPressureThrottled = this@HardwareSuite.isMemoryPressureThrottled
                 }
                 if (isForensic) {
                     forensicPeakVibration = 0.0
@@ -1024,6 +1038,10 @@ class HardwareSuite @Inject constructor(
                 lastHpfValue = vibrationBatch.nextHpf
                 currentKineticEnergy = vibrationBatch.nextEnergy
                 lastRawVibe = delta
+                
+                // Oct.7.7: Capture anomaly flags
+                isSuspiciousNoise = vibrationBatch.isSuspiciousNoise
+                isMemoryPressureThrottled = vibrationBatch.isMemoryPressureThrottled
             } else {
                 // Fallback to granular calls (Legacy/Audit)
                 delta = nativeFastPathProvider.calculateVibrationDelta(dx, dy, dz, lx, ly, lz)
@@ -1031,6 +1049,9 @@ class HardwareSuite @Inject constructor(
                 lastHpfValue = SentinelValidator.computeNextHpf(lastHpfValue, delta, lastRawVibe)
                 currentKineticEnergy = SentinelValidator.computeNextEnergy(currentKineticEnergy, lastHpfValue)
                 lastRawVibe = delta 
+                
+                isSuspiciousNoise = false
+                isMemoryPressureThrottled = false
             }
 
             if (delta > logicPeakVibration) logicPeakVibration = delta
@@ -1167,6 +1188,7 @@ class HardwareSuite @Inject constructor(
             stationaryStartRt = 0L
             emaPressure = 0.0
             lastBaroZeroingRt = 0L
+            lastBaroZeroingRt = 0L
             lastLinearAccelTs = 0L
             lastStayAliveRt = 0L
             lastDisplayTransitionRt = 0L
@@ -1188,6 +1210,8 @@ class HardwareSuite @Inject constructor(
             currentCpuLoad = 0.0
             cachedThermalHeadroom = 0.0
             cachedHeapAllocatedMb = 0.0
+            isSuspiciousNoise = false
+            isMemoryPressureThrottled = false
             activityContextProvider.reset()
         }
     }

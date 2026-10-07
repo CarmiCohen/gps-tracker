@@ -11,17 +11,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.7.7:
+ * - Issue #SIMP-1007-16: Flag Propagation. Added isSuspiciousNoise and 
+ *   isMemoryPressureThrottled delegates to ConnectionPoint for HUD visibility.
  * Oct.7.5:
  * - Issue #SIMP-1007-15: Unified Snapshot Container. Completed migration of 
  *   ConnectionPoint and LogEntry to use unified ForensicSnapshot for all probes (snr, vibe, thermal, heap).
- * Oct.7.4:
- * - Issue #SIMP-1007-15: Unified Snapshot Container. Migrated snrSnapshot, 
- *   vibeSnapshot, thermalSnapshot, and heapSnapshot into ForensicSnapshot container 
- *   in ConnectionPoint and LogEntry.
- * Oct.6.21:
- * - Issue #QA-1006-12: Forensic Hardening. Integrated safeDouble into 
- *   LogEntry.toJSONObject to prevent JSONExceptions (NaN/Infinity) during 
- *   high-pressure telemetry bursts. Ensures stability under stress test.
  */
 
 @Serializable
@@ -172,6 +167,14 @@ class ConnectionPoint(
         get() = forensic.heap
         set(value) { forensic.heap = value }
 
+    // Oct.7.7 Anomaly Flags
+    var isSuspiciousNoise: Boolean
+        get() = forensic.isSuspiciousNoise
+        set(value) { forensic.isSuspiciousNoise = value }
+    var isMemoryPressureThrottled: Boolean
+        get() = forensic.isMemoryPressureThrottled
+        set(value) { forensic.isMemoryPressureThrottled = value }
+
     fun copyFrom(other: ConnectionPoint) {
         this.localId = other.localId; this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt
         this.localSig = other.localSig; this.remoteSig = other.remoteSig; this.isConnected = other.isConnected
@@ -214,7 +217,9 @@ class ConnectionPoint(
                isGnssThrottled == other.isGnssThrottled && thermalHeadroom == other.thermalHeadroom && 
                heapAllocatedMb == other.heapAllocatedMb && activityType == other.activityType &&
                forensic.snr == other.forensic.snr && forensic.vibe == other.forensic.vibe &&
-               forensic.thermal == other.forensic.thermal && forensic.heap == other.forensic.heap
+               forensic.thermal == other.forensic.thermal && forensic.heap == other.forensic.heap &&
+               forensic.isSuspiciousNoise == other.forensic.isSuspiciousNoise &&
+               forensic.isMemoryPressureThrottled == other.forensic.isMemoryPressureThrottled
     }
 
     fun reset() {
@@ -310,7 +315,9 @@ data class LogEntry(
                count == other.count && durationMs == other.durationMs &&
                lat == other.lat && lng == other.lng && accuracy == other.accuracy &&
                forensic.snr == other.forensic.snr && forensic.vibe == other.forensic.vibe &&
-               forensic.thermal == other.forensic.thermal && forensic.heap == other.forensic.heap
+               forensic.thermal == other.forensic.thermal && forensic.heap == other.forensic.heap &&
+               forensic.isSuspiciousNoise == other.forensic.isSuspiciousNoise &&
+               forensic.isMemoryPressureThrottled == other.forensic.isMemoryPressureThrottled
     }
 
     fun toJSONObject(): JSONObject {
@@ -346,6 +353,10 @@ data class LogEntry(
             chargingSnapshot?.let { put("charging_snapshot", it) }
             thermalSnapshot?.let { put("thermal_snapshot", safeDouble(it)) }
             heapSnapshot?.let { put("heap_snapshot", safeDouble(it)) }
+            
+            // Oct.7.7 Anomaly Flags
+            put("is_suspicious_noise", forensic.isSuspiciousNoise)
+            put("is_memory_pressure_throttled", forensic.isMemoryPressureThrottled)
         }
     }
 
@@ -356,7 +367,9 @@ data class LogEntry(
                 snr = if (obj.has("snr_snapshot")) obj.optDouble("snr_snapshot") else null,
                 vibe = if (obj.has("vibe_snapshot")) obj.optDouble("vibe_snapshot") else null,
                 thermal = if (obj.has("thermal_snapshot")) obj.optDouble("thermal_snapshot") else null,
-                heap = if (obj.has("heap_snapshot")) obj.optDouble("heap_snapshot") else null
+                heap = if (obj.has("heap_snapshot")) obj.optDouble("heap_snapshot") else null,
+                isSuspiciousNoise = obj.optBoolean("is_suspicious_noise", false),
+                isMemoryPressureThrottled = obj.optBoolean("is_memory_pressure_throttled", false)
             )
             return LogEntry(
                 localId = obj.optString("localId"), timestamp = ts, message = obj.optString("message"),
@@ -480,7 +493,9 @@ data class DashboardHealthState(
     var lastEnergyDurationMs: Long = 0L,
     var systemPulse: Long = 0L,
     var thermalHeadroom: Double = 0.0,
-    var heapAllocatedMb: Double = 0.0
+    var heapAllocatedMb: Double = 0.0,
+    var isSuspiciousNoise: Boolean = false,
+    var isMemoryPressureThrottled: Boolean = false
 ) : BatteryProvider {
     override val battery: Int get() = batteryLevel
     override val isCharging: Boolean get() = trackerCurrentMa < 0
@@ -575,6 +590,8 @@ data class DashboardState(
     val systemPulse get() = health.systemPulse
     val thermalHeadroom get() = health.thermalHeadroom
     val heapAllocatedMb get() = health.heapAllocatedMb
+    val isSuspiciousNoise get() = health.isSuspiciousNoise
+    val isMemoryPressureThrottled get() = health.isMemoryPressureThrottled
 }
 
 class StatsState(
@@ -714,5 +731,7 @@ data class HudHealthState(
     val activeAlarms: List<AlarmInfo> = emptyList(),
     val progressPulse: Float = 0f,
     val systemPulse: Long = 0L,
-    val isMaliAnomaly: Boolean = false
+    val isMaliAnomaly: Boolean = false,
+    val isSuspiciousNoise: Boolean = false,
+    val isMemoryPressureThrottled: Boolean = false
 ) : BatteryProvider

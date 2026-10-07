@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Oct.7.7:
+ * - Issue #SIMP-1007-16: Flag Propagation. Integrated native isSuspiciousNoise and 
+ *   isMemoryPressureThrottled flags for HUD and decision logic.
  * Oct.7.4:
  * - Issue #SIMP-1007-15: Unified Snapshot Container. Migrated thermalSnapshot 
  *   and heapSnapshot into ForensicSnapshot container for architectural parity.
@@ -133,6 +136,14 @@ class SystemHealthState(
         get() = forensic.heap
         set(value) { forensic.heap = value }
 
+    // Oct.7.7 Delegates
+    var isSuspiciousNoise: Boolean
+        get() = forensic.isSuspiciousNoise
+        set(value) { forensic.isSuspiciousNoise = value }
+    var isMemoryPressureThrottled: Boolean
+        get() = forensic.isMemoryPressureThrottled
+        set(value) { forensic.isMemoryPressureThrottled = value }
+
     fun copyFrom(other: SystemHealthState) {
         this.signalLoss = other.signalLoss
         this.gpsStalled = other.gpsStalled
@@ -251,6 +262,7 @@ class SystemHealthState(
         tamperNote: String? = null, coolingEnteredRt: Long = 0L,
         thermalHeadroom: Double = 0.0, heapAllocatedMb: Double = 0.0,
         thermalSnapshot: Double? = null, heapSnapshot: Double? = null,
+        isSuspiciousNoise: Boolean = false, isMemoryPressureThrottled: Boolean = false,
         activityType: ActivityType = ActivityType.UNKNOWN
     ) {
         this.signalLoss = signalLoss
@@ -294,6 +306,8 @@ class SystemHealthState(
         this.heapAllocatedMb = heapAllocatedMb
         this.forensic.thermal = thermalSnapshot
         this.forensic.heap = heapSnapshot
+        this.forensic.isSuspiciousNoise = isSuspiciousNoise
+        this.forensic.isMemoryPressureThrottled = isMemoryPressureThrottled
         this.forensicReliability = forensicReliability
         this.vibration = vibration
         this.isBatteryLow = isBatteryLow

@@ -26,16 +26,16 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.7.7:
+ * - Issue #SIMP-1007-16: Flag Propagation. Injected native anomaly flags from 
+ *   HardwareSuiteLogicSnapshot into the evaluation monolith for alarm analysis.
  * Oct.6.21:
  * - Issue #QA-1006-12: Forensic Hardening. Wrapped all environmental indices 
  *   in PhysicsUtils.safeDouble to prevent SQLiteConstraintException (NaN/Inf) 
  *   during high-pressure bursts.
- * - Updated executeLogPressureTest to send constant messages to verify 
- *   conflation efficiency (Rule 1.123).
  * Oct.6.3:
  * - Issue #AUDIT-1006-2: Implemented triggerImmediateTick() to allow Fast-Path 
  *   triggers (Acoustic/Light) to preempt relaxed memory-throttled intervals.
- *   Ensures zero-latency alarm detection even during MemoryPressureLevel.HIGH/CRITICAL.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -518,6 +518,10 @@ class MonitorService : BaseMonitorService() {
             localInternetLoss = health.localInternetLoss; isHardwareOnline = health.isHardwareOnline
             cpuLoad = health.cpuLoad; ioWait = health.ioWait; maxIoLatency = health.maxIoLatency
             kinetic.activityType = hSnapshot.activityType
+            
+            // Oct.7.7 Anomaly Flags
+            isSuspiciousNoise = hSnapshot.isSuspiciousNoise
+            isMemoryPressureThrottled = hSnapshot.isMemoryPressureThrottled
         }
         
         if (isTrackerMode) {

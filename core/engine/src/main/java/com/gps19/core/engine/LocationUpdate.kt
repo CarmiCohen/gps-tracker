@@ -100,22 +100,28 @@ data class AtmosphericState(
 
 /**
  * ForensicSnapshot: Unified container for diagnostic sensor probes.
+ * Oct.7.7: Added anomaly flags (isSuspiciousNoise, isMemoryPressureThrottled).
  */
 @Serializable
 data class ForensicSnapshot(
     var snr: Double? = null,
     var vibe: Double? = null,
     var thermal: Double? = null,
-    var heap: Double? = null
+    var heap: Double? = null,
+    var isSuspiciousNoise: Boolean = false,
+    var isMemoryPressureThrottled: Boolean = false
 ) {
     fun copyFrom(other: ForensicSnapshot) {
         this.snr = other.snr
         this.vibe = other.vibe
         this.thermal = other.thermal
         this.heap = other.heap
+        this.isSuspiciousNoise = other.isSuspiciousNoise
+        this.isMemoryPressureThrottled = other.isMemoryPressureThrottled
     }
     fun reset() {
         snr = null; vibe = null; thermal = null; heap = null
+        isSuspiciousNoise = false; isMemoryPressureThrottled = false
     }
 }
 
@@ -247,6 +253,9 @@ data class IntegrityState(
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
+ * Oct.7.7:
+ * - Issue #SIMP-1007-16: Flag Propagation. Added isSuspiciousNoise and 
+ *   isMemoryPressureThrottled delegates to ForensicSnapshot container.
  * Oct.7.4:
  * - Issue #SIMP-1007-15: Unified Snapshot Container. Grouped snrSnapshot, 
  *   vibeSnapshot, thermalSnapshot, and heapSnapshot into ForensicSnapshot within IntegrityState.
@@ -637,6 +646,14 @@ data class LocationUpdate(
         get() = integrity.forensic.heap
         set(value) { integrity.forensic.heap = value }
 
+    // Oct.7.7 Anomaly Flags
+    var isSuspiciousNoise: Boolean
+        get() = integrity.forensic.isSuspiciousNoise
+        set(value) { integrity.forensic.isSuspiciousNoise = value }
+    var isMemoryPressureThrottled: Boolean
+        get() = integrity.forensic.isMemoryPressureThrottled
+        set(value) { integrity.forensic.isMemoryPressureThrottled = value }
+
     var activityType: ActivityType 
         get() = kinetic.activityType
         set(value) { kinetic.activityType = value }
@@ -812,6 +829,10 @@ data class LocationUpdate(
         put("snr_snapshot", snrSnapshot)
         put("vibe_snapshot", vibeSnapshot)
         put("suppression_note", suppressionNote)
+        
+        // Oct.7.7 Anomaly Flags
+        put("is_suspicious_noise", isSuspiciousNoise)
+        put("is_memory_pressure_throttled", isMemoryPressureThrottled)
     }
 
     companion object {

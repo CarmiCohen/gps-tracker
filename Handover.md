@@ -1,26 +1,24 @@
-# Forensic Handover (Oct7.6 - NATIVE ANOMALY DETECTION COMPLETION)
+# Forensic Handover (Oct7.7 - NATIVE ANOMALY PROPAGATION & MEMORY HARDENING)
 
 ## 🎯 Current System State
-*   **Version**: `Oct7.6` | **versionCode**: `1143` | **Status**: 🟢 **STABLE / READY FOR PROPAGATION**.
-*   **Native Anomaly Correlation (#SIMP-1007-16)**:
-    *   **C++ Implementation**: `jdhardware-jni.cpp` (Line 183-186) now calculates `isSuspiciousNoise` (SNR/Vibration correlation) and `isMemoryThrottled` (Heap > 256MB) during the 100Hz batch.
-    *   **JNI Bridge**: `JdHardwareManager.processVibrationBatchNative` successfully reads these flags from `sharedStateBuffer` at offsets 164 and 168.
-    *   **Hot-Path Hardening**: `HardwareSuite.kt` (Line 482) now caches `thermalHeadroom` and `heapAllocatedMb` in a 2s loop to prevent high-frequency system call overhead.
-    *   **Refactor Fixes**: Resolved all compilation regressions in `AppAlarmManager`, `AppEventCoordinator`, and `HistoryManager` caused by the `ForensicSnapshot` containerization.
+*   **Version**: `Oct7.7` | **versionCode**: `1144` | **Status**: 🟢 **STABLE / PIPELINE HARDENED**.
+*   **Flag Propagation (#SIMP-1007-16)**:
+    *   **Monolith Integration**: `isSuspiciousNoise` and `isMemoryPressureThrottled` are now fully integrated into the `LocationUpdate` monolith and `ForensicSnapshot`.
+    *   **JNI Capture**: `HardwareSuite.processVibration` successfully copies these flags from the 100Hz `VibrationBatch` after the native math transaction.
+    *   **Signaling**: Protobuf schema and `TelemetryMapper` updated to sync anomaly states to the Viewer HUD.
+*   **Memory Throttling (#SIMP-1007-17)**:
+    *   **Sentinel Guard**: `LocationSentinel.shouldThrottlePolling` now forces a staggered interval when `isMemoryPressureThrottled` is detected, ensuring background stability.
 *   **Audit Record**:
-    *   Modified: `app/src/main/cpp/jdhardware-jni.cpp` (Implemented logic)
-    *   Modified: `app/src/main/java/com/gps19/app/JdHardwareManager.kt` (Bridged flags)
-    *   Modified: `app/src/main/java/com/gps19/app/HardwareSuite.kt` (Metric caching)
-    *   Modified: `core/engine/src/main/java/com/gps19/core/engine/EngineModels.kt` (Updated DTO)
+    *   Modified: `HardwareSuite.kt`, `LocationUpdate.kt`, `LocationSentinel.kt`, `MonitorService.kt`.
+    *   Modified: `app_settings.proto`, `TelemetryProtobufMapper.kt`.
 
 ## 🚀 Resumption Action Path (Next Step)
-1.  **Flag Propagation**: Update `HardwareSuite.processVibration` (Line 608) to copy `vibrationBatch.isSuspiciousNoise` and `vibrationBatch.isMemoryPressureThrottled` into the `ForensicSnapshot` and `LocationUpdate` monolith.
-2.  **Sentinel Integration**: Modify `SentinelValidator.shouldThrottlePolling` in `core:engine` to check the native `isMemoryPressureThrottled` flag and force a staggered interval when under native memory stress.
-3.  **Telemetry Visibility**: Add the new anomaly flags to `TelemetryMapper.toMap` for remote visibility in the Viewer HUD.
+1.  **Adaptive Acoustic Gating**: Implement native logic in `jdhardware-jni.cpp` (Issue #SIMP-1010-1) to dynamically adjust `ACOUSTIC_EMA` alpha based on `vibrationRollingSum`.
+2.  **HUD Refinement**: Update `TrackerScreen.kt` to display a specific warning icon when `isSuspiciousNoise` is flagged by JNI.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct7.6)
+## 📊 Hardening Progress Dashboard (Oct7.7)
+- **Oct7.7: [Flag Propagation: Integrated native anomaly and memory stress flags across evaluation monolith and signaling protocol. Implemented forced polling throttling under native heap pressure (#SIMP-1007-16, #SIMP-1007-17).]**
 - **Oct7.6: [Native Anomaly Logic: Implemented SNR-Vibration correlation and native heap evaluation in JNI. Resolved forensic migration regressions across app managers (#SIMP-1007-16).]**
 - **Oct7.5: [Unified Snapshot Container: Completed migration for ConnectionPoint and LogEntry (#SIMP-1007-15).]**
-- **Oct7.4: [Structural Refactor: Introduced ForensicSnapshot and refactored IntegrityState/LocationUpdate delegation (#SIMP-1007-15).]**

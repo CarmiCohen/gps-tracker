@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.7.7:
+ * - Issue #SIMP-1007-16: Flag Propagation. Added isSuspiciousNoise and 
+ *   isMemoryPressureThrottled to SentinelForensicState.
  * Oct.7.6:
  * - Issue #SIMP-1007-16: JNI FastPath Expansion. Expanded VibrationBatch to 
  *   include anomaly flags (isSuspiciousNoise, isMemoryPressureThrottled).
@@ -536,6 +539,10 @@ class SentinelForensicState {
     var lastAcousticContractionRt: Long = 0L
     var lastSnr: Double = 0.0
     var lastSatsUsed: Int = 0
+    
+    // Oct.7.7 Anomaly Flags
+    var isSuspiciousNoise: Boolean = false
+    var isMemoryPressureThrottled: Boolean = false
 }
 
 @Serializable

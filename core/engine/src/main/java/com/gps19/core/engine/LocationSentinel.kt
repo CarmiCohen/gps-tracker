@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Oct.7.7:
+ * - Issue #SIMP-1007-16: Flag Propagation. Updated updateSensorState and 
+ *   shouldThrottlePolling to integrate native anomaly and memory flags.
  * Oct.4.6:
  * - Issue #1160: Flyweight & Pooling Expansion. Migrated to EnginePools.SENTINEL_RESULT 
  *   to eliminate static flyweight contention and JVM heap churn (R1160).
@@ -88,6 +91,10 @@ object LocationSentinel {
         if (update.lightSpikeRt > 0) state.forensic.lastFastPathLightSpikeRt = update.lightSpikeRt
         state.kineticEnergy = safeDouble(update.kinetic.kineticEnergy)
         
+        // Oct.7.7: Capture native anomaly flags
+        state.forensic.isSuspiciousNoise = update.isSuspiciousNoise
+        state.forensic.isMemoryPressureThrottled = update.isMemoryPressureThrottled
+
         if (update.atmospheric.peakVibrationShock > state.forensic.peakVibrationShock && !update.atmospheric.peakVibrationShock.isNaN()) {
             state.forensic.peakVibrationShock = update.atmospheric.peakVibrationShock
             state.forensic.peakVibrationShockRt = update.nowRt
@@ -404,6 +411,9 @@ object LocationSentinel {
     fun isStationary(state: LocationProcessingState, cpuLoad: Double = 0.0): Boolean = SentinelValidator.isStationary(state.forensic.currentVibrationIndex, state.forensic.adaptiveVibrationFloor, cpuLoad)
 
     fun shouldThrottlePolling(state: LocationProcessingState, providedIsStationary: Boolean? = null, cpuLoad: Double = 0.0): Boolean {
+        // Oct.7.7: Force throttling if native memory pressure is detected
+        if (state.forensic.isMemoryPressureThrottled) return true
+
         val stationary = providedIsStationary ?: isStationary(state, cpuLoad)
         return stationary &&
                abs(state.forensic.currentCompassHeading - state.forensic.lastCompassHeading) < THROTTLE_COMPASS_LIMIT &&
@@ -461,6 +471,8 @@ object LocationSentinel {
         state.forensic.stationaryProb = 1.0
         state.forensic.lastValidAccuracy = 0.0
         state.kineticEnergy = 0.0
+        state.forensic.isSuspiciousNoise = false
+        state.forensic.isMemoryPressureThrottled = false
         GtoEngine.clear(state)
     }
 }
