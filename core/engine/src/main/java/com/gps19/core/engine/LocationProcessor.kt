@@ -5,6 +5,10 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Oct.7.6:
+ * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated LogAdded event 
+ *   emission to utilize unified ForensicSnapshot container, resolving 
+ *   compilation regressions from Oct7.5 container migration.
  * Oct.4.6:
  * - Issue #1160: Flyweight & Pooling Expansion. Migrated processed location 
  *   generation to EnginePools.PROCESSED_LOCATION and EnginePools.GEO_POINT 
@@ -155,7 +159,7 @@ class LocationProcessor(
             "updateSensorData",
             LatencyMonitor.AuditType.PERFORMANCE,
             { message, _ ->
-                emitEvent(ProcessorEvent.LogAdded(message, "system", false, true, 0.0, 0.0, 0.0, null, update.atmospheric.vibration, isPrimary))
+                emitEvent(ProcessorEvent.LogAdded(message, "system", false, true, 0.0, 0.0, 0.0, ForensicSnapshot(vibe = update.atmospheric.vibration), isPrimary))
             }
         ) {
             val oldVibeFloor = state.forensic.adaptiveVibrationFloor
@@ -244,7 +248,7 @@ class LocationProcessor(
             "processGpsPoint",
             LatencyMonitor.AuditType.PERFORMANCE,
             { message, _ ->
-                emitEvent(ProcessorEvent.LogAdded(message, "system", false, true, lat, lng, accuracy, snr, state.forensic.currentVibrationIndex, isPrimary))
+                emitEvent(ProcessorEvent.LogAdded(message, "system", false, true, lat, lng, accuracy, ForensicSnapshot(snr = snr, vibe = state.forensic.currentVibrationIndex), isPrimary))
             }
         ) {
             val res = EnginePools.PROCESSED_LOCATION.acquire()
@@ -254,7 +258,7 @@ class LocationProcessor(
             if (state.lastTs > 0 && effectiveTs < state.lastTs) {
                 val delta = state.lastTs - effectiveTs
                 if (delta > CLOCK_REGRESSION_GATE_MS) { 
-                    emitEvent(ProcessorEvent.LogAdded("Merge-on-Stale: Coordinate update bypassed due to hardware clock regression (${delta}ms). Merging status-only data.", "system", false, true, 0.0, 0.0, 0.0, snr, state.forensic.currentVibrationIndex, isPrimary))
+                    emitEvent(ProcessorEvent.LogAdded("Merge-on-Stale: Coordinate update bypassed due to hardware clock regression (${delta}ms). Merging status-only data.", "system", false, true, 0.0, 0.0, 0.0, ForensicSnapshot(snr = snr, vibe = state.forensic.currentVibrationIndex), isPrimary))
                     if (delta > 86400000L) { state.lastTs = 0L; state.lastRt = 0L; LocationSentinel.reset(state) }
                 }
                 val status = update.status
@@ -450,7 +454,7 @@ class LocationProcessor(
                 snr = snr,
                 vibeIndex = state.forensic.currentVibrationIndex,
                 onLog = { msg, lLat, lLng, lAcc, lVibe ->
-                    emitEvent(ProcessorEvent.LogAdded(msg, "system", false, false, lLat, lLng, lAcc, null, lVibe, isPrimary))
+                    emitEvent(ProcessorEvent.LogAdded(msg, "system", false, false, lLat, lLng, lAcc, ForensicSnapshot(vibe = lVibe), isPrimary))
                 }
             )
 

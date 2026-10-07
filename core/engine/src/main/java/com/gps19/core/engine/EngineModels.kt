@@ -6,14 +6,15 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.7.6:
+ * - Issue #SIMP-1007-16: JNI FastPath Expansion. Expanded VibrationBatch to 
+ *   include anomaly flags (isSuspiciousNoise, isMemoryPressureThrottled).
  * Oct.7.5:
  * - Issue #SIMP-1007-15: Unified Snapshot Container. Completed migration of 
  *   EngineConnectionPoint to use unified ForensicSnapshot for all probes (snr, vibe, thermal, heap).
  * Oct.7.4:
  * - Issue #SIMP-1007-15: Unified Snapshot Container. Migrated thermalSnapshot 
  *   and heapSnapshot into ForensicSnapshot container.
- * Oct.6.3:
- * - Restored RevivalEvent definition (accidentally purged in Oct6.2).
  */
 
 @Serializable
@@ -326,6 +327,7 @@ interface DeviceIdentity {
 
 /**
  * VibrationBatch: Data transfer object for JNI batching (Issue #1450).
+ * Oct.7.6: Expanded with forensic snapshots for native correlation (#SIMP-1007-16).
  */
 @Serializable
 class VibrationBatch {
@@ -339,12 +341,21 @@ class VibrationBatch {
     var lastHpfValue: Double = 0.0
     var currentEnergy: Double = 0.0
     
+    // Forensic Expansion
+    var snr: Double = -1.0
+    var thermal: Double = -1.0
+    var heap: Double = -1.0
+    
     // Outputs
     var delta: Double = 0.0
     var nextFloor: Double = 0.0
     var nextHpf: Double = 0.0
     var nextEnergy: Double = 0.0
     var isStationary: Boolean = false
+    
+    // Oct.7.6 Anomaly Flags
+    var isSuspiciousNoise: Boolean = false
+    var isMemoryPressureThrottled: Boolean = false
 }
 
 /**

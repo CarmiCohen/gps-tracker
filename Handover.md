@@ -1,32 +1,26 @@
-# Forensic Handover (Oct7.5 - UNIFIED SNAPSHOT CONTAINER COMPLETION)
+# Forensic Handover (Oct7.6 - NATIVE ANOMALY DETECTION COMPLETION)
 
 ## 🎯 Current System State
-*   **Version**: `Oct7.5` | **versionCode**: `1142` | **Status**: 🟢 **STABLE**.
-*   **Unified Snapshot Container (#SIMP-1007-15)**:
-    *   **Architecture**: Completed the migration of all diagnostic probes into the `ForensicSnapshot` data class. 
-    *   **Engine Parity**: `EngineConnectionPoint` in `EngineModels.kt` now delegates `snr`, `vibe`, `thermal`, and `heap` probes to the `forensic` container.
-    *   **App Parity**: `ConnectionPoint` and `LogEntry` in `Models.kt` fully transitioned to the unified container, ensuring atomic updates and simplified state preservation.
-    *   **Persistence Integrity**: Verified that the Room persistence layer (`LogEntity` flat columns) correctly maps to the domain container during database I/O.
-    *   **Signaling Alignment**: Updated `TelemetryMapper` and verified `TelemetryProtobufMapper` logic to ensure remote diagnostics preserve all four probe types.
+*   **Version**: `Oct7.6` | **versionCode**: `1143` | **Status**: 🟢 **STABLE / READY FOR PROPAGATION**.
+*   **Native Anomaly Correlation (#SIMP-1007-16)**:
+    *   **C++ Implementation**: `jdhardware-jni.cpp` (Line 183-186) now calculates `isSuspiciousNoise` (SNR/Vibration correlation) and `isMemoryThrottled` (Heap > 256MB) during the 100Hz batch.
+    *   **JNI Bridge**: `JdHardwareManager.processVibrationBatchNative` successfully reads these flags from `sharedStateBuffer` at offsets 164 and 168.
+    *   **Hot-Path Hardening**: `HardwareSuite.kt` (Line 482) now caches `thermalHeadroom` and `heapAllocatedMb` in a 2s loop to prevent high-frequency system call overhead.
+    *   **Refactor Fixes**: Resolved all compilation regressions in `AppAlarmManager`, `AppEventCoordinator`, and `HistoryManager` caused by the `ForensicSnapshot` containerization.
 *   **Audit Record**:
-    *   Modified: `core/engine/src/main/java/com/gps19/core/engine/EngineModels.kt`
-    *   Modified: `app/src/main/java/com/gps19/app/Models.kt`
-    *   Modified: `app/src/main/java/com/gps19/app/TelemetryMapper.kt`
-    *   Modified: `app/build.gradle` (Version Bump to Oct7.5)
-
-## 🟢 Audit Record
-*   **Build Status**: 🟢 **SUCCESSFUL**.
-*   **Metrics**: Oct7.5: [SOT Count: 312 (Rules: 163), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 58, QA: 586]
+    *   Modified: `app/src/main/cpp/jdhardware-jni.cpp` (Implemented logic)
+    *   Modified: `app/src/main/java/com/gps19/app/JdHardwareManager.kt` (Bridged flags)
+    *   Modified: `app/src/main/java/com/gps19/app/HardwareSuite.kt` (Metric caching)
+    *   Modified: `core/engine/src/main/java/com/gps19/core/engine/EngineModels.kt` (Updated DTO)
 
 ## 🚀 Resumption Action Path (Next Step)
-1.  **Radio Soak Validation**: Verify that the additional container wrapping in `SmartSignalingDispatcher` doesn't impact conflation performance during 24-hour soak tests.
-2.  **JNI FastPath Expansion**: Evaluate if `ForensicSnapshot` can be passed to JNI `processVibrationBatch` for more complex multi-sensor correlation.
+1.  **Flag Propagation**: Update `HardwareSuite.processVibration` (Line 608) to copy `vibrationBatch.isSuspiciousNoise` and `vibrationBatch.isMemoryPressureThrottled` into the `ForensicSnapshot` and `LocationUpdate` monolith.
+2.  **Sentinel Integration**: Modify `SentinelValidator.shouldThrottlePolling` in `core:engine` to check the native `isMemoryPressureThrottled` flag and force a staggered interval when under native memory stress.
+3.  **Telemetry Visibility**: Add the new anomaly flags to `TelemetryMapper.toMap` for remote visibility in the Viewer HUD.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct7.5)
-- **Oct7.5: [Unified Snapshot Container: Completed migration for ConnectionPoint and LogEntry, ensuring full parity across Engine and App models (#SIMP-1007-15).]**
+## 📊 Hardening Progress Dashboard (Oct7.6)
+- **Oct7.6: [Native Anomaly Logic: Implemented SNR-Vibration correlation and native heap evaluation in JNI. Resolved forensic migration regressions across app managers (#SIMP-1007-16).]**
+- **Oct7.5: [Unified Snapshot Container: Completed migration for ConnectionPoint and LogEntry (#SIMP-1007-15).]**
 - **Oct7.4: [Structural Refactor: Introduced ForensicSnapshot and refactored IntegrityState/LocationUpdate delegation (#SIMP-1007-15).]**
-- **Oct7.3: [Forensic Expansion: Promoted internal engine flags to Protobuf and implemented conflation starvation protection (#QA-1007-1).]**
-- **Oct7.2: [Diagnostic Hardening: Fixed Exact Alarm label mapping and verified signaling efficiency metrics (#QA-1006-12).]**
-- **Oct7.1: [Telemetry Pruning: Reduced JSON payload size by marking internal evaluation fields as transient (Issue #SIMP-1006-14).]**

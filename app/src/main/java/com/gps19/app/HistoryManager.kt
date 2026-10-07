@@ -18,13 +18,13 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Oct.7.6:
+ * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated updateRibbons to 
+ *   utilize the unified ForensicSnapshot container properties, resolving 
+ *   compilation regressions from Oct7.5 container migration.
  * Oct.6.21:
  * - Issue #QA-1006-12: Forensic Hardening. Integrated PhysicsUtils.safeDouble 
- *   into currentPointFlyweight assignments to prevent SQLiteConstraintExceptions 
- *   (NaN/Infinity) during high-pressure bursts. Fixed typo in archive key.
- * Oct.5.2:
- * - Issue #1344: Forensic Diagnostic Expansion. Integrated thermalSnapshot 
- *   and heapSnapshot into ribbon aggregation (R1344).
+ *   into currentPointFlyweight assignments to prevent SQLiteConstraintExceptions.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -163,8 +163,8 @@ class HistoryManager @Inject constructor(
             isBatteryLow = snapshot.integrity.isBatteryLow,
             isBatteryCritical = snapshot.integrity.isBatteryCritical,
             isUltraLongStationary = snapshot.integrity.isUltraLongStationary,
-            thermalSnapshot = snapshot.integrity.thermalSnapshot,
-            heapSnapshot = snapshot.integrity.heapSnapshot
+            thermalSnapshot = snapshot.thermalSnapshot,
+            heapSnapshot = snapshot.heapSnapshot
         )
     }
 

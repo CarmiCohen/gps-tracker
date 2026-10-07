@@ -37,14 +37,12 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.7.6:
+ * - Issue #SIMP-1007-16: JNI FastPath Expansion. Integrated snr, thermal, and 
+ *   heap snapshots into VibrationBatch for native-layer correlation logic (R-ID 610).
  * Oct.5.7:
  * - Issue #1450: JNI Math Batching. Implemented processVibrationBatch to 
- *   consolidate 5 granular JNI calls into one. This reduces the 100Hz bridge 
- *   overhead significantly (R-ID 610).
- * Oct.5.5:
- * - Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2). Offloaded vibration 
- *   vector magnitude calculation to JNI via JdHardwareManager. Fully hardened 
- *   the 100Hz sensor path against JVM floating-point overhead.
+ *   consolidate 5 granular JNI calls into one.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -283,6 +281,9 @@ class HardwareSuite @Inject constructor(
     @Volatile private var isSafeMode = false
     @Volatile private var lastAnomalyActiveRt = 0L
 
+    @Volatile private var cachedThermalHeadroom = 0.0
+    @Volatile private var cachedHeapAllocatedMb = 0.0
+
     private val logicSnapshotBuffer = CircularStateBuffer(2, { ForensicSnapshot() }, { it.reset() })
     private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
 
@@ -437,6 +438,10 @@ class HardwareSuite @Inject constructor(
                     checkRevivalLifecycle()
                     updateStationaryExposure()
                     updateActivityHeuristic()
+                    
+                    // Oct.7.6: Cache forensic snapshots for JNI FastPath
+                    cachedThermalHeadroom = systemStatusProvider.getThermalHeadroom()
+                    cachedHeapAllocatedMb = systemStatusProvider.getHeapAllocatedMb()
                 }
                 delay(2000L)
             }
@@ -1003,6 +1008,11 @@ class HardwareSuite @Inject constructor(
                 this.lastRawVibe = this@HardwareSuite.lastRawVibe
                 this.lastHpfValue = this@HardwareSuite.lastHpfValue
                 this.currentEnergy = this@HardwareSuite.currentKineticEnergy
+                
+                // Oct.7.6: Forensic Expansion
+                this.snr = this@HardwareSuite.averageSnr
+                this.thermal = this@HardwareSuite.cachedThermalHeadroom
+                this.heap = this@HardwareSuite.cachedHeapAllocatedMb
             }
 
             val batched = nativeFastPathProvider.processVibrationBatch(vibrationBatch)
@@ -1176,6 +1186,8 @@ class HardwareSuite @Inject constructor(
             lastPlungePhaseRt = 0L
             lastGpsSpeedMps = 0.0
             currentCpuLoad = 0.0
+            cachedThermalHeadroom = 0.0
+            cachedHeapAllocatedMb = 0.0
             activityContextProvider.reset()
         }
     }

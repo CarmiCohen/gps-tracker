@@ -184,6 +184,8 @@ Java_com_gps19_app_JdHardwareManager_n18(JNIEnv* env, jclass clazz, jdouble vibe
 /**
  * n19: processVibrationBatch (Issue #1450)
  * Consolidates all granular vibration math into one call.
+ * Oct.7.6: Expanded with forensic snapshots (snr, thermal, heap) for multi-sensor
+ * correlation logic and memory pressure evaluation (#SIMP-1007-16).
  */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
@@ -204,6 +206,11 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     double lastRaw = *(double*)(ptr + 68);
     double lastHpf = *(double*)(ptr + 76);
     double energy = *(double*)(ptr + 84);
+
+    // Oct.7.6 Forensic Expansion (Offset 92)
+    double snr = *(double*)(ptr + 92);
+    double thermal = *(double*)(ptr + 100);
+    double heapMb = *(double*)(ptr + 108);
 
     // 1. Delta (n16 equivalent)
     double dx = x - lx, dy = y - ly, dz = z - lz;
@@ -235,12 +242,23 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     if (dynamicGate > upper) dynamicGate = upper;
     int isStationary = (delta < dynamicGate) ? 1 : 0;
 
+    // 6. Native Anomaly Detection (Oct.7.6)
+    // Rule: Suspicious noise if SNR is low but physical vibration is high (R-ID 610).
+    int isSuspiciousNoise = (snr > 0.0 && snr < 20.0 && delta > 0.5) ? 1 : 0;
+
+    // Memory Pressure Throttling: Flag if native-observed heap usage exceeds threshold.
+    int isMemoryThrottled = (heapMb > 256.0) ? 1 : 0;
+
     // Outputs (Offset 128)
     *(double*)(ptr + 128) = delta;
     *(double*)(ptr + 136) = nextFloor;
     *(double*)(ptr + 144) = nextHpf;
     *(double*)(ptr + 152) = nextEnergy;
     *(int*)(ptr + 160) = isStationary;
+
+    // Oct.7.6 Outputs (Offset 164)
+    *(int*)(ptr + 164) = isSuspiciousNoise;
+    *(int*)(ptr + 168) = isMemoryThrottled;
 
     return 0;
 }

@@ -28,14 +28,12 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.7.6:
+ * - Issue #SIMP-1007-16: JNI FastPath Expansion. Expanded processVibrationBatchNative 
+ *   to pack forensic snapshots and read back native anomaly flags (offsets 164/168).
  * Oct.5.7:
  * - Issue #1450: JNI Math Batching. Consolidated granular vibration calls 
- *   into a single 256-byte DirectByteBuffer transaction (n19). This minimizes 
- *   JNI bridge transitions during 100Hz bursts (R-ID 610).
- * Oct.5.5:
- * - Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2). Finalized vibration 
- *   hot-path offloading: vector magnitude, HPF, Energy, and Violation Gates. 
- *   Eliminated JVM floating-point overhead on 100Hz paths (R-ID 590/591).
+ *   into a single 256-byte DirectByteBuffer transaction (n19).
  */
 object JdHardwareManager {
 
@@ -235,6 +233,7 @@ object JdHardwareManager {
 
     /**
      * processVibrationBatchNative: Consolidated 100Hz JNI call (Issue #1450).
+     * Oct.7.6: Expanded with forensic snapshots (snr, thermal, heap) and anomaly flags (164/168).
      */
     fun processVibrationBatchNative(batch: VibrationBatch): Boolean {
         if (!isLibraryLoaded.get()) return false
@@ -254,6 +253,11 @@ object JdHardwareManager {
             sharedStateBuffer.putDouble(batch.lastHpfValue)
             sharedStateBuffer.putDouble(batch.currentEnergy)
             
+            // Oct.7.6 Forensic Expansion (Offset 92)
+            sharedStateBuffer.putDouble(batch.snr)
+            sharedStateBuffer.putDouble(batch.thermal)
+            sharedStateBuffer.putDouble(batch.heap)
+            
             val res = n19()
             if (res == 0) {
                 // Read outputs from offset 128
@@ -262,6 +266,10 @@ object JdHardwareManager {
                 batch.nextHpf = sharedStateBuffer.getDouble(144)
                 batch.nextEnergy = sharedStateBuffer.getDouble(152)
                 batch.isStationary = sharedStateBuffer.getInt(160) != 0
+                
+                // Oct.7.6 Anomaly Flags (Offset 164)
+                batch.isSuspiciousNoise = sharedStateBuffer.getInt(164) != 0
+                batch.isMemoryPressureThrottled = sharedStateBuffer.getInt(168) != 0
                 return true
             }
         }

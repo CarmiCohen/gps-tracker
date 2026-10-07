@@ -13,16 +13,12 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Oct.7.6:
+ * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated handleAlarmEvent and 
+ *   handleProcessorEvent to utilize the unified ForensicSnapshot container (R-ID 651).
  * Oct.5.2:
  * - Issue #1344: Forensic Diagnostic Expansion. Updated handleAlarmEvent to 
  *   pass thermal and heap snapshots to logManager (R1344).
- * Oct.2.9:
- * - Issue #1314: TrackerStatus Convergence. Migrated statusFlyweight to 
- *   unified LocationUpdate monolith.
- * Oct.2.7:
- * - Issue #1329: Telemetry Mapping Convergence. Consolidated tick-to-DTO 
- *   mapping into TelemetryMapper.mapTickToOutputs to centralize domain 
- *   orchestration and remove redundant field injection logic.
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -146,8 +142,9 @@ class AppEventCoordinator @Inject constructor(
                 extremeValue = event.extremeValue, localId = event.logId, durationMs = event.durationMs,
                 isSpecial = event.isSpecial, specialColor = event.specialColor,
                 lat = event.lat, lng = event.lng, accuracy = event.accuracy,
-                maxAccuracy = event.maxAccuracy, snr = event.snr, vibe = event.vibe,
-                thermal = event.thermal, heap = event.heap
+                maxAccuracy = event.maxAccuracy, 
+                snr = event.forensic.snr, vibe = event.forensic.vibe,
+                thermal = event.forensic.thermal, heap = event.forensic.heap
             )
         }
     }
@@ -201,7 +198,9 @@ class AppEventCoordinator @Inject constructor(
                     message = logPrefix + event.message, type = event.type, isImportant = event.isImportant,
                     isSpecial = event.isSpecial || event.message.contains("Merge-on-Stale"),
                     specialColor = specialColor, lat = event.lat, lng = event.lng,
-                    accuracy = event.accuracy, snr = event.snr, vibe = event.vibe
+                    accuracy = event.accuracy, 
+                    snr = event.forensic.snr, vibe = event.forensic.vibe,
+                    thermal = event.forensic.thermal, heap = event.forensic.heap
                 )
             }
             is ProcessorEvent.MaxAccuracyChanged -> {

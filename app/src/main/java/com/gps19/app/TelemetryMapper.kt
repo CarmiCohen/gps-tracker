@@ -6,14 +6,13 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.7.6:
+ * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated mapping functions 
+ *   to utilize the unified ForensicSnapshot container properties, resolving 
+ *   compilation regressions from Oct7.5 container migration.
  * Oct.6.21:
  * - Issue #QA-1006-12: Forensic Hardening. Integrated PhysicsUtils.safeDouble 
- *   into mapAppToEntity and mapStatusToPending to ensure NaN/Infinity values 
- *   do not trigger SQLiteConstraintExceptions in the persistence layer.
- * Oct.5.2:
- * - Issue #1344: Forensic Diagnostic Expansion. Restored accidentally removed 
- *   mapping functions and integrated thermalSnapshot/heapSnapshot into 
- *   all restoration and health projection paths (R1344).
+ *   into mapAppToEntity and mapStatusToPending.
  */
 object TelemetryMapper {
 
@@ -158,9 +157,10 @@ object TelemetryMapper {
                 tamperNote = if (proto.hasTamperNote()) proto.tamperNote else null
                 thermalHeadroom = proto.thermalHeadroom
                 heapAllocatedMb = proto.heapAllocatedMb
-                thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
-                heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
             }
+
+            this.thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
+            this.heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
 
             status = processed.status
             ts = now
@@ -285,9 +285,10 @@ object TelemetryMapper {
                 tamperNote = if (data.has("tamper_note")) data.getString("tamper_note") else null
                 thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
                 heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
-                thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else null
-                heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else null
             }
+
+            this.thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else null
+            this.heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else null
 
             this.status = statusVar
             this.ts = now
@@ -327,9 +328,11 @@ object TelemetryMapper {
                 currentMa = proto.currentMa
                 thermalHeadroom = proto.thermalHeadroom
                 heapAllocatedMb = proto.heapAllocatedMb
-                thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
-                heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
             }
+            
+            this.thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
+            this.heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
+
             snrSnapshot = proto.snrIdx * 5.0
             kinetic.jumpTier = proto.jumpTier
             integrity.isJammer = proto.isJammer
@@ -376,6 +379,8 @@ object TelemetryMapper {
                 satsUsed = data.optInt("sats_used", -1)
                 satsView = data.optInt("sats_view", -1)
                 snrIdx = data.optDouble("snr_idx", current.integrity.snrIdx)
+                thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
+                heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
             }
             atmospheric.apply {
                 noiseIdx = data.optDouble("noise_idx", current.atmospheric.noiseIdx)
@@ -392,10 +397,9 @@ object TelemetryMapper {
                              data.optBoolean("is_location_pending", false) || 
                              statusVar == SentinelStatus.TAMPER
             nowTs = now; this.nowRt = nowRt
-            integrity.thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
-            integrity.heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
-            integrity.thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else null
-            integrity.heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else null
+            
+            this.thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else null
+            this.heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else null
 
             trackerState = try { TrackerState.valueOf(data.optString("tracker_state", current.trackerState.name)) } catch(e: Exception) { current.trackerState }
             
@@ -457,8 +461,8 @@ object TelemetryMapper {
             coolingEnteredRt = snapshot.nowRt,
             thermalHeadroom = snapshot.integrity.thermalHeadroom,
             heapAllocatedMb = snapshot.integrity.heapAllocatedMb,
-            thermalSnapshot = snapshot.integrity.thermalSnapshot,
-            heapSnapshot = snapshot.integrity.heapSnapshot,
+            thermalSnapshot = snapshot.thermalSnapshot,
+            heapSnapshot = snapshot.heapSnapshot,
             activityType = snapshot.activityType
         )
     }
@@ -524,8 +528,8 @@ object TelemetryMapper {
             snrSnapshot = s.integrity.snrIdx * 5.0
             this.integrity.thermalHeadroom = s.integrity.thermalHeadroom
             this.integrity.heapAllocatedMb = s.integrity.heapAllocatedMb
-            this.integrity.thermalSnapshot = s.integrity.thermalSnapshot
-            this.integrity.heapSnapshot = s.integrity.heapSnapshot
+            this.thermalSnapshot = s.thermalSnapshot
+            this.heapSnapshot = s.heapSnapshot
             this.kinetic.activityType = s.activityType
             this.trackerState = s.trackerState
             // Issue #1410: Viewer Persistence

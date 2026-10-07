@@ -13,13 +13,12 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Oct.7.6:
+ * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated AlarmEvent emission 
+ *   to utilize the unified ForensicSnapshot container (R-ID 651).
  * Oct.5.1:
  * - Issue #SIMP-1201-1: Logic State Serialization. Refactored saveLogicState 
- *   to utilize the unified evaluation state object and restored monotonic 
- *   recovery using the consolidated binary map (R-ID 510).
- * Oct.3.9:
- * - Issue #1201 RESOLVED: Decoupled siren lockout authority. Purged lastSirenStopRt 
- *   logic in favor of reactive SirenLockoutUseCase (R-ID 510).
+ *   to utilize the unified evaluation state object (R-ID 510).
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -226,7 +225,7 @@ class AppAlarmManager @Inject constructor(
                     isSpecial = true,
                     specialColor = FORENSIC_PINK_COLOR,
                     lat = update.kinetic.lat, lng = update.kinetic.lng, accuracy = update.kinetic.accuracy,
-                    maxAccuracy = update.kinetic.maxAccuracy, snr = update.snrSnapshot, vibe = update.vibeSnapshot
+                    maxAccuracy = update.kinetic.maxAccuracy, forensic = update.integrity.forensic.copy()
                 ))
             },
             onTrigger = { eval: AlarmEvaluationState.ActiveAlarm ->
@@ -243,7 +242,7 @@ class AppAlarmManager @Inject constructor(
                     isSpecial = isSpecial,
                     specialColor = specialColor,
                     lat = update.kinetic.lat, lng = update.kinetic.lng, accuracy = update.kinetic.accuracy,
-                    maxAccuracy = update.kinetic.maxAccuracy, snr = update.snrSnapshot, vibe = update.vibeSnapshot
+                    maxAccuracy = update.kinetic.maxAccuracy, forensic = update.integrity.forensic.copy()
                 ))
             },
             onResolve = { eval: AlarmEvaluationState.ActiveAlarm, durationMs: Long ->
@@ -259,7 +258,7 @@ class AppAlarmManager @Inject constructor(
                     isSpecial = isSpecial,
                     specialColor = specialColor,
                     lat = update.kinetic.lat, lng = update.kinetic.lng, accuracy = update.kinetic.accuracy,
-                    maxAccuracy = update.kinetic.maxAccuracy, snr = update.snrSnapshot, vibe = update.vibeSnapshot
+                    maxAccuracy = update.kinetic.maxAccuracy, forensic = update.integrity.forensic.copy()
                 ))
             },
             onTriggerMuted = { eval: AlarmEvaluationState.ActiveAlarm ->
@@ -275,7 +274,7 @@ class AppAlarmManager @Inject constructor(
                     isSpecial = isSpecial,
                     specialColor = specialColor,
                     lat = update.kinetic.lat, lng = update.kinetic.lng, accuracy = update.kinetic.accuracy,
-                    maxAccuracy = update.kinetic.maxAccuracy, snr = update.snrSnapshot, vibe = update.vibeSnapshot
+                    maxAccuracy = update.kinetic.maxAccuracy, forensic = update.integrity.forensic.copy()
                 ))
             }
         )
