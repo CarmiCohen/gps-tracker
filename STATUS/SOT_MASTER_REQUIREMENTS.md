@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct7.2)
+# SOT Master Requirements & Hardening Status (Oct7.3)
 
-## 🏗️ Architectural Master Rules (161 Rules)
+## 🏗️ Architectural Master Rules (162 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -17,18 +17,19 @@
 *   **1.131 SignalingPipeline Abstraction (R-ID 511-S)**: Wire-level optimizations (Protobuf serialization, delta-encoding state, compression) MUST be encapsulated in a dedicated SignalingPipeline abstraction. Transport providers (e.g., CommunicationManager) MUST delegate transmission to the pipeline to ensure separation of concerns and instance-bound state management. (Oct6.20 - Issue #SIGN-1006-12).
 *   **1.132 Conflation Strategy Consolidation (R-ID 511-T)**: Field-level conflation strategies for various data types (Maps, LocationUpdates, Logs) MUST be encapsulated within the `SignalingPipeline` implementation to minimize cross-module coupling and centralize protocol optimization logic. (Oct6.23 - Issue #SIGN-1006-13).
 *   **1.133 Telemetry Pruning & Serialization Scoping (R-ID 511-U)**: Data models shared between engine evaluation and signaling MUST use serialization-level scoping (e.g., `@Transient`) to exclude internal evaluation scratchpad fields from wire payloads. This ensures minimal radio overhead for JSON-based metadata channels while maintaining a unified domain monolith. (Oct7.1 - Issue #SIMP-1006-14).
+*   **1.134 Conflation Starvation Protection (R-ID 511-V)**: Signaling dispatchers MUST implement a starvation cap for dynamic conflation windows. The transmission deadline MUST be calculated relative to the arrival of the FIRST message in a burst to ensure a deterministic maximum latency (e.g., 2000ms) regardless of subsequent burst density. (Oct7.3 - Issue #QA-1007-1).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 650**: Forensic Telemetry Expansion - Promoted internal engine flags (muzzled, siren, hardware health, environmental lockouts) to Protobuf for remote diagnostics. (Oct7.3 - Issue #QA-1007-1).
+*   **SOT ID 649**: Conflation Starvation Protection - Implemented first-entry relative deadlines in `SmartSignalingDispatcher`. (Oct7.3 - Issue #QA-1007-1).
 *   **SOT ID 648**: Diagnostic UI Hardening - Corrected label mapping for Exact Alarms and verified signaling efficiency metrics. (Oct7.2 - Issue #QA-1006-12).
 *   **SOT ID 647**: Telemetry Pruning - Marked internal engine evaluation fields as transient to optimize JSON wire payloads. (Oct7.1 - Issue #SIMP-1006-14).
-*   **SOT ID 646**: Conflation Strategy Consolidation - Migrated logic from `SignalingMessageConflator` to `SmartSignalingDispatcher` to centralize optimization. (Oct6.23 - Issue #SIGN-1006-13).
-*   **SOT ID 645**: SignalingPipeline Abstraction - Decoupled wire-level optimizations from `CommunicationManager`. (Oct6.20 - Issue #SIGN-1006-12).
 
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.266 (Forensic Fidelity Audit)**: PASSED - Verified that internal engine flags (muzzled, siren, snapshots) are preserved during pipeline emission and correctly mapped to Protobuf. (Oct7.3 - Issue #QA-1007-1).
 *   **Chapter 31.265 (Diagnostic Label Audit)**: PASSED - Verified that the "Exact Alarm" item in the Diagnostics UI correctly reports the system permission state. (Oct7.2 - Issue #QA-1006-12).
 *   **Chapter 31.264 (Wire Payload Optimization Audit)**: PASSED - Verified that `nowRt`, `nowTs`, and evaluation scratchpad fields are excluded from JSON serialization in `LocationUpdate`. Payload size reduced by ~15% for metadata updates. (Oct7.1 - Issue #SIMP-1006-14).
-*   **Chapter 31.263 (Conflation Efficiency Audit)**: PASSED - Verified that high-frequency log bursts (100Hz) trigger dynamic conflation window extension. Fixed 0% conflation savings defect reported in audit. (Oct6.23 - Issue #QA-1006-12).

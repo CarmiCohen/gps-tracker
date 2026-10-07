@@ -1,5 +1,11 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct7.3
+*   **Issue #QA-1007-1: Telemetry Forensic Expansion & Radio Soak Validation.**
+    *   **Protobuf Expansion**: Promoted 12 internal engine flags (muzzled, siren, hardware health, environmental lockouts, snapshots) to Protobuf for remote diagnostics.
+    *   **Dispatcher Hardening**: Implemented first-entry starvation cap in `SmartSignalingDispatcher` to prevent indefinite conflation delays under high-pressure bursts.
+    *   **Data Integrity**: Fixed `LocationUpdate.duplicate()` defect where body-defined properties were lost during pipeline emission.
+
 ## 🟢 Resolved in Oct7.2
 *   **Issue #QA-1006-12: Diagnostic Hardening & Forensic Audit.**
     *   **UI Fix**: Corrected permission label mapping in `DiagnosticsScreen.kt` for Exact Alarms (Rule 1.123).

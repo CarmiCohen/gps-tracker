@@ -1,25 +1,24 @@
-# Forensic Handover (Oct7.2 - DIAGNOSTIC HARDENING)
+# Forensic Handover (Oct7.3 - FORENSIC EXPANSION)
 
 ## 🎯 Current System State
-*   **Version**: `Oct7.2` | **versionCode**: `1139` | **Status**: 🟢 **STABLE** (Audited).
-*   **Diagnostic Fix (#QA-1006-12)**:
-    *   **UI Correctness**: Resolved a binding error in `DiagnosticsScreen.kt` where the "Exact Alarm" status text was incorrectly checking the overlay permission state. It is now correctly mapped to `permissions.isExactAlarmGranted`.
-    *   **Signaling Audit**: Verified that `SmartSignalingDispatcher` correctly handles 100Hz log bursts via the `TRIGGER LOG PRESSURE TEST` hook. Conflation savings reach ~99% for identical messages, ensuring radio efficiency.
-*   **Android 15 Forensic Hardening**:
-    *   **NaN/Inf Protection**: Confirmed `PhysicsUtils.safeDouble()` wrapping for all environmental indices (vibe, noise, lux, lift, tilt, baro) in `MonitorService.kt` to prevent `SQLiteConstraintException` on API 35.
-    *   **FGS Compliance**: Verified `FOREGROUND_SERVICE_TYPE_SPECIAL_USE` integration and special use property in `AndroidManifest.xml` for API 35 compliance.
+*   **Version**: `Oct7.3` | **versionCode**: `1140` | **Status**: 🟢 **STABLE** (Harden/Expansion).
+*   **Forensic Expansion (#QA-1007-1)**:
+    *   **Protobuf Schema**: Promoted 12 internal engine flags to `RealtimeStatus` and `TrackerStatusProto`. This includes `isMuzzled`, `isSirenActive`, `isHardwareOnline`, `localInternetLoss`, and environmental snapshots (`snr`, `vibe`, `acousticMinDb`, `adaptiveFloor`).
+    *   **Data Integrity Fix**: Resolved a critical defect where `LocationUpdate.duplicate()` used the default `copy()` constructor, losing properties defined in the class body. Manually implemented property transfer to preserve forensic telemetry during pipeline emission.
+    *   **Starvation Protection**: Hardened `SmartSignalingDispatcher` by enforcing a `MAX_CONFLATION_DELAY_MS` (2s) starvation cap relative to the arrival of the *first* frame in a burst. This prevents high-frequency bursts from indefinitely extending the transmission deadline.
+*   **Architecture**: Monolith parity maintained across `LocationUpdate.toMap()`, persistence, and binary signaling paths.
 
 ## 🟢 Audit Record
-*   **Build Status**: 🟢 **SUCCESSFUL**.
-*   **Metrics**: Oct7.2: [SOT Count: 306 (Rules: 161), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 57, QA: 578]
+*   **Build Status**: 🟢 **SUCCESSFUL** (Sync validated).
+*   **Metrics**: Oct7.3: [SOT Count: 308 (Rules: 162), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 58, QA: 582]
 
 ## 🚀 Resumption Action Path (Next Chat)
-1.  **Radio Soak Test**: Observe signaling emission ratios during extended background sessions to ensure dynamic window extension isn't causing excessive lag.
-2.  **Telemetry Review**: Verify if any other `@Transient` fields in `LocationUpdate` should be promoted to Protobuf fields for deeper forensic analysis.
+1.  **Radio Duty Cycle Audit**: Profile battery impact of the extended binary payload and 2s conflation window under high-pressure "Radio Soak" conditions.
+2.  **Strategic Simplification**: Implement Idea #SIMP-1007-15 to group forensic snapshots into a single container class within `IntegrityState`.
 
 ---
 
-## 📊 Hardening Progress Dashboard (Oct7.2)
+## 📊 Hardening Progress Dashboard (Oct7.3)
+- **Oct7.3: [Forensic Expansion: Promoted 12 internal engine flags to Protobuf and implemented conflation starvation protection (#QA-1007-1).]**
 - **Oct7.2: [Diagnostic Hardening: Fixed Exact Alarm label mapping and verified signaling efficiency metrics (#QA-1006-12).]**
 - **Oct7.1: [Telemetry Pruning: Reduced JSON payload size by marking internal evaluation fields as transient (Issue #SIMP-1006-14).]**
-- **Oct6.23: [Signaling Efficiency: Fixed 0% log conflation savings. Consolidated conflation logic into pipeline internal handlers (Issue #SIGN-1006-13).]**

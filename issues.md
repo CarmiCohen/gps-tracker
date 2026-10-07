@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct7.2
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct7.3
 
-## 🎯 Current Resumption Focus: Forensic Trace Integrity & Android 15 Reliability.
+## 🎯 Current Resumption Focus: Radio Duty Cycle Analysis & Persistence Optimization.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -9,26 +9,22 @@
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 0)
-*   *(No open ideas)*
+## 💡 Strategic Simplification Ideas (Ideas: 1)
+*   **SIMP-1007-15: Unified Snapshot Container.** (Medium) - Consider moving snrSnapshot, vibeSnapshot, thermalSnapshot, and heapSnapshot into a single `ForensicSnapshot` data class within `IntegrityState` to simplify property delegation and copying logic.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #QA-1007-1: Telemetry Forensic Expansion & Radio Soak Validation.** Resolved Oct7.3.
+    *   **Protobuf Expansion**: Promoted 12 internal engine flags (muzzled, siren, environmental lockouts, snapshots) to Protobuf for remote diagnostics.
+    *   **Dispatcher Hardening**: Implemented first-entry starvation cap in `SmartSignalingDispatcher` to prevent indefinite conflation delays.
+    *   **Data Integrity**: Fixed `LocationUpdate.duplicate()` to preserve body-defined properties during pipeline emission.
 *   **Issue #QA-1006-12: Android 15 (API 35) Deployment & Forensic Audit.** Resolved Oct7.2.
-    *   **UI FIX**: Corrected `DiagnosticsScreen.kt` label mapping for Exact Alarm (Rule 1.123).
-    *   **Telemetry Hardening**: Validated `PhysicsUtils.safeDouble` usage across all environmental indices to prevent `SQLiteConstraintException` on API 35.
-    *   **Signaling Efficiency**: Verified `SmartSignalingDispatcher` metrics and dynamic conflation scaling via 100Hz log pressure tests.
-*   **Issue #SIMP-1006-14: Telemetry Field Pruning.** Resolved Oct7.1. Marked engine-internal evaluation and scratchpad fields in `LocationUpdate` as `@Transient` to reduce JSON wire size.
-*   **Issue #SIGN-1006-13: Consolidate Conflation Strategies.** Resolved Oct6.23. Migrated logic from `SignalingMessageConflator` to `SmartSignalingDispatcher`.
-*   **Issue #SIGN-1006-12: SignalingPipeline Abstraction.** Resolved Oct6.20.
-*   **Issue #AUDIT-1006-11: Protobuf Stream Compression (Gzip).** Resolved Oct6.15.
+*   **Issue #SIMP-1006-14: Telemetry Field Pruning.** Resolved Oct7.1. 
 
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct7.3: [SOT Count: 308 (Rules: 162), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 58, QA: 582]**
 - **Oct7.2: [SOT Count: 306 (Rules: 161), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 57, QA: 578]**
 - **Oct7.1: [SOT Count: 306 (Rules: 161), Open: H:1, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 57, QA: 577]**
-- **Oct6.23: [Signaling Efficiency: Fixed 0% log conflation savings. Consolidated conflation logic into pipeline internal handlers (Issue #SIGN-1006-13).]**
-- **Oct6.21: [Defect Identified: SQLiteConstraintException. Pipeline hardening deployed.]**
-- **Oct6.20: [SOT Count: 304 (Rules: 160), Open: H:1, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 55, QA: 575]**

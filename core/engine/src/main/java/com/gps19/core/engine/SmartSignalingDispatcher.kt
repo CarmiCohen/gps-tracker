@@ -14,12 +14,13 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
+ * Oct.7.3:
+ * - Issue #QA-1007-1: Hardened Conflation against starvation. Added firstEntryTs 
+ *   to ConflationBucket to ensure MAX_CONFLATION_DELAY_MS is enforced relative 
+ *   to the initial message arrival, preventing indefinite deadline extension.
  * Oct.6.23:
  * - Issue #SIGN-1006-13: Consolidated Conflation Logic. Migrated field-level 
  *   conflation strategies from SignalingMessageConflator into internal handlers. 
- *   Reduced cross-module coupling and improved pipeline encapsulation.
- * - Issue #QA-1006-12: Signaling Efficiency Hardening. Refactored log conflation 
- *   to use dynamic window extension.
  */
 class SmartSignalingDispatcher(
     private var scope: CoroutineScope,
@@ -44,11 +45,13 @@ class SmartSignalingDispatcher(
     private class ConflationBucket<T> {
         val pending = AtomicReference<T?>(null)
         val scheduledTs = AtomicLong(0)
+        val firstEntryTs = AtomicLong(0)
         val burstCount = AtomicInteger(0)
 
         fun reset() {
             pending.set(null)
             scheduledTs.set(0)
+            firstEntryTs.set(0)
             burstCount.set(0)
         }
     }
@@ -193,6 +196,7 @@ class SmartSignalingDispatcher(
         if (ts > 0) {
             if (now >= ts) {
                 bucket.scheduledTs.set(0)
+                bucket.firstEntryTs.set(0)
                 bucket.burstCount.set(0)
                 bucket.pending.getAndSet(null)?.let {
                     enqueue(commandFactory(it))
@@ -314,6 +318,7 @@ class SmartSignalingDispatcher(
                     enqueue(Command.Json("log_update", it, SignalingPriority.NORMAL))
                 }
                 logBucket.scheduledTs.set(0)
+                logBucket.firstEntryTs.set(0)
                 logBucket.burstCount.set(0)
             } else {
                 val conf = framesConflated.incrementAndGet()
@@ -330,16 +335,27 @@ class SmartSignalingDispatcher(
     }
 
     private fun <T> updateBucketSchedule(bucket: ConflationBucket<T>, delayMultiplier: Int = 1) {
+        val now = timeProvider.currentTimeMillis()
         if (bucket.scheduledTs.get() == 0L) {
+            bucket.firstEntryTs.set(now)
             val delayMs = calculateDelay(bucket.burstCount.get()) * delayMultiplier
-            bucket.scheduledTs.set(timeProvider.currentTimeMillis() + delayMs)
+            bucket.scheduledTs.set(now + delayMs)
             conflationSignal.trySend(Unit)
         } else {
             val currentScheduled = bucket.scheduledTs.get()
-            val now = timeProvider.currentTimeMillis()
+            val firstArrival = bucket.firstEntryTs.get()
+            
+            // Hard Starvation Cap: Never delay more than MAX_CONFLATION_DELAY_MS from the first entry.
+            if (now - firstArrival >= MAX_CONFLATION_DELAY_MS) return
+
             val newDelay = calculateDelay(bucket.burstCount.get()) * delayMultiplier
-            if (currentScheduled - now < newDelay / 2) {
-                 bucket.scheduledTs.compareAndSet(currentScheduled, now + newDelay)
+            val targetScheduled = now + newDelay
+            
+            // Clamp to starvation cap
+            val finalTarget = minOf(targetScheduled, firstArrival + MAX_CONFLATION_DELAY_MS)
+            
+            if (currentScheduled < finalTarget && finalTarget - now >= newDelay / 2) {
+                 bucket.scheduledTs.compareAndSet(currentScheduled, finalTarget)
             }
         }
     }

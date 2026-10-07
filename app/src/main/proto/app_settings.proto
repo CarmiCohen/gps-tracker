@@ -261,6 +261,20 @@ message RealtimeStatus {
     sint32 lat_e7 = 95;
     sint32 lng_e7 = 96;
     optional bool is_delta = 97;
+
+    // Issue #QA-1007-1: Forensic Expansion
+    bool is_muzzled = 98;
+    bool is_siren_active = 99;
+    bool is_hardware_online = 100;
+    bool local_internet_loss = 101;
+    optional string suppression_note = 102;
+    bool is_warming = 103;
+    double snr_snapshot = 104;
+    double vibe_snapshot = 105;
+    int64 acoustic_lockout_rt = 106;
+    int64 light_spike_rt = 107;
+    double provided_adaptive_floor = 108;
+    double acoustic_min_db = 109;
 }
 
 message GeoPointProto {
@@ -435,6 +449,20 @@ message TrackerStatusProto {
 
     sint32 lat_e7 = 125;
     sint32 lng_e7 = 126;
+
+    // Issue #QA-1007-1: Forensic Expansion
+    bool is_muzzled = 127;
+    bool is_siren_active = 128;
+    bool is_hardware_online = 129;
+    bool local_internet_loss = 130;
+    optional string suppression_note = 131;
+    bool is_warming = 132;
+    double snr_snapshot = 133;
+    double vibe_snapshot = 134;
+    int64 acoustic_lockout_rt = 135;
+    int64 light_spike_rt = 136;
+    double provided_adaptive_floor = 137;
+    double acoustic_min_db = 138;
 }
 
 message ActiveAlarmProto {

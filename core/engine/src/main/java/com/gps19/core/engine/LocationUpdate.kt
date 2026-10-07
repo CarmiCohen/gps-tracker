@@ -228,6 +228,11 @@ data class IntegrityState(
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
+ * Oct.7.3:
+ * - Issue #QA-1007-1: Forensic Expansion. Fixed duplicate() to ensure forensic 
+ *   body properties (muzzled, siren, snapshots) are preserved during pipeline emission.
+ * - Promoted distToTracker and distToHome to monolith delegation and toMap.
+ * - Included extended forensic sensors in toMap for JSON consistency.
  * Oct.7.1:
  * - Issue #SIMP-1006-14: Telemetry Field Pruning. Marked internal evaluation 
  *   scratchpad and tick-local fields as @Transient to reduce JSON wire size.
@@ -319,6 +324,12 @@ data class LocationUpdate(
     var maxAccuracy: Double 
         get() = kinetic.maxAccuracy
         set(value) { kinetic.maxAccuracy = value }
+    var distToTracker: Double? 
+        get() = kinetic.distToTracker
+        set(value) { kinetic.distToTracker = value }
+    var distToHome: Double? 
+        get() = kinetic.distToHome
+        set(value) { kinetic.distToHome = value }
 
     override var battery: Int 
         get() = integrity.battery
@@ -652,12 +663,37 @@ data class LocationUpdate(
 
     /**
      * duplicate: Performs a deep copy to ensure thread safety during event emission (R-ID 392).
+     * Oct.7.3: Fixed to manually copy non-constructor forensic body properties.
      */
     fun duplicate(): LocationUpdate = copy(
         kinetic = kinetic.copy(),
         atmospheric = atmospheric.copy(),
         integrity = integrity.copy()
-    )
+    ).also {
+        it.isMe = this.isMe
+        it.deviceId = this.deviceId
+        it.viewerId = this.viewerId
+        it.trackerState = this.trackerState
+        it.isClockRegression = this.isClockRegression
+        it.lastValidFixRt = this.lastValidFixRt
+        
+        it.nowRt = this.nowRt
+        it.nowTs = this.nowTs
+        it.isMuzzled = this.isMuzzled
+        it.isWarming = this.isWarming
+        it.isSirenActive = this.isSirenActive
+        it.isHardwareOnline = this.isHardwareOnline
+        it.localInternetLoss = this.localInternetLoss
+        it.acousticLockoutRt = this.acousticLockoutRt
+        it.lightSpikeRt = this.lightSpikeRt
+        it.providedAdaptiveFloor = this.providedAdaptiveFloor
+        it.acousticMinDb = this.acousticMinDb
+        it.lastAlarmAckTs = this.lastAlarmAckTs
+        it.violationStartTs = this.violationStartTs
+        it.snrSnapshot = this.snrSnapshot
+        it.vibeSnapshot = this.vibeSnapshot
+        it.suppressionNote = this.suppressionNote
+    }
 
     fun reset() {
         kinetic.reset()
@@ -741,6 +777,22 @@ data class LocationUpdate(
         put("heap_snapshot", heapSnapshot)
         put("last_alarm_ack_ts", lastAlarmAckTs)
         put("violation_start_ts", violationStartTs)
+        put("dist_to_tracker", distToTracker)
+        put("dist_to_home", distToHome)
+        
+        // Extended Forensic Sensors
+        put("is_muzzled", isMuzzled)
+        put("is_warming", isWarming)
+        put("is_siren_active", isSirenActive)
+        put("is_hardware_online", isHardwareOnline)
+        put("local_internet_loss", localInternetLoss)
+        put("acoustic_lockout_rt", acousticLockoutRt)
+        put("light_spike_rt", lightSpikeRt)
+        put("provided_adaptive_floor", providedAdaptiveFloor)
+        put("acoustic_min_db", acousticMinDb)
+        put("snr_snapshot", snrSnapshot)
+        put("vibe_snapshot", vibeSnapshot)
+        put("suppression_note", suppressionNote)
     }
 
     companion object {

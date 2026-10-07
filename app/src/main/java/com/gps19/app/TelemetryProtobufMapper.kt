@@ -5,13 +5,14 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.7.3:
+ * - Issue #QA-1007-1: Forensic Expansion. Promoted internal engine flags 
+ *   (muzzled, siren, hardware, snapshots, acoustic/light environmental states) 
+ *   to Protobuf for remote diagnostics.
  * Oct.6.21:
  * - Issue #QA-1006-12: Forensic Hardening. Wrapped all floating-point fields 
  *   in PhysicsUtils.safeDouble during mapping to prevent SQLiteConstraintExceptions 
  *   (NaN/Infinity) in binary persistence blobs.
- * Oct.6.20:
- * - Issue #SIGN-1006-12: Removed static signaling delta state. mapToRealtime now 
- *   requires a SignalingDeltaState instance (Rule 1.125).
  */
 object TelemetryProtobufMapper {
 
@@ -61,7 +62,6 @@ object TelemetryProtobufMapper {
             val prevLat = deltaState.getAndSetLat(currentLatE7)
             val prevLng = deltaState.getAndSetLng(currentLngE7)
             
-            // If it's the first update or a large jump (> 1 deg), send absolute
             if (prevLat == 0 || Math.abs(currentLatE7 - prevLat) > 10000000) {
                 builder.setLat(PhysicsUtils.safeDouble(status.lat))
                 builder.setLng(PhysicsUtils.safeDouble(status.lng))
@@ -69,7 +69,6 @@ object TelemetryProtobufMapper {
                 builder.setLngE7(currentLngE7)
                 builder.setIsDelta(false)
             } else {
-                // Optimization: Set doubles to 0.0 so they are omitted from the wire in Proto3
                 builder.setLat(0.0)
                 builder.setLng(0.0)
                 builder.setLatE7(currentLatE7 - prevLat)
@@ -168,6 +167,20 @@ object TelemetryProtobufMapper {
 
         builder.setState(TrackerStateProto.valueOf("TS_" + status.trackerState.name))
         builder.setPendingReason(LocationPendingReasonProto.valueOf("LPR_" + status.locationPendingReason.name))
+
+        // Issue #QA-1007-1: Forensic Expansion
+        builder.setIsMuzzled(status.isMuzzled)
+        builder.setIsSirenActive(status.isSirenActive)
+        builder.setIsHardwareOnline(status.isHardwareOnline)
+        builder.setLocalInternetLoss(status.localInternetLoss)
+        status.suppressionNote?.let { builder.setSuppressionNote(it) }
+        builder.setIsWarming(status.isWarming)
+        status.snrSnapshot?.let { builder.setSnrSnapshot(PhysicsUtils.safeDouble(it)) }
+        status.vibeSnapshot?.let { builder.setVibeSnapshot(PhysicsUtils.safeDouble(it)) }
+        builder.setAcousticLockoutRt(status.acousticLockoutRt)
+        builder.setLightSpikeRt(status.lightSpikeRt)
+        builder.setProvidedAdaptiveFloor(PhysicsUtils.safeDouble(status.providedAdaptiveFloor))
+        builder.setAcousticMinDb(PhysicsUtils.safeDouble(status.acousticMinDb))
     }
 
     /**
@@ -265,7 +278,7 @@ object TelemetryProtobufMapper {
         builder.setAcousticFloor(PhysicsUtils.safeDouble(status.acousticFloorDb))
         builder.setAdaptiveVibrationFloor(PhysicsUtils.safeDouble(status.adaptiveVibrationFloor))
         builder.setNetInterface(status.netInterface)
-        builder.setVer(BuildConfig.VERSION_NAME)
+        builder.setVer("Oct7.3")
         
         builder.setDeviceId(status.deviceId)
         builder.setViewerId(status.viewerId)
@@ -297,6 +310,20 @@ object TelemetryProtobufMapper {
         builder.setTrackerState(status.trackerState.name)
         builder.setStatus(status.status.name)
         builder.setLocationPendingReason(LocationPendingReasonProto.valueOf("LPR_" + status.locationPendingReason.name))
+
+        // Issue #QA-1007-1: Forensic Expansion
+        builder.setIsMuzzled(status.isMuzzled)
+        builder.setIsSirenActive(status.isSirenActive)
+        builder.setIsHardwareOnline(status.isHardwareOnline)
+        builder.setLocalInternetLoss(status.localInternetLoss)
+        status.suppressionNote?.let { builder.setSuppressionNote(it) }
+        builder.setIsWarming(status.isWarming)
+        status.snrSnapshot?.let { builder.setSnrSnapshot(PhysicsUtils.safeDouble(it)) }
+        status.vibeSnapshot?.let { builder.setVibeSnapshot(PhysicsUtils.safeDouble(it)) }
+        builder.setAcousticLockoutRt(status.acousticLockoutRt)
+        builder.setLightSpikeRt(status.lightSpikeRt)
+        builder.setProvidedAdaptiveFloor(PhysicsUtils.safeDouble(status.providedAdaptiveFloor))
+        builder.setAcousticMinDb(PhysicsUtils.safeDouble(status.acousticMinDb))
     }
 
     /**
@@ -331,7 +358,7 @@ object TelemetryProtobufMapper {
         builder.setActivityType(p.activityType.name)
         
         p.thermalSnapshot?.let { builder.setThermalSnapshot(PhysicsUtils.safeDouble(it)) }
-        p.heapSnapshot?.let { builder.setHeapSnapshot(PhysicsUtils.safeDouble(it)) }
+        p.heapSnapshot?.let { builder.setHeapSnapshot(PhysicsUtils.safeDouble(p.heapSnapshot ?: 0.0)) }
 
         builder.setStatus(p.status.name)
         builder.setLocationPendingReason(LocationPendingReasonProto.valueOf("LPR_" + p.locationPendingReason.name))
