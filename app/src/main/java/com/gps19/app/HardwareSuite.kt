@@ -37,6 +37,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.7.8:
+ * - Issue #SIMP-1010-1: Adaptive Acoustic Gating. Integrated native motion-aware 
+ *   alpha adjustment into the acoustic monitoring loop.
  * Oct.7.7:
  * - Issue #SIMP-1007-16: Flag Propagation. Integrated native isSuspiciousNoise and 
  *   isMemoryPressureThrottled flags into ForensicSnapshot and processing pipeline.
@@ -896,7 +899,8 @@ class HardwareSuite @Inject constructor(
                                 synchronized(this) {
                                     currentAcousticDb = db; if (db > logicPeakDb) logicPeakDb = db; if (db < logicMinDb) logicMinDb = db; if (db > forensicPeakDb) forensicPeakDb = db; if (db < forensicMinDb) forensicMinDb = db; if (db > secPeakDb) secPeakDb = db
                                     
-                                    val alpha = SentinelValidator.accelerateAlpha(ACOUSTIC_EMA_UP_FAST, isWarming)
+                                    val baseAlpha = SentinelValidator.accelerateAlpha(ACOUSTIC_EMA_UP_FAST, isWarming)
+                                    val alpha = JdHardwareManager.computeAdaptiveAcousticAlphaNative(baseAlpha, vibrationRollingSum)
                                     if (acousticFastPath.evaluate(db, nowRt, isWarming, SPIKE_DEBOUNCE_MS, alpha)) {
                                         lastAcousticLockoutRt = acousticFastPath.lastSpikeRt
                                     }

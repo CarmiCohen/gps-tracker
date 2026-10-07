@@ -26,12 +26,12 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Oct.7.8:
+ * - Issue #SIMP-1010-1: Adaptive Acoustic Gating. Propagated isSuspiciousNoise 
+ *   flag to TelemetryBox for HUD visibility.
  * Oct.5.21:
  * - SIMP-1426-4: Boilerplate Reduction. Refactored signature to use MainViewModel 
- *   directly for event routing and state hydration manager. Migrated file 
- *   launchers to local scope. (R1426-4).
- * Oct.5.20:
- * - SIMP-1426-3: Refactored to consume unified UiStateProvider. (R1426-3).
+ *   directly for event routing and state hydration manager. (R1426-4).
  */
 
 @Composable
@@ -141,7 +141,7 @@ fun TrackerDashboard(
                     baroAlt = dashboardState.baroAlt, lux = dashboardState.lux, proximityCm = dashboardState.proximityCm, proximityDebounceMs = dashboardState.proximityDebounceMs, rollingVibration = dashboardState.rollingVibration, 
                     trackerMaxTemp = dashboardState.trackerMaxTemp, viewerMaxTemp = dashboardState.viewerMaxTemp, peakShock = dashboardState.peakShock, vibrationFloor = dashboardState.vibrationFloor, luxBaseline = dashboardState.luxBaseline, 
                     acousticFloorDb = dashboardState.acousticFloorDb, trackerCurrentMa = dashboardState.trackerCurrentMa, gpsIdx = gpsIdx, rttValue = rttValue, cpuLoad = dashboardState.cpuLoad, ioWait = dashboardState.ioWait, 
-                    maxIoLatency = dashboardState.maxIoLatency, isUltraLongStationary = dashboardState.isUltraLongStationary, onShowGnssDetail = { viewModel.onEvent(UiEvent.ToggleGnssDetail(true)) }
+                    maxIoLatency = dashboardState.maxIoLatency, isUltraLongStationary = dashboardState.isUltraLongStationary, isSuspiciousNoise = dashboardState.isSuspiciousNoise, onShowGnssDetail = { viewModel.onEvent(UiEvent.ToggleGnssDetail(true)) }
                 )
                 DebugTable(isLinkFresh = dashboardState.isLinkFresh, isTelemetryFresh = dashboardState.isTelemetryFresh, isGpsFresh = dashboardState.isGpsFresh, trackerStateName = dashboardState.trackerState.name, gpsAgeSec = if (kinematicState.localLocation.kinetic.gpsTs > 0) (systemPulse - kinematicState.localLocation.kinetic.gpsTs) / 1000 else -1L, rtt = rttValue, currentMa = currentMaValue)
                 Spacer(Modifier.height(16.dp)); SessionTerminationButton(appMode = appMode, onTerminate = { viewModel.onEvent(UiEvent.ShowStopTrackingConfirmation(true)) })

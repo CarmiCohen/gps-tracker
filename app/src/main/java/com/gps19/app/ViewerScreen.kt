@@ -24,12 +24,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Viewer-mode UI.
+ * Oct.7.8:
+ * - Issue #SIMP-1010-1: Adaptive Acoustic Gating. Propagated isSuspiciousNoise 
+ *   flag to TelemetryBox for HUD visibility.
  * Oct.6.1:
  * - AUDIT-1006-3: Fixed compilation errors in AppMapContainer call sites. 
  *   Aligned with unified UiStateProvider pattern (SIMP-1426-4).
- * Oct.5.21:
- * - SIMP-1426-4: Boilerplate Reduction. Refactored signature to use unified 
- *   UiStateProvider, eliminating redundant state parameter passing.
  */
 
 @Composable
@@ -151,7 +151,7 @@ fun ViewerDashboard(
                         baroAlt = dashboardState.baroAlt, lux = dashboardState.lux, proximityCm = dashboardState.proximityCm, proximityDebounceMs = dashboardState.proximityDebounceMs, rollingVibration = dashboardState.rollingVibration, 
                         trackerMaxTemp = dashboardState.trackerMaxTemp, viewerMaxTemp = dashboardState.viewerMaxTemp, peakShock = dashboardState.peakShock, vibrationFloor = dashboardState.vibrationFloor, luxBaseline = dashboardState.luxBaseline, 
                         acousticFloorDb = dashboardState.acousticFloorDb, trackerCurrentMa = currentMaValue, gpsIdx = gpsIdx, rttValue = rttValue, cpuLoad = dashboardState.cpuLoad, ioWait = dashboardState.ioWait, 
-                        maxIoLatency = dashboardState.maxIoLatency, isUltraLongStationary = dashboardState.isUltraLongStationary, onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
+                        maxIoLatency = dashboardState.maxIoLatency, isUltraLongStationary = dashboardState.isUltraLongStationary, isSuspiciousNoise = dashboardState.isSuspiciousNoise, onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
                     )
                     DebugTable(isLinkFresh = dashboardState.isLinkFresh, isTelemetryFresh = dashboardState.isTelemetryFresh, isGpsFresh = dashboardState.isGpsFresh, trackerStateName = dashboardState.trackerState.name, gpsAgeSec = if (gpsAge != Long.MAX_VALUE) gpsAge / 1000 else -1L, rtt = rttValue, currentMa = currentMaValue)
                 }

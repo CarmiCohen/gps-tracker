@@ -1,5 +1,12 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct7.8
+*   **Issue #SIMP-1010-1: Adaptive Acoustic Gating.**
+    *   **Native Suppression**: Implemented native `n20` logic in `jdhardware-jni.cpp` to scale `ACOUSTIC_EMA` alpha based on `vibrationRollingSum`. This prevents mechanical vibrations from triggering false acoustic alarms.
+    *   **Bridge Integration**: Updated `JdHardwareManager.kt` to expose the adaptive alpha calculation with JVM fallbacks for architectural resilience.
+    *   **Loop Hardening**: Integrated the adaptive alpha into the high-priority `AcousticMonitor` thread in `HardwareSuite.kt`.
+    *   **Visibility**: Propagated the `isSuspiciousNoise` flag through the telemetry pipeline to the Viewer HUD, adding a specific badge for JNI-detected anomalies.
+
 ## 🟢 Resolved in Oct7.7
 *   **Issue #SIMP-1007-16: Native Anomaly Propagation.**
     *   **Flag Convergence**: Successfully propagated `isSuspiciousNoise` and `isMemoryPressureThrottled` from JNI `VibrationBatch` into the `ForensicSnapshot` and the global `LocationUpdate` monolith.

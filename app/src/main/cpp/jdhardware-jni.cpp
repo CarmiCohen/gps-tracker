@@ -263,4 +263,18 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     return 0;
 }
 
+/**
+ * n20: computeAdaptiveAcousticAlphaNative (Issue #SIMP-1010-1)
+ * Scales the base alpha down as vibrationRollingSum increases to suppress motion-induced noise.
+ * Baseline: 0.5G vibration starts suppression. 1.5G vibration hits floor alpha (0.01).
+ */
+JNIEXPORT jdouble JNICALL
+Java_com_gps19_app_JdHardwareManager_n20(JNIEnv* env, jclass clazz, jdouble baseAlpha, jdouble vibrationRollingSum) {
+    double factor = 1.0;
+    if (vibrationRollingSum > 0.5) {
+        factor = std::max(0.01, 1.0 - ((vibrationRollingSum - 0.5) / 1.0));
+    }
+    return baseAlpha * factor;
+}
+
 }

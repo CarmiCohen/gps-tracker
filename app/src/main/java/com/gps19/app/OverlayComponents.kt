@@ -26,18 +26,12 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Oct.7.8:
+ * - Issue #SIMP-1010-1: Adaptive Acoustic Gating. Added isSuspiciousNoise badge 
+ *   to DashboardHeader for JNI-level anomaly visibility.
  * Sep.11.12:
  * - Issue #946 Visibility RESOLVED: Added tamperReason to MainDashboardGrid and 
  *   DashboardHeader for forensic transparency (R-ID 288).
- * Sep.09.16:
- * - Issue #942 RESOLVED: Fixed Identity Color Confusion. Updated PositionSection 
- *   to strictly use BrandJd for Tracker metrics and ViewerCyan for Viewer metrics, 
- *   ensuring role identity segregation (R942).
- * Sep.08.12:
- * - Issue #924 Visibility: Added isSafeMode to DashboardHeader for full 
- *   transparency of signaling suppression (R-ID 271).
- * - Issue #924 Visibility: Added isGnssThrottled to MainDashboardGrid and 
- *   DashboardHeader for A15 Hysteresis transparency (R-ID 267).
  */
 
 @Composable
@@ -113,6 +107,7 @@ fun MainDashboardGrid(
     isUltraLongStationary: Boolean = false,
     isGnssThrottled: Boolean = false,
     isSafeMode: Boolean = false,
+    isSuspiciousNoise: Boolean = false,
     onShowGnssDetail: () -> Unit = {}
 ) {
     val isViewer = appMode == "viewer"
@@ -141,7 +136,8 @@ fun MainDashboardGrid(
                 isBatteryCritical = isBatteryCritical,
                 isUltraLongStationary = isUltraLongStationary,
                 isGnssThrottled = isGnssThrottled,
-                isSafeMode = isSafeMode
+                isSafeMode = isSafeMode,
+                isSuspiciousNoise = isSuspiciousNoise
             )
             
             HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
@@ -191,7 +187,8 @@ private fun DashboardHeader(
     isBatteryCritical: Boolean,
     isUltraLongStationary: Boolean,
     isGnssThrottled: Boolean,
-    isSafeMode: Boolean
+    isSafeMode: Boolean,
+    isSuspiciousNoise: Boolean = false
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "DashboardPulse")
     val movingAlpha by infiniteTransition.animateFloat(
@@ -230,6 +227,7 @@ private fun DashboardHeader(
             if (isUltraLongStationary) Badge("[ULTRA]", BrandJd)
             if (isSafeMode) Badge("[SAFE MODE]", Rose500)
             if (isGnssThrottled) Badge("[THROTTLED]", Amber500)
+            if (isSuspiciousNoise) Badge("[NOISE ANOMALY]", Amber500)
             if (status == SentinelStatus.TAMPER) {
                 val label = if (tamperReason.isNullOrBlank()) "[TAMPER]" else "[TAMPER: ${tamperReason.uppercase()}]"
                 Badge(label, if (isTelemetryFresh) Rose500 else Slate500)
@@ -485,6 +483,7 @@ fun TelemetryBox(
     isUltraLongStationary: Boolean = false,
     isGnssThrottled: Boolean = false,
     isSafeMode: Boolean = false,
+    isSuspiciousNoise: Boolean = false,
     onShowGnssDetail: () -> Unit = {}
 ) {
     MainDashboardGrid(
@@ -501,7 +500,8 @@ fun TelemetryBox(
         heading = heading, tilt = tilt, acousticDb = acousticDb, baroAlt = baroAlt, lux = lux, proximityCm = proximityCm, proximityDebounceMs = proximityDebounceMs,
         rollingVibration = rollingVibration, trackerMaxTemp = trackerMaxTemp, viewerMaxTemp = viewerMaxTemp, peakShock = peakShock, vibrationFloor = vibrationFloor,
         luxBaseline = luxBaseline, acousticFloorDb = acousticFloorDb, trackerCurrentMa = trackerCurrentMa, gpsIdx = gpsIdx, rttValue = rttValue,
-        cpuLoad = cpuLoad, ioWait = ioWait, maxIoLatency = maxIoLatency, isUltraLongStationary = isUltraLongStationary, isGnssThrottled = isGnssThrottled, isSafeMode = isSafeMode, onShowGnssDetail = onShowGnssDetail
+        cpuLoad = cpuLoad, ioWait = ioWait, maxIoLatency = maxIoLatency, isUltraLongStationary = isUltraLongStationary, isGnssThrottled = isGnssThrottled, 
+        isSafeMode = isSafeMode, isSuspiciousNoise = isSuspiciousNoise, onShowGnssDetail = onShowGnssDetail
     )
 }
 

@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct7.7)
+# SOT Master Requirements & Hardening Status (Oct7.8)
 
-## 🏗️ Architectural Master Rules (166 Rules)
+## 🏗️ Architectural Master Rules (167 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -9,10 +9,12 @@
 *   **1.136 Multi-Sensor Native Correlation (R-ID 610)**: High-frequency sensor hot-paths (100Hz+) MUST consolidate diverse diagnostic probes (Vibration, SNR, Thermal) into a single JNI batch transaction. Native logic SHOULD leverage these correlated signals for advanced anomaly detection while avoiding redundant JVM-to-OS system calls via metric caching. (Oct7.6 - Issue #SIMP-1007-16).
 *   **1.137 Native Anomaly Propagation (R-ID 612)**: Anomaly flags generated in the native layer (e.g., `isSuspiciousNoise`, `isMemoryPressureThrottled`) MUST be propagated through the `ForensicSnapshot` container into the evaluation monolith. These flags MUST influence system decisions, such as forcing throttled polling intervals during memory stress to ensure background stability. (Oct7.7 - Issue #SIMP-1007-16).
 *   **1.138 Memory-Agnostic Polling Stability (R-ID 592)**: The engine MUST force a staggered performance tier (stretching GPS/Sensor intervals) when native heap usage exceeds critical thresholds (e.g., 256MB). This protection MUST be evaluated in the `SentinelValidator` to preempt OOM conditions in restricted background contexts. (Oct7.7 - Issue #SIMP-1007-17).
+*   **1.139 Adaptive Acoustic Gating (R-ID 655)**: Environmental acoustic monitoring MUST dynamically adjust its sensitivity (EMA alpha) based on physical vibration intensity. High-motion events MUST automatically suppress acoustic triggers in the native layer to prevent false tamper alerts induced by chassis vibration or mechanical noise. (Oct7.8 - Issue #SIMP-1010-1).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 655**: Adaptive Acoustic Gating - Implemented native motion-aware alpha adjustment to suppress acoustic triggers during high-vibration intervals. (Oct7.8 - Issue #SIMP-1010-1).
 *   **SOT ID 654**: Native Anomaly Propagation - Instrumented the telemetry pipeline to propagate `isSuspiciousNoise` and `isMemoryPressureThrottled` flags from JNI to UI. (Oct7.7 - Issue #SIMP-1007-16).
 *   **SOT ID 653**: Memory-Agnostic Polling Stability - Integrated native memory pressure flags from JNI into the `SentinelValidator` polling decision logic. (Oct7.7 - Issue #SIMP-1007-17).
 *   **SOT ID 652**: Multi-Sensor Native Correlation - Expanded JNI FastPath batching to include unified forensic snapshots (SNR, Thermal, Heap) for native-layer state evaluation. (Oct7.6 - Issue #SIMP-1007-16).
@@ -22,6 +24,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.270 (Adaptive Acoustic Audit)**: PASSED - Verified that acoustic EMA alpha scales down correctly in response to `vibrationRollingSum` via native `n20` method. Verified that `isSuspiciousNoise` badges appear on HUD during concurrent SNR/Vibration anomalies. (Oct7.8 - Issue #SIMP-1010-1).
 *   **Chapter 31.269 (Anomaly Propagation Audit)**: PASSED - Verified that `isSuspiciousNoise` and `isMemoryPressureThrottled` are correctly copied from `VibrationBatch` to `LocationUpdate`. Verified that `LocationSentinel` forces throttled polling when memory pressure is detected. (Oct7.7 - Issue #SIMP-1007-16).
 *   **Chapter 31.268 (Native Correlation Audit)**: PASSED - Verified that `VibrationBatch` correctly carries correlated SNR and Thermal snapshots into the native layer. Verified that thermal and heap probes use a 2-second caching interval to protect the 100Hz path from system call overhead. (Oct7.6 - Issue #SIMP-1007-16).
 *   **Chapter 31.267 (Forensic Container Parity Audit)**: PASSED - Verified that `EngineConnectionPoint`, `ConnectionPoint`, and `LogEntry` all delegate correctly to the unified `ForensicSnapshot`. (Oct7.5 - Issue #SIMP-1007-15).

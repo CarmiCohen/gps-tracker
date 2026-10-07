@@ -28,6 +28,9 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.7.8:
+ * - Issue #SIMP-1010-1: Adaptive Acoustic Gating. Implemented n20 to calculate 
+ *   adaptive alpha based on vibrationRollingSum.
  * Oct.7.6:
  * - Issue #SIMP-1007-16: JNI FastPath Expansion. Expanded processVibrationBatchNative 
  *   to pack forensic snapshots and read back native anomaly flags (offsets 164/168).
@@ -219,6 +222,10 @@ object JdHardwareManager {
         return if (isLibraryLoaded.get()) n8() else 0.0
     }
 
+    fun recordSensorAudit() {
+        // Obsolete but kept for signature parity if needed
+    }
+
     fun resetSensorAudit() {
         if (isLibraryLoaded.get()) n9()
     }
@@ -342,6 +349,19 @@ object JdHardwareManager {
         }
     }
 
+    /**
+     * computeAdaptiveAcousticAlphaNative: Native motion-aware alpha adjustment (Issue #SIMP-1010-1).
+     */
+    fun computeAdaptiveAcousticAlphaNative(baseAlpha: Double, vibrationRollingSum: Double): Double {
+        return if (isLibraryLoaded.get()) n20(baseAlpha, vibrationRollingSum) else {
+            var factor = 1.0
+            if (vibrationRollingSum > 0.5) {
+                factor = Math.max(0.01, 1.0 - ((vibrationRollingSum - 0.5) / 1.0))
+            }
+            baseAlpha * factor
+        }
+    }
+
     fun isAvailable(): Boolean = isLibraryLoaded.get()
 
     @JvmStatic private external fun n1(buffer: ByteBuffer): Int
@@ -363,4 +383,5 @@ object JdHardwareManager {
     @JvmStatic private external fun n17(peak: Double, floor: Double, sens: Float, cpu: Double): Int
     @JvmStatic private external fun n18(vibe: Double, floor: Double, sens: Float, cpu: Double): Int
     @JvmStatic private external fun n19(): Int
+    @JvmStatic private external fun n20(baseAlpha: Double, vibeRollingSum: Double): Double
 }

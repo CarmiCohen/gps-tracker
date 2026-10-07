@@ -21,12 +21,14 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.7.8:
+ * - Issue #SIMP-1010-1: Adaptive Acoustic Gating. Mapped isSuspiciousNoise and 
+ *   isMemoryPressureThrottled into DashboardHealthState for HUD visibility.
+ *   Fixed isGpsActive compilation error in mapDashboardTelemetry.
  * Oct.6.9:
  * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics. Replaced periodic polling 
  *   of signaling metrics with a reactive observation of repository.signalingMetrics 
  *   to reduce binder traffic and improve UI reactivity (Rule 2.1).
- * Oct.6.7:
- * - Issue #AUDIT-1006-8: Signaling Metrics Integration.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -485,7 +487,7 @@ class MainViewModel @Inject constructor(
         val gnss = loc.integrity.gnssDetail
         val avgCn0 = gnss?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0
         return DashboardTelemetryState(
-            lat = if (isGpsActive) loc.kinetic.lat else 0.0, lng = if (isGpsActive) loc.kinetic.lng else 0.0, 
+            lat = if (isGpsActive) loc.kinetic.lat else 0.0, lng = if (isGpsActive) loc.kinetic.lng else 0.0,
             gpsSpeedMps = loc.kinetic.speed, trackerAccuracy = loc.kinetic.accuracy, 
             trackerMaxAcc = if (loc.kinetic.maxAccuracy > 0) loc.kinetic.maxAccuracy else loc.kinetic.accuracy, 
             viewerAccuracy = if (appMode == "tracker") 0.0 else kinematicState.localLocation.kinetic.accuracy, 
@@ -520,7 +522,9 @@ class MainViewModel @Inject constructor(
             cpuLoad = health.cpuLoad, ioWait = health.ioWait, maxIoLatency = health.maxIoLatency, isSilentFailure = health.isSilentFailure, 
             isMaliAnomaly = health.isMaliAnomaly, isGnssThrottled = health.isGnssThrottled, lastEnergyDeltaMa = health.lastEnergyDeltaMa, 
             lastEnergyDeltaTemp = health.lastEnergyDeltaTemp, lastEnergyDurationMs = health.lastEnergyDurationMs, 
-            systemPulse = nowRt, thermalHeadroom = health.thermalHeadroom, heapAllocatedMb = health.heapAllocatedMb
+            systemPulse = nowRt, thermalHeadroom = health.thermalHeadroom, heapAllocatedMb = health.heapAllocatedMb,
+            isSuspiciousNoise = health.isSuspiciousNoise,
+            isMemoryPressureThrottled = health.isMemoryPressureThrottled
         )
     }
 
