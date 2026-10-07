@@ -189,6 +189,7 @@ Java_com_gps19_app_JdHardwareManager_n18(JNIEnv* env, jclass clazz, jdouble vibe
 /**
  * n19: processVibrationBatch (Issue #1450)
  * Consolidates all granular vibration math into one call.
+ * Oct.7.10: Added SNR Decay / Jammer Modeling (#SIMP-1010-3).
  * Oct.7.9: Added muzzle hysteresis offloading (#SIMP-1010-2).
  * Oct.7.6: Expanded with forensic snapshots (snr, thermal, heap) for multi-sensor
  * correlation logic and memory pressure evaluation (#SIMP-1007-16).
@@ -268,6 +269,15 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
         g_stationaryStartRt = 0;
     }
 
+    // 8. SNR Decay / Jammer Modeling (Oct.7.10, #SIMP-1010-3)
+    // Discriminate between mechanical interference (high vibe) and jamming (low vibe).
+    int isJammingCandidate = 0;
+    if (snr > 0.0 && snr < 18.0) {
+        if (delta < 0.15) { // Low vibration but SNR is degraded
+            isJammingCandidate = 1;
+        }
+    }
+
     // Outputs (Offset 128)
     *(double*)(ptr + 128) = delta;
     *(double*)(ptr + 136) = nextFloor;
@@ -282,6 +292,9 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     // Oct.7.9 Outputs (Offset 172)
     *(int64_t*)(ptr + 172) = stationaryDuration;
     *(int*)(ptr + 180) = muzzleResetTriggered;
+
+    // Oct.7.10 Outputs (Offset 184)
+    *(int*)(ptr + 184) = isJammingCandidate;
 
     return 0;
 }

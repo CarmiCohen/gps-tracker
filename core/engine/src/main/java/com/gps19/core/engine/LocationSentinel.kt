@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Oct.7.10:
+ * - Issue #SIMP-1010-3: SNR Decay Modeling. Integrated isJammingCandidate from 
+ *   telemetry update into forensic state and physical tamper evaluation.
  * Oct.7.9:
  * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Migrated stationary 
  *   duration logic to use native-provided duration from LocationUpdate. 
@@ -91,6 +94,7 @@ object LocationSentinel {
         
         state.forensic.isSuspiciousNoise = update.isSuspiciousNoise
         state.forensic.isMemoryPressureThrottled = update.isMemoryPressureThrottled
+        state.forensic.isJammingCandidate = update.isJammingCandidate
         state.forensic.stationaryDurationMs = update.stationaryDuration
 
         if (update.atmospheric.peakVibrationShock > state.forensic.peakVibrationShock && !update.atmospheric.peakVibrationShock.isNaN()) {
@@ -357,6 +361,12 @@ object LocationSentinel {
             result.reason = "Shock detected"
             return SentinelStatus.TAMPER
         }
+
+        // Oct.7.10: Jammer Discrimination (SNR vs Vibe)
+        if (state.forensic.isJammingCandidate) {
+            result.reason = "Jamming Candidate (SNR vs Vibe)"
+            return SentinelStatus.JAMMER_SUSPICION
+        }
         
         if (state.forensic.baroBaseline > -999.0) {
             val liftDelta = state.forensic.currentBaroAlt - state.forensic.baroBaseline
@@ -466,6 +476,7 @@ object LocationSentinel {
         state.kineticEnergy = 0.0
         state.forensic.isSuspiciousNoise = false
         state.forensic.isMemoryPressureThrottled = false
+        state.forensic.isJammingCandidate = false
         GtoEngine.clear(state)
     }
 }

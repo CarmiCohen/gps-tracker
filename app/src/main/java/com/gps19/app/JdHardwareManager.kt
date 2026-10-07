@@ -28,6 +28,9 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.7.10:
+ * - Issue #SIMP-1010-3: SNR Decay Modeling. Updated processVibrationBatchNative 
+ *   to read isJammingCandidate from offset 184.
  * Oct.7.9:
  * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Updated 
  *   processVibrationBatchNative to pack nowRt (offset 116) and read muzzle 
@@ -241,6 +244,7 @@ object JdHardwareManager {
 
     /**
      * processVibrationBatchNative: Consolidated 100Hz JNI call (Issue #1450).
+     * Oct.7.10: Added isJammingCandidate output (offset 184).
      * Oct.7.9: Added nowRt (offset 116) and read muzzle outputs (offsets 172/180).
      */
     fun processVibrationBatchNative(batch: VibrationBatch): Boolean {
@@ -285,6 +289,10 @@ object JdHardwareManager {
                 // Oct.7.9 Native Hysteresis (Offset 172)
                 batch.stationaryDuration = sharedStateBuffer.getLong(172)
                 batch.muzzleResetTriggered = sharedStateBuffer.getInt(180) != 0
+
+                // Oct.7.10 Jammer Discrimination (Offset 184)
+                batch.isJammingCandidate = sharedStateBuffer.getInt(184) != 0
+
                 return true
             }
         }

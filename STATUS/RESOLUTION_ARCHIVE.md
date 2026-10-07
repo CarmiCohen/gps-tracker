@@ -1,5 +1,12 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct7.10
+*   **Issue #SIMP-1010-3: SNR Decay Modeling.**
+    *   **Native Correlation**: Implemented native SNR-Vibration correlation in `jdhardware-jni.cpp` (n19). The model now distinguishes between mechanical interference (high vibe) and electronic jamming (low vibe) during SNR drops (< 18 dB).
+    *   **JNI Expansion**: Updated `VibrationBatch` and `JdHardwareManager` to propagate the `isJammingCandidate` flag from native to JVM.
+    *   **Sentinel Integration**: Updated `LocationSentinel.checkPhysicalTamper` to transition the engine to `JAMMER_SUSPICION` status when the native candidate flag is set.
+    *   **Telemetry Parity**: Integrated the jamming flag into `ForensicSnapshot` and the global `LocationUpdate` container for remote visibility.
+
 ## 🟢 Resolved in Oct7.9
 *   **Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading.**
     *   **Native Logic**: Migrated stationary duration tracking and muzzle reset triggers to `jdhardware-jni.cpp`. The native layer now evaluates the 2000ms muzzle window during the 100Hz vibration batch.

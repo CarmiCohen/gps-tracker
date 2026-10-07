@@ -6,13 +6,13 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.7.10:
+ * - Issue #SIMP-1010-3: SNR Decay Modeling. Added isJammingCandidate to 
+ *   VibrationBatch and SentinelForensicState for native jammer discrimination.
  * Oct.7.9:
  * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Added nowRt to 
  *   VibrationBatch inputs and stationaryDuration, muzzleResetTriggered to outputs.
  * - Replaced stationaryStartRt with stationaryDurationMs in SentinelForensicState.
- * Oct.7.7:
- * - Issue #SIMP-1007-16: Flag Propagation. Added isSuspiciousNoise and 
- *   isMemoryPressureThrottled to SentinelForensicState.
  */
 
 @Serializable
@@ -105,6 +105,8 @@ class EngineConnectionPoint(
     var hasGps: Boolean = false,
     var accuracy: Double = 0.0,
     var maxAccuracy: Double = 0.0,
+    var isBatteryLow: Boolean = false,
+    var isBatteryCritical: Boolean = false,
     var isBatterySteepDischarge: Boolean = false,
     var isCoolingModeActive: Boolean = false,
     var speed: Double = 0.0,
@@ -137,8 +139,6 @@ class EngineConnectionPoint(
     var ioWait: Double = 0.0,
     var maxIoLatency: Long = 0L,
     var isSilentFailure: Boolean = false,
-    var isBatteryLow: Boolean = false,
-    var isBatteryCritical: Boolean = false,
     var isUltraLongStationary: Boolean = false,
     var violationUptimeMs: Long = 0L,
     var thermalHeadroom: Double = 0.0,
@@ -163,6 +163,7 @@ class EngineConnectionPoint(
         this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt; this.remoteSig = other.remoteSig
         this.isConnected = other.isConnected; this.isGap = other.isGap; this.isRecoveryEvent = other.isRecoveryEvent
         this.hasGps = other.hasGps; this.accuracy = other.accuracy; this.maxAccuracy = other.maxAccuracy
+        this.isBatteryLow = other.isBatteryLow; this.isBatteryCritical = other.isBatteryCritical
         this.isBatterySteepDischarge = other.isBatterySteepDischarge; this.isCoolingModeActive = other.isCoolingModeActive
         this.speed = other.speed; this.bearing = other.bearing; this.isTick = other.isTick
         this.currentMa = other.currentMa; this.locationPendingReason = other.locationPendingReason
@@ -175,7 +176,7 @@ class EngineConnectionPoint(
         this.sitBaro = other.sitBaro; this.sitTilt = other.sitTilt; this.sitShock = other.sitShock
         this.kineticEnergy = other.kineticEnergy; this.gpsHardwareLock = other.gpsHardwareLock
         this.cpuLoad = other.cpuLoad; this.ioWait = other.ioWait; this.maxIoLatency = other.maxIoLatency
-        this.isSilentFailure = other.isSilentFailure; this.isBatteryLow = other.isBatteryLow; this.isBatteryCritical = other.isBatteryCritical
+        this.isSilentFailure = other.isSilentFailure
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
         this.thermalHeadroom = other.thermalHeadroom; this.heapAllocatedMb = other.heapAllocatedMb
         this.activityType = other.activityType
@@ -325,6 +326,8 @@ interface DeviceIdentity {
 
 /**
  * VibrationBatch: Data transfer object for JNI batching (Issue #1450).
+ * Oct.7.10:
+ * - Issue #SIMP-1010-3: SNR Decay Modeling. Added isJammingCandidate output (offset 184).
  * Oct.7.9:
  * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Added nowRt to 
  *   inputs and stationaryDuration, muzzleResetTriggered to outputs.
@@ -366,6 +369,9 @@ class VibrationBatch {
     // Oct.7.9 Native Hysteresis Outputs
     var stationaryDuration: Long = 0L
     var muzzleResetTriggered: Boolean = false
+
+    // Oct.7.10 Jammer Discrimination (Offset 184)
+    var isJammingCandidate: Boolean = false
 }
 
 /**
@@ -547,9 +553,12 @@ class SentinelForensicState {
     var lastSnr: Double = 0.0
     var lastSatsUsed: Int = 0
     
-    // Oct.7.7 Anomaly Flags
+    // Anomaly Flags
     var isSuspiciousNoise: Boolean = false
     var isMemoryPressureThrottled: Boolean = false
+
+    // Oct.7.10 Jammer Discrimination
+    var isJammingCandidate: Boolean = false
 }
 
 @Serializable

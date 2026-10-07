@@ -37,6 +37,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.7.10:
+ * - Issue #SIMP-1010-3: SNR Decay Modeling. Integrated isJammingCandidate from JNI 
+ *   vibration batch into forensic snapshots.
  * Oct.7.9:
  * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Migrated stationaryDuration 
  *   and muzzle reset logic to JNI batching path. Eliminated JVM stationary timestamp tracking.
@@ -117,6 +120,9 @@ class HardwareSuite @Inject constructor(
         
         var isSuspiciousNoise: Boolean = false
         var isMemoryPressureThrottled: Boolean = false
+        
+        // Oct.7.10: Jammer Discrimination
+        var isJammingCandidate: Boolean = false
 
         // Oct.7.9: Carry stationary duration to forensic pipeline
         var stationaryDurationMs: Long = 0L
@@ -129,6 +135,7 @@ class HardwareSuite @Inject constructor(
             vibrationRollingSum = 0.0; acousticPeak = 0.0; acousticPeakMin = -1.0; kineticEnergy = 0.0
             adaptiveVibrationFloor = 0.0; activityType = ActivityType.UNKNOWN
             isSuspiciousNoise = false; isMemoryPressureThrottled = false
+            isJammingCandidate = false
             stationaryDurationMs = 0L
         }
     }
@@ -294,6 +301,7 @@ class HardwareSuite @Inject constructor(
     
     @Volatile var isSuspiciousNoise = false; private set
     @Volatile var isMemoryPressureThrottled = false; private set
+    @Volatile var isJammingCandidate = false; private set
 
     private val logicSnapshotBuffer = CircularStateBuffer(2, { ForensicSnapshot() }, { it.reset() })
     private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
@@ -954,6 +962,7 @@ class HardwareSuite @Inject constructor(
                     activityType = activityContextProvider.currentActivityType
                     isSuspiciousNoise = this@HardwareSuite.isSuspiciousNoise
                     isMemoryPressureThrottled = this@HardwareSuite.isMemoryPressureThrottled
+                    isJammingCandidate = this@HardwareSuite.isJammingCandidate
                     stationaryDurationMs = this@HardwareSuite.stationaryDurationMs
                 }
                 if (isForensic) {
@@ -1045,6 +1054,7 @@ class HardwareSuite @Inject constructor(
                 
                 isSuspiciousNoise = vibrationBatch.isSuspiciousNoise
                 isMemoryPressureThrottled = vibrationBatch.isMemoryPressureThrottled
+                isJammingCandidate = vibrationBatch.isJammingCandidate
                 
                 // Oct.7.9: Capture native muzzle hysteresis
                 stationaryDurationMs = vibrationBatch.stationaryDuration
@@ -1062,6 +1072,7 @@ class HardwareSuite @Inject constructor(
                 
                 isSuspiciousNoise = false
                 isMemoryPressureThrottled = false
+                isJammingCandidate = false
 
                 // JVM Fallback muzzle reset
                 val stationary = isStationary()
@@ -1230,6 +1241,7 @@ class HardwareSuite @Inject constructor(
             cachedHeapAllocatedMb = 0.0
             isSuspiciousNoise = false
             isMemoryPressureThrottled = false
+            isJammingCandidate = false
             activityContextProvider.reset()
         }
     }

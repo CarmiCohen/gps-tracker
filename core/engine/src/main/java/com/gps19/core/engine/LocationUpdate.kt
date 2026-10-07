@@ -113,7 +113,10 @@ data class ForensicSnapshot(
     var thermal: Double? = null,
     var heap: Double? = null,
     var isSuspiciousNoise: Boolean = false,
-    var isMemoryPressureThrottled: Boolean = false
+    var isMemoryPressureThrottled: Boolean = false,
+    
+    // Oct.7.10 Jammer Discrimination
+    var isJammingCandidate: Boolean = false
 ) {
     fun copyFrom(other: ForensicSnapshot) {
         this.snr = other.snr
@@ -122,10 +125,12 @@ data class ForensicSnapshot(
         this.heap = other.heap
         this.isSuspiciousNoise = other.isSuspiciousNoise
         this.isMemoryPressureThrottled = other.isMemoryPressureThrottled
+        this.isJammingCandidate = other.isJammingCandidate
     }
     fun reset() {
         snr = null; vibe = null; thermal = null; heap = null
         isSuspiciousNoise = false; isMemoryPressureThrottled = false
+        isJammingCandidate = false
     }
 }
 
@@ -257,6 +262,9 @@ data class IntegrityState(
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
+ * Oct.7.10:
+ * - Issue #SIMP-1010-3: SNR Decay Modeling. Added isJammingCandidate delegate 
+ *   to ForensicSnapshot.
  * Oct.7.9:
  * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Added 
  *   stationaryDuration delegate to AtmosphericState.
@@ -646,6 +654,11 @@ data class LocationUpdate(
         get() = atmospheric.stationaryDurationMs
         set(value) { atmospheric.stationaryDurationMs = value }
 
+    // Oct.7.10 Jammer Discrimination
+    var isJammingCandidate: Boolean
+        get() = integrity.forensic.isJammingCandidate
+        set(value) { integrity.forensic.isJammingCandidate = value }
+
     var activityType: ActivityType 
         get() = kinetic.activityType
         set(value) { kinetic.activityType = value }
@@ -827,6 +840,9 @@ data class LocationUpdate(
         
         // Oct.7.9 Native Hysteresis
         put("stationary_duration_ms", stationaryDuration)
+
+        // Oct.7.10 Jammer Discrimination
+        put("is_jamming_candidate", isJammingCandidate)
     }
 
     companion object {
