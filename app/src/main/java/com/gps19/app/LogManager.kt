@@ -9,16 +9,13 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Oct.7.4:
+ * - Issue #SIMP-1007-15: Unified Snapshot Container. Updated LogEntry 
+ *   construction to utilize ForensicSnapshot container.
  * Oct.5.2:
  * - Issue #1344: Forensic Diagnostic Expansion. Updated logForensicTrace, 
  *   logForensicTraceOptimized, and submitToLogSink to include thermalSnapshot 
  *   and heapSnapshot forensic probes (R1344).
- * Sep.26.12:
- * - Issue #1344: Expanded logForensicTraceOptimized to include thermalHeadroom 
- *   and heapAllocatedMb forensic probes.
- * Sep.09.10:
- * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .atmospheric)
- *   in LocationUpdate to support bridge removal (R-ID 284).
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -72,8 +69,10 @@ class LogManager @Inject constructor(
             lat = lat,
             lng = lng,
             accuracy = accuracy,
-            thermalSnapshot = health.thermalHeadroom,
-            heapSnapshot = health.heapAllocatedMb,
+            forensic = ForensicSnapshot(
+                thermal = health.thermalHeadroom,
+                heap = health.heapAllocatedMb
+            ),
             tempSnapshot = health.batteryTemp,
             battSnapshot = health.batteryLevel,
             chargingSnapshot = health.isCharging
@@ -215,13 +214,15 @@ class LogManager @Inject constructor(
             lng = finalLng,
             accuracy = finalAccuracy,
             maxAccuracy = finalMaxAccuracy,
-            snrSnapshot = finalSnr,
-            vibeSnapshot = finalVibe,
+            forensic = ForensicSnapshot(
+                snr = finalSnr,
+                vibe = finalVibe,
+                thermal = thermal ?: health.thermalHeadroom,
+                heap = heap ?: health.heapAllocatedMb
+            ),
             tempSnapshot = health.batteryTemp,
             battSnapshot = health.batteryLevel,
-            chargingSnapshot = health.isCharging,
-            thermalSnapshot = thermal ?: health.thermalHeadroom,
-            heapSnapshot = heap ?: health.heapAllocatedMb
+            chargingSnapshot = health.isCharging
         )
         
         val suite = connectivitySuite

@@ -21,6 +21,9 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.7.4:
+ * - Issue #SIMP-1007-15: Unified Snapshot Container. Updated LogEntry mapping 
+ *   to utilize the ForensicSnapshot container while maintaining flat persistence.
  * Oct.6.2:
  * - Issue #AUDIT-1006-5: Forensic Log Pressure Test. Hardened addLog to prevent 
  *   dropping important safety alerts when the log buffer is full. Implemented 
@@ -308,7 +311,9 @@ class LogRepository @Inject constructor(
                                     maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot,
                                     vibeSnapshot = entry.vibeSnapshot, gpsHardwareLock = entry.gpsHardwareLock,
                                     tempSnapshot = entry.tempSnapshot, battSnapshot = entry.battSnapshot,
-                                    chargingSnapshot = entry.chargingSnapshot
+                                    chargingSnapshot = entry.chargingSnapshot,
+                                    thermalSnapshot = entry.thermalSnapshot,
+                                    heapSnapshot = entry.heapSnapshot
                                 ))
                                 continue
                             }
@@ -333,7 +338,9 @@ class LogRepository @Inject constructor(
                                         gpsHardwareLock = entry.gpsHardwareLock,
                                         tempSnapshot = entry.tempSnapshot,
                                         battSnapshot = entry.battSnapshot,
-                                        chargingSnapshot = entry.chargingSnapshot
+                                        chargingSnapshot = entry.chargingSnapshot,
+                                        thermalSnapshot = entry.thermalSnapshot,
+                                        heapSnapshot = entry.heapSnapshot
                                     )
                                     logDao.update(updated)
                                     lastEntityMetadata = metaKey
@@ -355,7 +362,9 @@ class LogRepository @Inject constructor(
                                 snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot,
                                 spillIdx = entry.spillIdx, gpsHardwareLock = entry.gpsHardwareLock,
                                 tempSnapshot = entry.tempSnapshot, battSnapshot = entry.battSnapshot,
-                                chargingSnapshot = entry.chargingSnapshot
+                                chargingSnapshot = entry.chargingSnapshot,
+                                thermalSnapshot = entry.thermalSnapshot,
+                                heapSnapshot = entry.heapSnapshot
                             )
                             toInsert.add(newLog)
                             logWriteCount.incrementAndGet()
@@ -387,7 +396,12 @@ class LogRepository @Inject constructor(
                         extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial, 
                         specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
                         lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
-                        snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
+                        forensic = ForensicSnapshot(
+                            snr = it.snrSnapshot, 
+                            vibe = it.vibeSnapshot, 
+                            thermal = it.thermalSnapshot, 
+                            heap = it.heapSnapshot
+                        ),
                         spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
                         tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
                         chargingSnapshot = it.chargingSnapshot
@@ -492,7 +506,12 @@ class LogRepository @Inject constructor(
                 extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial,
                 specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
                 lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
-                snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
+                forensic = ForensicSnapshot(
+                    snr = it.snrSnapshot,
+                    vibe = it.vibeSnapshot,
+                    thermal = it.thermalSnapshot,
+                    heap = it.heapSnapshot
+                ),
                 spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
                 tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
                 chargingSnapshot = it.chargingSnapshot
@@ -518,7 +537,12 @@ class LogRepository @Inject constructor(
                 extremeValue = it.extremeValue, durationMs = it.durationMs, isSpecial = it.isSpecial, 
                 specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
                 lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
-                snrSnapshot = it.snrSnapshot, vibeSnapshot = it.vibeSnapshot,
+                forensic = ForensicSnapshot(
+                    snr = it.snrSnapshot,
+                    vibe = it.vibeSnapshot,
+                    thermal = it.thermalSnapshot,
+                    heap = it.heapSnapshot
+                ),
                 spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
                 tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
                 chargingSnapshot = it.chargingSnapshot

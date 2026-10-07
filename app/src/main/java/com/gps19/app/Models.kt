@@ -11,6 +11,10 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.7.4:
+ * - Issue #SIMP-1007-15: Unified Snapshot Container. Migrated snrSnapshot, 
+ *   vibeSnapshot, thermalSnapshot, and heapSnapshot into ForensicSnapshot container 
+ *   in ConnectionPoint and LogEntry.
  * Oct.6.21:
  * - Issue #QA-1006-12: Forensic Hardening. Integrated safeDouble into 
  *   LogEntry.toJSONObject to prevent JSONExceptions (NaN/Infinity) during 
@@ -83,6 +87,8 @@ data class AlertSettings(
     val vibrationEnabled: Boolean = true,
     val alarmVolume: Float = 0.8f,
     val useCustomVolume: Boolean = false,
+    val vibrationEnabledV2: Boolean = true, // Placeholders for future expansion
+    val alarmVolumeV2: Float = 0.8f,
     val tiltAlert: Boolean = true,
     val acousticAlert: Boolean = true,
     val liftAlert: Boolean = true,
@@ -148,9 +154,15 @@ class ConnectionPoint(
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
     var activityType: ActivityType = ActivityType.UNKNOWN,
-    var thermalSnapshot: Double? = null,
-    var heapSnapshot: Double? = null
+    val forensic: ForensicSnapshot = ForensicSnapshot()
 ) {
+    var thermalSnapshot: Double?
+        get() = forensic.thermal
+        set(value) { forensic.thermal = value }
+    var heapSnapshot: Double?
+        get() = forensic.heap
+        set(value) { forensic.heap = value }
+
     fun copyFrom(other: ConnectionPoint) {
         this.localId = other.localId; this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt
         this.localSig = other.localSig; this.remoteSig = other.remoteSig; this.isConnected = other.isConnected
@@ -175,8 +187,7 @@ class ConnectionPoint(
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
         this.activityType = other.activityType
-        this.thermalSnapshot = other.thermalSnapshot
-        this.heapSnapshot = other.heapSnapshot
+        this.forensic.copyFrom(other.forensic)
     }
 
     /**
@@ -210,7 +221,7 @@ class ConnectionPoint(
         isSilentFailure = false; isUltraLongStationary = false; violationUptimeMs = 0L
         gpsHardwareLock = false; isAnchorLocked = false; isGnssThrottled = false
         thermalHeadroom = 0.0; heapAllocatedMb = 0.0; activityType = ActivityType.UNKNOWN
-        thermalSnapshot = null; heapSnapshot = null
+        forensic.reset()
     }
 }
 
@@ -261,16 +272,26 @@ data class LogEntry(
     val lng: Double = 0.0,
     val accuracy: Double = 0.0,
     val maxAccuracy: Double = 0.0,
-    val snrSnapshot: Double? = null,
-    val vibeSnapshot: Double? = null,
+    val forensic: ForensicSnapshot = ForensicSnapshot(),
     val spillIdx: Int = -1,
     val gpsHardwareLock: Boolean = false,
     val tempSnapshot: Double? = null,
     val battSnapshot: Int? = null,
-    val chargingSnapshot: Boolean? = null,
-    val thermalSnapshot: Double? = null,
-    val heapSnapshot: Double? = null
+    val chargingSnapshot: Boolean? = null
 ) {
+    var snrSnapshot: Double? 
+        get() = forensic.snr
+        set(value) { forensic.snr = value }
+    var vibeSnapshot: Double? 
+        get() = forensic.vibe
+        set(value) { forensic.vibe = value }
+    var thermalSnapshot: Double? 
+        get() = forensic.thermal
+        set(value) { forensic.thermal = value }
+    var heapSnapshot: Double? 
+        get() = forensic.heap
+        set(value) { forensic.heap = value }
+
     /**
      * contentEquals: Deep parity check to suppress redundant Logcat/UI noise (R312).
      */
@@ -321,6 +342,12 @@ data class LogEntry(
     companion object {
         fun fromJSONObject(obj: JSONObject): LogEntry {
             val ts = obj.optLong("timestamp")
+            val f = ForensicSnapshot(
+                snr = if (obj.has("snr_snapshot")) obj.optDouble("snr_snapshot") else null,
+                vibe = if (obj.has("vibe_snapshot")) obj.optDouble("vibe_snapshot") else null,
+                thermal = if (obj.has("thermal_snapshot")) obj.optDouble("thermal_snapshot") else null,
+                heap = if (obj.has("heap_snapshot")) obj.optDouble("heap_snapshot") else null
+            )
             return LogEntry(
                 localId = obj.optString("localId"), timestamp = ts, message = obj.optString("message"),
                 type = obj.optString("type"), isImportant = obj.optBoolean("isImportant"),
@@ -333,14 +360,11 @@ data class LogEntry(
                 extremeValue = obj.optDouble("extreme_value").let { if (it.isNaN() || it.isInfinite()) null else it },
                 lat = obj.optDouble("lat", 0.0), lng = obj.optDouble("lng", 0.0),
                 accuracy = obj.optDouble("accuracy", 0.0), maxAccuracy = obj.optDouble("max_accuracy", 0.0),
-                snrSnapshot = if (obj.has("snr_snapshot")) obj.optDouble("snr_snapshot") else null,
-                vibeSnapshot = if (obj.has("vibe_snapshot")) obj.optDouble("vibe_snapshot") else null,
+                forensic = f,
                 spillIdx = obj.optInt("spill_idx", -1), gpsHardwareLock = obj.optBoolean("gps_hw_lock", false),
                 tempSnapshot = if (obj.has("temp_snapshot")) obj.optDouble("temp_snapshot") else null,
                 battSnapshot = if (obj.has("batt_snapshot")) obj.optInt("batt_snapshot") else null,
-                chargingSnapshot = if (obj.has("charging_snapshot")) obj.optBoolean("charging_snapshot") else null,
-                thermalSnapshot = if (obj.has("thermal_snapshot")) obj.optDouble("thermal_snapshot") else null,
-                heapSnapshot = if (obj.has("heap_snapshot")) obj.optDouble("heap_snapshot") else null
+                chargingSnapshot = if (obj.has("charging_snapshot")) obj.optBoolean("charging_snapshot") else null
             )
         }
     }
@@ -551,8 +575,8 @@ class StatsState(
 ) {
     fun copyFrom(other: StatsState) {
         this.totalConnectedMs = other.totalConnectedMs; this.sessionConnectedMs = other.sessionConnectedMs
-        this.maxDropMs = other.maxDropMs; this.maxDropTs = other.maxDropTs; this.totalDropMs = totalDropMs
-        this.uptimeMs = other.uptimeMs; this.lastConnTs = other.lastConnTs; this.lastDiscTs = lastDiscTs
+        this.maxDropMs = other.maxDropMs; this.maxDropTs = other.maxDropTs; this.totalDropMs = other.totalDropMs
+        this.uptimeMs = other.uptimeMs; this.lastConnTs = other.lastConnTs; this.lastDiscTs = other.lastDiscTs
         this.violationUptimeMs = other.violationUptimeMs; this.violationPercentage = other.violationPercentage
     }
     fun update(totalConnectedMs: Long, sessionConnectedMs: Long, maxDropMs: Long, maxDropTs: Long, totalDropMs: Long, uptimeMs: Long, lastConnTs: Long, lastDiscTs: Long) {

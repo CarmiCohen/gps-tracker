@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * Oct.7.4:
+ * - Issue #SIMP-1007-15: Unified Snapshot Container. Migrated aggregation 
+ *   logic to use ForensicSnapshot container for architectural parity.
  * Oct.6.21:
  * - Issue #QA-1006-12: Forensic Hardening. Integrated safeDouble into 
  *   MutableAggregationPoint to ensure NaN/Infinity values are sanitized 
@@ -68,8 +71,7 @@ class TelemetryAggregator {
         var thermalHeadroom: Double = 0.0
         var heapAllocatedMb: Double = 0.0
         var activityType: ActivityType = ActivityType.UNKNOWN
-        var thermalSnapshot: Double? = null
-        var heapSnapshot: Double? = null
+        val forensic = ForensicSnapshot()
 
         fun reset(point: EngineConnectionPoint) {
             rtt = point.rtt
@@ -115,8 +117,10 @@ class TelemetryAggregator {
             thermalHeadroom = safeDouble(point.thermalHeadroom)
             heapAllocatedMb = safeDouble(point.heapAllocatedMb)
             activityType = point.activityType
-            thermalSnapshot = point.thermalSnapshot?.let { safeDouble(it) }
-            heapSnapshot = point.heapSnapshot?.let { safeDouble(it) }
+            forensic.snr = point.forensic.snr?.let { safeDouble(it) }
+            forensic.vibe = point.forensic.vibe?.let { safeDouble(it) }
+            forensic.thermal = point.forensic.thermal?.let { safeDouble(it) }
+            forensic.heap = point.forensic.heap?.let { safeDouble(it) }
         }
 
         fun merge(cur: EngineConnectionPoint) {
@@ -165,8 +169,10 @@ class TelemetryAggregator {
             heapAllocatedMb = safeDouble(max(heapAllocatedMb, cur.heapAllocatedMb))
             if (cur.activityType != ActivityType.UNKNOWN) activityType = cur.activityType
             
-            cur.thermalSnapshot?.let { thermalSnapshot = safeDouble(max(thermalSnapshot ?: 0.0, it)) }
-            cur.heapSnapshot?.let { heapSnapshot = safeDouble(max(heapSnapshot ?: 0.0, it)) }
+            cur.forensic.snr?.let { forensic.snr = safeDouble(max(forensic.snr ?: 0.0, it)) }
+            cur.forensic.vibe?.let { forensic.vibe = safeDouble(max(forensic.vibe ?: 0.0, it)) }
+            cur.forensic.thermal?.let { forensic.thermal = safeDouble(max(forensic.thermal ?: 0.0, it)) }
+            cur.forensic.heap?.let { forensic.heap = safeDouble(max(forensic.heap ?: 0.0, it)) }
         }
 
         fun writeTo(target: EngineConnectionPoint, base: EngineConnectionPoint, isTick: Boolean) {
@@ -213,8 +219,7 @@ class TelemetryAggregator {
             target.thermalHeadroom = safeDouble(this.thermalHeadroom)
             target.heapAllocatedMb = safeDouble(this.heapAllocatedMb)
             target.activityType = this.activityType
-            target.thermalSnapshot = this.thermalSnapshot?.let { safeDouble(it) }
-            target.heapSnapshot = this.heapSnapshot?.let { safeDouble(it) }
+            target.forensic.copyFrom(this.forensic)
             target.isTick = isTick
         }
     }

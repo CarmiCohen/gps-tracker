@@ -14,6 +14,9 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
+ * Oct.7.4:
+ * - Issue #SIMP-1007-15: Unified Snapshot Container. Refactored conflation 
+ *   logic to use the new ForensicSnapshot container in LocationUpdate.
  * Oct.7.3:
  * - Issue #QA-1007-1: Hardened Conflation against starvation. Added firstEntryTs 
  *   to ConflationBucket to ensure MAX_CONFLATION_DELAY_MS is enforced relative 
@@ -381,18 +384,15 @@ class SmartSignalingDispatcher(
         if (pending == null) return incoming
         
         // R-ID 511: Preserve fidelity across the burst.
-        if (incoming.thermalSnapshot == null && pending.thermalSnapshot != null) {
-            incoming.thermalSnapshot = pending.thermalSnapshot
-        }
-        if (incoming.heapSnapshot == null && pending.heapSnapshot != null) {
-            incoming.heapSnapshot = pending.heapSnapshot
-        }
-        if (incoming.snrSnapshot == null && pending.snrSnapshot != null) {
-            incoming.snrSnapshot = pending.snrSnapshot
-        }
-        if (incoming.vibeSnapshot == null && pending.vibeSnapshot != null) {
-            incoming.vibeSnapshot = pending.vibeSnapshot
-        }
+        // Oct.7.4: Refactored to use unified ForensicSnapshot container.
+        val pF = pending.integrity.forensic
+        val iF = incoming.integrity.forensic
+        
+        if (iF.thermal == null && pF.thermal != null) iF.thermal = pF.thermal
+        if (iF.heap == null && pF.heap != null) iF.heap = pF.heap
+        if (iF.snr == null && pF.snr != null) iF.snr = pF.snr
+        if (iF.vibe == null && pF.vibe != null) iF.vibe = pF.vibe
+
         if (incoming.integrity.uptimeMs == 0L && pending.integrity.uptimeMs > 0) {
             incoming.integrity.uptimeMs = pending.integrity.uptimeMs
         }

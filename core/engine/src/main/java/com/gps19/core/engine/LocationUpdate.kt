@@ -99,6 +99,27 @@ data class AtmosphericState(
 }
 
 /**
+ * ForensicSnapshot: Unified container for diagnostic sensor probes.
+ */
+@Serializable
+data class ForensicSnapshot(
+    var snr: Double? = null,
+    var vibe: Double? = null,
+    var thermal: Double? = null,
+    var heap: Double? = null
+) {
+    fun copyFrom(other: ForensicSnapshot) {
+        this.snr = other.snr
+        this.vibe = other.vibe
+        this.thermal = other.thermal
+        this.heap = other.heap
+    }
+    fun reset() {
+        snr = null; vibe = null; thermal = null; heap = null
+    }
+}
+
+/**
  * IntegrityState: Hardware, system health, and session audit telemetry.
  */
 @Serializable
@@ -165,8 +186,7 @@ data class IntegrityState(
     var isBatteryWhitelisted: Boolean = false,
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
-    var thermalSnapshot: Double? = null,
-    var heapSnapshot: Double? = null
+    val forensic: ForensicSnapshot = ForensicSnapshot()
 ) {
     fun copyFrom(other: IntegrityState) {
         this.battery = other.battery; this.isCharging = other.isCharging; this.currentMa = other.currentMa
@@ -202,8 +222,7 @@ data class IntegrityState(
         this.isBatteryWhitelisted = other.isBatteryWhitelisted
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
-        this.thermalSnapshot = other.thermalSnapshot
-        this.heapSnapshot = other.heapSnapshot
+        this.forensic.copyFrom(other.forensic)
     }
 
     fun reset() {
@@ -222,12 +241,15 @@ data class IntegrityState(
         locationPendingReason = LocationPendingReason.NONE; signal = null; tamperNote = null
         lastValidFixRt = 0L; isSilentFailure = false; isMaliAnomaly = false; cpuLoad = 0.0
         ioWait = 0.0; maxIoLatency = 0L; isBatteryWhitelisted = false
-        thermalHeadroom = 0.0; heapAllocatedMb = 0.0; thermalSnapshot = null; heapSnapshot = null
+        thermalHeadroom = 0.0; heapAllocatedMb = 0.0; forensic.reset()
     }
 }
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
+ * Oct.7.4:
+ * - Issue #SIMP-1007-15: Unified Snapshot Container. Grouped snrSnapshot, 
+ *   vibeSnapshot, thermalSnapshot, and heapSnapshot into ForensicSnapshot within IntegrityState.
  * Oct.7.3:
  * - Issue #QA-1007-1: Forensic Expansion. Fixed duplicate() to ensure forensic 
  *   body properties (muzzled, siren, snapshots) are preserved during pipeline emission.
@@ -288,12 +310,6 @@ data class LocationUpdate(
     var lastAlarmAckTs: Long = 0L,
     var violationStartTs: Long = 0L,
 
-    // Evaluation Scratchpad Fields (Internal)
-    @Transient
-    var snrSnapshot: Double? = null,
-    @Transient
-    var vibeSnapshot: Double? = null,
-    
     // Engine-Direct Flags (Internal)
     @Transient
     var suppressionNote: String? = null
@@ -606,12 +622,21 @@ data class LocationUpdate(
     var heapAllocatedMb: Double 
         get() = integrity.heapAllocatedMb
         set(value) { integrity.heapAllocatedMb = value }
+    
+    // Unified Forensic Snapshots
+    var snrSnapshot: Double? 
+        get() = integrity.forensic.snr
+        set(value) { integrity.forensic.snr = value }
+    var vibeSnapshot: Double? 
+        get() = integrity.forensic.vibe
+        set(value) { integrity.forensic.vibe = value }
     var thermalSnapshot: Double? 
-        get() = integrity.thermalSnapshot
-        set(value) { integrity.thermalSnapshot = value }
+        get() = integrity.forensic.thermal
+        set(value) { integrity.forensic.thermal = value }
     var heapSnapshot: Double? 
-        get() = integrity.heapSnapshot
-        set(value) { integrity.heapSnapshot = value }
+        get() = integrity.forensic.heap
+        set(value) { integrity.forensic.heap = value }
+
     var activityType: ActivityType 
         get() = kinetic.activityType
         set(value) { kinetic.activityType = value }
@@ -656,19 +681,17 @@ data class LocationUpdate(
         this.acousticMinDb = other.acousticMinDb
         this.lastAlarmAckTs = other.lastAlarmAckTs
         this.violationStartTs = other.violationStartTs
-        this.snrSnapshot = other.snrSnapshot
-        this.vibeSnapshot = other.vibeSnapshot
         this.suppressionNote = other.suppressionNote
     }
 
     /**
      * duplicate: Performs a deep copy to ensure thread safety during event emission (R-ID 392).
-     * Oct.7.3: Fixed to manually copy non-constructor forensic body properties.
+     * Oct.7.4: Optimized to use unified forensic container within integrity.copy().
      */
     fun duplicate(): LocationUpdate = copy(
         kinetic = kinetic.copy(),
         atmospheric = atmospheric.copy(),
-        integrity = integrity.copy()
+        integrity = integrity.copy(forensic = integrity.forensic.copy())
     ).also {
         it.isMe = this.isMe
         it.deviceId = this.deviceId
@@ -690,8 +713,6 @@ data class LocationUpdate(
         it.acousticMinDb = this.acousticMinDb
         it.lastAlarmAckTs = this.lastAlarmAckTs
         it.violationStartTs = this.violationStartTs
-        it.snrSnapshot = this.snrSnapshot
-        it.vibeSnapshot = this.vibeSnapshot
         it.suppressionNote = this.suppressionNote
     }
 
@@ -722,8 +743,6 @@ data class LocationUpdate(
         acousticMinDb = -1.0
         lastAlarmAckTs = 0L
         violationStartTs = 0L
-        snrSnapshot = null
-        vibeSnapshot = null
         suppressionNote = null
     }
 

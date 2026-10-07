@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Oct.7.4:
+ * - Issue #SIMP-1007-15: Unified Snapshot Container. Migrated thermalSnapshot 
+ *   and heapSnapshot into ForensicSnapshot container for architectural parity.
  * Oct.5.2:
  * - Issue #1344: Forensic Diagnostic Expansion. Added thermalSnapshot and 
  *   heapSnapshot for high-fidelity correlation with GPS stalls (R1344).
@@ -60,8 +63,7 @@ class SystemHealthState(
     var isThermalThrottling: Boolean = false,
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
-    var thermalSnapshot: Double? = null,
-    var heapSnapshot: Double? = null,
+    val forensic: ForensicSnapshot = ForensicSnapshot(),
 
     // Forensic Persistence Health
     var forensicReliability: Double = 1.0,
@@ -123,6 +125,14 @@ class SystemHealthState(
     var tamperNote: String? = null,
     var activityType: ActivityType = ActivityType.UNKNOWN
 ) : Locatable {
+
+    var thermalSnapshot: Double?
+        get() = forensic.thermal
+        set(value) { forensic.thermal = value }
+    var heapSnapshot: Double?
+        get() = forensic.heap
+        set(value) { forensic.heap = value }
+
     fun copyFrom(other: SystemHealthState) {
         this.signalLoss = other.signalLoss
         this.gpsStalled = other.gpsStalled
@@ -169,8 +179,7 @@ class SystemHealthState(
         this.isThermalThrottling = other.isThermalThrottling
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
-        this.thermalSnapshot = other.thermalSnapshot
-        this.heapSnapshot = other.heapSnapshot
+        this.forensic.copyFrom(other.forensic)
         this.forensicReliability = other.forensicReliability
         this.uptimeMs = other.uptimeMs
         this.lastConnTs = other.lastConnTs
@@ -283,8 +292,8 @@ class SystemHealthState(
         this.isThermalThrottling = isThermalThrottling
         this.thermalHeadroom = thermalHeadroom
         this.heapAllocatedMb = heapAllocatedMb
-        this.thermalSnapshot = thermalSnapshot
-        this.heapSnapshot = heapSnapshot
+        this.forensic.thermal = thermalSnapshot
+        this.forensic.heap = heapSnapshot
         this.forensicReliability = forensicReliability
         this.vibration = vibration
         this.isBatteryLow = isBatteryLow
@@ -347,8 +356,7 @@ class SystemHealthState(
         isThermalThrottling = false
         thermalHeadroom = 0.0
         heapAllocatedMb = 0.0
-        thermalSnapshot = null
-        heapSnapshot = null
+        forensic.reset()
         forensicReliability = 1.0
         uptimeMs = 0L
         lastConnTs = 0L

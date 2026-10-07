@@ -6,14 +6,11 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.7.4:
+ * - Issue #SIMP-1007-15: Unified Snapshot Container. Migrated thermalSnapshot 
+ *   and heapSnapshot into ForensicSnapshot container.
  * Oct.6.3:
  * - Restored RevivalEvent definition (accidentally purged in Oct6.2).
- * Oct.6.2:
- * - Issue #AUDIT-1006-5: Added ExecuteLogPressureTest to CommandEvent.
- * Oct.5.15:
- * - Issue #SIMP-1426-2: Leaf-Level Convergence. Added missing ProcessorEvent 
- *   definitions (LuxBaselineChanged, AcousticFloorChanged, GpsStallDetected) 
- *   to remediate build failure. (R1426-2).
  */
 
 @Serializable
@@ -145,9 +142,15 @@ class EngineConnectionPoint(
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
     var activityType: ActivityType = ActivityType.UNKNOWN,
-    var thermalSnapshot: Double? = null,
-    var heapSnapshot: Double? = null
+    val forensic: ForensicSnapshot = ForensicSnapshot()
 ) {
+    var thermalSnapshot: Double?
+        get() = forensic.thermal
+        set(value) { forensic.thermal = value }
+    var heapSnapshot: Double?
+        get() = forensic.heap
+        set(value) { forensic.heap = value }
+
     fun copyFrom(other: EngineConnectionPoint) {
         this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt; this.remoteSig = other.remoteSig
         this.isConnected = other.isConnected; this.isGap = other.isGap; this.isRecoveryEvent = other.isRecoveryEvent
@@ -168,8 +171,7 @@ class EngineConnectionPoint(
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
         this.thermalHeadroom = other.thermalHeadroom; this.heapAllocatedMb = other.heapAllocatedMb
         this.activityType = other.activityType
-        this.thermalSnapshot = other.thermalSnapshot
-        this.heapSnapshot = other.heapSnapshot
+        this.forensic.copyFrom(other.forensic)
     }
 }
 
@@ -230,8 +232,7 @@ sealed class AlarmEvent(override val priority: EventPriority = EventPriority.CRI
         val extremeValue: Double?, val logId: String?, val durationMs: Long, 
         val isSpecial: Boolean, val specialColor: Int?, 
         val lat: Double, val lng: Double, val accuracy: Double, 
-        val maxAccuracy: Double, val snr: Double?, val vibe: Double?,
-        val thermal: Double? = null, val heap: Double? = null
+        val maxAccuracy: Double, val forensic: ForensicSnapshot = ForensicSnapshot()
     ) : AlarmEvent(if (isImportant) EventPriority.CRITICAL else EventPriority.HIGH)
 }
 
@@ -246,7 +247,7 @@ sealed class IntegrityEvent(override val priority: EventPriority = EventPriority
 
 sealed class ProcessorEvent(open val isPrimary: Boolean, override val priority: EventPriority = EventPriority.NORMAL) : DomainEvent(priority) {
     data class TrailPointSaved(val lat: Double, val lng: Double, val isViewerTrail: Boolean, val status: SentinelStatus, val timestamp: Long, val accuracy: Double, val maxAccuracy: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.NORMAL)
-    data class LogAdded(val message: String, val type: String, val isImportant: Boolean, val isSpecial: Boolean, val lat: Double, val lng: Double, val accuracy: Double, val snr: Double?, val vibe: Double?, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, if (isImportant) EventPriority.HIGH else EventPriority.LOW)
+    data class LogAdded(val message: String, val type: String, val isImportant: Boolean, val isSpecial: Boolean, val lat: Double, val lng: Double, val accuracy: Double, val forensic: ForensicSnapshot = ForensicSnapshot(), override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, if (isImportant) EventPriority.HIGH else EventPriority.LOW)
     data class MaxAccuracyChanged(val accuracy: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
     data class ChairBaselineChanged(val baseline: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
     data class VibrationFloorChanged(val floor: Double, override val isPrimary: Boolean = true) : ProcessorEvent(isPrimary, EventPriority.LOW)
