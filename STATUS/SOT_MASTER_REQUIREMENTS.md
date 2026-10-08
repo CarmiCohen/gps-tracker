@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct8.9)
+# SOT Master Requirements & Hardening Status (Oct8.10)
 
-## 🏗️ Architectural Master Rules (175 Rules)
+## 🏗️ Architectural Master Rules (176 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -10,10 +10,12 @@
 *   **1.145 Native Proximity Health Authority (R-ID 683)**: Proximity state evaluation, including environment-aware debouncing and health index calculation, MUST be offloaded to JNI via `ProximityBatch`. The native implementation MUST handle stationary state transitions and display flickering filters to minimize JVM wake-ups and math overhead. (Oct8.8 - Issue #SIMP-1012-2).
 *   **1.146 Zero-Allocation Forensic Retrieval (R-ID 684)**: High-frequency forensic telemetry retrieval MUST utilize `inline` callback-based iteration (e.g., `forEachMatch`) instead of `Sequence` or `Iterator` patterns to achieve zero-allocation parity and prevent GC-induced jitter during background stability audits. (Oct8.8 - Issue #SIMP-1012-1).
 *   **1.147 SNR-Based Jamming Discrimination (R-ID 685)**: Jammer suspicion MUST be refined using SNR-based forensic stability audits. The system MUST distinguish between active jamming (sustained low SNR across multiple satellites) and signal blockage (complete loss of samples or residual high SNR) by analyzing forensic SNR trails during recovery phases to ensure high-assurance diagnostic reporting. (Oct8.9 - Issue #SIMP-1012-3).
+*   **1.148 Memory Pressure Hysteresis (R-ID 686)**: Aggressive memory recovery criteria (GC flushing) MUST be offloaded to JNI via `MemoryPressureBatch`. Decision logic MUST incorporate a native hysteresis window (`MEMORY_HYSTERESIS_OFFSET_MB`) to prevent "GC Thrashing" and rapid state oscillations when the system heap operates at the boundary of `CRITICAL` pressure. (Oct8.10 - Issue #SIMP-1013-1).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 664**: Memory Pressure Hysteresis - Offloaded GC flush criteria and hysteresis evaluation to JNI to prevent background thrashing. (Oct8.10 - Issue #SIMP-1013-1).
 *   **SOT ID 663**: Forensic Stability Audit - Implemented SNR-based jamming discrimination in `ForensicAuditor` leveraging zero-allocation retrieval. (Oct8.9 - Issue #SIMP-1012-3).
 *   **SOT ID 662**: Native Proximity Scaling - Migrated environment-aware proximity debouncing and index calculation to JNI to further centralize hardware health authority. (Oct8.8 - Issue #SIMP-1012-2).
 *   **SOT ID 661**: Forensic Retrieval Optimization - Refactored `CircularStateBuffer` and `HardwareSuite` to use zero-allocation inline iteration for telemetry retrieval. (Oct8.8 - Issue #SIMP-1012-1).
@@ -21,6 +23,7 @@
 ---
 
 ## Verification Chapters
+*   **Chapter 31.279 (Memory Pressure Audit)**: PASSED - Verified that `IntegrityMonitor` offloads flush decisions to JNI. Confirmed that a 20MB hysteresis window prevents rapid oscillation between `HIGH` and `CRITICAL` states under simulated heap flux. (Oct8.10 - Issue #SIMP-1013-1).
 *   **Chapter 31.278 (Forensic Jamming Audit)**: PASSED - Verified that `ForensicAuditor` uses `forEachSnrSample` to analyze signal health. Confirmed that "Jammer Suspicion" is correctly promoted based on sustained low SNR vs. complete signal loss. (Oct8.9 - Issue #SIMP-1012-3).
 *   **Chapter 31.277 (Native Proximity Audit)**: PASSED - Verified that `HardwareSuite` offloads proximity debouncing to JNI via `ProximityBatch`. Confirmed that stationary duration and thermal load are correctly considered natively. (Oct8.8 - Issue #SIMP-1012-2).
 *   **Chapter 31.276 (Zero-Allocation Retrieval Audit)**: PASSED - Verified that `HardwareSuite` get*Samples methods utilize `inline` callbacks. Confirmed via profiling that no `Iterator` or `Sequence` objects are allocated during forensic sampling. (Oct8.8 - Issue #SIMP-1012-1).

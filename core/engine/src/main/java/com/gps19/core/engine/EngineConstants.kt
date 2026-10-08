@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.8.10:
+ * - Issue #SIMP-1013-1: Memory Pressure Hysteresis. Added MEMORY_HYSTERESIS_OFFSET_MB 
+ *   to prevent GC thrashing at pressure boundaries.
  * Oct.8.9:
  * - Issue #SIMP-1012-3: Forensic Stability Audit. Added JAMMING_SNR_CRITICAL_THRESHOLD 
  *   and lookback constants for SNR-based jammer discrimination.
@@ -44,6 +47,7 @@ const val SENSOR_LOAD_GATE_CPU_THRESHOLD = 0.85
 // Issue #1416: Memory Pressure Thresholds (MB)
 const val MEMORY_PRESSURE_THRESHOLD_MB = 200.0
 const val MEMORY_CRITICAL_THRESHOLD_MB = 250.0
+const val MEMORY_HYSTERESIS_OFFSET_MB = 20.0
 
 // Issue #1417: Connectivity Jitter
 const val CONNECTIVITY_HYSTERESIS_MS = 3000L

@@ -1,5 +1,11 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct8.10
+*   **Issue #SIMP-1013-1: Memory Pressure Hysteresis.**
+    *   **Native Decision Logic**: Offloaded GC flush criteria to JNI via `MemoryPressureBatch` (n24).
+    *   **Thrashing Mitigation**: Implemented a 20MB native hysteresis window (`MEMORY_HYSTERESIS_OFFSET_MB`) to prevent rapid state oscillations at the `CRITICAL` boundary.
+    *   **Event-Driven Flush**: Refactored `MonitorService` and `IntegrityMonitor` to trigger aggressive memory recovery via centralized `CommandEvent.TriggerMemoryFlush`.
+
 ## 🟢 Resolved in Oct8.9
 *   **Issue #SIMP-1012-3: Forensic Stability Audit.**
     *   **Jammer Discrimination**: Implemented SNR-based signal health evaluation in `ForensicAuditor` to distinguish between active jamming and signal blockage.

@@ -18,11 +18,11 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Oct.8.10:
+ * - Issue #SIMP-1013-1: Memory Pressure Hysteresis. Integrated JdHardwareManager.n24 
+ *   to offload GC flush criteria to JNI, preventing thrashing via native hysteresis.
  * Oct.6.2:
  * - Issue #AUDIT-1006-6: Added Memory Pressure simulation hooks.
- * Oct.5.9:
- * - Issue #1295: Redundant Stream Observer Audit. Relaxed heartbeat loop 
- *   interval during ultra-long stationary periods to conserve CPU (R1295).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -59,6 +59,7 @@ class IntegrityMonitor @Inject constructor(
     private val INTERNET_CHECK_TTL_MS = 5000L
     
     private var lastMemoryPressure = MemoryPressureLevel.NORMAL
+    private val memoryBatch = MemoryPressureBatch()
 
     private val _health = MutableStateFlow(SystemHealthState())
     val healthFlow: StateFlow<SystemHealthState> = _health.asStateFlow()
@@ -254,15 +255,34 @@ class IntegrityMonitor @Inject constructor(
 
         hardwareSuite.setMaliAnomaly(maliAnomaly)
         
-        // Issue #1416: Memory Pressure Audit
-        val currentPressure = if (isMemorySimulated.get()) {
-            simulatedMemoryLevel.get()
-        } else {
-            when {
-                heap >= MEMORY_CRITICAL_THRESHOLD_MB -> MemoryPressureLevel.CRITICAL
-                heap >= MEMORY_PRESSURE_THRESHOLD_MB -> MemoryPressureLevel.HIGH
-                else -> MemoryPressureLevel.NORMAL
+        // Issue #SIMP-1013-1: Memory Pressure Hysteresis
+        val currentPressure: MemoryPressureLevel
+        var needsFlush = false
+        
+        if (isMemorySimulated.get()) {
+            currentPressure = simulatedMemoryLevel.get()
+            if (currentPressure != lastMemoryPressure) needsFlush = true
+        } else if (JdHardwareManager.isAvailable()) {
+            memoryBatch.apply {
+                heapMb = heap
+                pressureThresholdMb = MEMORY_PRESSURE_THRESHOLD_MB
+                criticalThresholdMb = MEMORY_CRITICAL_THRESHOLD_MB
+                hysteresisOffsetMb = MEMORY_HYSTERESIS_OFFSET_MB
             }
+            if (JdHardwareManager.processMemoryBatchNative(memoryBatch)) {
+                currentPressure = when (memoryBatch.currentLevel) {
+                    2 -> MemoryPressureLevel.CRITICAL
+                    1 -> MemoryPressureLevel.HIGH
+                    else -> MemoryPressureLevel.NORMAL
+                }
+                needsFlush = memoryBatch.needsFlush
+            } else {
+                currentPressure = evaluateMemoryPressureLegacy(heap)
+                if (currentPressure != lastMemoryPressure && currentPressure != MemoryPressureLevel.NORMAL) needsFlush = true
+            }
+        } else {
+            currentPressure = evaluateMemoryPressureLegacy(heap)
+            if (currentPressure != lastMemoryPressure && currentPressure != MemoryPressureLevel.NORMAL) needsFlush = true
         }
         
         if (currentPressure != lastMemoryPressure) {
@@ -271,6 +291,10 @@ class IntegrityMonitor @Inject constructor(
             if (currentPressure != MemoryPressureLevel.NORMAL) {
                 Timber.w("Memory Pressure Warning: Level $currentPressure (Heap: %.1f MB)".format(heap))
             }
+        }
+
+        if (needsFlush) {
+            domainEventBus.emit(CommandEvent.TriggerMemoryFlush)
         }
 
         updateHealth { h ->
@@ -314,6 +338,14 @@ class IntegrityMonitor @Inject constructor(
                     domainEventBus.emit(IntegrityEvent.ViolationResolved(ALERT_ID_PERFORMANCE_SPIKE))
                 }
             }
+        }
+    }
+
+    private fun evaluateMemoryPressureLegacy(heap: Double): MemoryPressureLevel {
+        return when {
+            heap >= MEMORY_CRITICAL_THRESHOLD_MB -> MemoryPressureLevel.CRITICAL
+            heap >= MEMORY_PRESSURE_THRESHOLD_MB -> MemoryPressureLevel.HIGH
+            else -> MemoryPressureLevel.NORMAL
         }
     }
 
@@ -739,6 +771,8 @@ class IntegrityMonitor @Inject constructor(
         repository.saveBooleanSync(IS_COOLING_MODE_ACTIVE_KEY, false)
         repository.saveLongSync(COOLING_ENTERED_RT_KEY, 0L)
         lastMemoryPressure = MemoryPressureLevel.NORMAL
+        memoryBatch.currentLevel = 0
+        memoryBatch.needsFlush = false
     }
 
     fun getBatteryLevel(): Int = currentHealth.batteryLevel

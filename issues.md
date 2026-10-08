@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct8.9
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct8.10
 
 ## 🎯 Current Resumption Focus: Strategic Hardening & Architectural Consolidation.
 
@@ -14,6 +14,7 @@
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #SIMP-1013-1: Memory Pressure Hysteresis.** Offloaded aggressive memory recovery criteria to JNI via `MemoryPressureBatch`. Implemented a 20MB native hysteresis window (`MEMORY_HYSTERESIS_OFFSET_MB`) to prevent "GC Thrashing" and state oscillation at the `CRITICAL` pressure boundary. Resolved Oct8.10.
 *   **Issue #SIMP-1012-3: Forensic Stability Audit.** Implemented SNR-based jammer discrimination in `ForensicAuditor`. Leveraged zero-allocation forensic SNR trails to distinguish between active jamming and signal blockage during recovery phases, refining the `LocationPendingReason` authority. Resolved Oct8.9.
 *   **Issue #SIMP-1012-2: Native Proximity Scaling.** Migrated environment-aware proximity debouncing and index calculation to JNI via `ProximityBatch`. Centralized proximity health authority, ensuring `HardwareSuite` strictly follows native decisions for stationary duration and thermal load scaling. Resolved Oct8.8.
 *   **Issue #SIMP-1012-1: Forensic Retrieval Optimization.** Refactored `CircularStateBuffer` and `HardwareSuite` to use `inline` callback-based iteration (`forEachMatch`, `forEachSnrSample`, etc.) for high-frequency telemetry retrieval. Achieved zero-allocation parity (R-ID 392) by eliminating `Sequence` and `Iterator` overhead. Resolved Oct8.8.
@@ -25,6 +26,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct8.10: [SOT Count: 329 (Rules: 176), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 72 (Sub-items: 360), QA: 651]**
 - **Oct8.9: [SOT Count: 328 (Rules: 175), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 71 (Sub-items: 355), QA: 646]**
 - **Oct8.8: [SOT Count: 327 (Rules: 174), Open: H:0, M:0, L:0, Ideas: H:0, M:1, L:0, Testing: 70 (Sub-items: 350), QA: 641]**
 - **Oct8.4: [SOT Count: 325 (Rules: 172), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 68 (Sub-items: 340), QA: 631]**

@@ -37,13 +37,12 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.8.10:
+ * - Issue #SIMP-1013-1: Memory Pressure Hysteresis. Added processMemoryBatch 
+ *   to nativeFastPathProvider (n24).
  * Oct.8.9:
  * - Issue #SIMP-1012-3: Forensic Stability Audit. Integrated evaluateSignalHealth 
  *   into updateLocationStatus to refine jammer suspicion using high-assurance SNR trails.
- * Oct.8.8:
- * - Issue #SIMP-1012-1: Forensic Retrieval Optimization. Migrated get*Samples 
- *   methods to inline callback-based iteration.
- * - Issue #SIMP-1012-2: Native Proximity Scaling. Refactored proximity handling.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -101,6 +100,10 @@ class HardwareSuite @Inject constructor(
 
         override fun processProximityBatch(batch: ProximityBatch): Boolean {
             return JdHardwareManager.processProximityBatchNative(batch)
+        }
+
+        override fun processMemoryBatch(batch: MemoryPressureBatch): Boolean {
+            return JdHardwareManager.processMemoryBatchNative(batch)
         }
     }
 

@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.8.10:
+ * - Issue #SIMP-1013-1: Memory Pressure Hysteresis. Added MemoryPressureBatch 
+ *   for native evaluation of GC flush criteria (n24).
  * Oct.8.5:
  * - Issue #SIMP-1012-2: Native Proximity Scaling. Added ProximityBatch DTO 
  *   for offloading environment-aware proximity debouncing to JNI.
@@ -428,6 +431,22 @@ class ProximityBatch {
 }
 
 /**
+ * MemoryPressureBatch: Data transfer object for JNI memory pressure evaluation (Issue #SIMP-1013-1).
+ */
+@Serializable
+class MemoryPressureBatch {
+    // Inputs
+    var heapMb: Double = 0.0
+    var pressureThresholdMb: Double = 0.0
+    var criticalThresholdMb: Double = 0.0
+    var hysteresisOffsetMb: Double = 0.0
+    
+    // Outputs
+    var currentLevel: Int = 0 // 0: Normal, 1: High, 2: Critical
+    var needsFlush: Boolean = false
+}
+
+/**
  * ForensicSample: Unified container for all forensic data points (Issue #SIMP-1011-3).
  */
 @Serializable
@@ -472,6 +491,7 @@ interface NativeFastPathProvider {
     fun processGnssBatch(batch: GnssHealthBatch): Boolean
     fun processAcousticBatch(batch: AcousticBatch, buffer: ShortArray): Boolean
     fun processProximityBatch(batch: ProximityBatch): Boolean
+    fun processMemoryBatch(batch: MemoryPressureBatch): Boolean
 }
 
 @Serializable

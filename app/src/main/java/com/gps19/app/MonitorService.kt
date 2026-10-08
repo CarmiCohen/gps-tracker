@@ -26,13 +26,14 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.8.10:
+ * - Issue #SIMP-1013-1: Memory Pressure Hysteresis. Refined observeIntegrityEvents 
+ *   to rely on CommandEvent.TriggerMemoryFlush for GC management, respecting 
+ *   native hysteresis logic.
  * Oct.8.2:
  * - Issue #SIMP-1007-17: Behavioral Reason Promotion. Ensured evaluationSnapshot 
  *   reflects promoted health reasons from ProcessedLocation before event emission 
  *   and alarm evaluation. Fixed syntax error in command routing.
- * Oct.7.7:
- * - Issue #SIMP-1007-16: Flag Propagation. Injected native anomaly flags from 
- *   HardwareSuiteLogicSnapshot into the evaluation monolith for alarm analysis.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -322,9 +323,8 @@ class MonitorService : BaseMonitorService() {
             .filterIsInstance<IntegrityEvent.MemoryPressureChanged>()
             .collect { event ->
                 memoryPressureLevel = event.level
-                if (event.level != MemoryPressureLevel.NORMAL) {
-                    performMemoryFlush()
-                }
+                // Oct.8.10: performMemoryFlush() call removed. Now driven by 
+                // CommandEvent.TriggerMemoryFlush via JNI hysteresis.
             }
     }
     
