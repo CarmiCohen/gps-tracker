@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.8.5:
+ * - Issue #SIMP-1012-2: Native Proximity Scaling. Added ProximityBatch DTO 
+ *   for offloading environment-aware proximity debouncing to JNI.
  * Oct.8.4:
  * - Issue #SIMP-1011-3: Forensic Buffer Consolidation. Merged EngineSnrSample, 
  *   EngineAcousticSample, and EngineSensorSnapshot into ForensicSample to reduce 
@@ -403,6 +406,28 @@ class AcousticBatch {
 }
 
 /**
+ * ProximityBatch: Data transfer object for JNI proximity processing (Issue #SIMP-1012-2).
+ */
+@Serializable
+class ProximityBatch {
+    // Inputs
+    var distance: Double = 0.0
+    var maxRange: Double = 0.0
+    var nowRt: Long = 0L
+    var isStationary: Boolean = false
+    var stationaryDurationMs: Long = 0L
+    var isHighLoad: Boolean = false
+    var currentIdx: Double = 0.0
+    var rawNear: Boolean = false
+    var isFlickering: Boolean = false
+
+    // Outputs
+    var nextIdx: Double = 0.0
+    var nextRawNear: Boolean = false
+    var debounceMs: Long = 0L
+}
+
+/**
  * ForensicSample: Unified container for all forensic data points (Issue #SIMP-1011-3).
  */
 @Serializable
@@ -446,6 +471,7 @@ interface NativeFastPathProvider {
     fun processVibrationBatch(batch: VibrationBatch): Boolean
     fun processGnssBatch(batch: GnssHealthBatch): Boolean
     fun processAcousticBatch(batch: AcousticBatch, buffer: ShortArray): Boolean
+    fun processProximityBatch(batch: ProximityBatch): Boolean
 }
 
 @Serializable

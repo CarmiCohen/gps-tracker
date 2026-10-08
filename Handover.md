@@ -1,28 +1,30 @@
-# Handover: Hardening Process - Oct8.3
+# Handover: Hardening Process - Oct8.4
 
 ## 🎯 Current Status
-Successfully implemented Native GNSS Batching (#SIMP-1011-1), offloading satellite status evaluation and SNR averaging to JNI.
+Successfully implemented **Acoustic JNI Offloading** (#SIMP-1011-2) and **Forensic Buffer Consolidation** (#SIMP-1011-3). The JVM mathematical footprint in the 44.1kHz audio and 100Hz sensor paths has been significantly reduced.
 
-## 🛠️ Changes Performed (Oct8.3)
+## 🛠️ Changes Performed (Oct8.4)
 1.  **HardwareSuite.kt**:
-    *   Migrated `satellitesUsed` and `averageSnr` calculation from JVM loops to `GnssHealthBatch` processing.
-    *   Implemented manual fallback for environments where JNI is unavailable.
+    *   Replaced `snrBuffer` and `sensorBuffer` with a single `forensicBuffer` (capacity: 1024) using the consolidated `ForensicSample`.
+    *   Migrated iterative `AudioRecord` RMS and Peak calculation to JNI via `AcousticBatch`.
+    *   Refactored sensor callbacks to record telemetry into the unified buffer.
 2.  **JdHardwareManager.kt**:
-    *   Expanded `sharedStateBuffer` to 1024 bytes.
-    *   Implemented `processGnssBatchNative` to pack 64 satellite slots and read back consolidated metrics.
+    *   Implemented `processAcousticBatchNative` (mapping to native `n22`) for offloading RMS/Peak evaluation and motion-aware spike detection.
 3.  **EngineModels.kt**:
-    *   Added `GnssHealthBatch` DTO.
+    *   Merged `EngineSnrSample`, `EngineAcousticSample`, and `EngineSensorSnapshot` into `ForensicSample`.
+    *   Added `AcousticBatch` DTO for native buffer processing.
     *   Expanded `NativeFastPathProvider` interface.
 4.  **Architecture**:
-    *   Rule **1.143 (R-ID 681)** added to SOT Master.
+    *   Rule **1.144 (R-ID 682)** added to SOT Master: Mandating native offloading for high-frequency audio buffers.
 5.  **Versioning**:
-    *   Version incremented to `Oct8.3` (Code: 1151).
+    *   Version incremented to `Oct8.4` (Code: 1152).
 
 ## 🔜 Next Steps
-1.  **Acoustic JNI Offloading**: Evaluate moving AudioRecord RMS/Peak logic to JNI to further reduce JVM interrupts (#SIMP-1011-2).
-2.  **Forensic Buffer Consolidation**: Simplify forensic sample classes to reduce memory fragmentation (#SIMP-1011-3).
+1.  **Forensic Retrieval Optimization**: Review `forensicSequence` usage in `MonitorService` to ensure zero-allocation parity with the new consolidated buffer structure.
+2.  **Native Proximity Scaling**: Evaluate migrating adaptive proximity debounce logic (#SIMP-1012-1) to JNI to further centralize environment health authority.
 
 ## 📍 Forensic State Snapshot
-*   **SIMP-1011-1 Progress**: 100% complete.
-*   **Version**: Oct8.3
-*   **Active Focus**: JVM Decoupling & Native Math Offloading.
+*   **SIMP-1011-2 Progress**: 100% complete.
+*   **SIMP-1011-3 Progress**: 100% complete.
+*   **Version**: Oct8.4
+*   **Active Focus**: Memory Footprint Optimization & Unified Forensic Telemetry.
