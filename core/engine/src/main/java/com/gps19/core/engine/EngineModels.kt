@@ -9,11 +9,9 @@ import java.util.concurrent.ConcurrentHashMap
  * Oct.8.15:
  * - Issue #SIMP-IDEA-3: Standardized on @NotNull native providers. Added 
  *   computeAdaptiveAcousticAlpha to NativeFastPathProvider.
- * Oct.8.12:
- * - Issue #SIMP-1014-2: Unified SystemPressureBatch. Consolidated Memory and 
- *   Storage pressure evaluation into a single JNI crossing (SIMP-IDEA-2).
- *   Removed deprecated MemoryPressureBatch and StoragePressureBatch.
- *   Fixed syntax regressions in AlarmEvaluationState and ForensicSample.
+ * - Fixed syntax regressions (accidental spaces in identifiers).
+ * - Consolidated redundant definitions and restored missing classes for build parity.
+ * - Fixed ProcessorEvent hierarchy override logic.
  */
 
 @Serializable
@@ -73,7 +71,7 @@ data class HardwareCapabilities(
     val hasBackgroundRestriction: Boolean = false,
     val backgroundStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
     val autostartStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
-    val requires WakeLockRenewal: Boolean = false,
+    val requiresWakeLockRenewal: Boolean = false,
     val requiresExtraTopPadding: Boolean = false,
     val isManualOverrideActive: Boolean = false,
     val isA15Device: Boolean = false,
@@ -256,7 +254,7 @@ class AlarmEvaluationState {
     var trackerSpeed: Double = 0.0
     var trackerBattery: Int = 0
     var trackerTemp: Double = 0.0
-    var first ViolationTs: Long = 0L
+    var firstViolationTs: Long = 0L
     var firstViolationRt: Long = 0L
     var firstViolationWasJump: Boolean = false
     var wasDistanceViolated: Boolean = false
@@ -621,3 +619,298 @@ class ProximityBatch {
     var nextRawNear: Boolean = false
     var debounceMs: Long = 0L
 }
+
+interface Locatable {
+    var isLocationPending: Boolean
+    var locationPendingReason: LocationPendingReason
+    var lat: Double
+    var lng: Double
+    var alt: Double
+    var gpsTs: Long
+    var ts: Long
+    var rt: Long
+}
+
+interface SpatialAnchor {
+    var lat: Double
+    var lng: Double
+    var alt: Double
+    var gpsTs: Long
+}
+
+interface BatteryProvider {
+    var battery: Int
+    var isCharging: Boolean
+}
+
+interface DeviceIdentity {
+    var trackerId: String
+    var viewerId: String
+}
+
+@Serializable
+sealed class DomainEvent {
+    abstract val priority: EventPriority
+    
+    @Serializable
+    data class TickEvaluated(val update: LocationUpdate, val isTrackerMode: Boolean, val isPeerActive: Boolean, val serviceTickCounter: Long) : DomainEvent() {
+        override val priority = EventPriority.NORMAL
+    }
+    @Serializable
+    data class ServiceStatus(val message: String, val isImportant: Boolean = false) : DomainEvent() {
+        override val priority = if (isImportant) EventPriority.HIGH else EventPriority.LOW
+    }
+    @Serializable
+    data class StabilityViolation(val message: String, val isJitter: Boolean, val lat: Double = 0.0, val lng: Double = 0.0, val accuracy: Double = 0.0) : DomainEvent() {
+        override val priority = EventPriority.HIGH
+    }
+    @Serializable
+    data class HeuristicRecovery(val message: String, val gapMs: Long, val lat: Double = 0.0, val lng: Double = 0.0, val accuracy: Double = 0.0) : DomainEvent() {
+        override val priority = EventPriority.HIGH
+    }
+    @Serializable
+    data class PowerSaveTransition(val isEngaged: Boolean) : DomainEvent() {
+        override val priority = EventPriority.NORMAL
+    }
+    @Serializable
+    data class PeerConnectionChanged(val isConnected: Boolean, val peerId: String) : DomainEvent() {
+        override val priority = EventPriority.HIGH
+    }
+    @Serializable
+    data class PeerStatusReceived(val status: LocationUpdate) : DomainEvent() {
+        override val priority = EventPriority.NORMAL
+    }
+}
+
+enum class EventPriority { LOW, NORMAL, HIGH }
+
+@Serializable
+class GnssDetail(
+    val satellites: List<SatelliteInfo> = emptyList()
+)
+
+@Serializable
+class SatelliteInfo(
+    val svid: Int,
+    val cn0: Double,
+    val usedInFix: Boolean,
+    val constellation: Int
+)
+
+sealed class ProcessorEvent : DomainEvent() {
+    override val priority = EventPriority.NORMAL
+    abstract val isPrimary: Boolean
+
+    data class LocationProcessed(val update: LocationUpdate) : ProcessorEvent() {
+        override val isPrimary: Boolean = true
+    }
+    data class LogAdded(val message: String, val type: String, val isImportant: Boolean, val isSpecial: Boolean, val lat: Double, val lng: Double, val accuracy: Double, val forensic: ForensicSnapshot, override val isPrimary: Boolean) : ProcessorEvent()
+    data class VibrationFloorChanged(val floor: Double, override val isPrimary: Boolean) : ProcessorEvent()
+    data class LuxBaselineChanged(val baseline: Double, override val isPrimary: Boolean) : ProcessorEvent()
+    data class AcousticFloorChanged(val floor: Double, override val isPrimary: Boolean) : ProcessorEvent()
+    data class ChairBaselineChanged(val baseline: Double, override val isPrimary: Boolean) : ProcessorEvent()
+    data class MaxAccuracyChanged(val accuracy: Double, override val isPrimary: Boolean) : ProcessorEvent()
+    data class TrailPointSaved(val lat: Double, val lng: Double, val isViewerTrail: Boolean, val status: SentinelStatus, val timestamp: Long, val accuracy: Double, val maxAccuracy: Double, override val isPrimary: Boolean) : ProcessorEvent()
+    data class GpsStallDetected(val rt: Long, override val isPrimary: Boolean) : ProcessorEvent()
+}
+
+sealed class AlarmEvent : DomainEvent() {
+    override val priority = EventPriority.HIGH
+    
+    data class LogEvent(val message: String, val type: String, val isImportant: Boolean, val extremeValue: Double, val logId: String?, val durationMs: Long, val isSpecial: Boolean, val specialColor: Int?, val lat: Double, val lng: Double, val accuracy: Double, val maxAccuracy: Double, val forensic: ForensicSnapshot) : AlarmEvent()
+}
+
+sealed class IntegrityEvent : DomainEvent() {
+    override val priority = EventPriority.HIGH
+    
+    data class ViolationSustained(val type: String) : IntegrityEvent()
+    data class ViolationResolved(val type: String) : IntegrityEvent()
+    data class LogEvent(val message: String, val isImportant: Boolean = false) : IntegrityEvent()
+    data class LocationStatusChanged(val status: LocationStatus) : IntegrityEvent()
+    data class GnssThrottledChanged(val isThrottled: Boolean) : IntegrityEvent()
+    data class MemoryPressureChanged(val level: MemoryPressureLevel, val heapMb: Double) : IntegrityEvent()
+    data class StoragePressureChanged(val isLow: Boolean, val isCritical: Boolean, val availableMb: Long) : IntegrityEvent()
+}
+
+sealed class ConnectivityEvent : DomainEvent() {
+    override val priority = EventPriority.NORMAL
+    
+    data class PeerPulse(val peerId: String) : ConnectivityEvent()
+}
+
+sealed class HistoryEvent : DomainEvent() {
+    override val priority = EventPriority.LOW
+    
+    data class LogEvent(val message: String, val isImportant: Boolean = false) : HistoryEvent()
+}
+
+sealed class AppSensorEvent : DomainEvent() {
+    override val priority = EventPriority.HIGH
+    
+    data class HardwareFailure(val reason: String) : AppSensorEvent()
+    data class LogEvent(val message: String, val isImportant: Boolean = false) : AppSensorEvent()
+}
+
+sealed class CommandEvent : DomainEvent() {
+    override val priority = EventPriority.HIGH
+    
+    object ResetTimers : CommandEvent()
+    object TriggerMemoryFlush : CommandEvent()
+    object TriggerStoragePrune : CommandEvent()
+    object WatchdogTrigger : CommandEvent()
+    object UiPulse : CommandEvent()
+    object SyncSensors : CommandEvent()
+    data class UiVisibilityChanged(val isVisible: Boolean) : CommandEvent()
+}
+
+sealed class RevivalEvent : DomainEvent() {
+    override val priority = EventPriority.HIGH
+    
+    data class Footprint(val deltaMa: Int, val deltaTemp: Double, val durationMs: Long) : RevivalEvent()
+    object HardwareLock : RevivalEvent()
+    data class Attempt(val count: Int) : RevivalEvent()
+    object Success : RevivalEvent()
+    object RawBurstStarted : RevivalEvent()
+    object RawBurstEnded : RevivalEvent()
+}
+
+class SystemHealthReport(
+    val reports: MutableList<ViolationReport> = MutableList(32) { ViolationReport() }
+) {
+    var size: Int = 0
+    fun getOrCreate(index: Int): ViolationReport {
+        while (reports.size <= index) { reports.add(ViolationReport()) }
+        if (index >= size) size = index + 1
+        return reports[index]
+    }
+    fun truncate(newSize: Int) {
+        size = newSize
+    }
+}
+
+class ViolationReport {
+    var type: String = ""
+    var title: String = ""
+    var subtitle: String = ""
+    var conditionMet: Boolean = false
+    var technicalDetails: String? = null
+    var extremeValue: Double = 0.0
+    
+    fun update(type: String, title: String, subtitle: String, conditionMet: Boolean, technicalDetails: String? = null, extremeValue: Double = 0.0) {
+        this.type = type; this.title = title; this.subtitle = subtitle; this.conditionMet = conditionMet
+        this.technicalDetails = technicalDetails; this.extremeValue = extremeValue
+    }
+}
+
+class JumpConfidence {
+    var tier: Int = 0
+    var isJump: Boolean = false
+    var isOutlier: Boolean = false
+    var isAdaptiveJump: Boolean = false
+    var score: Int = 0
+    var reason: String? = null
+    
+    fun reset() {
+        tier = 0; isJump = false; isOutlier = false; isAdaptiveJump = false; score = 0; reason = null
+    }
+}
+
+enum class RibbonScale(val intervalSeconds: Int) { 
+    FOUR_MIN(60), 
+    SIXTEEN_MIN(240), 
+    ONE_HOUR(900), 
+    FOUR_HOUR(3600), 
+    TWENTY_FOUR_HOUR(21600), 
+    SEVEN_DAY(86400) 
+}
+
+class ProcessedLocation {
+    var rawPoint: EngineGeoPoint? = null
+    var optimizedPoint: EngineGeoPoint? = null
+    var status: SentinelStatus = SentinelStatus.VALID
+    var maxAccuracy: Double = 0.0
+    var currentAccuracy: Double = 0.0
+    var filteredSpeed: Double = 0.0
+    var timestamp: Long = 0L
+    var rt: Long = 0L
+    var isStalled: Boolean = false
+    var isClockRegression: Boolean = false
+    var receiptRt: Long = 0L
+    var isTrajectoryPromoted: Boolean = false
+    var jumpTier: Int = 0
+    var isAdaptiveJump: Boolean = false
+    var distToHome: Double? = null
+    var isSpatiallyValid: Boolean = false
+    var geofenceViolationDetected: Boolean = false
+    var tamperDetected: Boolean = false
+    var jammerDetected: Boolean = false
+    var isAnchorLocked: Boolean = false
+    var suppressionNote: String? = null
+    var kineticEnergy: Double = 0.0
+    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
+    
+    fun reset() {
+        rawPoint = null; optimizedPoint = null; status = SentinelStatus.VALID
+        maxAccuracy = 0.0; currentAccuracy = 0.0; filteredSpeed = 0.0
+        timestamp = 0L; rt = 0L; isStalled = false; isClockRegression = false
+        receiptRt = 0L; isTrajectoryPromoted = false; jumpTier = 0
+        isAdaptiveJump = false; distToHome = null; isSpatiallyValid = false
+        geofenceViolationDetected = false; tamperDetected = false; jammerDetected = false
+        isAnchorLocked = false; suppressionNote = null; kineticEnergy = 0.0
+        locationPendingReason = LocationPendingReason.NONE
+    }
+}
+
+class SentinelResult {
+    var status: SentinelStatus = SentinelStatus.VALID
+    var reason: String? = null
+    var jumpConfidence: JumpConfidence? = null
+    var optimizedPoint: EngineGeoPoint? = null
+    var promotedPoints: List<EngineGeoPoint>? = null
+    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
+    var suppressionNote: String? = null
+    
+    fun reset(status: SentinelStatus = SentinelStatus.VALID) {
+        this.status = status
+        reason = null
+        jumpConfidence?.reset()
+        optimizedPoint = null
+        promotedPoints = null
+        locationPendingReason = LocationPendingReason.NONE
+        suppressionNote = null
+    }
+}
+
+class TrajectoryNode {
+    var lat: Double = 0.0
+    var lng: Double = 0.0
+    var alt: Double = 0.0
+    var accuracy: Double = 0.0
+    var maxAccuracy: Double = 0.0
+    var bearing: Double = 0.0
+    var speedMps: Double = 0.0
+    var ts: Long = 0L
+    var rt: Long = 0L
+    var vibe: Double = 0.0
+
+    fun update(lat: Double, lng: Double, alt: Double, acc: Double, maxAcc: Double, bearing: Double, speed: Double, ts: Long, rt: Long, vibe: Double) {
+        this.lat = lat; this.lng = lng; this.alt = alt; this.accuracy = acc; this.maxAccuracy = maxAcc
+        this.bearing = bearing; this.speedMps = speed; this.ts = ts; this.rt = rt; this.vibe = vibe
+    }
+
+    fun reset() {
+        lat = 0.0; lng = 0.0; alt = 0.0; accuracy = 0.0; maxAccuracy = 0.0
+        bearing = 0.0; speedMps = 0.0; ts = 0L; rt = 0L; vibe = 0.0
+    }
+}
+
+class RejectedPoint(
+    val lat: Double,
+    val lng: Double,
+    val alt: Double,
+    val accuracy: Double,
+    val bearing: Double,
+    val speedMps: Double,
+    val ts: Long,
+    val rt: Long
+)

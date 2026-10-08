@@ -4,18 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
- * Oct.7.7:
- * - Issue #SIMP-1007-16: Flag Propagation. Integrated native isSuspiciousNoise and 
- *   isMemoryPressureThrottled flags for HUD and decision logic.
- * Oct.7.4:
- * - Issue #SIMP-1007-15: Unified Snapshot Container. Migrated thermalSnapshot 
- *   and heapSnapshot into ForensicSnapshot container for architectural parity.
- * Oct.5.2:
- * - Issue #1344: Forensic Diagnostic Expansion. Added thermalSnapshot and 
- *   heapSnapshot for high-fidelity correlation with GPS stalls (R1344).
- * Oct.3.1:
- * - Issue #1420: Granular HUD Binding. Implemented Locatable interface to 
- *   support decoupled UI slicing and automated HUD status projection.
+ * Oct.8.15:
+ * - Issue #SIMP-1015-1: Build Parity. Implemented full Locatable interface 
+ *   to resolve compilation errors from model consolidation.
  */
 @Serializable
 class SystemHealthState(
@@ -36,8 +27,16 @@ class SystemHealthState(
     var micPending: Boolean = false,
     var isPowerTamper: Boolean = false,
     var isClockRegression: Boolean = false,
+    
     override var isLocationPending: Boolean = false,
     override var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    override var lat: Double = 0.0,
+    override var lng: Double = 0.0,
+    override var alt: Double = 0.0,
+    override var gpsTs: Long = 0L,
+    override var ts: Long = 0L,
+    override var rt: Long = 0L,
+    
     var lastValidFixRt: Long = 0L,
     var lastLocationPendingDurationMs: Long = 0L,
     var isPowerSaveMode: Boolean = false,
@@ -136,7 +135,6 @@ class SystemHealthState(
         get() = forensic.heap
         set(value) { forensic.heap = value }
 
-    // Oct.7.7 Delegates
     var isSuspiciousNoise: Boolean
         get() = forensic.isSuspiciousNoise
         set(value) { forensic.isSuspiciousNoise = value }
@@ -164,6 +162,12 @@ class SystemHealthState(
         this.isClockRegression = other.isClockRegression
         this.isLocationPending = other.isLocationPending
         this.locationPendingReason = other.locationPendingReason
+        this.lat = other.lat
+        this.lng = other.lng
+        this.alt = other.alt
+        this.gpsTs = other.gpsTs
+        this.ts = other.ts
+        this.rt = other.rt
         this.lastValidFixRt = other.lastValidFixRt
         this.lastLocationPendingDurationMs = other.lastLocationPendingDurationMs
         this.isPowerSaveMode = other.isPowerSaveMode
@@ -263,7 +267,8 @@ class SystemHealthState(
         thermalHeadroom: Double = 0.0, heapAllocatedMb: Double = 0.0,
         thermalSnapshot: Double? = null, heapSnapshot: Double? = null,
         isSuspiciousNoise: Boolean = false, isMemoryPressureThrottled: Boolean = false,
-        activityType: ActivityType = ActivityType.UNKNOWN
+        activityType: ActivityType = ActivityType.UNKNOWN,
+        lat: Double = 0.0, lng: Double = 0.0, alt: Double = 0.0, gpsTs: Long = 0L, ts: Long = 0L, rt: Long = 0L
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -322,6 +327,12 @@ class SystemHealthState(
         this.tamperNote = tamperNote
         this.coolingEnteredRt = coolingEnteredRt
         this.activityType = activityType
+        this.lat = lat
+        this.lng = lng
+        this.alt = alt
+        this.gpsTs = gpsTs
+        this.ts = ts
+        this.rt = rt
     }
     
     fun reset() {
@@ -344,6 +355,7 @@ class SystemHealthState(
         isClockRegression = false
         isLocationPending = false
         locationPendingReason = LocationPendingReason.NONE
+        lat = 0.0; lng = 0.0; alt = 0.0; gpsTs = 0L; ts = 0L; rt = 0L
         lastValidFixRt = 0L
         lastLocationPendingDurationMs = 0L
         isPowerSaveMode = false
