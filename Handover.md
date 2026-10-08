@@ -1,24 +1,28 @@
-# Forensic Handover (Oct7.10 - SNR DECAY MODELING)
+# Handover: Hardening Process - Oct7.11
 
-## 🎯 Current System State
-*   **Version**: `Oct7.10` | **versionCode**: `1147` | **Status**: 🟢 **STABLE / NATIVE REFINED**.
-*   **SNR Decay Modeling (#SIMP-1010-3)**:
-    *   **Native Logic**: Implemented SNR-Vibration correlation in JNI (`n19`). The native layer now distinguishes electronic jamming from mechanical interference by checking if SNR drops (< 18dB) occur during low-vibration intervals.
-    *   **Sentinel Integration**: `LocationSentinel` now consumes the `isJammingCandidate` flag to transition the engine into `JAMMER_SUSPICION` state.
-    *   **Architecture**: Expanded `VibrationBatch` and `ForensicSnapshot` to carry the jammer candidate flag across the telemetry pipeline.
-*   **Audit Record**:
-    *   Modified: `jdhardware-jni.cpp`, `JdHardwareManager.kt`, `HardwareSuite.kt`.
-    *   Modified: `EngineModels.kt`, `LocationUpdate.kt`, `LocationSentinel.kt`.
-    *   Modified: `app/build.gradle`, `issues.md`, `SOT_MASTER_REQUIREMENTS.md`, `RESOLUTION_ARCHIVE.md`.
+## 🎯 Current Status
+Consolidating redundant location pending logic between `HardwareSuite` and `SentinelValidator` (#SIMP-1007-17).
 
-## 🚀 Resumption Action Path (Next Step)
-1.  **Strategic Simplification**: Consolidate redundant location pending logic between `HardwareSuite` and `SentinelValidator` (#SIMP-1007-17).
-2.  **Trajectory Smoothing**: Evaluate native-side Kalman refinement for the 100Hz path to further reduce JVM jitter evaluation.
+## 🛠️ Changes Performed (Oct7.11)
+1.  **HardwareSuite.kt**:
+    *   Migrated GNSS health evaluation to `SentinelValidator.evaluateLocationPendingReason`.
+    *   Integrated `isJammingCandidate` into the unified `LocationStatus` evaluation loop.
+    *   Purged redundant manual `SIGNAL_LOSS`/`GPS_STALL`/`GPS_GAP` logic.
+2.  **SentinelValidator.kt**:
+    *   Added `evaluateLocationPendingReason` to centralize GNSS and behavioral health status.
+    *   Added `getReasonPriority` and `getHigherPriorityReason` to handle overlapping health issues.
+3.  **TelemetryAggregator.kt**:
+    *   Updated ribbon aggregation to use centralized `SentinelValidator.getHigherPriorityReason`.
+4.  **LocationSentinel.kt**:
+    *   Ensured `checkPhysicalTamperInternal` returns `JAMMER_SUSPICION` when native jamming is detected.
+    *   Consolidated reason strings for behavioral rejections.
 
----
+## 🔜 Next Steps
+1.  **LocationProcessor Promotion**: Ensure `LocationProcessor.processGpsPoint` promotes behavioral rejections (Acoustic, Tamper, Jammer) from `SentinelResult` into the `LocationUpdate.locationPendingReason`.
+2.  **Telemetry Integration**: Verify that `MonitorService` correctly propagates the promoted reasons to the telemetry pipeline.
+3.  **Integrity Audit**: Finalize metrics and release the version.
 
-## 📊 Hardening Progress Dashboard (Oct7.10)
-- **Oct7.10: [SNR Decay Modeling: Implemented native SNR-Vibration correlation to distinguish electronic jamming from mechanical interference during signal drops (#SIMP-1010-3).]**
-- **Oct7.9: [Muzzle Hysteresis Native Offloading: Migrated stationary duration tracking and muzzle reset triggers to JNI to eliminate JVM-side 100Hz timestamp tracking (#SIMP-1010-2).]**
-- **Oct7.8: [Adaptive Acoustic Gating: Implemented native motion-aware alpha adjustment (n20) to suppress acoustic triggers during high-vibration intervals (#SIMP-1010-1).]**
-- **Oct7.7: [Flag Propagation: Integrated native anomaly and memory stress flags across evaluation monolith and signaling protocol (#SIMP-1007-16, #SIMP-1007-17).]**
+## 📍 Forensic State Snapshot
+*   **SIMP-1007-17 Progress**: ~80% complete.
+*   **Version**: Oct7.11
+*   **Active Focus**: Strategic Simplification & Redundancy Consolidation.

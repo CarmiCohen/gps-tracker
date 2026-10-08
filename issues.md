@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct7.10
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct7.11
 
 ## 🎯 Current Resumption Focus: Strategic Simplification & Redundancy Consolidation.
 
@@ -9,11 +9,12 @@
 ---
 
 ## 💡 Strategic Simplification Ideas (Ideas: 1)
-*   **ID: SIMP-1007-17 [Low]**: Consolidate redundant location pending logic between HardwareSuite and SentinelValidator now that JNI batching covers state evaluation.
+*   **ID: SIMP-1011-1 [Low]**: Migrate remaining manual GNSS status checks in `HardwareSuite` (like `satellitesUsed` logic) into a native `GnssHealthBatch` to further decouple the JVM from hardware state evaluation.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #SIMP-1007-17: Strategic Simplification.** Consolidated redundant location pending logic between `HardwareSuite` and `SentinelValidator`. Centralized GNSS and behavioral health evaluation in `SentinelValidator`. Resolved Oct7.11.
 *   **Issue #SIMP-1010-3: SNR Decay Modeling.** Native correlation of SNR vs Vibration to distinguish jamming from mechanical interference. Resolved Oct7.10.
 *   **Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading.** Migrate remaining `stationaryStartRt` and muzzle logic to JNI to further reduce JVM overhead in the 100Hz path. Resolved Oct7.9.
 *   **Issue #SIMP-1010-1: Adaptive Acoustic Gating.** Implement native logic to adjust the `ACOUSTIC_EMA` alpha based on `vibrationRollingSum`. Resolved Oct7.8.
@@ -25,6 +26,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct7.11: [SOT Count: 319 (Rules: 170), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 64 (Sub-items: 320), QA: 611]**
 - **Oct7.10: [SOT Count: 318 (Rules: 169), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 63 (Sub-items: 315), QA: 606]**
 - **Oct7.9: [SOT Count: 317 (Rules: 168), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 62 (Sub-items: 310), QA: 601]**
 - **Oct7.8: [SOT Count: 316 (Rules: 167), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 61 (Sub-items: 305), QA: 596]**

@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.7.11:
+ * - Issue #SIMP-1007-17: Strategic Simplification. Added locationPendingReason 
+ *   to SentinelResult and ProcessedLocation for unified health propagation.
  * Oct.7.10:
  * - Issue #SIMP-1010-3: SNR Decay Modeling. Added isJammingCandidate to 
  *   VibrationBatch and SentinelForensicState for native jammer discrimination.
@@ -443,6 +446,9 @@ class ProcessedLocation {
     var isAnchorLocked: Boolean = false
     var suppressionNote: String? = null
     var kineticEnergy: Double = 0.0
+    
+    // Oct.7.11: Promoted pending reason
+    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
 
     fun reset() {
         status = SentinelStatus.VALID
@@ -465,6 +471,7 @@ class ProcessedLocation {
         isAnchorLocked = false
         suppressionNote = null
         kineticEnergy = 0.0
+        locationPendingReason = LocationPendingReason.NONE
         rawPoint.update(0.0, 0.0)
         optimizedPoint.update(0.0, 0.0)
     }
@@ -492,6 +499,7 @@ class ProcessedLocation {
         this.isAnchorLocked = other.isAnchorLocked
         this.suppressionNote = other.suppressionNote
         this.kineticEnergy = other.kineticEnergy
+        this.locationPendingReason = other.locationPendingReason
     }
 }
 
@@ -764,11 +772,15 @@ class EngineSensorSnapshot(
 class SentinelResult(
     var status: SentinelStatus = SentinelStatus.VALID, var reason: String = "",
     var optimizedPoint: EngineGeoPoint? = null, var jumpConfidence: JumpConfidence? = null,
-    var suppressionNote: String? = null, var promotedPoints: List<EngineGeoPoint>? = null
+    var suppressionNote: String? = null, var promotedPoints: List<EngineGeoPoint>? = null,
+    
+    // Oct.7.11: Behaviorally Promoted Pending Reason
+    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
 ) {
     fun reset(status: SentinelStatus = SentinelStatus.VALID) {
         this.status = status; this.reason = ""; this.optimizedPoint = null
         this.jumpConfidence?.reset(); this.suppressionNote = null; this.promotedPoints = null
+        this.locationPendingReason = LocationPendingReason.NONE
     }
 
     fun copyFrom(other: SentinelResult) {
@@ -782,6 +794,7 @@ class SentinelResult(
         }
         this.suppressionNote = other.suppressionNote
         this.promotedPoints = other.promotedPoints?.toList()
+        this.locationPendingReason = other.locationPendingReason
     }
 }
 

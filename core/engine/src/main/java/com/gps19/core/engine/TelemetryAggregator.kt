@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * TelemetryAggregator: Optimized logic for processing forensic ribbons.
+ * Oct.7.11:
+ * - Issue #SIMP-1007-17: Consolidated redundant priority logic into 
+ *   SentinelValidator.
  * Oct.7.4:
  * - Issue #SIMP-1007-15: Unified Snapshot Container. Migrated aggregation 
  *   logic to use ForensicSnapshot container for architectural parity.
@@ -12,9 +15,6 @@ import kotlin.math.*
  * - Issue #QA-1006-12: Forensic Hardening. Integrated safeDouble into 
  *   MutableAggregationPoint to ensure NaN/Infinity values are sanitized 
  *   during aggregation and final write-out to connection history entities.
- * Oct.5.2:
- * - Issue #1344: Forensic Diagnostic Expansion. Integrated thermalHeadroom, 
- *   heapAllocatedMb, and ActivityType into aggregation logic (R1344).
  */
 class TelemetryAggregator {
 
@@ -136,7 +136,10 @@ class TelemetryAggregator {
             speed = safeDouble(max(speed, cur.speed))
             if (cur.hasGps) bearing = safeDouble(cur.bearing)
             currentMa = min(currentMa, cur.currentMa)
-            locationPendingReason = getHigherPriorityReason(locationPendingReason, cur.locationPendingReason)
+            
+            // Oct.7.11: Use centralized priority logic
+            locationPendingReason = SentinelValidator.getHigherPriorityReason(locationPendingReason, cur.locationPendingReason)
+            
             gpsIndex = safeDouble(min(gpsIndex, cur.gpsIndex))
             noiseIdx = safeDouble(max(noiseIdx, cur.noiseIdx))
             luxIdx = safeDouble(max(luxIdx, cur.luxIdx))
@@ -226,23 +229,6 @@ class TelemetryAggregator {
 
     private companion object {
         private const val MONOTONIC_JITTER_TOLERANCE_MS = 2000L
-
-        private fun getReasonPriority(reason: LocationPendingReason): Int {
-            return when (reason) {
-                LocationPendingReason.NONE -> 0
-                LocationPendingReason.GPS_GAP -> 1
-                LocationPendingReason.SIGNAL_LOSS -> 2
-                LocationPendingReason.GPS_STALL -> 3
-                LocationPendingReason.ACOUSTIC_VIOLATION -> 4
-                LocationPendingReason.JAMMER_SUSPICION -> 5
-            }
-        }
-        private fun getHigherPriorityReason(r1: LocationPendingReason, r2: LocationPendingReason): LocationPendingReason {
-            if (r1 == r2) return r1
-            val p1 = getReasonPriority(r1)
-            val p2 = getReasonPriority(r2)
-            return if (p2 >= p1) r2 else r1
-        }
 
         private fun isScaleTick(scale: RibbonScale, totalSeconds: Int): Boolean {
             return when (scale) {

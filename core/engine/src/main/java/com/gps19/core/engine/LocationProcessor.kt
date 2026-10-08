@@ -5,14 +5,13 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Oct.7.11:
+ * - Issue #SIMP-1007-17: Strategic Simplification. Promoted locationPendingReason 
+ *   from SentinelResult into ProcessedLocation to centralize behavioral health propagation.
  * Oct.7.6:
  * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated LogAdded event 
  *   emission to utilize unified ForensicSnapshot container, resolving 
  *   compilation regressions from Oct7.5 container migration.
- * Oct.4.6:
- * - Issue #1160: Flyweight & Pooling Expansion. Migrated processed location 
- *   generation to EnginePools.PROCESSED_LOCATION and EnginePools.GEO_POINT 
- *   to eliminate per-tick allocations (R1160).
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider,
@@ -283,6 +282,7 @@ class LocationProcessor(
                     this.tamperDetected = update.integrity.isTamperDetected
                     this.jammerDetected = update.integrity.isJammer
                     this.kineticEnergy = update.kinetic.kineticEnergy
+                    this.locationPendingReason = LocationPendingReason.NONE
                 }
             }
 
@@ -308,6 +308,7 @@ class LocationProcessor(
                         this.tamperDetected = update.integrity.isTamperDetected
                         this.jammerDetected = update.integrity.isJammer
                         this.kineticEnergy = update.kinetic.kineticEnergy
+                        this.locationPendingReason = LocationPendingReason.NONE
                     }
                 }
             }
@@ -403,6 +404,7 @@ class LocationProcessor(
                     this.jammerDetected = finalIsJammer
                     this.suppressionNote = finalSuppressionNote
                     this.kineticEnergy = if (isLocal) state.kineticEnergy else update.kinetic.kineticEnergy
+                    this.locationPendingReason = sentinelResult.locationPendingReason
                 }
             }
 
@@ -498,6 +500,7 @@ class LocationProcessor(
                 this.isAnchorLocked = isAnchorLockedNow
                 this.suppressionNote = finalSuppressionNote
                 this.kineticEnergy = if (isLocal) state.kineticEnergy else update.kinetic.kineticEnergy
+                this.locationPendingReason = sentinelResult.locationPendingReason
             }
         }
     }

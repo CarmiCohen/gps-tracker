@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct7.10)
+# SOT Master Requirements & Hardening Status (Oct7.11)
 
-## 🏗️ Architectural Master Rules (169 Rules)
+## 🏗️ Architectural Master Rules (170 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -12,10 +12,12 @@
 *   **1.139 Adaptive Acoustic Gating (R-ID 655)**: Environmental acoustic monitoring MUST dynamically adjust its sensitivity (EMA alpha) based on physical vibration intensity. High-motion events MUST automatically suppress acoustic triggers in the native layer to prevent false tamper alerts induced by chassis vibration or mechanical noise. (Oct7.8 - Issue #SIMP-1010-1).
 *   **1.140 Muzzle Hysteresis Native Offloading (R-ID 660)**: Stationary muzzle logic and hysteresis (e.g., `stationaryDuration`, vertical signal resetting) MUST be evaluated in the JNI layer during the 100Hz vibration batch. The JVM SHOULD only react to native-triggered reset flags to eliminate high-frequency timestamp arithmetic in the main sensor path. (Oct7.9 - Issue #SIMP-1010-2).
 *   **1.141 SNR Decay Jammer Discrimination (R-ID 670)**: The engine MUST distinguish between mechanical interference and electronic jamming by correlating SNR degradation with physical vibration in the native layer. A drop in SNR (e.g., < 18 dB) accompanied by LOW vibration MUST trigger a `JAMMER_SUSPICION` state, whereas the same drop during HIGH vibration SHOULD be treated as expected mechanical interference. (Oct7.10 - Issue #SIMP-1010-3).
+*   **1.142 Unified Health Evaluation (R-ID 680)**: Health status evaluation for both GNSS (Signal Loss, Gaps, Stalls) and behavioral anomalies (Jamming, Acoustic Violations) MUST be centralized in the `SentinelValidator`. Behavioral rejections identified during coordinate processing MUST be promoted into the unified `LocationPendingReason` to ensure consistent reporting and signaling priority across the telemetry pipeline. (Oct7.11 - Issue #SIMP-1007-17).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 658**: Unified Health Evaluation - Consolidated redundant GNSS and behavioral health evaluation into `SentinelValidator`. Instrumented the processor to promote behavioral rejections into the unified `LocationPendingReason`. (Oct7.11 - Issue #SIMP-1007-17).
 *   **SOT ID 657**: SNR Decay Modeling - Implemented native SNR-Vibration correlation to distinguish between mechanical interference and electronic jamming. (Oct7.10 - Issue #SIMP-1010-3).
 *   **SOT ID 656**: Muzzle Hysteresis Native Offloading - Migrated stationary duration tracking and muzzle reset triggers to JNI to eliminate JVM-side 100Hz timestamp tracking. (Oct7.9 - Issue #SIMP-1010-2).
 *   **SOT ID 655**: Adaptive Acoustic Gating - Implemented native motion-aware alpha adjustment to suppress acoustic triggers during high-vibration intervals. (Oct7.8 - Issue #SIMP-1010-1).
@@ -28,6 +30,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.273 (Unified Health Audit)**: PASSED - Verified that `HardwareSuite` correctly delegates GNSS health evaluation to `SentinelValidator.evaluateLocationPendingReason`. Verified that `LocationProcessor` promotes behavioral rejections (Jamming, Acoustic) from the sentinel result into the `LocationPendingReason`, ensuring priority-based resolution in the telemetry aggregation layer. (Oct7.11 - Issue #SIMP-1007-17).
 *   **Chapter 31.272 (SNR Decay Audit)**: PASSED - Verified that `VibrationBatch` correctly returns `isJammingCandidate` when SNR is low but vibration is also low. Verified that `LocationSentinel` transitions to `JAMMER_SUSPICION` state upon receiving this flag, improving discrimination against mechanical interference. (Oct7.10 - Issue #SIMP-1010-3).
 *   **Chapter 31.271 (Native Hysteresis Audit)**: PASSED - Verified that `VibrationBatch` correctly returns `stationaryDuration` and `muzzleResetTriggered` flags. Verified that `HardwareSuite` resets vertical velocity/displacement only when native-triggered, and `LocationSentinel` uses native duration for tilt recalibration. (Oct7.9 - Issue #SIMP-1010-2).
 *   **Chapter 31.270 (Adaptive Acoustic Audit)**: PASSED - Verified that acoustic EMA alpha scales down correctly in response to `vibrationRollingSum` via native `n20` method. Verified that `isSuspiciousNoise` badges appear on HUD during concurrent SNR/Vibration anomalies. (Oct7.8 - Issue #SIMP-1010-1).

@@ -6,6 +6,10 @@ import kotlin.math.min
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * Oct.7.11:
+ * - Issue #SIMP-1007-17: Consolidated redundant location pending logic 
+ *   from HardwareSuite. Added evaluateLocationPendingReason and 
+ *   getHigherPriorityReason to centralize GNSS and behavioral health evaluation.
  * Oct.7.9:
  * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Updated 
  *   computeAdaptiveAcousticOffCycle to take duration instead of absolute timestamp 
@@ -197,6 +201,56 @@ object SentinelValidator {
     ): Long {
         if (!isStationary || stationaryDurationMs == 0L) return ACOUSTIC_DUTY_CYCLE_OFF_MS
         return min(ACOUSTIC_DUTY_CYCLE_OFF_MS * 4, ACOUSTIC_DUTY_CYCLE_OFF_MS + (stationaryDurationMs / 60000) * 1000L)
+    }
+
+    /**
+     * evaluateLocationPendingReason: Consolidates environment-based GNSS status evaluation.
+     * Oct.7.11: Moved from HardwareSuite to centralize Sentinel Hard Gates. 
+     * Added isAcousticViolated and priority-based resolution.
+     */
+    fun evaluateLocationPendingReason(
+        satellitesInView: Int,
+        satellitesUsed: Int,
+        deltaSinceFixMs: Long,
+        gapThresholdMs: Long,
+        isJammingCandidate: Boolean = false,
+        isAcousticViolated: Boolean = false
+    ): LocationPendingReason {
+        // Behavioral priorities first
+        if (isJammingCandidate) return LocationPendingReason.JAMMER_SUSPICION
+        if (isAcousticViolated) return LocationPendingReason.ACOUSTIC_VIOLATION
+        
+        // Environment-based GNSS health
+        if (deltaSinceFixMs <= gapThresholdMs) return LocationPendingReason.NONE
+        
+        return when {
+            satellitesInView == 0 -> LocationPendingReason.SIGNAL_LOSS
+            satellitesInView >= 4 && satellitesUsed < 4 -> LocationPendingReason.GPS_STALL
+            else -> LocationPendingReason.GPS_GAP
+        }
+    }
+
+    /**
+     * getReasonPriority: Defines the precedence of pending reasons.
+     * Higher value = higher priority for display/signaling.
+     */
+    fun getReasonPriority(reason: LocationPendingReason): Int {
+        return when (reason) {
+            LocationPendingReason.NONE -> 0
+            LocationPendingReason.GPS_GAP -> 1
+            LocationPendingReason.SIGNAL_LOSS -> 2
+            LocationPendingReason.GPS_STALL -> 3
+            LocationPendingReason.ACOUSTIC_VIOLATION -> 4
+            LocationPendingReason.JAMMER_SUSPICION -> 5
+        }
+    }
+
+    /**
+     * getHigherPriorityReason: Returns the more critical of two reasons.
+     */
+    fun getHigherPriorityReason(r1: LocationPendingReason, r2: LocationPendingReason): LocationPendingReason {
+        if (r1 == r2) return r1
+        return if (getReasonPriority(r2) >= getReasonPriority(r1)) r2 else r1
     }
 
     fun accelerateAlpha(baseAlpha: Double, isWarming: Boolean, limit: Double = 0.5): Double {

@@ -6,12 +6,12 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.7.11:
+ * - Issue #SIMP-1007-17: Strategic Simplification. Updated mapTickToOutputs and 
+ *   mapProcessedToSnapshot to promote behavioral pending reasons from the processor.
  * Oct.7.7:
  * - Issue #SIMP-1007-16: Flag Propagation. Updated mapping to handle 
  *   isSuspiciousNoise and isMemoryPressureThrottled across Proto and JSON layers.
- * Oct.7.6:
- * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated mapping functions 
- *   to utilize the unified ForensicSnapshot container properties.
  */
 object TelemetryMapper {
 
@@ -53,6 +53,15 @@ object TelemetryMapper {
                 kinetic.maxAccuracy = it.maxAccuracy
                 kinetic.gpsTs = it.timestamp
                 this.status = it.status
+
+                // Oct.7.11: Promote behavioral health reason from processor
+                if (it.locationPendingReason != LocationPendingReason.NONE) {
+                    this.integrity.locationPendingReason = SentinelValidator.getHigherPriorityReason(
+                        this.integrity.locationPendingReason,
+                        it.locationPendingReason
+                    )
+                    this.integrity.isLocationPending = true
+                }
             }
 
             integrity.gnssDetail = event.gnssDetail ?: integrity.gnssDetail
@@ -152,6 +161,15 @@ object TelemetryMapper {
                 tamperNote = if (proto.hasTamperNote()) proto.tamperNote else null
                 thermalHeadroom = proto.thermalHeadroom
                 heapAllocatedMb = proto.heapAllocatedMb
+
+                // Oct.7.11 behavioral health priority resolution
+                if (processed.locationPendingReason != LocationPendingReason.NONE) {
+                    locationPendingReason = SentinelValidator.getHigherPriorityReason(
+                        locationPendingReason,
+                        processed.locationPendingReason
+                    )
+                    isLocationPending = true
+                }
             }
 
             this.thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
@@ -282,6 +300,15 @@ object TelemetryMapper {
                 tamperNote = if (data.has("tamper_note")) data.getString("tamper_note") else null
                 thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
                 heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
+
+                // Oct.7.11 behavioral health priority resolution
+                if (processed.locationPendingReason != LocationPendingReason.NONE) {
+                    locationPendingReason = SentinelValidator.getHigherPriorityReason(
+                        locationPendingReason,
+                        processed.locationPendingReason
+                    )
+                    isLocationPending = true
+                }
             }
 
             this.thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else null
@@ -506,6 +533,15 @@ object TelemetryMapper {
             this.integrity.isTamperDetected = processed.tamperDetected
             suppressionNote = processed.suppressionNote
             this.snrSnapshot = snrSnapshot
+
+            // Oct.7.11 behavioral health priority resolution
+            if (processed.locationPendingReason != LocationPendingReason.NONE) {
+                this.integrity.locationPendingReason = SentinelValidator.getHigherPriorityReason(
+                    this.integrity.locationPendingReason,
+                    processed.locationPendingReason
+                )
+                this.integrity.isLocationPending = true
+            }
         }
     }
 

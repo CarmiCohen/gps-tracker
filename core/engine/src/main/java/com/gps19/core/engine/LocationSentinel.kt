@@ -5,6 +5,10 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Oct.7.11:
+ * - Issue #SIMP-1007-17: Strategic Simplification. Integrated behavioral suspicion 
+ *   into unified evaluation result to allow telemetry pipeline promotion to 
+ *   LocationPendingReason. Fixed forensic property scoping in reset().
  * Oct.7.10:
  * - Issue #SIMP-1010-3: SNR Decay Modeling. Integrated isJammingCandidate from 
  *   telemetry update into forensic state and physical tamper evaluation.
@@ -131,7 +135,6 @@ object LocationSentinel {
             }
         }
 
-        // Oct.7.9: Use native stationary duration for tilt recalibration
         if (isStationary(state, update.cpuLoad) && !state.forensic.isSitDetected) {
             if (state.forensic.stationaryDurationMs > PASSIVE_ZEROING_STATIONARY_MS) {
                 if (abs(state.forensic.baselineSitTilt - currentTilt) > 0.1 && !currentTilt.isNaN()) {
@@ -347,6 +350,7 @@ object LocationSentinel {
 
         if (!state.forensic.isNear) {
             result.reason = "Proximity Far"
+            result.locationPendingReason = LocationPendingReason.JAMMER_SUSPICION
             return SentinelStatus.TAMPER
         }
         if (state.forensic.isPowerTamper) {
@@ -365,6 +369,7 @@ object LocationSentinel {
         // Oct.7.10: Jammer Discrimination (SNR vs Vibe)
         if (state.forensic.isJammingCandidate) {
             result.reason = "Jamming Candidate (SNR vs Vibe)"
+            result.locationPendingReason = LocationPendingReason.JAMMER_SUSPICION
             return SentinelStatus.JAMMER_SUSPICION
         }
         
@@ -396,6 +401,7 @@ object LocationSentinel {
         
         if (!isAcousticLockedOut && SentinelValidator.isAcousticViolated(state.forensic.currentAcousticDb, state.forensic.acousticFloorDb)) {
             result.reason = "Acoustic alarm"
+            result.locationPendingReason = LocationPendingReason.ACOUSTIC_VIOLATION
             return SentinelStatus.TAMPER
         }
 
@@ -406,6 +412,7 @@ object LocationSentinel {
         
         if (!isAcousticLockedOut && SentinelValidator.isAcousticSuspicious(state.forensic.currentAcousticDb, state.forensic.acousticFloorDb, state.forensic.currentVibrationIndex)) {
             result.reason = "Acoustic suspicion"
+            result.locationPendingReason = LocationPendingReason.ACOUSTIC_VIOLATION
             return SentinelStatus.TAMPER
         }
 

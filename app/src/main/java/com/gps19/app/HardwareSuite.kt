@@ -37,15 +37,16 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.7.11:
+ * - Issue #SIMP-1007-17: Consolidated redundant location pending logic into 
+ *   SentinelValidator. Integrated evaluateLocationPendingReason into updateLocationStatus 
+ *   with acoustic violation awareness. Fixed property declaration syntax.
  * Oct.7.10:
  * - Issue #SIMP-1010-3: SNR Decay Modeling. Integrated isJammingCandidate from JNI 
  *   vibration batch into forensic snapshots.
  * Oct.7.9:
- * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Migrated stationaryDuration 
- *   and muzzle reset logic to JNI batching path. Eliminated JVM stationary timestamp tracking.
- * Oct.7.8:
- * - Issue #SIMP-1010-1: Adaptive Acoustic Gating. Integrated native motion-aware 
- *   alpha adjustment into the acoustic monitoring loop.
+ * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Migrated stationary 
+ *   duration and muzzle reset logic to JNI batching path.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -277,12 +278,25 @@ class HardwareSuite @Inject constructor(
     @Volatile var vibrationRollingSum = 0.0; private set
     private var vibrationBufferCount = 0
 
-    private var logicPeakDb = 0.0; private var logicMinDb = 100.0; private var logicPeakVibration = 0.0
-    private var logicPeakVerticalVelocity = 0.0; private var logicPeakVerticalVelocityTs = 0L; private var logicPeakVerticalVelocityRt = 0L; private var logicPeakVerticalDisplacement = 0.0
-    private var forensicPeakDb = 0.0; private var forensicMinDb = 100.0; private var forensicPeakVibration = 0.0
-    private var forensicPeakVerticalVelocity = 0.0; private var forensicPeakVerticalVelocityTs = 0L; private var forensicPeakVerticalVelocityRt = 0L; private var forensicPeakVerticalDisplacement = 0.0
+    private var logicPeakDb = 0.0
+    private var logicMinDb = 100.0
+    private var logicPeakVibration = 0.0
+    private var logicPeakVerticalVelocity = 0.0
+    private var logicPeakVerticalVelocityTs = 0L
+    private var logicPeakVerticalVelocityRt = 0L
+    private var logicPeakVerticalDisplacement = 0.0
 
-    private var lastRawVibe = 0.0; private var lastHpfValue = 0.0; @Volatile var currentKineticEnergy = 0.0; private set
+    private var forensicPeakDb = 0.0
+    private var forensicMinDb = 100.0
+    private var forensicPeakVibration = 0.0
+    private var forensicPeakVerticalVelocity = 0.0
+    private var forensicPeakVerticalVelocityTs = 0L
+    private var forensicPeakVerticalVelocityRt = 0L
+    private var forensicPeakVerticalDisplacement = 0.0
+
+    private var lastRawVibe = 0.0
+    private var lastHpfValue = 0.0
+    @Volatile var currentKineticEnergy = 0.0; private set
 
     @Volatile private var isMonitoring = false
     @Volatile private var isAcousticRunning = false
@@ -676,10 +690,25 @@ class HardwareSuite @Inject constructor(
         var shouldEmitSuccess = false
         
         val current = currentLocationStatus
-        var nextPending = current.isPending; var nextReason = current.reason
-        var recoveryConfirmed = current.recoveryConfirmed; var lastPendingDuration = current.lastPendingDurationMs
-        if (deltaSinceFix > GPS_GAP_THRESHOLD_MS) {
-            if (!nextPending) { 
+        
+        // Oct.7.11: Use centralized SentinelValidator to evaluate pending reason.
+        // Consolidated behavioral and environmental health decision path.
+        val nextReason = SentinelValidator.evaluateLocationPendingReason(
+            satellitesInView = satellitesInView,
+            satellitesUsed = satellitesUsed,
+            deltaSinceFixMs = deltaSinceFix,
+            gapThresholdMs = GPS_GAP_THRESHOLD_MS,
+            isJammingCandidate = isJammingCandidate,
+            isAcousticViolated = (nowRt - lastAcousticLockoutRt < 2000L)
+        )
+        
+        var nextPending = nextReason != LocationPendingReason.NONE
+        var recoveryConfirmed = current.recoveryConfirmed
+        var lastPendingDuration = current.lastPendingDurationMs
+        var reasonToEmit = nextReason
+
+        if (nextPending) {
+            if (!current.isPending) { 
                 pendingEnterRt = nowRt 
                 nextPending = true 
                 recoveryConfirmed = false 
@@ -689,15 +718,17 @@ class HardwareSuite @Inject constructor(
                 revivalBaselineCaptured = true
                 forensicAuditor.captureRevivalStart(nowRt)
             }
-            
-            nextReason = when { satellitesInView == 0 -> LocationPendingReason.SIGNAL_LOSS; satellitesInView >= 4 && satellitesUsed < 4 -> LocationPendingReason.GPS_STALL; else -> LocationPendingReason.GPS_GAP }
             recoveryStartRt = 0L 
-        } else if (nextPending) {
+        } else if (current.isPending) {
             if (recoveryStartRt == 0L) recoveryStartRt = nowRt
             val recoveryDuration = nowRt - recoveryStartRt
-            if (recoveryDuration < LOCATION_RECOVERY_DEBOUNCE_MS) { if (nowRt - pendingEnterRt > 0) lastPendingDuration = nowRt - pendingEnterRt; nextReason = LocationPendingReason.NONE }
+            if (recoveryDuration < LOCATION_RECOVERY_DEBOUNCE_MS) { 
+                if (nowRt - pendingEnterRt > 0) lastPendingDuration = nowRt - pendingEnterRt
+                nextPending = true
+                reasonToEmit = current.reason 
+            }
             else { 
-                nextPending = false; nextReason = LocationPendingReason.NONE; recoveryConfirmed = true; recoveryStartRt = 0L 
+                nextPending = false; reasonToEmit = LocationPendingReason.NONE; recoveryConfirmed = true; recoveryStartRt = 0L 
                 shouldEmitSuccess = true
                 isHardwareLocked = false
                 revivalBaselineCaptured = false 
@@ -707,7 +738,7 @@ class HardwareSuite @Inject constructor(
             revivalBaselineCaptured = false 
         }
         
-        val nextStatus = current.copy(isPending = nextPending, reason = nextReason, lastFixRt = lastFixRt, lastPendingDurationMs = lastPendingDuration, recoveryConfirmed = recoveryConfirmed)
+        val nextStatus = current.copy(isPending = nextPending, reason = reasonToEmit, lastFixRt = lastFixRt, lastPendingDurationMs = lastPendingDuration, recoveryConfirmed = recoveryConfirmed)
         if (nextStatus != currentLocationStatus) {
             currentLocationStatus = nextStatus
             _locationStatus.tryEmit(currentLocationStatus)
@@ -872,7 +903,7 @@ class HardwareSuite @Inject constructor(
             acousticThread = Thread {
                 while (isMonitoring) {
                     val sampleRate = ACOUSTIC_SAMPLE_RATE; val bufferSize = AudioRecord.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-                    if (bufferSize <= 0) { if (isMonitoring) domainEventBus.emit(AppSensorEvent.HardwareFailure("AudioRecord: Invalid buffer size")); try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
+                    if (bufferSize <= 0) { if (isMonitoring) domainEventBus.emit(AppSensorEvent.HardwareFailure("AudioRecord: Invalid buffer size")); try { Thread.sleep(ACOUSTIC_GENERIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
                     var audioRecord: AudioRecord? = null
                     try {
                         var attempts = 0
@@ -882,12 +913,11 @@ class HardwareSuite @Inject constructor(
                             record.release(); attempts++; try { Thread.sleep(ACOUSTIC_INIT_RETRY_DELAY_MS) } catch (ie: InterruptedException) { break }
                         }
                         if (!isMonitoring || audioRecord == null) continue
-                        try { audioRecord.startRecording() } catch (e: Exception) { try { audioRecord.release() } catch (ex: Exception) {}; try { Thread.sleep(ACOUSTIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
+                        try { audioRecord.startRecording() } catch (e: Exception) { try { audioRecord.release() } catch (ex: Exception) {}; try { Thread.sleep(ACOUSTIC_GENERIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
                         isAcousticRunning = true; val buffer = ShortArray(bufferSize); var lastDutyCycleTransitionRt = timeProvider.elapsedRealtime() ; var isInOffCycle = false
                         while (isMonitoring && !Thread.currentThread().isInterrupted) {
                             val nowRt = timeProvider.elapsedRealtime()
                             if (powerSaveMode) {
-                                // Oct.7.9: Use stationary duration for adaptive cycle
                                 val adaptiveOffCycleMs = SentinelValidator.computeAdaptiveAcousticOffCycle(isStationary(), stationaryDurationMs)
                                 if (!isInOffCycle && (nowRt - lastDutyCycleTransitionRt > ACOUSTIC_DUTY_CYCLE_ON_MS)) {
                                     isInOffCycle = true; lastDutyCycleTransitionRt = nowRt; try { audioRecord.stop() } catch (e: Exception) {} 
@@ -1038,7 +1068,6 @@ class HardwareSuite @Inject constructor(
                 this.thermal = this@HardwareSuite.cachedThermalHeadroom
                 this.heap = this@HardwareSuite.cachedHeapAllocatedMb
                 
-                // Oct.7.9: Time context for muzzle hysteresis
                 this.nowRt = nowRt
             }
 
@@ -1056,7 +1085,6 @@ class HardwareSuite @Inject constructor(
                 isMemoryPressureThrottled = vibrationBatch.isMemoryPressureThrottled
                 isJammingCandidate = vibrationBatch.isJammingCandidate
                 
-                // Oct.7.9: Capture native muzzle hysteresis
                 stationaryDurationMs = vibrationBatch.stationaryDuration
                 if (vibrationBatch.muzzleResetTriggered) {
                     currentVerticalVelocity = 0.0
@@ -1073,16 +1101,7 @@ class HardwareSuite @Inject constructor(
                 isSuspiciousNoise = false
                 isMemoryPressureThrottled = false
                 isJammingCandidate = false
-
-                // JVM Fallback muzzle reset
-                val stationary = isStationary()
-                if (stationary) {
-                    // This logic is slightly duplicated but only used if JNI fails/missing
-                    // We don't have JVM-side stationaryStartRt anymore, but we can't easily 
-                    // maintain parity here without adding it back. For simplicity, we skip 
-                    // muzzle reset in fallback if we really want to purge stationaryStartRt.
-                }
-                stationaryDurationMs = 0L // Cannot calculate without stationaryStartRt
+                stationaryDurationMs = 0L
             }
 
             if (delta > logicPeakVibration) logicPeakVibration = delta
@@ -1125,7 +1144,6 @@ class HardwareSuite @Inject constructor(
         val pressureDouble = pressure.toDouble(); if (emaPressure == 0.0) emaPressure = pressureDouble
         currentPressure = pressureDouble; val alpha = SentinelValidator.accelerateAlpha(1.0 - BARO_EMA_SLOW, isWarming); emaPressure = (emaPressure * (1.0 - alpha)) + (pressureDouble * alpha)
         val nowRt = timeProvider.elapsedRealtime()
-        // Oct.7.9: Use native stationary duration for baro zeroing
         if (nowRt - lastBaroZeroingRt > BARO_ZEROING_INTERVAL_MS && stationaryDurationMs >= PASSIVE_ZEROING_STATIONARY_MS) { emaPressure = pressureDouble; lastBaroZeroingRt = nowRt }
         val currentAlt = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure).toDouble()
         val baselineAlt = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, emaPressure.toFloat()).toDouble()
@@ -1135,7 +1153,6 @@ class HardwareSuite @Inject constructor(
 
     private fun processRotation(rotationVector: FloatArray) {
         android.hardware.SensorManager.getRotationMatrixFromVector(currentRotationVectorMatrixBuffer, rotationVector)
-        // Oct.7.9: Use native stationary duration for rotation initialization
         if (!hasInitialRotation) { if (!isWarming && stationaryDurationMs > ROTATION_INIT_STATIONARY_MS) { System.arraycopy(currentRotationVectorMatrixBuffer, 0, initialRotationMatrix, 0, 9); hasInitialRotation = true }; return }
         val dotProduct = (initialRotationMatrix[2] * currentRotationVectorMatrixBuffer[2]) + (initialRotationMatrix[5] * currentRotationVectorMatrixBuffer[5]) + (initialRotationMatrix[8] * currentRotationVectorMatrixBuffer[8])
         currentTiltDegrees = if (isWarming) 0.0 else Math.toDegrees(acos(dotProduct.coerceIn(-1.0f, 1.0f).toDouble()))
@@ -1258,7 +1275,6 @@ class HardwareSuite @Inject constructor(
             isDisplayFlickering.set(false); lastDisplayTransitionRt = 0L
             
             clearLifecycleLeftovers()
-            // Reset native audit/hysteresis
             JdHardwareManager.resetSensorAudit()
         }
     }

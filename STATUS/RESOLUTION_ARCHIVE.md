@@ -1,5 +1,12 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct7.11
+*   **Issue #SIMP-1007-17: Strategic Simplification.**
+    *   **Consolidation**: Centralized GNSS health evaluation (Signal Loss, Gaps, Stalls) and behavioral anomalies (Jamming, Acoustic Violations) into `SentinelValidator.evaluateLocationPendingReason`.
+    *   **Logic Migration**: Purged redundant manual status evaluation from `HardwareSuite.kt`, replacing it with delegation to the centralized evaluator.
+    *   **Pipeline Promotion**: Instrumented `LocationProcessor.processGpsPoint` to promote behavioral rejections from the sentinel result into the unified `LocationPendingReason`.
+    *   **Priority Resolution**: Integrated `getHigherPriorityReason` into `TelemetryAggregator` and `TelemetryMapper` to ensure the most critical health issue is signaled when multiple conditions overlap (e.g., Jamming vs. Signal Loss).
+
 ## 🟢 Resolved in Oct7.10
 *   **Issue #SIMP-1010-3: SNR Decay Modeling.**
     *   **Native Correlation**: Implemented native SNR-Vibration correlation in `jdhardware-jni.cpp` (n19). The model now distinguishes between mechanical interference (high vibe) and electronic jamming (low vibe) during SNR drops (< 18 dB).
@@ -31,10 +38,4 @@
 
 ## 🟢 Resolved in Oct7.6
 *   **Issue #SIMP-1007-16: JNI FastPath Expansion.**
-    *   **Native Correlation**: Expanded `processVibrationBatch` (n19) to include `snr`, `thermal`, and `heap` snapshots, allowing native-layer correlation between vibration bursts and signal quality.
-    *   **Efficiency**: Implemented caching for thermal and heap probes in `HardwareSuite.kt` to eliminate redundant system calls during 100Hz sensor processing.
-    *   **Architecture**: Updated `VibrationBatch` and `JdHardwareManager` bridge to support the expanded data structure, ensuring zero-copy transition through `DirectByteBuffer`.
-
-## 🟢 Resolved in Oct7.5
-*   **Issue #SIMP-1007-15: Unified Snapshot Container (Completion).**
 ...
