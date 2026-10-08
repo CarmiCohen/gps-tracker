@@ -26,14 +26,14 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.8.11:
+ * - Issue #SIMP-1013-2: Storage Flush Hysteresis. Added TriggerStoragePrune handling 
+ *   to execute authoritative pruning cycles driven by native hysteresis logic.
+ *   Fixed forensic field mapping for acousticPeakMin.
  * Oct.8.10:
  * - Issue #SIMP-1013-1: Memory Pressure Hysteresis. Refined observeIntegrityEvents 
  *   to rely on CommandEvent.TriggerMemoryFlush for GC management, respecting 
  *   native hysteresis logic.
- * Oct.8.2:
- * - Issue #SIMP-1007-17: Behavioral Reason Promotion. Ensured evaluationSnapshot 
- *   reflects promoted health reasons from ProcessedLocation before event emission 
- *   and alarm evaluation. Fixed syntax error in command routing.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -314,6 +314,7 @@ class MonitorService : BaseMonitorService() {
                     is CommandEvent.ExecuteNetworkStressTest -> connectivitySuite.executeFlappingStressTest()
                     is CommandEvent.SimulateStoragePressure -> {}
                     is CommandEvent.TriggerMemoryFlush -> performMemoryFlush()
+                    is CommandEvent.TriggerStoragePrune -> performStoragePrune()
                 }
             }
     }
@@ -323,8 +324,6 @@ class MonitorService : BaseMonitorService() {
             .filterIsInstance<IntegrityEvent.MemoryPressureChanged>()
             .collect { event ->
                 memoryPressureLevel = event.level
-                // Oct.8.10: performMemoryFlush() call removed. Now driven by 
-                // CommandEvent.TriggerMemoryFlush via JNI hysteresis.
             }
     }
     
@@ -336,6 +335,13 @@ class MonitorService : BaseMonitorService() {
         System.gc()
         System.runFinalization()
         System.gc()
+    }
+
+    private fun performStoragePrune() {
+        Timber.w("Storage Prune Triggered: Authoritative decision from JNI. Executing proactive pruning.")
+        lifecycleScope.launch(Dispatchers.IO) {
+            logManager.proactivePruning()
+        }
     }
 
     private suspend fun observeSettingsChanges() {
@@ -500,7 +506,7 @@ class MonitorService : BaseMonitorService() {
                 isCoolingModeActive = health.isCoolingModeActive; gpsHardwareLock = health.gpsHardwareLock 
                 isUltraLongStationary = health.isUltraLongStationary; isBatteryLow = health.isBatteryLow 
                 isBatteryCritical = health.isBatteryCritical; satsUsed = hardwareSuite.satellitesUsed 
-                satsView = hardwareSuite.satellitesInView; violationUptimeMs = sessionManager.violationUptimeMs
+                satsView = health.satsView; violationUptimeMs = sessionManager.violationUptimeMs
                 violationPercentage = sessionManager.getViolationPercentage()
                 thermalHeadroom = health.thermalHeadroom; heapAllocatedMb = health.heapAllocatedMb
                 if (isManualJammerActive) isJammer = true

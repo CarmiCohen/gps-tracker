@@ -6,18 +6,15 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.8.11:
+ * - Issue #SIMP-1013-2: Storage Flush Hysteresis. Added StoragePressureBatch 
+ *   for native evaluation of storage pressure state (n25).
  * Oct.8.10:
  * - Issue #SIMP-1013-1: Memory Pressure Hysteresis. Added MemoryPressureBatch 
  *   for native evaluation of GC flush criteria (n24).
  * Oct.8.5:
  * - Issue #SIMP-1012-2: Native Proximity Scaling. Added ProximityBatch DTO 
  *   for offloading environment-aware proximity debouncing to JNI.
- * Oct.8.4:
- * - Issue #SIMP-1011-3: Forensic Buffer Consolidation. Merged EngineSnrSample, 
- *   EngineAcousticSample, and EngineSensorSnapshot into ForensicSample to reduce 
- *   memory fragmentation and allocation overhead.
- * - Issue #SIMP-1011-2: Acoustic JNI Offloading. Added AcousticBatch for 
- *   native RMS/Peak and spike evaluation.
  */
 
 @Serializable
@@ -257,6 +254,7 @@ sealed class IntegrityEvent(override val priority: EventPriority = EventPriority
     data class LocationStatusChanged(val status: LocationStatus) : IntegrityEvent(EventPriority.HIGH)
     data class GnssThrottledChanged(val throttled: Boolean) : IntegrityEvent(EventPriority.NORMAL)
     data class MemoryPressureChanged(val level: MemoryPressureLevel, val heapMb: Double) : IntegrityEvent(EventPriority.HIGH)
+    data class StoragePressureChanged(val isLow: Boolean, val isCritical: Boolean, val availableMb: Long) : IntegrityEvent(EventPriority.HIGH)
 }
 
 sealed class ProcessorEvent(open val isPrimary: Boolean, override val priority: EventPriority = EventPriority.NORMAL) : DomainEvent(priority) {
@@ -294,6 +292,7 @@ sealed class CommandEvent(override val priority: EventPriority = EventPriority.H
     object ExecuteNetworkStressTest : CommandEvent(EventPriority.NORMAL)
     data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : CommandEvent(EventPriority.HIGH)
     object TriggerMemoryFlush : CommandEvent(EventPriority.HIGH)
+    object TriggerStoragePrune : CommandEvent(EventPriority.HIGH)
 }
 
 sealed class RevivalEvent(override val priority: EventPriority = EventPriority.NORMAL) : DomainEvent(priority) {
@@ -447,6 +446,22 @@ class MemoryPressureBatch {
 }
 
 /**
+ * StoragePressureBatch: Data transfer object for JNI storage pressure evaluation (Issue #SIMP-1013-2).
+ */
+@Serializable
+class StoragePressureBatch {
+    // Inputs
+    var availableMb: Double = 0.0
+    var lowThresholdMb: Double = 0.0
+    var criticalThresholdMb: Double = 0.0
+    var hysteresisOffsetMb: Double = 0.0
+    
+    // Outputs
+    var currentLevel: Int = 0 // 0: Normal, 1: Low, 2: Critical
+    var needsPrune: Boolean = false
+}
+
+/**
  * ForensicSample: Unified container for all forensic data points (Issue #SIMP-1011-3).
  */
 @Serializable
@@ -492,6 +507,7 @@ interface NativeFastPathProvider {
     fun processAcousticBatch(batch: AcousticBatch, buffer: ShortArray): Boolean
     fun processProximityBatch(batch: ProximityBatch): Boolean
     fun processMemoryBatch(batch: MemoryPressureBatch): Boolean
+    fun processStorageBatch(batch: StoragePressureBatch): Boolean
 }
 
 @Serializable

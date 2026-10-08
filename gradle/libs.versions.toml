@@ -3,24 +3,24 @@
 
 agp = "8.5.1"
 kotlin = "1.9.23"
-coreKtx = "1.15.0"
+coreKtx = "1.12.0"
 junit = "4.13.2"
 junitVersion = "1.2.1"
-espressoCore = "3.6.1"
-lifecycle = "2.8.7"
-activityCompose = "1.10.0"
-composeBom = "2024.04.01"
-appcompat = "1.7.0"
-material3 = "1.2.1"
+espressoCore = "3.5.1"
+lifecycle = "2.7.0"
+activityCompose = "1.8.2"
+composeBom = "2024.02.01"
+appcompat = "1.6.1"
+material3 = "1.2.0"
 materialIcons = "1.6.6"
-navigationCompose = "2.8.7"
-hilt = "2.51.1"
+navigationCompose = "2.7.7"
+hilt = "2.51"
 hiltNavigation = "1.2.0"
 room = "2.6.1"
 datastore = "1.1.1"
 protobuf = "3.25.1"
 socketIo = "2.1.2"
-playServicesLocation = "21.3.0"
+playServicesLocation = "21.2.0"
 playServicesBasement = "18.4.0"
 okhttp = "4.12.0"
 timber = "5.0.1"
@@ -34,6 +34,7 @@ gson = "2.10.1"
 preferenceKtx = "1.2.1"
 uiautomator = "2.3.0"
 ksp = "1.9.23-1.0.19"
+javaxInject = "1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -51,7 +52,7 @@ androidx-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
 androidx-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
 androidx-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
-androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
+androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended", version.ref = "materialIcons" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
@@ -79,6 +80,22 @@ kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-cor
 androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx", version.ref = "workManager" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 androidx-uiautomator = { group = "androidx.test.uiautomator", name = "uiautomator", version.ref = "uiautomator" }
+javax-inject = { group = "javax.inject", name = "javax.inject", version.ref = "javaxInject" }
+
+[bundles]
+compose = [
+    "androidx-activity-compose",
+    "androidx-ui",
+    "androidx-ui-graphics",
+    "androidx-ui-tooling-preview",
+    "androidx-material3",
+    "androidx-navigation-compose",
+    "androidx-appcompat"
+]
+room = ["room-runtime", "room-ktx"]
+lifecycle = ["androidx-lifecycle-runtime-ktx", "androidx-lifecycle-service"]
+hilt = ["hilt-android", "hilt-navigation-compose"]
+unit-test = ["junit", "kotlinx-coroutines-test"]
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

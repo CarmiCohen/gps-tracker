@@ -2,15 +2,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.8.11:
+ * - Issue #SIMP-1013-2: Storage Flush Hysteresis. Added STORAGE_HYSTERESIS_OFFSET_MB 
+ *   to prevent IO thrashing during boundary oscillations.
  * Oct.8.10:
  * - Issue #SIMP-1013-1: Memory Pressure Hysteresis. Added MEMORY_HYSTERESIS_OFFSET_MB 
  *   to prevent GC thrashing at pressure boundaries.
- * Oct.8.9:
- * - Issue #SIMP-1012-3: Forensic Stability Audit. Added JAMMING_SNR_CRITICAL_THRESHOLD 
- *   and lookback constants for SNR-based jammer discrimination.
- * Oct.2.6:
- * - Issue #1175: Real-time Only Path. Purged obsolete backfill constants: 
- *   REAL_TIME_GAP_LIMIT_MS, SENSOR_SAMPLE_BUFFER_MAX_AGE_MS, and MAX_BACKFILL_POINTS.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -48,6 +45,9 @@ const val SENSOR_LOAD_GATE_CPU_THRESHOLD = 0.85
 const val MEMORY_PRESSURE_THRESHOLD_MB = 200.0
 const val MEMORY_CRITICAL_THRESHOLD_MB = 250.0
 const val MEMORY_HYSTERESIS_OFFSET_MB = 20.0
+
+// Issue #SIMP-1013-2: Storage Hysteresis (MB)
+const val STORAGE_HYSTERESIS_OFFSET_MB = 10.0
 
 // Issue #1417: Connectivity Jitter
 const val CONNECTIVITY_HYSTERESIS_MS = 3000L

@@ -37,12 +37,12 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.8.11:
+ * - Issue #SIMP-1013-2: Storage Flush Hysteresis. Added processStorageBatch 
+ *   to nativeFastPathProvider (n25).
  * Oct.8.10:
  * - Issue #SIMP-1013-1: Memory Pressure Hysteresis. Added processMemoryBatch 
  *   to nativeFastPathProvider (n24).
- * Oct.8.9:
- * - Issue #SIMP-1012-3: Forensic Stability Audit. Integrated evaluateSignalHealth 
- *   into updateLocationStatus to refine jammer suspicion using high-assurance SNR trails.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -104,6 +104,10 @@ class HardwareSuite @Inject constructor(
 
         override fun processMemoryBatch(batch: MemoryPressureBatch): Boolean {
             return JdHardwareManager.processMemoryBatchNative(batch)
+        }
+
+        override fun processStorageBatch(batch: StoragePressureBatch): Boolean {
+            return JdHardwareManager.processStorageBatchNative(batch)
         }
     }
 
@@ -686,7 +690,6 @@ class HardwareSuite @Inject constructor(
         val nowRt = timeProvider.elapsedRealtime()
         val deltaSinceFix = if (lastFixRt > 0) nowRt - lastFixRt else nowRt
         
-        // Issue #SIMP-1012-3: Refine jamming status via ForensicAuditor SNR lookback
         val isAuditedJamming = forensicAuditor.evaluateSignalHealth(nowRt, AppRole.TRACKER) { from, to, action ->
             forEachSnrSample(from, to, action)
         }
@@ -967,7 +970,7 @@ class HardwareSuite @Inject constructor(
                     peakShock = if (isForensic) forensicPeakVibration else logicPeakVibration
                     peakVerticalVelocity = if (isForensic) forensicPeakVerticalVelocity else logicPeakVerticalVelocity
                     peakVerticalVelocityTs = if (isForensic) forensicPeakVerticalVelocityTs else logicPeakVerticalVelocityTs
-                    peakVerticalVelocityRt = if (isForensic) forensicPeakVerticalVelocityRt else logicPeakVerticalVelocityRt
+                    peakVerticalVelocityRt = if (isForensic) forensicPeakVerticalVelocityRt else logicPeakVerticalVelocityTs
                     plungeMatched = !isForensic && !isWarming && plungeMatched
                     peakVerticalDisplacement = if (isForensic) forensicPeakVerticalDisplacement else logicPeakVerticalDisplacement
                     proximityIdx = this@HardwareSuite.proximityIdx; proximityCm = currentProximityCm; proximityDebounceMs = this@HardwareSuite.proximityDebounceMs

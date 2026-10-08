@@ -18,11 +18,13 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Oct.8.11:
+ * - Issue #SIMP-1013-2: Storage Flush Hysteresis. Integrated JdHardwareManager.n25 
+ *   to offload storage pressure state and prune criteria to JNI, preventing 
+ *   IO thrashing via native hysteresis. Fixed AtomicBoolean named argument error.
  * Oct.8.10:
  * - Issue #SIMP-1013-1: Memory Pressure Hysteresis. Integrated JdHardwareManager.n24 
  *   to offload GC flush criteria to JNI, preventing thrashing via native hysteresis.
- * Oct.6.2:
- * - Issue #AUDIT-1006-6: Added Memory Pressure simulation hooks.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -60,6 +62,7 @@ class IntegrityMonitor @Inject constructor(
     
     private var lastMemoryPressure = MemoryPressureLevel.NORMAL
     private val memoryBatch = MemoryPressureBatch()
+    private val storageBatch = StoragePressureBatch()
 
     private val _health = MutableStateFlow(SystemHealthState())
     val healthFlow: StateFlow<SystemHealthState> = _health.asStateFlow()
@@ -295,6 +298,35 @@ class IntegrityMonitor @Inject constructor(
 
         if (needsFlush) {
             domainEventBus.emit(CommandEvent.TriggerMemoryFlush)
+        }
+
+        // Issue #SIMP-1013-2: Storage Flush Hysteresis
+        if (JdHardwareManager.isAvailable() && !isStorageSimulated.get()) {
+            val status = systemStatusProvider.getStorageStatus()
+            val available = status.availableMb
+            storageBatch.apply {
+                availableMb = available.toDouble()
+                lowThresholdMb = SYSTEM_STORAGE_LOW_THRESHOLD_MB.toDouble()
+                criticalThresholdMb = SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB.toDouble()
+                hysteresisOffsetMb = STORAGE_HYSTERESIS_OFFSET_MB
+            }
+            if (JdHardwareManager.processStorageBatchNative(storageBatch)) {
+                if (storageBatch.needsPrune) {
+                    domainEventBus.emit(CommandEvent.TriggerStoragePrune)
+                }
+                
+                val isLow = storageBatch.currentLevel >= 1
+                val isCritical = storageBatch.currentLevel >= 2
+                
+                if (isLow != currentHealth.isStorageLow || isCritical != currentHealth.isStorageCritical) {
+                    domainEventBus.emit(IntegrityEvent.StoragePressureChanged(isLow, isCritical, available))
+                    updateHealth { h ->
+                        h.isStorageLow = isLow
+                        h.isStorageCritical = isCritical
+                        h.storageAvailableMb = available
+                    }
+                }
+            }
         }
 
         updateHealth { h ->
@@ -773,6 +805,8 @@ class IntegrityMonitor @Inject constructor(
         lastMemoryPressure = MemoryPressureLevel.NORMAL
         memoryBatch.currentLevel = 0
         memoryBatch.needsFlush = false
+        storageBatch.currentLevel = 0
+        storageBatch.needsPrune = false
     }
 
     fun getBatteryLevel(): Int = currentHealth.batteryLevel

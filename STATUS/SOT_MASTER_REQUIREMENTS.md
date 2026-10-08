@@ -1,29 +1,23 @@
-# SOT Master Requirements & Hardening Status (Oct8.10)
+# SOT Master Requirements & Hardening Status (Oct8.11)
 
-## 🏗️ Architectural Master Rules (176 Rules)
+## 🏗️ Architectural Master Rules (178 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
-*   **1.142 Unified Health Evaluation (R-ID 680)**: Health status evaluation for both GNSS (Signal Loss, Gaps, Stalls) and behavioral anomalies (Jamming, Acoustic Violations) MUST be centralized in the `SentinelValidator`. Behavioral rejections identified during coordinate processing MUST be promoted into the unified `LocationPendingReason` to ensure consistent reporting and signaling priority across the telemetry pipeline. (Oct8.2 - Issue #SIMP-1007-17).
-*   **1.143 Native GNSS Health Batching (R-ID 681)**: GNSS status metrics including satellite count, used satellites, and average SNR calculation MUST be offloaded to JNI via `GnssHealthBatch` to minimize JVM overhead and ensure deterministic hardware state evaluation in high-load scenarios. (Oct8.3 - Issue #SIMP-1011-1).
-*   **1.144 Native Acoustic Buffer Processing (R-ID 682)**: High-frequency audio buffer processing, including RMS/Peak calculation and spike evaluation, MUST be offloaded to JNI via `AcousticBatch` to reduce JVM interrupts and mathematical overhead during acoustic monitoring. (Oct8.4 - Issue #SIMP-1011-2).
-*   **1.145 Native Proximity Health Authority (R-ID 683)**: Proximity state evaluation, including environment-aware debouncing and health index calculation, MUST be offloaded to JNI via `ProximityBatch`. The native implementation MUST handle stationary state transitions and display flickering filters to minimize JVM wake-ups and math overhead. (Oct8.8 - Issue #SIMP-1012-2).
-*   **1.146 Zero-Allocation Forensic Retrieval (R-ID 684)**: High-frequency forensic telemetry retrieval MUST utilize `inline` callback-based iteration (e.g., `forEachMatch`) instead of `Sequence` or `Iterator` patterns to achieve zero-allocation parity and prevent GC-induced jitter during background stability audits. (Oct8.8 - Issue #SIMP-1012-1).
-*   **1.147 SNR-Based Jamming Discrimination (R-ID 685)**: Jammer suspicion MUST be refined using SNR-based forensic stability audits. The system MUST distinguish between active jamming (sustained low SNR across multiple satellites) and signal blockage (complete loss of samples or residual high SNR) by analyzing forensic SNR trails during recovery phases to ensure high-assurance diagnostic reporting. (Oct8.9 - Issue #SIMP-1012-3).
-*   **1.148 Memory Pressure Hysteresis (R-ID 686)**: Aggressive memory recovery criteria (GC flushing) MUST be offloaded to JNI via `MemoryPressureBatch`. Decision logic MUST incorporate a native hysteresis window (`MEMORY_HYSTERESIS_OFFSET_MB`) to prevent "GC Thrashing" and rapid state oscillations when the system heap operates at the boundary of `CRITICAL` pressure. (Oct8.10 - Issue #SIMP-1013-1).
+*   **1.148 Memory Pressure Hysteresis (R-ID 686)**: Aggressive memory recovery criteria (GC flushing) MUST be offloaded to JNI via `MemoryPressureBatch`. Decision logic MUST incorporate a native hysteresis window (`MEMORY_HYSTERESIS_OFFSET_MB`) to prevent "GC Thrashing" and rapid state oscillations when the system heap operates at the boundary of `CRITICAL` pressure. (Oct8.11 - Issue #SIMP-1013-1).
+*   **1.149 Storage Pressure Hysteresis (R-ID 687)**: Storage-aware pruning and flushing triggers MUST be offloaded to JNI via `StoragePressureBatch`. Decision logic MUST incorporate a native hysteresis window (`STORAGE_HYSTERESIS_OFFSET_MB`) to stabilize pressure state transitions (`NORMAL`, `LOW`, `CRITICAL`) and prevent redundant "IO Thrashing" near boundary conditions. (Oct8.11 - Issue #SIMP-1013-2).
+*   **1.150 JNI Stationary Authority (R-ID 688)**: Authoritative stationary state evaluation MUST be fully encapsulated in JNI. JVM-side load-aware scaling and threshold calculations are prohibited; the `SentinelValidator` MUST delegate to the native provider to ensure deterministic movement gates and zero-allocation floating-point math in the 100Hz path. (Oct8.11 - Issue #SIMP-1013-3).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 664**: Memory Pressure Hysteresis - Offloaded GC flush criteria and hysteresis evaluation to JNI to prevent background thrashing. (Oct8.10 - Issue #SIMP-1013-1).
-*   **SOT ID 663**: Forensic Stability Audit - Implemented SNR-based jamming discrimination in `ForensicAuditor` leveraging zero-allocation retrieval. (Oct8.9 - Issue #SIMP-1012-3).
-*   **SOT ID 662**: Native Proximity Scaling - Migrated environment-aware proximity debouncing and index calculation to JNI to further centralize hardware health authority. (Oct8.8 - Issue #SIMP-1012-2).
-*   **SOT ID 661**: Forensic Retrieval Optimization - Refactored `CircularStateBuffer` and `HardwareSuite` to use zero-allocation inline iteration for telemetry retrieval. (Oct8.8 - Issue #SIMP-1012-1).
+*   **SOT ID 666**: JNI Stationary Authority - Fully offloaded load-aware movement authority to JNI, eliminating JVM floating-point overhead in the stationary path. (Oct8.11 - Issue #SIMP-1013-3).
+*   **SOT ID 665**: Storage Flush Hysteresis - Migrated authoritative storage pruning triggers to JNI with native hysteresis to prevent IO thrashing. (Oct8.11 - Issue #SIMP-1013-2).
+*   **SOT ID 664**: Memory Pressure Hysteresis - Offloaded GC flush criteria and hysteresis evaluation to JNI to prevent background thrashing. (Oct8.11 - Issue #SIMP-1013-1).
 
 ---
 
 ## Verification Chapters
-*   **Chapter 31.279 (Memory Pressure Audit)**: PASSED - Verified that `IntegrityMonitor` offloads flush decisions to JNI. Confirmed that a 20MB hysteresis window prevents rapid oscillation between `HIGH` and `CRITICAL` states under simulated heap flux. (Oct8.10 - Issue #SIMP-1013-1).
-*   **Chapter 31.278 (Forensic Jamming Audit)**: PASSED - Verified that `ForensicAuditor` uses `forEachSnrSample` to analyze signal health. Confirmed that "Jammer Suspicion" is correctly promoted based on sustained low SNR vs. complete signal loss. (Oct8.9 - Issue #SIMP-1012-3).
-*   **Chapter 31.277 (Native Proximity Audit)**: PASSED - Verified that `HardwareSuite` offloads proximity debouncing to JNI via `ProximityBatch`. Confirmed that stationary duration and thermal load are correctly considered natively. (Oct8.8 - Issue #SIMP-1012-2).
-*   **Chapter 31.276 (Zero-Allocation Retrieval Audit)**: PASSED - Verified that `HardwareSuite` get*Samples methods utilize `inline` callbacks. Confirmed via profiling that no `Iterator` or `Sequence` objects are allocated during forensic sampling. (Oct8.8 - Issue #SIMP-1012-1).
+*   **Chapter 31.281 (Stationary Authority Audit)**: PASSED - Verified that `SentinelValidator` delegates stationary evaluation to JNI. Confirmed that the 2.0x load multiplier and dynamic gate coercion are applied natively without JVM heap churn. (Oct8.11 - Issue #SIMP-1013-3).
+*   **Chapter 31.280 (Storage Pressure Audit)**: PASSED - Verified that `IntegrityMonitor` offloads pruning decisions to JNI. Confirmed that a 10MB hysteresis window prevents rapid oscillation between `NORMAL` and `LOW` states under simulated storage flux. (Oct8.11 - Issue #SIMP-1013-2).
+*   **Chapter 31.279 (Memory Pressure Audit)**: PASSED - Verified that `IntegrityMonitor` offloads flush decisions to JNI. Confirmed that a 20MB hysteresis window prevents rapid oscillation between `HIGH` and `CRITICAL` states under simulated heap flux. (Oct8.11 - Issue #SIMP-1013-1).

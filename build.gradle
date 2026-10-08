@@ -33,7 +33,7 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    return "Sep.30.43"
+    return "Oct8.11"
 }
 
 ext {
@@ -43,33 +43,26 @@ ext {
 
 /**
  * Issue #1354: Gradle Task Deduplication
- * Consolidates version integrity, interface validation, and doc sync into a single task
- * to reduce configuration overhead and improve build speed.
  */
 tasks.register('verifyProjectIntegrity') {
     group = "verification"
     description = "Consolidated project integrity audit (Version, Interfaces, Docs)"
     doLast {
-        // 1. Version Type-Safety Audit (Issue #1036)
+        // 1. Version Type-Safety Audit
         def testCode = rootProject.hasProperty('testVersionCode') ? rootProject.testVersionCode : "INVALID"
         def safeCode = 1000
         try {
             safeCode = testCode.toString().toInteger()
         } catch (Exception e) {
-            println "Fallback triggered successfully for malformed version: ${e.message}"
+            println "Fallback triggered successfully: ${e.message}"
         }
         assert safeCode instanceof Integer
         println "Integrity Audit: PASSED (Version: ${project.autoVersionName}, Code: ${project.autoVersionCode})"
 
-        // 2. Build-Time Interface Validation (Issue #1294)
+        // 2. Build-Time Interface Validation
         def requiredInterfaces = [
-            "TimeProvider",
-            "BootLifecycleAuthority",
-            "PowerStateProvider",
-            "NetworkProvider",
-            "SignalingTransport",
-            "SystemStatusProvider",
-            "SignalingProvider"
+            "TimeProvider", "BootLifecycleAuthority", "PowerStateProvider",
+            "NetworkProvider", "SignalingTransport", "SystemStatusProvider", "SignalingProvider"
         ]
         
         def appModuleDir = new File(project.rootDir, "app/src/main/java/com/gps19/app")
@@ -80,38 +73,34 @@ tasks.register('verifyProjectIntegrity') {
             def missing = []
             requiredInterfaces.each { inter ->
                 def pattern = java.util.regex.Pattern.compile(":\\s*" + inter + "\\b")
-                if (!pattern.matcher(combinedContent).find()) {
-                    missing.add(inter)
-                }
+                if (!pattern.matcher(combinedContent).find()) { missing.add(inter) }
             }
             
             if (!missing.isEmpty()) {
-                throw new GradleException("Build-Time Interface Validation FAILED: The following core interfaces are missing Hilt module bindings: ${missing}. Please define @Binds or @Provides in AppModule.kt or PowerModule.kt.")
+                throw new GradleException("Build-Time Interface Validation FAILED: Missing bindings for ${missing}")
             }
-            println "Build-Time Interface Validation: PASSED (All core service interfaces bound)."
+            println "Build-Time Interface Validation: PASSED."
         }
 
         // 3. Automated Documentation Version Sync (Issue #1034)
         def vName = project.autoVersionName
         def filesToUpdate = [
-            'Handover.md', 
-            'issues.md', 
-            'STATUS/SOT_MASTER_REQUIREMENTS.md',
-            'STATUS/RESOLUTION_ARCHIVE.md'
+            'Handover.md', 'issues.md', 
+            'STATUS/SOT_MASTER_REQUIREMENTS.md', 'STATUS/RESOLUTION_ARCHIVE.md'
         ]
         filesToUpdate.each { fileName ->
             def file = new File(project.rootDir, fileName)
             if (file.exists()) {
                 println "Updating version in ${fileName} to ${vName}..."
                 def content = file.text
-                def updatedContent = content.replaceAll(/(Sep\.\d{2}\.\d+)/, vName)
+                // Refined regex to capture Oct and Sep patterns
+                def updatedContent = content.replaceAll(/(Sep\.\d{2}\.\d+|Oct\d\.\d+)/, vName)
                 file.text = updatedContent
             }
         }
     }
 }
 
-// Lifecycle Integration (R-ID 336) - Optimized via Task Deduplication
 subprojects {
     afterEvaluate { subproject ->
         if (subproject.plugins.hasPlugin('com.android.application') || subproject.plugins.hasPlugin('com.android.library')) {

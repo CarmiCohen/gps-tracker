@@ -24,8 +24,9 @@ static double g_lastCalculatedHz = 0.0;
 static int64_t g_stationaryStartRt = 0;
 static const int64_t MUZZLE_HYSTERESIS_MS = 2000;
 
-// Memory Pressure Hysteresis State (Issue #SIMP-1013-1)
+// Pressure Hysteresis States (Issue #SIMP-1013-1, #SIMP-1013-2)
 static int g_currentMemoryLevel = 0; // 0: Normal, 1: High, 2: Critical
+static int g_currentStorageLevel = 0; // 0: Normal, 1: Low, 2: Critical
 
 // FastPath State (Issue #1176)
 struct FastPathConfig {
@@ -87,8 +88,9 @@ Java_com_gps19_app_JdHardwareManager_n9(JNIEnv* env, jclass clazz) {
     g_accelAuditStartRt = 0;
     g_accelEventCount = 0;
     g_lastCalculatedHz = 0.0;
-    g_stationaryStartRt = 0; // Oct.7.9: Reset muzzle hysteresis state
-    g_currentMemoryLevel = 0; // Oct.8.10: Reset memory state
+    g_stationaryStartRt = 0;
+    g_currentMemoryLevel = 0;
+    g_currentStorageLevel = 0; // Oct.8.11: Reset storage state
     return 0;
 }
 
@@ -113,9 +115,6 @@ Java_com_gps19_app_JdHardwareManager_n11(JNIEnv* env, jclass clazz, jint type, j
     return 0;
 }
 
-/**
- * n12: isStationaryNative (Issue #SIMP-1510-1)
- */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n12(JNIEnv* env, jclass clazz, jdouble vibration, jdouble adaptiveFloor, jdouble cpuLoad) {
     double loadFactor = (cpuLoad > 0.85) ? 2.0 : 1.0;
@@ -127,50 +126,34 @@ Java_com_gps19_app_JdHardwareManager_n12(JNIEnv* env, jclass clazz, jdouble vibr
     return (vibration < dynamicGate) ? 1 : 0;
 }
 
-/**
- * n13: updateVibrationFloorNative (Issue #SIMP-1510-1)
- * Aligned with SentinelValidator.kt coefficients (Oct.5 Hardening).
- */
 JNIEXPORT jdouble JNICALL
 Java_com_gps19_app_JdHardwareManager_n13(JNIEnv* env, jclass clazz, jdouble currentFloor, jdouble vibration, jint isWarming, jdouble cpuLoad) {
     if (std::isnan(vibration) || vibration <= 0.0 || cpuLoad > 0.85) return currentFloor;
     double alpha = 0.0;
     if (vibration < currentFloor) {
-        alpha = (isWarming ? 0.5 : 0.1); // VIBRATION_EMA_DOWN_FAST = 0.1
+        alpha = (isWarming ? 0.5 : 0.1);
     } else if (vibration < 1.0) {
-        alpha = (isWarming ? 0.1 : 0.01); // VIBRATION_EMA_UP_FAST = 0.01
+        alpha = (isWarming ? 0.1 : 0.01);
     }
     return (currentFloor * (1.0 - alpha)) + (vibration * alpha);
 }
 
-/**
- * n14: computeNextHpfNative (VIBRATION_HPF_ALPHA = 0.9)
- */
 JNIEXPORT jdouble JNICALL
 Java_com_gps19_app_JdHardwareManager_n14(JNIEnv* env, jclass clazz, jdouble lastHpfValue, jdouble currentRawVibe, jdouble lastRawVibe) {
     return 0.9 * (lastHpfValue + currentRawVibe - lastRawVibe);
 }
 
-/**
- * n15: computeNextEnergyNative (VIBRATION_ENERGY_EMA_ALPHA = 0.1)
- */
 JNIEXPORT jdouble JNICALL
 Java_com_gps19_app_JdHardwareManager_n15(JNIEnv* env, jclass clazz, jdouble currentEnergy, jdouble hpfValue) {
     return (currentEnergy * 0.9) + (std::abs(hpfValue) * 0.1);
 }
 
-/**
- * n16: calculateVibrationDeltaNative
- */
 JNIEXPORT jdouble JNICALL
 Java_com_gps19_app_JdHardwareManager_n16(JNIEnv* env, jclass clazz, jdouble x, jdouble y, jdouble z, jdouble lx, jdouble ly, jdouble lz) {
     double dx = x - lx, dy = y - ly, dz = z - lz;
     return std::sqrt(dx * dx + dy * dy + dz * dz) / 9.80665;
 }
 
-/**
- * n17: isShockViolatedNative
- */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n17(JNIEnv* env, jclass clazz, jdouble peak, jdouble floor, jfloat sens, jdouble cpu) {
     double loadFactor = (cpu > 0.85) ? 1.5 : 1.0;
@@ -179,9 +162,6 @@ Java_com_gps19_app_JdHardwareManager_n17(JNIEnv* env, jclass clazz, jdouble peak
     return (peak > dynamicThreshold) ? 1 : 0;
 }
 
-/**
- * n18: isVibrationSuspiciousNative
- */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n18(JNIEnv* env, jclass clazz, jdouble vibe, jdouble floor, jfloat sens, jdouble cpu) {
     double loadFactor = (cpu > 0.85) ? 1.5 : 1.0;
@@ -190,9 +170,6 @@ Java_com_gps19_app_JdHardwareManager_n18(JNIEnv* env, jclass clazz, jdouble vibe
     return (vibe > dynamicThreshold) ? 1 : 0;
 }
 
-/**
- * n19: processVibrationBatch (Issue #1450)
- */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 256) return -1;
@@ -264,9 +241,6 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     return 0;
 }
 
-/**
- * n20: computeAdaptiveAcousticAlphaNative
- */
 JNIEXPORT jdouble JNICALL
 Java_com_gps19_app_JdHardwareManager_n20(JNIEnv* env, jclass clazz, jdouble baseAlpha, jdouble vibrationRollingSum) {
     double factor = 1.0;
@@ -276,9 +250,6 @@ Java_com_gps19_app_JdHardwareManager_n20(JNIEnv* env, jclass clazz, jdouble base
     return baseAlpha * factor;
 }
 
-/**
- * n21: processGnssBatch
- */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n21(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 856) return -1;
@@ -307,9 +278,6 @@ Java_com_gps19_app_JdHardwareManager_n21(JNIEnv* env, jclass clazz) {
     return 0;
 }
 
-/**
- * n22: processAcousticBatch
- */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 1024) return -1;
@@ -336,15 +304,12 @@ Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz) {
 
     *(int*)(ptr + 1000) = maxAmp;
     *(double*)(ptr + 1004) = db;
-    *(int*)(ptr + 1012) = 0; // Spike detection omitted for brevity or handled in n11
+    *(int*)(ptr + 1012) = 0;
     *(int64_t*)(ptr + 1016) = 0;
 
     return 0;
 }
 
-/**
- * n23: processProximityBatch
- */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n23(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 256) return -1;
@@ -375,7 +340,6 @@ Java_com_gps19_app_JdHardwareManager_n23(JNIEnv* env, jclass clazz) {
 
 /**
  * n24: processMemoryBatch (Issue #SIMP-1013-1)
- * Native evaluation of GC flush criteria with hysteresis to prevent thrashing.
  */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n24(JNIEnv* env, jclass clazz) {
@@ -390,7 +354,6 @@ Java_com_gps19_app_JdHardwareManager_n24(JNIEnv* env, jclass clazz) {
     int nextLevel = g_currentMemoryLevel;
     bool needsFlush = false;
 
-    // Upward Transition
     if (heapMb >= criticalThresholdMb) {
         if (g_currentMemoryLevel < 2) {
             nextLevel = 2; // CRITICAL
@@ -403,7 +366,6 @@ Java_com_gps19_app_JdHardwareManager_n24(JNIEnv* env, jclass clazz) {
         }
     }
 
-    // Downward Transition with Hysteresis
     if (g_currentMemoryLevel == 2) {
         if (heapMb < (criticalThresholdMb - hysteresisOffsetMb)) {
             nextLevel = (heapMb >= pressureThresholdMb) ? 1 : 0;
@@ -418,6 +380,55 @@ Java_com_gps19_app_JdHardwareManager_n24(JNIEnv* env, jclass clazz) {
 
     *(int*)(ptr + 128) = g_currentMemoryLevel;
     *(int*)(ptr + 132) = (needsFlush ? 1 : 0);
+
+    return 0;
+}
+
+/**
+ * n25: processStorageBatch (Issue #SIMP-1013-2)
+ * Native evaluation of storage pressure with hysteresis to prevent IO thrashing.
+ */
+JNIEXPORT jint JNICALL
+Java_com_gps19_app_JdHardwareManager_n25(JNIEnv* env, jclass clazz) {
+    if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 256) return -1;
+    uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
+
+    double availableMb = *(double*)(ptr + 0);
+    double lowThresholdMb = *(double*)(ptr + 8);
+    double criticalThresholdMb = *(double*)(ptr + 16);
+    double hysteresisOffsetMb = *(double*)(ptr + 24);
+
+    int nextLevel = g_currentStorageLevel;
+    bool needsPrune = false;
+
+    // Upward Transition (Lower availability = higher pressure)
+    if (availableMb <= criticalThresholdMb) {
+        if (g_currentStorageLevel < 2) {
+            nextLevel = 2; // CRITICAL
+            needsPrune = true;
+        }
+    } else if (availableMb <= lowThresholdMb) {
+        if (g_currentStorageLevel < 1) {
+            nextLevel = 1; // LOW
+            needsPrune = true;
+        }
+    }
+
+    // Downward Transition with Hysteresis (Higher availability)
+    if (g_currentStorageLevel == 2) {
+        if (availableMb > (criticalThresholdMb + hysteresisOffsetMb)) {
+            nextLevel = (availableMb <= lowThresholdMb) ? 1 : 0;
+        }
+    } else if (g_currentStorageLevel == 1) {
+        if (availableMb > (lowThresholdMb + hysteresisOffsetMb)) {
+            nextLevel = 0;
+        }
+    }
+
+    g_currentStorageLevel = nextLevel;
+
+    *(int*)(ptr + 128) = g_currentStorageLevel;
+    *(int*)(ptr + 132) = (needsPrune ? 1 : 0);
 
     return 0;
 }

@@ -6,18 +6,14 @@ import kotlin.math.min
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * Oct.8.11:
+ * - Issue #SIMP-1013-3: JNI Stationary Authority. Offloaded load-aware stationary 
+ *   scaling to JNI. Eliminated JVM gate calculation to ensure movement authority 
+ *   convergence.
  * Oct.7.11:
  * - Issue #SIMP-1007-17: Consolidated redundant location pending logic 
  *   from HardwareSuite. Added evaluateLocationPendingReason and 
  *   getHigherPriorityReason to centralize GNSS and behavioral health evaluation.
- * Oct.7.9:
- * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Updated 
- *   computeAdaptiveAcousticOffCycle to take duration instead of absolute timestamp 
- *   to align with native offloading.
- * Oct.5.5:
- * - Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2). Offloaded 
- *   isShockViolated and isVibrationSuspicious to JNI to complete the 100Hz 
- *   vibration path hardening. Eliminated remaining JVM floating-point math.
  */
 object SentinelValidator {
 
@@ -71,13 +67,20 @@ object SentinelValidator {
         return vibration > dynamicThreshold
     }
 
+    /**
+     * isStationary: Authoritative movement gate.
+     * Oct.8.11: Fully offloaded load-factor logic to JNI.
+     */
     fun isStationary(vibration: Double, adaptiveFloor: Double, cpuLoad: Double = 0.0): Boolean {
         nativeProvider?.let {
             return it.isStationary(vibration, adaptiveFloor, cpuLoad)
         }
 
         val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 2.0 else 1.0
-        val dynamicGate = (adaptiveFloor * STATIONARY_FLOOR_MULT * loadFactor).coerceIn(INITIAL_VIBRATION_FLOOR, VIBRATION_STATIONARY_THRESHOLD * loadFactor)
+        val dynamicGate = (adaptiveFloor * STATIONARY_FLOOR_MULT * loadFactor).coerceIn(
+            INITIAL_VIBRATION_FLOOR, 
+            VIBRATION_STATIONARY_THRESHOLD * loadFactor
+        )
         return vibration < dynamicGate
     }
 

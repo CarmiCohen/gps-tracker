@@ -23,15 +23,12 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.8.11:
+ * - Issue #SIMP-1013-2: Storage Flush Hysteresis. Implemented processStorageBatch 
+ *   to offload storage pressure state and prune criteria to JNI (n25).
  * Oct.8.10:
  * - Issue #SIMP-1013-1: Memory Pressure Hysteresis. Implemented processMemoryBatch 
  *   to offload GC flush criteria and hysteresis evaluation to JNI (n24).
- * Oct.8.5:
- * - Issue #SIMP-1012-2: Native Proximity Scaling. Implemented processProximityBatchNative 
- *   to offload environment-aware proximity debouncing and index calculation (n23).
- * Oct.8.4:
- * - Issue #SIMP-1011-2: Acoustic JNI Offloading. Implemented processAcousticBatchNative 
- *   to offload RMS calculation and spike evaluation (n22).
  */
 object JdHardwareManager {
 
@@ -203,6 +200,24 @@ object JdHardwareManager {
         return false
     }
 
+    fun processStorageBatchNative(batch: StoragePressureBatch): Boolean {
+        if (!isLibraryLoaded.get()) return false
+        synchronized(sharedStateBuffer) {
+            sharedStateBuffer.clear()
+            sharedStateBuffer.putDouble(batch.availableMb) // 0
+            sharedStateBuffer.putDouble(batch.lowThresholdMb) // 8
+            sharedStateBuffer.putDouble(batch.criticalThresholdMb) // 16
+            sharedStateBuffer.putDouble(batch.hysteresisOffsetMb) // 24
+            val res = n25()
+            if (res == 0) {
+                batch.currentLevel = sharedStateBuffer.getInt(128)
+                batch.needsPrune = sharedStateBuffer.getInt(132) != 0
+                return true
+            }
+        }
+        return false
+    }
+
     fun isStationaryNative(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean {
         return if (isLibraryLoaded.get()) n12(vibration, adaptiveFloor, cpuLoad) != 0 else { val loadFactor = if (cpuLoad > 0.85) 2.0 else 1.0; vibration < (adaptiveFloor * 1.5 * loadFactor).coerceIn(0.05, 0.12 * loadFactor) }
     }
@@ -260,4 +275,5 @@ object JdHardwareManager {
     @JvmStatic private external fun n22(): Int
     @JvmStatic private external fun n23(): Int
     @JvmStatic private external fun n24(): Int
+    @JvmStatic private external fun n25(): Int
 }

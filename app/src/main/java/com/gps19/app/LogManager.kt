@@ -9,13 +9,12 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Oct.8.11:
+ * - Issue #SIMP-1013-2: Storage Flush Hysteresis. Exposed proactivePruning to 
+ *   support authoritative pruning cycles driven by native hysteresis logic.
  * Oct.7.4:
  * - Issue #SIMP-1007-15: Unified Snapshot Container. Updated LogEntry 
  *   construction to utilize ForensicSnapshot container.
- * Oct.5.2:
- * - Issue #1344: Forensic Diagnostic Expansion. Updated logForensicTrace, 
- *   logForensicTraceOptimized, and submitToLogSink to include thermalSnapshot 
- *   and heapSnapshot forensic probes (R1344).
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -43,6 +42,13 @@ class LogManager @Inject constructor(
      */
     fun setForensicStallSimulation(active: Boolean) {
         logRepository.setForensicStallSimulation(active)
+    }
+
+    /**
+     * proactivePruning: Triggers aggressive log cleanup based on system pressure.
+     */
+    suspend fun proactivePruning() {
+        logRepository.proactivePruning()
     }
 
     /**
