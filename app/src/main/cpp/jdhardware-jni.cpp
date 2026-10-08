@@ -90,7 +90,7 @@ Java_com_gps19_app_JdHardwareManager_n9(JNIEnv* env, jclass clazz) {
     g_lastCalculatedHz = 0.0;
     g_stationaryStartRt = 0;
     g_currentMemoryLevel = 0;
-    g_currentStorageLevel = 0; // Oct.8.11: Reset storage state
+    g_currentStorageLevel = 0;
     return 0;
 }
 
@@ -338,9 +338,6 @@ Java_com_gps19_app_JdHardwareManager_n23(JNIEnv* env, jclass clazz) {
     return 0;
 }
 
-/**
- * n24: processMemoryBatch (Issue #SIMP-1013-1)
- */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n24(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 256) return -1;
@@ -355,39 +352,23 @@ Java_com_gps19_app_JdHardwareManager_n24(JNIEnv* env, jclass clazz) {
     bool needsFlush = false;
 
     if (heapMb >= criticalThresholdMb) {
-        if (g_currentMemoryLevel < 2) {
-            nextLevel = 2; // CRITICAL
-            needsFlush = true;
-        }
+        if (g_currentMemoryLevel < 2) { nextLevel = 2; needsFlush = true; }
     } else if (heapMb >= pressureThresholdMb) {
-        if (g_currentMemoryLevel < 1) {
-            nextLevel = 1; // HIGH
-            needsFlush = true;
-        }
+        if (g_currentMemoryLevel < 1) { nextLevel = 1; needsFlush = true; }
     }
 
     if (g_currentMemoryLevel == 2) {
-        if (heapMb < (criticalThresholdMb - hysteresisOffsetMb)) {
-            nextLevel = (heapMb >= pressureThresholdMb) ? 1 : 0;
-        }
+        if (heapMb < (criticalThresholdMb - hysteresisOffsetMb)) { nextLevel = (heapMb >= pressureThresholdMb) ? 1 : 0; }
     } else if (g_currentMemoryLevel == 1) {
-        if (heapMb < (pressureThresholdMb - hysteresisOffsetMb)) {
-            nextLevel = 0;
-        }
+        if (heapMb < (pressureThresholdMb - hysteresisOffsetMb)) { nextLevel = 0; }
     }
 
     g_currentMemoryLevel = nextLevel;
-
     *(int*)(ptr + 128) = g_currentMemoryLevel;
     *(int*)(ptr + 132) = (needsFlush ? 1 : 0);
-
     return 0;
 }
 
-/**
- * n25: processStorageBatch (Issue #SIMP-1013-2)
- * Native evaluation of storage pressure with hysteresis to prevent IO thrashing.
- */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n25(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 256) return -1;
@@ -401,34 +382,88 @@ Java_com_gps19_app_JdHardwareManager_n25(JNIEnv* env, jclass clazz) {
     int nextLevel = g_currentStorageLevel;
     bool needsPrune = false;
 
-    // Upward Transition (Lower availability = higher pressure)
     if (availableMb <= criticalThresholdMb) {
-        if (g_currentStorageLevel < 2) {
-            nextLevel = 2; // CRITICAL
-            needsPrune = true;
-        }
+        if (g_currentStorageLevel < 2) { nextLevel = 2; needsPrune = true; }
     } else if (availableMb <= lowThresholdMb) {
-        if (g_currentStorageLevel < 1) {
-            nextLevel = 1; // LOW
-            needsPrune = true;
-        }
+        if (g_currentStorageLevel < 1) { nextLevel = 1; needsPrune = true; }
     }
 
-    // Downward Transition with Hysteresis (Higher availability)
     if (g_currentStorageLevel == 2) {
-        if (availableMb > (criticalThresholdMb + hysteresisOffsetMb)) {
-            nextLevel = (availableMb <= lowThresholdMb) ? 1 : 0;
-        }
+        if (availableMb > (criticalThresholdMb + hysteresisOffsetMb)) { nextLevel = (availableMb <= lowThresholdMb) ? 1 : 0; }
     } else if (g_currentStorageLevel == 1) {
-        if (availableMb > (lowThresholdMb + hysteresisOffsetMb)) {
-            nextLevel = 0;
-        }
+        if (availableMb > (lowThresholdMb + hysteresisOffsetMb)) { nextLevel = 0; }
     }
 
     g_currentStorageLevel = nextLevel;
-
     *(int*)(ptr + 128) = g_currentStorageLevel;
     *(int*)(ptr + 132) = (needsPrune ? 1 : 0);
+    return 0;
+}
+
+/**
+ * n26: processSystemPressure (Issue #SIMP-1014-2)
+ * Unified evaluation of memory and storage pressure in a single JNI crossing.
+ */
+JNIEXPORT jint JNICALL
+Java_com_gps19_app_JdHardwareManager_n26(JNIEnv* env, jclass clazz) {
+    if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 256) return -1;
+    uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
+
+    // Memory Inputs
+    double heapMb = *(double*)(ptr + 0);
+    double memPressureThresholdMb = *(double*)(ptr + 8);
+    double memCriticalThresholdMb = *(double*)(ptr + 16);
+    double memHysteresisOffsetMb = *(double*)(ptr + 24);
+
+    // Storage Inputs
+    double storageAvailableMb = *(double*)(ptr + 32);
+    double storageLowThresholdMb = *(double*)(ptr + 40);
+    double storageCriticalThresholdMb = *(double*)(ptr + 48);
+    double storageHysteresisOffsetMb = *(double*)(ptr + 56);
+
+    // 1. Evaluate Memory
+    int nextMemLevel = g_currentMemoryLevel;
+    bool needsMemFlush = false;
+
+    if (heapMb >= memCriticalThresholdMb) {
+        if (g_currentMemoryLevel < 2) { nextMemLevel = 2; needsMemFlush = true; }
+    } else if (heapMb >= memPressureThresholdMb) {
+        if (g_currentMemoryLevel < 1) { nextMemLevel = 1; needsMemFlush = true; }
+    }
+
+    if (g_currentMemoryLevel == 2) {
+        if (heapMb < (memCriticalThresholdMb - memHysteresisOffsetMb)) {
+            nextMemLevel = (heapMb >= memPressureThresholdMb) ? 1 : 0;
+        }
+    } else if (g_currentMemoryLevel == 1) {
+        if (heapMb < (memPressureThresholdMb - memHysteresisOffsetMb)) { nextMemLevel = 0; }
+    }
+    g_currentMemoryLevel = nextMemLevel;
+
+    // 2. Evaluate Storage
+    int nextStorageLevel = g_currentStorageLevel;
+    bool needsStoragePrune = false;
+
+    if (storageAvailableMb <= storageCriticalThresholdMb) {
+        if (g_currentStorageLevel < 2) { nextStorageLevel = 2; needsStoragePrune = true; }
+    } else if (storageAvailableMb <= storageLowThresholdMb) {
+        if (g_currentStorageLevel < 1) { nextStorageLevel = 1; needsStoragePrune = true; }
+    }
+
+    if (g_currentStorageLevel == 2) {
+        if (storageAvailableMb > (storageCriticalThresholdMb + storageHysteresisOffsetMb)) {
+            nextStorageLevel = (storageAvailableMb <= storageLowThresholdMb) ? 1 : 0;
+        }
+    } else if (g_currentStorageLevel == 1) {
+        if (storageAvailableMb > (storageLowThresholdMb + storageHysteresisOffsetMb)) { nextStorageLevel = 0; }
+    }
+    g_currentStorageLevel = nextStorageLevel;
+
+    // 3. Write Outputs
+    *(int*)(ptr + 128) = g_currentMemoryLevel;
+    *(int*)(ptr + 132) = (needsMemFlush ? 1 : 0);
+    *(int*)(ptr + 136) = g_currentStorageLevel;
+    *(int*)(ptr + 140) = (needsStoragePrune ? 1 : 0);
 
     return 0;
 }

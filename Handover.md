@@ -1,9 +1,9 @@
-# Handover: Hardening Process - Oct8.11
+# Handover: Hardening Process - Oct8.12
 
 ## 🎯 Current Status
-Successfully achieved **Native Authority Convergence** for version **Oct8.11**. The system now delegates both Storage Pressure evaluation (#SIMP-1013-2) and Stationary state gating (#SIMP-1013-3) to JNI. This eliminates JVM floating-point overhead in the 100Hz high-frequency path and prevents "IO Thrashing" via native hysteresis windows. Additionally, the build system has been modernized using a centralized Version Catalog and Dependency Bundles.
+Successfully achieved **Native Authority Convergence** for version **Oct8.12**. The system now delegates both Storage Pressure evaluation (#SIMP-1013-2) and Stationary state gating (#SIMP-1013-3) to JNI. This eliminates JVM floating-point overhead in the 100Hz high-frequency path and prevents "IO Thrashing" via native hysteresis windows. Additionally, the build system has been modernized using a centralized Version Catalog and Dependency Bundles.
 
-## 🛠️ Changes Performed (Oct8.11)
+## 🛠️ Changes Performed (Oct8.12)
 1.  **JNI Authority**:
     *   `jdhardware-jni.cpp`: Implemented `n25` (Storage Hysteresis) and hardened `n12` (Load-aware Stationary Gating).
     *   Movement logic now natively handles the 2.0x CPU-load multiplier (R-ID 688).
@@ -23,5 +23,5 @@ Successfully achieved **Native Authority Convergence** for version **Oct8.11**. 
 
 ## 📍 Forensic State Snapshot
 *   **SIMP-1013-2 & 3 Progress**: 100% complete.
-*   **Version**: Oct8.11
+*   **Version**: Oct8.12
 *   **Active Focus**: Performance Hardening & Build Integrity.

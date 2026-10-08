@@ -23,12 +23,10 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
- * Oct.8.11:
- * - Issue #SIMP-1013-2: Storage Flush Hysteresis. Implemented processStorageBatch 
- *   to offload storage pressure state and prune criteria to JNI (n25).
- * Oct.8.10:
- * - Issue #SIMP-1013-1: Memory Pressure Hysteresis. Implemented processMemoryBatch 
- *   to offload GC flush criteria and hysteresis evaluation to JNI (n24).
+ * Oct.8.12:
+ * - Issue #SIMP-1014-2: Unified SystemPressureBatch. Consolidated Memory and 
+ *   Storage pressure evaluation into a single JNI crossing (n26). Removed 
+ *   superseded n24 and n25.
  */
 object JdHardwareManager {
 
@@ -161,15 +159,15 @@ object JdHardwareManager {
         if (!isLibraryLoaded.get()) return false
         synchronized(sharedStateBuffer) {
             sharedStateBuffer.clear()
-            sharedStateBuffer.putDouble(batch.distance) // 0
-            sharedStateBuffer.putDouble(batch.maxRange) // 8
-            sharedStateBuffer.putLong(batch.nowRt) // 16
-            sharedStateBuffer.putInt(if (batch.isStationary) 1 else 0) // 24
-            sharedStateBuffer.putLong(batch.stationaryDurationMs) // 28
-            sharedStateBuffer.putInt(if (batch.isHighLoad) 1 else 0) // 36
-            sharedStateBuffer.putDouble(batch.currentIdx) // 40
-            sharedStateBuffer.putInt(if (batch.rawNear) 1 else 0) // 48
-            sharedStateBuffer.putInt(if (batch.isFlickering) 1 else 0) // 52
+            sharedStateBuffer.putDouble(batch.distance) 
+            sharedStateBuffer.putDouble(batch.maxRange) 
+            sharedStateBuffer.putLong(batch.nowRt) 
+            sharedStateBuffer.putInt(if (batch.isStationary) 1 else 0) 
+            sharedStateBuffer.putLong(batch.stationaryDurationMs) 
+            sharedStateBuffer.putInt(if (batch.isHighLoad) 1 else 0) 
+            sharedStateBuffer.putDouble(batch.currentIdx) 
+            sharedStateBuffer.putInt(if (batch.rawNear) 1 else 0) 
+            sharedStateBuffer.putInt(if (batch.isFlickering) 1 else 0)
             
             val res = n23()
             if (res == 0) {
@@ -182,36 +180,30 @@ object JdHardwareManager {
         return false
     }
 
-    fun processMemoryBatchNative(batch: MemoryPressureBatch): Boolean {
+    /**
+     * processSystemPressureNative: Unified Memory and Storage evaluation (Issue #SIMP-1014-2).
+     */
+    fun processSystemPressureNative(batch: SystemPressureBatch): Boolean {
         if (!isLibraryLoaded.get()) return false
         synchronized(sharedStateBuffer) {
             sharedStateBuffer.clear()
+            // Memory Inputs
             sharedStateBuffer.putDouble(batch.heapMb) // 0
-            sharedStateBuffer.putDouble(batch.pressureThresholdMb) // 8
-            sharedStateBuffer.putDouble(batch.criticalThresholdMb) // 16
-            sharedStateBuffer.putDouble(batch.hysteresisOffsetMb) // 24
-            val res = n24()
-            if (res == 0) {
-                batch.currentLevel = sharedStateBuffer.getInt(128)
-                batch.needsFlush = sharedStateBuffer.getInt(132) != 0
-                return true
-            }
-        }
-        return false
-    }
+            sharedStateBuffer.putDouble(batch.memPressureThresholdMb) // 8
+            sharedStateBuffer.putDouble(batch.memCriticalThresholdMb) // 16
+            sharedStateBuffer.putDouble(batch.memHysteresisOffsetMb) // 24
+            // Storage Inputs
+            sharedStateBuffer.putDouble(batch.storageAvailableMb) // 32
+            sharedStateBuffer.putDouble(batch.storageLowThresholdMb) // 40
+            sharedStateBuffer.putDouble(batch.storageCriticalThresholdMb) // 48
+            sharedStateBuffer.putDouble(batch.storageHysteresisOffsetMb) // 56
 
-    fun processStorageBatchNative(batch: StoragePressureBatch): Boolean {
-        if (!isLibraryLoaded.get()) return false
-        synchronized(sharedStateBuffer) {
-            sharedStateBuffer.clear()
-            sharedStateBuffer.putDouble(batch.availableMb) // 0
-            sharedStateBuffer.putDouble(batch.lowThresholdMb) // 8
-            sharedStateBuffer.putDouble(batch.criticalThresholdMb) // 16
-            sharedStateBuffer.putDouble(batch.hysteresisOffsetMb) // 24
-            val res = n25()
+            val res = n26()
             if (res == 0) {
-                batch.currentLevel = sharedStateBuffer.getInt(128)
-                batch.needsPrune = sharedStateBuffer.getInt(132) != 0
+                batch.currentMemLevel = sharedStateBuffer.getInt(128)
+                batch.needsMemFlush = sharedStateBuffer.getInt(132) != 0
+                batch.currentStorageLevel = sharedStateBuffer.getInt(136)
+                batch.needsStoragePrune = sharedStateBuffer.getInt(140) != 0
                 return true
             }
         }
@@ -274,6 +266,5 @@ object JdHardwareManager {
     @JvmStatic private external fun n21(): Int
     @JvmStatic private external fun n22(): Int
     @JvmStatic private external fun n23(): Int
-    @JvmStatic private external fun n24(): Int
-    @JvmStatic private external fun n25(): Int
+    @JvmStatic private external fun n26(): Int
 }

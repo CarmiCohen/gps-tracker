@@ -37,12 +37,13 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.8.12:
+ * - Issue #SIMP-1014-2: Unified SystemPressureBatch. Consolidated Memory and 
+ *   Storage pressure evaluation into a single JNI crossing (n26). Removed 
+ *   superseded overrides. Aligns with SIMP-IDEA-2.
  * Oct.8.11:
  * - Issue #SIMP-1013-2: Storage Flush Hysteresis. Added processStorageBatch 
  *   to nativeFastPathProvider (n25).
- * Oct.8.10:
- * - Issue #SIMP-1013-1: Memory Pressure Hysteresis. Added processMemoryBatch 
- *   to nativeFastPathProvider (n24).
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -102,12 +103,8 @@ class HardwareSuite @Inject constructor(
             return JdHardwareManager.processProximityBatchNative(batch)
         }
 
-        override fun processMemoryBatch(batch: MemoryPressureBatch): Boolean {
-            return JdHardwareManager.processMemoryBatchNative(batch)
-        }
-
-        override fun processStorageBatch(batch: StoragePressureBatch): Boolean {
-            return JdHardwareManager.processStorageBatchNative(batch)
+        override fun processSystemPressure(batch: SystemPressureBatch): Boolean {
+            return JdHardwareManager.processSystemPressureNative(batch)
         }
     }
 
@@ -836,7 +833,7 @@ class HardwareSuite @Inject constructor(
                 if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) {
                     lastStayAliveRt = nowRt
                     val canPoke = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true
-                    if (canPoke) systemMonitor.acquireWakeLock(force = true)
+                    if (canPoke) systemMonitor.acquire WakeLock(force = true)
                 }
                 forensicAuditor.auditSensorRate(isWarming).forEach { (role, msg) -> domainEventBus.emit(AppSensorEvent.LogEvent("[$role] $msg", false)) }
             }
@@ -1086,7 +1083,7 @@ class HardwareSuite @Inject constructor(
         synchronized(this) {
             lastAnomalyActiveRt = 0L; lastAcousticLockoutRt = 0L; acousticFastPath.reset(); lightFastPath.reset(); rawProximityNear = false; stationaryDurationMs = 0L; emaPressure = 0.0; lastBaroZeroingRt = 0L; lastLinearAccelTs = 0L; lastStayAliveRt = 0L; lastDisplayTransitionRt = 0L
             secPeakLux = 0.0; secPeakVibe = 0.0; secSumProxIdx = 0.0; secProxCount = 0; secPeakTilt = 0.0; secPeakLift = 0.0; secPeakDb = 0.0; secSitDetected = false; secPeakKinetic = 0.0
-            plungePhase = 0; plungeMatched = false; lastPlungePhaseRt = 0L; lastGpsSpeedMps = 0.0; currentCpuLoad = 0.0; cachedThermalHeadroom = 0.0; cachedHeapAllocatedMb = 0.0; isSuspiciousNoise = false; isMemoryPressureThrottled = false; isJammingCandidate = false; activityContextProvider.reset()
+            plungePhase = 0; plungeMatched = false; lastPlungePhaseRt = 0L; lastGpsSpeedMps = 0.0; currentCpuLoad = 0.0; cached ThermalHeadroom = 0.0; cachedHeapAllocatedMb = 0.0; isSuspiciousNoise = false; isMemoryPressureThrottled = false; isJammingCandidate = false; activityContextProvider.reset()
         }
     }
 
