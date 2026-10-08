@@ -37,13 +37,13 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.8.15:
+ * - Issue #SIMP-IDEA-3: Standardized on @NotNull native providers. Updated 
+ *   nativeFastPathProvider to include computeAdaptiveAcousticAlpha. Aligned 
+ *   SentinelValidator calls to eliminate redundant JVM fallbacks.
  * Oct.8.12:
  * - Issue #SIMP-1014-2: Unified SystemPressureBatch. Consolidated Memory and 
- *   Storage pressure evaluation into a single JNI crossing (n26). Removed 
- *   superseded overrides. Aligns with SIMP-IDEA-2.
- * Oct.8.11:
- * - Issue #SIMP-1013-2: Storage Flush Hysteresis. Added processStorageBatch 
- *   to nativeFastPathProvider (n25).
+ *   Storage pressure evaluation into a single JNI crossing (n26).
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -85,6 +85,10 @@ class HardwareSuite @Inject constructor(
 
         override fun isVibrationSuspicious(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
             return JdHardwareManager.isVibrationSuspiciousNative(vibration, adaptiveFloor, sensitivity, cpuLoad)
+        }
+
+        override fun computeAdaptiveAcousticAlpha(baseAlpha: Double, vibrationRollingSum: Double): Double {
+            return JdHardwareManager.computeAdaptiveAcousticAlphaNative(baseAlpha, vibrationRollingSum)
         }
 
         override fun processVibrationBatch(batch: VibrationBatch): Boolean {
@@ -939,7 +943,7 @@ class HardwareSuite @Inject constructor(
                                         var maxAmp = 0; for (i in 0 until read) { val a = abs(buffer[i].toInt()); if (a > maxAmp) maxAmp = a }
                                         val db = if (maxAmp > 0) 20 * log10(maxAmp.toDouble()) else 0.0
                                         currentAcousticDb = db; if (db > logicPeakDb) logicPeakDb = db; if (db < logicMinDb) logicMinDb = db; if (db > forensicPeakDb) forensicPeakDb = db; if (db < forensicMinDb) forensicMinDb = db; if (db > secPeakDb) secPeakDb = db
-                                        val alpha = JdHardwareManager.computeAdaptiveAcousticAlphaNative(baseAlpha, vibrationRollingSum)
+                                        val alpha = nativeFastPathProvider.computeAdaptiveAcousticAlpha(baseAlpha, vibrationRollingSum)
                                         if (acousticFastPath.evaluate(db, nowRt, isWarming, SPIKE_DEBOUNCE_MS, alpha)) lastAcousticLockoutRt = acousticFastPath.lastSpikeRt
                                     }
                                 }

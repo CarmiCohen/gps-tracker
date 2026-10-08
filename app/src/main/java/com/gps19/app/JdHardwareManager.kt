@@ -23,10 +23,13 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.8.15:
+ * - Issue #SIMP-IDEA-3: Standardized Native Provider Fallbacks. Updated JVM 
+ *   fallbacks in native wrapper methods to use EngineConstants for parity 
+ *   with SentinelValidator.
  * Oct.8.12:
  * - Issue #SIMP-1014-2: Unified SystemPressureBatch. Consolidated Memory and 
- *   Storage pressure evaluation into a single JNI crossing (n26). Removed 
- *   superseded n24 and n25.
+ *   Storage pressure evaluation into a single JNI crossing (n26).
  */
 object JdHardwareManager {
 
@@ -187,16 +190,14 @@ object JdHardwareManager {
         if (!isLibraryLoaded.get()) return false
         synchronized(sharedStateBuffer) {
             sharedStateBuffer.clear()
-            // Memory Inputs
-            sharedStateBuffer.putDouble(batch.heapMb) // 0
-            sharedStateBuffer.putDouble(batch.memPressureThresholdMb) // 8
-            sharedStateBuffer.putDouble(batch.memCriticalThresholdMb) // 16
-            sharedStateBuffer.putDouble(batch.memHysteresisOffsetMb) // 24
-            // Storage Inputs
-            sharedStateBuffer.putDouble(batch.storageAvailableMb) // 32
-            sharedStateBuffer.putDouble(batch.storageLowThresholdMb) // 40
-            sharedStateBuffer.putDouble(batch.storageCriticalThresholdMb) // 48
-            sharedStateBuffer.putDouble(batch.storageHysteresisOffsetMb) // 56
+            sharedStateBuffer.putDouble(batch.heapMb) 
+            sharedStateBuffer.putDouble(batch.memPressureThresholdMb) 
+            sharedStateBuffer.putDouble(batch.memCriticalThresholdMb) 
+            sharedStateBuffer.putDouble(batch.memHysteresisOffsetMb) 
+            sharedStateBuffer.putDouble(batch.storageAvailableMb) 
+            sharedStateBuffer.putDouble(batch.storageLowThresholdMb) 
+            sharedStateBuffer.putDouble(batch.storageCriticalThresholdMb) 
+            sharedStateBuffer.putDouble(batch.storageHysteresisOffsetMb) 
 
             val res = n26()
             if (res == 0) {
@@ -211,31 +212,59 @@ object JdHardwareManager {
     }
 
     fun isStationaryNative(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean {
-        return if (isLibraryLoaded.get()) n12(vibration, adaptiveFloor, cpuLoad) != 0 else { val loadFactor = if (cpuLoad > 0.85) 2.0 else 1.0; vibration < (adaptiveFloor * 1.5 * loadFactor).coerceIn(0.05, 0.12 * loadFactor) }
+        if (isLibraryLoaded.get()) return n12(vibration, adaptiveFloor, cpuLoad) != 0
+        
+        val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 2.0 else 1.0
+        val dynamicGate = (adaptiveFloor * STATIONARY_FLOOR_MULT * loadFactor).coerceIn(
+            INITIAL_VIBRATION_FLOOR, 
+            VIBRATION_STATIONARY_THRESHOLD * loadFactor
+        )
+        return vibration < dynamicGate
     }
 
     fun updateVibrationFloorNative(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double): Double {
-        return if (isLibraryLoaded.get()) n13(currentFloor, vibration, if (isWarming) 1 else 0, cpuLoad) else { if (vibration.isNaN() || vibration <= 0.0 || cpuLoad > 0.85) return currentFloor; val alpha = if (vibration < currentFloor) (if (isWarming) 0.5 else 0.1) else if (vibration < 1.0) (if (isWarming) 0.1 else 0.01) else 0.0; (currentFloor * (1.0 - alpha)) + (vibration * alpha) }
+        if (isLibraryLoaded.get()) return n13(currentFloor, vibration, if (isWarming) 1 else 0, cpuLoad)
+        
+        if (vibration.isNaN() || vibration <= 0.0 || cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) return currentFloor
+        return if (vibration < currentFloor) {
+            val alpha = (VIBRATION_EMA_DOWN_FAST * (if (isWarming) 10.0 else 1.0)).coerceAtMost(0.5)
+            (currentFloor * (1.0 - alpha)) + (vibration * alpha)
+        } else if (vibration < 1.0) {
+            val alpha = (VIBRATION_EMA_UP_FAST * (if (isWarming) 10.0 else 1.0)).coerceAtMost(0.1)
+            (currentFloor * (1.0 - alpha)) + (vibration * alpha)
+        } else {
+            currentFloor
+        }
     }
 
     fun computeNextHpfNative(lastHpfValue: Double, currentRawVibe: Double, lastRawVibe: Double): Double {
-        return if (isLibraryLoaded.get()) n14(lastHpfValue, currentRawVibe, lastRawVibe) else 0.9 * (lastHpfValue + currentRawVibe - lastRawVibe)
+        return if (isLibraryLoaded.get()) n14(lastHpfValue, currentRawVibe, lastRawVibe) else VIBRATION_HPF_ALPHA * (lastHpfValue + currentRawVibe - lastRawVibe)
     }
 
     fun computeNextEnergyNative(currentEnergy: Double, hpfValue: Double): Double {
-        return if (isLibraryLoaded.get()) n15(currentEnergy, hpfValue) else (currentEnergy * (1.0 - 0.1)) + (Math.abs(hpfValue) * 0.1)
+        return if (isLibraryLoaded.get()) n15(currentEnergy, hpfValue) else (currentEnergy * (1.0 - VIBRATION_ENERGY_EMA_ALPHA)) + (Math.abs(hpfValue) * VIBRATION_ENERGY_EMA_ALPHA)
     }
 
     fun calculateVibrationDeltaNative(x: Double, y: Double, z: Double, lx: Double, ly: Double, lz: Double): Double {
-        return if (isLibraryLoaded.get()) n16(x, y, z, lx, ly, lz) else Math.sqrt((x - lx) * (x - lx) + (y - ly) * (y - ly) + (z - lz) * (z - lz)) / 9.80665
+        return if (isLibraryLoaded.get()) n16(x, y, z, lx, ly, lz) else Math.sqrt((x - lx) * (x - lx) + (y - ly) * (y - ly) + (z - lz) * (z - lz)) / GRAVITY_EARTH
     }
 
     fun isShockViolatedNative(peakShock: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
-        return if (isLibraryLoaded.get()) n17(peakShock, adaptiveFloor, sensitivity, cpuLoad) != 0 else { val loadFactor = if (cpuLoad > 0.85) 1.5 else 1.0; peakShock > Math.max((0.2 + (1.4 - 0.2) * (1.0 - sensitivity)) * loadFactor, adaptiveFloor * 7.0 * loadFactor) }
+        if (isLibraryLoaded.get()) return n17(peakShock, adaptiveFloor, sensitivity, cpuLoad) != 0
+        
+        val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 1.5 else 1.0
+        val baseThreshold = (0.2 + (1.4 - 0.2) * (1.0 - sensitivity)) * loadFactor
+        val dynamicThreshold = Math.max(baseThreshold, adaptiveFloor * VIBRATION_SHOCK_MULTIPLIER * loadFactor)
+        return peakShock > dynamicThreshold
     }
 
     fun isVibrationSuspiciousNative(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
-        return if (isLibraryLoaded.get()) n18(vibration, adaptiveFloor, sensitivity, cpuLoad) != 0 else { val loadFactor = if (cpuLoad > 0.85) 1.5 else 1.0; vibration > Math.max((0.05 + (0.45 - 0.05) * (1.0 - sensitivity)) * loadFactor, adaptiveFloor * 2.5 * loadFactor) }
+        if (isLibraryLoaded.get()) return n18(vibration, adaptiveFloor, sensitivity, cpuLoad) != 0
+        
+        val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 1.5 else 1.0
+        val baseThreshold = (0.05 + (0.45 - 0.05) * (1.0 - sensitivity)) * loadFactor
+        val dynamicThreshold = Math.max(baseThreshold, adaptiveFloor * VIBRATION_SUSPICIOUS_MULTIPLIER * loadFactor)
+        return vibration > dynamicThreshold
     }
 
     fun computeAdaptiveAcousticAlphaNative(baseAlpha: Double, vibrationRollingSum: Double): Double {

@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.8.15:
+ * - Issue #SIMP-IDEA-3: Standardized on @NotNull native providers. Added 
+ *   computeAdaptiveAcousticAlpha to NativeFastPathProvider.
  * Oct.8.12:
  * - Issue #SIMP-1014-2: Unified SystemPressureBatch. Consolidated Memory and 
  *   Storage pressure evaluation into a single JNI crossing (SIMP-IDEA-2).
@@ -70,7 +73,7 @@ data class HardwareCapabilities(
     val hasBackgroundRestriction: Boolean = false,
     val backgroundStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
     val autostartStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
-    val requiresWakeLockRenewal: Boolean = false,
+    val requires WakeLockRenewal: Boolean = false,
     val requiresExtraTopPadding: Boolean = false,
     val isManualOverrideActive: Boolean = false,
     val isA15Device: Boolean = false,
@@ -253,7 +256,7 @@ class AlarmEvaluationState {
     var trackerSpeed: Double = 0.0
     var trackerBattery: Int = 0
     var trackerTemp: Double = 0.0
-    var firstViolationTs: Long = 0L
+    var first ViolationTs: Long = 0L
     var firstViolationRt: Long = 0L
     var firstViolationWasJump: Boolean = false
     var wasDistanceViolated: Boolean = false
@@ -385,6 +388,7 @@ interface NativeFastPathProvider {
     fun calculateVibrationDelta(x: Double, y: Double, z: Double, lx: Double, ly: Double, lz: Double): Double
     fun isShockViolated(peakShock: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean
     fun isVibrationSuspicious(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean
+    fun computeAdaptiveAcousticAlpha(baseAlpha: Double, vibrationRollingSum: Double): Double
     
     fun processVibrationBatch(batch: VibrationBatch): Boolean
     fun processGnssBatch(batch: GnssHealthBatch): Boolean
