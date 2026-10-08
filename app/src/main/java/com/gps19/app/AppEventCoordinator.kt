@@ -13,12 +13,11 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Oct.8.1:
+ * - Issue #SIMP-1007-17: Fixed key collision in AcousticFloorChanged persistence.
  * Oct.7.6:
  * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated handleAlarmEvent and 
  *   handleProcessorEvent to utilize the unified ForensicSnapshot container (R-ID 651).
- * Oct.5.2:
- * - Issue #1344: Forensic Diagnostic Expansion. Updated handleAlarmEvent to 
- *   pass thermal and heap snapshots to logManager (R1344).
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -184,7 +183,6 @@ class AppEventCoordinator @Inject constructor(
 
     private fun handleProcessorEvent(event: ProcessorEvent, isPrimary: Boolean) {
         val isTrackerMode = configManager.isTrackerMode
-        // R-ID 453/565: Local processing uses local roles
         val role = if (isTrackerMode) AppRole.TRACKER else (if (isPrimary) AppRole.VIEWER_SELF else AppRole.VIEWER_REMOTE)
         val logPrefix = if (!isTrackerMode && isPrimary) "[Self] " else ""
         
@@ -221,7 +219,7 @@ class AppEventCoordinator @Inject constructor(
                 repository.saveDoubleDebounced(role, TRACKER_LUX_BASELINE_KEY, event.baseline)
             }
             is ProcessorEvent.AcousticFloorChanged -> {
-                repository.saveDoubleDebounced(role, TRACKER_LUX_BASELINE_KEY, event.floor)
+                repository.saveDoubleDebounced(role, TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
             }
             is ProcessorEvent.GpsStallDetected -> {
                 if (!isTrackerMode && isPrimary) logManager.logServiceEvent(m = "GPS STALL: Fix unchanged for >1s", isImportant = false)
@@ -310,12 +308,6 @@ class AppEventCoordinator @Inject constructor(
         }
     }
 
-    /**
-     * Issue #1402-B: Reactive Alarm Notification.
-     * Observes active alarms and updates the alarm notification summary.
-     * If a high-priority alarm is active, it ensures the notification (and 
-     * its fullScreenIntent) is posted/updated.
-     */
     private suspend fun observeAlarmSummary() {
         if (configManager.isTrackerMode) return
 

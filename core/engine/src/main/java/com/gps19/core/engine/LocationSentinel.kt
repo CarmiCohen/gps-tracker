@@ -5,6 +5,10 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Oct.8.1:
+ * - Issue #SIMP-1007-17: Behavioral Reason Promotion. Ensured all TAMPER 
+ *   rejections in checkPhysicalTamperInternal set a locationPendingReason 
+ *   (JAMMER_SUSPICION) to allow telemetry pipeline promotion.
  * Oct.7.11:
  * - Issue #SIMP-1007-17: Strategic Simplification. Integrated behavioral suspicion 
  *   into unified evaluation result to allow telemetry pipeline promotion to 
@@ -355,14 +359,17 @@ object LocationSentinel {
         }
         if (state.forensic.isPowerTamper) {
             result.reason = "Power disconnected"
+            result.locationPendingReason = LocationPendingReason.JAMMER_SUSPICION
             return SentinelStatus.TAMPER
         }
         if (SentinelValidator.isTiltViolated(state.forensic.currentTiltDegrees)) {
             result.reason = "Tilt detected"
+            result.locationPendingReason = LocationPendingReason.JAMMER_SUSPICION
             return SentinelStatus.TAMPER
         }
         if (SentinelValidator.isShockViolated(state.forensic.peakVibrationShock, state.forensic.adaptiveVibrationFloor, cpuLoad = cpuLoad)) {
             result.reason = "Shock detected"
+            result.locationPendingReason = LocationPendingReason.JAMMER_SUSPICION
             return SentinelStatus.TAMPER
         }
 
@@ -378,9 +385,11 @@ object LocationSentinel {
             if (SentinelValidator.isLiftViolated(liftDelta)) {
                 if (state.forensic.currentVibrationIndex > VIBRATION_STATIONARY_THRESHOLD) {
                     result.reason = "Lift detected"
+                    result.locationPendingReason = LocationPendingReason.JAMMER_SUSPICION
                     return SentinelStatus.TAMPER
                 } else {
                     result.reason = "Barometric drift suspicion (No vibration)"
+                    result.locationPendingReason = LocationPendingReason.JAMMER_SUSPICION
                     return SentinelStatus.TAMPER
                 }
             }
@@ -388,12 +397,14 @@ object LocationSentinel {
         
         if (SentinelValidator.isLightViolated(state.forensic.currentLux, state.forensic.luxBaseline)) {
             result.reason = "Light jump"
+            result.locationPendingReason = LocationPendingReason.JAMMER_SUSPICION
             return SentinelStatus.TAMPER
         }
 
         val isLightSpikeRecently = (state.forensic.lastFastPathLightSpikeRt > 0 && (nowRt - state.forensic.lastFastPathLightSpikeRt < LIGHT_LOCKOUT_MS))
         if (isLightSpikeRecently) {
             result.reason = "Light jump (FastPath)"
+            result.locationPendingReason = LocationPendingReason.JAMMER_SUSPICION
             return SentinelStatus.TAMPER
         }
 
@@ -407,6 +418,7 @@ object LocationSentinel {
 
         if (SentinelValidator.isVibrationSuspicious(state.forensic.currentVibrationIndex, state.forensic.adaptiveVibrationFloor, cpuLoad = cpuLoad)) {
             result.reason = "Vibration suspicion"
+            result.locationPendingReason = LocationPendingReason.JAMMER_SUSPICION
             return SentinelStatus.TAMPER
         }
         
