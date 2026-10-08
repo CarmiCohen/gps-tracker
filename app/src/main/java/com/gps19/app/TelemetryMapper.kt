@@ -6,6 +6,9 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.8.2:
+ * - Issue #SIMP-1007-17: Behavioral Reason Promotion. Verified parity in 
+ *   priority-based health reason mapping.
  * Oct.7.11:
  * - Issue #SIMP-1007-17: Strategic Simplification. Updated mapTickToOutputs and 
  *   mapProcessedToSnapshot to promote behavioral pending reasons from the processor.

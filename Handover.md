@@ -1,28 +1,26 @@
-# Handover: Hardening Process - Oct7.11
+# Handover: Hardening Process - Oct8.2
 
 ## 🎯 Current Status
-Consolidating redundant location pending logic between `HardwareSuite` and `SentinelValidator` (#SIMP-1007-17).
+Finalized Behavioral Reason Promotion and Strategic Simplification of the health pipeline (#SIMP-1007-17).
 
-## 🛠️ Changes Performed (Oct7.11)
-1.  **HardwareSuite.kt**:
-    *   Migrated GNSS health evaluation to `SentinelValidator.evaluateLocationPendingReason`.
-    *   Integrated `isJammingCandidate` into the unified `LocationStatus` evaluation loop.
-    *   Purged redundant manual `SIGNAL_LOSS`/`GPS_STALL`/`GPS_GAP` logic.
-2.  **SentinelValidator.kt**:
-    *   Added `evaluateLocationPendingReason` to centralize GNSS and behavioral health status.
-    *   Added `getReasonPriority` and `getHigherPriorityReason` to handle overlapping health issues.
-3.  **TelemetryAggregator.kt**:
-    *   Updated ribbon aggregation to use centralized `SentinelValidator.getHigherPriorityReason`.
-4.  **LocationSentinel.kt**:
-    *   Ensured `checkPhysicalTamperInternal` returns `JAMMER_SUSPICION` when native jamming is detected.
-    *   Consolidated reason strings for behavioral rejections.
+## 🛠️ Changes Performed (Oct8.2)
+1.  **LocationProcessor.kt**:
+    *   Instrumented `processGpsPoint` to promote `locationPendingReason` from `SentinelResult` into the `LocationUpdate` snapshot.
+    *   Ensures rejection reasons (Acoustic, Tamper, Jammer) are immediately part of the telemetry state.
+2.  **MonitorService.kt**:
+    *   Updated the evaluation loop to sync the processor's promoted reasons into the `evaluationSnapshot` before alarm analysis.
+    *   Ensures parity between coordinate rejection and alarm triggers.
+3.  **Architecture**:
+    *   Completed the transition of health authority to `SentinelValidator` (R-ID 680).
+    *   Purged redundant GNSS status logic from `HardwareSuite`.
+4.  **Versioning**:
+    *   Version incremented to `Oct8.2` (Code: 1150).
 
 ## 🔜 Next Steps
-1.  **LocationProcessor Promotion**: Ensure `LocationProcessor.processGpsPoint` promotes behavioral rejections (Acoustic, Tamper, Jammer) from `SentinelResult` into the `LocationUpdate.locationPendingReason`.
-2.  **Telemetry Integration**: Verify that `MonitorService` correctly propagates the promoted reasons to the telemetry pipeline.
-3.  **Integrity Audit**: Finalize metrics and release the version.
+1.  **Native GNSS Batching**: Evaluate migrating `satellitesUsed` and basic hardware status checks to JNI for further JVM decoupling (#SIMP-1011-1).
+2.  **Stability Soak**: Perform long-duration radio soak with behavioral interference to verify priority resolution.
 
 ## 📍 Forensic State Snapshot
-*   **SIMP-1007-17 Progress**: ~80% complete.
-*   **Version**: Oct7.11
-*   **Active Focus**: Strategic Simplification & Redundancy Consolidation.
+*   **SIMP-1007-17 Progress**: 100% complete.
+*   **Version**: Oct8.2
+*   **Active Focus**: Strategic Simplification & JNI Offloading.

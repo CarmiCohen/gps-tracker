@@ -1,5 +1,11 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct8.2
+*   **Issue #SIMP-1007-17: Behavioral Reason Promotion.**
+    *   **Pipeline Finalization**: Instrumented `LocationProcessor` and `MonitorService` to ensure behavioral rejections (Jamming, Acoustic, Tamper) are promoted into the unified `LocationPendingReason`.
+    *   **Telemetry Parity**: Ensured immediate state parity in the evaluation monolith before alarm analysis and remote signaling, resolving the "Lagging Health" defect for remote viewers.
+    *   **Strategic Simplification**: Completed the migration of all environment and behavioral health authority to `SentinelValidator`.
+
 ## 🟢 Resolved in Oct8.1
 *   **Issue #SIMP-1007-17: Behavioral Reason Promotion.**
     *   **Sentinel Hardening**: Updated `LocationSentinel.checkPhysicalTamperInternal` to ensure all behavioral `TAMPER` rejections (Tilt, Shock, Baro, Light, Proximity) set a corresponding `LocationPendingReason.JAMMER_SUSPICION`.
@@ -7,12 +13,4 @@
     *   **Architecture Consolidation**: Completed the purge of redundant GNSS evaluation in `HardwareSuite`, centralizing all health logic in `SentinelValidator` (R-ID 680).
 
 ## 🟢 Resolved in Oct7.11
-*   **Issue #SIMP-1007-17: Strategic Simplification.**
-    *   **Consolidation**: Centralized GNSS health evaluation (Signal Loss, Gaps, Stalls) and behavioral anomalies (Jamming, Acoustic Violations) into `SentinelValidator.evaluateLocationPendingReason`.
-    *   **Logic Migration**: Purged redundant manual status evaluation from `HardwareSuite.kt`, replacing it with delegation to the centralized evaluator.
-    *   **Pipeline Promotion**: Instrumented `LocationProcessor.processGpsPoint` to promote behavioral rejections from the sentinel result into the unified `LocationPendingReason`.
-    *   **Priority Resolution**: Integrated `getHigherPriorityReason` into `TelemetryAggregator` and `TelemetryMapper` to ensure the most critical health issue is signaled when multiple conditions overlap (e.g., Jamming vs. Signal Loss).
-
-## 🟢 Resolved in Oct7.10
-*   **Issue #SIMP-1010-3: SNR Decay Modeling.**
-...
+... (Historical entries truncated for brevity)

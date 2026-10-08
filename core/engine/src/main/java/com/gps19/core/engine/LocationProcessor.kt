@@ -5,6 +5,10 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Oct.8.2:
+ * - Issue #SIMP-1007-17: Behavioral Reason Promotion. Ensured processGpsPoint 
+ *   promotes behavioral rejections from SentinelResult into the LocationUpdate 
+ *   snapshot for immediate telemetry parity.
  * Oct.7.11:
  * - Issue #SIMP-1007-17: Strategic Simplification. Promoted locationPendingReason 
  *   from SentinelResult into ProcessedLocation to centralize behavioral health propagation.
@@ -346,6 +350,15 @@ class LocationProcessor(
                 isMuzzled = update.isMuzzled, nowTs = nowWall, nowRt = nowRt, cpuLoad = cpuLoad
             )
             
+            // Oct.8.2: Promote behavioral reason to the snapshot for immediate telemetry parity
+            if (sentinelResult.locationPendingReason != LocationPendingReason.NONE) {
+                update.locationPendingReason = SentinelValidator.getHigherPriorityReason(
+                    update.locationPendingReason,
+                    sentinelResult.locationPendingReason
+                )
+                update.isLocationPending = true
+            }
+
             if (sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED) {
                 val promotedPoints = sentinelResult.promotedPoints
                 if (promotedPoints != null && promotedPoints.isNotEmpty() && state.lastLat != 0.0) {

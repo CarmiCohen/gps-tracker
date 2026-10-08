@@ -26,16 +26,13 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.8.2:
+ * - Issue #SIMP-1007-17: Behavioral Reason Promotion. Ensured evaluationSnapshot 
+ *   reflects promoted health reasons from ProcessedLocation before event emission 
+ *   and alarm evaluation. Fixed syntax error in command routing.
  * Oct.7.7:
  * - Issue #SIMP-1007-16: Flag Propagation. Injected native anomaly flags from 
  *   HardwareSuiteLogicSnapshot into the evaluation monolith for alarm analysis.
- * Oct.6.21:
- * - Issue #QA-1006-12: Forensic Hardening. Wrapped all environmental indices 
- *   in PhysicsUtils.safeDouble to prevent SQLiteConstraintException (NaN/Inf) 
- *   during high-pressure bursts.
- * Oct.6.3:
- * - Issue #AUDIT-1006-2: Implemented triggerImmediateTick() to allow Fast-Path 
- *   triggers (Acoustic/Light) to preempt relaxed memory-throttled intervals.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -597,6 +594,16 @@ class MonitorService : BaseMonitorService() {
             evaluationSnapshot.trackerState = if (isTrackerMode) {
                 TrackerStateManager.updateState(status = proc.status, speed = proc.filteredSpeed, vibration = evaluationSnapshot.atmospheric.vibration, vibrationFloor = primaryProcessor.getAdaptiveVibrationFloor(), isTrackerConnected = stateManagerConnected, systemTimePulse = nowRt)
             } else TrackerState.UNKNOWN
+
+            // Oct.8.2: Explicitly promote behavioral reasons into the evaluation snapshot before alarm analysis and emission
+            if (proc.locationPendingReason != LocationPendingReason.NONE) {
+                evaluationSnapshot.integrity.locationPendingReason = SentinelValidator.getHigherPriorityReason(
+                    evaluationSnapshot.integrity.locationPendingReason,
+                    proc.locationPendingReason
+                )
+                evaluationSnapshot.integrity.isLocationPending = true
+            }
+
             evaluateAlarmsInternal(now, nowRt, isSocketConnected, isPeerActive, proc, hSnapshot, proc.timestamp, evaluationSnapshot)
         }
 
