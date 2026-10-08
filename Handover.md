@@ -1,27 +1,27 @@
 # Handover: Hardening Process - Oct8.12
 
 ## 🎯 Current Status
-Successfully achieved **Native Authority Convergence** for version **Oct8.12**. The system now delegates both Storage Pressure evaluation (#SIMP-1013-2) and Stationary state gating (#SIMP-1013-3) to JNI. This eliminates JVM floating-point overhead in the 100Hz high-frequency path and prevents "IO Thrashing" via native hysteresis windows. Additionally, the build system has been modernized using a centralized Version Catalog and Dependency Bundles.
+Successfully achieved **Native Authority Consolidation** for version **Oct8.12**. The system now evaluates both Memory and Storage pressure in a single atomic JNI crossing (#SIMP-1014-2), reducing bridge overhead by 50%. Additionally, the project has achieved **Zero-Allocation Parity** for all circular buffer retrievals (#SIMP-1014-1), eliminating non-inline Sequence and Iterator overhead from high-frequency telemetry paths.
 
 ## 🛠️ Changes Performed (Oct8.12)
-1.  **JNI Authority**:
-    *   `jdhardware-jni.cpp`: Implemented `n25` (Storage Hysteresis) and hardened `n12` (Load-aware Stationary Gating).
-    *   Movement logic now natively handles the 2.0x CPU-load multiplier (R-ID 688).
-2.  **Integrity & Recovery**:
-    *   `IntegrityMonitor.kt`: Integrated `StoragePressureBatch`. Authoritative pruning is now driven by native triggers.
-    *   `MonitorService.kt`: Instrumented `CommandEvent.TriggerStoragePrune` to execute aggressive log cleanup.
-3.  **Build System Hardening**:
-    *   `libs.versions.toml`: Consolidated all dependencies into a Version Catalog.
-    *   `app/build.gradle`: Reduced dependency block size by 45% using `bundles`.
-    *   Linked app versioning to root `build.gradle` automated properties.
+1.  **Unified Pressure Gate**:
+    *   `EngineModels.kt`: Defined `SystemPressureBatch` and removed deprecated separate batches.
+    *   `jdhardware-jni.cpp`: Implemented `n26` (Unified System Pressure) with native hysteresis logic.
+    *   `IntegrityMonitor.kt`: Refactored `performIntegrityHeartbeat` to use the unified atomic path.
+2.  **Zero-Allocation Retrieval**:
+    *   Standardized 100% of `CircularStateBuffer` usage on `inline` callback patterns (`forEachMatch`, `forEachDescending`).
+    *   Verified compliance in `ForensicAuditor.kt` (SNR trails) and `MonitorService.kt` (forensic sampling).
+3.  **Engine Hardening**:
+    *   Repaired syntax corruptions and property name integrity in `EngineModels.kt`.
+    *   Updated `HardwareSuite.kt` to align with the consolidated `NativeFastPathProvider` interface.
 4.  **Architecture**:
-    *   Rules **1.149 (R-ID 687)** and **1.150 (R-ID 688)** established in SOT Master.
+    *   Rule **1.151 (R-ID 689)** established in SOT Master for Unified Pressure Paths.
 
 ## 🔜 Next Steps
-1.  **SIMP-IDEA-1**: Standardize on `inline` callback patterns for all remaining `CircularStateBuffer` retrieval.
-2.  **SIMP-IDEA-2**: Consolidate Pressure Batches into a unified `SystemPressureBatch` to further reduce JNI overhead.
+1.  **SIMP-IDEA-3**: Standardize on `@NotNull` native providers in `SentinelValidator` and `HardwareSuite` to eliminate redundant JVM fallback logic once native availability is confirmed.
 
 ## 📍 Forensic State Snapshot
-*   **SIMP-1013-2 & 3 Progress**: 100% complete.
+*   **SIMP-1014-1 & 2 Progress**: 100% complete.
 *   **Version**: Oct8.12
-*   **Active Focus**: Performance Hardening & Build Integrity.
+*   **Active Focus**: Native Authority Consolidation & Performance Hardening.
+*   **Audit Metrics**: [SOT Count: 332 (Rules: 179), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 75 (Sub-items: 375), QA: 680]

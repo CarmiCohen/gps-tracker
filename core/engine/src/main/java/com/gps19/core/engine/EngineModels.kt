@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap
  * - Issue #SIMP-1014-2: Unified SystemPressureBatch. Consolidated Memory and 
  *   Storage pressure evaluation into a single JNI crossing (SIMP-IDEA-2).
  *   Removed deprecated MemoryPressureBatch and StoragePressureBatch.
- *   Fixed syntax corruptions in property names and method parameters.
+ *   Fixed syntax regressions in AlarmEvaluationState and ForensicSample.
  */
 
 @Serializable
