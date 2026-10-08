@@ -212,7 +212,7 @@ class ProductionReadinessAuditTest {
     @Test
     fun verify24HourSoakSimulation() {
         sessionManager.reset()
-        forensicAuditor.reset("T")
+        forensicAuditor.reset(AppRole.TRACKER)
         
         val startRt = timeProvider.elapsedRealtime()
         var currentRt = startRt
@@ -231,7 +231,7 @@ class ProductionReadinessAuditTest {
             val hasGap = i % 100 == 0
             val injectionDelay = if (hasGap) 2000L else 0L
             
-            forensicAuditor.recordGpsFix(currentRt + injectionDelay, expectedInterval, "T")
+            forensicAuditor.recordGpsFix(currentRt + injectionDelay, expectedInterval, AppRole.TRACKER)
             
             sessionManager.updateTick(
                 nowRt = currentRt,
@@ -244,7 +244,7 @@ class ProductionReadinessAuditTest {
             totalFixes++
             
             if (i % 300 == 0) {
-                forensicAuditor.evaluateStability(currentRt, "T")
+                forensicAuditor.evaluateStability(currentRt, AppRole.TRACKER)
             }
         }
 

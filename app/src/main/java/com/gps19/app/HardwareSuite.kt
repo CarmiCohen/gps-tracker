@@ -37,17 +37,13 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.8.9:
+ * - Issue #SIMP-1012-3: Forensic Stability Audit. Integrated evaluateSignalHealth 
+ *   into updateLocationStatus to refine jammer suspicion using high-assurance SNR trails.
  * Oct.8.8:
  * - Issue #SIMP-1012-1: Forensic Retrieval Optimization. Migrated get*Samples 
- *   methods to inline callback-based iteration using CircularStateBuffer.forEachMatch, 
- *   achieving zero-allocation parity (R-ID 392). Removed legacy forensicFlyweight.
- * - Issue #SIMP-1012-2: Native Proximity Scaling. Refactored proximity handling 
- *   to strictly follow native JNI decisions for debouncing and health indexing.
- * Oct.8.5:
- * - Issue #SIMP-1012-2: Native Proximity Scaling. Migrated environment-aware 
- *   proximity debouncing and index calculation to JNI via ProximityBatch.
- * - Issue #SIMP-1012-1: Forensic Retrieval Optimization. Added pooled flyweight 
- *   support to get*Samples methods to ensure zero-allocation parity (R-ID 392).
+ *   methods to inline callback-based iteration.
+ * - Issue #SIMP-1012-2: Native Proximity Scaling. Refactored proximity handling.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -686,6 +682,12 @@ class HardwareSuite @Inject constructor(
     private fun updateLocationStatus() {
         val nowRt = timeProvider.elapsedRealtime()
         val deltaSinceFix = if (lastFixRt > 0) nowRt - lastFixRt else nowRt
+        
+        // Issue #SIMP-1012-3: Refine jamming status via ForensicAuditor SNR lookback
+        val isAuditedJamming = forensicAuditor.evaluateSignalHealth(nowRt, AppRole.TRACKER) { from, to, action ->
+            forEachSnrSample(from, to, action)
+        }
+        
         var shouldEmitSuccess = false
         val current = currentLocationStatus
         
@@ -694,7 +696,7 @@ class HardwareSuite @Inject constructor(
             satellitesUsed = satellitesUsed,
             deltaSinceFixMs = deltaSinceFix,
             gapThresholdMs = GPS_GAP_THRESHOLD_MS,
-            isJammingCandidate = isJammingCandidate,
+            isJammingCandidate = isJammingCandidate || isAuditedJamming,
             isAcousticViolated = (nowRt - lastAcousticLockoutRt < 2000L)
         )
         
@@ -787,7 +789,6 @@ class HardwareSuite @Inject constructor(
     fun setPollingInterval(intervalMs: Long) { if (pollingIntervalFlow.value != intervalMs) pollingIntervalFlow.value = intervalMs }
     fun resetGnssJitter() { forensicAuditor.resetGnssJitter() }
 
-    // Issue #SIMP-1012-1: Optimized zero-allocation retrieval using inline callback
     inline fun forEachSnrSample(fromRt: Long, toRt: Long, action: (ForensicSample) -> Unit) {
         forensicBuffer.forEachMatch(
             predicate = { it.rt in fromRt..toRt && it.snr > 0.0 },
@@ -972,7 +973,8 @@ class HardwareSuite @Inject constructor(
                     acousticPeakMin = if (minDb >= 100.0) -1.0 else minDb
                     kineticEnergy = this@HardwareSuite.currentKineticEnergy; adaptiveVibrationFloor = this@HardwareSuite.adaptiveVibrationFloor
                     activityType = activityContextProvider.currentActivityType; isSuspiciousNoise = this@HardwareSuite.isSuspiciousNoise
-                    isMemoryPressureThrottled = this@HardwareSuite.isMemoryPressureThrottled; isJammingCandidate = this@HardwareSuite.isJammingCandidate
+                    isMemoryPressureThrottled = this@HardwareSuite.isMemoryPressureThrottled
+                    isJammingCandidate = this@HardwareSuite.isJammingCandidate || forensicAuditor.isJammingSuspected(AppRole.TRACKER)
                     stationaryDurationMs = this@HardwareSuite.stationaryDurationMs
                 }
                 if (isForensic) { forensicPeakVibration = 0.0; forensicPeakVerticalVelocity = 0.0; forensicPeakVerticalVelocityTs = 0L; forensicPeakVerticalVelocityRt = 0L; forensicPeakVerticalDisplacement = 0.0; forensicPeakDb = 0.0; forensicMinDb = 100.0 }

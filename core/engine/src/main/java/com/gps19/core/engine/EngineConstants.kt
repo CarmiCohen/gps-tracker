@@ -2,13 +2,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.8.9:
+ * - Issue #SIMP-1012-3: Forensic Stability Audit. Added JAMMING_SNR_CRITICAL_THRESHOLD 
+ *   and lookback constants for SNR-based jammer discrimination.
  * Oct.2.6:
  * - Issue #1175: Real-time Only Path. Purged obsolete backfill constants: 
  *   REAL_TIME_GAP_LIMIT_MS, SENSOR_SAMPLE_BUFFER_MAX_AGE_MS, and MAX_BACKFILL_POINTS.
- * Oct.2.1:
- * - Issue #1417: Added CONNECTIVITY_HYSTERESIS_MS (3s).
- * - Issue #1416: Memory Pressure Mitigation. Added heap thresholds.
- * - Issue #1415: Added SENSOR_LOAD_GATE_CPU_THRESHOLD (0.85).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -247,6 +246,9 @@ const val MOVING_HOLD_DURATION_MS = 60000L
 const val GPS_GAP_THRESHOLD_MS = 15000L    
 const val GPS_STALL_THRESHOLD_MS = 15000L  
 const val JAMMER_DETECTION_THRESHOLD_MS = 180000L
+const val JAMMING_FORENSIC_LOOKBACK_MS = 60000L
+const val JAMMING_SNR_CRITICAL_THRESHOLD = 18.0
+const val JAMMING_STABILITY_REQUIRED_SAMPLES = 10
 const val LOCATION_RECOVERY_DEBOUNCE_MS = 3000L
 
 // Adaptive Polling Strategy
