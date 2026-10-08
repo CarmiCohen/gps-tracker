@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.8.3:
+ * - Issue #SIMP-1011-1: Native GNSS Batching. Added GnssHealthBatch for JNI 
+ *   offloading of satellite status evaluation.
  * Oct.7.11:
  * - Issue #SIMP-1007-17: Strategic Simplification. Added locationPendingReason 
  *   to SentinelResult and ProcessedLocation for unified health propagation.
@@ -378,6 +381,25 @@ class VibrationBatch {
 }
 
 /**
+ * GnssHealthBatch: Data transfer object for JNI GNSS processing (Issue #SIMP-1011-1).
+ * Oct.8.3: Initial implementation for native GNSS health offloading.
+ */
+@Serializable
+class GnssHealthBatch {
+    // Inputs
+    var count: Int = 0
+    var svid: IntArray = IntArray(64)
+    var cn0: FloatArray = FloatArray(64)
+    var usedInFix: BooleanArray = BooleanArray(64)
+    var constellation: IntArray = IntArray(64)
+
+    // Outputs
+    var satellitesInView: Int = 0
+    var satellitesUsed: Int = 0
+    var averageSnr: Double = 0.0
+}
+
+/**
  * NativeFastPathProvider: Interface for offloading math to JNI (Issue #SIMP-1510-1).
  */
 interface NativeFastPathProvider {
@@ -391,6 +413,9 @@ interface NativeFastPathProvider {
     
     // Issue #1450: Batched Vibration Processing
     fun processVibrationBatch(batch: VibrationBatch): Boolean
+
+    // Issue #SIMP-1011-1: Batched GNSS Processing
+    fun processGnssBatch(batch: GnssHealthBatch): Boolean
 }
 
 @Serializable

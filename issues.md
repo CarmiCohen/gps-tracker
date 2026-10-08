@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct8.2
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct8.3
 
 ## 🎯 Current Resumption Focus: Strategic Simplification & Redundancy Consolidation.
 
@@ -8,12 +8,13 @@
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 1)
-*   **ID: SIMP-1011-1 [Low]**: Migrate remaining manual GNSS status checks in `HardwareSuite` (like `satellitesUsed` logic) into a native `GnssHealthBatch` to further decouple the JVM from hardware state evaluation.
+## 💡 Strategic Simplification Ideas (Ideas: 0)
+*   *(None)*
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #SIMP-1011-1: Native GNSS Batching.** Migrated satellite status evaluation and SNR averaging to JNI via `GnssHealthBatch` to minimize JVM overhead and ensure deterministic hardware state evaluation. Resolved Oct8.3.
 *   **Issue #SIMP-1007-17: Behavioral Reason Promotion.** Instrumented `LocationProcessor` and `MonitorService` to ensure behavioral rejections (Acoustic, Jamming, Tamper) are promoted into the `LocationPendingReason` and propagated through the telemetry pipeline. Resolved Oct8.2.
 *   **Issue #SIMP-1007-17: Strategic Simplification.** Consolidated redundant location pending logic between `HardwareSuite` and `SentinelValidator`. Centralized GNSS and behavioral health evaluation in `SentinelValidator`. Resolved Oct7.11.
 *   **Issue #SIMP-1010-3: SNR Decay Modeling.** Native correlation of SNR vs Vibration to distinguish jamming from mechanical interference. Resolved Oct7.10.
@@ -27,6 +28,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct8.3: [SOT Count: 323 (Rules: 171), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 67 (Sub-items: 335), QA: 626]**
 - **Oct8.2: [SOT Count: 322 (Rules: 171), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 66 (Sub-items: 330), QA: 621]**
 - **Oct8.1: [SOT Count: 321 (Rules: 171), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 65 (Sub-items: 325), QA: 616]**
 - **Oct7.11: [SOT Count: 319 (Rules: 170), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 64 (Sub-items: 320), QA: 611]**

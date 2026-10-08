@@ -1,5 +1,11 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct8.3
+*   **Issue #SIMP-1011-1: Native GNSS Batching.**
+    *   **JNI Offloading**: Migrated GNSS status evaluation (satellites in view, used in fix, average SNR) to JNI via `GnssHealthBatch`.
+    *   **JVM Decoupling**: Reduced JVM overhead in the `onSatelliteStatusChanged` callback by performing batch math natively.
+    *   **Robustness**: Implemented automatic fallback to manual calculation if the native library is unavailable.
+
 ## 🟢 Resolved in Oct8.2
 *   **Issue #SIMP-1007-17: Behavioral Reason Promotion.**
     *   **Pipeline Finalization**: Instrumented `LocationProcessor` and `MonitorService` to ensure behavioral rejections (Jamming, Acoustic, Tamper) are promoted into the unified `LocationPendingReason`.

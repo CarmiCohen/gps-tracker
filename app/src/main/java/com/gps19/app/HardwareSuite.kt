@@ -37,16 +37,13 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.8.3:
+ * - Issue #SIMP-1011-1: Native GNSS Batching. Migrated GNSS status evaluation 
+ *   (view/used/snr) to JNI via GnssHealthBatch to further decouple JVM.
  * Oct.7.11:
  * - Issue #SIMP-1007-17: Consolidated redundant location pending logic into 
  *   SentinelValidator. Integrated evaluateLocationPendingReason into updateLocationStatus 
  *   with acoustic violation awareness. Fixed property declaration syntax.
- * Oct.7.10:
- * - Issue #SIMP-1010-3: SNR Decay Modeling. Integrated isJammingCandidate from JNI 
- *   vibration batch into forensic snapshots.
- * Oct.7.9:
- * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Migrated stationary 
- *   duration and muzzle reset logic to JNI batching path.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -92,6 +89,10 @@ class HardwareSuite @Inject constructor(
 
         override fun processVibrationBatch(batch: VibrationBatch): Boolean {
             return JdHardwareManager.processVibrationBatchNative(batch)
+        }
+
+        override fun processGnssBatch(batch: GnssHealthBatch): Boolean {
+            return JdHardwareManager.processGnssBatchNative(batch)
         }
     }
 
@@ -372,6 +373,7 @@ class HardwareSuite @Inject constructor(
     private val gnssPolicyEngine = GnssPolicyEngine()
 
     private val vibrationBatch = VibrationBatch()
+    private val gnssBatch = GnssHealthBatch()
 
     private inner class GnssPolicyEngine {
         fun evaluateInterval(nowRt: Long): Long {
@@ -400,14 +402,34 @@ class HardwareSuite @Inject constructor(
             if (isTeardownActive.get()) return
             val nowRt = timeProvider.elapsedRealtime()
             
-            satellitesInView = status.satelliteCount
-            var used = 0; var snrSum = 0.0; var snrCount = 0
-            for (i in 0 until status.satelliteCount) {
-                if (status.usedInFix(i)) used++
-                val snr = status.getCn0DbHz(i).toDouble()
-                if (snr > 0.0) { snrSum += snr; snrCount++ }
+            // Oct.8.3: Offload GNSS health calculation to JNI
+            synchronized(gnssBatch) {
+                val limit = min(status.satelliteCount, 64)
+                gnssBatch.count = limit
+                for (i in 0 until limit) {
+                    gnssBatch.svid[i] = status.getSvid(i)
+                    gnssBatch.cn0[i] = status.getCn0DbHz(i)
+                    gnssBatch.usedInFix[i] = status.usedInFix(i)
+                    gnssBatch.constellation[i] = status.getConstellationType(i)
+                }
+                
+                if (nativeFastPathProvider.processGnssBatch(gnssBatch)) {
+                    satellitesInView = gnssBatch.satellitesInView
+                    satellitesUsed = gnssBatch.satellitesUsed
+                    averageSnr = gnssBatch.averageSnr
+                } else {
+                    // Fallback to manual if JNI unavailable
+                    satellitesInView = status.satelliteCount
+                    var used = 0; var snrSum = 0.0; var snrCount = 0
+                    for (i in 0 until status.satelliteCount) {
+                        if (status.usedInFix(i)) used++
+                        val snr = status.getCn0DbHz(i).toDouble()
+                        if (snr > 0.0) { snrSum += snr; snrCount++ }
+                    }
+                    satellitesUsed = used; averageSnr = if (snrCount > 0) snrSum / snrCount else 0.0
+                }
             }
-            satellitesUsed = used; averageSnr = if (snrCount > 0) snrSum / snrCount else 0.0
+
             val now = timeProvider.currentTimeMillis()
             
             synchronized(snrBuffer) {

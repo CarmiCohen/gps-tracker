@@ -1,11 +1,6 @@
 package com.gps19.app
 
-import com.gps19.core.engine.JNI_RET_EINTR
-import com.gps19.core.engine.JNI_RET_NOT_INITIALIZED
-import com.gps19.core.engine.LATENCY_THRESHOLD_JNI_MS
-import com.gps19.core.engine.LatencyMonitor
-import com.gps19.core.engine.TimeProvider
-import com.gps19.core.engine.VibrationBatch
+import com.gps19.core.engine.*
 import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -28,6 +23,9 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.8.3:
+ * - Issue #SIMP-1011-1: Native GNSS Batching. Expanded sharedStateBuffer to 1024 
+ *   to accommodate satellite status batching. Implemented n21.
  * Oct.7.10:
  * - Issue #SIMP-1010-3: SNR Decay Modeling. Updated processVibrationBatchNative 
  *   to read isJammingCandidate from offset 184.
@@ -66,8 +64,8 @@ object JdHardwareManager {
     private const val MAX_INIT_RETRIES = 5
     private const val INITIAL_RETRY_DELAY_MS = 1000L
 
-    // Issue #1450: Expanded to 256 bytes for vibration batching
-    private val sharedStateBuffer: ByteBuffer = ByteBuffer.allocateDirect(256).apply {
+    // Issue #SIMP-1011-1: Expanded to 1024 bytes for GNSS batching
+    private val sharedStateBuffer: ByteBuffer = ByteBuffer.allocateDirect(1024).apply {
         order(ByteOrder.nativeOrder())
     }
 
@@ -299,6 +297,41 @@ object JdHardwareManager {
         return false
     }
 
+    /**
+     * processGnssBatchNative: Native satellite health offloading (Issue #SIMP-1011-1).
+     * Oct.8.3: Packs 64 satellites and reads back consolidated view/used/snr.
+     */
+    fun processGnssBatchNative(batch: GnssHealthBatch): Boolean {
+        if (!isLibraryLoaded.get()) return false
+        
+        synchronized(sharedStateBuffer) {
+            sharedStateBuffer.clear()
+            sharedStateBuffer.putInt(batch.count) // Offset 0
+            
+            // Pack SVIDs (Offset 4-259)
+            for (i in 0 until 64) sharedStateBuffer.putInt(batch.svid[i])
+            
+            // Pack CN0s (Offset 260-515)
+            for (i in 0 until 64) sharedStateBuffer.putFloat(batch.cn0[i])
+            
+            // Pack UsedInFix (Offset 516-579)
+            for (i in 0 until 64) sharedStateBuffer.put(if (batch.usedInFix[i]) 1.toByte() else 0.toByte())
+            
+            // Pack Constellation (Offset 580-835)
+            for (i in 0 until 64) sharedStateBuffer.putInt(batch.constellation[i])
+            
+            val res = n21()
+            if (res == 0) {
+                // Read outputs from offset 840
+                batch.satellitesInView = sharedStateBuffer.getInt(840)
+                batch.satellitesUsed = sharedStateBuffer.getInt(844)
+                batch.averageSnr = sharedStateBuffer.getDouble(848)
+                return true
+            }
+        }
+        return false
+    }
+
     fun isStationaryNative(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean {
         return if (isLibraryLoaded.get()) n12(vibration, adaptiveFloor, cpuLoad) != 0 else {
             val loadFactor = if (cpuLoad > 0.85) 2.0 else 1.0
@@ -400,4 +433,5 @@ object JdHardwareManager {
     @JvmStatic private external fun n18(vibe: Double, floor: Double, sens: Float, cpu: Double): Int
     @JvmStatic private external fun n19(): Int
     @JvmStatic private external fun n20(baseAlpha: Double, vibeRollingSum: Double): Double
+    @JvmStatic private external fun n21(): Int
 }
