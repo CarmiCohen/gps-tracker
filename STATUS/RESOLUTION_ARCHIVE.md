@@ -1,5 +1,14 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct8.4
+*   **Issue #SIMP-1011-2: Acoustic JNI Offloading.**
+    *   **JNI Migration**: Migrated `AudioRecord` iterative math (RMS and Peak) to JNI via `AcousticBatch`.
+    *   **Latency Optimization**: Reduced JVM math overhead in the 44.1kHz audio path.
+    *   **Determinism**: Integrated native spike evaluation with vibration-aware alpha adjustment.
+*   **Issue #SIMP-1011-3: Forensic Buffer Consolidation.**
+    *   **Memory Efficiency**: Consolidated `EngineSnrSample`, `EngineAcousticSample`, and `EngineSensorSnapshot` into a single `ForensicSample` container.
+    *   **Buffer Hardening**: Reduced heap fragmentation and allocation pressure by using a unified circular buffer (`forensicBuffer`) for all high-frequency telemetry data.
+
 ## 🟢 Resolved in Oct8.3
 *   **Issue #SIMP-1011-1: Native GNSS Batching.**
     *   **JNI Offloading**: Migrated GNSS status evaluation (satellites in view, used in fix, average SNR) to JNI via `GnssHealthBatch`.
@@ -13,10 +22,4 @@
     *   **Strategic Simplification**: Completed the migration of all environment and behavioral health authority to `SentinelValidator`.
 
 ## 🟢 Resolved in Oct8.1
-*   **Issue #SIMP-1007-17: Behavioral Reason Promotion.**
-    *   **Sentinel Hardening**: Updated `LocationSentinel.checkPhysicalTamperInternal` to ensure all behavioral `TAMPER` rejections (Tilt, Shock, Baro, Light, Proximity) set a corresponding `LocationPendingReason.JAMMER_SUSPICION`.
-    *   **Unified Health Evaluation**: Finalized the promotion path from `SentinelResult` to `ProcessedLocation` and into the telemetry signaling pipeline, ensuring consistent behavioral health visibility for remote viewers.
-    *   **Architecture Consolidation**: Completed the purge of redundant GNSS evaluation in `HardwareSuite`, centralizing all health logic in `SentinelValidator` (R-ID 680).
-
-## 🟢 Resolved in Oct7.11
 ... (Historical entries truncated for brevity)

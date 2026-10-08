@@ -23,22 +23,12 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.8.4:
+ * - Issue #SIMP-1011-2: Acoustic JNI Offloading. Implemented processAcousticBatchNative 
+ *   to offload RMS calculation and spike evaluation (n22).
  * Oct.8.3:
  * - Issue #SIMP-1011-1: Native GNSS Batching. Expanded sharedStateBuffer to 1024 
  *   to accommodate satellite status batching. Implemented n21.
- * Oct.7.10:
- * - Issue #SIMP-1010-3: SNR Decay Modeling. Updated processVibrationBatchNative 
- *   to read isJammingCandidate from offset 184.
- * Oct.7.9:
- * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Updated 
- *   processVibrationBatchNative to pack nowRt (offset 116) and read muzzle 
- *   outputs (offsets 172/180).
- * Oct.7.8:
- * - Issue #SIMP-1010-1: Adaptive Acoustic Gating. Implemented n20 to calculate 
- *   adaptive alpha based on vibrationRollingSum.
- * Oct.7.6:
- * - Issue #SIMP-1007-16: JNI FastPath Expansion. Expanded processVibrationBatchNative 
- *   to pack forensic snapshots and read back native anomaly flags (offsets 164/168).
  */
 object JdHardwareManager {
 
@@ -242,8 +232,6 @@ object JdHardwareManager {
 
     /**
      * processVibrationBatchNative: Consolidated 100Hz JNI call (Issue #1450).
-     * Oct.7.10: Added isJammingCandidate output (offset 184).
-     * Oct.7.9: Added nowRt (offset 116) and read muzzle outputs (offsets 172/180).
      */
     fun processVibrationBatchNative(batch: VibrationBatch): Boolean {
         if (!isLibraryLoaded.get()) return false
@@ -263,34 +251,24 @@ object JdHardwareManager {
             sharedStateBuffer.putDouble(batch.lastHpfValue)
             sharedStateBuffer.putDouble(batch.currentEnergy)
             
-            // Oct.7.6 Forensic Expansion (Offset 92)
             sharedStateBuffer.putDouble(batch.snr)
             sharedStateBuffer.putDouble(batch.thermal)
             sharedStateBuffer.putDouble(batch.heap)
 
-            // Oct.7.9: Time context (Offset 116)
             sharedStateBuffer.putLong(batch.nowRt)
             
             val res = n19()
             if (res == 0) {
-                // Read outputs from offset 128
                 batch.delta = sharedStateBuffer.getDouble(128)
                 batch.nextFloor = sharedStateBuffer.getDouble(136)
                 batch.nextHpf = sharedStateBuffer.getDouble(144)
                 batch.nextEnergy = sharedStateBuffer.getDouble(152)
                 batch.isStationary = sharedStateBuffer.getInt(160) != 0
-                
-                // Oct.7.6 Anomaly Flags (Offset 164)
                 batch.isSuspiciousNoise = sharedStateBuffer.getInt(164) != 0
                 batch.isMemoryPressureThrottled = sharedStateBuffer.getInt(168) != 0
-
-                // Oct.7.9 Native Hysteresis (Offset 172)
                 batch.stationaryDuration = sharedStateBuffer.getLong(172)
                 batch.muzzleResetTriggered = sharedStateBuffer.getInt(180) != 0
-
-                // Oct.7.10 Jammer Discrimination (Offset 184)
                 batch.isJammingCandidate = sharedStateBuffer.getInt(184) != 0
-
                 return true
             }
         }
@@ -299,7 +277,6 @@ object JdHardwareManager {
 
     /**
      * processGnssBatchNative: Native satellite health offloading (Issue #SIMP-1011-1).
-     * Oct.8.3: Packs 64 satellites and reads back consolidated view/used/snr.
      */
     fun processGnssBatchNative(batch: GnssHealthBatch): Boolean {
         if (!isLibraryLoaded.get()) return false
@@ -307,25 +284,49 @@ object JdHardwareManager {
         synchronized(sharedStateBuffer) {
             sharedStateBuffer.clear()
             sharedStateBuffer.putInt(batch.count) // Offset 0
-            
-            // Pack SVIDs (Offset 4-259)
             for (i in 0 until 64) sharedStateBuffer.putInt(batch.svid[i])
-            
-            // Pack CN0s (Offset 260-515)
             for (i in 0 until 64) sharedStateBuffer.putFloat(batch.cn0[i])
-            
-            // Pack UsedInFix (Offset 516-579)
             for (i in 0 until 64) sharedStateBuffer.put(if (batch.usedInFix[i]) 1.toByte() else 0.toByte())
-            
-            // Pack Constellation (Offset 580-835)
             for (i in 0 until 64) sharedStateBuffer.putInt(batch.constellation[i])
             
             val res = n21()
             if (res == 0) {
-                // Read outputs from offset 840
                 batch.satellitesInView = sharedStateBuffer.getInt(840)
                 batch.satellitesUsed = sharedStateBuffer.getInt(844)
                 batch.averageSnr = sharedStateBuffer.getDouble(848)
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * processAcousticBatchNative: Native RMS/Peak offloading (Issue #SIMP-1011-2).
+     * Packs audio buffer into sharedStateBuffer and evaluates DB level.
+     */
+    fun processAcousticBatchNative(batch: AcousticBatch, buffer: ShortArray): Boolean {
+        if (!isLibraryLoaded.get()) return false
+        
+        synchronized(sharedStateBuffer) {
+            sharedStateBuffer.clear()
+            sharedStateBuffer.putInt(batch.readCount) // Offset 0
+            sharedStateBuffer.putDouble(batch.baseAlpha) // Offset 4
+            sharedStateBuffer.putDouble(batch.vibrationRollingSum) // Offset 12
+            sharedStateBuffer.putLong(batch.nowRt) // Offset 20
+            sharedStateBuffer.putInt(if (batch.isWarming) 1 else 0) // Offset 28
+            
+            // Pack short buffer from offset 32. Max capacity is (1024-32)/2 = 496 shorts.
+            val limit = Math.min(batch.readCount, 496)
+            for (i in 0 until limit) {
+                sharedStateBuffer.putShort(buffer[i])
+            }
+            
+            val res = n22()
+            if (res == 0) {
+                batch.maxAmp = sharedStateBuffer.getInt(1000)
+                batch.db = sharedStateBuffer.getDouble(1004)
+                batch.isSpike = sharedStateBuffer.getInt(1012) != 0
+                batch.lastSpikeRt = sharedStateBuffer.getLong(1016)
                 return true
             }
         }
@@ -364,9 +365,6 @@ object JdHardwareManager {
         }
     }
 
-    /**
-     * calculateVibrationDeltaNative: Native vector magnitude offloading (Issue #SIMP-1510-1).
-     */
     fun calculateVibrationDeltaNative(x: Double, y: Double, z: Double, lx: Double, ly: Double, lz: Double): Double {
         return if (isLibraryLoaded.get()) n16(x, y, z, lx, ly, lz) else {
             val dx = x - lx; val dy = y - ly; val dz = z - lz
@@ -374,9 +372,6 @@ object JdHardwareManager {
         }
     }
 
-    /**
-     * isShockViolatedNative: Native Shock Gate (Issue #SIMP-1510-1).
-     */
     fun isShockViolatedNative(peakShock: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
         return if (isLibraryLoaded.get()) n17(peakShock, adaptiveFloor, sensitivity, cpuLoad) != 0 else {
             val loadFactor = if (cpuLoad > 0.85) 1.5 else 1.0
@@ -386,9 +381,6 @@ object JdHardwareManager {
         }
     }
 
-    /**
-     * isVibrationSuspiciousNative: Native Suspicious Gate (Issue #SIMP-1510-1).
-     */
     fun isVibrationSuspiciousNative(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
         return if (isLibraryLoaded.get()) n18(vibration, adaptiveFloor, sensitivity, cpuLoad) != 0 else {
             val loadFactor = if (cpuLoad > 0.85) 1.5 else 1.0
@@ -398,9 +390,6 @@ object JdHardwareManager {
         }
     }
 
-    /**
-     * computeAdaptiveAcousticAlphaNative: Native motion-aware alpha adjustment (Issue #SIMP-1010-1).
-     */
     fun computeAdaptiveAcousticAlphaNative(baseAlpha: Double, vibrationRollingSum: Double): Double {
         return if (isLibraryLoaded.get()) n20(baseAlpha, vibrationRollingSum) else {
             var factor = 1.0
@@ -434,4 +423,5 @@ object JdHardwareManager {
     @JvmStatic private external fun n19(): Int
     @JvmStatic private external fun n20(baseAlpha: Double, vibeRollingSum: Double): Double
     @JvmStatic private external fun n21(): Int
+    @JvmStatic private external fun n22(): Int
 }

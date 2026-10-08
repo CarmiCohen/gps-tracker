@@ -37,13 +37,15 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.8.4:
+ * - Issue #SIMP-1011-3: Forensic Buffer Consolidation. Merged snrBuffer and 
+ *   sensorBuffer into a single forensicBuffer using ForensicSample to reduce 
+ *   memory fragmentation.
+ * - Issue #SIMP-1011-2: Acoustic JNI Offloading. Migrated AudioRecord RMS/Peak 
+ *   evaluation to JNI via AcousticBatch to further reduce JVM interrupts.
  * Oct.8.3:
  * - Issue #SIMP-1011-1: Native GNSS Batching. Migrated GNSS status evaluation 
  *   (view/used/snr) to JNI via GnssHealthBatch to further decouple JVM.
- * Oct.7.11:
- * - Issue #SIMP-1007-17: Consolidated redundant location pending logic into 
- *   SentinelValidator. Integrated evaluateLocationPendingReason into updateLocationStatus 
- *   with acoustic violation awareness. Fixed property declaration syntax.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -93,6 +95,10 @@ class HardwareSuite @Inject constructor(
 
         override fun processGnssBatch(batch: GnssHealthBatch): Boolean {
             return JdHardwareManager.processGnssBatchNative(batch)
+        }
+
+        override fun processAcousticBatch(batch: AcousticBatch, buffer: ShortArray): Boolean {
+            return JdHardwareManager.processAcousticBatchNative(batch, buffer)
         }
     }
 
@@ -236,7 +242,8 @@ class HardwareSuite @Inject constructor(
     val locationStatusFlow: SharedFlow<LocationStatus> = _locationStatus.asSharedFlow()
     private var currentLocationStatus = LocationStatus()
 
-    private val snrBuffer = CircularStateBuffer(512, { EngineSnrSample() }, { it.ts = 0L; it.rt = 0L; it.snr = 0.0 })
+    // Issue #SIMP-1011-3: Consolidated forensic buffer
+    private val forensicBuffer = CircularStateBuffer(1024, { ForensicSample() }, { it.reset() })
 
     private val _internalGpsFlow = MutableSharedFlow<GpsUpdate>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
@@ -321,9 +328,6 @@ class HardwareSuite @Inject constructor(
     private val logicSnapshotBuffer = CircularStateBuffer(2, { ForensicSnapshot() }, { it.reset() })
     private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
 
-    private val sensorBuffer = CircularStateBuffer(256, { EngineSensorSnapshot() }, {
-        it.ts = 0L; it.rt = 0L; it.acoustic = 0.0; it.lux = 0.0; it.vibe = 0.0; it.proxIdx = 0.0; it.lift = 0.0; it.tilt = 0.0; it.isSitDetected = false; it.sitVzTs = 0L; it.sitVzRt = 0L; it.sitShock = 0.0; it.kineticEnergy = 0.0; it.activityType = ActivityType.UNKNOWN
-    })
     @Volatile private var lastBufferRecordRt = 0L
 
     private var secPeakLux = 0.0; private var secPeakVibe = 0.0; private var secSumProxIdx = 0.0; private var secProxCount = 0
@@ -374,6 +378,7 @@ class HardwareSuite @Inject constructor(
 
     private val vibrationBatch = VibrationBatch()
     private val gnssBatch = GnssHealthBatch()
+    private val acousticBatch = AcousticBatch()
 
     private inner class GnssPolicyEngine {
         fun evaluateInterval(nowRt: Long): Long {
@@ -432,8 +437,9 @@ class HardwareSuite @Inject constructor(
 
             val now = timeProvider.currentTimeMillis()
             
-            synchronized(snrBuffer) {
-                snrBuffer.next().apply {
+            // Issue #SIMP-1011-3: Consolidated SNR recording
+            synchronized(forensicBuffer) {
+                forensicBuffer.next().apply {
                     this.ts = now
                     this.rt = nowRt
                     this.snr = averageSnr
@@ -577,8 +583,8 @@ class HardwareSuite @Inject constructor(
             forensicAuditor.clearRevivalState()
             revivalBaselineCaptured = false
             
-            synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }
-            synchronized(snrBuffer) { snrBuffer.clear() }
+            // Issue #SIMP-1011-3: Consolidated buffer clearing
+            synchronized(forensicBuffer) { forensicBuffer.clear() }
             synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }
             synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() }
             
@@ -815,10 +821,11 @@ class HardwareSuite @Inject constructor(
     fun setPollingInterval(intervalMs: Long) { if (pollingIntervalFlow.value != intervalMs) pollingIntervalFlow.value = intervalMs }
     fun resetGnssJitter() { forensicAuditor.resetGnssJitter() }
 
-    fun getSnrSamples(fromRt: Long, toRt: Long): Sequence<EngineSnrSample> = 
-        snrBuffer.forensicSequence(
-            flyweight = EngineSnrSample(),
-            predicate = { it.rt in fromRt..toRt },
+    // Issue #SIMP-1011-3: Updated forensic getters
+    fun getSnrSamples(fromRt: Long, toRt: Long): Sequence<ForensicSample> = 
+        forensicBuffer.forensicSequence(
+            flyweight = ForensicSample(),
+            predicate = { it.rt in fromRt..toRt && it.snr > 0.0 },
             transform = { source, target -> 
                 target.ts = source.ts
                 target.rt = source.rt
@@ -889,9 +896,10 @@ class HardwareSuite @Inject constructor(
             Sensor.TYPE_ROTATION_VECTOR -> processRotation(values)
         }
         
+        // Issue #SIMP-1011-3: Record to consolidated forensic buffer
         if (nowRt - lastBufferRecordRt >= TICK_INTERVAL_MS) {
-            synchronized(sensorBuffer) {
-                sensorBuffer.next().apply {
+            synchronized(forensicBuffer) {
+                forensicBuffer.next().apply {
                     this.ts = wallNow
                     this.rt = nowRt
                     this.lux = secPeakLux
@@ -951,15 +959,38 @@ class HardwareSuite @Inject constructor(
                             if (isInOffCycle) { try { Thread.sleep(500) } catch (ie: InterruptedException) { break }; continue }
                             val read = audioRecord.read(buffer, 0, bufferSize)
                             if (read > 0) {
-                                var maxAmp = 0; for (i in 0 until read) { val a = abs(buffer[i].toInt()); if (a > maxAmp) maxAmp = a }
-                                val db = if (maxAmp > 0) 20 * log10(maxAmp.toDouble()) else 0.0
+                                val baseAlpha = SentinelValidator.accelerateAlpha(ACOUSTIC_EMA_UP_FAST, isWarming)
                                 synchronized(this) {
-                                    currentAcousticDb = db; if (db > logicPeakDb) logicPeakDb = db; if (db < logicMinDb) logicMinDb = db; if (db > forensicPeakDb) forensicPeakDb = db; if (db < forensicMinDb) forensicMinDb = db; if (db > secPeakDb) secPeakDb = db
-                                    
-                                    val baseAlpha = SentinelValidator.accelerateAlpha(ACOUSTIC_EMA_UP_FAST, isWarming)
-                                    val alpha = JdHardwareManager.computeAdaptiveAcousticAlphaNative(baseAlpha, vibrationRollingSum)
-                                    if (acousticFastPath.evaluate(db, nowRt, isWarming, SPIKE_DEBOUNCE_MS, alpha)) {
-                                        lastAcousticLockoutRt = acousticFastPath.lastSpikeRt
+                                    acousticBatch.apply {
+                                        this.readCount = read
+                                        this.baseAlpha = baseAlpha
+                                        this.vibrationRollingSum = this@HardwareSuite.vibrationRollingSum
+                                        this.nowRt = nowRt
+                                        this.isWarming = this@HardwareSuite.isWarming
+                                    }
+
+                                    if (nativeFastPathProvider.processAcousticBatch(acousticBatch, buffer)) {
+                                        currentAcousticDb = acousticBatch.db
+                                        if (acousticBatch.isSpike) {
+                                            lastAcousticLockoutRt = acousticBatch.lastSpikeRt
+                                        }
+                                        
+                                        val db = acousticBatch.db
+                                        if (db > logicPeakDb) logicPeakDb = db
+                                        if (db < logicMinDb) logicMinDb = db
+                                        if (db > forensicPeakDb) forensicPeakDb = db
+                                        if (db < forensicMinDb) forensicMinDb = db
+                                        if (db > secPeakDb) secPeakDb = db
+                                    } else {
+                                        // Fallback
+                                        var maxAmp = 0; for (i in 0 until read) { val a = abs(buffer[i].toInt()); if (a > maxAmp) maxAmp = a }
+                                        val db = if (maxAmp > 0) 20 * log10(maxAmp.toDouble()) else 0.0
+                                        currentAcousticDb = db; if (db > logicPeakDb) logicPeakDb = db; if (db < logicMinDb) logicMinDb = db; if (db > forensicPeakDb) forensicPeakDb = db; if (db < forensicMinDb) forensicMinDb = db; if (db > secPeakDb) secPeakDb = db
+                                        
+                                        val alpha = JdHardwareManager.computeAdaptiveAcousticAlphaNative(baseAlpha, vibrationRollingSum)
+                                        if (acousticFastPath.evaluate(db, nowRt, isWarming, SPIKE_DEBOUNCE_MS, alpha)) {
+                                            lastAcousticLockoutRt = acousticFastPath.lastSpikeRt
+                                        }
                                     }
                                 }
                             } else if (read < 0) { if (!isMonitoring) break; domainEventBus.emit(AppSensorEvent.HardwareFailure("AudioRecord: Hardware error")); break }
@@ -1052,21 +1083,34 @@ class HardwareSuite @Inject constructor(
         }
     }
 
-    fun getSensorSamples(fromRt: Long, toRt: Long): Sequence<EngineSensorSnapshot> =
-        sensorBuffer.forensicSequence(
-            flyweight = EngineSensorSnapshot(),
-            predicate = { it.rt in fromRt..toRt },
-            transform = { source, target -> target.copyFrom(source) }
-        )
-
-    fun getAcousticSamples(fromRt: Long, toRt: Long): Sequence<EngineAcousticSample> =
-        sensorBuffer.forensicSequence(
-            flyweight = EngineAcousticSample(),
-            predicate = { it.rt in fromRt..toRt },
+    // Issue #SIMP-1011-3: Forensic sample getters
+    fun getSensorSamples(fromRt: Long, toRt: Long): Sequence<ForensicSample> =
+        forensicBuffer.forensicSequence(
+            flyweight = ForensicSample(),
+            predicate = { it.rt in fromRt..toRt && it.vibe > 0.0 },
             transform = { source, target -> 
                 target.ts = source.ts
                 target.rt = source.rt
-                target.db = source.acoustic
+                target.lux = source.lux
+                target.vibe = source.vibe
+                target.proxIdx = source.proxIdx
+                target.tilt = source.tilt
+                target.lift = source.lift
+                target.acoustic = source.acoustic
+                target.isSitDetected = source.isSitDetected
+                target.kineticEnergy = source.kineticEnergy
+                target.activityType = source.activityType
+            }
+        )
+
+    fun getAcousticSamples(fromRt: Long, toRt: Long): Sequence<ForensicSample> =
+        forensicBuffer.forensicSequence(
+            flyweight = ForensicSample(),
+            predicate = { it.rt in fromRt..toRt && it.acoustic > 0.0 },
+            transform = { source, target -> 
+                target.ts = source.ts
+                target.rt = source.rt
+                target.acoustic = source.acoustic
             }
         )
 
@@ -1291,8 +1335,8 @@ class HardwareSuite @Inject constructor(
             
             forensicAuditor.reset(role)
             
-            revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
-            pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = sessionStartRt; currentLocationStatus = LocationStatus()
+            revivalBaselineCaptured = false; synchronized(forensicBuffer) { forensicBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
+            pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = sessionStartRt; lastBufferRecordRt = 0L; currentLocationStatus = LocationStatus()
             _locationStatus.tryEmit(currentLocationStatus)
             isDisplayFlickering.set(false); lastDisplayTransitionRt = 0L
             

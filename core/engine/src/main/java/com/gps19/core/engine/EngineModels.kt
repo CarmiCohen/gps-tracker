@@ -6,19 +6,12 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * Oct.8.3:
- * - Issue #SIMP-1011-1: Native GNSS Batching. Added GnssHealthBatch for JNI 
- *   offloading of satellite status evaluation.
- * Oct.7.11:
- * - Issue #SIMP-1007-17: Strategic Simplification. Added locationPendingReason 
- *   to SentinelResult and ProcessedLocation for unified health propagation.
- * Oct.7.10:
- * - Issue #SIMP-1010-3: SNR Decay Modeling. Added isJammingCandidate to 
- *   VibrationBatch and SentinelForensicState for native jammer discrimination.
- * Oct.7.9:
- * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Added nowRt to 
- *   VibrationBatch inputs and stationaryDuration, muzzleResetTriggered to outputs.
- * - Replaced stationaryStartRt with stationaryDurationMs in SentinelForensicState.
+ * Oct.8.4:
+ * - Issue #SIMP-1011-3: Forensic Buffer Consolidation. Merged EngineSnrSample, 
+ *   EngineAcousticSample, and EngineSensorSnapshot into ForensicSample to reduce 
+ *   memory fragmentation and allocation overhead.
+ * - Issue #SIMP-1011-2: Acoustic JNI Offloading. Added AcousticBatch for 
+ *   native RMS/Peak and spike evaluation.
  */
 
 @Serializable
@@ -332,14 +325,6 @@ interface DeviceIdentity {
 
 /**
  * VibrationBatch: Data transfer object for JNI batching (Issue #1450).
- * Oct.7.10:
- * - Issue #SIMP-1010-3: SNR Decay Modeling. Added isJammingCandidate output (offset 184).
- * Oct.7.9:
- * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Added nowRt to 
- *   inputs and stationaryDuration, muzzleResetTriggered to outputs.
- * Oct.7.6:
- * - Issue #SIMP-1007-16: JNI FastPath Expansion. Expanded VibrationBatch to 
- *   include anomaly flags (isSuspiciousNoise, isMemoryPressureThrottled).
  */
 @Serializable
 class VibrationBatch {
@@ -376,13 +361,12 @@ class VibrationBatch {
     var stationaryDuration: Long = 0L
     var muzzleResetTriggered: Boolean = false
 
-    // Oct.7.10 Jammer Discrimination (Offset 184)
+    // Oct.7.10 Jammer Discrimination
     var isJammingCandidate: Boolean = false
 }
 
 /**
  * GnssHealthBatch: Data transfer object for JNI GNSS processing (Issue #SIMP-1011-1).
- * Oct.8.3: Initial implementation for native GNSS health offloading.
  */
 @Serializable
 class GnssHealthBatch {
@@ -400,6 +384,54 @@ class GnssHealthBatch {
 }
 
 /**
+ * AcousticBatch: Data transfer object for JNI audio processing (Issue #SIMP-1011-2).
+ */
+@Serializable
+class AcousticBatch {
+    // Inputs
+    var readCount: Int = 0
+    var baseAlpha: Double = 0.0
+    var vibrationRollingSum: Double = 0.0
+    var nowRt: Long = 0L
+    var isWarming: Boolean = false
+    
+    // Outputs
+    var maxAmp: Int = 0
+    var db: Double = 0.0
+    var isSpike: Boolean = false
+    var lastSpikeRt: Long = 0L
+}
+
+/**
+ * ForensicSample: Unified container for all forensic data points (Issue #SIMP-1011-3).
+ */
+@Serializable
+class ForensicSample(
+    var ts: Long = 0L,
+    var rt: Long = 0L,
+    var snr: Double = 0.0,
+    var acoustic: Double = 0.0,
+    var lux: Double = 0.0,
+    var vibe: Double = 0.0,
+    var proxIdx: Double = 0.0,
+    var lift: Double = 0.0,
+    var tilt: Double = 0.0,
+    var isSitDetected: Boolean = false,
+    var sitVzTs: Long = 0L,
+    var sitVzRt: Long = 0L,
+    var sitShock: Double = 0.0,
+    var kineticEnergy: Double = 0.0,
+    var activityType: ActivityType = ActivityType.UNKNOWN
+) {
+    fun reset() {
+        ts = 0L; rt = 0L; snr = 0.0; acoustic = 0.0; lux = 0.0; vibe = 0.0
+        proxIdx = 0.0; lift = 0.0; tilt = 0.0; isSitDetected = false
+        sitVzTs = 0L; sitVzRt = 0L; sitShock = 0.0; kineticEnergy = 0.0
+        activityType = ActivityType.UNKNOWN
+    }
+}
+
+/**
  * NativeFastPathProvider: Interface for offloading math to JNI (Issue #SIMP-1510-1).
  */
 interface NativeFastPathProvider {
@@ -411,11 +443,9 @@ interface NativeFastPathProvider {
     fun isShockViolated(peakShock: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean
     fun isVibrationSuspicious(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean
     
-    // Issue #1450: Batched Vibration Processing
     fun processVibrationBatch(batch: VibrationBatch): Boolean
-
-    // Issue #SIMP-1011-1: Batched GNSS Processing
     fun processGnssBatch(batch: GnssHealthBatch): Boolean
+    fun processAcousticBatch(batch: AcousticBatch, buffer: ShortArray): Boolean
 }
 
 @Serializable
@@ -774,23 +804,6 @@ class AlarmEvaluationState {
 enum class RibbonScale(val key: String, val intervalSeconds: Int) {
     FOUR_MIN("4M", 1), SIXTEEN_MIN("16M", 4), ONE_HOUR("1H", 15),
     FOUR_HOUR("4H", 60), TWENTY_FOUR_HOUR("24H", 360), SEVEN_DAY("7D", 2700)
-}
-
-class EngineSnrSample(var ts: Long = 0L, var rt: Long = 0L, var snr: Double = 0.0)
-class EngineAcousticSample(var ts: Long = 0L, var rt: Long = 0L, var db: Double = 0.0)
-
-class EngineSensorSnapshot(
-    var ts: Long = 0L, var rt: Long = 0L, var acoustic: Double = 0.0, var lux: Double = 0.0,
-    var vibe: Double = 0.0, var proxIdx: Double = 0.0, var lift: Double = 0.0, var tilt: Double = 0.0,
-    var isSitDetected: Boolean = false, var sitVzTs: Long = 0L, var sitVzRt: Long = 0L,
-    var sitShock: Double = 0.0, var kineticEnergy: Double = 0.0, var activityType: ActivityType = ActivityType.UNKNOWN
-) {
-    fun copyFrom(other: EngineSensorSnapshot) {
-        this.ts = other.ts; this.rt = other.rt; this.acoustic = other.acoustic; this.lux = other.lux
-        this.vibe = other.vibe; this.proxIdx = other.proxIdx; this.lift = other.lift; this.tilt = other.tilt
-        this.isSitDetected = other.isSitDetected; this.sitVzTs = other.sitVzTs; this.sitVzRt = other.sitVzRt
-        this.sitShock = other.sitShock; this.kineticEnergy = other.kineticEnergy; this.activityType = other.activityType
-    }
 }
 
 @Serializable
