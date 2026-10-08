@@ -1,22 +1,24 @@
-# SOT Master Requirements & Hardening Status (Oct8.4)
+# SOT Master Requirements & Hardening Status (Oct8.8)
 
-## 🏗️ Architectural Master Rules (172 Rules)
+## 🏗️ Architectural Master Rules (174 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
 *   **1.142 Unified Health Evaluation (R-ID 680)**: Health status evaluation for both GNSS (Signal Loss, Gaps, Stalls) and behavioral anomalies (Jamming, Acoustic Violations) MUST be centralized in the `SentinelValidator`. Behavioral rejections identified during coordinate processing MUST be promoted into the unified `LocationPendingReason` to ensure consistent reporting and signaling priority across the telemetry pipeline. (Oct8.2 - Issue #SIMP-1007-17).
 *   **1.143 Native GNSS Health Batching (R-ID 681)**: GNSS status metrics including satellite count, used satellites, and average SNR calculation MUST be offloaded to JNI via `GnssHealthBatch` to minimize JVM overhead and ensure deterministic hardware state evaluation in high-load scenarios. (Oct8.3 - Issue #SIMP-1011-1).
 *   **1.144 Native Acoustic Buffer Processing (R-ID 682)**: High-frequency audio buffer processing, including RMS/Peak calculation and spike evaluation, MUST be offloaded to JNI via `AcousticBatch` to reduce JVM interrupts and mathematical overhead during acoustic monitoring. (Oct8.4 - Issue #SIMP-1011-2).
+*   **1.145 Native Proximity Health Authority (R-ID 683)**: Proximity state evaluation, including environment-aware debouncing and health index calculation, MUST be offloaded to JNI via `ProximityBatch`. The native implementation MUST handle stationary state transitions and display flickering filters to minimize JVM wake-ups and math overhead. (Oct8.8 - Issue #SIMP-1012-2).
+*   **1.146 Zero-Allocation Forensic Retrieval (R-ID 684)**: High-frequency forensic telemetry retrieval MUST utilize `inline` callback-based iteration (e.g., `forEachMatch`) instead of `Sequence` or `Iterator` patterns to achieve zero-allocation parity and prevent GC-induced jitter during background stability audits. (Oct8.8 - Issue #SIMP-1012-1).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 662**: Native Proximity Scaling - Migrated environment-aware proximity debouncing and index calculation to JNI to further centralize hardware health authority. (Oct8.8 - Issue #SIMP-1012-2).
+*   **SOT ID 661**: Forensic Retrieval Optimization - Refactored `CircularStateBuffer` and `HardwareSuite` to use zero-allocation inline iteration for telemetry retrieval. (Oct8.8 - Issue #SIMP-1012-1).
 *   **SOT ID 660**: Native Acoustic Buffer Processing - Migrated `AudioRecord` RMS/Peak evaluation and spike detection to JNI to minimize JVM overhead in the 44.1kHz path. (Oct8.4 - Issue #SIMP-1011-2).
-*   **SOT ID 659**: Native GNSS Health Batching - Migrated satellite status evaluation and SNR averaging to JNI to further decouple JVM from hardware state evaluation. (Oct8.3 - Issue #SIMP-1011-1).
-*   **SOT ID 658**: Unified Health Evaluation - Consolidated redundant GNSS and behavioral health evaluation into `SentinelValidator`. Instrumented the processor and monitor service to promote behavioral rejections into the unified `LocationPendingReason`. (Oct8.2 - Issue #SIMP-1007-17).
 
 ---
 
 ## Verification Chapters
-*   **Chapter 31.275 (Native Acoustic Audit)**: PASSED - Verified that `HardwareSuite` offloads audio buffer processing to JNI via `AcousticBatch`. Confirmed that DB levels and spike evaluations are correctly calculated natively with manual fallback. (Oct8.4 - Issue #SIMP-1011-2).
-*   **Chapter 31.274 (Native GNSS Health Audit)**: PASSED - Verified that `HardwareSuite` offloads GNSS status changes to JNI via `GnssHealthBatch`. Confirmed that `satellitesInView`, `satellitesUsed`, and `averageSnr` are correctly calculated natively with manual fallback. (Oct8.3 - Issue #SIMP-1011-1).
+*   **Chapter 31.277 (Native Proximity Audit)**: PASSED - Verified that `HardwareSuite` offloads proximity debouncing to JNI via `ProximityBatch`. Confirmed that stationary duration and thermal load are correctly considered natively. (Oct8.8 - Issue #SIMP-1012-2).
+*   **Chapter 31.276 (Zero-Allocation Retrieval Audit)**: PASSED - Verified that `HardwareSuite` get*Samples methods utilize `inline` callbacks. Confirmed via profiling that no `Iterator` or `Sequence` objects are allocated during forensic sampling. (Oct8.8 - Issue #SIMP-1012-1).

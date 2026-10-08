@@ -1,5 +1,13 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct8.8
+*   **Issue #SIMP-1012-2: Native Proximity Scaling.**
+    *   **JNI Migration**: Migrated proximity debouncing and health index calculation to JNI via `ProximityBatch`.
+    *   **Health Centralization**: Centralized proximity health authority, ensuring `HardwareSuite` strictly follows native decisions for stationary duration and thermal load scaling.
+*   **Issue #SIMP-1012-1: Forensic Retrieval Optimization.**
+    *   **Zero-Allocation Infrastructure**: Refactored `CircularStateBuffer` and `HardwareSuite` to use `inline` callback-based iteration (`forEachMatch`, `forEachSnrSample`, etc.).
+    *   **Performance Parity**: Achieved zero-allocation parity (R-ID 392) by eliminating `Sequence` and `Iterator` overhead during high-frequency telemetry retrieval.
+
 ## 🟢 Resolved in Oct8.4
 *   **Issue #SIMP-1011-2: Acoustic JNI Offloading.**
     *   **JNI Migration**: Migrated `AudioRecord` iterative math (RMS and Peak) to JNI via `AcousticBatch`.
@@ -20,6 +28,3 @@
     *   **Pipeline Finalization**: Instrumented `LocationProcessor` and `MonitorService` to ensure behavioral rejections (Jamming, Acoustic, Tamper) are promoted into the unified `LocationPendingReason`.
     *   **Telemetry Parity**: Ensured immediate state parity in the evaluation monolith before alarm analysis and remote signaling, resolving the "Lagging Health" defect for remote viewers.
     *   **Strategic Simplification**: Completed the migration of all environment and behavioral health authority to `SentinelValidator`.
-
-## 🟢 Resolved in Oct8.1
-... (Historical entries truncated for brevity)

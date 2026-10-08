@@ -37,14 +37,17 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.8.8:
+ * - Issue #SIMP-1012-1: Forensic Retrieval Optimization. Migrated get*Samples 
+ *   methods to inline callback-based iteration using CircularStateBuffer.forEachMatch, 
+ *   achieving zero-allocation parity (R-ID 392). Removed legacy forensicFlyweight.
+ * - Issue #SIMP-1012-2: Native Proximity Scaling. Refactored proximity handling 
+ *   to strictly follow native JNI decisions for debouncing and health indexing.
  * Oct.8.5:
  * - Issue #SIMP-1012-2: Native Proximity Scaling. Migrated environment-aware 
  *   proximity debouncing and index calculation to JNI via ProximityBatch.
  * - Issue #SIMP-1012-1: Forensic Retrieval Optimization. Added pooled flyweight 
  *   support to get*Samples methods to ensure zero-allocation parity (R-ID 392).
- * Oct.8.4:
- * - Issue #SIMP-1011-3: Forensic Buffer Consolidation. Merged snrBuffer and 
- *   sensorBuffer into a single forensicBuffer using ForensicSample.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -59,7 +62,7 @@ class HardwareSuite @Inject constructor(
     private val activityContextProvider: ActivityContextProvider
 ) : ManagedSensorListener() {
 
-    private val nativeFastPathProvider = object : NativeFastPathProvider {
+    @PublishedApi internal val nativeFastPathProvider = object : NativeFastPathProvider {
         override fun isStationary(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean {
             return JdHardwareManager.isStationaryNative(vibration, adaptiveFloor, cpuLoad)
         }
@@ -238,7 +241,7 @@ class HardwareSuite @Inject constructor(
     val locationStatusFlow: SharedFlow<LocationStatus> = _locationStatus.asSharedFlow()
     private var currentLocationStatus = LocationStatus()
 
-    private val forensicBuffer = CircularStateBuffer(1024, { ForensicSample() }, { it.reset() })
+    @PublishedApi internal val forensicBuffer = CircularStateBuffer(1024, { ForensicSample() }, { it.reset() })
     private val _internalGpsFlow = MutableSharedFlow<GpsUpdate>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     private sealed class GpsUpdate {
@@ -318,8 +321,8 @@ class HardwareSuite @Inject constructor(
     @Volatile var isMemoryPressureThrottled = false; private set
     @Volatile var isJammingCandidate = false; private set
 
-    private val logicSnapshotBuffer = CircularStateBuffer(2, { ForensicSnapshot() }, { it.reset() })
-    private val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
+    @PublishedApi internal val logicSnapshotBuffer = CircularStateBuffer(2, { ForensicSnapshot() }, { it.reset() })
+    @PublishedApi internal val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
 
     @Volatile private var lastBufferRecordRt = 0L
 
@@ -372,9 +375,6 @@ class HardwareSuite @Inject constructor(
     private val gnssBatch = GnssHealthBatch()
     private val acousticBatch = AcousticBatch()
     private val proximityBatch = ProximityBatch()
-
-    // Issue #SIMP-1012-1: Pooled flyweights for forensic retrieval
-    private val forensicFlyweight = ForensicSample()
 
     private inner class GnssPolicyEngine {
         fun evaluateInterval(nowRt: Long): Long {
@@ -787,37 +787,27 @@ class HardwareSuite @Inject constructor(
     fun setPollingInterval(intervalMs: Long) { if (pollingIntervalFlow.value != intervalMs) pollingIntervalFlow.value = intervalMs }
     fun resetGnssJitter() { forensicAuditor.resetGnssJitter() }
 
-    // Issue #SIMP-1012-1: Optimized forensic retrieval with pooled flyweight
-    fun getSnrSamples(fromRt: Long, toRt: Long, providedFlyweight: ForensicSample? = null): Sequence<ForensicSample> = 
-        forensicBuffer.forensicSequence(
-            flyweight = providedFlyweight ?: synchronized(forensicFlyweight) { forensicFlyweight },
+    // Issue #SIMP-1012-1: Optimized zero-allocation retrieval using inline callback
+    inline fun forEachSnrSample(fromRt: Long, toRt: Long, action: (ForensicSample) -> Unit) {
+        forensicBuffer.forEachMatch(
             predicate = { it.rt in fromRt..toRt && it.snr > 0.0 },
-            transform = { source, target -> 
-                target.ts = source.ts; target.rt = source.rt; target.snr = source.snr
-            }
+            action = action
         )
+    }
 
-    fun getSensorSamples(fromRt: Long, toRt: Long, providedFlyweight: ForensicSample? = null): Sequence<ForensicSample> =
-        forensicBuffer.forensicSequence(
-            flyweight = providedFlyweight ?: synchronized(forensicFlyweight) { forensicFlyweight },
+    inline fun forEachSensorSample(fromRt: Long, toRt: Long, action: (ForensicSample) -> Unit) {
+        forensicBuffer.forEachMatch(
             predicate = { it.rt in fromRt..toRt && it.vibe > 0.0 },
-            transform = { source, target -> 
-                target.ts = source.ts; target.rt = source.rt; target.lux = source.lux
-                target.vibe = source.vibe; target.proxIdx = source.proxIdx; target.tilt = source.tilt
-                target.lift = source.lift; target.acoustic = source.acoustic
-                target.isSitDetected = source.isSitDetected; target.kineticEnergy = source.kineticEnergy
-                target.activityType = source.activityType
-            }
+            action = action
         )
+    }
 
-    fun getAcousticSamples(fromRt: Long, toRt: Long, providedFlyweight: ForensicSample? = null): Sequence<ForensicSample> =
-        forensicBuffer.forensicSequence(
-            flyweight = providedFlyweight ?: synchronized(forensicFlyweight) { forensicFlyweight },
+    inline fun forEachAcousticSample(fromRt: Long, toRt: Long, action: (ForensicSample) -> Unit) {
+        forensicBuffer.forEachMatch(
             predicate = { it.rt in fromRt..toRt && it.acoustic > 0.0 },
-            transform = { source, target -> 
-                target.ts = source.ts; target.rt = source.rt; target.acoustic = source.acoustic
-            }
+            action = action
         )
+    }
 
     fun isScreenOn(): Boolean {
         if (lastDisplayState == Display.STATE_UNKNOWN) {
@@ -852,15 +842,10 @@ class HardwareSuite @Inject constructor(
                 
                 synchronized(proximityBatch) {
                     proximityBatch.apply {
-                        distance = dist
-                        maxRange = proximityMaxRange.toDouble()
-                        nowRt = this@HardwareSuite.timeProvider.elapsedRealtime()
-                        isStationary = this@HardwareSuite.isStationary()
-                        stationaryDurationMs = this@HardwareSuite.stationaryDurationMs
-                        isHighLoad = this@HardwareSuite.isHighLoad
-                        currentIdx = this@HardwareSuite.proximityIdx
-                        rawNear = rawProximityNear
-                        isFlickering = isFlickeringInWindow(nowRt)
+                        distance = dist; maxRange = proximityMaxRange.toDouble(); this.nowRt = nowRt
+                        isStationary = this@HardwareSuite.isStationary(); stationaryDurationMs = this@HardwareSuite.stationaryDurationMs
+                        isHighLoad = this@HardwareSuite.isHighLoad; currentIdx = this@HardwareSuite.proximityIdx
+                        rawNear = rawProximityNear; isFlickering = isFlickeringInWindow(nowRt)
                     }
 
                     if (nativeFastPathProvider.processProximityBatch(proximityBatch)) {
@@ -878,21 +863,6 @@ class HardwareSuite @Inject constructor(
                                     debouncedProximityCm = dist 
                                 } 
                             }
-                        }
-                    } else {
-                        // Fallback
-                        val newValue = dist < proximityMaxRange
-                        val rawIdx = (1.0 - (dist / proximityMaxRange)).coerceIn(0.0, 1.0)
-                        proximityIdx = (proximityIdx * (1.0 - PROXIMITY_EMA_ALPHA)) + (rawIdx * PROXIMITY_EMA_ALPHA)
-                        secSumProxIdx += proximityIdx; secProxCount++
-                        if (newValue != rawProximityNear) {
-                            if (!newValue && isFlickeringInWindow(nowRt) && isStationary()) return@synchronized
-                            rawProximityNear = newValue; proximityJob?.cancel()
-                            var calcDebounceMs = if (isStationary()) PROXIMITY_DEBOUNCE_STATIONARY_MS else PROXIMITY_DEBOUNCE_MOVING_MS
-                            if (isStationary() && stationaryDurationMs > 0L) calcDebounceMs += ((stationaryDurationMs / 3600000.0) * PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR).toLong()
-                            if (isHighLoad) calcDebounceMs = (calcDebounceMs * PROXIMITY_STRESS_SCALING_MULTIPLIER).toLong()
-                            calcDebounceMs = calcDebounceMs.coerceAtMost(PROXIMITY_DEBOUNCE_MAX_MS); proximityDebounceMs = calcDebounceMs
-                            proximityJob = scope.launch { delay(calcDebounceMs); if (isActive && isProximityNear != rawProximityNear) { isProximityNear = rawProximityNear; debouncedProximityCm = dist } }
                         }
                     }
                 }
