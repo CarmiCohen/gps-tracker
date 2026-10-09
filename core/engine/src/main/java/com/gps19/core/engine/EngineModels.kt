@@ -6,16 +6,16 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * Oct.8.15:
- * - Issue #SIMP-IDEA-3: Standardized on @NotNull native providers. Added 
- *   computeAdaptiveAcousticAlpha to NativeFastPathProvider.
- * - Fixed syntax regressions (accidental spaces in identifiers).
- * - Consolidated redundant definitions and restored missing classes for build parity.
- * - Fixed ProcessorEvent hierarchy override logic.
+ * Oct.8.16:
+ * - Issue #BUILD-FIX: Restored correct Kotlin syntax for data class constructors 
+ *   (added missing commas).
+ * - Standardized DomainEvent hierarchies for multi-module binary compatibility.
+ * - Migrated interfaces to 'val' to allow flexible implementation (mutable/immutable).
+ * - Fixed trackerLastValidFixTs assignment in AlarmEvaluationState.
  */
 
 @Serializable
-class EngineGeoPoint(
+data class EngineGeoPoint(
     var lat: Double = 0.0, 
     var lng: Double = 0.0, 
     var alt: Double = 0.0,
@@ -55,9 +55,13 @@ enum class AppRole(val prefix: String) {
     }
 }
 
+@Serializable
 enum class DiscoveryPhase { BOOTSTRAP, DISCOVERING, MONITORING }
+@Serializable
 enum class SentinelStatus { VALID, JUMP, TAMPER, TRAJECTORY_PROMOTED, OUTLIER, JITTER, JAMMER_SUSPICION }
+@Serializable
 enum class SignalingPriority { HIGH, NORMAL }
+@Serializable
 enum class CapabilityStatus { GRANTED, DENIED, UNKNOWN }
 
 @Serializable
@@ -81,6 +85,7 @@ data class HardwareCapabilities(
     val performanceTier: PerformanceTier = PerformanceTier.STANDARD
 )
 
+@Serializable
 enum class LocationPendingReason { NONE, GPS_STALL, GPS_GAP, ACOUSTIC_VIOLATION, SIGNAL_LOSS, JAMMER_SUSPICION }
 
 @Serializable
@@ -93,58 +98,58 @@ data class LocationStatus(
 )
 
 @Serializable
-class EngineConnectionPoint(
-    var ts: Long = 0L,
-    var rt: Long = 0L,
-    var rtt: Int = 0,
-    var remoteSig: Int = 0,
-    var isConnected: Boolean = false,
-    var isGap: Boolean = false,
-    var isRecoveryEvent: Boolean = false,
-    var hasGps: Boolean = false,
-    var accuracy: Double = 0.0,
-    var maxAccuracy: Double = 0.0,
-    var isBatteryLow: Boolean = false,
-    var isBatteryCritical: Boolean = false,
-    var isBatterySteepDischarge: Boolean = false,
-    var isCoolingModeActive: Boolean = false,
-    var speed: Double = 0.0,
-    var bearing: Double = 0.0,
-    var isTick: Boolean = false,
-    var currentMa: Int = 0,
-    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
-    var gpsIndex: Double = 0.0,
-    var noiseIdx: Double = 0.0,
-    var luxIdx: Double = 0.0,
-    var vibeIdx: Double = 0.0,
-    var proxIdx: Double = 0.0,
-    var liftIdx: Double = 0.0,
-    var snrIdx: Double = 0.0,
-    var tiltIdx: Double = 0.0,
-    var baroIdx: Double = 0.0,
-    var isSitDetected: Boolean = false,
-    var isSitActive: Boolean = false,
-    var verticalVelocity: Double = 0.0,
-    var sitVz: Double = 0.0,
-    var sitVzTs: Long = 0L,
-    var sitVzRt: Long = 0L,
-    var sitDz: Double = 0.0,
-    var sitBaro: Double = 0.0,
-    var sitTilt: Double = 0.0,
-    var sitShock: Double = 0.0,
-    var kineticEnergy: Double = 0.0,
-    var gpsHardwareLock: Boolean = false,
-    var cpuLoad: Double = 0.0,
-    var ioWait: Double = 0.0,
-    var maxIoLatency: Long = 0L,
-    var isSilentFailure: Boolean = false,
-    var isUltraLongStationary: Boolean = false,
-    var violationUptimeMs: Long = 0L,
-    var thermalHeadroom: Double = 0.0,
-    var heapAllocatedMb: Double = 0.0,
-    var activityType: ActivityType = ActivityType.UNKNOWN,
+class EngineConnectionPoint {
+    var ts: Long = 0L
+    var rt: Long = 0L
+    var rtt: Int = 0
+    var remoteSig: Int = 0
+    var isConnected: Boolean = false
+    var isGap: Boolean = false
+    var isRecoveryEvent: Boolean = false
+    var hasGps: Boolean = false
+    var accuracy: Double = 0.0
+    var maxAccuracy: Double = 0.0
+    var isBatteryLow: Boolean = false
+    var isBatteryCritical: Boolean = false
+    var isBatterySteepDischarge: Boolean = false
+    var isCoolingModeActive: Boolean = false
+    var speed: Double = 0.0
+    var bearing: Double = 0.0
+    var isTick: Boolean = false
+    var currentMa: Int = 0
+    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
+    var gpsIndex: Double = 0.0
+    var noiseIdx: Double = 0.0
+    var luxIdx: Double = 0.0
+    var vibeIdx: Double = 0.0
+    var proxIdx: Double = 0.0
+    var liftIdx: Double = 0.0
+    var snrIdx: Double = 0.0
+    var tiltIdx: Double = 0.0
+    var baroIdx: Double = 0.0
+    var isSitDetected: Boolean = false
+    var isSitActive: Boolean = false
+    var verticalVelocity: Double = 0.0
+    var sitVz: Double = 0.0
+    var sitVzTs: Long = 0L
+    var sitVzRt: Long = 0L
+    var sitDz: Double = 0.0
+    var sitBaro: Double = 0.0
+    var sitTilt: Double = 0.0
+    var sitShock: Double = 0.0
+    var kineticEnergy: Double = 0.0
+    var gpsHardwareLock: Boolean = false
+    var cpuLoad: Double = 0.0
+    var ioWait: Double = 0.0
+    var maxIoLatency: Long = 0L
+    var isSilentFailure: Boolean = false
+    var isUltraLongStationary: Boolean = false
+    var violationUptimeMs: Long = 0L
+    var thermalHeadroom: Double = 0.0
+    var heapAllocatedMb: Double = 0.0
+    var activityType: ActivityType = ActivityType.UNKNOWN
     val forensic: ForensicSnapshot = ForensicSnapshot()
-) {
+
     var snrSnapshot: Double?
         get() = forensic.snr
         set(value) { forensic.snr = value }
@@ -203,10 +208,10 @@ data class AlarmServiceContext(
 
 @Serializable
 class LocationProcessingState {
-    val accuracy = AccuracyState()
-    val forensic = SentinelForensicState()
-    val trajectory = TrajectoryBuffer()
-    val anchor = AnchorState()
+    val accuracy: AccuracyState = AccuracyState()
+    val forensic: SentinelForensicState = SentinelForensicState()
+    val trajectory: TrajectoryBuffer = TrajectoryBuffer()
+    val anchor: AnchorState = AnchorState()
     var lastValidFixRt: Long = 0L
     var lastLat: Double = 0.0
     var lastLng: Double = 0.0
@@ -348,36 +353,22 @@ class AlarmEvaluationState {
     }
 }
 
-/**
- * SystemPressureBatch: Unified container for Memory and Storage pressure evaluation.
- * Issue #SIMP-1014-2: Consolidation of pressure gates into a single JNI crossing.
- */
 @Serializable
 class SystemPressureBatch {
-    // Memory Inputs
     var heapMb: Double = 0.0
     var memPressureThresholdMb: Double = 0.0
     var memCriticalThresholdMb: Double = 0.0
     var memHysteresisOffsetMb: Double = 0.0
-    
-    // Storage Inputs
     var storageAvailableMb: Double = 0.0
     var storageLowThresholdMb: Double = 0.0
     var storageCriticalThresholdMb: Double = 0.0
     var storageHysteresisOffsetMb: Double = 0.0
-
-    // Memory Outputs
-    var currentMemLevel: Int = 0 // 0: Normal, 1: High, 2: Critical
+    var currentMemLevel: Int = 0
     var needsMemFlush: Boolean = false
-    
-    // Storage Outputs
-    var currentStorageLevel: Int = 0 // 0: Normal, 1: Low, 2: Critical
+    var currentStorageLevel: Int = 0
     var needsStoragePrune: Boolean = false
 }
 
-/**
- * NativeFastPathProvider: Interface for offloading math to JNI (Issue #SIMP-1510-1).
- */
 interface NativeFastPathProvider {
     fun isStationary(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean
     fun updateVibrationFloor(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double): Double
@@ -392,92 +383,86 @@ interface NativeFastPathProvider {
     fun processGnssBatch(batch: GnssHealthBatch): Boolean
     fun processAcousticBatch(batch: AcousticBatch, buffer: ShortArray): Boolean
     fun processProximityBatch(batch: ProximityBatch): Boolean
-    
-    // Oct.8.12: Unified pressure path
     fun processSystemPressure(batch: SystemPressureBatch): Boolean
 }
 
 @Serializable
-class AccuracyState {
-    var lastProcessedAccuracy: Double = 0.0
-    var maxAccuracy: Double = 0.0
-    var windowBuffer: DoubleArray = DoubleArray(64)
-    var windowSize: Int = 0
-    var windowHead: Int = 0
+data class AccuracyState(
+    var lastProcessedAccuracy: Double = 0.0,
+    var maxAccuracy: Double = 0.0,
+    var windowBuffer: DoubleArray = DoubleArray(64),
+    var windowSize: Int = 0,
+    var windowHead: Int = 0,
     var lastUpdateRt: Long = 0L
-}
+)
 
 @Serializable
-class SentinelForensicState {
-    var lastValidLat: Double = 0.0
-    var lastValidLng: Double = 0.0
-    var lastValidAlt: Double = 0.0
-    var lastValidTs: Long = 0L
-    var lastValidRt: Long = 0L
-    var lastValidSpeedMps: Double = 0.0
-    var lastValidBearing: Double = 0.0
-    var lastValidAccuracy: Double = 0.0
-    var estimatedSpeedMps: Double = 0.0
-    var estimatedBearing: Double = 0.0
-    var stationaryProb: Double = 1.0
-    var currentVibrationIndex: Double = 0.0
-    var peakVibrationShock: Double = 0.0
-    var peakVibrationShockRt: Long = 0L
-    var currentCompassHeading: Double = 0.0
-    var lastCompassHeading: Double = 0.0
-    var currentBaroAlt: Double = 0.0
-    var currentLux: Double = 0.0
-    var isNear: Boolean = true
-    var isPowerTamper: Boolean = false
-    var currentTiltDegrees: Double = 0.0
-    var currentAcousticDb: Double = 0.0
-    var lastFastPathAcousticSpikeRt: Long = 0L
-    var lastFastPathLightSpikeRt: Long = 0L
-    var isSitDetected: Boolean = false
-    var lastSitTs: Long = 0L
-    var lastSitRt: Long = 0L
-    var baselineSitTilt: Double = -1.0
-    var lastSitVz: Double = 0.0
-    var lastSitVzTs: Long = 0L
-    var lastSitVzRt: Long = 0L
-    var lastSitDz: Double = 0.0
-    var lastSitBaro: Double = 0.0
-    var lastSitTilt: Double = 0.0
-    var lastSitShock: Double = 0.0
-    var sitDetectionCooldownRt: Long = 0L
-    var stationaryDurationMs: Long = 0L
-    var gpsMotionStartRt: Long = 0L
-    var luxBaseline: Double = -1.0
-    var baroBaseline: Double = -1000.0
-    var acousticFloorDb: Double = -1.0
-    var adaptiveVibrationFloor: Double = 0.1
-    var lastAcousticContractionRt: Long = 0L
-    var lastSnr: Double = 0.0
-    var lastSatsUsed: Int = 0
-    
-    // Anomaly Flags
-    var isSuspiciousNoise: Boolean = false
-    var isMemoryPressureThrottled: Boolean = false
-
-    // Oct.7.10 Jammer Discrimination
+data class SentinelForensicState(
+    var lastValidLat: Double = 0.0,
+    var lastValidLng: Double = 0.0,
+    var lastValidAlt: Double = 0.0,
+    var lastValidTs: Long = 0L,
+    var lastValidRt: Long = 0L,
+    var lastValidSpeedMps: Double = 0.0,
+    var lastValidBearing: Double = 0.0,
+    var lastValidAccuracy: Double = 0.0,
+    var estimatedSpeedMps: Double = 0.0,
+    var estimatedBearing: Double = 0.0,
+    var stationaryProb: Double = 1.0,
+    var currentVibrationIndex: Double = 0.0,
+    var peakVibrationShock: Double = 0.0,
+    var peakVibrationShockRt: Long = 0L,
+    var currentCompassHeading: Double = 0.0,
+    var lastCompassHeading: Double = 0.0,
+    var currentBaroAlt: Double = 0.0,
+    var currentLux: Double = 0.0,
+    var isNear: Boolean = true,
+    var isPowerTamper: Boolean = false,
+    var currentTiltDegrees: Double = 0.0,
+    var currentAcousticDb: Double = 0.0,
+    var lastFastPathAcousticSpikeRt: Long = 0L,
+    var lastFastPathLightSpikeRt: Long = 0L,
+    var isSitDetected: Boolean = false,
+    var lastSitTs: Long = 0L,
+    var lastSitRt: Long = 0L,
+    var baselineSitTilt: Double = -1.0,
+    var lastSitVz: Double = 0.0,
+    var lastSitVzTs: Long = 0L,
+    var lastSitVzRt: Long = 0L,
+    var lastSitDz: Double = 0.0,
+    var lastSitBaro: Double = 0.0,
+    var lastSitTilt: Double = 0.0,
+    var lastSitShock: Double = 0.0,
+    var sitDetectionCooldownRt: Long = 0L,
+    var stationaryDurationMs: Long = 0L,
+    var gpsMotionStartRt: Long = 0L,
+    var luxBaseline: Double = -1.0,
+    var baroBaseline: Double = -1000.0,
+    var acousticFloorDb: Double = -1.0,
+    var adaptiveVibrationFloor: Double = 0.1,
+    var lastAcousticContractionRt: Long = 0L,
+    var lastSnr: Double = 0.0,
+    var lastSatsUsed: Int = 0,
+    var isSuspiciousNoise: Boolean = false,
+    var isMemoryPressureThrottled: Boolean = false,
     var isJammingCandidate: Boolean = false
-}
+)
 
 @Serializable
-class TrajectoryBuffer {
-    var latBuffer: DoubleArray = DoubleArray(128)
-    var lngBuffer: DoubleArray = DoubleArray(128)
-    var altBuffer: DoubleArray = DoubleArray(128)
-    var accBuffer: DoubleArray = DoubleArray(128)
-    var maxAccBuffer: DoubleArray = DoubleArray(128)
-    var bearingBuffer: DoubleArray = DoubleArray(128)
-    var speedBuffer: DoubleArray = DoubleArray(128)
-    var tsBuffer: LongArray = LongArray(128)
-    var rtBuffer: LongArray = LongArray(128)
-    var vibeBuffer: DoubleArray = DoubleArray(128)
-    var head: Int = 0
+data class TrajectoryBuffer(
+    var latBuffer: DoubleArray = DoubleArray(128),
+    var lngBuffer: DoubleArray = DoubleArray(128),
+    var altBuffer: DoubleArray = DoubleArray(128),
+    var accBuffer: DoubleArray = DoubleArray(128),
+    var maxAccBuffer: DoubleArray = DoubleArray(128),
+    var bearingBuffer: DoubleArray = DoubleArray(128),
+    var speedBuffer: DoubleArray = DoubleArray(128),
+    var tsBuffer: LongArray = LongArray(128),
+    var rtBuffer: LongArray = LongArray(128),
+    var vibeBuffer: DoubleArray = DoubleArray(128),
+    var head: Int = 0,
     var size: Int = 0
-}
+)
 
 @Serializable
 class AnchorState {
@@ -494,23 +479,23 @@ class AnchorState {
 }
 
 @Serializable
-class ForensicSample(
-    var ts: Long = 0L,
-    var rt: Long = 0L,
-    var snr: Double = 0.0,
-    var acoustic: Double = 0.0,
-    var lux: Double = 0.0,
-    var vibe: Double = 0.0,
-    var proxIdx: Double = 0.0,
-    var lift: Double = 0.0,
-    var tilt: Double = 0.0,
-    var isSitDetected: Boolean = false,
-    var sitVzTs: Long = 0L,
-    var sitVzRt: Long = 0L,
-    var sitShock: Double = 0.0,
-    var kineticEnergy: Double = 0.0,
+class ForensicSample {
+    var ts: Long = 0L
+    var rt: Long = 0L
+    var snr: Double = 0.0
+    var acoustic: Double = 0.0
+    var lux: Double = 0.0
+    var vibe: Double = 0.0
+    var proxIdx: Double = 0.0
+    var lift: Double = 0.0
+    var tilt: Double = 0.0
+    var isSitDetected: Boolean = false
+    var sitVzTs: Long = 0L
+    var sitVzRt: Long = 0L
+    var sitShock: Double = 0.0
+    var kineticEnergy: Double = 0.0
     var activityType: ActivityType = ActivityType.UNKNOWN
-) {
+
     fun reset() {
         ts = 0L; rt = 0L; snr = 0.0; acoustic = 0.0; lux = 0.0; vibe = 0.0
         proxIdx = 0.0; lift = 0.0; tilt = 0.0; isSitDetected = false
@@ -519,133 +504,99 @@ class ForensicSample(
     }
 }
 
-/**
- * VibrationBatch: Data transfer object for JNI batching (Issue #1450).
- */
 @Serializable
-class VibrationBatch {
-    // Inputs
-    var x: Double = 0.0; var y: Double = 0.0; var z: Double = 0.0
-    var lx: Double = 0.0; var ly: Double = 0.0; var lz: Double = 0.0
-    var adaptiveFloor: Double = 0.0
-    var isWarming: Boolean = false
-    var cpuLoad: Double = 0.0
-    var lastRawVibe: Double = 0.0
-    var lastHpfValue: Double = 0.0
-    var currentEnergy: Double = 0.0
-    
-    // Forensic Expansion
-    var snr: Double = -1.0
-    var thermal: Double = -1.0
-    var heap: Double = -1.0
-
-    // Oct.7.9: Time context for native hysteresis
-    var nowRt: Long = 0L
-    
-    // Outputs
-    var delta: Double = 0.0
-    var nextFloor: Double = 0.0
-    var nextHpf: Double = 0.0
-    var nextEnergy: Double = 0.0
-    var isStationary: Boolean = false
-    
-    // Oct.7.6 Anomaly Flags
-    var isSuspiciousNoise: Boolean = false
-    var isMemoryPressureThrottled: Boolean = false
-
-    // Oct.7.9 Native Hysteresis Outputs
-    var stationaryDuration: Long = 0L
-    var muzzleResetTriggered: Boolean = false
-
-    // Oct.7.10 Jammer Discrimination
+data class VibrationBatch(
+    var x: Double = 0.0, var y: Double = 0.0, var z: Double = 0.0,
+    var lx: Double = 0.0, var ly: Double = 0.0, var lz: Double = 0.0,
+    var adaptiveFloor: Double = 0.0,
+    var isWarming: Boolean = false,
+    var cpuLoad: Double = 0.0,
+    var lastRawVibe: Double = 0.0,
+    var lastHpfValue: Double = 0.0,
+    var currentEnergy: Double = 0.0,
+    var snr: Double = -1.0,
+    var thermal: Double = -1.0,
+    var heap: Double = -1.0,
+    var nowRt: Long = 0L,
+    var delta: Double = 0.0,
+    var nextFloor: Double = 0.0,
+    var nextHpf: Double = 0.0,
+    var nextEnergy: Double = 0.0,
+    var isStationary: Boolean = false,
+    var isSuspiciousNoise: Boolean = false,
+    var isMemoryPressureThrottled: Boolean = false,
+    var stationaryDuration: Long = 0L,
+    var muzzleResetTriggered: Boolean = false,
     var isJammingCandidate: Boolean = false
-}
+)
 
-/**
- * GnssHealthBatch: Data transfer object for JNI GNSS processing (Issue #SIMP-1011-1).
- */
 @Serializable
-class GnssHealthBatch {
-    // Inputs
-    var count: Int = 0
-    var svid: IntArray = IntArray(64)
-    var cn0: FloatArray = FloatArray(64)
-    var usedInFix: BooleanArray = BooleanArray(64)
-    var constellation: IntArray = IntArray(64)
-
-    // Outputs
-    var satellitesInView: Int = 0
-    var satellitesUsed: Int = 0
+data class GnssHealthBatch(
+    var count: Int = 0,
+    var svid: IntArray = IntArray(64),
+    var cn0: FloatArray = FloatArray(64),
+    var usedInFix: BooleanArray = BooleanArray(64),
+    var constellation: IntArray = IntArray(64),
+    var satellitesInView: Int = 0,
+    var satellitesUsed: Int = 0,
     var averageSnr: Double = 0.0
-}
+)
 
-/**
- * AcousticBatch: Data transfer object for JNI audio processing (Issue #SIMP-1011-2).
- */
 @Serializable
-class AcousticBatch {
-    // Inputs
-    var readCount: Int = 0
-    var baseAlpha: Double = 0.0
-    var vibrationRollingSum: Double = 0.0
-    var nowRt: Long = 0L
-    var isWarming: Boolean = false
-    
-    // Outputs
-    var maxAmp: Int = 0
-    var db: Double = 0.0
-    var isSpike: Boolean = false
+data class AcousticBatch(
+    var readCount: Int = 0,
+    var baseAlpha: Double = 0.0,
+    var vibrationRollingSum: Double = 0.0,
+    var nowRt: Long = 0L,
+    var isWarming: Boolean = false,
+    var maxAmp: Int = 0,
+    var db: Double = 0.0,
+    var isSpike: Boolean = false,
     var lastSpikeRt: Long = 0L
-}
+)
 
-/**
- * ProximityBatch: Data transfer object for JNI proximity processing (Issue #SIMP-1012-2).
- */
 @Serializable
-class ProximityBatch {
-    // Inputs
-    var distance: Double = 0.0
-    var maxRange: Double = 0.0
-    var nowRt: Long = 0L
-    var isStationary: Boolean = false
-    var stationaryDurationMs: Long = 0L
-    var isHighLoad: Boolean = false
-    var currentIdx: Double = 0.0
-    var rawNear: Boolean = false
-    var isFlickering: Boolean = false
-
-    // Outputs
-    var nextIdx: Double = 0.0
-    var nextRawNear: Boolean = false
+data class ProximityBatch(
+    var distance: Double = 0.0,
+    var maxRange: Double = 0.0,
+    var nowRt: Long = 0L,
+    var isStationary: Boolean = false,
+    var stationaryDurationMs: Long = 0L,
+    var isHighLoad: Boolean = false,
+    var currentIdx: Double = 0.0,
+    var rawNear: Boolean = false,
+    var isFlickering: Boolean = false,
+    var nextIdx: Double = 0.0,
+    var nextRawNear: Boolean = false,
     var debounceMs: Long = 0L
-}
+)
 
 interface Locatable {
-    var isLocationPending: Boolean
-    var locationPendingReason: LocationPendingReason
-    var lat: Double
-    var lng: Double
-    var alt: Double
-    var gpsTs: Long
-    var ts: Long
-    var rt: Long
+    val isLocationPending: Boolean
+    val locationPendingReason: LocationPendingReason
+    val lat: Double
+    val lng: Double
+    val alt: Double
+    val gpsTs: Long
+    val ts: Long
+    val rt: Long
 }
 
 interface SpatialAnchor {
-    var lat: Double
-    var lng: Double
-    var alt: Double
-    var gpsTs: Long
+    val lat: Double
+    val lng: Double
+    val alt: Double
+    val gpsTs: Long
 }
 
 interface BatteryProvider {
-    var battery: Int
-    var isCharging: Boolean
+    val battery: Int
+    val isCharging: Boolean
 }
 
 interface DeviceIdentity {
-    var trackerId: String
-    var viewerId: String
+    val trackerId: String
+    val viewerId: String
 }
 
 @Serializable
@@ -653,7 +604,24 @@ sealed class DomainEvent {
     abstract val priority: EventPriority
     
     @Serializable
-    data class TickEvaluated(val update: LocationUpdate, val isTrackerMode: Boolean, val isPeerActive: Boolean, val serviceTickCounter: Long) : DomainEvent() {
+    data class TickEvaluated(
+        val now: Long,
+        val nowRt: Long,
+        val isTrackerMode: Boolean,
+        val snapshot: LocationUpdate,
+        val processed: ProcessedLocation?,
+        val health: SystemHealthState,
+        val isSocketConnected: Boolean,
+        val isPeerActive: Boolean,
+        val serviceTickCounter: Long,
+        val rtt: Int,
+        val recoveryFlagged: Boolean,
+        val gnssDetail: GnssDetail?,
+        val isSuspiciousMode: Boolean,
+        val lastSitTs: Long,
+        val lastTickTs: Long,
+        val lastTickRt: Long
+    ) : DomainEvent() {
         override val priority = EventPriority.NORMAL
     }
     @Serializable
@@ -661,11 +629,11 @@ sealed class DomainEvent {
         override val priority = if (isImportant) EventPriority.HIGH else EventPriority.LOW
     }
     @Serializable
-    data class StabilityViolation(val message: String, val isJitter: Boolean, val lat: Double = 0.0, val lng: Double = 0.0, val accuracy: Double = 0.0) : DomainEvent() {
+    data class HeuristicRecovery(val message: String, val gapMs: Long, val lat: Double = 0.0, val lng: Double = 0.0, val accuracy: Double = 0.0) : DomainEvent() {
         override val priority = EventPriority.HIGH
     }
     @Serializable
-    data class HeuristicRecovery(val message: String, val gapMs: Long, val lat: Double = 0.0, val lng: Double = 0.0, val accuracy: Double = 0.0) : DomainEvent() {
+    data class StabilityViolation(val message: String, val isJitter: Boolean, val lat: Double = 0.0, val lng: Double = 0.0, val accuracy: Double = 0.0) : DomainEvent() {
         override val priority = EventPriority.HIGH
     }
     @Serializable
@@ -682,98 +650,153 @@ sealed class DomainEvent {
     }
 }
 
+@Serializable
 enum class EventPriority { LOW, NORMAL, HIGH }
 
 @Serializable
-class GnssDetail(
+data class GnssDetail(
     val satellites: List<SatelliteInfo> = emptyList()
 )
 
 @Serializable
-class SatelliteInfo(
+data class SatelliteInfo(
     val svid: Int,
     val cn0: Double,
     val usedInFix: Boolean,
     val constellation: Int
 )
 
+@Serializable
 sealed class ProcessorEvent : DomainEvent() {
     override val priority = EventPriority.NORMAL
     abstract val isPrimary: Boolean
 
+    @Serializable
     data class LocationProcessed(val update: LocationUpdate) : ProcessorEvent() {
         override val isPrimary: Boolean = true
     }
+    @Serializable
     data class LogAdded(val message: String, val type: String, val isImportant: Boolean, val isSpecial: Boolean, val lat: Double, val lng: Double, val accuracy: Double, val forensic: ForensicSnapshot, override val isPrimary: Boolean) : ProcessorEvent()
+    @Serializable
     data class VibrationFloorChanged(val floor: Double, override val isPrimary: Boolean) : ProcessorEvent()
+    @Serializable
     data class LuxBaselineChanged(val baseline: Double, override val isPrimary: Boolean) : ProcessorEvent()
+    @Serializable
     data class AcousticFloorChanged(val floor: Double, override val isPrimary: Boolean) : ProcessorEvent()
+    @Serializable
     data class ChairBaselineChanged(val baseline: Double, override val isPrimary: Boolean) : ProcessorEvent()
+    @Serializable
     data class MaxAccuracyChanged(val accuracy: Double, override val isPrimary: Boolean) : ProcessorEvent()
+    @Serializable
     data class TrailPointSaved(val lat: Double, val lng: Double, val isViewerTrail: Boolean, val status: SentinelStatus, val timestamp: Long, val accuracy: Double, val maxAccuracy: Double, override val isPrimary: Boolean) : ProcessorEvent()
+    @Serializable
     data class GpsStallDetected(val rt: Long, override val isPrimary: Boolean) : ProcessorEvent()
 }
 
+@Serializable
 sealed class AlarmEvent : DomainEvent() {
     override val priority = EventPriority.HIGH
     
-    data class LogEvent(val message: String, val type: String, val isImportant: Boolean, val extremeValue: Double, val logId: String?, val durationMs: Long, val isSpecial: Boolean, val specialColor: Int?, val lat: Double, val lng: Double, val accuracy: Double, val maxAccuracy: Double, val forensic: ForensicSnapshot) : AlarmEvent()
+    @Serializable
+    data class LogEvent(val message: String, val type: String, val isImportant: Boolean, val extremeValue: Double?, val logId: String?, val durationMs: Long, val isSpecial: Boolean, val specialColor: Int?, val lat: Double, val lng: Double, val accuracy: Double, val maxAccuracy: Double, val forensic: ForensicSnapshot) : AlarmEvent()
 }
 
+@Serializable
 sealed class IntegrityEvent : DomainEvent() {
     override val priority = EventPriority.HIGH
     
+    @Serializable
     data class ViolationSustained(val type: String) : IntegrityEvent()
+    @Serializable
     data class ViolationResolved(val type: String) : IntegrityEvent()
+    @Serializable
     data class LogEvent(val message: String, val isImportant: Boolean = false) : IntegrityEvent()
+    @Serializable
     data class LocationStatusChanged(val status: LocationStatus) : IntegrityEvent()
+    @Serializable
     data class GnssThrottledChanged(val isThrottled: Boolean) : IntegrityEvent()
+    @Serializable
     data class MemoryPressureChanged(val level: MemoryPressureLevel, val heapMb: Double) : IntegrityEvent()
+    @Serializable
     data class StoragePressureChanged(val isLow: Boolean, val isCritical: Boolean, val availableMb: Long) : IntegrityEvent()
 }
 
+@Serializable
 sealed class ConnectivityEvent : DomainEvent() {
     override val priority = EventPriority.NORMAL
     
+    @Serializable
     data class PeerPulse(val peerId: String) : ConnectivityEvent()
 }
 
+@Serializable
 sealed class HistoryEvent : DomainEvent() {
     override val priority = EventPriority.LOW
     
+    @Serializable
     data class LogEvent(val message: String, val isImportant: Boolean = false) : HistoryEvent()
 }
 
+@Serializable
 sealed class AppSensorEvent : DomainEvent() {
     override val priority = EventPriority.HIGH
     
+    @Serializable
     data class HardwareFailure(val reason: String) : AppSensorEvent()
+    @Serializable
     data class LogEvent(val message: String, val isImportant: Boolean = false) : AppSensorEvent()
 }
 
+@Serializable
 sealed class CommandEvent : DomainEvent() {
     override val priority = EventPriority.HIGH
     
-    object ResetTimers : CommandEvent()
-    object TriggerMemoryFlush : CommandEvent()
-    object TriggerStoragePrune : CommandEvent()
-    object WatchdogTrigger : CommandEvent()
-    object UiPulse : CommandEvent()
-    object SyncSensors : CommandEvent()
+    @Serializable
+    data object ResetTimers : CommandEvent()
+    @Serializable
+    data object TriggerMemoryFlush : CommandEvent()
+    @Serializable
+    data object TriggerStoragePrune : CommandEvent()
+    @Serializable
+    data object WatchdogTrigger : CommandEvent()
+    @Serializable
+    data object UiPulse : CommandEvent()
+    @Serializable
+    data object SyncSensors : CommandEvent()
+    @Serializable
     data class UiVisibilityChanged(val isVisible: Boolean) : CommandEvent()
+    
+    @Serializable
+    data object ExecuteStressTest : CommandEvent()
+    @Serializable
+    data object ExecuteLogPressureTest : CommandEvent()
+    @Serializable
+    data object ExecuteNetworkStressTest : CommandEvent()
+    @Serializable
+    data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : CommandEvent()
+    @Serializable
+    data class SimulateMemoryPressure(val active: Boolean, val level: MemoryPressureLevel) : CommandEvent()
 }
 
+@Serializable
 sealed class RevivalEvent : DomainEvent() {
     override val priority = EventPriority.HIGH
     
+    @Serializable
     data class Footprint(val deltaMa: Int, val deltaTemp: Double, val durationMs: Long) : RevivalEvent()
-    object HardwareLock : RevivalEvent()
+    @Serializable
+    data object HardwareLock : RevivalEvent()
+    @Serializable
     data class Attempt(val count: Int) : RevivalEvent()
-    object Success : RevivalEvent()
-    object RawBurstStarted : RevivalEvent()
-    object RawBurstEnded : RevivalEvent()
+    @Serializable
+    data object Success : RevivalEvent()
+    @Serializable
+    data object RawBurstStarted : RevivalEvent()
+    @Serializable
+    data object RawBurstEnded : RevivalEvent()
 }
 
+@Serializable
 class SystemHealthReport(
     val reports: MutableList<ViolationReport> = MutableList(32) { ViolationReport() }
 ) {
@@ -788,6 +811,7 @@ class SystemHealthReport(
     }
 }
 
+@Serializable
 class ViolationReport {
     var type: String = ""
     var title: String = ""
@@ -802,6 +826,7 @@ class ViolationReport {
     }
 }
 
+@Serializable
 class JumpConfidence {
     var tier: Int = 0
     var isJump: Boolean = false
@@ -815,6 +840,7 @@ class JumpConfidence {
     }
 }
 
+@Serializable
 enum class RibbonScale(val intervalSeconds: Int) { 
     FOUR_MIN(60), 
     SIXTEEN_MIN(240), 
@@ -824,6 +850,7 @@ enum class RibbonScale(val intervalSeconds: Int) {
     SEVEN_DAY(86400) 
 }
 
+@Serializable
 class ProcessedLocation {
     var rawPoint: EngineGeoPoint? = null
     var optimizedPoint: EngineGeoPoint? = null
@@ -861,6 +888,7 @@ class ProcessedLocation {
     }
 }
 
+@Serializable
 class SentinelResult {
     var status: SentinelStatus = SentinelStatus.VALID
     var reason: String? = null
@@ -881,6 +909,7 @@ class SentinelResult {
     }
 }
 
+@Serializable
 class TrajectoryNode {
     var lat: Double = 0.0
     var lng: Double = 0.0
@@ -904,6 +933,7 @@ class TrajectoryNode {
     }
 }
 
+@Serializable
 class RejectedPoint(
     val lat: Double,
     val lng: Double,

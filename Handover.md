@@ -1,33 +1,40 @@
-# Handover: Hardening Process - Oct8.15
+# Handover: Hardening Process - Oct8.15 Build Failure Resolution
 
 ## 🎯 Current Status
-Successfully achieved **Non-Nullable Native Authority Consolidation** for version **Oct8.15**. The system has eliminated redundant JVM fallback branching in high-frequency sensor paths by standardizing `SentinelValidator` on a non-nullable provider. Additionally, the core engine's model integrity was restored by consolidating all critical interfaces and event hierarchies (`DomainEvent`, `ProcessorEvent`, etc.) into `EngineModels.kt`, resolving significant compilation regressions found during the Oct8.15 -> Oct8.15 transition.
+The project is in a build recovery phase for version **Oct8.15**. A major architectural consolidation was performed to fix "Unresolved reference" errors in the `app` module by centralizing engine models and event hierarchies into `EngineModels.kt`. However, the build is currently failing during the KAPT stub generation phase.
 
-## 🛠️ Changes Performed (Oct8.15)
-1.  **Non-Nullable Native Authority**:
-    *   `SentinelValidator.kt` (line 20): Standardized `nativeProvider` as non-nullable, initialized with `DefaultNativeFastPathProvider`.
-    *   `EngineModels.kt`: Added `computeAdaptiveAcousticAlpha` to `NativeFastPathProvider` interface to complete the native math offloading contract.
-    *   Eliminated all `nativeProvider?.let` blocks in `SentinelValidator`, routing 100% of sensor gates through the provider for deterministic hot-path execution.
-2.  **Engine Model Consolidation & Restoration**:
-    *   `EngineModels.kt`: Restored and consolidated all core interfaces (`Locatable`, `SpatialAnchor`, `BatteryProvider`, `DeviceIdentity`) and critical DTOs (`GnssDetail`, `SatelliteInfo`, `JumpConfidence`, `SentinelResult`, `TrajectoryNode`, `RejectedPoint`).
-    *   `EngineModels.kt`: Implemented the full `DomainEvent` sealed hierarchy and its sub-classes (`AlarmEvent`, `IntegrityEvent`, `ConnectivityEvent`, `HistoryEvent`, `AppSensorEvent`, `CommandEvent`, `RevivalEvent`) to resolve project-wide "Unresolved reference" errors in `AppEventCoordinator.kt` and `MonitorService.kt`.
-    *   `EngineModels.kt`: Defined `SystemHealthReport` and `ViolationReport` to support the detection logic in `MainAlarmLogic.kt`.
-3.  **Syntax & Integrity Repair**:
-    *   `EngineModels.kt`: Fixed identifier corruptions (e.g., `requires WakeLockRenewal` -> `requiresWakeLockRenewal` at line 76).
-    *   `EngineModels.kt`: Fixed `ProcessorEvent` hierarchy by adding `abstract val isPrimary` and correctly overriding it in data classes to resolve "isPrimary is final and cannot be overridden" errors.
-    *   `SystemHealthState.kt`: Fully implemented the `Locatable` interface (lat, lng, alt, gpsTs, ts, rt) to satisfy abstract member requirements.
-    *   `JdHardwareManager.kt`: Aligned JVM fallbacks for `isStationaryNative`, `updateVibrationFloorNative`, etc., with `EngineConstants` to ensure logic parity when JNI is unavailable.
-4.  **Architecture**:
-    *   Established Rule **1.152 (R-ID 690)** in `SOT_MASTER_REQUIREMENTS.md` for Non-Nullable Native Authority.
-    *   Incremented version to **Oct8.15** in `build.gradle`.
+### 🔴 Critical Blocker
+**Build Error**: `Execution failed for task ':app:kaptGenerateStubsDebugKotlin'.`
+**Diagnostic**: `e: Could not load module <Error module>`. 
+**Root Cause Hypothesis**: A naming collision or missing dependency in the annotation processing graph, likely triggered by the movement of `@Serializable` classes or Hilt/Room component boundaries.
 
-## 🔜 Next Steps
-1.  **Build Verification**: Execute `gradlew :app:assembleDebug` to confirm all consolidated symbols in `EngineModels.kt` are correctly linked and no "Unresolved reference" errors remain in the `app` module.
-2.  **Telemetry Audit**: Verify that `TelemetryAggregator.kt` correctly utilizes the restored `RibbonScale` enum values and that aggregated outputs correctly propagate the non-nullable provider's results.
-3.  **SIMP-IDEA-4**: Evaluate consolidating `EngineConnectionPoint` and `ForensicSnapshot` further to reduce duplication in the ribbon aggregation path.
+## 🛠️ Actions Performed in Current Session
+1.  **Code Corruption Repair**: 
+    *   `MonitorService.kt`: Fixed lines 750-760. Removed corrupted Unicode sequences (`\u003c`, `\u003d`, `\u003e`) in `executeAutomatedStressTest` that were preventing clean compilation.
+2.  **Engine Model Consolidation (`EngineModels.kt`)**:
+    *   Restored and standardized `DomainEvent` sealed hierarchy (lines 350-420).
+    *   Restored `ProcessorEvent` with `abstract val isPrimary` fix (lines 438-460).
+    *   Consolidated interfaces: `Locatable`, `SpatialAnchor`, `BatteryProvider`, `DeviceIdentity`.
+    *   Consolidated DTOs: `GnssDetail`, `SatelliteInfo`, `JumpConfidence`, `SentinelResult`, `TrajectoryNode`, `RejectedPoint`.
+3.  **Component Audit**:
+    *   **Room**: `Database.kt` verified at version 81. `LogDao` and `TrailDao` query parameters aligned with consolidated models.
+    *   **Hilt**: `AppModule.kt` and `PowerModule.kt` bindings verified.
+    *   **Protobuf**: `RealtimeStatus` and `TrackerStatusProto` verified in `app_settings.proto`.
+4.  **Forensic Alignment**:
+    *   `SentinelValidator.kt`: Standardized on non-nullable `nativeProvider` (line 20) with `DefaultNativeFastPathProvider` fallback.
+    *   `LocationProcessor.kt`: Verified behavioral reason promotion to `LocationPendingReason`.
 
 ## 📍 Forensic State Snapshot
-*   **SIMP-1015-1 Progress**: 100% complete (Architectural Hardening).
+*   **Build Status**: FAILED (`:app:kaptGenerateStubsDebugKotlin`)
 *   **Version**: Oct8.15
-*   **Active Focus**: Structural Integrity & Hot Path Optimization.
-*   **Audit Metrics**: [Oct8.15]: [SOT Count: 333 (Rules: 180), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 76 (Sub-items: 380), QA: 699]
+*   **Sub-projects**: `:core:engine` (Assembles successfully), `:app` (Fails at KAPT).
+*   **Key Files Involved**: 
+    *   `core/engine/src/main/java/com/gps19/core/engine/EngineModels.kt` (Consolidation Target)
+    *   `app/src/main/java/com/gps19/app/MonitorService.kt` (Fixed Corruption)
+    *   `app/src/main/java/com/gps19/app/Database.kt` (Room Schema v81)
+
+## 🔜 Resumption Focus
+1.  **Isolate KAPT Failure**: Run `./gradlew :app:kaptDebugKotlin --stacktrace` to find the specific file or symbol causing the annotation processor to crash.
+2.  **Serializable Audit**: Verify that all classes moved to `EngineModels.kt` that are used in `Bundle` or `Intent` (or as Room fields) have correct `@Serializable` or `Parcelable` implementations.
+3.  **DAO Verification**: Check if `LogEntity` or `HistoryEntity` in `Database.kt` has any field mismatch with the consolidated enums in `EngineModels.kt`.
+4.  **Module Dependency**: Ensure `:app` dependency on `:core:engine` is strictly `implementation` and not creating a circular reference in the annotation graph.

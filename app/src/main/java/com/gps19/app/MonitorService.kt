@@ -295,7 +295,7 @@ class MonitorService : BaseMonitorService() {
         domainEventBus.events
             .filterIsInstance<ConnectivityEvent.PeerPulse>()
             .collect { event ->
-                if (isTrackerMode) handleViewerPulse(event.id) else handleTrackerPulse(event.id)
+                if (isTrackerMode) handleViewerPulse(event.peerId) else handleTrackerPulse(event.peerId)
             }
     }
 
@@ -306,7 +306,7 @@ class MonitorService : BaseMonitorService() {
                 when (event) {
                     is CommandEvent.WatchdogTrigger -> { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
                     is CommandEvent.UiPulse -> { lastUiPulseRt = timeProvider.elapsedRealtime(); updateForegroundServiceType() }
-                    is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
+                    is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.isVisible)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); lifecycleScope.launch { hardwareSuite.start() } }
                     is CommandEvent.ExecuteStressTest -> executeAutomatedStressTest()
@@ -315,6 +315,7 @@ class MonitorService : BaseMonitorService() {
                     is CommandEvent.SimulateStoragePressure -> {}
                     is CommandEvent.TriggerMemoryFlush -> performMemoryFlush()
                     is CommandEvent.TriggerStoragePrune -> performStoragePrune()
+                    else -> {}
                 }
             }
     }
@@ -495,6 +496,7 @@ class MonitorService : BaseMonitorService() {
                 proxIdx = hSnapshot.proximityIdx; proximityCm = hSnapshot.proximityCm 
                 proximityDebounceMs = hSnapshot.proximityDebounceMs
                 vibrationRollingSum = hSnapshot.vibrationRollingSum
+                stationaryDurationMs = hSnapshot.stationaryDurationMs
             }
             integrity.apply {
                 battery = health.batteryLevel; isCharging = health.isCharging; currentMa = health.currentMa
@@ -638,7 +640,7 @@ class MonitorService : BaseMonitorService() {
         triggerForensicSample()
     }
 
-    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isPeerActive: Boolean, processed: ProcessedLocation, hSnapshot: HardwareSuite.ForensicSnapshot, rawGpsTs: Long, evaluationSnapshot: LocationUpdate) {
+    private fun evaluateAlarmsInternal(now: Long, nowRt: Long, isSocketConnected: Boolean, isPeerActive: Boolean, processed: ProcessedLocation, hSnapshot: HardwareSuite.HardwareForensicSnapshot, rawGpsTs: Long, evaluationSnapshot: LocationUpdate) {
         val alarmSnapshot = EnginePools.LOCATION_UPDATE.acquire()
         if (isTrackerMode) {
             TelemetryMapper.mapProcessedToSnapshot(snapshot = evaluationSnapshot, processed = processed, rawGpsTs = rawGpsTs, lastValidFixRt = primaryProcessor.getLastValidFixRt(), snrSnapshot = hardwareSuite.averageSnr, out = alarmSnapshot)
@@ -756,12 +758,51 @@ class MonitorService : BaseMonitorService() {
 
     private fun executeAutomatedStressTest() {
         lifecycleScope.launch(Dispatchers.Default) {
-            isManualJammerActive = true; isManualStallActive = true; repository.setForensicStallSimulation(true)
-            val cpuOrder = launch(Dispatchers.Default) { val end = System.currentTimeMillis() + 10000L; var count = 0L; while (System.currentTimeMillis() < end) { sin(count.toDouble()); cos(count.toDouble()); sqrt(count.toDouble()); count++ }; domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: CPU Saturation complete ($count iterations).")) }
-            val ioJob = launch(Dispatchers.IO) { val end = System.currentTimeMillis() + 10000L; val data = ByteArray(1024 * 1024) { 0xFF.toByte() }; val tempFile = File(cacheDir, "stress_test.tmp"); var writes = 0; while (System.currentTimeMillis() < end) { try { FileOutputStream(tempFile).use { fos -> fos.write(data); fos.flush() }; writes++ } catch (e: Exception) { Timber.e(e, "Stress Test IO failure") } }; tempFile.delete(); domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: IO Saturation complete ($writes MB written).")) }
-            val forensicJob = launch(Dispatchers.Default) { repeat(1000) { i -> logManager.logForensicTrace("STRESS_BURST: Forensic sample #$i injection."); if (i % 100 == 0) delay(1) }; domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: Forensic Saturation burst complete.")) }
+            isManualJammerActive = true
+            isManualStallActive = true
+            repository.setForensicStallSimulation(true)
+            val cpuOrder = launch(Dispatchers.Default) {
+                val end = System.currentTimeMillis() + 10000L
+                var count = 0L
+                while (System.currentTimeMillis() < end) {
+                    sin(count.toDouble())
+                    cos(count.toDouble())
+                    sqrt(count.toDouble())
+                    count++
+                }
+                domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: CPU Saturation complete ($count iterations)."))
+            }
+            val ioJob = launch(Dispatchers.IO) {
+                val end = System.currentTimeMillis() + 10000L
+                val data = ByteArray(1024 * 1024) { 0xFF.toByte() }
+                val tempFile = File(cacheDir, "stress_test.tmp")
+                var writes = 0
+                while (System.currentTimeMillis() < end) {
+                    try {
+                        FileOutputStream(tempFile).use { fos ->
+                            fos.write(data)
+                            fos.flush()
+                        }
+                        writes++
+                    } catch (e: Exception) {
+                        Timber.e(e, "Stress Test IO failure")
+                    }
+                }
+                tempFile.delete()
+                domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: IO Saturation complete ($writes MB written)."))
+            }
+            val forensicJob = launch(Dispatchers.Default) {
+                repeat(1000) { i ->
+                    logManager.logForensicTrace("STRESS_BURST: Forensic sample #$i injection.")
+                    if (i % 100 == 0) delay(1)
+                }
+                domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: Forensic Saturation burst complete."))
+            }
             joinAll(cpuOrder, ioJob, forensicJob)
-            delay(40000); isManualJammerActive = false; isManualStallActive = false; repository.setForensicStallSimulation(false)
+            delay(40000)
+            isManualJammerActive = false
+            isManualStallActive = false
+            repository.setForensicStallSimulation(false)
         }
     }
 

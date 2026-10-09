@@ -11,12 +11,13 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.8.16:
+ * - Issue #BUILD-FIX: Aligned DashboardTelemetryState and HudTelemetryState with 
+ *   consolidated Locatable interface (added missing lat, lng, alt, gpsTs, ts, rt overrides).
+ * - Standardized DeviceIdentity and BatteryProvider implementations.
  * Oct.7.7:
  * - Issue #SIMP-1007-16: Flag Propagation. Added isSuspiciousNoise and 
  *   isMemoryPressureThrottled delegates to ConnectionPoint for HUD visibility.
- * Oct.7.5:
- * - Issue #SIMP-1007-15: Unified Snapshot Container. Completed migration of 
- *   ConnectionPoint and LogEntry to use unified ForensicSnapshot for all probes (snr, vibe, thermal, heap).
  */
 
 @Serializable
@@ -85,7 +86,7 @@ data class AlertSettings(
     val vibrationEnabled: Boolean = true,
     val alarmVolume: Float = 0.8f,
     val useCustomVolume: Boolean = false,
-    val vibrationEnabledV2: Boolean = true, // Placeholders for future expansion
+    val vibrationEnabledV2: Boolean = true,
     val alarmVolumeV2: Float = 0.8f,
     val tiltAlert: Boolean = true,
     val acousticAlert: Boolean = true,
@@ -95,6 +96,15 @@ data class AlertSettings(
     val systemStorageLow: Boolean = true,
     val vibrationSensitivity: Float = 0.5f,
     val tiltSensitivity: Float = 0.5f
+)
+
+@Serializable
+data class AlarmInfo(
+    val title: String,
+    val subtitle: String = "",
+    val type: String = "",
+    val isResolved: Boolean = false,
+    val isSirenDisabled: Boolean = false
 )
 
 class ConnectionPoint(
@@ -418,8 +428,9 @@ data class DashboardConnectivityState(
 
 @Serializable
 data class DashboardTelemetryState(
-    val lat: Double = 0.0,
-    val lng: Double = 0.0,
+    override val lat: Double = 0.0,
+    override val lng: Double = 0.0,
+    override val alt: Double = 0.0,
     val gpsSpeedMps: Double = 0.0,
     val trackerAccuracy: Double = 0.0,
     val trackerMaxAcc: Double = 0.0,
@@ -443,7 +454,9 @@ data class DashboardTelemetryState(
     val isUltraLongStationary: Boolean = false,
     val systemPulse: Long = 0L,
     val activityType: ActivityType = ActivityType.UNKNOWN,
-    val gpsTs: Long = 0L
+    override val gpsTs: Long = 0L,
+    override val ts: Long = 0L,
+    override val rt: Long = 0L
 ) : Locatable
 
 @Serializable
@@ -709,7 +722,13 @@ data class HudTelemetryState(
     val viewerLocPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val isUltraLongStationary: Boolean = false,
     val systemPulse: Long = 0L,
-    val activityType: ActivityType = ActivityType.UNKNOWN
+    val activityType: ActivityType = ActivityType.UNKNOWN,
+    override val lat: Double = 0.0,
+    override val lng: Double = 0.0,
+    override val alt: Double = 0.0,
+    override val gpsTs: Long = 0L,
+    override val ts: Long = 0L,
+    override val rt: Long = 0L
 ) : Locatable {
     override val isLocationPending: Boolean get() = isTrackerLocPending
 }

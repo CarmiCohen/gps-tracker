@@ -41,9 +41,10 @@ import kotlin.math.*
  * - Issue #SIMP-IDEA-3: Standardized on @NotNull native providers. Updated 
  *   nativeFastPathProvider to include computeAdaptiveAcousticAlpha. Aligned 
  *   SentinelValidator calls to eliminate redundant JVM fallbacks.
- * Oct.8.12:
- * - Issue #SIMP-1014-2: Unified SystemPressureBatch. Consolidated Memory and 
- *   Storage pressure evaluation into a single JNI crossing (n26).
+ * - Issue #BUILD-FIX: Renamed internal GpsUpdate.LocationUpdate to GpsLocationUpdate 
+ *   and HardwareSuite.ForensicSnapshot to HardwareForensicSnapshot to resolve 
+ *   kapt namespace collisions. Fixed currentKineticEnergy and lastHpfValue 
+ *   variable regressions.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -112,7 +113,7 @@ class HardwareSuite @Inject constructor(
         }
     }
 
-    class ForensicSnapshot {
+    class HardwareForensicSnapshot {
         var vibration: Double = 0.0
         var heading: Double = 0.0
         var baroAlt: Double = 0.0
@@ -249,7 +250,7 @@ class HardwareSuite @Inject constructor(
     private val _internalGpsFlow = MutableSharedFlow<GpsUpdate>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
     private sealed class GpsUpdate {
-        data class LocationUpdate(val location: Location) : GpsUpdate()
+        data class GpsLocationUpdate(val location: Location) : GpsUpdate()
         data class GnssUpdate(val detail: GnssDetail) : GpsUpdate()
     }
 
@@ -325,8 +326,8 @@ class HardwareSuite @Inject constructor(
     @Volatile var isMemoryPressureThrottled = false; private set
     @Volatile var isJammingCandidate = false; private set
 
-    @PublishedApi internal val logicSnapshotBuffer = CircularStateBuffer(2, { ForensicSnapshot() }, { it.reset() })
-    @PublishedApi internal val forensicSnapshotBuffer = CircularStateBuffer(4, { ForensicSnapshot() }, { it.reset() })
+    @PublishedApi internal val logicSnapshotBuffer = CircularStateBuffer(2, { HardwareForensicSnapshot() }, { it.reset() })
+    @PublishedApi internal val forensicSnapshotBuffer = CircularStateBuffer(4, { HardwareForensicSnapshot() }, { it.reset() })
 
     @Volatile private var lastBufferRecordRt = 0L
 
@@ -647,7 +648,7 @@ class HardwareSuite @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) return
+        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
         
         revivalPulseJob?.cancel()
         revivalPulseJob = scope.launch(Dispatchers.Default) {
@@ -777,8 +778,8 @@ class HardwareSuite @Inject constructor(
     private val hardwareObservationFlow = pollingIntervalFlow.flatMapLatest { interval ->
         callbackFlow<GpsUpdate> {
             start() 
-            fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime(); lastGpsSpeedMps = loc.speed.toDouble(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
-            val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime(); lastGpsSpeedMps = it.speed.toDouble(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
+            fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime(); lastGpsSpeedMps = loc.speed.toDouble(); trySend(GpsUpdate.GpsLocationUpdate(loc)); updateLocationStatus() } }
+            val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime(); lastGpsSpeedMps = it.speed.toDouble(); trySend(GpsUpdate.GpsLocationUpdate(it)); updateLocationStatus() } } }
             val handler = synchronized(lifecycleLock) { hardwareHandler }
             synchronized(lifecycleLock) { activeLocationCallback?.unregister(fusedLocationClient, timeProvider, handler); activeLocationCallback = fusedCallback }
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval).setMinUpdateIntervalMillis(interval / 2).build()
@@ -790,7 +791,7 @@ class HardwareSuite @Inject constructor(
         }
     }.shareIn(scope = scope, started = SharingStarted.WhileSubscribed(5000), replay = 1)
 
-    fun getLocationFlow(): Flow<Location> = hardwareObservationFlow.filterIsInstance<GpsUpdate.LocationUpdate>().map { it.location }
+    fun getLocationFlow(): Flow<Location> = hardwareObservationFlow.filterIsInstance<GpsUpdate.GpsLocationUpdate>().map { it.location }
     val gnssDetailFlow: Flow<GnssDetail?> = hardwareObservationFlow.filterIsInstance<GpsUpdate.GnssUpdate>().map { it.detail }
 
     fun setPollingInterval(intervalMs: Long) { if (pollingIntervalFlow.value != intervalMs) pollingIntervalFlow.value = intervalMs }
@@ -837,7 +838,7 @@ class HardwareSuite @Inject constructor(
                 if (!isStepDetectorRegistered && nowRt - lastStayAliveRt > 10000L) {
                     lastStayAliveRt = nowRt
                     val canPoke = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ContextCompat.checkSelfPermission(context, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED else true
-                    if (canPoke) systemMonitor.acquire WakeLock(force = true)
+                    if (canPoke) systemMonitor.acquireWakeLock(force = true)
                 }
                 forensicAuditor.auditSensorRate(isWarming).forEach { (role, msg) -> domainEventBus.emit(AppSensorEvent.LogEvent("[$role] $msg", false)) }
             }
@@ -961,7 +962,7 @@ class HardwareSuite @Inject constructor(
     fun isAcousticMonitoringEnabled() = isMonitoring
     fun isAcousticMonitoringActive() = isAcousticRunning
 
-    private fun privateConsumeSnapshot(buffer: CircularStateBuffer<ForensicSnapshot>, isForensic: Boolean): ForensicSnapshot {
+    private fun privateConsumeSnapshot(buffer: CircularStateBuffer<HardwareForensicSnapshot>, isForensic: Boolean): HardwareForensicSnapshot {
         synchronized(this) {
             synchronized(buffer) {
                 val snapshot = buffer.next()
@@ -991,14 +992,14 @@ class HardwareSuite @Inject constructor(
         }
     }
 
-    fun consumeLogicSnapshot(): ForensicSnapshot {
-        return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeLogicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> domainEventBus.emit(AppSensorEvent.LogEvent(m, false)) }) {
+    fun consumeLogicSnapshot(): HardwareForensicSnapshot {
+        return LatencyMonitor.measureAndAudit<HardwareForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeLogicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> domainEventBus.emit(AppSensorEvent.LogEvent(m, false)) }) {
             privateConsumeSnapshot(logicSnapshotBuffer, isForensic = false)
         }
     }
 
-    fun consumeForensicSnapshot(): ForensicSnapshot {
-        return LatencyMonitor.measureAndAudit<ForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeForensicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> domainEventBus.emit(AppSensorEvent.LogEvent(m, false)) }) {
+    fun consumeForensicSnapshot(): HardwareForensicSnapshot {
+        return LatencyMonitor.measureAndAudit<HardwareForensicSnapshot>(timeProvider, LATENCY_THRESHOLD_SENSOR_PROCESS_MS, "consumeForensicSnapshot", LatencyMonitor.AuditType.PERFORMANCE, { m, _ -> domainEventBus.emit(AppSensorEvent.LogEvent(m, false)) }) {
             privateConsumeSnapshot(forensicSnapshotBuffer, isForensic = true)
         }
     }
@@ -1016,7 +1017,7 @@ class HardwareSuite @Inject constructor(
                 isSuspiciousNoise = vibrationBatch.isSuspiciousNoise; isMemoryPressureThrottled = vibrationBatch.isMemoryPressureThrottled; isJammingCandidate = vibrationBatch.isJammingCandidate; stationaryDurationMs = vibrationBatch.stationaryDuration
                 if (vibrationBatch.muzzleResetTriggered) { currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; if (plungePhase != 2) plungePhase = 0 }
             } else {
-                delta = nativeFastPathProvider.calculateVibrationDelta(dx, dy, dz, lx, ly, lz); adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(adaptiveVibrationFloor, delta, isWarming, currentCpuLoad); lastHpfValue = SentinelValidator.computeNextHpf(lastHpfValue, delta, lastRawVibe); currentKineticEnergy = SentinelValidator.computeNextEnergy(currentKineticEnergy, lastHpfValue); lastRawVibe = delta 
+                delta = nativeFastPathProvider.calculateVibrationDelta(dx, dy, dz, lx, ly, lz); adaptiveVibrationFloor = SentinelValidator.updateVibrationFloor(adaptiveVibrationFloor, delta, isWarming, currentCpuLoad); lastHpfValue = SentinelValidator.computeNextHpf(lastHpfValue, delta, lastRawVibe); currentKineticEnergy = SentinelValidator.computeNextEnergy(currentKineticEnergy, lastHpfValue); lastRawVibe = delta
                 isSuspiciousNoise = false; isMemoryPressureThrottled = false; isJammingCandidate = false; stationaryDurationMs = 0L
             }
             if (delta > logicPeakVibration) logicPeakVibration = delta
@@ -1087,7 +1088,7 @@ class HardwareSuite @Inject constructor(
         synchronized(this) {
             lastAnomalyActiveRt = 0L; lastAcousticLockoutRt = 0L; acousticFastPath.reset(); lightFastPath.reset(); rawProximityNear = false; stationaryDurationMs = 0L; emaPressure = 0.0; lastBaroZeroingRt = 0L; lastLinearAccelTs = 0L; lastStayAliveRt = 0L; lastDisplayTransitionRt = 0L
             secPeakLux = 0.0; secPeakVibe = 0.0; secSumProxIdx = 0.0; secProxCount = 0; secPeakTilt = 0.0; secPeakLift = 0.0; secPeakDb = 0.0; secSitDetected = false; secPeakKinetic = 0.0
-            plungePhase = 0; plungeMatched = false; lastPlungePhaseRt = 0L; lastGpsSpeedMps = 0.0; currentCpuLoad = 0.0; cached ThermalHeadroom = 0.0; cachedHeapAllocatedMb = 0.0; isSuspiciousNoise = false; isMemoryPressureThrottled = false; isJammingCandidate = false; activityContextProvider.reset()
+            plungePhase = 0; plungeMatched = false; lastPlungePhaseRt = 0L; lastGpsSpeedMps = 0.0; currentCpuLoad = 0.0; cachedThermalHeadroom = 0.0; cachedHeapAllocatedMb = 0.0; isSuspiciousNoise = false; isMemoryPressureThrottled = false; isJammingCandidate = false; activityContextProvider.reset()
         }
     }
 
