@@ -1,5 +1,12 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct10.6
+*   **Issue #SIMP-1011-2: Acoustic Decoupling.**
+    *   **Consolidation**: Centralized Acoustic health evaluation (dB calculation, adaptive alpha, and spike detection) in `JdHardwareManager.processAcousticBatchNative`.
+    *   **Decoupling**: Removed manual acoustic processing logic from `HardwareSuite.kt`, delegating all environment monitoring heuristics to the native/JNI path.
+    *   **Reliability**: Implemented a robust Kotlin fallback within the manager, including a `FallbackFastPath` state tracker to ensure functional parity for non-native environments.
+    *   **Architecture**: Aligned with Rule 1.147 for hardware logic offloading and core engine simplicity.
+
 ## 🟢 Resolved in Oct10.5
 *   **Issue #SIMP-1011-1: Native GNSS Batching.**
     *   **Consolidation**: Centralized GNSS health evaluation (satellite counts and average SNR) in `JdHardwareManager.processGnssBatchNative`.
@@ -9,15 +16,4 @@
 
 ## 🟢 Resolved in Oct10.4
 *   **Issue #BUILD-FIX-OCT10.3: Communication & Test Remediation.**
-    *   **JSON Hardening**: Resolved type ambiguity in `CommunicationManager.kt` by explicitly casting `JSONObject.keys()` iterations to `String` and adding non-null value checks to prevent `put()` signature mismatches.
-    *   **Test Alignment**: Remediated `ProductionReadinessAuditTest.kt`, `GeofenceBatteryAuditTest.kt`, and `ForensicStressAuditTest.kt` to use strict property-based access (`timeProvider.currentTimeMillis`, `timeProvider.elapsedRealtime`) instead of legacy method calls.
-    *   **Forensic Restoration**: Migrated `ForensicSpillBuffer.kt` to the property-based `TimeProvider` API, eliminating direct `System` clock leaks during buffer resets.
-
-## 🟢 Resolved in Oct10.3
-*   **Issue #SIMP-1010-4: HUD Interface Alignment (Phase 2).**
-    *   **Alignment**: Migrated secondary service interfaces (`NetworkProvider` and `SignalingProvider`) from method-based accessors to strict `val` properties.
-    *   **Refactoring**: Updated `AndroidNetworkProvider` and `CommunicationManager` to implement property-based state access for availability, connection status, and RTT.
-    *   **Architecture**: Verified complete alignment across all core engine service interfaces.
-*   **Issue #SIMP-1017-1: Build-Time Metadata Guardian (Re-Audit).**
-    *   **Verification**: Confirmed recursive audit script in `build.gradle` is fully operational and prevents cross-module `internal` leaks.
 ...

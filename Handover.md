@@ -1,26 +1,26 @@
-# Handover: Oct10.5 Forensic State & Remediation Path
+# Handover: Oct10.6 Forensic State & Remediation Path
 
-## 🎯 Current Status: GREEN (Stabilized & Decoupled)
-The **Oct10.5** session has successfully completed the native GNSS batching migration (**SIMP-1011-1**). The hardware logic has been decoupled from the `:app` module, moving all satellite health evaluation into `JdHardwareManager`.
+## 🎯 Current Status: GREEN (Decoupled & Centralized)
+The **Oct10.6** session has successfully completed the Acoustic Decoupling migration (**SIMP-1011-2**). The engine's sensor processing is now structurally leaner, delegating all environment heuristics to the hardware manager.
 
 ### ✅ Remediation Completed
 
-#### 1. Native GNSS Consolidation (Issue #SIMP-1011-1)
-*   **JdHardwareManager.kt**: Migrated manual GNSS health evaluation (satellite counts and average SNR) into `processGnssBatchNative`.
-    *   Implemented a robust Kotlin fallback within the manager to ensure consistent state reporting even if the JNI library is absent or fails.
-*   **HardwareSuite.kt**: Removed redundant manual calculation logic. The component now exclusively uses the `GnssHealthBatch` resulting from the native provider.
+#### 1. Acoustic Decoupling (Issue #SIMP-1011-2)
+*   **JdHardwareManager.kt**: Centralized all acoustic processing (dB calculation, adaptive alpha based on vibration, and FastPath spike evaluation).
+    *   Implemented `FallbackFastPath` state storage to ensure Kotlin fallback parity.
+*   **HardwareSuite.kt**: Refactored `startAcousticMonitoring` to delegate raw buffer processing to the manager via `processAcousticBatchNative`.
 
 #### 2. Architecture & Compliance
-*   **SOT Master**: Added **Rule 1.146 (R-ID 615)** to mandate centralization of GNSS health logic in the native batching layer.
-*   **Version Alignment**: Incremented `versionName` to **Oct10.5** in `app/build.gradle`.
+*   **SOT Master**: Added **Rule 1.147 (R-ID 616)** mandating acoustic centralization.
+*   **Version Alignment**: Incremented `versionName` to **Oct10.6** in `app/build.gradle`.
 
 ### 📍 Forensic State Snapshot
-*   **Build Status**: GREEN (Zero compilation errors).
+*   **Build Status**: GREEN (Success).
 *   **Test Status**: Verified core engine stability (43/43 tests).
-*   **Version**: Oct10.5.
-*   **Baseline**: SIMP-1011-1 fully resolved.
+*   **Version**: Oct10.6.
+*   **Baseline**: SIMP-1011-2 fully resolved.
 
 ### 🔜 Resumption Path (Oct11.1)
-1.  **Acoustic Decoupling**: Initiate **SIMP-1011-2** to migrate the manual acoustic health evaluation fallback from `HardwareSuite` to `JdHardwareManager.processAcousticBatchNative`.
-2.  **Performance Audit**: Audit `ForensicSpillBuffer` throughput under A15 "Staggered" performance tier to ensure no I/O stalls during high-frequency sampling.
-3.  **UI Verification**: Confirm HUD "Data Healthy" indicator correctly reflects the new property-based connectivity states.
+1.  **Proximity Decoupling**: Initiate **SIMP-1011-3** to migrate proximity debouncing and index calculation fallback to `JdHardwareManager.processProximityBatchNative`.
+2.  **Logic Verification**: Verify `MonitorService` correctly handles `acousticLockoutRt` propagated from the centralized manager.
+3.  **Pressure Consolidation**: Evaluate `processSystemPressureNative` integration (Issue #SIMP-1014-2) for next-phase hardening.

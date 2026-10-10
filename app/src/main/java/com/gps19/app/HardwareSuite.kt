@@ -37,14 +37,12 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.10.6:
+ * - Issue #SIMP-1011-2: Acoustic Decoupling. Migrated manual acoustic health 
+ *   evaluation into JdHardwareManager. Simplified startAcousticMonitoring.
  * Oct.10.5:
  * - Issue #SIMP-1011-1: Native GNSS Batching. Migrated manual GNSS health evaluation 
  *   into JdHardwareManager to decouple engine from hardware state logic.
- * Oct.10.2:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
- *   TimeProvider and PowerStateProvider APIs.
- * Oct.10.1 (Restoration Path):
- * - Issue #SIMP-1012-1: Forensic Retrieval Optimization. Standardized buffer retrievals.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -982,19 +980,13 @@ class HardwareSuite @Inject constructor(
                                         this.isWarming = this@HardwareSuite.isWarming
                                     }
 
-                                    if (nativeFastPathProvider.processAcousticBatch(acousticBatch, buffer)) {
-                                        currentAcousticDb = acousticBatch.db
-                                        if (acousticBatch.isSpike) {
-                                            lastAcousticLockoutRt = acousticBatch.lastSpikeRt
-                                        }
-                                    } else {
-                                        var maxAmp = 0; for (i in 0 until read) { val a = abs(buffer[i].toInt()); if (a > maxAmp) maxAmp = a }
-                                        val db = if (maxAmp > 0) 20 * log10(maxAmp.toDouble()) else 0.0
-                                        currentAcousticDb = db
-                                        val alpha = JdHardwareManager.computeAdaptiveAcousticAlphaNative(acousticBatch.baseAlpha, vibrationRollingSum)
-                                        if (acousticFastPath.evaluate(db, nowRt, isWarming, SPIKE_DEBOUNCE_MS, alpha)) {
-                                            lastAcousticLockoutRt = acousticFastPath.lastSpikeRt
-                                        }
+                                    // Issue #SIMP-1011-2: processAcousticBatch now handles all health logic
+                                    // internally (via native or Kotlin fallback) to decouple HardwareSuite.
+                                    nativeFastPathProvider.processAcousticBatch(acousticBatch, buffer)
+                                    currentAcousticDb = acousticBatch.db
+                                    if (acousticBatch.isSpike) {
+                                        lastAcousticLockoutRt = acousticBatch.lastSpikeRt
+                                        acousticFastPath.onSpike?.invoke()
                                     }
                                     
                                     val db = currentAcousticDb

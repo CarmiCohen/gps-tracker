@@ -18,6 +18,7 @@ import java.util.concurrent.locks.ReentrantLock
 import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlin.math.*
 
 /**
  * LedStatus: Type-safe abstraction for hardware LED states (Idea #15).
@@ -32,15 +33,13 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.10.6:
+ * - Issue #SIMP-1011-2: Acoustic Decoupling. Centralized Acoustic health evaluation 
+ *   fallback in processAcousticBatchNative. Implemented Kotlin FastPath state 
+ *   storage for non-native environments.
  * Oct.10.5:
  * - Issue #SIMP-1011-1: Native GNSS Batching. Migrated manual GNSS health evaluation 
  *   fallback into processGnssBatchNative to decouple HardwareSuite.
- * Oct.10.1 (Restoration Path):
- * - Issue #SIMP-1014-2: Unified Pressure Path. Added processSystemPressureNative 
- *   (n24) to consolidate Memory and Storage pressure evaluation in JNI.
- * - Issue #SIMP-1012-2: Native Proximity Scaling. Added processProximityBatchNative (n23).
- * - Issue #SIMP-1011-2: Acoustic JNI Offloading. Added processAcousticBatchNative (n22).
- * - Issue #SIMP-1011-1: Native GNSS Batching. Added processGnssBatchNative (n21).
  */
 object JdHardwareManager {
 
@@ -70,6 +69,20 @@ object JdHardwareManager {
     private val sharedStateBuffer: ByteBuffer = ByteBuffer.allocateDirect(1024).apply {
         order(ByteOrder.nativeOrder())
     }
+
+    // Kotlin Fallback State (Issue #SIMP-1011-2)
+    private class FallbackFastPath(
+        var baseline: Double = -1.0,
+        var threshold: Double = 0.0,
+        var minThreshold: Double = -1.0,
+        var debounceMs: Long = 5000L,
+        var lastSpikeRt: Long = 0L
+    )
+    private val fallbackFastPaths = mapOf(
+        FASTPATH_ACOUSTIC to FallbackFastPath(),
+        FASTPATH_LIGHT to FallbackFastPath(),
+        FASTPATH_STATIONARY to FallbackFastPath()
+    )
 
     /**
      * syncHardwareState: High-level helper to consolidate LED flag construction (Idea #15).
@@ -231,11 +244,32 @@ object JdHardwareManager {
     }
 
     fun updateFastPathConfig(type: Int, baseline: Double, threshold: Double, minThreshold: Double, debounceMs: Long): Int {
-        return if (isLibraryLoaded.get()) n10(type, baseline, threshold, minThreshold, debounceMs) else -1
+        if (isLibraryLoaded.get()) return n10(type, baseline, threshold, minThreshold, debounceMs)
+        
+        fallbackFastPaths[type]?.let {
+            it.baseline = baseline
+            it.threshold = threshold
+            it.minThreshold = minThreshold
+            it.debounceMs = debounceMs
+            return 0
+        }
+        return -1
     }
 
     fun evaluateFastPath(type: Int, value: Double, nowRt: Long, alpha: Double): Boolean {
-        return if (isLibraryLoaded.get()) n11(type, value, nowRt, alpha) != 0 else false
+        if (isLibraryLoaded.get()) return n11(type, value, nowRt, alpha) != 0
+        
+        val fp = fallbackFastPaths[type] ?: return false
+        if (fp.baseline < 0) { fp.baseline = value; return false }
+        if (alpha > 0.0) fp.baseline = (fp.baseline * (1.0 - alpha)) + (value * alpha)
+
+        if ((value - fp.baseline) > fp.threshold && value >= fp.minThreshold) {
+            if (nowRt - fp.lastSpikeRt > fp.debounceMs) {
+                fp.lastSpikeRt = nowRt
+                return true
+            }
+        }
+        return false
     }
 
     fun processVibrationBatchNative(batch: VibrationBatch): Boolean {
@@ -315,27 +349,47 @@ object JdHardwareManager {
         return true
     }
 
+    /**
+     * processAcousticBatchNative: Consolidated JNI audio path (Issue #SIMP-1011-2).
+     * Includes Kotlin fallback to ensure consistent dB calculation and spike evaluation.
+     */
     fun processAcousticBatchNative(batch: AcousticBatch, buffer: ShortArray): Boolean {
-        if (!isLibraryLoaded.get()) return false
-        
-        synchronized(sharedStateBuffer) {
-            sharedStateBuffer.clear()
-            sharedStateBuffer.putInt(batch.readCount)
-            sharedStateBuffer.putDouble(batch.baseAlpha)
-            sharedStateBuffer.putDouble(batch.vibrationRollingSum)
-            sharedStateBuffer.putLong(batch.nowRt)
-            sharedStateBuffer.putInt(if (batch.isWarming) 1 else 0)
-            
-            val res = n22(buffer)
-            if (res == 0) {
-                batch.maxAmp = sharedStateBuffer.getInt(128)
-                batch.db = sharedStateBuffer.getDouble(132)
-                batch.isSpike = sharedStateBuffer.getInt(140) != 0
-                batch.lastSpikeRt = sharedStateBuffer.getLong(144)
-                return true
+        if (isLibraryLoaded.get()) {
+            synchronized(sharedStateBuffer) {
+                sharedStateBuffer.clear()
+                sharedStateBuffer.putInt(batch.readCount)
+                sharedStateBuffer.putDouble(batch.baseAlpha)
+                sharedStateBuffer.putDouble(batch.vibrationRollingSum)
+                sharedStateBuffer.putLong(batch.nowRt)
+                sharedStateBuffer.putInt(if (batch.isWarming) 1 else 0)
+                
+                val res = n22(buffer)
+                if (res == 0) {
+                    batch.maxAmp = sharedStateBuffer.getInt(128)
+                    batch.db = sharedStateBuffer.getDouble(132)
+                    batch.isSpike = sharedStateBuffer.getInt(140) != 0
+                    batch.lastSpikeRt = sharedStateBuffer.getLong(144)
+                    return true
+                }
             }
         }
-        return false
+        
+        // Architecture Rule 2: Fallback logic migrated from HardwareSuite for decoupling
+        var maxAmp = 0
+        for (i in 0 until batch.readCount) {
+            val a = abs(buffer[i].toInt())
+            if (a > maxAmp) maxAmp = a
+        }
+        batch.maxAmp = maxAmp
+        batch.db = if (maxAmp > 0) 20 * log10(maxAmp.toDouble()) else 0.0
+        
+        val alpha = computeAdaptiveAcousticAlphaNative(batch.baseAlpha, batch.vibrationRollingSum)
+        batch.isSpike = evaluateFastPath(FASTPATH_ACOUSTIC, batch.db, batch.nowRt, if (batch.isWarming) 0.0 else alpha)
+        if (batch.isSpike) {
+            batch.lastSpikeRt = batch.nowRt
+        }
+        
+        return true
     }
 
     fun processProximityBatchNative(batch: ProximityBatch): Boolean {
@@ -437,7 +491,7 @@ object JdHardwareManager {
         return if (isLibraryLoaded.get()) n17(peakShock, adaptiveFloor, sensitivity, cpuLoad) != 0 else {
             val loadFactor = if (cpuLoad > 0.85) 1.5 else 1.0
             val baseThreshold = (0.2 + (1.4 - 0.2) * (1.0 - sensitivity)) * loadFactor
-            val dynamicThreshold = Math.max(baseThreshold, adaptiveFloor * 7.0 * loadFactor)
+            val dynamicThreshold = max(baseThreshold, adaptiveFloor * 7.0 * loadFactor)
             peakShock > dynamicThreshold
         }
     }
@@ -446,7 +500,7 @@ object JdHardwareManager {
         return if (isLibraryLoaded.get()) n18(vibration, adaptiveFloor, sensitivity, cpuLoad) != 0 else {
             val loadFactor = if (cpuLoad > 0.85) 1.5 else 1.0
             val baseThreshold = (0.05 + (0.45 - 0.05) * (1.0 - sensitivity)) * loadFactor
-            val dynamicThreshold = Math.max(baseThreshold, adaptiveFloor * 2.5 * loadFactor)
+            val dynamicThreshold = max(baseThreshold, adaptiveFloor * 2.5 * loadFactor)
             vibration > dynamicThreshold
         }
     }
@@ -455,7 +509,7 @@ object JdHardwareManager {
         return if (isLibraryLoaded.get()) n20(baseAlpha, vibrationRollingSum) else {
             var factor = 1.0
             if (vibrationRollingSum > 0.5) {
-                factor = Math.max(0.01, 1.0 - ((vibrationRollingSum - 0.5) / 1.0))
+                factor = max(0.01, 1.0 - ((vibrationRollingSum - 0.5) / 1.0))
             }
             baseAlpha * factor
         }
