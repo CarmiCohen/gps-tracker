@@ -6,12 +6,13 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.10.10:
+ * - Issue #SIMP-1010-3: Signal Decay Audit. Corrected SNR reconstruction scaling 
+ *   to use RIBBON_SNR_SCALE_DB (45.0) instead of hardcoded 5.0. Ensured snrSnapshot 
+ *   precedence over indexed fallback in mapProtoToSnapshot and mapStatusToSnapshot.
  * Oct.7.11:
  * - Issue #SIMP-1007-17: Strategic Simplification. Updated mapTickToOutputs and 
  *   mapProcessedToSnapshot to promote behavioral pending reasons from the processor.
- * Oct.7.7:
- * - Issue #SIMP-1007-16: Flag Propagation. Updated mapping to handle 
- *   isSuspiciousNoise and isMemoryPressureThrottled across Proto and JSON layers.
  */
 object TelemetryMapper {
 
@@ -363,7 +364,9 @@ object TelemetryMapper {
             this.isSuspiciousNoise = proto.isSuspiciousNoise
             this.isMemoryPressureThrottled = proto.isMemoryPressureThrottled
 
-            snrSnapshot = proto.snrIdx * 5.0
+            // Oct.10.10: Corrected SNR scaling to raw dB-Hz using RIBBON_SNR_SCALE_DB standard.
+            snrSnapshot = if (proto.hasSnrSnapshot()) proto.snrSnapshot else proto.snrIdx * RIBBON_SNR_SCALE_DB
+            
             kinetic.jumpTier = proto.jumpTier
             integrity.isJammer = proto.isJammer
             integrity.isStalled = proto.isStalled
@@ -442,6 +445,9 @@ object TelemetryMapper {
             
             lastAlarmAckTs = data.optLong("last_alarm_ack_ts", 0L)
             violationStartTs = data.optLong("violation_start_ts", 0L)
+            
+            // Oct.10.10: Reconstruct raw SNR for remote processor consistency
+            snrSnapshot = if (data.has("snr_snapshot")) data.optDouble("snr_snapshot") else integrity.snrIdx * RIBBON_SNR_SCALE_DB
         }
     }
 
@@ -569,8 +575,14 @@ object TelemetryMapper {
             suppressionNote = s.integrity.tamperNote
             this.integrity.isStalled = s.integrity.isStalled
             this.isClockRegression = s.isClockRegression || (nowRt - s.lastValidFixRt > 30000L)
-            snrSnapshot = s.integrity.snrIdx * 5.0
+            
+            // Oct.10.10: Corrected SNR scaling to raw dB-Hz for remote processor parity
+            snrSnapshot = s.snrSnapshot ?: (s.integrity.snrIdx * RIBBON_SNR_SCALE_DB)
+            
             this.integrity.thermalHeadroom = s.integrity.thermalHeadroom
+            this.integrity.lastEnergyDeltaMa = s.integrity.lastEnergyDeltaMa
+            this.integrity.lastEnergyDeltaTemp = s.integrity.lastEnergyDeltaTemp
+            this.integrity.lastEnergyDurationMs = s.integrity.lastEnergyDurationMs
             this.integrity.heapAllocatedMb = s.integrity.heapAllocatedMb
             this.thermalSnapshot = s.thermalSnapshot
             this.heapSnapshot = s.heapSnapshot

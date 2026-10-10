@@ -211,7 +211,8 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     if (dynamicGate > 0.12 * loadFactor) dynamicGate = 0.12 * loadFactor;
     int isStationary = (delta < dynamicGate) ? 1 : 0;
 
-    int isSuspiciousNoise = (snr > 0.0 && snr < 20.0 && delta > 0.5) ? 1 : 0;
+    // Oct.10.10: Aligned SNR threshold with EngineConstants.JUMP_GATE_LOW_SNR_THRESHOLD (22.0)
+    int isSuspiciousNoise = (snr > 0.0 && snr < 22.0 && delta > 0.5) ? 1 : 0;
     int isMemoryThrottled = (heapMb > 256.0) ? 1 : 0;
 
     int64_t stationaryDuration = 0;
@@ -224,7 +225,8 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
         g_stationaryStartRt = 0;
     }
 
-    int isJammingCandidate = (snr > 0.0 && snr < 18.0 && delta < 0.15) ? 1 : 0;
+    // Oct.10.10: Aligned SNR threshold with EngineConstants.JUMP_GATE_LOW_SNR_THRESHOLD (22.0)
+    int isJammingCandidate = (snr > 0.0 && snr < 22.0 && delta < 0.15) ? 1 : 0;
 
     *(double*)(ptr + 128) = delta;
     *(double*)(ptr + 136) = nextFloor;

@@ -1,23 +1,23 @@
-# Handover: Oct10.9 Forensic State & Remediation Path
+# Handover: Oct10.10 Forensic State & Remediation Path
 
-## 🎯 Current Status: GREEN (Stabilized IO/UI)
-The **Oct10.9** session has successfully remediated **Connectivity Jitter (#SIMP-1014-3)**. The application now gracefully handles high-frequency native telemetry bursts without saturating the IO layer or causing UI flutter.
+## 🎯 Current Status: GREEN (Signal Parity Restored)
+The **Oct10.10** session has successfully remediated the **Signal Decay Audit (#SIMP-1010-3)**. We have achieved architectural consistency in SNR thresholds between Native and Engine layers and fixed a critical scaling bug in the Remote Processor.
 
 ### ✅ Remediation Completed
 
-#### 1. Connectivity Jitter (Issue #SIMP-1014-3)
-*   **EngineConstants.kt**: Defined `HUD_STATE_SAMPLE_MS` (200ms) as the global temporal dampening standard.
-*   **MainRepository.kt**: Implemented `saveLocationUpdateDebounced`. This caps `DataStore` persistence at 1Hz during bursts, using flyweight duplication to ensure state snapshot integrity.
-*   **MainViewModel.kt**: Applied temporal sampling to `localLocation`, `remoteStatus`, and `signalingMetrics` flows. UI recomposition is now capped at 5Hz.
-*   **Signaling Stability**: Verified that tracker-side persistence logic in `ConnectivitySuite` uses the debounced path for high-priority telemetry.
+#### 1. Signal Decay Audit (Issue #SIMP-1010-3)
+*   **jdhardware-jni.cpp**: Synchronized `isJammingCandidate` and `isSuspiciousNoise` thresholds to the engine standard (**22.0 dB-Hz**).
+*   **app_settings.proto**: Hardened the forensic schema with `optional` markers for `snr_snapshot` and `vibe_snapshot`, enabling reliable presence detection on Viewers.
+*   **TelemetryMapper.kt**: Corrected the raw SNR reconstruction scaling. Replaced the hardcoded `5.0x` multiplier with the normalized `RIBBON_SNR_SCALE_DB` (**45.0x**).
+*   **Presence Parity**: Ensured that dedicated snapshot fields take precedence over indexed fallbacks in all telemetry mapping paths.
 
 ### 📍 Forensic State Snapshot
 *   **Build Status**: GREEN (Success).
-*   **Test Status**: IO/UI stability verified via architectural analysis.
-*   **Version**: Oct10.9.
-*   **Baseline**: SIMP-1014-3 fully resolved.
+*   **Test Status**: Signal consistency verified; Remote rejection logic stabilized.
+*   **Version**: Oct10.10.
+*   **Baseline**: SIMP-1010-3 fully resolved.
 
 ### 🔜 Resumption Path (Oct11.1)
-1.  **Signal Decay Audit**: Verify SNR degradation logic in production environments.
-2.  **Hysteresis Tuning**: Fine-tune Storage/Memory native gates based on field performance logs.
-3.  **Acoustic Profiling**: Audit JNI `n22` performance on budget (Staggered) hardware.
+1.  **Hysteresis Tuning**: Fine-tune Storage/Memory native gates based on field performance logs.
+2.  **Acoustic Profiling**: Audit JNI `n22` performance on budget (Staggered) hardware.
+3.  **Mali Forensic Audit**: Investigate JNI bridge latency on devices with specific GPU anomalies.

@@ -269,8 +269,8 @@ message RealtimeStatus {
     bool local_internet_loss = 101;
     optional string suppression_note = 102;
     bool is_warming = 103;
-    double snr_snapshot = 104;
-    double vibe_snapshot = 105;
+    optional double snr_snapshot = 104;
+    optional double vibe_snapshot = 105;
     int64 acoustic_lockout_rt = 106;
     int64 light_spike_rt = 107;
     double provided_adaptive_floor = 108;
@@ -461,8 +461,8 @@ message TrackerStatusProto {
     bool local_internet_loss = 130;
     optional string suppression_note = 131;
     bool is_warming = 132;
-    double snr_snapshot = 133;
-    double vibe_snapshot = 134;
+    optional double snr_snapshot = 133;
+    optional double vibe_snapshot = 134;
     int64 acoustic_lockout_rt = 135;
     int64 light_spike_rt = 136;
     double provided_adaptive_floor = 137;

@@ -1,5 +1,16 @@
 # Resolution Archive
 
+## [Oct10.10] - Signal Decay Audit
+**Issue ID**: #SIMP-1010-3
+**Status**: RESOLVED
+**Description**: Aligned SNR health thresholds across Native, Engine, and Telemetry layers and remediated a critical scaling bug in the Remote Processor.
+**Root Cause**: Native JNI layer used legacy hardcoded thresholds (18.0/20.0) that drifted from the engine standard (22.0). TelemetryMapper used a hardcoded 5.0x multiplier instead of the normalized 45.0x (RIBBON_SNR_SCALE_DB), causing incorrect remote rejections.
+**Remediation**:
+- Synchronized `jdhardware-jni.cpp` thresholds to 22.0 dB-Hz.
+- Updated `app_settings.proto` to support SNR/Vibe presence detection via `optional` fields.
+- Corrected `TelemetryMapper.kt` reconstruction scaling to raw dB-Hz using `RIBBON_SNR_SCALE_DB`.
+- Prioritized dedicated snapshot fields over indexed fallbacks in all mapping paths.
+
 ## [Oct10.9] - Connectivity Jitter Remediation
 **Issue ID**: #SIMP-1014-3
 **Status**: RESOLVED
@@ -13,5 +24,5 @@
 ## [Oct10.8] - JNI Consolidation
 **Issue ID**: #SIMP-1014-2
 **Status**: RESOLVED
-**Description**: Finalized native system pressure evaluation and consolidated GNSS, Acoustic, and Proximity JNI paths.
+**Description**: Finalized native system pressure evaluation (Memory/Storage) with hysteresis in `n24`. Consolidated GNSS (`n21`), Acoustic (`n22`), and Proximity (`n23`) JNI paths to replace Kotlin fallbacks. Increased shared state buffer to 2048 bytes for multi-sensor safety. Optimized forensic capture for zero-allocation throughput. Resolved Oct10.8.
 ...
