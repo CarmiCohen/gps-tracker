@@ -13,11 +13,9 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
- * Oct.8.1:
- * - Issue #SIMP-1007-17: Fixed key collision in AcousticFloorChanged persistence.
- * Oct.7.6:
- * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated handleAlarmEvent and 
- *   handleProcessorEvent to utilize the unified ForensicSnapshot container (R-ID 651).
+ * Oct.10.1 (Restoration Path):
+ * - Issue #SIMP-1014-2: Unified Pressure Path. Updated handleIntegrityEvent 
+ *   to handle consolidated StoragePressureChanged events.
  */
 @Singleton
 class AppEventCoordinator @Inject constructor(
@@ -33,12 +31,7 @@ class AppEventCoordinator @Inject constructor(
     private val domainEventBus: DomainEventBus
 ) {
     private var isStarted = false
-    
-    // Issue #1333: Cache to suppress redundant peer lifecycle logs.
     private val peerConnectionCache = ConcurrentHashMap<String, Boolean>()
-
-    // R-ID 392: Reusable flyweights for zero-allocation event handling.
-    // Issue #1314: Both flyweights now use unified LocationUpdate DTO.
     private val updateFlyweight = LocationUpdate()
     private val statusFlyweight = LocationUpdate()
 
@@ -77,7 +70,6 @@ class AppEventCoordinator @Inject constructor(
     }
 
     private suspend fun handleTickEvaluated(event: DomainEvent.TickEvaluated, connectivitySuite: ConnectivitySuite) {
-        // 1. Consolidated Mapping Convergence (Issue #1329)
         TelemetryMapper.mapTickToOutputs(
             event = event,
             deviceId = configManager.deviceId,
@@ -86,48 +78,29 @@ class AppEventCoordinator @Inject constructor(
             violationStartTs = alarmManager.getEarliestViolationTs(),
             updateOut = updateFlyweight
         )
-
-        // 2. Repository Persistence
         repository.updateLocation(updateFlyweight)
-        
-        // 3. Peer Signaling
         if (event.isTrackerMode) {
             connectivitySuite.updateLocalTelemetry(updateFlyweight)
-            
             if (event.isPeerActive || event.serviceTickCounter < 300) {
                 connectivitySuite.sendTelemetry(updateFlyweight)
             }
         }
-
         historyManager.updateRibbons(event)
     }
 
     private fun handlePeerConnectionChanged(event: DomainEvent.PeerConnectionChanged) {
         val lastState = peerConnectionCache[event.peerId]
         if (lastState == event.isConnected) return 
-        
         peerConnectionCache[event.peerId] = event.isConnected
-
-        logManager.logServiceEvent(
-            m = "PEER LIFECYCLE: Peer ${event.peerId} ${if (event.isConnected) "Connected" else "Disconnected"}",
-            isImportant = true
-        )
+        logManager.logServiceEvent(m = "PEER LIFECYCLE: Peer ${event.peerId} ${if (event.isConnected) "Connected" else "Disconnected"}", isImportant = true)
     }
 
     private fun handleHeuristicRecovery(event: DomainEvent.HeuristicRecovery) {
-        logManager.logServiceEvent(
-            m = "HEURISTIC RECOVERY: ${event.message} - Heartbeat gap detected (${event.gapMs}ms). Reviving connection.", 
-            isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, 
-            lat = event.lat, lng = event.lng, accuracy = event.accuracy
-        )
+        logManager.logServiceEvent(m = "HEURISTIC RECOVERY: ${event.message} - gap detected (${event.gapMs}ms).", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = event.lat, lng = event.lng, accuracy = event.accuracy)
     }
 
     private fun handleStabilityViolation(event: DomainEvent.StabilityViolation) {
-        logManager.logServiceEvent(
-            m = event.message, isImportant = true, isSpecial = event.isJitter, 
-            specialColor = if (event.isJitter) FORENSIC_PINK_COLOR else null, 
-            lat = event.lat, lng = event.lng, accuracy = event.accuracy
-        )
+        logManager.logServiceEvent(m = event.message, isImportant = true, isSpecial = event.isJitter, specialColor = if (event.isJitter) FORENSIC_PINK_COLOR else null, lat = event.lat, lng = event.lng, accuracy = event.accuracy)
     }
 
     private fun handlePowerSaveTransition(event: DomainEvent.PowerSaveTransition) {
@@ -136,15 +109,7 @@ class AppEventCoordinator @Inject constructor(
 
     private fun handleAlarmEvent(event: AlarmEvent) {
         if (event is AlarmEvent.LogEvent) {
-            logManager.submitToLogSink(
-                message = event.message, type = event.type, isImportant = event.isImportant,
-                extremeValue = event.extremeValue, localId = event.logId, durationMs = event.durationMs,
-                isSpecial = event.isSpecial, specialColor = event.specialColor,
-                lat = event.lat, lng = event.lng, accuracy = event.accuracy,
-                maxAccuracy = event.maxAccuracy, 
-                snr = event.forensic.snr, vibe = event.forensic.vibe,
-                thermal = event.forensic.thermal, heap = event.forensic.heap
-            )
+            logManager.submitToLogSink(message = event.message, type = event.type, isImportant = event.isImportant, extremeValue = event.extremeValue, localId = event.logId, durationMs = event.durationMs, isSpecial = event.isSpecial, specialColor = event.specialColor, lat = event.lat, lng = event.lng, accuracy = event.accuracy, maxAccuracy = event.maxAccuracy, snr = event.forensic.snr, vibe = event.forensic.vibe, thermal = event.forensic.thermal, heap = event.forensic.heap)
         }
     }
 
@@ -154,30 +119,19 @@ class AppEventCoordinator @Inject constructor(
         
         when (event) {
             is IntegrityEvent.ViolationSustained -> {
-                if (event.type == ALERT_ID_TRACKER_POWER && isTrackerMode) {
-                    alarmManager.setPowerAlarmPending(true, localRole)
-                }
+                if (event.type == ALERT_ID_TRACKER_POWER && isTrackerMode) alarmManager.setPowerAlarmPending(true, localRole)
             }
             is IntegrityEvent.ViolationResolved -> {
-                if (event.type == ALERT_ID_TRACKER_POWER && isTrackerMode) {
-                    alarmManager.setPowerAlarmPending(false, localRole)
-                }
+                if (event.type == ALERT_ID_TRACKER_POWER && isTrackerMode) alarmManager.setPowerAlarmPending(false, localRole)
             }
             is IntegrityEvent.LogEvent -> {
-                val isSpecial = event.message.contains("tamper", ignoreCase = true) || 
-                               event.message.contains("confirmed", ignoreCase = true) || 
-                               event.message.contains("EMERGENCY", ignoreCase = true) || 
-                               event.message.contains("ENERGY AUDIT", ignoreCase = true)
-                logManager.logServiceEvent(
-                    m = event.message, 
-                    isImportant = event.isImportant, 
-                    isSpecial = isSpecial, 
-                    specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null
-                )
+                val isSpecial = event.message.contains("tamper", ignoreCase = true) || event.message.contains("ENERGY AUDIT", ignoreCase = true)
+                logManager.logServiceEvent(m = event.message, isImportant = event.isImportant, isSpecial = isSpecial, specialColor = if (isSpecial) FORENSIC_PINK_COLOR else null)
             }
             is IntegrityEvent.LocationStatusChanged -> {}
             is IntegrityEvent.GnssThrottledChanged -> {}
             is IntegrityEvent.MemoryPressureChanged -> {}
+            is IntegrityEvent.StoragePressureChanged -> {}
         }
     }
 
@@ -187,50 +141,25 @@ class AppEventCoordinator @Inject constructor(
         val logPrefix = if (!isTrackerMode && isPrimary) "[Self] " else ""
         
         when (event) {
-            is ProcessorEvent.TrailPointSaved -> {
-                repository.saveTrailPoint(event.lat, event.lng, event.isViewerTrail, event.status, event.timestamp, accuracy = event.accuracy, maxAccuracy = event.maxAccuracy)
-            }
+            is ProcessorEvent.TrailPointSaved -> repository.saveTrailPoint(event.lat, event.lng, event.isViewerTrail, event.status, event.timestamp, accuracy = event.accuracy, maxAccuracy = event.maxAccuracy)
             is ProcessorEvent.LogAdded -> {
-                val specialColor = if (event.isSpecial || event.message.contains("Merge-on-Stale")) FORENSIC_PINK_COLOR else null
-                logManager.submitToLogSink(
-                    message = logPrefix + event.message, type = event.type, isImportant = event.isImportant,
-                    isSpecial = event.isSpecial || event.message.contains("Merge-on-Stale"),
-                    specialColor = specialColor, lat = event.lat, lng = event.lng,
-                    accuracy = event.accuracy, 
-                    snr = event.forensic.snr, vibe = event.forensic.vibe,
-                    thermal = event.forensic.thermal, heap = event.forensic.heap
-                )
+                val specialColor = if (event.isSpecial) FORENSIC_PINK_COLOR else null
+                logManager.submitToLogSink(message = logPrefix + event.message, type = event.type, isImportant = event.isImportant, isSpecial = event.isSpecial, specialColor = specialColor, lat = event.lat, lng = event.lng, accuracy = event.accuracy, snr = event.forensic.snr, vibe = event.forensic.vibe, thermal = event.forensic.thermal, heap = event.forensic.heap)
             }
-            is ProcessorEvent.MaxAccuracyChanged -> {
-                repository.saveDoubleSync(role, MAX_ACCURACY_KEY, event.accuracy)
-            }
+            is ProcessorEvent.MaxAccuracyChanged -> repository.saveDoubleSync(role, MAX_ACCURACY_KEY, event.accuracy)
             is ProcessorEvent.ChairBaselineChanged -> {
                 val telem = if (isTrackerMode || isPrimary) repository.getLocalLocationSync() else repository.getTrackerLocationSync()
-                logManager.logServiceEvent(
-                    m = "Passive Zeroing: Chair baseline calibrated to ${event.baseline.roundToOneDecimal()}°", 
-                    lat = telem.kinetic.lat, lng = telem.kinetic.lng, accuracy = telem.kinetic.maxAccuracy
-                )
+                logManager.logServiceEvent(m = "Passive Zeroing: Chair baseline calibrated to ${event.baseline.roundToOneDecimal()}°", lat = telem.kinetic.lat, lng = telem.kinetic.lng, accuracy = telem.kinetic.maxAccuracy)
                 repository.saveDoubleSync(role, CHAIR_BASELINE_TILT_KEY, event.baseline)
             }
-            is ProcessorEvent.VibrationFloorChanged -> {
-                repository.saveDoubleDebounced(role, ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
-            }
-            is ProcessorEvent.LuxBaselineChanged -> {
-                repository.saveDoubleDebounced(role, TRACKER_LUX_BASELINE_KEY, event.baseline)
-            }
-            is ProcessorEvent.AcousticFloorChanged -> {
-                repository.saveDoubleDebounced(role, TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
-            }
-            is ProcessorEvent.GpsStallDetected -> {
-                if (!isTrackerMode && isPrimary) logManager.logServiceEvent(m = "GPS STALL: Fix unchanged for >1s", isImportant = false)
-            }
+            is ProcessorEvent.VibrationFloorChanged -> repository.saveDoubleDebounced(role, ADAPTIVE_VIBRATION_FLOOR_KEY, event.floor)
+            is ProcessorEvent.LuxBaselineChanged -> repository.saveDoubleDebounced(role, TRACKER_LUX_BASELINE_KEY, event.baseline)
+            is ProcessorEvent.AcousticFloorChanged -> repository.saveDoubleDebounced(role, TRACKER_ACOUSTIC_FLOOR_KEY, event.floor)
+            is ProcessorEvent.GpsStallDetected -> { if (!isTrackerMode && isPrimary) logManager.logServiceEvent(m = "GPS STALL: Fix unchanged for >1s", isImportant = false) }
         }
     }
 
-    private fun handleConnectivityEvent(event: ConnectivityEvent) {
-        if (event is ConnectivityEvent.PeerPulse) { }
-    }
-
+    private fun handleConnectivityEvent(event: ConnectivityEvent) {}
     private fun handleHistoryEvent(event: HistoryEvent) {
         if (event is HistoryEvent.LogEvent) logManager.logServiceEvent(m = event.message, isImportant = event.isImportant)
     }
@@ -239,11 +168,7 @@ class AppEventCoordinator @Inject constructor(
         when (event) {
             is AppSensorEvent.HardwareFailure -> {
                 val telem = repository.getLocalLocationSync()
-                logManager.logServiceEvent(
-                    m = "CRITICAL: SENSOR_HARDWARE_FAILURE - ${event.reason}", 
-                    isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, 
-                    lat = telem.kinetic.lat, lng = telem.kinetic.lng, accuracy = telem.kinetic.maxAccuracy
-                )
+                logManager.logServiceEvent(m = "CRITICAL: SENSOR_HARDWARE_FAILURE - ${event.reason}", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = telem.kinetic.lat, lng = telem.kinetic.lng, accuracy = telem.kinetic.maxAccuracy)
             }
             is AppSensorEvent.LogEvent -> logManager.logServiceEvent(m = event.message, isImportant = event.isImportant)
         }
@@ -251,10 +176,8 @@ class AppEventCoordinator @Inject constructor(
 
     private fun handleCommandEvent(event: CommandEvent) {
         when (event) {
-            is CommandEvent.ResetTimers -> {
-                peerConnectionCache.clear()
-            }
-            else -> { }
+            is CommandEvent.ResetTimers -> peerConnectionCache.clear()
+            else -> {}
         }
     }
 
@@ -262,22 +185,12 @@ class AppEventCoordinator @Inject constructor(
         val isTrackerMode = configManager.isTrackerMode
         val roleTag = if (isTrackerMode) "" else "(V) "
         val telem = repository.getLocalLocationSync()
-        
         when (event) {
             is RevivalEvent.Footprint -> {
                 val msg = "ENERGY AUDIT ${roleTag}: Revival Footprint - Delta: ${event.deltaMa}mA, Temp Rise: ${event.deltaTemp}°C, Duration: ${event.durationMs}ms"
-                logManager.submitToLogSink(
-                    msg, "system", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, 
-                    lat = telem.kinetic.lat, lng = telem.kinetic.lng, accuracy = telem.kinetic.maxAccuracy
-                )
+                logManager.submitToLogSink(msg, "system", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = telem.kinetic.lat, lng = telem.kinetic.lng, accuracy = telem.kinetic.maxAccuracy)
             }
-            is RevivalEvent.HardwareLock -> {
-                logManager.logServiceEvent(
-                    m = "CRITICAL ${roleTag}: GPS_HARDWARE_LOCK - All revival attempts failed. Hardware stall confirmed.", 
-                    isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, 
-                    lat = telem.kinetic.lat, lng = telem.kinetic.lng, accuracy = telem.kinetic.maxAccuracy
-                )
-            }
+            is RevivalEvent.HardwareLock -> logManager.logServiceEvent(m = "CRITICAL ${roleTag}: GPS_HARDWARE_LOCK - All revival attempts failed.", isImportant = true, isSpecial = true, specialColor = FORENSIC_PINK_COLOR, lat = telem.kinetic.lat, lng = telem.kinetic.lng, accuracy = telem.kinetic.maxAccuracy)
             is RevivalEvent.Attempt -> logManager.logServiceEvent(m = "GPS REVIVAL ${roleTag}: Hardware restart attempt ${event.count} triggered.", isImportant = false)
             is RevivalEvent.Success -> logManager.logServiceEvent(m = "GPS REVIVAL ${roleTag}: Hardware fix restored successfully.", isImportant = true)
             is RevivalEvent.RawBurstStarted -> {}
@@ -289,14 +202,8 @@ class AppEventCoordinator @Inject constructor(
         alarmManager.isSirenRequired.collectLatest { required ->
             val isCurrentlyPlaying = audioSynthesizer.isPlaying()
             val isTrackerMode = configManager.isTrackerMode
-            
             if (required && !isCurrentlyPlaying) {
-                audioSynthesizer.playSiren(
-                    timeProvider = timeProvider,
-                    isTrackerMode = isTrackerMode,
-                    vibrate = true,
-                    force = true
-                )
+                audioSynthesizer.playSiren(timeProvider = timeProvider, isTrackerMode = isTrackerMode, vibrate = true, force = true)
             } else if (!required && isCurrentlyPlaying) {
                 if (!audioSynthesizer.isForced()) {
                     audioSynthesizer.stopSiren(timeProvider = timeProvider)
@@ -310,27 +217,18 @@ class AppEventCoordinator @Inject constructor(
 
     private suspend fun observeAlarmSummary() {
         if (configManager.isTrackerMode) return
-
-        alarmManager.activeAlarmsFlow
-            .map { list -> list.filter { !it.isResolved && !it.isSirenDisabled } }
-            .distinctUntilChanged()
-            .collectLatest { activeSpecialAlarms ->
-                if (activeSpecialAlarms.isNotEmpty()) {
-                    val summary = activeSpecialAlarms.joinToString(", ") { it.title }
-                    notificationManager.updateAlarmNotification(summary)
-                } else {
-                    notificationManager.cancelAlarm()
-                }
-            }
+        alarmManager.activeAlarmsFlow.map { list -> list.filter { !it.isResolved && !it.isSirenDisabled } }.distinctUntilChanged().collectLatest { activeSpecialAlarms ->
+            if (activeSpecialAlarms.isNotEmpty()) {
+                val summary = activeSpecialAlarms.joinToString(", ") { it.title }
+                notificationManager.updateAlarmNotification(summary)
+            } else notificationManager.cancelAlarm()
+        }
     }
 
     private suspend fun observePhysicalSirenState() {
         audioSynthesizer.isSirenPlaying.collectLatest { playing ->
-            if (playing) {
-                logManager.logServiceEvent("AUDIO: Siren output engaged", isImportant = false)
-            } else {
-                logManager.logServiceEvent("AUDIO: Siren output disengaged", isImportant = false)
-            }
+            if (playing) logManager.logServiceEvent("AUDIO: Siren output engaged", isImportant = false)
+            else logManager.logServiceEvent("AUDIO: Siren output disengaged", isImportant = false)
         }
     }
 

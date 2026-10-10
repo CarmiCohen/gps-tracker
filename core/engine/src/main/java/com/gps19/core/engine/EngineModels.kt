@@ -6,16 +6,13 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * Oct.7.11:
- * - Issue #SIMP-1007-17: Strategic Simplification. Added locationPendingReason 
- *   to SentinelResult and ProcessedLocation for unified health propagation.
- * Oct.7.10:
- * - Issue #SIMP-1010-3: SNR Decay Modeling. Added isJammingCandidate to 
- *   VibrationBatch and SentinelForensicState for native jammer discrimination.
- * Oct.7.9:
- * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Added nowRt to 
- *   VibrationBatch inputs and stationaryDuration, muzzleResetTriggered to outputs.
- * - Replaced stationaryStartRt with stationaryDurationMs in SentinelForensicState.
+ * Oct.10.1 (Restoration Path):
+ * - Issue #SIMP-1014-2: Unified Pressure Path. Added SystemPressureBatch 
+ *   DTO and updated events/interfaces for consolidated JNI pressure evaluation.
+ * - Issue #SIMP-1012-2: Native Proximity Scaling. Added ProximityBatch for JNI debouncing.
+ * - Issue #SIMP-1011-3: Forensic Buffer Consolidation. Unified ForensicSample.
+ * - Issue #SIMP-1011-2: Acoustic JNI Offloading. JNI audio processing.
+ * - Issue #SIMP-1011-1: Native GNSS Batching. Native SV evaluation.
  */
 
 @Serializable
@@ -255,6 +252,7 @@ sealed class IntegrityEvent(override val priority: EventPriority = EventPriority
     data class LocationStatusChanged(val status: LocationStatus) : IntegrityEvent(EventPriority.HIGH)
     data class GnssThrottledChanged(val throttled: Boolean) : IntegrityEvent(EventPriority.NORMAL)
     data class MemoryPressureChanged(val level: MemoryPressureLevel, val heapMb: Double) : IntegrityEvent(EventPriority.HIGH)
+    data class StoragePressureChanged(val isLow: Boolean, val isCritical: Boolean, val availableMb: Long) : IntegrityEvent(EventPriority.HIGH)
 }
 
 sealed class ProcessorEvent(open val isPrimary: Boolean, override val priority: EventPriority = EventPriority.NORMAL) : DomainEvent(priority) {
@@ -292,6 +290,7 @@ sealed class CommandEvent(override val priority: EventPriority = EventPriority.H
     object ExecuteNetworkStressTest : CommandEvent(EventPriority.NORMAL)
     data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : CommandEvent(EventPriority.HIGH)
     object TriggerMemoryFlush : CommandEvent(EventPriority.HIGH)
+    object TriggerStoragePrune : CommandEvent(EventPriority.HIGH)
 }
 
 sealed class RevivalEvent(override val priority: EventPriority = EventPriority.NORMAL) : DomainEvent(priority) {
@@ -329,14 +328,6 @@ interface DeviceIdentity {
 
 /**
  * VibrationBatch: Data transfer object for JNI batching (Issue #1450).
- * Oct.7.10:
- * - Issue #SIMP-1010-3: SNR Decay Modeling. Added isJammingCandidate output (offset 184).
- * Oct.7.9:
- * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Added nowRt to 
- *   inputs and stationaryDuration, muzzleResetTriggered to outputs.
- * Oct.7.6:
- * - Issue #SIMP-1007-16: JNI FastPath Expansion. Expanded VibrationBatch to 
- *   include anomaly flags (isSuspiciousNoise, isMemoryPressureThrottled).
  */
 @Serializable
 class VibrationBatch {
@@ -349,13 +340,9 @@ class VibrationBatch {
     var lastRawVibe: Double = 0.0
     var lastHpfValue: Double = 0.0
     var currentEnergy: Double = 0.0
-    
-    // Forensic Expansion
     var snr: Double = -1.0
     var thermal: Double = -1.0
     var heap: Double = -1.0
-
-    // Oct.7.9: Time context for native hysteresis
     var nowRt: Long = 0L
     
     // Outputs
@@ -364,17 +351,118 @@ class VibrationBatch {
     var nextHpf: Double = 0.0
     var nextEnergy: Double = 0.0
     var isStationary: Boolean = false
-    
-    // Oct.7.6 Anomaly Flags
     var isSuspiciousNoise: Boolean = false
     var isMemoryPressureThrottled: Boolean = false
-
-    // Oct.7.9 Native Hysteresis Outputs
     var stationaryDuration: Long = 0L
     var muzzleResetTriggered: Boolean = false
-
-    // Oct.7.10 Jammer Discrimination (Offset 184)
     var isJammingCandidate: Boolean = false
+}
+
+/**
+ * GnssHealthBatch: Data transfer object for JNI GNSS processing (Issue #SIMP-1011-1).
+ */
+@Serializable
+class GnssHealthBatch {
+    var count: Int = 0
+    var svid: IntArray = IntArray(64)
+    var cn0: FloatArray = FloatArray(64)
+    var usedInFix: BooleanArray = BooleanArray(64)
+    var constellation: IntArray = IntArray(64)
+    var satellitesInView: Int = 0
+    var satellitesUsed: Int = 0
+    var averageSnr: Double = 0.0
+}
+
+/**
+ * AcousticBatch: Data transfer object for JNI audio processing (Issue #SIMP-1011-2).
+ */
+@Serializable
+class AcousticBatch {
+    var readCount: Int = 0
+    var baseAlpha: Double = 0.0
+    var vibrationRollingSum: Double = 0.0
+    var nowRt: Long = 0L
+    var isWarming: Boolean = false
+    var maxAmp: Int = 0
+    var db: Double = 0.0
+    var isSpike: Boolean = false
+    var lastSpikeRt: Long = 0L
+}
+
+/**
+ * ProximityBatch: Data transfer object for JNI proximity processing (Issue #SIMP-1012-2).
+ */
+@Serializable
+class ProximityBatch {
+    var distance: Double = 0.0
+    var maxRange: Double = 0.0
+    var nowRt: Long = 0L
+    var isStationary: Boolean = false
+    var stationaryDurationMs: Long = 0L
+    var isHighLoad: Boolean = false
+    var currentIdx: Double = 0.0
+    var rawNear: Boolean = false
+    var isFlickering: Boolean = false
+    var nextIdx: Double = 0.0
+    var nextRawNear: Boolean = false
+    var debounceMs: Long = 0L
+}
+
+/**
+ * SystemPressureBatch: Unified container for Memory and Storage pressure evaluation.
+ * Issue #SIMP-1014-2: Consolidation of pressure gates into a single JNI crossing.
+ */
+@Serializable
+class SystemPressureBatch {
+    var heapMb: Double = 0.0
+    var memPressureThresholdMb: Double = 0.0
+    var memCriticalThresholdMb: Double = 0.0
+    var memHysteresisOffsetMb: Double = 0.0
+    var storageAvailableMb: Double = 0.0
+    var storageLowThresholdMb: Double = 0.0
+    var storageCriticalThresholdMb: Double = 0.0
+    var storageHysteresisOffsetMb: Double = 0.0
+    var currentMemLevel: Int = 0 // 0: Normal, 1: High, 2: Critical
+    var needsMemFlush: Boolean = false
+    var currentStorageLevel: Int = 0 // 0: Normal, 1: Low, 2: Critical
+    var needsStoragePrune: Boolean = false
+}
+
+/**
+ * ForensicSample: Unified container for forensic telemetry samples (Issue #SIMP-1011-3).
+ */
+@Serializable
+class ForensicSample(
+    var ts: Long = 0L,
+    var rt: Long = 0L,
+    var snr: Double = 0.0,
+    var acoustic: Double = 0.0,
+    var lux: Double = 0.0,
+    var vibe: Double = 0.0,
+    var proxIdx: Double = 0.0,
+    var lift: Double = 0.0,
+    var tilt: Double = 0.0,
+    var isSitDetected: Boolean = false,
+    var sitVzTs: Long = 0L,
+    var sitVzRt: Long = 0L,
+    var sitShock: Double = 0.0,
+    var kineticEnergy: Double = 0.0,
+    var activityType: ActivityType = ActivityType.UNKNOWN
+) {
+    fun reset() {
+        ts = 0L; rt = 0L; snr = 0.0; acoustic = 0.0; lux = 0.0; vibe = 0.0
+        proxIdx = 0.0; lift = 0.0; tilt = 0.0; isSitDetected = false
+        sitVzTs = 0L; sitVzRt = 0L; sitShock = 0.0; kineticEnergy = 0.0
+        activityType = ActivityType.UNKNOWN
+    }
+    
+    fun copyFrom(other: ForensicSample) {
+        this.ts = other.ts; this.rt = other.rt; this.snr = other.snr; this.acoustic = other.acoustic
+        this.lux = other.lux; this.vibe = other.vibe; this.proxIdx = other.proxIdx; this.lift = other.lift
+        this.tilt = other.tilt; this.isSitDetected = other.isSitDetected; this.sitVzTs = other.sitVzTs
+        this.sitVzRt = other.sitVzRt; this.sitShock = other.sitShock; this.kineticEnergy = other.kineticEnergy
+        this.activityType = other.activityType
+    }
 }
 
 /**
@@ -388,9 +476,11 @@ interface NativeFastPathProvider {
     fun calculateVibrationDelta(x: Double, y: Double, z: Double, lx: Double, ly: Double, lz: Double): Double
     fun isShockViolated(peakShock: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean
     fun isVibrationSuspicious(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean
-    
-    // Issue #1450: Batched Vibration Processing
     fun processVibrationBatch(batch: VibrationBatch): Boolean
+    fun processGnssBatch(batch: GnssHealthBatch): Boolean
+    fun processAcousticBatch(batch: AcousticBatch, buffer: ShortArray): Boolean
+    fun processProximityBatch(batch: ProximityBatch): Boolean
+    fun processSystemPressure(batch: SystemPressureBatch): Boolean
 }
 
 @Serializable
@@ -446,8 +536,6 @@ class ProcessedLocation {
     var isAnchorLocked: Boolean = false
     var suppressionNote: String? = null
     var kineticEnergy: Double = 0.0
-    
-    // Oct.7.11: Promoted pending reason
     var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
 
     fun reset() {
@@ -560,12 +648,8 @@ class SentinelForensicState {
     var lastAcousticContractionRt: Long = 0L
     var lastSnr: Double = 0.0
     var lastSatsUsed: Int = 0
-    
-    // Anomaly Flags
     var isSuspiciousNoise: Boolean = false
     var isMemoryPressureThrottled: Boolean = false
-
-    // Oct.7.10 Jammer Discrimination
     var isJammingCandidate: Boolean = false
 }
 
@@ -669,12 +753,8 @@ class AlarmEvaluationState {
     var forensicReliabilityDegradationStartRt: Long = 0L
     var powerAlarmPending: Boolean = false
     var lastGlobalTriggerRt: Long = 0L
-    
-    // Issue #1417: Connectivity Hysteresis
     var lastRelayOnlineRt: Long = 0L
     var lastRelayOfflineRt: Long = 0L
-
-    // Issue #SIMP-1201-1: Serialization Parity
     var lastSirenStopRt: Long = 0L
     var bootId: String = ""
     
@@ -751,30 +831,11 @@ enum class RibbonScale(val key: String, val intervalSeconds: Int) {
     FOUR_HOUR("4H", 60), TWENTY_FOUR_HOUR("24H", 360), SEVEN_DAY("7D", 2700)
 }
 
-class EngineSnrSample(var ts: Long = 0L, var rt: Long = 0L, var snr: Double = 0.0)
-class EngineAcousticSample(var ts: Long = 0L, var rt: Long = 0L, var db: Double = 0.0)
-
-class EngineSensorSnapshot(
-    var ts: Long = 0L, var rt: Long = 0L, var acoustic: Double = 0.0, var lux: Double = 0.0,
-    var vibe: Double = 0.0, var proxIdx: Double = 0.0, var lift: Double = 0.0, var tilt: Double = 0.0,
-    var isSitDetected: Boolean = false, var sitVzTs: Long = 0L, var sitVzRt: Long = 0L,
-    var sitShock: Double = 0.0, var kineticEnergy: Double = 0.0, var activityType: ActivityType = ActivityType.UNKNOWN
-) {
-    fun copyFrom(other: EngineSensorSnapshot) {
-        this.ts = other.ts; this.rt = other.rt; this.acoustic = other.acoustic; this.lux = other.lux
-        this.vibe = other.vibe; this.proxIdx = other.proxIdx; this.lift = other.lift; this.tilt = other.tilt
-        this.isSitDetected = other.isSitDetected; this.sitVzTs = other.sitVzTs; this.sitVzRt = other.sitVzRt
-        this.sitShock = other.sitShock; this.kineticEnergy = other.kineticEnergy; this.activityType = other.activityType
-    }
-}
-
 @Serializable
 class SentinelResult(
     var status: SentinelStatus = SentinelStatus.VALID, var reason: String = "",
     var optimizedPoint: EngineGeoPoint? = null, var jumpConfidence: JumpConfidence? = null,
     var suppressionNote: String? = null, var promotedPoints: List<EngineGeoPoint>? = null,
-    
-    // Oct.7.11: Behaviorally Promoted Pending Reason
     var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
 ) {
     fun reset(status: SentinelStatus = SentinelStatus.VALID) {

@@ -26,16 +26,10 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
- * Oct.7.7:
- * - Issue #SIMP-1007-16: Flag Propagation. Injected native anomaly flags from 
- *   HardwareSuiteLogicSnapshot into the evaluation monolith for alarm analysis.
- * Oct.6.21:
- * - Issue #QA-1006-12: Forensic Hardening. Wrapped all environmental indices 
- *   in PhysicsUtils.safeDouble to prevent SQLiteConstraintException (NaN/Inf) 
- *   during high-pressure bursts.
- * Oct.6.3:
- * - Issue #AUDIT-1006-2: Implemented triggerImmediateTick() to allow Fast-Path 
- *   triggers (Acoustic/Light) to preempt relaxed memory-throttled intervals.
+ * Oct.10.1 (Restoration Path):
+ * - Issue #SIMP-1014-2: Unified Pressure Path. Handled TriggerStoragePrune command 
+ *   triggered by JNI-side storage evaluation.
+ * - Issue #SIMP-1011-1: Native GNSS Batching. Integrated JNI satellite status evaluation.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -316,6 +310,11 @@ class MonitorService : BaseMonitorService() {
                     is CommandEvent.ExecuteNetworkStressTest -> connectivitySuite.executeFlappingStressTest()
                     is CommandEvent.SimulateStoragePressure -> {}
                     is CommandEvent.TriggerMemoryFlush -> performMemoryFlush()
+                    is CommandEvent.TriggerStoragePrune -> {
+                        lifecycleScope.launch(Dispatchers.IO) {
+                            historyManager.pruneStorage()
+                        }
+                    }
                 }
             }
     }
@@ -452,11 +451,6 @@ class MonitorService : BaseMonitorService() {
         return type
     }
 
-    /**
-     * getRequiredTickInterval: Unified interval authority.
-     * Issue #AUDIT-1006-6: Aggressive loop throttling during MemoryPressureLevel.CRITICAL.
-     * Throttles to 15s when memory is critical to prevent background OOM (R-ID 592).
-     */
     override fun getRequiredTickInterval(): Long {
         if (memoryPressureLevel == MemoryPressureLevel.CRITICAL) return 15000L
         if (memoryPressureLevel == MemoryPressureLevel.HIGH) return 5000L
@@ -519,7 +513,6 @@ class MonitorService : BaseMonitorService() {
             cpuLoad = health.cpuLoad; ioWait = health.ioWait; maxIoLatency = health.maxIoLatency
             kinetic.activityType = hSnapshot.activityType
             
-            // Oct.7.7 Anomaly Flags
             isSuspiciousNoise = hSnapshot.isSuspiciousNoise
             isMemoryPressureThrottled = hSnapshot.isMemoryPressureThrottled
         }
@@ -635,8 +628,6 @@ class MonitorService : BaseMonitorService() {
 
         val serviceContext = AlarmServiceContext(now = now, nowRt = nowRt, serviceStartTs = serviceStartWall, serviceStartRt = serviceStartRealtime, appStartTime = sessionManager.appStartTime, isTrackerMode = isTrackerMode, isRelayConnected = isSocketConnected, isTrackerConnected = if (isTrackerMode) true else isPeerActive, isUiVisible = isUiVisible(), distToHomeAuthority = if (isTrackerMode) processed.distToHome else (if (isSocketConnected && isPeerActive) PhysicsUtils.calculateDistance(alarmSnapshot.kinetic.lat, alarmSnapshot.kinetic.lng, (repository.getCachedHomePoints().firstOrNull()?.latitude ?: 0.0), (repository.getCachedHomePoints().firstOrNull()?.longitude ?: 0.0)) else null), maxDistanceAuthority = (if (isTrackerMode) primaryProcessor else remoteProcessor).getMaxDistanceAuthority(), capabilities = capabilities, role = if (isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE)
         tickOrchestrator.launchJob("alarm_evaluation", lifecycleScope + Dispatchers.Default) {
-            // R1160: Alarms now use a pooled snapshot. Note: evaluateAlarms should NOT 
-            // store this reference long-term as it belongs to a circular pool.
             alarmManager.evaluateAlarms(alarmSnapshot, serviceContext)
         }
     }
@@ -701,10 +692,6 @@ class MonitorService : BaseMonitorService() {
 
     private fun triggerForensicSample(isSpike: Boolean = false) { forensicTriggerChannel.trySend(isSpike) }
 
-    /**
-     * Issue #AUDIT-1006-2: Preempts the current tick loop delay to process 
-     * a tick immediately. Used for safety-critical sensor spikes.
-     */
     private fun triggerImmediateTick() {
         tickOrchestrator.preemptLoop("tick_loop")
     }
@@ -717,7 +704,6 @@ class MonitorService : BaseMonitorService() {
             onSpike = { 
                 lastFastPathAcousticSpikeRt = timeProvider.elapsedRealtime()
                 triggerForensicSample(isSpike = true)
-                // R-ID 289: Force immediate tick to evaluate potential alarm
                 triggerImmediateTick()
             }
         )
@@ -727,7 +713,6 @@ class MonitorService : BaseMonitorService() {
             onSpike = { 
                 lastFastPathLightSpikeRt = timeProvider.elapsedRealtime()
                 triggerForensicSample(isSpike = true)
-                // R-ID 289: Force immediate tick to evaluate potential alarm
                 triggerImmediateTick()
             }
         )

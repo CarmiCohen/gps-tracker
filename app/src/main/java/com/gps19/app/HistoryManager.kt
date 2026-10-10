@@ -18,13 +18,10 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * Oct.7.6:
- * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated updateRibbons to 
- *   utilize the unified ForensicSnapshot container properties, resolving 
- *   compilation regressions from Oct7.5 container migration.
- * Oct.6.21:
- * - Issue #QA-1006-12: Forensic Hardening. Integrated PhysicsUtils.safeDouble 
- *   into currentPointFlyweight assignments to prevent SQLiteConstraintExceptions.
+ * Oct.10.1 (Restoration Path):
+ * - Issue #SIMP-1014-2: Unified Pressure Path. Added pruneStorage() to 
+ *   support JNI-triggered aggressive cleanup.
+ * - Issue #SIMP-1011-3: Forensic Buffer Consolidation. Standardized on ForensicSample.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -103,6 +100,14 @@ class HistoryManager @Inject constructor(
      */
     suspend fun trimMemory() = ribbonMutex.withLock {
         appPointPool.forEach { it.reset() }
+    }
+
+    /**
+     * pruneStorage: Issue #SIMP-1014-2. Triggers proactive database pruning 
+     * to alleviate storage pressure.
+     */
+    suspend fun pruneStorage() = withContext(Dispatchers.IO) {
+        repository.proactivePruning()
     }
 
     private fun emitSanitizedLog(message: String, isImportant: Boolean = false) {

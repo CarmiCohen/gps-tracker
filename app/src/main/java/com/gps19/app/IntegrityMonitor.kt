@@ -18,11 +18,11 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Oct.10.1 (Restoration Path):
+ * - Issue #SIMP-1014-2: Unified Pressure Path. Consolidated Memory and 
+ *   Storage pressure evaluation into a single JNI crossing via SystemPressureBatch.
  * Oct.6.2:
  * - Issue #AUDIT-1006-6: Added Memory Pressure simulation hooks.
- * Oct.5.9:
- * - Issue #1295: Redundant Stream Observer Audit. Relaxed heartbeat loop 
- *   interval during ultra-long stationary periods to conserve CPU (R1295).
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -59,6 +59,7 @@ class IntegrityMonitor @Inject constructor(
     private val INTERNET_CHECK_TTL_MS = 5000L
     
     private var lastMemoryPressure = MemoryPressureLevel.NORMAL
+    private val systemPressureBatch = SystemPressureBatch()
 
     private val _health = MutableStateFlow(SystemHealthState())
     val healthFlow: StateFlow<SystemHealthState> = _health.asStateFlow()
@@ -254,14 +255,56 @@ class IntegrityMonitor @Inject constructor(
 
         hardwareSuite.setMaliAnomaly(maliAnomaly)
         
-        // Issue #1416: Memory Pressure Audit
-        val currentPressure = if (isMemorySimulated.get()) {
-            simulatedMemoryLevel.get()
+        // Issue #1416 & SIMP-1014-2: Unified Pressure Audit
+        val currentPressure: MemoryPressureLevel
+        var needsFlush = false
+        val storageStatus = systemStatusProvider.getStorageStatus()
+        val available = storageStatus.availableMb
+
+        if (JdHardwareManager.isAvailable() && !isMemorySimulated.get() && !isStorageSimulated.get()) {
+            systemPressureBatch.apply {
+                heapMb = heap
+                memPressureThresholdMb = MEMORY_PRESSURE_THRESHOLD_MB
+                memCriticalThresholdMb = MEMORY_CRITICAL_THRESHOLD_MB
+                memHysteresisOffsetMb = MEMORY_HYSTERESIS_OFFSET_MB
+                storageAvailableMb = available.toDouble()
+                storageLowThresholdMb = SYSTEM_STORAGE_LOW_THRESHOLD_MB.toDouble()
+                storageCriticalThresholdMb = SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB.toDouble()
+                storageHysteresisOffsetMb = STORAGE_HYSTERESIS_OFFSET_MB
+            }
+            
+            if (hardwareSuite.processSystemPressure(systemPressureBatch)) {
+                currentPressure = when (systemPressureBatch.currentMemLevel) {
+                    2 -> MemoryPressureLevel.CRITICAL
+                    1 -> MemoryPressureLevel.HIGH
+                    else -> MemoryPressureLevel.NORMAL
+                }
+                needsFlush = systemPressureBatch.needsMemFlush
+                if (systemPressureBatch.needsStoragePrune) {
+                    domainEventBus.emit(CommandEvent.TriggerStoragePrune)
+                }
+                
+                val isLow = systemPressureBatch.currentStorageLevel >= 1
+                val isCritical = systemPressureBatch.currentStorageLevel >= 2
+                
+                if (isLow != currentHealth.isStorageLow || isCritical != currentHealth.isStorageCritical) {
+                    domainEventBus.emit(IntegrityEvent.StoragePressureChanged(isLow, isCritical, available))
+                    updateHealth { h ->
+                        h.isStorageLow = isLow
+                        h.isStorageCritical = isCritical
+                        h.storageAvailableMb = available
+                    }
+                }
+            } else {
+                currentPressure = evaluateMemoryPressureLegacy(heap)
+                if (currentPressure != lastMemoryPressure && currentPressure != MemoryPressureLevel.NORMAL) {
+                    needsFlush = true
+                }
+            }
         } else {
-            when {
-                heap >= MEMORY_CRITICAL_THRESHOLD_MB -> MemoryPressureLevel.CRITICAL
-                heap >= MEMORY_PRESSURE_THRESHOLD_MB -> MemoryPressureLevel.HIGH
-                else -> MemoryPressureLevel.NORMAL
+            currentPressure = if (isMemorySimulated.get()) simulatedMemoryLevel.get() else evaluateMemoryPressureLegacy(heap)
+            if (currentPressure != lastMemoryPressure && (currentPressure != MemoryPressureLevel.NORMAL || isMemorySimulated.get())) {
+                needsFlush = true
             }
         }
         
@@ -271,6 +314,10 @@ class IntegrityMonitor @Inject constructor(
             if (currentPressure != MemoryPressureLevel.NORMAL) {
                 Timber.w("Memory Pressure Warning: Level $currentPressure (Heap: %.1f MB)".format(heap))
             }
+        }
+        
+        if (needsFlush) {
+            domainEventBus.emit(CommandEvent.TriggerMemoryFlush)
         }
 
         updateHealth { h ->
@@ -315,6 +362,12 @@ class IntegrityMonitor @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun evaluateMemoryPressureLegacy(heap: Double): MemoryPressureLevel = when {
+        heap >= MEMORY_CRITICAL_THRESHOLD_MB -> MemoryPressureLevel.CRITICAL
+        heap >= MEMORY_PRESSURE_THRESHOLD_MB -> MemoryPressureLevel.HIGH
+        else -> MemoryPressureLevel.NORMAL
     }
 
     private fun checkMaliDriverAnomaly(maxIo: Long, cpu: Double, iow: Double): Boolean {
@@ -739,6 +792,11 @@ class IntegrityMonitor @Inject constructor(
         repository.saveBooleanSync(IS_COOLING_MODE_ACTIVE_KEY, false)
         repository.saveLongSync(COOLING_ENTERED_RT_KEY, 0L)
         lastMemoryPressure = MemoryPressureLevel.NORMAL
+        
+        systemPressureBatch.currentMemLevel = 0
+        systemPressureBatch.needsMemFlush = false
+        systemPressureBatch.currentStorageLevel = 0
+        systemPressureBatch.needsStoragePrune = false
     }
 
     fun getBatteryLevel(): Int = currentHealth.batteryLevel

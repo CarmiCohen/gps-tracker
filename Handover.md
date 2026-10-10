@@ -1,28 +1,24 @@
-# Handover: Hardening Process - Oct7.11
+# Handover: Deep Restoration & Oct10.1 Launch
 
 ## 🎯 Current Status
-Consolidating redundant location pending logic between `HardwareSuite` and `SentinelValidator` (#SIMP-1007-17).
+We have successfully completed the **Restoration Protocol**. The project was rolled back to Oct8.1 (`64faffd`) to resolve fatal metadata corruption and then cautiously re-hardened by porting the JNI enhancements (SIMP-1011 through SIMP-1015) in small, build-verified increments.
 
-## 🛠️ Changes Performed (Oct7.11)
-1.  **HardwareSuite.kt**:
-    *   Migrated GNSS health evaluation to `SentinelValidator.evaluateLocationPendingReason`.
-    *   Integrated `isJammingCandidate` into the unified `LocationStatus` evaluation loop.
-    *   Purged redundant manual `SIGNAL_LOSS`/`GPS_STALL`/`GPS_GAP` logic.
-2.  **SentinelValidator.kt**:
-    *   Added `evaluateLocationPendingReason` to centralize GNSS and behavioral health status.
-    *   Added `getReasonPriority` and `getHigherPriorityReason` to handle overlapping health issues.
-3.  **TelemetryAggregator.kt**:
-    *   Updated ribbon aggregation to use centralized `SentinelValidator.getHigherPriorityReason`.
-4.  **LocationSentinel.kt**:
-    *   Ensured `checkPhysicalTamperInternal` returns `JAMMER_SUSPICION` when native jamming is detected.
-    *   Consolidated reason strings for behavioral rejections.
+### ✅ Ported & Verified Improvements
+*   **JNI Offloading**: Native GNSS evaluation, 44.1kHz Acoustic math, and Proximity scaling are active.
+*   **Unified Pressure Path**: Atomic JNI evaluation of Memory and Storage stress is implemented.
+*   **Forensic Consolidation**: Standardized on a unified `ForensicSample` container and zero-allocation `forEachMatch` iteration.
+*   **Native Authority**: Centralized all high-frequency gates under a non-nullable `NativeFastPathProvider`.
 
-## 🔜 Next Steps
-1.  **LocationProcessor Promotion**: Ensure `LocationProcessor.processGpsPoint` promotes behavioral rejections (Acoustic, Tamper, Jammer) from `SentinelResult` into the `LocationUpdate.locationPendingReason`.
-2.  **Telemetry Integration**: Verify that `MonitorService` correctly propagates the promoted reasons to the telemetry pipeline.
-3.  **Integrity Audit**: Finalize metrics and release the version.
+## 🛠️ Procedure Followed
+1.  **Hard Reset**: Reverted to known-good `64faffd`.
+2.  **Incremental Porting**: Re-applied code changes file-by-file with clean builds.
+3.  **Integrity Check**: Final build `:app:assembleDebug` PASSED.
+
+## 🔜 Next Steps (Oct10.2)
+1.  **Build Metadata Guardian**: Implement the SIMP-1017-1 script to prevent future KAPT module-loading failures.
+2.  **HUD Interface Alignment**: Begin migrating `EngineModels.kt` interfaces to `val` properties one-by-one, verifying Hilt visibility at each step.
 
 ## 📍 Forensic State Snapshot
-*   **SIMP-1007-17 Progress**: ~80% complete.
-*   **Version**: Oct7.11
-*   **Active Focus**: Strategic Simplification & Redundancy Consolidation.
+*   **Build Status**: GREEN (Success).
+*   **Baseline**: Oct8.1 (Ported to Oct10.1).
+*   **Active Focus**: Structural Alignment & Build Safety.

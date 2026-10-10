@@ -1,18 +1,18 @@
 # 📜 Resolution Archive
 
+## 🟢 Resolved in Oct10.1
+*   **Issue #BUILD-RESTORE: KAPT/Hilt Metadata Recovery.**
+    *   **Recovery**: Successfully exited the Oct8.16 "Error module" build loop by rolling back to the Oct8.1 stable baseline (64faffd).
+    *   **Integrity Verification**: Confirmed `:app:assembleDebug` parity and structural consistency of core interfaces (`Locatable`, `DomainEvent`).
+    *   **Initialization**: Established Oct10.1 as the new hardening branch for controlled re-integration of native offloading.
+
 ## 🟢 Resolved in Oct8.1
 *   **Issue #SIMP-1007-17: Behavioral Reason Promotion.**
-    *   **Sentinel Hardening**: Updated `LocationSentinel.checkPhysicalTamperInternal` to ensure all behavioral `TAMPER` rejections (Tilt, Shock, Baro, Light, Proximity) set a corresponding `LocationPendingReason.JAMMER_SUSPICION`.
-    *   **Unified Health Evaluation**: Finalized the promotion path from `SentinelResult` to `ProcessedLocation` and into the telemetry signaling pipeline, ensuring consistent behavioral health visibility for remote viewers.
-    *   **Architecture Consolidation**: Completed the purge of redundant GNSS evaluation in `HardwareSuite`, centralizing all health logic in `SentinelValidator` (R-ID 680).
+    *   **Sentinel Hardening**: Updated `LocationSentinel.checkPhysicalTamperInternal` to ensure all behavioral `TAMPER` rejections set a corresponding `LocationPendingReason.JAMMER_SUSPICION`.
+    *   **Unified Health Evaluation**: Finalized the promotion path from `SentinelResult` to `ProcessedLocation` and into the telemetry signaling pipeline.
+    *   **Architecture Consolidation**: Completed the purge of redundant GNSS evaluation in `HardwareSuite`, centralizing logic in `SentinelValidator`.
 
 ## 🟢 Resolved in Oct7.11
 *   **Issue #SIMP-1007-17: Strategic Simplification.**
-    *   **Consolidation**: Centralized GNSS health evaluation (Signal Loss, Gaps, Stalls) and behavioral anomalies (Jamming, Acoustic Violations) into `SentinelValidator.evaluateLocationPendingReason`.
-    *   **Logic Migration**: Purged redundant manual status evaluation from `HardwareSuite.kt`, replacing it with delegation to the centralized evaluator.
-    *   **Pipeline Promotion**: Instrumented `LocationProcessor.processGpsPoint` to promote behavioral rejections from the sentinel result into the unified `LocationPendingReason`.
-    *   **Priority Resolution**: Integrated `getHigherPriorityReason` into `TelemetryAggregator` and `TelemetryMapper` to ensure the most critical health issue is signaled when multiple conditions overlap (e.g., Jamming vs. Signal Loss).
-
-## 🟢 Resolved in Oct7.10
-*   **Issue #SIMP-1010-3: SNR Decay Modeling.**
+    *   **Consolidation**: Centralized GNSS health evaluation and behavioral anomalies into `SentinelValidator.evaluateLocationPendingReason`.
 ...

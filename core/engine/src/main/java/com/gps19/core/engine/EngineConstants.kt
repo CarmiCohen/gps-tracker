@@ -2,13 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * Oct.2.6:
- * - Issue #1175: Real-time Only Path. Purged obsolete backfill constants: 
- *   REAL_TIME_GAP_LIMIT_MS, SENSOR_SAMPLE_BUFFER_MAX_AGE_MS, and MAX_BACKFILL_POINTS.
- * Oct.2.1:
- * - Issue #1417: Added CONNECTIVITY_HYSTERESIS_MS (3s).
- * - Issue #1416: Memory Pressure Mitigation. Added heap thresholds.
- * - Issue #1415: Added SENSOR_LOAD_GATE_CPU_THRESHOLD (0.85).
+ * Oct.10.1 (Restoration Path):
+ * - Issue #SIMP-1014-2: Unified Pressure Path. Added hysteresis offsets 
+ *   for JNI-side Memory and Storage evaluation.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -45,6 +41,7 @@ const val SENSOR_LOAD_GATE_CPU_THRESHOLD = 0.85
 // Issue #1416: Memory Pressure Thresholds (MB)
 const val MEMORY_PRESSURE_THRESHOLD_MB = 200.0
 const val MEMORY_CRITICAL_THRESHOLD_MB = 250.0
+const val MEMORY_HYSTERESIS_OFFSET_MB = 10.0
 
 // Issue #1417: Connectivity Jitter
 const val CONNECTIVITY_HYSTERESIS_MS = 3000L
@@ -339,6 +336,7 @@ const val BATTERY_STEEP_DISCHARGE_WINDOW_MS = 60000L
 // Storage thresholds
 const val SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB = 10L
 const val SYSTEM_STORAGE_LOW_THRESHOLD_MB = 50L
+const val STORAGE_HYSTERESIS_OFFSET_MB = 10.0
 const val SYSTEM_STORAGE_CRITICAL_THRESHOLD_PCT = 0.01 
 const val SYSTEM_STORAGE_LOW_THRESHOLD_PCT = 0.05 
 

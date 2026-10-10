@@ -6,23 +6,16 @@ import kotlin.math.min
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
- * Oct.7.11:
- * - Issue #SIMP-1007-17: Consolidated redundant location pending logic 
- *   from HardwareSuite. Added evaluateLocationPendingReason and 
- *   getHigherPriorityReason to centralize GNSS and behavioral health evaluation.
- * Oct.7.9:
- * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Updated 
- *   computeAdaptiveAcousticOffCycle to take duration instead of absolute timestamp 
- *   to align with native offloading.
- * Oct.5.5:
- * - Issue #SIMP-1510-1: Native FastPath Convergence (Phase 2). Offloaded 
- *   isShockViolated and isVibrationSuspicious to JNI to complete the 100Hz 
- *   vibration path hardening. Eliminated remaining JVM floating-point math.
+ * Oct.10.1 (Restoration Path):
+ * - Issue #SIMP-1015-1: Non-Nullable Native Authority. Standardized on @NotNull 
+ *   native providers. All high-frequency gates now route through nativeProvider 
+ *   without null-checks, using DefaultNativeFastPathProvider as the baseline.
+ * - Issue #SIMP-1013-3: JNI Stationary Authority. Offloaded load-aware movement 
+ *   authority to JNI. Eliminated JVM gate calculation in the authoritative path.
  */
 object SentinelValidator {
 
-    @Volatile
-    private var nativeProvider: NativeFastPathProvider? = null
+    private var nativeProvider: NativeFastPathProvider = DefaultNativeFastPathProvider
 
     fun setNativeProvider(provider: NativeFastPathProvider) {
         this.nativeProvider = provider
@@ -45,14 +38,7 @@ object SentinelValidator {
         sensitivity: Float = 0.5f,
         cpuLoad: Double = 0.0
     ): Boolean {
-        nativeProvider?.let {
-            return it.isShockViolated(peakShock, adaptiveFloor, sensitivity, cpuLoad)
-        }
-
-        val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 1.5 else 1.0
-        val baseThreshold = (0.2 + (1.4 - 0.2) * (1.0 - sensitivity)) * loadFactor
-        val dynamicThreshold = maxOf(baseThreshold, adaptiveFloor * VIBRATION_SHOCK_MULTIPLIER * loadFactor)
-        return peakShock > dynamicThreshold
+        return nativeProvider.isShockViolated(peakShock, adaptiveFloor, sensitivity, cpuLoad)
     }
 
     fun isVibrationSuspicious(
@@ -61,24 +47,14 @@ object SentinelValidator {
         sensitivity: Float = 0.5f,
         cpuLoad: Double = 0.0
     ): Boolean {
-        nativeProvider?.let {
-            return it.isVibrationSuspicious(vibration, adaptiveFloor, sensitivity, cpuLoad)
-        }
-
-        val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 1.5 else 1.0
-        val baseThreshold = (0.05 + (0.45 - 0.05) * (1.0 - sensitivity)) * loadFactor
-        val dynamicThreshold = maxOf(baseThreshold, adaptiveFloor * VIBRATION_SUSPICIOUS_MULTIPLIER * loadFactor)
-        return vibration > dynamicThreshold
+        return nativeProvider.isVibrationSuspicious(vibration, adaptiveFloor, sensitivity, cpuLoad)
     }
 
+    /**
+     * isStationary: Authoritative movement gate.
+     */
     fun isStationary(vibration: Double, adaptiveFloor: Double, cpuLoad: Double = 0.0): Boolean {
-        nativeProvider?.let {
-            return it.isStationary(vibration, adaptiveFloor, cpuLoad)
-        }
-
-        val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 2.0 else 1.0
-        val dynamicGate = (adaptiveFloor * STATIONARY_FLOOR_MULT * loadFactor).coerceIn(INITIAL_VIBRATION_FLOOR, VIBRATION_STATIONARY_THRESHOLD * loadFactor)
-        return vibration < dynamicGate
+        return nativeProvider.isStationary(vibration, adaptiveFloor, cpuLoad)
     }
 
     fun isAcousticViolated(peakDb: Double, floorDb: Double, vibration: Double = 0.0): Boolean {
@@ -119,41 +95,15 @@ object SentinelValidator {
     }
 
     fun updateVibrationFloor(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double = 0.0): Double {
-        if (vibration.isNaN() || vibration <= 0.0) return currentFloor
-        
-        nativeProvider?.let {
-            return it.updateVibrationFloor(currentFloor, vibration, isWarming, cpuLoad)
-        }
-
-        if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) return currentFloor
-        
-        return if (vibration < currentFloor) {
-            val alpha = accelerateAlpha(VIBRATION_EMA_DOWN_FAST, isWarming, 0.5)
-            applyEma(currentFloor, vibration, alpha)
-        } else if (vibration < 1.0) {
-            val alpha = accelerateAlpha(VIBRATION_EMA_UP_FAST, isWarming, 0.1)
-            applyEma(currentFloor, vibration, alpha)
-        } else {
-            currentFloor
-        }
+        return nativeProvider.updateVibrationFloor(currentFloor, vibration, isWarming, cpuLoad)
     }
 
     fun computeNextHpf(lastHpfValue: Double, currentRawVibe: Double, lastRawVibe: Double): Double {
-        nativeProvider?.let {
-            return it.computeNextHpf(lastHpfValue, currentRawVibe, lastRawVibe)
-        }
-        
-        return VIBRATION_HPF_ALPHA * (lastHpfValue + currentRawVibe - lastRawVibe)
+        return nativeProvider.computeNextHpf(lastHpfValue, currentRawVibe, lastRawVibe)
     }
 
     fun computeNextEnergy(currentEnergy: Double, hpfValue: Double): Double {
-        nativeProvider?.let {
-            return it.computeNextEnergy(currentEnergy, hpfValue)
-        }
-
-        val instantEnergy = abs(hpfValue)
-        val alphaEnergy = VIBRATION_ENERGY_EMA_ALPHA
-        return (currentEnergy * (1.0 - alphaEnergy)) + (instantEnergy * alphaEnergy)
+        return nativeProvider.computeNextEnergy(currentEnergy, hpfValue)
     }
 
     fun updateLuxBaseline(currentBaseline: Double, lux: Double, isStationary: Boolean, isWarming: Boolean): Double {
@@ -193,7 +143,6 @@ object SentinelValidator {
 
     /**
      * computeAdaptiveAcousticOffCycle: Part of Issue #762 (R762b). 
-     * Oct.7.9: Updated to take durationMs directly for JNI offloading parity.
      */
     fun computeAdaptiveAcousticOffCycle(
         isStationary: Boolean,
@@ -205,8 +154,6 @@ object SentinelValidator {
 
     /**
      * evaluateLocationPendingReason: Consolidates environment-based GNSS status evaluation.
-     * Oct.7.11: Moved from HardwareSuite to centralize Sentinel Hard Gates. 
-     * Added isAcousticViolated and priority-based resolution.
      */
     fun evaluateLocationPendingReason(
         satellitesInView: Int,
@@ -230,10 +177,6 @@ object SentinelValidator {
         }
     }
 
-    /**
-     * getReasonPriority: Defines the precedence of pending reasons.
-     * Higher value = higher priority for display/signaling.
-     */
     fun getReasonPriority(reason: LocationPendingReason): Int {
         return when (reason) {
             LocationPendingReason.NONE -> 0
@@ -245,9 +188,6 @@ object SentinelValidator {
         }
     }
 
-    /**
-     * getHigherPriorityReason: Returns the more critical of two reasons.
-     */
     fun getHigherPriorityReason(r1: LocationPendingReason, r2: LocationPendingReason): LocationPendingReason {
         if (r1 == r2) return r1
         return if (getReasonPriority(r2) >= getReasonPriority(r1)) r2 else r1
@@ -260,5 +200,69 @@ object SentinelValidator {
 
     private fun applyEma(last: Double, current: Double, alpha: Double): Double {
         return (last * (1.0 - alpha)) + (current * alpha)
+    }
+
+    /**
+     * DefaultNativeFastPathProvider: JVM implementation of native-eligible math.
+     * Serves as a fallback if JdHardwareManager is not available or hasn't 
+     * yet injected the native-linked provider.
+     */
+    private object DefaultNativeFastPathProvider : NativeFastPathProvider {
+        override fun isStationary(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean {
+            val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 2.0 else 1.0
+            val dynamicGate = (adaptiveFloor * STATIONARY_FLOOR_MULT * loadFactor).coerceIn(
+                INITIAL_VIBRATION_FLOOR, 
+                VIBRATION_STATIONARY_THRESHOLD * loadFactor
+            )
+            return vibration < dynamicGate
+        }
+
+        override fun updateVibrationFloor(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double): Double {
+            if (vibration.isNaN() || vibration <= 0.0 || cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) return currentFloor
+            
+            return if (vibration < currentFloor) {
+                val alpha = accelerateAlpha(VIBRATION_EMA_DOWN_FAST, isWarming, 0.5)
+                (currentFloor * (1.0 - alpha)) + (vibration * alpha)
+            } else if (vibration < 1.0) {
+                val alpha = accelerateAlpha(VIBRATION_EMA_UP_FAST, isWarming, 0.1)
+                (currentFloor * (1.0 - alpha)) + (vibration * alpha)
+            } else {
+                currentFloor
+            }
+        }
+
+        override fun computeNextHpf(lastHpfValue: Double, currentRawVibe: Double, lastRawVibe: Double): Double {
+            return VIBRATION_HPF_ALPHA * (lastHpfValue + currentRawVibe - lastRawVibe)
+        }
+
+        override fun computeNextEnergy(currentEnergy: Double, hpfValue: Double): Double {
+            val instantEnergy = abs(hpfValue)
+            val alphaEnergy = VIBRATION_ENERGY_EMA_ALPHA
+            return (currentEnergy * (1.0 - alphaEnergy)) + (instantEnergy * alphaEnergy)
+        }
+
+        override fun calculateVibrationDelta(x: Double, y: Double, z: Double, lx: Double, ly: Double, lz: Double): Double {
+            return Math.sqrt((x - lx) * (x - lx) + (y - ly) * (y - ly) + (z - lz) * (z - lz)) / GRAVITY_EARTH
+        }
+
+        override fun isShockViolated(peakShock: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
+            val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 1.5 else 1.0
+            val baseThreshold = (0.2 + (1.4 - 0.2) * (1.0 - sensitivity)) * loadFactor
+            val dynamicThreshold = maxOf(baseThreshold, adaptiveFloor * VIBRATION_SHOCK_MULTIPLIER * loadFactor)
+            return peakShock > dynamicThreshold
+        }
+
+        override fun isVibrationSuspicious(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
+            val loadFactor = if (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) 1.5 else 1.0
+            val baseThreshold = (0.05 + (0.45 - 0.05) * (1.0 - sensitivity)) * loadFactor
+            val dynamicThreshold = maxOf(baseThreshold, adaptiveFloor * VIBRATION_SUSPICIOUS_MULTIPLIER * loadFactor)
+            return vibration > dynamicThreshold
+        }
+
+        override fun processVibrationBatch(batch: VibrationBatch): Boolean = false
+        override fun processGnssBatch(batch: GnssHealthBatch): Boolean = false
+        override fun processAcousticBatch(batch: AcousticBatch, buffer: ShortArray): Boolean = false
+        override fun processProximityBatch(batch: ProximityBatch): Boolean = false
+        override fun processSystemPressure(batch: SystemPressureBatch): Boolean = false
     }
 }

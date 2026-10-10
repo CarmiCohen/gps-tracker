@@ -1,9 +1,13 @@
 package com.gps19.app
 
+import com.gps19.core.engine.AcousticBatch
+import com.gps19.core.engine.GnssHealthBatch
 import com.gps19.core.engine.JNI_RET_EINTR
 import com.gps19.core.engine.JNI_RET_NOT_INITIALIZED
 import com.gps19.core.engine.LATENCY_THRESHOLD_JNI_MS
 import com.gps19.core.engine.LatencyMonitor
+import com.gps19.core.engine.ProximityBatch
+import com.gps19.core.engine.SystemPressureBatch
 import com.gps19.core.engine.TimeProvider
 import com.gps19.core.engine.VibrationBatch
 import timber.log.Timber
@@ -28,19 +32,12 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
- * Oct.7.10:
- * - Issue #SIMP-1010-3: SNR Decay Modeling. Updated processVibrationBatchNative 
- *   to read isJammingCandidate from offset 184.
- * Oct.7.9:
- * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Updated 
- *   processVibrationBatchNative to pack nowRt (offset 116) and read muzzle 
- *   outputs (offsets 172/180).
- * Oct.7.8:
- * - Issue #SIMP-1010-1: Adaptive Acoustic Gating. Implemented n20 to calculate 
- *   adaptive alpha based on vibrationRollingSum.
- * Oct.7.6:
- * - Issue #SIMP-1007-16: JNI FastPath Expansion. Expanded processVibrationBatchNative 
- *   to pack forensic snapshots and read back native anomaly flags (offsets 164/168).
+ * Oct.10.1 (Restoration Path):
+ * - Issue #SIMP-1014-2: Unified Pressure Path. Added processSystemPressureNative 
+ *   (n24) to consolidate Memory and Storage pressure evaluation in JNI.
+ * - Issue #SIMP-1012-2: Native Proximity Scaling. Added processProximityBatchNative (n23).
+ * - Issue #SIMP-1011-2: Acoustic JNI Offloading. Added processAcousticBatchNative (n22).
+ * - Issue #SIMP-1011-1: Native GNSS Batching. Added processGnssBatchNative (n21).
  */
 object JdHardwareManager {
 
@@ -66,8 +63,8 @@ object JdHardwareManager {
     private const val MAX_INIT_RETRIES = 5
     private const val INITIAL_RETRY_DELAY_MS = 1000L
 
-    // Issue #1450: Expanded to 256 bytes for vibration batching
-    private val sharedStateBuffer: ByteBuffer = ByteBuffer.allocateDirect(256).apply {
+    // Issue #SIMP-1011-1: Increased to 1024 bytes for GNSS/Acoustic/Pressure batching arrays
+    private val sharedStateBuffer: ByteBuffer = ByteBuffer.allocateDirect(1024).apply {
         order(ByteOrder.nativeOrder())
     }
 
@@ -226,10 +223,6 @@ object JdHardwareManager {
         return if (isLibraryLoaded.get()) n8() else 0.0
     }
 
-    fun recordSensorAudit() {
-        // Obsolete but kept for signature parity if needed
-    }
-
     fun resetSensorAudit() {
         if (isLibraryLoaded.get()) n9()
     }
@@ -242,11 +235,6 @@ object JdHardwareManager {
         return if (isLibraryLoaded.get()) n11(type, value, nowRt, alpha) != 0 else false
     }
 
-    /**
-     * processVibrationBatchNative: Consolidated 100Hz JNI call (Issue #1450).
-     * Oct.7.10: Added isJammingCandidate output (offset 184).
-     * Oct.7.9: Added nowRt (offset 116) and read muzzle outputs (offsets 172/180).
-     */
     fun processVibrationBatchNative(batch: VibrationBatch): Boolean {
         if (!isLibraryLoaded.get()) return false
         
@@ -264,35 +252,124 @@ object JdHardwareManager {
             sharedStateBuffer.putDouble(batch.lastRawVibe)
             sharedStateBuffer.putDouble(batch.lastHpfValue)
             sharedStateBuffer.putDouble(batch.currentEnergy)
-            
-            // Oct.7.6 Forensic Expansion (Offset 92)
             sharedStateBuffer.putDouble(batch.snr)
             sharedStateBuffer.putDouble(batch.thermal)
             sharedStateBuffer.putDouble(batch.heap)
-
-            // Oct.7.9: Time context (Offset 116)
             sharedStateBuffer.putLong(batch.nowRt)
             
             val res = n19()
             if (res == 0) {
-                // Read outputs from offset 128
                 batch.delta = sharedStateBuffer.getDouble(128)
                 batch.nextFloor = sharedStateBuffer.getDouble(136)
                 batch.nextHpf = sharedStateBuffer.getDouble(144)
                 batch.nextEnergy = sharedStateBuffer.getDouble(152)
                 batch.isStationary = sharedStateBuffer.getInt(160) != 0
-                
-                // Oct.7.6 Anomaly Flags (Offset 164)
                 batch.isSuspiciousNoise = sharedStateBuffer.getInt(164) != 0
                 batch.isMemoryPressureThrottled = sharedStateBuffer.getInt(168) != 0
-
-                // Oct.7.9 Native Hysteresis (Offset 172)
                 batch.stationaryDuration = sharedStateBuffer.getLong(172)
                 batch.muzzleResetTriggered = sharedStateBuffer.getInt(180) != 0
-
-                // Oct.7.10 Jammer Discrimination (Offset 184)
                 batch.isJammingCandidate = sharedStateBuffer.getInt(184) != 0
+                return true
+            }
+        }
+        return false
+    }
 
+    fun processGnssBatchNative(batch: GnssHealthBatch): Boolean {
+        if (!isLibraryLoaded.get()) return false
+        
+        synchronized(sharedStateBuffer) {
+            sharedStateBuffer.clear()
+            sharedStateBuffer.putInt(batch.count)
+            for (i in 0 until 64) sharedStateBuffer.putInt(batch.svid[i])
+            for (i in 0 until 64) sharedStateBuffer.putFloat(batch.cn0[i])
+            for (i in 0 until 64) sharedStateBuffer.putInt(if (batch.usedInFix[i]) 1 else 0)
+            for (i in 0 until 64) sharedStateBuffer.putInt(batch.constellation[i])
+            
+            val res = n21()
+            if (res == 0) {
+                batch.satellitesInView = sharedStateBuffer.getInt(896)
+                batch.satellitesUsed = sharedStateBuffer.getInt(900)
+                batch.averageSnr = sharedStateBuffer.getDouble(904)
+                return true
+            }
+        }
+        return false
+    }
+
+    fun processAcousticBatchNative(batch: AcousticBatch, buffer: ShortArray): Boolean {
+        if (!isLibraryLoaded.get()) return false
+        
+        synchronized(sharedStateBuffer) {
+            sharedStateBuffer.clear()
+            sharedStateBuffer.putInt(batch.readCount)
+            sharedStateBuffer.putDouble(batch.baseAlpha)
+            sharedStateBuffer.putDouble(batch.vibrationRollingSum)
+            sharedStateBuffer.putLong(batch.nowRt)
+            sharedStateBuffer.putInt(if (batch.isWarming) 1 else 0)
+            
+            val res = n22(buffer)
+            if (res == 0) {
+                batch.maxAmp = sharedStateBuffer.getInt(128)
+                batch.db = sharedStateBuffer.getDouble(132)
+                batch.isSpike = sharedStateBuffer.getInt(140) != 0
+                batch.lastSpikeRt = sharedStateBuffer.getLong(144)
+                return true
+            }
+        }
+        return false
+    }
+
+    fun processProximityBatchNative(batch: ProximityBatch): Boolean {
+        if (!isLibraryLoaded.get()) return false
+        
+        synchronized(sharedStateBuffer) {
+            sharedStateBuffer.clear()
+            sharedStateBuffer.putDouble(batch.distance)
+            sharedStateBuffer.putDouble(batch.maxRange)
+            sharedStateBuffer.putLong(batch.nowRt)
+            sharedStateBuffer.putInt(if (batch.isStationary) 1 else 0)
+            sharedStateBuffer.putLong(batch.stationaryDurationMs)
+            sharedStateBuffer.putInt(if (batch.isHighLoad) 1 else 0)
+            sharedStateBuffer.putDouble(batch.currentIdx)
+            sharedStateBuffer.putInt(if (batch.rawNear) 1 else 0)
+            sharedStateBuffer.putInt(if (batch.isFlickering) 1 else 0)
+            
+            val res = n23()
+            if (res == 0) {
+                batch.nextIdx = sharedStateBuffer.getDouble(128)
+                batch.nextRawNear = sharedStateBuffer.getInt(136) != 0
+                batch.debounceMs = sharedStateBuffer.getLong(140)
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
+     * processSystemPressureNative: Consolidated JNI pressure path (Issue #SIMP-1014-2).
+     */
+    fun processSystemPressureNative(batch: SystemPressureBatch): Boolean {
+        if (!isLibraryLoaded.get()) return false
+        
+        synchronized(sharedStateBuffer) {
+            sharedStateBuffer.clear()
+            sharedStateBuffer.putDouble(batch.heapMb)
+            sharedStateBuffer.putDouble(batch.memPressureThresholdMb)
+            sharedStateBuffer.putDouble(batch.memCriticalThresholdMb)
+            sharedStateBuffer.putDouble(batch.memHysteresisOffsetMb)
+            sharedStateBuffer.putDouble(batch.storageAvailableMb)
+            sharedStateBuffer.putDouble(batch.storageLowThresholdMb)
+            sharedStateBuffer.putDouble(batch.storageCriticalThresholdMb)
+            sharedStateBuffer.putDouble(batch.storageHysteresisOffsetMb)
+            
+            val res = n24()
+            if (res == 0) {
+                // Read outputs from offset 64
+                batch.currentMemLevel = sharedStateBuffer.getInt(64)
+                batch.needsMemFlush = sharedStateBuffer.getInt(68) != 0
+                batch.currentStorageLevel = sharedStateBuffer.getInt(72)
+                batch.needsStoragePrune = sharedStateBuffer.getInt(76) != 0
                 return true
             }
         }
@@ -331,9 +408,6 @@ object JdHardwareManager {
         }
     }
 
-    /**
-     * calculateVibrationDeltaNative: Native vector magnitude offloading (Issue #SIMP-1510-1).
-     */
     fun calculateVibrationDeltaNative(x: Double, y: Double, z: Double, lx: Double, ly: Double, lz: Double): Double {
         return if (isLibraryLoaded.get()) n16(x, y, z, lx, ly, lz) else {
             val dx = x - lx; val dy = y - ly; val dz = z - lz
@@ -341,9 +415,6 @@ object JdHardwareManager {
         }
     }
 
-    /**
-     * isShockViolatedNative: Native Shock Gate (Issue #SIMP-1510-1).
-     */
     fun isShockViolatedNative(peakShock: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
         return if (isLibraryLoaded.get()) n17(peakShock, adaptiveFloor, sensitivity, cpuLoad) != 0 else {
             val loadFactor = if (cpuLoad > 0.85) 1.5 else 1.0
@@ -353,9 +424,6 @@ object JdHardwareManager {
         }
     }
 
-    /**
-     * isVibrationSuspiciousNative: Native Suspicious Gate (Issue #SIMP-1510-1).
-     */
     fun isVibrationSuspiciousNative(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean {
         return if (isLibraryLoaded.get()) n18(vibration, adaptiveFloor, sensitivity, cpuLoad) != 0 else {
             val loadFactor = if (cpuLoad > 0.85) 1.5 else 1.0
@@ -365,9 +433,6 @@ object JdHardwareManager {
         }
     }
 
-    /**
-     * computeAdaptiveAcousticAlphaNative: Native motion-aware alpha adjustment (Issue #SIMP-1010-1).
-     */
     fun computeAdaptiveAcousticAlphaNative(baseAlpha: Double, vibrationRollingSum: Double): Double {
         return if (isLibraryLoaded.get()) n20(baseAlpha, vibrationRollingSum) else {
             var factor = 1.0
@@ -400,4 +465,8 @@ object JdHardwareManager {
     @JvmStatic private external fun n18(vibe: Double, floor: Double, sens: Float, cpu: Double): Int
     @JvmStatic private external fun n19(): Int
     @JvmStatic private external fun n20(baseAlpha: Double, vibeRollingSum: Double): Double
+    @JvmStatic private external fun n21(): Int
+    @JvmStatic private external fun n22(buffer: ShortArray): Int
+    @JvmStatic private external fun n23(): Int
+    @JvmStatic private external fun n24(): Int
 }
