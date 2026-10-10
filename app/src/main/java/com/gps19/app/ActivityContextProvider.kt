@@ -20,10 +20,9 @@ import javax.inject.Singleton
 
 /**
  * ActivityContextProvider: Unified authority for tracking user activity context.
- * Oct.4.5:
- * - Issue #1425: Unified Clock Authority. Migrated lastActivityUpdateRt to 
- *   monotonic time (elapsedRealtime) to prevent heuristic fallback errors 
- *   during clock drift.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 @Singleton
 class ActivityContextProvider @Inject constructor(
@@ -35,7 +34,7 @@ class ActivityContextProvider @Inject constructor(
 
     @Volatile private var lastActivityUpdateRt = 0L
     private val activityRecognitionClient by lazy { ActivityRecognition.getClient(context) }
-    private val ACTIVITY_RECEIVER_ACTION = "com.gps19.app.ACTION_ACTIVITY_UPDATE"
+    private val ACTIVITY_RECEIVER_ACTION = "com.gps19.app.ACTIVITY_RECEIVER_ACTION"
     private var activityPendingIntent: PendingIntent? = null
 
     private val activityReceiver = object : BroadcastReceiver() {
@@ -56,7 +55,7 @@ class ActivityContextProvider @Inject constructor(
                 
                 if (nextActivity != ActivityType.UNKNOWN) {
                     currentActivityType = nextActivity
-                    lastActivityUpdateRt = timeProvider.elapsedRealtime()
+                    lastActivityUpdateRt = timeProvider.elapsedRealtime
                     Timber.d("ActivityContextProvider: Activity Recognition Update: $nextActivity (${mostProbable.confidence}%)")
                 }
             }
@@ -108,7 +107,7 @@ class ActivityContextProvider @Inject constructor(
 
     fun updateActivityHeuristic(speedMps: Double, vibe: Double, isStationary: Boolean, adaptiveVibrationFloor: Double) {
         // If we haven't had an Activity Recognition update in 2 minutes, fallback to heuristics
-        if (timeProvider.elapsedRealtime() - lastActivityUpdateRt < 120000L) return
+        if (timeProvider.elapsedRealtime - lastActivityUpdateRt < 120000L) return
 
         currentActivityType = when {
             speedMps > 10.0 -> ActivityType.IN_VEHICLE

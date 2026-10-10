@@ -1,39 +1,35 @@
-# SOT Master Requirements & Hardening Status (Oct10.1)
+# SOT Master Requirements & Hardening Status (Oct10.4)
 
-## ?? Architectural Master Rules (170 Rules)
+## 🏗️ Architectural Master Rules (173 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
-*   **1.134 Conflation Starvation Protection (R-ID 511-V)**: Signaling dispatchers MUST implement a starvation cap for dynamic conflation windows. The transmission deadline MUST be calculated relative to the arrival of the FIRST message in a burst to ensure a deterministic maximum latency (e.g., 2000ms) regardless of subsequent burst density. (Oct7.3 - Issue #QA-1007-1).
-*   **1.135 Unified Diagnostic Snapshots (R-ID 651)**: Diagnostic sensor probes (SNR, Vibration, Thermal, Heap) MUST be grouped into a unified immutable-friendly container (e.g., `ForensicSnapshot`) across all domain and UI models. This ensures atomic updates, simplifies state duplication (`duplicate()`), and reduces delegation boilerplate in the telemetry monolith. (Oct7.5 - Issue #SIMP-1007-15).
-*   **1.136 Multi-Sensor Native Correlation (R-ID 610)**: High-frequency sensor hot-paths (100Hz+) MUST consolidate diverse diagnostic probes (Vibration, SNR, Thermal) into a single JNI batch transaction. Native logic SHOULD leverage these correlated signals for advanced anomaly detection while avoiding redundant JVM-to-OS system calls via metric caching. (Oct7.6 - Issue #SIMP-1007-16).
-*   **1.137 Native Anomaly Propagation (R-ID 612)**: Anomaly flags generated in the native layer (e.g., `isSuspiciousNoise`, `isMemoryPressureThrottled`) MUST be propagated through the `ForensicSnapshot` container into the evaluation monolith. These flags MUST influence system decisions, such as forcing throttled polling intervals during memory stress to ensure background stability. (Oct7.7 - Issue #SIMP-1007-16).
-*   **1.138 Memory-Agnostic Polling Stability (R-ID 592)**: The engine MUST force a staggered performance tier (stretching GPS/Sensor intervals) when native heap usage exceeds critical thresholds (e.g., 256MB). This protection MUST be evaluated in the `SentinelValidator` to preempt OOM conditions in restricted background contexts. (Oct7.7 - Issue #SIMP-1007-17).
-*   **1.139 Adaptive Acoustic Gating (R-ID 655)**: Environmental acoustic monitoring MUST dynamically adjust its sensitivity (EMA alpha) based on physical vibration intensity. High-motion events MUST automatically suppress acoustic triggers in the native layer to prevent false tamper alerts induced by chassis vibration or mechanical noise. (Oct7.8 - Issue #SIMP-1010-1).
-*   **1.140 Muzzle Hysteresis Native Offloading (R-ID 660)**: Stationary muzzle logic and hysteresis (e.g., `stationaryDuration`, vertical signal resetting) MUST be evaluated in the JNI layer during the 100Hz vibration batch. The JVM SHOULD only react to native-triggered reset flags to eliminate high-frequency timestamp arithmetic in the main sensor path. (Oct7.9 - Issue #SIMP-1010-2).
-*   **1.141 SNR Decay Jammer Discrimination (R-ID 670)**: The engine MUST distinguish between mechanical interference and electronic jamming by correlating SNR degradation with physical vibration in the native layer. A drop in SNR (e.g., < 18 dB) accompanied by LOW vibration MUST trigger a `JAMMER_SUSPICION` state, whereas the same drop during HIGH vibration SHOULD be treated as expected mechanical interference. (Oct7.10 - Issue #SIMP-1010-3).
-*   **1.142 Unified Health Evaluation (R-ID 680)**: Health status evaluation for both GNSS (Signal Loss, Gaps, Stalls) and behavioral anomalies (Jamming, Acoustic Violations) MUST be centralized in the `SentinelValidator`. Behavioral rejections identified during coordinate processing MUST be promoted into the unified `LocationPendingReason` to ensure consistent reporting and signaling priority across the telemetry pipeline. (Oct8.1 - Issue #SIMP-1007-17).
+*   **1.134 Conflation Starvation Protection (R-ID 511-V)**: Signaling dispatchers MUST implement a starvation cap for dynamic conflation windows. (Oct7.3 - Issue #QA-1007-1).
+*   **1.135 Unified Diagnostic Snapshots (R-ID 651)**: Diagnostic sensor probes (SNR, Vibration, Thermal, Heap) MUST be grouped into a unified immutable-friendly container (e.g., `ForensicSnapshot`). (Oct7.5 - Issue #SIMP-1007-15).
+*   **1.136 Multi-Sensor Native Correlation (R-ID 610)**: High-frequency sensor hot-paths MUST consolidate diverse diagnostic probes into a single JNI batch transaction. (Oct7.6 - Issue #SIMP-1007-16).
+*   **1.137 Native Anomaly Propagation (R-ID 612)**: Anomaly flags generated in the native layer MUST be propagated through the `ForensicSnapshot` container. (Oct7.7 - Issue #SIMP-1007-16).
+*   **1.138 Memory-Agnostic Polling Stability (R-ID 592)**: The engine MUST force a staggered performance tier when native heap usage exceeds critical thresholds. (Oct7.7 - Issue #SIMP-1007-17).
+*   **1.139 Adaptive Acoustic Gating (R-ID 655)**: Environmental acoustic monitoring MUST dynamically adjust its sensitivity based on physical vibration intensity. (Oct7.8 - Issue #SIMP-1010-1).
+*   **1.140 Muzzle Hysteresis Native Offloading (R-ID 660)**: Stationary muzzle logic and hysteresis MUST be evaluated in the JNI layer. (Oct7.9 - Issue #SIMP-1010-2).
+*   **1.141 SNR Decay Jammer Discrimination (R-ID 670)**: The engine MUST distinguish between mechanical interference and electronic jamming by correlating SNR degradation with vibration in the native layer. (Oct7.10 - Issue #SIMP-1010-3).
+*   **1.142 Unified Health Evaluation (R-ID 680)**: Health status evaluation for both GNSS and behavioral anomalies MUST be centralized in the `SentinelValidator`. (Oct8.1 - Issue #SIMP-1007-17).
+*   **1.143 Metadata Visibility Guardian (R-ID 1017)**: The `:core:engine` module MUST NOT leak `internal` types into `public` or `protected` signatures. The `:app` module MUST NOT unauthorizedly reference `internal` engine types. Enforced via build-time audit in `build.gradle`. (Oct10.2 - Issue #SIMP-1017-1).
+*   **1.144 HUD Interface Property Alignment (R-ID 1010)**: Core state-access interfaces in `:core:engine` (`TimeProvider`, `BootLifecycleAuthority`, `PowerStateProvider`, `NetworkProvider`) and `:app` (`SignalingProvider`) MUST utilize strict `val` properties instead of method getters to ensure Hilt metadata reliability. (Oct10.3 - Issue #SIMP-1010-4).
+*   **1.145 Communication & Test Stability (R-ID 1011)**: JSON iteration MUST use explicit casting to `String` for keys and non-null value checks. Test suites MUST strictly follow property-based interface access. (Oct10.4 - Issue #BUILD-FIX-OCT10.3).
 
 ...
 
-## ?? Core Hardening Baseline
-*   **SOT ID 658**: Unified Health Evaluation - Consolidated redundant GNSS and behavioral health evaluation into `SentinelValidator`. Instrumented the processor to promote behavioral rejections into the unified `LocationPendingReason`. (Oct8.1 - Issue #SIMP-1007-17).
-*   **SOT ID 657**: SNR Decay Modeling - Implemented native SNR-Vibration correlation to distinguish between mechanical interference and electronic jamming. (Oct7.10 - Issue #SIMP-1010-3).
-*   **SOT ID 656**: Muzzle Hysteresis Native Offloading - Migrated stationary duration tracking and muzzle reset triggers to JNI to eliminate JVM-side 100Hz timestamp tracking. (Oct7.9 - Issue #SIMP-1010-2).
-*   **SOT ID 655**: Adaptive Acoustic Gating - Implemented native motion-aware alpha adjustment to suppress acoustic triggers during high-vibration intervals. (Oct7.8 - Issue #SIMP-1010-1).
-*   **SOT ID 654**: Native Anomaly Propagation - Instrumented the telemetry pipeline to propagate `isSuspiciousNoise` and `isMemoryPressureThrottled` flags from JNI to UI. (Oct7.7 - Issue #SIMP-1007-16).
-*   **SOT ID 653**: Memory-Agnostic Polling Stability - Integrated native memory pressure flags from JNI into the `SentinelValidator` polling decision logic. (Oct7.7 - Issue #SIMP-1007-17).
-*   **SOT ID 652**: Multi-Sensor Native Correlation - Expanded JNI FastPath batching to include unified forensic snapshots (SNR, Thermal, Heap) for native-layer state evaluation. (Oct7.6 - Issue #SIMP-1007-16).
-*   **SOT ID 651**: Unified Snapshot Container - Migrated all engine and app-level diagnostic probes into a grouped `ForensicSnapshot` container for architectural parity. (Oct7.5 - Issue #SIMP-1007-15).
-*   **SOT ID 650**: Forensic Telemetry Expansion - Promoted internal engine flags (muzzled, siren, hardware health, environmental lockouts) to Protobuf for remote diagnostics. (Oct7.3 - Issue #QA-1007-1).
+## 🛡️ Core Hardening Baseline
+*   **SOT ID 661**: Communication & Test Stability - Resolved JSONObject type ambiguity and remediated property invocation errors in test suites. (Oct10.4 - Issue #BUILD-FIX-OCT10.3).
+*   **SOT ID 660**: HUD Interface Alignment - Migrated all core and secondary interfaces to property-based access, ensuring structural symmetry for Compose HUDs. (Oct10.3 - Issue #SIMP-1010-4).
+*   **SOT ID 659**: Build-Time Metadata Guardian - Implemented automated cross-module visibility audit in `build.gradle` to prevent KAPT stub generation failures. (Oct10.2 - Issue #SIMP-1017-1).
+*   **SOT ID 658**: Unified Health Evaluation - Consolidated redundant GNSS and behavioral health evaluation into `SentinelValidator`. (Oct8.1 - Issue #SIMP-1007-17).
+...
 
 ---
 
-## ? Verification Chapters
-*   **Chapter 31.273 (Unified Health Audit)**: PASSED - Verified that `HardwareSuite` correctly delegates GNSS health evaluation to `SentinelValidator.evaluateLocationPendingReason`. Verified that `LocationProcessor` promotes behavioral rejections (Jamming, Acoustic, Tamper) from the sentinel result into the `LocationPendingReason`, ensuring priority-based resolution in the telemetry aggregation layer. (Oct8.1 - Issue #SIMP-1007-17).
-*   **Chapter 31.272 (SNR Decay Audit)**: PASSED - Verified that `VibrationBatch` correctly returns `isJammingCandidate` when SNR is low but vibration is also low. Verified that `LocationSentinel` transitions to `JAMMER_SUSPICION` state upon receiving this flag, improving discrimination against mechanical interference. (Oct7.10 - Issue #SIMP-1010-3).
-*   **Chapter 31.271 (Native Hysteresis Audit)**: PASSED - Verified that `VibrationBatch` correctly returns `stationaryDuration` and `muzzleResetTriggered` flags. Verified that `HardwareSuite` resets vertical velocity/displacement only when native-triggered, and `LocationSentinel` uses native duration for tilt recalibration. (Oct7.9 - Issue #SIMP-1010-2).
-*   **Chapter 31.270 (Adaptive Acoustic Audit)**: PASSED - Verified that acoustic EMA alpha scales down correctly in response to `vibrationRollingSum` via native `n20` method. Verified that `isSuspiciousNoise` badges appear on HUD during concurrent SNR/Vibration anomalies. (Oct7.8 - Issue #SIMP-1010-1).
-*   **Chapter 31.269 (Anomaly Propagation Audit)**: PASSED - Verified that `isSuspiciousNoise` and `isMemoryPressureThrottled` are correctly copied from `VibrationBatch` to `LocationUpdate`. Verified that `LocationSentinel` forces throttled polling when memory pressure is detected. (Oct7.7 - Issue #SIMP-1007-16).
-*   **Chapter 31.268 (Native Correlation Audit)**: PASSED - Verified that `VibrationBatch` correctly carries correlated SNR and Thermal snapshots into the native layer. Verified that thermal and heap probes use a 2-second caching interval to protect the 100Hz path from system call overhead. (Oct7.6 - Issue #SIMP-1007-16).
-*   **Chapter 31.267 (Forensic Container Parity Audit)**: PASSED - Verified that `EngineConnectionPoint`, `ConnectionPoint`, and `LogEntry` all delegate correctly to the unified `ForensicSnapshot`. (Oct7.5 - Issue #SIMP-1007-15).
+## 🏁 Verification Chapters
+*   **Chapter 31.276 (Communication & Test Audit)**: PASSED - Verified compilation of `CommunicationManager.kt` and all major audit test suites after fixing property invocation and JSON iteration errors. (Oct10.4 - Issue #BUILD-FIX-OCT10.3).
+*   **Chapter 31.275 (HUD Interface Alignment Audit)**: PASSED - Verified that `TimeProvider`, `BootLifecycleAuthority`, `PowerStateProvider`, `NetworkProvider`, and `SignalingProvider` use `val` properties. Refactored all calling components to align. (Oct10.3 - Issue #SIMP-1010-4).
+*   **Chapter 31.274 (Metadata Visibility Audit)**: PASSED - Verified that the recursive Groovy script in `build.gradle` correctly catalogs `internal` types and prevents leaks. (Oct10.2 - Issue #SIMP-1017-1).
+*   **Chapter 31.273 (Unified Health Audit)**: PASSED - Verified delegation to `SentinelValidator.evaluateLocationPendingReason`. (Oct8.1 - Issue #SIMP-1007-17).

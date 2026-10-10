@@ -4,11 +4,9 @@ import kotlin.math.max
 
 /**
  * ViolationProcessor: Pure logic for evaluating and deduplicating violations.
- * v8.9.75:
- * - Issue #014: Type Safety Optimization. Standardized parameters to Double 
- *   to eliminate redundant toDouble()/toFloat() conversions.
- * v8.9.42:
- * - Issue #325: Authoritative Spatial Anchoring.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
  */
 class ViolationProcessor(private val timeProvider: TimeProvider) {
 
@@ -27,7 +25,7 @@ class ViolationProcessor(private val timeProvider: TimeProvider) {
         accuracy: Double,
         maxAccuracy: Double
     ): Boolean {
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         
         val gate = max(10.0, maxAccuracy)
 

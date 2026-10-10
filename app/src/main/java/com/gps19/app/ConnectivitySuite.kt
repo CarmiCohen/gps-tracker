@@ -21,12 +21,9 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
- * Oct.10.2:
+ * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
- *   TimeProvider API.
- * Oct.6.10:
- * - Issue #AUDIT-1006-9: Fixed Coordinate Reconstruction. Ensured floating-point 
- *   precision when converting E7 deltas back to doubles (Rule 1.125).
+ *   TimeProvider and SignalingProvider APIs. Fixed bulk property invocation errors.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -270,7 +267,7 @@ class ConnectivitySuite @Inject constructor(
                 val delayMs = if (isUltra) 300000L else 30000L
                 delay(delayMs)
 
-                if (isTrackerMode && isConnected() && !isStopped.get()) {
+                if (isTrackerMode && isConnected && !isStopped.get()) {
                     if (localStatusFlyweight.ts > 0 && !hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) {
                         Timber.d("ConnectivitySuite: Issuing Bypass Heartbeat to stabilize peer link.")
                         sendTelemetryInternal(localStatusFlyweight, SignalingPriority.NORMAL)
@@ -281,8 +278,8 @@ class ConnectivitySuite @Inject constructor(
     }
 
     private fun calculateNextRejoinDelay(): Long {
-        if (signalingProvider.isConnected()) reconnectAttempt = 0
-        return hardwareSuite.calculateNextBackoff(reconnectAttempt, signalingProvider.isConnected())
+        if (signalingProvider.isConnected) reconnectAttempt = 0
+        return hardwareSuite.calculateNextBackoff(reconnectAttempt, signalingProvider.isConnected)
     }
 
     private fun startIdentitySyncLoop() {
@@ -290,7 +287,7 @@ class ConnectivitySuite @Inject constructor(
         identitySyncJob = scope.launch {
             while (isActive) {
                 delay(60000) 
-                if (isConnected() && !isStopped.get()) {
+                if (isConnected && !isStopped.get()) {
                     if (hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) {
                         Timber.d("ConnectivitySuite: Identity sync deferred (Doze active)")
                         continue
@@ -335,7 +332,7 @@ class ConnectivitySuite @Inject constructor(
             }
 
             val nowRt = timeProvider.elapsedRealtime
-            if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
+            if (!signalingProvider.isConnected && !signalingProvider.isConnecting) {
                 val delay = calculateNextRejoinDelay()
                 if (nowRt - lastReconnectTs > delay) {
                     withContext(Dispatchers.Default) {
@@ -364,8 +361,8 @@ class ConnectivitySuite @Inject constructor(
             var wasConnected = false
             
             while (isActive) {
-                val currentRtt = signalingProvider.getRtt()
-                val isCurrentlyConnected = isConnected()
+                val currentRtt = signalingProvider.rtt
+                val isCurrentlyConnected = isConnected
                 val inViolation = sessionManager.isInViolation
                 
                 if (isCurrentlyConnected) {
@@ -437,7 +434,7 @@ class ConnectivitySuite @Inject constructor(
     }
 
     private fun sendTelemetryInternal(status: LocationUpdate, priority: SignalingPriority): Boolean {
-        if (!isConnected()) return false
+        if (!isConnected) return false
         if (hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) return false
         signalingProvider.transmit(status, priority, fromViewer = !isTrackerMode)
         return true
@@ -688,7 +685,7 @@ class ConnectivitySuite @Inject constructor(
         heartbeatJob?.cancel(); heartbeatJob = null
         scope.cancel()
         
-        networkProvider.registerListener(networkListener)
+        networkProvider.unregisterListener(networkListener)
         
         val sigStart = timeProvider.elapsedRealtime
         signalingProvider.disconnect() 
@@ -703,8 +700,8 @@ class ConnectivitySuite @Inject constructor(
         """.trimIndent())
     }
 
-    fun isConnected() = signalingProvider.isConnected()
-    fun getRtt() = signalingProvider.getRtt()
+    val isConnected get() = signalingProvider.isConnected
+    val rtt get() = signalingProvider.rtt
     fun clearRtt() = signalingProvider.clearRtt()
     
     fun emit(event: String, data: JSONObject, priority: SignalingPriority = SignalingPriority.NORMAL) { 
@@ -734,7 +731,7 @@ class ConnectivitySuite @Inject constructor(
             val start = timeProvider.elapsedRealtime
             var count = 0
             while (timeProvider.elapsedRealtime - start < 10000) {
-                if (signalingProvider.isConnected()) {
+                if (signalingProvider.isConnected) {
                     signalingProvider.disconnect()
                 } else {
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
@@ -744,7 +741,7 @@ class ConnectivitySuite @Inject constructor(
             }
             domainEventBus.emit(DomainEvent.ServiceStatus("NETWORK STRESS TEST: Flapping burst complete ($count transitions).", isImportant = true))
             
-            if (!signalingProvider.isConnected()) {
+            if (!signalingProvider.isConnected) {
                 signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
             }
         }

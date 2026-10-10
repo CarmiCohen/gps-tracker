@@ -26,11 +26,12 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Fixed bulk property invocation 
+ *   errors for TimeProvider and ConnectivitySuite.
  * Oct.10.2:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
  *   TimeProvider API. Fixed TRACKER_ACOUSTIC_FLOOR_KEY typo.
- * Oct.10.1:
- * - Issue #SIMP-1014-2: Unified Pressure Path. Handled TriggerStoragePrune command.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -470,7 +471,7 @@ class MonitorService : BaseMonitorService() {
         integrityMonitor.pollSystemStatus(now, nowRt); integrityMonitor.checkInternetIntegrity(nowRt)
         val health = integrityMonitor.currentHealth; val hSnapshot = hardwareSuite.consumeLogicSnapshot()
 
-        val isSocketConnected = connectivitySuite.isConnected(); connectivitySuite.updateRelayStatus(isSocketConnected)
+        val isSocketConnected = connectivitySuite.isConnected; connectivitySuite.updateRelayStatus(isSocketConnected)
         val isPeerActive = if (isTrackerMode) (sessionManager.getViewerCount() > 0 || isRecentUiPulse()) else (connectivitySuite.lastPeerActivityTs > 0 && (nowRt - connectivitySuite.lastPeerActivityTs < WATCH_TIMEOUT_MS))
 
         val evaluationSnapshot = EnginePools.LOCATION_UPDATE.acquire().apply {
@@ -607,7 +608,7 @@ class MonitorService : BaseMonitorService() {
         domainEventBus.emit(DomainEvent.TickEvaluated(
             now = now, nowRt = nowRt, isTrackerMode = isTrackerMode, snapshot = evaluationSnapshot,
             processed = lastProcessedLocation, health = health, isSocketConnected = isSocketConnected, isPeerActive = isPeerActive,
-            serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.getRtt(), recoveryFlagged = recoveryFlagged,
+            serviceTickCounter = serviceTickCounter, rtt = connectivitySuite.rtt, recoveryFlagged = recoveryFlagged,
             gnssDetail = latestGnssDetail, isSuspiciousMode = isSuspiciousMode,
             lastSitTs = primaryProcessor.getLastSitTs(), lastTickTs = lastServiceTickTs, lastTickRt = lastServiceTickRealtime
         ))

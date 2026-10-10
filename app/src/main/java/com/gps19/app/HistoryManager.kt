@@ -18,10 +18,9 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
- * Oct.10.1 (Restoration Path):
- * - Issue #SIMP-1014-2: Unified Pressure Path. Added pruneStorage() to 
- *   support JNI-triggered aggressive cleanup.
- * - Issue #SIMP-1011-3: Forensic Buffer Consolidation. Standardized on ForensicSample.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
  */
 @Singleton
 class HistoryManager @Inject constructor(
@@ -59,7 +58,7 @@ class HistoryManager @Inject constructor(
         withContext(Dispatchers.IO) {
             val lastSitTs = repository.getLong(currentRole, LAST_SIT_TS_KEY, 0L)
             if (lastSitTs > 0) {
-                 lastSitDetectedRt = timeProvider.elapsedRealtime() - (timeProvider.currentTimeMillis() - lastSitTs)
+                 lastSitDetectedRt = timeProvider.elapsedRealtime - (timeProvider.currentTimeMillis - lastSitTs)
             }
             clockDriftRef = repository.getLong(currentRole, CLOCK_DRIFT_REF_KEY, 0L)
             lastProcessedHour = repository.getInt(LAST_AUTO_SAVE_HOUR_KEY, -1)
@@ -71,8 +70,8 @@ class HistoryManager @Inject constructor(
      * recoverLastRealtime: Provides reboot-aware monotonic clock recovery.
      */
     fun recoverLastRealtime(lastTs: Long, recoveredDrift: Long): Long {
-        val now = timeProvider.currentTimeMillis()
-        val nowRt = timeProvider.elapsedRealtime()
+        val now = timeProvider.currentTimeMillis
+        val nowRt = timeProvider.elapsedRealtime
         val currentDrift = now - nowRt
         
         val effectiveDrift = if (recoveredDrift != 0L && abs(currentDrift - recoveredDrift) < DRIFT_TOLERANCE_MS) {
@@ -258,7 +257,7 @@ class HistoryManager @Inject constructor(
     }
 
     private fun detectClockTampering(nowWall: Long) {
-        val monotonic = timeProvider.elapsedRealtime()
+        val monotonic = timeProvider.elapsedRealtime
         val currentDrift = nowWall - monotonic
         if (clockDriftRef == 0L) {
             clockDriftRef = currentDrift

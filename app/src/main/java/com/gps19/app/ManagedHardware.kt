@@ -21,9 +21,9 @@ import timber.log.Timber
 /**
  * ManagedUnregistrationHelper: Centralized logic for safe unregistration
  * of hardware listeners. 
- * Sep.28.11:
- * - Issue #1359: Temporal Precision & Service Logic Hardening. Migrated 
- *   unregistration duration monitoring to use centralized timeProvider.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 object ManagedUnregistrationHelper {
     fun safeUnregister(
@@ -35,10 +35,10 @@ object ManagedUnregistrationHelper {
         Timber.d("$label: Starting unregistration...")
 
         if (handler == null || Looper.myLooper() == handler.looper) {
-            val startTime = timeProvider.elapsedRealtime()
+            val startTime = timeProvider.elapsedRealtime
             try {
                 action()
-                Timber.d("$label: Immediate unregistration complete in ${timeProvider.elapsedRealtime() - startTime}ms.")
+                Timber.d("$label: Immediate unregistration complete in ${timeProvider.elapsedRealtime - startTime}ms.")
             } catch (e: Exception) {
                 Timber.e(e, "$label: Immediate unregistration failed")
             }
@@ -46,13 +46,13 @@ object ManagedUnregistrationHelper {
         }
 
         handler.post {
-            val taskStartTime = timeProvider.elapsedRealtime()
+            val taskStartTime = timeProvider.elapsedRealtime
             try {
                 action()
-                val duration = timeProvider.elapsedRealtime() - taskStartTime
+                val duration = timeProvider.elapsedRealtime - taskStartTime
                 Timber.d("$label: Async unregistration complete in ${duration}ms.")
             } catch (e: Exception) {
-                Timber.e(e, "$label: Async unregistration failed after ${timeProvider.elapsedRealtime() - taskStartTime}ms")
+                Timber.e(e, "$label: Async unregistration failed after ${timeProvider.elapsedRealtime - taskStartTime}ms")
             }
         }
     }

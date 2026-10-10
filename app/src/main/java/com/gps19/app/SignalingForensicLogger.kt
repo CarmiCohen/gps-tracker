@@ -10,19 +10,9 @@ import javax.inject.Singleton
 /**
  * SignalingForensicLogger: Decouples signaling-specific forensic logging 
  * and throttling from the main ConnectivitySuite.
- * Sep.30.4:
- * - Alignment: Updated to alignment Sep.30.4.
- * Sep.29.3:
- * - Issue #1378: Added force parameter to logTransmissionFailure and logHandover
- *   to guarantee test probe recording under concurrent background network activity.
- * Sep.26.11:
- * - Issue #1343: Signaling Lifecycle Probes. Added throttled logging for 
- *   transmission failures and interface handovers (R-ID 334).
- * - Issue #1343: Fixed throttling logic to ensure the first event after 
- *   initialization (or reset) is always logged.
- * Sep.14.47:
- * - Forensic Decoupling (#1039): Extracted drop and latency logging to 
- *   reduce ConnectivitySuite complexity (R-ID 333).
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 @Singleton
 class SignalingForensicLogger @Inject constructor(
@@ -38,7 +28,7 @@ class SignalingForensicLogger @Inject constructor(
      * logDrop: Throttled logging for packet rejection events (R-ID 332).
      */
     fun logDrop(tag: String, reason: String?, id: String, viewerId: String, mode: String, ownD: String, ownV: String, extra: String? = null) {
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         if (lastDropLogTs == 0L || nowRt - lastDropLogTs > 10000L) {
             lastDropLogTs = nowRt
             val logMsg = "Forensic drop [$tag]: reason=$reason id=$id viewerId=$viewerId${if (extra != null) " type=$extra" else ""}"
@@ -53,7 +43,7 @@ class SignalingForensicLogger @Inject constructor(
      * logHighLatency: Throttled logging for RTT spikes.
      */
     fun logHighLatency(rtt: Long, threshold: Int) {
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         if (lastHighRttLogTs == 0L || nowRt - lastHighRttLogTs > 10000L) {
             lastHighRttLogTs = nowRt
             logManagerProvider.get().submitToLogSink("High latency spike detected: RTT=$rtt ms (Threshold: $threshold)", "high_latency", isImportant = false)
@@ -64,7 +54,7 @@ class SignalingForensicLogger @Inject constructor(
      * logTransmissionFailure: Throttled audit of outbound signaling failures.
      */
     fun logTransmissionFailure(reason: String, mode: String, deviceId: String, viewerId: String, force: Boolean = false) {
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         if (force || lastTxFailureLogTs == 0L || nowRt - lastTxFailureLogTs > 15000L) {
             if (!force) lastTxFailureLogTs = nowRt
             val logMsg = "Forensic TX Failure: $reason (Mode: $mode, D:$deviceId, V:$viewerId)"
@@ -77,7 +67,7 @@ class SignalingForensicLogger @Inject constructor(
      * logHandover: Records network interface transitions in the forensic trace.
      */
     fun logHandover(status: String, interfaceName: String?, force: Boolean = false) {
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         if (force || lastHandoverLogTs == 0L || nowRt - lastHandoverLogTs > 5000L) {
             if (!force) lastHandoverLogTs = nowRt
             val msg = "Forensic Handover: $status (${interfaceName ?: "unknown"})"

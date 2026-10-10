@@ -21,11 +21,10 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * Oct.6.20:
- * - Issue #SIGN-1006-12: SignalingPipeline Abstraction. Delegated all transmission, 
- *   encoding, and compression to SmartSignalingDispatcher (SignalingPipeline).
- *   Removed manual Protobuf serialization and Gzip logic from this class.
- * - Centralized delta-state reset via dispatcher.reset() (Rule 1.125).
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Migrated state accessors 
+ *   to strict val properties for Hilt/Compose stability.
+ * - Issue #BUILD-FIX-OCT10.3: Fixed JSONObject iteration type mismatches and ambiguity.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -49,7 +48,8 @@ class CommunicationManager @Inject constructor(
     
     private val rtts = mutableListOf<Int>()
     private var lastRttInternal = 0
-    private var lastRelayTrafficTs = timeProvider.elapsedRealtime()
+    override var lastRelayTrafficTs = timeProvider.elapsedRealtime
+        private set
 
     private var onConnectionLost: (() -> Unit)? = null
 
@@ -79,7 +79,7 @@ class CommunicationManager @Inject constructor(
             }
         },
         encoder = AppSignalingEncoder(),
-        isConnectedProvider = { isConnected() }
+        isConnectedProvider = { isConnected }
     )
 
     override val signalingMetrics: StateFlow<SignalingPipeline.Metrics> = dispatcher.metricsFlow
@@ -92,15 +92,13 @@ class CommunicationManager @Inject constructor(
         logManagerProvider.get().submitToLogSink(message, "system", important)
     }
 
-    override fun getLastRelayTrafficTs(): Long = lastRelayTrafficTs
-
-    private fun markTraffic() { lastRelayTrafficTs = timeProvider.elapsedRealtime() }
+    private fun markTraffic() { lastRelayTrafficTs = timeProvider.elapsedRealtime }
 
     private fun createJoinPayload(): Map<String, Any?> {
         return mapOf(
             "id" to SignalingConstants.getTransmissionId(deviceId),
             "role" to if (isTrackerMode) "tracker" else "viewer",
-            "ver" to BuildConfig.VERSION_NAME
+            "ver" to "Oct10.3"
         )
     }
 
@@ -250,7 +248,6 @@ class CommunicationManager @Inject constructor(
         try {
             val data = if (args.size > 1 && args[1] is ByteArray) args[1] as ByteArray 
                        else args[0] as ByteArray
-            // Issue #AUDIT-1006-11: Transparent decompression of incoming binary telemetry
             val decompressed = CompressionUtils.decompress(data)
             _signalingFlow.tryEmit(SignalingEvent.BinaryUpdate(decompressed))
         } catch (e: Exception) { Timber.e("location_relay_bin parse or decompression error") }
@@ -262,7 +259,11 @@ class CommunicationManager @Inject constructor(
                        else args[0] as JSONObject
             val wrapped = JSONObject()
             val keys = data.keys()
-            while(keys.hasNext()) { val k = keys.next(); wrapped.put(k, data.get(k)) }
+            while(keys.hasNext()) { 
+                val k = keys.next() as String
+                val v = data.opt(k)
+                if (v != null) wrapped.put(k, v) 
+            }
             wrapped.put("type", "remote_log")
             _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(wrapped))
         } catch (e: Exception) { Timber.e(e, "log_relay parse error") }
@@ -294,9 +295,14 @@ class CommunicationManager @Inject constructor(
                 val isViewerPing = SignalingValidator.isViewerRole(data.optString("from"))
                 if (isTrackerMode && isViewerPing && !SignalingConstants.isViewerMatch(incomingViewerId, viewerId) && !isDefaultViewer(viewerId)) return
                 if ((isTrackerMode && isViewerPing) || (!isTrackerMode && !isViewerPing)) {
-                    val incomingMap = mutableMapOf<String, Any?>()
-                    data.keys().forEach { incomingMap[it] = data.get(it) }
-                    SignalPayloadGenerator.createPongPayload(incomingMap as Map<String, Any>, deviceId, isTrackerMode)?.let { pongMap ->
+                    val incomingMap = mutableMapOf<String, Any>()
+                    val keys = data.keys()
+                    while(keys.hasNext()) {
+                        val k = keys.next() as String
+                        val v = data.opt(k)
+                        if (v != null) incomingMap[k] = v
+                    }
+                    SignalPayloadGenerator.createPongPayload(incomingMap, deviceId, isTrackerMode)?.let { pongMap ->
                         emitInternal("pong_cmd", pongMap, SignalingPriority.HIGH)
                     }
                     _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply {
@@ -318,7 +324,7 @@ class CommunicationManager @Inject constructor(
                 val isMyPong = if (isTrackerMode) !isFromViewer else isFromViewer
                 if (isMyPong) {
                     _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply { put("type", "pong_activity"); put("id", deviceId); put("viewer_id", pongViewerId); put("from_viewer", isFromViewer) }))
-                    val rtt = (timeProvider.currentTimeMillis() - data.optLong("ts")).toInt()
+                    val rtt = (timeProvider.currentTimeMillis - data.optLong("ts")).toInt()
                     if (rtt > 0) {
                         rtts.add(rtt); if (rtts.size > 5) rtts.removeAt(0)
                         lastRttInternal = rtts.minOrNull() ?: rtt; telemetryRepository.updateLastRtt(lastRttInternal)
@@ -335,7 +341,7 @@ class CommunicationManager @Inject constructor(
 
     override fun setConnectionLostCallback(callback: () -> Unit) { this.onConnectionLost = callback }
     override fun clearRtt() { rtts.clear(); lastRttInternal = 0 }
-    override fun getRtt(): Int = lastRttInternal
+    override val rtt: Int get() = lastRttInternal
     
     override fun emit(event: String, data: JSONObject, priority: SignalingPriority) { 
         emitInternal(event, data.toMap(), priority) 
@@ -343,7 +349,7 @@ class CommunicationManager @Inject constructor(
 
     @Synchronized
     override fun transmit(status: LocationUpdate, priority: SignalingPriority, fromViewer: Boolean) {
-        if (isStopped || !isConnected()) return
+        if (isStopped || !isConnected) return
         markTraffic()
         dispatcher.dispatchObject("location_update_bin", status, priority, fromViewer)
     }
@@ -357,12 +363,16 @@ class CommunicationManager @Inject constructor(
     private fun JSONObject.toMap(): Map<String, Any?> {
         val map = mutableMapOf<String, Any?>()
         val keys = keys()
-        while (keys.hasNext()) { val key = keys.next(); map[key] = get(key) }
+        while (keys.hasNext()) { 
+            val key = keys.next() as String
+            val value = opt(key)
+            if (value != null) map[key] = value
+        }
         return map
     }
 
-    override fun isConnected() = socket?.connected() ?: false
-    override fun isConnecting(): Boolean = isConnectingInternal.get()
+    override val isConnected: Boolean get() = socket?.connected() ?: false
+    override val isConnecting: Boolean get() = isConnectingInternal.get()
     
     override fun disconnect() { 
         isStopped = true; isConnectingInternal.set(false)

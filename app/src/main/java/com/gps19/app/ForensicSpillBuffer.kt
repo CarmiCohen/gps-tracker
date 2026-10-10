@@ -16,6 +16,14 @@ import java.util.zip.CRC32
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * ForensicSpillBuffer: High-performance memory-mapped circular buffer for forensic traces.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
+ * Oct.10.4:
+ * - Build Fix: Restored missing deviceId/viewerId parameters in LogEntity instantiation.
+ */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -66,7 +74,6 @@ class ForensicSpillBuffer @Inject constructor(
 
     init {
         try {
-            val exists = spillFile.exists()
             val size = (FORENSIC_SPILL_CAPACITY * FORENSIC_SPILL_ENTRY_SIZE_V5).toLong() + HEADER_SIZE
             RandomAccessFile(spillFile, "rw").use { raf ->
                 mappedBuffer = raf.channel.map(FileChannel.MapMode.READ_WRITE, 0, size).apply {
@@ -119,8 +126,7 @@ class ForensicSpillBuffer @Inject constructor(
         buffer.putInt(OFF_COUNT, 0)
         buffer.putInt(OFF_READ_IDX, 0)
         
-        val now = System.currentTimeMillis()
-        buffer.putLong(OFF_BASE_TS, now)
+        buffer.putLong(OFF_BASE_TS, timeProvider.currentTimeMillis)
         buffer.putDouble(OFF_BASE_LAT, 0.0)
         buffer.putDouble(OFF_BASE_LNG, 0.0)
         
@@ -196,8 +202,6 @@ class ForensicSpillBuffer @Inject constructor(
                 buffer.position(offset)
                 buffer.put(entryWriteBuffer.array())
                 
-                Timber.w("DEBUG_WRITE: msgLen=$msgLen, maxMsgLen=$maxMsgLen, bytes=${entryWriteBuffer.array().take(60).joinToString { it.toString() }}")
-
                 advanceWritePointer(buffer)
                 true
             }
@@ -269,7 +273,7 @@ class ForensicSpillBuffer @Inject constructor(
         buffer.putInt(OFF_WRITE_IDX, nextWrite)
         val newCount = totalCount.incrementAndGet()
         buffer.putInt(OFF_COUNT, newCount)
-        buffer.putLong(OFF_LAST_WRITE_RT, timeProvider.elapsedRealtime())
+        buffer.putLong(OFF_LAST_WRITE_RT, timeProvider.elapsedRealtime)
     }
 
     fun peekToEntities(limit: Int): List<LogEntity> {
@@ -303,8 +307,6 @@ class ForensicSpillBuffer @Inject constructor(
                     
                     val storedCrc = readEntryWrapper.getInt(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
                     
-                    Timber.w("DEBUG_READ: storedCrc=$storedCrc, calcCrc=${readCrc.value.toInt()}, bytes=${readEntryBytes.take(60).joinToString { it.toString() }}")
-
                     if (storedCrc == readCrc.value.toInt()) {
                         val ts = readEntryWrapper.getLong()
                         val lat = readEntryWrapper.getDouble()

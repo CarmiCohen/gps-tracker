@@ -14,16 +14,9 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
- * Oct.7.4:
- * - Issue #SIMP-1007-15: Unified Snapshot Container. Refactored conflation 
- *   logic to use the new ForensicSnapshot container in LocationUpdate.
- * Oct.7.3:
- * - Issue #QA-1007-1: Hardened Conflation against starvation. Added firstEntryTs 
- *   to ConflationBucket to ensure MAX_CONFLATION_DELAY_MS is enforced relative 
- *   to the initial message arrival, preventing indefinite deadline extension.
- * Oct.6.23:
- * - Issue #SIGN-1006-13: Consolidated Conflation Logic. Migrated field-level 
- *   conflation strategies from SignalingMessageConflator into internal handlers. 
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
  */
 class SmartSignalingDispatcher(
     private var scope: CoroutineScope,
@@ -32,8 +25,8 @@ class SmartSignalingDispatcher(
     private val encoder: SignalingEncoder,
     private val isConnectedProvider: () -> Boolean,
     private val timeProvider: TimeProvider = object : TimeProvider {
-        override fun currentTimeMillis() = System.currentTimeMillis()
-        override fun elapsedRealtime() = System.currentTimeMillis()
+        override val currentTimeMillis: Long get() = System.currentTimeMillis()
+        override val elapsedRealtime: Long get() = System.currentTimeMillis()
     },
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default
 ) : SignalingPipeline {
@@ -125,7 +118,7 @@ class SmartSignalingDispatcher(
                     }
 
                     if (command.priority == SignalingPriority.NORMAL) {
-                        val now = timeProvider.currentTimeMillis()
+                        val now = timeProvider.currentTimeMillis
                         val delayMs = if (isViolationProvider()) SIGNALING_EMIT_DELAY_VIOLATION_MS else SIGNALING_EMIT_DELAY_MS
                         val elapsed = now - lastNormalEmitTs
                         if (elapsed < delayMs) {
@@ -140,7 +133,7 @@ class SmartSignalingDispatcher(
                                 continue
                             }
                         }
-                        lastNormalEmitTs = timeProvider.currentTimeMillis()
+                        lastNormalEmitTs = timeProvider.currentTimeMillis
                     }
 
                     emit(command)
@@ -161,7 +154,7 @@ class SmartSignalingDispatcher(
                     conflationSignal.receive()
                     
                     while (isActive) {
-                        val now = timeProvider.currentTimeMillis()
+                        val now = timeProvider.currentTimeMillis
                         var nextCheck = Long.MAX_VALUE
                         
                         // Check Location Map
@@ -338,7 +331,7 @@ class SmartSignalingDispatcher(
     }
 
     private fun <T> updateBucketSchedule(bucket: ConflationBucket<T>, delayMultiplier: Int = 1) {
-        val now = timeProvider.currentTimeMillis()
+        val now = timeProvider.currentTimeMillis
         if (bucket.scheduledTs.get() == 0L) {
             bucket.firstEntryTs.set(now)
             val delayMs = calculateDelay(bucket.burstCount.get()) * delayMultiplier

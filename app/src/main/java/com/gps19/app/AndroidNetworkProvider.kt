@@ -20,12 +20,12 @@ import javax.inject.Singleton
  * AndroidNetworkProvider: Production implementation of NetworkProvider 
  * using ConnectivityManager.NetworkCallback.
  * 
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Implemented isNetworkAvailable 
+ *   property for unified state access.
  * Sep.28.12:
  * - Issue #1360: Mismatched unregistration signatures. Injected TimeProvider
  *   to comply with updated ManagedNetworkCallback.unregister requirement.
- * Sep.16.11 Fix (#20): Resolved race condition in asynchronous unregistration.
- * All registration state transitions are now serialized on the Main Looper
- * to prevent overlapping platform calls during rapid listener toggling.
  */
 @Singleton
 class AndroidNetworkProvider @Inject constructor(
@@ -37,6 +37,13 @@ class AndroidNetworkProvider @Inject constructor(
     private val listeners = mutableSetOf<NetworkListener>()
     private val mainHandler = Handler(Looper.getMainLooper())
     
+    override val isNetworkAvailable: Boolean
+        get() {
+            val network = connectivityManager.activeNetwork ?: return false
+            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+            return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        }
+
     private val networkCallback = object : ManagedNetworkCallback() {
         override fun onAvailable(network: Network) {
             synchronized(listeners) {
@@ -109,7 +116,6 @@ class AndroidNetworkProvider @Inject constructor(
     }
 
     private fun performUnregistration() {
-        // ManagedNetworkCallback.unregister executes synchronously if already on mainHandler's looper.
         networkCallback.unregister(connectivityManager, timeProvider, mainHandler)
         isRegistered = false
         Timber.d("AndroidNetworkProvider: Unregistered callback")

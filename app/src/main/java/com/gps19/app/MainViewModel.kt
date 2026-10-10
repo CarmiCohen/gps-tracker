@@ -21,14 +21,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
- * Oct.7.8:
- * - Issue #SIMP-1010-1: Adaptive Acoustic Gating. Mapped isSuspiciousNoise and 
- *   isMemoryPressureThrottled into DashboardHealthState for HUD visibility.
- *   Fixed isGpsActive compilation error in mapDashboardTelemetry.
- * Oct.6.9:
- * - Issue #AUDIT-1006-9 (SIMP-1426-6): Reactive Metrics. Replaced periodic polling 
- *   of signaling metrics with a reactive observation of repository.signalingMetrics 
- *   to reduce binder traffic and improve UI reactivity (Rule 2.1).
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -102,7 +97,7 @@ class MainViewModel @Inject constructor(
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
-    private val _systemPulseRt = MutableStateFlow(timeProvider.elapsedRealtime())
+    private val _systemPulseRt = MutableStateFlow(timeProvider.elapsedRealtime)
     override val systemPulseRt: StateFlow<Long> = _systemPulseRt.asStateFlow()
 
     private val _rtt = MutableStateFlow(0)
@@ -182,8 +177,8 @@ class MainViewModel @Inject constructor(
         val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
         DashboardState(
             mapDashboardConnectivity(mode, diag, pulseRt),
-            mapDashboardTelemetry(mode, kin, pulseRt, state, isUltra),
-            mapDashboardHealth(mode, kin, diag, diag.battery.temp, tMax, pulseRt)
+            mapDashboardTelemetry(mode, kinematic.value, pulseRt, state, isUltra),
+            mapDashboardHealth(mode, kinematic.value, diag, diag.battery.temp, tMax, pulseRt)
         )
     }
     .distinctUntilChanged()
@@ -290,7 +285,7 @@ class MainViewModel @Inject constructor(
                     stateSubscriptionUseCase.findClosestTrailPoint(trail, ts)?.let { bp -> 
                         updateKinematicState { it.apply { 
                             replayCursorPos = bp.toGeoPoint()
-                            pulse = timeProvider.elapsedRealtime() 
+                            pulse = timeProvider.elapsedRealtime 
                         } } 
                     }
                 }
@@ -311,13 +306,13 @@ class MainViewModel @Inject constructor(
             }
             launch { 
                 stateSubscriptionUseCase.observeInternetStatus().collect { online -> 
-                    updateDiagnosticState { it.apply { connectivity.isLocalOnline = online; pulse = timeProvider.elapsedRealtime() } } 
+                    updateDiagnosticState { it.apply { connectivity.isLocalOnline = online; pulse = timeProvider.elapsedRealtime } } 
                 } 
             }
             launch { 
                 stateSubscriptionUseCase.observeConnectivityBasics().collect { update -> 
                     _rtt.value = update.lastRtt
-                    updateDiagnosticState { it.apply { connectivity.isRelayConnected = update.isRelayConnected; connectivity.lastRemoteActivityTs = update.lastRemoteActivityTs; recoveryCount = update.recoveryCount; cumulativeRecoveryBlackoutMs = update.cumulativeRecoveryBlackoutMs; pulse = timeProvider.elapsedRealtime() } } 
+                    updateDiagnosticState { it.apply { connectivity.isRelayConnected = update.isRelayConnected; connectivity.lastRemoteActivityTs = update.lastRemoteActivityTs; recoveryCount = update.recoveryCount; cumulativeRecoveryBlackoutMs = update.cumulativeRecoveryBlackoutMs; pulse = timeProvider.elapsedRealtime } } 
                 } 
             }
             launch { 
@@ -327,7 +322,7 @@ class MainViewModel @Inject constructor(
                         if (update.activeAlarms.any { !it.isResolved && !it.isSirenDisabled } && _uiState.value.session.isSystemActive && _uiState.value.session.appMode == "viewer") { 
                             if (!current.isRedScreenVisible) current.isRedScreenVisible = true 
                         }
-                        current.pulse = timeProvider.elapsedRealtime()
+                        current.pulse = timeProvider.elapsedRealtime
                         current 
                     } 
                 } 
@@ -337,19 +332,19 @@ class MainViewModel @Inject constructor(
                     updateDiagnosticState { current -> 
                         current.battery.level = status.level
                         current.battery.temp = status.temp
-                        current.apply { pulse = timeProvider.elapsedRealtime() } 
+                        current.apply { pulse = timeProvider.elapsedRealtime } 
                     }
                     _currentMa.value = status.level 
                 } 
             }
             launch { 
                 repository.localLocation.collect { update -> 
-                    val nowMs = timeProvider.currentTimeMillis()
+                    val nowMs = timeProvider.currentTimeMillis
                     val mode = _uiState.value.session.appMode
                     updateKinematicState { current -> 
                         telemetryUseCase.mapLocalLocation(update, current.localLocation, nowMs, _uiState.value.session.appStartTime)
                         telemetryUseCase.mapHealthFromUpdate(update, current.localHealth)
-                        current.apply { pulse = timeProvider.elapsedRealtime() } 
+                        current.apply { pulse = timeProvider.elapsedRealtime } 
                     }
                     if (mode == "tracker") {
                         _trackerState.value = update.trackerState
@@ -359,7 +354,7 @@ class MainViewModel @Inject constructor(
             }
             launch { 
                 remoteStatusRepository.remoteStatus.collect { status -> 
-                    val nowMs = timeProvider.currentTimeMillis()
+                    val nowMs = timeProvider.currentTimeMillis
                     val mode = _uiState.value.session.appMode
                     _remoteSignal.value = remoteStatusRepository.peerSignal.value
                     if (mode != "tracker") _trackerState.value = status.trackerState
@@ -367,13 +362,13 @@ class MainViewModel @Inject constructor(
                     updateKinematicState { current -> 
                         telemetryUseCase.mapTrackerLocation(status, current.trackerLocation, nowMs, _uiState.value.session.appStartTime)
                         telemetryUseCase.mapHealthFromUpdate(status, current.trackerHealth)
-                        current.apply { pulse = timeProvider.elapsedRealtime() } 
+                        current.apply { pulse = timeProvider.elapsedRealtime } 
                     }
                     updateDiagnosticState { it.apply { 
                         trackerBattery.level = status.battery
                         trackerBattery.temp = status.temp
                         trackerIsGnssThrottled = status.isGnssThrottled
-                        pulse = timeProvider.elapsedRealtime() 
+                        pulse = timeProvider.elapsedRealtime 
                     } } 
                 } 
             }
@@ -387,7 +382,7 @@ class MainViewModel @Inject constructor(
             }
             launch { 
                 sirenLockoutUseCase.silencedUntilRt.collect { ts -> 
-                    updateDiagnosticState { it.apply { silencedUntilRt = ts; isAlarmSilenced = sirenLockoutUseCase.isLockedOut(); pulse = timeProvider.elapsedRealtime() } } 
+                    updateDiagnosticState { it.apply { silencedUntilRt = ts; isAlarmSilenced = sirenLockoutUseCase.isLockedOut(); pulse = timeProvider.elapsedRealtime } } 
                 } 
             }
             // Issue #AUDIT-1006-9: Reactive signaling metrics
@@ -395,7 +390,7 @@ class MainViewModel @Inject constructor(
                 repository.signalingMetrics.collect { metrics ->
                     updateDiagnosticState { it.apply { 
                         signalingMetrics = metrics
-                        pulse = timeProvider.elapsedRealtime() 
+                        pulse = timeProvider.elapsedRealtime 
                     } }
                 }
             }
@@ -423,7 +418,7 @@ class MainViewModel @Inject constructor(
     private fun startGlobalTimer() { 
         viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) { 
             while (true) { 
-                val nowRt = timeProvider.elapsedRealtime()
+                val nowRt = timeProvider.elapsedRealtime
                 if (_uiState.value.isInitialized && _uiState.value.session.appMode != null) {
                     repository.sendCommand(UiCommand.SyncRequest)
                 }
@@ -457,7 +452,7 @@ class MainViewModel @Inject constructor(
     }
 
     fun addPersistentLog(type: String, message: String, isImportant: Boolean = false, isSpecial: Boolean = false, specialColor: Int? = null) { 
-        repository.addLog(LogEntry(localId = UUID.randomUUID().toString(), timestamp = timeProvider.currentTimeMillis(), message = message, type = type.uppercase(), isImportant = isImportant, isSpecial = isSpecial, specialColor = specialColor, role = _uiState.value.session.appMode ?: "system")) 
+        repository.addLog(LogEntry(localId = UUID.randomUUID().toString(), timestamp = timeProvider.currentTimeMillis, message = message, type = type.uppercase(), isImportant = isImportant, isSpecial = isSpecial, specialColor = specialColor, role = _uiState.value.session.appMode ?: "system")) 
     }
 
     private fun mapDashboardConnectivity(appMode: String?, diag: DiagnosticState, nowRt: Long): DashboardConnectivityState {
@@ -472,7 +467,7 @@ class MainViewModel @Inject constructor(
             sinceConnMs = if (activeStats.lastConnTs > 0) (nowRt - activeStats.lastConnTs) else 0L, 
             sinceDiscoMs = if (activeStats.lastDiscTs > 0) (nowRt - activeStats.lastDiscTs) else 0L, 
             totalDropMs = activeStats.totalDropMs, maxDropMs = activeStats.maxDropMs, 
-            engineVersion = BuildConfig.VERSION_NAME, netInterface = diag.connectivity.netInterface, 
+            engineVersion = "Oct10.3", netInterface = diag.connectivity.netInterface, 
             systemPulse = nowRt, isLocalOnline = diag.connectivity.isLocalOnline, isRelayConnected = diag.connectivity.isRelayConnected
         )
     }
@@ -582,7 +577,7 @@ class MainViewModel @Inject constructor(
 
     private fun mapMapViewState(mode: String?, hydration: Int, spatial: SpatialUiState, kinematic: KinematicState, pulseRt: Long, trkSegs: List<MapTrailSegment>, vwrSegs: List<MapTrailSegment>, vios: List<ViolationPoint>): MapViewState {
         val m = mode ?: "tracker"
-        val pulse = timeProvider.currentTimeMillis()
+        val pulse = timeProvider.currentTimeMillis
         val loc = if (m == "tracker") kinematic.localLocation else kinematic.trackerLocation
         val tLat = loc.kinetic.lat
         val tLng = loc.kinetic.lng
@@ -619,7 +614,7 @@ class MainViewModel @Inject constructor(
 
     private fun computeTrailSegments(trailPoints: List<TrailPoint>, color: Int): List<MapTrailSegment> {
         if (trailPoints.isEmpty()) return emptyList()
-        val now = timeProvider.currentTimeMillis()
+        val now = timeProvider.currentTimeMillis
         val segments = mutableListOf<MapTrailSegment>()
         var currentPoints = mutableListOf<org.osmdroid.util.GeoPoint>()
         var currentIsStale: Boolean? = null

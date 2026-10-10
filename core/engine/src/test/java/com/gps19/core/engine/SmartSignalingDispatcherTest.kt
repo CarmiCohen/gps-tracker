@@ -17,20 +17,24 @@ class SmartSignalingDispatcherTest {
         
         val testDispatcher = UnconfinedTestDispatcher(testScheduler)
         val testTimeProvider = object : TimeProvider {
-            override fun currentTimeMillis() = testScheduler.currentTime
-            override fun elapsedRealtime() = testScheduler.currentTime
+            override val currentTimeMillis: Long get() = testScheduler.currentTime
+            override val elapsedRealtime: Long get() = testScheduler.currentTime
         }
         
         val dispatcher = SmartSignalingDispatcher(
             scope = this,
             isViolationProvider = { false },
-            jsonSink = { event, _ ->
-                if (event == "critical_alert") {
-                    highPriorityReceivedTs.set(testScheduler.currentTime)
+            wireSink = object : SignalingWireSink {
+                override fun emitJson(event: String, data: Map<String, Any?>) {
+                    if (event == "critical_alert") {
+                        highPriorityReceivedTs.set(testScheduler.currentTime)
+                    }
                 }
+                override fun emitBinary(event: String, routingId: String, data: ByteArray) {}
             },
-            binarySink = { _, _, _ -> },
-            objectSink = { _, _ -> },
+            encoder = object : SignalingEncoder {
+                override fun encodeObject(update: LocationUpdate, deltaState: SignalingDeltaState, fromViewer: Boolean): ByteArray = ByteArray(0)
+            },
             isConnectedProvider = { true },
             timeProvider = testTimeProvider,
             dispatcher = testDispatcher
@@ -38,20 +42,20 @@ class SmartSignalingDispatcherTest {
 
         // 1. Inject 50 Normal logs. 
         repeat(50) {
-            dispatcher.dispatch(SmartSignalingDispatcher.Command.Json(
+            dispatcher.dispatchJson(
                 "log_update", 
                 mapOf("message" to "Normal $it"), 
                 SignalingPriority.NORMAL
-            ))
+            )
         }
 
         // 2. Inject a High priority message
         val highSendTs = testScheduler.currentTime
-        dispatcher.dispatch(SmartSignalingDispatcher.Command.Json(
+        dispatcher.dispatchJson(
             "critical_alert", 
             mapOf("message" to "CRITICAL"), 
             SignalingPriority.HIGH
-        ))
+        )
 
         // Process all pending tasks
         advanceUntilIdle()
@@ -70,25 +74,29 @@ class SmartSignalingDispatcherTest {
         val dispatcher = SmartSignalingDispatcher(
             scope = this,
             isViolationProvider = { false },
-            jsonSink = { _, _ -> },
-            binarySink = { _, _, _ -> },
-            objectSink = { _, _ -> },
+            wireSink = object : SignalingWireSink {
+                override fun emitJson(event: String, data: Map<String, Any?>) {}
+                override fun emitBinary(event: String, routingId: String, data: ByteArray) {}
+            },
+            encoder = object : SignalingEncoder {
+                override fun encodeObject(update: LocationUpdate, deltaState: SignalingDeltaState, fromViewer: Boolean): ByteArray = ByteArray(0)
+            },
             isConnectedProvider = { true },
             dispatcher = testDispatcher
         )
 
         // Dispatch 3 identical logs (should result in 2 conflations)
         repeat(3) {
-            dispatcher.dispatch(SmartSignalingDispatcher.Command.Json(
+            dispatcher.dispatchJson(
                 "log_update",
                 mapOf("message" to "test"),
                 SignalingPriority.NORMAL
-            ))
+            )
         }
 
         advanceUntilIdle()
 
-        val metrics = dispatcher.getMetrics()
+        val metrics = dispatcher.metricsFlow.value
         assertTrue("Expected 3 frames received, got ${metrics.received}", metrics.received == 3L)
         assertTrue("Expected 2 frames conflated, got ${metrics.conflated}", metrics.conflated == 2L)
         
@@ -100,16 +108,20 @@ class SmartSignalingDispatcherTest {
         val emitCount = AtomicInteger(0)
         val testDispatcher = UnconfinedTestDispatcher(testScheduler)
         val testTimeProvider = object : TimeProvider {
-            override fun currentTimeMillis() = testScheduler.currentTime
-            override fun elapsedRealtime() = testScheduler.currentTime
+            override val currentTimeMillis: Long get() = testScheduler.currentTime
+            override val elapsedRealtime: Long get() = testScheduler.currentTime
         }
 
         val dispatcher = SmartSignalingDispatcher(
             scope = this,
             isViolationProvider = { false },
-            jsonSink = { _, _ -> emitCount.incrementAndGet() },
-            binarySink = { _, _, _ -> emitCount.incrementAndGet() },
-            objectSink = { _, _ -> emitCount.incrementAndGet() },
+            wireSink = object : SignalingWireSink {
+                override fun emitJson(event: String, data: Map<String, Any?>) { emitCount.incrementAndGet() }
+                override fun emitBinary(event: String, routingId: String, data: ByteArray) { emitCount.incrementAndGet() }
+            },
+            encoder = object : SignalingEncoder {
+                override fun encodeObject(update: LocationUpdate, deltaState: SignalingDeltaState, fromViewer: Boolean): ByteArray = ByteArray(0)
+            },
             isConnectedProvider = { true },
             timeProvider = testTimeProvider,
             dispatcher = testDispatcher
@@ -117,24 +129,24 @@ class SmartSignalingDispatcherTest {
 
         // Simultaneous burst of 10 Location Maps, 10 Location Objects, and 10 Logs
         repeat(10) { i ->
-            dispatcher.dispatch(SmartSignalingDispatcher.Command.Json(
+            dispatcher.dispatchJson(
                 "location_update",
                 mapOf("lat" to 1.0, "lon" to i.toDouble()),
                 SignalingPriority.NORMAL
-            ))
-            dispatcher.dispatch(SmartSignalingDispatcher.Command.Object(
+            )
+            dispatcher.dispatchObject(
                 "location_update_bin",
                 LocationUpdate().apply {
-                    lat = 1.0
-                    lng = i.toDouble()
+                    kinetic.lat = 1.0
+                    kinetic.lng = i.toDouble()
                 },
                 SignalingPriority.NORMAL
-            ))
-            dispatcher.dispatch(SmartSignalingDispatcher.Command.Json(
+            )
+            dispatcher.dispatchJson(
                 "log_update",
                 mapOf("message" to "stress_log"),
                 SignalingPriority.NORMAL
-            ))
+            )
         }
 
         // Expected results:
@@ -144,7 +156,7 @@ class SmartSignalingDispatcherTest {
         
         advanceUntilIdle()
 
-        val metrics = dispatcher.getMetrics()
+        val metrics = dispatcher.metricsFlow.value
         assertEquals("Received frames mismatch", 30L, metrics.received)
         assertEquals("Conflated frames mismatch", 27L, metrics.conflated)
         assertEquals("Emitted frames mismatch", 3L, metrics.emitted)

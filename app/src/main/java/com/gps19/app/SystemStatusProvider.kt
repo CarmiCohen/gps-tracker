@@ -60,11 +60,9 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
- * Sep.28.11:
- * - Issue #1359: Temporal Precision & Service Logic Hardening. Migrated 
- *   hardware status and internet cache throttling to use centralized timeProvider.
- * Sep.26.12:
- * - Issue #1344: Added getThermalHeadroom and getHeapAllocatedMb forensic probes.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 interface SystemStatusProvider {
     suspend fun isBatteryWhitelisted(): Boolean
@@ -165,7 +163,7 @@ class SystemStatusProviderImpl @Inject constructor(
     override fun getPerformanceTier(): PerformanceTier = if (isStaggeredTier) PerformanceTier.STAGGERED else PerformanceTier.STANDARD
 
     override suspend fun isLocalOnline(): Boolean = internetMutex.withLock {
-        val now = timeProvider.elapsedRealtime()
+        val now = timeProvider.elapsedRealtime
         if (now - lastInternetCheckRt < INTERNET_CACHE_TTL_MS && lastInternetCheckRt != 0L) {
             return cachedInternetStatus
         }
@@ -197,7 +195,7 @@ class SystemStatusProviderImpl @Inject constructor(
     }
 
     override suspend fun getPermissionState(forceRefresh: Boolean): PermissionState {
-        val now = timeProvider.elapsedRealtime()
+        val now = timeProvider.elapsedRealtime
         val isStale = now - lastFullRefreshTime > PERMISSION_TTL_MS
         
         val shouldExecute = when {
@@ -207,7 +205,7 @@ class SystemStatusProviderImpl @Inject constructor(
 
         if (shouldExecute) {
             refreshMutex.withLock {
-                val currentNow = timeProvider.elapsedRealtime()
+                val currentNow = timeProvider.elapsedRealtime
                 val doubleCheckExecute = when {
                     forceRefresh -> (currentNow - lastHardwareCheckRt >= FORCED_REFRESH_COOLDOWN_MS) || lastHardwareCheckRt == 0L
                     else -> (currentNow - lastFullRefreshTime > PERMISSION_TTL_MS)

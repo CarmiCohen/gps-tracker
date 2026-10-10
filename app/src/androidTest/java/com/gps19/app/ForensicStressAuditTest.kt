@@ -15,8 +15,9 @@ import javax.inject.Inject
 
 /**
  * ForensicStressAuditTest: Verifies Chapter 12.2 Database Stress Audit requirements.
- * Validates zero-churn performance of ForensicSpillBuffer and R197 chunked pruning 
- * under sustained 100Hz log generation (R700/R715).
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -54,7 +55,7 @@ class ForensicStressAuditTest {
         val job = launch(Dispatchers.Default) {
             repeat(burstCount) { i ->
                 val success = spillBuffer.writeTraceOptimized(
-                    timestamp = System.currentTimeMillis(),
+                    timestamp = timeProvider.currentTimeMillis,
                     lat = 40.7128,
                     lng = -74.0060,
                     accuracy = 5.0,
@@ -103,7 +104,7 @@ class ForensicStressAuditTest {
         var writes = 0
         repeat(overflowCount) {
             val success = spillBuffer.writeTraceOptimized(
-                timestamp = System.currentTimeMillis(),
+                timestamp = timeProvider.currentTimeMillis,
                 lat = 0.0, lng = 0.0, accuracy = 0.0, maxAccuracy = 0.0,
                 vibe = 0.0, snr = 0.0, batteryLevel = 0, isCharging = false, batteryTemp = 0.0
             )

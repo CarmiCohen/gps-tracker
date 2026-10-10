@@ -1,44 +1,26 @@
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
-    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.protobuf)
 }
 
-// FORCE OVERRIDE for Issue #1035 Alignment
-def safeVersionCode = 1149
-def safeVersionName = "Oct10.2"
-
 android {
     namespace 'com.gps19.app'
-    compileSdk 35
+    compileSdk 34
 
     defaultConfig {
         applicationId "com.gps19.app"
         minSdk 24
-        targetSdk 35
-        versionCode safeVersionCode
-        versionName safeVersionName
+        targetSdk 34
+        versionCode rootProject.ext.autoVersionCode
+        versionName "Oct10.4"
 
-        testInstrumentationRunner "com.gps19.app.HiltTestRunner"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary true
-        }
-
-        externalNativeBuild {
-            cmake {
-                cppFlags ""
-                abiFilters "armeabi-v7a", "arm64-v8a", "x86", "x86_64"
-            }
-        }
-    }
-
-    externalNativeBuild {
-        cmake {
-            path file('src/main/cpp/CMakeLists.txt')
-            version '3.22.1'
         }
     }
 
@@ -54,6 +36,11 @@ android {
     }
     kotlinOptions {
         jvmTarget = '17'
+        freeCompilerArgs += [
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi",
+            "-opt-in=kotlinx.coroutines.FlowPreview",
+            "-opt-in=kotlinx.serialization.ExperimentalSerializationApi"
+        ]
     }
     buildFeatures {
         compose true
@@ -63,9 +50,6 @@ android {
         kotlinCompilerExtensionVersion '1.5.11'
     }
     packaging {
-        jniLibs {
-            useLegacyPackaging = false
-        }
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
         }
@@ -79,7 +63,6 @@ protobuf {
     generateProtoTasks {
         all().each { task ->
             task.builtins {
-                task.builtins.remove('java')
                 java {
                     option 'lite'
                 }
@@ -89,73 +72,64 @@ protobuf {
 }
 
 dependencies {
-    implementation project(':core:engine')
-    
-    implementation libs.androidx.core.ktx
-    implementation libs.androidx.appcompat
-    implementation libs.androidx.lifecycle.runtime.ktx
-    implementation libs.androidx.lifecycle.runtime.compose
-    implementation libs.androidx.lifecycle.service
-    implementation libs.androidx.activity.compose
-    implementation platform(libs.compose.bom)
-    implementation libs.androidx.material3
-    implementation libs.material.icons.extended
-    implementation libs.androidx.navigation.compose
-    implementation libs.androidx.ui.tooling.preview
-
-    // DataStore & Protobuf
-    implementation libs.datastore
-    implementation libs.protobuf.javalite
-
-    // Networking & Socket.io
-    implementation (libs.socket.io.client) {
-        exclude group: 'org.json', module: 'json'
-    }
-    
-    // Play Services Location
-    implementation libs.play.services.location
-    
-    // Preferences
-    implementation libs.androidx.preference.ktx
-
-    // Serialization
-    implementation libs.kotlinx.serialization.json
+    implementation(project(":core:engine"))
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.service)
+    implementation(libs.androidx.activity.compose)
+    implementation(platform(libs.compose.bom))
+    implementation(libs.androidx.ui)
+    implementation(libs.androidx.ui.graphics)
+    implementation(libs.androidx.ui.tooling.preview)
+    implementation(libs.androidx.material3)
+    implementation(libs.material.icons.extended)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.preference.ktx)
 
     // Hilt
-    implementation libs.hilt.android
-    ksp libs.hilt.compiler
-    implementation libs.hilt.navigation.compose
-    implementation libs.hilt.work
-    ksp libs.hilt.androidx.compiler
-
-    // WorkManager
-    implementation libs.androidx.work.runtime.ktx
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+    implementation(libs.hilt.navigation.compose)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.androidx.compiler)
 
     // Room
-    implementation libs.room.runtime
-    implementation libs.room.ktx
-    ksp libs.room.compiler
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
 
-    // Networking & Logging
-    implementation libs.okhttp
-    implementation libs.timber
-    implementation libs.play.services.basement
-    implementation libs.gson
+    // DataStore
+    implementation(libs.datastore)
+
+    // WorkManager
+    implementation(libs.androidx.work.runtime.ktx)
+
+    // Play Services
+    implementation(libs.play.services.location)
+    implementation(libs.play.services.basement)
+
+    // Networking & Signaling
+    implementation(libs.socket.io.client)
+    implementation(libs.okhttp)
+    implementation(libs.kotlinx.serialization.json)
+    implementation(libs.protobuf.javalite)
+    implementation(libs.gson)
 
     // Maps
-    implementation libs.osmdroid.android
+    implementation(libs.osmdroid.android)
 
-    testImplementation libs.junit
-    androidTestImplementation libs.androidx.junit
-    androidTestImplementation libs.androidx.espresso.core
-    androidTestImplementation libs.androidx.uiautomator
-    androidTestImplementation platform(libs.compose.bom)
-    androidTestImplementation libs.androidx.ui.test.junit4
-    
-    // Hilt Testing
-    androidTestImplementation libs.hilt.android.testing
-    kspAndroidTest libs.hilt.compiler
+    // Utilities
+    implementation(libs.timber)
 
-    debugImplementation libs.androidx.ui.tooling
-    debugImplementation libs.androidx.ui.test.manifest
+    testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(platform(libs.compose.bom))
+    androidTestImplementation(libs.androidx.ui.test.junit4)
+    androidTestImplementation(libs.androidx.uiautomator)
+    debugImplementation(libs.androidx.ui.tooling)
+    debugImplementation(libs.androidx.ui.test.manifest)
 }

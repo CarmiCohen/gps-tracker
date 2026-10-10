@@ -18,25 +18,27 @@ sealed class SignalingEvent {
 
 /**
  * Interface for signaling implementations (Socket.io, MQTT, etc.)
- * Oct.6.20:
- * - Issue #SIGN-1006-12: SignalingPipeline Abstraction. Updated to use 
- *   SignalingPipeline.Metrics instead of internal dispatcher metrics.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Migrated state accessors 
+ *   to strict val properties for Hilt/Compose stability.
  */
 interface SignalingProvider {
     val signalingFlow: SharedFlow<SignalingEvent>
     val signalingMetrics: StateFlow<SignalingPipeline.Metrics>
+    
+    val isConnected: Boolean
+    val isConnecting: Boolean
+    val rtt: Int
+    val lastRelayTrafficTs: Long
 
     fun connect(url: String, deviceId: String, viewerId: String, isTracker: Boolean)
     fun disconnect()
     fun updateIdentity(deviceId: String, viewerId: String, isTracker: Boolean, force: Boolean = false)
-    fun isConnected(): Boolean
-    fun isConnecting(): Boolean
-    fun getRtt(): Int
+    
     fun clearRtt()
     
     fun emit(event: String, data: JSONObject, priority: SignalingPriority = SignalingPriority.NORMAL)
     fun transmit(status: LocationUpdate, priority: SignalingPriority = SignalingPriority.NORMAL, fromViewer: Boolean = false)
 
-    fun getLastRelayTrafficTs(): Long
     fun setConnectionLostCallback(callback: () -> Unit)
 }

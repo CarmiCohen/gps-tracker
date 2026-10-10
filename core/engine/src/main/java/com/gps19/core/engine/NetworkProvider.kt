@@ -11,8 +11,17 @@ interface NetworkListener {
 /**
  * NetworkProvider: Abstract interface for monitoring network availability.
  * Decouples engine logic from Android's ConnectivityManager for testability.
+ * 
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Migrated to property-based 
+ *   availability check for Hilt/Compose interoperability.
  */
 interface NetworkProvider {
+    /**
+     * Returns true if the network interface is currently available.
+     */
+    val isNetworkAvailable: Boolean
+
     fun registerListener(listener: NetworkListener)
     fun unregisterListener(listener: NetworkListener)
 }

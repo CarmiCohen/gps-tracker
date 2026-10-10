@@ -6,24 +6,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.*
 import kotlin.math.abs
-import kotlin.math.ceil
-import kotlin.math.roundToInt
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
- * Oct.6.5:
- * - Fixed build failure: Added missing violationStartTs to state.update() call.
- * - Issue #1405 AUDIT: Adjusted muteCount expectations. PowerTamper triggers 
- *   ALERT_ID_TRACKER_POWER and ALERT_ID_TRACKER_TAMPER (R-ID 510).
- * Oct.3.9:
- * - Issue #1201 RESOLVED: Updated detectViolations calls to match new signature 
- *   with explicit isLockedOut parameter (R-ID 510).
+ * Oct.10.4:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 class MainAlarmLogicTest {
 
     private val mockTimeProvider = object : TimeProvider {
-        override fun elapsedRealtime(): Long = 100000L
-        override fun currentTimeMillis(): Long = 1700000000000L
+        override val elapsedRealtime: Long get() = 100000L
+        override val currentTimeMillis: Long get() = 1700000000000L
     }
 
     private val spikeLogger: (String, Long) -> Unit = { _, _ -> }
@@ -276,6 +270,4 @@ class MainAlarmLogicTest {
         MainAlarmLogic.detectViolations(state, mockTimeProvider, report2, false, spikeLogger, onTrigger, onResolve)
         assertFalse("Silent Failure should be suppressed if tamper is detected", report2.reports.find { it.type == ALERT_ID_SILENT_FAILURE }?.conditionMet == true)
     }
-
-    private fun isDefaultLocation(lat: Double, lng: Double) = abs(lat - DEFAULT_LAT) < 0.0001 && abs(lng - DEFAULT_LNG) < 0.0001
 }

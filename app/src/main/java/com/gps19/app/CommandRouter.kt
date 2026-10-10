@@ -18,14 +18,9 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
- * Oct.6.3:
- * - Issue #AUDIT-1006-6: Added routing for SimulateMemoryPressure.
- * Oct.6.2:
- * - Issue #AUDIT-1006-5: Added ExecuteLogPressureTest routing.
- * Oct.1.8:
- * - Issue #1410: Viewer Persistence. Added remote signaling for StopSiren in 
- *   Viewer mode. Emits "acknowledge_alarm" to ensure the Tracker synchronizes 
- *   its global acknowledgment state (R-ID 575). Fixed SyncSensors reference.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -87,7 +82,7 @@ class CommandRouter @Inject constructor(
                         is UiCommand.SyncRequest -> domainEventBus.emit(CommandEvent.UiPulse)
                         is UiCommand.UiVisibilityChanged -> domainEventBus.emit(CommandEvent.UiVisibilityChanged(command.visible))
                         is UiCommand.StopSiren -> {
-                            val now = timeProvider.currentTimeMillis()
+                            val now = timeProvider.currentTimeMillis
                             val role = if (configManager.isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE
                             
                             repository.saveLongSync(role, LAST_ALARM_ACK_TS_KEY, now)

@@ -29,9 +29,9 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
- * Oct.6.20:
- * - Issue #SIGN-1006-12: Updated signalingMetrics to use SignalingPipeline.Metrics.
- * - Fixed typo in UI history emitter delay.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider and SignalingProvider APIs. Fixed telemetryRepository naming conflict.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -42,7 +42,7 @@ class MainRepository @Inject constructor(
     private val pendingStatusDao: PendingStatusDao,
     private val database: AppDatabase,
     private val settings: SettingsRepository,
-    private val telemetry: TelemetryRepository,
+    private val telemetryRepository: TelemetryRepository,
     private val logRepository: LogRepository,
     private val offlineRepository: OfflineRepository,
     private val timeProvider: TimeProvider,
@@ -94,15 +94,15 @@ class MainRepository @Inject constructor(
         private const val VIEWER_ID_KEY = "viewer_id"
     }
 
-    val isRelayConnected = telemetry.isRelayConnected
-    val lastRtt = telemetry.lastRtt
-    val isSafeMode = telemetry.isSafeMode
-    val systemHealth = telemetry.systemHealth
-    val localLocation = telemetry.localLocation
-    val trackerLocation = telemetry.trackerLocation
-    val connectedViewers = telemetry.connectedViewers
-    val lastRemoteActivityTs = telemetry.lastRemoteActivityTs
-    val gnssDetail = telemetry.gnssDetail
+    val isRelayConnected = telemetryRepository.isRelayConnected
+    val lastRtt = telemetryRepository.lastRtt
+    val isSafeMode = telemetryRepository.isSafeMode
+    val systemHealth = telemetryRepository.systemHealth
+    val localLocation = telemetryRepository.localLocation
+    val trackerLocation = telemetryRepository.trackerLocation
+    val connectedViewers = telemetryRepository.connectedViewers
+    val lastRemoteActivityTs = telemetryRepository.lastRemoteActivityTs
+    val gnssDetail = telemetryRepository.gnssDetail
     
     // Issue #SIGN-1006-12: Reactive signaling pipeline metrics
     val signalingMetrics: StateFlow<SignalingPipeline.Metrics> 
@@ -138,19 +138,19 @@ class MainRepository @Inject constructor(
 
     fun sendCommand(command: UiCommand) { scope.launch { _uiCommands.emit(command) } }
 
-    fun updateRelayStatus(connected: Boolean) { telemetry.updateRelayStatus(connected) }
-    fun updateLastRtt(rtt: Int) { telemetry.updateLastRtt(rtt) }
-    fun setSafeMode(enabled: Boolean) { telemetry.setSafeMode(enabled) }
-    fun updateHealth(state: SystemHealthState) { telemetry.updateHealth(state) }
-    fun updateLocation(update: LocationUpdate) { telemetry.updateLocation(update) }
-    fun updateConnectedViewers(viewers: List<String>) { telemetry.updateConnectedViewers(viewers) }
-    fun updateRemoteActivity(ts: Long) { telemetry.updateRemoteActivity(ts) }
-    fun updateGnssDetail(detail: GnssDetail?) { telemetry.updateGnssDetail(detail) }
+    fun updateRelayStatus(connected: Boolean) { telemetryRepository.updateRelayStatus(connected) }
+    fun updateLastRtt(rtt: Int) { telemetryRepository.updateLastRtt(rtt) }
+    fun setSafeMode(enabled: Boolean) { telemetryRepository.setSafeMode(enabled) }
+    fun updateHealth(state: SystemHealthState) { telemetryRepository.updateHealth(state) }
+    fun updateLocation(update: LocationUpdate) { telemetryRepository.updateLocation(update) }
+    fun updateConnectedViewers(viewers: List<String>) { telemetryRepository.updateConnectedViewers(viewers) }
+    fun updateRemoteActivity(ts: Long) { telemetryRepository.updateRemoteActivity(ts) }
+    fun updateGnssDetail(detail: GnssDetail?) { telemetryRepository.updateGnssDetail(detail) }
 
-    fun getLocalLocationSync(): LocationUpdate = telemetry.localLocation.value
-    fun getTrackerLocationSync(): LocationUpdate = telemetry.trackerLocation.value
+    fun getLocalLocationSync(): LocationUpdate = telemetryRepository.localLocation.value
+    fun getTrackerLocationSync(): LocationUpdate = telemetryRepository.trackerLocation.value
 
-    fun clear() { telemetry.clear() }
+    fun clear() { telemetryRepository.clear() }
 
     val appModeFlow = settings.appModeFlow
     val trackerIdFlow = settings.trackerIdFlow
@@ -284,7 +284,7 @@ class MainRepository @Inject constructor(
     suspend fun loadHomePoints(): List<GeoPoint> {
         val points = settings.loadHomePoints()
         cachedHomePoints = points
-        lastHomeRefreshTs = timeProvider.currentTimeMillis()
+        lastHomeRefreshTs = timeProvider.currentTimeMillis
         return points
     }
     
@@ -302,7 +302,7 @@ class MainRepository @Inject constructor(
     suspend fun saveHomePoints(points: List<GeoPoint>, maxDist: Double? = null, ts: Long? = null) {
         settings.saveHomePoints(points, maxDist, ts)
         cachedHomePoints = points
-        lastHomeRefreshTs = timeProvider.currentTimeMillis()
+        lastHomeRefreshTs = timeProvider.currentTimeMillis
     }
 
     suspend fun addHomePoint(lat: Double, lng: Double) = settings.addHomePoint(lat, lng)
@@ -335,10 +335,10 @@ class MainRepository @Inject constructor(
 
     fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, status: SentinelStatus = SentinelStatus.VALID, timestamp: Long? = null, force: Boolean = false, accuracy: Double = 0.0, maxAccuracy: Double = 0.0) {
         if (lat == 0.0 || lng == 0.0) return
-        val health = telemetry.systemHealth.value
+        val health = telemetryRepository.systemHealth.value
         if (!PersistencePolicy.shouldSaveTrailPoint(health, status)) return
         scope.launch {
-            val wallTs = timestamp ?: timeProvider.currentTimeMillis()
+            val wallTs = timestamp ?: timeProvider.currentTimeMillis
             trailDao.insert(TrailEntity(lat = lat, lng = lng, timestamp = wallTs, isViewerTrail = isViewer, status = status.name, accuracy = accuracy, maxAccuracy = maxAccuracy))
             if (force || metrics.trailWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
                 metrics.trailWriteCount.set(0); triggerBackgroundPruning()
@@ -360,7 +360,7 @@ class MainRepository @Inject constructor(
 
     fun addViolation(lat: Double, lng: Double, type: String, accuracy: Double = 0.0, maxAccuracy: Double = 0.0, adaptiveRadius: Double = 0.0, timestamp: Long? = null) {
         if (!violationProcessor.shouldRecordViolation(lat, lng, type, accuracy, maxAccuracy)) return
-        val wallTs = timestamp ?: timeProvider.currentTimeMillis()
+        val wallTs = timestamp ?: timeProvider.currentTimeMillis
         scope.launch { 
             violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
             if (metrics.violationWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
@@ -389,11 +389,11 @@ class MainRepository @Inject constructor(
     private val liveHistoryBuffer = ConcurrentLinkedQueue<Pair<String, ConnectionPoint>>()
 
     fun addHistoryPoint(ribbonKey: String, point: ConnectionPoint) {
-        val health = telemetry.systemHealth.value
+        val health = telemetryRepository.systemHealth.value
         liveHistoryBuffer.add(ribbonKey to ConnectionPoint().apply { copyFrom(point) })
         if (!PersistencePolicy.shouldSaveHistoryPoint(health)) return
         historyBuffer.add(TelemetryMapper.mapAppToEntity(point, ribbonKey))
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         if ((nowRt - lastBatchWriteRealtime > HISTORY_BATCH_WRITE_INTERVAL_MS) || (historyBuffer.size >= HISTORY_BUFFER_MAX_SIZE)) {
             scope.launch { flushHistoryBufferInternal(nowRt) }
         }
@@ -413,7 +413,7 @@ class MainRepository @Inject constructor(
         }
     }
 
-    suspend fun flushHistory() { flushHistoryBufferInternal(timeProvider.elapsedRealtime()) }
+    suspend fun flushHistory() { flushHistoryBufferInternal(timeProvider.elapsedRealtime) }
 
     private suspend fun flushHistoryBufferInternal(nowRt: Long) = withContext(Dispatchers.IO) {
         val dbPoints = mutableListOf<HistoryEntity>()
@@ -431,7 +431,7 @@ class MainRepository @Inject constructor(
 
     private fun triggerBackgroundPruning() {
         if (metrics.isPruningActive.getAndSet(true)) return
-        if (telemetry.systemHealth.value.isBatteryCritical) { metrics.isPruningActive.set(false); return }
+        if (telemetryRepository.systemHealth.value.isBatteryCritical) { metrics.isPruningActive.set(false); return }
         scope.launch {
             try {
                 database.withTransaction {
@@ -482,8 +482,8 @@ class MainRepository @Inject constructor(
     fun setForensicStallSimulation(active: Boolean) { logRepository.setForensicStallSimulation(active) }
     suspend fun saveDraftSettings(deviceId: String, viewerId: String, relayUrl: String, maxDistance: Double, alertSettings: AlertSettings) { settings.saveDraftSettings(deviceId, viewerId, relayUrl, maxDistance, alertSettings) }
     suspend fun commitDraftSettings(): CommitResult { return settings.commitDraftSettings() }
-    suspend fun resetPeerStats() { telemetry.updateRemoteActivity(0L) }
-    suspend fun clearDraftSettings() { settings.clearDraftSettings() }
+    suspend fun resetPeerStats() { telemetryRepository.updateRemoteActivity(0L) }
+    fun clearDraftSettings() { scope.launch { settings.clearDraftSettings() } }
 
     suspend fun saveLogicState(state: AlarmEvaluationState, role: AppRole) {
         settings.saveLogicState(state, role)

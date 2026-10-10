@@ -1,6 +1,5 @@
 package com.gps19.core.engine
 
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.*
 import org.junit.Before
@@ -8,18 +7,18 @@ import org.junit.Test
 
 /**
  * ForensicIdentityTest: Verifying signature-based trace deduplication.
- * Oct.2.8:
- * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
- *   to unified LocationUpdate DTO (R-ID 596).
+ * Oct.10.4:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 class ForensicIdentityTest {
 
     private lateinit var processor: LocationProcessor
-    private val timeProvider = TestTimeProvider()
+    private val timeProvider get() = (processor.getTimeProviderForTest() as TestTimeProvider)
 
     @Before
     fun setup() {
-        processor = LocationProcessor(timeProvider)
+        processor = LocationProcessor(TestTimeProvider())
     }
 
     @Test
@@ -28,12 +27,13 @@ class ForensicIdentityTest {
         val lng = 34.5678
         val ts = 1700000000000L
         
-        timeProvider.wallTime = ts
-        timeProvider.elapsedTime = 10000L
+        val tp = timeProvider
+        tp.wallTime = ts
+        tp.elapsedTime = 10000L
 
         val initialSnapshot = LocationUpdate(
             kinetic = KineticState(lat = lat, lng = lng, alt = 0.0, speed = 0.0, gpsTs = ts, accuracy = 5.0, bearing = 0.0),
-            nowRt = timeProvider.elapsedTime,
+            nowRt = tp.elapsedRealtime,
             nowTs = ts
         )
 
@@ -47,7 +47,7 @@ class ForensicIdentityTest {
 
         val duplicateSnapshot = LocationUpdate(
             kinetic = KineticState(lat = lat, lng = lng, alt = 0.0, speed = 0.0, gpsTs = ts, accuracy = 5.0, bearing = 0.0),
-            nowRt = timeProvider.elapsedTime,
+            nowRt = tp.elapsedRealtime,
             nowTs = ts
         )
 
@@ -65,7 +65,13 @@ class ForensicIdentityTest {
     private class TestTimeProvider : TimeProvider {
         var wallTime = 0L
         var elapsedTime = 0L
-        override fun currentTimeMillis() = wallTime
-        override fun elapsedRealtime() = elapsedTime
+        override val currentTimeMillis: Long get() = wallTime
+        override val elapsedRealtime: Long get() = elapsedTime
+    }
+
+    private fun LocationProcessor.getTimeProviderForTest(): TimeProvider {
+        val field = LocationProcessor::class.java.getDeclaredField("timeProvider")
+        field.isAccessible = true
+        return field.get(this) as TimeProvider
     }
 }

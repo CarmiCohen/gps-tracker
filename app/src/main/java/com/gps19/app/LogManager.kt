@@ -9,13 +9,9 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
- * Oct.7.4:
- * - Issue #SIMP-1007-15: Unified Snapshot Container. Updated LogEntry 
- *   construction to utilize ForensicSnapshot container.
- * Oct.5.2:
- * - Issue #1344: Forensic Diagnostic Expansion. Updated logForensicTrace, 
- *   logForensicTraceOptimized, and submitToLogSink to include thermalSnapshot 
- *   and heapSnapshot forensic probes (R1344).
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider and ConnectivitySuite APIs.
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -34,7 +30,7 @@ class LogManager @Inject constructor(
     }
 
     fun startNewSession() {
-        sessionStartTs = timeProvider.currentTimeMillis()
+        sessionStartTs = timeProvider.currentTimeMillis
         isOverflowLogged.set(false)
     }
 
@@ -50,7 +46,7 @@ class LogManager @Inject constructor(
      */
     fun logForensicTrace(message: String, lat: Double = 0.0, lng: Double = 0.0, accuracy: Double = 0.0) {
         val buffer = forensicSpillBufferProvider.get()
-        val now = timeProvider.currentTimeMillis()
+        val now = timeProvider.currentTimeMillis
         val health = telemetry.systemHealth.value
         
         // R779: Scrub metadata at the edge
@@ -147,7 +143,7 @@ class LogManager @Inject constructor(
         thermal: Double? = null,
         heap: Double? = null
     ) {
-        val now = timeProvider.currentTimeMillis()
+        val now = timeProvider.currentTimeMillis
         val health = telemetry.systemHealth.value
         
         if (health.isStorageCritical && !isSpecial) return
@@ -226,7 +222,7 @@ class LogManager @Inject constructor(
         )
         
         val suite = connectivitySuite
-        val isConnected = suite.isConnected()
+        val isConnected = suite.isConnected
         
         val data = log.toJSONObject().apply {
             put("ver", BuildConfig.VERSION_NAME)

@@ -6,9 +6,9 @@ import org.junit.Test
 
 /**
  * AdaptationMuzzleTest: Validating A15-specific polling stabilization logic.
- * Oct.2.8:
- * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
- *   to unified LocationUpdate DTO (R-ID 596).
+ * Oct.10.4:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors in mock and call sites.
  */
 class AdaptationMuzzleTest {
 
@@ -29,11 +29,11 @@ class AdaptationMuzzleTest {
         timeProvider.elapsedTime = 10000L
 
         // 1. Establish initial fix and interval
-        processor.updateExpectedInterval(timeProvider.elapsedTime, 45000L) 
+        processor.updateExpectedInterval(timeProvider.elapsedRealtime, 45000L) 
 
         val initialSnapshot = LocationUpdate(
             kinetic = KineticState(lat = startLat, lng = startLng, alt = 10.0, gpsTs = now, accuracy = 5.0),
-            nowRt = timeProvider.elapsedTime,
+            nowRt = timeProvider.elapsedRealtime,
             nowTs = now
         )
         processor.processGpsPoint(
@@ -44,7 +44,7 @@ class AdaptationMuzzleTest {
         )
 
         // 2. Simulate a frequency transition
-        processor.updateExpectedInterval(timeProvider.elapsedTime, 2000L)
+        processor.updateExpectedInterval(timeProvider.elapsedRealtime, 2000L)
 
         // 3. Simulate a "Jump" artifact immediately after transition.
         val jumpLat = 52.5210 
@@ -54,7 +54,7 @@ class AdaptationMuzzleTest {
 
         val jumpSnapshot = LocationUpdate(
             kinetic = KineticState(lat = jumpLat, lng = startLng, alt = 10.0, gpsTs = jumpTs, accuracy = 5.0),
-            nowRt = timeProvider.elapsedTime,
+            nowRt = timeProvider.elapsedRealtime,
             nowTs = jumpTs
         )
 
@@ -78,7 +78,7 @@ class AdaptationMuzzleTest {
 
         val expiredSnapshot = LocationUpdate(
             kinetic = KineticState(lat = nextJumpLat, lng = startLng, alt = 10.0, gpsTs = nextJumpTs, accuracy = 5.0),
-            nowRt = timeProvider.elapsedTime,
+            nowRt = timeProvider.elapsedRealtime,
             nowTs = nextJumpTs
         )
 
@@ -96,7 +96,7 @@ class AdaptationMuzzleTest {
     private class TestTimeProvider : TimeProvider {
         var wallTime = 0L
         var elapsedTime = 0L
-        override fun currentTimeMillis() = wallTime
-        override fun elapsedRealtime() = elapsedTime
+        override val currentTimeMillis: Long get() = wallTime
+        override val elapsedRealtime: Long get() = elapsedTime
     }
 }

@@ -6,13 +6,9 @@ import javax.inject.Inject
 
 /**
  * AlertUseCase: Handles logic for alarm dismissal and siren control.
- * Sep.30.70:
- * - Issue #1407: Unified Storage Authority. Updated to use role-based 
- *   repository storage API (R-ID 565).
- * Sep.30.60:
- * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
- *   ensure prefix consistency ("VR_" authority in Viewer mode) and fix 
- *   acknowledgment loops (R-ID 453/565).
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
  */
 class AlertUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -23,7 +19,7 @@ class AlertUseCase @Inject constructor(
     private fun getAlarmRole(): AppRole = if (configManager.isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE
 
     suspend fun dismissAlarms(): Long {
-        val now = timeProvider.currentTimeMillis()
+        val now = timeProvider.currentTimeMillis
         repository.saveLong(getAlarmRole(), LAST_ALARM_ACK_TS_KEY, now)
         repository.sendCommand(UiCommand.StopSiren("User Dismissed"))
         logManager.submitToLogSink("USER ACTION: Alerts acknowledged", "user", isImportant = true)
@@ -31,7 +27,7 @@ class AlertUseCase @Inject constructor(
     }
 
     suspend fun stopSiren(causes: String?): Long {
-        val now = timeProvider.currentTimeMillis()
+        val now = timeProvider.currentTimeMillis
         repository.saveLong(getAlarmRole(), LAST_ALARM_ACK_TS_KEY, now)
         repository.sendCommand(UiCommand.StopSiren(causes))
         logManager.submitToLogSink("USER ACTION: Siren stopped ${causes ?: ""}", "user", isImportant = true)

@@ -112,16 +112,16 @@ class ProductionReadinessAuditTest {
             val testInterface = "wlan${(10..99).random()}"
             val failureTag = "TEST_FAIL_${(100..999).random()}"
             
-            val ts = timeProvider.currentTimeMillis()
+            val ts = timeProvider.currentTimeMillis
             val probe1 = LogEntry(
                 localId = "P1-$ts", timestamp = ts,
                 message = "Forensic Handover: TEST_UP ($testInterface)", type = "FORENSIC_TRACE",
-                isImportant = false, id = "SYSTEM", viewerId = "SYSTEM", role = "tracker"
+                isImportant = false, role = "tracker"
             )
             val probe2 = LogEntry(
                 localId = "P2-$ts", timestamp = ts,
                 message = "Forensic TX Failure: $failureTag (Mode: TRK, D:A, V:O)", type = "FORENSIC_TRACE",
-                isImportant = false, id = "SYSTEM", viewerId = "SYSTEM", role = "tracker"
+                isImportant = false, role = "tracker"
             )
 
             assertTrue("Probe 1 write must succeed", buffer.writeTrace(probe1))
@@ -163,12 +163,12 @@ class ProductionReadinessAuditTest {
     @Test
     fun verifyExtendedSoakSimulation() = runBlocking {
         logRepository.setForensicStallSimulation(false)
-        val startTime = timeProvider.elapsedRealtime()
+        val startTime = timeProvider.elapsedRealtime
         val durationMs = 60000L // 60s Soak
         
         var ticks = 0
-        while (timeProvider.elapsedRealtime() - startTime < durationMs) {
-            val nowRt = timeProvider.elapsedRealtime()
+        while (timeProvider.elapsedRealtime - startTime < durationMs) {
+            val nowRt = timeProvider.elapsedRealtime
             
             sessionManager.onTrackerPulse("Soak_Device", nowRt)
             sessionManager.updateTick(nowRt + 1000, nowRt, true, isInViolation = false)
@@ -194,7 +194,7 @@ class ProductionReadinessAuditTest {
         sessionManager.reset()
         assertFalse("Initial state should not be in violation", sessionManager.isInViolation)
         
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         sessionManager.onTrackerPulse("Device_Alpha", nowRt)
         sessionManager.onViewerPulse("Viewer_Omega", nowRt)
 
@@ -214,7 +214,7 @@ class ProductionReadinessAuditTest {
         sessionManager.reset()
         forensicAuditor.reset("T")
         
-        val startRt = timeProvider.elapsedRealtime()
+        val startRt = timeProvider.elapsedRealtime
         var currentRt = startRt
         val durationMs = 24 * 3600 * 1000L
         val stepMs = 2000L
@@ -304,7 +304,7 @@ class ProductionReadinessAuditTest {
     @Test
     fun verifyForensicThroughputUnderViolation() {
         sessionManager.reset()
-        val startRt = timeProvider.elapsedRealtime()
+        val startRt = timeProvider.elapsedRealtime
         var currentRt = startRt
         val simulationDurationMs = 4 * 3600 * 1000L
         val tickStepMs = 2000L

@@ -21,9 +21,9 @@ import timber.log.Timber
 
 /**
  * MainFileHelper: Handles importing and exporting configuration and telemetry data.
- * Sep.22.40:
- * - Refactored to use MainRepository directly for telemetry access to support
- *   ViewModel decomposition (R-ID 408).
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 object MainFileHelper {
 
@@ -37,7 +37,7 @@ object MainFileHelper {
     fun getUnifiedFileName(category: String, source: String, deviceId: String, isAuto: Boolean, timeProvider: TimeProvider, extension: String = "json"): String {
         val prefix = if (isAuto) "A_" else "M_"
         val sdf = SimpleDateFormat("d_HH.mm", Locale.getDefault())
-        val baseName = "${category}_${source}_${deviceId}_${sdf.format(Date(timeProvider.currentTimeMillis()))}.$extension"
+        val baseName = "${category}_${source}_${deviceId}_${sdf.format(Date(timeProvider.currentTimeMillis))}.$extension"
         return prefix + baseName.replace("_system", "")
     }
 
@@ -219,7 +219,7 @@ object MainFileHelper {
 
                 val logs = viewModel.repository.eventLogsFlow(LOG_LIMIT_STANDARD).first()
                 val root = JSONObject().apply {
-                    put("exported_at", timeProvider.currentTimeMillis())
+                    put("exported_at", timeProvider.currentTimeMillis)
                     put("role", appMode)
                     put("settings_snapshot", settings)
                     put("logs", JSONArray().apply { logs.forEach { put(it.toJSONObject()) } })
@@ -285,7 +285,7 @@ object MainFileHelper {
                 }
 
                 val root = JSONObject().apply {
-                    put("exported_at", timeProvider.currentTimeMillis())
+                    put("exported_at", timeProvider.currentTimeMillis)
                     put("role", appMode)
                     put("config", settingsJson)
                 }
@@ -323,7 +323,7 @@ object MainFileHelper {
                 }
 
                 val root = JSONObject().apply {
-                    put("exported_at", timeProvider.currentTimeMillis())
+                    put("exported_at", timeProvider.currentTimeMillis)
                     put("device_id", deviceId)
                     put("role", appMode)
                     put("tracker_trail", JSONArray().apply {
@@ -373,7 +373,7 @@ object MainFileHelper {
 
     suspend fun autoExportData(context: Context, repository: MainRepository, timeProvider: TimeProvider) {
         try {
-            val now = timeProvider.currentTimeMillis()
+            val now = timeProvider.currentTimeMillis
             val deviceId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
             val appMode = repository.getAppMode()
             
@@ -417,7 +417,7 @@ object MainFileHelper {
                     })
                 }
                 put("points", arr)
-                put("timestamp", timeProvider.currentTimeMillis())
+                put("timestamp", timeProvider.currentTimeMillis)
                 put("role", source) 
                 put("source", source)
                 put("device_id", deviceId)
@@ -436,7 +436,7 @@ object MainFileHelper {
     fun performDailyArchiving(context: Context, timeProvider: TimeProvider) {
         try {
             val appFolder = getPublicAppFolder(context)
-            val now = timeProvider.currentTimeMillis()
+            val now = timeProvider.currentTimeMillis
             val thresholdMs = 28 * 60 * 60 * 1000L
             val cutoff = now - thresholdMs
             val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())

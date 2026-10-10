@@ -7,12 +7,9 @@ import kotlin.math.*
 
 /**
  * GeofenceBatteryAuditTest: Verification of R406a Dynamic Polling vs. Geofence Integrity.
- * Oct.3.9:
- * - Issue #1201 RESOLVED: Updated detectViolations calls to match new signature 
- *   with explicit isLockedOut parameter (R-ID 510).
- * Oct.2.8:
- * - Issue #1330: Snap-to-Update Monolith. Migrated from SystemEvaluationSnapshot 
- *   to unified LocationUpdate DTO (R-ID 596).
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors in mock and call sites.
  */
 class GeofenceBatteryAuditTest {
 
@@ -20,8 +17,8 @@ class GeofenceBatteryAuditTest {
         private var time = 1700000000000L
         private var rt = 100000L
         
-        override fun elapsedRealtime(): Long = rt
-        override fun currentTimeMillis(): Long = time
+        override val elapsedRealtime: Long get() = rt
+        override val currentTimeMillis: Long get() = time
         
         fun advance(ms: Long) {
             time += ms
@@ -34,8 +31,8 @@ class GeofenceBatteryAuditTest {
     private val onResolve: (AlarmEvaluationState.ActiveAlarm, Long) -> Unit = { _, _ -> }
 
     private fun createDefaultState(): AlarmEvaluationState {
-        val now = mockTimeProvider.currentTimeMillis()
-        val rt = mockTimeProvider.elapsedRealtime()
+        val now = mockTimeProvider.currentTimeMillis
+        val rt = mockTimeProvider.elapsedRealtime
         val state = AlarmEvaluationState()
         state.update(
             now = now,
@@ -91,8 +88,8 @@ class GeofenceBatteryAuditTest {
         val report = SystemHealthReport()
         state.trackerSpeed = 0.0
         mockTimeProvider.advance(45000)
-        state.now = mockTimeProvider.currentTimeMillis()
-        state.nowRt = mockTimeProvider.elapsedRealtime()
+        state.now = mockTimeProvider.currentTimeMillis
+        state.nowRt = mockTimeProvider.elapsedRealtime
         state.trackerLat = 10.0011 // ~120m away
         state.trackerSpeed = 5.0
         state.lastGpsPacketRt = state.nowRt
@@ -127,8 +124,8 @@ class GeofenceBatteryAuditTest {
         state.distanceViolationCounter = DISTANCE_ALARM_SAMPLES_REQUIRED
         state.trackerLastValidFixRt = state.nowRt
         mockTimeProvider.advance(100000)
-        state.now = mockTimeProvider.currentTimeMillis()
-        state.nowRt = mockTimeProvider.elapsedRealtime()
+        state.now = mockTimeProvider.currentTimeMillis
+        state.nowRt = mockTimeProvider.elapsedRealtime
         state.health.isLocationPending = true
         state.trackerSpeed = 20.0
         MainAlarmLogic.detectViolations(state, mockTimeProvider, report, false, spikeLogger, onTrigger, onResolve)
@@ -139,8 +136,8 @@ class GeofenceBatteryAuditTest {
     fun `Audit LocationProcessor Status Transitions`() {
         val processor = LocationProcessor(mockTimeProvider)
         processor.loadState(5.0, 0L, -1.0, null, listOf(EngineGeoPoint(10.0, 10.0)), 100.0)
-        val nowRt = mockTimeProvider.elapsedRealtime()
-        val nowWall = mockTimeProvider.currentTimeMillis()
+        val nowRt = mockTimeProvider.elapsedRealtime
+        val nowWall = mockTimeProvider.currentTimeMillis
         
         val snap1 = LocationUpdate(
             kinetic = KineticState(lat = 10.0, lng = 10.0, alt = 0.0, speed = 0.0, accuracy = 5.0, bearing = 0.0, gpsTs = nowWall),

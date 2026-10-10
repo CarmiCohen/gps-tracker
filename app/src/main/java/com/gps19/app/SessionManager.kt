@@ -6,10 +6,9 @@ import javax.inject.Singleton
 
 /**
  * SessionManager: Tracks session-level state and uptime metrics.
- * Oct.4.5:
- * - Issue #1425: Unified Clock Authority. Added appStartRt for monotonic 
- *   duration checks (e.g. startup settling delay).
- * - Rename currentDropStartTs to currentDropStartRt for source clarity.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 @Singleton
 class SessionManager @Inject constructor(
@@ -17,11 +16,11 @@ class SessionManager @Inject constructor(
     private val timeProvider: TimeProvider
 ) {
     // appStartTime remains Wall Clock for absolute audit logs and UI display.
-    var appStartTime: Long = timeProvider.currentTimeMillis()
+    var appStartTime: Long = timeProvider.currentTimeMillis
         private set
 
     // appStartRt is the monotonic reference for duration logic (R-ID 1425).
-    var appStartRt: Long = timeProvider.elapsedRealtime()
+    var appStartRt: Long = timeProvider.elapsedRealtime
         private set
 
     var lastGpsTs: Long = 0L
@@ -92,8 +91,8 @@ class SessionManager @Inject constructor(
     }
 
     fun reset() {
-        appStartTime = timeProvider.currentTimeMillis()
-        appStartRt = timeProvider.elapsedRealtime()
+        appStartTime = timeProvider.currentTimeMillis
+        appStartRt = timeProvider.elapsedRealtime
         violationUptimeMs = 0L
         totalUptimeMs = 0L
         currentDropStartRt = 0L

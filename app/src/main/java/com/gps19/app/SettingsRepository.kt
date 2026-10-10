@@ -55,11 +55,12 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  * Oct.6.9:
  * - Issue #AUDIT-1006-9: Protocol Optimization. Restored missing Protobuf accessors 
  *   to resolve compilation errors (Rule 1.1).
- * Oct.5.1:
- * - Issue #SIMP-1201-1: Logic State Serialization.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -391,7 +392,7 @@ class SettingsRepository @Inject constructor(
     suspend fun loadHomePoints(): List<GeoPoint> = dataStore.data.first().homePointsList.map { GeoPoint(it.lat, it.lng) }
 
     suspend fun saveHomePoints(points: List<GeoPoint>, maxDistance: Double? = null, timestamp: Long? = null): Long {
-        val ts = timestamp ?: timeProvider.currentTimeMillis()
+        val ts = timestamp ?: timeProvider.currentTimeMillis
         dataStore.mutate {
             clearHomePoints().addAllHomePoints(points.map { GeoPointProto.newBuilder().setLat(it.latitude).setLng(it.longitude).build() })
             setHomePointsTs(ts)
@@ -401,7 +402,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun addHomePoint(lat: Double, lng: Double): Long {
-        val ts = timeProvider.currentTimeMillis()
+        val ts = timeProvider.currentTimeMillis
         dataStore.mutate {
             addHomePoints(GeoPointProto.newBuilder().setLat(lat).setLng(lng).build())
             setHomePointsTs(ts)
@@ -410,7 +411,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun removeHomePoint(index: Int): Long {
-        val ts = timeProvider.currentTimeMillis()
+        val ts = timeProvider.currentTimeMillis
         dataStore.mutate {
             if (index >= 0 && index < homePointsCount) {
                 removeHomePoints(index)
@@ -467,7 +468,7 @@ class SettingsRepository @Inject constructor(
             setTotalDrop(totalDrop + blackoutMs)
             if (blackoutMs > maxDrop) {
                 setMaxDrop(blackoutMs)
-                setMaxDropTs(timeProvider.currentTimeMillis())
+                setMaxDropTs(timeProvider.currentTimeMillis)
             }
         }
     }

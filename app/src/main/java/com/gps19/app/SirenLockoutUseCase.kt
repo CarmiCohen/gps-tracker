@@ -12,8 +12,9 @@ import timber.log.Timber
 /**
  * SirenLockoutUseCase: Handles system-wide siren lockout/cooldown logic reactively.
  * Decouples domain cooldown policy from audio generation components.
- * Sep.27.10:
- * - Issue #1201 RESOLVED: Centralized siren lockout authority with standard durations (R-ID 510).
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 @Singleton
 class SirenLockoutUseCase @Inject constructor(
@@ -28,7 +29,7 @@ class SirenLockoutUseCase @Inject constructor(
      * Returns true if the siren is currently locked out by a cooldown or manual silence.
      */
     fun isLockedOut(): Boolean {
-        return timeProvider.elapsedRealtime() < _silencedUntilRt.value
+        return timeProvider.elapsedRealtime < _silencedUntilRt.value
     }
 
     /**
@@ -38,7 +39,7 @@ class SirenLockoutUseCase @Inject constructor(
      */
     fun setSilence(durationMs: Long) {
         if (durationMs > 0) {
-            val nowRt = timeProvider.elapsedRealtime()
+            val nowRt = timeProvider.elapsedRealtime
             val newSilenceRt = nowRt + durationMs
             synchronized(this) {
                 if (newSilenceRt > _silencedUntilRt.value) {

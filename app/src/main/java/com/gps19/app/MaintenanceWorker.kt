@@ -18,12 +18,9 @@ import java.util.concurrent.TimeUnit
 
 /**
  * MaintenanceWorker: A "Second Line of Defense" to ensure the tracking/viewing service remains active.
- * Sep.30.70:
- * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
- *   API in MainRepository, eliminating manual prefixing (R-ID 568).
- * Sep.30.60:
- * - Issue #1406: Standardized Role Identity. Migrated to AppRole enum to 
- *   ensure prefix consistency (R-ID 453/565).
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 @HiltWorker
 class MaintenanceWorker @AssistedInject constructor(
@@ -68,8 +65,8 @@ class MaintenanceWorker @AssistedInject constructor(
         val savedMode = repository.getAppMode()
         val isSystemActive = repository.isSystemActiveFlow.firstOrNull() ?: repository.getBoolean(IS_SYSTEM_ACTIVE_KEY, false)
         
-        val now = timeProvider.currentTimeMillis()
-        val nowRt = timeProvider.elapsedRealtime()
+        val now = timeProvider.currentTimeMillis
+        val nowRt = timeProvider.elapsedRealtime
         
         // R-ID 453/565: Local recovery audits local service ticks
         val role = if (savedMode == "tracker") AppRole.TRACKER else AppRole.VIEWER_SELF

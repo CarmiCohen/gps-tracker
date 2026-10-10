@@ -22,13 +22,9 @@ import kotlin.math.exp
 
 /**
  * AudioSynthesizer: Procedural audio generator for sirens and alerts.
- * Sep.27.10:
- * - Issue #1201 RESOLVED: Decoupled siren lockout logic into SirenLockoutUseCase.
- *   AudioSynthesizer is now focused on audio generation (R-ID 510).
- * Sep.23.01:
- * - Issue #1193 Hardening: Converted isLooping to MutableStateFlow to expose 
- *   isSirenPlaying flow, resolving asymmetric state dispersion between 
- *   engine and UI layers (R-ID 418).
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 @Singleton
 class AudioSynthesizer @Inject constructor(
@@ -103,11 +99,11 @@ class AudioSynthesizer @Inject constructor(
             var isAutoStopped = false
             try {
                 Timber.d("Siren loop started: $type (force=$force, loop=$loop)")
-                val startRt = timeProvider.elapsedRealtime()
+                val startRt = timeProvider.elapsedRealtime
                 val vibrator = if (vibrate) context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator else null
 
                 while (isActive) {
-                    val nowRt = timeProvider.elapsedRealtime()
+                    val nowRt = timeProvider.elapsedRealtime
                     val elapsed = nowRt - startRt
                     if (elapsed >= SIREN_AUTO_STOP_MS) {
                         isAutoStopped = true
@@ -234,8 +230,8 @@ class AudioSynthesizer @Inject constructor(
             audioTrack.play()
             
             val durationMs = (samples.size.toDouble() / SIREN_SAMPLE_RATE * 1000).toLong()
-            val startRt = timeProvider.elapsedRealtime()
-            while (isActive && timeProvider.elapsedRealtime() - startRt < durationMs) {
+            val startRt = timeProvider.elapsedRealtime
+            while (isActive && timeProvider.elapsedRealtime - startRt < durationMs) {
                 delay(50)
             }
         } catch (e: Exception) {
@@ -282,8 +278,8 @@ class AudioSynthesizer @Inject constructor(
             
             val durationMs = (duration * 1000).toLong()
             if (timeProvider != null) {
-                val startRt = timeProvider.elapsedRealtime()
-                while (isActive && timeProvider.elapsedRealtime() - startRt < durationMs) {
+                val startRt = timeProvider.elapsedRealtime
+                while (isActive && timeProvider.elapsedRealtime - startRt < durationMs) {
                     delay(10)
                 }
             } else {

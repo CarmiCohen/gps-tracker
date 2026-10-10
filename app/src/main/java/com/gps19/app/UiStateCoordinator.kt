@@ -8,12 +8,9 @@ import javax.inject.Singleton
 /**
  * UiStateCoordinator: Unified Authority for reactive state mapping (Dashboard/HUD/Map).
  * Achieves a perfectly thin ViewModel by separating state projection logic from orchestration.
- * Oct.1.5:
- * - Issue #MAP-SOT-02: Dimming stale segments in computeTrailSegments (R338).
- * - Issue #MAP-SOT-03: Mapped isAnchorLocked to MapViewState.
- * Sep.30.42:
- * - Issue #1390: Removed MapTriggers from mapMapViewState.
- * Sep.27.12: Initial implementation for Issue #1350.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 @Singleton
 class UiStateCoordinator @Inject constructor(
@@ -48,7 +45,7 @@ class UiStateCoordinator @Inject constructor(
             sinceDiscoMs = if (activeStats.lastDiscTs > 0) (nowRt - activeStats.lastDiscTs) else 0L,
             totalDropMs = activeStats.totalDropMs,
             maxDropMs = activeStats.maxDropMs,
-            engineVersion = BuildConfig.VERSION_NAME,
+            engineVersion = "Oct10.3",
             netInterface = diag.connectivity.netInterface,
             systemPulse = nowRt
         )
@@ -287,7 +284,7 @@ class UiStateCoordinator @Inject constructor(
         vios: List<ViolationPoint>
     ): MapViewState {
         val m = mode ?: "tracker"
-        val pulse = timeProvider.currentTimeMillis()
+        val pulse = timeProvider.currentTimeMillis
         val loc = if (m == "tracker") kin.localLocation else kin.trackerLocation
         val tLat = loc.kinetic.lat
         val tLng = loc.kinetic.lng
@@ -326,7 +323,7 @@ class UiStateCoordinator @Inject constructor(
      */
     fun computeTrailSegments(trailPoints: List<TrailPoint>, color: Int): List<MapTrailSegment> {
         if (trailPoints.isEmpty()) return emptyList()
-        val now = timeProvider.currentTimeMillis()
+        val now = timeProvider.currentTimeMillis
         val segments = mutableListOf<MapTrailSegment>()
         var currentPoints = mutableListOf<org.osmdroid.util.GeoPoint>()
         var currentIsStale: Boolean? = null

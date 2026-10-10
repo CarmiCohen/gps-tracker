@@ -9,16 +9,9 @@ import javax.inject.Inject
 
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
- * Oct.2.9:
- * - Issue #1314: TrackerStatus Convergence. Migrated InitialSettings to use 
- *   unified LocationUpdate monolith.
- * Oct.1.3:
- * - Issue #1408: Telemetry Convergence. Updated loadAllSettings to utilize 
- *   AppRole.VIEWER_REMOTE for alarm acknowledgment state when in Viewer mode, 
- *   ensuring parity with AppAlarmManager and HUD visibility (R-ID 571).
- * Sep.30.70:
- * - Issue #1407: Unified Storage Authority. Migrated to role-based storage 
- *   API in SettingsRepository, eliminating manual prefixing.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 class SettingsUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -102,7 +95,7 @@ class SettingsUseCase @Inject constructor(
         
         var appStartTime = s.appStartTime
         if (appStartTime == 0L) {
-            appStartTime = timeProvider.currentTimeMillis()
+            appStartTime = timeProvider.currentTimeMillis
             repository.saveLong(APP_START_TIME_KEY, appStartTime)
         }
 
@@ -143,7 +136,7 @@ class SettingsUseCase @Inject constructor(
             repository.saveBoolean(IS_SYSTEM_ACTIVE_KEY, false)
             repository.clearDraftSettings()
             
-            val appStartTime = timeProvider.currentTimeMillis()
+            val appStartTime = timeProvider.currentTimeMillis
             repository.saveLong(APP_START_TIME_KEY, appStartTime)
             repository.sendCommand(UiCommand.FullInitializationReset)
             

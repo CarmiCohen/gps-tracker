@@ -12,12 +12,9 @@ import javax.inject.Singleton
 
 /**
  * GpsStatusManager: Centralized reactive Flow for the GPS-Index.
- * Oct.4.5:
- * - Issue #1425: Unified Clock Authority. Migrated GPS age calculation to 
- *   monotonic time (elapsedRealtime) to prevent index jitter during clock sync.
- * Sep.09.10:
- * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .integrity)
- *   in LocationUpdate to support bridge removal.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
+ *   TimeProvider API and fixed property invocation errors.
  */
 @Singleton
 class GpsStatusManager @Inject constructor(
@@ -36,7 +33,7 @@ class GpsStatusManager @Inject constructor(
     @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class)
     val gpsIndexFlow: SharedFlow<GpsIndexData> = flow {
         while (true) {
-            emit(timeProvider.elapsedRealtime())
+            emit(timeProvider.elapsedRealtime)
             delay(TICK_INTERVAL_MS)
         }
     }.flatMapLatest { nowRt ->

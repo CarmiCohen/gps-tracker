@@ -39,11 +39,9 @@ class BootReceiver : BroadcastReceiver() {
 
 /**
  * Worker that bridges the boot broadcast to the Foreground Service.
- * Sep.24.92:
- * - Issue #1261: Service Unification. Migrated to MonitorService for boot revival (R-ID 471).
- * Sep.03.101:
- * - Issue #897 Enforcement: Fixed InvalidForegroundServiceTypeException on 
- *   Target SDK 35 by explicitly declaring FOREGROUND_SERVICE_TYPE_SPECIAL_USE (R897).
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
  */
 @HiltWorker
 class BootServiceStartWorker @AssistedInject constructor(
@@ -81,7 +79,7 @@ class BootServiceStartWorker @AssistedInject constructor(
         if (isSystemActive && appMode != null) {
             Timber.i("BootWorker: Restarting service in $appMode mode (System Active)")
             
-            repository.setAppStartTime(timeProvider.currentTimeMillis())
+            repository.setAppStartTime(timeProvider.currentTimeMillis)
 
             // Issue #1261: Unified MonitorService manages role transitions internally
             val serviceIntent = Intent(applicationContext, MonitorService::class.java)

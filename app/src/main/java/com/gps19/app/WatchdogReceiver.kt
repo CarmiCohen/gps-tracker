@@ -13,14 +13,9 @@ import javax.inject.Inject
 
 /**
  * WatchdogReceiver: Responds to watchdog alarms to ensure the service stays active.
- * Sep.24.92:
- * - Issue #1261: Service Unification. Migrated to MonitorService for system 
- *   recovery operations (R-ID 471).
- * July.30.27:
- * - Issue #629: Deferred Recovery Latency Audit. Added recoveryBlockedTs recording.
- * July.30.26:
- * - Issue #626: Foreground Service Start Hardening. Added handling for 
- *   ForegroundServiceStartNotAllowedException with deferred recovery flagging.
+ * Oct.10.3:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
  */
 @AndroidEntryPoint
 class WatchdogReceiver : BroadcastReceiver() {
@@ -36,8 +31,8 @@ class WatchdogReceiver : BroadcastReceiver() {
         
         if (action == ACTION_ALARM_WAKEUP) {
             val pendingResult = goAsync()
-            val nowRt = timeProvider.elapsedRealtime()
-            val nowTs = timeProvider.currentTimeMillis()
+            val nowRt = timeProvider.elapsedRealtime
+            val nowTs = timeProvider.currentTimeMillis
             
             scope.launch {
                 try {
