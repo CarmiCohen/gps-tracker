@@ -5,12 +5,12 @@ import java.util.concurrent.atomic.AtomicLong
 /**
  * LatencyMonitor: Unified framework for tracking execution durations 
  * of critical operations (JNI, DB, I/O).
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Migrated to TimeProvider 
+ *   property-based API.
  * Aug.10.26:
  * - Issue #131: Forensic Performance Audit. Added rolling max latency tracking 
  *   to support forensic trend analysis on budget hardware (A15).
- * July.29.22:
- * - Issue #623: Structural: Latency Monitor Metric Cleanup. Standardized spike 
- *   reporting and removed deprecated measure() API.
  */
 object LatencyMonitor {
 
@@ -37,9 +37,9 @@ object LatencyMonitor {
         onSpike: (message: String, duration: Long) -> Unit,
         block: () -> T
     ): T {
-        val start = timeProvider.elapsedRealtime()
+        val start = timeProvider.elapsedRealtime
         val result = block()
-        val duration = timeProvider.elapsedRealtime() - start
+        val duration = timeProvider.elapsedRealtime - start
         
         if (type == AuditType.IO) {
             updateMaxIo(duration)

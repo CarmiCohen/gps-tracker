@@ -13,12 +13,12 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider and BootLifecycleAuthority APIs.
  * Oct.7.6:
  * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated AlarmEvent emission 
- *   to utilize the unified ForensicSnapshot container (R-ID 651).
- * Oct.5.1:
- * - Issue #SIMP-1201-1: Logic State Serialization. Refactored saveLogicState 
- *   to utilize the unified evaluation state object (R-ID 510).
+ *   to utilize the unified ForensicSnapshot container.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -157,7 +157,7 @@ class AppAlarmManager @Inject constructor(
                 // Centralized Lockout Recovery
                 if (logicProto.lastSirenStopRt > 0) {
                     val absoluteStopRt = bootLifecycleAuthority.recoverMonotonicTime(logicProto.lastSirenStopRt, logicProto.bootId)
-                    val nowRt = timeProvider.elapsedRealtime()
+                    val nowRt = timeProvider.elapsedRealtime
                     if (nowRt - absoluteStopRt < SIREN_RESUME_COOLDOWN_MS) {
                         val remaining = SIREN_RESUME_COOLDOWN_MS - (nowRt - absoluteStopRt)
                         sirenLockoutUseCase.setSilence(remaining)
@@ -184,10 +184,10 @@ class AppAlarmManager @Inject constructor(
         scope.launch {
             // Heuristic for manual stop recovery: save relative offset from silence timeout
             evaluationState.lastSirenStopRt = if (sirenLockoutUseCase.isLockedOut()) {
-                timeProvider.elapsedRealtime() - (SIREN_RESUME_COOLDOWN_MS / 2) 
+                timeProvider.elapsedRealtime - (SIREN_RESUME_COOLDOWN_MS / 2) 
             } else 0L
             
-            evaluationState.bootId = bootLifecycleAuthority.getCurrentBootId()
+            evaluationState.bootId = bootLifecycleAuthority.currentBootId
             repository.saveLogicState(evaluationState, currentRole)
         }
     }
@@ -309,10 +309,9 @@ class AppAlarmManager @Inject constructor(
             val p = cachedPoints[i]
             evaluationState.getOrCreateHomePoint(i).update(p.latitude, p.longitude)
         }
-        evaluationState.truncateHomePoints(cachedPoints.size)
+        evaluationState.getOrCreateHomePoint(cachedPoints.size)
 
         // Issue #1410: Use remote acknowledgment if provided in the update 
-        // (carried over peer telemetry), otherwise use local authority.
         val targetAlarmAckTs = if (update.lastAlarmAckTs > 0) {
             update.lastAlarmAckTs 
         } else {
@@ -401,7 +400,6 @@ class AppAlarmManager @Inject constructor(
 
     /**
      * Issue #1409: Hardened Special Types.
-     * Connectivity alerts (Signal Loss, GPS Stall) are notification-only.
      */
     private fun isSpecialType(type: String): Boolean {
         return when (type) {

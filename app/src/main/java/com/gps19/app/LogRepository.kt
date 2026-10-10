@@ -21,17 +21,12 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
  * Oct.7.4:
  * - Issue #SIMP-1007-15: Unified Snapshot Container. Updated LogEntry mapping 
  *   to utilize the ForensicSnapshot container while maintaining flat persistence.
- * Oct.6.2:
- * - Issue #AUDIT-1006-5: Forensic Log Pressure Test. Hardened addLog to prevent 
- *   dropping important safety alerts when the log buffer is full. Implemented 
- *   async fallback for isImportant logs. Fixed reference errors (it -> entry, 
- *   getLogCount -> getCount).
- * Oct.4.5:
- * - Issue #1425: Unified Clock Authority. Migrated batch flush and forensic 
- *   drain timers to monotonic time (elapsedRealtime).
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -91,7 +86,7 @@ class LogRepository @Inject constructor(
     private fun startBatchProcessor() {
         scope.launch(Dispatchers.IO) {
             val batch = mutableListOf<BufferedLog>()
-            var lastFlushRt = timeProvider.elapsedRealtime()
+            var lastFlushRt = timeProvider.elapsedRealtime
 
             while (isActive) {
                 try {
@@ -103,7 +98,7 @@ class LogRepository @Inject constructor(
                         batch.add(log)
                     }
 
-                    val nowRt = timeProvider.elapsedRealtime()
+                    val nowRt = timeProvider.elapsedRealtime
                     if (batch.size >= LOG_BATCH_SIZE || (batch.isNotEmpty() && nowRt - lastFlushRt >= LOG_BATCH_DELAY_MS)) {
                         flushBatch(batch)
                         batch.clear()
@@ -130,7 +125,7 @@ class LogRepository @Inject constructor(
 
     private fun startForensicDrainer() {
         scope.launch(Dispatchers.IO) {
-            var lastDrainRt = timeProvider.elapsedRealtime()
+            var lastDrainRt = timeProvider.elapsedRealtime
             
             while (isActive) {
                 try {
@@ -142,7 +137,7 @@ class LogRepository @Inject constructor(
                     
                     delay(dynamicDelay)
                     
-                    val nowRt = timeProvider.elapsedRealtime()
+                    val nowRt = timeProvider.elapsedRealtime
                     val buffer = forensicSpillBufferProvider.get()
                     val pendingAtStart = buffer.getPendingCount()
                     val fillLevel = pendingAtStart.toDouble() / FORENSIC_SPILL_CAPACITY
@@ -212,7 +207,7 @@ class LogRepository @Inject constructor(
             updateReliability(true)
             
             if (isRecovery && filteredEntities.isNotEmpty()) {
-                val recoveryTs = timeProvider.currentTimeMillis()
+                val recoveryTs = timeProvider.currentTimeMillis
                 addLog(LogEntry(
                     localId = "RECOVERY-$recoveryTs",
                     timestamp = recoveryTs,
@@ -262,7 +257,7 @@ class LogRepository @Inject constructor(
                 val h = telemetry.systemHealth.value
                 val msg = "Forensic Stall Correlated: Backfill not converging ($pendingAfter pending). System: [CPU: ${h.cpuLoad}, IOW: ${h.ioWait}]"
                 Timber.w(msg)
-                val stallTs = timeProvider.currentTimeMillis()
+                val stallTs = timeProvider.currentTimeMillis
                 addLog(LogEntry(
                     localId = "STALL-$stallTs",
                     timestamp = stallTs,
@@ -438,7 +433,7 @@ class LogRepository @Inject constructor(
     }
 
     private fun triggerAsyncPruning() {
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         if (nowRt - lastPruneTime.get() < PRUNE_COOLDOWN_MS) return
         if (isPruning.compareAndSet(false, true)) {
             lastPruneTime.set(nowRt)

@@ -16,18 +16,11 @@ import javax.inject.Singleton
 
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
- * Decouples MainViewModel from procedural orchestration.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
  * Oct.6.2:
  * - Issue #AUDIT-1006-5: Added ExecuteLogPressureTest routing.
- * - Issue #AUDIT-1006-6: Added SetMemoryPressureSimulation routing.
- * Oct.4.5:
- * - Issue #1425: Unified Clock Authority. Migrated startup settling delay 
- *   to monotonic time (appStartRt) to prevent service startup glitches 
- *   during clock drift (R-ID 1425).
- * Oct.4.1:
- * - Issue #1202: Unified UI event routing. Integrated UiEffect for imperative 
- *   commands. Migrated mode transition logic and permission orchestration 
- *   from View to Domain layer (R-ID 612).
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -266,7 +259,7 @@ class UiEventCoordinator @Inject constructor(
             is UiEvent.LogAction -> {
                 repository.addLog(LogEntry(
                     localId = UUID.randomUUID().toString(),
-                    timestamp = timeProvider.currentTimeMillis(),
+                    timestamp = timeProvider.currentTimeMillis,
                     message = event.message,
                     type = event.type.uppercase(),
                     isImportant = event.isImportant,
@@ -363,7 +356,7 @@ class UiEventCoordinator @Inject constructor(
         handleEvent(UiEvent.SetSystemActive(true), state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, {}, {}, onUiEffect)
 
         val appStartRt = sessionManager.appStartRt
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         val elapsed = nowRt - appStartRt
         
         if (elapsed < STARTUP_SETTLING_DELAY_MS && appStartRt > 0) {

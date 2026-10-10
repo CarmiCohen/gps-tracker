@@ -9,8 +9,8 @@ import javax.inject.Singleton
 
 /**
  * Android-specific implementation of [PowerStateProvider] using PowerManager.
- * Sep.16.06:
- * - Issue #1050/1052 Test Suite Hardening: Abstracted Doze state for deterministic testing.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Migrated isDeviceIdleMode to property.
  */
 @Singleton
 class AndroidPowerStateProvider @Inject constructor(
@@ -18,7 +18,6 @@ class AndroidPowerStateProvider @Inject constructor(
 ) : PowerStateProvider {
     private val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
 
-    override fun isDeviceIdleMode(): Boolean {
-        return powerManager.isDeviceIdleMode
-    }
+    override val isDeviceIdleMode: Boolean
+        get() = powerManager.isDeviceIdleMode
 }

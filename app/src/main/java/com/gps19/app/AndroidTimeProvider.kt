@@ -7,9 +7,11 @@ import javax.inject.Singleton
 
 /**
  * Android-specific implementation of [TimeProvider] using SystemClock.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Migrated methods to properties.
  */
 @Singleton
 class AndroidTimeProvider @Inject constructor() : TimeProvider {
-    override fun elapsedRealtime(): Long = SystemClock.elapsedRealtime()
-    override fun currentTimeMillis(): Long = System.currentTimeMillis()
+    override val elapsedRealtime: Long get() = SystemClock.elapsedRealtime()
+    override val currentTimeMillis: Long get() = System.currentTimeMillis()
 }

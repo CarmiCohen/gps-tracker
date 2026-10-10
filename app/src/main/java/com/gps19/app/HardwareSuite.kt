@@ -37,11 +37,11 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider and PowerStateProvider APIs.
  * Oct.10.1 (Restoration Path):
- * - Issue #SIMP-1012-1: Forensic Retrieval Optimization. Standardized 100% of 
- *   buffer retrievals on inline forEachMatch callback patterns (R-ID 392).
- * - Issue #SIMP-1014-2: Unified Pressure Path. JNI-driven pressure evaluation.
- * - Issue #SIMP-1011-x: Native JNI Offloading & Forensic Consolidation.
+ * - Issue #SIMP-1012-1: Forensic Retrieval Optimization. Standardized buffer retrievals.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -337,7 +337,7 @@ class HardwareSuite @Inject constructor(
 
     @Volatile var lastAcousticLockoutRt = 0L; private set
     private var sessionStartRt = 0L
-    val isWarming get() = (timeProvider.elapsedRealtime() - sessionStartRt < SENSOR_WARMING_MS)
+    val isWarming get() = (timeProvider.elapsedRealtime - sessionStartRt < SENSOR_WARMING_MS)
 
     @Volatile var currentVibrationIndex = 0.0; private set
     @Volatile var adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; private set
@@ -404,7 +404,7 @@ class HardwareSuite @Inject constructor(
     private val gnssStatusCallback = object : ManagedGnssStatusCallback() {
         override fun onSatelliteStatusChanged(status: GnssStatus) {
             if (isTeardownActive.get()) return
-            val nowRt = timeProvider.elapsedRealtime()
+            val nowRt = timeProvider.elapsedRealtime
             
             synchronized(gnssHealthBatch) {
                 gnssHealthBatch.count = status.satelliteCount.coerceAtMost(64)
@@ -431,7 +431,7 @@ class HardwareSuite @Inject constructor(
                 }
             }
             
-            val now = timeProvider.currentTimeMillis()
+            val now = timeProvider.currentTimeMillis
             
             synchronized(snrBuffer) {
                 snrBuffer.next().apply {
@@ -461,7 +461,7 @@ class HardwareSuite @Inject constructor(
             val display = displayManager.getDisplay(displayId) ?: return
             val newState = display.state
             if (newState != lastDisplayState) {
-                val nowRt = timeProvider.elapsedRealtime()
+                val nowRt = timeProvider.elapsedRealtime
                 val isDozeVolatility = (lastDisplayState == Display.STATE_DOZE && newState == Display.STATE_DOZE_SUSPEND) ||
                                        (lastDisplayState == Display.STATE_DOZE_SUSPEND && newState == Display.STATE_DOZE)
 
@@ -519,7 +519,7 @@ class HardwareSuite @Inject constructor(
             val count = activeUsers.incrementAndGet()
             Timber.d("HardwareSuite: start() called. Active users: $count")
 
-            val nowRt = timeProvider.elapsedRealtime()
+            val nowRt = timeProvider.elapsedRealtime
             if (!isStarted.get()) {
                 sessionStartRt = nowRt
                 lastBaroZeroingRt = nowRt
@@ -708,7 +708,7 @@ class HardwareSuite @Inject constructor(
     }
 
     private fun updateLocationStatus() {
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         val deltaSinceFix = if (lastFixRt > 0) nowRt - lastFixRt else nowRt
         var shouldEmitSuccess = false
         
@@ -795,8 +795,8 @@ class HardwareSuite @Inject constructor(
     private val hardwareObservationFlow = pollingIntervalFlow.flatMapLatest { interval ->
         callbackFlow<GpsUpdate> {
             start() 
-            fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime(); lastGpsSpeedMps = loc.speed.toDouble(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
-            val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime(); lastGpsSpeedMps = it.speed.toDouble(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
+            fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime; lastGpsSpeedMps = loc.speed.toDouble(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
+            val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime; lastGpsSpeedMps = it.speed.toDouble(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
             val handler = synchronized(lifecycleLock) { hardwareHandler }
             synchronized(lifecycleLock) { activeLocationCallback?.unregister(fusedLocationClient, timeProvider, handler); activeLocationCallback = fusedCallback }
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval).setMinUpdateIntervalMillis(interval / 2).build()
@@ -834,7 +834,7 @@ class HardwareSuite @Inject constructor(
 
     override fun onSensorChanged(event: SensorEvent) {
         if (isTeardownActive.get()) return
-        val nowRt = timeProvider.elapsedRealtime(); val wallNow = timeProvider.currentTimeMillis(); val values = event.values
+        val nowRt = timeProvider.elapsedRealtime; val wallNow = timeProvider.currentTimeMillis; val values = event.values
         when (event.sensor.type) {
             Sensor.TYPE_STEP_DETECTOR -> lastStayAliveRt = nowRt
             Sensor.TYPE_ACCELEROMETER -> {
@@ -963,9 +963,9 @@ class HardwareSuite @Inject constructor(
                         }
                         if (!isMonitoring || audioRecord == null) continue
                         try { audioRecord.startRecording() } catch (e: Exception) { try { audioRecord.release() } catch (ex: Exception) {}; try { Thread.sleep(ACOUSTIC_GENERIC_RECOVERY_DELAY_MS) } catch (ie: InterruptedException) { break }; continue }
-                        isAcousticRunning = true; val buffer = ShortArray(bufferSize); var lastDutyCycleTransitionRt = timeProvider.elapsedRealtime() ; var isInOffCycle = false
+                        isAcousticRunning = true; val buffer = ShortArray(bufferSize); var lastDutyCycleTransitionRt = timeProvider.elapsedRealtime ; var isInOffCycle = false
                         while (isMonitoring && !Thread.currentThread().isInterrupted) {
-                            val nowRt = timeProvider.elapsedRealtime()
+                            val nowRt = timeProvider.elapsedRealtime
                             if (powerSaveMode) {
                                 val adaptiveOffCycleMs = SentinelValidator.computeAdaptiveAcousticOffCycle(isStationary(), stationaryDurationMs)
                                 if (!isInOffCycle && (nowRt - lastDutyCycleTransitionRt > ACOUSTIC_DUTY_CYCLE_ON_MS)) {
@@ -1112,7 +1112,7 @@ class HardwareSuite @Inject constructor(
     private fun processVibration(x: Float, y: Float, z: Float) {
         val dx = x.toDouble(); val dy = y.toDouble(); val dz = z.toDouble()
         val lx = lastAccelX.toDouble(); val ly = lastAccelY.toDouble(); val lz = lastAccelZ.toDouble()
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         
         synchronized(this) { 
             vibrationBatch.apply {
@@ -1181,7 +1181,7 @@ class HardwareSuite @Inject constructor(
             val d0 = val0.toDouble(); val d1 = val1.toDouble(); val d2 = val2.toDouble(); val g0 = gravityBuffer[0].toDouble(); val g1 = gravityBuffer[1].toDouble(); val g2 = gravityBuffer[2].toDouble(); val dot = d0 * g0 + d1 * g1 + d2 * g2; val gravMag = sqrt(g0 * g0 + g1 * g1 + g2 * g2); val vz_accel = if (gravMag > 0.1) dot / gravMag else 0.0
             currentVerticalVelocity += vz_accel * dt; currentVerticalDisplacement += currentVerticalVelocity * dt 
             if (abs(currentVerticalVelocity) > VERTICAL_VELOCITY_MAX_MPS) currentVerticalVelocity = if (currentVerticalVelocity > 0) VERTICAL_VELOCITY_MAX_MPS else -VERTICAL_VELOCITY_MAX_MPS 
-            val nowRt = timeProvider.elapsedRealtime(); val wallNow = timeProvider.currentTimeMillis()
+            val nowRt = timeProvider.elapsedRealtime; val wallNow = timeProvider.currentTimeMillis
             if (plungePhase > 0 && nowRt - lastPlungePhaseRt > CHAIR_PLUNGE_PHASE_TIMEOUT_MS) plungePhase = 0
             when (plungePhase) {
                 0 -> if (!isWarming && currentVerticalVelocity < -CHAIR_PLUNGE_VELOCITY_THRESHOLD) { plungePhase = 1; lastPlungePhaseRt = nowRt; currentVerticalDisplacement = 0.0 }
@@ -1199,7 +1199,7 @@ class HardwareSuite @Inject constructor(
     private fun processPressure(pressure: Float) {
         val pressureDouble = pressure.toDouble(); if (emaPressure == 0.0) emaPressure = pressureDouble
         currentPressure = pressureDouble; val alpha = SentinelValidator.accelerateAlpha(1.0 - BARO_EMA_SLOW, isWarming); emaPressure = (emaPressure * (1.0 - alpha)) + (pressureDouble * alpha)
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         if (nowRt - lastBaroZeroingRt > BARO_ZEROING_INTERVAL_MS && stationaryDurationMs >= PASSIVE_ZEROING_STATIONARY_MS) { emaPressure = pressureDouble; lastBaroZeroingRt = nowRt }
         val currentAlt = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, pressure).toDouble()
         val baselineAlt = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, emaPressure.toFloat()).toDouble()
@@ -1237,14 +1237,14 @@ class HardwareSuite @Inject constructor(
     
     fun setHighLoad(high: Boolean) { 
         this.isHighLoad = high 
-        if (high) lastAnomalyActiveRt = timeProvider.elapsedRealtime()
+        if (high) lastAnomalyActiveRt = timeProvider.elapsedRealtime
     }
     fun setCpuLoad(load: Double) {
         this.currentCpuLoad = load
     }
     fun setMaliAnomaly(active: Boolean) { 
         this.maliAnomaly = active 
-        if (active) lastAnomalyActiveRt = timeProvider.elapsedRealtime()
+        if (active) lastAnomalyActiveRt = timeProvider.elapsedRealtime
     }
     
     fun setSafeMode(active: Boolean) { 
@@ -1290,7 +1290,7 @@ class HardwareSuite @Inject constructor(
 
     fun resetBaseline(role: AppRole? = null) { 
         synchronized(this) {
-            emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryDurationMs = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime(); lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; 
+            emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryDurationMs = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime; lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; 
             forensicAuditor.reset(role)
             revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
             pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = sessionStartRt; currentLocationStatus = LocationStatus()
@@ -1318,7 +1318,7 @@ class HardwareSuite @Inject constructor(
 
     private fun checkRevivalLifecycle() {
         if (!isStarted.get() || isSafeMode) return
-        val nowRt = timeProvider.elapsedRealtime(); val currentStatus = currentLocationStatus
+        val nowRt = timeProvider.elapsedRealtime; val currentStatus = currentLocationStatus
         if (currentStatus.isPending) {
             val stallDuration = nowRt - pendingEnterRt
             val retryThreshold = (revivalAttemptCount + 1) * GPS_REVIVAL_RETRY_INTERVAL_MS
@@ -1332,7 +1332,7 @@ class HardwareSuite @Inject constructor(
         } else { revivalAttemptCount = 0; isHardwareLocked = false }
     }
 
-    fun shouldDeferSignaling(isInViolation: Boolean): Boolean = powerStateProvider.isDeviceIdleMode() && !isInViolation
+    fun shouldDeferSignaling(isInViolation: Boolean): Boolean = powerStateProvider.isDeviceIdleMode && !isInViolation
 
     fun calculateNextBackoff(attempt: Int, isConnected: Boolean): Long {
         if (isConnected) return NET_REJOIN_THRESHOLD_MS
@@ -1342,7 +1342,7 @@ class HardwareSuite @Inject constructor(
 
     fun shouldPokeHardware(isStaggered: Boolean, lastPokeRt: Long, intervalMs: Long): Boolean {
         if (!isStaggered) return false
-        return timeProvider.elapsedRealtime() - lastPokeRt >= intervalMs
+        return timeProvider.elapsedRealtime - lastPokeRt >= intervalMs
     }
 
     fun processSystemPressure(batch: SystemPressureBatch): Boolean = nativeFastPathProvider.processSystemPressure(batch)

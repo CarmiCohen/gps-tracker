@@ -7,13 +7,12 @@ import javax.inject.Inject
 
 /**
  * SessionUseCase: Logic for managing tracking sessions, mode transitions, and resource cleanup.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
  * Sep.07.81:
  * - HUD LED Specification Compliance (R975): Integrated repository.clear() into 
- *   setAppMode to ensure telemetry state is reset during mode transitions, 
- *   preventing "ghost" peer status on single-device switches.
- * Sep.02.66:
- * - Issue #241 RESOLVED: Mode-Selection Activation. Integrated IS_SYSTEM_ACTIVE_KEY 
- *   toggle into setAppMode to ensure atomic state transition during role selection (R-ID 241).
+ *   setAppMode to ensure telemetry state is reset during mode transitions.
  */
 class SessionUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -21,7 +20,6 @@ class SessionUseCase @Inject constructor(
 ) {
     /**
      * Sets the application mode and activates the system if a mode is selected.
-     * Sep.07.81: Now calls repository.clear() to reset peer activity during role change.
      */
     suspend fun setAppMode(mode: String?): Long? {
         repository.setAppMode(mode)
@@ -29,7 +27,7 @@ class SessionUseCase @Inject constructor(
             // R975: Clear shared telemetry state to prevent stale peer activity from previous role
             repository.clear()
 
-            val appStartTime = timeProvider.currentTimeMillis()
+            val appStartTime = timeProvider.currentTimeMillis
             repository.saveLong(APP_START_TIME_KEY, appStartTime)
             repository.saveBoolean(IS_MANUAL_EXIT_KEY, false)
             // Ensure system is active upon mode selection to unblock workers (R-ID 241)
@@ -56,7 +54,7 @@ class SessionUseCase @Inject constructor(
         return withContext(Dispatchers.IO) {
             repository.resetStats()
             repository.sendCommand(UiCommand.StatsReset)
-            val appStartTime = timeProvider.currentTimeMillis()
+            val appStartTime = timeProvider.currentTimeMillis
             repository.saveLong(APP_START_TIME_KEY, appStartTime)
             appStartTime
         }

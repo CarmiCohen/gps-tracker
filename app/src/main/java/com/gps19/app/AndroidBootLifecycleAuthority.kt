@@ -9,6 +9,8 @@ import javax.inject.Singleton
 /**
  * Android-specific implementation of [BootLifecycleAuthority].
  * Centralizes monotonic clock recovery and session validation.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Migrated getCurrentBootId to property.
  */
 @Singleton
 class AndroidBootLifecycleAuthority @Inject constructor() : BootLifecycleAuthority {
@@ -31,7 +33,7 @@ class AndroidBootLifecycleAuthority @Inject constructor() : BootLifecycleAuthori
         return savedBootId == bootId
     }
 
-    override fun getCurrentBootId(): String = bootId
+    override val currentBootId: String get() = bootId
 
     override fun recoverMonotonicTime(savedRt: Long, savedBootId: String): Long {
         if (savedRt <= 0L) return 0L

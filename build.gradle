@@ -33,7 +33,7 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    return "Sep.30.43"
+    return "Oct10.2"
 }
 
 ext {
@@ -91,7 +91,52 @@ tasks.register('verifyProjectIntegrity') {
             println "Build-Time Interface Validation: PASSED (All core service interfaces bound)."
         }
 
-        // 3. Automated Documentation Version Sync (Issue #1034)
+        // 3. Metadata Visibility Audit (Issue #SIMP-1017-1)
+        println "Metadata Visibility Audit: Scanning for internal leaks..."
+        def engineSourceDir = new File(project.rootDir, "core/engine/src/main/java/com/gps19/core/engine")
+        if (engineSourceDir.exists()) {
+            def allInternalTypes = [] as Set
+            engineSourceDir.eachFileRecurse { file ->
+                if (file.name.endsWith(".kt")) {
+                    def matcher = file.text =~ /\binternal\s+(class|interface|enum|typealias)\s+(\w+)/
+                    while (matcher.find()) {
+                        allInternalTypes.add(matcher.group(2))
+                    }
+                }
+            }
+            
+            println "Metadata Visibility Audit: Cataloged ${allInternalTypes.size()} internal engine types."
+
+            engineSourceDir.eachFileRecurse { file ->
+                if (file.name.endsWith(".kt")) {
+                    def content = file.text
+                    allInternalTypes.each { type ->
+                        def leakPattern = java.util.regex.Pattern.compile(/\b(public|protected)?\s*(val|var|fun|constructor)\s+.*:\s*${type}\b/)
+                        if (leakPattern.matcher(content).find()) {
+                            throw new GradleException("Metadata Leak Detected in ${file.name}: Internal type '${type}' is exposed in a potentially public/protected signature. This will break KAPT/Hilt stubs in :app.")
+                        }
+                    }
+                }
+            }
+            
+            // Cross-Module Authorization Audit
+            if (appModuleDir.exists()) {
+                appModuleDir.eachFileRecurse { file ->
+                    if (file.name.endsWith(".kt")) {
+                        def content = file.text
+                        allInternalTypes.each { type ->
+                            def usagePattern = java.util.regex.Pattern.compile(/\b:\s*${type}\b|\bimport\s+.*\.${type}\b|\b@Inject\s+lateinit\s+var\s+.*:\s*${type}\b/)
+                            if (usagePattern.matcher(content).find()) {
+                                throw new GradleException("Metadata Violation in ${file.name}: App module is attempting to reference internal engine type '${type}'. This causes KAPT stub corruption.")
+                            }
+                        }
+                    }
+                }
+            }
+            println "Metadata Visibility Audit: PASSED (No internal leaks or unauthorized cross-module usage found)."
+        }
+
+        // 4. Automated Documentation Version Sync (Issue #1034)
         def vName = project.autoVersionName
         def filesToUpdate = [
             'Handover.md', 
@@ -104,7 +149,7 @@ tasks.register('verifyProjectIntegrity') {
             if (file.exists()) {
                 println "Updating version in ${fileName} to ${vName}..."
                 def content = file.text
-                def updatedContent = content.replaceAll(/(Sep\.\d{2}\.\d+)/, vName)
+                def updatedContent = content.replaceAll(/(Sep\.\d{2}\.\d+|Oct\.\d{2}\.\d+)/, vName)
                 file.text = updatedContent
             }
         }

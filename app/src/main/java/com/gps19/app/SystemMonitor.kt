@@ -27,12 +27,11 @@ sealed class SystemMonitorEvent {
 /**
  * SystemMonitor: Manages system-level resources like WakeLocks and 
  * Watchdog Alarms to ensure service longevity.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
  * Sep.15.04:
- * - Context Shadowing Automation (#1047): Switched to @ApplicationContext 
- *   as IPC optimization is now handled globally in GpsApplication (R-ID 240).
- * Sep.10.39:
- * - Hardened Testability: Moved `calculateNextGridPoint` to companion object 
- *   to allow deterministic logic testing without Android Context (Issue #945).
+ * - Context Shadowing Automation (#1047): Switched to @ApplicationContext.
  */
 @Singleton
 class SystemMonitor @Inject constructor(
@@ -71,7 +70,7 @@ class SystemMonitor @Inject constructor(
     }
 
     fun acquireWakeLock(force: Boolean = false) {
-        val now = timeProvider.elapsedRealtime()
+        val now = timeProvider.elapsedRealtime
         if (!force && lastWakeLockRenewalTs != 0L && (now - lastWakeLockRenewalTs < WAKELOCK_RENEWAL_TTL_MS)) {
             return
         }
@@ -115,7 +114,7 @@ class SystemMonitor @Inject constructor(
     }
 
     fun scheduleWatchdogAlarm(force: Boolean = false) {
-        val now = timeProvider.elapsedRealtime()
+        val now = timeProvider.elapsedRealtime
         
         if (!force && lastScheduledWatchdogTs != 0L && (now - lastScheduledWatchdogTs) < SYSTEM_WATCHDOG_THROTTLE_MS) return
         

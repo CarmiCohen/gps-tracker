@@ -21,12 +21,12 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
  * Oct.6.10:
  * - Issue #AUDIT-1006-9: Fixed Coordinate Reconstruction. Ensured floating-point 
  *   precision when converting E7 deltas back to doubles (Rule 1.125).
- * Oct.6.9:
- * - Issue #AUDIT-1006-9: Protocol Optimization. Implemented reconstruction of 
- *   absolute coordinates from E7 deltas in handleBinaryUpdate.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -160,7 +160,7 @@ class ConnectivitySuite @Inject constructor(
         override fun onNetworkAvailable() {
             if (isStopped.get() || relayUrl.isEmpty()) return
             scope.launch {
-                val nowRt = timeProvider.elapsedRealtime()
+                val nowRt = timeProvider.elapsedRealtime
                 if (lastReconnectTs > 0L && nowRt - lastReconnectTs < 3000L) return@launch
                 
                 if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) return@launch
@@ -203,7 +203,7 @@ class ConnectivitySuite @Inject constructor(
 
         signalingProvider.setConnectionLostCallback {
             if (!isStopped.get() && relayUrl.isNotEmpty()) {
-                val nowRt = timeProvider.elapsedRealtime()
+                val nowRt = timeProvider.elapsedRealtime
                 if (nowRt - lastReconnectTs > 10000L) {
                     lastReconnectTs = nowRt
                     wakeUpRelay()
@@ -317,7 +317,7 @@ class ConnectivitySuite @Inject constructor(
             if (SignalingConstants.isValidTrackerId(latestDeviceId) && SignalingConstants.isValidViewerId(latestViewerId)) {
                 deviceId = latestDeviceId; viewerId = latestViewerId; relayUrl = latestRelayUrl; isTrackerMode = latestIsTracker
                 withContext(Dispatchers.Default) {
-                    lastReconnectTs = timeProvider.elapsedRealtime()
+                    lastReconnectTs = timeProvider.elapsedRealtime
                     reconnectAttempt = 0
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                     wakeUpRelay()
@@ -334,7 +334,7 @@ class ConnectivitySuite @Inject constructor(
                 if (consecutiveHttpFailures.incrementAndGet() > 3) wakeUpRelay()
             }
 
-            val nowRt = timeProvider.elapsedRealtime()
+            val nowRt = timeProvider.elapsedRealtime
             if (!signalingProvider.isConnected() && !signalingProvider.isConnecting()) {
                 val delay = calculateNextRejoinDelay()
                 if (nowRt - lastReconnectTs > delay) {
@@ -486,8 +486,8 @@ class ConnectivitySuite @Inject constructor(
                 return
             }
 
-            val now = timeProvider.currentTimeMillis()
-            val nowRt = timeProvider.elapsedRealtime()
+            val now = timeProvider.currentTimeMillis
+            val nowRt = timeProvider.elapsedRealtime
             val peerId = statusProto.id
 
             domainEventBus.emit(ConnectivityEvent.PeerPulse(peerId))
@@ -527,7 +527,7 @@ class ConnectivitySuite @Inject constructor(
     }
 
     private fun handleRemoteLog(entry: LogEntry) {
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         mainRepository.addLog(entry)
         remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt)
     }
@@ -535,7 +535,7 @@ class ConnectivitySuite @Inject constructor(
     private fun handleJsonUpdate(data: JSONObject) {
         val type = data.optString("type", "")
         val fromId = data.optString("id"); val fromViewerId = data.optString("viewer_id"); val fromViewer = data.optBoolean("from_viewer", false)
-        val now = timeProvider.currentTimeMillis(); val nowRt = timeProvider.elapsedRealtime()
+        val now = timeProvider.currentTimeMillis; val nowRt = timeProvider.elapsedRealtime
         val peerId = if (isTrackerMode) (if (fromViewerId.isNotEmpty()) fromViewerId else fromId) else fromId
 
         if (type == "remote_log") {
@@ -673,7 +673,7 @@ class ConnectivitySuite @Inject constructor(
     fun stop() { 
         if (!isStarted.getAndSet(false)) return
         isStopped.set(true)
-        val stopStartTime = timeProvider.elapsedRealtime()
+        val stopStartTime = timeProvider.elapsedRealtime
         Timber.i("ConnectivitySuite: Starting teardown sequence (R-ID 197).")
 
         resetPeerStats()
@@ -690,11 +690,11 @@ class ConnectivitySuite @Inject constructor(
         
         networkProvider.registerListener(networkListener)
         
-        val sigStart = timeProvider.elapsedRealtime()
+        val sigStart = timeProvider.elapsedRealtime
         signalingProvider.disconnect() 
-        val sigDuration = timeProvider.elapsedRealtime() - sigStart
+        val sigDuration = timeProvider.elapsedRealtime - sigStart
         
-        val totalDuration = timeProvider.elapsedRealtime() - stopStartTime
+        val totalDuration = timeProvider.elapsedRealtime - stopStartTime
         Timber.i("""
             ConnectivitySuite: Teardown Summary (Issue #197 Verification):
             - Total Teardown Time: ${totalDuration}ms
@@ -720,7 +720,7 @@ class ConnectivitySuite @Inject constructor(
     }
     fun connect(url: String) {
         if (isStopped.get()) return
-        this.relayUrl = url; this.lastReconnectTs = timeProvider.elapsedRealtime()
+        this.relayUrl = url; this.lastReconnectTs = timeProvider.elapsedRealtime
         if (SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
             reconnectAttempt = 0
             signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
@@ -731,9 +731,9 @@ class ConnectivitySuite @Inject constructor(
     fun executeFlappingStressTest() {
         scope.launch(Dispatchers.Default) {
             domainEventBus.emit(DomainEvent.ServiceStatus("NETWORK STRESS TEST: Initiating 10s Signaling Flapping Burst.", isImportant = true))
-            val start = timeProvider.elapsedRealtime()
+            val start = timeProvider.elapsedRealtime
             var count = 0
-            while (timeProvider.elapsedRealtime() - start < 10000) {
+            while (timeProvider.elapsedRealtime - start < 10000) {
                 if (signalingProvider.isConnected()) {
                     signalingProvider.disconnect()
                 } else {

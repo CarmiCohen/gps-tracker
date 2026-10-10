@@ -18,11 +18,12 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * Oct.10.1 (Restoration Path):
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
+ * Oct.10.1:
  * - Issue #SIMP-1014-2: Unified Pressure Path. Consolidated Memory and 
- *   Storage pressure evaluation into a single JNI crossing via SystemPressureBatch.
- * Oct.6.2:
- * - Issue #AUDIT-1006-6: Added Memory Pressure simulation hooks.
+ *   Storage pressure evaluation into a single JNI crossing.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -80,7 +81,7 @@ class IntegrityMonitor @Inject constructor(
             }
 
             systemStatusProvider.observeInternetStatus()
-                .onEach { lastInternetUpdateRt = timeProvider.elapsedRealtime() }
+                .onEach { lastInternetUpdateRt = timeProvider.elapsedRealtime }
                 .distinctUntilChanged()
                 .onEach { online -> 
                     updateHealth { it.isHardwareOnline = online } 
@@ -90,7 +91,7 @@ class IntegrityMonitor @Inject constructor(
 
         scope.launch {
             systemStatusProvider.observeBatteryStatus()
-                .onEach { lastBatteryUpdateRt = timeProvider.elapsedRealtime() }
+                .onEach { lastBatteryUpdateRt = timeProvider.elapsedRealtime }
                 .distinctUntilChanged()
                 .onEach { status -> 
                     handleBatteryUpdate(status) 
@@ -100,7 +101,7 @@ class IntegrityMonitor @Inject constructor(
 
         scope.launch {
             systemStatusProvider.observeStorageStatus()
-                .onEach { lastStorageUpdateRt = timeProvider.elapsedRealtime() }
+                .onEach { lastStorageUpdateRt = timeProvider.elapsedRealtime }
                 .distinctUntilChanged()
                 .onEach { status -> 
                     if (!isStorageSimulated.get()) {
@@ -112,7 +113,7 @@ class IntegrityMonitor @Inject constructor(
 
         scope.launch {
             systemStatusProvider.observePowerStatus()
-                .onEach { lastPowerUpdateRt = timeProvider.elapsedRealtime() }
+                .onEach { lastPowerUpdateRt = timeProvider.elapsedRealtime }
                 .distinctUntilChanged()
                 .onEach { status -> 
                     handlePowerUpdate(status) 
@@ -122,7 +123,7 @@ class IntegrityMonitor @Inject constructor(
 
         scope.launch {
             hardwareSuite.locationStatusFlow
-                .onEach { lastLocationStatusUpdateRt = timeProvider.elapsedRealtime() }
+                .onEach { lastLocationStatusUpdateRt = timeProvider.elapsedRealtime }
                 .distinctUntilChanged()
                 .onEach { status -> 
                     handleLocationStatusUpdate(status) 
@@ -212,7 +213,7 @@ class IntegrityMonitor @Inject constructor(
     }
 
     private suspend fun performIntegrityHeartbeat() {
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         val stallThreshold = INTEGRITY_HEARTBEAT_INTERVAL_MS * 3
         
         val storageStalled = lastStorageUpdateRt > 0 && (nowRt - lastStorageUpdateRt) > stallThreshold
@@ -418,7 +419,7 @@ class IntegrityMonitor @Inject constructor(
     }
 
     private fun handleBatteryUpdate(status: BatteryStatus) {
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         val batteryTemp = status.temp
         val isCharging = status.isCharging
         
@@ -612,7 +613,7 @@ class IntegrityMonitor @Inject constructor(
                   else "System Info: Simulated Thermal limit recovered."
         domainEventBus.emit(IntegrityEvent.LogEvent(msg, active))
         
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         val coolingEnteredTimestamp = if (active) nowRt else 0L
 
         if (active) domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_TRACKER_TEMP))
@@ -687,7 +688,7 @@ class IntegrityMonitor @Inject constructor(
     }
 
     suspend fun checkInternetIntegrity(now: Long): Boolean {
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         if (nowRt - lastInternetCheckRt < INTERNET_CHECK_TTL_MS && lastInternetCheckRt != 0L) {
             return !currentHealth.localInternetLoss
         }
@@ -710,9 +711,6 @@ class IntegrityMonitor @Inject constructor(
 
     /**
      * checkSignalIntegrity: Enhanced Signal Loss auditing with forensic grace periods.
-     * Issue #1060: Transitioned to unified PerformanceTier inspection via provider (R-ID 348).
-     * Issue #247: Mitigates false positives on budget hardware (A15) by injecting 
-     * a hardware-specific grace period (5s) for telemetry gaps.
      */
     fun checkSignalIntegrity(nowRt: Long, silenceDelta: Long, isTracker: Boolean): Boolean {
         var threshold = if (isTracker) {
@@ -734,7 +732,7 @@ class IntegrityMonitor @Inject constructor(
     }
 
     fun checkViolationSustained(type: String, startTs: Long, threshold: Long): Boolean {
-        if (startTs > 0 && (timeProvider.elapsedRealtime() - startTs) > threshold) {
+        if (startTs > 0 && (timeProvider.elapsedRealtime - startTs) > threshold) {
             domainEventBus.emit(IntegrityEvent.ViolationSustained(type))
             return true
         }
@@ -743,7 +741,7 @@ class IntegrityMonitor @Inject constructor(
 
     fun onPowerDisconnected() {
         if (!currentHealth.isPowerTamper && lastPowerDisconnectTs == 0L) {
-            lastPowerDisconnectTs = timeProvider.elapsedRealtime()
+            lastPowerDisconnectTs = timeProvider.elapsedRealtime
             domainEventBus.emit(IntegrityEvent.LogEvent("Device power unplugged, starting debounce... on this device", false))
         }
     }

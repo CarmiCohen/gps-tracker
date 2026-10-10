@@ -26,10 +26,11 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
- * Oct.10.1 (Restoration Path):
- * - Issue #SIMP-1014-2: Unified Pressure Path. Handled TriggerStoragePrune command 
- *   triggered by JNI-side storage evaluation.
- * - Issue #SIMP-1011-1: Native GNSS Batching. Integrated JNI satellite status evaluation.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API. Fixed TRACKER_ACOUSTIC_FLOOR_KEY typo.
+ * Oct.10.1:
+ * - Issue #SIMP-1014-2: Unified Pressure Path. Handled TriggerStoragePrune command.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -89,8 +90,8 @@ class MonitorService : BaseMonitorService() {
     }
 
     override suspend fun onServiceInitialize() {
-        repository.saveLongSync(currentRole, LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
-        repository.saveLongSync(currentRole, LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime())
+        repository.saveLongSync(currentRole, LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis)
+        repository.saveLongSync(currentRole, LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime)
 
         val trackerId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
         val viewerId = repository.getString(VIEWER_ID_KEY, SettingsRepository.DEFAULT_VIEWER_ID)
@@ -125,16 +126,16 @@ class MonitorService : BaseMonitorService() {
             hardwareSuite.gnssDetailFlow.collectLatest { latestGnssDetail = it }
         }
 
-        val recoveredTs = repository.getLong(currentRole, LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis())
+        val recoveredTs = repository.getLong(currentRole, LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis)
         val recoveredDrift = repository.getLong(currentRole, CLOCK_DRIFT_REF_KEY, 0L)
         
         lastServiceTickTs = recoveredTs
         lastServiceTickRealtime = historyManager.recoverLastRealtime(recoveredTs, recoveredDrift)
         
-        primaryProcessor.setLastValidFixRt(timeProvider.elapsedRealtime())
-        remoteProcessor.setLastValidFixRt(timeProvider.elapsedRealtime())
+        primaryProcessor.setLastValidFixRt(timeProvider.elapsedRealtime)
+        remoteProcessor.setLastValidFixRt(timeProvider.elapsedRealtime)
         
-        systemMonitor.setSessionStart(timeProvider.elapsedRealtime())
+        systemMonitor.setSessionStart(timeProvider.elapsedRealtime)
 
         if (isTrackerMode) setupPhysicalFastPaths()
         
@@ -264,10 +265,10 @@ class MonitorService : BaseMonitorService() {
 
         loadLogicState()
 
-        lastServiceTickTs = timeProvider.currentTimeMillis()
-        lastServiceTickRealtime = timeProvider.elapsedRealtime()
-        primaryProcessor.setLastValidFixRt(timeProvider.elapsedRealtime())
-        remoteProcessor.setLastValidFixRt(timeProvider.elapsedRealtime())
+        lastServiceTickTs = timeProvider.currentTimeMillis
+        lastServiceTickRealtime = timeProvider.elapsedRealtime
+        primaryProcessor.setLastValidFixRt(timeProvider.elapsedRealtime)
+        remoteProcessor.setLastValidFixRt(timeProvider.elapsedRealtime)
 
         tickOrchestrator.launchJob("gps_collection", lifecycleScope + Dispatchers.Default) {
             hardwareSuite.getLocationFlow().collectLatest { onLocationChanged(it) }
@@ -301,7 +302,7 @@ class MonitorService : BaseMonitorService() {
             .collect { event ->
                 when (event) {
                     is CommandEvent.WatchdogTrigger -> { systemMonitor.acquireWakeLock(); systemMonitor.scheduleWatchdogAlarm(force = true) }
-                    is CommandEvent.UiPulse -> { lastUiPulseRt = timeProvider.elapsedRealtime(); updateForegroundServiceType() }
+                    is CommandEvent.UiPulse -> { lastUiPulseRt = timeProvider.elapsedRealtime; updateForegroundServiceType() }
                     is CommandEvent.UiVisibilityChanged -> onUiVisibilityChangedInternal(event.visible)
                     is CommandEvent.ResetTimers -> resetServiceTimers()
                     is CommandEvent.SyncSensors -> { refreshCapabilitiesInternal(); lifecycleScope.launch { hardwareSuite.start() } }
@@ -370,13 +371,13 @@ class MonitorService : BaseMonitorService() {
 
     private fun handleViewerPulse(id: String) {
         if (!SignalingConstants.isValidViewerId(id)) return
-        repository.updateRemoteActivity(timeProvider.elapsedRealtime())
+        repository.updateRemoteActivity(timeProvider.elapsedRealtime)
         if ((configManager.viewerId == SettingsRepository.DEFAULT_VIEWER_ID || configManager.viewerId.isEmpty()) && id.isNotEmpty() && id != "Active Viewer") {
             configManager.viewerId = id
             connectivitySuite.updateIdentity(configManager.deviceId, id, true)
             lifecycleScope.launch(Dispatchers.IO) { repository.saveString(VIEWER_ID_KEY, id) } 
         }
-        val isNew = sessionManager.onViewerPulse(id, timeProvider.elapsedRealtime())
+        val isNew = sessionManager.onViewerPulse(id, timeProvider.elapsedRealtime)
         if (isNew || !tickOrchestrator.isLoopActive("tick_loop")) {
             if (isNew) {
                 domainEventBus.emit(DomainEvent.PeerConnectionChanged(isConnected = true, peerId = id))
@@ -387,7 +388,7 @@ class MonitorService : BaseMonitorService() {
 
     private fun handleTrackerPulse(id: String) {
         if (!SignalingConstants.isValidTrackerId(id)) return
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         if ((configManager.deviceId == SignalingConstants.DEFAULT_TRACKER_ID || configManager.deviceId.isEmpty()) && id.isNotEmpty() && id != "Active Tracker") {
             configManager.deviceId = id; connectivitySuite.updateIdentity(id, configManager.viewerId, false)
             lifecycleScope.launch(Dispatchers.IO) { repository.saveString(TRACKER_ID_KEY, id) }
@@ -405,8 +406,8 @@ class MonitorService : BaseMonitorService() {
         val processors = mutableListOf(primaryProcessor, remoteProcessor)
         
         sessionCoordinator.resetSession(role = currentRole, processors = processors, onReset = {
-            serviceStartRealtime = timeProvider.elapsedRealtime()
-            serviceStartWall = timeProvider.currentTimeMillis()
+            serviceStartRealtime = timeProvider.elapsedRealtime
+            serviceStartWall = timeProvider.currentTimeMillis
             lastHardwareRecoveryTs = 0L; lastForensicLat = 0.0; lastForensicLng = 0.0; lastForensicVibe = 0.0; lastForensicTilt = 0.0; lastWasCooling = false
             if (isTrackerMode) {
                 lastFastPathAcousticSpikeRt = 0L; lastFastPathLightSpikeRt = 0L
@@ -651,7 +652,7 @@ class MonitorService : BaseMonitorService() {
         val dist = if (lastForensicLat != 0.0) PhysicsUtils.calculateDistance(lastForensicLat, lastForensicLng, lat, lng) else Double.MAX_VALUE
         if (isSpike || dist > FORENSIC_SPATIAL_GATE_METERS || abs(vibe - lastForensicVibe) > FORENSIC_IMU_VIBRATION_THRESHOLD || abs(tilt - lastForensicTilt) > FORENSIC_IMU_TILT_THRESHOLD) {
             lastForensicLat = lat; lastForensicLng = lng; lastForensicVibe = vibe; lastForensicTilt = tilt
-            logManager.logForensicTraceOptimized(timestamp = timeProvider.currentTimeMillis(), lat = lat, lng = lng, accuracy = proc?.currentAccuracy ?: 0.0, maxAccuracy = proc?.maxAccuracy ?: 0.0, vibe = vibe, snr = snapshot.acousticDb, batteryLevel = health.batteryLevel, isCharging = health.isCharging, batteryTemp = health.batteryTemp)
+            logManager.logForensicTraceOptimized(timestamp = timeProvider.currentTimeMillis, lat = lat, lng = lng, accuracy = proc?.currentAccuracy ?: 0.0, maxAccuracy = proc?.maxAccuracy ?: 0.0, vibe = vibe, snr = snapshot.acousticDb, batteryLevel = health.batteryLevel, isCharging = health.isCharging, batteryTemp = health.batteryTemp)
         }
     }
 
@@ -662,7 +663,7 @@ class MonitorService : BaseMonitorService() {
                 val health = integrityMonitor.currentHealth
                 if (lastWasCooling && !health.isCoolingModeActive) {
                     val entryRt = if (cachedCoolingEnteredRt > 0) cachedCoolingEnteredRt else health.coolingEnteredRt
-                    if (entryRt > 0) domainEventBus.emit(DomainEvent.ServiceStatus("Forensic Performance Audit ${if (isTrackerMode) "" else "(V)"}: Thermal Recovery Latency: ${timeProvider.elapsedRealtime() - entryRt}ms", isImportant = true))
+                    if (entryRt > 0) domainEventBus.emit(DomainEvent.ServiceStatus("Forensic Performance Audit ${if (isTrackerMode) "" else "(V)"}: Thermal Recovery Latency: ${timeProvider.elapsedRealtime - entryRt}ms", isImportant = true))
                     cachedCoolingEnteredRt = 0L
                 }
                 if (health.isCoolingModeActive && !lastWasCooling) cachedCoolingEnteredRt = health.coolingEnteredRt
@@ -702,7 +703,7 @@ class MonitorService : BaseMonitorService() {
             spikeThreshold = 15.0, 
             minDb = 40.0, 
             onSpike = { 
-                lastFastPathAcousticSpikeRt = timeProvider.elapsedRealtime()
+                lastFastPathAcousticSpikeRt = timeProvider.elapsedRealtime
                 triggerForensicSample(isSpike = true)
                 triggerImmediateTick()
             }
@@ -711,7 +712,7 @@ class MonitorService : BaseMonitorService() {
             baseline = primaryProcessor.getLuxBaseline(), 
             spikeThreshold = LIGHT_THRESHOLD_LUX_JUMP, 
             onSpike = { 
-                lastFastPathLightSpikeRt = timeProvider.elapsedRealtime()
+                lastFastPathLightSpikeRt = timeProvider.elapsedRealtime
                 triggerForensicSample(isSpike = true)
                 triggerImmediateTick()
             }

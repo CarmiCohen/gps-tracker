@@ -3,6 +3,8 @@ package com.gps19.core.engine
 /**
  * BootLifecycleAuthority: Central authority for monotonic clock recovery and 
  * boot session validation.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Migrated getCurrentBootId to property.
  */
 interface BootLifecycleAuthority {
     /**
@@ -14,7 +16,7 @@ interface BootLifecycleAuthority {
     /**
      * Returns the current unique boot session identifier.
      */
-    fun getCurrentBootId(): String
+    val currentBootId: String
 
     /**
      * Recovers a monotonic timestamp (elapsedRealtime).

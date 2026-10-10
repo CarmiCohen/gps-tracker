@@ -18,12 +18,12 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
  * Oct.5.8:
- * - Issue #1293: Migrated tick and heartbeat loops to unified TickOrchestrator
- *   periodic loop management. Centralized initialization gates and timing logic.
- * Oct.4.5:
- * - Issue #1425: Unified Clock Authority. Migrated lastUiPulseRt to monotonic 
- *   time (elapsedRealtime) to prevent logic errors during clock drift/sync.
+ * - Issue #1293: Migrated tick and heartbeat loops to unified TickOrchestrator 
+ *   periodic loop management.
  */
 @AndroidEntryPoint
 abstract class BaseMonitorService : LifecycleService() {
@@ -87,8 +87,8 @@ abstract class BaseMonitorService : LifecycleService() {
         super.onCreate()
         Timber.d("Issue #910: Service onCreate starting")
         
-        serviceStartRealtime = timeProvider.elapsedRealtime()
-        serviceStartWall = timeProvider.currentTimeMillis()
+        serviceStartRealtime = timeProvider.elapsedRealtime
+        serviceStartWall = timeProvider.currentTimeMillis
         
         onServicePreInit()
         startServiceForeground()
@@ -133,8 +133,8 @@ abstract class BaseMonitorService : LifecycleService() {
             scope = lifecycleScope + serviceExceptionHandler,
             intervalProvider = { getRequiredTickInterval() }
         ) {
-            val now = timeProvider.currentTimeMillis()
-            val nowRt = timeProvider.elapsedRealtime()
+            val now = timeProvider.currentTimeMillis
+            val nowRt = timeProvider.elapsedRealtime
             
             systemMonitor.scheduleWatchdogAlarm()
             processTick(now, nowRt) 
@@ -147,22 +147,22 @@ abstract class BaseMonitorService : LifecycleService() {
             scope = lifecycleScope + serviceExceptionHandler,
             intervalProvider = { NOTIFICATION_THROTTLE_MS }
         ) {
-            val now = timeProvider.currentTimeMillis()
-            val nowRt = timeProvider.elapsedRealtime()
+            val now = timeProvider.currentTimeMillis
+            val nowRt = timeProvider.elapsedRealtime
             onHeartbeat(now, nowRt)
         }
     }
 
     protected fun isUiVisible(): Boolean {
-        return isUiForeground.get() && (timeProvider.elapsedRealtime() - lastUiPulseRt < UI_PULSE_TIMEOUT_MS)
+        return isUiForeground.get() && (timeProvider.elapsedRealtime - lastUiPulseRt < UI_PULSE_TIMEOUT_MS)
     }
 
     protected fun isRecentUiPulse(): Boolean {
-        return (timeProvider.elapsedRealtime() - lastUiPulseRt < UI_PULSE_TIMEOUT_MS)
+        return (timeProvider.elapsedRealtime - lastUiPulseRt < UI_PULSE_TIMEOUT_MS)
     }
 
     protected fun safeStartForeground(id: Int, notification: Notification, type: Int = 0, force: Boolean = false) {
-        val now = timeProvider.elapsedRealtime()
+        val now = timeProvider.elapsedRealtime
         if (!force && lastFgsUpdateRealtime != 0L && (now - lastFgsUpdateRealtime < FGS_UPDATE_THROTTLE_MS)) return
         
         lastFgsUpdateRealtime = now

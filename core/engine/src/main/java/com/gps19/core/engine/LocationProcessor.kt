@@ -5,13 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Oct.10.2:
+ * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
+ *   TimeProvider API.
  * Oct.7.11:
  * - Issue #SIMP-1007-17: Strategic Simplification. Promoted locationPendingReason 
- *   from SentinelResult into ProcessedLocation to centralize behavioral health propagation.
- * Oct.7.6:
- * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated LogAdded event 
- *   emission to utilize unified ForensicSnapshot container, resolving 
- *   compilation regressions from Oct7.5 container migration.
+ *   from SentinelResult into ProcessedLocation.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider,
@@ -59,7 +58,7 @@ class LocationProcessor(
             state.lastLat = trackerState.lat
             state.lastLng = trackerState.lng
             state.lastTs = trackerState.gpsTs
-            state.lastRt = timeProvider.elapsedRealtime()
+            state.lastRt = timeProvider.elapsedRealtime
             LocationSentinel.setSpatialAnchor(state, trackerState.lat, trackerState.lng, trackerState.alt, trackerState.gpsTs, state.lastRt)
         }
 
@@ -199,7 +198,7 @@ class LocationProcessor(
 
     fun updateWindowedAccuracy(acc: Double) {
         if (acc <= 0.0) return
-        val nowRt = timeProvider.elapsedRealtime()
+        val nowRt = timeProvider.elapsedRealtime
         val bucketDuration = ACCURACY_WINDOW_BUCKET_MS / ACCURACY_WINDOW_MAX_SIZE
         
         if (state.accuracy.windowSize == 0 || (state.accuracy.lastUpdateRt > 0 && nowRt - state.accuracy.lastUpdateRt >= bucketDuration)) {
@@ -301,6 +300,7 @@ class LocationProcessor(
                         this.rt = nowRt
                         this.isStalled = update.integrity.isStalled
                         this.receiptRt = nowRt
+                        this.isTrajectoryPromoted = false
                         this.jumpTier = update.kinetic.jumpTier
                         this.isAdaptiveJump = update.kinetic.isAdaptiveJump
                         this.distToHome = state.lastNearestHomeDistance
