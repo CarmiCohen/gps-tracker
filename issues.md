@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct10.6
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct10.7
 
 ## 🎯 Current Resumption Focus: Forensic Throughput & UI Connectivity.
 
@@ -9,12 +9,13 @@
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 1)
-*   **ID: SIMP-1011-3 [Low]**: Centralize Proximity health evaluation fallback in `JdHardwareManager.processProximityBatchNative` to complete the decoupling of sensor logic from `HardwareSuite.kt`.
+## 💡 Strategic Simplification Ideas (Ideas: 0)
+*   *No active simplification ideas.*
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #SIMP-1011-3: Proximity Decoupling.** Centralized proximity debouncing and index calculation fallback in `JdHardwareManager.processProximityBatchNative`. Finalized decoupling of environmental heuristics from `HardwareSuite.kt`. Resolved Oct10.7.
 *   **Issue #SIMP-1011-2: Acoustic Decoupling.** Centralized Acoustic health evaluation fallback (dB calculation, adaptive alpha, and spike detection) in `JdHardwareManager.processAcousticBatchNative`. Removed manual sensor math from `HardwareSuite.kt`, delegating all environment heuristics to the native/JNI path with a robust Kotlin fallback. Resolved Oct10.6.
 *   **Issue #SIMP-1011-1: Native GNSS Batching.** Centralized GNSS health evaluation (satellite counts and average SNR) in `JdHardwareManager.processGnssBatchNative`. Removed manual fallback logic from `HardwareSuite.kt`. Resolved Oct10.5.
 *   **Issue #BUILD-FIX-OCT10.3: Communication & Test Remediation.** Fixed `JSONObject` iteration type mismatches in `CommunicationManager.kt` and remediated property invocation errors in `ProductionReadinessAuditTest`, `GeofenceBatteryAuditTest`, and `ForensicStressAuditTest`. Resolved Oct10.4.
@@ -25,6 +26,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct10.7: [SOT Count: 326 (Rules: 176), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 68 (Sub-items: 340), QA: 672]**
 - **Oct10.6: [SOT Count: 325 (Rules: 175), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 68 (Sub-items: 340), QA: 658]**
 - **Oct10.5: [SOT Count: 324 (Rules: 174), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 68 (Sub-items: 340), QA: 644]**
 - **Oct10.4: [SOT Count: 323 (Rules: 173), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 68 (Sub-items: 340), QA: 630]**

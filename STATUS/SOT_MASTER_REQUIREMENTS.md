@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct10.6)
+# SOT Master Requirements & Hardening Status (Oct10.7)
 
-## 🏗️ Architectural Master Rules (175 Rules)
+## 🏗️ Architectural Master Rules (176 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -18,10 +18,12 @@
 *   **1.145 Communication & Test Stability (R-ID 1011)**: JSON iteration MUST use explicit casting to `String` for keys and non-null value checks. Test suites MUST strictly follow property-based interface access. (Oct10.4 - Issue #BUILD-FIX-OCT10.3).
 *   **1.146 Native GNSS Batching (R-ID 615)**: GNSS health evaluation (satellites used, average SNR) MUST be centralized in the native batching layer (or its Kotlin fallback in `JdHardwareManager`) to decouple the JVM from hardware state logic. (Oct10.5 - Issue #SIMP-1011-1).
 *   **1.147 Acoustic Decoupling (R-ID 616)**: Acoustic health evaluation (dB calculation, adaptive alpha, and spike detection) MUST be centralized in `JdHardwareManager` to complete the decoupling of sensor logic from the engine's application layer. (Oct10.6 - Issue #SIMP-1011-2).
+*   **1.148 Proximity Decoupling (R-ID 617)**: Proximity debouncing and health index calculation fallback MUST be centralized in `JdHardwareManager` to finalize the decoupling of environmental heuristics from `HardwareSuite.kt`. (Oct10.7 - Issue #SIMP-1011-3).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 664**: Proximity Decoupling - Centralized proximity debouncing and index calculation fallback in `JdHardwareManager.processProximityBatchNative`. (Oct10.7 - Issue #SIMP-1011-3).
 *   **SOT ID 663**: Acoustic Decoupling - Centralized Acoustic health evaluation fallback in `JdHardwareManager.processAcousticBatchNative`. (Oct10.6 - Issue #SIMP-1011-2).
 *   **SOT ID 662**: Native GNSS Batching - Centralized GNSS health evaluation in `JdHardwareManager`, eliminating manual fallback logic in `HardwareSuite`. (Oct10.5 - Issue #SIMP-1011-1).
 *   **SOT ID 661**: Communication & Test Stability - Resolved JSONObject type ambiguity and remediated property invocation errors in test suites. (Oct10.4 - Issue #BUILD-FIX-OCT10.3).
@@ -33,6 +35,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.279 (Proximity Decoupling Audit)**: PASSED - Verified that `HardwareSuite` delegates proximity health logic to `JdHardwareManager` and no longer contains manual debouncing math. (Oct10.7 - Issue #SIMP-1011-3).
 *   **Chapter 31.278 (Acoustic Decoupling Audit)**: PASSED - Verified that `HardwareSuite` no longer contains manual dB/alpha calculation logic and correctly delegates to `JdHardwareManager`. (Oct10.6 - Issue #SIMP-1011-2).
 *   **Chapter 31.277 (Native GNSS Batching Audit)**: PASSED - Verified that `HardwareSuite` no longer contains manual SNR/Satellite counting logic and correctly delegates to `JdHardwareManager`. (Oct10.5 - Issue #SIMP-1011-1).
 *   **Chapter 31.276 (Communication & Test Audit)**: PASSED - Verified compilation of `CommunicationManager.kt` and all major audit test suites after fixing property invocation and JSON iteration errors. (Oct10.4 - Issue #BUILD-FIX-OCT10.3).

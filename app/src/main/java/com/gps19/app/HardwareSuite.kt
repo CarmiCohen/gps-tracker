@@ -37,12 +37,12 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.10.7:
+ * - Issue #SIMP-1011-3: Proximity Decoupling. Migrated proximity debouncing 
+ *   and index calculation fallback to JdHardwareManager. Simplified onSensorChanged.
  * Oct.10.6:
  * - Issue #SIMP-1011-2: Acoustic Decoupling. Migrated manual acoustic health 
  *   evaluation into JdHardwareManager. Simplified startAcousticMonitoring.
- * Oct.10.5:
- * - Issue #SIMP-1011-1: Native GNSS Batching. Migrated manual GNSS health evaluation 
- *   into JdHardwareManager to decouple engine from hardware state logic.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -867,33 +867,21 @@ class HardwareSuite @Inject constructor(
                     proximityBatch.rawNear = rawProximityNear
                     proximityBatch.isFlickering = isFlickeringInWindow(nowRt)
                     
-                    if (nativeFastPathProvider.processProximityBatch(proximityBatch)) {
-                        proximityIdx = proximityBatch.nextIdx
-                        proximityDebounceMs = proximityBatch.debounceMs
-                        
-                        if (proximityBatch.nextRawNear != rawProximityNear) {
-                            rawProximityNear = proximityBatch.nextRawNear
-                            proximityJob?.cancel()
-                            proximityJob = scope.launch { 
-                                delay(proximityDebounceMs)
-                                if (isActive && isProximityNear != rawProximityNear) {
-                                    isProximityNear = rawProximityNear
-                                    debouncedProximityCm = dist
-                                }
+                    // Issue #SIMP-1011-3: processProximityBatch now handles all health logic
+                    // internally (via native or Kotlin fallback) to decouple HardwareSuite.
+                    nativeFastPathProvider.processProximityBatch(proximityBatch)
+                    proximityIdx = proximityBatch.nextIdx
+                    proximityDebounceMs = proximityBatch.debounceMs
+                    
+                    if (proximityBatch.nextRawNear != rawProximityNear) {
+                        rawProximityNear = proximityBatch.nextRawNear
+                        proximityJob?.cancel()
+                        proximityJob = scope.launch { 
+                            delay(proximityDebounceMs)
+                            if (isActive && isProximityNear != rawProximityNear) {
+                                isProximityNear = rawProximityNear
+                                debouncedProximityCm = dist
                             }
-                        }
-                    } else {
-                        val newValue = dist < proximityMaxRange
-                        val rawIdx = (1.0 - (dist / proximityMaxRange)).coerceIn(0.0, 1.0)
-                        proximityIdx = (proximityIdx * (1.0 - PROXIMITY_EMA_ALPHA)) + (rawIdx * PROXIMITY_EMA_ALPHA)
-                        if (newValue != rawProximityNear) {
-                            if (!newValue && proximityBatch.isFlickering && isStationary()) return
-                            rawProximityNear = newValue; proximityJob?.cancel()
-                            var calcDebounceMs = if (isStationary()) PROXIMITY_DEBOUNCE_STATIONARY_MS else PROXIMITY_DEBOUNCE_MOVING_MS
-                            if (isStationary() && stationaryDurationMs > 0L) calcDebounceMs += ((stationaryDurationMs / 3600000.0) * PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR).toLong()
-                            if (isHighLoad) calcDebounceMs = (calcDebounceMs * PROXIMITY_STRESS_SCALING_MULTIPLIER).toLong()
-                            proximityDebounceMs = calcDebounceMs.coerceAtMost(PROXIMITY_DEBOUNCE_MAX_MS)
-                            proximityJob = scope.launch { delay(calcDebounceMs); if (isActive && isProximityNear != rawProximityNear) { isProximityNear = rawProximityNear; debouncedProximityCm = dist } }
                         }
                     }
                     secSumProxIdx += proximityIdx; secProxCount++

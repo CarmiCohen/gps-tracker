@@ -6,6 +6,12 @@ import com.gps19.core.engine.JNI_RET_EINTR
 import com.gps19.core.engine.JNI_RET_NOT_INITIALIZED
 import com.gps19.core.engine.LATENCY_THRESHOLD_JNI_MS
 import com.gps19.core.engine.LatencyMonitor
+import com.gps19.core.engine.PROXIMITY_DEBOUNCE_MAX_MS
+import com.gps19.core.engine.PROXIMITY_DEBOUNCE_MOVING_MS
+import com.gps19.core.engine.PROXIMITY_DEBOUNCE_STATIONARY_MS
+import com.gps19.core.engine.PROXIMITY_EMA_ALPHA
+import com.gps19.core.engine.PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR
+import com.gps19.core.engine.PROXIMITY_STRESS_SCALING_MULTIPLIER
 import com.gps19.core.engine.ProximityBatch
 import com.gps19.core.engine.SystemPressureBatch
 import com.gps19.core.engine.TimeProvider
@@ -33,13 +39,15 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.10.7:
+ * - Issue #SIMP-1011-3: Proximity Decoupling. Centralized Proximity health 
+ *   evaluation fallback in processProximityBatchNative.
+ * - Issue #SIMP-1014-2: Pressure Consolidation. Added Kotlin fallback for 
+ *   processSystemPressureNative with hysteresis support.
  * Oct.10.6:
  * - Issue #SIMP-1011-2: Acoustic Decoupling. Centralized Acoustic health evaluation 
  *   fallback in processAcousticBatchNative. Implemented Kotlin FastPath state 
  *   storage for non-native environments.
- * Oct.10.5:
- * - Issue #SIMP-1011-1: Native GNSS Batching. Migrated manual GNSS health evaluation 
- *   fallback into processGnssBatchNative to decouple HardwareSuite.
  */
 object JdHardwareManager {
 
@@ -83,6 +91,10 @@ object JdHardwareManager {
         FASTPATH_LIGHT to FallbackFastPath(),
         FASTPATH_STATIONARY to FallbackFastPath()
     )
+
+    // Issue #SIMP-1014-2: Pressure Fallback State
+    private var lastMemLevel = 0
+    private var lastStorageLevel = 0
 
     /**
      * syncHardwareState: High-level helper to consolidate LED flag construction (Idea #15).
@@ -241,6 +253,8 @@ object JdHardwareManager {
 
     fun resetSensorAudit() {
         if (isLibraryLoaded.get()) n9()
+        lastMemLevel = 0
+        lastStorageLevel = 0
     }
 
     fun updateFastPathConfig(type: Int, baseline: Double, threshold: Double, minThreshold: Double, debounceMs: Long): Int {
@@ -392,60 +406,133 @@ object JdHardwareManager {
         return true
     }
 
+    /**
+     * processProximityBatchNative: Consolidated JNI proximity path (Issue #SIMP-1011-3).
+     * Includes Kotlin fallback to ensure consistent index calculation and debouncing.
+     */
     fun processProximityBatchNative(batch: ProximityBatch): Boolean {
-        if (!isLibraryLoaded.get()) return false
-        
-        synchronized(sharedStateBuffer) {
-            sharedStateBuffer.clear()
-            sharedStateBuffer.putDouble(batch.distance)
-            sharedStateBuffer.putDouble(batch.maxRange)
-            sharedStateBuffer.putLong(batch.nowRt)
-            sharedStateBuffer.putInt(if (batch.isStationary) 1 else 0)
-            sharedStateBuffer.putLong(batch.stationaryDurationMs)
-            sharedStateBuffer.putInt(if (batch.isHighLoad) 1 else 0)
-            sharedStateBuffer.putDouble(batch.currentIdx)
-            sharedStateBuffer.putInt(if (batch.rawNear) 1 else 0)
-            sharedStateBuffer.putInt(if (batch.isFlickering) 1 else 0)
-            
-            val res = n23()
-            if (res == 0) {
-                batch.nextIdx = sharedStateBuffer.getDouble(128)
-                batch.nextRawNear = sharedStateBuffer.getInt(136) != 0
-                batch.debounceMs = sharedStateBuffer.getLong(140)
-                return true
+        if (isLibraryLoaded.get()) {
+            synchronized(sharedStateBuffer) {
+                sharedStateBuffer.clear()
+                sharedStateBuffer.putDouble(batch.distance)
+                sharedStateBuffer.putDouble(batch.maxRange)
+                sharedStateBuffer.putLong(batch.nowRt)
+                sharedStateBuffer.putInt(if (batch.isStationary) 1 else 0)
+                sharedStateBuffer.putLong(batch.stationaryDurationMs)
+                sharedStateBuffer.putInt(if (batch.isHighLoad) 1 else 0)
+                sharedStateBuffer.putDouble(batch.currentIdx)
+                sharedStateBuffer.putInt(if (batch.rawNear) 1 else 0)
+                sharedStateBuffer.putInt(if (batch.isFlickering) 1 else 0)
+                
+                val res = n23()
+                if (res == 0) {
+                    batch.nextIdx = sharedStateBuffer.getDouble(128)
+                    batch.nextRawNear = sharedStateBuffer.getInt(136) != 0
+                    batch.debounceMs = sharedStateBuffer.getLong(140)
+                    return true
+                }
             }
         }
-        return false
+
+        // Architecture Rule 2: Fallback logic migrated from HardwareSuite for decoupling
+        val newValue = batch.distance < batch.maxRange
+        val rawIdx = (1.0 - (batch.distance / batch.maxRange)).coerceIn(0.0, 1.0)
+        batch.nextIdx = (batch.currentIdx * (1.0 - PROXIMITY_EMA_ALPHA)) + (rawIdx * PROXIMITY_EMA_ALPHA)
+        
+        if (newValue != batch.rawNear) {
+            // Guard against display flicker during stationary phase
+            if (!newValue && batch.isFlickering && batch.isStationary) {
+                batch.nextRawNear = batch.rawNear // No change
+                batch.debounceMs = 0
+            } else {
+                batch.nextRawNear = newValue
+                var calcDebounceMs = if (batch.isStationary) PROXIMITY_DEBOUNCE_STATIONARY_MS else PROXIMITY_DEBOUNCE_MOVING_MS
+                if (batch.isStationary && batch.stationaryDurationMs > 0L) {
+                    calcDebounceMs += ((batch.stationaryDurationMs / 3600000.0) * PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR).toLong()
+                }
+                if (batch.isHighLoad) {
+                    calcDebounceMs = (calcDebounceMs * PROXIMITY_STRESS_SCALING_MULTIPLIER).toLong()
+                }
+                batch.debounceMs = calcDebounceMs.coerceAtMost(PROXIMITY_DEBOUNCE_MAX_MS)
+            }
+        } else {
+            batch.nextRawNear = batch.rawNear
+            batch.debounceMs = 0
+        }
+        
+        return true
     }
 
     /**
      * processSystemPressureNative: Consolidated JNI pressure path (Issue #SIMP-1014-2).
+     * Includes Kotlin fallback to ensure consistent memory and storage evaluation with hysteresis.
      */
     fun processSystemPressureNative(batch: SystemPressureBatch): Boolean {
-        if (!isLibraryLoaded.get()) return false
-        
-        synchronized(sharedStateBuffer) {
-            sharedStateBuffer.clear()
-            sharedStateBuffer.putDouble(batch.heapMb)
-            sharedStateBuffer.putDouble(batch.memPressureThresholdMb)
-            sharedStateBuffer.putDouble(batch.memCriticalThresholdMb)
-            sharedStateBuffer.putDouble(batch.memHysteresisOffsetMb)
-            sharedStateBuffer.putDouble(batch.storageAvailableMb)
-            sharedStateBuffer.putDouble(batch.storageLowThresholdMb)
-            sharedStateBuffer.putDouble(batch.storageCriticalThresholdMb)
-            sharedStateBuffer.putDouble(batch.storageHysteresisOffsetMb)
-            
-            val res = n24()
-            if (res == 0) {
-                // Read outputs from offset 64
-                batch.currentMemLevel = sharedStateBuffer.getInt(64)
-                batch.needsMemFlush = sharedStateBuffer.getInt(68) != 0
-                batch.currentStorageLevel = sharedStateBuffer.getInt(72)
-                batch.needsStoragePrune = sharedStateBuffer.getInt(76) != 0
-                return true
+        if (isLibraryLoaded.get()) {
+            synchronized(sharedStateBuffer) {
+                sharedStateBuffer.clear()
+                sharedStateBuffer.putDouble(batch.heapMb)
+                sharedStateBuffer.putDouble(batch.memPressureThresholdMb)
+                sharedStateBuffer.putDouble(batch.memCriticalThresholdMb)
+                sharedStateBuffer.putDouble(batch.memHysteresisOffsetMb)
+                sharedStateBuffer.putDouble(batch.storageAvailableMb)
+                sharedStateBuffer.putDouble(batch.storageLowThresholdMb)
+                sharedStateBuffer.putDouble(batch.storageCriticalThresholdMb)
+                sharedStateBuffer.putDouble(batch.storageHysteresisOffsetMb)
+                
+                val res = n24()
+                if (res == 0) {
+                    // Read outputs from offset 64
+                    batch.currentMemLevel = sharedStateBuffer.getInt(64)
+                    batch.needsMemFlush = sharedStateBuffer.getInt(68) != 0
+                    batch.currentStorageLevel = sharedStateBuffer.getInt(72)
+                    batch.needsStoragePrune = sharedStateBuffer.getInt(76) != 0
+                    return true
+                }
             }
         }
-        return false
+
+        // Architecture Rule 2: Fallback logic migrated from IntegrityMonitor for decoupling
+        var currentMem = 0
+        if (batch.heapMb >= batch.memCriticalThresholdMb) {
+            currentMem = 2
+        } else if (batch.heapMb >= batch.memPressureThresholdMb) {
+            currentMem = 1
+        }
+        
+        // Hysteresis for memory
+        if (currentMem < lastMemLevel) {
+            val threshold = if (lastMemLevel == 2) batch.memCriticalThresholdMb else batch.memPressureThresholdMb
+            if (batch.heapMb > threshold - batch.memHysteresisOffsetMb) {
+                currentMem = lastMemLevel
+            }
+        }
+        
+        batch.currentMemLevel = currentMem
+        batch.needsMemFlush = (currentMem != 0 && currentMem != lastMemLevel)
+        lastMemLevel = currentMem
+
+        // Storage logic
+        var currentStorage = 0
+        if (batch.storageAvailableMb <= batch.storageCriticalThresholdMb) {
+            currentStorage = 2
+        } else if (batch.storageAvailableMb <= batch.storageLowThresholdMb) {
+            currentStorage = 1
+        }
+        
+        // Hysteresis for storage
+        if (currentStorage < lastStorageLevel) {
+            val threshold = if (lastStorageLevel == 2) batch.storageCriticalThresholdMb else batch.storageLowThresholdMb
+            if (batch.storageAvailableMb < threshold + batch.storageHysteresisOffsetMb) {
+                currentStorage = lastStorageLevel
+            }
+        }
+
+        batch.currentStorageLevel = currentStorage
+        batch.needsStoragePrune = (currentStorage != 0 && currentStorage != lastStorageLevel)
+        lastStorageLevel = currentStorage
+        
+        return true
     }
 
     fun isStationaryNative(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean {

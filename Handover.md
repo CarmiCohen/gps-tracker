@@ -1,26 +1,31 @@
-# Handover: Oct10.6 Forensic State & Remediation Path
+# Handover: Oct10.7 Forensic State & Remediation Path
 
 ## 🎯 Current Status: GREEN (Decoupled & Centralized)
-The **Oct10.6** session has successfully completed the Acoustic Decoupling migration (**SIMP-1011-2**). The engine's sensor processing is now structurally leaner, delegating all environment heuristics to the hardware manager.
+The **Oct10.7** session has completed the Proximity Decoupling migration (**SIMP-1011-3**). The hardware manager now serves as the single authority for both acoustic and proximity environmental heuristics.
 
 ### ✅ Remediation Completed
 
-#### 1. Acoustic Decoupling (Issue #SIMP-1011-2)
-*   **JdHardwareManager.kt**: Centralized all acoustic processing (dB calculation, adaptive alpha based on vibration, and FastPath spike evaluation).
-    *   Implemented `FallbackFastPath` state storage to ensure Kotlin fallback parity.
-*   **HardwareSuite.kt**: Refactored `startAcousticMonitoring` to delegate raw buffer processing to the manager via `processAcousticBatchNative`.
+#### 1. Proximity Decoupling (Issue #SIMP-1011-3)
+*   **JdHardwareManager.kt**: Centralized proximity debouncing, index calculation, and display-flicker guarding.
+    *   Implemented Kotlin fallback with stationary duration scaling and high-load stress multipliers.
+*   **HardwareSuite.kt**: Refactored `onSensorChanged` for `TYPE_PROXIMITY` to delegate all evaluation logic to `processProximityBatchNative`.
 
-#### 2. Architecture & Compliance
-*   **SOT Master**: Added **Rule 1.147 (R-ID 616)** mandating acoustic centralization.
-*   **Version Alignment**: Incremented `versionName` to **Oct10.6** in `app/build.gradle`.
+#### 2. Pressure Path Preparation (Issue #SIMP-1014-2)
+*   **JdHardwareManager.kt**: Implemented a robust Kotlin fallback for `processSystemPressureNative`.
+    *   Added full hysteresis support for Memory and Storage gates to ensure stability during JNI transition.
+*   **IntegrityMonitor.kt**: Verified consistent propagation of pressure levels through the centralized batch.
+
+#### 3. Architecture & Compliance
+*   **SOT Master**: Added **Rule 1.148 (R-ID 617)** mandating proximity decoupling.
+*   **Version Alignment**: Incremented `versionName` to **Oct10.7** in `app/build.gradle`.
 
 ### 📍 Forensic State Snapshot
 *   **Build Status**: GREEN (Success).
-*   **Test Status**: Verified core engine stability (43/43 tests).
-*   **Version**: Oct10.6.
-*   **Baseline**: SIMP-1011-2 fully resolved.
+*   **Test Status**: Core logic stability verified.
+*   **Version**: Oct10.7.
+*   **Baseline**: SIMP-1011-3 fully resolved.
 
 ### 🔜 Resumption Path (Oct11.1)
-1.  **Proximity Decoupling**: Initiate **SIMP-1011-3** to migrate proximity debouncing and index calculation fallback to `JdHardwareManager.processProximityBatchNative`.
-2.  **Logic Verification**: Verify `MonitorService` correctly handles `acousticLockoutRt` propagated from the centralized manager.
-3.  **Pressure Consolidation**: Evaluate `processSystemPressureNative` integration (Issue #SIMP-1014-2) for next-phase hardening.
+1.  **JNI Consolidation**: Finalize the native implementation of `processSystemPressureNative` (SIMP-1014-2) in the C++ layer.
+2.  **Forensic Throughput**: Optimize `performForensicCapture` in `MonitorService` to utilize zero-allocation buffers for high-load scenarios.
+3.  **UI Connectivity**: Audit `ConnectivitySuite` state propagation to the Compose HUD for responsiveness.
