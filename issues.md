@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct10.4
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct10.5
 
-## 🎯 Current Resumption Focus: Structural Symmetry & Hilt Reliability.
+## 🎯 Current Resumption Focus: Forensic Throughput & UI Connectivity.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -10,11 +10,12 @@
 ---
 
 ## 💡 Strategic Simplification Ideas (Ideas: 1)
-*   **ID: SIMP-1011-1 [Low]**: Migrate remaining manual GNSS status checks in `HardwareSuite` (like `satellitesUsed` logic) into a native `GnssHealthBatch` to further decouple the JVM from hardware state evaluation.
+*   **ID: SIMP-1011-2 [Low]**: Centralize Acoustic health evaluation fallback in `JdHardwareManager.processAcousticBatchNative` to complete the decoupling of sensor logic from `HardwareSuite.kt`.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #SIMP-1011-1: Native GNSS Batching.** Centralized GNSS health evaluation (satellite counts and average SNR) in `JdHardwareManager.processGnssBatchNative`. Removed manual fallback logic from `HardwareSuite.kt`, delegating all SV evaluation to the native/JNI batching path with a robust Kotlin fallback in the manager. Resolved Oct10.5.
 *   **Issue #BUILD-FIX-OCT10.3: Communication & Test Remediation.** Fixed `JSONObject` iteration type mismatches in `CommunicationManager.kt` and remediated property invocation errors in `ProductionReadinessAuditTest`, `GeofenceBatteryAuditTest`, and `ForensicStressAuditTest`. Resolved Oct10.4.
 *   **Issue #SIMP-1010-4: HUD Interface Alignment.** Migrated all core and secondary service interfaces in `:core:engine` (TimeProvider, PowerStateProvider, NetworkProvider, SignalingProvider) to strict `val` properties for state access. Ensures Hilt reliability and Compose HUD binding. Resolved Oct10.3.
 *   **Issue #SIMP-1017-1: Build-Time Metadata Guardian.** Implemented a module-wide audit script in `build.gradle` that catalogs `internal` types in `:core:engine` and prevents leaks into public signatures or unauthorized cross-module usage. Resolved Oct10.2.
@@ -23,6 +24,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct10.5: [SOT Count: 324 (Rules: 174), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 68 (Sub-items: 340), QA: 644]**
 - **Oct10.4: [SOT Count: 323 (Rules: 173), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 68 (Sub-items: 340), QA: 630]**
 - **Oct10.3: [SOT Count: 322 (Rules: 172), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 65 (Sub-items: 325), QA: 616]**
 - **Oct10.2: [SOT Count: 322 (Rules: 172), Open: H:0, M:1, L:0, Ideas: H:0, M:0, L:1, Testing: 65 (Sub-items: 325), QA: 616]**

@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct10.4)
+# SOT Master Requirements & Hardening Status (Oct10.5)
 
-## 🏗️ Architectural Master Rules (173 Rules)
+## 🏗️ Architectural Master Rules (174 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -16,10 +16,12 @@
 *   **1.143 Metadata Visibility Guardian (R-ID 1017)**: The `:core:engine` module MUST NOT leak `internal` types into `public` or `protected` signatures. The `:app` module MUST NOT unauthorizedly reference `internal` engine types. Enforced via build-time audit in `build.gradle`. (Oct10.2 - Issue #SIMP-1017-1).
 *   **1.144 HUD Interface Property Alignment (R-ID 1010)**: Core state-access interfaces in `:core:engine` (`TimeProvider`, `BootLifecycleAuthority`, `PowerStateProvider`, `NetworkProvider`) and `:app` (`SignalingProvider`) MUST utilize strict `val` properties instead of method getters to ensure Hilt metadata reliability. (Oct10.3 - Issue #SIMP-1010-4).
 *   **1.145 Communication & Test Stability (R-ID 1011)**: JSON iteration MUST use explicit casting to `String` for keys and non-null value checks. Test suites MUST strictly follow property-based interface access. (Oct10.4 - Issue #BUILD-FIX-OCT10.3).
+*   **1.146 Native GNSS Batching (R-ID 615)**: GNSS health evaluation (satellites used, average SNR) MUST be centralized in the native batching layer (or its Kotlin fallback in `JdHardwareManager`) to decouple the JVM from hardware state logic. (Oct10.5 - Issue #SIMP-1011-1).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 662**: Native GNSS Batching - Centralized GNSS health evaluation in `JdHardwareManager`, eliminating manual fallback logic in `HardwareSuite`. (Oct10.5 - Issue #SIMP-1011-1).
 *   **SOT ID 661**: Communication & Test Stability - Resolved JSONObject type ambiguity and remediated property invocation errors in test suites. (Oct10.4 - Issue #BUILD-FIX-OCT10.3).
 *   **SOT ID 660**: HUD Interface Alignment - Migrated all core and secondary interfaces to property-based access, ensuring structural symmetry for Compose HUDs. (Oct10.3 - Issue #SIMP-1010-4).
 *   **SOT ID 659**: Build-Time Metadata Guardian - Implemented automated cross-module visibility audit in `build.gradle` to prevent KAPT stub generation failures. (Oct10.2 - Issue #SIMP-1017-1).
@@ -29,6 +31,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.277 (Native GNSS Batching Audit)**: PASSED - Verified that `HardwareSuite` no longer contains manual SNR/Satellite counting logic and correctly delegates to `JdHardwareManager`. (Oct10.5 - Issue #SIMP-1011-1).
 *   **Chapter 31.276 (Communication & Test Audit)**: PASSED - Verified compilation of `CommunicationManager.kt` and all major audit test suites after fixing property invocation and JSON iteration errors. (Oct10.4 - Issue #BUILD-FIX-OCT10.3).
 *   **Chapter 31.275 (HUD Interface Alignment Audit)**: PASSED - Verified that `TimeProvider`, `BootLifecycleAuthority`, `PowerStateProvider`, `NetworkProvider`, and `SignalingProvider` use `val` properties. Refactored all calling components to align. (Oct10.3 - Issue #SIMP-1010-4).
 *   **Chapter 31.274 (Metadata Visibility Audit)**: PASSED - Verified that the recursive Groovy script in `build.gradle` correctly catalogs `internal` types and prevents leaks. (Oct10.2 - Issue #SIMP-1017-1).

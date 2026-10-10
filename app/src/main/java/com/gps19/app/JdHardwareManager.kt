@@ -32,6 +32,9 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.10.5:
+ * - Issue #SIMP-1011-1: Native GNSS Batching. Migrated manual GNSS health evaluation 
+ *   fallback into processGnssBatchNative to decouple HardwareSuite.
  * Oct.10.1 (Restoration Path):
  * - Issue #SIMP-1014-2: Unified Pressure Path. Added processSystemPressureNative 
  *   (n24) to consolidate Memory and Storage pressure evaluation in JNI.
@@ -275,26 +278,41 @@ object JdHardwareManager {
         return false
     }
 
+    /**
+     * processGnssBatchNative: Consolidated JNI GNSS path (Issue #SIMP-1011-1).
+     * Includes Kotlin fallback to ensure consistent health evaluation when JNI is absent.
+     */
     fun processGnssBatchNative(batch: GnssHealthBatch): Boolean {
-        if (!isLibraryLoaded.get()) return false
-        
-        synchronized(sharedStateBuffer) {
-            sharedStateBuffer.clear()
-            sharedStateBuffer.putInt(batch.count)
-            for (i in 0 until 64) sharedStateBuffer.putInt(batch.svid[i])
-            for (i in 0 until 64) sharedStateBuffer.putFloat(batch.cn0[i])
-            for (i in 0 until 64) sharedStateBuffer.putInt(if (batch.usedInFix[i]) 1 else 0)
-            for (i in 0 until 64) sharedStateBuffer.putInt(batch.constellation[i])
-            
-            val res = n21()
-            if (res == 0) {
-                batch.satellitesInView = sharedStateBuffer.getInt(896)
-                batch.satellitesUsed = sharedStateBuffer.getInt(900)
-                batch.averageSnr = sharedStateBuffer.getDouble(904)
-                return true
+        if (isLibraryLoaded.get()) {
+            synchronized(sharedStateBuffer) {
+                sharedStateBuffer.clear()
+                sharedStateBuffer.putInt(batch.count)
+                for (i in 0 until 64) sharedStateBuffer.putInt(batch.svid[i])
+                for (i in 0 until 64) sharedStateBuffer.putFloat(batch.cn0[i])
+                for (i in 0 until 64) sharedStateBuffer.putInt(if (batch.usedInFix[i]) 1 else 0)
+                for (i in 0 until 64) sharedStateBuffer.putInt(batch.constellation[i])
+                
+                val res = n21()
+                if (res == 0) {
+                    batch.satellitesInView = sharedStateBuffer.getInt(896)
+                    batch.satellitesUsed = sharedStateBuffer.getInt(900)
+                    batch.averageSnr = sharedStateBuffer.getDouble(904)
+                    return true
+                }
             }
         }
-        return false
+        
+        // Architecture Rule 2: Fallback logic migrated from HardwareSuite for decoupling
+        batch.satellitesInView = batch.count
+        var used = 0; var snrSum = 0.0; var snrCount = 0
+        for (i in 0 until batch.count) {
+            if (batch.usedInFix[i]) used++
+            val snr = batch.cn0[i].toDouble()
+            if (snr > 0.0) { snrSum += snr; snrCount++ }
+        }
+        batch.satellitesUsed = used
+        batch.averageSnr = if (snrCount > 0) snrSum / snrCount else 0.0
+        return true
     }
 
     fun processAcousticBatchNative(batch: AcousticBatch, buffer: ShortArray): Boolean {

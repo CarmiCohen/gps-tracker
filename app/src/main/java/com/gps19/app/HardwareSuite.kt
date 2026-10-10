@@ -37,6 +37,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.10.5:
+ * - Issue #SIMP-1011-1: Native GNSS Batching. Migrated manual GNSS health evaluation 
+ *   into JdHardwareManager to decouple engine from hardware state logic.
  * Oct.10.2:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
  *   TimeProvider and PowerStateProvider APIs.
@@ -415,20 +418,12 @@ class HardwareSuite @Inject constructor(
                     gnssHealthBatch.constellation[i] = status.getConstellationType(i)
                 }
 
-                if (nativeFastPathProvider.processGnssBatch(gnssHealthBatch)) {
-                    satellitesInView = gnssHealthBatch.satellitesInView
-                    satellitesUsed = gnssHealthBatch.satellitesUsed
-                    averageSnr = gnssHealthBatch.averageSnr
-                } else {
-                    satellitesInView = status.satelliteCount
-                    var used = 0; var snrSum = 0.0; var snrCount = 0
-                    for (i in 0 until status.satelliteCount) {
-                        if (status.usedInFix(i)) used++
-                        val snr = status.getCn0DbHz(i).toDouble()
-                        if (snr > 0.0) { snrSum += snr; snrCount++ }
-                    }
-                    satellitesUsed = used; averageSnr = if (snrCount > 0) snrSum / snrCount else 0.0
-                }
+                // Issue #SIMP-1011-1: processGnssBatch now handles health calculation logic 
+                // internally (via native or Kotlin fallback) to decouple HardwareSuite.
+                nativeFastPathProvider.processGnssBatch(gnssHealthBatch)
+                satellitesInView = gnssHealthBatch.satellitesInView
+                satellitesUsed = gnssHealthBatch.satellitesUsed
+                averageSnr = gnssHealthBatch.averageSnr
             }
             
             val now = timeProvider.currentTimeMillis
