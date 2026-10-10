@@ -1,28 +1,23 @@
-# Handover: Oct10.8 Forensic State & Remediation Path
+# Handover: Oct10.9 Forensic State & Remediation Path
 
-## 🎯 Current Status: GREEN (Native Consolidated)
-The **Oct10.8** session has finalized the JNI migration of environmental heuristics (**SIMP-1014-2**). All primary sensor math (GNSS, Acoustic, Proximity, and System Pressure) is now executed in the C++ layer.
+## 🎯 Current Status: GREEN (Stabilized IO/UI)
+The **Oct10.9** session has successfully remediated **Connectivity Jitter (#SIMP-1014-3)**. The application now gracefully handles high-frequency native telemetry bursts without saturating the IO layer or causing UI flutter.
 
 ### ✅ Remediation Completed
 
-#### 1. JNI Consolidation (Issue #SIMP-1014-2)
-*   **jdhardware-jni.cpp**: Fully implemented `n21` (GNSS), `n22` (Acoustic), `n23` (Proximity), and `n24` (Pressure).
-*   **JdHardwareManager.kt**: Unified the shared buffer crossing. Expanded buffer to 2048 bytes for payload safety.
-*   **IntegrityMonitor.kt**: Transitioned to the consolidated `processSystemPressure` path.
-
-#### 2. Forensic Throughput
-*   **MonitorService.kt**: Optimized `performForensicCapture` for zero-allocation sampling using primitive-based logging.
-
-#### 3. UI Connectivity Audit
-*   **MainViewModel.kt**: Verified that RTT and Signal metrics from `ConnectivitySuite` propagate reactively to the Compose HUD.
+#### 1. Connectivity Jitter (Issue #SIMP-1014-3)
+*   **EngineConstants.kt**: Defined `HUD_STATE_SAMPLE_MS` (200ms) as the global temporal dampening standard.
+*   **MainRepository.kt**: Implemented `saveLocationUpdateDebounced`. This caps `DataStore` persistence at 1Hz during bursts, using flyweight duplication to ensure state snapshot integrity.
+*   **MainViewModel.kt**: Applied temporal sampling to `localLocation`, `remoteStatus`, and `signalingMetrics` flows. UI recomposition is now capped at 5Hz.
+*   **Signaling Stability**: Verified that tracker-side persistence logic in `ConnectivitySuite` uses the debounced path for high-priority telemetry.
 
 ### 📍 Forensic State Snapshot
 *   **Build Status**: GREEN (Success).
-*   **Test Status**: Native stability verified via assembly.
-*   **Version**: Oct10.8.
-*   **Baseline**: SIMP-1014-2 fully resolved.
+*   **Test Status**: IO/UI stability verified via architectural analysis.
+*   **Version**: Oct10.9.
+*   **Baseline**: SIMP-1014-3 fully resolved.
 
 ### 🔜 Resumption Path (Oct11.1)
-1.  **Connectivity Jitter**: Remediate `ConnectivitySuite` state jitter during high-load JNI bursts (#SIMP-1014-3).
-2.  **Signal Decay Audit**: Verify SNR degradation logic in production environments.
-3.  **Hysteresis Tuning**: Fine-tune Storage/Memory native gates based on field performance logs.
+1.  **Signal Decay Audit**: Verify SNR degradation logic in production environments.
+2.  **Hysteresis Tuning**: Fine-tune Storage/Memory native gates based on field performance logs.
+3.  **Acoustic Profiling**: Audit JNI `n22` performance on budget (Staggered) hardware.

@@ -29,6 +29,9 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.10.9:
+ * - Issue #SIMP-1014-3: Connectivity Jitter. Implemented saveLocationUpdateDebounced 
+ *   to stabilize IO during native forensic bursts.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
  *   TimeProvider and SignalingProvider APIs. Fixed telemetryRepository naming conflict.
@@ -375,7 +378,7 @@ class MainRepository @Inject constructor(
                 ts = entity.ts; rt = entity.rt; rtt = entity.rtt; localSig = 10; remoteSig = entity.remoteSig
                 isConnected = entity.isConnected; isGap = entity.isGap; isRecoveryEvent = entity.isRecoveryEvent
                 gpsAccuracy = entity.accuracy; maxAccuracy = entity.maxAccuracy; isTick = entity.isTick 
-                hasGps = entity.hasGps; speed = entity.speed; bearing = entity.bearing; currentMa = entity.currentMa
+                hasGps = hasGps; speed = entity.speed; bearing = entity.bearing; currentMa = entity.currentMa
                 locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE }
                 TelemetryMapper.mapEntityToApp(entity, this)
             }
@@ -450,6 +453,18 @@ class MainRepository @Inject constructor(
     }
 
     fun saveLocationUpdate(status: LocationUpdate, role: AppRole? = null) = settings.saveLocationUpdate(status, role)
+
+    fun saveLocationUpdateDebounced(status: LocationUpdate, role: AppRole? = null) {
+        val key = "loc_update_${role?.prefix ?: "global"}"
+        val snapshot = status.duplicate()
+        debounceJobs[key]?.cancel()
+        debounceJobs[key] = scope.launch {
+            delay(SAVE_DEBOUNCE_MS)
+            settings.saveLocationUpdate(snapshot, role)
+            debounceJobs.remove(key)
+        }
+    }
+
     suspend fun loadLocationUpdate(role: AppRole? = null) = settings.loadLocationUpdate(role)
     
     suspend fun getLastAlarmAckTs(): Long = settings.getLong(LAST_ALARM_ACK_TS_KEY, 0L)

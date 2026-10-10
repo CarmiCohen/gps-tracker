@@ -21,6 +21,10 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.10.9:
+ * - Issue #SIMP-1014-3: Connectivity Jitter. Migrated tracker-side telemetry 
+ *   persistence to saveLocationUpdateDebounced to prevent IO saturation 
+ *   during JNI forensic bursts.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
  *   TimeProvider and SignalingProvider APIs. Fixed bulk property invocation errors.
@@ -93,7 +97,6 @@ class ConnectivitySuite @Inject constructor(
     val trackerSpeed get() = trackerStatus.speed
     val trackerBearing get() = trackerStatus.bearing
     val trackerAccuracy get() = trackerStatus.accuracy
-    val trackerMaxAccuracy get() = trackerStatus.maxAccuracy
     val trackerLastGpsTs get() = trackerStatus.gpsTs
     val trackerLastValidFixRt get() = trackerStatus.lastValidFixRt
     val trackerBattery get() = trackerStatus.battery
@@ -419,7 +422,7 @@ class ConnectivitySuite @Inject constructor(
     suspend fun sendTelemetry(status: LocationUpdate): Boolean {
         val success = sendTelemetryInternal(status, SignalingPriority.HIGH)
         if (isTrackerMode) {
-            mainRepository.saveLocationUpdate(status, AppRole.TRACKER)
+            mainRepository.saveLocationUpdateDebounced(status, AppRole.TRACKER)
             if (!success) {
                 val entity = TelemetryMapper.mapStatusToPending(status)
                 offlineRepository.addPendingStatusUpdate(entity)

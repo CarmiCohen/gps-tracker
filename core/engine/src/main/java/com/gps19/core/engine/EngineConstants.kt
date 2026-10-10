@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.10.9:
+ * - Issue #SIMP-1014-3: Connectivity Jitter. Added HUD_STATE_SAMPLE_MS 
+ *   for unified UI temporal dampening.
  * Oct.10.1 (Restoration Path):
  * - Issue #SIMP-1014-2: Unified Pressure Path. Added hysteresis offsets 
  *   for JNI-side Memory and Storage evaluation.
@@ -45,6 +48,7 @@ const val MEMORY_HYSTERESIS_OFFSET_MB = 10.0
 
 // Issue #1417: Connectivity Jitter
 const val CONNECTIVITY_HYSTERESIS_MS = 3000L
+const val HUD_STATE_SAMPLE_MS = 200L
 
 // Issue #1328: Event Bus Hardening
 const val DOMAIN_EVENT_BUS_CAPACITY = 512
