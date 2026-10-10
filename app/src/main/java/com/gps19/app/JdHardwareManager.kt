@@ -39,15 +39,13 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.10.8:
+ * - Issue #SIMP-1014-2: Pressure Consolidation. Finalized n21-n24 JNI implementations.
+ *   Increased sharedStateBuffer to 2048 to prevent GNSS batch overflow and corrected
+ *   output offsets for satellite evaluation.
  * Oct.10.7:
  * - Issue #SIMP-1011-3: Proximity Decoupling. Centralized Proximity health 
  *   evaluation fallback in processProximityBatchNative.
- * - Issue #SIMP-1014-2: Pressure Consolidation. Added Kotlin fallback for 
- *   processSystemPressureNative with hysteresis support.
- * Oct.10.6:
- * - Issue #SIMP-1011-2: Acoustic Decoupling. Centralized Acoustic health evaluation 
- *   fallback in processAcousticBatchNative. Implemented Kotlin FastPath state 
- *   storage for non-native environments.
  */
 object JdHardwareManager {
 
@@ -73,8 +71,8 @@ object JdHardwareManager {
     private const val MAX_INIT_RETRIES = 5
     private const val INITIAL_RETRY_DELAY_MS = 1000L
 
-    // Issue #SIMP-1011-1: Increased to 1024 bytes for GNSS/Acoustic/Pressure batching arrays
-    private val sharedStateBuffer: ByteBuffer = ByteBuffer.allocateDirect(1024).apply {
+    // Issue #SIMP-1014-2: Increased to 2048 bytes for GNSS/Acoustic/Pressure batching arrays
+    private val sharedStateBuffer: ByteBuffer = ByteBuffer.allocateDirect(2048).apply {
         order(ByteOrder.nativeOrder())
     }
 
@@ -342,9 +340,10 @@ object JdHardwareManager {
                 
                 val res = n21()
                 if (res == 0) {
-                    batch.satellitesInView = sharedStateBuffer.getInt(896)
-                    batch.satellitesUsed = sharedStateBuffer.getInt(900)
-                    batch.averageSnr = sharedStateBuffer.getDouble(904)
+                    // Oct.10.8: Offsets aligned for 2048 buffer safety (outputs at 1040)
+                    batch.satellitesInView = sharedStateBuffer.getInt(1040)
+                    batch.satellitesUsed = sharedStateBuffer.getInt(1044)
+                    batch.averageSnr = sharedStateBuffer.getDouble(1048)
                     return true
                 }
             }

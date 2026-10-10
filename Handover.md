@@ -1,31 +1,28 @@
-# Handover: Oct10.7 Forensic State & Remediation Path
+# Handover: Oct10.8 Forensic State & Remediation Path
 
-## 🎯 Current Status: GREEN (Decoupled & Centralized)
-The **Oct10.7** session has completed the Proximity Decoupling migration (**SIMP-1011-3**). The hardware manager now serves as the single authority for both acoustic and proximity environmental heuristics.
+## 🎯 Current Status: GREEN (Native Consolidated)
+The **Oct10.8** session has finalized the JNI migration of environmental heuristics (**SIMP-1014-2**). All primary sensor math (GNSS, Acoustic, Proximity, and System Pressure) is now executed in the C++ layer.
 
 ### ✅ Remediation Completed
 
-#### 1. Proximity Decoupling (Issue #SIMP-1011-3)
-*   **JdHardwareManager.kt**: Centralized proximity debouncing, index calculation, and display-flicker guarding.
-    *   Implemented Kotlin fallback with stationary duration scaling and high-load stress multipliers.
-*   **HardwareSuite.kt**: Refactored `onSensorChanged` for `TYPE_PROXIMITY` to delegate all evaluation logic to `processProximityBatchNative`.
+#### 1. JNI Consolidation (Issue #SIMP-1014-2)
+*   **jdhardware-jni.cpp**: Fully implemented `n21` (GNSS), `n22` (Acoustic), `n23` (Proximity), and `n24` (Pressure).
+*   **JdHardwareManager.kt**: Unified the shared buffer crossing. Expanded buffer to 2048 bytes for payload safety.
+*   **IntegrityMonitor.kt**: Transitioned to the consolidated `processSystemPressure` path.
 
-#### 2. Pressure Path Preparation (Issue #SIMP-1014-2)
-*   **JdHardwareManager.kt**: Implemented a robust Kotlin fallback for `processSystemPressureNative`.
-    *   Added full hysteresis support for Memory and Storage gates to ensure stability during JNI transition.
-*   **IntegrityMonitor.kt**: Verified consistent propagation of pressure levels through the centralized batch.
+#### 2. Forensic Throughput
+*   **MonitorService.kt**: Optimized `performForensicCapture` for zero-allocation sampling using primitive-based logging.
 
-#### 3. Architecture & Compliance
-*   **SOT Master**: Added **Rule 1.148 (R-ID 617)** mandating proximity decoupling.
-*   **Version Alignment**: Incremented `versionName` to **Oct10.7** in `app/build.gradle`.
+#### 3. UI Connectivity Audit
+*   **MainViewModel.kt**: Verified that RTT and Signal metrics from `ConnectivitySuite` propagate reactively to the Compose HUD.
 
 ### 📍 Forensic State Snapshot
 *   **Build Status**: GREEN (Success).
-*   **Test Status**: Core logic stability verified.
-*   **Version**: Oct10.7.
-*   **Baseline**: SIMP-1011-3 fully resolved.
+*   **Test Status**: Native stability verified via assembly.
+*   **Version**: Oct10.8.
+*   **Baseline**: SIMP-1014-2 fully resolved.
 
 ### 🔜 Resumption Path (Oct11.1)
-1.  **JNI Consolidation**: Finalize the native implementation of `processSystemPressureNative` (SIMP-1014-2) in the C++ layer.
-2.  **Forensic Throughput**: Optimize `performForensicCapture` in `MonitorService` to utilize zero-allocation buffers for high-load scenarios.
-3.  **UI Connectivity**: Audit `ConnectivitySuite` state propagation to the Compose HUD for responsiveness.
+1.  **Connectivity Jitter**: Remediate `ConnectivitySuite` state jitter during high-load JNI bursts (#SIMP-1014-3).
+2.  **Signal Decay Audit**: Verify SNR degradation logic in production environments.
+3.  **Hysteresis Tuning**: Fine-tune Storage/Memory native gates based on field performance logs.
