@@ -5,6 +5,10 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Oct.11.8:
+ * - Issue #SIMP-1011-22: Performance Tier Alignment. Refactored performBayesianExpansion 
+ *   to use hardware-aware uncertainty growth rates (Standard: 15m/s, Staggered: 25m/s).
+ * - Fixed unresolved reference 'finalJumpTier' in early exit branches.
  * Oct.11.2:
  * - Issue #SIMP-1101-1: Bayesian Drift Audit. Centralized authoritative 
  *   accuracy expansion (uncertainty growth) during GNSS gaps.
@@ -36,8 +40,11 @@ class LocationProcessor(
         savedLastValidFixRt: Long = 0L,
         savedVibrationFloor: Double = -1.0,
         savedLuxBaseline: Double = -1.0,
-        savedAcousticFloor: Double = -1.0
+        savedAcousticFloor: Double = -1.0,
+        performanceTier: PerformanceTier = PerformanceTier.STANDARD
     ) {
+        state.performanceTier = performanceTier
+
         if (savedMaxAccuracy > 0.0) {
             state.accuracy.maxAccuracy = savedMaxAccuracy
             fillAccuracyWindow(savedMaxAccuracy)
@@ -160,8 +167,15 @@ class LocationProcessor(
         val elapsedSec = (nowRt - state.lastValidFixRt) / 1000.0
         if (elapsedSec <= 0) return state.accuracy.maxAccuracy
 
+        // Issue #SIMP-1011-22: Hardware-aware expansion rate
+        val growthThreshold = if (state.performanceTier == PerformanceTier.STAGGERED) {
+            PENDING_UNCERTAINTY_GROWTH_RATE_STAGGERED_MPS
+        } else {
+            PENDING_UNCERTAINTY_GROWTH_RATE_MPS
+        }
+
         val driftRate = if (lastSpeedMps > 1.0) {
-            lastSpeedMps.coerceIn(PENDING_UNCERTAINTY_GROWTH_RATE_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS)
+            lastSpeedMps.coerceIn(growthThreshold, PENDING_UNCERTAINTY_SPEED_CAP_MPS)
         } else {
             PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS
         }
@@ -569,7 +583,8 @@ class LocationProcessor(
     }
     fun invalidateHomePointsCache() { state.cachedHomePoints = null }
     fun resetStats() {
-        state.accuracy.lastProcessedAccuracy = 0.0; state.accuracy.maxAccuracy = 0.0
+        state.accuracy.lastProcessedAccuracy = 0.0
+        state.accuracy.maxAccuracy = 0.0
         resetAccuracyWindow()
         state.lastDistanceToTracker = null; state.lastNearestHomeDistance = null
         state.lastLat = 0.0; state.lastLng = 0.0; state.lastTs = 0L; state.lastRt = 0L; state.lastAcc = 0.0; state.lastMaxAcc = 0.0

@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.11.8:
+ * - Issue #SIMP-1011-22: Performance Tier Alignment. Added performanceTier 
+ *   to LocationProcessingState to support hardware-aware Bayesian expansion.
  * Oct.11.1:
  * - Issue #SIMP-1011-5: Acoustic Profiling. Updated NativeFastPathProvider 
  *   to accept TimeProvider for standardized latency auditing.
@@ -716,6 +719,7 @@ class LocationProcessingState {
     var kineticEnergy: Double = 0.0
     val optimizedPointFlyweight: EngineGeoPoint = EngineGeoPoint()
     @Transient var cachedHomePoints: List<EngineGeoPoint>? = null
+    var performanceTier: PerformanceTier = PerformanceTier.STANDARD
 }
 
 @Serializable

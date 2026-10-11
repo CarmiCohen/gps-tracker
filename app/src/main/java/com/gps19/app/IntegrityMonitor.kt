@@ -18,6 +18,10 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Oct.11.8:
+ * - Issue #SIMP-1011-22: Performance Tier Alignment. Refined Mali anomaly 
+ *   detection to use tiered JNI bridge thresholds (Standard: 150ms, 
+ *   Staggered: 250ms) to reduce false positives on budget hardware.
  * Oct.11.4:
  * - Issue #SIMP-1011-18: Mali Correlation Refinement. Refined Mali anomaly 
  *   trigger to require sustained contention (30s) and increased bridge 
@@ -401,8 +405,14 @@ class IntegrityMonitor @Inject constructor(
     }
 
     private fun checkMaliDriverAnomaly(maxIo: Long, maxJni: Long, cpu: Double, iow: Double, nowRt: Long): Boolean {
-        // Issue #SIMP-1011-18: Refine Mali trigger. Use 150ms bridge threshold and require sustained contention.
-        val isJniBridgeStalled = maxJni > MALI_BRIDGE_LATENCY_THRESHOLD_MS
+        // Issue #SIMP-1011-22: Performance Tier Alignment. Tiered JNI threshold.
+        val threshold = if (systemStatusProvider.isStaggeredPerformanceTier()) {
+            MALI_BRIDGE_LATENCY_THRESHOLD_STAGGERED_MS
+        } else {
+            MALI_BRIDGE_LATENCY_THRESHOLD_MS
+        }
+
+        val isJniBridgeStalled = maxJni > threshold
         val isIoContended = maxIo > 500 && cpu > 6.0
 
         if (isIoContended || (isJniBridgeStalled && cpu > 6.0)) {

@@ -2,6 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.11.8:
+ * - Issue #SIMP-1011-22: Performance Tier Alignment. Added tiered thresholds 
+ *   for MALI_BRIDGE_LATENCY and PENDING_UNCERTAINTY_GROWTH to support 
+ *   hardware-aware detection and geofencing reliability.
  * Oct.11.5:
  * - Issue #SIMP-1011-21: Radio-Warm Keep-Alive. Added RADIO_KEEP_ALIVE_INTERVAL_MS (60s) 
  *   to maintain GNSS residency on budget hardware.
@@ -156,6 +160,7 @@ const val JUMP_GATE_LOW_SNR_THRESHOLD = 22.0
 
 // Bayesian Uncertainty Growth
 const val PENDING_UNCERTAINTY_GROWTH_RATE_MPS = 15.0 
+const val PENDING_UNCERTAINTY_GROWTH_RATE_STAGGERED_MPS = 25.0
 const val PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS = 1.5 
 const val PENDING_UNCERTAINTY_SPEED_CAP_MPS = 33.3 
 
@@ -496,6 +501,7 @@ const val LOG_MUZZLE_STARTUP_MS = 60000L
 // Issue #SIMP-1011-18: Mali Correlation Refinement
 const val MALI_ANOMALY_SUSTAINED_THRESHOLD_MS = 30000L
 const val MALI_BRIDGE_LATENCY_THRESHOLD_MS = 150L
+const val MALI_BRIDGE_LATENCY_THRESHOLD_STAGGERED_MS = 250L
 
 const val FORENSIC_PINK_COLOR = 0xFFFF00FF.toInt()
 

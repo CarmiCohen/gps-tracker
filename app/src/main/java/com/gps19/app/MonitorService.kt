@@ -26,6 +26,9 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.11.8:
+ * - Issue #SIMP-1011-22: Performance Tier Alignment. Propagated performanceTier 
+ *   to LocationProcessors during loadState to enable hardware-aware expansion.
  * Oct.11.5:
  * - Background Hardening: Pass UI visibility to DeviceProfileManager during 
  *   processTick to enable transition window WakeLock escalation.
@@ -174,7 +177,8 @@ class MonitorService : BaseMonitorService() {
             savedLastValidFixRt = repository.getLong(currentRole, LAST_VALID_FIX_RT_KEY, 0L),
             savedVibrationFloor = repository.getDouble(currentRole, ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
             savedLuxBaseline = repository.getDouble(currentRole, TRACKER_LUX_BASELINE_KEY, -1.0),
-            savedAcousticFloor = repository.getDouble(currentRole, TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
+            savedAcousticFloor = repository.getDouble(currentRole, TRACKER_ACOUSTIC_FLOOR_KEY, -1.0),
+            performanceTier = capabilities.performanceTier
         )
 
         val vibeFloor = repository.getDouble(currentRole, ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0)
@@ -202,7 +206,8 @@ class MonitorService : BaseMonitorService() {
                 savedLastValidFixRt = remoteState?.lastValidFixRt ?: 0L,
                 savedVibrationFloor = repository.getDouble(remoteRole, ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
                 savedLuxBaseline = repository.getDouble(currentRole, TRACKER_LUX_BASELINE_KEY, -1.0),
-                savedAcousticFloor = repository.getDouble(currentRole, TRACKER_ACOUSTIC_FLOOR_KEY, -1.0)
+                savedAcousticFloor = repository.getDouble(currentRole, TRACKER_ACOUSTIC_FLOOR_KEY, -1.0),
+                performanceTier = PerformanceTier.STANDARD // Viewer remote is usually standard or irrelevant for local expansion
             )
         }
 
