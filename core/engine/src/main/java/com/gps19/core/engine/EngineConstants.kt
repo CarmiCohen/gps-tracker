@@ -3,6 +3,8 @@ package com.gps19.core.engine
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
  * Oct.11.5:
+ * - Issue #SIMP-1011-21: Radio-Warm Keep-Alive. Added RADIO_KEEP_ALIVE_INTERVAL_MS (60s) 
+ *   to maintain GNSS residency on budget hardware.
  * - Issue #SIMP-1011-17: Event Bus Hardening. Increased buffer capacity to 1024 
  *   and implemented staged priority-aware dropping to protect critical telemetry.
  * Oct.11.4:
@@ -282,6 +284,7 @@ const val LANDING_PAGE_PAUSE_MS = 2000L
 const val STARTUP_SETTLING_DELAY_MS = 2000L
 const val STAGGERED_IO_PRUNING_DELAY_MS = 15000L
 const val GPS_WARMUP_GRACE_MS = 30000L
+const val RADIO_KEEP_ALIVE_INTERVAL_MS = 60000L
 
 // GPS Polling Intervals (Central Authority)
 const val HIGH_FREQUENCY_GPS_POLLING_MS = 2000L

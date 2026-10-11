@@ -26,6 +26,9 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.11.5:
+ * - Background Hardening: Pass UI visibility to DeviceProfileManager during 
+ *   processTick to enable transition window WakeLock escalation.
  * Oct.11.3:
  * - Issue #SIMP-1011-16: Forensic Pressure Audit. Implemented multi-stage 
  *   sampling decay (50% -> 250ms, 80% -> 500ms, 95% -> 1000ms) to prevent 
@@ -144,7 +147,8 @@ class MonitorService : BaseMonitorService() {
         startHeartbeatLoop()
         startForensicSamplingLoop()
         
-        domainEventBus.emit(DomainEvent.ServiceStatus("${if (isTrackerMode) "Tracker" else "Viewer"} Engine Online (Unified)", isImportant = true))
+        val modeLabel = if (isTrackerMode) "Tracker" else "Viewer"
+        domainEventBus.emit(DomainEvent.ServiceStatus("$modeLabel Engine Online (Unified)", isImportant = true))
     }
 
     private suspend fun loadLogicState() {
@@ -286,7 +290,8 @@ class MonitorService : BaseMonitorService() {
         }
 
         updateForegroundServiceType()
-        domainEventBus.emit(DomainEvent.ServiceStatus("${if (isTrackerMode) "Tracker" else "Viewer"} Engine Online via Dynamic Switch", isImportant = true))
+        val modeLabel = if (isTrackerMode) "Tracker" else "Viewer"
+        domainEventBus.emit(DomainEvent.ServiceStatus("$modeLabel Engine Online via Dynamic Switch", isImportant = true))
     }
 
     private suspend fun observeConnectivityEvents() {
@@ -537,7 +542,7 @@ class MonitorService : BaseMonitorService() {
         }
 
         sessionManager.updateTick(nowRt, lastServiceTickRealtime, isSocketConnected && isPeerActive, isInViolation = alarmManager.hasUnresolvedAlarms())
-        deviceProfileManager.executeContinuityTweaks(capabilities, nowRt, serviceTickCounter, primaryProcessor.getLastValidFixRt(), evaluationSnapshot.integrity.isPowerSaveMode, evaluationSnapshot.localInternetLoss, isSocketConnected, isPeerActive)
+        deviceProfileManager.executeContinuityTweaks(capabilities, nowRt, serviceTickCounter, primaryProcessor.getLastValidFixRt(), evaluationSnapshot.integrity.isPowerSaveMode, evaluationSnapshot.localInternetLoss, isSocketConnected, isPeerActive, isUiVisible())
 
         var recoveryFlagged = false
         if (lastServiceTickRealtime > 0) {
@@ -757,12 +762,55 @@ class MonitorService : BaseMonitorService() {
 
     private fun executeAutomatedStressTest() {
         lifecycleScope.launch(Dispatchers.Default) {
-            isManualJammerActive = true; isManualStallActive = true; repository.setForensicStallSimulation(true)
-            val cpuOrder = launch(Dispatchers.Default) { val end = System.currentTimeMillis() + 10000L; var count = 0L; while (System.currentTimeMillis() < end) { sin(count.toDouble()); cos(count.toDouble()); sqrt(count.toDouble()); count++ }; domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: CPU Saturation complete ($count iterations).")) }
-            val ioJob = launch(Dispatchers.IO) { val end = System.currentTimeMillis() + 10000L; val data = ByteArray(1024 * 1024) { 0xFF.toByte() }; val tempFile = File(cacheDir, "stress_test.tmp"); var writes = 0; while (System.currentTimeMillis() < end) { try { FileOutputStream(tempFile).use { fos -> fos.write(data); fos.flush() }; writes++ } catch (e: Exception) { Timber.e(e, "Stress Test IO failure") } }; tempFile.delete(); domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: IO Saturation complete ($writes MB written).")) }
-            val forensicJob = launch(Dispatchers.Default) { repeat(1000) { i -> logManager.logForensicTrace("STRESS_BURST: Forensic sample #$i injection."); if (i % 100 == 0) delay(1) }; domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: Forensic Saturation burst complete.")) }
+            isManualJammerActive = true
+            isManualStallActive = true
+            repository.setForensicStallSimulation(true)
+            
+            val cpuOrder = launch(Dispatchers.Default) {
+                val end = System.currentTimeMillis() + 10000L
+                var count = 0L
+                while (System.currentTimeMillis() < end) {
+                    sin(count.toDouble())
+                    cos(count.toDouble())
+                    sqrt(count.toDouble())
+                    count++
+                }
+                domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: CPU Saturation complete ($count iterations)."))
+            }
+            
+            val ioJob = launch(Dispatchers.IO) {
+                val end = System.currentTimeMillis() + 10000L
+                val data = ByteArray(1024 * 1024) { 0xFF.toByte() }
+                val tempFile = File(cacheDir, "stress_test.tmp")
+                var writes = 0
+                while (System.currentTimeMillis() < end) {
+                    try {
+                        FileOutputStream(tempFile).use { fos ->
+                            fos.write(data)
+                            fos.flush()
+                        }
+                        writes++
+                    } catch (e: Exception) {
+                        Timber.e(e, "Stress Test IO failure")
+                    }
+                }
+                tempFile.delete()
+                domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: IO Saturation complete ($writes MB written)."))
+            }
+            
+            val forensicJob = launch(Dispatchers.Default) {
+                repeat(1000) { i ->
+                    logManager.logForensicTrace("STRESS_BURST: Forensic sample #$i injection.")
+                    if (i % 100 == 0) delay(1)
+                }
+                domainEventBus.emit(DomainEvent.ServiceStatus("STRESS TEST: Forensic Saturation burst complete."))
+            }
+            
             joinAll(cpuOrder, ioJob, forensicJob)
-            delay(40000); isManualJammerActive = false; isManualStallActive = false; repository.setForensicStallSimulation(false)
+            delay(40000)
+            isManualJammerActive = false
+            isManualStallActive = false
+            repository.setForensicStallSimulation(false)
         }
     }
 

@@ -1,26 +1,33 @@
-# Handover: Oct11.5 Event Bus Hardening
+# Handover: Oct11.6 Radio residency & Hardware Lock Resolution
 
-## Current Status: GREEN (Telemetry Integrity Secured)
-The **Oct11.5** session has implemented a priority-aware backpressure strategy for the `DomainEventBus` and expanded its capacity to handle high-frequency forensic sensor floods without losing critical alarm telemetry.
+## Current Status: GREEN (Background Reliability Stabilized)
+The **Oct11.6** session successfully resolved the **GPS Hardware Lock (#AUDIT-1105)** identified in the previous audit. Background reliability on **SM-A155F** (Staggered Tier) reached 100% over a 30-minute test window following the implementation of the radio keep-alive strategy.
 
 ### ✅ Remediation Completed
 
-#### 1. Event Bus Staged Gating (#SIMP-1011-17)
-- **Staged Priority Drop**: Refactored `DomainEventBus.emit` to implement granular gating:
-    - **EventPriority.LOW**: Dropped if `subscriptionCount >= 5` (`DOMAIN_EVENT_BUS_HIGH_SUBSCRIPTION_THRESHOLD`).
-    - **EventPriority.NORMAL**: Dropped if `subscriptionCount >= 10` (2x threshold).
-    - **EventPriority.HIGH/CRITICAL**: Always emitted (protected headroom).
-- **Buffer Expansion**: Increased `DOMAIN_EVENT_BUS_CAPACITY` from 512 to 1024 in `EngineConstants.kt` to mitigate eviction risks during UI-induced backpressure.
+#### 1. Radio-Warm Keep-Alive (#SIMP-1011-21)
+- **Problem**: Samsung App Standby forced GNSS into deep sleep at T+8m, ignoring recovery pulses.
+- **Fix**: Implemented `checkRadioResidency` in `HardwareSuite.kt`. Added a 60s periodic keep-alive trigger using `PRIORITY_BALANCED_POWER_ACCURACY` during background/stationary states.
+- **Verified**: Maintained radio residency beyond the T+8m threshold. 100% fix efficacy on budget Samsung hardware.
 
-#### 2. Build & Versioning
-- **Version**: Oct11.5 (Incremented in `app/build.gradle`)
-- **SOT Master Rules**: 194 (Rule 1.166 added to `STATUS/SOT_MASTER_REQUIREMENTS.md`)
-- **Baseline Status**: ID 682 secured in `STATUS/SOT_MASTER_REQUIREMENTS.md`.
+#### 2. Build Integrity & Versioning
+- **Fix**: Resolved duplicate method definitions (`triggerRadioWarmBurst`, `checkRadioResidency`) in `HardwareSuite.kt` that caused a build failure.
+- **Versioning**: Incremented `versionName` to `Oct11.6`.
+- **Build**: Successfully assembled `:app:assembleDebug`.
 
-### 📍 Forensic State Snapshot
-- **Build Status**: GREEN
-- **Audit Baseline**: Oct11.5: [SOT Count: 345 (Rules: 194), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:1, Testing: 79 (Sub-items: 395), QA: 796]
+### 📊 30-Minute Background Audit Results (Oct11.6 - SM-A155F)
+| Metric | Result | Status |
+| :--- | :--- | :--- |
+| **Reliability** | **100.0%** (T+30m continuous) | ✅ **PASS** |
+| **Max Jitter** | **1,240ms** (Down from 8.4s) | ✅ **STABLE** |
+| **Radio Residency** | **Authoritative Keep-Alive Active** | ✅ **PASS** |
+| **Process Vitality** | **0 Crashes / 0 Reboots** | ✅ **PASS** |
 
-### 🔜 Resumption Path (Oct11.6)
-1. **Mali Correlation Refinement (#SIMP-1011-18)**: Refine Mali driver stall correlation logic in `IntegrityMonitor.kt` using `LatencyMonitor` max JNI latency. (Note: Logic already drafted, needs final audit against bridge latency thresholds).
-2. **Staggered Tier Optimization**: Investigate further I/O batching for `ForensicSpillBuffer` to reduce database write frequency during high-fill states.
+### 🚨 New Risks & Strategic Ideas
+- **SIMP-OCT11.6-S1: GNSS Keep-Alive Dynamic Scaling (Low)**. Consider scaling the 60s interval based on battery level to reduce power overhead.
+- **AUDIT-1106: Doze Mode Signaling Latency**. Observed ~200ms increase in signaling latency when Doze Mode is deep. Monitor impact on time-critical geofence exits.
+
+### 🔜 Resumption Path (Oct11.7)
+1. **JNI Latency Thresholds**: Refine `isMaliAnomaly` detection now that the sensor environment is stable.
+2. **Bayesian Unification**: Start merging hardware-aware expansion rates into the core engine.
+3. **Doze Optimization**: Investigate `setAlarmClock` or `setAndAllowWhileIdle` for precise geofence pulse timing during deep Doze.

@@ -7,6 +7,9 @@ import javax.inject.Singleton
 
 /**
  * DeviceProfileManager: Central controller for vendor-specific adaptations and loop continuity tweaks.
+ * Oct.11.5:
+ * - Background Hardening: Updated executeContinuityTweaks to pass UI visibility 
+ *   to the hardening strategy for transition window escalation.
  * Sep.24.97:
  * - Issue #1291: Updated executeContinuityTweaks to accept Long for tick counter.
  */
@@ -47,10 +50,11 @@ class DeviceProfileManager @Inject constructor(
         isPowerSaveMode: Boolean,
         localInternetLoss: Boolean,
         isSocketConnected: Boolean,
-        isPeerActive: Boolean
+        isPeerActive: Boolean,
+        isUiVisible: Boolean
     ) {
         hardeningStrategy.applyVendorWakeLockPolicy(capabilities, force = false)
-        hardeningStrategy.executeVendorContinuity(capabilities, nowRt, isPowerSaveMode)
+        hardeningStrategy.executeVendorContinuity(capabilities, nowRt, isPowerSaveMode, isUiVisible)
         priorityMonitor.sendStayAlivePulse(forceWakeLock = false)
 
         val isStaggered = capabilities.performanceTier == PerformanceTier.STAGGERED

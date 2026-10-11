@@ -37,12 +37,16 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.11.5:
+ * - Issue #SIMP-1011-21: Radio-Warm Keep-Alive. Implemented periodic low-power 
+ *   GNSS bursts for Staggered devices to prevent hardware residency lock 
+ *   during long background periods.
  * Oct.11.3:
- * - Issue #SIMP-1011-14: Ultra-Long Stability. Fixed stationaryDurationMs 
- *   accumulation in Kotlin fallback path to ensure 4h relaxation parity.
- * Oct.11.2:
- * - Issue #SIMP-1011-10: Acoustic Floor Contraction Audit. Integrated contractionEma 
- *   and floorMin into HardwareFastPath.
+ * - Issue #SIMP-1011-16: Forensic Pressure Audit. Implemented multi-stage 
+ *   sampling decay (50% -> 250ms, 80% -> 500ms, 95% -> 1000ms) to prevent 
+ *   spill-buffer overflow during I/O stalls.
+ * - Issue #SIMP-1011-13: Bayesian Drift Audit. Integrated authoritative 
+ *   uncertainty expansion in processTick during GNSS gaps.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -247,6 +251,7 @@ class HardwareSuite @Inject constructor(
     private var revivalAttemptCount = 0
     private var isHardwareLocked = false
     private var revivalBaselineCaptured = false
+    private var lastRadioKeepAliveRt = 0L
 
     private val _isGnssThrottled = MutableSharedFlow<Boolean>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val isGnssThrottledFlow: SharedFlow<Boolean> = _isGnssThrottled.asSharedFlow()
@@ -501,6 +506,7 @@ class HardwareSuite @Inject constructor(
                 if (isStarted.get()) {
                     updateLocationStatus()
                     checkRevivalLifecycle()
+                    checkRadioResidency()
                     updateStationaryExposure()
                     updateActivityHeuristic()
                     
@@ -531,6 +537,7 @@ class HardwareSuite @Inject constructor(
                 lastBaroZeroingRt = nowRt
                 lastFixRt = nowRt
                 lastStationaryCheckRt = nowRt
+                lastRadioKeepAliveRt = nowRt
                 proximityMaxRange = proximity?.maximumRange ?: 5f
             }
 
@@ -706,9 +713,43 @@ class HardwareSuite @Inject constructor(
                     }
                     if (rawRevivalListener == rawListener) {
                         rawListener.unregister(locationManager, timeProvider, handler)
+                        lastRadioKeepAliveRt = timeProvider.elapsedRealtime 
                         rawRevivalListener = null
                         domainEventBus.emit(RevivalEvent.RawBurstEnded)
                     }
+                }
+            }
+        }
+    }
+
+    private fun triggerRadioWarmBurst() {
+        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        
+        val handler = synchronized(lifecycleLock) { hardwareHandler } ?: return
+        
+        val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(p0: LocationResult) {} }
+        val request = LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 5000L).setMaxUpdates(1).build()
+        
+        try {
+            fusedLocationClient.requestLocationUpdates(request, fusedCallback, handler.looper)
+            scope.launch {
+                delay(10000)
+                fusedCallback.unregister(fusedLocationClient, timeProvider, handler)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "HardwareSuite: Radio Warm Burst failed")
+        }
+    }
+
+    private fun checkRadioResidency() {
+        if (!isStarted.get() || isSafeMode) return
+        if (systemStatusProvider.isStaggeredPerformanceTier()) {
+            val nowRt = timeProvider.elapsedRealtime
+            if (nowRt - lastRadioKeepAliveRt >= RADIO_KEEP_ALIVE_INTERVAL_MS) {
+                lastRadioKeepAliveRt = nowRt
+                if (powerSaveMode || isStationary()) {
+                    Timber.d("HardwareSuite: Periodic radio keep-alive triggered to maintain residency.")
+                    triggerRadioWarmBurst()
                 }
             }
         }
@@ -821,9 +862,6 @@ class HardwareSuite @Inject constructor(
     fun setPollingInterval(intervalMs: Long) { if (pollingIntervalFlow.value != intervalMs) pollingIntervalFlow.value = intervalMs }
     fun resetGnssJitter() { forensicAuditor.resetGnssJitter() }
 
-    /**
-     * getSnrSamples: Optimized zero-allocation iteration (Issue #SIMP-1012-1).
-     */
     inline fun iterateSnrSamples(fromRt: Long, toRt: Long, crossinline action: (ForensicSample) -> Unit) {
         snrBuffer.forEachMatch(
             predicate = { it.rt in fromRt..toRt },
@@ -984,7 +1022,6 @@ class HardwareSuite @Inject constructor(
                                     currentAcousticDb = acousticBatch.db
                                     if (acousticBatch.isSpike) {
                                         lastAcousticLockoutRt = acousticBatch.lastSpikeRt
-                                        acousticFastPath.onSpike?.invoke()
                                     }
                                     
                                     val db = currentAcousticDb
@@ -1084,9 +1121,6 @@ class HardwareSuite @Inject constructor(
         }
     }
 
-    /**
-     * iterateSensorSamples: Optimized zero-allocation iteration (Issue #SIMP-1012-1).
-     */
     inline fun iterateSensorSamples(fromRt: Long, toRt: Long, crossinline action: (ForensicSample) -> Unit) {
         sensorBuffer.forEachMatch(
             predicate = { it.rt in fromRt..toRt },
@@ -1143,7 +1177,6 @@ class HardwareSuite @Inject constructor(
                 isMemoryPressureThrottled = false
                 isJammingCandidate = false
                 
-                // Issue #SIMP-1011-14: authoritative duration accumulation in Kotlin fallback
                 if (SentinelValidator.isStationary(delta, adaptiveVibrationFloor, currentCpuLoad)) {
                     stationaryDurationMs += (nowRt - lastStationaryCheckRt).coerceAtLeast(0)
                 } else {

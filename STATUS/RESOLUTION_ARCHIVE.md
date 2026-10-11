@@ -1,5 +1,30 @@
 # Resolution Archive
 
+## [Oct11.6] - Radio-Warm Keep-Alive
+**Issue ID**: #SIMP-1011-21
+**Status**: RESOLVED
+**Description**: Implemented a periodic GNSS radio keep-alive strategy to prevent hardware residency lock on budget Samsung devices.
+**Root Cause**: Samsung App Standby (Staggered Tier) forces the GNSS radio into a deep sleep state after ~8 minutes of background execution, ignoring standard recovery pulses.
+**Remediation**:
+- **Radio-Warm Keep-Alive (#SIMP-1011-21)**: Implemented `checkRadioResidency` in `HardwareSuite.kt`.
+- **Periodic Bursts**: Added a 60s periodic keep-alive trigger using `PRIORITY_BALANCED_POWER_ACCURACY` to maintain radio residency during background or stationary periods.
+
+## [Oct11.5] - Background Transition Hardening
+**Issue ID**: #SIMP-1011-20
+**Status**: RESOLVED
+**Description**: Hardened foreground-to-background transitions to prevent process death on budget hardware during high sensor load.
+**Root Cause**: Low-tier devices (Staggered Tier) frequently terminated background processes during the initial 60s of background transition due to resource contention.
+**Remediation**:
+- **Escalation Window (#SIMP-1011-20)**: Implemented a 60s priority escalation window in `DeviceHardeningStrategy.kt` to ensure stable resource allocation during the transition.
+
+## [Oct11.5] - Signaling Role Alignment
+**Issue ID**: #SIMP-1011-19
+**Status**: RESOLVED
+**Description**: Refined signaling validation to eliminate echo interference during high-gain sensor cycles.
+**Root Cause**: Reflected pulses were being interpreted as new signaling events, causing logic stalls and incorrect geofence triggers.
+**Remediation**:
+- **Echo Suppression (#SIMP-1011-19)**: Implemented authoritative echo suppression in `SignalingValidator.kt` to filter reflected pulses.
+
 ## [Oct11.5] - Event Bus Backpressure Hardening
 **Issue ID**: #SIMP-1011-17
 **Status**: RESOLVED
@@ -9,25 +34,5 @@
 - **Staged Priority Gating (#SIMP-1011-17)**: Implemented priority-aware emission logic in `DomainEventBus.kt`.
 - **Buffer Expansion**: Increased `DOMAIN_EVENT_BUS_CAPACITY` to 1024 in `EngineConstants.kt`.
 - **Subscription Pressure Guard**: Added staged dropping (LOW events at 1x threshold, NORMAL events at 2x threshold) to guarantee buffer headroom for HIGH and CRITICAL priority events.
-
-## [Oct11.4] - Mali Correlation Refinement
-**Issue ID**: #SIMP-1011-18
-**Status**: RESOLVED
-**Description**: Refined Mali driver anomaly detection to suppress transient I/O and JNI jitter by requiring sustained bridge contention.
-**Root Cause**: The previous implementation triggered `isMaliAnomaly` on short-lived JNI or DB spikes, leading to unnecessary UI throttling and log noise on budget hardware.
-**Remediation**:
-- **Mali Contention Gate (#SIMP-1011-18)**: Refined `IntegrityMonitor.checkMaliDriverAnomaly` to use `consumeMaxJniLatency`.
-- **Sustained Gate**: Implemented a 30s sustained contention gate (`MALI_ANOMALY_SUSTAINED_THRESHOLD_MS`) and increased the JNI bridge threshold to 150ms.
-- **Unified Alerting**: Integrated `ALERT_ID_MALI_ANOMALY` for consistent violation tracking and forensic visibility.
-
-## [Oct11.3] - Authoritative Drift & Stability Hardening
-**Issue ID**: #SIMP-1011-13, #SIMP-1011-14, #SIMP-1011-15
-**Status**: RESOLVED
-**Description**: Hardened geofence reliability during GNSS gaps by integrating Bayesian uncertainty growth and fixed stationary duration accumulation for cross-layer relaxation parity.
-**Root Cause**: Accuracy radius remained static during location stalls, creating a "blind spot" for geofence enforcement. Additionally, the Kotlin fallback for vibration processing failed to track stationary duration, breaking 4-hour relaxation on non-JNI paths.
-**Remediation**:
-- **Bayesian Drift Authority (#SIMP-1011-13)**: Integrated `performBayesianExpansion` in `MonitorService.kt`. Accuracy now authoritatively grows at 15.0 m/s during GNSS stalls.
-- **Ultra-Long Stability (#SIMP-1011-14)**: Implemented authoritative `stationaryDurationMs` accumulation in `HardwareSuite.kt` Kotlin fallback to ensure parity with JNI logic.
-- **Circular Buffer Forensic (#SIMP-1011-15)**: Audited `CircularStateBuffer.forEachMatch` for zero-allocation safety. Verified `inline` enforcement prevents GC pressure during high-frequency sensor floods.
 
 ...

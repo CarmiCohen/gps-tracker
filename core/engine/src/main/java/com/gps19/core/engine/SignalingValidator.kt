@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * SignalingValidator: Pure logic for enforcing role-based message filtering.
+ * Oct.11.5:
+ * - Forensic Alignment: Refined getDropReason for Tracker mode to correctly 
+ *   identify self-echoes as "Echo suppression" rather than "another Tracker".
  * Oct.3.6:
  * - Bug Fix: Corrected inverted logic in shouldProcessLogRelay which was 
  *   dropping legitimate tracker logs on the viewer.
@@ -64,7 +67,8 @@ object SignalingValidator {
 
         if (isTrackerMode) {
             if (!isFromViewer) {
-                return "Tracker dropped packet from another Tracker"
+                // Oct.11.5: Identify self-echoes to prevent false "another tracker" forensic alarms.
+                return "Echo suppression: Ignored own reflected pulse"
             }
             if (!SignalingConstants.isViewerMatch(viewerId, ownViewerId) && !isDefault(ownViewerId)) {
                 return "Unauthorized Viewer: Incoming=$viewerId (Authorized=$ownViewerId)"

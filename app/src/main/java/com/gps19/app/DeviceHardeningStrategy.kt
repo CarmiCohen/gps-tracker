@@ -11,6 +11,10 @@ import javax.inject.Singleton
 /**
  * DeviceHardeningStrategy: Central authority for vendor-specific power management overrides 
  * and unified background execution policies (Samsung, Xiaomi, Huawei).
+ * Oct.11.5:
+ * - Background Transition Hardening: Implemented priority escalation for budget 
+ *   devices (SM-A155F) during the first 60s of background transition to eliminate 
+ *   8.7s jitter spikes.
  * Sep.24.00:
  * - Issue #1232 REMEDIATION: Converted cosmetic stubs into functional hardening logic. 
  *   Implemented Samsung/Huawei-specific WakeLock escalation and Watchdog re-alignment (R-ID 421).
@@ -20,6 +24,9 @@ class DeviceHardeningStrategy @Inject constructor(
     @ApplicationContext private val context: Context,
     private val systemMonitor: SystemMonitor
 ) {
+    private var lastForegroundExitRt = 0L
+    private val BACKGROUND_ESCALATION_WINDOW_MS = 60_000L
+
     /**
      * Unifies and applies the correct WakeLock policy based on device manufacturer and capabilities.
      */
@@ -32,9 +39,37 @@ class DeviceHardeningStrategy @Inject constructor(
     }
 
     /**
+     * Records UI visibility changes to track transition windows.
+     */
+    fun notifyUiVisibility(visible: Boolean, nowRt: Long) {
+        if (!visible && lastForegroundExitRt == 0L) {
+            lastForegroundExitRt = nowRt
+            Timber.i("DeviceHardeningStrategy: UI moved to background. Escalation window active.")
+        } else if (visible) {
+            lastForegroundExitRt = 0L
+        }
+    }
+
+    /**
      * Executes vendor-specific background continuity adjustments to prevent OS termination.
      */
-    fun executeVendorContinuity(capabilities: HardwareCapabilities, nowRt: Long, isPowerSave: Boolean) {
+    fun executeVendorContinuity(
+        capabilities: HardwareCapabilities, 
+        nowRt: Long, 
+        isPowerSave: Boolean,
+        isUiVisible: Boolean
+    ) {
+        notifyUiVisibility(isUiVisible, nowRt)
+
+        val isInTransitionWindow = lastForegroundExitRt > 0L && (nowRt - lastForegroundExitRt < BACKGROUND_ESCALATION_WINDOW_MS)
+        val isStaggeredTier = capabilities.performanceTier == PerformanceTier.STAGGERED
+
+        // Background Transition Hardening: Force aggressive WakeLock for budget/staggered devices 
+        // during the critical 60s window after exiting foreground.
+        if (isInTransitionWindow && isStaggeredTier) {
+            systemMonitor.acquireWakeLock(force = true)
+        }
+
         if (capabilities.isHuaweiDevice) {
             // Huawei requires aggressive Watchdog scheduling and forced WakeLock renewal to prevent deep sleep freezing.
             systemMonitor.acquireWakeLock(force = true)
@@ -46,7 +81,7 @@ class DeviceHardeningStrategy @Inject constructor(
             systemMonitor.renewWakeLock()
         }
         
-        if (capabilities.hasBackgroundRestriction || capabilities.performanceTier == PerformanceTier.STAGGERED) {
+        if (capabilities.hasBackgroundRestriction || isStaggeredTier) {
             // For Xiaomi or restricted devices, ensure the watchdog grid is alive to prevent heuristic termination.
             if (!isPowerSave) {
                 systemMonitor.scheduleWatchdogAlarm(force = false)
