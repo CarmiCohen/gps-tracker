@@ -1,52 +1,37 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct11.1
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct11.2
 
-## 🎯 Current Resumption Focus: Field Stability.
+## 🎯 Current Resumption Focus: Bayesian Drift & Ultra-Long Stability.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
-### 🔴 High Priority (0)
-*   *No open high priority issues.*
+### 🔴 High Priority (2)
+*   **Issue #SIMP-1011-13: Bayesian Drift Audit.** Verify uncertainty growth scaling during sustained GNSS gaps on low-SNR hardware. Ensure accuracy expands authoritatively to prevent geofence bypass during stalls.
+*   **Issue #SIMP-1011-14: Ultra-Long Stability.** Audit `ULTRA_LONG_STATIONARY_DURATION_MS` (4h) transitions to ensure no state leakage and correct polling relaxation during extended stillness.
 
-### 🟡 Medium Priority (0)
-*   *No open medium priority issues.*
+### 🟡 Medium Priority (1)
+*   **Issue #SIMP-1011-15: Circular Buffer Forensic.** Audit zero-allocation iteration safety in `CircularStateBuffer.forEachMatch` to ensure thread-safety during high-frequency sensor floods.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 0)
-*   *No active simplification ideas.*
+## 💡 Strategic Simplification Ideas (Ideas: 2)
+*   **SIMP-OCT11.2-S1: Acoustic Math Consolidation (Medium).** The temporal decay math is duplicated between JNI and Kotlin fallback. Moving this to a shared C++ header or a centralized utility in `:core:engine` could reduce drift risks.
+*   **SIMP-OCT11.2-S2: Sampling Policy Monolith (Low).** `MainViewModel` now has complex sampling logic. Moving the sampling interval decision (Sample vs Throttled) to a `UiPolicyEngine` would keep the ViewModel thinner.
 
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #SIMP-1011-12: HUD Throttling Sync.** Synced Compose HUD telemetry flows with `isMaliAnomaly` state. Implemented dynamic sampling (1000ms) during driver stalls to reduce rendering and I/O pressure on budget hardware. Resolved Oct11.2.
+*   **Issue #SIMP-1011-11: JNI Resource Audit.** Hardened `n22` acoustic batching with explicit array bounds verification and zero-JNI loop enforcement within `GetPrimitiveArrayCritical` blocks to prevent system-level stalls. Resolved Oct11.2.
+*   **Issue #SIMP-1011-10: Acoustic Floor Hardening.** Implemented temporal contraction (Leaky Integrator) in `jdhardware-jni.cpp` and `JdHardwareManager.kt` to ensure baseline recovery during duty-cycle "off" periods. Resolved Oct11.2.
 *   **Issue #SIMP-1011-9: Field Stability Audit.** Verified that the 30MB hysteresis gate effectively silences "Memory Pressure" jitter on budget hardware. Implemented forensic logging of hysteresis "gate hits" in `IntegrityMonitor.kt` to provide visibility in field logs without triggering reactive flushes. Resolved Oct11.1.
 *   **Issue #SIMP-1011-8: I/O Pressure Test.** Integrated `isMaliAnomaly` into persistence gating in `PersistencePolicy.kt` and proactive pruning in `LogRepository.kt`. Throttled forensic sampling to 250ms in `MonitorService.kt` during driver-level stalls to mitigate JNI bridge contention. Resolved Oct11.1.
 *   **Issue #SIMP-1011-7: Thermal Forensic Audit.** Hardened forensic metadata to authoritatively audit sampling decay. Added `coolingSnapshot` to `LogEntry` and `LogEntity` (Migration 82). Integrated cooling state into `ForensicSpillBuffer` flags (0x10) and ensured it is captured in optimized native traces. Resolved Oct11.1.
 *   **Issue #SIMP-1011-6: Mali Forensic Audit.** Correlated JNI bridge latency stalls (>100ms) with GPU driver anomaly detection in `IntegrityMonitor.kt`. Expanded `LatencyMonitor` to track rolling max JNI latency. Resolved Oct10.11.
-*   **Issue #SIMP-1011-5: Acoustic Profiling.** Optimized acoustic JNI path (`n22`) with zero-copy `GetPrimitiveArrayCritical` access. Integrated standardized `LatencyMonitor` auditing into all native batching paths to identify bridge overhead. Resolved Oct10.11.
-*   **Issue #SIMP-1011-4: Hysteresis Tuning.** Fine-tune native Memory and Storage hysteresis gates in `jdhardware-jni.cpp` and `IntegrityMonitor.kt` to prevent state oscillation on devices with volatile heap/storage reports. Applied staggered scaling (2.0x) for budget hardware stability. Resolved Oct10.11.
-*   **Issue #SIMP-1010-3: Signal Decay Audit.** Synchronized SNR thresholds in `jdhardware-jni.cpp` to the engine standard (22.0 dB-Hz). Remediated a critical scaling bug in `TelemetryMapper.kt` where raw SNR was reconstructed with a 5.0x multiplier instead of `RIBBON_SNR_SCALE_DB` (45.0x). Hardened the Protobuf schema in `app_settings.proto` with `optional` markers for SNR/Vibe snapshots to enable reliable presence detection. Resolved Oct10.10.
-*   **Issue #SIMP-1014-3: Connectivity Jitter.** Remediated state jitter in the Compose HUD and IO layer caused by high-frequency native JNI telemetry bursts. Implemented `saveLocationUpdateDebounced` in `MainRepository` to cap persistence IO at 1Hz. Applied 200ms temporal sampling (`HUD_STATE_SAMPLE_MS`) to telemetry and signaling flows in `MainViewModel`. Integrated flyweight duplication to maintain state integrity during asynchronous debouncing. Resolved Oct10.9.
-*   **Issue #SIMP-1014-2: JNI Consolidation.** Finalized native system pressure evaluation (Memory/Storage) with hysteresis in `n24`. Consolidated GNSS (`n21`), Acoustic (`n22`), and Proximity (`n23`) JNI paths to replace Kotlin fallbacks. Increased shared state buffer to 2048 bytes for multi-sensor safety. Optimized forensic capture for zero-allocation throughput. Resolved Oct10.8.
-*   **Issue #SIMP-1011-3: Proximity Decoupling.** Centralized proximity debouncing and index calculation fallback in `JdHardwareManager.processProximityBatchNative`. Finalized decoupling of environmental heuristics from `HardwareSuite.kt`. Resolved Oct10.7.
-*   **Issue #SIMP-1011-2: Acoustic Decoupling.** Centralized Acoustic health evaluation fallback (dB calculation, adaptive alpha, and spike detection) in `JdHardwareManager.processAcousticBatchNative`. Removed manual sensor math from `HardwareSuite.kt`, delegating all environment heuristics to the native/JNI path with a robust Kotlin fallback. Resolved Oct10.6.
-*   **Issue #SIMP-1011-1: Native GNSS Batching.** Centralized GNSS health evaluation (satellite counts and average SNR) in `JdHardwareManager.processGnssBatchNative`. Removed manual fallback logic from `HardwareSuite.kt`. Resolved Oct10.5.
-*   **Issue #BUILD-FIX-OCT10.3: Communication & Test Remediation.** Fixed `JSONObject` iteration type mismatches in `CommunicationManager.kt` and remediated property invocation errors in `ProductionReadinessAuditTest`, `GeofenceBatteryAuditTest`, and `ForensicStressAuditTest`. Resolved Oct10.4.
-*   **Issue #SIMP-1010-4: HUD Interface Alignment.** Migrated all core and secondary service interfaces in `:core:engine` to strict `val` properties for state access. Resolved Oct10.3.
-*   **Issue #SIMP-1017-1: Build-Time Metadata Guardian.** Implemented a module-wide audit script in `build.gradle` that catalogs `internal` types in `:core:engine`. Resolved Oct10.2.
-*   **Issue #BUILD-RESTORE: KAPT/Hilt Metadata Recovery.** Successfully exited the Oct8.16 "Error module" build loop. Resolved Oct10.1.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct11.2: [SOT Count: 339 (Rules: 188), Open: H:2, M:1, L:0, Ideas: H:0, M:1, L:1, Testing: 74 (Sub-items: 370), QA: 748]**
 - **Oct11.1: [SOT Count: 336 (Rules: 185), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 71 (Sub-items: 355), QA: 745]**
 - **Oct10.11: [SOT Count: 333 (Rules: 182), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 71 (Sub-items: 355), QA: 742]**
 - **Oct10.10: [SOT Count: 329 (Rules: 179), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 69 (Sub-items: 345), QA: 714]**
-- **Oct10.9: [SOT Count: 328 (Rules: 178), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 68 (Sub-items: 340), QA: 700]**
-- **Oct10.8: [SOT Count: 327 (Rules: 177), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 68 (Sub-items: 340), QA: 686]**
-- **Oct10.7: [SOT Count: 326 (Rules: 176), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 68 (Sub-items: 340), QA: 672]**
-- **Oct10.6: [SOT Count: 325 (Rules: 175), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 68 (Sub-items: 340), QA: 658]**
-- **Oct10.5: [SOT Count: 324 (Rules: 174), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 68 (Sub-items: 340), QA: 644]**
-- **Oct10.4: [SOT Count: 323 (Rules: 173), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 68 (Sub-items: 340), QA: 630]**
-- **Oct10.3: [SOT Count: 322 (Rules: 172), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: 65 (Sub-items: 325), QA: 616]**
-- **Oct10.2: [SOT Count: 322 (Rules: 172), Open: H:0, M:1, L:0, Ideas: H:0, M:0, L:1, Testing: 65 (Sub-items: 325), QA: 616]**
-- **Oct10.1: [SOT Count: 321 (Rules: 171), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: 65 (Sub-items: 325), QA: 616]**

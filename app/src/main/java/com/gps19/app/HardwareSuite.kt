@@ -37,15 +37,13 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.11.2:
+ * - Issue #SIMP-1011-10: Acoustic Floor Contraction Audit. Integrated contractionEma 
+ *   and floorMin into HardwareFastPath to sync authoritative baseline decay with 
+ *   the engine standards.
  * Oct.10.11:
  * - Issue #SIMP-1011-5: Acoustic Profiling. Updated nativeFastPathProvider to 
  *   support TimeProvider-aware auditing in the JNI bridge.
- * Oct.10.7:
- * - Issue #SIMP-1011-3: Proximity Decoupling. Migrated proximity debouncing 
- *   and index calculation fallback to JdHardwareManager. Simplified onSensorChanged.
- * Oct.10.6:
- * - Issue #SIMP-1011-2: Acoustic Decoupling. Migrated manual acoustic health 
- *   evaluation into JdHardwareManager. Simplified startAcousticMonitoring.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -157,24 +155,37 @@ class HardwareSuite @Inject constructor(
         var spikeThreshold: Double = 0.0,
         var minThreshold: Double = -1.0,
         var onSpike: (() -> Unit)? = null,
-        var lastSpikeRt: Long = 0L
+        var lastSpikeRt: Long = 0L,
+        var contractionEma: Double = 0.0,
+        var floorMin: Double = 0.0
     ) {
         fun reset() {
             baseline = -1.0; spikeThreshold = 0.0; minThreshold = -1.0
-            onSpike = null; lastSpikeRt = 0L
+            onSpike = null; lastSpikeRt = 0L; contractionEma = 0.0; floorMin = 0.0
             JdHardwareManager.updateFastPathConfig(type, -1.0, 0.0, -1.0, 0L)
         }
 
-        fun update(baseline: Double, threshold: Double, min: Double = -1.0, debounceMs: Long = 5000L, preserveExistingBaseline: Boolean = false, callback: (() -> Unit)? = null) {
+        fun update(
+            baseline: Double, 
+            threshold: Double, 
+            min: Double = -1.0, 
+            debounceMs: Long = 5000L, 
+            preserveExistingBaseline: Boolean = false, 
+            contractionEma: Double = 0.0,
+            floorMin: Double = 0.0,
+            callback: (() -> Unit)? = null
+        ) {
             if (!preserveExistingBaseline || this.baseline < 0) {
                 this.baseline = baseline
             }
             this.spikeThreshold = threshold
             this.minThreshold = min
+            this.contractionEma = contractionEma
+            this.floorMin = floorMin
             if (callback != null) {
                 this.onSpike = callback
             }
-            JdHardwareManager.updateFastPathConfig(type, this.baseline, threshold, min, debounceMs)
+            JdHardwareManager.updateFastPathConfig(type, this.baseline, threshold, min, debounceMs, contractionEma, floorMin)
         }
 
         fun evaluate(currentValue: Double, nowRt: Long, isWarming: Boolean, debounceMs: Long, alpha: Double = 0.0): Boolean {
@@ -190,6 +201,7 @@ class HardwareSuite @Inject constructor(
                 return false
             }
 
+            // Kotlin Fallback Implementation
             if (baseline < 0) { baseline = currentValue; return false }
             if (alpha > 0.0) baseline = (baseline * (1.0 - alpha)) + (currentValue * alpha)
 
@@ -897,13 +909,6 @@ class HardwareSuite @Inject constructor(
                     lightFastPath.evaluate(lux, nowRt, isWarming, SPIKE_DEBOUNCE_MS, alpha)
                 }
             }
-            Sensor.TYPE_LIGHT -> {
-                val lux = values[0].toDouble(); currentLux = lux; if (lux > secPeakLux) secPeakLux = lux
-                synchronized(this) {
-                    val alpha = SentinelValidator.accelerateAlpha(LUX_EMA_FAST, isWarming)
-                    lightFastPath.evaluate(lux, nowRt, isWarming, SPIKE_DEBOUNCE_MS, alpha)
-                }
-            }
             Sensor.TYPE_ROTATION_VECTOR -> processRotation(values)
         }
         
@@ -1213,11 +1218,31 @@ class HardwareSuite @Inject constructor(
     }
     
     fun setAcousticFastPath(floor: Double, spikeThreshold: Double, minDb: Double, onSpike: (() -> Unit)? = null) { 
-        synchronized(this) { acousticFastPath.update(floor, spikeThreshold, minDb, SPIKE_DEBOUNCE_MS, false, onSpike) } 
+        synchronized(this) { 
+            acousticFastPath.update(
+                baseline = floor, 
+                threshold = spikeThreshold, 
+                min = minDb, 
+                debounceMs = SPIKE_DEBOUNCE_MS, 
+                preserveExistingBaseline = false, 
+                contractionEma = ACOUSTIC_FLOOR_CONTRACTION_EMA,
+                floorMin = ACOUSTIC_FLOOR_MIN_DB,
+                callback = onSpike
+            ) 
+        } 
     }
 
     fun setLightFastPath(baseline: Double, spikeThreshold: Double, onSpike: (() -> Unit)? = null) {
-        synchronized(this) { lightFastPath.update(baseline, spikeThreshold, -1.0, SPIKE_DEBOUNCE_MS, true, onSpike) }
+        synchronized(this) { 
+            lightFastPath.update(
+                baseline = baseline, 
+                threshold = spikeThreshold, 
+                min = -1.0, 
+                debounceMs = SPIKE_DEBOUNCE_MS, 
+                preserveExistingBaseline = true, 
+                callback = onSpike
+            ) 
+        }
     }
     
     fun setHighLoad(high: Boolean) { 

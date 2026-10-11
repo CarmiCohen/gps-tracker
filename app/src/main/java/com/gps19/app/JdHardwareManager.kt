@@ -39,16 +39,13 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.11.2:
+ * - Issue #SIMP-1011-10: Acoustic Floor Contraction Audit. Updated n10 to support 
+ *   temporal contraction parameters (contractionEma, floorMin) and added decay 
+ *   logic to evaluateFastPath/processAcousticBatch for parity with LocationSentinel.
  * Oct.10.11:
  * - Issue #SIMP-1011-5: Acoustic Profiling. Integrated LatencyMonitor into 
  *   all JNI batching paths (n19, n21, n22, n23, n24) for performance auditing.
- * Oct.10.8:
- * - Issue #SIMP-1014-2: Pressure Consolidation. Finalized n21-n24 JNI implementations.
- *   Increased sharedStateBuffer to 2048 to prevent GNSS batch overflow and corrected
- *   output offsets for satellite evaluation.
- * Oct.10.7:
- * - Issue #SIMP-1011-3: Proximity Decoupling. Centralized Proximity health 
- *   evaluation fallback in processProximityBatchNative.
  */
 object JdHardwareManager {
 
@@ -85,7 +82,10 @@ object JdHardwareManager {
         var threshold: Double = 0.0,
         var minThreshold: Double = -1.0,
         var debounceMs: Long = 5000L,
-        var lastSpikeRt: Long = 0L
+        var lastSpikeRt: Long = 0L,
+        var contractionEma: Double = 0.0,
+        var floorMin: Double = 0.0,
+        var lastBaselineUpdateRt: Long = 0L
     )
     private val fallbackFastPaths = mapOf(
         FASTPATH_ACOUSTIC to FallbackFastPath(),
@@ -258,14 +258,16 @@ object JdHardwareManager {
         lastStorageLevel = 0
     }
 
-    fun updateFastPathConfig(type: Int, baseline: Double, threshold: Double, minThreshold: Double, debounceMs: Long): Int {
-        if (isLibraryLoaded.get()) return n10(type, baseline, threshold, minThreshold, debounceMs)
+    fun updateFastPathConfig(type: Int, baseline: Double, threshold: Double, minThreshold: Double, debounceMs: Long, contractionEma: Double = 0.0, floorMin: Double = 0.0): Int {
+        if (isLibraryLoaded.get()) return n10(type, baseline, threshold, minThreshold, debounceMs, contractionEma, floorMin)
         
         fallbackFastPaths[type]?.let {
             it.baseline = baseline
             it.threshold = threshold
             it.minThreshold = minThreshold
             it.debounceMs = debounceMs
+            it.contractionEma = contractionEma
+            it.floorMin = floorMin
             return 0
         }
         return -1
@@ -275,6 +277,20 @@ object JdHardwareManager {
         if (isLibraryLoaded.get()) return n11(type, value, nowRt, alpha) != 0
         
         val fp = fallbackFastPaths[type] ?: return false
+        
+        // Issue #SIMP-1011-10: Apply temporal contraction for Kotlin Fallback
+        if (fp.lastBaselineUpdateRt > 0 && nowRt > fp.lastBaselineUpdateRt && fp.contractionEma > 0.0) {
+            val secondsPassed = (nowRt - fp.lastBaselineUpdateRt) / 1000.0
+            if (secondsPassed >= 0.5) {
+                val decayFactor = decay(fp.contractionEma, secondsPassed)
+                fp.baseline *= decayFactor
+                if (fp.baseline < fp.floorMin) fp.baseline = fp.floorMin
+                fp.lastBaselineUpdateRt = nowRt
+            }
+        } else if (fp.lastBaselineUpdateRt == 0L) {
+            fp.lastBaselineUpdateRt = nowRt
+        }
+
         if (fp.baseline < 0) { fp.baseline = value; return false }
         if (alpha > 0.0) fp.baseline = (fp.baseline * (1.0 - alpha)) + (value * alpha)
 
@@ -286,6 +302,8 @@ object JdHardwareManager {
         }
         return false
     }
+    
+    private fun decay(ema: Double, seconds: Double): Double = ema.pow(seconds)
 
     fun processVibrationBatchNative(timeProvider: TimeProvider, batch: VibrationBatch): Boolean {
         if (!isLibraryLoaded.get()) return false
@@ -654,7 +672,7 @@ object JdHardwareManager {
     @JvmStatic private external fun n7(nowRt: Long): Int
     @JvmStatic private external fun n8(): Double
     @JvmStatic private external fun n9(): Int
-    @JvmStatic private external fun n10(type: Int, baseline: Double, threshold: Double, minThreshold: Double, debounceMs: Long): Int
+    @JvmStatic private external fun n10(type: Int, baseline: Double, threshold: Double, minThreshold: Double, debounceMs: Long, contractionEma: Double, floorMin: Double): Int
     @JvmStatic private external fun n11(type: Int, value: Double, nowRt: Long, alpha: Double): Int
     @JvmStatic private external fun n12(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Int
     @JvmStatic private external fun n13(currentFloor: Double, vibration: Double, isWarming: Int, cpuLoad: Double): Double

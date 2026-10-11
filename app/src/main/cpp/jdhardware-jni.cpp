@@ -28,13 +28,16 @@ static const int64_t MUZZLE_HYSTERESIS_MS = 2000;
 static int g_lastMemLevel = 0;
 static int g_lastStorageLevel = 0;
 
-// FastPath State (Issue #1176)
+// FastPath State (Issue #SIMP-1011-10: Added Temporal Contraction)
 struct FastPathConfig {
     double baseline;
     double threshold;
     double minThreshold;
     int64_t debounceMs;
     int64_t lastTriggerRt;
+    double contractionEma;
+    double floorMin;
+    int64_t lastBaselineUpdateRt;
 };
 static FastPathConfig g_fastPathConfigs[3] = {};
 
@@ -95,9 +98,9 @@ Java_com_gps19_app_JdHardwareManager_n9(JNIEnv* env, jclass clazz) {
 }
 
 JNIEXPORT jint JNICALL
-Java_com_gps19_app_JdHardwareManager_n10(JNIEnv* env, jclass clazz, jint type, jdouble baseline, jdouble threshold, jdouble minThreshold, jlong debounceMs) {
+Java_com_gps19_app_JdHardwareManager_n10(JNIEnv* env, jclass clazz, jint type, jdouble baseline, jdouble threshold, jdouble minThreshold, jlong debounceMs, jdouble contractionEma, jdouble floorMin) {
     if (type < 0 || type >= 3) return -1;
-    g_fastPathConfigs[type] = {baseline, threshold, minThreshold, debounceMs, 0};
+    g_fastPathConfigs[type] = {baseline, threshold, minThreshold, debounceMs, 0, contractionEma, floorMin, 0};
     return 0;
 }
 
@@ -105,6 +108,20 @@ JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n11(JNIEnv* env, jclass clazz, jint type, jdouble value, jlong nowRt, jdouble alpha) {
     if (type < 0 || type >= 3) return 0;
     FastPathConfig& cfg = g_fastPathConfigs[type];
+
+    // Issue #SIMP-1011-10: Apply temporal contraction (Leaky Integrator)
+    if (cfg.lastBaselineUpdateRt > 0 && nowRt > cfg.lastBaselineUpdateRt && cfg.contractionEma > 0.0) {
+        double secondsPassed = (nowRt - cfg.lastBaselineUpdateRt) / 1000.0;
+        if (secondsPassed >= 0.5) { // Precision gate to avoid excessive pow() calls
+            double decayFactor = std::pow(cfg.contractionEma, secondsPassed);
+            cfg.baseline *= decayFactor;
+            if (cfg.baseline < cfg.floorMin) cfg.baseline = cfg.floorMin;
+            cfg.lastBaselineUpdateRt = nowRt;
+        }
+    } else if (cfg.lastBaselineUpdateRt == 0) {
+        cfg.lastBaselineUpdateRt = nowRt;
+    }
+
     if (cfg.baseline < 0) { cfg.baseline = value; return 0; }
 
     if (alpha > 0.0) cfg.baseline = (cfg.baseline * (1.0 - alpha)) + (value * alpha);
@@ -289,6 +306,7 @@ Java_com_gps19_app_JdHardwareManager_n21(JNIEnv* env, jclass clazz) {
 
 /**
  * n22: processAcousticBatch (Issue #SIMP-1011-2)
+ * Oct.11.2: Hardened GetPrimitiveArrayCritical safety (#SIMP-1011-11).
  * Oct.10.11: Optimized with GetPrimitiveArrayCritical for zero-copy access.
  */
 JNIEXPORT jint JNICALL
@@ -302,31 +320,53 @@ Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz, jshortArray 
     int64_t nowRt = *(int64_t*)(ptr + 20);
     int isWarming = *(int*)(ptr + 28);
 
+    // Hardening: Verify array bounds before critical section
+    jsize arrayLen = env->GetArrayLength(buffer);
+    if (readCount > (int)arrayLen) readCount = (int)arrayLen;
+    if (readCount <= 0) return 0;
+
     jshort* samples = (jshort*)env->GetPrimitiveArrayCritical(buffer, nullptr);
     if (samples == nullptr) return -2;
 
     int maxAmp = 0;
+    // Issue #SIMP-1011-11: Strict local-only loop with zero JNI calls.
     for (int i = 0; i < readCount; i++) {
-        int amp = std::abs((int)samples[i]);
+        int amp = samples[i];
+        if (amp < 0) amp = -amp;
         if (amp > maxAmp) maxAmp = amp;
     }
     env->ReleasePrimitiveArrayCritical(buffer, samples, JNI_ABORT);
 
     double db = (maxAmp > 0) ? (20.0 * std::log10((double)maxAmp)) : 0.0;
 
-    // Adaptive Alpha (n20 logic)
-    double factor = 1.0;
-    if (vibeSum > 0.5) factor = std::max(0.01, 1.0 - ((vibeSum - 0.5) / 1.0));
-    double alpha = baseAlpha * factor;
-
     // FastPath Acoustic Evaluation (n11 logic)
     int isSpike = 0;
     FastPathConfig& cfg = g_fastPathConfigs[0]; // FASTPATH_ACOUSTIC = 0
+
+    // Issue #SIMP-1011-10: Apply temporal contraction (Leaky Integrator)
+    if (cfg.lastBaselineUpdateRt > 0 && nowRt > cfg.lastBaselineUpdateRt && cfg.contractionEma > 0.0) {
+        double secondsPassed = (nowRt - cfg.lastBaselineUpdateRt) / 1000.0;
+        if (secondsPassed >= 0.5) {
+            double decayFactor = std::pow(cfg.contractionEma, secondsPassed);
+            cfg.baseline *= decayFactor;
+            if (cfg.baseline < cfg.floorMin) cfg.baseline = cfg.floorMin;
+            cfg.lastBaselineUpdateRt = nowRt;
+        }
+    } else if (cfg.lastBaselineUpdateRt == 0) {
+        cfg.lastBaselineUpdateRt = nowRt;
+    }
+
     if (cfg.baseline < 0) {
         cfg.baseline = db;
     } else {
+        // Adaptive Alpha (n20 logic)
+        double factor = 1.0;
+        if (vibeSum > 0.5) factor = std::max(0.01, 1.0 - ((vibeSum - 0.5) / 1.0));
+        double alpha = baseAlpha * factor;
+
         double effectiveAlpha = (isWarming != 0) ? 0.0 : alpha;
         cfg.baseline = (cfg.baseline * (1.0 - effectiveAlpha)) + (db * effectiveAlpha);
+
         if ((db - cfg.baseline) > cfg.threshold && db >= cfg.minThreshold) {
             if (nowRt - cfg.lastTriggerRt > cfg.debounceMs) {
                 cfg.lastTriggerRt = nowRt;

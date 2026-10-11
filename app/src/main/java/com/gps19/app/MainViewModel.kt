@@ -21,12 +21,13 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.11.2:
+ * - Issue #SIMP-1011-12: HUD Throttling Sync. Dynamically adjusted telemetry 
+ *   sampling to HUD_STATE_SAMPLE_THROTTLED_MS (1000ms) during Mali driver anomalies 
+ *   to reduce rendering and I/O pressure on budget hardware.
  * Oct.10.9:
  * - Issue #SIMP-1014-3: Connectivity Jitter. Applied HUD_STATE_SAMPLE_MS to 
  *   telemetry flows to stabilize HUD recomposition during native bursts.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
- *   TimeProvider API and fixed property invocation errors.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -340,47 +341,52 @@ class MainViewModel @Inject constructor(
                     _currentMa.value = status.level 
                 } 
             }
-            // Issue #SIMP-1014-3: Applied HUD_STATE_SAMPLE_MS to dampen reactive flutter
+            // Issue #SIMP-1011-12: HUD Throttling Sync
+            val isMaliAnomalyFlow = kinematic.map { it.localHealth.isMaliAnomaly }.distinctUntilChanged()
+            
             launch { 
-                repository.localLocation
-                    .sample(HUD_STATE_SAMPLE_MS)
-                    .collect { update -> 
-                        val nowMs = timeProvider.currentTimeMillis
-                        val mode = _uiState.value.session.appMode
-                        updateKinematicState { current -> 
-                            telemetryUseCase.mapLocalLocation(update, current.localLocation, nowMs, _uiState.value.session.appStartTime)
-                            telemetryUseCase.mapHealthFromUpdate(update, current.localHealth)
-                            current.apply { pulse = timeProvider.elapsedRealtime } 
-                        }
-                        if (mode == "tracker") {
-                            _trackerState.value = update.trackerState
-                        }
-                        _gpsIndexData.value = GpsIndexData(update.integrity.snrIdx, update.integrity.satsUsed.toDouble(), update.integrity.satsView.toDouble(), 0.0)
-                    } 
+                isMaliAnomalyFlow.flatMapLatest { isAnomaly ->
+                    val interval = if (isAnomaly) HUD_STATE_SAMPLE_THROTTLED_MS else HUD_STATE_SAMPLE_MS
+                    repository.localLocation.sample(interval)
+                }.collect { update -> 
+                    val nowMs = timeProvider.currentTimeMillis
+                    val mode = _uiState.value.session.appMode
+                    updateKinematicState { current -> 
+                        telemetryUseCase.mapLocalLocation(update, current.localLocation, nowMs, _uiState.value.session.appStartTime)
+                        telemetryUseCase.mapHealthFromUpdate(update, current.localHealth)
+                        current.apply { pulse = timeProvider.elapsedRealtime } 
+                    }
+                    if (mode == "tracker") {
+                        _trackerState.value = update.trackerState
+                    }
+                    _gpsIndexData.value = GpsIndexData(update.integrity.snrIdx, update.integrity.satsUsed.toDouble(), update.integrity.satsView.toDouble(), 0.0)
+                } 
             }
-            // Issue #SIMP-1014-3: Applied HUD_STATE_SAMPLE_MS to dampen reactive flutter
+
             launch { 
-                remoteStatusRepository.remoteStatus
-                    .sample(HUD_STATE_SAMPLE_MS)
-                    .collect { status -> 
-                        val nowMs = timeProvider.currentTimeMillis
-                        val mode = _uiState.value.session.appMode
-                        _remoteSignal.value = remoteStatusRepository.peerSignal.value
-                        if (mode != "tracker") _trackerState.value = status.trackerState
-                        _trackerMaxTemp.value = status.maxTemp
-                        updateKinematicState { current -> 
-                            telemetryUseCase.mapTrackerLocation(status, current.trackerLocation, nowMs, _uiState.value.session.appStartTime)
-                            telemetryUseCase.mapHealthFromUpdate(status, current.trackerHealth)
-                            current.apply { pulse = timeProvider.elapsedRealtime } 
-                        }
-                        updateDiagnosticState { it.apply { 
-                            trackerBattery.level = status.battery
-                            trackerBattery.temp = status.temp
-                            trackerIsGnssThrottled = status.isGnssThrottled
-                            pulse = timeProvider.elapsedRealtime 
-                        } } 
-                    } 
+                isMaliAnomalyFlow.flatMapLatest { isAnomaly ->
+                    val interval = if (isAnomaly) HUD_STATE_SAMPLE_THROTTLED_MS else HUD_STATE_SAMPLE_MS
+                    remoteStatusRepository.remoteStatus.sample(interval)
+                }.collect { status -> 
+                    val nowMs = timeProvider.currentTimeMillis
+                    val mode = _uiState.value.session.appMode
+                    _remoteSignal.value = remoteStatusRepository.peerSignal.value
+                    if (mode != "tracker") _trackerState.value = status.trackerState
+                    _trackerMaxTemp.value = status.maxTemp
+                    updateKinematicState { current -> 
+                        telemetryUseCase.mapTrackerLocation(status, current.trackerLocation, nowMs, _uiState.value.session.appStartTime)
+                        telemetryUseCase.mapHealthFromUpdate(status, current.trackerHealth)
+                        current.apply { pulse = timeProvider.elapsedRealtime } 
+                    }
+                    updateDiagnosticState { it.apply { 
+                        trackerBattery.level = status.battery
+                        trackerBattery.temp = status.temp
+                        trackerIsGnssThrottled = status.isGnssThrottled
+                        pulse = timeProvider.elapsedRealtime 
+                    } } 
+                } 
             }
+
             launch { 
                 audioSynthesizer.isSirenPlaying.collect { playing -> 
                     updateDiagnosticState { it.apply { isSirenPlaying = playing } }
@@ -394,16 +400,17 @@ class MainViewModel @Inject constructor(
                     updateDiagnosticState { it.apply { silencedUntilRt = ts; isAlarmSilenced = sirenLockoutUseCase.isLockedOut(); pulse = timeProvider.elapsedRealtime } } 
                 } 
             }
-            // Issue #SIMP-1014-3: Applied HUD_STATE_SAMPLE_MS to dampen signaling metric flutter
+            // Issue #SIMP-1011-12: Applied dynamic sampling to signaling metrics
             launch {
-                repository.signalingMetrics
-                    .sample(HUD_STATE_SAMPLE_MS)
-                    .collect { metrics ->
-                        updateDiagnosticState { it.apply { 
-                            signalingMetrics = metrics
-                            pulse = timeProvider.elapsedRealtime 
-                        } }
-                    }
+                isMaliAnomalyFlow.flatMapLatest { isAnomaly ->
+                    val interval = if (isAnomaly) HUD_STATE_SAMPLE_THROTTLED_MS else HUD_STATE_SAMPLE_MS
+                    repository.signalingMetrics.sample(interval)
+                }.collect { metrics ->
+                    updateDiagnosticState { it.apply { 
+                        signalingMetrics = metrics
+                        pulse = timeProvider.elapsedRealtime 
+                    } }
+                }
             }
             launch(Dispatchers.IO) { 
                 while(true) { 
@@ -478,7 +485,7 @@ class MainViewModel @Inject constructor(
             sinceConnMs = if (activeStats.lastConnTs > 0) (nowRt - activeStats.lastConnTs) else 0L, 
             sinceDiscoMs = if (activeStats.lastDiscTs > 0) (nowRt - activeStats.lastDiscTs) else 0L, 
             totalDropMs = activeStats.totalDropMs, maxDropMs = activeStats.maxDropMs, 
-            engineVersion = "Oct10.9", netInterface = diag.connectivity.netInterface,
+            engineVersion = "Oct11.2", netInterface = diag.connectivity.netInterface,
             systemPulse = nowRt, isLocalOnline = diag.connectivity.isLocalOnline, isRelayConnected = diag.connectivity.isRelayConnected
         )
     }

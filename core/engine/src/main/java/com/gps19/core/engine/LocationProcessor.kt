@@ -5,12 +5,12 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Oct.11.2:
+ * - Issue #SIMP-1101-1: Bayesian Drift Audit. Centralized authoritative 
+ *   accuracy expansion (uncertainty growth) during GNSS gaps.
  * Oct.10.2:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
  *   TimeProvider API.
- * Oct.7.11:
- * - Issue #SIMP-1007-17: Strategic Simplification. Promoted locationPendingReason 
- *   from SentinelResult into ProcessedLocation.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider,
@@ -148,6 +148,29 @@ class LocationProcessor(
     private fun isAdaptationMuzzled(nowRt: Long): Boolean {
         if (state.lastIntervalChangeRt == 0L) return false
         return nowRt - state.lastIntervalChangeRt < ADAPTATION_SETTLING_MS
+    }
+
+    /**
+     * performBayesianExpansion: Authoritative uncertainty growth (Issue #SIMP-1101-1).
+     * Calculates accuracy radius expansion during GNSS fix stalls.
+     */
+    fun performBayesianExpansion(nowRt: Long, isPending: Boolean, lastSpeedMps: Double): Double {
+        if (!isPending || state.lastValidFixRt <= 0L) return state.accuracy.maxAccuracy
+
+        val elapsedSec = (nowRt - state.lastValidFixRt) / 1000.0
+        if (elapsedSec <= 0) return state.accuracy.maxAccuracy
+
+        val driftRate = if (lastSpeedMps > 1.0) {
+            lastSpeedMps.coerceIn(PENDING_UNCERTAINTY_GROWTH_RATE_MPS, PENDING_UNCERTAINTY_SPEED_CAP_MPS)
+        } else {
+            PENDING_UNCERTAINTY_DRIFT_STATIONARY_MPS
+        }
+
+        val expansion = driftRate * elapsedSec
+        // Authoritative update of windowed max accuracy
+        updateWindowedAccuracy(state.accuracy.lastProcessedAccuracy + expansion)
+        
+        return state.accuracy.maxAccuracy
     }
 
     fun updateSensorData(update: LocationUpdate): Boolean {

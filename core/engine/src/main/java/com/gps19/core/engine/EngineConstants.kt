@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.11.2:
+ * - Issue #SIMP-1011-12: HUD Throttling Sync. Added HUD_STATE_SAMPLE_THROTTLED_MS 
+ *   (1000ms) for aggressive UI dampening during GPU driver anomalies.
  * Oct.11.1:
  * - Issue #SIMP-1011-4: Hysteresis Tuning. Increased base Memory/Storage 
  *   hysteresis to 15.0 MB and added SYSTEM_PRESSURE_STAGGERED_HYSTERESIS_MULT 
@@ -9,9 +12,6 @@ package com.gps19.core.engine
  * Oct.10.9:
  * - Issue #SIMP-1014-3: Connectivity Jitter. Added HUD_STATE_SAMPLE_MS 
  *   for unified UI temporal dampening.
- * Oct.10.1 (Restoration Path):
- * - Issue #SIMP-1014-2: Unified Pressure Path. Added hysteresis offsets 
- *   for JNI-side Memory and Storage evaluation.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -54,6 +54,7 @@ const val SYSTEM_PRESSURE_STAGGERED_HYSTERESIS_MULT = 2.0
 // Issue #1417: Connectivity Jitter
 const val CONNECTIVITY_HYSTERESIS_MS = 3000L
 const val HUD_STATE_SAMPLE_MS = 200L
+const val HUD_STATE_SAMPLE_THROTTLED_MS = 1000L
 
 // Issue #1328: Event Bus Hardening
 const val DOMAIN_EVENT_BUS_CAPACITY = 512
