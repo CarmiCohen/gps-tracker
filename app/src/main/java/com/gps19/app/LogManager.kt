@@ -9,6 +9,9 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Oct.11.1:
+ * - Issue #SIMP-1011-7: Thermal Forensic Audit. Integrated coolingSnapshot into 
+ *   forensic trace paths for authoritative decay auditing.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
  *   TimeProvider and ConnectivitySuite APIs.
@@ -71,7 +74,8 @@ class LogManager @Inject constructor(
             ),
             tempSnapshot = health.batteryTemp,
             battSnapshot = health.batteryLevel,
-            chargingSnapshot = health.isCharging
+            chargingSnapshot = health.isCharging,
+            coolingSnapshot = health.isCoolingModeActive
         )
         
         if (!buffer.writeTrace(log)) {
@@ -91,13 +95,13 @@ class LogManager @Inject constructor(
     fun logForensicTraceOptimized(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
         vibe: Double, snr: Double, batteryLevel: Int, isCharging: Boolean, batteryTemp: Double,
-        thermalHeadroom: Double = 0.0, heapAllocatedMb: Double = 0.0
+        thermalHeadroom: Double = 0.0, heapAllocatedMb: Double = 0.0, isCooling: Boolean = false
     ) {
         val buffer = forensicSpillBufferProvider.get()
         if (!buffer.writeTraceOptimized(
             timestamp, lat, lng, accuracy, maxAccuracy, vibe, snr, 
             batteryTemp, batteryLevel, isCharging, thermalHeadroom = thermalHeadroom,
-            heapAllocatedMb = heapAllocatedMb
+            heapAllocatedMb = heapAllocatedMb, isCooling = isCooling
         )) {
             handleOverflow()
         } else {
@@ -218,7 +222,8 @@ class LogManager @Inject constructor(
             ),
             tempSnapshot = health.batteryTemp,
             battSnapshot = health.batteryLevel,
-            chargingSnapshot = health.isCharging
+            chargingSnapshot = health.isCharging,
+            coolingSnapshot = health.isCoolingModeActive
         )
         
         val suite = connectivitySuite

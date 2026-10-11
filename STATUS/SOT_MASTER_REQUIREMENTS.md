@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct10.11)
+# SOT Master Requirements & Hardening Status (Oct11.1)
 
-## 🏗️ Architectural Master Rules (182 Rules)
+## 🏗️ Architectural Master Rules (185 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -13,10 +13,16 @@
 *   **1.152 Native Latency Auditing (R-ID 621)**: All native JNI batching paths MUST be audited via `LatencyMonitor` to ensure forensic visibility into bridge overhead on budget hardware. (Oct10.11 - Issue #SIMP-1011-5).
 *   **1.153 Staggered Hysteresis Scaling (R-ID 622)**: System pressure hysteresis MUST apply performance-tier-aware scaling (e.g., 2.0x for Staggered) to prevent telemetry oscillation on unstable hardware. (Oct10.11 - Issue #SIMP-1011-4).
 *   **1.154 Mali-JNI Correlation (R-ID 623)**: Mali GPU anomaly detection MUST correlate JNI bridge latency spikes with high resource load to trigger defensive UI/Sensor throttling. (Oct10.11 - Issue #SIMP-1011-6).
+*   **1.155 Forensic Sampling Decay (R-ID 624)**: Forensic sampling MUST decay to `FORENSIC_SAMPLING_INTERVAL_COOLING_MS` (250ms) during both thermal cooling and Mali driver anomalies to protect the JNI bridge from contention. (Oct11.1 - Issue #SIMP-1011-8).
+*   **1.156 Authoritative Thermal Metadata (R-ID 625)**: All forensic traces MUST authoritatively capture the device cooling state (`coolingSnapshot`) to enable post-mortem verification of sampling decay during high-temp transients. (Oct11.1 - Issue #SIMP-1011-7).
+*   **1.157 Hysteresis Visibility (R-ID 626)**: Suppression of telemetry jitter via hysteresis MUST be captured in forensic logs as "gate hits" to provide visibility into budget hardware stability without triggering reactive system flushes. (Oct11.1 - Issue #SIMP-1011-9).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 673**: Authoritative Thermal Metadata - Integrated `coolingSnapshot` into optimized JNI traces and Room persistence. (Oct11.1 - Issue #SIMP-1011-7).
+*   **SOT ID 672**: Adaptive I/O Back-off - Integrated `isMaliAnomaly` into persistence gating and proactive pruning to mitigate driver-level contention. (Oct11.1 - Issue #SIMP-1011-8).
+*   **SOT ID 671**: Hysteresis Forensic Audit - Implemented logging of hysteresis gate hits to verify jitter suppression on budget hardware. (Oct11.1 - Issue #SIMP-1011-9).
 *   **SOT ID 670**: Mali Forensic Depth - Correlated JNI stalls with GPU driver anomaly detection. (Oct10.11 - Issue #SIMP-1011-6).
 *   **SOT ID 669**: Native Acoustic Optimization - Transitioned to zero-copy JNI (PrimitiveArrayCritical) and integrated standardized latency auditing. (Oct10.11 - Issue #SIMP-1011-5).
 *   **SOT ID 668**: Hysteresis Hardening - Applied staggered scaling (2.0x) to system pressure gates to prevent state oscillation. (Oct10.11 - Issue #SIMP-1011-4).
@@ -28,6 +34,9 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.745 (Field Stability Audit)**: PASSED - Verified hysteresis gate hits logging in `IntegrityMonitor` for jitter audit. (Oct11.1 - Issue #SIMP-1011-9).
+*   **Chapter 31.744 (Adaptive I/O Pressure)**: PASSED - Verified persistence inhibition and pruning escalation during Mali anomalies. (Oct11.1 - Issue #SIMP-1011-8).
+*   **Chapter 31.743 (Thermal Forensic Audit)**: PASSED - Verified `coolingSnapshot` capture and sampling rate decay to 250ms. (Oct11.1 - Issue #SIMP-1011-7).
 *   **Chapter 31.284 (Acoustic JNI Optimization)**: PASSED - Verified zero-copy JNI access and integrated standardized `LatencyMonitor` auditing. (Oct10.11 - Issue #SIMP-1011-5).
 *   **Chapter 31.283 (Staggered Pressure Audit)**: PASSED - Verified tiered hysteresis scaling in `IntegrityMonitor` for Staggered performance profiles. (Oct10.11 - Issue #SIMP-1011-4).
 *   **Chapter 31.282 (Signal Decay Audit)**: PASSED - Verified that `jdhardware-jni.cpp` uses the 22.0 threshold. Confirmed `TelemetryMapper` correctly reconstructs raw SNR using `RIBBON_SNR_SCALE_DB`. (Oct10.10 - Issue #SIMP-1010-3).

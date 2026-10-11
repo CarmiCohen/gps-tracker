@@ -11,6 +11,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.11.1:
+ * - Issue #SIMP-1011-7: Thermal Forensic Audit. Added coolingSnapshot to 
+ *   LogEntry to authoritatively audit sampling decay during transients.
  * Oct.7.7:
  * - Issue #SIMP-1007-16: Flag Propagation. Added isSuspiciousNoise and 
  *   isMemoryPressureThrottled delegates to ConnectionPoint for HUD visibility.
@@ -292,7 +295,8 @@ data class LogEntry(
     val gpsHardwareLock: Boolean = false,
     val tempSnapshot: Double? = null,
     val battSnapshot: Int? = null,
-    val chargingSnapshot: Boolean? = null
+    val chargingSnapshot: Boolean? = null,
+    val coolingSnapshot: Boolean? = null
 ) {
     var snrSnapshot: Double? 
         get() = forensic.snr
@@ -317,7 +321,8 @@ data class LogEntry(
                forensic.snr == other.forensic.snr && forensic.vibe == other.forensic.vibe &&
                forensic.thermal == other.forensic.thermal && forensic.heap == other.forensic.heap &&
                forensic.isSuspiciousNoise == other.forensic.isSuspiciousNoise &&
-               forensic.isMemoryPressureThrottled == other.forensic.isMemoryPressureThrottled
+               forensic.isMemoryPressureThrottled == other.forensic.isMemoryPressureThrottled &&
+               coolingSnapshot == other.coolingSnapshot
     }
 
     fun toJSONObject(): JSONObject {
@@ -351,6 +356,7 @@ data class LogEntry(
             tempSnapshot?.let { put("temp_snapshot", safeDouble(it)) }
             battSnapshot?.let { put("batt_snapshot", it) }
             chargingSnapshot?.let { put("charging_snapshot", it) }
+            coolingSnapshot?.let { put("cooling_snapshot", it) }
             thermalSnapshot?.let { put("thermal_snapshot", safeDouble(it)) }
             heapSnapshot?.let { put("heap_snapshot", safeDouble(it)) }
             
@@ -387,7 +393,8 @@ data class LogEntry(
                 spillIdx = obj.optInt("spill_idx", -1), gpsHardwareLock = obj.optBoolean("gps_hw_lock", false),
                 tempSnapshot = if (obj.has("temp_snapshot")) obj.optDouble("temp_snapshot") else null,
                 battSnapshot = if (obj.has("batt_snapshot")) obj.optInt("batt_snapshot") else null,
-                chargingSnapshot = if (obj.has("charging_snapshot")) obj.optBoolean("charging_snapshot") else null
+                chargingSnapshot = if (obj.has("charging_snapshot")) obj.optBoolean("charging_snapshot") else null,
+                coolingSnapshot = if (obj.has("cooling_snapshot")) obj.optBoolean("cooling_snapshot") else null
             )
         }
     }

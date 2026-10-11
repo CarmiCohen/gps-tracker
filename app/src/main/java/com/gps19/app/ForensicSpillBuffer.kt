@@ -18,11 +18,12 @@ import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for forensic traces.
+ * Oct.11.1:
+ * - Issue #SIMP-1011-7: Thermal Forensic Audit. Integrated coolingSnapshot 
+ *   into circular buffer flags (0x10) for authoritative audit.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
  *   TimeProvider API and fixed property invocation errors.
- * Oct.10.4:
- * - Build Fix: Restored missing deviceId/viewerId parameters in LogEntity instantiation.
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -180,6 +181,7 @@ class ForensicSpillBuffer @Inject constructor(
                 if (entry.isSpecial) flags = flags or 0x02
                 if (entry.chargingSnapshot == true) flags = flags or 0x04
                 if (entry.gpsHardwareLock) flags = flags or 0x08
+                if (entry.coolingSnapshot == true) flags = flags or 0x10
                 
                 entryWriteBuffer.put(flags.toByte())
                 entryWriteBuffer.put(entry.battSnapshot?.toByte() ?: 0.toByte())
@@ -211,7 +213,8 @@ class ForensicSpillBuffer @Inject constructor(
     fun writeTraceOptimized(
         timestamp: Long, lat: Double, lng: Double, accuracy: Double, maxAccuracy: Double,
         vibe: Double, snr: Double, batteryTemp: Double, batteryLevel: Int, isCharging: Boolean,
-        gpsHardwareLock: Boolean = false, thermalHeadroom: Double = 0.0, heapAllocatedMb: Double = 0.0
+        gpsHardwareLock: Boolean = false, thermalHeadroom: Double = 0.0, heapAllocatedMb: Double = 0.0,
+        isCooling: Boolean = false
     ): Boolean {
         return LatencyMonitor.measureAndAudit<Boolean>(
             timeProvider = timeProvider,
@@ -244,6 +247,7 @@ class ForensicSpillBuffer @Inject constructor(
                 var flags = 0
                 if (isCharging) flags = flags or 0x04
                 if (gpsHardwareLock) flags = flags or 0x08
+                if (isCooling) flags = flags or 0x10
                 
                 entryWriteBuffer.put(flags.toByte())
                 entryWriteBuffer.put(batteryLevel.toByte())
@@ -353,6 +357,7 @@ class ForensicSpillBuffer @Inject constructor(
                             tempSnapshot = batTemp,
                             battSnapshot = batLevel,
                             chargingSnapshot = (flags and 0x04) != 0,
+                            coolingSnapshot = (flags and 0x10) != 0,
                             thermalSnapshot = thermal,
                             heapSnapshot = heap
                         ))

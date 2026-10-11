@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct10.11
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct11.1
 
-## 🎯 Current Resumption Focus: Forensic Integrity.
+## 🎯 Current Resumption Focus: Field Stability.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
@@ -18,6 +18,9 @@
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #SIMP-1011-9: Field Stability Audit.** Verified that the 30MB hysteresis gate effectively silences "Memory Pressure" jitter on budget hardware. Implemented forensic logging of hysteresis "gate hits" in `IntegrityMonitor.kt` to provide visibility in field logs without triggering reactive flushes. Resolved Oct11.1.
+*   **Issue #SIMP-1011-8: I/O Pressure Test.** Integrated `isMaliAnomaly` into persistence gating in `PersistencePolicy.kt` and proactive pruning in `LogRepository.kt`. Throttled forensic sampling to 250ms in `MonitorService.kt` during driver-level stalls to mitigate JNI bridge contention. Resolved Oct11.1.
+*   **Issue #SIMP-1011-7: Thermal Forensic Audit.** Hardened forensic metadata to authoritatively audit sampling decay. Added `coolingSnapshot` to `LogEntry` and `LogEntity` (Migration 82). Integrated cooling state into `ForensicSpillBuffer` flags (0x10) and ensured it is captured in optimized native traces. Resolved Oct11.1.
 *   **Issue #SIMP-1011-6: Mali Forensic Audit.** Correlated JNI bridge latency stalls (>100ms) with GPU driver anomaly detection in `IntegrityMonitor.kt`. Expanded `LatencyMonitor` to track rolling max JNI latency. Resolved Oct10.11.
 *   **Issue #SIMP-1011-5: Acoustic Profiling.** Optimized acoustic JNI path (`n22`) with zero-copy `GetPrimitiveArrayCritical` access. Integrated standardized `LatencyMonitor` auditing into all native batching paths to identify bridge overhead. Resolved Oct10.11.
 *   **Issue #SIMP-1011-4: Hysteresis Tuning.** Fine-tune native Memory and Storage hysteresis gates in `jdhardware-jni.cpp` and `IntegrityMonitor.kt` to prevent state oscillation on devices with volatile heap/storage reports. Applied staggered scaling (2.0x) for budget hardware stability. Resolved Oct10.11.
@@ -35,6 +38,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct11.1: [SOT Count: 336 (Rules: 185), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 71 (Sub-items: 355), QA: 745]**
 - **Oct10.11: [SOT Count: 333 (Rules: 182), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 71 (Sub-items: 355), QA: 742]**
 - **Oct10.10: [SOT Count: 329 (Rules: 179), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 69 (Sub-items: 345), QA: 714]**
 - **Oct10.9: [SOT Count: 328 (Rules: 178), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 68 (Sub-items: 340), QA: 700]**

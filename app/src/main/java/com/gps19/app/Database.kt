@@ -8,14 +8,14 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Oct.11.1:
+ * - Issue #SIMP-1011-7: Thermal Forensic Audit. Added coolingSnapshot to 
+ *   LogEntity for authoritative audit of sampling decay. Incremented version 
+ *   to 82 with migration.
  * Oct.4.6:
  * - Issue #1173: Protobuf-First Persistence. Added binary payload BLOBs to 
  *   HistoryEntity and PendingStatusEntity to eliminate Room column overhead 
  *   during high-frequency writes. Incremented version to 81 (R1173).
- * Sep.27.18:
- * - Issue #1205: Context-Aware Power Optimization. Added activityType to 
- *   HistoryEntity and PendingStatusEntity for telemetry parity. 
- *   Incremented version to 80 with migration (R-ID 503).
  */
 @Entity(
     tableName = "logs", 
@@ -60,7 +60,8 @@ data class LogEntity(
     val battSnapshot: Int? = null,
     val chargingSnapshot: Boolean? = null,
     val thermalSnapshot: Double? = null,
-    val heapSnapshot: Double? = null
+    val heapSnapshot: Double? = null,
+    val coolingSnapshot: Boolean? = null
 )
 
 data class ForensicSignature(
@@ -317,7 +318,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 81, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 82, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -341,6 +342,15 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_81_82 = object : Migration(81, 82) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #SIMP-1011-7: Thermal Forensic Audit.
+                try {
+                    db.execSQL("ALTER TABLE logs ADD COLUMN coolingSnapshot INTEGER")
+                } catch (e: Exception) {}
+            }
+        }
+
         val MIGRATION_80_81 = object : Migration(80, 81) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #1173: Protobuf-First Persistence.

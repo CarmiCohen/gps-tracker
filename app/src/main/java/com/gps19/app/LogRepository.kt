@@ -21,12 +21,12 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
- * Oct.10.2:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
- *   TimeProvider API.
- * Oct.7.4:
- * - Issue #SIMP-1007-15: Unified Snapshot Container. Updated LogEntry mapping 
- *   to utilize the ForensicSnapshot container while maintaining flat persistence.
+ * Oct.11.1:
+ * - Issue #SIMP-1011-8: I/O Pressure Test. Integrated isMaliAnomaly into 
+ *   proactive pruning and forensic drainer backing off to mitigate driver-level 
+ *   IO contention on budget hardware.
+ * - Issue #SIMP-1011-7: Thermal Forensic Audit. Integrated coolingSnapshot 
+ *   mapping between LogEntry and LogEntity for authoritative audit.
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -131,7 +131,8 @@ class LogRepository @Inject constructor(
                 try {
                     val health = telemetry.systemHealth.value
                     
-                    val loadFactor = (health.cpuLoad / 8.0).coerceIn(0.0, 1.0)
+                    // Issue #SIMP-1011-8: Back off drainer if Mali Driver Anomaly is detected.
+                    val loadFactor = if (health.isMaliAnomaly) 1.0 else (health.cpuLoad / 8.0).coerceIn(0.0, 1.0)
                     val dynamicDelay = FORENSIC_DRAIN_THROTTLE_MIN_MS + 
                                      ((FORENSIC_DRAIN_THROTTLE_MAX_MS - FORENSIC_DRAIN_THROTTLE_MIN_MS) * loadFactor).toLong()
                     
@@ -308,7 +309,8 @@ class LogRepository @Inject constructor(
                                     tempSnapshot = entry.tempSnapshot, battSnapshot = entry.battSnapshot,
                                     chargingSnapshot = entry.chargingSnapshot,
                                     thermalSnapshot = entry.thermalSnapshot,
-                                    heapSnapshot = entry.heapSnapshot
+                                    heapSnapshot = entry.heapSnapshot,
+                                    coolingSnapshot = entry.coolingSnapshot
                                 ))
                                 continue
                             }
@@ -335,7 +337,8 @@ class LogRepository @Inject constructor(
                                         battSnapshot = entry.battSnapshot,
                                         chargingSnapshot = entry.chargingSnapshot,
                                         thermalSnapshot = entry.thermalSnapshot,
-                                        heapSnapshot = entry.heapSnapshot
+                                        heapSnapshot = entry.heapSnapshot,
+                                        coolingSnapshot = entry.coolingSnapshot
                                     )
                                     logDao.update(updated)
                                     lastEntityMetadata = metaKey
@@ -359,7 +362,8 @@ class LogRepository @Inject constructor(
                                 tempSnapshot = entry.tempSnapshot, battSnapshot = entry.battSnapshot,
                                 chargingSnapshot = entry.chargingSnapshot,
                                 thermalSnapshot = entry.thermalSnapshot,
-                                heapSnapshot = entry.heapSnapshot
+                                heapSnapshot = entry.heapSnapshot,
+                                coolingSnapshot = entry.coolingSnapshot
                             )
                             toInsert.add(newLog)
                             logWriteCount.incrementAndGet()
@@ -399,7 +403,8 @@ class LogRepository @Inject constructor(
                         ),
                         spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
                         tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
-                        chargingSnapshot = it.chargingSnapshot
+                        chargingSnapshot = it.chargingSnapshot,
+                        coolingSnapshot = it.coolingSnapshot
                     ) 
                 }
             }
@@ -456,8 +461,9 @@ class LogRepository @Inject constructor(
                 val memoryCritical = health.heapAllocatedMb >= MEMORY_CRITICAL_THRESHOLD_MB
                 val memoryHigh = health.heapAllocatedMb >= MEMORY_PRESSURE_THRESHOLD_MB
 
+                // Issue #SIMP-1011-8: Treat Mali anomaly as critical pressure to reduce DB overhead.
                 val threshold = when {
-                    health.isStorageCritical || memoryCritical -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
+                    health.isStorageCritical || memoryCritical || health.isMaliAnomaly -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
                     health.isStorageLow || memoryHigh -> ADAPTIVE_PRUNE_THRESHOLD_LOW
                     health.isBatteryCritical -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL 
                     health.isCharging -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING 
@@ -465,11 +471,11 @@ class LogRepository @Inject constructor(
                 }
 
                 if (count > threshold) {
-                    val heartbeatTarget = if (health.isStorageLow || memoryHigh) 100 else 500
-                    val generalTarget = if (health.isStorageLow || memoryHigh) 1000 else 2000 
-                    val forensicTarget = if (health.isStorageCritical || memoryCritical) FORENSIC_PRUNE_LIMIT_CRITICAL else if (health.isStorageLow || memoryHigh) FORENSIC_PRUNE_LIMIT_LOW else if (health.isCharging) FORENSIC_PRUNE_LIMIT_CHARGING else FORENSIC_PRUNE_LIMIT_NORMAL
+                    val heartbeatTarget = if (health.isStorageLow || memoryHigh || health.isMaliAnomaly) 100 else 500
+                    val generalTarget = if (health.isStorageLow || memoryHigh || health.isMaliAnomaly) 1000 else 2000 
+                    val forensicTarget = if (health.isStorageCritical || memoryCritical || health.isMaliAnomaly) FORENSIC_PRUNE_LIMIT_CRITICAL else if (health.isStorageLow || memoryHigh) FORENSIC_PRUNE_LIMIT_LOW else if (health.isCharging) FORENSIC_PRUNE_LIMIT_CHARGING else FORENSIC_PRUNE_LIMIT_NORMAL
                     
-                    val maxChunks = if (health.isStorageCritical || memoryCritical) 30 else 15
+                    val maxChunks = if (health.isStorageCritical || memoryCritical || health.isMaliAnomaly) 30 else 15
                     val hT = logDao.getHeartbeatPruneThreshold(heartbeatTarget)
                     val gT = logDao.getGeneralPruneThreshold(generalTarget)
                     val iT = logDao.getImportantPruneThreshold(2000)
@@ -509,7 +515,8 @@ class LogRepository @Inject constructor(
                 ),
                 spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
                 tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
-                chargingSnapshot = it.chargingSnapshot
+                chargingSnapshot = it.chargingSnapshot,
+                coolingSnapshot = it.coolingSnapshot
             )
         }
     }
@@ -540,7 +547,8 @@ class LogRepository @Inject constructor(
                 ),
                 spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
                 tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
-                chargingSnapshot = it.chargingSnapshot
+                chargingSnapshot = it.chargingSnapshot,
+                coolingSnapshot = it.coolingSnapshot
             )
         }
     }

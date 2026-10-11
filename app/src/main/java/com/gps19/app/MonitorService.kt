@@ -26,12 +26,14 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.11.1:
+ * - Issue #SIMP-1011-8: I/O Pressure Test. Integrated isMaliAnomaly into 
+ *   forensic sampling loop to decay sampling to 250ms during driver stalls.
+ * - Issue #SIMP-1011-7: Thermal Forensic Audit. Updated performForensicCapture 
+ *   to pass thermal headroom, heap allocation, and cooling state to optimized traces.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Fixed bulk property invocation 
  *   errors for TimeProvider and ConnectivitySuite.
- * Oct.10.2:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
- *   TimeProvider API. Fixed TRACKER_ACOUSTIC_FLOOR_KEY typo.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -653,7 +655,19 @@ class MonitorService : BaseMonitorService() {
         val dist = if (lastForensicLat != 0.0) PhysicsUtils.calculateDistance(lastForensicLat, lastForensicLng, lat, lng) else Double.MAX_VALUE
         if (isSpike || dist > FORENSIC_SPATIAL_GATE_METERS || abs(vibe - lastForensicVibe) > FORENSIC_IMU_VIBRATION_THRESHOLD || abs(tilt - lastForensicTilt) > FORENSIC_IMU_TILT_THRESHOLD) {
             lastForensicLat = lat; lastForensicLng = lng; lastForensicVibe = vibe; lastForensicTilt = tilt
-            logManager.logForensicTraceOptimized(timestamp = timeProvider.currentTimeMillis, lat = lat, lng = lng, accuracy = proc?.currentAccuracy ?: 0.0, maxAccuracy = proc?.maxAccuracy ?: 0.0, vibe = vibe, snr = snapshot.acousticDb, batteryLevel = health.batteryLevel, isCharging = health.isCharging, batteryTemp = health.batteryTemp)
+            logManager.logForensicTraceOptimized(
+                timestamp = timeProvider.currentTimeMillis, 
+                lat = lat, lng = lng, 
+                accuracy = proc?.currentAccuracy ?: 0.0, 
+                maxAccuracy = proc?.maxAccuracy ?: 0.0, 
+                vibe = vibe, snr = snapshot.acousticDb, 
+                batteryLevel = health.batteryLevel, 
+                isCharging = health.isCharging, 
+                batteryTemp = health.batteryTemp,
+                thermalHeadroom = health.thermalHeadroom,
+                heapAllocatedMb = health.heapAllocatedMb,
+                isCooling = health.isCoolingModeActive
+            )
         }
     }
 
@@ -678,6 +692,7 @@ class MonitorService : BaseMonitorService() {
                 
                 val delayMs = when { 
                     health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS 
+                    health.isMaliAnomaly -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS // R1.155: Back off sampling during Mali Driver stalls
                     logManager.isForensicBufferUnderPressure() -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS 
                     health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS 
                     health.isUltraLongStationary -> 5000L

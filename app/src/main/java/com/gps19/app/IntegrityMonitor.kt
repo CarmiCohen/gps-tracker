@@ -19,6 +19,8 @@ import javax.inject.Singleton
 /**
  * IntegrityMonitor: Tracks hardware and network health.
  * Oct.11.1:
+ * - Issue #SIMP-1011-9: Field Stability Audit. Implemented forensic logging 
+ *   of memory/storage hysteresis "gate hits" to audit jitter suppression.
  * - Issue #SIMP-1011-6: Mali Forensic Audit. Integrated JNI bridge latency 
  *   into Mali driver anomaly detection.
  * - Issue #SIMP-1011-4: Hysteresis Tuning. Applied staggered scaling to 
@@ -297,6 +299,11 @@ class IntegrityMonitor @Inject constructor(
                         h.storageAvailableMb = available
                     }
                 }
+
+                // Issue #SIMP-1011-9: Forensic logging of native gate hits
+                if (systemPressureBatch.currentMemLevel < lastMemoryPressure.ordinal && !needsFlush) {
+                    domainEventBus.emit(IntegrityEvent.LogEvent("STABILITY AUDIT: Native Memory hysteresis gate hit. Suppressing jitter [Heap: %.1f MB]".format(heap), false))
+                }
             } else {
                 currentPressure = evaluateMemoryPressureLegacy(heap)
                 if (currentPressure != lastMemoryPressure && currentPressure != MemoryPressureLevel.NORMAL) {
@@ -379,7 +386,11 @@ class IntegrityMonitor @Inject constructor(
         
         return if (rawLevel.ordinal < lastMemoryPressure.ordinal) {
             val threshold = if (lastMemoryPressure == MemoryPressureLevel.CRITICAL) MEMORY_CRITICAL_THRESHOLD_MB else MEMORY_PRESSURE_THRESHOLD_MB
-            if (heap > threshold - hysteresis) lastMemoryPressure else rawLevel
+            if (heap > threshold - hysteresis) {
+                // Issue #SIMP-1011-9: Forensic logging of legacy gate hits
+                domainEventBus.emit(IntegrityEvent.LogEvent("STABILITY AUDIT: Legacy Memory hysteresis gate hit. Suppressing jitter [Heap: %.1f MB]".format(heap), false))
+                lastMemoryPressure
+            } else rawLevel
         } else {
             rawLevel
         }
