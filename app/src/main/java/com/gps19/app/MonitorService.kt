@@ -26,14 +26,12 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
- * Oct.11.1:
- * - Issue #SIMP-1011-8: I/O Pressure Test. Integrated isMaliAnomaly into 
- *   forensic sampling loop to decay sampling to 250ms during driver stalls.
- * - Issue #SIMP-1011-7: Thermal Forensic Audit. Updated performForensicCapture 
- *   to pass thermal headroom, heap allocation, and cooling state to optimized traces.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Fixed bulk property invocation 
- *   errors for TimeProvider and ConnectivitySuite.
+ * Oct.11.3:
+ * - Issue #SIMP-1011-16: Forensic Pressure Audit. Implemented multi-stage 
+ *   sampling decay (50% -> 250ms, 80% -> 500ms, 95% -> 1000ms) to prevent 
+ *   spill-buffer overflow during I/O stalls.
+ * - Issue #SIMP-1011-13: Bayesian Drift Audit. Integrated authoritative 
+ *   uncertainty expansion in processTick during GNSS gaps.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -569,6 +567,17 @@ class MonitorService : BaseMonitorService() {
             lastPowerSaveCheckRt = nowRt
         }
 
+        // Issue #SIMP-1011-13 Bayesian Drift Audit. Expand authoritative uncertainty during gaps.
+        if (locationBuffer.isEmpty() && isTrackerMode && evaluationSnapshot.integrity.isLocationPending) {
+            val newMax = primaryProcessor.performBayesianExpansion(
+                nowRt = nowRt,
+                isPending = true,
+                lastSpeedMps = primaryProcessor.state.forensic.estimatedSpeedMps
+            )
+            // Ensure expanded accuracy reflects in the last processed location for evaluation
+            lastProcessedLocation?.let { it.maxAccuracy = newMax }
+        }
+
         while (locationBuffer.isNotEmpty()) {
             val loc = locationBuffer.poll() ?: break
             forensicAuditor.recordGpsFix(nowRt, currentIntervalMs, currentRole)
@@ -690,10 +699,13 @@ class MonitorService : BaseMonitorService() {
                     else -> 1.0
                 }
                 
+                val fillLevel = logManager.getForensicFillLevel()
                 val delayMs = when { 
                     health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS 
                     health.isMaliAnomaly -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS // R1.155: Back off sampling during Mali Driver stalls
-                    logManager.isForensicBufferUnderPressure() -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS 
+                    fillLevel >= 0.95 -> FORENSIC_SAMPLING_INTERVAL_EMERGENCY_MS // R11.16: High contention emergency back-off
+                    fillLevel >= 0.80 -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS 
+                    fillLevel >= 0.50 -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS
                     health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS 
                     health.isUltraLongStationary -> 5000L
                     else -> FORENSIC_SAMPLING_INTERVAL_MAX_MS 

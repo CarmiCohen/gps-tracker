@@ -9,6 +9,9 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Oct.11.3:
+ * - Issue #SIMP-1011-16: Forensic Pressure Audit. Added getForensicFillLevel() 
+ *   to enable multi-stage sampling decay in MonitorService.
  * Oct.11.1:
  * - Issue #SIMP-1011-7: Thermal Forensic Audit. Integrated coolingSnapshot into 
  *   forensic trace paths for authoritative decay auditing.
@@ -112,6 +115,8 @@ class LogManager @Inject constructor(
     }
 
     fun isForensicBufferUnderPressure(): Boolean = forensicSpillBufferProvider.get().isHighPressure()
+
+    fun getForensicFillLevel(): Double = forensicSpillBufferProvider.get().getFillLevel()
 
     private fun handleOverflow() {
         if (isOverflowLogged.compareAndSet(false, true)) {

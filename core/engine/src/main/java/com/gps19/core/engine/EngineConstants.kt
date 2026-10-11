@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.11.3:
+ * - Issue #SIMP-1011-16: Forensic Pressure Audit. Added FORENSIC_SAMPLING_INTERVAL_EMERGENCY_MS (1000ms).
  * Oct.11.2:
  * - Issue #SIMP-1011-12: HUD Throttling Sync. Added HUD_STATE_SAMPLE_THROTTLED_MS 
  *   (1000ms) for aggressive UI dampening during GPU driver anomalies.
@@ -101,6 +103,7 @@ const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 10L
 const val FORENSIC_SAMPLING_INTERVAL_MAX_MS = 100L 
 const val FORENSIC_SAMPLING_INTERVAL_COOLING_MS = 250L 
 const val FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS = 500L
+const val FORENSIC_SAMPLING_INTERVAL_EMERGENCY_MS = 1000L
 
 // Issue #701: Forensic Spatial Quantization
 const val FORENSIC_SPATIAL_GATE_METERS = 0.1
@@ -418,7 +421,7 @@ const val ALERT_ID_TRACKER_GAP = "GPS_GAP"
 const val ALERT_ID_TRACKER_POWER = "POWER_TAMPER"
 const val ALERT_ID_TRACKER_BATTERY = "LOW_BATTERY"
 const val ALERT_ID_TRACKER_TEMP = "TRACKER_TEMP"
-const val ALERT_ID_TRACKER_TAMPER = "TRACKER_TAMPER"
+const val ALERT_ID_TRACKER_TAMPER = "TAMPER_DETECTION"
 const val ALERT_ID_TRACKER_TILT = "TILT_ALERT"
 const val ALERT_ID_TRACKER_ACOUSTIC = "ACOUSTIC_ALERT"
 const val ALERT_ID_TRACKER_LIFT = "LIFT_ALERT"

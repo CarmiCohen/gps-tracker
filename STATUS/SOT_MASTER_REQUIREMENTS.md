@@ -1,32 +1,30 @@
-# SOT Master Requirements & Hardening Status (Oct11.2)
+# SOT Master Requirements & Hardening Status (Oct11.3)
 
-## 🏗️ Architectural Master Rules (188 Rules)
+## 🏗️ Architectural Master Rules (192 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
-*   **1.155 Forensic Sampling Decay (R-ID 624)**: Forensic sampling MUST decay to `FORENSIC_SAMPLING_INTERVAL_COOLING_MS` (250ms) during both thermal cooling and Mali driver anomalies to protect the JNI bridge from contention. (Oct11.1 - Issue #SIMP-1011-8).
-*   **1.156 Authoritative Thermal Metadata (R-ID 625)**: All forensic traces MUST authoritatively capture the device cooling state (`coolingSnapshot`) to enable post-mortem verification of sampling decay during high-temp transients. (Oct11.1 - Issue #SIMP-1011-7).
-*   **1.157 Hysteresis Visibility (R-ID 626)**: Suppression of telemetry jitter via hysteresis MUST be captured in forensic logs as "gate hits" to provide visibility into budget hardware stability without triggering reactive system flushes. (Oct11.1 - Issue #SIMP-1011-9).
-*   **1.158 Acoustic Baseline Parity (R-ID 627)**: Authoritative acoustic spike detection (Native and Fallback) MUST implement temporal contraction (`ACOUSTIC_FLOOR_CONTRACTION_EMA`) to ensure the baseline correctly decays during duty-cycle "off" periods. (Oct11.2 - Issue #SIMP-1011-10).
 *   **1.159 JNI Critical Safety (R-ID 628)**: Usage of `GetPrimitiveArrayCritical` MUST be preceded by array length verification and MUST NOT contain any nested JNI calls to ensure thread safety during driver-level stalls. (Oct11.2 - Issue #SIMP-1011-11).
 *   **1.160 Adaptive HUD Sampling (R-ID 629)**: Compose HUD telemetry flows MUST dynamically transition to `HUD_STATE_SAMPLE_THROTTLED_MS` (1000ms) during `isMaliAnomaly` states to mitigate rendering pressure on budget hardware. (Oct11.2 - Issue #SIMP-1011-12).
+*   **1.161 Bayesian Drift Authority (R-ID 630)**: The engine MUST authoritatively expand the accuracy radius (`maxAccuracy`) during GNSS gaps at a rate determined by `PENDING_UNCERTAINTY_GROWTH_RATE_MPS` (15.0 m/s) to prevent geofence bypass during stalls. (Oct11.3 - Issue #SIMP-1011-13).
+*   **1.162 Authoritative Stationary Duration (R-ID 631)**: All vibration processing paths (Native and Kotlin Fallback) MUST authoritatively accumulate `stationaryDurationMs` to ensure parity in power-save relaxation transitions. (Oct11.3 - Issue #SIMP-1011-14).
+*   **1.163 Inline Forensic Iteration (R-ID 632)**: Iteration over high-frequency sensor buffers MUST use `inline` matching functions (e.g., `forEachMatch`) to ensure zero-allocation parity and prevent GC pressure during forensic captures. (Oct11.3 - Issue #SIMP-1011-15).
+*   **1.164 Staged Forensic Back-pressure (R-ID 633)**: Forensic sampling MUST implement multi-stage decay based on granular spill-buffer fill levels (50% -> 250ms, 80% -> 500ms, 95% -> 1000ms) to protect against OOM during sustained database I/O contention. (Oct11.3 - Issue #SIMP-1011-16).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 676**: Adaptive HUD Sampling - Implemented dynamic UI flow dampening (1Hz) during Mali anomalies. (Oct11.2 - Issue #SIMP-1011-12).
-*   **SOT ID 675**: JNI Critical Hardening - Added bounds checks and validated zero-JNI loops for acoustic processing. (Oct11.2 - Issue #SIMP-1011-11).
-*   **SOT ID 674**: Acoustic Baseline Parity - Integrated temporal contraction into authoritative JNI and Kotlin baseline evaluators. (Oct11.2 - Issue #SIMP-1011-10).
-*   **SOT ID 673**: Authoritative Thermal Metadata - Integrated `coolingSnapshot` into optimized JNI traces and Room persistence. (Oct11.1 - Issue #SIMP-1011-7).
-*   **SOT ID 672**: Adaptive I/O Back-off - Integrated `isMaliAnomaly` into persistence gating and proactive pruning to mitigate driver-level contention. (Oct11.1 - Issue #SIMP-1011-8).
-*   **SOT ID 671**: Hysteresis Forensic Audit - Implemented logging of hysteresis gate hits to verify jitter suppression on budget hardware. (Oct11.1 - Issue #SIMP-1011-9).
+*   **SOT ID 680**: Staged Forensic Back-pressure - Implemented granular sampling decay based on spill-buffer fill level. (Oct11.3 - Issue #SIMP-1011-16).
+*   **SOT ID 679**: Bayesian Drift Authority - Integrated authoritative uncertainty growth in MonitorService tick loop. (Oct11.3 - Issue #SIMP-1011-13).
+*   **SOT ID 678**: Authoritative Stationary Duration - Fixed duration accumulation in HardwareSuite Kotlin fallback. (Oct11.3 - Issue #SIMP-1011-14).
+*   **SOT ID 677**: Inline Forensic Iteration - Audited and verified zero-allocation safety in CircularStateBuffer. (Oct11.3 - Issue #SIMP-1011-15).
 ...
 
 ---
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.755 (HUD Throttling Audit)**: PASSED - Verified telemetry flows transition to 1000ms sampling during Mali anomaly simulation. (Oct11.2 - Issue #SIMP-1011-12).
-*   **Chapter 31.754 (JNI Safety Audit)**: PASSED - Verified zero JNI calls in `n22` critical sections and added bounds validation. (Oct11.2 - Issue #SIMP-1011-11).
-*   **Chapter 31.753 (Acoustic Floor Recovery)**: PASSED - Verified temporal baseline contraction in both Native and Kotlin paths. (Oct11.2 - Issue #SIMP-1011-10).
-*   **Chapter 31.745 (Field Stability Audit)**: PASSED - Verified hysteresis gate hits logging in `IntegrityMonitor` for jitter audit. (Oct11.1 - Issue #SIMP-1011-9).
+*   **Chapter 31.763 (Forensic Back-pressure Audit)**: PASSED - Verified multi-stage sampling decay transitions based on granular fill level. (Oct11.3 - Issue #SIMP-1011-16).
+*   **Chapter 31.762 (Bayesian Drift Audit)**: PASSED - Verified authoritative maxAccuracy expansion during simulated GNSS gaps. (Oct11.3 - Issue #SIMP-1011-13).
+*   **Chapter 31.761 (Stationary Parity Audit)**: PASSED - Verified accumulation of stationaryDurationMs in Kotlin fallback path. (Oct11.3 - Issue #SIMP-1011-14).
+*   **Chapter 31.760 (Buffer Forensic Audit)**: PASSED - Verified zero-allocation iteration safety in CircularStateBuffer. (Oct11.3 - Issue #SIMP-1011-15).
 ...

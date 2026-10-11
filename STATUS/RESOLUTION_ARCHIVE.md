@@ -1,5 +1,15 @@
 # Resolution Archive
 
+## [Oct11.3] - Authoritative Drift & Stability Hardening
+**Issue ID**: #SIMP-1011-13, #SIMP-1011-14, #SIMP-1011-15
+**Status**: RESOLVED
+**Description**: Hardened geofence reliability during GNSS gaps by integrating Bayesian uncertainty growth and fixed stationary duration accumulation for cross-layer relaxation parity.
+**Root Cause**: Accuracy radius remained static during location stalls, creating a "blind spot" for geofence enforcement. Additionally, the Kotlin fallback for vibration processing failed to track stationary duration, breaking 4-hour relaxation on non-JNI paths.
+**Remediation**:
+- **Bayesian Drift Authority (#SIMP-1011-13)**: Integrated `performBayesianExpansion` in `MonitorService.kt`. Accuracy now authoritatively grows at 15.0 m/s during GNSS stalls.
+- **Ultra-Long Stability (#SIMP-1011-14)**: Implemented authoritative `stationaryDurationMs` accumulation in `HardwareSuite.kt` Kotlin fallback to ensure parity with JNI logic.
+- **Circular Buffer Forensic (#SIMP-1011-15)**: Audited `CircularStateBuffer.forEachMatch` for zero-allocation safety. Verified `inline` enforcement prevents GC pressure during high-frequency sensor floods.
+
 ## [Oct11.2] - Authoritative Sensor & JNI Hardening
 **Issue ID**: #SIMP-1011-10, #SIMP-1011-11, #SIMP-1011-12
 **Status**: RESOLVED
@@ -9,15 +19,5 @@
 - **Acoustic Floor Hardening (#SIMP-1011-10)**: Implemented time-based decay in `jdhardware-jni.cpp` and `JdHardwareManager.kt` to ensure baseline recovery during duty-cycle off-periods.
 - **JNI Resource Audit (#SIMP-1011-11)**: Hardened `n22` with bounds validation and verified zero-JNI loops within `GetPrimitiveArrayCritical` blocks.
 - **HUD Throttling Sync (#SIMP-1011-12)**: Applied `HUD_STATE_SAMPLE_THROTTLED_MS` (1000ms) to UI telemetry flows during `isMaliAnomaly` states to reduce rendering pressure.
-
-## [Oct11.1] - Budget Stability & Thermal Forensic Audit
-**Issue ID**: #SIMP-1011-7, #SIMP-1011-8, #SIMP-1011-9
-**Status**: RESOLVED
-**Description**: Finalized stability hardening for budget (Staggered) hardware by auditing thermal sampling decay, implementing adaptive I/O back-off during Mali anomalies, and verifying hysteresis effectiveness.
-**Root Cause**: High-temperature transients and GPU driver stalls on low-RAM hardware required authoritative forensic visibility and aggressive I/O mitigation to prevent thermal runaway and system-level stutters.
-**Remediation**:
-- **Thermal Forensic Audit (#SIMP-1011-7)**: Hardened forensic metadata by adding `coolingSnapshot` to `LogEntry` and `LogEntity` (Migration 82). Verified sampling rate decay to 250ms (`FORENSIC_SAMPLING_INTERVAL_COOLING_MS`) during thermal events.
-- **I/O Pressure Test (#SIMP-1011-8)**: Integrated `isMaliAnomaly` into `PersistencePolicy` and `LogRepository` pruning logic. Inhibited trail/history IO and decayed forensic sampling to 250ms during driver-level stalls to mitigate JNI bridge contention.
-- **Field Stability Audit (#SIMP-1011-9)**: Implemented forensic logging of hysteresis "gate hits" in `IntegrityMonitor.kt` (both Native and Legacy paths). Verified the 30MB total gate effectively silences memory pressure jitter on budget hardware.
 
 ...

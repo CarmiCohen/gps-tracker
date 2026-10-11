@@ -37,13 +37,12 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.11.3:
+ * - Issue #SIMP-1011-14: Ultra-Long Stability. Fixed stationaryDurationMs 
+ *   accumulation in Kotlin fallback path to ensure 4h relaxation parity.
  * Oct.11.2:
  * - Issue #SIMP-1011-10: Acoustic Floor Contraction Audit. Integrated contractionEma 
- *   and floorMin into HardwareFastPath to sync authoritative baseline decay with 
- *   the engine standards.
- * Oct.10.11:
- * - Issue #SIMP-1011-5: Acoustic Profiling. Updated nativeFastPathProvider to 
- *   support TimeProvider-aware auditing in the JNI bridge.
+ *   and floorMin into HardwareFastPath.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -377,6 +376,7 @@ class HardwareSuite @Inject constructor(
 
     @Volatile private var lastLinearAccelTs = 0L
     @Volatile private var stationaryDurationMs = 0L
+    @Volatile private var lastStationaryCheckRt = 0L
     
     @Volatile private var emaPressure = 0.0; @Volatile private var lastBaroZeroingRt = 0L
     private var initialRotationMatrix = FloatArray(9); private var hasInitialRotation = false
@@ -431,8 +431,6 @@ class HardwareSuite @Inject constructor(
                     gnssHealthBatch.constellation[i] = status.getConstellationType(i)
                 }
 
-                // Issue #SIMP-1011-1: processGnssBatch now handles health calculation logic 
-                // internally (via native or Kotlin fallback) to decouple HardwareSuite.
                 nativeFastPathProvider.processGnssBatch(timeProvider, gnssHealthBatch)
                 satellitesInView = gnssHealthBatch.satellitesInView
                 satellitesUsed = gnssHealthBatch.satellitesUsed
@@ -532,6 +530,7 @@ class HardwareSuite @Inject constructor(
                 sessionStartRt = nowRt
                 lastBaroZeroingRt = nowRt
                 lastFixRt = nowRt
+                lastStationaryCheckRt = nowRt
                 proximityMaxRange = proximity?.maximumRange ?: 5f
             }
 
@@ -882,8 +881,6 @@ class HardwareSuite @Inject constructor(
                     proximityBatch.rawNear = rawProximityNear
                     proximityBatch.isFlickering = isFlickeringInWindow(nowRt)
                     
-                    // Issue #SIMP-1011-3: processProximityBatch now handles all health logic
-                    // internally (via native or Kotlin fallback) to decouple HardwareSuite.
                     nativeFastPathProvider.processProximityBatch(timeProvider, proximityBatch)
                     proximityIdx = proximityBatch.nextIdx
                     proximityDebounceMs = proximityBatch.debounceMs
@@ -983,8 +980,6 @@ class HardwareSuite @Inject constructor(
                                         this.isWarming = this@HardwareSuite.isWarming
                                     }
 
-                                    // Issue #SIMP-1011-2: processAcousticBatch now handles all health logic
-                                    // internally (via native or Kotlin fallback) to decouple HardwareSuite.
                                     nativeFastPathProvider.processAcousticBatch(timeProvider, acousticBatch, buffer)
                                     currentAcousticDb = acousticBatch.db
                                     if (acousticBatch.isSpike) {
@@ -1147,7 +1142,14 @@ class HardwareSuite @Inject constructor(
                 isSuspiciousNoise = false
                 isMemoryPressureThrottled = false
                 isJammingCandidate = false
-                stationaryDurationMs = 0L
+                
+                // Issue #SIMP-1011-14: authoritative duration accumulation in Kotlin fallback
+                if (SentinelValidator.isStationary(delta, adaptiveVibrationFloor, currentCpuLoad)) {
+                    stationaryDurationMs += (nowRt - lastStationaryCheckRt).coerceAtLeast(0)
+                } else {
+                    stationaryDurationMs = 0L
+                }
+                lastStationaryCheckRt = nowRt
             }
 
             if (delta > logicPeakVibration) logicPeakVibration = delta
@@ -1292,7 +1294,7 @@ class HardwareSuite @Inject constructor(
 
     private fun clearLifecycleLeftovers() {
         synchronized(this) {
-            lastAnomalyActiveRt = 0L; lastAcousticLockoutRt = 0L; acousticFastPath.reset(); lightFastPath.reset(); rawProximityNear = false; stationaryDurationMs = 0L; emaPressure = 0.0; lastBaroZeroingRt = 0L; lastLinearAccelTs = 0L; lastStayAliveRt = 0L; lastDisplayTransitionRt = 0L
+            lastAnomalyActiveRt = 0L; lastAcousticLockoutRt = 0L; acousticFastPath.reset(); lightFastPath.reset(); rawProximityNear = false; stationaryDurationMs = 0L; lastStationaryCheckRt = 0L; emaPressure = 0.0; lastBaroZeroingRt = 0L; lastLinearAccelTs = 0L; lastStayAliveRt = 0L; lastDisplayTransitionRt = 0L
             secPeakLux = 0.0; secPeakVibe = 0.0; secSumProxIdx = 0.0; secProxCount = 0; secPeakTilt = 0.0; secPeakLift = 0.0; secPeakDb = 0.0; secSitDetected = false; secPeakKinetic = 0.0
             plungePhase = 0; plungeMatched = false; lastPlungePhaseRt = 0L; lastGpsSpeedMps = 0.0; currentCpuLoad = 0.0; cachedThermalHeadroom = 0.0; cachedHeapAllocatedMb = 0.0; isSuspiciousNoise = false; isMemoryPressureThrottled = false; isJammingCandidate = false; activityContextProvider.reset()
         }
@@ -1300,7 +1302,7 @@ class HardwareSuite @Inject constructor(
 
     fun resetBaseline(role: AppRole? = null) { 
         synchronized(this) {
-            emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryDurationMs = 0L; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime; lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0; 
+            emaPressure = currentPressure; relativeAltitude = 0.0; absoluteAltitude = android.hardware.SensorManager.getAltitude(android.hardware.SensorManager.PRESSURE_STANDARD_ATMOSPHERE, currentPressure.toFloat()).toDouble(); hasInitialRotation = false; stationaryDurationMs = 0L; lastStationaryCheckRt = timeProvider.elapsedRealtime; currentVerticalVelocity = 0.0; currentVerticalDisplacement = 0.0; plungePhase = 0; plungeMatched = false; secSitDetected = false; sessionStartRt = timeProvider.elapsedRealtime; lastBaroZeroingRt = sessionStartRt; adaptiveVibrationFloor = VIBRATION_STATIONARY_THRESHOLD; debouncedProximityCm = -1.0; proximityDebounceMs = 0L; vibrationCircularIdx = 0; vibrationRollingSum = 0.0; vibrationBufferCount = 0; vibrationCircularBuffer.fill(0.0); lastRawVibe = 0.0; lastHpfValue = 0.0; currentKineticEnergy = 0.0;
             forensicAuditor.reset(role)
             revivalBaselineCaptured = false; synchronized(sensorBuffer) { sensorBuffer.clear(); lastBufferRecordRt = 0L }; synchronized(snrBuffer) { snrBuffer.clear() }; synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }; synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() } 
             pendingEnterRt = 0L; recoveryStartRt = 0L; revivalAttemptCount = 0; isHardwareLocked = false; lastFixRt = sessionStartRt; currentLocationStatus = LocationStatus()
