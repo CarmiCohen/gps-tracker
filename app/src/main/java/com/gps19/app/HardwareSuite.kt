@@ -37,6 +37,10 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.11.7:
+ * - Issue #SIMP-1107: GPS Acquisition Regression. Implemented dynamic gap 
+ *   thresholding (2x current interval) to prevent revival loop interference 
+ *   during stationary power-save periods (60s).
  * Oct.11.5:
  * - Issue #SIMP-1011-21: Radio-Warm Keep-Alive. Implemented periodic low-power 
  *   GNSS bursts for Staggered devices to prevent hardware residency lock 
@@ -762,11 +766,16 @@ class HardwareSuite @Inject constructor(
         
         val current = currentLocationStatus
         
+        // Issue #SIMP-1107: Dynamic Gap Threshold. Scale threshold to 2x the current 
+        // intended interval to prevent false 'Pending' states during stationary power-save.
+        val currentInterval = pollingIntervalFlow.value
+        val dynamicGapThreshold = max(GPS_GAP_THRESHOLD_MS, (currentInterval * 2))
+
         val nextReason = SentinelValidator.evaluateLocationPendingReason(
             satellitesInView = satellitesInView,
             satellitesUsed = satellitesUsed,
             deltaSinceFixMs = deltaSinceFix,
-            gapThresholdMs = GPS_GAP_THRESHOLD_MS,
+            gapThresholdMs = dynamicGapThreshold,
             isJammingCandidate = isJammingCandidate,
             isAcousticViolated = (nowRt - lastAcousticLockoutRt < 2000L)
         )
@@ -1366,7 +1375,12 @@ class HardwareSuite @Inject constructor(
         val nowRt = timeProvider.elapsedRealtime; val currentStatus = currentLocationStatus
         if (currentStatus.isPending) {
             val stallDuration = nowRt - pendingEnterRt
-            val retryThreshold = (revivalAttemptCount + 1) * GPS_REVIVAL_RETRY_INTERVAL_MS
+            // Issue #SIMP-1107: Revival retry must be aware of the intended interval.
+            // If interval is 60s, wait at least 90s before restarting hardware.
+            val currentInterval = pollingIntervalFlow.value
+            val baseRetryInterval = max(GPS_REVIVAL_RETRY_INTERVAL_MS, (currentInterval * 1.5).toLong())
+            
+            val retryThreshold = (revivalAttemptCount + 1) * baseRetryInterval
             if (stallDuration > retryThreshold) {
                 if (revivalAttemptCount < MAX_REVIVAL_ATTEMPTS) {
                     revivalAttemptCount++; Timber.w("HardwareSuite: GNSS Recovery Pulse triggered (Attempt $revivalAttemptCount)"); domainEventBus.emit(RevivalEvent.Attempt(revivalAttemptCount)); restartLocationUpdates()

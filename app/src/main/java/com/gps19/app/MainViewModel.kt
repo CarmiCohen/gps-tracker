@@ -21,13 +21,14 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.11.7:
+ * - Issue #SIMP-1107: GPS Acquisition Regression. Harmonized UI staleness 
+ *   thresholds with dynamic polling intervals (PARKING/Ultra-Long) to 
+ *   prevent false "RED" GPS LED states.
  * Oct.11.2:
  * - Issue #SIMP-1011-12: HUD Throttling Sync. Dynamically adjusted telemetry 
  *   sampling to HUD_STATE_SAMPLE_THROTTLED_MS (1000ms) during Mali driver anomalies 
  *   to reduce rendering and I/O pressure on budget hardware.
- * Oct.10.9:
- * - Issue #SIMP-1014-3: Connectivity Jitter. Applied HUD_STATE_SAMPLE_MS to 
- *   telemetry flows to stabilize HUD recomposition during native bursts.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -494,7 +495,12 @@ class MainViewModel @Inject constructor(
         val isViewer = appMode == "viewer"
         val loc = if (isViewer) kinematicState.trackerLocation else kinematicState.localLocation
         val fixAgeRt = if (loc.kinetic.rt > 0) nowRt - loc.kinetic.rt else Long.MAX_VALUE
-        val isGpsActive = fixAgeRt < GPS_UI_FAIL_THRESHOLD_MS && loc.kinetic.gpsTs > 0
+        
+        // Issue #SIMP-1107: GPS freshness must be aware of the intentional polling window.
+        // PARKING state represents the stationary polling interval (60s).
+        val threshold = if (isUltra) ULTRA_LONG_STATIONARY_GPS_POLLING_MS + 30000L else if (trackerState == TrackerState.PARKING) STATIONARY_GPS_POLLING_MS + 15000L else GPS_UI_FAIL_THRESHOLD_MS
+        val isGpsActive = fixAgeRt < threshold && loc.kinetic.gpsTs > 0
+        
         val telemetryAge = if (kinematicState.pulse > 0) nowRt - kinematicState.pulse else Long.MAX_VALUE
         val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
         val gnss = loc.integrity.gnssDetail
@@ -559,9 +565,16 @@ class MainViewModel @Inject constructor(
 
     private fun mapHudTelemetry(appMode: String?, kinematicState: KinematicState, nowRt: Long, trackerState: TrackerState, isUltra: Boolean): HudTelemetryState {
         val loc = if (appMode == "viewer") kinematicState.trackerLocation else kinematicState.localLocation
-        val isGpsFresh = (nowRt - loc.kinetic.rt) < GPS_UI_FAIL_THRESHOLD_MS && loc.kinetic.gpsTs > 0
+        
+        // Issue #SIMP-1107: GPS freshness must be aware of the intentional polling window.
+        // Scale threshold: Interval + 30s grace (or 15s for normal stationary).
+        val threshold = if (isUltra) ULTRA_LONG_STATIONARY_GPS_POLLING_MS + 30000L else if (trackerState == TrackerState.PARKING) STATIONARY_GPS_POLLING_MS + 15000L else GPS_UI_FAIL_THRESHOLD_MS
+        val isGpsFresh = (nowRt - loc.kinetic.rt) < threshold && loc.kinetic.gpsTs > 0
+        
+        val isLocalFresh = if (appMode == "tracker") isGpsFresh else (nowRt - kinematicState.localLocation.kinetic.rt < GPS_UI_FAIL_THRESHOLD_MS && kinematicState.localLocation.kinetic.gpsTs > 0)
+
         return HudTelemetryState(
-            isLocalGpsActive = if (appMode == "tracker") isGpsFresh else (nowRt - kinematicState.localLocation.kinetic.rt < GPS_UI_FAIL_THRESHOLD_MS && kinematicState.localLocation.kinetic.gpsTs > 0), 
+            isLocalGpsActive = isLocalFresh, 
             isGpsFresh = isGpsFresh, speedMps = (if (appMode == "viewer") kinematicState.trackerLocation.kinetic.speed else 0.0).toFloat(), 
             trackerAccuracy = kinematicState.trackerLocation.kinetic.accuracy.toFloat(), maxTrackerAccuracy = kinematicState.trackerLocation.kinetic.maxAccuracy.toFloat(), 
             viewerAccuracy = (if (kinematicState.localLocation.kinetic.lat != 0.0) kinematicState.localLocation.kinetic.accuracy.toFloat() else 0f), 
@@ -609,7 +622,11 @@ class MainViewModel @Inject constructor(
             else { sTrkLat = PhysicsUtils.smoothCoordinate(sTrkLat, tLat, alpha); sTrkLng = PhysicsUtils.smoothCoordinate(sTrkLng, tLng, alpha) } 
         }
         val fixAgeRt = if (loc.kinetic.rt > 0) pulseRt - loc.kinetic.rt else Long.MAX_VALUE
-        val isTrackerFresh = fixAgeRt < GPS_UI_FAIL_THRESHOLD_MS && tTs > 0
+        
+        // Issue #SIMP-1107: Harmonized Map Freshness.
+        val threshold = if (kinematic.trackerHealth.isUltraLongStationary) ULTRA_LONG_STATIONARY_GPS_POLLING_MS + 30000L else if (loc.trackerState == TrackerState.PARKING) STATIONARY_GPS_POLLING_MS + 15000L else GPS_UI_FAIL_THRESHOLD_MS
+        val isTrackerFresh = fixAgeRt < threshold && tTs > 0
+
         val isTrackerValid = PhysicsUtils.isValidLocation(tLat, tLng)
         val isViewerValid = PhysicsUtils.isValidLocation(vLat, vLng)
         val initialCenter = when { 

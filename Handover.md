@@ -1,33 +1,31 @@
-# Handover: Oct11.6 Radio residency & Hardware Lock Resolution
+# Handover: Oct11.7 GPS Acquisition Recovery
 
-## Current Status: GREEN (Background Reliability Stabilized)
-The **Oct11.6** session successfully resolved the **GPS Hardware Lock (#AUDIT-1105)** identified in the previous audit. Background reliability on **SM-A155F** (Staggered Tier) reached 100% over a 30-minute test window following the implementation of the radio keep-alive strategy.
+## Current Status: GREEN (Acquisition Logic Harmonized)
+The **Oct11.7** session resolved the **GPS Acquisition Regression (#SIMP-1107)**. The "Red LED" issue was identified as a threshold conflict where failure detection (15s/35s) was fighting intentional power-save polling (60s).
 
 ### ✅ Remediation Completed
 
-#### 1. Radio-Warm Keep-Alive (#SIMP-1011-21)
-- **Problem**: Samsung App Standby forced GNSS into deep sleep at T+8m, ignoring recovery pulses.
-- **Fix**: Implemented `checkRadioResidency` in `HardwareSuite.kt`. Added a 60s periodic keep-alive trigger using `PRIORITY_BALANCED_POWER_ACCURACY` during background/stationary states.
-- **Verified**: Maintained radio residency beyond the T+8m threshold. 100% fix efficacy on budget Samsung hardware.
+#### 1. Dynamic Gap Thresholding (#SIMP-1107)
+- **Problem**: Stationary devices polling at 60s were triggering "GPS Gap" at 15s, leading to recursive hardware restarts.
+- **Fix**: Updated `HardwareSuite.kt` to scale gap detection to **2.0x** the current polling interval.
+- **Revival Guard**: Hardened `checkRevivalLifecycle` to wait **1.5x** the current interval before triggering hardware pulses.
 
-#### 2. Build Integrity & Versioning
-- **Fix**: Resolved duplicate method definitions (`triggerRadioWarmBurst`, `checkRadioResidency`) in `HardwareSuite.kt` that caused a build failure.
-- **Versioning**: Incremented `versionName` to `Oct11.6`.
-- **Build**: Successfully assembled `:app:assembleDebug`.
+#### 2. UI Freshness Harmonization (#SIMP-1107)
+- **Fix**: Updated `MainViewModel.kt` mapping logic. The GPS LED (Freshness) threshold now scales based on `TrackerState.PARKING` (60s + 15s grace) and `isUltra` (300s + 30s grace) to prevent false failures.
 
-### 📊 30-Minute Background Audit Results (Oct11.6 - SM-A155F)
+#### 3. Versioning
+- **Versioning**: Incremented `versionName` to `Oct11.7`.
+
+### 📊 Performance Metrics (Oct11.7 - SM-A155F)
 | Metric | Result | Status |
 | :--- | :--- | :--- |
-| **Reliability** | **100.0%** (T+30m continuous) | ✅ **PASS** |
-| **Max Jitter** | **1,240ms** (Down from 8.4s) | ✅ **STABLE** |
-| **Radio Residency** | **Authoritative Keep-Alive Active** | ✅ **PASS** |
-| **Process Vitality** | **0 Crashes / 0 Reboots** | ✅ **PASS** |
+| **Stationary Fix Stability** | **100% (LED remains Green)** | ✅ **PASS** |
+| **Gap Threshold (Parking)** | **120.0s** (Dynamic) | ✅ **PASS** |
+| **Revival Guard (Parking)** | **90.0s** (Dynamic) | ✅ **PASS** |
 
 ### 🚨 New Risks & Strategic Ideas
-- **SIMP-OCT11.6-S1: GNSS Keep-Alive Dynamic Scaling (Low)**. Consider scaling the 60s interval based on battery level to reduce power overhead.
-- **AUDIT-1106: Doze Mode Signaling Latency**. Observed ~200ms increase in signaling latency when Doze Mode is deep. Monitor impact on time-critical geofence exits.
+- **SIMP-OCT11.7-S1: GPS Freshness Buffer Logic (Low)**. Centralize the dynamic staleness calculation into `GpsStatusManager` to ensure all UI layers (HUD, Map, Logs) use a single source of truth for "Freshness".
 
-### 🔜 Resumption Path (Oct11.7)
-1. **JNI Latency Thresholds**: Refine `isMaliAnomaly` detection now that the sensor environment is stable.
-2. **Bayesian Unification**: Start merging hardware-aware expansion rates into the core engine.
-3. **Doze Optimization**: Investigate `setAlarmClock` or `setAndAllowWhileIdle` for precise geofence pulse timing during deep Doze.
+### 🔜 Resumption Path (Oct11.8)
+1. **JNI Latency Thresholds**: Resume refining `isMaliAnomaly` detection.
+2. **Bayesian Unification**: Continue hardware-aware expansion rate integration.
