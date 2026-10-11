@@ -1,5 +1,15 @@
 # Resolution Archive
 
+## [Oct10.11] - Budget Hardware Hardening
+**Issue ID**: #SIMP-1011-4, #SIMP-1011-5, #SIMP-1011-6
+**Status**: RESOLVED
+**Description**: Hardened the forensic path for budget hardware (Staggered tier) by tuning pressure hysteresis, optimizing JNI bridge performance, and deepening Mali anomaly detection.
+**Root Cause**: Low-tier devices exhibited telemetry oscillation due to tight hysteresis and showed JNI-level micro-stutters during high GPU load that were previously invisible to JVM-side monitoring.
+**Remediation**:
+- **Hysteresis Tuning (#SIMP-1011-4)**: Increased base Memory/Storage hysteresis to 15.0 MB and applied a 2.0x multiplier for Staggered performance tiers in `IntegrityMonitor.kt`.
+- **Acoustic Profiling (#SIMP-1011-5)**: Transitioned `n22` to zero-copy `GetPrimitiveArrayCritical` in `jdhardware-jni.cpp`. Integrated standardized `LatencyMonitor` auditing into all JNI batch paths in `JdHardwareManager.kt`.
+- **Mali Forensic Audit (#SIMP-1011-6)**: Expanded `LatencyMonitor` to track `maxJniLatency`. Updated `IntegrityMonitor.kt` to correlate JNI bridge stalls (>100ms) with CPU load for Mali anomaly detection.
+
 ## [Oct10.10] - Signal Decay Audit
 **Issue ID**: #SIMP-1010-3
 **Status**: RESOLVED

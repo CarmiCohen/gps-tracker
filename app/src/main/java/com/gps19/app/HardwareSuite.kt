@@ -37,6 +37,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.10.11:
+ * - Issue #SIMP-1011-5: Acoustic Profiling. Updated nativeFastPathProvider to 
+ *   support TimeProvider-aware auditing in the JNI bridge.
  * Oct.10.7:
  * - Issue #SIMP-1011-3: Proximity Decoupling. Migrated proximity debouncing 
  *   and index calculation fallback to JdHardwareManager. Simplified onSensorChanged.
@@ -86,24 +89,24 @@ class HardwareSuite @Inject constructor(
             return JdHardwareManager.isVibrationSuspiciousNative(vibration, adaptiveFloor, sensitivity, cpuLoad)
         }
 
-        override fun processVibrationBatch(batch: VibrationBatch): Boolean {
-            return JdHardwareManager.processVibrationBatchNative(batch)
+        override fun processVibrationBatch(timeProvider: TimeProvider, batch: VibrationBatch): Boolean {
+            return JdHardwareManager.processVibrationBatchNative(timeProvider, batch)
         }
 
-        override fun processGnssBatch(batch: GnssHealthBatch): Boolean {
-            return JdHardwareManager.processGnssBatchNative(batch)
+        override fun processGnssBatch(timeProvider: TimeProvider, batch: GnssHealthBatch): Boolean {
+            return JdHardwareManager.processGnssBatchNative(timeProvider, batch)
         }
 
-        override fun processAcousticBatch(batch: AcousticBatch, buffer: ShortArray): Boolean {
-            return JdHardwareManager.processAcousticBatchNative(batch, buffer)
+        override fun processAcousticBatch(timeProvider: TimeProvider, batch: AcousticBatch, buffer: ShortArray): Boolean {
+            return JdHardwareManager.processAcousticBatchNative(timeProvider, batch, buffer)
         }
 
-        override fun processProximityBatch(batch: ProximityBatch): Boolean {
-            return JdHardwareManager.processProximityBatchNative(batch)
+        override fun processProximityBatch(timeProvider: TimeProvider, batch: ProximityBatch): Boolean {
+            return JdHardwareManager.processProximityBatchNative(timeProvider, batch)
         }
 
-        override fun processSystemPressure(batch: SystemPressureBatch): Boolean {
-            return JdHardwareManager.processSystemPressureNative(batch)
+        override fun processSystemPressure(timeProvider: TimeProvider, batch: SystemPressureBatch): Boolean {
+            return JdHardwareManager.processSystemPressureNative(timeProvider, batch)
         }
     }
 
@@ -418,7 +421,7 @@ class HardwareSuite @Inject constructor(
 
                 // Issue #SIMP-1011-1: processGnssBatch now handles health calculation logic 
                 // internally (via native or Kotlin fallback) to decouple HardwareSuite.
-                nativeFastPathProvider.processGnssBatch(gnssHealthBatch)
+                nativeFastPathProvider.processGnssBatch(timeProvider, gnssHealthBatch)
                 satellitesInView = gnssHealthBatch.satellitesInView
                 satellitesUsed = gnssHealthBatch.satellitesUsed
                 averageSnr = gnssHealthBatch.averageSnr
@@ -869,7 +872,7 @@ class HardwareSuite @Inject constructor(
                     
                     // Issue #SIMP-1011-3: processProximityBatch now handles all health logic
                     // internally (via native or Kotlin fallback) to decouple HardwareSuite.
-                    nativeFastPathProvider.processProximityBatch(proximityBatch)
+                    nativeFastPathProvider.processProximityBatch(timeProvider, proximityBatch)
                     proximityIdx = proximityBatch.nextIdx
                     proximityDebounceMs = proximityBatch.debounceMs
                     
@@ -885,6 +888,13 @@ class HardwareSuite @Inject constructor(
                         }
                     }
                     secSumProxIdx += proximityIdx; secProxCount++
+                }
+            }
+            Sensor.TYPE_LIGHT -> {
+                val lux = values[0].toDouble(); currentLux = lux; if (lux > secPeakLux) secPeakLux = lux
+                synchronized(this) {
+                    val alpha = SentinelValidator.accelerateAlpha(LUX_EMA_FAST, isWarming)
+                    lightFastPath.evaluate(lux, nowRt, isWarming, SPIKE_DEBOUNCE_MS, alpha)
                 }
             }
             Sensor.TYPE_LIGHT -> {
@@ -970,7 +980,7 @@ class HardwareSuite @Inject constructor(
 
                                     // Issue #SIMP-1011-2: processAcousticBatch now handles all health logic
                                     // internally (via native or Kotlin fallback) to decouple HardwareSuite.
-                                    nativeFastPathProvider.processAcousticBatch(acousticBatch, buffer)
+                                    nativeFastPathProvider.processAcousticBatch(timeProvider, acousticBatch, buffer)
                                     currentAcousticDb = acousticBatch.db
                                     if (acousticBatch.isSpike) {
                                         lastAcousticLockoutRt = acousticBatch.lastSpikeRt
@@ -1105,7 +1115,7 @@ class HardwareSuite @Inject constructor(
                 this.nowRt = nowRt
             }
 
-            val batched = nativeFastPathProvider.processVibrationBatch(vibrationBatch)
+            val batched = nativeFastPathProvider.processVibrationBatch(timeProvider, vibrationBatch)
             
             val delta: Double
             if (batched) {
@@ -1320,5 +1330,5 @@ class HardwareSuite @Inject constructor(
         return timeProvider.elapsedRealtime - lastPokeRt >= intervalMs
     }
 
-    fun processSystemPressure(batch: SystemPressureBatch): Boolean = nativeFastPathProvider.processSystemPressure(batch)
+    fun processSystemPressure(timeProvider: TimeProvider, batch: SystemPressureBatch): Boolean = nativeFastPathProvider.processSystemPressure(timeProvider, batch)
 }

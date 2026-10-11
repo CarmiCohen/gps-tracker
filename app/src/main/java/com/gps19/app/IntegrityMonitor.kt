@@ -18,12 +18,11 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
- * Oct.10.2:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
- *   TimeProvider API.
- * Oct.10.1:
- * - Issue #SIMP-1014-2: Unified Pressure Path. Consolidated Memory and 
- *   Storage pressure evaluation into a single JNI crossing.
+ * Oct.11.1:
+ * - Issue #SIMP-1011-6: Mali Forensic Audit. Integrated JNI bridge latency 
+ *   into Mali driver anomaly detection.
+ * - Issue #SIMP-1011-4: Hysteresis Tuning. Applied staggered scaling to 
+ *   Memory and Storage pressure hysteresis in both JNI and Legacy paths.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -233,6 +232,7 @@ class IntegrityMonitor @Inject constructor(
         var cpu = systemStatusProvider.getCpuLoad()
         var iow = systemStatusProvider.getIoWait()
         var maxIo = LatencyMonitor.consumeMaxIoLatency()
+        val maxJni = LatencyMonitor.consumeMaxJniLatency()
         
         val thermal = systemStatusProvider.getThermalHeadroom()
         val heap = systemStatusProvider.getHeapAllocatedMb()
@@ -251,7 +251,7 @@ class IntegrityMonitor @Inject constructor(
                 domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_PERFORMANCE_SPIKE))
             }
             
-            maliAnomaly = checkMaliDriverAnomaly(maxIo, cpu, iow)
+            maliAnomaly = checkMaliDriverAnomaly(maxIo, maxJni, cpu, iow)
         }
 
         hardwareSuite.setMaliAnomaly(maliAnomaly)
@@ -261,20 +261,21 @@ class IntegrityMonitor @Inject constructor(
         var needsFlush = false
         val storageStatus = systemStatusProvider.getStorageStatus()
         val available = storageStatus.availableMb
+        val isStaggered = systemStatusProvider.isStaggeredPerformanceTier()
 
         if (JdHardwareManager.isAvailable() && !isMemorySimulated.get() && !isStorageSimulated.get()) {
             systemPressureBatch.apply {
                 heapMb = heap
                 memPressureThresholdMb = MEMORY_PRESSURE_THRESHOLD_MB
                 memCriticalThresholdMb = MEMORY_CRITICAL_THRESHOLD_MB
-                memHysteresisOffsetMb = MEMORY_HYSTERESIS_OFFSET_MB
+                memHysteresisOffsetMb = if (isStaggered) MEMORY_HYSTERESIS_OFFSET_MB * SYSTEM_PRESSURE_STAGGERED_HYSTERESIS_MULT else MEMORY_HYSTERESIS_OFFSET_MB
                 storageAvailableMb = available.toDouble()
                 storageLowThresholdMb = SYSTEM_STORAGE_LOW_THRESHOLD_MB.toDouble()
                 storageCriticalThresholdMb = SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB.toDouble()
-                storageHysteresisOffsetMb = STORAGE_HYSTERESIS_OFFSET_MB
+                storageHysteresisOffsetMb = if (isStaggered) STORAGE_HYSTERESIS_OFFSET_MB * SYSTEM_PRESSURE_STAGGERED_HYSTERESIS_MULT else STORAGE_HYSTERESIS_OFFSET_MB
             }
             
-            if (hardwareSuite.processSystemPressure(systemPressureBatch)) {
+            if (hardwareSuite.processSystemPressure(timeProvider, systemPressureBatch)) {
                 currentPressure = when (systemPressureBatch.currentMemLevel) {
                     2 -> MemoryPressureLevel.CRITICAL
                     1 -> MemoryPressureLevel.HIGH
@@ -365,18 +366,36 @@ class IntegrityMonitor @Inject constructor(
         }
     }
 
-    private fun evaluateMemoryPressureLegacy(heap: Double): MemoryPressureLevel = when {
-        heap >= MEMORY_CRITICAL_THRESHOLD_MB -> MemoryPressureLevel.CRITICAL
-        heap >= MEMORY_PRESSURE_THRESHOLD_MB -> MemoryPressureLevel.HIGH
-        else -> MemoryPressureLevel.NORMAL
+    private fun evaluateMemoryPressureLegacy(heap: Double): MemoryPressureLevel {
+        val rawLevel = when {
+            heap >= MEMORY_CRITICAL_THRESHOLD_MB -> MemoryPressureLevel.CRITICAL
+            heap >= MEMORY_PRESSURE_THRESHOLD_MB -> MemoryPressureLevel.HIGH
+            else -> MemoryPressureLevel.NORMAL
+        }
+
+        // Issue #SIMP-1011-4: Applied staggered hysteresis for legacy path consistency
+        val isStaggered = systemStatusProvider.isStaggeredPerformanceTier()
+        val hysteresis = if (isStaggered) MEMORY_HYSTERESIS_OFFSET_MB * SYSTEM_PRESSURE_STAGGERED_HYSTERESIS_MULT else MEMORY_HYSTERESIS_OFFSET_MB
+        
+        return if (rawLevel.ordinal < lastMemoryPressure.ordinal) {
+            val threshold = if (lastMemoryPressure == MemoryPressureLevel.CRITICAL) MEMORY_CRITICAL_THRESHOLD_MB else MEMORY_PRESSURE_THRESHOLD_MB
+            if (heap > threshold - hysteresis) lastMemoryPressure else rawLevel
+        } else {
+            rawLevel
+        }
     }
 
-    private fun checkMaliDriverAnomaly(maxIo: Long, cpu: Double, iow: Double): Boolean {
-        if (maxIo > 500 && cpu > 6.0) {
+    private fun checkMaliDriverAnomaly(maxIo: Long, maxJni: Long, cpu: Double, iow: Double): Boolean {
+        // Issue #SIMP-1011-6: Broaden Mali anomaly trigger to include JNI bridge stalls (>100ms)
+        val isJniBridgeStalled = maxJni > LATENCY_THRESHOLD_JNI_MS
+        val isIoContended = maxIo > 500 && cpu > 6.0
+
+        if (isIoContended || (isJniBridgeStalled && cpu > 6.0)) {
             if (!currentHealth.isMaliAnomaly) {
-                Timber.w("Forensic Audit (R266): Potential Mali driver configuration failure suspected. [IO: %dms, CPU: %.1f]", maxIo, cpu)
+                val reason = if (isIoContended) "High I/O contention" else "JNI Bridge stall (${maxJni}ms)"
+                Timber.w("Forensic Audit (R266): Mali Driver Anomaly suspected. [Reason: $reason, CPU: %.1f]", cpu)
                 domainEventBus.emit(IntegrityEvent.LogEvent(
-                    "STRESS AUDIT: Mali Driver Anomaly detected on this device (High I/O correlation). UI throttling engaged.",
+                    "STRESS AUDIT: Mali Driver Anomaly detected on this device ($reason). UI throttling engaged.",
                     isImportant = true
                 ))
             }
@@ -688,12 +707,6 @@ class IntegrityMonitor @Inject constructor(
     }
 
     suspend fun checkInternetIntegrity(now: Long): Boolean {
-        val nowRt = timeProvider.elapsedRealtime
-        if (nowRt - lastInternetCheckRt < INTERNET_CHECK_TTL_MS && lastInternetCheckRt != 0L) {
-            return !currentHealth.localInternetLoss
-        }
-        lastInternetCheckRt = nowRt
-
         val online = isInternetHardwarePresent()
         if (!online) {
             val firstDetected = sustainedViolations.getOrPut(ALERT_ID_LOCAL_INTERNET) { now }

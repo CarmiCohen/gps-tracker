@@ -1,8 +1,11 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct10.10
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct10.11
 
-## 🎯 Current Resumption Focus: Hysteresis Tuning.
+## 🎯 Current Resumption Focus: Forensic Integrity.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
+
+### 🔴 High Priority (0)
+*   *No open high priority issues.*
 
 ### 🟡 Medium Priority (0)
 *   *No open medium priority issues.*
@@ -15,6 +18,9 @@
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #SIMP-1011-6: Mali Forensic Audit.** Correlated JNI bridge latency stalls (>100ms) with GPU driver anomaly detection in `IntegrityMonitor.kt`. Expanded `LatencyMonitor` to track rolling max JNI latency. Resolved Oct10.11.
+*   **Issue #SIMP-1011-5: Acoustic Profiling.** Optimized acoustic JNI path (`n22`) with zero-copy `GetPrimitiveArrayCritical` access. Integrated standardized `LatencyMonitor` auditing into all native batching paths to identify bridge overhead. Resolved Oct10.11.
+*   **Issue #SIMP-1011-4: Hysteresis Tuning.** Fine-tune native Memory and Storage hysteresis gates in `jdhardware-jni.cpp` and `IntegrityMonitor.kt` to prevent state oscillation on devices with volatile heap/storage reports. Applied staggered scaling (2.0x) for budget hardware stability. Resolved Oct10.11.
 *   **Issue #SIMP-1010-3: Signal Decay Audit.** Synchronized SNR thresholds in `jdhardware-jni.cpp` to the engine standard (22.0 dB-Hz). Remediated a critical scaling bug in `TelemetryMapper.kt` where raw SNR was reconstructed with a 5.0x multiplier instead of `RIBBON_SNR_SCALE_DB` (45.0x). Hardened the Protobuf schema in `app_settings.proto` with `optional` markers for SNR/Vibe snapshots to enable reliable presence detection. Resolved Oct10.10.
 *   **Issue #SIMP-1014-3: Connectivity Jitter.** Remediated state jitter in the Compose HUD and IO layer caused by high-frequency native JNI telemetry bursts. Implemented `saveLocationUpdateDebounced` in `MainRepository` to cap persistence IO at 1Hz. Applied 200ms temporal sampling (`HUD_STATE_SAMPLE_MS`) to telemetry and signaling flows in `MainViewModel`. Integrated flyweight duplication to maintain state integrity during asynchronous debouncing. Resolved Oct10.9.
 *   **Issue #SIMP-1014-2: JNI Consolidation.** Finalized native system pressure evaluation (Memory/Storage) with hysteresis in `n24`. Consolidated GNSS (`n21`), Acoustic (`n22`), and Proximity (`n23`) JNI paths to replace Kotlin fallbacks. Increased shared state buffer to 2048 bytes for multi-sensor safety. Optimized forensic capture for zero-allocation throughput. Resolved Oct10.8.
@@ -29,6 +35,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct10.11: [SOT Count: 333 (Rules: 182), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 71 (Sub-items: 355), QA: 742]**
 - **Oct10.10: [SOT Count: 329 (Rules: 179), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 69 (Sub-items: 345), QA: 714]**
 - **Oct10.9: [SOT Count: 328 (Rules: 178), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 68 (Sub-items: 340), QA: 700]**
 - **Oct10.8: [SOT Count: 327 (Rules: 177), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 68 (Sub-items: 340), QA: 686]**

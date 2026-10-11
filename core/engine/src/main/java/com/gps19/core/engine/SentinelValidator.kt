@@ -6,6 +6,9 @@ import kotlin.math.min
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * Oct.11.1:
+ * - Issue #SIMP-1011-5: Acoustic Profiling. Updated DefaultNativeFastPathProvider 
+ *   to match the new TimeProvider-aware interface.
  * Oct.10.1 (Restoration Path):
  * - Issue #SIMP-1015-1: Non-Nullable Native Authority. Standardized on @NotNull 
  *   native providers. All high-frequency gates now route through nativeProvider 
@@ -259,10 +262,10 @@ object SentinelValidator {
             return vibration > dynamicThreshold
         }
 
-        override fun processVibrationBatch(batch: VibrationBatch): Boolean = false
-        override fun processGnssBatch(batch: GnssHealthBatch): Boolean = false
-        override fun processAcousticBatch(batch: AcousticBatch, buffer: ShortArray): Boolean = false
-        override fun processProximityBatch(batch: ProximityBatch): Boolean = false
-        override fun processSystemPressure(batch: SystemPressureBatch): Boolean = false
+        override fun processVibrationBatch(timeProvider: TimeProvider, batch: VibrationBatch): Boolean = false
+        override fun processGnssBatch(timeProvider: TimeProvider, batch: GnssHealthBatch): Boolean = false
+        override fun processAcousticBatch(timeProvider: TimeProvider, batch: AcousticBatch, buffer: ShortArray): Boolean = false
+        override fun processProximityBatch(timeProvider: TimeProvider, batch: ProximityBatch): Boolean = false
+        override fun processSystemPressure(timeProvider: TimeProvider, batch: SystemPressureBatch): Boolean = false
     }
 }

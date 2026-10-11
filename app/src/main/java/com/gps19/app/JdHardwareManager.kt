@@ -39,6 +39,9 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.10.11:
+ * - Issue #SIMP-1011-5: Acoustic Profiling. Integrated LatencyMonitor into 
+ *   all JNI batching paths (n19, n21, n22, n23, n24) for performance auditing.
  * Oct.10.8:
  * - Issue #SIMP-1014-2: Pressure Consolidation. Finalized n21-n24 JNI implementations.
  *   Increased sharedStateBuffer to 2048 to prevent GNSS batch overflow and corrected
@@ -284,67 +287,82 @@ object JdHardwareManager {
         return false
     }
 
-    fun processVibrationBatchNative(batch: VibrationBatch): Boolean {
+    fun processVibrationBatchNative(timeProvider: TimeProvider, batch: VibrationBatch): Boolean {
         if (!isLibraryLoaded.get()) return false
         
-        synchronized(sharedStateBuffer) {
-            sharedStateBuffer.clear()
-            sharedStateBuffer.putDouble(batch.x)
-            sharedStateBuffer.putDouble(batch.y)
-            sharedStateBuffer.putDouble(batch.z)
-            sharedStateBuffer.putDouble(batch.lx)
-            sharedStateBuffer.putDouble(batch.ly)
-            sharedStateBuffer.putDouble(batch.lz)
-            sharedStateBuffer.putDouble(batch.adaptiveFloor)
-            sharedStateBuffer.putDouble(batch.cpuLoad)
-            sharedStateBuffer.putInt(if (batch.isWarming) 1 else 0)
-            sharedStateBuffer.putDouble(batch.lastRawVibe)
-            sharedStateBuffer.putDouble(batch.lastHpfValue)
-            sharedStateBuffer.putDouble(batch.currentEnergy)
-            sharedStateBuffer.putDouble(batch.snr)
-            sharedStateBuffer.putDouble(batch.thermal)
-            sharedStateBuffer.putDouble(batch.heap)
-            sharedStateBuffer.putLong(batch.nowRt)
-            
-            val res = n19()
-            if (res == 0) {
-                batch.delta = sharedStateBuffer.getDouble(128)
-                batch.nextFloor = sharedStateBuffer.getDouble(136)
-                batch.nextHpf = sharedStateBuffer.getDouble(144)
-                batch.nextEnergy = sharedStateBuffer.getDouble(152)
-                batch.isStationary = sharedStateBuffer.getInt(160) != 0
-                batch.isSuspiciousNoise = sharedStateBuffer.getInt(164) != 0
-                batch.isMemoryPressureThrottled = sharedStateBuffer.getInt(168) != 0
-                batch.stationaryDuration = sharedStateBuffer.getLong(172)
-                batch.muzzleResetTriggered = sharedStateBuffer.getInt(180) != 0
-                batch.isJammingCandidate = sharedStateBuffer.getInt(184) != 0
-                return true
+        return LatencyMonitor.measureAndAudit<Boolean>(
+            timeProvider = timeProvider,
+            thresholdMs = LATENCY_THRESHOLD_JNI_MS,
+            operation = "Native processVibrationBatch",
+            type = LatencyMonitor.AuditType.PERFORMANCE,
+            onSpike = { message, _ -> Timber.w(message) }
+        ) {
+            synchronized(sharedStateBuffer) {
+                sharedStateBuffer.clear()
+                sharedStateBuffer.putDouble(batch.x)
+                sharedStateBuffer.putDouble(batch.y)
+                sharedStateBuffer.putDouble(batch.z)
+                sharedStateBuffer.putDouble(batch.lx)
+                sharedStateBuffer.putDouble(batch.ly)
+                sharedStateBuffer.putDouble(batch.lz)
+                sharedStateBuffer.putDouble(batch.adaptiveFloor)
+                sharedStateBuffer.putDouble(batch.cpuLoad)
+                sharedStateBuffer.putInt(if (batch.isWarming) 1 else 0)
+                sharedStateBuffer.putDouble(batch.lastRawVibe)
+                sharedStateBuffer.putDouble(batch.lastHpfValue)
+                sharedStateBuffer.putDouble(batch.currentEnergy)
+                sharedStateBuffer.putDouble(batch.snr)
+                sharedStateBuffer.putDouble(batch.thermal)
+                sharedStateBuffer.putDouble(batch.heap)
+                sharedStateBuffer.putLong(batch.nowRt)
+                
+                val res = n19()
+                if (res == 0) {
+                    batch.delta = sharedStateBuffer.getDouble(128)
+                    batch.nextFloor = sharedStateBuffer.getDouble(136)
+                    batch.nextHpf = sharedStateBuffer.getDouble(144)
+                    batch.nextEnergy = sharedStateBuffer.getDouble(152)
+                    batch.isStationary = sharedStateBuffer.getInt(160) != 0
+                    batch.isSuspiciousNoise = sharedStateBuffer.getInt(164) != 0
+                    batch.isMemoryPressureThrottled = sharedStateBuffer.getInt(168) != 0
+                    batch.stationaryDuration = sharedStateBuffer.getLong(172)
+                    batch.muzzleResetTriggered = sharedStateBuffer.getInt(180) != 0
+                    batch.isJammingCandidate = sharedStateBuffer.getInt(184) != 0
+                    true
+                } else false
             }
         }
-        return false
     }
 
     /**
      * processGnssBatchNative: Consolidated JNI GNSS path (Issue #SIMP-1011-1).
      * Includes Kotlin fallback to ensure consistent health evaluation when JNI is absent.
      */
-    fun processGnssBatchNative(batch: GnssHealthBatch): Boolean {
+    fun processGnssBatchNative(timeProvider: TimeProvider, batch: GnssHealthBatch): Boolean {
         if (isLibraryLoaded.get()) {
-            synchronized(sharedStateBuffer) {
-                sharedStateBuffer.clear()
-                sharedStateBuffer.putInt(batch.count)
-                for (i in 0 until 64) sharedStateBuffer.putInt(batch.svid[i])
-                for (i in 0 until 64) sharedStateBuffer.putFloat(batch.cn0[i])
-                for (i in 0 until 64) sharedStateBuffer.putInt(if (batch.usedInFix[i]) 1 else 0)
-                for (i in 0 until 64) sharedStateBuffer.putInt(batch.constellation[i])
-                
-                val res = n21()
-                if (res == 0) {
-                    // Oct.10.8: Offsets aligned for 2048 buffer safety (outputs at 1040)
-                    batch.satellitesInView = sharedStateBuffer.getInt(1040)
-                    batch.satellitesUsed = sharedStateBuffer.getInt(1044)
-                    batch.averageSnr = sharedStateBuffer.getDouble(1048)
-                    return true
+            return LatencyMonitor.measureAndAudit<Boolean>(
+                timeProvider = timeProvider,
+                thresholdMs = LATENCY_THRESHOLD_JNI_MS,
+                operation = "Native processGnssBatch",
+                type = LatencyMonitor.AuditType.PERFORMANCE,
+                onSpike = { message, _ -> Timber.w(message) }
+            ) {
+                synchronized(sharedStateBuffer) {
+                    sharedStateBuffer.clear()
+                    sharedStateBuffer.putInt(batch.count)
+                    for (i in 0 until 64) sharedStateBuffer.putInt(batch.svid[i])
+                    for (i in 0 until 64) sharedStateBuffer.putFloat(batch.cn0[i])
+                    for (i in 0 until 64) sharedStateBuffer.putInt(if (batch.usedInFix[i]) 1 else 0)
+                    for (i in 0 until 64) sharedStateBuffer.putInt(batch.constellation[i])
+                    
+                    val res = n21()
+                    if (res == 0) {
+                        // Oct.10.8: Offsets aligned for 2048 buffer safety (outputs at 1040)
+                        batch.satellitesInView = sharedStateBuffer.getInt(1040)
+                        batch.satellitesUsed = sharedStateBuffer.getInt(1044)
+                        batch.averageSnr = sharedStateBuffer.getDouble(1048)
+                        true
+                    } else false
                 }
             }
         }
@@ -366,23 +384,31 @@ object JdHardwareManager {
      * processAcousticBatchNative: Consolidated JNI audio path (Issue #SIMP-1011-2).
      * Includes Kotlin fallback to ensure consistent dB calculation and spike evaluation.
      */
-    fun processAcousticBatchNative(batch: AcousticBatch, buffer: ShortArray): Boolean {
+    fun processAcousticBatchNative(timeProvider: TimeProvider, batch: AcousticBatch, buffer: ShortArray): Boolean {
         if (isLibraryLoaded.get()) {
-            synchronized(sharedStateBuffer) {
-                sharedStateBuffer.clear()
-                sharedStateBuffer.putInt(batch.readCount)
-                sharedStateBuffer.putDouble(batch.baseAlpha)
-                sharedStateBuffer.putDouble(batch.vibrationRollingSum)
-                sharedStateBuffer.putLong(batch.nowRt)
-                sharedStateBuffer.putInt(if (batch.isWarming) 1 else 0)
-                
-                val res = n22(buffer)
-                if (res == 0) {
-                    batch.maxAmp = sharedStateBuffer.getInt(128)
-                    batch.db = sharedStateBuffer.getDouble(132)
-                    batch.isSpike = sharedStateBuffer.getInt(140) != 0
-                    batch.lastSpikeRt = sharedStateBuffer.getLong(144)
-                    return true
+            return LatencyMonitor.measureAndAudit<Boolean>(
+                timeProvider = timeProvider,
+                thresholdMs = LATENCY_THRESHOLD_JNI_MS,
+                operation = "Native processAcousticBatch",
+                type = LatencyMonitor.AuditType.PERFORMANCE,
+                onSpike = { message, _ -> Timber.w(message) }
+            ) {
+                synchronized(sharedStateBuffer) {
+                    sharedStateBuffer.clear()
+                    sharedStateBuffer.putInt(batch.readCount)
+                    sharedStateBuffer.putDouble(batch.baseAlpha)
+                    sharedStateBuffer.putDouble(batch.vibrationRollingSum)
+                    sharedStateBuffer.putLong(batch.nowRt)
+                    sharedStateBuffer.putInt(if (batch.isWarming) 1 else 0)
+                    
+                    val res = n22(buffer)
+                    if (res == 0) {
+                        batch.maxAmp = sharedStateBuffer.getInt(128)
+                        batch.db = sharedStateBuffer.getDouble(132)
+                        batch.isSpike = sharedStateBuffer.getInt(140) != 0
+                        batch.lastSpikeRt = sharedStateBuffer.getLong(144)
+                        true
+                    } else false
                 }
             }
         }
@@ -409,26 +435,34 @@ object JdHardwareManager {
      * processProximityBatchNative: Consolidated JNI proximity path (Issue #SIMP-1011-3).
      * Includes Kotlin fallback to ensure consistent index calculation and debouncing.
      */
-    fun processProximityBatchNative(batch: ProximityBatch): Boolean {
+    fun processProximityBatchNative(timeProvider: TimeProvider, batch: ProximityBatch): Boolean {
         if (isLibraryLoaded.get()) {
-            synchronized(sharedStateBuffer) {
-                sharedStateBuffer.clear()
-                sharedStateBuffer.putDouble(batch.distance)
-                sharedStateBuffer.putDouble(batch.maxRange)
-                sharedStateBuffer.putLong(batch.nowRt)
-                sharedStateBuffer.putInt(if (batch.isStationary) 1 else 0)
-                sharedStateBuffer.putLong(batch.stationaryDurationMs)
-                sharedStateBuffer.putInt(if (batch.isHighLoad) 1 else 0)
-                sharedStateBuffer.putDouble(batch.currentIdx)
-                sharedStateBuffer.putInt(if (batch.rawNear) 1 else 0)
-                sharedStateBuffer.putInt(if (batch.isFlickering) 1 else 0)
-                
-                val res = n23()
-                if (res == 0) {
-                    batch.nextIdx = sharedStateBuffer.getDouble(128)
-                    batch.nextRawNear = sharedStateBuffer.getInt(136) != 0
-                    batch.debounceMs = sharedStateBuffer.getLong(140)
-                    return true
+            return LatencyMonitor.measureAndAudit<Boolean>(
+                timeProvider = timeProvider,
+                thresholdMs = LATENCY_THRESHOLD_JNI_MS,
+                operation = "Native processProximityBatch",
+                type = LatencyMonitor.AuditType.PERFORMANCE,
+                onSpike = { message, _ -> Timber.w(message) }
+            ) {
+                synchronized(sharedStateBuffer) {
+                    sharedStateBuffer.clear()
+                    sharedStateBuffer.putDouble(batch.distance)
+                    sharedStateBuffer.putDouble(batch.maxRange)
+                    sharedStateBuffer.putLong(batch.nowRt)
+                    sharedStateBuffer.putInt(if (batch.isStationary) 1 else 0)
+                    sharedStateBuffer.putLong(batch.stationaryDurationMs)
+                    sharedStateBuffer.putInt(if (batch.isHighLoad) 1 else 0)
+                    sharedStateBuffer.putDouble(batch.currentIdx)
+                    sharedStateBuffer.putInt(if (batch.rawNear) 1 else 0)
+                    sharedStateBuffer.putInt(if (batch.isFlickering) 1 else 0)
+                    
+                    val res = n23()
+                    if (res == 0) {
+                        batch.nextIdx = sharedStateBuffer.getDouble(128)
+                        batch.nextRawNear = sharedStateBuffer.getInt(136) != 0
+                        batch.debounceMs = sharedStateBuffer.getLong(140)
+                        true
+                    } else false
                 }
             }
         }
@@ -466,27 +500,35 @@ object JdHardwareManager {
      * processSystemPressureNative: Consolidated JNI pressure path (Issue #SIMP-1014-2).
      * Includes Kotlin fallback to ensure consistent memory and storage evaluation with hysteresis.
      */
-    fun processSystemPressureNative(batch: SystemPressureBatch): Boolean {
+    fun processSystemPressureNative(timeProvider: TimeProvider, batch: SystemPressureBatch): Boolean {
         if (isLibraryLoaded.get()) {
-            synchronized(sharedStateBuffer) {
-                sharedStateBuffer.clear()
-                sharedStateBuffer.putDouble(batch.heapMb)
-                sharedStateBuffer.putDouble(batch.memPressureThresholdMb)
-                sharedStateBuffer.putDouble(batch.memCriticalThresholdMb)
-                sharedStateBuffer.putDouble(batch.memHysteresisOffsetMb)
-                sharedStateBuffer.putDouble(batch.storageAvailableMb)
-                sharedStateBuffer.putDouble(batch.storageLowThresholdMb)
-                sharedStateBuffer.putDouble(batch.storageCriticalThresholdMb)
-                sharedStateBuffer.putDouble(batch.storageHysteresisOffsetMb)
-                
-                val res = n24()
-                if (res == 0) {
-                    // Read outputs from offset 64
-                    batch.currentMemLevel = sharedStateBuffer.getInt(64)
-                    batch.needsMemFlush = sharedStateBuffer.getInt(68) != 0
-                    batch.currentStorageLevel = sharedStateBuffer.getInt(72)
-                    batch.needsStoragePrune = sharedStateBuffer.getInt(76) != 0
-                    return true
+            return LatencyMonitor.measureAndAudit<Boolean>(
+                timeProvider = timeProvider,
+                thresholdMs = LATENCY_THRESHOLD_JNI_MS,
+                operation = "Native processSystemPressure",
+                type = LatencyMonitor.AuditType.PERFORMANCE,
+                onSpike = { message, _ -> Timber.w(message) }
+            ) {
+                synchronized(sharedStateBuffer) {
+                    sharedStateBuffer.clear()
+                    sharedStateBuffer.putDouble(batch.heapMb)
+                    sharedStateBuffer.putDouble(batch.memPressureThresholdMb)
+                    sharedStateBuffer.putDouble(batch.memCriticalThresholdMb)
+                    sharedStateBuffer.putDouble(batch.memHysteresisOffsetMb)
+                    sharedStateBuffer.putDouble(batch.storageAvailableMb)
+                    sharedStateBuffer.putDouble(batch.storageLowThresholdMb)
+                    sharedStateBuffer.putDouble(batch.storageCriticalThresholdMb)
+                    sharedStateBuffer.putDouble(batch.storageHysteresisOffsetMb)
+                    
+                    val res = n24()
+                    if (res == 0) {
+                        // Read outputs from offset 64
+                        batch.currentMemLevel = sharedStateBuffer.getInt(64)
+                        batch.needsMemFlush = sharedStateBuffer.getInt(68) != 0
+                        batch.currentStorageLevel = sharedStateBuffer.getInt(72)
+                        batch.needsStoragePrune = sharedStateBuffer.getInt(76) != 0
+                        true
+                    } else false
                 }
             }
         }

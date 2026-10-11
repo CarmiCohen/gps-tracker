@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.11.1:
+ * - Issue #SIMP-1011-5: Acoustic Profiling. Updated NativeFastPathProvider 
+ *   to accept TimeProvider for standardized latency auditing.
  * Oct.10.1 (Restoration Path):
  * - Issue #SIMP-1014-2: Unified Pressure Path. Added SystemPressureBatch 
  *   DTO and updated events/interfaces for consolidated JNI pressure evaluation.
@@ -476,11 +479,11 @@ interface NativeFastPathProvider {
     fun calculateVibrationDelta(x: Double, y: Double, z: Double, lx: Double, ly: Double, lz: Double): Double
     fun isShockViolated(peakShock: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean
     fun isVibrationSuspicious(vibration: Double, adaptiveFloor: Double, sensitivity: Float, cpuLoad: Double): Boolean
-    fun processVibrationBatch(batch: VibrationBatch): Boolean
-    fun processGnssBatch(batch: GnssHealthBatch): Boolean
-    fun processAcousticBatch(batch: AcousticBatch, buffer: ShortArray): Boolean
-    fun processProximityBatch(batch: ProximityBatch): Boolean
-    fun processSystemPressure(batch: SystemPressureBatch): Boolean
+    fun processVibrationBatch(timeProvider: TimeProvider, batch: VibrationBatch): Boolean
+    fun processGnssBatch(timeProvider: TimeProvider, batch: GnssHealthBatch): Boolean
+    fun processAcousticBatch(timeProvider: TimeProvider, batch: AcousticBatch, buffer: ShortArray): Boolean
+    fun processProximityBatch(timeProvider: TimeProvider, batch: ProximityBatch): Boolean
+    fun processSystemPressure(timeProvider: TimeProvider, batch: SystemPressureBatch): Boolean
 }
 
 @Serializable

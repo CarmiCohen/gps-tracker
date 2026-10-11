@@ -2,6 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.11.1:
+ * - Issue #SIMP-1011-4: Hysteresis Tuning. Increased base Memory/Storage 
+ *   hysteresis to 15.0 MB and added SYSTEM_PRESSURE_STAGGERED_HYSTERESIS_MULT 
+ *   (2.0x) for budget hardware stability.
  * Oct.10.9:
  * - Issue #SIMP-1014-3: Connectivity Jitter. Added HUD_STATE_SAMPLE_MS 
  *   for unified UI temporal dampening.
@@ -44,7 +48,8 @@ const val SENSOR_LOAD_GATE_CPU_THRESHOLD = 0.85
 // Issue #1416: Memory Pressure Thresholds (MB)
 const val MEMORY_PRESSURE_THRESHOLD_MB = 200.0
 const val MEMORY_CRITICAL_THRESHOLD_MB = 250.0
-const val MEMORY_HYSTERESIS_OFFSET_MB = 10.0
+const val MEMORY_HYSTERESIS_OFFSET_MB = 15.0
+const val SYSTEM_PRESSURE_STAGGERED_HYSTERESIS_MULT = 2.0
 
 // Issue #1417: Connectivity Jitter
 const val CONNECTIVITY_HYSTERESIS_MS = 3000L
@@ -193,7 +198,7 @@ const val INITIAL_VIBRATION_FLOOR = 0.05
 const val VIBRATION_WINDOW_SIZE = 5 
 const val PASSIVE_ZEROING_STATIONARY_MS = 30000L
 const val ROTATION_INIT_STATIONARY_MS = 3000L
-const val BARO_ZEROING_INTERVAL_MS = 300000L 
+const val BARO_ZEROING_INTERVAL_MS = 300000L
 const val SPIKE_DEBOUNCE_MS = 5000L
 
 // Issue #601: Kinetic Energy Anomaly Detection
@@ -340,9 +345,9 @@ const val BATTERY_STEEP_DISCHARGE_WINDOW_MS = 60000L
 // Storage thresholds
 const val SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB = 10L
 const val SYSTEM_STORAGE_LOW_THRESHOLD_MB = 50L
-const val STORAGE_HYSTERESIS_OFFSET_MB = 10.0
+const val STORAGE_HYSTERESIS_OFFSET_MB = 15.0
 const val SYSTEM_STORAGE_CRITICAL_THRESHOLD_PCT = 0.01 
-const val SYSTEM_STORAGE_LOW_THRESHOLD_PCT = 0.05 
+const val SYSTEM_STORAGE_LOW_THRESHOLD_PCT = 0.05
 
 // GPS Polling & Filtering
 const val GPS_SEQUENCE_TOLERANCE_MS = 120000L 

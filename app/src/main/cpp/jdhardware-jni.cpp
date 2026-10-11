@@ -289,6 +289,7 @@ Java_com_gps19_app_JdHardwareManager_n21(JNIEnv* env, jclass clazz) {
 
 /**
  * n22: processAcousticBatch (Issue #SIMP-1011-2)
+ * Oct.10.11: Optimized with GetPrimitiveArrayCritical for zero-copy access.
  */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz, jshortArray buffer) {
@@ -301,7 +302,7 @@ Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz, jshortArray 
     int64_t nowRt = *(int64_t*)(ptr + 20);
     int isWarming = *(int*)(ptr + 28);
 
-    jshort* samples = env->GetShortArrayElements(buffer, nullptr);
+    jshort* samples = (jshort*)env->GetPrimitiveArrayCritical(buffer, nullptr);
     if (samples == nullptr) return -2;
 
     int maxAmp = 0;
@@ -309,7 +310,7 @@ Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz, jshortArray 
         int amp = std::abs((int)samples[i]);
         if (amp > maxAmp) maxAmp = amp;
     }
-    env->ReleaseShortArrayElements(buffer, samples, JNI_ABORT);
+    env->ReleasePrimitiveArrayCritical(buffer, samples, JNI_ABORT);
 
     double db = (maxAmp > 0) ? (20.0 * std::log10((double)maxAmp)) : 0.0;
 
