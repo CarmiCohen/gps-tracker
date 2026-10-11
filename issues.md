@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct11.3
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct11.5
 
 ## 🎯 Current Resumption Focus: Backpressure Logic & Native Parity.
 
@@ -7,9 +7,8 @@
 ### 🔴 High Priority (0)
 *   *All high priority issues resolved in Oct11.3.*
 
-### 🟡 Medium Priority (2)
-*   **Issue #SIMP-1011-17: Event Bus Backpressure.** Audit `DomainEventBus` drop-oldest behavior during high-frequency sensor floods. Ensure `extraBufferCapacity` (512) and `BufferOverflow.DROP_OLDEST` correctly preserve system stability without losing critical audit telemetry.
-*   **Issue #SIMP-1011-18: Mali Correlation Refinement.** Refine Mali driver stall correlation in `IntegrityMonitor.kt` using `LatencyMonitor` max JNI latency. Ensure `isMaliAnomaly` is not triggered by transient DB spikes but by sustained bridge contention.
+### 🟡 Medium Priority (0)
+*   *Issue #SIMP-1011-17 resolved in Oct11.5.*
 
 ---
 
@@ -21,6 +20,8 @@
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **Issue #SIMP-1011-17: Event Bus Backpressure.** Audited `DomainEventBus` drop-oldest behavior. Increased buffer capacity to 1024 and implemented staged priority-aware gating (LOW at 1x threshold, NORMAL at 2x) to protect CRITICAL/HIGH telemetry during sensor floods. Resolved Oct11.5.
+*   **Issue #SIMP-1011-18: Mali Correlation Refinement.** Refine Mali driver stall correlation in `IntegrityMonitor.kt` using `LatencyMonitor` max JNI latency. Refined anomaly trigger to require sustained bridge contention (>150ms) for 30s to suppress transient jitter. Resolved Oct11.4.
 *   **Issue #SIMP-1011-16: Forensic Back-pressure (Staged).** Implemented multi-stage forensic sampling decay in `MonitorService.kt` based on granular fill level (50% -> 250ms, 80% -> 500ms, 95% -> 1000ms). Added `getForensicFillLevel()` to `LogManager.kt`. Resolved Oct11.3.
 *   **Issue #SIMP-1011-15: Circular Buffer Forensic.** Audited `CircularStateBuffer.forEachMatch` for zero-allocation iteration safety. Confirmed `inline` usage prevents overhead during sensor floods. Contention risk on sensor thread verified as minimal for buffer sizes < 1024. Resolved Oct11.3.
 *   **Issue #SIMP-1011-14: Ultra-Long Stability.** Fixed bug in `HardwareSuite.kt` where `stationaryDurationMs` was incorrectly reset in the Kotlin fallback path. Implemented authoritative accumulation to ensure 4-hour relaxation parity without JNI. Resolved Oct11.3.
@@ -32,8 +33,8 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct11.5: [SOT Count: 345 (Rules: 194), Open: H:0, M:0, L:0, Ideas: H:0, M:2, L:1, Testing: 79 (Sub-items: 395), QA: 796]**
+- **Oct11.4: [SOT Count: 344 (Rules: 193), Open: H:0, M:1, L:0, Ideas: H:0, M:2, L:1, Testing: 78 (Sub-items: 390), QA: 780]**
 - **Oct11.3: [SOT Count: 343 (Rules: 192), Open: H:0, M:2, L:0, Ideas: H:0, M:2, L:1, Testing: 77 (Sub-items: 385), QA: 764]**
 - **Oct11.2: [SOT Count: 339 (Rules: 188), Open: H:2, M:1, L:0, Ideas: H:0, M:1, L:1, Testing: 74 (Sub-items: 370), QA: 748]**
 - **Oct11.1: [SOT Count: 336 (Rules: 185), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 71 (Sub-items: 355), QA: 745]**
-- **Oct10.11: [SOT Count: 333 (Rules: 182), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 71 (Sub-items: 355), QA: 742]**
-- **Oct10.10: [SOT Count: 329 (Rules: 179), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:0, Testing: 69 (Sub-items: 345), QA: 714]**

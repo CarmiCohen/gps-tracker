@@ -18,6 +18,10 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Oct.11.4:
+ * - Issue #SIMP-1011-18: Mali Correlation Refinement. Refined Mali anomaly 
+ *   trigger to require sustained contention (30s) and increased bridge 
+ *   threshold to 150ms to suppress transient jitter.
  * Oct.11.1:
  * - Issue #SIMP-1011-9: Field Stability Audit. Implemented forensic logging 
  *   of memory/storage hysteresis "gate hits" to audit jitter suppression.
@@ -253,7 +257,7 @@ class IntegrityMonitor @Inject constructor(
                 domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_PERFORMANCE_SPIKE))
             }
             
-            maliAnomaly = checkMaliDriverAnomaly(maxIo, maxJni, cpu, iow)
+            maliAnomaly = checkMaliDriverAnomaly(maxIo, maxJni, cpu, iow, nowRt)
         }
 
         hardwareSuite.setMaliAnomaly(maliAnomaly)
@@ -396,23 +400,31 @@ class IntegrityMonitor @Inject constructor(
         }
     }
 
-    private fun checkMaliDriverAnomaly(maxIo: Long, maxJni: Long, cpu: Double, iow: Double): Boolean {
-        // Issue #SIMP-1011-6: Broaden Mali anomaly trigger to include JNI bridge stalls (>100ms)
-        val isJniBridgeStalled = maxJni > LATENCY_THRESHOLD_JNI_MS
+    private fun checkMaliDriverAnomaly(maxIo: Long, maxJni: Long, cpu: Double, iow: Double, nowRt: Long): Boolean {
+        // Issue #SIMP-1011-18: Refine Mali trigger. Use 150ms bridge threshold and require sustained contention.
+        val isJniBridgeStalled = maxJni > MALI_BRIDGE_LATENCY_THRESHOLD_MS
         val isIoContended = maxIo > 500 && cpu > 6.0
 
         if (isIoContended || (isJniBridgeStalled && cpu > 6.0)) {
-            if (!currentHealth.isMaliAnomaly) {
+            val firstDetected = sustainedViolations.getOrPut(ALERT_ID_MALI_ANOMALY) { nowRt }
+            val isSustained = nowRt - firstDetected >= MALI_ANOMALY_SUSTAINED_THRESHOLD_MS
+
+            if (isSustained && !currentHealth.isMaliAnomaly) {
                 val reason = if (isIoContended) "High I/O contention" else "JNI Bridge stall (${maxJni}ms)"
-                Timber.w("Forensic Audit (R266): Mali Driver Anomaly suspected. [Reason: $reason, CPU: %.1f]", cpu)
+                Timber.w("Forensic Audit (R266): Mali Driver Anomaly confirmed. [Reason: $reason, CPU: %.1f]", cpu)
                 domainEventBus.emit(IntegrityEvent.LogEvent(
                     "STRESS AUDIT: Mali Driver Anomaly detected on this device ($reason). UI throttling engaged.",
                     isImportant = true
                 ))
+                domainEventBus.emit(IntegrityEvent.ViolationSustained(ALERT_ID_MALI_ANOMALY))
             }
-            return true
+            return isSustained
+        } else {
+            if (sustainedViolations.remove(ALERT_ID_MALI_ANOMALY) != null && currentHealth.isMaliAnomaly) {
+                domainEventBus.emit(IntegrityEvent.ViolationResolved(ALERT_ID_MALI_ANOMALY))
+            }
+            return false
         }
-        return false
     }
 
     private fun updateHealth(mutator: (SystemHealthState) -> Unit) {

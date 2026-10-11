@@ -2,6 +2,12 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.11.5:
+ * - Issue #SIMP-1011-17: Event Bus Hardening. Increased buffer capacity to 1024 
+ *   and implemented staged priority-aware dropping to protect critical telemetry.
+ * Oct.11.4:
+ * - Issue #SIMP-1011-18: Mali Correlation Refinement. Added MALI_ANOMALY_SUSTAINED_THRESHOLD_MS 
+ *   (30000ms) and refined bridge threshold to 150ms to suppress transient spikes.
  * Oct.11.3:
  * - Issue #SIMP-1011-16: Forensic Pressure Audit. Added FORENSIC_SAMPLING_INTERVAL_EMERGENCY_MS (1000ms).
  * Oct.11.2:
@@ -58,8 +64,8 @@ const val CONNECTIVITY_HYSTERESIS_MS = 3000L
 const val HUD_STATE_SAMPLE_MS = 200L
 const val HUD_STATE_SAMPLE_THROTTLED_MS = 1000L
 
-// Issue #1328: Event Bus Hardening
-const val DOMAIN_EVENT_BUS_CAPACITY = 512
+// Issue #1328 & SIMP-1011-17: Event Bus Hardening
+const val DOMAIN_EVENT_BUS_CAPACITY = 1024
 const val DOMAIN_EVENT_BUS_HIGH_SUBSCRIPTION_THRESHOLD = 5
 
 // Issue #660: Forensic Audit: Log Buffer Pressure
@@ -434,6 +440,7 @@ const val ALERT_ID_SILENT_FAILURE = "SILENT_FAILURE"
 const val ALERT_ID_GPS_HARDWARE_LOCK = "GPS_HARDWARE_LOCK"
 const val ALERT_ID_HARDWARE_CONFIGURATION = "HARDWARE_CONFIG_MISSING"
 const val ALERT_ID_PERFORMANCE_SPIKE = "PERFORMANCE_SPIKE"
+const val ALERT_ID_MALI_ANOMALY = "MALI_DRIVER_ANOMALY"
 
 // Alert Titles 
 const val ALERT_TITLE_LOCAL_INTERNET = "This device: Internet Lost"
@@ -463,6 +470,7 @@ const val ALERT_TITLE_HARDWARE_CONFIGURATION = "This device: Hardware Config"
 const val ALERT_TITLE_PERFORMANCE_SPIKE = "This device: Performance Warning"
 const val ALERT_TITLE_JUMP_ALERT = "Jammer Alert"
 const val ALERT_TITLE_VISUAL_JUMP = "Visual Jump"
+const val ALERT_TITLE_MALI_ANOMALY = "Forensic: Mali Driver Anomaly"
 
 // System Watchdog & Grace Periods
 const val SYSTEM_WATCHDOG_INTERVAL_MS = 90000L
@@ -481,6 +489,10 @@ const val SENSOR_GRACE_PERIOD_MS = 600000L
 const val DB_PRUNE_THRESHOLD = 2000 
 const val PRUNE_COOLDOWN_MS = 30000L 
 const val LOG_MUZZLE_STARTUP_MS = 60000L
+
+// Issue #SIMP-1011-18: Mali Correlation Refinement
+const val MALI_ANOMALY_SUSTAINED_THRESHOLD_MS = 30000L
+const val MALI_BRIDGE_LATENCY_THRESHOLD_MS = 150L
 
 const val FORENSIC_PINK_COLOR = 0xFFFF00FF.toInt()
 

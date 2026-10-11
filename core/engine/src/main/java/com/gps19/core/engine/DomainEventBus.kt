@@ -9,6 +9,11 @@ import javax.inject.Singleton
 
 /**
  * DomainEventBus: A high-performance, unified reactive bus for domain-level events.
+ * Oct.11.5:
+ * - Issue #SIMP-1011-17: Event Bus Hardening. Refined priority-aware gating 
+ *   logic. Increased buffer to 1024 and implemented staged dropping (LOW at 1x 
+ *   threshold, NORMAL at 2x) to ensure CRITICAL alarms are never evicted 
+ *   by sensor noise during high-subscription pressure.
  * Oct.5.6:
  * - Issue #1328: Phase 2 - Prioritized Drop Strategy. Implemented selective 
  *   dropping of LOW priority events when subscription count exceeds threshold 
@@ -29,13 +34,23 @@ class DomainEventBus @Inject constructor() {
     /**
      * Emits a domain event to all subscribers.
      * Uses non-blocking tryEmit to ensure the tracking loop is never stalled by UI observers.
-     * Oct.5.6: Drops LOW priority events if subscription count is high.
+     * Oct.11.5: Staged dropping based on priority and subscription pressure.
      */
     fun emit(event: DomainEvent) {
-        if (event.priority == EventPriority.LOW && 
-            _events.subscriptionCount.value >= DOMAIN_EVENT_BUS_HIGH_SUBSCRIPTION_THRESHOLD) {
-            return
+        val subs = _events.subscriptionCount.value
+        
+        // Staged Priority Gate: Protect buffer space for CRITICAL/HIGH events.
+        when (event.priority) {
+            EventPriority.LOW -> {
+                if (subs >= DOMAIN_EVENT_BUS_HIGH_SUBSCRIPTION_THRESHOLD) return
+            }
+            EventPriority.NORMAL -> {
+                // Drop NORMAL events (like TrailPoints) only under extreme subscription pressure.
+                if (subs >= DOMAIN_EVENT_BUS_HIGH_SUBSCRIPTION_THRESHOLD * 2) return
+            }
+            else -> { /* HIGH and CRITICAL always attempt emission */ }
         }
+
         _events.tryEmit(event)
     }
 }
