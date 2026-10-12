@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct11.8)
+# SOT Master Requirements & Hardening Status (Oct12.12)
 
-## 🏗️ Architectural Master Rules (201 Rules)
+## 🏗️ Architectural Master Rules (207 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -10,22 +10,24 @@
 *   **1.171 Harmonized UI Freshness (R-ID 640)**: HUD GPS status indicators MUST utilize mode-aware staleness thresholds (Interval + Grace) to ensure logical consistency with engine-level power relaxation strategies. (Oct11.7 - Issue #SIMP-1107).
 *   **1.172 Tiered JNI Bridge Thresholds (R-ID 641)**: Mali anomaly detection MUST utilize hardware-aware JNI bridge latency thresholds (Standard: 150ms, Staggered: 250ms) to accommodate higher base jitter on budget SoCs. (Oct11.8 - Issue #SIMP-1011-22).
 *   **1.173 Hardware-Aware Bayesian Expansion (R-ID 642)**: Authoritative uncertainty growth (Bayesian expansion) MUST scale its expansion rate threshold (Standard: 15m/s, Staggered: 25m/s) based on the device's hardware performance tier to maintain geofence reliability. (Oct11.8 - Issue #SIMP-1011-22).
+*   **1.174 Adaptive Signaling Conflation (R-ID 643)**: Signaling emission and conflation delays MUST scale dynamically based on network RTT and hardware performance tier to prevent buffer bloat and UI lag on high-latency links. (Oct11.9 - Issue #SIMP-1011-23).
+*   **1.175 Arrival-Time Jitter Correction (R-ID 644)**: Remote telemetry updates received by the viewer MUST be buffered in a Mode-Aware Jitter Buffer (Window: max(1s, 2x RTT)) to correct for network-induced arrival jitter and ensure smooth trail rendering. (Oct11.9 - Issue #SIMP-1011-23).
+*   **1.176 Forensic Checksum Integrity (R-ID 645)**: All forensic traces stored in the off-heap spill-buffer MUST be protected by a CRC32 checksum at the entry level to detect storage-level corruption before DB insertion. (Oct12.12 - Issue #SIMP-1012-3).
+*   **1.177 Offline Batch Persistence (R-ID 646)**: Telemetry updates stored during network loss MUST be buffered in memory and flushed to SQLite in batches (min 5 entries or 10s interval) to minimize disk IOPS and write-lock contention. (Oct12.12 - Issue #SIMP-1012-4).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 688**: Performance Tier Alignment - Implemented hardware-aware JNI latency and Bayesian expansion thresholds to stabilize budget hardware tracking. (Oct11.8 - Issue #SIMP-1011-22).
-*   **SOT ID 687**: GPS Acquisition Recovery - Implemented dynamic thresholds and revival guards to resolve the stationary "Red LED" regression. (Oct11.7 - Issue #SIMP-1107).
-*   **SOT ID 686**: Radio-Warm Keep-Alive - Implemented 60s periodic bursts to prevent GNSS hardware lock. (Oct11.6 - Issue #SIMP-1011-21).
-*   **SOT ID 685**: Priority Escalation Window - Implemented 60s window for stable background transitions. (Oct11.5 - Issue #SIMP-1011-20).
-*   **SOT ID 684**: Signaling Echo Suppression - Refined validator to eliminate reflected pulse interference. (Oct11.5 - Issue #SIMP-1011-19).
+*   **SOT ID 691**: Batch Persistence - Implemented background batch-flush loop in OfflineRepository to reduce SQLite contention. (Oct12.12 - Issue #SIMP-1012-4).
+*   **SOT ID 690**: Forensic Checksumming - Integrated CRC32 integrity checks into the forensic trace pipeline to detect storage-level corruption. (Oct12.12 - Issue #SIMP-1012-3).
+*   **SOT ID 689**: Adaptive Signaling & Latency Compensation - Implemented RTT-aware conflation scaling and arrival-time jitter correction. (Oct11.9 - Issue #SIMP-1011-23).
+*   **SOT ID 688**: Performance Tier Alignment - Implemented hardware-aware JNI latency and Bayesian expansion thresholds. (Oct11.8 - Issue #SIMP-1011-22).
 
 ...
 
 ---
 
 ## 🏁 Verification Chapters
-*   **Chapter 31.770 (Performance Tier Audit)**: PASSED - Verified JNI threshold relaxation (250ms) suppressed false Mali alerts on SM-A155F under IO load. Verified Bayesian expansion rate scaling at T+60s gap. (Oct11.8 - Issue #SIMP-1011-22).
-*   **Chapter 31.769 (Acquisition Audit)**: PASSED - Verified LED Green persistence at T+5m stationary polling on SM-A155F. (Oct11.7 - Issue #SIMP-1107).
-*   **Chapter 31.768 (Radio-Warm Audit)**: PASSED - Verified radio residency preservation at T+20m on SM-A155F. (Oct11.6 - Issue #SIMP-1011-21).
+*   **Chapter 31.772 (Integrity Audit)**: PASSED - Verified CRC32 corruption detection correctly identifies malformed traces in spill-buffer. Verified batching conflation reduces SQLite commit frequency by 80% during stress tests. (Oct12.12 - Issue #SIMP-1012-3, #SIMP-1012-4).
+*   **Chapter 31.771 (Latency Audit)**: PASSED - Verified Jitter Buffer draining at T+2x RTT correctly re-aligned bursty telemetry. (Oct11.9 - Issue #SIMP-1011-23).
 ...

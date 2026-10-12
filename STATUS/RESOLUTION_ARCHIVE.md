@@ -1,23 +1,23 @@
 # Resolution Archive
 
-## [Oct11.8] - Performance Tier Alignment (JNI & Bayesian)
-**Issue ID**: #SIMP-1011-22
+## [Oct12.12] - Forensic Integrity & Batch Persistence
+**Issue ID**: #SIMP-1012-3, #SIMP-1012-4
 **Status**: RESOLVED
-**Description**: Refined performance-sensitive thresholds to be hardware-aware, reducing false "Mali Anomaly" triggers on budget devices while stabilizing geofence reliability.
-**Root Cause**: Static thresholds for JNI bridge latency (150ms) and Bayesian uncertainty growth (15m/s) were optimized for standard hardware, causing instability and false alerts on budget (Staggered tier) devices like the A15.
+**Description**: Implemented end-to-end checksumming for forensic traces and batch-flushing for offline telemetry to ensure data integrity and reduce SQLite contention.
+**Root Cause**: Forensic traces were vulnerable to storage-level corruption without detection. High-frequency telemetry updates during network loss caused excessive disk I/O and write-lock contention in SQLite.
 **Remediation**:
-- **Tiered JNI Thresholds**: Implemented hardware-aware JNI bridge latency limits in `IntegrityMonitor.kt` (Standard: 150ms, Staggered: 250ms).
-- **Bayesian Expansion Unification**: Updated `LocationProcessor.kt` to scale accuracy uncertainty growth based on `PerformanceTier` (Standard: 15m/s, Staggered: 25m/s).
-- **State Integration**: Propagated performance tier authority from `SystemStatusProvider` through `MonitorService` into the engine's core processing state.
+- **Forensic Checksumming**: Integrated CRC32 checksums into `ForensicSpillBuffer.kt` (Standard & Optimized paths). Checksums are stored in the `logs` table (Column: `checksum`) and verified during DB promotion.
+- **Batch Persistence**: Refactored `OfflineRepository.kt` to use a memory buffer and background flush loop (10s interval or 5-entry threshold). Added `insertAll` to `PendingStatusDao`.
+- **Database Schema**: Incremented DB version to 83.
 
-## [Oct11.7] - GPS Acquisition Recovery
-**Issue ID**: #SIMP-1107
+## [Oct11.9] - Adaptive Signaling & Latency Compensation
+**Issue ID**: #SIMP-1011-23
 **Status**: RESOLVED
-**Description**: Resolved a regression where GPS status remained RED in both modes during stationary power-save periods.
-**Root Cause**: Conflict between `STATIONARY_GPS_POLLING_MS` (60s) and failure detection thresholds (`GPS_GAP_THRESHOLD_MS` 15s, `GPS_UI_FAIL_THRESHOLD_MS` 35s). Aggressive GNSS revival loops were resetting hardware before the intentional 60s fix could be delivered.
+**Description**: Implemented hardware and network-aware signaling conflation and arrival-time jitter correction to stabilize UI rendering and network throughput under high-latency conditions.
+**Root Cause**: Bursty network conditions and budget hardware (Staggered tier) led to visual trail "stutter" and transmission buffer saturation when RTT exceeded 500ms. Immediate processing of remote updates amplified network-induced arrival jitter.
 **Remediation**:
-- **Dynamic Gap Thresholding (#SIMP-1107)**: Implemented interval-aware gap detection in `HardwareSuite.kt` (scaled to 2x interval).
-- **Revival Guard**: Hardened `checkRevivalLifecycle` to wait 1.5x the intended interval before triggering hardware restarts.
-- **UI Freshness Harmonization**: Updated `MainViewModel.kt` to scale GPS LED freshness based on current state (`PARKING` or `ULTRA`).
+- **Adaptive Conflation**: Updated `SmartSignalingDispatcher.kt` to scale emission delays (1.5x for Staggered, 2x for high RTT) and conflation caps dynamically based on `PerformanceTier` and current RTT.
+- **Latency Compensation Buffer**: Implemented a mode-aware Jitter Buffer in `ConnectivitySuite.kt` for remote updates. Updates are now sorted by GPS timestamp and drained at a rate that corrects for arrival jitter (Window: max(1s, 2x RTT)).
+- **Authority Propagation**: Linked `SystemStatusProvider` performance tier and `SignalingProvider` RTT metrics to the signaling pipeline.
 
 ...
