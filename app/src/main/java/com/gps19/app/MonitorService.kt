@@ -26,13 +26,14 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.12.18:
+ * - Issue #ISSUE-OCT12.13-11: Temporal Jitter Hardening. Synchronized HardwareSuite active 
+ *   role during initialization and dynamic transition to ensure role-isolated 
+ *   GNSS audits.
  * Oct.12.1:
  * - Issue #SIMP-1012-1: Memory Pressure Hardening. Integrated OfflineRepository 
  *   adaptive pruning and HardwareSuite buffer trimming into performMemoryFlush(). 
  *   Propagated memoryPressureLevel for sub-sampling.
- * Oct.11.8:
- * - Issue #SIMP-1011-22: Performance Tier Alignment. Propagated performanceTier 
- *   to LocationProcessors during loadState to enable hardware-aware expansion.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -116,6 +117,9 @@ class MonitorService : BaseMonitorService() {
         loadLogicState()
 
         historyManager.initialize(lifecycleScope, currentRole)
+        
+        // Issue #ISSUE-OCT12.13-11: Synchronize role before starting hardware
+        hardwareSuite.setActiveRole(currentRole)
         hardwareSuite.start()
 
         commandRouter.register()
@@ -264,6 +268,9 @@ class MonitorService : BaseMonitorService() {
         notificationManager.setTrackerMode(isTrackerMode)
         configManager.isTrackerMode = isTrackerMode
 
+        // Issue #ISSUE-OCT12.13-11: Synchronize role before starting hardware
+        hardwareSuite.setActiveRole(currentRole)
+
         val trackerId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
         val viewerId = repository.getString(VIEWER_ID_KEY, SettingsRepository.DEFAULT_VIEWER_ID)
         connectivitySuite.start(configManager.relayUrl, trackerId, viewerId, isTrackerMode)
@@ -332,7 +339,6 @@ class MonitorService : BaseMonitorService() {
             .collect { event ->
                 memoryPressureLevel = event.level
                 
-                // Oct.12.1: Propagate pressure to edge repositories and hardware
                 offlineRepository.setMemoryPressureLevel(event.level)
                 hardwareSuite.setMemoryPressureThrottled(event.level != MemoryPressureLevel.NORMAL)
                 
@@ -579,14 +585,12 @@ class MonitorService : BaseMonitorService() {
             lastPowerSaveCheckRt = nowRt
         }
 
-        // Issue #SIMP-1011-13 Bayesian Drift Audit. Expand authoritative uncertainty during gaps.
         if (locationBuffer.isEmpty() && isTrackerMode && evaluationSnapshot.integrity.isLocationPending) {
             val newMax = primaryProcessor.performBayesianExpansion(
                 nowRt = nowRt,
                 isPending = true,
                 lastSpeedMps = primaryProcessor.state.forensic.estimatedSpeedMps
             )
-            // Ensure expanded accuracy reflects in the last processed location for evaluation
             lastProcessedLocation?.let { it.maxAccuracy = newMax }
         }
 

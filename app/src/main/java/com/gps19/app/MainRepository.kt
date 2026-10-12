@@ -29,12 +29,13 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.12.18:
+ * - Issue #ISSUE-OCT12.13-10: I/O Pressure Mitigation. Refactored triggerBackgroundPruning 
+ *   to remove giant block-level transactions. Implemented yielded chunked pruning 
+ *   to prevent UI frame drops and database contention.
  * Oct.10.9:
  * - Issue #SIMP-1014-3: Connectivity Jitter. Implemented saveLocationUpdateDebounced 
  *   to stabilize IO during native forensic bursts.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
- *   TimeProvider and SignalingProvider APIs. Fixed telemetryRepository naming conflict.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -107,7 +108,6 @@ class MainRepository @Inject constructor(
     val lastRemoteActivityTs = telemetryRepository.lastRemoteActivityTs
     val gnssDetail = telemetryRepository.gnssDetail
     
-    // Issue #SIGN-1006-12: Reactive signaling pipeline metrics
     val signalingMetrics: StateFlow<SignalingPipeline.Metrics> 
         get() = signalingProvider.get().signalingMetrics
 
@@ -432,23 +432,48 @@ class MainRepository @Inject constructor(
         }
     }
 
+    /**
+     * triggerBackgroundPruning: Oct.12.18 yielded chunked pruning. 
+     * Refactored to remove giant transactions and allow telemetry persistence 
+     * to interleave with maintenance.
+     */
     private fun triggerBackgroundPruning() {
         if (metrics.isPruningActive.getAndSet(true)) return
         if (telemetryRepository.systemHealth.value.isBatteryCritical) { metrics.isPruningActive.set(false); return }
+        
         scope.launch {
             try {
-                database.withTransaction {
-                    listOf("4M", "16M", "1H", "4H", "24H", "7D").forEach { key ->
-                        historyDao.getPruneThreshold(key, PRUNE_LIMIT_HISTORY)?.let { historyDao.pruneByThreshold(key, it, PRUNE_CHUNK_SIZE) }
+                // Yield immediately to let write callers return
+                yield()
+                
+                // 1. History Pruning (Isolated per ribbon key)
+                listOf("4M", "16M", "1H", "4H", "24H", "7D").forEach { key ->
+                    historyDao.getPruneThreshold(key, PRUNE_LIMIT_HISTORY)?.let { threshold ->
+                        historyDao.pruneByThreshold(key, threshold, PRUNE_CHUNK_SIZE)
                     }
-                    listOf(false, true).forEach { isViewer ->
-                        trailDao.getPruneThreshold(isViewer, PRUNE_LIMIT_TRAIL)?.let { threshold ->
-                            trailDao.pruneByThreshold(isViewer, threshold, PRUNE_CHUNK_SIZE)
-                        }
-                    }
-                    violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)?.let { violationDao.pruneByThreshold(it, PRUNE_CHUNK_SIZE) }
+                    yield()
                 }
-            } catch (e: Exception) { Timber.e(e, "Background pruning failed") } finally { metrics.isPruningActive.set(false) }
+                
+                // 2. Trail Pruning (Isolated per role)
+                listOf(false, true).forEach { isViewer ->
+                    trailDao.getPruneThreshold(isViewer, PRUNE_LIMIT_TRAIL)?.let { threshold ->
+                        trailDao.pruneByThreshold(isViewer, threshold, PRUNE_CHUNK_SIZE)
+                    }
+                    yield()
+                }
+                
+                // 3. Violation Pruning
+                violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)?.let { threshold ->
+                    violationDao.pruneByThreshold(threshold, PRUNE_CHUNK_SIZE)
+                }
+                yield()
+                
+                Timber.d("MainRepository: Background yielded pruning completed successfully.")
+            } catch (e: Exception) { 
+                Timber.e(e, "Background pruning failed") 
+            } finally { 
+                metrics.isPruningActive.set(false) 
+            }
         }
     }
 

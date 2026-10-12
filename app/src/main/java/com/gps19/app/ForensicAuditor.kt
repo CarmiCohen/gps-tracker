@@ -6,10 +6,16 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
+import kotlin.math.max
 import kotlin.math.round
 
 /**
  * ForensicAuditor: Encapsulates high-assurance hardware audits (Stability, Jitter, Sensor Rates, Energy).
+ * Oct.12.18:
+ * - Issue #ISSUE-OCT12.13-11: Temporal Jitter Hardening. Moved lastGnssStatusRt into RoleState 
+ *   to prevent local GNSS jitter from leaking into remote viewer roles. 
+ *   Added gap protection to recordGnssStatus and recordGpsFix to ignore sleep/suspension intervals (>15s).
+ *   Isolated auditSensorRate to specific roles.
  * Oct.10.1 (Restoration Path):
  * - Issue #SIMP-1012-1: Forensic Retrieval Optimization. Standardized on zero-allocation 
  *   audit paths and native frequency verification.
@@ -22,6 +28,7 @@ class ForensicAuditor @Inject constructor(
     private class RoleState {
         var maxGnssJitterMs = 0L
         var lastGpsFixRealtime = 0L
+        var lastGnssStatusRt = 0L
         var stabilityAuditFixCount = 0
         var stabilityAuditViolationCount = 0
         var lastStabilityAuditTs = 0L
@@ -34,6 +41,7 @@ class ForensicAuditor @Inject constructor(
         fun reset() {
             maxGnssJitterMs = 0L
             lastGpsFixRealtime = 0L
+            lastGnssStatusRt = 0L
             stabilityAuditFixCount = 0
             stabilityAuditViolationCount = 0
             lastStabilityAuditTs = 0L
@@ -49,22 +57,30 @@ class ForensicAuditor @Inject constructor(
         put(AppRole.VIEWER_REMOTE, RoleState())
     }
 
-    @Volatile private var lastGnssStatusRt = 0L
-
-    fun recordGnssStatus(nowRt: Long, expectedIntervalMs: Long) {
-        val lastRt = lastGnssStatusRt
-        if (lastRt > 0) {
-            val interval = nowRt - lastRt
-            val jitter = abs(interval - expectedIntervalMs)
-            roleStates.values.forEach { state ->
-                synchronized(state) {
+    /**
+     * recordGnssStatus: Oct.12.18 role-isolated GNSS jitter tracking.
+     */
+    fun recordGnssStatus(nowRt: Long, expectedIntervalMs: Long, role: AppRole) {
+        val state = roleStates[role] ?: return
+        synchronized(state) {
+            val lastRt = state.lastGnssStatusRt
+            if (lastRt > 0) {
+                val interval = nowRt - lastRt
+                
+                // Issue #ISSUE-OCT12.13-11: Temporal Jitter.
+                // Ignore gaps > 15s or 2x expected as jitter. These are temporal gaps 
+                // (sleep/suspension), not GNSS hardware clock jitter.
+                val gapThreshold = max(GPS_GAP_THRESHOLD_MS, expectedIntervalMs * 2)
+                
+                if (interval < gapThreshold) {
+                    val jitter = abs(interval - expectedIntervalMs)
                     if (jitter > state.maxGnssJitterMs) {
                         state.maxGnssJitterMs = jitter
                     }
                 }
             }
+            state.lastGnssStatusRt = nowRt
         }
-        lastGnssStatusRt = nowRt
     }
 
     fun updateExpectedInterval(nowRt: Long, expectedIntervalMs: Long, role: AppRole) {
@@ -96,10 +112,17 @@ class ForensicAuditor @Inject constructor(
             if (state.lastGpsFixRealtime > 0) {
                 val gap = nowRt - state.lastGpsFixRealtime
                 state.stabilityAuditFixCount++
-                if (gap > expectedIntervalMs + GPS_STABILITY_GAP_THRESHOLD_MS) {
-                    if (!muzzled) {
+                
+                // Issue #ISSUE-OCT12.13-11: Temporal Jitter.
+                val gapThreshold = expectedIntervalMs + GPS_STABILITY_GAP_THRESHOLD_MS
+                val suspensionThreshold = max(GPS_GAP_THRESHOLD_MS, expectedIntervalMs * 2)
+                
+                if (gap > gapThreshold) {
+                    if (!muzzled && gap < suspensionThreshold) {
                         state.stabilityAuditViolationCount++
                         gapMessage = "${gap}ms detected during logic pulse."
+                    } else if (gap >= suspensionThreshold) {
+                        Timber.d("ForensicAuditor: Stability Audit bypassed for suspension gap of ${gap}ms (Role: ${role.name})")
                     }
                 }
             }
@@ -162,26 +185,21 @@ class ForensicAuditor @Inject constructor(
     private fun Double.roundToOneDecimal(): String = (round(this * 10) / 10).toString()
 
     fun resetGnssJitter() {
-        roleStates.values.forEach { state -> synchronized(state) { state.maxGnssJitterMs = 0L } }
-        lastGnssStatusRt = 0L
+        roleStates.values.forEach { state -> synchronized(state) { state.maxGnssJitterMs = 0L; state.lastGnssStatusRt = 0L } }
     }
 
-    fun auditSensorRate(isWarming: Boolean): List<Pair<AppRole, String>> {
-        if (isWarming) return emptyList()
+    fun auditSensorRate(isWarming: Boolean, role: AppRole): String? {
+        if (isWarming) return null
         val hz = JdHardwareManager.getSensorAuditHz()
-        if (hz <= 0.0) return emptyList()
+        if (hz <= 0.0) return null
 
-        val results = mutableListOf<Pair<AppRole, String>>()
-        roleStates.forEach { (role, state) ->
-            synchronized(state) {
-                if (!state.isSensorRateAudited) {
-                    state.isSensorRateAudited = true
-                    val msg = "Sensor Rate Audit (R-ID 256): ${hz.toInt()} Hz (Native)"
-                    results.add(role to msg)
-                }
-            }
+        val state = roleStates[role] ?: return null
+        return synchronized(state) {
+            if (!state.isSensorRateAudited) {
+                state.isSensorRateAudited = true
+                "Sensor Rate Audit (R-ID 256): ${hz.toInt()} Hz (Native)"
+            } else null
         }
-        return results
     }
 
     private var revivalStartBattery: BatteryStatus? = null
@@ -218,7 +236,6 @@ class ForensicAuditor @Inject constructor(
             resetGnssJitter(); clearRevivalState(); JdHardwareManager.resetSensorAudit()
         } else {
             roleStates[role]?.let { synchronized(it) { it.reset() } }
-            lastGnssStatusRt = 0L
         }
     }
 

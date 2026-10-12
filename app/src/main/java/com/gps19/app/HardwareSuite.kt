@@ -37,16 +37,12 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.12.18:
+ * - Issue #ISSUE-OCT12.13-11: Temporal Jitter Hardening. Integrated AppRole awareness 
+ *   into GNSS and sensor audits to prevent cross-role forensic pollution.
  * Oct.12.17:
  * - ISSUE-OCT12.13-3: Implemented automatic recovery from GPS_HARDWARE_LOCK after 10m.
  * - ISSUE-OCT12.13-4: Added interval update debounce to mitigate GPS registration flutter.
- * Oct.12.2:
- * - Issue #SIMP-1107-2: GNSS Burst Refining. Optimized radio-warm keep-alive pulse 
- *   duration based on RTT stability. Fixed permission check regressions.
- * Oct.12.1:
- * - Issue #SIMP-1012-1: Forensic Buffer Optimization & Memory Hardening. 
- *   Implemented sub-sampling for vibration (1/2 rate when stationary) and 
- *   optimized JNI auditing. Added trimMemory() for aggressive buffer clearing.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -92,7 +88,6 @@ class HardwareSuite @Inject constructor(
         }
 
         override fun processVibrationBatch(timeProvider: TimeProvider, batch: VibrationBatch): Boolean {
-            // Oct.12.1: Audit JNI only when not throttled to reduce overhead.
             val shouldAudit = !isMemoryPressureThrottled
             return JdHardwareManager.processVibrationBatchNative(timeProvider, batch, audit = shouldAudit)
         }
@@ -207,7 +202,6 @@ class HardwareSuite @Inject constructor(
                 return false
             }
 
-            // Kotlin Fallback Implementation
             if (baseline < 0) { baseline = currentValue; return false }
             if (alpha > 0.0) baseline = (baseline * (1.0 - alpha)) + (currentValue * alpha)
 
@@ -238,6 +232,7 @@ class HardwareSuite @Inject constructor(
     private val activeUsers = AtomicInteger(0)
 
     private val random = java.util.Random()
+    private var activeRole: AppRole = AppRole.TRACKER
 
     // --- GPS & GNSS State ---
     private var revivalCallback: ManagedLocationCallback? = null
@@ -404,7 +399,6 @@ class HardwareSuite @Inject constructor(
     private val acousticBatch = AcousticBatch()
     private val proximityBatch = ProximityBatch()
 
-    // Oct.12.1: Vibration sub-sampling state
     private var vibrationTick = 0
 
     private inner class GnssPolicyEngine {
@@ -424,7 +418,7 @@ class HardwareSuite @Inject constructor(
                 GNSS_SAMPLING_INTERVAL_MS
             }
 
-            forensicAuditor.recordGnssStatus(nowRt, currentInterval)
+            forensicAuditor.recordGnssStatus(nowRt, currentInterval, activeRole)
             return currentInterval
         }
     }
@@ -523,6 +517,11 @@ class HardwareSuite @Inject constructor(
                 delay(2000L)
             }
         }
+    }
+
+    fun setActiveRole(role: AppRole) {
+        this.activeRole = role
+        Timber.d("HardwareSuite: Active role transitioned to ${role.name}")
     }
 
     suspend fun start() {
@@ -734,7 +733,6 @@ class HardwareSuite @Inject constructor(
         
         val handler = synchronized(lifecycleLock) { hardwareHandler } ?: return
         
-        // Oct.12.2: GNSS Burst Refining. Scale duration by RTT stability.
         val rtt = telemetryRepository.lastRtt.value
         val burstDuration = if (rtt > 0 && rtt < RTT_STABILITY_LIMIT_MS) {
             RADIO_WARM_BURST_STABLE_MS
@@ -778,8 +776,6 @@ class HardwareSuite @Inject constructor(
         
         val current = currentLocationStatus
         
-        // Issue #SIMP-1107: Dynamic Gap Threshold. Scale threshold to 2x the current 
-        // intended interval to prevent false 'Pending' states during stationary power-save.
         val currentInterval = pollingIntervalFlow.value
         val dynamicGapThreshold = max(GPS_GAP_THRESHOLD_MS, (currentInterval * 2))
 
@@ -883,7 +879,6 @@ class HardwareSuite @Inject constructor(
     fun setPollingInterval(intervalMs: Long) { 
         val nowRt = timeProvider.elapsedRealtime
         if (pollingIntervalFlow.value != intervalMs) {
-            // ISSUE-OCT12.13-4: GPS Registration Debounce
             if (lastIntervalUpdateRt > 0 && nowRt - lastIntervalUpdateRt < GPS_REGISTRATION_DEBOUNCE_MS) {
                 Timber.d("HardwareSuite: Polling interval update suppressed (flutter protection)")
                 return
@@ -917,8 +912,6 @@ class HardwareSuite @Inject constructor(
             Sensor.TYPE_ACCELEROMETER -> {
                 gravityBuffer[0] = values[0]; gravityBuffer[1] = values[1]; gravityBuffer[2] = values[2]; hasGravity = true
                 
-                // Oct.12.1: Vibration sub-sampling. 
-                // Process at 1/2 rate when stationary and memory pressure is detected to reduce JNI overhead.
                 vibrationTick++
                 val shouldSkip = isMemoryPressureThrottled && isStationary() && (vibrationTick % 2 != 0)
                 
@@ -937,8 +930,8 @@ class HardwareSuite @Inject constructor(
                     if (canPoke) systemMonitor.acquireWakeLock(force = true)
                 }
 
-                forensicAuditor.auditSensorRate(isWarming).forEach { (role, msg) ->
-                    domainEventBus.emit(AppSensorEvent.LogEvent("[$role] $msg", false))
+                forensicAuditor.auditSensorRate(isWarming, activeRole)?.let { msg ->
+                    domainEventBus.emit(AppSensorEvent.LogEvent("[$activeRole] $msg", false))
                 }
             }
             Sensor.TYPE_LINEAR_ACCELERATION -> processLinearAcceleration(values[0], values[1], values[2], event.timestamp)
@@ -1385,10 +1378,6 @@ class HardwareSuite @Inject constructor(
         }
     }
 
-    /**
-     * trimMemory: Issue #SIMP-1012-1. Aggressively clears forensic and sensor 
-     * buffers to alleviate memory pressure.
-     */
     fun trimMemory() {
         synchronized(sensorBuffer) { sensorBuffer.clear() }
         synchronized(snrBuffer) { snrBuffer.clear() }
@@ -1397,9 +1386,6 @@ class HardwareSuite @Inject constructor(
         Timber.i("HardwareSuite: Memory trim completed. Forensic buffers cleared.")
     }
 
-    /**
-     * setMemoryPressureThrottled: Propagates memory pressure state for sensor sub-sampling.
-     */
     fun setMemoryPressureThrottled(throttled: Boolean) {
         this.isMemoryPressureThrottled = throttled
     }
@@ -1430,7 +1416,6 @@ class HardwareSuite @Inject constructor(
             val retryThreshold = (revivalAttemptCount + 1) * baseRetryInterval
 
             if (isHardwareLocked) {
-                // ISSUE-OCT12.13-3: Automatic Recovery from Hardware Lock
                 val recoveryThreshold = retryThreshold + GPS_LOCK_RECOVERY_DELAY_MS
                 if (stallDuration > recoveryThreshold) {
                     Timber.i("HardwareSuite: Attempting automatic recovery from GPS_HARDWARE_LOCK.")

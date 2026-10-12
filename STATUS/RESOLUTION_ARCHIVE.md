@@ -1,5 +1,15 @@
 # Resolution Archive
 
+## [Oct12.18] - Temporal Integrity & I/O Optimization
+**Issue ID**: #ISSUE-OCT12.13-11, #ISSUE-OCT12.13-10
+**Status**: RESOLVED
+**Description**: Eliminated extreme jitter spikes in viewer forensics caused by system suspension. Optimized database maintenance to prevent UI stutter during pruning operations.
+**Root Cause**: `ForensicAuditor` was calculating GNSS jitter across system sleep intervals, resulting in 1000s+ false positives. Database pruning used a monolithic transaction block that held a write-lock for up to 3.4s, blocking telemetry persistence and UI updates.
+**Remediation**:
+- **Jitter Hardening**: Implemented role-isolation in `ForensicAuditor.kt`. Added a 15s gap protection gate to `recordGnssStatus` and `recordGpsFix` to ignore intervals representing system suspension.
+- **I/O Optimization**: Refactored `MainRepository.kt` background pruning to remove giant `withTransaction` blocks. Implemented `yield()` points and chunked deletion to allow high-priority telemetry tasks to interleave with maintenance.
+- **Role Synchronization**: Updated `MonitorService.kt` and `HardwareSuite.kt` to explicitly synchronize the active `AppRole` for isolated forensic auditing.
+
 ## [Oct12.17] - HUD Remediation & Engine Hardening
 **Issue ID**: #ISSUE-OCT12.16-1, #ISSUE-OCT12.16-3, #ISSUE-OCT12.13-1, #ISSUE-OCT12.13-3, #ISSUE-OCT12.13-7, #ISSUE-OCT12.13-6
 **Status**: RESOLVED
