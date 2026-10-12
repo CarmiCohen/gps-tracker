@@ -18,12 +18,9 @@ import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for forensic traces.
- * Oct.11.1:
- * - Issue #SIMP-1011-7: Thermal Forensic Audit. Integrated coolingSnapshot 
- *   into circular buffer flags (0x10) for authoritative audit.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
- *   TimeProvider API and fixed property invocation errors.
+ * Oct.12.3:
+ * - Issue #SIMP-1012-3: Forensic Integrity. Propagated CRC32 checksum into 
+ *   LogEntity to support end-to-end corruption detection.
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -359,7 +356,8 @@ class ForensicSpillBuffer @Inject constructor(
                             chargingSnapshot = (flags and 0x04) != 0,
                             coolingSnapshot = (flags and 0x10) != 0,
                             thermalSnapshot = thermal,
-                            heapSnapshot = heap
+                            heapSnapshot = heap,
+                            checksum = storedCrc.toLong() and 0xFFFFFFFFL
                         ))
                     } else {
                         Timber.w("Forensic Audit: CRC mismatch at index $tempReadIdx. Trace ignored.")

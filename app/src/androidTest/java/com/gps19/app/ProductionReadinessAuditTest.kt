@@ -30,9 +30,8 @@ class FakePowerStateProvider(private val real: AndroidPowerStateProvider) : Powe
         var useOverride = false
         var isIdle = false
     }
-    override fun isDeviceIdleMode(): Boolean {
-        return if (useOverride) isIdle else real.isDeviceIdleMode()
-    }
+    override val isDeviceIdleMode: Boolean
+        get() = if (useOverride) isIdle else real.isDeviceIdleMode
 }
 
 @Module
@@ -86,6 +85,9 @@ class ProductionReadinessAuditTest {
 
     @Inject
     lateinit var logRepository: LogRepository
+    
+    @Inject
+    lateinit var telemetryRepository: TelemetryRepository
 
     @Before
     fun init() {
@@ -116,12 +118,12 @@ class ProductionReadinessAuditTest {
             val probe1 = LogEntry(
                 localId = "P1-$ts", timestamp = ts,
                 message = "Forensic Handover: TEST_UP ($testInterface)", type = "FORENSIC_TRACE",
-                isImportant = false, role = "tracker"
+                isImportant = false, role = AppRole.TRACKER.name
             )
             val probe2 = LogEntry(
                 localId = "P2-$ts", timestamp = ts,
                 message = "Forensic TX Failure: $failureTag (Mode: TRK, D:A, V:O)", type = "FORENSIC_TRACE",
-                isImportant = false, role = "tracker"
+                isImportant = false, role = AppRole.TRACKER.name
             )
 
             assertTrue("Probe 1 write must succeed", buffer.writeTrace(probe1))
@@ -212,7 +214,7 @@ class ProductionReadinessAuditTest {
     @Test
     fun verify24HourSoakSimulation() {
         sessionManager.reset()
-        forensicAuditor.reset("T")
+        forensicAuditor.reset(AppRole.TRACKER)
         
         val startRt = timeProvider.elapsedRealtime
         var currentRt = startRt
@@ -231,7 +233,7 @@ class ProductionReadinessAuditTest {
             val hasGap = i % 100 == 0
             val injectionDelay = if (hasGap) 2000L else 0L
             
-            forensicAuditor.recordGpsFix(currentRt + injectionDelay, expectedInterval, "T")
+            forensicAuditor.recordGpsFix(currentRt + injectionDelay, expectedInterval, AppRole.TRACKER)
             
             sessionManager.updateTick(
                 nowRt = currentRt,
@@ -244,7 +246,7 @@ class ProductionReadinessAuditTest {
             totalFixes++
             
             if (i % 300 == 0) {
-                forensicAuditor.evaluateStability(currentRt, "T")
+                forensicAuditor.evaluateStability(currentRt, AppRole.TRACKER)
             }
         }
 
@@ -278,7 +280,8 @@ class ProductionReadinessAuditTest {
             powerStateProvider = newProvider,
             forensicAuditor = hardwareSuite.getForensicAuditorForTest(),
             domainEventBus = domainEventBus,
-            activityContextProvider = ActivityContextProvider(context, timeProvider)
+            activityContextProvider = ActivityContextProvider(context, timeProvider),
+            telemetryRepository = telemetryRepository
         )
 
         assertTrue("Power state must persist across component recreation",

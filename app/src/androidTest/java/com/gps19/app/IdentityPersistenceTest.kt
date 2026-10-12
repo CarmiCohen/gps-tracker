@@ -15,6 +15,7 @@ import org.junit.runner.RunWith
 /**
  * IdentityPersistenceTest: Instrumented verification for Issue #027.
  * Ensures Viewer ID persistence and uniqueness enforcement logic.
+ * Oct.12.13: Updated to property-based TimeProvider API.
  */
 @RunWith(AndroidJUnit4::class)
 class IdentityPersistenceTest {
@@ -23,8 +24,8 @@ class IdentityPersistenceTest {
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
 
     private val timeProvider = object : TimeProvider {
-        override fun currentTimeMillis() = System.currentTimeMillis()
-        override fun elapsedRealtime() = android.os.SystemClock.elapsedRealtime()
+        override val currentTimeMillis: Long get() = System.currentTimeMillis()
+        override val elapsedRealtime: Long get() = android.os.SystemClock.elapsedRealtime()
     }
 
     @Before

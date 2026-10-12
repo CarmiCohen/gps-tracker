@@ -12,26 +12,29 @@ import org.junit.runner.RunWith
 
 /**
  * HardwareSuiteProfileTest: Automated profiling study for the staggered performance tier.
- * Sep.28.27:
- * - Issue #1374: Fixed SystemStatusProviderImpl mock instantiation to pass mockTimeProvider.
+ * Oct.12.14: Updated to property-based API and fixed TelemetryRepository instantiation.
  */
 @RunWith(AndroidJUnit4::class)
 class HardwareSuiteProfileTest {
 
     private val mockTimeProvider = object : TimeProvider {
         private var time = 1000000L
-        override fun elapsedRealtime(): Long {
-            val current = time
-            time += 30000L // Simulate a 30s tick step
-            return current
-        }
-        override fun currentTimeMillis(): Long = 1700000000000L
+        override val elapsedRealtime: Long
+            get() {
+                val current = time
+                time += 30000L // Simulate a 30s tick step
+                return current
+            }
+        override val currentTimeMillis: Long = 1700000000000L
     }
 
     private val fakePowerStateProvider = object : PowerStateProvider {
         var isIdle = false
-        override fun isDeviceIdleMode(): Boolean = isIdle
+        override val isDeviceIdleMode: Boolean get() = isIdle
     }
+    
+    // TelemetryRepository is an in-memory store, safe to use real instance in profile tests.
+    private val testTelemetryRepository = TelemetryRepository()
 
     private val testScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     
@@ -50,7 +53,8 @@ class HardwareSuiteProfileTest {
             powerStateProvider = fakePowerStateProvider,
             forensicAuditor = mockForensicAuditor(),
             domainEventBus = testDomainEventBus,
-            activityContextProvider = mockActivityContextProvider(context)
+            activityContextProvider = mockActivityContextProvider(context),
+            telemetryRepository = testTelemetryRepository
         )
 
         // Profile progression across 20 successive reconnect attempts
@@ -77,12 +81,13 @@ class HardwareSuiteProfileTest {
             powerStateProvider = fakePowerStateProvider,
             forensicAuditor = mockForensicAuditor(),
             domainEventBus = testDomainEventBus,
-            activityContextProvider = mockActivityContextProvider(context)
+            activityContextProvider = mockActivityContextProvider(context),
+            telemetryRepository = testTelemetryRepository
         )
         val intervalMs = 30000L
 
         // Tick 1: Initial state
-        val lastPoke = mockTimeProvider.elapsedRealtime()
+        val lastPoke = mockTimeProvider.elapsedRealtime
         
         // Tick 2: Should require poke as mockTimeProvider advances 30s per invocation
         val shouldPoke = suite.shouldPokeHardware(isStaggered = true, lastPokeRt = lastPoke, intervalMs = intervalMs)

@@ -13,6 +13,7 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
 import org.json.JSONObject
 import timber.log.Timber
+import java.util.concurrent.PriorityBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
@@ -21,13 +22,13 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.11.9:
+ * - Issue #SIMP-1011-23: Latency Compensation. Implemented arrival-time 
+ *   jitter correction for remote updates to prevent UI trail stutter.
  * Oct.10.9:
  * - Issue #SIMP-1014-3: Connectivity Jitter. Migrated tracker-side telemetry 
  *   persistence to saveLocationUpdateDebounced to prevent IO saturation 
  *   during JNI forensic bursts.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
- *   TimeProvider and SignalingProvider APIs. Fixed bulk property invocation errors.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -76,16 +77,26 @@ class ConnectivitySuite @Inject constructor(
     private var signalingJob: Job? = null
     private var identitySyncJob: Job? = null
     private var heartbeatJob: Job? = null
+    private var jitterCorrectionJob: Job? = null
+
+    // Latency Compensation Buffer
+    private val remoteJitterBuffer = PriorityBlockingQueue<JitterEntry>(50, compareBy { it.gpsTs })
 
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
 
     private val snapshotFlyweight = LocationUpdate()
-    private val updateFlyweight = LocationUpdate()
     private val statusFlyweight = LocationUpdate()
     private val pendingStatusFlyweight = LocationUpdate()
     
     private val localStatusFlyweight = LocationUpdate()
+
+    private data class JitterEntry(
+        val data: ByteArray?,
+        val json: JSONObject?,
+        val gpsTs: Long,
+        val receiptRt: Long
+    )
 
     val trackerStatus get() = remoteStatusRepository.remoteStatus.value
     val isTrackerConnected get() = remoteStatusRepository.isTrackerConnected.value
@@ -224,6 +235,7 @@ class ConnectivitySuite @Inject constructor(
         startSyncLoop()
         startIdentitySyncLoop()
         startHeartbeatLoop()
+        startJitterCorrectionLoop()
         initializePeerState()
     }
 
@@ -246,6 +258,7 @@ class ConnectivitySuite @Inject constructor(
         startSignalingObservation()
         startIdentitySyncLoop()
         startHeartbeatLoop()
+        startJitterCorrectionLoop()
     }
 
     private fun startKeepAliveLoop() {
@@ -402,6 +415,37 @@ class ConnectivitySuite @Inject constructor(
         }
     }
 
+    private fun startJitterCorrectionLoop() {
+        jitterCorrectionJob?.cancel()
+        jitterCorrectionJob = scope.launch {
+            while (isActive) {
+                val nowRt = timeProvider.elapsedRealtime
+                val rtt = signalingProvider.rtt
+                
+                // Adaptive Jitter Window: 2x RTT or 1s minimum for bursty cellular links.
+                val jitterWindowMs = maxOf(1000L, rtt * 2L).coerceAtMost(5000L)
+                
+                val nextEntry = remoteJitterBuffer.peek()
+                if (nextEntry != null) {
+                    val waitTime = nowRt - nextEntry.receiptRt
+                    if (waitTime >= jitterWindowMs || remoteJitterBuffer.size > 10) {
+                        remoteJitterBuffer.poll()?.let { entry ->
+                            if (entry.data != null) {
+                                processBinaryUpdateInternal(entry.data)
+                            } else if (entry.json != null) {
+                                processJsonUpdateInternal(entry.json)
+                            }
+                        }
+                    }
+                }
+                
+                // Adaptive poll: faster if buffer is filling up
+                val pollInterval = if (remoteJitterBuffer.size > 5) 50L else 200L
+                delay(pollInterval)
+            }
+        }
+    }
+
     private suspend fun flushPendingUpdates(limit: Int = LOG_BATCH_SIZE) {
         val pending = offlineRepository.getPendingStatusUpdates(limit)
         if (pending.isEmpty()) return
@@ -452,6 +496,25 @@ class ConnectivitySuite @Inject constructor(
     private fun handleBinaryUpdate(data: ByteArray) {
         if (isStopped.get()) return
         try {
+            // Quick parse for jitter buffer sequencing
+            val rawProto = RealtimeStatus.parseFrom(data)
+            val gpsTs = rawProto.gpsTs
+            
+            // Only buffer remote updates if we are in Viewer mode
+            if (!isTrackerMode && !rawProto.fromViewer) {
+                remoteJitterBuffer.add(JitterEntry(data, null, gpsTs, timeProvider.elapsedRealtime))
+            } else {
+                processBinaryUpdateInternal(data)
+            }
+        } catch (e: Exception) {
+            Timber.e(e, "Binary update quick parse failed")
+            processBinaryUpdateInternal(data) // Fallback to immediate
+        }
+    }
+
+    private fun processBinaryUpdateInternal(data: ByteArray) {
+        if (isStopped.get()) return
+        try {
             val rawProto = RealtimeStatus.parseFrom(data)
             
             // Issue #AUDIT-1006-9: Coordinate Reconstruction logic
@@ -459,13 +522,11 @@ class ConnectivitySuite @Inject constructor(
             if (rawProto.isDelta) {
                 remoteLastLatE7 += rawProto.latE7
                 remoteLastLngE7 += rawProto.lngE7
-                // Fix Oct.6.10: Use floating-point division for precision
                 builder.setLat(remoteLastLatE7.toDouble() / 1e7)
                 builder.setLng(remoteLastLngE7.toDouble() / 1e7)
             } else {
                 remoteLastLatE7 = rawProto.latE7
                 remoteLastLngE7 = rawProto.lngE7
-                // If lat/lng doubles are 0 (optimized out in transit), use e7 absolute
                 if (rawProto.lat == 0.0 && rawProto.lng == 0.0 && (remoteLastLatE7 != 0 || remoteLastLngE7 != 0)) {
                     builder.setLat(remoteLastLatE7.toDouble() / 1e7)
                     builder.setLng(remoteLastLngE7.toDouble() / 1e7)
@@ -533,6 +594,19 @@ class ConnectivitySuite @Inject constructor(
     }
 
     private fun handleJsonUpdate(data: JSONObject) {
+        if (isStopped.get()) return
+        val type = data.optString("type", "")
+        
+        // Jitter Buffering for location updates in Viewer mode
+        if (!isTrackerMode && type == "location_update") {
+            val gpsTs = data.optLong("gps_ts", data.optLong("ts"))
+            remoteJitterBuffer.add(JitterEntry(null, data, gpsTs, timeProvider.elapsedRealtime))
+        } else {
+            processJsonUpdateInternal(data)
+        }
+    }
+
+    private fun processJsonUpdateInternal(data: JSONObject) {
         val type = data.optString("type", "")
         val fromId = data.optString("id"); val fromViewerId = data.optString("viewer_id"); val fromViewer = data.optBoolean("from_viewer", false)
         val now = timeProvider.currentTimeMillis; val nowRt = timeProvider.elapsedRealtime
@@ -664,6 +738,7 @@ class ConnectivitySuite @Inject constructor(
         trackerGpsStallStartTs = 0L
         remoteLastLatE7 = 0
         remoteLastLngE7 = 0
+        remoteJitterBuffer.clear()
         
         val role = if (isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE
         mainRepository.saveDoubleSync(role, TRACKER_LUX_BASELINE_KEY, 0.0)
@@ -686,6 +761,7 @@ class ConnectivitySuite @Inject constructor(
         signalingJob?.cancel(); signalingJob = null
         identitySyncJob?.cancel(); identitySyncJob = null
         heartbeatJob?.cancel(); heartbeatJob = null
+        jitterCorrectionJob?.cancel(); jitterCorrectionJob = null
         scope.cancel()
         
         networkProvider.unregisterListener(networkListener)

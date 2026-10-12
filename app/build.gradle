@@ -16,9 +16,9 @@ android {
         minSdk 24
         targetSdk 34
         versionCode rootProject.ext.autoVersionCode
-        versionName "Oct12.12"
+        versionName "Oct12.16"
 
-        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {
             useSupportLibrary true
         }
@@ -135,6 +135,11 @@ dependencies {
     androidTestImplementation(platform(libs.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
     androidTestImplementation(libs.androidx.uiautomator)
+    
+    // Hilt Testing
+    androidTestImplementation(libs.hilt.android.testing)
+    kspAndroidTest(libs.hilt.compiler)
+
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 }

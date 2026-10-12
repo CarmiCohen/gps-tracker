@@ -1,34 +1,30 @@
-# Handover: Oct12.12 Forensic Integrity & Batch Persistence
+# Handover: Oct12.16 HUD & Collision Audit
 
-## Current Status: GREEN (Build Success)
-The **Oct12.12** session successfully implemented **Forensic Integrity (#SIMP-1012-3)** and **Batch Persistence (#SIMP-1012-4)**. The application build (`:app:assembleDebug`) is verified stable with no errors.
+## Current Status: YELLOW (Audit Identified Gaps)
+The **Oct12.16** session focused on a visual and functional audit of the Viewer Map. While the build is stable, the audit revealed several UI collisions and validated active engine-level stalls (GPS/Relay).
 
-### ✅ Remediation Completed
+### ✅ Audit Findings
 
-#### 1. Forensic Integrity (#SIMP-1012-3)
-- **Safety**: Integrated **CRC32 checksumming** into `ForensicSpillBuffer.kt`. Checksums are calculated during `writeTrace` (both standard and optimized) and verified during `peekToEntities` to detect storage-level corruption.
-- **Persistence**: Incremented Database version to **83**. Added `checksum` column to `LogEntity` and `LogEntry` to support end-to-end auditability.
-- **Auditing**: Propagated checksum fields through `LogRepository` flushing and Entity mapping to ensure forensic traces remain tamper-evident through the entire pipeline.
+#### 1. HUD & Overlay Collisions
+- **Z-Stacking**: Confirmed "OFFLINE" watermark overlaps with `GlobalStatusBar` metrics.
+- **Contrast**: HUD metrics (V/T) are illegible on light map tiles (R-ID 647 added to SOT).
+- **Scale Bar**: Version tag collision with `ScaleBarOverlay` confirmed on SM-G990E.
 
-#### 2. Batch Persistence (#SIMP-1012-4)
-- **Optimization**: Refactored `OfflineRepository.kt` with a memory buffer and a background batch-flush loop (10s interval / 5-entry threshold). This reduces SQLite write-lock duration and IOPS overhead during network loss.
-- **Infrastructure**: Added `insertAll` to `PendingStatusDao` for bulk insertions, significantly reducing transaction overhead during high-frequency telemetry bursts.
+#### 2. Functional Validation
+- **Engine Stalls**: Live HUD confirms RED status for `GPS`, `TRK`, and `DAT`, validating signaling and provider failure reports.
+- **Accessibility**: HeaderBar touch targets in portrait mode (24dp) are below the recommended 48dp threshold.
 
-#### 3. Build Verification
-- **Status**: Executed `:app:assembleDebug`. Build finished successfully.
-- **Code Health**: Cleaned redundant semicolons and unused imports in `HardwareSuite.kt`.
-
-### 📊 Performance Metrics (Oct12.12 - Audit Baseline)
+### 📊 Performance Metrics (Oct12.16 - Audit Baseline)
 | Metric | Result | Status |
 | :--- | :--- | :--- |
-| **Forensic Corruption Detection** | **CRC32 (End-to-End)** | ✅ **PASS** |
-| **Persistence I/O Efficiency** | **Batching (10s/5-entry)** | ✅ **PASS** |
-| **Database Integrity** | **PRAGMA Verified** | ✅ **PASS** |
+| **HUD Contrast Ratio** | **< 2:1 (Fail)** | 🔴 **CRITICAL** |
+| **Touch Target Spacing** | **8dp (Fail)** | 🟡 **WARNING** |
+| **Engine Link Status** | **Stalled (RED)** | 🔴 **CRITICAL** |
 
 ### 🚨 New Risks & Strategic Ideas
-- **SIMP-OCT12.12-S1: Pruning Deadlock Guard (Medium).** Monitor for contention between `proactivePruning` in `LogRepository` and the new batch-flush loop in `OfflineRepository`. Consider unifying triggers into a shared `PersistenceWatchdog`.
-- **SIMP-OCT12.12-S2: Checksum Failure Alerting (Low).** Implement a passive UI indicator for forensic corruption events to notify users of SD card failure.
+- **SIMP-OCT12.16-S1: Unified HUD Overlay (High).** Merge all HUD elements into a single `OverlayManager` to centrally manage Z-index and safe-area insets.
 
-### 🔜 Resumption Path (Oct12.13)
-1. **Activity Context**: Complete the refinement of `ActivityContextProvider.kt` to support the tiered sampling rates called in `MonitorService`.
-2. **JNI Pressure Consolidation**: Align `JdHardwareManager` JNI crossing with the new `SystemPressureBatch` to further reduce bridge latency on budget hardware.
+### 🔜 Resumption Path (Oct12.17)
+1. **Contrast Remediation**: Implement background plates for `GlobalStatusBar` and `MapToolButton` labels.
+2. **Safe Area Audit**: Adjust `AppMapContainer` bottom padding to prevent collision between version tags, scale bars, and system navigation pills.
+3. **Relay Revival**: Investigate the root cause of the RED `DAT` status confirmed in the Oct12.16 snapshot.

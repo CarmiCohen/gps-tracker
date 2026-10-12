@@ -1,6 +1,7 @@
 package com.gps19.core.engine
 
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.ClosedReceiveChannelException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,9 +15,12 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
- *   TimeProvider API.
+ * Oct.12.2:
+ * - Issue #SIMP-1012-2: Network Buffer Hardening. Implemented capacity-limited 
+ *   priority queues with DROP_OLDEST shedding to prevent OOM during disconnects.
+ * Oct.11.9:
+ * - Issue #SIMP-1011-23: Adaptive Signaling. Implemented hardware and network-aware 
+ *   conflation scaling.
  */
 class SmartSignalingDispatcher(
     private var scope: CoroutineScope,
@@ -24,6 +28,8 @@ class SmartSignalingDispatcher(
     private val wireSink: SignalingWireSink,
     private val encoder: SignalingEncoder,
     private val isConnectedProvider: () -> Boolean,
+    private val rttProvider: () -> Int = { 0 },
+    private val performanceTier: PerformanceTier = PerformanceTier.STANDARD,
     private val timeProvider: TimeProvider = object : TimeProvider {
         override val currentTimeMillis: Long get() = System.currentTimeMillis()
         override val elapsedRealtime: Long get() = System.currentTimeMillis()
@@ -52,8 +58,9 @@ class SmartSignalingDispatcher(
         }
     }
 
-    private var highQueue = Channel<Command>(capacity = Channel.UNLIMITED)
-    private var normalQueue = Channel<Command>(capacity = Channel.UNLIMITED)
+    private var criticalQueue = Channel<Command>(capacity = SIGNALING_QUEUE_LIMIT_CRITICAL, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    private var highQueue = Channel<Command>(capacity = SIGNALING_QUEUE_LIMIT_HIGH, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    private var normalQueue = Channel<Command>(capacity = SIGNALING_QUEUE_LIMIT_NORMAL, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     
     private val locMapBucket = ConflationBucket<Map<String, Any?>>()
     private val locObjBucket = ConflationBucket<LocationUpdate>()
@@ -86,8 +93,9 @@ class SmartSignalingDispatcher(
         
         shutdown()
         this.scope = scope
-        highQueue = Channel(capacity = Channel.UNLIMITED)
-        normalQueue = Channel(capacity = Channel.UNLIMITED)
+        criticalQueue = Channel(capacity = SIGNALING_QUEUE_LIMIT_CRITICAL, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+        highQueue = Channel(capacity = SIGNALING_QUEUE_LIMIT_HIGH, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+        normalQueue = Channel(capacity = SIGNALING_QUEUE_LIMIT_NORMAL, onBufferOverflow = BufferOverflow.DROP_OLDEST)
         conflationSignal = Channel(capacity = Channel.CONFLATED)
         
         locMapBucket.reset()
@@ -112,23 +120,39 @@ class SmartSignalingDispatcher(
                 if (!isActive) break
 
                 try {
-                    val command = highQueue.tryReceive().getOrNull() ?: select<Command> {
-                        highQueue.onReceive { it }
-                        normalQueue.onReceive { it }
-                    }
+                    val command = criticalQueue.tryReceive().getOrNull() 
+                        ?: highQueue.tryReceive().getOrNull() 
+                        ?: select<Command> {
+                            criticalQueue.onReceive { it }
+                            highQueue.onReceive { it }
+                            normalQueue.onReceive { it }
+                        }
 
                     if (command.priority == SignalingPriority.NORMAL) {
                         val now = timeProvider.currentTimeMillis
-                        val delayMs = if (isViolationProvider()) SIGNALING_EMIT_DELAY_VIOLATION_MS else SIGNALING_EMIT_DELAY_MS
+                        
+                        // Oct.11.9: Adaptive Emit Delay
+                        val rtt = rttProvider()
+                        val isStaggered = performanceTier == PerformanceTier.STAGGERED
+                        
+                        var delayMs = if (isViolationProvider()) SIGNALING_EMIT_DELAY_VIOLATION_MS else SIGNALING_EMIT_DELAY_MS
+                        
+                        // Scale delay based on hardware and network
+                        if (isStaggered) delayMs = (delayMs * 1.5).toLong()
+                        if (rtt > 500) delayMs = (delayMs * 2.0).toLong()
+                        
                         val elapsed = now - lastNormalEmitTs
                         if (elapsed < delayMs) {
                             val waitTime = delayMs - elapsed
-                            val highReady = withTimeoutOrNull(waitTime) {
-                                highQueue.receive()
+                            val fastReady = withTimeoutOrNull(waitTime) {
+                                select<Command?> {
+                                    criticalQueue.onReceive { it }
+                                    highQueue.onReceive { it }
+                                }
                             }
                             
-                            if (highReady != null) {
-                                emit(highReady)
+                            if (fastReady != null) {
+                                emit(fastReady)
                                 normalQueue.trySend(command) // Re-queue original normal priority
                                 continue
                             }
@@ -139,7 +163,7 @@ class SmartSignalingDispatcher(
                     emit(command)
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
-                    if (highQueue.isClosedForReceive || normalQueue.isClosedForReceive) break
+                    if (criticalQueue.isClosedForReceive || highQueue.isClosedForReceive || normalQueue.isClosedForReceive) break
                     delay(100)
                 }
             }
@@ -230,13 +254,13 @@ class SmartSignalingDispatcher(
     }
 
     private fun dispatch(command: Command) {
-        if (highQueue.isClosedForSend) return
+        if (criticalQueue.isClosedForSend) return
 
         val received = framesReceived.incrementAndGet()
         updateMetrics(received = received)
         when (command) {
             is Command.Json -> {
-                if (command.event == "location_update" && command.priority != SignalingPriority.HIGH) {
+                if (command.event == "location_update" && command.priority == SignalingPriority.NORMAL) {
                     dispatchConflatedLocationMap(command.data)
                 } else if (command.event == "log_update" && command.priority == SignalingPriority.NORMAL) {
                     dispatchConflatedLog(command.data)
@@ -245,7 +269,7 @@ class SmartSignalingDispatcher(
                 }
             }
             is Command.Object -> {
-                if (command.event == "location_update_bin" && command.priority != SignalingPriority.HIGH) {
+                if (command.event == "location_update_bin" && command.priority == SignalingPriority.NORMAL) {
                     dispatchConflatedLocationObject(command.update)
                 } else {
                     enqueue(command)
@@ -256,10 +280,10 @@ class SmartSignalingDispatcher(
     }
 
     private fun enqueue(command: Command) {
-        if (command.priority == SignalingPriority.HIGH) {
-            highQueue.trySend(command)
-        } else {
-            normalQueue.trySend(command)
+        when (command.priority) {
+            SignalingPriority.CRITICAL -> criticalQueue.trySend(command)
+            SignalingPriority.HIGH -> highQueue.trySend(command)
+            SignalingPriority.NORMAL -> normalQueue.trySend(command)
         }
     }
 
@@ -342,13 +366,14 @@ class SmartSignalingDispatcher(
             val firstArrival = bucket.firstEntryTs.get()
             
             // Hard Starvation Cap: Never delay more than MAX_CONFLATION_DELAY_MS from the first entry.
-            if (now - firstArrival >= MAX_CONFLATION_DELAY_MS) return
+            val starvationCap = calculateStarvationCap()
+            if (now - firstArrival >= starvationCap) return
 
             val newDelay = calculateDelay(bucket.burstCount.get()) * delayMultiplier
             val targetScheduled = now + newDelay
             
             // Clamp to starvation cap
-            val finalTarget = minOf(targetScheduled, firstArrival + MAX_CONFLATION_DELAY_MS)
+            val finalTarget = minOf(targetScheduled, firstArrival + starvationCap)
             
             if (currentScheduled < finalTarget && finalTarget - now >= newDelay / 2) {
                  bucket.scheduledTs.compareAndSet(currentScheduled, finalTarget)
@@ -357,11 +382,32 @@ class SmartSignalingDispatcher(
     }
 
     private fun calculateDelay(burstCount: Int): Long {
-        val baseDelay = if (isViolationProvider()) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
+        val rtt = rttProvider()
+        val isStaggered = performanceTier == PerformanceTier.STAGGERED
+        
+        var baseDelay = if (isViolationProvider()) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
+        
+        // Oct.11.9: Hardware/Network scaling
+        if (isStaggered) baseDelay = (baseDelay * 1.5).toLong()
+        if (rtt > 500) baseDelay = (baseDelay * 2.0).toLong()
+        
         if (burstCount < BURST_PRESSURE_THRESHOLD) return baseDelay
         
         val pressureBonus = (burstCount - BURST_PRESSURE_THRESHOLD) * 100L
-        return minOf(baseDelay + pressureBonus, MAX_CONFLATION_DELAY_MS)
+        val maxDelay = calculateStarvationCap()
+        
+        return minOf(baseDelay + pressureBonus, maxDelay)
+    }
+    
+    private fun calculateStarvationCap(): Long {
+        val rtt = rttProvider()
+        val isStaggered = performanceTier == PerformanceTier.STAGGERED
+        
+        var cap = MAX_CONFLATION_DELAY_MS
+        if (isStaggered) cap = (cap * 1.5).toLong()
+        if (rtt > 800) cap = (cap * 2.0).toLong()
+        
+        return cap
     }
 
     // --- Conflation Strategies (Issue #SIGN-1006-13 Consolidation) ---
@@ -370,6 +416,7 @@ class SmartSignalingDispatcher(
         if (pending == null) return incoming
         val merged = pending.toMutableMap()
         merged.putAll(incoming)
+        merged["timestamp"] = incoming["timestamp"] // Ensure latest timestamp survives
         return merged
     }
 
@@ -412,6 +459,7 @@ class SmartSignalingDispatcher(
     override fun shutdown() {
         processorJob?.cancel()
         conflationJob?.cancel()
+        criticalQueue.close()
         highQueue.close()
         normalQueue.close()
         conflationSignal.close()

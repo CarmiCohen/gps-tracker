@@ -21,10 +21,12 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Oct.11.9:
+ * - Issue #SIMP-1011-23: Adaptive Signaling. Propagated PerformanceTier and RTT 
+ *   to SmartSignalingDispatcher for adaptive conflation.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Migrated state accessors 
  *   to strict val properties for Hilt/Compose stability.
- * - Issue #BUILD-FIX-OCT10.3: Fixed JSONObject iteration type mismatches and ambiguity.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -33,7 +35,8 @@ class CommunicationManager @Inject constructor(
     private val logManagerProvider: Provider<LogManager>,
     private val telemetryRepository: TelemetryRepository,
     private val timeProvider: TimeProvider,
-    private val sessionManagerProvider: Provider<SessionManager>
+    private val sessionManagerProvider: Provider<SessionManager>,
+    private val systemStatusProvider: SystemStatusProvider
 ) : SignalingProvider {
 
     private var socket: Socket? = null
@@ -79,7 +82,9 @@ class CommunicationManager @Inject constructor(
             }
         },
         encoder = AppSignalingEncoder(),
-        isConnectedProvider = { isConnected }
+        isConnectedProvider = { isConnected },
+        rttProvider = { lastRttInternal },
+        performanceTier = systemStatusProvider.getPerformanceTier()
     )
 
     override val signalingMetrics: StateFlow<SignalingPipeline.Metrics> = dispatcher.metricsFlow
@@ -98,7 +103,7 @@ class CommunicationManager @Inject constructor(
         return mapOf(
             "id" to SignalingConstants.getTransmissionId(deviceId),
             "role" to if (isTrackerMode) "tracker" else "viewer",
-            "ver" to "Oct10.3"
+            "ver" to "Oct11.9"
         )
     }
 

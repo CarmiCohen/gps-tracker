@@ -21,12 +21,13 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.12.3:
+ * - Issue #SIMP-1012-3: Forensic Integrity. Propagated checksum field during 
+ *   batch flushing and Entity mapping to support corruption detection.
  * Oct.11.1:
  * - Issue #SIMP-1011-8: I/O Pressure Test. Integrated isMaliAnomaly into 
  *   proactive pruning and forensic drainer backing off to mitigate driver-level 
  *   IO contention on budget hardware.
- * - Issue #SIMP-1011-7: Thermal Forensic Audit. Integrated coolingSnapshot 
- *   mapping between LogEntry and LogEntity for authoritative audit.
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -310,7 +311,8 @@ class LogRepository @Inject constructor(
                                     chargingSnapshot = entry.chargingSnapshot,
                                     thermalSnapshot = entry.thermalSnapshot,
                                     heapSnapshot = entry.heapSnapshot,
-                                    coolingSnapshot = entry.coolingSnapshot
+                                    coolingSnapshot = entry.coolingSnapshot,
+                                    checksum = entry.checksum
                                 ))
                                 continue
                             }
@@ -338,7 +340,8 @@ class LogRepository @Inject constructor(
                                         chargingSnapshot = entry.chargingSnapshot,
                                         thermalSnapshot = entry.thermalSnapshot,
                                         heapSnapshot = entry.heapSnapshot,
-                                        coolingSnapshot = entry.coolingSnapshot
+                                        coolingSnapshot = entry.coolingSnapshot,
+                                        checksum = entry.checksum
                                     )
                                     logDao.update(updated)
                                     lastEntityMetadata = metaKey
@@ -363,7 +366,8 @@ class LogRepository @Inject constructor(
                                 chargingSnapshot = entry.chargingSnapshot,
                                 thermalSnapshot = entry.thermalSnapshot,
                                 heapSnapshot = entry.heapSnapshot,
-                                coolingSnapshot = entry.coolingSnapshot
+                                coolingSnapshot = entry.coolingSnapshot,
+                                checksum = entry.checksum
                             )
                             toInsert.add(newLog)
                             logWriteCount.incrementAndGet()
@@ -404,7 +408,8 @@ class LogRepository @Inject constructor(
                         spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
                         tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
                         chargingSnapshot = it.chargingSnapshot,
-                        coolingSnapshot = it.coolingSnapshot
+                        coolingSnapshot = it.coolingSnapshot,
+                        checksum = it.checksum
                     ) 
                 }
             }
@@ -516,7 +521,8 @@ class LogRepository @Inject constructor(
                 spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
                 tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
                 chargingSnapshot = it.chargingSnapshot,
-                coolingSnapshot = it.coolingSnapshot
+                coolingSnapshot = it.coolingSnapshot,
+                checksum = it.checksum
             )
         }
     }
@@ -548,7 +554,8 @@ class LogRepository @Inject constructor(
                 spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,
                 tempSnapshot = it.tempSnapshot, battSnapshot = it.battSnapshot,
                 chargingSnapshot = it.chargingSnapshot,
-                coolingSnapshot = it.coolingSnapshot
+                coolingSnapshot = it.coolingSnapshot,
+                checksum = it.checksum
             )
         }
     }

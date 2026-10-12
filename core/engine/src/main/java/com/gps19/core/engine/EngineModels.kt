@@ -6,19 +6,11 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.12.2:
+ * - Issue #SIMP-1012-2: Network Buffer Hardening. Added SignalingPriority.CRITICAL.
  * Oct.11.8:
  * - Issue #SIMP-1011-22: Performance Tier Alignment. Added performanceTier 
  *   to LocationProcessingState to support hardware-aware Bayesian expansion.
- * Oct.11.1:
- * - Issue #SIMP-1011-5: Acoustic Profiling. Updated NativeFastPathProvider 
- *   to accept TimeProvider for standardized latency auditing.
- * Oct.10.1 (Restoration Path):
- * - Issue #SIMP-1014-2: Unified Pressure Path. Added SystemPressureBatch 
- *   DTO and updated events/interfaces for consolidated JNI pressure evaluation.
- * - Issue #SIMP-1012-2: Native Proximity Scaling. Added ProximityBatch for JNI debouncing.
- * - Issue #SIMP-1011-3: Forensic Buffer Consolidation. Unified ForensicSample.
- * - Issue #SIMP-1011-2: Acoustic JNI Offloading. JNI audio processing.
- * - Issue #SIMP-1011-1: Native GNSS Batching. Native SV evaluation.
  */
 
 @Serializable
@@ -64,7 +56,7 @@ enum class AppRole(val prefix: String) {
 
 enum class DiscoveryPhase { BOOTSTRAP, DISCOVERING, MONITORING }
 enum class SentinelStatus { VALID, JUMP, TAMPER, TRAJECTORY_PROMOTED, OUTLIER, JITTER, JAMMER_SUSPICION }
-enum class SignalingPriority { HIGH, NORMAL }
+enum class SignalingPriority { CRITICAL, HIGH, NORMAL }
 enum class CapabilityStatus { GRANTED, DENIED, UNKNOWN }
 
 @Serializable

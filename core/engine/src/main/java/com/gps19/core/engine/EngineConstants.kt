@@ -2,30 +2,14 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * Oct.11.8:
- * - Issue #SIMP-1011-22: Performance Tier Alignment. Added tiered thresholds 
- *   for MALI_BRIDGE_LATENCY and PENDING_UNCERTAINTY_GROWTH to support 
- *   hardware-aware detection and geofencing reliability.
- * Oct.11.5:
- * - Issue #SIMP-1011-21: Radio-Warm Keep-Alive. Added RADIO_KEEP_ALIVE_INTERVAL_MS (60s) 
- *   to maintain GNSS residency on budget hardware.
- * - Issue #SIMP-1011-17: Event Bus Hardening. Increased buffer capacity to 1024 
- *   and implemented staged priority-aware dropping to protect critical telemetry.
- * Oct.11.4:
- * - Issue #SIMP-1011-18: Mali Correlation Refinement. Added MALI_ANOMALY_SUSTAINED_THRESHOLD_MS 
- *   (30000ms) and refined bridge threshold to 150ms to suppress transient spikes.
- * Oct.11.3:
- * - Issue #SIMP-1011-16: Forensic Pressure Audit. Added FORENSIC_SAMPLING_INTERVAL_EMERGENCY_MS (1000ms).
- * Oct.11.2:
- * - Issue #SIMP-1011-12: HUD Throttling Sync. Added HUD_STATE_SAMPLE_THROTTLED_MS 
- *   (1000ms) for aggressive UI dampening during GPU driver anomalies.
- * Oct.11.1:
- * - Issue #SIMP-1011-4: Hysteresis Tuning. Increased base Memory/Storage 
- *   hysteresis to 15.0 MB and added SYSTEM_PRESSURE_STAGGERED_HYSTERESIS_MULT 
- *   (2.0x) for budget hardware stability.
- * Oct.10.9:
- * - Issue #SIMP-1014-3: Connectivity Jitter. Added HUD_STATE_SAMPLE_MS 
- *   for unified UI temporal dampening.
+ * Oct.12.3:
+ * - Issue #SIMP-1012-3: Forensic Integrity. Restored missing thresholds 
+ *   required for LogRepository and TrackerStateManager.
+ * Oct.12.2:
+ * - Issue #SIMP-1012-2: Network Buffer Hardening. Added SIGNALING_QUEUE_LIMIT 
+ *   to prevent OOM during long disconnects.
+ * - Issue #SIMP-1107-2: GNSS Burst Refining. Added RADIO_WARM_BURST durations 
+ *   and RTT stability thresholds.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -331,6 +315,7 @@ const val SUSTAINED_SPEED_STATIONARY_THRESHOLD = 4
 const val STATE_CONFIDENCE_BUFFER_MS = 2000L
 const val PARKING_CONFIDENCE_BUFFER_MS = 5000L
 const val HIGH_SPEED_PROMOTION_THRESHOLD = 5.0
+const val BI_DIRECTIONAL_STABILITY_THRESHOLD = 0.8
 
 // Throttling Limits
 const val THROTTLE_LUX_LIMIT = 50.0
@@ -406,6 +391,16 @@ const val SYNC_INTERVAL_VIOLATION_MS = 2000L
 const val SYNC_BATCH_SIZE_VIOLATION = 250
 const val SOCKET_TIMEOUT_MS = 60000
 const val RTT_WINDOW_SIZE = 5
+
+// Issue #SIMP-1012-2: Signaling Queue Limits
+const val SIGNALING_QUEUE_LIMIT_HIGH = 500
+const val SIGNALING_QUEUE_LIMIT_NORMAL = 2000
+const val SIGNALING_QUEUE_LIMIT_CRITICAL = 250
+
+// Issue #SIMP-1107-2: Radio-Warm Keep-Alive Refining
+const val RADIO_WARM_BURST_STABLE_MS = 4000L
+const val RADIO_WARM_BURST_UNSTABLE_MS = 10000L
+const val RTT_STABILITY_LIMIT_MS = 400
 
 const val HOME_POINT_REFRESH_INTERVAL_MS = 30000L
 

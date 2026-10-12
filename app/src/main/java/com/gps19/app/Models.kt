@@ -11,15 +11,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.12.3:
+ * - Issue #SIMP-1012-3: Forensic Integrity. Added checksum to LogEntry to 
+ *   support storage-level corruption detection for forensic traces.
  * Oct.11.1:
  * - Issue #SIMP-1011-7: Thermal Forensic Audit. Added coolingSnapshot to 
  *   LogEntry to authoritatively audit sampling decay during transients.
- * Oct.7.7:
- * - Issue #SIMP-1007-16: Flag Propagation. Added isSuspiciousNoise and 
- *   isMemoryPressureThrottled delegates to ConnectionPoint for HUD visibility.
- * Oct.7.5:
- * - Issue #SIMP-1007-15: Unified Snapshot Container. Completed migration of 
- *   ConnectionPoint and LogEntry to use unified ForensicSnapshot for all probes (snr, vibe, thermal, heap).
  */
 
 @Serializable
@@ -296,7 +293,8 @@ data class LogEntry(
     val tempSnapshot: Double? = null,
     val battSnapshot: Int? = null,
     val chargingSnapshot: Boolean? = null,
-    val coolingSnapshot: Boolean? = null
+    val coolingSnapshot: Boolean? = null,
+    val checksum: Long? = null
 ) {
     var snrSnapshot: Double? 
         get() = forensic.snr
@@ -322,7 +320,7 @@ data class LogEntry(
                forensic.thermal == other.forensic.thermal && forensic.heap == other.forensic.heap &&
                forensic.isSuspiciousNoise == other.forensic.isSuspiciousNoise &&
                forensic.isMemoryPressureThrottled == other.forensic.isMemoryPressureThrottled &&
-               coolingSnapshot == other.coolingSnapshot
+               coolingSnapshot == other.coolingSnapshot && checksum == other.checksum
     }
 
     fun toJSONObject(): JSONObject {
@@ -359,6 +357,7 @@ data class LogEntry(
             coolingSnapshot?.let { put("cooling_snapshot", it) }
             thermalSnapshot?.let { put("thermal_snapshot", safeDouble(it)) }
             heapSnapshot?.let { put("heap_snapshot", safeDouble(it)) }
+            checksum?.let { put("checksum", it) }
             
             // Oct.7.7 Anomaly Flags
             put("is_suspicious_noise", forensic.isSuspiciousNoise)
@@ -394,7 +393,8 @@ data class LogEntry(
                 tempSnapshot = if (obj.has("temp_snapshot")) obj.optDouble("temp_snapshot") else null,
                 battSnapshot = if (obj.has("batt_snapshot")) obj.optInt("batt_snapshot") else null,
                 chargingSnapshot = if (obj.has("charging_snapshot")) obj.optBoolean("charging_snapshot") else null,
-                coolingSnapshot = if (obj.has("cooling_snapshot")) obj.optBoolean("cooling_snapshot") else null
+                coolingSnapshot = if (obj.has("cooling_snapshot")) obj.optBoolean("cooling_snapshot") else null,
+                checksum = if (obj.has("checksum")) obj.optLong("checksum") else null
             )
         }
     }

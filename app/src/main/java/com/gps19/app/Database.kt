@@ -8,14 +8,12 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
- * Oct.11.1:
- * - Issue #SIMP-1011-7: Thermal Forensic Audit. Added coolingSnapshot to 
- *   LogEntity for authoritative audit of sampling decay. Incremented version 
- *   to 82 with migration.
- * Oct.4.6:
- * - Issue #1173: Protobuf-First Persistence. Added binary payload BLOBs to 
- *   HistoryEntity and PendingStatusEntity to eliminate Room column overhead 
- *   during high-frequency writes. Incremented version to 81 (R1173).
+ * Oct.12.3:
+ * - Issue #SIMP-1012-3: Forensic Integrity. Added checksum column to 
+ *   LogEntity for storage-level corruption detection. Incremented version 
+ *   to 83 with migration. Fixed SQL syntax and duplicate migrations.
+ * - Issue #SIMP-1012-4: Batch Persistence. Added insertAll to PendingStatusDao 
+ *   to support bulk buffering.
  */
 @Entity(
     tableName = "logs", 
@@ -61,7 +59,8 @@ data class LogEntity(
     val chargingSnapshot: Boolean? = null,
     val thermalSnapshot: Double? = null,
     val heapSnapshot: Double? = null,
-    val coolingSnapshot: Boolean? = null
+    val coolingSnapshot: Boolean? = null,
+    val checksum: Long? = null
 )
 
 data class ForensicSignature(
@@ -303,7 +302,8 @@ interface ViolationDao {
 
 @Dao
 interface PendingStatusDao {
-    @Insert suspend fun insert(status: PendingStatusEntity)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insert(status: PendingStatusEntity)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAll(statuses: List<PendingStatusEntity>)
     @Query("SELECT * FROM pending_status_updates ORDER BY timestamp ASC LIMIT :limit") suspend fun getOldestPending(limit: Int): List<PendingStatusEntity>
     @Query("DELETE FROM pending_status_updates WHERE id IN (:ids)") suspend fun deletePending(ids: LongArray)
     @Query("SELECT COUNT(*) FROM pending_status_updates") suspend fun getCount(): Int
@@ -318,7 +318,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 82, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 83, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -342,6 +342,15 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_82_83 = object : Migration(82, 83) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #SIMP-1012-3: Forensic Integrity.
+                try {
+                    db.execSQL("ALTER TABLE logs ADD COLUMN checksum INTEGER")
+                } catch (e: Exception) {}
+            }
+        }
+
         val MIGRATION_81_82 = object : Migration(81, 82) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #SIMP-1011-7: Thermal Forensic Audit.
@@ -592,7 +601,6 @@ abstract class AppDatabase : RoomDatabase() {
         val MIGRATION_58_59 = object : Migration(58, 59) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN noiseIdx REAL NOT NULL DEFAULT 0")
-                db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN luxIdx REAL NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN luxIdx REAL NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN vibeIdx REAL NOT NULL DEFAULT 0")
                 db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN liftIdx REAL NOT NULL DEFAULT 0")

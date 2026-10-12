@@ -37,20 +37,13 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
- * Oct.11.7:
- * - Issue #SIMP-1107: GPS Acquisition Regression. Implemented dynamic gap 
- *   thresholding (2x current interval) to prevent revival loop interference 
- *   during stationary power-save periods (60s).
- * Oct.11.5:
- * - Issue #SIMP-1011-21: Radio-Warm Keep-Alive. Implemented periodic low-power 
- *   GNSS bursts for Staggered devices to prevent hardware residency lock 
- *   during long background periods.
- * Oct.11.3:
- * - Issue #SIMP-1011-16: Forensic Pressure Audit. Implemented multi-stage 
- *   sampling decay (50% -> 250ms, 80% -> 500ms, 95% -> 1000ms) to prevent 
- *   spill-buffer overflow during I/O stalls.
- * - Issue #SIMP-1011-13: Bayesian Drift Audit. Integrated authoritative 
- *   uncertainty expansion in processTick during GNSS gaps.
+ * Oct.12.2:
+ * - Issue #SIMP-1107-2: GNSS Burst Refining. Optimized radio-warm keep-alive pulse 
+ *   duration based on RTT stability. Fixed permission check regressions.
+ * Oct.12.1:
+ * - Issue #SIMP-1012-1: Forensic Buffer Optimization & Memory Hardening. 
+ *   Implemented sub-sampling for vibration (1/2 rate when stationary) and 
+ *   optimized JNI auditing. Added trimMemory() for aggressive buffer clearing.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -62,7 +55,8 @@ class HardwareSuite @Inject constructor(
     private val powerStateProvider: PowerStateProvider,
     private val forensicAuditor: ForensicAuditor,
     private val domainEventBus: DomainEventBus,
-    private val activityContextProvider: ActivityContextProvider
+    private val activityContextProvider: ActivityContextProvider,
+    private val telemetryRepository: TelemetryRepository
 ) : ManagedSensorListener() {
 
     private val nativeFastPathProvider = object : NativeFastPathProvider {
@@ -95,7 +89,9 @@ class HardwareSuite @Inject constructor(
         }
 
         override fun processVibrationBatch(timeProvider: TimeProvider, batch: VibrationBatch): Boolean {
-            return JdHardwareManager.processVibrationBatchNative(timeProvider, batch)
+            // Oct.12.1: Audit JNI only when not throttled to reduce overhead.
+            val shouldAudit = !isMemoryPressureThrottled
+            return JdHardwareManager.processVibrationBatchNative(timeProvider, batch, audit = shouldAudit)
         }
 
         override fun processGnssBatch(timeProvider: TimeProvider, batch: GnssHealthBatch): Boolean {
@@ -403,6 +399,9 @@ class HardwareSuite @Inject constructor(
     private val gnssHealthBatch = GnssHealthBatch()
     private val acousticBatch = AcousticBatch()
     private val proximityBatch = ProximityBatch()
+
+    // Oct.12.1: Vibration sub-sampling state
+    private var vibrationTick = 0
 
     private inner class GnssPolicyEngine {
         fun evaluateInterval(nowRt: Long): Long {
@@ -731,14 +730,23 @@ class HardwareSuite @Inject constructor(
         
         val handler = synchronized(lifecycleLock) { hardwareHandler } ?: return
         
+        // Oct.12.2: GNSS Burst Refining. Scale duration by RTT stability.
+        val rtt = telemetryRepository.lastRtt.value
+        val burstDuration = if (rtt > 0 && rtt < RTT_STABILITY_LIMIT_MS) {
+            RADIO_WARM_BURST_STABLE_MS
+        } else {
+            RADIO_WARM_BURST_UNSTABLE_MS
+        }
+
         val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(p0: LocationResult) {} }
         val request = LocationRequest.Builder(Priority.PRIORITY_BALANCED_POWER_ACCURACY, 5000L).setMaxUpdates(1).build()
         
         try {
             fusedLocationClient.requestLocationUpdates(request, fusedCallback, handler.looper)
             scope.launch {
-                delay(10000)
+                delay(burstDuration)
                 fusedCallback.unregister(fusedLocationClient, timeProvider, handler)
+                Timber.d("HardwareSuite: Radio Warm Burst completed (Duration: ${burstDuration}ms, RTT: ${rtt}ms)")
             }
         } catch (e: Exception) {
             Timber.e(e, "HardwareSuite: Radio Warm Burst failed")
@@ -893,7 +901,15 @@ class HardwareSuite @Inject constructor(
             Sensor.TYPE_STEP_DETECTOR -> lastStayAliveRt = nowRt
             Sensor.TYPE_ACCELEROMETER -> {
                 gravityBuffer[0] = values[0]; gravityBuffer[1] = values[1]; gravityBuffer[2] = values[2]; hasGravity = true
-                processVibration(values[0], values[1], values[2]); updateOrientation()
+                
+                // Oct.12.1: Vibration sub-sampling. 
+                // Process at 1/2 rate when stationary and memory pressure is detected to reduce JNI overhead.
+                vibrationTick++
+                val shouldSkip = isMemoryPressureThrottled && isStationary() && (vibrationTick % 2 != 0)
+                
+                if (!shouldSkip) {
+                    processVibration(values[0], values[1], values[2]); updateOrientation()
+                }
                 
                 JdHardwareManager.recordSensorPulse(nowRt)
                 
@@ -1352,6 +1368,25 @@ class HardwareSuite @Inject constructor(
             isDisplayFlickering.set(false); lastDisplayTransitionRt = 0L
             clearLifecycleLeftovers(); JdHardwareManager.resetSensorAudit()
         }
+    }
+
+    /**
+     * trimMemory: Issue #SIMP-1012-1. Aggressively clears forensic and sensor 
+     * buffers to alleviate memory pressure.
+     */
+    fun trimMemory() {
+        synchronized(sensorBuffer) { sensorBuffer.clear() }
+        synchronized(snrBuffer) { snrBuffer.clear() }
+        synchronized(logicSnapshotBuffer) { logicSnapshotBuffer.clear() }
+        synchronized(forensicSnapshotBuffer) { forensicSnapshotBuffer.clear() }
+        Timber.i("HardwareSuite: Memory trim completed. Forensic buffers cleared.")
+    }
+
+    /**
+     * setMemoryPressureThrottled: Propagates memory pressure state for sensor sub-sampling.
+     */
+    fun setMemoryPressureThrottled(throttled: Boolean) {
+        this.isMemoryPressureThrottled = throttled
     }
 
     private fun startStepDetectorRecoveryLoop() { recoveryJob?.cancel(); recoveryJob = scope.launch { while (isActive) { delay(300000L); if (!isStepDetectorRegistered) attemptStepRegistration() } } }

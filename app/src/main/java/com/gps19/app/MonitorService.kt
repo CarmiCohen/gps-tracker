@@ -26,18 +26,13 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.12.1:
+ * - Issue #SIMP-1012-1: Memory Pressure Hardening. Integrated OfflineRepository 
+ *   adaptive pruning and HardwareSuite buffer trimming into performMemoryFlush(). 
+ *   Propagated memoryPressureLevel for sub-sampling.
  * Oct.11.8:
  * - Issue #SIMP-1011-22: Performance Tier Alignment. Propagated performanceTier 
  *   to LocationProcessors during loadState to enable hardware-aware expansion.
- * Oct.11.5:
- * - Background Hardening: Pass UI visibility to DeviceProfileManager during 
- *   processTick to enable transition window WakeLock escalation.
- * Oct.11.3:
- * - Issue #SIMP-1011-16: Forensic Pressure Audit. Implemented multi-stage 
- *   sampling decay (50% -> 250ms, 80% -> 500ms, 95% -> 1000ms) to prevent 
- *   spill-buffer overflow during I/O stalls.
- * - Issue #SIMP-1011-13: Bayesian Drift Audit. Integrated authoritative 
- *   uncertainty expansion in processTick during GNSS gaps.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -207,7 +202,7 @@ class MonitorService : BaseMonitorService() {
                 savedVibrationFloor = repository.getDouble(remoteRole, ADAPTIVE_VIBRATION_FLOOR_KEY, -1.0),
                 savedLuxBaseline = repository.getDouble(currentRole, TRACKER_LUX_BASELINE_KEY, -1.0),
                 savedAcousticFloor = repository.getDouble(currentRole, TRACKER_ACOUSTIC_FLOOR_KEY, -1.0),
-                performanceTier = PerformanceTier.STANDARD // Viewer remote is usually standard or irrelevant for local expansion
+                performanceTier = PerformanceTier.STANDARD 
             )
         }
 
@@ -336,6 +331,11 @@ class MonitorService : BaseMonitorService() {
             .filterIsInstance<IntegrityEvent.MemoryPressureChanged>()
             .collect { event ->
                 memoryPressureLevel = event.level
+                
+                // Oct.12.1: Propagate pressure to edge repositories and hardware
+                offlineRepository.setMemoryPressureLevel(event.level)
+                hardwareSuite.setMemoryPressureThrottled(event.level != MemoryPressureLevel.NORMAL)
+                
                 if (event.level != MemoryPressureLevel.NORMAL) {
                     performMemoryFlush()
                 }
@@ -346,6 +346,8 @@ class MonitorService : BaseMonitorService() {
         Timber.w("Memory Flush Triggered: Pressure level $memoryPressureLevel. Executing aggressive recovery.")
         lifecycleScope.launch(Dispatchers.IO) {
             historyManager.trimMemory()
+            offlineRepository.trimMemory()
+            hardwareSuite.trimMemory()
         }
         System.gc()
         System.runFinalization()
@@ -712,8 +714,8 @@ class MonitorService : BaseMonitorService() {
                 val fillLevel = logManager.getForensicFillLevel()
                 val delayMs = when { 
                     health.isCoolingModeActive -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS 
-                    health.isMaliAnomaly -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS // R1.155: Back off sampling during Mali Driver stalls
-                    fillLevel >= 0.95 -> FORENSIC_SAMPLING_INTERVAL_EMERGENCY_MS // R11.16: High contention emergency back-off
+                    health.isMaliAnomaly -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS 
+                    fillLevel >= 0.95 -> FORENSIC_SAMPLING_INTERVAL_EMERGENCY_MS
                     fillLevel >= 0.80 -> FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS 
                     fillLevel >= 0.50 -> FORENSIC_SAMPLING_INTERVAL_COOLING_MS
                     health.isCharging -> FORENSIC_SAMPLING_INTERVAL_MIN_MS 

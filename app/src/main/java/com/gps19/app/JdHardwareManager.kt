@@ -39,13 +39,14 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.12.1:
+ * - Issue #SIMP-1012-1: Forensic Buffer Optimization. Added 'audit' parameter to 
+ *   processVibrationBatchNative to reduce LatencyMonitor overhead during 100Hz 
+ *   sampling.
  * Oct.11.2:
  * - Issue #SIMP-1011-10: Acoustic Floor Contraction Audit. Updated n10 to support 
  *   temporal contraction parameters (contractionEma, floorMin) and added decay 
  *   logic to evaluateFastPath/processAcousticBatch for parity with LocationSentinel.
- * Oct.10.11:
- * - Issue #SIMP-1011-5: Acoustic Profiling. Integrated LatencyMonitor into 
- *   all JNI batching paths (n19, n21, n22, n23, n24) for performance auditing.
  */
 object JdHardwareManager {
 
@@ -305,16 +306,14 @@ object JdHardwareManager {
     
     private fun decay(ema: Double, seconds: Double): Double = ema.pow(seconds)
 
-    fun processVibrationBatchNative(timeProvider: TimeProvider, batch: VibrationBatch): Boolean {
+    /**
+     * processVibrationBatchNative: Consolidated JNI vibration path (Oct.12.1).
+     * @param audit If true, enables LatencyMonitor auditing for forensic tracing.
+     */
+    fun processVibrationBatchNative(timeProvider: TimeProvider, batch: VibrationBatch, audit: Boolean = true): Boolean {
         if (!isLibraryLoaded.get()) return false
         
-        return LatencyMonitor.measureAndAudit<Boolean>(
-            timeProvider = timeProvider,
-            thresholdMs = LATENCY_THRESHOLD_JNI_MS,
-            operation = "Native processVibrationBatch",
-            type = LatencyMonitor.AuditType.PERFORMANCE,
-            onSpike = { message, _ -> Timber.w(message) }
-        ) {
+        val block = {
             synchronized(sharedStateBuffer) {
                 sharedStateBuffer.clear()
                 sharedStateBuffer.putDouble(batch.x)
@@ -349,6 +348,19 @@ object JdHardwareManager {
                     true
                 } else false
             }
+        }
+
+        return if (audit) {
+            LatencyMonitor.measureAndAudit<Boolean>(
+                timeProvider = timeProvider,
+                thresholdMs = LATENCY_THRESHOLD_JNI_MS,
+                operation = "Native processVibrationBatch",
+                type = LatencyMonitor.AuditType.PERFORMANCE,
+                onSpike = { message, _ -> Timber.w(message) },
+                block = block
+            )
+        } else {
+            block()
         }
     }
 

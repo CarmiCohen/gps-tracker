@@ -20,6 +20,7 @@ import javax.inject.Inject
  * Uses adb shell commands to force the device into Doze mode and verifies 
  * the AndroidPowerStateProvider correctly reports the state.
  * Sep.16.13: Issue #1050/1052 Verification (R-ID 351).
+ * Oct.12.13: Updated to property-based PowerStateProvider API.
  */
 @HiltAndroidTest
 class PowerIntegrationAuditTest {
@@ -49,7 +50,7 @@ class PowerIntegrationAuditTest {
     @Test
     fun testDozeStateDetection_RealIntegration() {
         // 1. Initial State: Should not be idle
-        assertFalse("Device should not be in idle mode initially", powerStateProvider.isDeviceIdleMode())
+        assertFalse("Device should not be in idle mode initially", powerStateProvider.isDeviceIdleMode)
 
         // 2. Force Idle (Doze)
         device.executeShellCommand("dumpsys deviceidle force-idle")
@@ -58,12 +59,12 @@ class PowerIntegrationAuditTest {
         Thread.sleep(1000)
 
         // 3. Verify Deferral Detection
-        assertTrue("PowerStateProvider should detect Doze mode after force-idle", powerStateProvider.isDeviceIdleMode())
+        assertTrue("PowerStateProvider should detect Doze mode after force-idle", powerStateProvider.isDeviceIdleMode)
 
         // 4. Restore State
         device.executeShellCommand("dumpsys deviceidle unforce")
         Thread.sleep(1000)
         
-        assertFalse("PowerStateProvider should detect exit from Doze mode after unforce", powerStateProvider.isDeviceIdleMode())
+        assertFalse("PowerStateProvider should detect exit from Doze mode after unforce", powerStateProvider.isDeviceIdleMode)
     }
 }
