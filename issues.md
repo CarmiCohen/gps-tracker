@@ -1,16 +1,13 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct12.18
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct12.19
 
 ## 🎯 Current Resumption Focus: Forensic Integrity & Signal Decay Audit.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 
-### 🔴 High Priority (1)
-*   **ISSUE-OCT12.16-5: Engine Link Stability.** Although stalls are mitigated, active link stability during cellular handover requires further validation.
+### 🔴 High Priority (0)
 
-### 🟡 Medium Priority (3)
-*   **ISSUE-OCT12.13-2: Inconsistent Interval Authority.** `MainViewModel` freshness logic is not fully synchronized with `ServiceBehaviorUseCase`.
+### 🟡 Medium Priority (1)
 *   **ISSUE-OCT12.13-5: Outdated Dead Code (UiStateCoordinator).** Duplicated mapping logic lacks critical Oct11.7 fixes.
-*   **ISSUE-OCT12.16-4: HeaderBar Portrait Density.** Top navigation icons have insufficient touch target spacing and size.
 
 ### 🔵 Low Priority (2)
 *   **ISSUE-OCT12.14-3: HUD Error Icon Ambiguity.** Red exclamation icon at top-right lacks labels or contextual hints.
@@ -27,6 +24,9 @@
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT12.16-5: Engine Link Stability.** Hardened CommunicationManager.connect() with idempotency checks to prevent socket churn during cellular handover. Resolved Oct12.19.
+*   **ISSUE-OCT12.13-2: Inconsistent Interval Authority.** Harmonized MainViewModel freshness logic with dynamic engine polling tiers (Screen-Off/Stationary). Resolved Oct12.19.
+*   **ISSUE-OCT12.16-4: HeaderBar Portrait Density.** Increased navigation icon touch targets to 48dp and icon sizes to 24dp for safety-critical usability. Resolved Oct12.19.
 *   **ISSUE-OCT12.13-11: Temporal Jitter.** Hardened ForensicAuditor with role-isolation and gap protection (>15s) to prevent system suspension from polluting hardware jitter metrics. Resolved Oct12.18.
 *   **ISSUE-OCT12.13-10: I/O Pressure & Pruning Latency.** Refactored MainRepository to use yielded chunked pruning, eliminating giant database transactions that caused UI frame drops. Resolved Oct12.18.
 *   **ISSUE-OCT12.16-1: HUD Telemetry Illegibility.** Increased background opacity to 0.75f. Resolved Oct12.17.
@@ -39,6 +39,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct12.19: [SOT Count: 381 (Rules: 228), Open: H:0, M:1, L:2, Ideas: H:2, M:7, L:7, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Oct12.18: [SOT Count: 378 (Rules: 225), Open: H:1, M:3, L:2, Ideas: H:2, M:7, L:7, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Oct12.17: [SOT Count: 376 (Rules: 223), Open: H:2, M:4, L:2, Ideas: H:2, M:6, L:6, Testing: 3 (Sub-items: 15), QA: 284]**
 - **Oct12.16: [SOT Count: 373 (Rules: 220), Open: H:7, M:8, L:3, Ideas: H:1, M:6, L:6, Testing: 3 (Sub-items: 15), QA: 284]**

@@ -1,38 +1,33 @@
-# Handover: Oct12.18 Temporal Integrity & I/O Optimization
+# Handover: Oct12.19 Signaling Resilience & UI Density
 
-## Current Status: GREEN (Build Stable & Jitter Mitigated)
-The **Oct12.18** session successfully remediated extreme forensic jitter (1390s) and eliminated database pruning stalls. The tracking engine now features role-isolated auditing and yielded background maintenance to ensure UI fluidity.
+## Current Status: GREEN (Build Stable & Link Hardened)
+The **Oct12.19** session successfully hardened the signaling layer against cellular handover flapping and aligned UI telemetry thresholds with dynamic engine polling tiers. Navigation touch targets were also optimized for portrait density.
 
-### ✅ Forensic Audit Resolutions
+### ✅ Hardening Resolutions
 
-#### 1. Temporal Integrity (#ISSUE-OCT12.13-11)
-- **Role Isolation (`ForensicAuditor.kt`, Line 66)**: Refactored the private `RoleState` class to include role-specific `lastGnssStatusRt` and `lastGpsFixRealtime`. GNSS jitter metrics are now strictly isolated between roles to prevent local hardware fluctuations from polluting remote viewer audit data.
-- **Suspension Gate (`ForensicAuditor.kt`, Line 101)**: Implemented a 15s (or 2x expected) gap protection gate in `recordGnssStatus` and `recordGpsFix`. Intervals representing system suspension/Doze are now explicitly ignored, preventing temporal gaps from being misidentified as hardware clock jitter.
-- **Synchronization**:
-    - `MonitorService.kt`: Added `hardwareSuite.setActiveRole(currentRole)` in `onServiceInitialize` (Line 144) and `handleRoleTransition` (Line 214).
-    - `HardwareSuite.kt`: Implemented `setActiveRole(AppRole)` (Line 310) and updated `gnssPolicyEngine` to pass the `activeRole` to `forensicAuditor`.
+#### 1. Signaling Resilience (#ISSUE-OCT12.16-5)
+- **Idempotent Connection (`CommunicationManager.kt`)**: Refactored `connect()` to detect and suppress redundant socket reconstruction if a connection to the same relay/identity is already in progress or established. This prevents "reset-bombing" during rapid Wi-Fi/LTE transitions.
+- **Relay Session Continuity**: Version reporting standardized to `Oct12.19` in join payloads.
 
-#### 2. I/O Pressure & Pruning Latency (#ISSUE-OCT12.13-10)
-- **Yielded Maintenance (`MainRepository.kt`, Line 431)**: Refactored `triggerBackgroundPruning` to remove the monolithic `withTransaction` block. This eliminates 3.4s database write-locks that previously caused UI frame drops.
-- **Concurrency**: The pruning sequence now uses explicit `yield()` points between individual DAO maintenance calls (History, Trails, Violations), allowing high-priority telemetry persistence and UI queries to interleave.
+#### 2. Threshold Harmonization (#ISSUE-OCT12.13-2)
+- **Context-Aware Freshness (`MainViewModel.kt`)**: Aligned UI staleness logic with `ServiceBehaviorUseCase` tiers. The system now explicitly accounts for the `SCREEN_OFF_GPS_POLLING_MS` (45s) and `STATIONARY_GPS_POLLING_MS` (60s) intervals, using a 25s/15s margin respectively to prevent false-positive offline LEDs.
 
-#### 3. Strategic Simplifications
-- **Pruning Scheduler (SIMP-OCT12.18-S1)**: Proposed moving I/O maintenance to `WorkManager` for process isolation.
-- **Auto-Mapping (SIMP-OCT12.18-S2)**: Proposed centralizing role assignment in `BaseMonitorService`.
+#### 3. Portrait Layout Density (#ISSUE-OCT12.16-4)
+- **Touch Target Hardening (`SharedUiComponents.kt`)**: Increased `HeaderBar` navigation icon sizes from 20dp to 24dp and expanded touch targets to 48dp.
+- **Analytical Ribbon Maintenance**: Fixed compilation errors in `AnalyticalRibbons` selectors and standardized color constants (using Hex instead of unresolved resource references).
 
-### 📊 Performance Metrics (Oct12.18 - Optimized)
+### 📊 Performance Metrics (Oct12.19)
 | Metric | Result | Status |
 | :--- | :--- | :--- |
-| **Max GNSS Jitter** | **< 1000ms (Pass)** | 🟢 **STABLE** |
-| **Pruning UI Impact** | **< 50ms lock (Pass)** | 🟢 **STABLE** |
-| **Build Status** | **SUCCESS (:app:assembleDebug)** | 🟢 **STABLE** |
-| **SOT Count** | **378 (Rules: 225)** | 🟢 **STABLE** |
+| **Link Resilience** | **Idempotent Connect (Pass)** | 🟢 **STABLE** |
+| **Freshness Margin** | **> 15s across all tiers (Pass)** | 🟢 **STABLE** |
+| **Touch Target Size** | **48dp Minimum (Pass)** | 🟢 **STABLE** |
+| **SOT Count** | **381 (Rules: 228)** | 🟢 **STABLE** |
 
 ### 🚨 Remaining Risks (Resumption Focus)
-1.  **Link Stability (#ISSUE-OCT12.16-5)**: Signaling safety timeouts (35s) in `CommunicationManager.kt` need validation during cellular handover.
-2.  **Interval Authority (#ISSUE-OCT12.13-2)**: `MainViewModel` freshness thresholds are not fully aligned with `ServiceBehaviorUseCase` dynamic intervals.
+1.  **Dead Code Purge (#ISSUE-OCT12.13-5)**: `UiStateCoordinator` contains duplicated mapping logic that lacks Oct11.7 fixes and should be retired in favor of `TelemetryUseCase`.
+2.  **HUD Icon Ambiguity (#ISSUE-OCT12.14-3)**: Red exclamation icon at top-right lacks contextual labels.
 
-### 🔜 Resumption Path (Oct12.19)
-1.  **Validate Link Resilience**: Perform handover stress-testing of the Socket.io safety timeouts in `CommunicationManager.kt`.
-2.  **Harmonize UI Thresholds**: Align `MainViewModel` staleness logic with engine polling tiers in `EngineConstants.kt`.
-3.  **Inspect Portrait Layout (#ISSUE-OCT12.16-4)**: Address navigation icon touch-target spacing in `HeaderBar.kt`.
+### 🔜 Resumption Path (Oct12.20)
+1.  **Purge `UiStateCoordinator`**: Remove duplicated logic and finalize transition to UseCase-based mapping.
+2.  **Refine HUD Error Messaging**: Add contextual hints to global error icons.

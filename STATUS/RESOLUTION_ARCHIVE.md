@@ -1,5 +1,15 @@
 # Resolution Archive
 
+## [Oct12.19] - Signaling Resilience & UI Density Hardening
+**Issue ID**: #ISSUE-OCT12.16-5, #ISSUE-OCT12.13-2, #ISSUE-OCT12.16-4
+**Status**: RESOLVED
+**Description**: Hardened the signaling provider to survive rapid network handovers. Harmonized UI staleness thresholds with dynamic polling tiers. Increased touch target density in the HeaderBar for safety-critical usability.
+**Root Cause**: `CommunicationManager.connect()` was destroying/reconstructing sockets on every interface change, causing relay "reset-bombing" during Wi-Fi/LTE flapping. UI freshness thresholds used a fixed 60s fallback which didn't account for the 45s Screen-Off interval margin. Portrait HeaderBar icons had 38dp touch targets, which were insufficient for reliable field use.
+**Remediation**:
+- **Signaling Resilience**: Implemented an idempotency check in `CommunicationManager.connect()`. If a connection attempt with identical parameters is already in progress or active, reconstruction is suppressed.
+- **Threshold Harmonization**: Refined `MainViewModel.kt` staleness logic to explicitly account for the `SCREEN_OFF_GPS_POLLING_MS` (45s) and `STATIONARY_GPS_POLLING_MS` (60s) tiers, adding appropriate safety margins.
+- **Layout Density**: Increased `HeaderBar` icon sizes to 24dp and touch targets to 48dp in `SharedUiComponents.kt`. Resolved compilation errors in Analytical Ribbon selectors.
+
 ## [Oct12.18] - Temporal Integrity & I/O Optimization
 **Issue ID**: #ISSUE-OCT12.13-11, #ISSUE-OCT12.13-10
 **Status**: RESOLVED

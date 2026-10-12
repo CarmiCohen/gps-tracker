@@ -21,6 +21,9 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Oct.12.19:
+ * - ISSUE-OCT12.16-5: Hardened connect() with idempotency check to prevent socket 
+ *   churn and reset-bombing during rapid network handovers.
  * Oct.12.17:
  * - ISSUE-OCT12.13-7: Hardened connection logic with error event handling 
  *   and safety timeouts to prevent isConnecting latch stalls.
@@ -103,7 +106,7 @@ class CommunicationManager @Inject constructor(
         return mapOf(
             "id" to SignalingConstants.getTransmissionId(deviceId),
             "role" to if (isTrackerMode) "tracker" else "viewer",
-            "ver" to "Oct12.17"
+            "ver" to "Oct12.19"
         )
     }
 
@@ -138,11 +141,19 @@ class CommunicationManager @Inject constructor(
     }
 
     override fun connect(url: String, deviceId: String, viewerId: String, isTracker: Boolean) {
-        this.isStopped = false
         val newUrl = url.trim()
         val newDeviceId = deviceId.trim()
         val newViewerId = viewerId.trim()
-        
+
+        // ISSUE-OCT12.16-5: Idempotency check to prevent socket churn during rapid handover.
+        if (!isStopped && socket != null && (socket?.connected() == true || isConnectingInternal.get())) {
+            if (this.relayUrl == newUrl && this.deviceId == newDeviceId && this.viewerId == newViewerId && this.isTrackerMode == isTracker) {
+                logToApp("Connect: Session already active/connecting for $newUrl. Skipping reconstruction.")
+                return
+            }
+        }
+
+        this.isStopped = false
         this.relayUrl = newUrl
         this.deviceId = newDeviceId
         this.viewerId = newViewerId
