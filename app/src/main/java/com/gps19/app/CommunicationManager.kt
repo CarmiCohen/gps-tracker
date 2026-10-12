@@ -21,12 +21,12 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Oct.12.17:
+ * - ISSUE-OCT12.13-7: Hardened connection logic with error event handling 
+ *   and safety timeouts to prevent isConnecting latch stalls.
  * Oct.11.9:
  * - Issue #SIMP-1011-23: Adaptive Signaling. Propagated PerformanceTier and RTT 
  *   to SmartSignalingDispatcher for adaptive conflation.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Migrated state accessors 
- *   to strict val properties for Hilt/Compose stability.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -103,7 +103,7 @@ class CommunicationManager @Inject constructor(
         return mapOf(
             "id" to SignalingConstants.getTransmissionId(deviceId),
             "role" to if (isTrackerMode) "tracker" else "viewer",
-            "ver" to "Oct11.9"
+            "ver" to "Oct12.17"
         )
     }
 
@@ -172,7 +172,7 @@ class CommunicationManager @Inject constructor(
 
         val opts = IO.Options().apply {
             transports = arrayOf("websocket")
-            timeout = 60000
+            timeout = 30000
             reconnection = true; reconnectionAttempts = Int.MAX_VALUE
             reconnectionDelay = 2000; reconnectionDelayMax = 10000; randomizationFactor = 0.5; forceNew = true 
         }
@@ -181,6 +181,15 @@ class CommunicationManager @Inject constructor(
             socket = IO.socket(relayUrl, opts)
             registerSocketListeners(sessionId)
             socket?.connect()
+            
+            // Safety fallback to prevent latch stall
+            scope.launch {
+                delay(35000)
+                if (sessionId == currentSessionId.get() && isConnectingInternal.get()) {
+                    Timber.w("Comm: Connection session $sessionId timed out in latch. Resetting.")
+                    isConnectingInternal.set(false)
+                }
+            }
         } catch (e: Exception) {
             if (sessionId == currentSessionId.get()) isConnectingInternal.set(false)
             logToApp("Socket creation failed: ${e.message}", true)
@@ -207,6 +216,15 @@ class CommunicationManager @Inject constructor(
                     dispatcher.reset()
                     if (deviceId.isNotEmpty()) emitInternal("join", createJoinPayload(), SignalingPriority.HIGH)
                 }
+            }
+        }
+
+        s.on(Socket.EVENT_CONNECT_ERROR) {
+            checkSession {
+                isConnectingInternal.set(false)
+                logToApp("Relay Connection Error [Session $sessionId]", true)
+                telemetryRepository.updateRelayStatus(false)
+                onConnectionLost?.invoke()
             }
         }
 

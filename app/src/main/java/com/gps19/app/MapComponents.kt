@@ -41,12 +41,9 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * Oct.5.21:
- * - SIMP-1426-4: Boilerplate Reduction. Refactored AppMapContainer to consume 
- *   unified UiStateProvider. Eliminated manual parameter passing for trails 
- *   and camera actions. (R1426-4).
- * Oct.5.20:
- * - Map Hardening (Phase 3): Migrated initialCenter logic to ViewModel. (R-ID 287).
+ * Oct.12.17:
+ * - ISSUE-OCT12.16-3: Shifted version tag by 40dp bottom padding to avoid 
+ *   collision with the scale bar.
  */
 
 @Composable
@@ -84,7 +81,7 @@ fun AppMapContainer(
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .navigationBarsPadding()
-                    .padding(end = 4.dp, bottom = 2.dp)
+                    .padding(end = 4.dp, bottom = 42.dp)
                     .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(2.dp))
                     .padding(horizontal = 4.dp, vertical = 1.dp)
             )

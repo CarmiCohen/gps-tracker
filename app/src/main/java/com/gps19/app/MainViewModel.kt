@@ -21,14 +21,13 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.12.17:
+ * - ISSUE-OCT12.13-6: Fixed Viewer smoothing bug where sVwrLat/Lng were never 
+ *   updated, causing markers to default to (0,0).
+ * - ISSUE-OCT12.13-12: Standardized engine version reporting to Oct12.17.
  * Oct.11.7:
  * - Issue #SIMP-1107: GPS Acquisition Regression. Harmonized UI staleness 
- *   thresholds with dynamic polling intervals (PARKING/Ultra-Long) to 
- *   prevent false "RED" GPS LED states.
- * Oct.11.2:
- * - Issue #SIMP-1011-12: HUD Throttling Sync. Dynamically adjusted telemetry 
- *   sampling to HUD_STATE_SAMPLE_THROTTLED_MS (1000ms) during Mali driver anomalies 
- *   to reduce rendering and I/O pressure on budget hardware.
+ *   thresholds with dynamic polling intervals.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -486,7 +485,7 @@ class MainViewModel @Inject constructor(
             sinceConnMs = if (activeStats.lastConnTs > 0) (nowRt - activeStats.lastConnTs) else 0L, 
             sinceDiscoMs = if (activeStats.lastDiscTs > 0) (nowRt - activeStats.lastDiscTs) else 0L, 
             totalDropMs = activeStats.totalDropMs, maxDropMs = activeStats.maxDropMs, 
-            engineVersion = "Oct11.2", netInterface = diag.connectivity.netInterface,
+            engineVersion = "Oct12.17", netInterface = diag.connectivity.netInterface,
             systemPulse = nowRt, isLocalOnline = diag.connectivity.isLocalOnline, isRelayConnected = diag.connectivity.isRelayConnected
         )
     }
@@ -616,11 +615,20 @@ class MainViewModel @Inject constructor(
         val tTel = loc.ts
         val vLat = if (m == "viewer") kinematic.localLocation.kinetic.lat else 0.0
         val vLng = if (m == "viewer") kinematic.localLocation.kinetic.lng else 0.0
+        
         if (PhysicsUtils.isValidLocation(tLat, tLng)) { 
             val alpha = if (kinematic.localLocation.kinetic.speed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
             if (sTrkLat == 0.0 || PhysicsUtils.calculateDistance(sTrkLat, sTrkLng, tLat, tLng) > 100.0) { sTrkLat = tLat; sTrkLng = tLng } 
             else { sTrkLat = PhysicsUtils.smoothCoordinate(sTrkLat, tLat, alpha); sTrkLng = PhysicsUtils.smoothCoordinate(sTrkLng, tLng, alpha) } 
         }
+
+        // Oct.12.17: Added Viewer Smoothing logic (Fixes Null Island for local marker)
+        if (PhysicsUtils.isValidLocation(vLat, vLng)) {
+            val alpha = if (kinematic.localLocation.kinetic.speed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
+            if (sVwrLat == 0.0 || PhysicsUtils.calculateDistance(sVwrLat, sVwrLng, vLat, vLng) > 100.0) { sVwrLat = vLat; sVwrLng = vLng } 
+            else { sVwrLat = PhysicsUtils.smoothCoordinate(sVwrLat, vLat, alpha); sVwrLng = PhysicsUtils.smoothCoordinate(sVwrLng, vLng, alpha) } 
+        }
+
         val fixAgeRt = if (loc.kinetic.rt > 0) pulseRt - loc.kinetic.rt else Long.MAX_VALUE
         
         // Issue #SIMP-1107: Harmonized Map Freshness.
@@ -643,7 +651,9 @@ class MainViewModel @Inject constructor(
             viewerLat = vLat, viewerLng = vLng, systemPulse = pulse, systemPulseRt = pulseRt, 
             trackerSegments = trkSegs, viewerSegments = vwrSegs, violations = vios, 
             isTrackerFresh = isTrackerFresh, isTrackerValid = isTrackerValid, isViewerValid = isViewerValid, 
-            smoothedTrackerLat = sTrkLat, smoothedTrackerLng = sTrkLng, initialCenter = initialCenter
+            smoothedTrackerLat = sTrkLat, smoothedTrackerLng = sTrkLng,
+            smoothedViewerLat = sVwrLat, smoothedViewerLng = sVwrLng,
+            initialCenter = initialCenter
         )
     }
 

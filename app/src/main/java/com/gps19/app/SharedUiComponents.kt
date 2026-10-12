@@ -48,10 +48,9 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * Oct.5.20:
- * - SIMP-1426-3: Refactored RibbonsOverlay and GlobalStatusBar to consume 
- *   unified UiStateProvider. Corrected syntax errors by expanding dense 
- *   logic blocks. (R1426-3).
+ * Oct.12.17:
+ * - ISSUE-OCT12.16-1: Increased HUD background opacity to 0.75f for 
+ *   better legibility against map tiles.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -560,7 +559,7 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
     val trackerStateActive = isTrackerGpsActive && telemetry.trackerState != TrackerState.UNKNOWN
     val stateColor = if (trackerStateActive) BrandJd else Slate500
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
-        Card(modifier = modifier.fillMaxWidth(), shape = androidx.compose.ui.graphics.RectangleShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = if (isLandscape) 0.6f else 0.4f)), elevation = CardDefaults.cardElevation(0.dp)) {
+        Card(modifier = modifier.fillMaxWidth(), shape = androidx.compose.ui.graphics.RectangleShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)), elevation = CardDefaults.cardElevation(0.dp)) {
             Column(modifier = Modifier.fillMaxWidth().padding(top = 1.dp, bottom = 2.dp)) {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {

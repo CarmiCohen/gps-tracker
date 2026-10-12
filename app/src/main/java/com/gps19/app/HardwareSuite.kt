@@ -37,6 +37,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.12.17:
+ * - ISSUE-OCT12.13-3: Implemented automatic recovery from GPS_HARDWARE_LOCK after 10m.
+ * - ISSUE-OCT12.13-4: Added interval update debounce to mitigate GPS registration flutter.
  * Oct.12.2:
  * - Issue #SIMP-1107-2: GNSS Burst Refining. Optimized radio-warm keep-alive pulse 
  *   duration based on RTT stability. Fixed permission check regressions.
@@ -250,6 +253,7 @@ class HardwareSuite @Inject constructor(
     private val pollingIntervalFlow = MutableStateFlow(TICK_INTERVAL_MS)
     private var revivalAttemptCount = 0
     private var isHardwareLocked = false
+    private var lastIntervalUpdateRt = 0L
     private var revivalBaselineCaptured = false
     private var lastRadioKeepAliveRt = 0L
 
@@ -680,7 +684,7 @@ class HardwareSuite @Inject constructor(
     }
 
     private fun restartLocationUpdates() {
-        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) return
+        if (!isStarted.get() || isSafeMode || ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) return
         
         revivalPulseJob?.cancel()
         revivalPulseJob = scope.launch(Dispatchers.Default) {
@@ -876,7 +880,18 @@ class HardwareSuite @Inject constructor(
     fun getLocationFlow(): Flow<Location> = hardwareObservationFlow.filterIsInstance<GpsUpdate.LocationUpdate>().map { it.location }
     val gnssDetailFlow: Flow<GnssDetail?> = hardwareObservationFlow.filterIsInstance<GpsUpdate.GnssUpdate>().map { it.detail }
 
-    fun setPollingInterval(intervalMs: Long) { if (pollingIntervalFlow.value != intervalMs) pollingIntervalFlow.value = intervalMs }
+    fun setPollingInterval(intervalMs: Long) { 
+        val nowRt = timeProvider.elapsedRealtime
+        if (pollingIntervalFlow.value != intervalMs) {
+            // ISSUE-OCT12.13-4: GPS Registration Debounce
+            if (lastIntervalUpdateRt > 0 && nowRt - lastIntervalUpdateRt < GPS_REGISTRATION_DEBOUNCE_MS) {
+                Timber.d("HardwareSuite: Polling interval update suppressed (flutter protection)")
+                return
+            }
+            lastIntervalUpdateRt = nowRt
+            pollingIntervalFlow.value = intervalMs 
+        }
+    }
     fun resetGnssJitter() { forensicAuditor.resetGnssJitter() }
 
     inline fun iterateSnrSamples(fromRt: Long, toRt: Long, crossinline action: (ForensicSample) -> Unit) {
@@ -1410,12 +1425,21 @@ class HardwareSuite @Inject constructor(
         val nowRt = timeProvider.elapsedRealtime; val currentStatus = currentLocationStatus
         if (currentStatus.isPending) {
             val stallDuration = nowRt - pendingEnterRt
-            // Issue #SIMP-1107: Revival retry must be aware of the intended interval.
-            // If interval is 60s, wait at least 90s before restarting hardware.
             val currentInterval = pollingIntervalFlow.value
             val baseRetryInterval = max(GPS_REVIVAL_RETRY_INTERVAL_MS, (currentInterval * 1.5).toLong())
-            
             val retryThreshold = (revivalAttemptCount + 1) * baseRetryInterval
+
+            if (isHardwareLocked) {
+                // ISSUE-OCT12.13-3: Automatic Recovery from Hardware Lock
+                val recoveryThreshold = retryThreshold + GPS_LOCK_RECOVERY_DELAY_MS
+                if (stallDuration > recoveryThreshold) {
+                    Timber.i("HardwareSuite: Attempting automatic recovery from GPS_HARDWARE_LOCK.")
+                    isHardwareLocked = false
+                    revivalAttemptCount = 0
+                }
+                return
+            }
+
             if (stallDuration > retryThreshold) {
                 if (revivalAttemptCount < MAX_REVIVAL_ATTEMPTS) {
                     revivalAttemptCount++; Timber.w("HardwareSuite: GNSS Recovery Pulse triggered (Attempt $revivalAttemptCount)"); domainEventBus.emit(RevivalEvent.Attempt(revivalAttemptCount)); restartLocationUpdates()

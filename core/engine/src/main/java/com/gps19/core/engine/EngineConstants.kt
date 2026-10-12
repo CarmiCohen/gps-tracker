@@ -2,14 +2,15 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.12.17:
+ * - ISSUE-OCT12.13-1: Increased UI staleness thresholds to 60s to safely 
+ *   accommodate the 45s Screen-Off polling interval and prevent false RED LEDs.
+ * - ISSUE-OCT12.13-3: Added GPS_LOCK_RECOVERY_DELAY_MS for automatic recovery.
+ * - ISSUE-OCT12.13-4: Added GPS_REGISTRATION_DEBOUNCE_MS to mitigate chip flutter.
+ * - Typo Fix: Corrected GPS_INDEX_AGE_EXCELLENT_SEC spelling.
  * Oct.12.3:
  * - Issue #SIMP-1012-3: Forensic Integrity. Restored missing thresholds 
  *   required for LogRepository and TrackerStateManager.
- * Oct.12.2:
- * - Issue #SIMP-1012-2: Network Buffer Hardening. Added SIGNALING_QUEUE_LIMIT 
- *   to prevent OOM during long disconnects.
- * - Issue #SIMP-1107-2: GNSS Burst Refining. Added RADIO_WARM_BURST durations 
- *   and RTT stability thresholds.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -274,6 +275,8 @@ const val STARTUP_SETTLING_DELAY_MS = 2000L
 const val STAGGERED_IO_PRUNING_DELAY_MS = 15000L
 const val GPS_WARMUP_GRACE_MS = 30000L
 const val RADIO_KEEP_ALIVE_INTERVAL_MS = 60000L
+const val GPS_LOCK_RECOVERY_DELAY_MS = 600000L
+const val GPS_REGISTRATION_DEBOUNCE_MS = 2000L
 
 // GPS Polling Intervals (Central Authority)
 const val HIGH_FREQUENCY_GPS_POLLING_MS = 2000L
@@ -412,8 +415,8 @@ const val GPS_STABILITY_RELIABILITY_THRESHOLD = 98.0
 const val GNSS_EXPECTED_INTERVAL_MS = 1000L
 const val GNSS_JITTER_THRESHOLD_MS = 3000L
 
-const val TELEMETRY_UI_STALE_THRESHOLD_MS = 35000L 
-const val GPS_UI_FAIL_THRESHOLD_MS = 35000L
+const val TELEMETRY_UI_STALE_THRESHOLD_MS = 60000L 
+const val GPS_UI_FAIL_THRESHOLD_MS = 60000L
 
 const val NOTIFICATION_THROTTLE_MS = 30000L
 
