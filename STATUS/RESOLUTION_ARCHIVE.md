@@ -1,5 +1,16 @@
 # Resolution Archive
 
+## [Oct11.20] - Mapping Centralization & HUD Clarity
+**Issue ID**: #ISSUE-OCT12.13-5, #ISSUE-OCT12.14-3, #ISSUE-OCT12.16-6
+**Status**: RESOLVED
+**Description**: Purged redundant `UiStateCoordinator` to eliminate stale mapping logic. Hardened HUD error indicators with contextual labels and resolved navigation bar overlap on gesture-enabled devices.
+**Root Cause**: `UiStateCoordinator` contained duplicated projection logic that lacked critical Oct11.7 and Oct12.19 hardening fixes. Global HUD error icons lacked labels, making it difficult to distinguish relay disconnection from telemetry staleness. Map overlays (version tag/uncertainty) lacked sufficient vertical buffering from system navigation bars.
+**Remediation**:
+- **Dead Code Purge**: Emptied `UiStateCoordinator.kt` and centralized all UI state mapping within `MainViewModel.kt` using validated engine polling thresholds.
+- **HUD Clarity**: Updated `StatusBar` in `SharedUiComponents.kt` to include "DATA ERR" labels for link health failures. Refined `mapHudConnectivity` logic to correctly evaluate health based on active role (Tracker vs Viewer).
+- **Inset Hardening**: Applied `windowInsetsPadding(WindowInsets.navigationBars)` and increased safety margins (44dp/82dp) for map overlays in `MapComponents.kt`.
+- **Versioning**: Standardized internal engine version strings to `Oct11.20`.
+
 ## [Oct12.19] - Signaling Resilience & UI Density Hardening
 **Issue ID**: #ISSUE-OCT12.16-5, #ISSUE-OCT12.13-2, #ISSUE-OCT12.16-4
 **Status**: RESOLVED

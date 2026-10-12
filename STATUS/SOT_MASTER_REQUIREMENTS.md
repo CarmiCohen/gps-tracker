@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct12.19)
+# SOT Master Requirements & Hardening Status (Oct11.20)
 
-## 🏗️ Architectural Master Rules (228 Rules)
+## 🏗️ Architectural Master Rules (230 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -15,10 +15,14 @@
 *   **1.184 Idempotent Signaling Handover (R-ID 653)**: Signaling connection requests MUST be idempotent; if a connection is active or in-progress with identical parameters, redundant socket reconstruction MUST be suppressed to prevent relay "reset-bombing" during network flapping. (Oct12.19 - Issue #ISSUE-OCT12.16-5).
 *   **1.185 Context-Aware Freshness (R-ID 654)**: UI staleness indicators MUST explicitly account for the active engine polling tier (e.g., 45s Screen-Off, 60s Stationary) to prevent false-positive failure alerts during intentional acquisition decay. (Oct12.19 - Issue #ISSUE-OCT12.13-2).
 *   **1.186 High-Density Touch Targets (R-ID 655)**: Navigation icons in high-density layouts (Portrait HeaderBar) MUST maintain a minimum touch target size of 48dp to ensure usability for safety-critical operations. (Oct12.19 - Issue #ISSUE-OCT12.16-4).
+*   **1.187 Centralized State Projection (R-ID 656)**: UI state mapping logic MUST be centralized within the ViewModel (or dedicated UseCases) to ensure all telemetry projections utilize the latest verified polling thresholds and architectural fixes. (Oct11.20 - Issue #ISSUE-OCT12.13-5).
+*   **1.188 Contextual HUD Diagnostics (R-ID 657)**: Safety-critical status indicators (HUD) MUST provide explicit contextual labels (e.g., "DATA ERR") when health checks fail, ensuring users can distinguish between link loss and telemetry staleness without opening deeper logs. (Oct11.20 - Issue #ISSUE-OCT12.14-3).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 702**: HUD Clarity - Integrated "DATA ERR" contextual hint for link health failures. (Oct11.20 - Issue #ISSUE-OCT12.14-3).
+*   **SOT ID 701**: Mapping Integrity - Purged UiStateCoordinator and unified state projection logic. (Oct11.20 - Issue #ISSUE-OCT12.13-5).
 *   **SOT ID 700**: Layout Density - Increased HeaderBar touch targets and icon dimensions for portrait usability. (Oct12.19 - Issue #ISSUE-OCT12.16-4).
 *   **SOT ID 699**: Threshold Harmonization - Aligned MainViewModel freshness logic with dynamic polling tiers (Screen-Off/Stationary). (Oct12.19 - Issue #ISSUE-OCT12.13-2).
 *   **SOT ID 698**: Signaling Resilience - Implemented idempotency in CommunicationManager.connect() to survive cellular handover flapping. (Oct12.19 - Issue #ISSUE-OCT12.16-5).
@@ -34,6 +38,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.778 (UI Transparency)**: PASSED - Verified that "DATA ERR" label appears correctly when relay connection is dropped or telemetry exceeds tier-specific thresholds. (Oct11.20).
 *   **Chapter 31.777 (Link Resilience)**: PASSED - Verified that rapid Wi-Fi/LTE switching no longer triggers redundant socket creation in CommunicationManager. (Oct12.19).
 *   **Chapter 31.776 (Temporal Integrity)**: PASSED - Verified that system suspension events no longer trigger 1000s+ jitter spikes in ForensicAuditor. (Oct12.18).
 *   **Chapter 31.775 (UI Alignment)**: PASSED - Verified HUD contrast (75%) and version tag padding (42dp) prevent tile-clash and scale-bar overlap on SM-G990E. (Oct12.17).

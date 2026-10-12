@@ -21,6 +21,11 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.11.20:
+ * - ISSUE-OCT12.13-5: Purged UiStateCoordinator and finalized transition to 
+ *   ViewModel-local mapping logic to ensure consistency with latest hardening fixes.
+ * - ISSUE-OCT12.14-3: Refined mapHudConnectivity to correctly evaluate data health 
+ *   in tracker mode (relay connectivity only) vs viewer mode (relay + telemetry freshness).
  * Oct.12.19:
  * - ISSUE-OCT12.13-2: Harmonized GPS freshness thresholds with engine polling tiers, 
  *   explicitly accounting for Screen-Off/Power-Save intervals (45s).
@@ -28,9 +33,6 @@ import javax.inject.Inject
  * - ISSUE-OCT12.13-6: Fixed Viewer smoothing bug where sVwrLat/Lng were never 
  *   updated, causing markers to default to (0,0).
  * - ISSUE-OCT12.13-12: Standardized engine version reporting to Oct12.17.
- * Oct.11.7:
- * - Issue #SIMP-1107: GPS Acquisition Regression. Harmonized UI staleness 
- *   thresholds with dynamic polling intervals.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -488,7 +490,7 @@ class MainViewModel @Inject constructor(
             sinceConnMs = if (activeStats.lastConnTs > 0) (nowRt - activeStats.lastConnTs) else 0L, 
             sinceDiscoMs = if (activeStats.lastDiscTs > 0) (nowRt - activeStats.lastDiscTs) else 0L, 
             totalDropMs = activeStats.totalDropMs, maxDropMs = activeStats.maxDropMs, 
-            engineVersion = "Oct12.19", netInterface = diag.connectivity.netInterface,
+            engineVersion = "Oct11.20", netInterface = diag.connectivity.netInterface,
             systemPulse = nowRt, isLocalOnline = diag.connectivity.isLocalOnline, isRelayConnected = diag.connectivity.isRelayConnected
         )
     }
@@ -560,7 +562,16 @@ class MainViewModel @Inject constructor(
         val isTelemetryFresh = if (lastSeenTs > 0) (nowRt - lastSeenTs) < TELEMETRY_UI_STALE_THRESHOLD_MS else false
         val commIndex = if (isSystemActive && diag.connectivity.isRelayConnected) TelemetryUtils.calculateCommIndex(rtt, 10, 10) else 0
         val remoteCommIndex = if (appMode == "viewer" && isTelemetryFresh) TelemetryUtils.calculateCommIndex(rtt, remoteSignal, 10) else 0
-        val isDataHealthy = (appMode == "viewer") && isTelemetryFresh && diag.connectivity.isLocalOnline && diag.connectivity.isRelayConnected
+        
+        // ISSUE-OCT12.14-3: Refined data health logic for tracker mode.
+        val isDataHealthy = if (appMode == "viewer") {
+            isTelemetryFresh && diag.connectivity.isLocalOnline && diag.connectivity.isRelayConnected
+        } else {
+            // For tracker, data is healthy if we are online and connected to relay. 
+            // We don't check "telemetry freshness" as we ARE the source.
+            diag.connectivity.isLocalOnline && diag.connectivity.isRelayConnected
+        }
+        
         val isLocalServiceAlive = (nowRt - diag.pulse) < TELEMETRY_UI_STALE_THRESHOLD_MS
         val throttled = if (appMode == "viewer") diag.trackerIsGnssThrottled else diag.isGnssThrottled
         return HudConnectivityState(

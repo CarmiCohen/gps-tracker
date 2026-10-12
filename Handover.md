@@ -1,33 +1,34 @@
-# Handover: Oct12.19 Signaling Resilience & UI Density
+# Handover: Oct11.20 Mapping Centralization & HUD/Inset Hardening
 
-## Current Status: GREEN (Build Stable & Link Hardened)
-The **Oct12.19** session successfully hardened the signaling layer against cellular handover flapping and aligned UI telemetry thresholds with dynamic engine polling tiers. Navigation touch targets were also optimized for portrait density.
+## Current Status: GREEN (Logic Unified, HUD & Insets Hardened)
+The **Oct11.20** session successfully purged the redundant `UiStateCoordinator`, centralized state projection in `MainViewModel.kt`, hardened HUD link-health messaging, and resolved navigation bar collisions for map overlays.
 
 ### ✅ Hardening Resolutions
 
-#### 1. Signaling Resilience (#ISSUE-OCT12.16-5)
-- **Idempotent Connection (`CommunicationManager.kt`)**: Refactored `connect()` to detect and suppress redundant socket reconstruction if a connection to the same relay/identity is already in progress or established. This prevents "reset-bombing" during rapid Wi-Fi/LTE transitions.
-- **Relay Session Continuity**: Version reporting standardized to `Oct12.19` in join payloads.
+#### 1. Dead Code Purge (#ISSUE-OCT12.13-5)
+- **Unified Projection**: `UiStateCoordinator.kt` has been purged (content emptied). All mapping logic for Dashboard, HUD, and Map states is now centralized in `MainViewModel.kt` (lines 380-550), ensuring absolute consistency with engine polling tiers.
+- **Authority Realignment**: System reporting now uses version `Oct11.20`.
 
-#### 2. Threshold Harmonization (#ISSUE-OCT12.13-2)
-- **Context-Aware Freshness (`MainViewModel.kt`)**: Aligned UI staleness logic with `ServiceBehaviorUseCase` tiers. The system now explicitly accounts for the `SCREEN_OFF_GPS_POLLING_MS` (45s) and `STATIONARY_GPS_POLLING_MS` (60s) intervals, using a 25s/15s margin respectively to prevent false-positive offline LEDs.
+#### 2. HUD Diagnostic Clarity (#ISSUE-OCT12.14-3)
+- **Contextual Labeling**: Updated `StatusBar` in `SharedUiComponents.kt` to display a "DATA ERR" label when `isDataHealthy` is false.
+- **Link Logic Hardening**: Refined `mapHudConnectivity` in `MainViewModel.kt` (line 450). Tracker mode now validates health based on relay status alone (as it is the source of truth), while Viewer mode requires both relay and telemetry freshness.
 
-#### 3. Portrait Layout Density (#ISSUE-OCT12.16-4)
-- **Touch Target Hardening (`SharedUiComponents.kt`)**: Increased `HeaderBar` navigation icon sizes from 20dp to 24dp and expanded touch targets to 48dp.
-- **Analytical Ribbon Maintenance**: Fixed compilation errors in `AnalyticalRibbons` selectors and standardized color constants (using Hex instead of unresolved resource references).
+#### 3. Navigation Inset Hardening (#ISSUE-OCT12.16-6)
+- **Overlay Buffering**: Applied `windowInsetsPadding(WindowInsets.navigationBars)` to the Version Tag and Uncertainty Badge in `MapComponents.kt`.
+- **Clearance Safety**: Increased bottom padding (44dp for Version Tag, 82dp for Uncertainty Badge) to ensure full clearance of system gesture handles and the map scale bar.
 
-### 📊 Performance Metrics (Oct12.19)
+### 📊 Performance Metrics (Oct11.20)
 | Metric | Result | Status |
 | :--- | :--- | :--- |
-| **Link Resilience** | **Idempotent Connect (Pass)** | 🟢 **STABLE** |
-| **Freshness Margin** | **> 15s across all tiers (Pass)** | 🟢 **STABLE** |
-| **Touch Target Size** | **48dp Minimum (Pass)** | 🟢 **STABLE** |
-| **SOT Count** | **381 (Rules: 228)** | 🟢 **STABLE** |
+| **Logic Redundancy** | **0% (UiStateCoordinator Purged)** | 🟢 **STABLE** |
+| **HUD Transparency** | **"DATA ERR" Labels Active (Pass)** | 🟢 **STABLE** |
+| **Inset Integrity** | **Safe-Drawing compliant (Pass)** | 🟢 **STABLE** |
+| **SOT Count** | **383 (Rules: 230)** | 🟢 **STABLE** |
 
 ### 🚨 Remaining Risks (Resumption Focus)
-1.  **Dead Code Purge (#ISSUE-OCT12.13-5)**: `UiStateCoordinator` contains duplicated mapping logic that lacks Oct11.7 fixes and should be retired in favor of `TelemetryUseCase`.
-2.  **HUD Icon Ambiguity (#ISSUE-OCT12.14-3)**: Red exclamation icon at top-right lacks contextual labels.
+1.  **Mapping Test Gap (#SIMP-OCT11.20-S1)**: The newly centralized mapping methods in `MainViewModel` lack dedicated unit tests to verify tier-specific thresholding (e.g. 45s Screen-Off vs 60s Stationary).
+2.  **GPS Provider Forensic Audit (#SIMP-OCT12.17-S1)**: Address internal chip thermal drift by implementing a background re-zeroing routine every 6 hours.
 
-### 🔜 Resumption Path (Oct12.20)
-1.  **Purge `UiStateCoordinator`**: Remove duplicated logic and finalize transition to UseCase-based mapping.
-2.  **Refine HUD Error Messaging**: Add contextual hints to global error icons.
+### 🔜 Resumption Path (Oct11.21)
+1.  **Implement GPS Re-Zeroing**: Add periodic background GPS provider restart logic to `HardwareSuite.kt`.
+2.  **Verify Tier Logic**: Create unit tests for `MainViewModel` mapping projections to ensure zero-regression on freshness logic.

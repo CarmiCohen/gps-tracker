@@ -48,14 +48,12 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.11.20:
+ * - ISSUE-OCT12.14-3: HUD Error Icon Ambiguity Hardening. Added "DATA ERR" 
+ *   contextual label when link health fails to provide forensic clarity.
  * Oct.12.19:
  * - ISSUE-OCT12.16-4: HeaderBar Portrait Density Hardening. Increased touch 
  *   target sizes (48dp) and icon dimensions (24dp) for better usability.
- * - Compilation Fix: Resolved unresolved references (Reverse -> RepeatMode.Reverse, 
- *   ScatteredFloat -> toFloat) and added missing selector definitions.
- * Oct.12.17:
- * - ISSUE-OCT12.16-1: Increased HUD background opacity to 0.75f for 
- *   better legibility against map tiles.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -535,7 +533,6 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
     val isTrackerGpsActive = if (mode == "viewer") telemetry.isGpsFresh else telemetry.isLocalGpsActive
     val progressValue = if (health.progressPulse > 0f) health.progressPulse else 0f
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val trkIdLabel = connectivity.trackerId.take(6).uppercase()
     val viewIdLabel = connectivity.viewerId.take(6).uppercase()
     val isThrottled = health.isMaliAnomaly
@@ -586,9 +583,8 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
                         if (health.hasActiveAlarms) { StatusBadge(label = "ALM", active = true, activeColor = Color(0xFFF43F5E).copy(alpha = alarmAlpha), isBold = true) }
                         if (health.isRedScreenSuppressed) { Box(modifier = Modifier.background(if (health.isSirenPlaying) Color(0xFFF43F5E).copy(alpha = alarmAlpha) else Slate500, RoundedCornerShape(2.dp)).padding(horizontal = 2.dp)) { Text(text = if (health.isSirenPlaying) "SIREN" else "LOCK", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Bold, style = compactStyle) } }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(text = telemetry.trackerState.name, color = stateColor.copy(alpha = if (telemetry.trackerState == TrackerState.MOVING && isTrackerGpsActive) movingAlpha else 1f), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
-                        Spacer(Modifier.width(6.dp))
                         val animatedSpeedState = animateFloatAsState(
                             if (isTrackerGpsActive && !telemetry.speedMps.isNaN()) telemetry.speedMps * 3.6f else 0f, 
                             if (isThrottled) snap() else tween(1000), 
@@ -603,95 +599,72 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
                             fontFamily = FontFamily.Monospace, 
                             style = compactStyle
                         )
-                        Spacer(Modifier.width(4.dp))
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(14.dp)) { 
+                        
+                        // ISSUE-OCT12.14-3: HUD Data Health Label for forensic clarity.
+                        if (!connectivity.isDataHealthy) {
+                            Text(
+                                text = "DATA ERR",
+                                color = Color(0xFFF43F5E),
+                                fontSize = 7.sp,
+                                fontWeight = FontWeight.Black,
+                                fontFamily = FontFamily.Monospace,
+                                style = compactStyle,
+                                modifier = Modifier.padding(end = 2.dp)
+                            )
+                        }
+
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(16.dp)) { 
                             if (!isThrottled) {
                                 CircularProgressIndicator(
                                     progress = { progressValue }, 
-                                    modifier = Modifier.size(12.dp), 
+                                    modifier = Modifier.size(14.dp), 
                                     color = if (connectivity.isDataHealthy) localColor else Color(0xFFF43F5E), 
-                                    strokeWidth = 1.5.dp
+                                    strokeWidth = 2.dp
                                 )
                             }
                             Icon(
                                 imageVector = if (connectivity.isDataHealthy) Icons.Default.CheckCircle else Icons.Default.Error, 
-                                contentDescription = null, 
-                                modifier = Modifier.size(7.dp), 
+                                contentDescription = if (connectivity.isDataHealthy) "Data Healthy" else "Data Health Error", 
+                                modifier = Modifier.size(9.dp), 
                                 tint = if (connectivity.isDataHealthy) localColor else Color(0xFFF43F5E)
                             ) 
                         }
                     }
                 }
-                if (isLandscape && mode == "viewer") {
-                    Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp)) {
+                Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (mode == "viewer") { 
                         val vAge = if(telemetry.viewerGpsTs > 0) health.systemPulse - telemetry.viewerGpsTs else -1L
-                        Box(modifier = Modifier.weight(1f)) { 
-                            StatusRowData(
-                                StatusRowState(
-                                    label = viewIdLabel, battery = health.battery, commIndex = connectivity.commIndex, 
-                                    color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = health.isCharging, 
-                                    accuracy = telemetry.viewerAccuracy, maxAccuracy = telemetry.maxViewerAccuracy, 
-                                    temp = health.viewerTemp, distance = telemetry.distToViewer, satsUsed = telemetry.viewerSatsUsed, 
-                                    satsView = telemetry.viewerSatsView, gpsAgeMs = vAge, isLocPending = telemetry.isViewerLocPending, 
-                                    locPendingReason = telemetry.viewerLocPendingReason, 
-                                    isTelemetryFresh = telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), 
-                                    isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS, isThrottled = isThrottled
-                                )
-                            ) 
-                        }
-                        val tAge = if(lastGpsTs > 0) health.systemPulse - lastGpsTs else -1L
-                        Box(modifier = Modifier.weight(1f)) { 
-                            StatusRowData(
-                                StatusRowState(
-                                    label = trkIdLabel, battery = health.battery, commIndex = if(isPeerActive) connectivity.remoteCommIndex else 0, 
-                                    color = if(isPeerActive) BrandJd else Slate500, isCharging = health.remoteCharging, 
-                                    accuracy = telemetry.trackerAccuracy, maxAccuracy = telemetry.maxTrackerAccuracy, 
-                                    satsView = telemetry.satsView, satsUsed = telemetry.satsUsed, gpsAgeMs = tAge, 
-                                    temp = health.trackerTemp, distance = telemetry.distToHome, isRemote = true, 
-                                    isPeerActive = isPeerActive, isLocPending = telemetry.isTrackerLocPending, 
-                                    locPendingReason = telemetry.locationPendingReason, isTelemetryFresh = isPeerActive, 
-                                    isGpsFresh = isTrackerGpsActive, isUltraLongStationary = telemetry.isUltraLongStationary, 
-                                    isThrottled = isThrottled
-                                )
-                            ) 
-                        }
-                    }
-                } else {
-                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (mode == "viewer") { 
-                            val vAge = if(telemetry.viewerGpsTs > 0) health.systemPulse - telemetry.viewerGpsTs else -1L
-                            StatusRowData(
-                                StatusRowState(
-                                    label = viewIdLabel, battery = health.battery, commIndex = connectivity.commIndex, 
-                                    color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = health.isCharging, 
-                                    accuracy = telemetry.viewerAccuracy, maxAccuracy = telemetry.maxViewerAccuracy, 
-                                    temp = health.viewerTemp, distance = telemetry.distToViewer, satsUsed = telemetry.viewerSatsUsed, 
-                                    satsView = telemetry.viewerSatsView, gpsAgeMs = vAge, isLocPending = telemetry.isViewerLocPending, 
-                                    locPendingReason = telemetry.viewerLocPendingReason, 
-                                    isTelemetryFresh = telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), 
-                                    isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS, isThrottled = isThrottled
-                                )
-                            ) 
-                        }
-                        val tAge = if(lastGpsTs > 0) health.systemPulse - lastGpsTs else -1L
                         StatusRowData(
                             StatusRowState(
-                                label = trkIdLabel, 
-                                battery = if (mode == "viewer") health.remoteBattery else health.battery, 
-                                commIndex = if (mode == "viewer") (if(isPeerActive) connectivity.remoteCommIndex else 0) else connectivity.commIndex, 
-                                color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, 
-                                isCharging = if (mode == "viewer") health.remoteCharging else health.isCharging, 
-                                accuracy = telemetry.trackerAccuracy, maxAccuracy = telemetry.maxTrackerAccuracy, 
-                                satsView = telemetry.satsView, satsUsed = telemetry.satsUsed, gpsAgeMs = tAge, 
-                                temp = health.trackerTemp, distance = telemetry.distToHome, isRemote = mode == "viewer", 
-                                isPeerActive = if(mode == "viewer") isPeerActive else true, 
-                                isLocPending = telemetry.isTrackerLocPending, locPendingReason = telemetry.locationPendingReason, 
-                                isTelemetryFresh = if (mode == "tracker") (telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isPeerActive, 
-                                isGpsFresh = isTrackerGpsActive, isUltraLongStationary = telemetry.isUltraLongStationary, 
-                                isThrottled = isThrottled
+                                label = viewIdLabel, battery = health.battery, commIndex = connectivity.commIndex, 
+                                color = ViewerCyan, overrideDistanceColor = BrandJd, isCharging = health.isCharging, 
+                                accuracy = telemetry.viewerAccuracy, maxAccuracy = telemetry.maxViewerAccuracy, 
+                                temp = health.viewerTemp, distance = telemetry.distToViewer, satsUsed = telemetry.viewerSatsUsed, 
+                                satsView = telemetry.viewerSatsView, gpsAgeMs = vAge, isLocPending = telemetry.isViewerLocPending, 
+                                locPendingReason = telemetry.viewerLocPendingReason, 
+                                isTelemetryFresh = telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), 
+                                isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS, isThrottled = isThrottled
                             )
-                        )
+                        ) 
                     }
+                    val tAge = if(lastGpsTs > 0) health.systemPulse - lastGpsTs else -1L
+                    StatusRowData(
+                        StatusRowState(
+                            label = trkIdLabel, 
+                            battery = if (mode == "viewer") health.remoteBattery else health.battery, 
+                            commIndex = if (mode == "viewer") (if(isPeerActive) connectivity.remoteCommIndex else 0) else connectivity.commIndex, 
+                            color = if (mode == "viewer" && !isPeerActive) Slate500 else BrandJd, 
+                            isCharging = if (mode == "viewer") health.remoteCharging else health.isCharging, 
+                            accuracy = telemetry.trackerAccuracy, maxAccuracy = telemetry.maxTrackerAccuracy, 
+                            satsView = telemetry.satsView, satsUsed = telemetry.satsUsed, gpsAgeMs = tAge, 
+                            temp = health.trackerTemp, distance = telemetry.distToHome, isRemote = mode == "viewer", 
+                            isPeerActive = if(mode == "viewer") isPeerActive else true, 
+                            isLocPending = telemetry.isTrackerLocPending, locPendingReason = telemetry.locationPendingReason, 
+                            isTelemetryFresh = if (mode == "tracker") (telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isPeerActive, 
+                            isGpsFresh = isTrackerGpsActive, isUltraLongStationary = telemetry.isUltraLongStationary, 
+                            isThrottled = isThrottled
+                        )
+                    )
                 }
             }
         }

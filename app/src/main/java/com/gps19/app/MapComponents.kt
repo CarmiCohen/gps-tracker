@@ -41,9 +41,10 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * Oct.12.17:
- * - ISSUE-OCT12.16-3: Shifted version tag by 40dp bottom padding to avoid 
- *   collision with the scale bar.
+ * Oct.11.21:
+ * - ISSUE-OCT12.16-6: Hardened navigation insets for bottom overlays. Switched 
+ *   to explicit windowInsetsPadding and increased safety margins (44dp/82dp) 
+ *   to ensure clearance of system gesture handles and scale bar.
  */
 
 @Composable
@@ -73,6 +74,7 @@ fun AppMapContainer(
                 mapViewRef = mapViewRef
             )
 
+            // Version Tag: Positioned to clear scale bar and system navigation handle
             Text(
                 text = BuildConfig.VERSION_NAME, 
                 color = Color.White, 
@@ -80,8 +82,8 @@ fun AppMapContainer(
                 fontWeight = FontWeight.Black, 
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(end = 4.dp, bottom = 42.dp)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(end = 6.dp, bottom = 44.dp)
                     .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(2.dp))
                     .padding(horizontal = 4.dp, vertical = 1.dp)
             )
@@ -116,8 +118,15 @@ fun AppMapContainer(
                 }
             }
 
+            // Uncertainty Badge: Positioned above the status card region
             if (state.trackerLocPending && state.trackerLocPendingReason != LocationPendingReason.NONE) {
-                Box(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp).background(Amber500.copy(alpha = 0.95f), RoundedCornerShape(4.dp)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                Box(modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(bottom = 82.dp)
+                    .background(Amber500.copy(alpha = 0.95f), RoundedCornerShape(4.dp))
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                ) {
                     Text(text = "UNCERTAINTY: ${state.trackerLocPendingReason.name.replace("_", " ")}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
                 }
             }
