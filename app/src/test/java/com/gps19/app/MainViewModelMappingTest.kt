@@ -8,6 +8,10 @@ import org.mockito.kotlin.*
 
 /**
  * MainViewModelMappingTest: Verifies centralized mapping logic and tier-specific freshness gates.
+ * Oct.13.2:
+ * - Issue #SIMP-OCT11.20-S1: Hardened smoothing tests by ensuring non-stationary speed 
+ *   (>0.5 m/s) to trigger default EMA alpha (0.3). Corrected location field targeting 
+ *   (localLocation vs trackerLocation) for tracker mode validation.
  * Oct.12.21:
  * - Issue #SIMP-OCT11.20-S1: Mapping Test Gap. Added coverage for Dashboard, HUD, and Map 
  *   telemetry freshness logic across all engine polling tiers.
@@ -23,13 +27,15 @@ class MainViewModelMappingTest {
         rt: Long = 1000000L,
         gpsTs: Long = 1700000000000L,
         isUltra: Boolean = false,
-        isPowerSave: Boolean = false
+        isPowerSave: Boolean = false,
+        speed: Double = 1.0 // Default to moving to use alpha 0.3
     ): KinematicState {
         return KinematicState().apply {
             localLocation.kinetic.rt = rt
             localLocation.kinetic.gpsTs = gpsTs
             localLocation.kinetic.lat = 32.0
             localLocation.kinetic.lng = 34.0
+            localLocation.kinetic.speed = speed
             localHealth.isUltraLongStationary = isUltra
             localHealth.isPowerSaveMode = isPowerSave
             
@@ -37,6 +43,7 @@ class MainViewModelMappingTest {
             trackerLocation.kinetic.gpsTs = gpsTs
             trackerLocation.kinetic.lat = 32.0
             trackerLocation.kinetic.lng = 34.0
+            trackerLocation.kinetic.speed = speed
             trackerHealth.isUltraLongStationary = isUltra
             trackerHealth.isPowerSaveMode = isPowerSave
             
@@ -45,8 +52,6 @@ class MainViewModelMappingTest {
     }
 
     private fun createViewModel(): MainViewModel {
-        // Mocking MainViewModel with CALLS_REAL_METHODS to test internal mapping functions
-        // while providing mocked dependencies.
         return mock<MainViewModel>(defaultAnswer = Answers.CALLS_REAL_METHODS) {
             on { timeProvider } doReturn timeProvider
         }
@@ -140,7 +145,8 @@ class MainViewModelMappingTest {
         val viewModel = createViewModel()
         val nowRt = timeProvider.elapsedRealtime
         val nowMs = timeProvider.currentTimeMillis
-        val kin = createKinematicState(rt = nowRt)
+        // Ensure speed > 0.5 to use alpha 0.3
+        val kin = createKinematicState(rt = nowRt, speed = 1.0)
         val spatial = SpatialUiState()
         
         // Initial mapping (Null Island check)
@@ -149,6 +155,7 @@ class MainViewModelMappingTest {
         assertEquals(34.0, result1.smoothedTrackerLng, 0.0001)
         
         // Move location slightly: Should smooth
+        // In "tracker" mode, MainViewModel uses localLocation as the "tracker" (primary) location
         kin.localLocation.kinetic.lat = 32.0001
         kin.localLocation.kinetic.lng = 34.0001
         val result2 = viewModel.mapMapViewState("tracker", 4, spatial, kin, nowRt + 2000L, nowMs + 2000L, emptyList(), emptyList(), emptyList())
@@ -162,8 +169,9 @@ class MainViewModelMappingTest {
         val viewModel = createViewModel()
         val nowRt = timeProvider.elapsedRealtime
         val nowMs = timeProvider.currentTimeMillis
-        val kin = createKinematicState(rt = nowRt)
-        // Set viewer location
+        // Ensure speed > 0.5 to use alpha 0.3
+        val kin = createKinematicState(rt = nowRt, speed = 1.0)
+        // Set viewer location (localLocation in viewer mode)
         kin.localLocation.kinetic.lat = 35.0
         kin.localLocation.kinetic.lng = 36.0
         
@@ -172,6 +180,8 @@ class MainViewModelMappingTest {
         
         kin.localLocation.kinetic.lat = 35.0001
         val result2 = viewModel.mapMapViewState("viewer", 4, SpatialUiState(), kin, nowRt + 2000L, nowMs + 2000L, emptyList(), emptyList(), emptyList())
+        
+        // sVwrLat = smooth(35.0, 35.0001, alpha=0.3) = 35.00003
         assertEquals(35.00003, result2.smoothedViewerLat, 0.00001)
     }
 

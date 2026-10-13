@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct10.3
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct.13.2
 
 ## 🎯 Current Resumption Focus: Forensic Integrity & Signal Decay Audit.
 
@@ -21,6 +21,7 @@
 ---
 
 ## 🟢 Resolved Traceability & Metadata Issues
+*   **SIMP-OCT11.20-S1: Mapping Test Hardening.** Hardened unit tests for `MainViewModel` smoothing projections by ensuring test data fidelity (non-stationary speeds) to trigger correct EMA branches. Resolved Oct.13.2.
 *   **SIMP-OCT12.16-S1: Unified HUD Overlay.** Merged HeaderBar, GlobalStatusBar, and map overlays into a unified `OverlayManager` to prevent Z-order collisions and simplify state management. Resolved Oct10.3.
 *   **SIMP-OCT11.20-S1: Mapping Verification.** Added comprehensive unit tests for `MainViewModel` mapping projections to ensure parity with engine tiers. Resolved Oct12.21.
 *   **ISSUE-OCT12.16-6: Navigation Inset Buffer.** Hardened map overlays with explicit navigation bar inset padding to clear system gesture handles. Resolved Oct11.20.
@@ -35,6 +36,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct.13.2: [SOT Count: 386 (Rules: 233), Open: H:0, M:0, L:0, Ideas: H:1, M:8, L:7, Testing: 5 (Sub-items: 25), QA: 285]**
 - **Oct10.3: [SOT Count: 385 (Rules: 232), Open: H:0, M:0, L:0, Ideas: H:1, M:8, L:7, Testing: 4 (Sub-items: 20), QA: 284]**
 - **Oct12.21: [SOT Count: 384 (Rules: 231), Open: H:0, M:0, L:0, Ideas: H:2, M:7, L:7, Testing: 4 (Sub-items: 20), QA: 284]**
 - **Oct11.20: [SOT Count: 383 (Rules: 230), Open: H:0, M:0, L:0, Ideas: H:2, M:7, L:8, Testing: 3 (Sub-items: 15), QA: 284]**

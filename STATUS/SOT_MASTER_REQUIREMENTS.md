@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct10.3)
+# SOT Master Requirements & Hardening Status (Oct.13.2)
 
-## 🏗️ Architectural Master Rules (232 Rules)
+## 🏗️ Architectural Master Rules (233 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -19,10 +19,12 @@
 *   **1.188 Contextual HUD Diagnostics (R-ID 657)**: Safety-critical status indicators (HUD) MUST provide explicit contextual labels (e.g., "DATA ERR") when health checks fail, ensuring users can distinguish between link loss and telemetry staleness without opening deeper logs. (Oct11.20 - Issue #ISSUE-OCT12.14-3).
 *   **1.189 Mapping Test Coverage (R-ID 658)**: All centralized UI mapping projections MUST be covered by unit tests that verify tier-specific freshness logic and coordinate smoothing to prevent state regression. (Oct12.21 - Issue #SIMP-OCT11.20-S1).
 *   **1.190 Unified HUD Orchestration (R-ID 659)**: All global telemetry overlays, navigation controls, and map badges MUST be orchestrated by a single `OverlayManager` to ensure deterministic Z-order stacking and prevent input collisions between fragmented UI layers. (Oct10.3 - Issue #SIMP-OCT12.16-S1).
+*   **1.191 Test Data Fidelity (R-ID 660)**: Automated tests for kinematic projections MUST utilize high-fidelity mock data (e.g., non-zero speeds) to ensure all EMA and tier-specific logic branches are correctly traversed. (Oct.13.2 - Issue #SIMP-OCT11.20-S1).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 705**: Mapping Test Hardening - Verified EMA alpha branches and coordinate smoothing with high-fidelity test data (>0.5 m/s). (Oct.13.2 - Issue #SIMP-OCT11.20-S1).
 *   **SOT ID 704**: Unified HUD - Merged HeaderBar, GlobalStatusBar, and map overlays into a single OverlayManager to prevent Z-order collisions. (Oct10.3 - Issue #SIMP-OCT12.16-S1).
 *   **SOT ID 703**: Mapping Verification - Implemented comprehensive unit tests for Dashboard, HUD, and Map projections. (Oct12.21 - Issue #SIMP-OCT11.20-S1).
 *   **SOT ID 702**: HUD Clarity - Integrated "DATA ERR" contextual hint for link health failures. (Oct11.20 - Issue #ISSUE-OCT12.14-3).
@@ -42,6 +44,7 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.781 (Test Hardening)**: PASSED - Verified that MainViewModelMappingTest successfully exercises EMA alpha branches for stationary vs moving states, resolving false-positive smoothing failures. (Oct.13.2).
 *   **Chapter 31.780 (UI Orchestration)**: PASSED - Verified that UnifiedHUDOverlay correctly stacks Header, Status, and Map tools, resolving Z-order collision risks between fragmented layers. (Oct10.3).
 *   **Chapter 31.779 (Logic Parity)**: PASSED - Verified that MainViewModel mapping logic correctly implements engine polling thresholds across all 4 tiers (Standard, Power-Save, Parking, Ultra). (Oct12.21).
 *   **Chapter 31.778 (UI Transparency)**: PASSED - Verified that "DATA ERR" label appears correctly when relay connection is dropped or telemetry exceeds tier-specific thresholds. (Oct11.20).
