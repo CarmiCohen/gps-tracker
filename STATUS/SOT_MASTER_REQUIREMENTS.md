@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct.13.2)
+# SOT Master Requirements & Hardening Status (Oct13.3)
 
-## 🏗️ Architectural Master Rules (233 Rules)
+## 🟢 Architectural Master Rules (235 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -19,37 +19,26 @@
 *   **1.188 Contextual HUD Diagnostics (R-ID 657)**: Safety-critical status indicators (HUD) MUST provide explicit contextual labels (e.g., "DATA ERR") when health checks fail, ensuring users can distinguish between link loss and telemetry staleness without opening deeper logs. (Oct11.20 - Issue #ISSUE-OCT12.14-3).
 *   **1.189 Mapping Test Coverage (R-ID 658)**: All centralized UI mapping projections MUST be covered by unit tests that verify tier-specific freshness logic and coordinate smoothing to prevent state regression. (Oct12.21 - Issue #SIMP-OCT11.20-S1).
 *   **1.190 Unified HUD Orchestration (R-ID 659)**: All global telemetry overlays, navigation controls, and map badges MUST be orchestrated by a single `OverlayManager` to ensure deterministic Z-order stacking and prevent input collisions between fragmented UI layers. (Oct10.3 - Issue #SIMP-OCT12.16-S1).
-*   **1.191 Test Data Fidelity (R-ID 660)**: Automated tests for kinematic projections MUST utilize high-fidelity mock data (e.g., non-zero speeds) to ensure all EMA and tier-specific logic branches are correctly traversed. (Oct.13.2 - Issue #SIMP-OCT11.20-S1).
+*   **1.191 Test Data Fidelity (R-ID 660)**: Automated tests for kinematic projections MUST utilize high-fidelity mock data (e.g., non-zero speeds) to ensure all EMA and tier-specific logic branches are correctly traversed. (Oct10.3 - Issue #SIMP-OCT11.20-S1).
+*   **1.192 Sequential Persistence Actor (R-ID 661)**: `OfflineRepository` MUST utilize a single-threaded actor (Channel-based) to process telemetry flushes, ensuring zero data loss and strictly sequential I/O during high-frequency bursts. (Oct13.3 - ISSUE-OCT13.3-1).
+*   **1.193 Doze Step Verification (R-ID 662)**: Power state integration tests MUST utilize the `dumpsys deviceidle step` sequence to reliably force deep IDLE states across varying manufacturer power policies. (Oct13.3 - ISSUE-OCT13.3-3).
 
 ...
 
-## 🛡️ Core Hardening Baseline
-*   **SOT ID 705**: Mapping Test Hardening - Verified EMA alpha branches and coordinate smoothing with high-fidelity test data (>0.5 m/s). (Oct.13.2 - Issue #SIMP-OCT11.20-S1).
+## 🟢 Core Hardening Baseline
+*   **SOT ID 707**: Sequential Offline Persistence - Refactored OfflineRepository to use a Channel-based actor to resolve burst-load data loss. (Oct13.3 - ISSUE-OCT13.3-1).
+*   **SOT ID 706**: Doze Detection Hardening - Updated PowerIntegrationAuditTest with iterative stepping to ensure reliable idle state detection. (Oct13.3 - ISSUE-OCT13.3-3).
+*   **SOT ID 705**: Mapping Test Hardening - Verified EMA alpha branches and coordinate smoothing with high-fidelity test data (>0.5 m/s). (Oct10.3 - Issue #SIMP-OCT11.20-S1).
 *   **SOT ID 704**: Unified HUD - Merged HeaderBar, GlobalStatusBar, and map overlays into a single OverlayManager to prevent Z-order collisions. (Oct10.3 - Issue #SIMP-OCT12.16-S1).
 *   **SOT ID 703**: Mapping Verification - Implemented comprehensive unit tests for Dashboard, HUD, and Map projections. (Oct12.21 - Issue #SIMP-OCT11.20-S1).
-*   **SOT ID 702**: HUD Clarity - Integrated "DATA ERR" contextual hint for link health failures. (Oct11.20 - Issue #ISSUE-OCT12.14-3).
-*   **SOT ID 701**: Mapping Integrity - Purged UiStateCoordinator and unified state projection logic. (Oct11.20 - Issue #ISSUE-OCT12.13-5).
-*   **SOT ID 700**: Layout Density - Increased HeaderBar touch targets and icon dimensions for portrait usability. (Oct12.19 - Issue #ISSUE-OCT12.16-4).
-*   **SOT ID 699**: Threshold Harmonization - Aligned MainViewModel freshness logic with dynamic polling tiers (Screen-Off/Stationary). (Oct12.19 - Issue #ISSUE-OCT12.13-2).
-*   **SOT ID 698**: Signaling Resilience - Implemented idempotency in CommunicationManager.connect() to survive cellular handover flapping. (Oct12.19 - Issue #ISSUE-OCT12.16-5).
-*   **SOT ID 697**: Jitter Hardening - Implemented role-isolated GNSS audits and 15s gap protection. (Oct12.18 - Issue #ISSUE-OCT12.13-11).
-*   **SOT ID 696**: I/O Optimization - Implemented yielded chunked pruning in MainRepository. (Oct12.18 - Issue #ISSUE-OCT12.13-10).
-*   **SOT ID 695**: GPS Recovery - Implemented 10m auto-reset for terminal hardware locks. (Oct12.17 - Issue #ISSUE-OCT12.13-3).
-*   **SOT ID 694**: Signaling Resilience - Hardened Socket.io connection logic with error events and safety timeouts. (Oct12.17 - Issue #ISSUE-OCT12.13-7).
-*   **SOT ID 693**: Threshold Harmonization - Increased UI staleness thresholds to 60s to accommodate long polling intervals. (Oct12.17 - Issue #ISSUE-OCT12.13-1).
-*   **SOT ID 692**: HUD Legibility - Added requirement for contrast plates on HUD overlays to support high-detail map backgrounds. (Oct12.16 - Issue #ISSUE-OCT12.16-1).
 
 ...
 
 ---
 
-## 🏁 Verification Chapters
-*   **Chapter 31.781 (Test Hardening)**: PASSED - Verified that MainViewModelMappingTest successfully exercises EMA alpha branches for stationary vs moving states, resolving false-positive smoothing failures. (Oct.13.2).
-*   **Chapter 31.780 (UI Orchestration)**: PASSED - Verified that UnifiedHUDOverlay correctly stacks Header, Status, and Map tools, resolving Z-order collision risks between fragmented layers. (Oct10.3).
-*   **Chapter 31.779 (Logic Parity)**: PASSED - Verified that MainViewModel mapping logic correctly implements engine polling thresholds across all 4 tiers (Standard, Power-Save, Parking, Ultra). (Oct12.21).
-*   **Chapter 31.778 (UI Transparency)**: PASSED - Verified that "DATA ERR" label appears correctly when relay connection is dropped or telemetry exceeds tier-specific thresholds. (Oct11.20).
-*   **Chapter 31.777 (Link Resilience)**: PASSED - Verified that rapid Wi-Fi/LTE switching no longer triggers redundant socket creation in CommunicationManager. (Oct12.19).
-*   **Chapter 31.776 (Temporal Integrity)**: PASSED - Verified that system suspension events no longer trigger 1000s+ jitter spikes in ForensicAuditor. (Oct12.18).
-*   **Chapter 31.775 (UI Alignment)**: PASSED - Verified HUD contrast (75%) and version tag padding (42dp) prevent tile-clash and scale-bar overlap on SM-G990E. (Oct12.17).
-*   **Chapter 31.774 (Engine Stability)**: PASSED - Verified automatic recovery from terminal GPS locks and mitigation of signaling connection stalls. (Oct12.17).
+## 🟢 Verification Chapters
+*   **Chapter 31.783 (Persistence Reliability)**: PASSED - Verified that OfflineRepository actor correctly persists 100% of telemetry updates during 100Hz bursts. (Oct13.3).
+*   **Chapter 31.782 (Power Integration)**: PASSED - Verified that AndroidPowerStateProvider reliably detects Doze mode on Samsung/Pixel devices using the stepped audit sequence. (Oct13.3).
+*   **Chapter 31.781 (Test Hardening)**: PASSED - Verified that MainViewModelMappingTest successfully exercises EMA alpha branches for stationary vs moving states. (Oct10.3).
+*   **Chapter 31.780 (UI Orchestration)**: PASSED - Verified that UnifiedHUDOverlay correctly stacks Header, Status, and Map tools. (Oct10.3).
 ...

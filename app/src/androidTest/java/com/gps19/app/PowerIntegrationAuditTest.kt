@@ -19,8 +19,10 @@ import javax.inject.Inject
  * PowerIntegrationAuditTest: High-fidelity integration test for Doze awareness.
  * Uses adb shell commands to force the device into Doze mode and verifies 
  * the AndroidPowerStateProvider correctly reports the state.
+ * Oct.13.3:
+ * - Hardening: Added "dumpsys deviceidle step" loop to ensure the device 
+ *   reaches the deep IDLE state reliably across different manufacturers.
  * Sep.16.13: Issue #1050/1052 Verification (R-ID 351).
- * Oct.12.13: Updated to property-based PowerStateProvider API.
  */
 @HiltAndroidTest
 class PowerIntegrationAuditTest {
@@ -37,13 +39,11 @@ class PowerIntegrationAuditTest {
     fun setup() {
         hiltRule.inject()
         device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
-        // Ensure device is not in Doze at start
         device.executeShellCommand("dumpsys deviceidle unforce")
     }
 
     @After
     fun teardown() {
-        // Clean up and restore device state
         device.executeShellCommand("dumpsys deviceidle unforce")
     }
 
@@ -55,11 +55,16 @@ class PowerIntegrationAuditTest {
         // 2. Force Idle (Doze)
         device.executeShellCommand("dumpsys deviceidle force-idle")
         
-        // Wait a brief moment for the system state to propagate
-        Thread.sleep(1000)
+        // Hardening: Step through phases until IDLE is reached
+        var attempts = 0
+        while (!powerStateProvider.isDeviceIdleMode && attempts < 10) {
+            device.executeShellCommand("dumpsys deviceidle step")
+            Thread.sleep(500)
+            attempts++
+        }
 
         // 3. Verify Deferral Detection
-        assertTrue("PowerStateProvider should detect Doze mode after force-idle", powerStateProvider.isDeviceIdleMode)
+        assertTrue("PowerStateProvider should detect Doze mode after force-idle/step sequence", powerStateProvider.isDeviceIdleMode)
 
         // 4. Restore State
         device.executeShellCommand("dumpsys deviceidle unforce")
