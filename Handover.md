@@ -18,7 +18,7 @@ The **Oct13.7** session resolved the persistent "drain deficit" and "duplication
 | **Read Pointer Progress** | **Deterministic (PeekResult)** | ✅ **STABLE** |
 | **SOT Count** | **402 (Rules: 248)** | ✅ **STABLE** |
 
-### 🚀 Resumption Path (Oct10.3)
+### 🚀 Resumption Path (Oct.13.8)
 1.  **SIMP-OCT12.17-S1: Periodic GPS Re-Zeroing**: Implement the silent background GPS provider restart every 6 hours if accuracy remains poor (> 30m) to clear internal chip thermal drift.
     - **Target**: `HardwareSuite.kt` or `MonitorService.kt`.
     - **Logic**: Track the last "Good Fix" time and trigger a provider reset if a timeout is exceeded under poor signal conditions.
