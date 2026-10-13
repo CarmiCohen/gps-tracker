@@ -16,11 +16,12 @@ import javax.inject.Singleton
 
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
+ * Oct.13.1:
+ * - SIMP-OCT12.16-S1: Unified HUD Overlay. Added ClearTrails event routing 
+ *   to support the unified overlay toolset.
  * Oct.10.2:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
  *   TimeProvider API.
- * Oct.6.2:
- * - Issue #AUDIT-1006-5: Added ExecuteLogPressureTest routing.
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -270,6 +271,10 @@ class UiEventCoordinator @Inject constructor(
                 ))
             }
             is UiEvent.ClearLogs -> repository.clearLogs()
+            is UiEvent.ClearTrails -> scope.launch(Dispatchers.IO) { 
+                repository.clearTrails() 
+                repository.addLog(LogEntry(localId = UUID.randomUUID().toString(), timestamp = timeProvider.currentTimeMillis, message = "Trails cleared by user", type = "SYSTEM", isImportant = true, role = currentState.session.appMode ?: "system"))
+            }
             is UiEvent.ResetStats -> scope.launch(Dispatchers.IO) { repository.resetStats() }
             is UiEvent.SetLogFilterShowDetails -> repository.updateLogFilters(details = event.show)
             is UiEvent.SetLogFilterShowRecovered -> repository.updateLogFilters(recovered = event.show)

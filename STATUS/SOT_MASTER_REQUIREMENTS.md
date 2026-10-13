@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct11.20)
+# SOT Master Requirements & Hardening Status (Oct10.3)
 
-## 🏗️ Architectural Master Rules (230 Rules)
+## 🏗️ Architectural Master Rules (232 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -17,10 +17,14 @@
 *   **1.186 High-Density Touch Targets (R-ID 655)**: Navigation icons in high-density layouts (Portrait HeaderBar) MUST maintain a minimum touch target size of 48dp to ensure usability for safety-critical operations. (Oct12.19 - Issue #ISSUE-OCT12.16-4).
 *   **1.187 Centralized State Projection (R-ID 656)**: UI state mapping logic MUST be centralized within the ViewModel (or dedicated UseCases) to ensure all telemetry projections utilize the latest verified polling thresholds and architectural fixes. (Oct11.20 - Issue #ISSUE-OCT12.13-5).
 *   **1.188 Contextual HUD Diagnostics (R-ID 657)**: Safety-critical status indicators (HUD) MUST provide explicit contextual labels (e.g., "DATA ERR") when health checks fail, ensuring users can distinguish between link loss and telemetry staleness without opening deeper logs. (Oct11.20 - Issue #ISSUE-OCT12.14-3).
+*   **1.189 Mapping Test Coverage (R-ID 658)**: All centralized UI mapping projections MUST be covered by unit tests that verify tier-specific freshness logic and coordinate smoothing to prevent state regression. (Oct12.21 - Issue #SIMP-OCT11.20-S1).
+*   **1.190 Unified HUD Orchestration (R-ID 659)**: All global telemetry overlays, navigation controls, and map badges MUST be orchestrated by a single `OverlayManager` to ensure deterministic Z-order stacking and prevent input collisions between fragmented UI layers. (Oct10.3 - Issue #SIMP-OCT12.16-S1).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 704**: Unified HUD - Merged HeaderBar, GlobalStatusBar, and map overlays into a single OverlayManager to prevent Z-order collisions. (Oct10.3 - Issue #SIMP-OCT12.16-S1).
+*   **SOT ID 703**: Mapping Verification - Implemented comprehensive unit tests for Dashboard, HUD, and Map projections. (Oct12.21 - Issue #SIMP-OCT11.20-S1).
 *   **SOT ID 702**: HUD Clarity - Integrated "DATA ERR" contextual hint for link health failures. (Oct11.20 - Issue #ISSUE-OCT12.14-3).
 *   **SOT ID 701**: Mapping Integrity - Purged UiStateCoordinator and unified state projection logic. (Oct11.20 - Issue #ISSUE-OCT12.13-5).
 *   **SOT ID 700**: Layout Density - Increased HeaderBar touch targets and icon dimensions for portrait usability. (Oct12.19 - Issue #ISSUE-OCT12.16-4).
@@ -38,6 +42,8 @@
 ---
 
 ## 🏁 Verification Chapters
+*   **Chapter 31.780 (UI Orchestration)**: PASSED - Verified that UnifiedHUDOverlay correctly stacks Header, Status, and Map tools, resolving Z-order collision risks between fragmented layers. (Oct10.3).
+*   **Chapter 31.779 (Logic Parity)**: PASSED - Verified that MainViewModel mapping logic correctly implements engine polling thresholds across all 4 tiers (Standard, Power-Save, Parking, Ultra). (Oct12.21).
 *   **Chapter 31.778 (UI Transparency)**: PASSED - Verified that "DATA ERR" label appears correctly when relay connection is dropped or telemetry exceeds tier-specific thresholds. (Oct11.20).
 *   **Chapter 31.777 (Link Resilience)**: PASSED - Verified that rapid Wi-Fi/LTE switching no longer triggers redundant socket creation in CommunicationManager. (Oct12.19).
 *   **Chapter 31.776 (Temporal Integrity)**: PASSED - Verified that system suspension events no longer trigger 1000s+ jitter spikes in ForensicAuditor. (Oct12.18).

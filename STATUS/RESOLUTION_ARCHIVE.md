@@ -1,5 +1,26 @@
 # Resolution Archive
 
+## [Oct10.3] - Unified HUD Overlay
+**Issue ID**: #SIMP-OCT12.16-S1
+**Status**: RESOLVED
+**Description**: Merged HeaderBar, GlobalStatusBar, and map overlays into a unified `OverlayManager` to prevent Z-order collisions and simplify state management.
+**Root Cause**: Multiple overlays were managed independently across `ViewerScreen`, `TrackerScreen`, and `AppMapContainer`, leading to Z-order collisions (e.g., scale bar overlapping version tags) and fragmented state routing.
+**Remediation**:
+- **Consolidation**: Created `UnifiedHUDOverlay` in `OverlayManager.kt` to host all global UI elements (Header, Status Bar, Map Tools, Badges).
+- **Interface Hardening**: Centralized overlay logic in `ViewerScreen` and `TrackerScreen`, removing redundant calls from `AppMapContainer`.
+- **Event Routing**: Added `UiEvent.ClearTrails` to `MainUiState.kt` and `UiEventCoordinator.kt` to support unified toolset actions.
+- **Complexity Reduction**: Simplified screen layouts by delegating overlay Z-stacking to a single high-level component.
+
+## [Oct12.21] - Mapping Verification & GPS Re-Zeroing
+**Issue ID**: #SIMP-OCT11.20-S1, #SIMP-OCT12.17-S1
+**Status**: RESOLVED
+**Description**: Implemented comprehensive unit tests for UI mapping projections and added a background GPS re-zeroing mechanism to clear thermal drift.
+**Root Cause**: Mapping logic in `MainViewModel` lacked regression tests to ensure parity with engine tiers. Internal GPS chips were exhibiting accuracy decay (>30m) after prolonged high-frequency operation due to thermal drift.
+**Remediation**:
+- **Mapping Verification**: Created `MainViewModelMappingTest.kt` covering Dashboard, HUD, and Map projections across all 4 polling tiers. Refactored `MainViewModel` to pass temporal dependencies into projection methods.
+- **GPS Re-Zeroing**: Implemented `checkGpsRezeroing()` in `HardwareSuite.kt` to trigger a silent provider restart every 6 hours if accuracy thresholds are not met.
+- **Dependencies**: Integrated `mockito-kotlin` for robust unit testing of internal ViewModel logic.
+
 ## [Oct11.20] - Mapping Centralization & HUD Clarity
 **Issue ID**: #ISSUE-OCT12.13-5, #ISSUE-OCT12.14-3, #ISSUE-OCT12.16-6
 **Status**: RESOLVED
@@ -43,8 +64,3 @@
 - **GPS Recovery**: Implemented 10-minute auto-reset for `GPS_HARDWARE_LOCK` in `HardwareSuite.kt`. Added acquisition flutter protection via `GPS_REGISTRATION_DEBOUNCE_MS`.
 - **Signaling Hardening**: Integrated `EVENT_CONNECT_ERROR` handling and a 35s safety timeout to `CommunicationManager.kt` to prevent connection stalls.
 - **Viewer Fix**: Corrected smoothing coordinate logic in `MainViewModel.kt` for local viewer position to prevent (0,0) defaulting.
-
-## [Oct12.12] - Forensic Integrity & Batch Persistence
-**Issue ID**: #SIMP-1012-3, #SIMP-1012-4
-**Status**: RESOLVED
-...

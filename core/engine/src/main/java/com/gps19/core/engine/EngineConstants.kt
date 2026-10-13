@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.11.21:
+ * - Issue #SIMP-OCT12.17-S1: Periodic GPS Re-Zeroing constants.
  * Oct.12.17:
  * - ISSUE-OCT12.13-1: Increased UI staleness thresholds to 60s to safely 
  *   accommodate the 45s Screen-Off polling interval and prevent false RED LEDs.
@@ -277,6 +279,8 @@ const val GPS_WARMUP_GRACE_MS = 30000L
 const val RADIO_KEEP_ALIVE_INTERVAL_MS = 60000L
 const val GPS_LOCK_RECOVERY_DELAY_MS = 600000L
 const val GPS_REGISTRATION_DEBOUNCE_MS = 2000L
+const val GPS_REZEROING_INTERVAL_MS = 21600000L // 6 Hours
+const val GPS_REZEROING_ACCURACY_THRESHOLD = 30.0
 
 // GPS Polling Intervals (Central Authority)
 const val HIGH_FREQUENCY_GPS_POLLING_MS = 2000L

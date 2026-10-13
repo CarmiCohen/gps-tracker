@@ -41,10 +41,9 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * Oct.11.21:
- * - ISSUE-OCT12.16-6: Hardened navigation insets for bottom overlays. Switched 
- *   to explicit windowInsetsPadding and increased safety margins (44dp/82dp) 
- *   to ensure clearance of system gesture handles and scale bar.
+ * Oct.13.1:
+ * - SIMP-OCT12.16-S1: Unified HUD Overlay. Removed redundant UI overlays from 
+ *   AppMapContainer as they are now managed by UnifiedHUDOverlay.
  */
 
 @Composable
@@ -57,9 +56,6 @@ fun AppMapContainer(
     val cameraActions = (stateProvider as? MainViewModel)?.cameraActions
     
     val isTrackerMode = state.appMode == "tracker"
-    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
-    val toggleTopPadding = if (isLandscape) 12.dp else 110.dp
-
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -73,63 +69,6 @@ fun AppMapContainer(
                 onLockChange = { onLockChange -> (stateProvider as? MainViewModel)?.onEvent(UiEvent.SetMapLocked(onLockChange)) },
                 mapViewRef = mapViewRef
             )
-
-            // Version Tag: Positioned to clear scale bar and system navigation handle
-            Text(
-                text = BuildConfig.VERSION_NAME, 
-                color = Color.White, 
-                fontSize = 9.sp, 
-                fontWeight = FontWeight.Black, 
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(end = 6.dp, bottom = 44.dp)
-                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(2.dp))
-                    .padding(horizontal = 4.dp, vertical = 1.dp)
-            )
-
-            if (state.showSettingsButton) {
-                MapSettingsToggle(
-                    isMapButtonsVisible = state.isMapButtonsVisible, 
-                    onToggle = { (stateProvider as? MainViewModel)?.onEvent(UiEvent.SetMapButtonsVisible(!state.isMapButtonsVisible)) }, 
-                    modifier = Modifier.align(Alignment.TopEnd).padding(end = 12.dp, top = toggleTopPadding)
-                )
-            }
-
-            if (state.isAnchorLocked) {
-                AnchorLockedBadge(
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = toggleTopPadding + 8.dp)
-                )
-            }
-            
-            if (state.showToolsOverlay && state.isMapButtonsVisible) {
-                Box(Modifier.fillMaxSize()) {
-                    Box(Modifier.align(Alignment.CenterStart).padding(start = 8.dp).fillMaxHeight(0.85f).width(140.dp)) { 
-                        MapToolsOverlay(
-                            state = state,
-                            onClear = { (stateProvider as? MainViewModel)?.clearTrails() }, 
-                            onSave = onSaveTrail, 
-                            onLoad = onLoadTrail, 
-                            onEvent = { (stateProvider as? MainViewModel)?.onEvent(it) }
-                        ) 
-                    }
-                }
-            }
-
-            // Uncertainty Badge: Positioned above the status card region
-            if (state.trackerLocPending && state.trackerLocPendingReason != LocationPendingReason.NONE) {
-                Box(modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(bottom = 82.dp)
-                    .background(Amber500.copy(alpha = 0.95f), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text(text = "UNCERTAINTY: ${state.trackerLocPendingReason.name.replace("_", " ")}", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
-                }
-            }
         }
     }
 }
@@ -295,7 +234,7 @@ fun MapToolsOverlay(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(sp)) { 
             MapToolButton(icon = if (state.isFenceVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, label = "FENCE", onClick = { onEvent(UiEvent.SetFenceVisible(!state.isFenceVisible)) }, iconColor = if (state.isFenceVisible) BrandJd else Color.Gray)
-            MapToolButton(icon = Icons.Default.Delete, label = "CLEAR", onClick = { onEvent(UiEvent.CenterTracker); onClear() }, iconColor = Rose500) 
+            MapToolButton(icon = Icons.Default.Delete, label = "CLEAR", onClick = { onEvent(UiEvent.CenterTracker); onEvent(UiEvent.ClearTrails) }, iconColor = Rose500)
         }
     }
 }

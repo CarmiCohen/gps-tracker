@@ -1,6 +1,7 @@
 package com.gps19.app
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -21,6 +22,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.12.21:
+ * - Issue #SIMP-OCT11.20-S1: Mapping Test Gap. Promoted mapping projections to internal 
+ *   to facilitate unit testing of tier-specific thresholding. Added nowMs to mapMapViewState.
  * Oct.11.20:
  * - ISSUE-OCT12.13-5: Purged UiStateCoordinator and finalized transition to 
  *   ViewModel-local mapping logic to ensure consistency with latest hardening fixes.
@@ -249,7 +253,7 @@ class MainViewModel @Inject constructor(
         viewerTrailSegments,
         repository.violationsFlow.distinctUntilChanged()
     ) { parts, pulseRt, trkSegs, vwrSegs, vios ->
-        mapMapViewState(parts.mode, parts.hydration, parts.spatial, parts.kin, pulseRt, trkSegs, vwrSegs, vios)
+        mapMapViewState(parts.mode, parts.hydration, parts.spatial, parts.kin, pulseRt, timeProvider.currentTimeMillis, trkSegs, vwrSegs, vios)
     }
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MapViewState())
 
@@ -478,7 +482,8 @@ class MainViewModel @Inject constructor(
         repository.addLog(LogEntry(localId = UUID.randomUUID().toString(), timestamp = timeProvider.currentTimeMillis, message = message, type = type.uppercase(), isImportant = isImportant, isSpecial = isSpecial, specialColor = specialColor, role = _uiState.value.session.appMode ?: "system")) 
     }
 
-    private fun mapDashboardConnectivity(appMode: String?, diag: DiagnosticState, nowRt: Long): DashboardConnectivityState {
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    internal fun mapDashboardConnectivity(appMode: String?, diag: DiagnosticState, nowRt: Long): DashboardConnectivityState {
         val isViewer = appMode == "viewer"
         val activeStats = if (isViewer) diag.trackerStats else diag.stats
         val lastSeenTs = diag.connectivity.lastRemoteActivityTs
@@ -490,12 +495,13 @@ class MainViewModel @Inject constructor(
             sinceConnMs = if (activeStats.lastConnTs > 0) (nowRt - activeStats.lastConnTs) else 0L, 
             sinceDiscoMs = if (activeStats.lastDiscTs > 0) (nowRt - activeStats.lastDiscTs) else 0L, 
             totalDropMs = activeStats.totalDropMs, maxDropMs = activeStats.maxDropMs, 
-            engineVersion = "Oct11.20", netInterface = diag.connectivity.netInterface,
+            engineVersion = "Oct12.21", netInterface = diag.connectivity.netInterface,
             systemPulse = nowRt, isLocalOnline = diag.connectivity.isLocalOnline, isRelayConnected = diag.connectivity.isRelayConnected
         )
     }
 
-    private fun mapDashboardTelemetry(appMode: String?, kinematicState: KinematicState, nowRt: Long, trackerState: TrackerState, isUltra: Boolean): DashboardTelemetryState {
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    internal fun mapDashboardTelemetry(appMode: String?, kinematicState: KinematicState, nowRt: Long, trackerState: TrackerState, isUltra: Boolean): DashboardTelemetryState {
         val isViewer = appMode == "viewer"
         val loc = if (isViewer) kinematicState.trackerLocation else kinematicState.localLocation
         val fixAgeRt = if (loc.kinetic.rt > 0) nowRt - loc.kinetic.rt else Long.MAX_VALUE
@@ -531,7 +537,8 @@ class MainViewModel @Inject constructor(
         )
     }
 
-    private fun mapDashboardHealth(appMode: String?, kinematicState: KinematicState, diag: DiagnosticState, localMaxTemp: Double, trackerMaxTemp: Double, nowRt: Long): DashboardHealthState {
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    internal fun mapDashboardHealth(appMode: String?, kinematicState: KinematicState, diag: DiagnosticState, localMaxTemp: Double, trackerMaxTemp: Double, nowRt: Long): DashboardHealthState {
         val isViewer = appMode == "viewer"
         val health = if (isViewer) kinematicState.trackerHealth else kinematicState.localHealth
         return DashboardHealthState(
@@ -557,7 +564,8 @@ class MainViewModel @Inject constructor(
         )
     }
 
-    private fun mapHudConnectivity(appMode: String?, deviceId: String, viewerId: String, isSystemActive: Boolean, isSafeMode: Boolean, isStaggered: Boolean, diag: DiagnosticState, rtt: Int, remoteSignal: Int, nowRt: Long): HudConnectivityState {
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    internal fun mapHudConnectivity(appMode: String?, deviceId: String, viewerId: String, isSystemActive: Boolean, isSafeMode: Boolean, isStaggered: Boolean, diag: DiagnosticState, rtt: Int, remoteSignal: Int, nowRt: Long): HudConnectivityState {
         val lastSeenTs = diag.connectivity.lastRemoteActivityTs
         val isTelemetryFresh = if (lastSeenTs > 0) (nowRt - lastSeenTs) < TELEMETRY_UI_STALE_THRESHOLD_MS else false
         val commIndex = if (isSystemActive && diag.connectivity.isRelayConnected) TelemetryUtils.calculateCommIndex(rtt, 10, 10) else 0
@@ -582,7 +590,8 @@ class MainViewModel @Inject constructor(
         )
     }
 
-    private fun mapHudTelemetry(appMode: String?, kinematicState: KinematicState, nowRt: Long, trackerState: TrackerState, isUltra: Boolean): HudTelemetryState {
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    internal fun mapHudTelemetry(appMode: String?, kinematicState: KinematicState, nowRt: Long, trackerState: TrackerState, isUltra: Boolean): HudTelemetryState {
         val loc = if (appMode == "viewer") kinematicState.trackerLocation else kinematicState.localLocation
         
         // ISSUE-OCT12.13-2: Harmonized GPS freshness with engine polling tiers.
@@ -614,7 +623,8 @@ class MainViewModel @Inject constructor(
         )
     }
 
-    private fun mapHudHealth(diag: DiagnosticState, nowRt: Long, isMaliAnomaly: Boolean): HudHealthState {
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    internal fun mapHudHealth(diag: DiagnosticState, nowRt: Long, isMaliAnomaly: Boolean): HudHealthState {
         val rawPulse = diag.connectivity.lastRemoteActivityTs
         val age = if (rawPulse > 0) nowRt - rawPulse else Long.MAX_VALUE
         val progressValue = if (rawPulse > 0) maxOf(0f, minOf(1f, (TELEMETRY_UI_STALE_THRESHOLD_MS - age).toFloat() / TELEMETRY_UI_STALE_THRESHOLD_MS)) else 0f
@@ -630,9 +640,9 @@ class MainViewModel @Inject constructor(
         )
     }
 
-    private fun mapMapViewState(mode: String?, hydration: Int, spatial: SpatialUiState, kinematic: KinematicState, pulseRt: Long, trkSegs: List<MapTrailSegment>, vwrSegs: List<MapTrailSegment>, vios: List<ViolationPoint>): MapViewState {
+    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+    internal fun mapMapViewState(mode: String?, hydration: Int, spatial: SpatialUiState, kinematic: KinematicState, pulseRt: Long, nowMs: Long, trkSegs: List<MapTrailSegment>, vwrSegs: List<MapTrailSegment>, vios: List<ViolationPoint>): MapViewState {
         val m = mode ?: "tracker"
-        val pulse = timeProvider.currentTimeMillis
         val loc = if (m == "tracker") kinematic.localLocation else kinematic.trackerLocation
         val tLat = loc.kinetic.lat
         val tLng = loc.kinetic.lng
@@ -679,7 +689,7 @@ class MainViewModel @Inject constructor(
             maxDistance = spatial.maxDistance, isMapLocked = spatial.isMapLocked, mapFollowMode = spatial.mapFollowMode,
             isAnchorLocked = loc.integrity.isAnchorLocked, homePoints = spatial.homePoints, 
             trackerLat = tLat, trackerLng = tLng, trackerGpsTs = tTs, trackerTelemetryTs = tTel, 
-            viewerLat = vLat, viewerLng = vLng, systemPulse = pulse, systemPulseRt = pulseRt, 
+            viewerLat = vLat, viewerLng = vLng, systemPulse = nowMs, systemPulseRt = pulseRt,
             trackerSegments = trkSegs, viewerSegments = vwrSegs, violations = vios, 
             isTrackerFresh = isTrackerFresh, isTrackerValid = isTrackerValid, isViewerValid = isViewerValid, 
             smoothedTrackerLat = sTrkLat, smoothedTrackerLng = sTrkLng,

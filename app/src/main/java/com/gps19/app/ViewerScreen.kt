@@ -2,34 +2,24 @@ package com.gps19.app
 
 import android.content.res.Configuration
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gps19.core.engine.*
-import kotlinx.coroutines.flow.StateFlow
 
 /**
  * ViewerScreen: Viewer-mode UI.
- * Oct.7.8:
- * - Issue #SIMP-1010-1: Adaptive Acoustic Gating. Propagated isSuspiciousNoise 
- *   flag to TelemetryBox for HUD visibility.
- * Oct.6.1:
- * - AUDIT-1006-3: Fixed compilation errors in AppMapContainer call sites. 
- *   Aligned with unified UiStateProvider pattern (SIMP-1426-4).
+ * Oct.13.1:
+ * - SIMP-OCT12.16-S1: Unified HUD Overlay. Integrated UnifiedHUDOverlay and 
+ *   removed redundant overlay calls to prevent Z-order collisions.
  */
 
 @Composable
@@ -51,44 +41,18 @@ fun ViewerScreen(
 ) {
     val session by stateProvider.session.collectAsStateWithLifecycle()
     val nav by stateProvider.navigation.collectAsStateWithLifecycle()
-    val spatial by stateProvider.spatial.collectAsStateWithLifecycle()
 
     val isMapVisible = nav.isMapVisible
     val isAnyOverlayOpen = nav.isSettingsOpen || nav.isLogVisible || nav.isRibbonsVisible || nav.isGnssDetailVisible
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     
-    val onDashboard = {
-        if (isMapVisible) onToggleMap()
-        if (nav.isLogVisible) onToggleLog()
-        if (nav.isSettingsOpen) onToggleSettings()
-        if (nav.isRibbonsVisible) onMainEvent(UiEvent.ToggleRibbons(false))
-        if (nav.isGnssDetailVisible) onMainEvent(UiEvent.ToggleGnssDetail(false))
-    }
-
-    val isSystemReady = session.isSystemReady(spatial.homePoints.size)
-    val systemIssuesCount = session.systemIssuesCount(spatial.homePoints.size)
-
-    val header = @Composable {
-        HeaderBar(
-            isLogVisible = nav.isLogVisible, isSettingsOpen = nav.isSettingsOpen, isRibbonsVisible = nav.isRibbonsVisible, isMapVisible = nav.isMapVisible, 
-            requiresExtraTopPadding = session.permissions.requiresExtraTopPadding, isSystemReady = isSystemReady, systemIssuesCount = systemIssuesCount, 
-            onDashboard = onDashboard, onS = onToggleSettings, onL = onToggleLog, onM = onToggleMap, onR = { onMainEvent(UiEvent.ToggleRibbons(!nav.isRibbonsVisible)) }, onEvent = { onMainEvent(it) }
-        )
-    }
-
-    val statusBar = @Composable {
-        GlobalStatusBar(stateProvider = stateProvider, modifier = Modifier.pointerInput(Unit) { detectTapGestures(onTap = { onMainEvent(UiEvent.SetRedScreenVisible(true)) }) })
-    }
-
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         if (session.hydrationLevel < 3) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp, modifier = Modifier.size(32.dp)) }
         } else {
             if (isLandscape) {
                 Row(modifier = Modifier.fillMaxSize()) {
-                    if (session.hydrationLevel >= 4 && !isAnyOverlayOpen) header()
                     Column(modifier = Modifier.weight(1f).navigationBarsPadding()) {
-                        if (session.hydrationLevel >= 5 && !isAnyOverlayOpen) statusBar()
                         Box(modifier = Modifier.weight(1f)) {
                             if (session.hydrationLevel >= 6 && isMapVisible) {
                                 AppMapContainer(stateProvider = stateProvider, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail)
@@ -103,12 +67,20 @@ fun ViewerScreen(
                     AppMapContainer(stateProvider = stateProvider, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail)
                 }
                 Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
-                    Surface(color = if (isAnyOverlayOpen || isMapVisible) Color.Transparent else MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxWidth().zIndex(10f)) { Column { if (session.hydrationLevel >= 4 && !isAnyOverlayOpen) header(); if (session.hydrationLevel >= 5 && !isAnyOverlayOpen) statusBar() } }
+                    Spacer(Modifier.height(82.dp)) // Reserve space for Unified HUD
                     if (session.hydrationLevel >= 4 && !isMapVisible) {
                         ViewerDashboard(stateProvider = stateProvider, isDashboardExpanded = nav.isDashboardExpanded, onEvent = { onMainEvent(it) })
                     }
                 }
             }
+
+            // Unified HUD Overlay
+            UnifiedHUDOverlay(
+                stateProvider = stateProvider,
+                onMainEvent = onMainEvent,
+                onSaveTrail = onSaveTrail,
+                onLoadTrail = onLoadTrail
+            )
         }
     }
 }

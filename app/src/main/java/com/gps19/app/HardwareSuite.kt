@@ -37,6 +37,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.12.21:
+ * - Issue #SIMP-OCT12.17-S1: Periodic GPS Re-Zeroing. Implemented silent background 
+ *   GPS provider restart every 6 hours if accuracy remains > 30m to clear thermal drift.
  * Oct.12.18:
  * - Issue #ISSUE-OCT12.13-11: Temporal Jitter Hardening. Integrated AppRole awareness 
  *   into GNSS and sensor audits to prevent cross-role forensic pollution.
@@ -251,6 +254,8 @@ class HardwareSuite @Inject constructor(
     private var lastIntervalUpdateRt = 0L
     private var revivalBaselineCaptured = false
     private var lastRadioKeepAliveRt = 0L
+    private var lastKnownAccuracy = 0f
+    private var lastGpsRezeroingRt = 0L
 
     private val _isGnssThrottled = MutableSharedFlow<Boolean>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val isGnssThrottledFlow: SharedFlow<Boolean> = _isGnssThrottled.asSharedFlow()
@@ -269,7 +274,7 @@ class HardwareSuite @Inject constructor(
         data class GnssUpdate(val detail: GnssDetail) : GpsUpdate()
     }
 
-    // --- Sensor State ---
+    // --- Sensor ---
     private val accelerometer by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) }
     private val linearAccel by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION) }
     private val magnetometer by lazy { sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) }
@@ -508,6 +513,7 @@ class HardwareSuite @Inject constructor(
                     updateLocationStatus()
                     checkRevivalLifecycle()
                     checkRadioResidency()
+                    checkGpsRezeroing()
                     updateStationaryExposure()
                     updateActivityHeuristic()
                     
@@ -544,6 +550,7 @@ class HardwareSuite @Inject constructor(
                 lastFixRt = nowRt
                 lastStationaryCheckRt = nowRt
                 lastRadioKeepAliveRt = nowRt
+                lastGpsRezeroingRt = nowRt
                 proximityMaxRange = proximity?.maximumRange ?: 5f
             }
 
@@ -837,6 +844,37 @@ class HardwareSuite @Inject constructor(
         }
     }
 
+    private fun checkGpsRezeroing() {
+        if (!isStarted.get() || isSafeMode) return
+        val nowRt = timeProvider.elapsedRealtime
+        if (lastGpsRezeroingRt == 0L) {
+            lastGpsRezeroingRt = nowRt
+            return
+        }
+
+        if (nowRt - lastGpsRezeroingRt >= GPS_REZEROING_INTERVAL_MS) {
+            if (lastKnownAccuracy > GPS_REZEROING_ACCURACY_THRESHOLD || lastKnownAccuracy == 0f) {
+                Timber.w("HardwareSuite: Periodic GPS Re-Zeroing triggered (Accuracy: ${lastKnownAccuracy}m, Gap: ${(nowRt - lastGpsRezeroingRt) / 1000}s)")
+                lastGpsRezeroingRt = nowRt
+                performGpsRezeroing()
+            } else {
+                lastGpsRezeroingRt = nowRt
+                Timber.d("HardwareSuite: GPS Re-Zeroing skipped (Accuracy: ${lastKnownAccuracy}m is sufficient)")
+            }
+        }
+    }
+
+    private fun performGpsRezeroing() {
+        scope.launch {
+            val currentInterval = pollingIntervalFlow.value
+            // Bypass flutter protection by updating directly and then restoring
+            pollingIntervalFlow.value = currentInterval + 1
+            delay(500)
+            pollingIntervalFlow.value = currentInterval
+            domainEventBus.emit(RevivalEvent.Attempt(99)) // Forensic code for Re-Zeroing
+        }
+    }
+
     private fun updateStationaryExposure() {
         val isUltra = isStationary() && stationaryDurationMs > ULTRA_LONG_STATIONARY_DURATION_MS
         
@@ -860,8 +898,8 @@ class HardwareSuite @Inject constructor(
     private val hardwareObservationFlow = pollingIntervalFlow.flatMapLatest { interval ->
         callbackFlow<GpsUpdate> {
             start() 
-            fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime; lastGpsSpeedMps = loc.speed.toDouble(); trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
-            val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime; lastGpsSpeedMps = it.speed.toDouble(); trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
+            fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime; lastGpsSpeedMps = loc.speed.toDouble(); lastKnownAccuracy = loc.accuracy; trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
+            val fusedCallback = object : ManagedLocationCallback() { override fun onLocationResult(result: LocationResult) { result.lastLocation?.let { lastFixRt = timeProvider.elapsedRealtime; lastGpsSpeedMps = it.speed.toDouble(); lastKnownAccuracy = it.accuracy; trySend(GpsUpdate.LocationUpdate(it)); updateLocationStatus() } } }
             val handler = synchronized(lifecycleLock) { hardwareHandler }
             synchronized(lifecycleLock) { activeLocationCallback?.unregister(fusedLocationClient, timeProvider, handler); activeLocationCallback = fusedCallback }
             val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, interval).setMinUpdateIntervalMillis(interval / 2).build()
@@ -953,7 +991,7 @@ class HardwareSuite @Inject constructor(
                     proximityBatch.isFlickering = isFlickeringInWindow(nowRt)
                     
                     nativeFastPathProvider.processProximityBatch(timeProvider, proximityBatch)
-                    proximityIdx = proximityBatch.nextIdx
+                    proximityIdx = proximityIdx
                     proximityDebounceMs = proximityBatch.debounceMs
                     
                     if (proximityBatch.nextRawNear != rawProximityNear) {

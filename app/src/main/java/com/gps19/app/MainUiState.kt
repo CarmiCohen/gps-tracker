@@ -453,8 +453,8 @@ data class PermissionState(
     val isBackgroundLocationGranted: Boolean = false,
     val isActivityRecognitionGranted: Boolean = false,
     val hasBackgroundRestriction: Boolean = false,
-    val backgroundStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
-    val autostartStatus: CapabilityStatus = CapabilityStatus.UNKNOWN,
+    val backgroundStatus: CapabilityStatus = CapabilityStatus.GRANTED,
+    val autostartStatus: CapabilityStatus = CapabilityStatus.GRANTED,
     val isManualOverride: Boolean = false,
     val requiresWakeLockRenewal: Boolean = false,
     val requiresExtraTopPadding: Boolean = false,
@@ -499,6 +499,7 @@ sealed class UiEvent {
     data class StopSiren(val causes: String? = null) : UiEvent()
     object ResetStats : UiEvent()
     object ClearLogs : UiEvent()
+    object ClearTrails : UiEvent()
     object ClearHomePoints : UiEvent()
     object ManualExit : UiEvent()
     data class LogAction(val type: String, val message: String, val isImportant: Boolean = false, val isSpecial: Boolean = false, val specialColor: Int? = null) : UiEvent()

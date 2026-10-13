@@ -10,8 +10,8 @@ import org.junit.Test
 class ServiceBehaviorAuditTest {
 
     private val mockTimeProvider = object : TimeProvider {
-        override fun elapsedRealtime(): Long = 100000L
-        override fun currentTimeMillis(): Long = 1700000000000L
+        override val elapsedRealtime: Long get() = 100000L
+        override val currentTimeMillis: Long get() = 1700000000000L
     }
 
     @Test
