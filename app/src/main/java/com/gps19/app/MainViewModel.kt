@@ -22,6 +22,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.13.8:
+ * - Issue #SIMP-OCT12.18-S1: Pruning Scheduler. Migrated proactive database 
+ *   pruning to WorkManager.
  * Oct.12.21:
  * - Issue #SIMP-OCT11.20-S1: Mapping Test Gap. Promoted mapping projections to internal 
  *   to facilitate unit testing of tier-specific thresholding. Added nowMs to mapMapViewState.
@@ -278,9 +281,10 @@ class MainViewModel @Inject constructor(
                 }
             }
             
+            // Issue #SIMP-OCT12.18-S1: Background pruning migrated to WorkManager.
             launch(Dispatchers.IO) { 
                 delay(STAGGERED_IO_PRUNING_DELAY_MS + 1000)
-                repository.proactivePruning() 
+                PruningWorker.triggerNow(context)
             }
             
             withContext(Dispatchers.Main.immediate) { 

@@ -1,5 +1,6 @@
 package com.gps19.app
 
+import android.content.Context
 import android.util.Log
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -15,6 +16,7 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
 import com.gps19.core.engine.*
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
@@ -24,6 +26,9 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.13.8:
+ * - Issue #SIMP-OCT12.18-S1: Pruning Scheduler. Migrated triggerAsyncPruning 
+ *   to utilize PruningWorker (WorkManager) to offload IO from ApplicationScope.
  * Oct.13.7:
  * - Aggressive Draining in Test Mode: Ignored interval and used max batch size 
  *   to resolve 755/1000 under-count in ForensicStressAuditTest.
@@ -36,6 +41,7 @@ import kotlin.coroutines.coroutineContext
 @OptIn(FlowPreview::class)
 @Singleton
 class LogRepository @Inject constructor(
+    @ApplicationContext private val context: Context,
     private val logDao: LogDao,
     private val db: AppDatabase,
     private val forensicSpillBufferProvider: Provider<ForensicSpillBuffer>,
@@ -525,7 +531,9 @@ class LogRepository @Inject constructor(
         if (nowRt - lastPruneTime.get() < PRUNE_COOLDOWN_MS) return
         if (isPruning.compareAndSet(false, true)) {
             lastPruneTime.set(nowRt)
-            scope.launch(Dispatchers.IO) { try { proactivePruning() } finally { isPruning.set(false) } }
+            // Issue #SIMP-OCT12.18-S1: Offloaded to PruningWorker (WorkManager)
+            PruningWorker.triggerNow(context)
+            isPruning.set(false)
         }
     }
 

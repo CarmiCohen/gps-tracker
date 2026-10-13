@@ -18,6 +18,8 @@ import kotlin.math.abs
 
 /**
  * HistoryManager: Manages the periodic recording of connection metrics (ribbons).
+ * Oct.13.8:
+ * - Issue #SIMP-OCT12.18-S1: Pruning Scheduler. Migrated pruneStorage to WorkManager.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
  *   TimeProvider API.
@@ -105,8 +107,8 @@ class HistoryManager @Inject constructor(
      * pruneStorage: Issue #SIMP-1014-2. Triggers proactive database pruning 
      * to alleviate storage pressure.
      */
-    suspend fun pruneStorage() = withContext(Dispatchers.IO) {
-        repository.proactivePruning()
+    fun pruneStorage() {
+        PruningWorker.triggerNow(context)
     }
 
     private fun emitSanitizedLog(message: String, isImportant: Boolean = false) {

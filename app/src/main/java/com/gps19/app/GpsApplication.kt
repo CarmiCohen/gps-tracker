@@ -27,6 +27,9 @@ import com.gps19.core.engine.CommandEvent
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Oct.13.8:
+ * - Issue #SIMP-OCT12.18-S1: Pruning Scheduler. Integrated PruningWorker 
+ *   into the deferred startup sequence.
  * Oct.2.2:
  * - Issue #1416: Memory Pressure Mitigation (R-ID 592). Integrated CommandEvent.TriggerMemoryFlush 
  *   emission into onTrimMemory to ensure the engine flushes its caches under system pressure.
@@ -134,6 +137,7 @@ class GpsApplication : Application(), Configuration.Provider {
                 isOsmReady.set(true)
 
                 MaintenanceWorker.schedule(this@GpsApplication)
+                PruningWorker.schedule(this@GpsApplication)
                 delay(3000)
             } catch (e: Exception) {
                 Timber.e(e, "Issue #664: Deferred startup failed")

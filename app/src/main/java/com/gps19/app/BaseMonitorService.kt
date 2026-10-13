@@ -18,6 +18,9 @@ import kotlin.math.max
 
 /**
  * BaseMonitorService: Common infrastructure for Tracker and Viewer services.
+ * Oct.13.8:
+ * - Issue #SIMP-OCT12.18-S1: Pruning Scheduler. Migrated proactive database 
+ *   pruning to WorkManager.
  * Oct.10.2:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
  *   TimeProvider API.
@@ -107,7 +110,7 @@ abstract class BaseMonitorService : LifecycleService() {
                 systemMonitor.acquireWakeLock()
                 
                 delay(LANDING_PAGE_PAUSE_MS) 
-                repository.proactivePruning()
+                PruningWorker.triggerNow(applicationContext)
                 
                 systemMonitor.systemMonitorEvents.collect { event ->
                     if (event is SystemMonitorEvent.WatchdogScheduled) {

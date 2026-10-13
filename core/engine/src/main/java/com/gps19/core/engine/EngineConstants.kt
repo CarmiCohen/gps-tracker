@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.12.8:
+ * - Issue #ISSUE-OCT12.13-1: Increased VIEWER_SIGNAL_LOSS_THRESHOLD_MS to 90s to 
+ *   safely accommodate the 45s Screen-Off polling interval and network jitter.
  * Oct.11.21:
  * - Issue #SIMP-OCT12.17-S1: Periodic GPS Re-Zeroing constants.
  * Oct.12.17:
@@ -336,7 +339,7 @@ const val GNSS_THROTTLING_HYSTERESIS_MS = 10000L
 
 // System Thresholds (Core Logic)
 const val TRACKER_SIGNAL_LOSS_THRESHOLD_MS = 180000L
-const val VIEWER_SIGNAL_LOSS_THRESHOLD_MS = 30000L
+const val VIEWER_SIGNAL_LOSS_THRESHOLD_MS = 90000L
 const val BUDGET_HARDWARE_SIGNAL_GRACE_MS = 5000L
 const val INTERNET_LOSS_THRESHOLD_MS = 60000L 
 const val DISTANCE_ALARM_SAMPLES_REQUIRED = 6

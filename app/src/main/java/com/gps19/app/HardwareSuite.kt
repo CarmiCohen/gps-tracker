@@ -249,6 +249,7 @@ class HardwareSuite @Inject constructor(
     private var pendingEnterRt = 0L
     private var recoveryStartRt = 0L
     private val pollingIntervalFlow = MutableStateFlow(TICK_INTERVAL_MS)
+    private val gpsRestartTrigger = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     private var revivalAttemptCount = 0
     private var isHardwareLocked = false
     private var lastIntervalUpdateRt = 0L
@@ -866,11 +867,7 @@ class HardwareSuite @Inject constructor(
 
     private fun performGpsRezeroing() {
         scope.launch {
-            val currentInterval = pollingIntervalFlow.value
-            // Bypass flutter protection by updating directly and then restoring
-            pollingIntervalFlow.value = currentInterval + 1
-            delay(500)
-            pollingIntervalFlow.value = currentInterval
+            gpsRestartTrigger.emit(Unit)
             domainEventBus.emit(RevivalEvent.Attempt(99)) // Forensic code for Re-Zeroing
         }
     }
@@ -895,7 +892,10 @@ class HardwareSuite @Inject constructor(
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @SuppressLint("MissingPermission")
-    private val hardwareObservationFlow = pollingIntervalFlow.flatMapLatest { interval ->
+    private val hardwareObservationFlow = combine(
+        pollingIntervalFlow,
+        gpsRestartTrigger.onStart { emit(Unit) }
+    ) { interval, _ -> interval }.flatMapLatest { interval ->
         callbackFlow<GpsUpdate> {
             start() 
             fusedLocationClient.lastLocation.addOnSuccessListener { loc -> if (loc != null) { lastFixRt = timeProvider.elapsedRealtime; lastGpsSpeedMps = loc.speed.toDouble(); lastKnownAccuracy = loc.accuracy; trySend(GpsUpdate.LocationUpdate(loc)); updateLocationStatus() } }
