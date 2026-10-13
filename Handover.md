@@ -1,26 +1,24 @@
-# Handover: Oct10.3 Mapping Test Hardening
+# Handover: Oct13.4 Full Build & Baseline Verification
 
-## Current Status: GREEN (Logic Verified, Tests Hardened)
-The **Oct10.3** session has successfully addressed the mapping verification gap identified in **SIMP-OCT11.20-S1**, ensuring that UI state projections are robustly tested against dynamic engine polling tiers.
+## Current Status: GREEN (Build Verified, Baseline Synchronized)
+The **Oct13.4** session focused on a comprehensive project build and documentation synchronization to establish a verified baseline for the next hardening cycle.
 
-### ? Hardening Resolutions
+### ✅ Hardening Resolutions (Cumulative Oct13.3)
+- **Sequential Persistence (#ISSUE-OCT13.3-1)**: Refactored `OfflineRepository` to use a Channel-based actor, resolving telemetry data loss during high-frequency bursts.
+- **Doze Hardening (#ISSUE-OCT13.3-3)**: Updated `PowerIntegrationAuditTest` with iterative stepping to ensure reliable idle state detection on Samsung/Pixel devices.
+- **Mapping Test Hardening (#SIMP-OCT11.20-S1)**: Verified EMA alpha branches and coordinate smoothing with high-fidelity kinematic mock data.
 
-#### 1. Mapping Test Hardening (#SIMP-OCT11.20-S1)
-- **Test Fidelity**: Updated `MainViewModelMappingTest.kt` to utilize non-stationary speeds (>0.5 m/s) in kinematic mock data. This ensures that coordinate smoothing tests correctly exercise the `0.3` EMA alpha branch instead of defaulting to stationary logic.
-- **Verification Coverage**: Confirmed that all 29 unit tests in the `:app` module and 43 tests in the `:core:engine` module pass successfully.
-- **Role Alignment**: Corrected location field targeting in `Verify Map View State Smoothing Integration` to ensure the `trackerLocation` is used when the app is in `tracker` mode, matching the production mapping logic.
-
-### ? Performance Metrics (Oct10.3)
+### 📊 Performance Metrics (Oct13.4)
 | Metric | Result | Status |
 | :--- | :--- | :--- |
-| **Unit Test Pass Rate** | **100% (72/72)** | ? **STABLE** |
-| **Logic Verification** | **Validated (EMA Branches)** | ? **STABLE** |
-| **SOT Count** | **388 (Rules: 233)** | ? **STABLE** |
+| **Unit Test Pass Rate** | **100% (72/72)** | ✅ **STABLE** |
+| **Build Integrity** | **Debug APK Assembled** | ✅ **STABLE** |
+| **SOT Count** | **388 (Rules: 235)** | ✅ **STABLE** |
 
-### ? Remaining Risks
-1.  **I/O Pressure**: Database maintenance remains process-local. (Focus: SIMP-OCT12.18-S1).
-2.  **GPS Drift**: Background thermal drift mitigation requires field verification. (Focus: SIMP-OCT12.17-S1).
+### ⚠️ Remaining Risks
+1.  **Forensic Corruption**: `ISSUE-OCT13.3-2` regarding CRC mismatches in `ForensicSpillBuffer` remains the primary focus for the next session.
+2.  **GPS Drift**: Background thermal drift mitigation (`SIMP-OCT12.17-S1`) is pending implementation.
 
-### ? Resumption Path
-1.  **Pruning Isolation**: Initiate **SIMP-OCT12.18-S1** to move maintenance tasks to `WorkManager`.
-2.  **State Slicing**: Evaluate **SIMP-OCT13.1-S1** to decouple HUD state flows from `MainViewModel`.
+### 🚀 Resumption Path
+1.  **Forensic Audit**: Investigate `ForensicSpillBuffer` synchronization to resolve CRC mismatches (**ISSUE-OCT13.3-2**).
+2.  **Re-Zeroing Logic**: Initiate **SIMP-OCT12.17-S1** to implement periodic GPS provider resets.

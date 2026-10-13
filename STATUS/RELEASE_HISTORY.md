@@ -1,6 +1,16 @@
-# Project History & Versioning (Oct12.12)
+# Project History & Versioning (Oct13.4)
 
 **For historical records (v8.9.x and older), see [docs_history_archive.md](docs_history_archive.md).**
+
+## Oct13.4 (Full Build & Baseline Verification)
+- **Full Build Execution**: Successfully executed comprehensive assembly and unit test suite (72/72 passed).
+- **Baseline Synchronization**: Synchronized `SOT_MASTER_REQUIREMENTS.md` and `issues.md` for the `Oct13.4` hardening baseline.
+
+## Oct13.3 (Persistence & Power Hardening)
+- **Sequential Persistence (#ISSUE-OCT13.3-1)**: Refactored `OfflineRepository` to use a Channel-based actor to prevent data loss during high-frequency bursts. (SOT ID 707).
+- **Doze Hardening (#ISSUE-OCT13.3-3)**: Updated `PowerIntegrationAuditTest` with iterative stepping to ensure reliable idle state detection. (SOT ID 706).
+- **Mapping Hardening (#SIMP-OCT11.20-S1)**: Verified EMA alpha branches and coordinate smoothing with high-fidelity test data. (SOT ID 705).
+- **Unified HUD (#SIMP-OCT12.16-S1)**: Merged HeaderBar, Status, and Map overlays into a single `OverlayManager`. (SOT ID 704).
 
 ## Oct12.12 (Forensic Integrity & Batch Persistence)
 - **Forensic Integrity (#SIMP-1012-3)**: Integrated CRC32 checksums into `ForensicSpillBuffer.kt` and `LogEntity` to detect storage-level corruption. Incremented DB version to 83. (SOT ID 680).
@@ -10,13 +20,4 @@
 - **Network Buffer Hardening (#SIMP-1012-2)**: Migrated `SmartSignalingDispatcher.kt` to bounded channels with `DROP_OLDEST` and introduced `SignalingPriority.CRITICAL`. (SOT ID 678).
 - **GNSS Burst Refining (#SIMP-1107-2)**: Dynamically scaled radio-warm keep-alive duration in `HardwareSuite.kt` based on RTT stability (4s/10s). (SOT ID 679).
 
-## Oct12.1 (Forensic Buffer Optimization)
-- **Forensic Sub-sampling (#SIMP-1012-1)**: Implemented vibration sub-sampling (1/2 rate) in `HardwareSuite.kt` and aggressive buffer trimming during memory pressure. (SOT ID 677).
-
-## Oct11.2 (Authoritative Sensor & JNI Hardening)
-- **Acoustic Floor Hardening (#SIMP-1011-10)**: Implemented temporal baseline decay (Leaky Integrator) in `jdhardware-jni.cpp` and `JdHardwareManager.kt`. (SOT ID 674).
-- **JNI Resource Audit (#SIMP-1011-11)**: Hardened `n22` with explicit array bounds verification and zero-JNI loops. (SOT ID 675).
-- **HUD Throttling Sync (#SIMP-1011-12)**: Integrated `HUD_STATE_SAMPLE_THROTTLED_MS` (1000ms) in budget hardware scenarios. (SOT ID 676).
-
----
-*For historical entries, see [docs_history_archive.md](docs_history_archive.md) or Git logs.*
+...
