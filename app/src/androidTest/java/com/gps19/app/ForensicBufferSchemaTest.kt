@@ -39,13 +39,15 @@ class ForensicBufferSchemaTest {
         }
         
         spillBuffer.writeTrace(entry)
-        val traces = spillBuffer.peekToEntities(10)
+        val peekResult = spillBuffer.peekToEntities(10)
+        val traces = peekResult.entities
         
         Timber.i("SCHEMA_TEST: Written message: ${entry.message}")
         if (traces.isNotEmpty()) {
             Timber.i("SCHEMA_TEST: Read message: ${traces.last().message}")
         }
         
+        assertTrue("Traces should not be empty", traces.isNotEmpty())
         assertEquals(entry.message, traces.last().message)
     }
 }

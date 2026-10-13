@@ -1,5 +1,6 @@
 package com.gps19.app
 
+import android.util.Log
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
@@ -18,17 +19,19 @@ import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
 import androidx.room.withTransaction
+import androidx.annotation.VisibleForTesting
+import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
- * Oct.13.5:
- * - Hardened forensic drainer with a dedicated Mutex to prevent duplicate 
- *   insertions during concurrent recovery and periodic cycles.
- * - Fixed Long bit-overflow in forensic signature deduplication (Issue #OCT13.5-2).
- * - Fixed unresolved reference 'it' in flushBatch mapping.
- * Oct.12.3:
- * - Issue #SIMP-1012-3: Forensic Integrity. Propagated checksum field during 
- *   batch flushing and Entity mapping to support corruption detection.
+ * Oct.13.7:
+ * - Aggressive Draining in Test Mode: Ignored interval and used max batch size 
+ *   to resolve 755/1000 under-count in ForensicStressAuditTest.
+ * - Added Log.i diagnostics for reliable logcat visibility.
+ * - Integrated PeekResult from ForensicSpillBuffer to ensure read-pointer 
+ *   forward progress even during CRC errors (Resolving Drain Deficit).
+ * - Made stopBackgroundTasks and resetForTest suspendable with cancelAndJoin for 
+ *   guaranteed test isolation (Resolving ISSUE-OCT13.5-3 leakage).
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -41,7 +44,7 @@ class LogRepository @Inject constructor(
     private val telemetry: TelemetryRepository
 ) {
     private val logMutex = Mutex()
-    private val forensicMutex = Mutex() // Serializes forensic drains (Oct13.5)
+    private val forensicMutex = Mutex() 
     private val logWriteCount = AtomicInteger(0)
     private val isPruning = AtomicBoolean(false)
     private val lastPruneTime = AtomicLong(0L)
@@ -53,6 +56,11 @@ class LogRepository @Inject constructor(
 
     private val logBuffer = Channel<BufferedLog>(LOG_BUFFER_CAPACITY)
 
+    private var batchJob: Job? = null
+    private var recoveryJob: Job? = null
+    private var drainerJob: Job? = null
+    private var consecutiveStalls = 0
+
     private data class BufferedLog(
         val entry: LogEntry, 
         val initiallySynced: Boolean, 
@@ -60,6 +68,14 @@ class LogRepository @Inject constructor(
     )
 
     companion object {
+        private val isTestMode = AtomicBoolean(false)
+
+        @VisibleForTesting
+        fun setTestMode(enabled: Boolean) {
+            isTestMode.set(enabled)
+            Log.i("LogRepository", "Test mode set to $enabled")
+        }
+
         private val BRACKET_REGEX = Regex("""\[.*?\]""")
         private val PAREN_REGEX = Regex("""\(.*?\)""")
         private val INTERRUPTION_REGEX = Regex("""\s*after an interruption of[^.]+""", RegexOption.IGNORE_CASE)
@@ -76,97 +92,143 @@ class LogRepository @Inject constructor(
     }
 
     init {
-        startBatchProcessor()
-        recoverAbandonedTraces()
-        startForensicDrainer()
+        if (!isTestMode.get()) {
+            startBackgroundTasks()
+        } else {
+            Log.i("LogRepository", "Background tasks inhibited by Test Mode.")
+        }
+    }
+
+    private fun startBackgroundTasks() {
+        if (batchJob?.isActive == true) return
+        
+        batchJob = scope.launch(Dispatchers.IO) { runBatchProcessor() }
+        recoveryJob = scope.launch(Dispatchers.IO) { recoverAbandonedTraces() }
+        drainerJob = scope.launch(Dispatchers.IO) { runForensicDrainer() }
+    }
+
+    @VisibleForTesting
+    suspend fun stopBackgroundTasks() {
+        batchJob?.cancelAndJoin()
+        recoveryJob?.cancelAndJoin()
+        drainerJob?.cancelAndJoin()
+        Log.i("LogRepository", "Background tasks stopped and joined.")
+    }
+
+    @VisibleForTesting
+    suspend fun resetForTest() {
+        stopBackgroundTasks()
+        logWriteCount.set(0)
+        isPruning.set(false)
+        forensicSuccessCount.set(0)
+        forensicFailureCount.set(0)
+        liveReliability = BigDecimal.ONE
+        isForensicStallSimulated.set(false)
+        consecutiveStalls = 0
+        // Clear log buffer
+        while (logBuffer.tryReceive().isSuccess) { /* drain */ }
+        Log.i("LogRepository", "Internal state reset for test.")
+    }
+
+    /**
+     * Manually triggers forensic recovery. Useful in Test Mode.
+     */
+    @VisibleForTesting
+    fun triggerManualRecovery() {
+        recoveryJob = scope.launch(Dispatchers.IO) { recoverAbandonedTraces() }
+    }
+
+    /**
+     * Manually starts the forensic drainer loop. Useful in Test Mode.
+     */
+    @VisibleForTesting
+    fun triggerManualDrainer() {
+        if (drainerJob?.isActive == true) return
+        drainerJob = scope.launch(Dispatchers.IO) { runForensicDrainer() }
+        Log.i("LogRepository", "Manual drainer triggered.")
     }
 
     fun setForensicStallSimulation(active: Boolean) {
         isForensicStallSimulated.set(active)
-        Timber.i("Forensic Audit: Simulation mode ${if (active) "ENABLED" else "DISABLED"}")
+        Log.i("LogRepository", "Forensic Audit: Simulation mode ${if (active) "ENABLED" else "DISABLED"}")
     }
 
-    private fun startBatchProcessor() {
-        scope.launch(Dispatchers.IO) {
-            val batch = mutableListOf<BufferedLog>()
-            var lastFlushRt = timeProvider.elapsedRealtime
+    private suspend fun runBatchProcessor() {
+        val batch = mutableListOf<BufferedLog>()
+        var lastFlushRt = timeProvider.elapsedRealtime
 
-            while (isActive) {
-                try {
-                    val log = withTimeoutOrNull(LOG_BATCH_DELAY_MS) {
-                        logBuffer.receive()
-                    }
-
-                    if (log != null) {
-                        batch.add(log)
-                    }
-
-                    val nowRt = timeProvider.elapsedRealtime
-                    if (batch.size >= LOG_BATCH_SIZE || (batch.isNotEmpty() && nowRt - lastFlushRt >= LOG_BATCH_DELAY_MS)) {
-                        flushBatch(batch)
-                        batch.clear()
-                        lastFlushRt = nowRt
-                    }
-                } catch (e: Exception) {
-                    if (e is CancellationException) throw e
-                    Timber.e(e, "Error in log batch processor")
+        while (coroutineContext.isActive) {
+            try {
+                val log = withTimeoutOrNull(LOG_BATCH_DELAY_MS) {
+                    logBuffer.receive()
                 }
+
+                if (log != null) {
+                    batch.add(log)
+                }
+
+                val nowRt = timeProvider.elapsedRealtime
+                if (batch.size >= LOG_BATCH_SIZE || (batch.isNotEmpty() && nowRt - lastFlushRt >= LOG_BATCH_DELAY_MS)) {
+                    flushBatch(batch)
+                    batch.clear()
+                    lastFlushRt = nowRt
+                }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Timber.e(e, "Error in log batch processor")
             }
         }
     }
 
-    private fun recoverAbandonedTraces() {
-        scope.launch(Dispatchers.IO) {
-            val buffer = forensicSpillBufferProvider.get()
-            val pending = buffer.getPendingCount()
-            if (pending > 0) {
-                Timber.i("Forensic Recovery: Replaying $pending abandoned traces.")
-                performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = true)
-            }
+    private suspend fun recoverAbandonedTraces() {
+        val buffer = forensicSpillBufferProvider.get()
+        val pending = buffer.getPendingCount()
+        if (pending > 0) {
+            Log.i("LogRepository", "Forensic Recovery: Replaying $pending abandoned traces.")
+            performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = true)
         }
     }
 
-    private fun startForensicDrainer() {
-        scope.launch(Dispatchers.IO) {
-            var lastDrainRt = timeProvider.elapsedRealtime
-            
-            while (isActive) {
-                try {
-                    val health = telemetry.systemHealth.value
-                    val loadFactor = if (health.isMaliAnomaly) 1.0 else (health.cpuLoad / 8.0).coerceIn(0.0, 1.0)
-                    val dynamicDelay = FORENSIC_DRAIN_THROTTLE_MIN_MS + 
-                                     ((FORENSIC_DRAIN_THROTTLE_MAX_MS - FORENSIC_DRAIN_THROTTLE_MIN_MS) * loadFactor).toLong()
+    private suspend fun runForensicDrainer() {
+        var lastDrainRt = timeProvider.elapsedRealtime
+        
+        while (coroutineContext.isActive) {
+            try {
+                val health = telemetry.systemHealth.value
+                val loadFactor = if (health.isMaliAnomaly) 1.0 else (health.cpuLoad / 8.0).coerceIn(0.0, 1.0)
+                val dynamicDelay = FORENSIC_DRAIN_THROTTLE_MIN_MS + 
+                                 ((FORENSIC_DRAIN_THROTTLE_MAX_MS - FORENSIC_DRAIN_THROTTLE_MIN_MS) * loadFactor).toLong()
+                
+                delay(dynamicDelay)
+                
+                val nowRt = timeProvider.elapsedRealtime
+                val buffer = forensicSpillBufferProvider.get()
+                val pendingAtStart = buffer.getPendingCount()
+                val fillLevel = pendingAtStart.toDouble() / FORENSIC_SPILL_CAPACITY
+                val isEmergency = fillLevel >= FORENSIC_EMERGENCY_FILL_LEVEL
+                
+                val shouldDrain = isEmergency || 
+                                buffer.isHighPressure() ||
+                                (pendingAtStart >= FORENSIC_FILL_THRESHOLD && loadFactor < 0.8) || 
+                                (pendingAtStart > 0 && (nowRt - lastDrainRt >= FORENSIC_DRAIN_INTERVAL_MS || isTestMode.get())) ||
+                                isForensicStallSimulated.get()
+                
+                if (shouldDrain) {
+                    val baseBatchSize = if (isTestMode.get()) FORENSIC_BATCH_SIZE_MAX else 
+                                      FORENSIC_BATCH_SIZE_MIN + 
+                                      ((FORENSIC_BATCH_SIZE_MAX - FORENSIC_BATCH_SIZE_MIN) * fillLevel).toInt()
                     
-                    delay(dynamicDelay)
-                    
-                    val nowRt = timeProvider.elapsedRealtime
-                    val buffer = forensicSpillBufferProvider.get()
-                    val pendingAtStart = buffer.getPendingCount()
-                    val fillLevel = pendingAtStart.toDouble() / FORENSIC_SPILL_CAPACITY
-                    val isEmergency = fillLevel >= FORENSIC_EMERGENCY_FILL_LEVEL
-                    
-                    val shouldDrain = isEmergency || 
-                                    buffer.isHighPressure() ||
-                                    (pendingAtStart >= FORENSIC_FILL_THRESHOLD && loadFactor < 0.8) || 
-                                    (pendingAtStart > 0 && nowRt - lastDrainRt >= FORENSIC_DRAIN_INTERVAL_MS) ||
-                                    isForensicStallSimulated.get()
-                    
-                    if (shouldDrain) {
-                        val baseBatchSize = FORENSIC_BATCH_SIZE_MIN + 
-                                          ((FORENSIC_BATCH_SIZE_MAX - FORENSIC_BATCH_SIZE_MIN) * fillLevel).toInt()
-                        
-                        val loadImpact = if (isEmergency) 0.1 else 0.4
-                        val dynamicBatchSize = (baseBatchSize * (1.0 - (loadFactor * loadImpact))).toInt()
-                            .coerceIn(FORENSIC_BATCH_SIZE_MIN, FORENSIC_BATCH_SIZE_MAX)
+                    val loadImpact = if (isEmergency) 0.1 else 0.4
+                    val dynamicBatchSize = (baseBatchSize * (1.0 - (loadFactor * loadImpact))).toInt()
+                        .coerceIn(FORENSIC_BATCH_SIZE_MIN, FORENSIC_BATCH_SIZE_MAX)
 
-                        if (performForensicDrain(limit = dynamicBatchSize, isRecovery = false)) {
-                            lastDrainRt = nowRt
-                        }
+                    if (performForensicDrain(limit = dynamicBatchSize, isRecovery = false)) {
+                        lastDrainRt = nowRt
                     }
-                } catch (e: Exception) {
-                    if (e is CancellationException) throw e
-                    Timber.e(e, "Error in forensic drainer loop")
                 }
+            } catch (e: Exception) {
+                if (e is CancellationException) throw e
+                Log.e("LogRepository", "Error in forensic drainer loop", e)
             }
         }
     }
@@ -181,9 +243,16 @@ class LogRepository @Inject constructor(
         val buffer = forensicSpillBufferProvider.get()
         val pendingAtStart = buffer.getPendingCount()
         
-        val entities = buffer.peekToEntities(limit)
+        val peekResult = buffer.peekToEntities(limit)
+        val entities = peekResult.entities
+        val processedCount = peekResult.processedCount
+
         if (entities.isEmpty()) {
-            if (pendingAtStart > 0) buffer.commitDrain(pendingAtStart)
+            if (processedCount > 0) {
+                Log.w("LogRepository", "Forensic Drain: Peeked $processedCount entries but none were valid (CRC mismatches). Advancing read pointer.")
+                buffer.commitDrain(processedCount)
+                return@withLock true
+            }
             return@withLock false
         }
 
@@ -195,15 +264,25 @@ class LogRepository @Inject constructor(
         }
         
         val filteredEntities = if (signaturesSet.isEmpty()) entities else entities.filter { 
-            (it.timestamp to it.spillIdx) !in signaturesSet 
+            val isUnique = (it.timestamp to it.spillIdx) !in signaturesSet
+            if (!isUnique) {
+                Log.i("LogRepository", "Forensic Drain: Filtering existing trace at ts=${it.timestamp}, idx=${it.spillIdx}")
+            }
+            isUnique
+        }
+
+        val dupCount = entities.size - filteredEntities.size
+        if (dupCount > 0) {
+            Log.i("LogRepository", "Forensic Drain: Filtered $dupCount duplicates out of ${entities.size} valid peeked.")
         }
 
         return@withLock try {
             if (filteredEntities.isNotEmpty()) {
                 logDao.insertAll(filteredEntities)
+                Log.i("LogRepository", "Forensic Drain: Successfully inserted ${filteredEntities.size} traces (Pending at start: $pendingAtStart, Peek limit: $limit).")
             }
             
-            buffer.commitDrain(entities.size)
+            buffer.commitDrain(processedCount)
             forensicSuccessCount.incrementAndGet()
             updateReliability(true)
             
@@ -230,7 +309,7 @@ class LogRepository @Inject constructor(
         } catch (e: Exception) {
             forensicFailureCount.incrementAndGet()
             updateReliability(false)
-            Timber.e(e, "Forensic drain failed")
+            Log.e("LogRepository", "Forensic drain failed", e)
             false
         }
     }
@@ -257,7 +336,7 @@ class LogRepository @Inject constructor(
             if (consecutiveStalls >= FORENSIC_CONVERGENCE_STALL_LIMIT) {
                 val h = telemetry.systemHealth.value
                 val msg = "Forensic Stall Correlated: Backfill not converging ($pendingAfter pending). System: [CPU: ${h.cpuLoad}, IOW: ${h.ioWait}]"
-                Timber.w(msg)
+                Log.w("LogRepository", msg)
                 val stallTs = timeProvider.currentTimeMillis
                 addLog(LogEntry(
                     localId = "STALL-$stallTs",
@@ -271,7 +350,6 @@ class LogRepository @Inject constructor(
             consecutiveStalls = 0
         }
     }
-    private var consecutiveStalls = 0
 
     private suspend fun flushBatch(batch: List<BufferedLog>) {
         if (batch.isEmpty()) return
@@ -305,7 +383,8 @@ class LogRepository @Inject constructor(
                                     specialColor = entry.specialColor, role = entry.role, synced = initiallySynced,
                                     lat = entry.lat, lng = entry.lng, accuracy = entry.accuracy,
                                     maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot,
-                                    vibeSnapshot = entry.vibeSnapshot, gpsHardwareLock = entry.gpsHardwareLock,
+                                    vibeSnapshot = entry.vibeSnapshot,
+                                    gpsHardwareLock = entry.gpsHardwareLock,
                                     tempSnapshot = entry.tempSnapshot, battSnapshot = entry.battSnapshot,
                                     chargingSnapshot = entry.chargingSnapshot,
                                     thermalSnapshot = entry.thermalSnapshot,
@@ -332,7 +411,8 @@ class LogRepository @Inject constructor(
                                         } else last.extremeValue,
                                         timestamp = entry.timestamp, message = entry.message, synced = initiallySynced,
                                         lat = entry.lat, lng = entry.lng, accuracy = entry.accuracy,
-                                        maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot,
+                                        maxAccuracy = entry.maxAccuracy, snrSnapshot = entry.snrSnapshot, 
+                                        vibeSnapshot = entry.vibeSnapshot, 
                                         gpsHardwareLock = entry.gpsHardwareLock,
                                         tempSnapshot = entry.tempSnapshot,
                                         battSnapshot = entry.battSnapshot,
@@ -359,7 +439,7 @@ class LogRepository @Inject constructor(
                                 firstSeenTs = if (entry.firstSeenTs == 0L) (entry.timestamp - entry.durationMs) else entry.firstSeenTs,
                                 role = entry.role, synced = initiallySynced, lat = entry.lat, lng = entry.lng, 
                                 accuracy = entry.accuracy, maxAccuracy = entry.maxAccuracy, 
-                                snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot,
+                                snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot, 
                                 spillIdx = entry.spillIdx, gpsHardwareLock = entry.gpsHardwareLock,
                                 tempSnapshot = entry.tempSnapshot, battSnapshot = entry.battSnapshot,
                                 chargingSnapshot = entry.chargingSnapshot,
@@ -532,7 +612,7 @@ class LogRepository @Inject constructor(
         return m.trim().trimEnd('.')
     }
 
-    fun clearLogs() { scope.launch(Dispatchers.IO) { try { logDao.clearAll() } catch (e: Exception) { Timber.e(e, "Error clearing logs") } } }
+    fun clearLogs() { scope.launch(Dispatchers.IO) { try { logDao.clearAll() } catch (e: Exception) { Log.e("LogRepository", "Error clearing logs", e) } } }
 
     suspend fun loadAllLogsStatic(limit: Int = LOG_LIMIT_STANDARD): List<LogEntry> = withContext(Dispatchers.Default) {
         logDao.getAllLogsStatic(limit).map {

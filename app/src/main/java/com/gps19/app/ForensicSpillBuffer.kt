@@ -18,10 +18,9 @@ import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for forensic traces.
- * Oct.13.5: 
- * - Hardened thread safety: Duplication of MappedByteBuffer moved inside lock.
- * - Synchronized resetBuffer to prevent races with background drainers.
- * - Eliminated shared member buffers to prevent corruption during high-pressure bursts.
+ * Oct.13.7:
+ * - Introduced PeekResult to accurately track processed entries vs valid entities.
+ * - Added logging for CRC mismatches to diagnose under-count issues.
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -35,6 +34,11 @@ class ForensicSpillBuffer @Inject constructor(
     private val writeIdx = AtomicInteger(0)
     private val totalCount = AtomicInteger(0)
     private val readIdx = AtomicInteger(0)
+
+    data class PeekResult(
+        val entities: List<LogEntity>,
+        val processedCount: Int
+    )
     
     private companion object {
         const val MAGIC_NUMBER = 0x46535042
@@ -270,22 +274,22 @@ class ForensicSpillBuffer @Inject constructor(
         buffer.putLong(OFF_LAST_WRITE_RT, timeProvider.elapsedRealtime)
     }
 
-    fun peekToEntities(limit: Int): List<LogEntity> {
-        return LatencyMonitor.measureAndAudit<List<LogEntity>>(
+    fun peekToEntities(limit: Int): PeekResult {
+        return LatencyMonitor.measureAndAudit<PeekResult>(
             timeProvider = timeProvider,
             thresholdMs = DRAIN_STALL_THRESHOLD_MS,
             operation = "Forensic Peek Entities",
             type = LatencyMonitor.AuditType.PERFORMANCE,
             onSpike = { msg, _ -> Timber.w(msg) }
         ) {
-            val mainBuffer = mappedBuffer ?: return@measureAndAudit emptyList()
+            val mainBuffer = mappedBuffer ?: return@measureAndAudit PeekResult(emptyList(), 0)
             val localEntryBytes = ByteArray(FORENSIC_SPILL_ENTRY_SIZE_V5)
             val localCrc = CRC32()
             
             synchronized(this) {
                 val readBuffer = mainBuffer.duplicate().order(ByteOrder.nativeOrder())
                 val count = totalCount.get()
-                if (count == 0) return@synchronized emptyList()
+                if (count == 0) return@synchronized PeekResult(emptyList(), 0)
                 
                 val toPeekCount = count.coerceAtMost(limit)
                 val currentReadIdx = readIdx.get()
@@ -359,7 +363,7 @@ class ForensicSpillBuffer @Inject constructor(
                     }
                     tempReadIdx = (tempReadIdx + 1) % FORENSIC_SPILL_CAPACITY
                 }
-                results
+                PeekResult(results, toPeekCount)
             }
         }
     }

@@ -7,15 +7,21 @@ import dagger.hilt.android.testing.HiltAndroidTest
 import kotlinx.coroutines.*
 import org.junit.Assert.*
 import org.junit.Before
+import org.junit.After
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import timber.log.Timber
 import javax.inject.Inject
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * ForensicStressAuditTest: Verifies Forensic Integrity and Stress stability.
- * Oct.13.5: Hardened to detect silent CRC mismatches and verify full backfill convergence.
- * - Improved @Before isolation with synchronous log clearing.
+ * Oct.13.7: 
+ * - Updated tearDown to runBlocking for suspendable LogRepository cleanups.
+ * - Improved burst loop to track and assert successful writes (Diagnosing 755/1000 under-count).
+ * Oct.13.6: 
+ * - Integrated 'isTestMode' and 'resetForTest()' to guarantee strict test isolation.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -31,13 +37,32 @@ class ForensicStressAuditTest {
 
     @Before
     fun init() {
+        // Set test mode globally to inhibit background interference
+        LogRepository.setTestMode(true)
         hiltRule.inject()
+        
         runBlocking {
-            // Synchronously clear logs to ensure isolation
+            // 1. Reset Repository and stop any existing background jobs
+            logRepository.resetForTest()
+            
+            // 2. Synchronously clear logs to ensure isolation
             withContext(Dispatchers.IO) {
                 logDao.clearAll()
             }
+            // 3. Clear the memory-mapped buffer
             spillBuffer.resetBufferForTest()
+            
+            // 4. Now that we are isolated, manually start the drainer for this test session
+            logRepository.triggerManualDrainer()
+        }
+    }
+    
+    @After
+    fun tearDown() {
+        runBlocking {
+            // Stop background tasks to prevent leakage into the next test
+            logRepository.stopBackgroundTasks()
+            LogRepository.setTestMode(false)
         }
     }
 
@@ -46,9 +71,12 @@ class ForensicStressAuditTest {
         // 1. High-frequency 100Hz burst (10ms)
         val burstCount = 1000 
         val intervalMs = 10L
+        val successWrites = AtomicInteger(0)
+        val failWrites = AtomicInteger(0)
         
         val startTime = timeProvider.currentTimeMillis
         
+        // Use a separate scope to avoid cancelling the test scope if one write fails
         val job = launch(Dispatchers.Default) {
             repeat(burstCount) { i ->
                 val success = spillBuffer.writeTraceOptimized(
@@ -63,26 +91,41 @@ class ForensicStressAuditTest {
                     isCharging = true,
                     batteryTemp = 35.0
                 )
-                if (!success) delay(50) else delay(intervalMs)
+                if (success) {
+                    successWrites.incrementAndGet()
+                    delay(intervalMs)
+                } else {
+                    failWrites.incrementAndGet()
+                    delay(50) 
+                }
             }
         }
         
         job.join()
         
+        Timber.i("Forensic Stress: Burst complete. Success: ${successWrites.get()}, Fails: ${failWrites.get()}")
+        assertEquals("Failed to write all traces to spill buffer", burstCount, successWrites.get())
+
         // 2. Wait for drainer convergence
-        // The drainer runs periodically; we wait up to 20s for full backfill
+        // The drainer runs periodically; we wait up to 40s for full backfill
         var attempts = 0
         var dbCount = 0
-        while (attempts < 20 && dbCount < burstCount) {
+        while (attempts < 40 && dbCount < burstCount) {
             delay(1000)
-            dbCount = logRepository.loadAllLogsStatic(burstCount + 100).filter { it.type == "FORENSIC_TRACE" }.size
+            val logs = logRepository.loadAllLogsStatic(burstCount + 500)
+            dbCount = logs.filter { it.type == "FORENSIC_TRACE" }.size
+            
+            val pending = spillBuffer.getPendingCount()
+            Timber.d("Forensic Convergence: DB Count: $dbCount, Pending: $pending (Attempt $attempts/40)")
+            
+            attempts++
         }
         
-        val pending = spillBuffer.getPendingCount()
+        val finalPending = spillBuffer.getPendingCount()
         
-        // 3. Verify zero data loss (R197)
-        assertEquals("Database count mismatch - possible data loss or duplication.", burstCount, dbCount)
-        assertEquals("Buffer should be empty after convergence.", 0, pending)
+        // 3. Verify zero data loss (R197) and zero duplication
+        assertEquals("Database count mismatch - data loss or duplication leak.", burstCount, dbCount)
+        assertEquals("Buffer should be empty after convergence.", 0, finalPending)
     }
 
     @Test

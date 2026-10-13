@@ -135,7 +135,8 @@ class ProductionReadinessAuditTest {
             var lastObservedMessages = listOf<String>()
 
             repeat(50) {
-                val traces = buffer.peekToEntities(FORENSIC_SPILL_CAPACITY)
+                val peekResult = buffer.peekToEntities(FORENSIC_SPILL_CAPACITY)
+                val traces = peekResult.entities
                 val dbLogs = logRepository.loadAllLogsStatic(1000)
                 
                 lastObservedCount = traces.size
