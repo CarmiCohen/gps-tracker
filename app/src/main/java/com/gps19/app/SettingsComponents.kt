@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DirectionsRun
 import androidx.compose.material.icons.automirrored.filled.HelpCenter
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -33,6 +34,9 @@ import java.util.Date
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Oct.13.20:
+ * - Issue #ISSUE-OCT13.20-M2: Migrated VolumeUp icon to AutoMirrored version.
+ * - Fixed unresolved reference 'onUpdateAlertSettings' in SettingsOverlay.
  * Oct.5.20:
  * - SIMP-1426-3: Refactored SettingsOverlay and PhoneSetupOverlay to consume 
  *   unified UiStateProvider. (R1426-3).
@@ -126,7 +130,7 @@ fun SettingsOverlay(
                     if (visibleCount >= 3) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.ALERTS)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.Default.NotificationsActive, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_alerts)) }
-                            Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.SOUND)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Violet500.copy(alpha = 0.8f))) { Icon(Icons.Default.VolumeUp, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_sound)) }
+                            Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.SOUND)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Violet500.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.VolumeUp, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_sound)) }
                         }
                         Spacer(Modifier.height(16.dp))
                     }

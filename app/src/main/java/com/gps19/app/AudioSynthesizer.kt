@@ -8,6 +8,7 @@ import android.media.AudioTrack
 import android.os.Build
 import android.os.VibrationEffect
 import android.os.Vibrator
+import android.os.VibratorManager
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -22,6 +23,9 @@ import kotlin.math.exp
 
 /**
  * AudioSynthesizer: Procedural audio generator for sirens and alerts.
+ * Oct.13.20:
+ * - Issue #ISSUE-OCT13.20-M2: Resolved VIBRATOR_SERVICE deprecation by using 
+ *   VibratorManager on API 31+.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
  *   TimeProvider API and fixed property invocation errors.
@@ -100,7 +104,16 @@ class AudioSynthesizer @Inject constructor(
             try {
                 Timber.d("Siren loop started: $type (force=$force, loop=$loop)")
                 val startRt = timeProvider.elapsedRealtime
-                val vibrator = if (vibrate) context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator else null
+                
+                val vibrator = if (vibrate) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                        val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                        vibratorManager.defaultVibrator
+                    } else {
+                        @Suppress("DEPRECATION")
+                        context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                    }
+                } else null
 
                 while (isActive) {
                     val nowRt = timeProvider.elapsedRealtime

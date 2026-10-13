@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -23,6 +25,8 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Oct.13.20:
+ * - Issue #ISSUE-OCT13.20-M2: Migrated ArrowBack and List icons to AutoMirrored versions.
  * Oct.7.2:
  * - Issue #QA-1006-12: Fixed status label for Exact Alarm (was using isOverlayGranted).
  * Oct.6.8:
@@ -74,7 +78,7 @@ fun DiagnosticsScreen(
                 title = { Text("System Diagnostics", color = Color.White) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Black)
@@ -251,7 +255,7 @@ fun DiagnosticsScreen(
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
             ) {
-                Icon(Icons.Default.List, null)
+                Icon(Icons.AutoMirrored.Filled.List, null)
                 Spacer(Modifier.width(8.dp))
                 Text("TRIGGER LOG PRESSURE TEST (100Hz)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }

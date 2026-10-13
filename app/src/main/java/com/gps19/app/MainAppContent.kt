@@ -21,7 +21,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.core.view.WindowCompat
@@ -29,6 +28,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -40,6 +40,8 @@ import kotlinx.coroutines.flow.collectLatest
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.13.20:
+ * - Issue #ISSUE-OCT13.20-M2: Migrated LocalLifecycleOwner to androidx.lifecycle.compose.
  * Oct.6.2:
  * - Issue #AUDIT-1006-5: Integrated ExecuteLogPressureTest in DiagnosticsScreen call site.
  * Oct.6.1:

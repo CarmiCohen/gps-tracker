@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Oct.13.20:
+ * - Issue #ISSUE-OCT13.20-L1: Dead Code Cleanup. Removed unused 'androidSpeedMps' variable 
+ *   and 'nowRt' parameter in shouldSavePoint.
  * Oct.11.8:
  * - Issue #SIMP-1011-22: Performance Tier Alignment. Refactored performBayesianExpansion 
  *   to use hardware-aware uncertainty growth rates (Standard: 15m/s, Staggered: 25m/s).
@@ -268,7 +271,6 @@ class LocationProcessor(
         val lat = update.kinetic.lat
         val lng = update.kinetic.lng
         val alt = update.kinetic.alt
-        val androidSpeedMps = update.kinetic.speed
         val gpsTs = update.kinetic.gpsTs
         val accuracy = update.kinetic.accuracy
         val bearing = update.kinetic.bearing
@@ -418,7 +420,7 @@ class LocationProcessor(
             val fallbackPoint = EnginePools.GEO_POINT.acquire().apply { update(if (state.lastLat != 0.0) state.lastLat else lat, if (state.lastLng != 0.0) state.lastLng else lng, alt = alt, ts = if (state.lastTs != 0L) state.lastTs else effectiveTs, rt = if (state.lastRt != 0L) state.lastRt else nowRt, accuracy = state.lastAcc, maxAccuracy = state.lastMaxAcc) }
 
             if (!isSpatiallyValid) {
-                if (shouldSavePoint(update.isMuzzled || adaptationMuzzled, true, PhysicsUtils.calculateDistance(state.lastSavedLat, state.lastSavedLng, lat, lng), 0L, state.accuracy.maxAccuracy, nowRt)) {
+                if (shouldSavePoint(update.isMuzzled || adaptationMuzzled, true, PhysicsUtils.calculateDistance(state.lastSavedLat, state.lastSavedLng, lat, lng), 0L, state.accuracy.maxAccuracy)) {
                     emitEvent(ProcessorEvent.TrailPointSaved(lat, lng, isViewerTrail, finalStatus, effectiveTs, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy, isPrimary = isPrimary))
                 }
                 return@measureAndAudit res.apply {
@@ -501,7 +503,7 @@ class LocationProcessor(
             val isAnchorLockedNow = anchorResult.isLocked
 
             val timeSinceLastGpsSaveRt = if (nowRt > 0 && state.lastSavedRt > 0) nowRt - state.lastSavedRt else 0L
-            if (shouldSavePoint(update.isMuzzled || adaptationMuzzled, isThrottled, PhysicsUtils.calculateDistance(state.lastSavedLat, state.lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSaveRt, state.accuracy.maxAccuracy, nowRt) && !skipPersistence) {
+            if (shouldSavePoint(update.isMuzzled || adaptationMuzzled, isThrottled, PhysicsUtils.calculateDistance(state.lastSavedLat, state.lastSavedLng, persistencePoint.lat, persistencePoint.lng), timeSinceLastGpsSaveRt, state.accuracy.maxAccuracy) && !skipPersistence) {
                 emitEvent(ProcessorEvent.TrailPointSaved(persistencePoint.lat, persistencePoint.lng, isViewerTrail, finalStatus, effectiveTs, accuracy = persistencePoint.accuracy, maxAccuracy = persistencePoint.maxAccuracy, isPrimary = isPrimary))
                 state.lastSavedLat = persistencePoint.lat; state.lastSavedLng = persistencePoint.lng; state.lastSavedTs = nowWall; state.lastSavedRt = nowRt; state.lastSavedGpsTs = gpsTs
             }
@@ -548,7 +550,7 @@ class LocationProcessor(
 
     private fun isStationary(cpuLoad: Double = 0.0): Boolean = LocationSentinel.isStationary(state, cpuLoad)
 
-    private fun shouldSavePoint(isSuspicious: Boolean, isThrottled: Boolean, distFromLast: Double, timeSinceLastRt: Long, maxAcc: Double, nowRt: Long): Boolean {
+    private fun shouldSavePoint(isSuspicious: Boolean, isThrottled: Boolean, distFromLast: Double, timeSinceLastRt: Long, maxAcc: Double): Boolean {
         if (isSuspicious) return true
         val spatialGate = max(ACTIVE_MOVE_THRESHOLD, maxAcc * DEDUPLICATION_SPATIAL_GATE_FACTOR)
         return (distFromLast > (if (isThrottled) PARKING_ANCHOR_MIN_DIST else spatialGate) || (timeSinceLastRt > GPS_SAVE_INTERVAL_MS) || state.lastSavedRt == 0L)

@@ -15,6 +15,9 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
+ * Oct.13.20:
+ * - Issue #ISSUE-OCT13.20-H1: Resolved Delicate API warnings. Replaced isClosedForSend/Receive 
+ *   with exception handling and trySend results. Improved scope management for leaks.
  * Oct.12.2:
  * - Issue #SIMP-1012-2: Network Buffer Hardening. Implemented capacity-limited 
  *   priority queues with DROP_OLDEST shedding to prevent OOM during disconnects.
@@ -89,7 +92,8 @@ class SmartSignalingDispatcher(
     }
 
     override fun reinitialize(scope: CoroutineScope) {
-        if (processorJob?.isActive == true && !highQueue.isClosedForSend) return
+        // Oct.13.20: Guard re-initialization with job status instead of delicate channel state.
+        if (processorJob?.isActive == true) return
         
         shutdown()
         this.scope = scope
@@ -163,7 +167,8 @@ class SmartSignalingDispatcher(
                     emit(command)
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
-                    if (criticalQueue.isClosedForReceive || highQueue.isClosedForReceive || normalQueue.isClosedForReceive) break
+                    // Oct.13.20: Catch specific channel closure to break loop instead of checking delicate state.
+                    if (e is ClosedReceiveChannelException) break
                     delay(100)
                 }
             }
@@ -199,8 +204,12 @@ class SmartSignalingDispatcher(
                         if (nextCheck == Long.MAX_VALUE) break
                         
                         val waitTime = nextCheck.coerceAtLeast(10L)
-                        withTimeoutOrNull(waitTime) {
-                            conflationSignal.receive()
+                        try {
+                            withTimeoutOrNull(waitTime) {
+                                conflationSignal.receive()
+                            }
+                        } catch (e: ClosedReceiveChannelException) {
+                            break
                         }
                     }
                 }
@@ -254,8 +263,7 @@ class SmartSignalingDispatcher(
     }
 
     private fun dispatch(command: Command) {
-        if (criticalQueue.isClosedForSend) return
-
+        // Oct.13.20: Removed delicate isClosedForSend check. trySend handles this safely.
         val received = framesReceived.incrementAndGet()
         updateMetrics(received = received)
         when (command) {
