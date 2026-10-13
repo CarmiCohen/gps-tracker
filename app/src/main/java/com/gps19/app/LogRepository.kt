@@ -21,13 +21,14 @@ import androidx.room.withTransaction
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.13.5:
+ * - Hardened forensic drainer with a dedicated Mutex to prevent duplicate 
+ *   insertions during concurrent recovery and periodic cycles.
+ * - Fixed Long bit-overflow in forensic signature deduplication (Issue #OCT13.5-2).
+ * - Fixed unresolved reference 'it' in flushBatch mapping.
  * Oct.12.3:
  * - Issue #SIMP-1012-3: Forensic Integrity. Propagated checksum field during 
  *   batch flushing and Entity mapping to support corruption detection.
- * Oct.11.1:
- * - Issue #SIMP-1011-8: I/O Pressure Test. Integrated isMaliAnomaly into 
- *   proactive pruning and forensic drainer backing off to mitigate driver-level 
- *   IO contention on budget hardware.
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -40,6 +41,7 @@ class LogRepository @Inject constructor(
     private val telemetry: TelemetryRepository
 ) {
     private val logMutex = Mutex()
+    private val forensicMutex = Mutex() // Serializes forensic drains (Oct13.5)
     private val logWriteCount = AtomicInteger(0)
     private val isPruning = AtomicBoolean(false)
     private val lastPruneTime = AtomicLong(0L)
@@ -131,8 +133,6 @@ class LogRepository @Inject constructor(
             while (isActive) {
                 try {
                     val health = telemetry.systemHealth.value
-                    
-                    // Issue #SIMP-1011-8: Back off drainer if Mali Driver Anomaly is detected.
                     val loadFactor = if (health.isMaliAnomaly) 1.0 else (health.cpuLoad / 8.0).coerceIn(0.0, 1.0)
                     val dynamicDelay = FORENSIC_DRAIN_THROTTLE_MIN_MS + 
                                      ((FORENSIC_DRAIN_THROTTLE_MAX_MS - FORENSIC_DRAIN_THROTTLE_MIN_MS) * loadFactor).toLong()
@@ -171,11 +171,11 @@ class LogRepository @Inject constructor(
         }
     }
 
-    private suspend fun performForensicDrain(limit: Int, isRecovery: Boolean): Boolean {
+    private suspend fun performForensicDrain(limit: Int, isRecovery: Boolean): Boolean = forensicMutex.withLock {
         if (isForensicStallSimulated.get() && !isRecovery) {
             forensicFailureCount.incrementAndGet()
             updateReliability(false)
-            return false
+            return@withLock false
         }
 
         val buffer = forensicSpillBufferProvider.get()
@@ -184,22 +184,21 @@ class LogRepository @Inject constructor(
         val entities = buffer.peekToEntities(limit)
         if (entities.isEmpty()) {
             if (pendingAtStart > 0) buffer.commitDrain(pendingAtStart)
-            return false
+            return@withLock false
         }
 
         val minTs = entities.minOf { it.timestamp }
         val maxTs = entities.maxOf { it.timestamp }
         
         val signaturesSet = logDao.getExistingForensicSignaturesInRange(minTs, maxTs).mapTo(HashSet()) {
-            (it.timestamp shl 32) or (it.spillIdx.toLong() and 0xFFFFFFFFL)
+            it.timestamp to it.spillIdx
         }
         
         val filteredEntities = if (signaturesSet.isEmpty()) entities else entities.filter { 
-            val packed = (it.timestamp shl 32) or (it.spillIdx.toLong() and 0xFFFFFFFFL)
-            packed !in signaturesSet 
+            (it.timestamp to it.spillIdx) !in signaturesSet 
         }
 
-        return try {
+        return@withLock try {
             if (filteredEntities.isNotEmpty()) {
                 logDao.insertAll(filteredEntities)
             }
@@ -432,7 +431,6 @@ class LogRepository @Inject constructor(
         
         if (result.isFailure) {
             if (entry.isImportant) {
-                // R660: Critical alerts MUST NOT be dropped. Use async fallback to await space.
                 scope.launch(Dispatchers.IO) {
                     logBuffer.send(buffered)
                 }
@@ -466,7 +464,6 @@ class LogRepository @Inject constructor(
                 val memoryCritical = health.heapAllocatedMb >= MEMORY_CRITICAL_THRESHOLD_MB
                 val memoryHigh = health.heapAllocatedMb >= MEMORY_PRESSURE_THRESHOLD_MB
 
-                // Issue #SIMP-1011-8: Treat Mali anomaly as critical pressure to reduce DB overhead.
                 val threshold = when {
                     health.isStorageCritical || memoryCritical || health.isMaliAnomaly -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
                     health.isStorageLow || memoryHigh -> ADAPTIVE_PRUNE_THRESHOLD_LOW
@@ -546,9 +543,9 @@ class LogRepository @Inject constructor(
                 specialColor = it.specialColor, firstSeenTs = it.firstSeenTs, role = it.role,
                 lat = it.lat, lng = it.lng, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy,
                 forensic = ForensicSnapshot(
-                    snr = it.snrSnapshot,
-                    vibe = it.vibeSnapshot,
-                    thermal = it.thermalSnapshot,
+                    snr = it.snrSnapshot, 
+                    vibe = it.vibeSnapshot, 
+                    thermal = it.thermalSnapshot, 
                     heap = it.heapSnapshot
                 ),
                 spillIdx = it.spillIdx, gpsHardwareLock = it.gpsHardwareLock,

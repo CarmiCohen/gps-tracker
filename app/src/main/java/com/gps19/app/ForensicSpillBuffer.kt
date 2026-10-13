@@ -18,9 +18,10 @@ import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for forensic traces.
- * Oct.12.3:
- * - Issue #SIMP-1012-3: Forensic Integrity. Propagated CRC32 checksum into 
- *   LogEntity to support end-to-end corruption detection.
+ * Oct.13.5: 
+ * - Hardened thread safety: Duplication of MappedByteBuffer moved inside lock.
+ * - Synchronized resetBuffer to prevent races with background drainers.
+ * - Eliminated shared member buffers to prevent corruption during high-pressure bursts.
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -34,13 +35,6 @@ class ForensicSpillBuffer @Inject constructor(
     private val writeIdx = AtomicInteger(0)
     private val totalCount = AtomicInteger(0)
     private val readIdx = AtomicInteger(0)
-    
-    private val entryWriteBuffer = ByteBuffer.allocate(FORENSIC_SPILL_ENTRY_SIZE_V5).order(ByteOrder.nativeOrder())
-    private val writeCrc = CRC32()
-    
-    private val readEntryBytes = ByteArray(FORENSIC_SPILL_ENTRY_SIZE_V5)
-    private val readEntryWrapper = ByteBuffer.wrap(readEntryBytes).order(ByteOrder.nativeOrder())
-    private val readCrc = CRC32()
     
     private companion object {
         const val MAGIC_NUMBER = 0x46535042
@@ -115,29 +109,29 @@ class ForensicSpillBuffer @Inject constructor(
 
     private fun resetBuffer() {
         val buffer = mappedBuffer ?: return
-        buffer.putInt(OFF_MAGIC, MAGIC_NUMBER)
-        buffer.putInt(OFF_VERSION, CURRENT_VERSION)
-        buffer.putInt(OFF_CAPACITY, FORENSIC_SPILL_CAPACITY)
-        buffer.putInt(OFF_ENTRY_SIZE, FORENSIC_SPILL_ENTRY_SIZE_V5)
-        buffer.putLong(OFF_LAST_WRITE_RT, 0L)
-        buffer.putInt(OFF_WRITE_IDX, 0)
-        buffer.putInt(OFF_COUNT, 0)
-        buffer.putInt(OFF_READ_IDX, 0)
-        
-        buffer.putLong(OFF_BASE_TS, timeProvider.currentTimeMillis)
-        buffer.putDouble(OFF_BASE_LAT, 0.0)
-        buffer.putDouble(OFF_BASE_LNG, 0.0)
-        
-        writeIdx.set(0)
-        totalCount.set(0)
-        readIdx.set(0)
+        synchronized(this) {
+            buffer.putInt(OFF_MAGIC, MAGIC_NUMBER)
+            buffer.putInt(OFF_VERSION, CURRENT_VERSION)
+            buffer.putInt(OFF_CAPACITY, FORENSIC_SPILL_CAPACITY)
+            buffer.putInt(OFF_ENTRY_SIZE, FORENSIC_SPILL_ENTRY_SIZE_V5)
+            buffer.putLong(OFF_LAST_WRITE_RT, 0L)
+            buffer.putInt(OFF_WRITE_IDX, 0)
+            buffer.putInt(OFF_COUNT, 0)
+            buffer.putInt(OFF_READ_IDX, 0)
+            
+            buffer.putLong(OFF_BASE_TS, timeProvider.currentTimeMillis)
+            buffer.putDouble(OFF_BASE_LAT, 0.0)
+            buffer.putDouble(OFF_BASE_LNG, 0.0)
+            
+            writeIdx.set(0)
+            totalCount.set(0)
+            readIdx.set(0)
+            buffer.force()
+        }
     }
 
     fun writeTrace(entry: LogEntry): Boolean {
-        val buffer = mappedBuffer ?: return false
-
         val rawBytes = entry.message.toByteArray(Charsets.UTF_8)
-        
         val maxMsgLen = FORENSIC_SPILL_ENTRY_SIZE_V5 - DATA_FIELDS_SIZE - CHECKSUM_SIZE
         var msgLen = rawBytes.size.coerceAtMost(maxMsgLen)
         
@@ -154,24 +148,25 @@ class ForensicSpillBuffer @Inject constructor(
             type = LatencyMonitor.AuditType.PERFORMANCE,
             onSpike = { msg, _ -> Timber.w(msg) }
         ) {
+            val buffer = mappedBuffer ?: return@measureAndAudit false
+            val localWriteBuffer = ByteBuffer.allocate(FORENSIC_SPILL_ENTRY_SIZE_V5).order(ByteOrder.nativeOrder())
+            val localCrc = CRC32()
+
             synchronized(this) {
                 if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
 
-                entryWriteBuffer.clear()
-                Arrays.fill(entryWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE_V5, 0.toByte())
+                localWriteBuffer.putLong(entry.timestamp)
+                localWriteBuffer.putDouble(entry.lat)
+                localWriteBuffer.putDouble(entry.lng)
                 
-                entryWriteBuffer.putLong(entry.timestamp)
-                entryWriteBuffer.putDouble(entry.lat)
-                entryWriteBuffer.putDouble(entry.lng)
+                localWriteBuffer.putFloat(entry.accuracy.toFloat())
+                localWriteBuffer.putFloat(entry.maxAccuracy.toFloat())
+                localWriteBuffer.putFloat(entry.vibeSnapshot?.toFloat() ?: -1.0f)
+                localWriteBuffer.putFloat(entry.snrSnapshot?.toFloat() ?: -1.0f)
+                localWriteBuffer.putFloat(entry.tempSnapshot?.toFloat() ?: 0.0f)
                 
-                entryWriteBuffer.putFloat(entry.accuracy.toFloat())
-                entryWriteBuffer.putFloat(entry.maxAccuracy.toFloat())
-                entryWriteBuffer.putFloat(entry.vibeSnapshot?.toFloat() ?: -1.0f)
-                entryWriteBuffer.putFloat(entry.snrSnapshot?.toFloat() ?: -1.0f)
-                entryWriteBuffer.putFloat(entry.tempSnapshot?.toFloat() ?: 0.0f)
-                
-                entryWriteBuffer.putFloat(entry.thermalSnapshot?.toFloat() ?: 0.0f)
-                entryWriteBuffer.putFloat(entry.heapSnapshot?.toFloat() ?: 0.0f)
+                localWriteBuffer.putFloat(entry.thermalSnapshot?.toFloat() ?: 0.0f)
+                localWriteBuffer.putFloat(entry.heapSnapshot?.toFloat() ?: 0.0f)
 
                 var flags = 0
                 if (entry.isImportant) flags = flags or 0x01
@@ -180,26 +175,25 @@ class ForensicSpillBuffer @Inject constructor(
                 if (entry.gpsHardwareLock) flags = flags or 0x08
                 if (entry.coolingSnapshot == true) flags = flags or 0x10
                 
-                entryWriteBuffer.put(flags.toByte())
-                entryWriteBuffer.put(entry.battSnapshot?.toByte() ?: 0.toByte())
-                entryWriteBuffer.put(msgLen.toByte())
-                entryWriteBuffer.put(0.toByte()) 
+                localWriteBuffer.put(flags.toByte())
+                localWriteBuffer.put(entry.battSnapshot?.toByte() ?: 0.toByte())
+                localWriteBuffer.put(msgLen.toByte())
+                localWriteBuffer.put(0.toByte()) 
                 
                 if (msgLen > 0) {
-                    entryWriteBuffer.put(rawBytes, 0, msgLen)
+                    localWriteBuffer.put(rawBytes, 0, msgLen)
                 }
                 
-                entryWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
-
-                writeCrc.reset()
-                writeCrc.update(entryWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
-                entryWriteBuffer.putInt(writeCrc.value.toInt())
+                localWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
+                localCrc.reset()
+                localCrc.update(localWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
+                localWriteBuffer.putInt(localCrc.value.toInt())
 
                 val currentWrite = writeIdx.get()
                 val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE_V5)
                 
                 buffer.position(offset)
-                buffer.put(entryWriteBuffer.array())
+                buffer.put(localWriteBuffer.array())
                 
                 advanceWritePointer(buffer)
                 true
@@ -221,45 +215,44 @@ class ForensicSpillBuffer @Inject constructor(
             onSpike = { msg, _ -> Timber.w(msg) }
         ) {
             val buffer = mappedBuffer ?: return@measureAndAudit false
+            val localWriteBuffer = ByteBuffer.allocate(FORENSIC_SPILL_ENTRY_SIZE_V5).order(ByteOrder.nativeOrder())
+            val localCrc = CRC32()
             
             synchronized(this) {
                 if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
                 
-                entryWriteBuffer.clear()
-                Arrays.fill(entryWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE_V5, 0.toByte())
-
-                entryWriteBuffer.putLong(timestamp)
-                entryWriteBuffer.putDouble(lat)
-                entryWriteBuffer.putDouble(lng)
+                localWriteBuffer.putLong(timestamp)
+                localWriteBuffer.putDouble(lat)
+                localWriteBuffer.putDouble(lng)
                 
-                entryWriteBuffer.putFloat(accuracy.toFloat())
-                entryWriteBuffer.putFloat(maxAccuracy.toFloat())
-                entryWriteBuffer.putFloat(vibe.toFloat())
-                entryWriteBuffer.putFloat(snr.toFloat())
-                entryWriteBuffer.putFloat(batteryTemp.toFloat())
+                localWriteBuffer.putFloat(accuracy.toFloat())
+                localWriteBuffer.putFloat(maxAccuracy.toFloat())
+                localWriteBuffer.putFloat(vibe.toFloat())
+                localWriteBuffer.putFloat(snr.toFloat())
+                localWriteBuffer.putFloat(batteryTemp.toFloat())
                 
-                entryWriteBuffer.putFloat(thermalHeadroom.toFloat())
-                entryWriteBuffer.putFloat(heapAllocatedMb.toFloat())
+                localWriteBuffer.putFloat(thermalHeadroom.toFloat())
+                localWriteBuffer.putFloat(heapAllocatedMb.toFloat())
 
                 var flags = 0
                 if (isCharging) flags = flags or 0x04
                 if (gpsHardwareLock) flags = flags or 0x08
                 if (isCooling) flags = flags or 0x10
                 
-                entryWriteBuffer.put(flags.toByte())
-                entryWriteBuffer.put(batteryLevel.toByte())
-                entryWriteBuffer.put(0.toByte()) // msgLen = 0
-                entryWriteBuffer.put(0.toByte())
+                localWriteBuffer.put(flags.toByte())
+                localWriteBuffer.put(batteryLevel.toByte())
+                localWriteBuffer.put(0.toByte()) // msgLen = 0
+                localWriteBuffer.put(0.toByte())
 
-                entryWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
-                writeCrc.reset()
-                writeCrc.update(entryWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
-                entryWriteBuffer.putInt(writeCrc.value.toInt())
+                localWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
+                localCrc.reset()
+                localCrc.update(localWriteBuffer.array(), 0, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
+                localWriteBuffer.putInt(localCrc.value.toInt())
 
                 val currentWrite = writeIdx.get()
                 val offset = HEADER_SIZE + (currentWrite * FORENSIC_SPILL_ENTRY_SIZE_V5)
                 buffer.position(offset)
-                buffer.put(entryWriteBuffer.array())
+                buffer.put(localWriteBuffer.array())
 
                 advanceWritePointer(buffer)
                 true
@@ -286,9 +279,11 @@ class ForensicSpillBuffer @Inject constructor(
             onSpike = { msg, _ -> Timber.w(msg) }
         ) {
             val mainBuffer = mappedBuffer ?: return@measureAndAudit emptyList()
-            val readBuffer = mainBuffer.duplicate().order(ByteOrder.nativeOrder())
+            val localEntryBytes = ByteArray(FORENSIC_SPILL_ENTRY_SIZE_V5)
+            val localCrc = CRC32()
             
             synchronized(this) {
+                val readBuffer = mainBuffer.duplicate().order(ByteOrder.nativeOrder())
                 val count = totalCount.get()
                 if (count == 0) return@synchronized emptyList()
                 
@@ -300,35 +295,35 @@ class ForensicSpillBuffer @Inject constructor(
                 repeat(toPeekCount) {
                     val offset = HEADER_SIZE + (tempReadIdx * FORENSIC_SPILL_ENTRY_SIZE_V5)
                     readBuffer.position(offset)
-                    readBuffer.get(readEntryBytes)
+                    readBuffer.get(localEntryBytes)
                     
-                    readEntryWrapper.clear()
-                    readCrc.reset()
-                    readCrc.update(readEntryBytes, 0, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
+                    val localWrapper = ByteBuffer.wrap(localEntryBytes).order(ByteOrder.nativeOrder())
+                    localCrc.reset()
+                    localCrc.update(localEntryBytes, 0, FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
                     
-                    val storedCrc = readEntryWrapper.getInt(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
+                    val storedCrcLong = localWrapper.getInt(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE).toLong() and 0xFFFFFFFFL
                     
-                    if (storedCrc == readCrc.value.toInt()) {
-                        val ts = readEntryWrapper.getLong()
-                        val lat = readEntryWrapper.getDouble()
-                        val lng = readEntryWrapper.getDouble()
+                    if (storedCrcLong == localCrc.value) {
+                        val ts = localWrapper.getLong()
+                        val lat = localWrapper.getDouble()
+                        val lng = localWrapper.getDouble()
 
-                        val acc = readEntryWrapper.getFloat().toDouble()
-                        val maxAcc = readEntryWrapper.getFloat().toDouble()
-                        val vibe = readEntryWrapper.getFloat().toDouble()
-                        val snr = readEntryWrapper.getFloat().toDouble()
-                        val batTemp = readEntryWrapper.getFloat().toDouble()
+                        val acc = localWrapper.getFloat().toDouble()
+                        val maxAcc = localWrapper.getFloat().toDouble()
+                        val vibe = localWrapper.getFloat().toDouble()
+                        val snr = localWrapper.getFloat().toDouble()
+                        val batTemp = localWrapper.getFloat().toDouble()
                         
-                        val thermal = readEntryWrapper.getFloat().toDouble()
-                        val heap = readEntryWrapper.getFloat().toDouble()
+                        val thermal = localWrapper.getFloat().toDouble()
+                        val heap = localWrapper.getFloat().toDouble()
 
-                        val flags = readEntryWrapper.get().toInt()
-                        val batLevel = readEntryWrapper.get().toInt() and 0xFF
-                        val msgLen = readEntryWrapper.get().toInt() and 0xFF
-                        readEntryWrapper.get() // read the padding byte
+                        val flags = localWrapper.get().toInt()
+                        val batLevel = localWrapper.get().toInt() and 0xFF
+                        val msgLen = localWrapper.get().toInt() and 0xFF
+                        localWrapper.get() // read padding
 
                         val msg = if (msgLen > 0) {
-                            String(readEntryBytes, readEntryWrapper.position(), msgLen, Charsets.UTF_8)
+                            String(localEntryBytes, localWrapper.position(), msgLen, Charsets.UTF_8)
                         } else {
                             DEFAULT_TRACE_MSG
                         }
@@ -357,10 +352,10 @@ class ForensicSpillBuffer @Inject constructor(
                             coolingSnapshot = (flags and 0x10) != 0,
                             thermalSnapshot = thermal,
                             heapSnapshot = heap,
-                            checksum = storedCrc.toLong() and 0xFFFFFFFFL
+                            checksum = storedCrcLong
                         ))
                     } else {
-                        Timber.w("Forensic Audit: CRC mismatch at index $tempReadIdx. Trace ignored.")
+                        Timber.w("Forensic Audit: CRC mismatch at index $tempReadIdx. Stored: $storedCrcLong, Computed: ${localCrc.value}")
                     }
                     tempReadIdx = (tempReadIdx + 1) % FORENSIC_SPILL_CAPACITY
                 }
@@ -389,6 +384,7 @@ class ForensicSpillBuffer @Inject constructor(
                 val newCount = totalCount.get() - actualToConsume
                 totalCount.set(newCount)
                 buffer.putInt(OFF_COUNT, newCount)
+                buffer.force()
             }
         }
     }

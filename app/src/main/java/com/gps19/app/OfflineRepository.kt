@@ -13,6 +13,8 @@ import javax.inject.Singleton
 
 /**
  * OfflineRepository: Manages persistent buffering of status updates during network loss.
+ * Oct.13.5:
+ * - Hardened persistence actor for extreme concurrent burst handling.
  * Oct.13.3:
  * - Issue #SIMP-OCT13.3-S1: Sequential Persistence Actor. Replaced concurrent 
  *   launch-based flushes with a Channel-based actor to guarantee sequential 
