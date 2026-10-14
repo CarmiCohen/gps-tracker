@@ -23,9 +23,11 @@ import kotlinx.coroutines.flow.onEach
 
 /**
  * AlarmActivity: Full-screen alarm overlay that bypasses the lock screen.
+ * Oct.14.9:
+ * - SIMP-OCT14.8-S1: Updated to consolidated HudState. Derived health 
+ *   sub-state from viewModel.hudState.
  * Oct.5.20:
  * - SIMP-1426-3: Updated AlarmOverlay call to use unified UiStateProvider (viewModel).
- *   Corrected property references to use 'session' flow.
  */
 @AndroidEntryPoint
 class AlarmActivity : ComponentActivity() {
@@ -75,7 +77,8 @@ class AlarmActivity : ComponentActivity() {
                     AlarmOverlay(
                         stateProvider = viewModel,
                         onMute = {
-                            val currentAlarms = viewModel.hudHealthState.value.activeAlarms
+                            val hudHealth = viewModel.hudState.value.health
+                            val currentAlarms = hudHealth.activeAlarms
                             val currentCauses = currentAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
                             viewModel.onEvent(UiEvent.StopSiren(currentCauses))
                         },
@@ -86,7 +89,8 @@ class AlarmActivity : ComponentActivity() {
                         onGoToMap = {
                             viewModel.onEvent(UiEvent.DismissAlarms)
                             
-                            val currentAlarms = viewModel.hudHealthState.value.activeAlarms
+                            val hudHealth = viewModel.hudState.value.health
+                            val currentAlarms = hudHealth.activeAlarms
                             val currentCauses = currentAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Map Navigation" }
                             viewModel.onEvent(UiEvent.StopSiren(currentCauses))
                             

@@ -26,12 +26,12 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Oct.14.8:
+ * - SIMP-OCT13.21-S1: Pure Event UI. Flattened TelemetryBox and MainDashboardGrid 
+ *   signatures by migrating specialized lambdas to UiEvent bus.
  * Oct.7.8:
  * - Issue #SIMP-1010-1: Adaptive Acoustic Gating. Added isSuspiciousNoise badge 
  *   to DashboardHeader for JNI-level anomaly visibility.
- * Sep.11.12:
- * - Issue #946 Visibility RESOLVED: Added tamperReason to MainDashboardGrid and 
- *   DashboardHeader for forensic transparency (R-ID 288).
  */
 
 @Composable
@@ -108,7 +108,7 @@ fun MainDashboardGrid(
     isGnssThrottled: Boolean = false,
     isSafeMode: Boolean = false,
     isSuspiciousNoise: Boolean = false,
-    onShowGnssDetail: () -> Unit = {}
+    onEvent: (UiEvent) -> Unit
 ) {
     val isViewer = appMode == "viewer"
     val gpsColor = if (isGpsFresh) Color.White else Slate500
@@ -157,7 +157,7 @@ fun MainDashboardGrid(
                 distToHome = distToHome, distToViewer = distToViewer, lat = lat, lng = lng, gpsSpeedMps = gpsSpeedMps,
                 trackerAccuracy = trackerAccuracy, trackerMaxAcc = trackerMaxAcc, viewerAccuracy = viewerAccuracy, viewerMaxAcc = viewerMaxAcc,
                 satsUsed = satsUsed, satsView = satsView, isSatsIndexWarning = isSatsIndexWarning, snr = snr, isGpsFresh = isGpsFresh,
-                gpsIdx = gpsIdx, isViewer = isViewer, isLocalOnline = isLocalOnline, gpsColor = gpsColor, onShowGnssDetail = onShowGnssDetail
+                gpsIdx = gpsIdx, isViewer = isViewer, isLocalOnline = isLocalOnline, gpsColor = gpsColor, onEvent = onEvent
             )
             SectionDivider()
             ForensicSection(
@@ -297,7 +297,7 @@ private fun PositionSection(
     distToHome: Double?, distToViewer: Double?, lat: Double, lng: Double, gpsSpeedMps: Double,
     trackerAccuracy: Double, trackerMaxAcc: Double, viewerAccuracy: Double, viewerMaxAcc: Double,
     satsUsed: Int, satsView: Int, isSatsIndexWarning: Boolean, snr: Double, isGpsFresh: Boolean,
-    gpsIdx: GpsIndexData, isViewer: Boolean, isLocalOnline: Boolean, gpsColor: Color, onShowGnssDetail: () -> Unit
+    gpsIdx: GpsIndexData, isViewer: Boolean, isLocalOnline: Boolean, gpsColor: Color, onEvent: (UiEvent) -> Unit
 ) {
     val tFreshColor = if (isGpsFresh) BrandJd else Slate500
     val vFreshColor = if (isViewer && !isLocalOnline) Slate500 else ViewerCyan
@@ -312,7 +312,7 @@ private fun PositionSection(
     
     val gpsIdxStr = remember(gpsIdx.totalIndex) { "%.2f".format(Locale.getDefault(), gpsIdx.totalIndex) }
     val gpsSpeedStr = remember(gpsSpeedMps, isGpsFresh) { if (isGpsFresh) "%.1fkm/h".format(Locale.getDefault(), gpsSpeedMps * 3.6) else "--" }
-    InfoRow(leftVal = gpsIdxStr, leftLabel = "GPS-Index", leftColor = if(!isGpsFresh) Slate500 else BrandJd, rightVal = gpsSpeedStr, rightLabel = "GPS Speed", rightColor = if(!isGpsFresh) Slate500 else BrandJd, onLeftClick = onShowGnssDetail)
+    InfoRow(leftVal = gpsIdxStr, leftLabel = "GPS-Index", leftColor = if(!isGpsFresh) Slate500 else BrandJd, rightVal = gpsSpeedStr, rightLabel = "GPS Speed", rightColor = if(!isGpsFresh) Slate500 else BrandJd, onLeftClick = { onEvent(UiEvent.ToggleGnssDetail(true)) })
     
     val trkAccDisplay = remember(trackerAccuracy, trackerMaxAcc, isGpsFresh) { if (isGpsFresh) "±%.1fm (±%.1fm)".format(Locale.getDefault(), trackerAccuracy, trackerMaxAcc) else "--" }
     val vwrAccDisplay = remember(viewerAccuracy, viewerMaxAcc, isViewer) { if (isViewer) "±%.1fm (±%.1fm)".format(Locale.getDefault(), viewerAccuracy, viewerMaxAcc) else "" }
@@ -324,7 +324,7 @@ private fun PositionSection(
     
     val accIdxStr = remember(gpsIdx.accIndex) { "%.2f".format(Locale.getDefault(), gpsIdx.accIndex) }
     val snrStr = remember(snr, isGpsFresh) { if (isGpsFresh) "${snr.toInt()}dB" else "--" }
-    InfoRow(leftVal = accIdxStr, leftLabel = "Acc Index", leftColor = if(!isGpsFresh) Slate500 else Color.White, rightVal = snrStr, rightLabel = "Avg SNR", rightColor = if(!isGpsFresh) Slate500 else Color(0xFF38BDF8), onRightClick = onShowGnssDetail)
+    InfoRow(leftVal = accIdxStr, leftLabel = "Acc Index", leftColor = if(!isGpsFresh) Slate500 else Color.White, rightVal = snrStr, rightLabel = "Avg SNR", rightColor = if(!isGpsFresh) Slate500 else Color(0xFF38BDF8), onRightClick = { onEvent(UiEvent.ToggleGnssDetail(true)) })
 }
 
 @Composable
@@ -484,7 +484,7 @@ fun TelemetryBox(
     isGnssThrottled: Boolean = false,
     isSafeMode: Boolean = false,
     isSuspiciousNoise: Boolean = false,
-    onShowGnssDetail: () -> Unit = {}
+    onEvent: (UiEvent) -> Unit
 ) {
     MainDashboardGrid(
         appMode = appMode, isBatteryWhitelisted = isBatteryWhitelisted, isLocalOnline = isLocalOnline, isRelayConnected = isRelayConnected,
@@ -501,7 +501,7 @@ fun TelemetryBox(
         rollingVibration = rollingVibration, trackerMaxTemp = trackerMaxTemp, viewerMaxTemp = viewerMaxTemp, peakShock = peakShock, vibrationFloor = vibrationFloor,
         luxBaseline = luxBaseline, acousticFloorDb = acousticFloorDb, trackerCurrentMa = trackerCurrentMa, gpsIdx = gpsIdx, rttValue = rttValue,
         cpuLoad = cpuLoad, ioWait = ioWait, maxIoLatency = maxIoLatency, isUltraLongStationary = isUltraLongStationary, isGnssThrottled = isGnssThrottled, 
-        isSafeMode = isSafeMode, isSuspiciousNoise = isSuspiciousNoise, onShowGnssDetail = onShowGnssDetail
+        isSafeMode = isSafeMode, isSuspiciousNoise = isSuspiciousNoise, onEvent = onEvent
     )
 }
 

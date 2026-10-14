@@ -19,12 +19,10 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerScreen: Tracker-mode UI.
- * Oct.13.21:
- * - SIMP-OCT13.21-S1: Pure Event UI. Aligned signature with ViewerScreen to use 
- *   UiStateProvider and onMainEvent bubbling.
- * Oct.13.1:
- * - SIMP-OCT12.16-S1: Unified HUD Overlay. Integrated UnifiedHUDOverlay and 
- *   removed redundant overlay calls.
+ * Oct.14.8:
+ * - SIMP-OCT13.21-S1: Pure Event UI. Flattened TrackerDashboard signature by 
+ *   migrating TelemetryBox and SessionTerminationButton to UiEvent bus. 
+ *   Updated AppMapContainer calls to pass onMainEvent.
  */
 
 @Composable
@@ -48,7 +46,7 @@ fun TrackerScreen(
                     Column(modifier = Modifier.weight(1f).navigationBarsPadding()) {
                         Box(modifier = Modifier.weight(1f)) {
                             if (session.hydrationLevel >= 4 && isMapVisible && !isAnyOverlayOpen) {
-                                AppMapContainer(stateProvider = stateProvider)
+                                AppMapContainer(stateProvider = stateProvider, onEvent = onMainEvent)
                             } else if (session.hydrationLevel >= 2 && !isMapVisible) {
                                 TrackerDashboard(stateProvider = stateProvider, onEvent = onMainEvent)
                             }
@@ -57,7 +55,7 @@ fun TrackerScreen(
                 }
             } else {
                 if (session.hydrationLevel >= 4 && isMapVisible && !isAnyOverlayOpen) {
-                    AppMapContainer(stateProvider = stateProvider)
+                    AppMapContainer(stateProvider = stateProvider, onEvent = onMainEvent)
                 }
                 Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
                     Spacer(Modifier.height(82.dp)) // Reserve space for Unified HUD
@@ -114,10 +112,10 @@ fun TrackerDashboard(
                     baroAlt = dashboardState.baroAlt, lux = dashboardState.lux, proximityCm = dashboardState.proximityCm, proximityDebounceMs = dashboardState.proximityDebounceMs, rollingVibration = dashboardState.rollingVibration, 
                     trackerMaxTemp = dashboardState.trackerMaxTemp, viewerMaxTemp = dashboardState.viewerMaxTemp, peakShock = dashboardState.peakShock, vibrationFloor = dashboardState.vibrationFloor, luxBaseline = dashboardState.luxBaseline, 
                     acousticFloorDb = dashboardState.acousticFloorDb, trackerCurrentMa = currentMaValue, gpsIdx = gpsIdx, rttValue = rttValue, cpuLoad = dashboardState.cpuLoad, ioWait = dashboardState.ioWait, 
-                    maxIoLatency = dashboardState.maxIoLatency, isUltraLongStationary = dashboardState.isUltraLongStationary, isSuspiciousNoise = dashboardState.isSuspiciousNoise, onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
+                    maxIoLatency = dashboardState.maxIoLatency, isUltraLongStationary = dashboardState.isUltraLongStationary, isSuspiciousNoise = dashboardState.isSuspiciousNoise, onEvent = onEvent
                 )
                 DebugTable(isLinkFresh = dashboardState.isLinkFresh, isTelemetryFresh = dashboardState.isTelemetryFresh, isGpsFresh = dashboardState.isGpsFresh, trackerStateName = dashboardState.trackerState.name, gpsAgeSec = if (kinematicState.localLocation.kinetic.gpsTs > 0) (systemPulse - kinematicState.localLocation.kinetic.gpsTs) / 1000 else -1L, rtt = rttValue, currentMa = currentMaValue)
-                Spacer(Modifier.height(16.dp)); SessionTerminationButton(appMode = appMode, onTerminate = { onEvent(UiEvent.ShowStopTrackingConfirmation(true)) })
+                Spacer(Modifier.height(16.dp)); SessionTerminationButton(appMode = appMode, onEvent = onEvent)
             } else { Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { Text("Tap status card above to expand dashboard", color = Slate500, fontSize = 11.sp, fontWeight = FontWeight.Medium) } }
         }
         item { Spacer(Modifier.height(32.dp)) }

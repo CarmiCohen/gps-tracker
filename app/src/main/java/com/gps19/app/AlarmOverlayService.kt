@@ -23,11 +23,12 @@ import javax.inject.Inject
 /**
  * AlarmOverlayService: Implements SYSTEM_ALERT_WINDOW to ensure alarm visibility 
  * even when the app is in background and device is unlocked.
+ * Oct.14.9:
+ * - SIMP-OCT14.8-S1: Updated to consolidated HudState. derive hudState flow 
+ *   locally for the overlay state provider.
  * Oct.6.1:
  * - AUDIT-1006-1: Refactored state preparation. Migrated flow creation out of 
  *   composition scope to service-level initialization.
- * - AUDIT-1006-2: Optimized transition latency. Seeded sessionStateFlow with 
- *   immediate emission to prevent initial black frames.
  */
 @AndroidEntryPoint
 class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
@@ -69,15 +70,17 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
     }
 
     private fun initializeStateProvider() {
-        val hudHealthFlow = combine(
+        val hudStateFlow = combine(
             alarmManager.activeAlarmsFlow,
             sirenLockoutUseCase.silencedUntilRt
         ) { alarms, _ ->
-            HudHealthState(
-                activeAlarms = alarms,
-                isAlarmSilenced = sirenLockoutUseCase.isLockedOut()
+            HudState(
+                health = HudHealthState(
+                    activeAlarms = alarms,
+                    isAlarmSilenced = sirenLockoutUseCase.isLockedOut()
+                )
             )
-        }.stateIn(lifecycleScope, SharingStarted.Eagerly, HudHealthState())
+        }.stateIn(lifecycleScope, SharingStarted.Eagerly, HudState())
 
         val kinematicFlow = repository.trackerLocation.map { update ->
             KinematicState().apply {
@@ -87,7 +90,6 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
         }.stateIn(lifecycleScope, SharingStarted.Eagerly, KinematicState())
 
         val sessionStateFlow = flow {
-            // Seed immediate value for AUDIT-1006-2
             emit(SessionUiState(permissions = systemStatusProvider.getPermissionState()))
             while(true) {
                 kotlinx.coroutines.delay(30000)
@@ -98,7 +100,7 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
         stateProvider = SimpleUiStateProvider(
             session = sessionStateFlow,
             kinematic = kinematicFlow,
-            hudHealthState = hudHealthFlow
+            hudState = hudStateFlow
         )
     }
 
@@ -183,9 +185,7 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
             it.disposeComposition()
             try {
                 windowManager.removeViewImmediate(it)
-            } catch (e: Exception) {
-                // View might already be detached
-            }
+            } catch (e: Exception) { }
         }
         composeView = null
         stateProvider = null

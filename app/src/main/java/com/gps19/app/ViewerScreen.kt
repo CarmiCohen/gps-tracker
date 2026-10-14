@@ -17,9 +17,10 @@ import com.gps19.core.engine.*
 
 /**
  * ViewerScreen: Viewer-mode UI.
- * Oct.13.21:
- * - SIMP-OCT13.21-S1: Pure Event UI. Finalized removal of onSaveTrail and 
- *   onLoadTrail lambdas from signature.
+ * Oct.14.8:
+ * - SIMP-OCT13.21-S1: Pure Event UI. Flattened ViewerDashboard signature by 
+ *   migrating TelemetryBox and SessionTerminationButton to UiEvent bus.
+ *   Updated AppMapContainer calls to pass onMainEvent.
  */
 
 @Composable
@@ -42,21 +43,21 @@ fun ViewerScreen(
                     Column(modifier = Modifier.weight(1f).navigationBarsPadding()) {
                         Box(modifier = Modifier.weight(1f)) {
                             if (session.hydrationLevel >= 6 && isMapVisible) {
-                                AppMapContainer(stateProvider = stateProvider)
+                                AppMapContainer(stateProvider = stateProvider, onEvent = onMainEvent)
                             } else if (session.hydrationLevel >= 4 && !isMapVisible) {
-                                ViewerDashboard(stateProvider = stateProvider, isDashboardExpanded = nav.isDashboardExpanded, onEvent = { onMainEvent(it) })
+                                ViewerDashboard(stateProvider = stateProvider, isDashboardExpanded = nav.isDashboardExpanded, onEvent = onMainEvent)
                             }
                         }
                     }
                 }
             } else {
                 if (session.hydrationLevel >= 6 && isMapVisible) {
-                    AppMapContainer(stateProvider = stateProvider)
+                    AppMapContainer(stateProvider = stateProvider, onEvent = onMainEvent)
                 }
                 Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
                     Spacer(Modifier.height(82.dp)) // Reserve space for Unified HUD
                     if (session.hydrationLevel >= 4 && !isMapVisible) {
-                        ViewerDashboard(stateProvider = stateProvider, isDashboardExpanded = nav.isDashboardExpanded, onEvent = { onMainEvent(it) })
+                        ViewerDashboard(stateProvider = stateProvider, isDashboardExpanded = nav.isDashboardExpanded, onEvent = onMainEvent)
                     }
                 }
             }
@@ -108,11 +109,11 @@ fun ViewerDashboard(
                         baroAlt = dashboardState.baroAlt, lux = dashboardState.lux, proximityCm = dashboardState.proximityCm, proximityDebounceMs = dashboardState.proximityDebounceMs, rollingVibration = dashboardState.rollingVibration, 
                         trackerMaxTemp = dashboardState.trackerMaxTemp, viewerMaxTemp = dashboardState.viewerMaxTemp, peakShock = dashboardState.peakShock, vibrationFloor = dashboardState.vibrationFloor, luxBaseline = dashboardState.luxBaseline, 
                         acousticFloorDb = dashboardState.acousticFloorDb, trackerCurrentMa = currentMaValue, gpsIdx = gpsIdx, rttValue = rttValue, cpuLoad = dashboardState.cpuLoad, ioWait = dashboardState.ioWait, 
-                        maxIoLatency = dashboardState.maxIoLatency, isUltraLongStationary = dashboardState.isUltraLongStationary, isSuspiciousNoise = dashboardState.isSuspiciousNoise, onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
+                        maxIoLatency = dashboardState.maxIoLatency, isUltraLongStationary = dashboardState.isUltraLongStationary, isSuspiciousNoise = dashboardState.isSuspiciousNoise, onEvent = onEvent
                     )
                     DebugTable(isLinkFresh = dashboardState.isLinkFresh, isTelemetryFresh = dashboardState.isTelemetryFresh, isGpsFresh = dashboardState.isGpsFresh, trackerStateName = dashboardState.trackerState.name, gpsAgeSec = if (gpsAge != Long.MAX_VALUE) gpsAge / 1000 else -1L, rtt = rttValue, currentMa = currentMaValue)
                 }
-                Spacer(Modifier.height(16.dp)); SessionTerminationButton(appMode = sessionState.appMode ?: "viewer", onTerminate = { onEvent(UiEvent.ShowStopTrackingConfirmation(true)) })
+                Spacer(Modifier.height(16.dp)); SessionTerminationButton(appMode = sessionState.appMode ?: "viewer", onEvent = onEvent)
             } else { Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { Text("Tap status card above to expand dashboard", color = Slate500, fontSize = 11.sp, fontWeight = FontWeight.Medium) } }
         }
         item { Spacer(Modifier.height(32.dp)) }

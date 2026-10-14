@@ -1,5 +1,38 @@
 # Resolution Archive
 
+## [Oct14.1] - Full Unit Test Verification
+**Issue ID**: #ISSUE-OCT14.5-H1
+**Status**: RESOLVED
+**Description**: Verified project stability and regression-free state by executing the full unit test suite for both the app and core engine modules.
+**Root Cause**: N/A (Verification Task)
+**Remediation**:
+- **Execution**: Successfully ran 72 unit tests (29 app unit, 43 engine unit).
+- **Result**: 100% pass rate.
+- **Traceability**: Updated SOT Master Requirements and Hardening Dashboard for version Oct14.1.
+
+## [Oct14.1] - HUD State Flow Consolidation
+**Issue ID**: #SIMP-OCT14.8-S1
+**Status**: RESOLVED
+**Description**: Consolidated individual `hudConnectivityState`, `hudTelemetryState`, and `hudHealthState` flows in `MainViewModel` into a single combined `HudState` flow. This reduces subscription overhead in the UI layer and ensures atomic, synchronized updates for HUD-related components.
+**Root Cause**: Subscription overhead and potential race conditions in UI components that relied on multiple independent state flows for related HUD information.
+**Remediation**:
+- **Atomic State Definition**: Defined `HudState` data class in `MainUiState.kt` to encapsulate Connectivity, Telemetry, and Health.
+- **ViewModel Refactoring**: Replaced individual flows with a consolidated `hudState` using nested `combine` blocks to handle the dependency on 8 distinct source flows.
+- **Interface Update**: Standardized `UiStateProvider` to expose only the combined `hudState`.
+- **UI Consumer Migration**: Refactored `GlobalStatusBar`, `AlarmOverlay`, `AlarmActivity`, and `AlarmOverlayService` to consume the unified state.
+- **Verification**: Verified atomic updates across HUD components. Subscription count in `UnifiedHUDOverlay` reduced by 2.
+
+## [Oct14.1] - Composable Event Bubbling Optimization
+**Issue ID**: #SIMP-OCT13.21-S1
+**Status**: RESOLVED
+**Description**: Migrated all remaining specialized lambdas in the UI layer (HeaderBar, TelemetryBox, RibbonsOverlay, etc.) to a centralized `UiEvent` bubbling architecture. This removed all instances of `as? MainViewModel` casting inside Composables and flattened the component signatures to a standard `(UiStateProvider, (UiEvent) -> Unit)` pattern.
+**Root Cause**: Evolutionary architectural debt where some components still used direct callbacks or ViewModel casting instead of the standard event bus.
+**Remediation**:
+- **Event Bus Expansion**: Added `UiEvent.NavigateToDashboard` as a macro to close all overlays. Standardized all permission and data management triggers (Export/Import) into the event bus.
+- **Signature Unification**: Refactored `ViewerScreen`, `TrackerScreen`, `AppMapContainer`, and all dashboard sub-components to strictly use `onEvent` bubbling.
+- **ViewModel Decoupling**: Removed ViewModel-specific casting in `MapComponents.kt`, ensuring UI components are truly decoupled from implementation details.
+- **Verification**: Verified via manual audit of all screen signatures. UI remains fully reactive with zero lambda-prop fatigue.
+
 ## [Oct14.1] - PowerStateProvider Mock Unification
 **Issue ID**: #SIMP-OCT14.5-S1
 **Status**: RESOLVED
@@ -40,4 +73,3 @@
 **Remediation**:
 - **Verification**: Successfully executed 43 engine unit tests, 29 app unit tests, and 25 instrumented stress tests on the S21FE (Device ID: R5CRC14PG4F).
 - **Traceability**: Updated SOT Master Requirements (SOT ID 718) and Hardening Dashboard.
-...

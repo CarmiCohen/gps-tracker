@@ -1,22 +1,21 @@
-# Project Handover - Oct14.7
+# Project Handover - Oct14.1
 
-## ✅ Current Status: Power Mock Unification Complete
-- **Version**: Oct14.7
-- **Focus**: Test infrastructure consolidation and architectural hardening.
+## ✅ Current Status: Full Unit Test Verification
+- **Version**: Oct14.1
+- **Focus**: Verification of stability and regression-free state.
 - **Key Changes**:
-    - **PowerStateProvider Mock Unification (SIMP-OCT14.5-S1)**:
-        - Centralized `MockPowerStateProvider` in `:core:engine` test-fixtures.
-        - Refactored `ProductionReadinessAuditTest.kt` (instrumented) and `HardwareSuiteProfileTest.kt` (unit) to use the unified mock.
-        - Enabled delegation in the mock to support Hilt-based "override-real-implementation" patterns in instrumented tests.
-    - **Traceability**:
-        - Updated `SOT_MASTER_REQUIREMENTS.md` (R-ID 721) and `RESOLUTION_ARCHIVE.md`.
+    - **Full Unit Test Execution (ISSUE-OCT14.5-H1)**:
+        - Executed 72 total unit tests across `:app` and `:core:engine`.
+        - Result: 100% Pass (29 app unit, 43 engine unit).
     - **Versioning**:
-        - Incremented `versionName` to "Oct14.7".
+        - Incremented `versionName` to "Oct14.1" in `app/build.gradle`.
+    - **Traceability**:
+        - Updated `SOT_MASTER_REQUIREMENTS.md` (SOT ID 724), `RESOLUTION_ARCHIVE.md`, and `issues.md`.
 
 ## 🛠️ Pending Debt
-- **SIMP-OCT13.21-S1**: Composable Event Bubbling (Low). Move remaining specialized lambdas into `UiEvent`.
-- **Strategic Simplification**: Evaluation of `DomainEventBus` internal buffering vs. `SharedFlow` for long-term telemetry routing.
+- **SIMP-OCT14.10-S1**: HUD Mapper Extraction (Low). Consider moving state transformation logic to a dedicated mapper class to prune `MainViewModel` size.
+- **Strategic Evaluation**: Long-term evaluation of `DomainEventBus` internal buffering vs. `SharedFlow` for telemetry routing.
 
 ## 🔍 Forensic Pulse
-- **SOT Metrics**: 255 Architectural Rules / 409 Total Requirements.
-- **Audit Baseline**: Oct14.7: [SOT Count: 409 (Rules: 255), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:8, Testing: 13 (Sub-items: 118), QA: 312]
+- **SOT Metrics**: 257 Architectural Rules / 412 Total Requirements.
+- **Audit Baseline**: Oct14.1: [SOT Count: 412 (Rules: 257), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:8, Testing: 13 (Sub-items: 118), QA: 312]

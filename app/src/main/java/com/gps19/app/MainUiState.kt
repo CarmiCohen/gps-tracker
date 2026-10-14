@@ -7,10 +7,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Composite UI state partitioned into specialized slices.
- * Oct.13.21:
- * - SIMP-OCT13.21-S1: Pure Event Architecture. Flattened all specialized 
- *   lambdas into UiEvent bus, including FullInitialization, PhoneSetup, 
- *   and individual Permission/Setting requests.
+ * Oct.14.9:
+ * - SIMP-OCT14.8-S1: HUD State Consolidation. Introduced HudState data class 
+ *   to group connectivity, telemetry, and health states.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -59,6 +58,12 @@ data class MainUiState(
     val systemIssuesCount: Int get() = session.systemIssuesCount(spatial.homePoints.size)
 }
 
+data class HudState(
+    val connectivity: HudConnectivityState = HudConnectivityState(),
+    val telemetry: HudTelemetryState = HudTelemetryState(),
+    val health: HudHealthState = HudHealthState()
+)
+
 interface UiStateProvider {
     val session: StateFlow<SessionUiState>
     val settings: StateFlow<SettingsUiState>
@@ -69,9 +74,7 @@ interface UiStateProvider {
     val diagnostic: StateFlow<DiagnosticState>
     val systemPulseRt: StateFlow<Long>
     val mapViewState: StateFlow<MapViewState>
-    val hudHealthState: StateFlow<HudHealthState>
-    val hudConnectivityState: StateFlow<HudConnectivityState>
-    val hudTelemetryState: StateFlow<HudTelemetryState>
+    val hudState: StateFlow<HudState>
     val dashboardState: StateFlow<DashboardState>
     val isSirenPlaying: StateFlow<Boolean>
     val eventLogs: StateFlow<List<LogEntry>>
@@ -91,18 +94,16 @@ interface UiStateProvider {
 }
 
 class SimpleUiStateProvider(
-    override val session: StateFlow<SessionUiState>,
+    override val session: StateFlow<SessionUiState> = MutableStateFlow(SessionUiState()),
     override val settings: StateFlow<SettingsUiState> = MutableStateFlow(SettingsUiState()),
     override val spatial: StateFlow<SpatialUiState> = MutableStateFlow(SpatialUiState()),
     override val navigation: StateFlow<NavigationState> = MutableStateFlow(NavigationState()),
     override val simulation: StateFlow<SimulationUiState> = MutableStateFlow(SimulationUiState()),
-    override val kinematic: StateFlow<KinematicState>,
+    override val kinematic: StateFlow<KinematicState> = MutableStateFlow(KinematicState()),
     override val diagnostic: StateFlow<DiagnosticState> = MutableStateFlow(DiagnosticState()),
     override val systemPulseRt: StateFlow<Long> = MutableStateFlow(0L),
     override val mapViewState: StateFlow<MapViewState> = MutableStateFlow(MapViewState()),
-    override val hudHealthState: StateFlow<HudHealthState>,
-    override val hudConnectivityState: StateFlow<HudConnectivityState> = MutableStateFlow(HudConnectivityState()),
-    override val hudTelemetryState: StateFlow<HudTelemetryState> = MutableStateFlow(HudTelemetryState()),
+    override val hudState: StateFlow<HudState> = MutableStateFlow(HudState()),
     override val dashboardState: StateFlow<DashboardState> = MutableStateFlow(DashboardState()),
     override val isSirenPlaying: StateFlow<Boolean> = MutableStateFlow(false),
     override val eventLogs: StateFlow<List<LogEntry>> = MutableStateFlow(emptyList()),
@@ -490,7 +491,7 @@ sealed class UiEvent {
     data class SetSirenType(val type: String) : UiEvent()
     data class SetFenceVisible(val visible: Boolean) : UiEvent()
     data class SetViolationsVisible(val visible: Boolean) : UiEvent()
-    data class SetGeofenceViolationsVisible(val visible: Boolean) : UiEvent() 
+    data class SetGeofenceViolationsVisible(val visible: Boolean) : UiEvent()
     data class SetMapButtonsVisible(val visible: Boolean) : UiEvent()
     data class SetMapLocked(val locked: Boolean) : UiEvent()
     object MapZoomIn : UiEvent()
@@ -547,6 +548,7 @@ sealed class UiEvent {
     object RefreshNavigation : UiEvent()
     data class InitiateMode(val mode: String) : UiEvent()
     data class ConfirmBackgroundDisclosure(val confirmed: Boolean, val mode: String) : UiEvent()
+    object NavigateToDashboard : UiEvent()
     
     // Oct.13.21: Data Management & Permission Events
     object ExportTrails : UiEvent()

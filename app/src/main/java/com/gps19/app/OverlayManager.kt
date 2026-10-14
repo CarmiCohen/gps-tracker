@@ -24,12 +24,12 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayManager: Unified HUD management for GPS Tracker.
+ * Oct.14.8:
+ * - SIMP-OCT13.21-S1: Pure Event HUD. Flattened HeaderBar and GlobalStatusBar 
+ *   integration by migrating to centralized onMainEvent bubbling.
  * Oct.13.21:
  * - SIMP-OCT13.21-S1: Pure Event HUD. Pruned onSaveTrail and onLoadTrail 
  *   lambdas in favor of centralized event bubbling via onMainEvent.
- * Oct.13.1:
- * - SIMP-OCT12.16-S1: Unified HUD Overlay. Merged HeaderBar, GlobalStatusBar, 
- *   and map overlays into a single layout.
  */
 
 @Composable
@@ -49,15 +49,6 @@ fun UnifiedHUDOverlay(
     val isSystemReady = session.isSystemReady(spatial.homePoints.size)
     val systemIssuesCount = session.systemIssuesCount(spatial.homePoints.size)
 
-    val onDashboard = {
-        if (isMapVisible) onMainEvent(UiEvent.ToggleMap(false))
-        if (nav.isLogVisible) onMainEvent(UiEvent.ToggleLog(false))
-        if (nav.isSettingsOpen) onMainEvent(UiEvent.ToggleSettings(false))
-        if (nav.isRibbonsVisible) onMainEvent(UiEvent.ToggleRibbons(false))
-        if (nav.isGnssDetailVisible) onMainEvent(UiEvent.ToggleGnssDetail(false))
-        if (nav.isPhoneSetupVisible) onMainEvent(UiEvent.TogglePhoneSetup(false))
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
         // 1. Map Overlays (Lower Z-Order than Header/Status if overlapping)
         if (isMapVisible && !isAnyOverlayOpen && session.hydrationLevel >= 4) {
@@ -75,7 +66,7 @@ fun UnifiedHUDOverlay(
                     HeaderBar(
                         isLogVisible = nav.isLogVisible, isSettingsOpen = nav.isSettingsOpen, isRibbonsVisible = nav.isRibbonsVisible, isMapVisible = nav.isMapVisible, isPhoneSetupVisible = nav.isPhoneSetupVisible,
                         requiresExtraTopPadding = session.permissions.requiresExtraTopPadding, isSystemReady = isSystemReady, systemIssuesCount = systemIssuesCount,
-                        onDashboard = onDashboard, onS = { onMainEvent(UiEvent.ToggleSettings(!nav.isSettingsOpen)) }, onL = { onMainEvent(UiEvent.ToggleLog(!nav.isLogVisible)) }, onM = { onMainEvent(UiEvent.ToggleMap(!nav.isMapVisible)) }, onR = { onMainEvent(UiEvent.ToggleRibbons(!nav.isRibbonsVisible)) }, onEvent = onMainEvent
+                        onEvent = onMainEvent
                     )
                     if (session.hydrationLevel >= 5) {
                         Column(modifier = Modifier.weight(1f)) {
@@ -93,7 +84,7 @@ fun UnifiedHUDOverlay(
                             HeaderBar(
                                 isLogVisible = nav.isLogVisible, isSettingsOpen = nav.isSettingsOpen, isRibbonsVisible = nav.isRibbonsVisible, isMapVisible = nav.isMapVisible, isPhoneSetupVisible = nav.isPhoneSetupVisible,
                                 requiresExtraTopPadding = session.permissions.requiresExtraTopPadding, isSystemReady = isSystemReady, systemIssuesCount = systemIssuesCount,
-                                onDashboard = onDashboard, onS = { onMainEvent(UiEvent.ToggleSettings(!nav.isSettingsOpen)) }, onL = { onMainEvent(UiEvent.ToggleLog(!nav.isLogVisible)) }, onM = { onMainEvent(UiEvent.ToggleMap(!nav.isMapVisible)) }, onR = { onMainEvent(UiEvent.ToggleRibbons(!nav.isRibbonsVisible)) }, onEvent = onMainEvent
+                                onEvent = onMainEvent
                             )
                             if (session.hydrationLevel >= 5) {
                                 GlobalStatusBar(

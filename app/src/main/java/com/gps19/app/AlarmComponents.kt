@@ -30,12 +30,12 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * AlarmComponents: Overlay for active alarm states and sirens.
+ * Oct.14.9:
+ * - SIMP-OCT14.8-S1: HUD State Consolidation. Refactored to consume 
+ *   consolidated hudState from stateProvider. Derive health sub-state locally.
  * Oct.5.20:
  * - SIMP-1426-3: Refactored AlarmOverlay to consume unified UiStateProvider. 
  *   Reduced parameter overhead and unified state collection. (R1426-3).
- * Oct.5.15:
- * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored AlarmOverlay to collect 
- *   its own state from flows.
  */
 
 @Composable
@@ -46,10 +46,11 @@ fun AlarmOverlay(
     onGoToMap: () -> Unit = onClose, 
     onHardwarePermissionClick: () -> Unit = {}
 ) {
-    val hudHealth by stateProvider.hudHealthState.collectAsStateWithLifecycle()
+    val hudState by stateProvider.hudState.collectAsStateWithLifecycle()
     val kinematicState by stateProvider.kinematic.collectAsStateWithLifecycle()
     val sessionState by stateProvider.session.collectAsStateWithLifecycle()
 
+    val hudHealth = hudState.health
     val alarms = hudHealth.activeAlarms
     val isMuted = hudHealth.isAlarmSilenced
     val locatable = kinematicState.trackerHealth

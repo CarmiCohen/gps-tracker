@@ -1,6 +1,6 @@
 # SOT Master Requirements & Hardening Status (Oct14.1)
 
-## ✅ Architectural Master Rules (255 Rules)
+## ✅ Architectural Master Rules (257 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -8,10 +8,15 @@
 *   **1.201 Unified Temporal Mocking (R-ID 719)**: Unified temporal mocks MUST be used across all modules via the `MockTimeProvider` test fixture to ensure consistency and eliminate redundant implementation. (Oct14.1 - SIMP-OCT14.2-S1).
 *   **1.202 Unified Conflation Orchestration (R-ID 720)**: Conflation logic within the signaling pipeline MUST use the unified `dispatchConflated` orchestration pattern to ensure atomic state management, consistent burst pressure handling, and adaptive scheduling across all telemetry types. (Oct14.1 - SIMP-OCT13.20-S1).
 *   **1.203 Unified Power State Mocking (R-ID 721)**: Mock power state providers MUST be unified via the `MockPowerStateProvider` test fixture to ensure consistent Doze mode simulation across engine and app test modules. (Oct14.1 - SIMP-OCT14.5-S1).
+*   **1.204 Pure Event UI Architecture (R-ID 722)**: All UI components MUST utilize the centralized `UiEvent` bus for action propagation, ensuring zero manual lambda prop fatigue and complete decoupling from `MainViewModel` implementation details. (Oct14.1 - SIMP-OCT13.21-S1).
+*   **1.205 Consolidated HUD State (R-ID 723)**: HUD-related UI states (Connectivity, Telemetry, Health) MUST be consolidated into a single atomic `HudState` StateFlow in `MainViewModel` to reduce subscription overhead and ensure synchronized updates across HUD components. (Oct14.1 - SIMP-OCT14.8-S1).
 
 ...
 
 ## ✅ Core Hardening Baseline
+*   **SOT ID 724**: Full Unit Test Verification - Verified project stability through 72 unit tests across engine and app modules. (Oct14.1 - ISSUE-OCT14.5-H1).
+*   **SOT ID 723**: HUD State Consolidation - Consolidated individual HUD connectivity, telemetry, and health flows into a single atomic `hudState`, reducing UI subscription overhead and ensuring atomic component updates. (Oct14.1 - SIMP-OCT14.8-S1).
+*   **SOT ID 722**: Pure Event UI Architecture - Migrated all specialized UI lambdas to a centralized event bus, eliminating direct ViewModel casting and standardizing Composable signatures to (UiStateProvider, (UiEvent) -> Unit). (Oct14.1 - SIMP-OCT13.21-S1).
 *   **SOT ID 721**: MockPowerStateProvider Unification - Unified the `MockPowerStateProvider` implementation into a shared test-fixture module, eliminating manual mock duplication across instrumented and unit tests. (Oct14.1 - SIMP-OCT14.5-S1).
 *   **SOT ID 720**: Unified Signaling Conflation - Unified the conflation orchestration in `SmartSignalingDispatcher` for Maps, Objects, and Logs, reducing redundancy and improving atomic state management under burst pressure. (Oct14.1 - SIMP-OCT13.20-S1).
 *   **SOT ID 719**: MockTimeProvider Unification - Unified the `MockTimeProvider` implementation into a shared test-fixture module, eliminating duplication across 4 test suites. (Oct14.1 - SIMP-OCT14.2-S1).
@@ -22,6 +27,9 @@
 ---
 
 ## 🔍 Verification Chapters
+*   **Chapter 31.799 (Unit Test Verification)**: PASSED - Verified all 72 unit tests pass on local build. (Oct14.1).
+*   **Chapter 31.798 (HUD Consolidation)**: PASSED - Verified all HUD consumers (StatusBar, AlarmOverlay) subscribe only to the combined hudState. Verified atomic updates via logs. (Oct14.1).
+*   **Chapter 31.797 (Pure Event UI)**: PASSED - Verified all top-level screens and dashboard components utilize the standard onEvent bus. Removed all MainViewModel casting in Map components. (Oct14.1).
 *   **Chapter 31.796 (Power Mock Unification)**: PASSED - Verified all tests (ProductionReadinessAuditTest, HardwareSuiteProfileTest) pass using the centralized MockPowerStateProvider. (Oct14.1).
 *   **Chapter 31.795 (Conflation Unification)**: PASSED - Verified all telemetry types (Map, Bin, Log) conflate correctly under burst pressure using the unified dispatcher. (Oct14.1).
 *   **Chapter 31.794 (Mock Unification)**: PASSED - Verified all tests pass after migrating to shared MockTimeProvider. (Oct14.1).

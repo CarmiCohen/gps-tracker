@@ -22,24 +22,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.14.9:
+ * - SIMP-OCT14.8-S1: HUD State Consolidation. Consolidated individual HUD 
+ *   connectivity, telemetry, and health flows into a single hudState for atomic UI updates.
  * Oct.13.8:
  * - Issue #SIMP-OCT12.18-S1: Pruning Scheduler. Migrated proactive database 
  *   pruning to WorkManager.
- * Oct.12.21:
- * - Issue #SIMP-OCT11.20-S1: Mapping Test Gap. Promoted mapping projections to internal 
- *   to facilitate unit testing of tier-specific thresholding. Added nowMs to mapMapViewState.
- * Oct.11.20:
- * - ISSUE-OCT12.13-5: Purged UiStateCoordinator and finalized transition to 
- *   ViewModel-local mapping logic to ensure consistency with latest hardening fixes.
- * - ISSUE-OCT12.14-3: Refined mapHudConnectivity to correctly evaluate data health 
- *   in tracker mode (relay connectivity only) vs viewer mode (relay + telemetry freshness).
- * Oct.12.19:
- * - ISSUE-OCT12.13-2: Harmonized GPS freshness thresholds with engine polling tiers, 
- *   explicitly accounting for Screen-Off/Power-Save intervals (45s).
- * Oct.12.17:
- * - ISSUE-OCT12.13-6: Fixed Viewer smoothing bug where sVwrLat/Lng were never 
- *   updated, causing markers to default to (0,0).
- * - ISSUE-OCT12.13-12: Standardized engine version reporting to Oct12.17.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -200,47 +188,25 @@ class MainViewModel @Inject constructor(
     .distinctUntilChanged()
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardState())
 
-    override val hudConnectivityState: StateFlow<HudConnectivityState> = combine(
-        combine(session, settings) { session, settings -> session to settings },
-        diagnostic,
-        _rtt,
-        _remoteSignal,
-        systemPulseRt
-    ) { (session, settings), diag, rtt, sig, pulseRt ->
-        mapHudConnectivity(
-            session.appMode, 
-            settings.deviceId, 
-            settings.viewerId, 
-            session.isSystemActive, 
-            settings.isSafeMode, 
-            session.permissions.performanceTier == PerformanceTier.STAGGERED, 
-            diag, rtt, sig, pulseRt
+    override val hudState: StateFlow<HudState> = combine(
+        combine(session, settings, diagnostic) { s, set, d -> Triple(s, set, d) },
+        combine(_rtt, _remoteSignal, systemPulseRt) { r, sig, p -> Triple(r, sig, p) },
+        combine(kinematic, _trackerState) { k, ts -> k to ts }
+    ) { (session, settings, diag), (rtt, remoteSignal, pulseRt), (kin, trackerState) ->
+        val mode = session.appMode
+        val isMali = kin.localHealth.isMaliAnomaly
+        val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
+        HudState(
+            connectivity = mapHudConnectivity(
+                mode, settings.deviceId, settings.viewerId, session.isSystemActive, settings.isSafeMode, 
+                session.permissions.performanceTier == PerformanceTier.STAGGERED, diag, rtt, remoteSignal, pulseRt
+            ),
+            telemetry = mapHudTelemetry(mode, kin, pulseRt, trackerState, isUltra),
+            health = mapHudHealth(diag, pulseRt, isMali)
         )
     }
-    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudConnectivityState())
-
-    override val hudTelemetryState: StateFlow<HudTelemetryState> = combine(
-        _uiState.map { it.session.appMode }.distinctUntilChanged(),
-        kinematic,
-        systemPulseRt, 
-        _trackerState
-    ) { mode, kinematic, pulseRt, state ->
-        val m = mode ?: "tracker"
-        mapHudTelemetry(
-            m, kinematic, pulseRt, state, 
-            if (m == "viewer") kinematic.trackerHealth.isUltraLongStationary else kinematic.localHealth.isUltraLongStationary
-        )
-    }
-    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudTelemetryState())
-
-    override val hudHealthState: StateFlow<HudHealthState> = combine(
-        diagnostic,
-        systemPulseRt, 
-        kinematic.map { it.localHealth.isMaliAnomaly }.distinctUntilChanged()
-    ) { diag, pulseRt, isMali ->
-        mapHudHealth(diag, pulseRt, isMali)
-    }
-    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudHealthState())
+    .distinctUntilChanged()
+    .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState())
 
     override val mapViewState: StateFlow<MapViewState> = combine(
         combine(

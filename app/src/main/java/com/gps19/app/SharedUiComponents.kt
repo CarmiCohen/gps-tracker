@@ -48,12 +48,12 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * Oct.11.20:
- * - ISSUE-OCT12.14-3: HUD Error Icon Ambiguity Hardening. Added "DATA ERR" 
- *   contextual label when link health fails to provide forensic clarity.
- * Oct.12.19:
- * - ISSUE-OCT12.16-4: HeaderBar Portrait Density Hardening. Increased touch 
- *   target sizes (48dp) and icon dimensions (24dp) for better usability.
+ * Oct.14.9:
+ * - SIMP-OCT14.8-S1: HUD State Consolidation. Refactored GlobalStatusBar to 
+ *   consume consolidated hudState flow, reducing subscription overhead.
+ * Oct.14.8:
+ * - SIMP-OCT13.21-S1: Pure Event UI. Flattened HeaderBar, RibbonsOverlay, and 
+ *   SessionTerminationButton signatures by migrating to UiEvent bus.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -75,13 +75,11 @@ data class StatusRowState(
 @Composable
 fun RibbonsOverlay(
     stateProvider: UiStateProvider,
-    onToggleStrictMode: (Boolean) -> Unit,
-    onScrub: (Long?) -> Unit,
-    onDismiss: () -> Unit
+    onEvent: (UiEvent) -> Unit
 ) {
     val navState by stateProvider.navigation.collectAsStateWithLifecycle()
     
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+    Dialog(onDismissRequest = { onEvent(UiEvent.ToggleRibbons(false)) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(modifier = Modifier.fillMaxSize(), color = Color.Black.copy(alpha = 0.95f)) {
             Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
                 Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
@@ -89,8 +87,7 @@ fun RibbonsOverlay(
                         stateProvider = stateProvider,
                         isStrictMode = navState.isStrictMode,
                         replayCursorTs = navState.replayCursorTs,
-                        onToggleStrictMode = onToggleStrictMode,
-                        onScrub = onScrub
+                        onEvent = onEvent
                     )
                 }
             }
@@ -103,8 +100,7 @@ fun AnalyticalRibbons(
     stateProvider: UiStateProvider,
     isStrictMode: Boolean,
     replayCursorTs: Long?,
-    onToggleStrictMode: (Boolean) -> Unit,
-    onScrub: (Long?) -> Unit
+    onEvent: (UiEvent) -> Unit
 ) {
     var selectedScale by remember { mutableStateOf("4M") }
     
@@ -155,35 +151,35 @@ fun AnalyticalRibbons(
                 }
             }
             Surface(
-                modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { onToggleStrictMode(!isStrictMode) }.padding(horizontal = 8.dp, vertical = 4.dp),
+                modifier = Modifier.clip(RoundedCornerShape(4.dp)).clickable { onEvent(UiEvent.ToggleStrictMode(!isStrictMode)) }.padding(horizontal = 8.dp, vertical = 4.dp),
                 color = if (isStrictMode) Color.Red.copy(alpha = 0.3f) else Color.Transparent
             ) {
                 Text(text = "STRICT", color = if (isStrictMode) Color.White else Color.Gray.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Black, fontFamily = FontFamily.Monospace)
             }
         }
 
-        ConnectionQualityRibbon(history, "CON", selectedScale, isStrictMode, replayCursorTs, onScrub)
+        ConnectionQualityRibbon(history, "CON", selectedScale, isStrictMode, replayCursorTs, onEvent)
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
 
-        GenericSensorRibbon(history, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), isStrictMode = isStrictMode, valueSelector = snrSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "NOI", selectedScale, lineColor = amberColor, isStrictMode = isStrictMode, valueSelector = noiseSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "KNT", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, valueSelector = kineticSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "LUX", selectedScale, lineColor = Color.White, isStrictMode = isStrictMode, valueSelector = luxSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "VIB", selectedScale, lineColor = Color.Magenta, isStrictMode = isStrictMode, valueSelector = vibeSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "PRX", selectedScale, lineColor = roseColor, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = proxSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "LIF", selectedScale, lineColor = Color(0xFFFACC15), isStrictMode = isStrictMode, valueSelector = liftSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "BAT", selectedScale, lineColor = roseColor, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = batSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = thmSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "CUR", selectedScale, lineColor = Color(0xFFFB923C), isStrictMode = isStrictMode, valueSelector = curSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "SIT", selectedScale, lineColor = Color(0xFFF97316), renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = sitSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "TLT", selectedScale, lineColor = Color(0xFF818CF8), isStrictMode = isStrictMode, valueSelector = tltSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), isStrictMode = isStrictMode, valueSelector = baroSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "SVZ", selectedScale, lineColor = violetColor, isStrictMode = isStrictMode, valueSelector = svzSelector, driftSelector = svzDriftSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "SDZ", selectedScale, lineColor = violetColor, isStrictMode = isStrictMode, valueSelector = sdzSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), isStrictMode = isStrictMode, valueSelector = snrSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "NOI", selectedScale, lineColor = amberColor, isStrictMode = isStrictMode, valueSelector = noiseSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "KNT", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, valueSelector = kineticSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "LUX", selectedScale, lineColor = Color.White, isStrictMode = isStrictMode, valueSelector = luxSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "VIB", selectedScale, lineColor = Color.Magenta, isStrictMode = isStrictMode, valueSelector = vibeSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "PRX", selectedScale, lineColor = roseColor, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = proxSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "LIF", selectedScale, lineColor = Color(0xFFFACC15), isStrictMode = isStrictMode, valueSelector = liftSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "BAT", selectedScale, lineColor = roseColor, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = batSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = thmSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "CUR", selectedScale, lineColor = Color(0xFFFB923C), isStrictMode = isStrictMode, valueSelector = curSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "SIT", selectedScale, lineColor = Color(0xFFF97316), renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = sitSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "TLT", selectedScale, lineColor = Color(0xFF818CF8), isStrictMode = isStrictMode, valueSelector = tltSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), isStrictMode = isStrictMode, valueSelector = baroSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "SVZ", selectedScale, lineColor = violetColor, isStrictMode = isStrictMode, valueSelector = svzSelector, driftSelector = svzDriftSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "SDZ", selectedScale, lineColor = violetColor, isStrictMode = isStrictMode, valueSelector = sdzSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
-        GenericSensorRibbon(history, "CPU", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, valueSelector = cpuSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "IOW", selectedScale, lineColor = amberColor, isStrictMode = isStrictMode, valueSelector = iowSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
-        GenericSensorRibbon(history, "LAT", selectedScale, lineColor = roseColor, isStrictMode = isStrictMode, valueSelector = latSelector, replayCursorTs = replayCursorTs, onScrub = onScrub)
+        GenericSensorRibbon(history, "CPU", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, valueSelector = cpuSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "IOW", selectedScale, lineColor = amberColor, isStrictMode = isStrictMode, valueSelector = iowSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "LAT", selectedScale, lineColor = roseColor, isStrictMode = isStrictMode, valueSelector = latSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
     }
 }
 
@@ -196,7 +192,7 @@ fun ForensicRibbonContainer(
     scale: String, 
     isStrictMode: Boolean = false, 
     replayCursorTs: Long? = null, 
-    onScrub: (Long?) -> Unit = {},
+    onEvent: (UiEvent) -> Unit = {},
     onDrawRibbon: DrawScope.(totalPoints: Float, pointWidth: Float, baseLineY: Float, maxHeight: Float, isLandscape: Boolean) -> Unit
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -233,17 +229,17 @@ fun ForensicRibbonContainer(
                             val pointWidth = size.width / totalPoints
                             val startOffset = totalPoints - history.size
                             val index = ((offset.x / pointWidth) - startOffset).toInt()
-                            if (index in history.indices) onScrub(history[index].ts) 
+                            if (index in history.indices) onEvent(UiEvent.SetReplayCursor(history[index].ts)) 
                         }, 
                         onDrag = { change, _ -> 
                             val totalPoints = MAX_HISTORY_POINTS_PER_RIBBONS.toFloat()
                             val pointWidth = size.width / totalPoints
                             val startOffset = totalPoints - history.size
                             val index = ((change.position.x / pointWidth) - startOffset).toInt()
-                            if (index in history.indices) onScrub(history[index].ts) 
+                            if (index in history.indices) onEvent(UiEvent.SetReplayCursor(history[index].ts)) 
                         }, 
-                        onDragEnd = { onScrub(null) }, 
-                        onDragCancel = { onScrub(null) }
+                        onDragEnd = { onEvent(UiEvent.SetReplayCursor(null)) }, 
+                        onDragCancel = { onEvent(UiEvent.SetReplayCursor(null)) }
                     ) 
                 }
                 .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
@@ -315,12 +311,12 @@ fun GenericSensorRibbon(
     renderType: RibbonRenderType = RibbonRenderType.LINE, 
     isStrictMode: Boolean = false, 
     replayCursorTs: Long? = null, 
-    onScrub: (Long?) -> Unit = {},
+    onEvent: (UiEvent) -> Unit = {},
     valueSelector: (ConnectionPoint) -> Float, 
     driftSelector: ((ConnectionPoint) -> Long)? = null
 ) {
     val sensorHeight = if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) 40.dp else 24.dp
-    ForensicRibbonContainer(title, lineColor, sensorHeight, history, scale, isStrictMode, replayCursorTs, onScrub) { totalPoints, pointWidth, baseLineY, maxHeight, landscape ->
+    ForensicRibbonContainer(title, lineColor, sensorHeight, history, scale, isStrictMode, replayCursorTs, onEvent) { totalPoints, pointWidth, baseLineY, maxHeight, landscape ->
         if (history.isEmpty()) return@ForensicRibbonContainer
         val startOffset = totalPoints - history.size
         val rectW = maxOf(1f, pointWidth)
@@ -378,7 +374,7 @@ fun ConnectionQualityRibbon(
     scale: String, 
     isStrictMode: Boolean = false, 
     replayCursorTs: Long? = null, 
-    onScrub: (Long?) -> Unit = {}
+    onEvent: (UiEvent) -> Unit = {}
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val timeFormatter = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
@@ -405,7 +401,7 @@ fun ConnectionQualityRibbon(
         } 
     }
     val ribbonHeight = if (isLandscape) 68.dp else 50.dp
-    ForensicRibbonContainer(title, Color.Gray, ribbonHeight, history, scale, isStrictMode, replayCursorTs, onScrub) { totalPoints, pointWidth, connectionBaseY, maxHeight, landscape ->
+    ForensicRibbonContainer(title, Color.Gray, ribbonHeight, history, scale, isStrictMode, replayCursorTs, onEvent) { totalPoints, pointWidth, connectionBaseY, maxHeight, landscape ->
         if (history.isEmpty()) return@ForensicRibbonContainer
         val ribbonMaxHeight = if (landscape) 14.dp.toPx() else 8.dp.toPx()
         val effectiveBaseY = connectionBaseY - (if (landscape) 6.dp.toPx() else 4.dp.toPx())
@@ -484,33 +480,33 @@ fun ConnectionQualityRibbon(
 fun HeaderBar(
     isLogVisible: Boolean, isSettingsOpen: Boolean, isRibbonsVisible: Boolean, isMapVisible: Boolean, isPhoneSetupVisible: Boolean = false, 
     requiresExtraTopPadding: Boolean, isSystemReady: Boolean, systemIssuesCount: Int, 
-    onDashboard: () -> Unit = {}, onS: () -> Unit = {}, onL: () -> Unit = {}, onM: () -> Unit = {}, onR: () -> Unit = {}, onEvent: (UiEvent) -> Unit
+    onEvent: (UiEvent) -> Unit
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val isDashboardActive = !isMapVisible && !(isLogVisible || isSettingsOpen || isRibbonsVisible)
-    val commitAnd = { action: () -> Unit -> if (isSettingsOpen) onEvent(UiEvent.CommitSettings); action() }
+    val commitAnd = { event: UiEvent -> if (isSettingsOpen) onEvent(UiEvent.CommitSettings); onEvent(event) }
     val alertPulse = rememberInfiniteTransition(label = "AlertPulse")
     val alertAlpha by alertPulse.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), label = "Alpha")
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         if (isLandscape) {
             Column(modifier = Modifier.fillMaxHeight().width(48.dp).background(Color.Black.copy(alpha = 0.4f)), verticalArrangement = Arrangement.Top, horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(Modifier.height(8.dp)); IconButton(onClick = { commitAnd(onS); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Settings button clicked", false)) }) { Icon(Icons.Default.Settings, null, tint = if (isSettingsOpen) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
-                Spacer(Modifier.height(16.dp)); IconButton(onClick = { commitAnd(onDashboard); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Dashboard button clicked", false)) }, modifier = Modifier.size(44.dp)) { Icon(Icons.Default.Info, "Dashboard", tint = if (isDashboardActive) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
-                IconButton(onClick = { commitAnd(onR) }, modifier = Modifier.size(44.dp)) { Icon(Icons.Default.BarChart, null, tint = if (isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
+                Spacer(Modifier.height(8.dp)); IconButton(onClick = { commitAnd(UiEvent.ToggleSettings(!isSettingsOpen)); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Settings button clicked", false)) }) { Icon(Icons.Default.Settings, null, tint = if (isSettingsOpen) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
+                Spacer(Modifier.height(16.dp)); IconButton(onClick = { commitAnd(UiEvent.NavigateToDashboard); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Dashboard button clicked", false)) }, modifier = Modifier.size(44.dp)) { Icon(Icons.Default.Info, "Dashboard", tint = if (isDashboardActive) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
+                IconButton(onClick = { commitAnd(UiEvent.ToggleRibbons(!isRibbonsVisible)) }, modifier = Modifier.size(44.dp)) { Icon(Icons.Default.BarChart, null, tint = if (isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
                 Spacer(Modifier.weight(1f)); if (!isSystemReady && !isPhoneSetupVisible) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.ReportProblem, "System Issues", tint = Color(0xFFF43F5E).copy(alpha = alertAlpha), modifier = Modifier.size(28.dp)); Text(text = systemIssuesCount.toString(), color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) } }
-                IconButton(onClick = { commitAnd(onL); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false)) }) { Icon(Icons.AutoMirrored.Filled.List, null, tint = if (isLogVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
-                IconButton(onClick = { commitAnd(onM) }) { Icon(Icons.Default.Map, null, tint = if (isMapVisible && !(isLogVisible || isSettingsOpen || isRibbonsVisible)) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
+                IconButton(onClick = { commitAnd(UiEvent.ToggleLog(!isLogVisible)); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false)) }) { Icon(Icons.AutoMirrored.Filled.List, null, tint = if (isLogVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
+                IconButton(onClick = { commitAnd(UiEvent.ToggleMap(!isMapVisible)) }) { Icon(Icons.Default.Map, null, tint = if (isMapVisible && !(isLogVisible || isSettingsOpen || isRibbonsVisible)) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
                 Spacer(Modifier.height(8.dp))
             }
         } else {
             Column(modifier = Modifier.fillMaxWidth().padding(top = if (requiresExtraTopPadding) 8.dp else 2.dp)) {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) { 
-                    IconButton(onClick = { commitAnd(onS); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Settings button clicked", false)) }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Settings, null, tint = if (isSettingsOpen) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
-                    IconButton(onClick = { commitAnd(onDashboard); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Dashboard button clicked", false)) }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Info, "Dashboard", tint = if (isDashboardActive) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
-                    IconButton(onClick = { commitAnd(onR) }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.BarChart, null, tint = if (isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
+                    IconButton(onClick = { commitAnd(UiEvent.ToggleSettings(!isSettingsOpen)); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Settings button clicked", false)) }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Settings, null, tint = if (isSettingsOpen) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
+                    IconButton(onClick = { commitAnd(UiEvent.NavigateToDashboard); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Dashboard button clicked", false)) }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Info, "Dashboard", tint = if (isDashboardActive) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
+                    IconButton(onClick = { commitAnd(UiEvent.ToggleRibbons(!isRibbonsVisible)) }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.BarChart, null, tint = if (isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
                     Spacer(Modifier.weight(1f)); if (!isSystemReady && !isPhoneSetupVisible) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }, modifier = Modifier.size(48.dp)) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.ReportProblem, "System Issues", tint = Color(0xFFF43F5E).copy(alpha = alertAlpha), modifier = Modifier.size(28.dp)); Text(text = systemIssuesCount.toString(), color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) } }
-                    IconButton(onClick = { commitAnd(onL); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false)) }, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Filled.List, null, tint = if (isLogVisible) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
-                    IconButton(onClick = { commitAnd(onM) }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Map, null, tint = if (isMapVisible && !(isLogVisible || isSettingsOpen || isRibbonsVisible)) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
+                    IconButton(onClick = { commitAnd(UiEvent.ToggleLog(!isLogVisible)); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false)) }, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Filled.List, null, tint = if (isLogVisible) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
+                    IconButton(onClick = { commitAnd(UiEvent.ToggleMap(!isMapVisible)) }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Map, null, tint = if (isMapVisible && !(isLogVisible || isSettingsOpen || isRibbonsVisible)) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
                 }
             }
         }
@@ -519,10 +515,8 @@ fun HeaderBar(
 
 @Composable
 fun GlobalStatusBar(stateProvider: UiStateProvider, modifier: Modifier = Modifier) {
-    val connectivity by stateProvider.hudConnectivityState.collectAsStateWithLifecycle()
-    val telemetry by stateProvider.hudTelemetryState.collectAsStateWithLifecycle()
-    val health by stateProvider.hudHealthState.collectAsStateWithLifecycle()
-    StatusBar(connectivity = connectivity, telemetry = telemetry, health = health, modifier = modifier)
+    val hudState by stateProvider.hudState.collectAsStateWithLifecycle()
+    StatusBar(connectivity = hudState.connectivity, telemetry = hudState.telemetry, health = hudState.health, modifier = modifier)
 }
 
 @Composable
@@ -841,7 +835,7 @@ fun StatusBadge(label: String, active: Boolean, activeColor: Color = BrandJd, is
 }
 
 @Composable
-fun SessionTerminationButton(appMode: String, onTerminate: () -> Unit, modifier: Modifier = Modifier) {
+fun SessionTerminationButton(appMode: String, onEvent: (UiEvent) -> Unit, modifier: Modifier = Modifier) {
     val label = if (appMode == "tracker") "TERMINATE TRACKING SESSION" else "TERMINATE MONITORING SESSION"
-    Button(onClick = onTerminate, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF43F5E).copy(alpha = 0.1f)), border = BorderStroke(1.dp, Color(0xFFF43F5E).copy(alpha = 0.4f)), shape = RoundedCornerShape(12.dp), modifier = modifier.fillMaxWidth().height(48.dp)) { Icon(Icons.Default.StopCircle, null, tint = Color(0xFFF43F5E), modifier = Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text(text = label, color = Color(0xFFF43F5E), fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+    Button(onClick = { onEvent(UiEvent.ShowStopTrackingConfirmation(true)) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF43F5E).copy(alpha = 0.1f)), border = BorderStroke(1.dp, Color(0xFFF43F5E).copy(alpha = 0.4f)), shape = RoundedCornerShape(12.dp), modifier = modifier.fillMaxWidth().height(48.dp)) { Icon(Icons.Default.StopCircle, null, tint = Color(0xFFF43F5E), modifier = Modifier.size(20.dp)); Spacer(Modifier.width(8.dp)); Text(text = label, color = Color(0xFFF43F5E), fontSize = 11.sp, fontWeight = FontWeight.Bold) }
 }

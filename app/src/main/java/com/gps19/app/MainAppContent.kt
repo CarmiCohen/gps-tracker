@@ -39,6 +39,9 @@ import kotlinx.coroutines.flow.collectLatest
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.14.9:
+ * - SIMP-OCT14.8-S1: HUD State Consolidation. Refactored OverlayHost to 
+ *   derive health state from consolidated hudState.
  * Oct.14.1:
  * - SIMP-OCT13.30-S1: Integrated SystemIntentHandler via settingsLauncher.
  * - SIMP-OCT13.21-S2: Finalized Pure Event transition.
@@ -327,8 +330,9 @@ fun OverlayHost(
     viewModel: MainViewModel,
     navigationState: NavigationState
 ) {
-    val hudHealth by viewModel.hudHealthState.collectAsStateWithLifecycle()
+    val hudState by viewModel.hudState.collectAsStateWithLifecycle()
     val sessionState by viewModel.session.collectAsStateWithLifecycle()
+    val hudHealth = hudState.health
 
     if (navigationState.isSettingsOpen) {
         SettingsOverlay(
@@ -350,9 +354,7 @@ fun OverlayHost(
     } else if (navigationState.isRibbonsVisible) {
         RibbonsOverlay(
             stateProvider = viewModel,
-            onToggleStrictMode = { strict -> viewModel.onEvent(UiEvent.ToggleStrictMode(strict)) },
-            onScrub = { ts -> viewModel.onEvent(UiEvent.SetReplayCursor(ts)) },
-            onDismiss = { viewModel.onEvent(UiEvent.ToggleRibbons(false)) }
+            onEvent = { viewModel.onEvent(it) }
         )
     } else if (navigationState.isGnssDetailVisible) {
         GnssDetailOverlay(

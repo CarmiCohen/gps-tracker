@@ -41,22 +41,19 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
- * Oct.13.21:
- * - SIMP-OCT13.21-S1: Pure Event Map. Pruned onSaveTrail and onLoadTrail 
- *   lambdas from AppMapContainer and MapToolsOverlay. Standardized on UiEvent routing.
- * Oct.13.1:
- * - SIMP-OCT12.16-S1: Unified HUD Overlay. Removed redundant UI overlays from 
- *   AppMapContainer as they are now managed by UnifiedHUDOverlay.
+ * Oct.14.8:
+ * - SIMP-OCT13.21-S1: Pure Event Map. Refactored AppMapContainer and OsmMap 
+ *   signatures to use onEvent bubbling, removing MainViewModel casting.
  */
 
 @Composable
 fun AppMapContainer(
-    stateProvider: UiStateProvider
+    stateProvider: UiStateProvider,
+    onEvent: (UiEvent) -> Unit
 ) {
     val state by stateProvider.mapViewState.collectAsStateWithLifecycle()
     val cameraActions = (stateProvider as? MainViewModel)?.cameraActions
     
-    val isTrackerMode = state.appMode == "tracker"
     val mapViewRef = remember { mutableStateOf<MapView?>(null) }
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -65,9 +62,7 @@ fun AppMapContainer(
                 state = state,
                 cameraActions = cameraActions,
                 initialCenter = state.initialCenter,
-                onTap = { (stateProvider as? MainViewModel)?.onEvent(UiEvent.MapTap(it)) },
-                onRemoveMarker = { if (!isTrackerMode) (stateProvider as? MainViewModel)?.onEvent(UiEvent.RemoveHomePoint(it)) },
-                onLockChange = { onLockChange -> (stateProvider as? MainViewModel)?.onEvent(UiEvent.SetMapLocked(onLockChange)) },
+                onEvent = onEvent,
                 mapViewRef = mapViewRef
             )
         }
@@ -131,13 +126,12 @@ fun OsmMap(
     state: MapViewState,
     cameraActions: kotlinx.coroutines.flow.SharedFlow<CameraAction>? = null,
     initialCenter: GeoPoint? = null,
-    onTap: (GeoPoint) -> Unit,
-    onRemoveMarker: (Int) -> Unit,
-    onLockChange: (Boolean) -> Unit,
+    onEvent: (UiEvent) -> Unit,
     mapViewRef: MutableState<MapView?>
 ) {
     val context = LocalContext.current
     val density = context.resources.displayMetrics.density
+    val isTrackerMode = state.appMode == "tracker"
 
     val mapController = remember(mapViewRef.value) {
         mapViewRef.value?.let { MapController(context, it, density) }
@@ -181,7 +175,7 @@ fun OsmMap(
             overlays.add(MapEventsOverlay(object : MapEventsReceiver {
                 override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
                     performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
-                    onTap(p)
+                    onEvent(UiEvent.MapTap(p))
                     return true
                 }
                 override fun longPressHelper(p: GeoPoint): Boolean = true
@@ -189,13 +183,13 @@ fun OsmMap(
 
             overlays.add(object : Overlay() {
                 override fun onTouchEvent(event: MotionEvent, mapView: MapView): Boolean {
-                    if (event.action == MotionEvent.ACTION_DOWN) { onLockChange(false) }
+                    if (event.action == MotionEvent.ACTION_DOWN) { onEvent(UiEvent.SetMapLocked(false)) }
                     return false
                 }
             })
         } 
     }, update = { 
-        mapController?.update(state, onTap, onRemoveMarker)
+        mapController?.update(state, { onEvent(UiEvent.MapTap(it)) }, { if (!isTrackerMode) onEvent(UiEvent.RemoveHomePoint(it)) })
     }, onRelease = { 
         mapController?.detach()
     }, modifier = Modifier.fillMaxSize())

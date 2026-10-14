@@ -17,10 +17,9 @@ import javax.inject.Singleton
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
  * Oct.13.21:
- * - SIMP-OCT13.21-S1: Pure Event Architecture. Routed all file management, 
- *   initialization, and permission events (ExportTrails, ImportTrails, ExportLogs, 
- *   ImportConfig, TriggerFullInitialization, ShowPhoneSetup, RequestBatteryExemption, 
- *   etc.) to achieve minimal UI signatures.
+ * - SIMP-OCT13.21-S1: Pure Event Architecture. Flattened all specialized 
+ *   lambdas into UiEvent bus, including FullInitialization, PhoneSetup, 
+ *   and individual Permission/Setting requests.
  * Oct.13.1:
  * - SIMP-OCT12.16-S1: Unified HUD Overlay. Added ClearTrails event routing.
  */
@@ -58,7 +57,7 @@ class UiEventCoordinator @Inject constructor(
             is UiEvent.ToggleMap, is UiEvent.ToggleLog, is UiEvent.ToggleSettings,
             is UiEvent.TogglePhoneSetup, is UiEvent.ToggleRibbons, is UiEvent.SetDashboardExpanded,
             is UiEvent.ToggleGnssDetail, is UiEvent.SetSubSettings, is UiEvent.ShowStopTrackingConfirmation,
-            is UiEvent.NavigateToDiagnostics, is UiEvent.SetPendingMode -> {
+            is UiEvent.NavigateToDiagnostics, is UiEvent.SetPendingMode, UiEvent.NavigateToDashboard -> {
                 if (event is UiEvent.ToggleSettings) {
                     if (event.visible) {
                         onStateUpdate { it.copy(settings = it.settings.copy(draftSettings = settingsUseCase.prepareDraft(it))) }
@@ -66,7 +65,14 @@ class UiEventCoordinator @Inject constructor(
                         commitSettings(currentState.settings.draftSettings, scope, onStateUpdate)
                     }
                 }
-                onStateUpdate { it.copy(navigation = navigationUseCase.handleNavigationEvent(event, it)) }
+                if (event is UiEvent.NavigateToDashboard) {
+                    onStateUpdate { it.copy(navigation = it.navigation.copy(
+                        isMapVisible = false, isLogVisible = false, isSettingsOpen = false,
+                        isRibbonsVisible = false, isGnssDetailVisible = false, isPhoneSetupVisible = false
+                    )) }
+                } else {
+                    onStateUpdate { it.copy(navigation = navigationUseCase.handleNavigationEvent(event, it)) }
+                }
             }
 
             is UiEvent.SetUiVisible -> {
