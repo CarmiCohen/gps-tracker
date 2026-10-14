@@ -33,7 +33,7 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    return "Oct13.30"
+    return "Oct14.1"
 }
 
 ext {
@@ -149,7 +149,7 @@ tasks.register('verifyProjectIntegrity') {
             if (file.exists()) {
                 println "Updating version in ${fileName} to ${vName}..."
                 def content = file.text
-                def updatedContent = content.replaceAll(/(Sep\.\d{2}\.\d+|Oct\.\d{2}\.\d+)/, vName)
+                def updatedContent = content.replaceAll(/(Sep\.\d{2}\.\d+|Oct\.\d{2}\.\d+|Oct1\d\.\d+)/, vName)
                 file.text = updatedContent
             }
         }

@@ -1,5 +1,6 @@
 package com.gps19.app
 
+import android.content.Intent
 import android.content.res.Configuration
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -38,10 +39,9 @@ import kotlinx.coroutines.flow.collectLatest
 
 /**
  * MainAppContent: Root UI composition.
- * Oct.13.30:
- * - SIMP-OCT13.21-S2: Finalized Pure Event transition. Pruned all lambda 
- *   injection parameters. Centralized Activity-level orchestration in 
- *   AppEffectAggregator via UiEffect.
+ * Oct.14.1:
+ * - SIMP-OCT13.30-S1: Integrated SystemIntentHandler via settingsLauncher.
+ * - SIMP-OCT13.21-S2: Finalized Pure Event transition.
  */
 @Composable
 fun MainAppContent(
@@ -61,6 +61,10 @@ fun MainAppContent(
         navigationState.pendingMode?.let { mode -> viewModel.onEvent(UiEvent.InitiateMode(mode)) }
     }
 
+    val settingsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        viewModel.onEvent(UiEvent.RefreshPermissionStatus)
+    }
+
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { MainFileHelper.importConfig(activity, viewModel, uri) } }
     val importTrailLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> MainFileHelper.importTrails(activity, viewModel, uris) }
 
@@ -72,6 +76,7 @@ fun MainAppContent(
         spatialState = spatialState,
         activity = activity,
         requestPermissionLauncher = requestPermissionLauncher,
+        settingsLauncher = settingsLauncher,
         importLauncher = importLauncher,
         importTrailLauncher = importTrailLauncher,
         onShowBackgroundDisclosure = { showBackgroundDisclosure = true }
@@ -199,6 +204,7 @@ private fun AppEffectAggregator(
     spatialState: SpatialUiState,
     activity: MainActivity,
     requestPermissionLauncher: ActivityResultLauncher<Array<String>>,
+    settingsLauncher: ActivityResultLauncher<Intent>,
     importLauncher: ActivityResultLauncher<String>,
     importTrailLauncher: ActivityResultLauncher<String>,
     onShowBackgroundDisclosure: () -> Unit
@@ -242,11 +248,11 @@ private fun AppEffectAggregator(
                 UiEffect.LaunchConfigImport -> importLauncher.launch("application/json")
                 UiEffect.LaunchFullInitialization -> viewModel.fullInitialization(activity)
                 
-                UiEffect.LaunchBatteryExemption -> activity.launchBatteryExemptionSetting()
-                UiEffect.LaunchOverlayPermission -> activity.launchOverlayPermissionSetting()
-                UiEffect.LaunchAppInfo -> activity.launchAppInfo()
-                UiEffect.LaunchExactAlarm -> activity.launchExactAlarmSetting()
-                UiEffect.LaunchHardwarePermission -> activity.launchOverlayPermissionSetting()
+                UiEffect.LaunchBatteryExemption -> activity.systemIntentHandler.launchBatteryExemptionSetting(settingsLauncher)
+                UiEffect.LaunchOverlayPermission -> activity.systemIntentHandler.launchOverlayPermissionSetting(settingsLauncher)
+                UiEffect.LaunchAppInfo -> activity.systemIntentHandler.launchAppInfo(settingsLauncher)
+                UiEffect.LaunchExactAlarm -> activity.systemIntentHandler.launchExactAlarmSetting(settingsLauncher)
+                UiEffect.LaunchHardwarePermission -> activity.systemIntentHandler.launchOverlayPermissionSetting(settingsLauncher)
             }
         }
     }

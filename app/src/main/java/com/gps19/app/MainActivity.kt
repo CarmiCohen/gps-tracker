@@ -1,11 +1,8 @@
 package com.gps19.app
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -14,17 +11,21 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
+import javax.inject.Inject
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
- * Oct.13.30:
- * - SIMP-OCT13.21-S2: Finalized Pure Event transition. Moved system-level 
- *   launchers to Activity-scope public methods triggered by AppEffectAggregator.
+ * Oct.14.1:
+ * - SIMP-OCT13.30-S1: Delegated system intent orchestration to SystemIntentHandler.
+ * - SIMP-OCT13.21-S2: Finalized Pure Event transition.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+
+    @Inject
+    lateinit var systemIntentHandler: SystemIntentHandler
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -68,62 +69,6 @@ class MainActivity : ComponentActivity() {
         finishAffinity()
     }
 
-    fun launchAppInfo() {
-        try {
-            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = Uri.fromParts("package", packageName, null)
-            }
-            startActivity(intent)
-        } catch (e: Exception) {
-            Toast.makeText(this, "Could not open App Info", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    fun launchExactAlarmSetting() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            try {
-                val intent = Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).apply {
-                    data = Uri.fromParts("package", packageName, null)
-                }
-                startActivity(intent)
-            } catch (e: Exception) {
-                Toast.makeText(this, "Could not open alarm settings", Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    fun launchBatteryExemptionSetting() {
-        try {
-            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                data = Uri.fromParts("package", packageName, null)
-            }
-            startActivity(intent)
-        } catch (e: Exception) {
-            try {
-                startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-            } catch (e2: Exception) {
-                launchAppInfo()
-            }
-        }
-    }
-
-    fun launchOverlayPermissionSetting() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION).apply {
-                    data = Uri.fromParts("package", packageName, null)
-                }
-                startActivity(intent)
-            } catch (e: Exception) {
-                try {
-                    startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
-                } catch (e2: Exception) {
-                    Toast.makeText(this, "Could not open overlay settings", Toast.LENGTH_SHORT).show()
-                }
-            }
-        }
-    }
-
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleIntent(intent)
@@ -135,7 +80,7 @@ class MainActivity : ComponentActivity() {
                 viewModel.onEvent(UiEvent.ToggleMap(true))
             }
             ACTION_FIX_PERMISSIONS -> {
-                launchOverlayPermissionSetting()
+                systemIntentHandler.getOverlayPermissionIntent()?.let { startActivity(it) }
             }
         }
     }
