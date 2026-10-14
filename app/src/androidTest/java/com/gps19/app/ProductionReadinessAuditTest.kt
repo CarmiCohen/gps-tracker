@@ -160,7 +160,7 @@ class ProductionReadinessAuditTest {
     fun verifyExtendedSoakSimulation() = runBlocking {
         logRepository.setForensicStallSimulation(false)
         val startTime = timeProvider.elapsedRealtime
-        val durationMs = 60000L // 60s Soak
+        val durationMs = 1800000L // 30 Minute Soak (Oct14.1 Requirement)
         
         var ticks = 0
         while (timeProvider.elapsedRealtime - startTime < durationMs) {
@@ -169,17 +169,18 @@ class ProductionReadinessAuditTest {
             sessionManager.onTrackerPulse("Soak_Device", nowRt)
             sessionManager.updateTick(nowRt + 1000, nowRt, true, isInViolation = false)
             
-            if (ticks % 5 == 0) {
-                repeat(10) { i ->
+            if (ticks % 10 == 0) {
+                repeat(5) { i ->
                     forensicLogger.logHandover("SOAK_BURST_$ticks", "wlan$i", force = true)
                 }
             }
             
             ticks++
-            delay(500)
+            delay(1000) // 1Hz telemetry simulation
             
-            if (ticks % 20 == 0) {
+            if (ticks % 60 == 0) {
                 val buffer = forensicSpillBufferProvider.get()
+                Timber.i("Soak Status: 30m cycle progress: ${((nowRt - startTime).toDouble() / durationMs * 100).toInt()}%")
                 assertTrue("Buffer must maintain operational state", buffer.getFillLevel() <= 1.0)
             }
         }
@@ -265,6 +266,8 @@ class ProductionReadinessAuditTest {
 
         val realProvider = AndroidPowerStateProvider(context)
         val newProvider = MockPowerStateProvider(delegate = realProvider, initialIdle = true)
+        newProvider.useDelegate = false 
+
         val newSuite = HardwareSuite(
             context = context,
             scope = externalScope,

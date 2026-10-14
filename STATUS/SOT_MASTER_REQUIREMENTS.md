@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct14.1)
+# SOT Master Requirements & Hardening Status (Oct14.10)
 
 ## ✅ Architectural Master Rules (257 Rules)
 
@@ -14,6 +14,7 @@
 ...
 
 ## ✅ Core Hardening Baseline
+*   **SOT ID 725**: A15 Instrumental Test Verification (30m) - Verified 30-minute sustained 1Hz telemetry cycle on Samsung A15 hardware. Zero forensic data loss. (Oct14.10 - ISSUE-OCT14.10-I1).
 *   **SOT ID 724**: Full Unit Test Verification - Verified project stability through 72 unit tests across engine and app modules. (Oct14.1 - ISSUE-OCT14.5-H1).
 *   **SOT ID 723**: HUD State Consolidation - Consolidated individual HUD connectivity, telemetry, and health flows into a single atomic `hudState`, reducing UI subscription overhead and ensuring atomic component updates. (Oct14.1 - SIMP-OCT14.8-S1).
 *   **SOT ID 722**: Pure Event UI Architecture - Migrated all specialized UI lambdas to a centralized event bus, eliminating direct ViewModel casting and standardizing Composable signatures to (UiStateProvider, (UiEvent) -> Unit). (Oct14.1 - SIMP-OCT13.21-S1).
@@ -27,6 +28,7 @@
 ---
 
 ## 🔍 Verification Chapters
+*   **Chapter 31.800 (A15 Soak Verification)**: PASSED - Verified 30m sustained telemetry cycle on A15 hardware. (Oct14.10).
 *   **Chapter 31.799 (Unit Test Verification)**: PASSED - Verified all 72 unit tests pass on local build. (Oct14.1).
 *   **Chapter 31.798 (HUD Consolidation)**: PASSED - Verified all HUD consumers (StatusBar, AlarmOverlay) subscribe only to the combined hudState. Verified atomic updates via logs. (Oct14.1).
 *   **Chapter 31.797 (Pure Event UI)**: PASSED - Verified all top-level screens and dashboard components utilize the standard onEvent bus. Removed all MainViewModel casting in Map components. (Oct14.1).

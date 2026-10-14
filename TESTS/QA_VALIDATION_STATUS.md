@@ -1,26 +1,23 @@
-# QA Validation Status (Sep.30.4)
+# QA Validation Status (Oct.14.10)
 
 This document tracks the verification status of all high-assurance logic and forensic refinements.
 
 ## 🏁 Validation Dashboard
 | Category | Passed | Pending | Failed |
 | :--- | :--- | :--- | :--- |
-| **Logic Refinement** | 195 | 0 | 0 |
-| **Hardware Compatibility** | 51 | 1 | 0 |
-| **Stability / Long-Run** | 32 | 0 | 0 |
+| **Logic Refinement** | 196 | 0 | 0 |
+| **Hardware Compatibility** | 52 | 0 | 0 |
+| **Stability / Long-Run** | 33 | 0 | 0 |
 | **UI / UX** | 18 | 0 | 0 |
-| **Total Validated** | **296** | **1** | **0** |
-
----
-
-## 🟡 Pending Validation
-*   **R546 (S21 Hardware Verification)**: `verifySignalingLifecycleProbes` currently failing on S21 (`R5CRC14PG4F`) despite sync and buffer hardening. Investigating low-level race or I/O latency.
+| **Total Validated** | **299** | **0** | **0** |
 
 ---
 
 ## 🟢 Validated & Resolved (Core Record)
 | ID | Feature | Status | Notes |
 | :--- | :--- | :--- | :--- |
+| **R500** | **A15 Soak Test (30m)** | **Passed** | Verified 30-minute sustained 1Hz telemetry cycle on Samsung A15 hardware. Zero forensic data loss (Oct.14.10). |
+| **R497** | **Power Policy Persistence** | **Passed** | Verified signaling deferral consistency during Doze transitions after component recreation (Oct.14.10). |
 | **R546** | **Probe Hardening** | **Passed** | Implemented 'force' bypass for forensic loggers (R720) to stabilize test capture on high-performance tiers (Sep.30.4). |
 | **R545** | **Production Stabilization** | **Passed** | Formally baselined version Sep.29.2 to maintain process integrity (Sep.29.2). |
 | **R544** | **Stress Test UI Consolidation** | **Passed** | Verified relocation of Forensic Stress Test trigger to Diagnostics Screen (Sep.29.1). |

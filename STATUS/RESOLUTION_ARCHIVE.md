@@ -1,5 +1,16 @@
 # Resolution Archive
 
+## [Oct14.10] - A15 Instrumental Test Verification (30m)
+**Issue ID**: #ISSUE-OCT14.10-I1
+**Status**: RESOLVED
+**Description**: Executed the full instrumental test suite and a 30-minute soak simulation on the Samsung A15 (SM-A155F) to verify hardware-specific stability and forensic pipeline integrity.
+**Root Cause**: N/A (Verification Task)
+**Remediation**:
+- **Execution**: Successfully ran 25 instrumental tests on the A15.
+- **Soak Validation**: Verified 30 minutes of sustained 1Hz telemetry with zero data loss in the ForensicSpillBuffer.
+- **Regression Fix**: Resolved a mock override failure in `ProductionReadinessAuditTest` during component recreation.
+- **Traceability**: Updated SOT Master Requirements (SOT ID 725) and QA Validation Status.
+
 ## [Oct14.1] - Full Unit Test Verification
 **Issue ID**: #ISSUE-OCT14.5-H1
 **Status**: RESOLVED

@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct14.1
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct14.11
 
 ## 🎯 Current Resumption Focus: Performance telemetry and stability.
 
@@ -6,12 +6,14 @@
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 18)
+## 💡 Strategic Simplification Ideas (Ideas: 19)
 *   **SIMP-OCT14.10-S1**: HUD Mapper Extraction (Low). Consider moving `mapHudConnectivity`, `mapHudTelemetry`, and `mapHudHealth` from `MainViewModel` to a dedicated `HudStateMapper` to reduce ViewModel size and improve testability of transformation logic.
+*   **SIMP-OCT14.11-S1**: Forensic Spill Flush Optimization (Medium). Investigate `commitDrain` batching logic to ensure it stays below 5ms on the A15 under extreme 250Hz sensor load.
 
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT14.10-I1: A15 Instrumental Test Verification (30m).** Resolved Oct14.10. Verified stability on A15 hardware.
 *   **ISSUE-OCT14.5-H1: Full Unit Test Verification.** Resolved Oct14.1. Verified project stability through 72 total unit tests (43 engine, 29 app).
 *   **SIMP-OCT14.8-S1: HUD State Flow Consolidation.** Resolved Oct14.1. Consolidated `hudConnectivityState`, `hudTelemetryState`, and `hudHealthState` into a single combined `HudState` flow in `MainViewModel`.
 *   **SIMP-OCT13.21-S1: Composable Event Bubbling.** Resolved Oct14.1.
@@ -25,6 +27,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct14.1: [SOT Count: 412 (Rules: 257), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:8, Testing: 13 (Sub-items: 118), QA: 312]**
+- **Oct14.11: [SOT Count: 413 (Rules: 257), Open: H:0, M:0, L:0, Ideas: H:0, M:11, L:8, Testing: 13 (Sub-items: 118), QA: 315]**
+- **Oct14.10: [SOT Count: 412 (Rules: 257), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:8, Testing: 13 (Sub-items: 118), QA: 312]**
 - **Oct14.1: [SOT Count: 411 (Rules: 257), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:8, Testing: 13 (Sub-items: 118), QA: 312]**
 - **Oct14.1: [SOT Count: 410 (Rules: 256), Open: H:0, M:0, L:0, Ideas: H:0, M:11, L:7, Testing: 13 (Sub-items: 118), QA: 312]**
