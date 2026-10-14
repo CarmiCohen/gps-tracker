@@ -2,7 +2,6 @@ package com.gps19.app
 
 import android.content.res.Configuration
 import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
@@ -175,19 +174,7 @@ fun MainAppContent(
                             if (sessionState.hydrationLevel >= 3) {
                                 DiagnosticsScreen(
                                     stateProvider = viewModel,
-                                    onBack = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) },
-                                    onRefresh = { viewModel.onEvent(UiEvent.RefreshPermissionStatus) },
-                                    onToggleManualOverride = { viewModel.onEvent(UiEvent.ToggleXiaomiManualOverride) },
-                                    onToggleForensicSimulation = { active -> viewModel.onEvent(UiEvent.SetForensicSimulation(active)) },
-                                    onToggleStorageSimulation = { active, critical -> viewModel.onEvent(UiEvent.SetStorageSimulation(active, critical)) },
-                                    onToggleSetupBypass = { active -> viewModel.onEvent(UiEvent.ToggleSetupBypass(active)) },
-                                    onExecuteStressTest = { viewModel.onEvent(UiEvent.ExecuteStressTest) },
-                                    onExecuteLogPressureTest = { viewModel.onEvent(UiEvent.ExecuteLogPressureTest) },
-                                    onRequestBatteryExemption = { viewModel.onEvent(UiEvent.RequestBatteryExemption) },
-                                    onRequestOverlayPermission = { viewModel.onEvent(UiEvent.RequestOverlayPermission) },
-                                    onRequestAppInfo = { viewModel.onEvent(UiEvent.RequestAppInfo) },
-                                    onRequestExactAlarm = { viewModel.onEvent(UiEvent.RequestExactAlarm) },
-                                    onRequestHardwarePermission = { viewModel.onEvent(UiEvent.RequestHardwarePermission) }
+                                    onMainEvent = { viewModel.onEvent(it) }
                                 )
                             }
                         }
