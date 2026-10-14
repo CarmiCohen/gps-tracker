@@ -15,6 +15,9 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
+ * Oct.14.6:
+ * - Issue #SIMP-OCT13.20-S1: Unified Signaling Payload Conflation logic.
+ *   Introduced generic dispatchConflated to eliminate redundancy across Map and Object buckets.
  * Oct.13.20:
  * - Issue #ISSUE-OCT13.20-H1: Resolved Delicate API warnings. Replaced isClosedForSend/Receive 
  *   with exception handling and trySend results. Improved scope management for leaks.
@@ -269,16 +272,35 @@ class SmartSignalingDispatcher(
         when (command) {
             is Command.Json -> {
                 if (command.event == "location_update" && command.priority == SignalingPriority.NORMAL) {
-                    dispatchConflatedLocationMap(command.data)
+                    dispatchConflated(
+                        bucket = locMapBucket,
+                        incoming = command.data,
+                        conflater = ::conflateMaps,
+                        flushCommandFactory = { Command.Json("location_update", it, SignalingPriority.NORMAL) }
+                    )
                 } else if (command.event == "log_update" && command.priority == SignalingPriority.NORMAL) {
-                    dispatchConflatedLog(command.data)
+                    dispatchConflated(
+                        bucket = logBucket,
+                        incoming = command.data,
+                        conflater = ::conflateLogMaps,
+                        shouldFlush = { pending, new ->
+                            (pending?.get("message") as? String) != (new["message"] as? String)
+                        },
+                        flushCommandFactory = { Command.Json("log_update", it, SignalingPriority.NORMAL) },
+                        delayMultiplier = 2
+                    )
                 } else {
                     enqueue(command)
                 }
             }
             is Command.Object -> {
                 if (command.event == "location_update_bin" && command.priority == SignalingPriority.NORMAL) {
-                    dispatchConflatedLocationObject(command.update)
+                    dispatchConflated(
+                        bucket = locObjBucket,
+                        incoming = command.update,
+                        conflater = ::conflateLocationUpdates,
+                        flushCommandFactory = { Command.Object("location_update_bin", it, false, SignalingPriority.NORMAL) }
+                    )
                 } else {
                     enqueue(command)
                 }
@@ -305,61 +327,40 @@ class SmartSignalingDispatcher(
         }
     }
 
-    private fun dispatchConflatedLocationMap(incoming: Map<String, Any?>) {
-        var wasConflated = false
-        locMapBucket.pending.updateAndGet { current ->
-            if (current != null) wasConflated = true
-            conflateMaps(current, incoming)
-        }
-        if (wasConflated) {
-            val conf = framesConflated.incrementAndGet()
-            updateMetrics(conflated = conf)
-            locMapBucket.burstCount.incrementAndGet()
-        }
-
-        updateBucketSchedule(locMapBucket)
-    }
-
-    private fun dispatchConflatedLocationObject(incoming: LocationUpdate) {
-        var wasConflated = false
-        locObjBucket.pending.updateAndGet { current ->
-            if (current != null) wasConflated = true
-            conflateLocationUpdates(current, incoming)
-        }
-        if (wasConflated) {
-            val conf = framesConflated.incrementAndGet()
-            updateMetrics(conflated = conf)
-            locObjBucket.burstCount.incrementAndGet()
-        }
-
-        updateBucketSchedule(locObjBucket)
-    }
-
-    private fun dispatchConflatedLog(incoming: Map<String, Any?>) {
-        val current = logBucket.pending.get()
-        if (current != null) {
-            val pendingMsg = current["message"] as? String
-            val incomingMsg = incoming["message"] as? String
-            if (pendingMsg != incomingMsg) {
-                // Sequence break: Flush immediately
-                logBucket.pending.getAndSet(null)?.let {
-                    enqueue(Command.Json("log_update", it, SignalingPriority.NORMAL))
-                }
-                logBucket.scheduledTs.set(0)
-                logBucket.firstEntryTs.set(0)
-                logBucket.burstCount.set(0)
-            } else {
-                val conf = framesConflated.incrementAndGet()
-                updateMetrics(conflated = conf)
-                logBucket.burstCount.incrementAndGet()
+    /**
+     * Oct.14.6: Unified Conflation Dispatcher.
+     * Manages AtomicReference state, burst counts, and scheduling for a specific bucket.
+     */
+    private fun <T> dispatchConflated(
+        bucket: ConflationBucket<T>,
+        incoming: T,
+        conflater: (T?, T) -> T,
+        shouldFlush: (T?, T) -> Boolean = { _, _ -> false },
+        flushCommandFactory: (T) -> Command,
+        delayMultiplier: Int = 1
+    ) {
+        val existing = bucket.pending.get()
+        if (existing != null && shouldFlush(existing, incoming)) {
+            // Sequence break: Flush immediately
+            bucket.pending.getAndSet(null)?.let {
+                enqueue(flushCommandFactory(it))
             }
+            bucket.reset()
         }
 
-        logBucket.pending.updateAndGet { cur ->
-            conflateLogMaps(cur, incoming)
+        var wasConflated = false
+        bucket.pending.updateAndGet { current ->
+            if (current != null) wasConflated = true
+            conflater(current, incoming)
         }
 
-        updateBucketSchedule(logBucket, delayMultiplier = 2)
+        if (wasConflated) {
+            val conf = framesConflated.incrementAndGet()
+            updateMetrics(conflated = conf)
+            bucket.burstCount.incrementAndGet()
+        }
+
+        updateBucketSchedule(bucket, delayMultiplier)
     }
 
     private fun <T> updateBucketSchedule(bucket: ConflationBucket<T>, delayMultiplier: Int = 1) {
