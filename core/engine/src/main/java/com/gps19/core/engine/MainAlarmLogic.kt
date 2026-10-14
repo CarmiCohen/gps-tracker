@@ -5,11 +5,11 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Oct.14.0:
+ * - SIMP-OCT14.13-S2: Integrated EntityBrandingProvider for centralized 
+ *   mode-aware naming.
  * Oct.13.21:
  * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump logic (R-ID 601).
- * Oct.3.9:
- * - Issue #1201 RESOLVED: Decoupled siren lockout authority. DetectViolations now 
- *   accepts external isLockedOut state instead of tracking lastSirenStopRt (R-ID 510).
  */
 object MainAlarmLogic {
 
@@ -17,7 +17,7 @@ object MainAlarmLogic {
 
     private fun getTrackerTitleCached(isTracker: Boolean, title: String): String {
         val key = isTracker to title
-        return titleCache[key] ?: getTrackerTitle(isTracker, title).also { titleCache[key] = it }
+        return titleCache[key] ?: EntityBrandingProvider.getModeAwareTitle(isTracker, title).also { titleCache[key] = it }
     }
 
     fun detectViolations(
@@ -45,7 +45,6 @@ object MainAlarmLogic {
             val uptimeRt = nowRt - state.serviceStartRt
             val isGpsWarmupActive = uptimeRt < GPS_WARMUP_GRACE_MS || isWarmup
             
-            // Issue #1417: Track connectivity state duration for hysteresis
             if (state.isRelayConnected) {
                 state.lastRelayOnlineRt = nowRt
             } else {
@@ -54,21 +53,13 @@ object MainAlarmLogic {
 
             var reportIdx = 0
 
-            // 1. Connectivity & Peer Status
             reportIdx = evaluateConnectivity(state, report, reportIdx, isTracker, isGpsWarmupActive, uptimeRt)
-
-            // 2. Physical & Hardware Tamper
             reportIdx = evaluatePhysical(state, report, reportIdx, isTracker)
-
-            // 3. Geofence & Spatial Integrity
             reportIdx = evaluateGeofence(state, report, reportIdx, isTracker, nowRt)
-
-            // 4. System Health & Performance
             reportIdx = evaluateSystem(state, report, reportIdx, isTracker, nowRt)
 
             report.truncate(reportIdx)
 
-            // Process Active Alarms State
             processActiveAlarms(state, report, nowTs, nowRt, isLockedOut, onTrigger, onResolve, onTriggerMuted)
 
             report
@@ -91,14 +82,11 @@ object MainAlarmLogic {
         report.reports.forEach { violation ->
             val type = violation.type
             
-            // Thread-safe access to existing alarm state
             val eval = synchronized(state.activeAlarms) { 
                 state.activeAlarms[type] 
             } ?: AlarmEvaluationState.ActiveAlarm(type, violation.title)
 
             if (violation.conditionMet) {
-                // Issue #1410: Global suppression of historical violations.
-                // If the violation started before the last acknowledgment, treat it as handled.
                 val violationStart = if (state.violationStartTs > 0) state.violationStartTs else now
                 val isHistoricallyAcknowledged = state.lastAlarmAckTs > 0 && violationStart <= state.lastAlarmAckTs
 
@@ -142,7 +130,6 @@ object MainAlarmLogic {
             state.lastGlobalTriggerRt = nowRt
         }
         
-        // Critical synchronization for map replacement (R-ID 585)
         synchronized(state.activeAlarms) {
             state.activeAlarms.clear()
             state.activeAlarms.putAll(newActiveAlarms)
@@ -165,8 +152,6 @@ object MainAlarmLogic {
         val isInternetHardwareOk = health.isHardwareOnline
         val isRelayConnected = state.isRelayConnected
         
-        // Issue #1417: Connectivity Hysteresis.
-        // Suppression: If relay was offline within the last 3s, suppress peer errors to avoid oscillation.
         val wasRelayOfflineRecently = (state.lastRelayOfflineRt > 0 && nowRt - state.lastRelayOfflineRt < CONNECTIVITY_HYSTERESIS_MS)
         val shouldSuppressPeerErrors = !isInternetHardwareOk || !isRelayConnected || wasRelayOfflineRecently
 
@@ -177,7 +162,6 @@ object MainAlarmLogic {
             conditionMet = health.localInternetLoss
         )
 
-        // Issue #1417: Delayed triggering of RELAY_OFFLINE to ignore blips.
         val relayOfflineSustained = !isRelayConnected && isInternetHardwareOk && 
                                    (state.lastRelayOnlineRt > 0 && nowRt - state.lastRelayOnlineRt >= CONNECTIVITY_HYSTERESIS_MS)
 
@@ -571,10 +555,6 @@ object MainAlarmLogic {
         )
 
         return idx
-    }
-
-    private fun getTrackerTitle(isTracker: Boolean, title: String): String {
-        return if (isTracker) title.removePrefix("Tracker:").trim() else title.removePrefix("Viewer:").trim()
     }
 
     private fun isDefaultLocation(lat: Double, lng: Double) = abs(lat - DEFAULT_LAT) < 0.0001 && abs(lng - DEFAULT_LNG) < 0.0001

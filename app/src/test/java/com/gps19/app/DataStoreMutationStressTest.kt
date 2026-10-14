@@ -2,6 +2,8 @@ package com.gps19.app
 
 import com.gps19.core.engine.MockTimeProvider
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -29,21 +31,24 @@ class DataStoreMutationStressTest {
         field.set(repository, mockDataStore)
 
         var currentSettings = AppSettings.getDefaultInstance()
+        val mockMutex = Mutex()
         
-        // Mock updateData to simulate atomic updates on a local variable
+        // Mock updateData to simulate atomic updates with thread-safety (Matching DataStore behavior)
         whenever(mockDataStore.updateData(any())).thenAnswer { invocation ->
             val transform = invocation.arguments[0] as suspend (AppSettings) -> AppSettings
             runBlocking {
-                val next = transform(currentSettings)
-                currentSettings = next
-                next
+                mockMutex.withLock {
+                    val next = transform(currentSettings)
+                    currentSettings = next
+                    next
+                }
             }
         }
 
-        // Act: Perform 100 concurrent increments to recoveryCount
+        // Act: Perform 100 concurrent increments to recoveryCount using the ATOMIC API
         val jobs = List(100) {
             launch(Dispatchers.Default) {
-                repository.saveInt(RECOVERY_COUNT_KEY, currentSettings.recoveryCount + 1)
+                repository.incrementInt(RECOVERY_COUNT_KEY, 1)
             }
         }
         jobs.joinAll()

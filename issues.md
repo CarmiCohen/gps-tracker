@@ -1,27 +1,28 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct14.14
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct14.1
 
-## ? Current Resumption Focus: Performance telemetry and stability.
+## ? Current Resumption Focus: Forensic audit and telemetry stability.
 
 ## ?? Open Gaps & Unfinished Integration Points
-*   **ISSUE-OCT14.0-F1**: `DataStoreMutationStressTest` failure. Concurrent saves failed: expected 100, but was 2. Indicates race condition in atomic mutation logic (Issue #1180).
-*   **ISSUE-OCT14.0-F2**: `AlarmStealthTest` failure. Viewer mode alert branding mismatch. Expected 'Tracker' as offline entity but assertion failed (Issue #1413).
+*   None. (All identified logical regressions from Oct14.1 baseline resolved).
 
 ---
 
 ## ? Strategic Simplification Ideas (Ideas: 21)
-*   **SIMP-OCT14.13-S1**: Atomic Mutation Simplification (High). The current custom mutex implementation in DataStore extensions is failing under concurrent load. Investigate migrating to a pure `updateData` transformation or a centralized Actor to ensure serial consistency.
-*   **SIMP-OCT14.13-S2**: Alarm Entity Resolver (Medium). Centralize 'Tracker' vs 'Viewer' naming logic into a single `EntityBrandingProvider` to eliminate fragmented string logic that led to the regression in `AlarmStealthTest`.
+*   **SIMP-OCT14.13-S1: Atomic Mutation Simplification (High).** RESOLVED Oct14.1. Migrated custom mutex/non-atomic Read-Modify-Write in DataStore to internal transformation blocks within `updateData`.
+*   **SIMP-OCT14.13-S2: Alarm Entity Resolver (Medium).** RESOLVED Oct14.1. Centralized 'Tracker' vs 'Viewer' naming logic into `EntityBrandingProvider`.
 *   **SIMP-OCT14.10-S1**: HUD Mapper Extraction (Low). Consider moving `mapHudConnectivity`, `mapHudTelemetry`, and `mapHudHealth` from `MainViewModel` to a dedicated `HudStateMapper` to reduce ViewModel size and improve testability of transformation logic.
 *   **SIMP-OCT14.11-S1**: Forensic Spill Flush Optimization (Medium). Investigate `commitDrain` batching logic to ensure it stays below 5ms on the A15 under extreme 250Hz sensor load.
 
 ---
 
 ## ? Resolved Traceability & Metadata Issues
-*   **ISSUE-OCT14.14-P1: Physical Hardware Verification (A15/S21FE).** Resolved Oct14.14. Verified stability on connected hardware.
-*   **ISSUE-OCT14.12-I1: S21FE Instrumental Test Verification (5m).** Resolved Oct14.1. Verified stability on S21FE hardware.
-*   **ISSUE-OCT14.10-I1: A15 Instrumental Test Verification (30m).** Resolved Oct14.1. Verified stability on A15 hardware.
-*   **ISSUE-OCT14.5-H1: Full Unit Test Verification.** Resolved Oct14.1. Verified project stability through 72 total unit tests (43 engine, 29 app).
-*   **SIMP-OCT14.8-S1: HUD State Flow Consolidation.** Resolved Oct14.1. Consolidated `hudConnectivityState`, `hudTelemetryState`, and `hudHealthState` into a single combined `HudState` flow in `MainViewModel`.
+*   **ISSUE-OCT14.0-F1: DataStore Mutation Integrity.** Resolved Oct14.1. Hardened `SettingsRepository` with functional transformation API (`incrementInt`) and ensured atomic `commitDraftSettings`. Verified via `DataStoreMutationStressTest`.
+*   **ISSUE-OCT14.0-F2: Alarm mode-awareness branding (Issue #1413).** Resolved Oct14.1. Centralized branding logic in `EntityBrandingProvider` and synchronized `EngineConstants`.
+*   **ISSUE-OCT14.14-P1: Physical Hardware Verification (A15/S21FE).** Resolved Oct14.1.
+*   **ISSUE-OCT14.12-I1: S21FE Instrumental Test Verification (5m).** Resolved Oct14.1.
+*   **ISSUE-OCT14.10-I1: A15 Instrumental Test Verification (30m).** Resolved Oct14.1.
+*   **ISSUE-OCT14.5-H1: Full Unit Test Verification.** Resolved Oct14.1.
+*   **SIMP-OCT14.8-S1: HUD State Flow Consolidation.** Resolved Oct14.1.
 *   **SIMP-OCT13.21-S1: Composable Event Bubbling.** Resolved Oct14.1.
 *   **SIMP-OCT14.5-S1: PowerStateProvider Mock Unification.** Resolved Oct14.1.
 *   **SIMP-OCT13.20-S1: Signaling Payload Conflation Logic.** Resolved Oct14.1.
@@ -31,8 +32,6 @@
 ---
 
 ## ? Hardening Progress Dashboard
-- **Oct14.14: [SOT Count: 416 (Rules: 257), Open: H:0, M:2, L:0, Ideas: H:1, M:12, L:8, Testing: 13 (Sub-items: 118), QA: 321]**
-- **Oct14.13: [SOT Count: 415 (Rules: 257), Open: H:0, M:2, L:0, Ideas: H:1, M:12, L:8, Testing: 13 (Sub-items: 118), QA: 318]**
-- **Oct14.1: [SOT Count: 414 (Rules: 257), Open: H:0, M:0, L:0, Ideas: H:0, M:11, L:8, Testing: 13 (Sub-items: 118), QA: 318]**
-- **Oct14.1: [SOT Count: 413 (Rules: 257), Open: H:0, M:0, L:0, Ideas: H:0, M:11, L:8, Testing: 13 (Sub-items: 118), QA: 315]**
-- **Oct14.1: [SOT Count: 412 (Rules: 257), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:8, Testing: 13 (Sub-items: 118), QA: 312]**
+- **Oct14.1: [SOT Count: 417 (Rules: 258), Open: H:0, M:0, L:0, Ideas: H:0, M:12, L:8, Testing: 13 (Sub-items: 120), QA: 324]**
+- **Oct14.1: [SOT Count: 416 (Rules: 257), Open: H:0, M:2, L:0, Ideas: H:1, M:12, L:8, Testing: 13 (Sub-items: 118), QA: 321]**
+- **Oct14.1: [SOT Count: 415 (Rules: 257), Open: H:0, M:2, L:0, Ideas: H:1, M:12, L:8, Testing: 13 (Sub-items: 118), QA: 318]**

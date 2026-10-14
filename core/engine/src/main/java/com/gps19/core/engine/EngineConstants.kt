@@ -6,6 +6,9 @@ package com.gps19.core.engine
  * - ISSUE-OCT13.21-H1: Restored JUMP_HOLD_DURATION_MS and GPS_INDEX_AGE_SCALING 
  *   required by engine logic.
  * - ISSUE-OCT13.20-L1: Dead Code Cleanup. Pruned 4 obsolete constants.
+ * Oct.14.15:
+ * - Issue #1413: Hardened mode-aware branding. Added "Tracker:" prefix to 
+ *   baseline titles to ensure correct filtering in MainAlarmLogic (R-ID 511).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -448,21 +451,21 @@ const val ALERT_ID_MALI_ANOMALY = "MALI_DRIVER_ANOMALY"
 // Alert Titles 
 const val ALERT_TITLE_LOCAL_INTERNET = "This device: Internet Lost"
 const val ALERT_TITLE_RELAY_OFFLINE = "This device: Relay Lost"
-const val ALERT_TITLE_TRACKER_OFFLINE = "Offline"
+const val ALERT_TITLE_TRACKER_OFFLINE = "Tracker: Offline"
 const val ALERT_TITLE_VIEWER_OFFLINE = "Viewer: Offline"
-const val ALERT_TITLE_SIGNAL_LOSS = "Signal Lost"
+const val ALERT_TITLE_SIGNAL_LOSS = "Tracker: Signal Lost"
 const val ALERT_TITLE_VIEWER_SIGNAL_LOSS = "Viewer: Signal Lost"
-const val ALERT_TITLE_TRACKER_GEOFENCE = "Geofence"
-const val ALERT_TITLE_GPS_STALL = "GPS Stalled"
-const val ALERT_TITLE_TRACKER_GAP = "GPS Gap"
+const val ALERT_TITLE_TRACKER_GEOFENCE = "Tracker: Geofence"
+const val ALERT_TITLE_GPS_STALL = "Tracker: GPS Stalled"
+const val ALERT_TITLE_TRACKER_GAP = "Tracker: GPS Gap"
 const val ALERT_TITLE_VIEWER_GAP = "Viewer: GPS Gap"
-const val ALERT_TITLE_TRACKER_POWER = "Charger unplugged"
-const val ALERT_TITLE_TRACKER_BATTERY = "Low Battery"
-const val ALERT_TITLE_TRACKER_TEMP = "High Temp"
-const val ALERT_TITLE_TRACKER_TAMPER = "Tamper Detected"
-const val ALERT_TITLE_TRACKER_TILT = "Tilt Alert"
-const val ALERT_TITLE_TRACKER_ACOUSTIC = "Acoustic Alert"
-const val ALERT_TITLE_TRACKER_LIFT = "Lift"
+const val ALERT_TITLE_TRACKER_POWER = "Tracker: Charger unplugged"
+const val ALERT_TITLE_TRACKER_BATTERY = "Tracker: Low Battery"
+const val ALERT_TITLE_TRACKER_TEMP = "Tracker: High Temp"
+const val ALERT_TITLE_TRACKER_TAMPER = "Tracker: Tamper Detected"
+const val ALERT_TITLE_TRACKER_TILT = "Tracker: Tilt Alert"
+const val ALERT_TITLE_TRACKER_ACOUSTIC = "Tracker: Acoustic Alert"
+const val ALERT_TITLE_TRACKER_LIFT = "Tracker: Lift"
 const val ALERT_TITLE_SYSTEM_STORAGE_LOW = "This device: Storage Low"
 const val ALERT_TITLE_SYSTEM_STORAGE_CRITICAL = "This device: Storage Critical"
 const val ALERT_TITLE_BATTERY_STEEP_DISCHARGE = "This device: Battery Health"
@@ -471,8 +474,8 @@ const val ALERT_TITLE_SILENT_FAILURE = "Forensic: Silent Failure"
 const val ALERT_TITLE_GPS_HARDWARE_LOCK = "This device: GPS Hardware Lock"
 const val ALERT_TITLE_HARDWARE_CONFIGURATION = "This device: Hardware Config"
 const val ALERT_TITLE_PERFORMANCE_SPIKE = "This device: Performance Warning"
-const val ALERT_TITLE_JUMP_ALERT = "Jammer Alert"
-const val ALERT_TITLE_VISUAL_JUMP = "Visual Jump"
+const val ALERT_TITLE_JUMP_ALERT = "Tracker: Jammer Alert"
+const val ALERT_TITLE_VISUAL_JUMP = "Tracker: Visual Jump"
 const val ALERT_TITLE_MALI_ANOMALY = "Forensic: Mali Driver Anomaly"
 
 // System Watchdog & Grace Periods
@@ -493,7 +496,7 @@ const val DB_PRUNE_THRESHOLD = 2000
 const val PRUNE_COOLDOWN_MS = 30000L 
 const val LOG_MUZZLE_STARTUP_MS = 60000L
 
-// Issue #SIMP-1011-18: Mali Correlation Refinement
+// Issue #SIMP-1012-2: Mali Correlation Refinement
 const val MALI_ANOMALY_SUSTAINED_THRESHOLD_MS = 30000L
 const val MALI_BRIDGE_LATENCY_THRESHOLD_MS = 150L
 const val MALI_BRIDGE_LATENCY_THRESHOLD_STAGGERED_MS = 250L

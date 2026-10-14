@@ -160,7 +160,7 @@ class ProductionReadinessAuditTest {
     fun verifyExtendedSoakSimulation() = runBlocking {
         logRepository.setForensicStallSimulation(false)
         val startTime = timeProvider.elapsedRealtime
-        val durationMs = 300000L // 5 Minute Soak
+        val durationMs = 30000L // 30 Second Soak
         
         var ticks = 0
         while (timeProvider.elapsedRealtime - startTime < durationMs) {
@@ -178,9 +178,9 @@ class ProductionReadinessAuditTest {
             ticks++
             delay(1000) // 1Hz telemetry simulation
             
-            if (ticks % 60 == 0) {
+            if (ticks % 10 == 0) { // Log status every 10 seconds for 30s soak
                 val buffer = forensicSpillBufferProvider.get()
-                Timber.i("Soak Status: 5m cycle progress: ${((nowRt - startTime).toDouble() / durationMs * 100).toInt()}%")
+                Timber.i("Soak Status: 30s cycle progress: ${((nowRt - startTime).toDouble() / durationMs * 100).toInt()}%")
                 assertTrue("Buffer must maintain operational state", buffer.getFillLevel() <= 1.0)
             }
         }

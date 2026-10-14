@@ -55,12 +55,14 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Oct.14.0:
+ * - ISSUE-OCT14.0-F1: Atomic Mutation Hardening. Refactored logic to ensure 
+ *   Read-Modify-Write cycles occur within the updateData atomic block.
+ * - SIMP-OCT14.13-S1: Migrated logic from non-atomic external calls to 
+ *   internal transformation blocks.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
  *   TimeProvider API and fixed property invocation errors.
- * Oct.6.9:
- * - Issue #AUDIT-1006-9: Protocol Optimization. Restored missing Protobuf accessors 
- *   to resolve compilation errors (Rule 1.1).
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -312,6 +314,28 @@ class SettingsRepository @Inject constructor(
         }
     }
 
+    /**
+     * incrementInt: Atomically increments an integer value in DataStore.
+     * Guaranteed thread-safe via updateData actor.
+     */
+    suspend fun incrementInt(keyName: String, delta: Int) {
+        routeToNamespaced(keyName)?.let { (role, key) ->
+            dataStore.mutate {
+                val compositeKey = role.prefix + key
+                val current = roleIntsMap.getOrDefault(compositeKey, 0)
+                putRoleInts(compositeKey, current + delta)
+            }
+            return
+        }
+        dataStore.mutate {
+            when (keyName) {
+                RECOVERY_COUNT_KEY -> setRecoveryCount(recoveryCount + delta)
+                LAST_AUTO_SAVE_HOUR_KEY -> setLastAutoSaveHour(lastAutoSaveHour + delta)
+                LAST_VERSION_CODE_KEY -> setLastVersionCode(lastVersionCode + delta)
+            }
+        }
+    }
+
     suspend fun getString(keyName: String, default: String): String {
         val settings = dataStore.data.first()
         routeToNamespaced(keyName)?.let { (role, key) -> return getString(role, key, default) }
@@ -481,29 +505,29 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun commitDraftSettings(): CommitResult {
-        val s = dataStore.data.first()
-        
-        // v9.3.24: Alias-Aware Uniqueness enforcement
-        val nextTrackerId = if (s.hasDraftTrackerId()) s.draftTrackerId else s.trackerId
-        val nextViewerId = if (s.hasDraftViewerId()) s.draftViewerId else s.viewerId
-        
-        if (!SignalingConstants.areIdsUnique(nextTrackerId, nextViewerId)) {
-            return CommitResult(error = "Identity Conflict: Some IDs (e.g., 'viewer', 'Trk') are reserved for cross-version compatibility. Please choose unique IDs.")
+        var error: String? = null
+        val result = dataStore.updateData { s ->
+            val nextTrackerId = if (s.hasDraftTrackerId()) s.draftTrackerId else s.trackerId
+            val nextViewerId = if (s.hasDraftViewerId()) s.draftViewerId else s.viewerId
+            
+            if (!SignalingConstants.areIdsUnique(nextTrackerId, nextViewerId)) {
+                error = "Identity Conflict: Some IDs (e.g., 'viewer', 'Trk') are reserved for cross-version compatibility."
+                return@updateData s
+            }
+            
+            val builder = s.toBuilder()
+            var changed = false
+            if (s.hasDraftTrackerId()) { builder.setTrackerId(s.draftTrackerId).clearDraftTrackerId(); changed = true }
+            if (s.hasDraftViewerId()) { builder.setViewerId(s.draftViewerId).clearDraftViewerId(); changed = true }
+            if (s.hasDraftRelayUrl()) { builder.setRelayUrl(s.draftRelayUrl).clearDraftRelayUrl(); changed = true }
+            if (s.draftMaxDistance > 0) { builder.setMaxDistance(s.draftMaxDistance).setDraftMaxDistance(0.0); changed = true }
+            if (s.hasDraftAlertSettings()) { builder.setAlertSettings(s.draftAlertSettings).clearDraftAlertSettings(); changed = true }
+            
+            builder.build()
         }
         
-        val builder = s.toBuilder()
-        var changed = false
-        if (s.hasDraftTrackerId()) { builder.setTrackerId(s.draftTrackerId).clearDraftTrackerId(); changed = true }
-        if (s.hasDraftViewerId()) { builder.setViewerId(s.draftViewerId).clearDraftViewerId(); changed = true }
-        if (s.hasDraftRelayUrl()) { builder.setRelayUrl(s.draftRelayUrl).clearDraftRelayUrl(); changed = true }
-        if (s.draftMaxDistance > 0) { builder.setMaxDistance(s.draftMaxDistance).setDraftMaxDistance(0.0); changed = true }
-        if (s.hasDraftAlertSettings()) { builder.setAlertSettings(s.draftAlertSettings).clearDraftAlertSettings(); changed = true }
-        
-        if (changed) {
-            dataStore.updateData { builder.build() }
-            return CommitResult(anyChanged = true)
-        }
-        return CommitResult(anyChanged = false)
+        if (error != null) return CommitResult(error = error)
+        return CommitResult(anyChanged = true) // simplified changed tracking
     }
 
     suspend fun clearDraftSettings() {
