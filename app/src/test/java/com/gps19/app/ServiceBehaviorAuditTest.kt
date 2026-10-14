@@ -6,13 +6,12 @@ import org.junit.Test
 
 /**
  * ServiceBehaviorAuditTest: Audit of R406a Dynamic Polling Intervals.
+ * Oct.14.2:
+ * - SIMP-OCT14.2-S1: Migrated to unified MockTimeProvider.
  */
 class ServiceBehaviorAuditTest {
 
-    private val mockTimeProvider = object : TimeProvider {
-        override val elapsedRealtime: Long get() = 100000L
-        override val currentTimeMillis: Long get() = 1700000000000L
-    }
+    private val mockTimeProvider = MockTimeProvider()
 
     @Test
     fun `Audit Polling Interval - Cooling Mode Override`() {

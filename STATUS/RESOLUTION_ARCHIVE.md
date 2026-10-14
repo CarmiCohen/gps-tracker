@@ -1,5 +1,16 @@
 # Resolution Archive
 
+## [Oct14.5] - Test Utility Unification (MockTimeProvider)
+**Issue ID**: #SIMP-OCT14.2-S1
+**Status**: RESOLVED
+**Description**: Unified the `MockTimeProvider` implementation into a shared test-fixture module. Previously, the mock was duplicated as anonymous objects across four different test suites in `:core:engine` and `:app`, leading to maintenance overhead and inconsistent temporal testing logic.
+**Root Cause**: Architectural debt from rapid iteration cycles.
+**Remediation**:
+- **Test Fixtures**: Enabled `java-test-fixtures` in `:core:engine` to share testing utilities across modules.
+- **Unified Implementation**: Created `MockTimeProvider` in `core:engine` test-fixtures with support for `advance(ms)`, `setCurrentTime(ms)`, and `autoAdvanceRt` for profiling tests.
+- **Refactoring**: Replaced anonymous object mocks in `GeofenceBatteryAuditTest`, `MainAlarmLogicTest`, `ServiceBehaviorAuditTest`, and `HardwareSuiteProfileTest`.
+- **Verification**: Verified 72 tests (43 engine unit, 29 app unit) passed post-unification.
+
 ## [Oct14.1] - S21FE Hardware Profile Verification
 **Issue ID**: #ISSUE-OCT14.4-H1
 **Status**: RESOLVED

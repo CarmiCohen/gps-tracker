@@ -9,21 +9,12 @@ import kotlin.math.*
  * GeofenceBatteryAuditTest: Verification of R406a Dynamic Polling vs. Geofence Integrity.
  * Oct.14.1:
  * - Issue #ISSUE-OCT14.1-H1: Build Restoration. Pruned isAdaptiveJump from update() call sites.
+ * Oct.14.2:
+ * - SIMP-OCT14.2-S1: Migrated to unified MockTimeProvider.
  */
 class GeofenceBatteryAuditTest {
 
-    private val mockTimeProvider = object : TimeProvider {
-        private var time = 1700000000000L
-        private var rt = 100000L
-        
-        override val elapsedRealtime: Long get() = rt
-        override val currentTimeMillis: Long get() = time
-        
-        fun advance(ms: Long) {
-            time += ms
-            rt += ms
-        }
-    }
+    private val mockTimeProvider = MockTimeProvider()
 
     private val spikeLogger: (String, Long) -> Unit = { _, _ -> }
     private val onTrigger: (AlarmEvaluationState.ActiveAlarm) -> Unit = { }

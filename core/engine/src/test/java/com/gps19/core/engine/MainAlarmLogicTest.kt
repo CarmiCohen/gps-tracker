@@ -11,13 +11,12 @@ import kotlin.math.abs
  * MainAlarmLogicTest: Validating centralized violation logic.
  * Oct.14.1:
  * - Issue #ISSUE-OCT14.1-H1: Build Restoration. Pruned isAdaptiveJump from update() call sites.
+ * Oct.14.2:
+ * - SIMP-OCT14.2-S1: Migrated to unified MockTimeProvider.
  */
 class MainAlarmLogicTest {
 
-    private val mockTimeProvider = object : TimeProvider {
-        override val elapsedRealtime: Long get() = 100000L
-        override val currentTimeMillis: Long get() = 1700000000000L
-    }
+    private val mockTimeProvider = MockTimeProvider()
 
     private val spikeLogger: (String, Long) -> Unit = { _, _ -> }
     private val onTrigger: (AlarmEvaluationState.ActiveAlarm) -> Unit = { }

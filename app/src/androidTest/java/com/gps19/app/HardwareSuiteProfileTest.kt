@@ -13,20 +13,17 @@ import org.junit.runner.RunWith
 /**
  * HardwareSuiteProfileTest: Automated profiling study for the staggered performance tier.
  * Oct.12.14: Updated to property-based API and fixed TelemetryRepository instantiation.
+ * Oct.14.2:
+ * - SIMP-OCT14.2-S1: Migrated to unified MockTimeProvider.
  */
 @RunWith(AndroidJUnit4::class)
 class HardwareSuiteProfileTest {
 
-    private val mockTimeProvider = object : TimeProvider {
-        private var time = 1000000L
-        override val elapsedRealtime: Long
-            get() {
-                val current = time
-                time += 30000L // Simulate a 30s tick step
-                return current
-            }
-        override val currentTimeMillis: Long = 1700000000000L
-    }
+    private val mockTimeProvider = MockTimeProvider(
+        initialTime = 1000000L, 
+        initialRt = 1000000L, 
+        autoAdvanceRt = 30000L
+    )
 
     private val fakePowerStateProvider = object : PowerStateProvider {
         var isIdle = false
