@@ -15,6 +15,8 @@ import org.junit.runner.RunWith
  * Oct.12.14: Updated to property-based API and fixed TelemetryRepository instantiation.
  * Oct.14.2:
  * - SIMP-OCT14.2-S1: Migrated to unified MockTimeProvider.
+ * Oct.14.7:
+ * - SIMP-OCT14.5-S1: Migrated to unified MockPowerStateProvider.
  */
 @RunWith(AndroidJUnit4::class)
 class HardwareSuiteProfileTest {
@@ -25,10 +27,7 @@ class HardwareSuiteProfileTest {
         autoAdvanceRt = 30000L
     )
 
-    private val fakePowerStateProvider = object : PowerStateProvider {
-        var isIdle = false
-        override val isDeviceIdleMode: Boolean get() = isIdle
-    }
+    private val mockPowerStateProvider = MockPowerStateProvider(initialIdle = false)
     
     // TelemetryRepository is an in-memory store, safe to use real instance in profile tests.
     private val testTelemetryRepository = TelemetryRepository()
@@ -47,7 +46,7 @@ class HardwareSuiteProfileTest {
             timeProvider = mockTimeProvider,
             systemMonitor = mockSystemMonitor(),
             systemStatusProvider = mockSystemStatusProvider(),
-            powerStateProvider = fakePowerStateProvider,
+            powerStateProvider = mockPowerStateProvider,
             forensicAuditor = mockForensicAuditor(),
             domainEventBus = testDomainEventBus,
             activityContextProvider = mockActivityContextProvider(context),
@@ -75,7 +74,7 @@ class HardwareSuiteProfileTest {
             timeProvider = mockTimeProvider,
             systemMonitor = mockSystemMonitor(),
             systemStatusProvider = mockSystemStatusProvider(),
-            powerStateProvider = fakePowerStateProvider,
+            powerStateProvider = mockPowerStateProvider,
             forensicAuditor = mockForensicAuditor(),
             domainEventBus = testDomainEventBus,
             activityContextProvider = mockActivityContextProvider(context),

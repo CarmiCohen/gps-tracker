@@ -25,15 +25,6 @@ import javax.inject.Provider
 import javax.inject.Singleton
 import kotlin.math.*
 
-class FakePowerStateProvider(private val real: AndroidPowerStateProvider) : PowerStateProvider {
-    companion object {
-        var useOverride = false
-        var isIdle = false
-    }
-    override val isDeviceIdleMode: Boolean
-        get() = if (useOverride) isIdle else real.isDeviceIdleMode
-}
-
 @Module
 @TestInstallIn(
     components = [SingletonComponent::class],
@@ -49,7 +40,7 @@ object TestPowerModule {
     @Provides
     @Singleton
     fun providePowerStateProvider(real: AndroidPowerStateProvider): PowerStateProvider = 
-        FakePowerStateProvider(real)
+        MockPowerStateProvider(delegate = real)
 }
 
 @HiltAndroidTest
@@ -89,11 +80,13 @@ class ProductionReadinessAuditTest {
     @Inject
     lateinit var telemetryRepository: TelemetryRepository
 
+    private val mockPowerStateProvider get() = powerStateProvider as MockPowerStateProvider
+
     @Before
     fun init() {
         hiltRule.inject()
-        FakePowerStateProvider.useOverride = true
-        FakePowerStateProvider.isIdle = false
+        mockPowerStateProvider.useDelegate = false
+        mockPowerStateProvider.isIdle = false
         forensicSpillBufferProvider.get().resetBufferForTest()
     }
 
@@ -266,12 +259,12 @@ class ProductionReadinessAuditTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val externalScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
         
-        FakePowerStateProvider.useOverride = true
-        FakePowerStateProvider.isIdle = true
+        mockPowerStateProvider.useDelegate = false
+        mockPowerStateProvider.isIdle = true
         assertTrue("Initial state should be Doze", hardwareSuite.shouldDeferSignaling(false))
 
         val realProvider = AndroidPowerStateProvider(context)
-        val newProvider = FakePowerStateProvider(realProvider)
+        val newProvider = MockPowerStateProvider(delegate = realProvider, initialIdle = true)
         val newSuite = HardwareSuite(
             context = context,
             scope = externalScope,
@@ -288,7 +281,7 @@ class ProductionReadinessAuditTest {
         assertTrue("Power state must persist across component recreation",
             newSuite.shouldDeferSignaling(false))
             
-        FakePowerStateProvider.isIdle = false
+        newProvider.isIdle = false
         assertFalse("Power state change must be reflected",
             newSuite.shouldDeferSignaling(false))
     }
@@ -331,11 +324,11 @@ class ProductionReadinessAuditTest {
 
     @Test
     fun verifyDozeModeSignalingDeferral() {
-        FakePowerStateProvider.useOverride = true
-        FakePowerStateProvider.isIdle = false
+        mockPowerStateProvider.useDelegate = false
+        mockPowerStateProvider.isIdle = false
         assertFalse("Should not defer when not in Doze", hardwareSuite.shouldDeferSignaling(false))
 
-        FakePowerStateProvider.isIdle = true
+        mockPowerStateProvider.isIdle = true
         assertTrue("Signaling should be deferred in Doze mode", 
             hardwareSuite.shouldDeferSignaling(isInViolation = false))
         

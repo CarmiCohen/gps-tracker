@@ -1,6 +1,17 @@
 # Resolution Archive
 
-## [Oct14.6] - Signaling Payload Conflation Unification
+## [Oct14.1] - PowerStateProvider Mock Unification
+**Issue ID**: #SIMP-OCT14.5-S1
+**Status**: RESOLVED
+**Description**: Unified the `MockPowerStateProvider` implementation into a shared test-fixture module. Previously, the mock was duplicated across multiple test modules, including anonymous objects and a `FakePowerStateProvider` in instrumented tests.
+**Root Cause**: Architectural debt and lack of centralized test utility strategy.
+**Remediation**:
+- **Test Fixtures**: Leveraged the existing `java-test-fixtures` in `:core:engine`.
+- **Unified Implementation**: Created `MockPowerStateProvider` with delegation support to allow overriding real providers in instrumented tests while maintaining a clean API for unit tests.
+- **Refactoring**: Replaced all manual mock implementations in `ProductionReadinessAuditTest.kt` and `HardwareSuiteProfileTest.kt`.
+- **Verification**: Verified via `ProductionReadinessAuditTest` and `HardwareSuiteProfileTest`. (Oct14.1).
+
+## [Oct14.1] - Signaling Payload Conflation Unification
 **Issue ID**: #SIMP-OCT13.20-S1
 **Status**: RESOLVED
 **Description**: Unified the conflation orchestration in `SmartSignalingDispatcher` by introducing a generic `dispatchConflated` method. This removed redundant logic for managing `AtomicReference` state, burst counts, and scheduling across Map, Object, and Log buckets.
@@ -10,7 +21,7 @@
 - **Strategy Injection**: Conflation-specific logic (e.g., Map merging vs. Log sequence checks) is now injected via lambdas.
 - **Verification**: Verified via `SmartSignalingDispatcherTest` (43 engine unit tests passed). Total system stability maintained.
 
-## [Oct14.5] - Test Utility Unification (MockTimeProvider)
+## [Oct14.1] - Test Utility Unification (MockTimeProvider)
 **Issue ID**: #SIMP-OCT14.2-S1
 **Status**: RESOLVED
 **Description**: Unified the `MockTimeProvider` implementation into a shared test-fixture module. Previously, the mock was duplicated as anonymous objects across four different test suites in `:core:engine` and `:app`, leading to maintenance overhead and inconsistent temporal testing logic.
