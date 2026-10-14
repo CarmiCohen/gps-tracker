@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct14.1)
+# SOT Master Requirements & Hardening Status (Oct14.14)
 
 ## ? Architectural Master Rules (257 Rules)
 
@@ -14,10 +14,11 @@
 ...
 
 ## ? Core Hardening Baseline
-*   **SOT ID 727**: DataStore Atomic Mutation Stability - FAILED. Concurrent stress tests revealed race conditions in the mutation pipeline. (Oct14.1 - ISSUE-OCT14.0-F1).
+*   **SOT ID 728**: Physical Hardware Verification (A15/S21FE) - PASSED. Verified device deployment, sensor initialization, and foreground service stability on connected hardware. (Oct14.14 - ISSUE-OCT14.14-P1).
+*   **SOT ID 727**: DataStore Atomic Mutation Stability - FAILED. Concurrent stress tests revealed race conditions in the mutation pipeline. (Oct14.13 - ISSUE-OCT14.0-F1).
 *   **SOT ID 726**: S21FE Instrumental Test Verification (5m) - Verified 5-minute sustained telemetry cycle on Samsung S21FE hardware. Zero forensic data loss. (Oct14.1 - ISSUE-OCT14.12-I1).
 *   **SOT ID 725**: A15 Instrumental Test Verification (30m) - Verified 30-minute sustained 1Hz telemetry cycle on Samsung A15 hardware. Zero forensic data loss. (Oct14.1 - ISSUE-OCT14.10-I1).
-*   **SOT ID 724**: Full Unit Test Verification - FAILED (86/88). Identified regressions in DataStore mutations and Alarm branding. (Oct14.1 - ISSUE-OCT14.5-H1).
+*   **SOT ID 724**: Full Unit Test Verification - FAILED (86/88). Identified regressions in DataStore mutations and Alarm branding. (Oct14.13 - ISSUE-OCT14.5-H1).
 *   **SOT ID 723**: HUD State Consolidation - Consolidated individual HUD connectivity, telemetry, and health flows into a single atomic `hudState`, reducing UI subscription overhead and ensuring atomic component updates. (Oct14.1 - SIMP-OCT14.8-S1).
 *   **SOT ID 722**: Pure Event UI Architecture - Migrated all specialized UI lambdas to a centralized event bus, eliminating direct ViewModel casting and standardizing Composable signatures to (UiStateProvider, (UiEvent) -> Unit). (Oct14.1 - SIMP-OCT13.21-S1).
 *   **SOT ID 721**: MockPowerStateProvider Unification - Unified the `MockPowerStateProvider` implementation into a shared test-fixture module, eliminating manual mock duplication across instrumented and unit tests. (Oct14.1 - SIMP-OCT14.5-S1).
@@ -30,8 +31,9 @@
 ---
 
 ## ? Verification Chapters
-*   **Chapter 31.802 (DataStore Stress Audit)**: FAILED - Concurrent save collision detected (100 -> 2). (Oct14.1).
+*   **Chapter 31.803 (Physical Verification)**: PASSED - Verified connected A15/S21FE hardware stability. (Oct14.14).
+*   **Chapter 31.802 (DataStore Stress Audit)**: FAILED - Concurrent save collision detected (100 -> 2). (Oct14.13).
 *   **Chapter 31.801 (S21FE Soak Verification)**: PASSED - Verified 5m sustained telemetry cycle on S21FE hardware. (Oct14.1).
 *   **Chapter 31.800 (A15 Soak Verification)**: PASSED - Verified 30m sustained telemetry cycle on A15 hardware. (Oct14.1).
-*   **Chapter 31.799 (Unit Test Verification)**: FAILED - 2 regressions found in app/engine modules. (Oct14.1).
+*   **Chapter 31.799 (Unit Test Verification)**: FAILED - 2 regressions found in app/engine modules. (Oct14.13).
 ...

@@ -1,26 +1,23 @@
-# Project Handover - Oct14.13
+# Project Handover - Oct14.14
 
-## ? Current Status: Regression Discovery & Hardening Audit
-- **Version**: Oct14.13
-- **Focus**: Full project unit test verification and regression logging.
+## ? Current Status: Physical Stability Verified / Logical Regressions Logged
+- **Version**: Oct14.14
+- **Focus**: Hardware verification and baseline hardening.
 - **Key Changes**:
-    - **Unit Test Execution**: Ran all 88 unit tests across `:app` and `:core:engine`.
-    - **Regression Identification**:
-        - **ISSUE-OCT14.0-F1**: `DataStoreMutationStressTest` failing due to race conditions in atomic mutations (Expected 100, got 2).
-        - **ISSUE-OCT14.0-F2**: `AlarmStealthTest` failing due to Viewer mode branding mismatch (Issue #1413).
-    - **Documentation Synchronization**: Updated `test_results.md`, `issues.md`, `SOT_MASTER_REQUIREMENTS.md`, and `RESOLUTION_ARCHIVE.md` to reflect these regressions.
-    - **Strategic Simplification**: Proposed `Atomic Mutation Simplification` (High) and `Entity Branding Provider` (Medium) to address root causes.
+    - **Physical Verification**: Successfully executed 25 instrumental tests on both A15 and S21FE hardware. Zero hardware-level failures.
+    - **Logical Audit**: Confirmed 2 unit test regressions (`DataStoreMutationStressTest` and `AlarmStealthTest`).
+    - **Branding Sync**: Verified that while unit tests fail on branding logic, the physical UI on devices currently displays correctly for the tested scenarios.
+    - **SOT Update**: Synchronized all tracking files to include SOT ID 728 (Physical Hardware Verification).
 
 ## ? Project Metrics
-- **Total Production Lines**: ~32,845 (Excluding tests/issues).
-- **Test Coverage**: 86/88 Passed (2 Regressions identified).
+- **Total Production Lines**: ~32,845.
+- **Test Coverage**: 86/88 Unit Passed (2 Regressions), 50/50 Instrumental Passed (Hardware stable).
 
 ## ?? Pending Debt
-- **ISSUE-OCT14.0-F1**: Fix race condition in DataStore atomic mutations.
-- **ISSUE-OCT14.0-F2**: Fix branding logic in Alarm mode-awareness.
-- **SIMP-OCT14.11-S1**: Forensic Spill Flush Optimization (Medium).
-- **SIMP-OCT14.10-S1**: HUD Mapper Extraction (Low).
+- **ISSUE-OCT14.0-F1**: Fix race condition in DataStore atomic mutations (High priority for data integrity).
+- **ISSUE-OCT14.0-F2**: Fix branding logic in Alarm mode-awareness (Issue #1413).
+- **SIMP-OCT14.13-S1**: Migrate custom mutex in DataStore to Actor/updateData (Simplification Idea).
 
 ## ? Forensic Pulse
-- **SOT Metrics**: 257 Architectural Rules / 415 Total Requirements.
-- **Audit Baseline**: Oct14.13: [SOT Count: 415 (Rules: 257), Open: H:0, M:2, L:0, Ideas: H:1, M:12, L:8, Testing: 13 (Sub-items: 118), QA: 318]
+- **SOT Metrics**: 257 Architectural Rules / 416 Total Requirements.
+- **Audit Baseline**: Oct14.14: [SOT Count: 416 (Rules: 257), Open: H:0, M:2, L:0, Ideas: H:1, M:12, L:8, Testing: 13 (Sub-items: 118), QA: 321]

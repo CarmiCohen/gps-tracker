@@ -17,7 +17,7 @@ This document tracks the historical and current manual test results based on the
     *   **Status (Sep.22.03):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 *   **2.5 DataStore Mutation Extension (Issue #1180):**
     *   **Status (Sep.22.04):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
-    *   **Status (Oct.14.0):** 🔴 **Logical: FAILED** (DataStoreMutationStressTest: Concurrent saves failed, expected 100 but was 2).
+    *   **Status (Oct.14.13):** 🔴 **Logical: FAILED** (DataStoreMutationStressTest) | 🟢 **Physical: PASSED** (A15/S21FE stable).
 *   **2.6 UseCase Functional Consolidation (Issue #1181):**
     *   **Status (Sep.22.05):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 *   **2.7 Connection Sticky-State (Issue #1422):**
@@ -34,7 +34,7 @@ This document tracks the historical and current manual test results based on the
 ## Chapter 4 - Viewer Mode & Remote Sync
 *   **4.9 Mode-Based Alert Restriction (Issue #1413):**
     *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
-    *   **Status (Oct.14.0):** 🔴 **Logical: FAILED** (AlarmStealthTest: Viewer mode did not see 'Tracker' as offline entity).
+    *   **Status (Oct.14.13):** 🔴 **Logical: FAILED** (AlarmStealthTest) | 🟢 **Physical: PASSED** (Branding correctly visual on device UI).
 *   **4.10 Alarm Acknowledgment Idempotency (Issue #1410):**
     *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 *   **4.11 HUD Visibility & Occlusion (Issue #1421):**

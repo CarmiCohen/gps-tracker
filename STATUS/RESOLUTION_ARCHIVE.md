@@ -1,9 +1,19 @@
 # Resolution Archive
 
-## [Oct14.1] - Full Unit Test Verification (Regression Discovery)
+## [Oct14.14] - Physical Hardware Verification (A15/S21FE)
+**Issue ID**: #ISSUE-OCT14.14-P1
+**Status**: RESOLVED
+**Description**: Verified stable deployment and physical execution on Samsung A15 and S21FE hardware via connected USB station.
+**Root Cause**: N/A (Verification Task)
+**Remediation**:
+- **Execution**: Successfully ran `connectedDebugAndroidTest` on both devices.
+- **Result**: 25/25 tests passed on each device.
+- **Traceability**: Updated SOT Master Requirements (SOT ID 728) and QA Validation Status.
+
+## [Oct14.13] - Full Unit Test Verification (Regression Discovery)
 **Issue ID**: #ISSUE-OCT14.5-H1
 **Status**: FAILED / REGRESSION IDENTIFIED
-**Description**: Executed full unit test suite as part of the Oct14.1 hardening cycle. Identified two critical regressions.
+**Description**: Executed full unit test suite as part of the Oct14.13 hardening cycle. Identified two critical regressions.
 **Root Cause**: 
 1. `DataStoreMutationStressTest`: Race condition in atomic mutation logic during concurrent access.
 2. `AlarmStealthTest`: UI branding logic failure for 'Tracker' entity in Viewer mode.
@@ -31,5 +41,3 @@
 - **Soak Validation**: Verified 30 minutes of sustained 1Hz telemetry with zero data loss in the ForensicSpillBuffer.
 - **Regression Fix**: Resolved a mock override failure in `ProductionReadinessAuditTest` during component recreation.
 - **Traceability**: Updated SOT Master Requirements (SOT ID 725) and QA Validation Status.
-
-...
