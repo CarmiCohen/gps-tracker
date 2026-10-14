@@ -8,9 +8,8 @@ import org.junit.Test
 
 /**
  * LocationSentinelHindsightTest: Validating trajectory promotion and jump buffering.
- * Sep.27.5:
- * - Issue #1349: Mutability Reduction. Updated references to follow partitioned 
- *   sub-states within LocationProcessingState.
+ * Oct.14.1:
+ * - Issue #ISSUE-OCT14.1-H1: Build Restoration. Pruned nowTs from processLocation calls (R-ID 601).
  */
 class LocationSentinelHindsightTest {
 
@@ -37,7 +36,6 @@ class LocationSentinelHindsightTest {
             snr = 40.0,
             satsUsed = 12,
             timestamp = 1000L,
-            nowTs = 1000L,
             nowRt = 1000L
         )
     }
@@ -58,7 +56,6 @@ class LocationSentinelHindsightTest {
             snr = 40.0,
             satsUsed = 12,
             timestamp = jumpTime,
-            nowTs = jumpTime,
             nowRt = jumpTime
         )
 
@@ -79,7 +76,6 @@ class LocationSentinelHindsightTest {
             snr = 40.0,
             satsUsed = 12,
             timestamp = consistentTime,
-            nowTs = consistentTime,
             nowRt = consistentTime
         )
 
@@ -93,22 +89,22 @@ class LocationSentinelHindsightTest {
         // P1
         val p1Lat = baseLat + jitterOffset 
         val p1Time = 2000L
-        LocationSentinel.processLocation(state, p1Lat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, p1Time, nowTs = p1Time, nowRt = p1Time)
+        LocationSentinel.processLocation(state, p1Lat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, p1Time, nowRt = p1Time)
         
         // P2
         val p2Lat = p1Lat + jitterOffset
         val p2Time = 3000L
-        LocationSentinel.processLocation(state, p2Lat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, p2Time, nowTs = p2Time, nowRt = p2Time)
+        LocationSentinel.processLocation(state, p2Lat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, p2Time, nowRt = p2Time)
 
         // P3
         val p3Lat = p2Lat + jitterOffset
         val p3Time = 4000L
-        LocationSentinel.processLocation(state, p3Lat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, p3Time, nowTs = p3Time, nowRt = p3Time)
+        LocationSentinel.processLocation(state, p3Lat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, p3Time, nowRt = p3Time)
 
         // Final point P4 consistent with P3 triggers promotion
         val p4Lat = p3Lat + jitterOffset
         val p4Time = 5000L
-        val result = LocationSentinel.processLocation(state, p4Lat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, p4Time, nowTs = p4Time, nowRt = p4Time)
+        val result = LocationSentinel.processLocation(state, p4Lat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, p4Time, nowRt = p4Time)
 
         assertEquals(SentinelStatus.TRAJECTORY_PROMOTED, result.status)
         assertTrue(result.reason.contains("Trajectory Promoted"))
@@ -118,12 +114,12 @@ class LocationSentinelHindsightTest {
     @Test
     fun `hindsight buffer respects maximum size`() {
         LocationSentinel.reset(state)
-        LocationSentinel.processLocation(state, baseLat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, 1000L, nowTs = 1000L, nowRt = 1000L)
+        LocationSentinel.processLocation(state, baseLat, baseLng, baseAlt, 10.0, 10.0, 0.0, 40.0, 12, 1000L, nowRt = 1000L)
         
         for (i in 1..25) {
             val ts = 1000L + (i * 1000L)
             val bearing = (i * 90.0) % 360.0
-            LocationSentinel.processLocation(state, baseLat + (jitterOffset * i), baseLng, baseAlt, 10.0, 10.0, bearing, 40.0, 12, ts, nowTs = ts, nowRt = ts)
+            LocationSentinel.processLocation(state, baseLat + (jitterOffset * i), baseLng, baseAlt, 10.0, 10.0, bearing, 40.0, 12, ts, nowRt = ts)
         }
 
         assertEquals(5, LocationSentinel.getHindsightBuffer(state).size)

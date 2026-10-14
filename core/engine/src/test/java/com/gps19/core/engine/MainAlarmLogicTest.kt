@@ -9,9 +9,8 @@ import kotlin.math.abs
 
 /**
  * MainAlarmLogicTest: Validating centralized violation logic.
- * Oct.10.4:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
- *   TimeProvider API and fixed property invocation errors.
+ * Oct.14.1:
+ * - Issue #ISSUE-OCT14.1-H1: Build Restoration. Pruned isAdaptiveJump from update() call sites.
  */
 class MainAlarmLogicTest {
 
@@ -48,7 +47,6 @@ class MainAlarmLogicTest {
             trackerLastValidFixRt = baseNowRt,
             trackerSpeed = 0.0,
             jumpTier = 0,
-            isAdaptiveJump = false,
             trackerBattery = 100,
             trackerTemp = 30.0,
             wasDistanceViolated = false,

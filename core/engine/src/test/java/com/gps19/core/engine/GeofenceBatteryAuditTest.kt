@@ -7,9 +7,8 @@ import kotlin.math.*
 
 /**
  * GeofenceBatteryAuditTest: Verification of R406a Dynamic Polling vs. Geofence Integrity.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
- *   TimeProvider API and fixed property invocation errors in mock and call sites.
+ * Oct.14.1:
+ * - Issue #ISSUE-OCT14.1-H1: Build Restoration. Pruned isAdaptiveJump from update() call sites.
  */
 class GeofenceBatteryAuditTest {
 
@@ -55,7 +54,6 @@ class GeofenceBatteryAuditTest {
             trackerLastValidFixRt = rt,
             trackerSpeed = 0.0,
             jumpTier = 0,
-            isAdaptiveJump = false,
             trackerBattery = 100,
             trackerTemp = 30.0,
             wasDistanceViolated = false,
