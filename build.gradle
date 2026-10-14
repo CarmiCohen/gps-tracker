@@ -33,7 +33,7 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    return "Oct10.3"
+    return "Oct13.30"
 }
 
 ext {
@@ -51,7 +51,7 @@ tasks.register('verifyProjectIntegrity') {
     description = "Consolidated project integrity audit (Version, Interfaces, Docs)"
     doLast {
         // 1. Version Type-Safety Audit (Issue #1036)
-        def testCode = rootProject.hasProperty('testVersionCode') ? rootProject.testVersionCode : "INVALID"
+        def testCode = project.autoVersionCode
         def safeCode = 1000
         try {
             safeCode = testCode.toString().toInteger()

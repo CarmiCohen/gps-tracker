@@ -5,15 +5,11 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Oct.13.21:
+ * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump logic (R-ID 601).
  * Oct.3.9:
  * - Issue #1201 RESOLVED: Decoupled siren lockout authority. DetectViolations now 
  *   accepts external isLockedOut state instead of tracking lastSirenStopRt (R-ID 510).
- * Oct.2.1:
- * - Issue #1417: Jitter-Resistant Connectivity (R-ID 593). Integrated 3s temporal 
- *   hysteresis for RELAY_OFFLINE and Peer Error suppression.
- * - Issue #1415: Load-Aware IMU Gating (R-ID 590). Integrated health.cpuLoad 
- *   into isShockViolated and isVibrationSuspicious calls to prevent false 
- *   positives during A15 CPU saturation.
  */
 object MainAlarmLogic {
 
@@ -402,7 +398,7 @@ object MainAlarmLogic {
                 }
 
                 val timeSinceFirstRt = nowRt - state.firstViolationRt
-                val effectiveHoldMs = if (state.isAdaptiveJump) (JUMP_HOLD_DURATION_MS * 2).toLong() else JUMP_HOLD_DURATION_MS
+                val effectiveHoldMs = JUMP_HOLD_DURATION_MS
                 val isSustained = if (state.firstViolationWasJump) timeSinceFirstRt >= effectiveHoldMs else state.distanceViolationCounter >= DISTANCE_ALARM_SAMPLES_REQUIRED
 
                 if (isSustained || isPredictedExit) state.wasDistanceViolated = true

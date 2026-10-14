@@ -29,33 +29,20 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gps19.core.engine.*
 import kotlinx.coroutines.delay
-import timber.log.Timber
-import java.util.Date
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
- * Oct.13.20:
- * - Issue #ISSUE-OCT13.20-M2: Migrated VolumeUp icon to AutoMirrored version.
- * - Fixed unresolved reference 'onUpdateAlertSettings' in SettingsOverlay.
- * Oct.5.20:
- * - SIMP-1426-3: Refactored SettingsOverlay and PhoneSetupOverlay to consume 
- *   unified UiStateProvider. (R1426-3).
- * Oct.5.15:
- * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored SettingsOverlay and 
- *   PhoneSetupOverlay to collect their own state from flows.
+ * Oct.13.21:
+ * - SIMP-OCT13.21-S1: Pure Event UI. Pruned all specific lambda parameters 
+ *   from SettingsOverlay and PhoneSetupOverlay. Standardized on onEvent bubbling.
  */
 
 @Composable
 fun SettingsOverlay(
     stateProvider: UiStateProvider,
-    onReset: (() -> Unit)?=null, 
-    onExport: (() -> Unit)?=null, 
-    onClear: (() -> Unit)?=null, 
-    onImportConfig: () -> Unit, 
-    onFullInitialization: () -> Unit,
-    onShowPhoneSetup: () -> Unit = {}, 
     onEvent: (UiEvent) -> Unit
 ) { 
+    val sessionState by stateProvider.session.collectAsStateWithLifecycle()
     val settingsState by stateProvider.settings.collectAsStateWithLifecycle()
     val navState by stateProvider.navigation.collectAsStateWithLifecycle()
     val isSirenPlaying by stateProvider.isSirenPlaying.collectAsStateWithLifecycle()
@@ -122,7 +109,7 @@ fun SettingsOverlay(
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.CLEAN)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteSweep, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clean)) }
-                            Button(onClick = onShowPhoneSetup, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.HelpCenter, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_phone_setup)) }
+                            Button(onClick = { onEvent(UiEvent.ShowPhoneSetup) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.HelpCenter, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_phone_setup)) }
                         }
                         Spacer(Modifier.height(16.dp))
                     }
@@ -140,8 +127,8 @@ fun SettingsOverlay(
                         Spacer(Modifier.height(24.dp))
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = onImportConfig, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_load_config), fontSize = 11.sp) }
-                            if (onExport != null) { Button(onClick = onExport, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_save_logs), fontSize = 11.sp) } }
+                            Button(onClick = { onEvent(UiEvent.ImportConfig) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_load_config), fontSize = 11.sp) }
+                            if (sessionState.appMode == "viewer") { Button(onClick = { onEvent(UiEvent.ExportLogs) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_save_logs), fontSize = 11.sp) } }
                         }
                     }
 
@@ -157,7 +144,7 @@ fun SettingsOverlay(
         }
         if (isHydrated && visibleCount >= 5) {
             when (activeSubSettings) {
-                SubSettings.CLEAN -> CleanSetupOverlay(onClear = onClear, onReset = onReset, onFullInitialization = onFullInitialization, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
+                SubSettings.CLEAN -> CleanSetupOverlay(onEvent = onEvent)
                 SubSettings.ALERTS -> AlertManagementOverlay(draftAlertSettings = draft.alertSettings, onUpdateAlertSettings = { onEvent(UiEvent.UpdateDraftAlertSettings(it)) }, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
                 SubSettings.SOUND -> AlarmSoundOverlay(draftAlertSettings = draft.alertSettings, selectedSirenType = settingsState.selectedSirenType, isSirenPlaying = isSirenPlaying, onUpdateAlertSettings = { onEvent(UiEvent.UpdateDraftAlertSettings(it)) }, onUpdateSirenType = { onEvent(UiEvent.SetSirenType(it)) }, onUpdateAlarmVolume = { onEvent(UiEvent.UpdateDraftAlarmVolume(it)) }, onTestSiren = { onEvent(UiEvent.ToggleTestSiren) }, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
                 else -> {}
@@ -167,14 +154,14 @@ fun SettingsOverlay(
 }
 
 @Composable
-fun CleanSetupOverlay(onClear: (() -> Unit)?, onReset: (() -> Unit)?, onFullInitialization: () -> Unit, onClose: () -> Unit) {
+fun CleanSetupOverlay(onEvent: (UiEvent) -> Unit) {
     Surface(modifier = Modifier.fillMaxSize(), color = Slate900) {
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.clean_init_title), color = Rose500, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.clean_init_title), color = Rose500, fontSize = 22.sp, fontWeight = FontWeight.Bold); IconButton(onClick = { onEvent(UiEvent.SetSubSettings(null)) }) { Icon(Icons.Default.Close, null, tint = Color.White) } }
             Spacer(Modifier.height(16.dp)); SettingsGroupHeader(stringResource(R.string.clean_group_maintenance), Rose500)
-            if (onClear != null) { Button(onClick = { onClear(); onClose() }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteForever, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clear_home), fontSize = 13.sp) }; Spacer(Modifier.height(16.dp)) }
-            if (onReset != null) { Button(onClick = { onReset(); onClose() }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.History, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_reset_stats), fontSize = 13.sp) }; Spacer(Modifier.height(16.dp)) }
-            Button(onClick = { onFullInitialization(); onClose() }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500.copy(alpha = 0.8f))) { Icon(Icons.Default.Warning, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_full_init), fontSize = 13.sp) }; Spacer(Modifier.weight(1f))
+            Button(onClick = { onEvent(UiEvent.ClearHomePoints); onEvent(UiEvent.SetSubSettings(null)) }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteForever, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clear_home), fontSize = 13.sp) }; Spacer(Modifier.height(16.dp))
+            Button(onClick = { onEvent(UiEvent.ResetStats); onEvent(UiEvent.SetSubSettings(null)) }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.History, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_reset_stats), fontSize = 13.sp) }; Spacer(Modifier.height(16.dp))
+            Button(onClick = { onEvent(UiEvent.TriggerFullInitialization); onEvent(UiEvent.SetSubSettings(null)) }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500.copy(alpha = 0.8f))) { Icon(Icons.Default.Warning, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_full_init), fontSize = 13.sp) }; Spacer(Modifier.weight(1f))
         }
     }
 }
@@ -183,7 +170,7 @@ fun CleanSetupOverlay(onClear: (() -> Unit)?, onReset: (() -> Unit)?, onFullInit
 fun AlertManagementOverlay(draftAlertSettings: AlertSettings, onUpdateAlertSettings: (AlertSettings) -> Unit, onClose: () -> Unit) {
     Surface(modifier = Modifier.fillMaxSize(), color = Slate900) {
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.alert_mgmt_title), color = ViewerCyan, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.alert_mgmt_title), color = ViewerCyan, fontSize = 22.sp, fontWeight = FontWeight.Bold); IconButton(onClick = onClose) { Icon(Icons.Default.Close, null, tint = Color.White) } }
             Spacer(Modifier.height(16.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.alert_group_toggles), color = Color.White.copy(alpha = 0.6f), fontSize = 14.sp); Row(horizontalArrangement = Arrangement.spacedBy(1.dp)) { TextButton(onClick = { onUpdateAlertSettings(draftAlertSettings.copy(localInternet = true, serverConnection = true, relayConnection = true, jammerDetection = true, signalLoss = true, gpsStalling = true, distance = true, power = true, lowBattery = true, batteryHealth = true, highTemperature = true, longTimeGap = true, tamperAlert = true, tiltAlert = true, acousticAlert = true, liftAlert = true, systemStorageLow = true)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_all_on), fontSize = 7.5.sp, color = BrandJd) }; TextButton(onClick = { onUpdateAlertSettings(draftAlertSettings.copy(localInternet = false, serverConnection = false, relayConnection = false, jammerDetection = false, signalLoss = false, gpsStalling = false, distance = false, power = false, lowBattery = false, batteryHealth = false, highTemperature = false, longTimeGap = false, tamperAlert = false, tiltAlert = false, acousticAlert = false, liftAlert = false, systemStorageLow = false)) }, contentPadding = PaddingValues(horizontal = 2.dp)) { Text(stringResource(R.string.btn_reset), fontSize = 7.5.sp, color = Rose500) } } }
             
             Spacer(Modifier.height(8.dp)); SettingsGroupHeader(stringResource(R.string.alert_group_master), BrandJd)
@@ -248,7 +235,7 @@ fun AlarmSoundOverlay(draftAlertSettings: AlertSettings, selectedSirenType: Stri
     val sirenOptions = listOf("Siren", "Chimes", "Pulse")
     Surface(modifier = Modifier.fillMaxSize(), color = Slate900) {
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.sound_title), color = Violet500, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.sound_title), color = Violet500, fontSize = 22.sp, fontWeight = FontWeight.Bold); IconButton(onClick = onClose) { Icon(Icons.Default.Close, null, tint = Color.White) } }
             Spacer(Modifier.height(24.dp)); Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) { Text(stringResource(R.string.sound_label_test_audio), color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Medium); Button(onClick = onTestSiren, colors = ButtonDefaults.buttonColors(containerColor = BrandJd)) { Icon(if (isSirenPlaying) Icons.Default.Stop else Icons.Default.PlayArrow, null); Spacer(Modifier.width(8.dp)); Text(if (isSirenPlaying) stringResource(R.string.btn_test_audio_stop) else stringResource(R.string.btn_test_audio_test)) } }
             Spacer(Modifier.height(24.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_type), Amber500); Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) { sirenOptions.forEach { type -> FilterChip(selected = selectedSirenType == type, onClick = { onUpdateSirenType(type) }, label = { Text(type) }) } }
             Spacer(Modifier.height(24.dp)); SettingsGroupHeader(stringResource(R.string.sound_group_behaviors), ViewerCyan)
@@ -265,12 +252,7 @@ fun AlarmSoundOverlay(draftAlertSettings: AlertSettings, selectedSirenType: Stri
 @Composable
 fun PhoneSetupOverlay(
     stateProvider: UiStateProvider,
-    onClose: () -> Unit, onWhitelist: () -> Unit, onOverlay: () -> Unit, onAppInfo: () -> Unit, 
-    onExactAlarm: () -> Unit, onHardwarePermission: () -> Unit, onRefresh: () -> Unit, 
-    onToggleManualOverride: () -> Unit = {},
-    onTestAlarm: () -> Unit,
-    onNavigateToDiagnostics: () -> Unit = {},
-    onGoToMap: () -> Unit = {}
+    onEvent: (UiEvent) -> Unit
 ) {
     val sessionState by stateProvider.session.collectAsStateWithLifecycle()
     val spatialState by stateProvider.spatial.collectAsStateWithLifecycle()
@@ -316,36 +298,36 @@ fun PhoneSetupOverlay(
                     
                     if (visibleCount >= 1) {
                         val preciseReason = if (permissions.isSamsungDevice) "Precise Location: REQUIRED for A15 GNSS. Open App Info -> Permissions -> Location -> Toggle 'Use precise location' ON." else "Precise Location: Permission NOT granted"
-                        Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step0_title), stringResource(R.string.setup_step0_desc), onAppInfo, stringResource(R.string.btn_app_info), permissions.isFineLocationGranted, Icons.Default.MyLocation, reason = if (!permissions.isFineLocationGranted) preciseReason else null)
+                        Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step0_title), stringResource(R.string.setup_step0_desc), { onEvent(UiEvent.RequestAppInfo) }, stringResource(R.string.btn_app_info), permissions.isFineLocationGranted, Icons.Default.MyLocation, reason = if (!permissions.isFineLocationGranted) preciseReason else null)
                     }
                     
                     if (visibleCount >= 2) {
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step1_title), recentsLockDesc, {}, stringResource(R.string.setup_info_only), if (permissions.requiresWakeLockRenewal) true else null, Icons.Default.Lock)
                         val batteryReason = if (permissions.isSamsungDevice) "Battery Optimization: Unrestricted mode NOT active. Open App Info -> Battery -> Select 'Unrestricted'." else "Battery Optimization: Unrestricted mode NOT active"
-                        Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step2_title), batteryOptDesc, onWhitelist, stringResource(R.string.btn_open_settings), permissions.isBatteryWhitelisted, Icons.Default.BatteryChargingFull, reason = if (!permissions.isBatteryWhitelisted) batteryReason else null)
+                        Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step2_title), batteryOptDesc, { onEvent(UiEvent.RequestBatteryExemption) }, stringResource(R.string.btn_open_settings), permissions.isBatteryWhitelisted, Icons.Default.BatteryChargingFull, reason = if (!permissions.isBatteryWhitelisted) batteryReason else null)
                     }
                     
                     if (visibleCount >= 3) {
-                        Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step3_title), stringResource(R.string.setup_step3_desc), onOverlay, stringResource(R.string.btn_authorize), permissions.isOverlayGranted, Icons.Default.Layers, reason = if (!permissions.isOverlayGranted) "Appear on Top: Permission NOT granted" else null)
-                        Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step4_title), stringResource(R.string.setup_step4_desc), onAppInfo, stringResource(R.string.btn_app_info), permissions.isMicrophoneGranted, Icons.Default.Mic, reason = if (!permissions.isMicrophoneGranted) "Microphone: Permission NOT granted" else null)
+                        Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step3_title), stringResource(R.string.setup_step3_desc), { onEvent(UiEvent.RequestOverlayPermission) }, stringResource(R.string.btn_authorize), permissions.isOverlayGranted, Icons.Default.Layers, reason = if (!permissions.isOverlayGranted) "Appear on Top: Permission NOT granted" else null)
+                        Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step4_title), stringResource(R.string.setup_step4_desc), { onEvent(UiEvent.RequestAppInfo) }, stringResource(R.string.btn_app_info), permissions.isMicrophoneGranted, Icons.Default.Mic, reason = if (!permissions.isMicrophoneGranted) "Microphone: Permission NOT granted" else null)
                     }
 
                     if (visibleCount >= 4) {
-                        Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step5_title), description = autoStartDesc, onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isAutoStartGranted, icon = Icons.Default.PlayCircle, reason = if (!permissions.isAutoStartGranted) "Manual verification required: Ensure 'Unrestricted' battery mode and 'Background activity' are allowed in system settings." else null)
+                        Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step5_title), description = autoStartDesc, onClick = { onEvent(UiEvent.RequestAppInfo) }, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isAutoStartGranted, icon = Icons.Default.PlayCircle, reason = if (!permissions.isAutoStartGranted) "Manual verification required: Ensure 'Unrestricted' battery mode and 'Background activity' are allowed in system settings." else null)
                         Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step6_title), stringResource(R.string.setup_step6_desc), {}, stringResource(R.string.setup_info_only), null, Icons.Default.Wifi)
                     }
 
                     if (visibleCount >= 5) {
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step7_title), stringResource(R.string.setup_step7_desc), onExactAlarm, stringResource(R.string.btn_authorize), permissions.isExactAlarmGranted, Icons.Default.Alarm, reason = if (!permissions.isExactAlarmGranted) "Exact Alarms: Permission NOT granted" else null) }
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { Spacer(Modifier.height(16.dp)); GuideSection(stringResource(R.string.setup_step7_title), stringResource(R.string.setup_step7_desc), { onEvent(UiEvent.RequestExactAlarm) }, stringResource(R.string.btn_authorize), permissions.isExactAlarmGranted, Icons.Default.Alarm, reason = if (!permissions.isExactAlarmGranted) "Exact Alarms: Permission NOT granted" else null) }
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            Spacer(Modifier.height(16.dp)); GuideSection(title = "Notification Alerts", description = "Required to show status and critical alerts in the notification shade.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isPostNotificationsGranted, icon = Icons.Default.Notifications, reason = if (!permissions.isPostNotificationsGranted) "Notifications: Permission NOT granted" else null)
+                            Spacer(Modifier.height(16.dp)); GuideSection(title = "Notification Alerts", description = "Required to show status and critical alerts in the notification shade.", onClick = { onEvent(UiEvent.RequestAppInfo) }, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isPostNotificationsGranted, icon = Icons.Default.Notifications, reason = if (!permissions.isPostNotificationsGranted) "Notifications: Permission NOT granted" else null)
                         }
                     }
 
                     if (visibleCount >= 6) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                            Spacer(Modifier.height(16.dp)); GuideSection(title = "Background Location", description = "Allows tracking and geofencing to work while the screen is off or app is in background.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBackgroundLocationGranted, icon = Icons.Default.LocationOn, reason = if (!permissions.isBackgroundLocationGranted) "Background Location: Set to 'Allow all the time' in system settings" else null)
-                            Spacer(Modifier.height(16.dp)); GuideSection(title = "Physical Activity", description = "Required for Step Detector and stay-alive pulsing to stabilize background performance.", onClick = onAppInfo, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isActivityRecognitionGranted, icon = Icons.AutoMirrored.Filled.DirectionsRun, reason = if (!permissions.isActivityRecognitionGranted) "Physical Activity: Permission NOT granted" else null)
+                            Spacer(Modifier.height(16.dp)); GuideSection(title = "Background Location", description = "Allows tracking and geofencing to work while the screen is off or app is in background.", onClick = { onEvent(UiEvent.RequestAppInfo) }, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBackgroundLocationGranted, icon = Icons.Default.LocationOn, reason = if (!permissions.isBackgroundLocationGranted) "Background Location: Set to 'Allow all the time' in system settings" else null)
+                            Spacer(Modifier.height(16.dp)); GuideSection(title = "Physical Activity", description = "Required for Step Detector and stay-alive pulsing to stabilize background performance.", onClick = { onEvent(UiEvent.RequestAppInfo) }, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isActivityRecognitionGranted, icon = Icons.AutoMirrored.Filled.DirectionsRun, reason = if (!permissions.isActivityRecognitionGranted) "Physical Activity: Permission NOT granted" else null)
                         }
                     }
 
@@ -359,33 +341,33 @@ fun PhoneSetupOverlay(
                             }
                             GuideSection(
                                 title = "Background Service Lock", description = "Required to ensure the tracking service remains active on this hardware.", 
-                                onClick = onHardwarePermission, buttonText = stringResource(R.string.btn_miui_permissions), 
+                                onClick = { onEvent(UiEvent.RequestHardwarePermission) }, buttonText = stringResource(R.string.btn_miui_permissions), 
                                 isCompleted = isCompleted, icon = Icons.Default.Security, 
                                 reason = if (permissions.backgroundStatus == CapabilityStatus.DENIED) "Hardware Policy: Required for Lock Screen alerts" else if (permissions.backgroundStatus == CapabilityStatus.UNKNOWN && !permissions.isManualOverride) "Hardware Policy: Automatic verification failed. Please check manually." else null
                             )
                             if (permissions.backgroundStatus == CapabilityStatus.UNKNOWN) {
                                 Spacer(Modifier.height(4.dp))
                                 Row(modifier = Modifier.padding(start = 28.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Checkbox(checked = permissions.isManualOverride, onCheckedChange = { onToggleManualOverride() })
+                                    Checkbox(checked = permissions.isManualOverride, onCheckedChange = { onEvent(UiEvent.ToggleXiaomiManualOverride) })
                                     Text("Manually verified (Status detection failed)", color = Color.White, fontSize = 11.sp)
                                 }
                             }
                         }
-                        if (!isTrackerMode) { Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step9_title), description = stringResource(R.string.setup_step9_desc), onClick = onGoToMap, buttonText = stringResource(R.string.btn_open_map), isCompleted = homePointsCount > 0, icon = Icons.Default.Map, reason = if (homePointsCount == 0) "Geofence: No Home Points defined" else null) }
+                        if (!isTrackerMode) { Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step9_title), description = stringResource(R.string.setup_step9_desc), onClick = { onEvent(UiEvent.TogglePhoneSetup(false)); onEvent(UiEvent.ToggleMap(true)) }, buttonText = stringResource(R.string.btn_open_map), isCompleted = homePointsCount > 0, icon = Icons.Default.Map, reason = if (homePointsCount == 0) "Geofence: No Home Points defined" else null) }
                     }
 
                     if (visibleCount >= 8) {
                         Spacer(Modifier.height(16.dp))
-                        Button(onClick = onNavigateToDiagnostics, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Slate700)) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_view_diagnostics), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                        Button(onClick = { onEvent(UiEvent.TogglePhoneSetup(false)); onEvent(UiEvent.NavigateToDiagnostics(true)) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Slate700)) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_view_diagnostics), fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                         Spacer(Modifier.height(16.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = onRefresh, modifier = Modifier.weight(1f).heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh), fontSize = 13.sp) }
-                            Button(onClick = onTestAlarm, modifier = Modifier.weight(1f).heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm), fontSize = 13.sp) }
+                            Button(onClick = { onEvent(UiEvent.RefreshPermissionStatus) }, modifier = Modifier.weight(1f).heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh), fontSize = 13.sp) }
+                            Button(onClick = { onEvent(UiEvent.RequestTestAlarm) }, modifier = Modifier.weight(1f).heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm), fontSize = 13.sp) }
                         }
                         
                         if (isSetupBypassActive) {
                             Spacer(Modifier.height(16.dp))
-                            Button(onClick = onClose, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.Green.copy(alpha = 0.6f))) { Icon(Icons.Default.Close, null); Spacer(Modifier.width(8.dp)); Text("DISMISS (BYPASS ACTIVE)", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                            Button(onClick = { onEvent(UiEvent.TogglePhoneSetup(false)) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Color.Green.copy(alpha = 0.6f))) { Icon(Icons.Default.Close, null); Spacer(Modifier.width(8.dp)); Text("DISMISS (BYPASS ACTIVE)", fontWeight = FontWeight.Bold, fontSize = 13.sp) }
                         }
                         Spacer(Modifier.height(88.dp)) 
                     }

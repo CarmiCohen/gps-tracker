@@ -20,7 +20,6 @@ data class KineticState(
     var isJump: Boolean = false,
     var isTrajectoryPromoted: Boolean = false,
     var jumpTier: Int = 0,
-    var isAdaptiveJump: Boolean = false,
     var verticalVelocity: Double = 0.0,
     var kineticEnergy: Double = 0.0,
     var distToTracker: Double? = null,
@@ -32,7 +31,7 @@ data class KineticState(
         this.accuracy = other.accuracy; this.maxAccuracy = other.maxAccuracy; this.bearing = other.bearing
         this.gpsTs = other.gpsTs; this.rt = other.rt; this.isJump = other.isJump
         this.isTrajectoryPromoted = other.isTrajectoryPromoted; this.jumpTier = other.jumpTier
-        this.isAdaptiveJump = other.isAdaptiveJump; this.verticalVelocity = other.verticalVelocity
+        this.verticalVelocity = other.verticalVelocity
         this.kineticEnergy = other.kineticEnergy; this.distToTracker = other.distToTracker
         this.distToHome = other.distToHome
         this.activityType = other.activityType
@@ -41,7 +40,7 @@ data class KineticState(
     fun reset() {
         lat = 0.0; lng = 0.0; alt = 0.0; speed = 0.0; accuracy = 0.0; maxAccuracy = 0.0; bearing = 0.0
         gpsTs = 0L; rt = 0L; isJump = false; isTrajectoryPromoted = false; jumpTier = 0
-        isAdaptiveJump = false; verticalVelocity = 0.0; kineticEnergy = 0.0
+        verticalVelocity = 0.0; kineticEnergy = 0.0
         distToTracker = null; distToHome = null; activityType = ActivityType.UNKNOWN
     }
 }
@@ -262,12 +261,11 @@ data class IntegrityState(
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
+ * Oct.13.30:
+ * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
  * Oct.7.10:
  * - Issue #SIMP-1010-3: SNR Decay Modeling. Added isJammingCandidate delegate 
  *   to ForensicSnapshot.
- * Oct.7.9:
- * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Added 
- *   stationaryDuration delegate to AtmosphericState.
  */
 @Serializable
 data class LocationUpdate(
@@ -668,9 +666,6 @@ data class LocationUpdate(
     var jumpTier: Int 
         get() = kinetic.jumpTier
         set(value) { kinetic.jumpTier = value }
-    var isAdaptiveJump: Boolean
-        get() = kinetic.isAdaptiveJump
-        set(value) { kinetic.isAdaptiveJump = value }
 
     override var trackerId: String 
         get() = deviceId
@@ -801,7 +796,7 @@ data class LocationUpdate(
         put("sit_vz", sitVz); put("sit_vz_ts", integrity.sitVzTs); put("sit_vz_rt", integrity.sitVzRt)
         put("sit_dz", sitDz); put("sit_baro", sitBaro); put("sit_tilt", sitTilt); put("sit_shock", sitShock)
         put("vertical_velocity", verticalVelocity); put("kinetic_energy", kineticEnergy)
-        put("is_adaptive_jump", isAdaptiveJump); put("is_battery_low", isBatteryLow)
+        put("is_battery_low", isBatteryLow)
         put("is_battery_critical", isBatteryCritical); put("is_silent_failure", isSilentFailure)
         put("is_battery_whitelisted", isBatteryWhitelisted)
         put("is_ultra_long_stationary", isUltraLongStationary)
@@ -842,7 +837,7 @@ data class LocationUpdate(
         put("stationary_duration_ms", stationaryDuration)
 
         // Oct.7.10 Jammer Discrimination
-        put("is_jamming_candidate", isJammingCandidate)
+        put("is_jammingCandidate", isJammingCandidate)
     }
 
     companion object {

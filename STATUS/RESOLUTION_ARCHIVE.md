@@ -1,20 +1,17 @@
 # Resolution Archive
 
-## [Oct13.20] - Signaling Hardening & API Modernization
-**Issue ID**: #ISSUE-OCT13.20-H1 (Signaling), #ISSUE-OCT13.20-M1 (Manifest), #ISSUE-OCT13.20-M2 (Deprecations)
+## [Oct10.3] - Dead Code & Hygiene Cleanup
+**Issue ID**: #ISSUE-OCT13.20-L1
 **Status**: RESOLVED
-**Description**: Hardened signaling dispatcher lifecycle management and migrated legacy Android/Compose APIs to modern equivalents.
+**Description**: Comprehensive cleanup of unused parameters, variables, and redundant logic across UI, Engine, and Infrastructure layers.
 **Root Cause**: 
-- **Delicate API Usage**: `SmartSignalingDispatcher` relied on delicate channel states (`isClosedForSend/Receive`) which are error-prone for lifecycle management.
-- **Legacy Manifest**: `extractNativeLibs` was manually specified, causing AGP warnings.
-- **API Rot**: Multiple UI and System APIs (Icons, Vibrator, Lifecycle) reached deprecation status.
+- **Refactor Leftovers**: Parameters in `ViewerScreen` and `TrackerScreen` became redundant after the `UnifiedHUDOverlay` migration.
+- **Engine Evolution**: Local variables in `LocationProcessor` and `LocationSentinel` were no longer needed following recent architectural shifts.
+- **Redundant Casts**: Legacy type assertions in `MapOverlayManager` remained after icon pooling optimizations.
 **Remediation**:
-- **Managed Lifecycle**: Replaced delicate state checks in `SmartSignalingDispatcher` with explicit `Job` tracking and `ClosedReceiveChannelException` handling.
-- **Manifest Cleanup**: Removed `android:extractNativeLibs` from `AndroidManifest.xml`.
-- **API Migration**:
-    - Migrated `VIBRATOR_SERVICE` to `VibratorManager` (API 31+).
-    - Migrated `ArrowBack`, `List`, and `VolumeUp` icons to `AutoMirrored` versions.
-    - Moved `LocalLifecycleOwner` to `androidx.lifecycle.compose`.
+- **Signature Pruning**: Slimmed down UI composable signatures to use centralized event handlers.
+- **Engine Cleanup**: Pruned unused state trackers and retired obsolete constants.
+- **Logic Correction**: Fixed acoustic lockout constant mismatch in `LocationSentinel`.
 
-## [Oct13.8] - Pruning Scheduler & UI Staleness Hardening
+## [Oct13.20] - Signaling Hardening & API Modernization
 ... (Rest of file preserved)

@@ -6,14 +6,11 @@ import kotlinx.coroutines.flow.StateFlow
 import org.osmdroid.util.GeoPoint
 
 /**
- * MainUiState: Composite UI state partitioned into specialized slices to 
- * minimize recomposition costs and isolate volatile triggers (Issue #1166).
- * Oct.6.20:
- * - Issue #SIGN-1006-12: SignalingPipeline Abstraction. Updated DiagnosticState 
- *   to use SignalingPipeline.Metrics for radio efficiency tracking.
- * Oct.6.7:
- * - Issue #AUDIT-1006-8: Signaling Stability & Conflation Metrics. Added 
- *   SignalingMetrics to DiagnosticState to expose radio efficiency (R-ID 511).
+ * MainUiState: Composite UI state partitioned into specialized slices.
+ * Oct.13.21:
+ * - SIMP-OCT13.21-S1: Pure Event Architecture. Flattened all specialized 
+ *   lambdas into UiEvent bus, including FullInitialization, PhoneSetup, 
+ *   and individual Permission/Setting requests.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -22,7 +19,6 @@ data class MainUiState(
     val navigation: NavigationState = NavigationState(isMapVisible = true),
     val simulation: SimulationUiState = SimulationUiState()
 ) {
-    // Top-level property accessors for backward compatibility
     val isInitialized: Boolean get() = session.isInitialized
     val hydrationLevel: Int get() = session.hydrationLevel
     val appMode: String? get() = session.appMode
@@ -63,10 +59,6 @@ data class MainUiState(
     val systemIssuesCount: Int get() = session.systemIssuesCount(spatial.homePoints.size)
 }
 
-/**
- * UiStateProvider: SIMP-1426-3 unified flow container to reduce boilerplate 
- * in leaf component signatures.
- */
 interface UiStateProvider {
     val session: StateFlow<SessionUiState>
     val settings: StateFlow<SettingsUiState>
@@ -98,10 +90,6 @@ interface UiStateProvider {
     val activeGnssDetail: StateFlow<GnssDetail?>
 }
 
-/**
- * SimpleUiStateProvider: A concrete implementation of [UiStateProvider] used in 
- * contexts where a full ViewModel is unavailable (e.g., Background Services).
- */
 class SimpleUiStateProvider(
     override val session: StateFlow<SessionUiState>,
     override val settings: StateFlow<SettingsUiState> = MutableStateFlow(SettingsUiState()),
@@ -133,9 +121,6 @@ class SimpleUiStateProvider(
     override val activeGnssDetail: StateFlow<GnssDetail?> = MutableStateFlow(null)
 ) : UiStateProvider
 
-/**
- * SessionUiState: Core application lifecycle and permission states.
- */
 data class SessionUiState(
     val isInitialized: Boolean = false,
     val hydrationLevel: Int = 0,
@@ -190,9 +175,6 @@ data class SessionUiState(
     }
 }
 
-/**
- * SettingsUiState: Persistent identity and configuration parameters.
- */
 data class SettingsUiState(
     val deviceId: String = MainRepository.DEFAULT_TRACKER_ID,
     val viewerId: String = MainRepository.DEFAULT_VIEWER_ID,
@@ -205,9 +187,6 @@ data class SettingsUiState(
     val draftSettings: DraftSettings = DraftSettings()
 )
 
-/**
- * SpatialUiState: Geofencing and map behavior state.
- */
 data class SpatialUiState(
     val homePoints: List<GeoPoint> = emptyList(),
     val geofenceMode: GeofenceMode = GeofenceMode.IDLE,
@@ -237,9 +216,6 @@ data class SimulationUiState(
     val simulatedMemoryLevel: MemoryPressureLevel = MemoryPressureLevel.NORMAL
 )
 
-/**
- * MapViewState: Partitioned state for AppMapContainer (R-ID 287).
- */
 data class MapViewState(
     val appMode: String? = null,
     val hydrationLevel: Int = 0,
@@ -571,6 +547,19 @@ sealed class UiEvent {
     object RefreshNavigation : UiEvent()
     data class InitiateMode(val mode: String) : UiEvent()
     data class ConfirmBackgroundDisclosure(val confirmed: Boolean, val mode: String) : UiEvent()
+    
+    // Oct.13.21: Data Management & Permission Events
+    object ExportTrails : UiEvent()
+    object ImportTrails : UiEvent()
+    object ExportLogs : UiEvent()
+    object ImportConfig : UiEvent()
+    object TriggerFullInitialization : UiEvent()
+    object ShowPhoneSetup : UiEvent()
+    object RequestBatteryExemption : UiEvent()
+    object RequestOverlayPermission : UiEvent()
+    object RequestAppInfo : UiEvent()
+    object RequestExactAlarm : UiEvent()
+    object RequestHardwarePermission : UiEvent()
 }
 
 sealed class UiEffect {
@@ -581,6 +570,18 @@ sealed class UiEffect {
     data class RequestPermissions(val permissions: List<String>, val mode: String) : UiEffect()
     data class ShowToast(val message: String) : UiEffect()
     data class ShowBackgroundDisclosure(val mode: String) : UiEffect()
+    
+    // Oct.13.21: Direct File/System Actions
+    object LaunchTrailExport : UiEffect()
+    object LaunchTrailImport : UiEffect()
+    object LaunchLogExport : UiEffect()
+    object LaunchConfigImport : UiEffect()
+    object LaunchFullInitialization : UiEffect()
+    object LaunchBatteryExemption : UiEffect()
+    object LaunchOverlayPermission : UiEffect()
+    object LaunchAppInfo : UiEffect()
+    object LaunchExactAlarm : UiEffect()
+    object LaunchHardwarePermission : UiEffect()
 }
 
 sealed class UiCommand {

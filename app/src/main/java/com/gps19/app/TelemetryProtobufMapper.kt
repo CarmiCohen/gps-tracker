@@ -5,12 +5,11 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.13.30:
+ * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
  * Oct.7.7:
  * - Issue #SIMP-1007-16: Flag Propagation. Integrated isSuspiciousNoise and 
  *   isMemoryPressureThrottled into all serialization paths (Realtime & Persistence).
- * Oct.7.5:
- * - Issue #SIMP-1007-15: Unified Snapshot Container. Ensured snr and vibe 
- *   snapshots are included in ConnectionPoint persistence mapping.
  */
 object TelemetryProtobufMapper {
 
@@ -131,7 +130,6 @@ object TelemetryProtobufMapper {
         builder.setKineticEnergy(PhysicsUtils.safeDouble(status.kineticEnergy))
         builder.setSitVzTs(status.integrity.sitVzTs)
         builder.setSitVzRt(status.integrity.sitVzRt)
-        builder.setIsAdaptiveJump(status.isAdaptiveJump)
         builder.setIsBatteryLow(status.isBatteryLow)
         builder.setIsBatteryCritical(status.isBatteryCritical)
         builder.setIsSilentFailure(status.isSilentFailure)
@@ -258,7 +256,6 @@ object TelemetryProtobufMapper {
         builder.setKineticEnergy(PhysicsUtils.safeDouble(status.kineticEnergy))
         builder.setSitVzTs(status.integrity.sitVzTs)
         builder.setSitVzRt(status.integrity.sitVzRt)
-        builder.setIsAdaptiveJump(status.isAdaptiveJump)
         builder.setIsBatteryLow(status.isBatteryLow)
         builder.setIsBatteryCritical(status.isBatteryCritical)
         builder.setIsSilentFailure(status.isSilentFailure)

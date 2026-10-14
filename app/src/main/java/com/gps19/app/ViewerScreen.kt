@@ -17,33 +17,20 @@ import com.gps19.core.engine.*
 
 /**
  * ViewerScreen: Viewer-mode UI.
- * Oct.13.1:
- * - SIMP-OCT12.16-S1: Unified HUD Overlay. Integrated UnifiedHUDOverlay and 
- *   removed redundant overlay calls to prevent Z-order collisions.
+ * Oct.13.21:
+ * - SIMP-OCT13.21-S1: Pure Event UI. Finalized removal of onSaveTrail and 
+ *   onLoadTrail lambdas from signature.
  */
 
 @Composable
 fun ViewerScreen(
     stateProvider: UiStateProvider,
-    onToggleMap: () -> Unit,
-    onToggleLog: () -> Unit,
-    onToggleSettings: () -> Unit,
-    onExit: () -> Unit,
-    onImportConfig: () -> Unit,
-    onExportLogs: () -> Unit,
-    onClearLogs: () -> Unit,
-    onMainEvent: (UiEvent) -> Unit,
-    onFullInitialization: () -> Unit,
-    onResetStats: () -> Unit = {},
-    onClearHome: () -> Unit = {},
-    onSaveTrail: () -> Unit = {},
-    onLoadTrail: () -> Unit = {}
+    onMainEvent: (UiEvent) -> Unit
 ) {
     val session by stateProvider.session.collectAsStateWithLifecycle()
     val nav by stateProvider.navigation.collectAsStateWithLifecycle()
 
     val isMapVisible = nav.isMapVisible
-    val isAnyOverlayOpen = nav.isSettingsOpen || nav.isLogVisible || nav.isRibbonsVisible || nav.isGnssDetailVisible
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -55,7 +42,7 @@ fun ViewerScreen(
                     Column(modifier = Modifier.weight(1f).navigationBarsPadding()) {
                         Box(modifier = Modifier.weight(1f)) {
                             if (session.hydrationLevel >= 6 && isMapVisible) {
-                                AppMapContainer(stateProvider = stateProvider, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail)
+                                AppMapContainer(stateProvider = stateProvider)
                             } else if (session.hydrationLevel >= 4 && !isMapVisible) {
                                 ViewerDashboard(stateProvider = stateProvider, isDashboardExpanded = nav.isDashboardExpanded, onEvent = { onMainEvent(it) })
                             }
@@ -64,7 +51,7 @@ fun ViewerScreen(
                 }
             } else {
                 if (session.hydrationLevel >= 6 && isMapVisible) {
-                    AppMapContainer(stateProvider = stateProvider, onSaveTrail = onSaveTrail, onLoadTrail = onLoadTrail)
+                    AppMapContainer(stateProvider = stateProvider)
                 }
                 Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
                     Spacer(Modifier.height(82.dp)) // Reserve space for Unified HUD
@@ -77,9 +64,7 @@ fun ViewerScreen(
             // Unified HUD Overlay
             UnifiedHUDOverlay(
                 stateProvider = stateProvider,
-                onMainEvent = onMainEvent,
-                onSaveTrail = onSaveTrail,
-                onLoadTrail = onLoadTrail
+                onMainEvent = onMainEvent
             )
         }
     }

@@ -238,7 +238,7 @@ class MapOverlayManager(
                     polygons.add(poly)
 
                     val marker = if (idx < homeMarkerPool.size) homeMarkerPool[idx] else Marker(mapView).also { m -> m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER); m.setInfoWindow(null); homeMarkerPool.add(m) }
-                    marker.position = p; marker.icon = homeIcons.getOrPut(idx + 1) { createHomeBitmap(density, idx + 1).toDrawable(resources) as BitmapDrawable }
+                    marker.position = p; marker.icon = homeIcons.getOrPut(idx + 1) { createHomeBitmap(density, idx + 1).toDrawable(resources) }
                     marker.setOnMarkerClickListener { mk, mv -> 
                         if (!isTrackerMode && geofenceMode == GeofenceMode.REMOVE) { 
                             mv.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)

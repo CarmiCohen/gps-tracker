@@ -2,20 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
- * Oct.12.8:
- * - Issue #ISSUE-OCT12.13-1: Increased VIEWER_SIGNAL_LOSS_THRESHOLD_MS to 90s to 
- *   safely accommodate the 45s Screen-Off polling interval and network jitter.
- * Oct.11.21:
- * - Issue #SIMP-OCT12.17-S1: Periodic GPS Re-Zeroing constants.
- * Oct.12.17:
- * - ISSUE-OCT12.13-1: Increased UI staleness thresholds to 60s to safely 
- *   accommodate the 45s Screen-Off polling interval and prevent false RED LEDs.
- * - ISSUE-OCT12.13-3: Added GPS_LOCK_RECOVERY_DELAY_MS for automatic recovery.
- * - ISSUE-OCT12.13-4: Added GPS_REGISTRATION_DEBOUNCE_MS to mitigate chip flutter.
- * - Typo Fix: Corrected GPS_INDEX_AGE_EXCELLENT_SEC spelling.
- * Oct.12.3:
- * - Issue #SIMP-1012-3: Forensic Integrity. Restored missing thresholds 
- *   required for LogRepository and TrackerStateManager.
+ * Oct.13.21:
+ * - ISSUE-OCT13.21-H1: Restored JUMP_HOLD_DURATION_MS and GPS_INDEX_AGE_SCALING 
+ *   required by engine logic.
+ * - ISSUE-OCT13.20-L1: Dead Code Cleanup. Pruned 4 obsolete constants.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -507,8 +497,6 @@ const val LOG_MUZZLE_STARTUP_MS = 60000L
 const val MALI_ANOMALY_SUSTAINED_THRESHOLD_MS = 30000L
 const val MALI_BRIDGE_LATENCY_THRESHOLD_MS = 150L
 const val MALI_BRIDGE_LATENCY_THRESHOLD_STAGGERED_MS = 250L
-
-const val FORENSIC_PINK_COLOR = 0xFFFF00FF.toInt()
 
 // Siren and Alarm UI
 const val SIREN_RESUME_COOLDOWN_MS = 30000L

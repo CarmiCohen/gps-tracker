@@ -18,21 +18,10 @@ import javax.inject.Singleton
 
 /**
  * IntegrityMonitor: Tracks hardware and network health.
+ * Oct.13.21:
+ * - ISSUE-OCT13.20-L1: Dead Code Cleanup. Removed unused vitality and internet check variables.
  * Oct.11.8:
- * - Issue #SIMP-1011-22: Performance Tier Alignment. Refined Mali anomaly 
- *   detection to use tiered JNI bridge thresholds (Standard: 150ms, 
- *   Staggered: 250ms) to reduce false positives on budget hardware.
- * Oct.11.4:
- * - Issue #SIMP-1011-18: Mali Correlation Refinement. Refined Mali anomaly 
- *   trigger to require sustained contention (30s) and increased bridge 
- *   threshold to 150ms to suppress transient jitter.
- * Oct.11.1:
- * - Issue #SIMP-1011-9: Field Stability Audit. Implemented forensic logging 
- *   of memory/storage hysteresis "gate hits" to audit jitter suppression.
- * - Issue #SIMP-1011-6: Mali Forensic Audit. Integrated JNI bridge latency 
- *   into Mali driver anomaly detection.
- * - Issue #SIMP-1011-4: Hysteresis Tuning. Applied staggered scaling to 
- *   Memory and Storage pressure hysteresis in both JNI and Legacy paths.
+ * - Issue #SIMP-1011-22: Performance Tier Alignment.
  */
 @Singleton
 class IntegrityMonitor @Inject constructor(
@@ -59,14 +48,9 @@ class IntegrityMonitor @Inject constructor(
     private val simulatedMemoryLevel = AtomicReference<MemoryPressureLevel>(MemoryPressureLevel.NORMAL)
 
     // Vitality Tracking
-    private var lastInternetUpdateRt = 0L
-    private var lastBatteryUpdateRt = 0L
     private var lastStorageUpdateRt = 0L
     private var lastPowerUpdateRt = 0L
     private var lastLocationStatusUpdateRt = 0L
-
-    private var lastInternetCheckRt = 0L
-    private val INTERNET_CHECK_TTL_MS = 5000L
     
     private var lastMemoryPressure = MemoryPressureLevel.NORMAL
     private val systemPressureBatch = SystemPressureBatch()
@@ -90,7 +74,6 @@ class IntegrityMonitor @Inject constructor(
             }
 
             systemStatusProvider.observeInternetStatus()
-                .onEach { lastInternetUpdateRt = timeProvider.elapsedRealtime }
                 .distinctUntilChanged()
                 .onEach { online -> 
                     updateHealth { it.isHardwareOnline = online } 
@@ -100,7 +83,6 @@ class IntegrityMonitor @Inject constructor(
 
         scope.launch {
             systemStatusProvider.observeBatteryStatus()
-                .onEach { lastBatteryUpdateRt = timeProvider.elapsedRealtime }
                 .distinctUntilChanged()
                 .onEach { status -> 
                     handleBatteryUpdate(status) 
@@ -819,11 +801,8 @@ class IntegrityMonitor @Inject constructor(
         lastPowerDisconnectTs = 0L
         batterySamples.clear()
         lastFullPollTs = 0L
-        lastInternetCheckRt = 0L
         
         // Issue #1142: Reset vitality timestamps to prevent spurious "Flow Stall" alerts.
-        lastInternetUpdateRt = 0L
-        lastBatteryUpdateRt = 0L
         lastStorageUpdateRt = 0L
         lastPowerUpdateRt = 0L
         lastLocationStatusUpdateRt = 0L

@@ -1,7 +1,6 @@
 package com.gps19.app
 
 import android.content.res.Configuration
-import androidx.activity.ComponentActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -20,18 +19,21 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Oct.13.21:
+ * - SIMP-OCT13.21-S1: Pure Event UI. Aligned signature with ViewerScreen to use 
+ *   UiStateProvider and onMainEvent bubbling.
  * Oct.13.1:
  * - SIMP-OCT12.16-S1: Unified HUD Overlay. Integrated UnifiedHUDOverlay and 
- *   removed redundant overlay calls to prevent Z-order collisions.
+ *   removed redundant overlay calls.
  */
 
 @Composable
 fun TrackerScreen(
-    activity: ComponentActivity,
-    viewModel: MainViewModel
+    stateProvider: UiStateProvider,
+    onMainEvent: (UiEvent) -> Unit
 ) {
-    val nav by viewModel.navigation.collectAsStateWithLifecycle()
-    val session by viewModel.session.collectAsStateWithLifecycle()
+    val nav by stateProvider.navigation.collectAsStateWithLifecycle()
+    val session by stateProvider.session.collectAsStateWithLifecycle()
 
     val isMapVisible = nav.isMapVisible
     val isAnyOverlayOpen = nav.isSettingsOpen || nav.isLogVisible || nav.isRibbonsVisible || nav.isGnssDetailVisible || nav.isPhoneSetupVisible
@@ -46,29 +48,29 @@ fun TrackerScreen(
                     Column(modifier = Modifier.weight(1f).navigationBarsPadding()) {
                         Box(modifier = Modifier.weight(1f)) {
                             if (session.hydrationLevel >= 4 && isMapVisible && !isAnyOverlayOpen) {
-                                AppMapContainer(stateProvider = viewModel)
+                                AppMapContainer(stateProvider = stateProvider)
                             } else if (session.hydrationLevel >= 2 && !isMapVisible) {
-                                TrackerDashboard(viewModel = viewModel)
+                                TrackerDashboard(stateProvider = stateProvider, onEvent = onMainEvent)
                             }
                         }
                     }
                 }
             } else {
                 if (session.hydrationLevel >= 4 && isMapVisible && !isAnyOverlayOpen) {
-                    AppMapContainer(stateProvider = viewModel)
+                    AppMapContainer(stateProvider = stateProvider)
                 }
                 Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
                     Spacer(Modifier.height(82.dp)) // Reserve space for Unified HUD
                     if (session.hydrationLevel >= 2 && !isMapVisible) {
-                        TrackerDashboard(viewModel = viewModel)
+                        TrackerDashboard(stateProvider = stateProvider, onEvent = onMainEvent)
                     }
                 }
             }
 
             // Unified HUD Overlay
             UnifiedHUDOverlay(
-                stateProvider = viewModel,
-                onMainEvent = { viewModel.onEvent(it) }
+                stateProvider = stateProvider,
+                onMainEvent = onMainEvent
             )
         }
     }
@@ -76,22 +78,24 @@ fun TrackerScreen(
 
 @Composable
 fun TrackerDashboard(
-    viewModel: MainViewModel
+    stateProvider: UiStateProvider,
+    onEvent: (UiEvent) -> Unit
 ) {
-    val dashboardState by viewModel.dashboardState.collectAsStateWithLifecycle()
-    val sessionState by viewModel.session.collectAsStateWithLifecycle()
-    val diagnosticState by viewModel.diagnostic.collectAsStateWithLifecycle()
-    val kinematicState by viewModel.kinematic.collectAsStateWithLifecycle()
-    val gpsIdx by viewModel.gpsIndexData.collectAsStateWithLifecycle()
-    val rttValue by viewModel.rtt.collectAsStateWithLifecycle()
-    val currentMaValue by viewModel.currentMa.collectAsStateWithLifecycle()
-    val systemPulse by viewModel.systemPulseRt.collectAsStateWithLifecycle()
+    val dashboardState by stateProvider.dashboardState.collectAsStateWithLifecycle()
+    val sessionState by stateProvider.session.collectAsStateWithLifecycle()
+    val diagnosticState by stateProvider.diagnostic.collectAsStateWithLifecycle()
+    val kinematicState by stateProvider.kinematic.collectAsStateWithLifecycle()
+    val gpsIdx by stateProvider.gpsIndexData.collectAsStateWithLifecycle()
+    val rttValue by stateProvider.rtt.collectAsStateWithLifecycle()
+    val currentMaValue by stateProvider.currentMa.collectAsStateWithLifecycle()
+    val systemPulse by stateProvider.systemPulseRt.collectAsStateWithLifecycle()
+    val navState by stateProvider.navigation.collectAsStateWithLifecycle()
 
     val appMode = sessionState.appMode ?: "tracker"
 
     LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         item {
-            if (viewModel.navigation.value.isDashboardExpanded) {
+            if (navState.isDashboardExpanded) {
                 if (appMode == "tracker") {
                     Spacer(Modifier.height(2.dp)); Icon(Icons.Default.Agriculture, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(40.dp)); Spacer(Modifier.height(4.dp))
                 }
@@ -109,11 +113,11 @@ fun TrackerDashboard(
                     isSatsIndexWarning = dashboardState.isSatsIndexWarning, snr = dashboardState.snr, vibration = dashboardState.vibration, heading = dashboardState.heading, tilt = dashboardState.tilt, acousticDb = dashboardState.acousticDb, 
                     baroAlt = dashboardState.baroAlt, lux = dashboardState.lux, proximityCm = dashboardState.proximityCm, proximityDebounceMs = dashboardState.proximityDebounceMs, rollingVibration = dashboardState.rollingVibration, 
                     trackerMaxTemp = dashboardState.trackerMaxTemp, viewerMaxTemp = dashboardState.viewerMaxTemp, peakShock = dashboardState.peakShock, vibrationFloor = dashboardState.vibrationFloor, luxBaseline = dashboardState.luxBaseline, 
-                    acousticFloorDb = dashboardState.acousticFloorDb, trackerCurrentMa = dashboardState.trackerCurrentMa, gpsIdx = gpsIdx, rttValue = rttValue, cpuLoad = dashboardState.cpuLoad, ioWait = dashboardState.ioWait, 
-                    maxIoLatency = dashboardState.maxIoLatency, isUltraLongStationary = dashboardState.isUltraLongStationary, isSuspiciousNoise = dashboardState.isSuspiciousNoise, onShowGnssDetail = { viewModel.onEvent(UiEvent.ToggleGnssDetail(true)) }
+                    acousticFloorDb = dashboardState.acousticFloorDb, trackerCurrentMa = currentMaValue, gpsIdx = gpsIdx, rttValue = rttValue, cpuLoad = dashboardState.cpuLoad, ioWait = dashboardState.ioWait, 
+                    maxIoLatency = dashboardState.maxIoLatency, isUltraLongStationary = dashboardState.isUltraLongStationary, isSuspiciousNoise = dashboardState.isSuspiciousNoise, onShowGnssDetail = { onEvent(UiEvent.ToggleGnssDetail(true)) }
                 )
                 DebugTable(isLinkFresh = dashboardState.isLinkFresh, isTelemetryFresh = dashboardState.isTelemetryFresh, isGpsFresh = dashboardState.isGpsFresh, trackerStateName = dashboardState.trackerState.name, gpsAgeSec = if (kinematicState.localLocation.kinetic.gpsTs > 0) (systemPulse - kinematicState.localLocation.kinetic.gpsTs) / 1000 else -1L, rtt = rttValue, currentMa = currentMaValue)
-                Spacer(Modifier.height(16.dp)); SessionTerminationButton(appMode = appMode, onTerminate = { viewModel.onEvent(UiEvent.ShowStopTrackingConfirmation(true)) })
+                Spacer(Modifier.height(16.dp)); SessionTerminationButton(appMode = appMode, onTerminate = { onEvent(UiEvent.ShowStopTrackingConfirmation(true)) })
             } else { Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) { Text("Tap status card above to expand dashboard", color = Slate500, fontSize = 11.sp, fontWeight = FontWeight.Medium) } }
         }
         item { Spacer(Modifier.height(32.dp)) }

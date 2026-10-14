@@ -22,13 +22,11 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.13.30:
+ * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
  * Oct.11.9:
  * - Issue #SIMP-1011-23: Latency Compensation. Implemented arrival-time 
  *   jitter correction for remote updates to prevent UI trail stutter.
- * Oct.10.9:
- * - Issue #SIMP-1014-3: Connectivity Jitter. Migrated tracker-side telemetry 
- *   persistence to saveLocationUpdateDebounced to prevent IO saturation 
- *   during JNI forensic bursts.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -119,7 +117,6 @@ class ConnectivitySuite @Inject constructor(
     val isTrackerCharging get() = trackerStatus.isCharging
     val isTrackerJammerSuspicion get() = trackerStatus.integrity.isJammer
     val isTrackerVisualJump get() = trackerStatus.isJump
-    val isTrackerAdaptiveJump get() = trackerStatus.isAdaptiveJump
     val trackerJumpTier get() = trackerStatus.jumpTier
     val isTrackerTamperDetected get() = trackerStatus.integrity.isTamperDetected
     val isTrackerPowerTamper get() = trackerStatus.isPowerTamper

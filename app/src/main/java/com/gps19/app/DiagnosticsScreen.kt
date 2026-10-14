@@ -25,38 +25,15 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
- * Oct.13.20:
- * - Issue #ISSUE-OCT13.20-M2: Migrated ArrowBack and List icons to AutoMirrored versions.
- * Oct.7.2:
- * - Issue #QA-1006-12: Fixed status label for Exact Alarm (was using isOverlayGranted).
- * Oct.6.8:
- * - Issue #AUDIT-1006-8: Signaling Efficiency Audit. Added signaling metrics section 
- *   to expose real-time conflation efficiency and radio emission counts (Rule 1.123).
- * Oct.6.2:
- * - Issue #AUDIT-1006-5: Added TRIGGER LOG PRESSURE TEST button to simulate 
- *   high-frequency telemetry bursts.
- * Oct.5.20:
- * - SIMP-1426-3: Refactored DiagnosticsScreen to consume unified UiStateProvider. 
- *   Reduced parameter overhead and unified state collection. (R1426-3).
+ * Oct.13.30:
+ * - SIMP-OCT13.21-S1: Pure Event UI. Refactored to use centralized onMainEvent 
+ *   bubbling for all actions, unifying signature with Tracker/Viewer screens.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticsScreen(
     stateProvider: UiStateProvider,
-    onBack: () -> Unit,
-    onRefresh: () -> Unit,
-    onToggleManualOverride: () -> Unit,
-    onToggleForensicSimulation: (Boolean) -> Unit,
-    onToggleStorageSimulation: (Boolean, Boolean) -> Unit,
-    onToggleSetupBypass: (Boolean) -> Unit = {},
-    onExecuteStressTest: () -> Unit = {},
-    onExecuteLogPressureTest: () -> Unit = {},
-    onRequestBatteryExemption: () -> Unit,
-    onRequestOverlayPermission: () -> Unit,
-    onRequestAppInfo: () -> Unit,
-    onRequestAppInfoForStaggered: () -> Unit = onRequestAppInfo,
-    onRequestExactAlarm: () -> Unit,
-    onRequestHardwarePermission: () -> Unit
+    onMainEvent: (UiEvent) -> Unit
 ) {
     val sessionState by stateProvider.session.collectAsStateWithLifecycle()
     val diagnosticState by stateProvider.diagnostic.collectAsStateWithLifecycle()
@@ -77,7 +54,7 @@ fun DiagnosticsScreen(
             TopAppBar(
                 title = { Text("System Diagnostics", color = Color.White) },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { onMainEvent(UiEvent.NavigateToDiagnostics(false)) }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
                     }
                 },
@@ -106,7 +83,7 @@ fun DiagnosticsScreen(
                 status = if (permissions.isBatteryWhitelisted) "UNRESTRICTED" else "OPTIMIZED",
                 isOk = permissions.isBatteryWhitelisted,
                 icon = Icons.Default.BatteryChargingFull,
-                onClick = onRequestBatteryExemption
+                onClick = { onMainEvent(UiEvent.RequestBatteryExemption) }
             )
 
             DiagnosticItem(
@@ -114,7 +91,7 @@ fun DiagnosticsScreen(
                 status = if (permissions.isOverlayGranted) "GRANTED" else "DENIED",
                 isOk = permissions.isOverlayGranted,
                 icon = Icons.Default.Layers,
-                onClick = onRequestOverlayPermission
+                onClick = { onMainEvent(UiEvent.RequestOverlayPermission) }
             )
 
             DiagnosticItem(
@@ -122,7 +99,7 @@ fun DiagnosticsScreen(
                 status = if (permissions.isExactAlarmGranted) "GRANTED" else "DENIED",
                 isOk = permissions.isExactAlarmGranted,
                 icon = Icons.Default.Alarm,
-                onClick = onRequestExactAlarm
+                onClick = { onMainEvent(UiEvent.RequestExactAlarm) }
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -195,7 +172,7 @@ fun DiagnosticsScreen(
                     status = if (isGnssThrottled) "THROTTLED (5s)" else "STANDARD (2s)",
                     isOk = !isGnssThrottled,
                     icon = Icons.Default.Speed,
-                    onClick = onRequestAppInfoForStaggered
+                    onClick = { onMainEvent(UiEvent.RequestAppInfo) }
                 )
             }
 
@@ -206,7 +183,7 @@ fun DiagnosticsScreen(
                     isOk = permissions.backgroundStatus == CapabilityStatus.GRANTED || 
                            (permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride),
                     icon = Icons.Default.SettingsSuggest,
-                    onClick = onRequestHardwarePermission
+                    onClick = { onMainEvent(UiEvent.RequestHardwarePermission) }
                 )
                 
                 if (permissions.backgroundStatus == CapabilityStatus.UNKNOWN) {
@@ -218,7 +195,7 @@ fun DiagnosticsScreen(
                         Text("Manual Override", color = Color.LightGray)
                         Switch(
                             checked = permissions.isManualOverride,
-                            onCheckedChange = { onToggleManualOverride() }
+                            onCheckedChange = { onMainEvent(UiEvent.ToggleXiaomiManualOverride) }
                         )
                     }
                 }
@@ -239,7 +216,7 @@ fun DiagnosticsScreen(
             )
 
             Button(
-                onClick = onExecuteStressTest,
+                onClick = { onMainEvent(UiEvent.ExecuteStressTest) },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF00FF)) // ForensicPink
             ) {
@@ -251,7 +228,7 @@ fun DiagnosticsScreen(
             Spacer(modifier = Modifier.height(8.dp))
 
             Button(
-                onClick = onExecuteLogPressureTest,
+                onClick = { onMainEvent(UiEvent.ExecuteLogPressureTest) },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
             ) {
@@ -271,7 +248,7 @@ fun DiagnosticsScreen(
                     Text("Setup Overlay Bypass", color = Color.White, fontWeight = FontWeight.SemiBold)
                     Text("Skips permission check for soak tests", color = if (isSetupBypassActive) Color.Green else Color.Gray, fontSize = 12.sp)
                 }
-                Switch(checked = isSetupBypassActive, onCheckedChange = { onToggleSetupBypass(it) }, colors = SwitchDefaults.colors(checkedThumbColor = Color.Green, checkedTrackColor = Color.Green.copy(alpha = 0.5f)))
+                Switch(checked = isSetupBypassActive, onCheckedChange = { onMainEvent(UiEvent.ToggleSetupBypass(it)) }, colors = SwitchDefaults.colors(checkedThumbColor = Color.Green, checkedTrackColor = Color.Green.copy(alpha = 0.5f)))
             }
 
             Row(
@@ -283,7 +260,7 @@ fun DiagnosticsScreen(
                     Text("Forensic Stall Simulation", color = Color.White, fontWeight = FontWeight.SemiBold)
                     Text("Simulates Urban Multipath / IO Latency", color = if (isForensicStallSimulated) Color.Yellow else Color.Gray, fontSize = 12.sp)
                 }
-                Switch(checked = isForensicStallSimulated, onCheckedChange = { onToggleForensicSimulation(it) })
+                Switch(checked = isForensicStallSimulated, onCheckedChange = { onMainEvent(UiEvent.SetForensicSimulation(it)) })
             }
 
             Row(
@@ -298,9 +275,9 @@ fun DiagnosticsScreen(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isStorageSimulated) {
                         Text("CRIT", color = if (isStorageCriticalSimulated) Color.Red else Color.Gray, fontSize = 10.sp, modifier = Modifier.padding(end = 4.dp))
-                        Checkbox(checked = isStorageCriticalSimulated, onCheckedChange = { onToggleStorageSimulation(true, it) })
+                        Checkbox(checked = isStorageCriticalSimulated, onCheckedChange = { onMainEvent(UiEvent.SetStorageSimulation(true, it)) })
                     }
-                    Switch(checked = isStorageSimulated, onCheckedChange = { onToggleStorageSimulation(it, isStorageCriticalSimulated) })
+                    Switch(checked = isStorageSimulated, onCheckedChange = { onMainEvent(UiEvent.SetStorageSimulation(it, isStorageCriticalSimulated)) })
                 }
             }
 
@@ -312,12 +289,12 @@ fun DiagnosticsScreen(
                 fontWeight = FontWeight.Bold
             )
 
-            DiagnosticItem(title = "Background Location", status = if (permissions.isBackgroundLocationGranted) "GRANTED" else "DENIED", isOk = permissions.isBackgroundLocationGranted, icon = Icons.Default.LocationOn, onClick = onRequestAppInfo)
-            DiagnosticItem(title = "Microphone (Acoustic)", status = if (permissions.isMicrophoneGranted) "GRANTED" else "DENIED", isOk = permissions.isMicrophoneGranted, icon = Icons.Default.Mic, onClick = onRequestAppInfo)
-            DiagnosticItem(title = "Notifications", status = if (permissions.isPostNotificationsGranted) "GRANTED" else "DENIED", isOk = permissions.isPostNotificationsGranted, icon = Icons.Default.Notifications, onClick = onRequestAppInfo)
+            DiagnosticItem(title = "Background Location", status = if (permissions.isBackgroundLocationGranted) "GRANTED" else "DENIED", isOk = permissions.isBackgroundLocationGranted, icon = Icons.Default.LocationOn, onClick = { onMainEvent(UiEvent.RequestAppInfo) })
+            DiagnosticItem(title = "Microphone (Acoustic)", status = if (permissions.isMicrophoneGranted) "GRANTED" else "DENIED", isOk = permissions.isMicrophoneGranted, icon = Icons.Default.Mic, onClick = { onMainEvent(UiEvent.RequestAppInfo) })
+            DiagnosticItem(title = "Notifications", status = if (permissions.isPostNotificationsGranted) "GRANTED" else "DENIED", isOk = permissions.isPostNotificationsGranted, icon = Icons.Default.Notifications, onClick = { onMainEvent(UiEvent.RequestAppInfo) })
 
             Spacer(modifier = Modifier.height(24.dp))
-            Button(onClick = onRefresh, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)) { Text("REFRESH STATUS") }
+            Button(onClick = { onMainEvent(UiEvent.RefreshPermissionStatus) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)) { Text("REFRESH STATUS") }
         }
     }
 }

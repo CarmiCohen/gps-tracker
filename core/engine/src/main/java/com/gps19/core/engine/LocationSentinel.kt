@@ -5,21 +5,11 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
- * Oct.8.1:
- * - Issue #SIMP-1007-17: Behavioral Reason Promotion. Ensured all TAMPER 
- *   rejections in checkPhysicalTamperInternal set a locationPendingReason 
- *   (JAMMER_SUSPICION) to allow telemetry pipeline promotion.
- * Oct.7.11:
- * - Issue #SIMP-1007-17: Strategic Simplification. Integrated behavioral suspicion 
- *   into unified evaluation result to allow telemetry pipeline promotion to 
- *   LocationPendingReason. Fixed forensic property scoping in reset().
- * Oct.7.10:
- * - Issue #SIMP-1010-3: SNR Decay Modeling. Integrated isJammingCandidate from 
- *   telemetry update into forensic state and physical tamper evaluation.
- * Oct.7.9:
- * - Issue #SIMP-1010-2: Muzzle Hysteresis Native Offloading. Migrated stationary 
- *   duration logic to use native-provided duration from LocationUpdate. 
- *   Eliminated remaining JVM stationaryStartRt calculations.
+ * Oct.13.21:
+ * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Pruned unused qScale and nowTs (R-ID 601).
+ * Oct.13.21:
+ * - ISSUE-OCT13.20-L1: Dead Code Cleanup. Removed unused sensor baseline locals.
+ * - Logic Fix: isAcousticLockedOut now correctly uses ACOUSTIC_LOCKOUT_MS.
  */
 object LocationSentinel {
 
@@ -65,10 +55,10 @@ object LocationSentinel {
         state.forensic.lastValidTs = timestamp
         state.forensic.lastValidRt = rt
         state.forensic.lastValidAccuracy = accuracy
-        updateFilters(state, lat, lng, timestamp, 1.0)
+        updateFilters(state, lat, lng, timestamp)
     }
 
-    private fun updateFilters(state: LocationProcessingState, lat: Double, lng: Double, ts: Long, qScale: Double) {
+    private fun updateFilters(state: LocationProcessingState, lat: Double, lng: Double, ts: Long) {
         if (state.forensic.lastValidTs > 0) {
             val d = PhysicsUtils.calculateDistance(state.forensic.lastValidLat, state.forensic.lastValidLng, lat, lng)
             val dt = max(0.1, (ts - state.forensic.lastValidTs) / 1000.0)
@@ -208,7 +198,6 @@ object LocationSentinel {
         bypassBehavioral: Boolean = false,
         isSuspicious: Boolean = false,
         isMuzzled: Boolean = false, 
-        nowTs: Long,
         nowRt: Long,
         cpuLoad: Double = 0.0,
         acousticFloorDb: Double = -1.0
@@ -224,7 +213,7 @@ object LocationSentinel {
 
         if (state.forensic.lastValidTs == 0L) {
             updateLastValid(state, lat, lng, alt, timestamp, nowRt, 0.0, bearing, accuracy)
-            updateFilters(state, lat, lng, timestamp, 1.0)
+            updateFilters(state, lat, lng, timestamp)
             result.reset(SentinelStatus.VALID)
             result.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
             return result
@@ -288,12 +277,12 @@ object LocationSentinel {
             if (GtoEngine.evaluateTrajectory(state, lat, lng, bearing, currentSpeedMps, timestamp, nowRt)) {
                 val promoted = mutableListOf<EngineGeoPoint>()
                 GtoEngine.getWindow(state).forEach { p ->
-                    updateFilters(state, p.lat, p.lng, p.ts, SUSPICIOUS_Q_SCALE)
+                    updateFilters(state, p.lat, p.lng, p.ts)
                     promoted.add(EngineGeoPoint(p.lat, p.lng, p.alt, p.ts, p.rt, p.accuracy, p.maxAccuracy))
                     updateLastValid(state, p.lat, p.lng, p.alt, p.ts, p.rt, p.speedMps, p.bearing, p.accuracy)
                 }
                 GtoEngine.clear(state)
-                updateFilters(state, lat, lng, timestamp, SUSPICIOUS_Q_SCALE)
+                updateFilters(state, lat, lng, timestamp)
                 updateLastValid(state, lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
                 
                 result.status = SentinelStatus.TRAJECTORY_PROMOTED
@@ -316,7 +305,7 @@ object LocationSentinel {
             }
             
             if (result.status == SentinelStatus.VALID && result.suppressionNote != null) {
-                updateFilters(state, lat, lng, timestamp, if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0)
+                updateFilters(state, lat, lng, timestamp)
                 updateLastValid(state, lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
                 GtoEngine.clear(state)
                 result.optimizedPoint = EngineGeoPoint(lat, lng, alt, timestamp, nowRt, accuracy, maxAccuracy)
@@ -324,7 +313,7 @@ object LocationSentinel {
             }
         }
 
-        updateFilters(state, lat, lng, timestamp, if (isSuspicious) SUSPICIOUS_Q_SCALE else 1.0)
+        updateFilters(state, lat, lng, timestamp)
         updateLastValid(state, lat, lng, alt, timestamp, nowRt, currentSpeedMps, bearing, accuracy)
         GtoEngine.clear(state)
         result.status = behavioralStatus
@@ -408,7 +397,7 @@ object LocationSentinel {
             return SentinelStatus.TAMPER
         }
 
-        val isAcousticLockedOut = (state.forensic.lastFastPathAcousticSpikeRt > 0 && (nowRt - state.forensic.lastFastPathAcousticSpikeRt < LIGHT_LOCKOUT_MS))
+        val isAcousticLockedOut = (state.forensic.lastFastPathAcousticSpikeRt > 0 && (nowRt - state.forensic.lastFastPathAcousticSpikeRt < ACOUSTIC_LOCKOUT_MS))
         
         if (!isAcousticLockedOut && SentinelValidator.isAcousticViolated(state.forensic.currentAcousticDb, state.forensic.acousticFloorDb)) {
             result.reason = "Acoustic alarm"

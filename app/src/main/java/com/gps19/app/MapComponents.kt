@@ -41,6 +41,9 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Oct.13.21:
+ * - SIMP-OCT13.21-S1: Pure Event Map. Pruned onSaveTrail and onLoadTrail 
+ *   lambdas from AppMapContainer and MapToolsOverlay. Standardized on UiEvent routing.
  * Oct.13.1:
  * - SIMP-OCT12.16-S1: Unified HUD Overlay. Removed redundant UI overlays from 
  *   AppMapContainer as they are now managed by UnifiedHUDOverlay.
@@ -48,9 +51,7 @@ import com.gps19.core.engine.*
 
 @Composable
 fun AppMapContainer(
-    stateProvider: UiStateProvider,
-    onSaveTrail: () -> Unit = {},
-    onLoadTrail: () -> Unit = {}
+    stateProvider: UiStateProvider
 ) {
     val state by stateProvider.mapViewState.collectAsStateWithLifecycle()
     val cameraActions = (stateProvider as? MainViewModel)?.cameraActions
@@ -203,9 +204,6 @@ fun OsmMap(
 @Composable
 fun MapToolsOverlay(
     state: MapViewState,
-    onClear: () -> Unit,
-    onSave: () -> Unit,
-    onLoad: () -> Unit,
     onEvent: (UiEvent) -> Unit
 ) {
     val sc = rememberScrollState(); val sp = 16.dp; val prp = Color(0xFF800080)
@@ -225,8 +223,8 @@ fun MapToolsOverlay(
             MapToolButton(icon = if (state.isViolationsVisible) Icons.Default.Report else Icons.Default.ReportOff, label = "JUMP", onClick = { onEvent(UiEvent.SetViolationsVisible(!state.isViolationsVisible)) }, iconColor = if (state.isViolationsVisible) Color(0xFFFF00FF) else Color.Gray) 
         }
         Row(horizontalArrangement = Arrangement.spacedBy(sp)) { 
-            MapToolButton(icon = Icons.Default.Upload, label = "LOAD", onClick = onLoad, iconColor = BrandJd)
-            MapToolButton(icon = Icons.Default.Save, label = "SAVE", onClick = onSave, iconColor = Indigo500) 
+            MapToolButton(icon = Icons.Default.Upload, label = "LOAD", onClick = { onEvent(UiEvent.ImportTrails) }, iconColor = BrandJd)
+            MapToolButton(icon = Icons.Default.Save, label = "SAVE", onClick = { onEvent(UiEvent.ExportTrails) }, iconColor = Indigo500)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(sp)) { 
             MapToolButton(icon = Icons.Default.AddLocation, label = "ADD", onClick = { if (!isTrackerMode) onEvent(UiEvent.SetGeofenceMode(GeofenceMode.ADD)) }, iconColor = if (state.geofenceMode == GeofenceMode.ADD) Color.White else BrandJd, containerColor = if (state.geofenceMode == GeofenceMode.ADD) BrandJd else Color.White)

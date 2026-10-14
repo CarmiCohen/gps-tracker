@@ -31,24 +31,19 @@ import java.util.*
 
 /**
  * LogComponents: UI for system logs and diagnostic history.
- * Oct.5.20:
- * - SIMP-1426-3: Refactored LogOverlay to consume unified UiStateProvider. 
- *   Reduced parameter count and unified state collection. (R1426-3).
- * Oct.5.15:
- * - Issue #SIMP-1426-2: Leaf-Level Convergence. Refactored LogOverlay to collect 
- *   its own state from flows.
+ * Oct.13.21:
+ * - SIMP-OCT13.21-S1: Pure Event UI. Pruned onExport, onToggle, and onClear 
+ *   lambdas in favor of centralized ExportLogs event bubbling.
  */
 
 @Composable
 fun LogOverlay(
     stateProvider: UiStateProvider,
-    onExport: () -> Unit, 
-    onToggle: () -> Unit, 
-    onClear: () -> Unit,
     onSetShowDetails: (Boolean) -> Unit,
     onSetShowRecovered: (Boolean) -> Unit, 
     onHistLink: (Long) -> Unit = {},
-    onDetailsLink: () -> Unit = {}
+    onDetailsLink: () -> Unit = {},
+    onMainEvent: (UiEvent) -> Unit
 ) {
     val logs by stateProvider.eventLogs.collectAsStateWithLifecycle()
     val showDetails by stateProvider.logFilterDetails.collectAsStateWithLifecycle()
@@ -83,8 +78,9 @@ fun LogOverlay(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     LogFilterButton(stringResource(R.string.log_filter_details), showDetails, BrandJd, onSetShowDetails)
                     LogFilterButton(stringResource(R.string.log_filter_hist), showRecovered, Amber500, onSetShowRecovered)
-                    IconButton(onClick = onExport, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Download, "Save", tint = Color.White, modifier = Modifier.size(20.dp)) }
-                    IconButton(onClick = onClear, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.DeleteSweep, "Clear", tint = Rose500, modifier = Modifier.size(20.dp)) }
+                    IconButton(onClick = { onMainEvent(UiEvent.ExportLogs) }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Download, "Save", tint = Color.White, modifier = Modifier.size(20.dp)) }
+                    IconButton(onClick = { onMainEvent(UiEvent.ClearLogs) }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.DeleteSweep, "Clear", tint = Rose500, modifier = Modifier.size(20.dp)) }
+                    IconButton(onClick = { onMainEvent(UiEvent.ToggleLog(false)) }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(20.dp)) }
                 }
             }
             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {

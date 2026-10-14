@@ -5,19 +5,11 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Oct.13.21:
+ * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed unused nowTs from processLocation calls (R-ID 601).
  * Oct.13.20:
  * - Issue #ISSUE-OCT13.20-L1: Dead Code Cleanup. Removed unused 'androidSpeedMps' variable 
  *   and 'nowRt' parameter in shouldSavePoint.
- * Oct.11.8:
- * - Issue #SIMP-1011-22: Performance Tier Alignment. Refactored performBayesianExpansion 
- *   to use hardware-aware uncertainty growth rates (Standard: 15m/s, Staggered: 25m/s).
- * - Fixed unresolved reference 'finalJumpTier' in early exit branches.
- * Oct.11.2:
- * - Issue #SIMP-1101-1: Bayesian Drift Audit. Centralized authoritative 
- *   accuracy expansion (uncertainty growth) during GNSS gaps.
- * Oct.10.2:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
- *   TimeProvider API.
  */
 class LocationProcessor(
     private val timeProvider: TimeProvider,
@@ -314,7 +306,6 @@ class LocationProcessor(
                     this.receiptRt = nowRt
                     this.isTrajectoryPromoted = false
                     this.jumpTier = update.kinetic.jumpTier
-                    this.isAdaptiveJump = update.kinetic.isAdaptiveJump
                     this.distToHome = state.lastNearestHomeDistance
                     this.isSpatiallyValid = true
                     this.tamperDetected = update.integrity.isTamperDetected
@@ -341,7 +332,6 @@ class LocationProcessor(
                         this.receiptRt = nowRt
                         this.isTrajectoryPromoted = false
                         this.jumpTier = update.kinetic.jumpTier
-                        this.isAdaptiveJump = update.kinetic.isAdaptiveJump
                         this.distToHome = state.lastNearestHomeDistance
                         this.isSpatiallyValid = false
                         this.tamperDetected = update.integrity.isTamperDetected
@@ -382,7 +372,7 @@ class LocationProcessor(
                 lat = lat, lng = lng, alt = alt, accuracy = accuracy, maxAccuracy = state.accuracy.maxAccuracy, 
                 bearing = bearing, snr = snr, satsUsed = update.integrity.satsUsed, timestamp = effectiveTs,
                 bypassBehavioral = !isLocal, isSuspicious = update.isMuzzled || adaptationMuzzled,
-                isMuzzled = update.isMuzzled, nowTs = nowWall, nowRt = nowRt, cpuLoad = cpuLoad
+                isMuzzled = update.isMuzzled, nowRt = nowRt, cpuLoad = cpuLoad
             )
             
             if (sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED) {
@@ -410,7 +400,6 @@ class LocationProcessor(
             val finalIsJump = (isActualJump && !isMuzzledJump) || update.integrity.isJammer
             val finalIsTrajectoryPromoted = sentinelResult.status == SentinelStatus.TRAJECTORY_PROMOTED
             val finalJumpTier = maxOf(sentinelResult.jumpConfidence?.tier ?: 0, update.kinetic.jumpTier)
-            val finalIsAdaptiveJump = (sentinelResult.jumpConfidence?.isAdaptiveJump == true) || update.kinetic.isAdaptiveJump
             val finalIsTamper = sentinelResult.status == SentinelStatus.TAMPER || update.integrity.isTamperDetected
             val finalIsJammer = finalIsJump || finalIsTamper || isActualJammer || update.integrity.isJammer
             // R-ID 544: Explicitly check manual injection flag for stalls even in local mode.
@@ -436,7 +425,6 @@ class LocationProcessor(
                     this.receiptRt = nowRt
                     this.isTrajectoryPromoted = finalIsTrajectoryPromoted
                     this.jumpTier = finalJumpTier
-                    this.isAdaptiveJump = finalIsAdaptiveJump
                     this.distToHome = state.lastNearestHomeDistance
                     this.isSpatiallyValid = false
                     this.tamperDetected = finalIsTamper
@@ -530,7 +518,6 @@ class LocationProcessor(
                 this.receiptRt = nowRt
                 this.isTrajectoryPromoted = finalIsTrajectoryPromoted
                 this.jumpTier = finalJumpTier
-                this.isAdaptiveJump = finalIsAdaptiveJump
                 this.distToHome = state.lastNearestHomeDistance
                 this.isSpatiallyValid = true
                 this.geofenceViolationDetected = geofenceViolation

@@ -4,13 +4,12 @@ import com.gps19.core.engine.*
 
 /**
  * SettingsMapper: Conversion logic between DataStore Protos and Domain Models.
+ * Oct.13.30:
+ * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
  * Oct.5.1:
  * - Issue #SIMP-1201-1: Logic State Serialization. Added logicStateToProto 
  *   and applyLogicStateFromProto to consolidate alarm evaluation state 
  *   into a single binary blob (R-ID 510).
- * Oct.2.9:
- * - Issue #1314: TrackerStatus Convergence. Migrated from TrackerStatus 
- *   to unified LocationUpdate monolith DTO.
  */
 object SettingsMapper {
 
@@ -76,7 +75,7 @@ object SettingsMapper {
             speed = s.speed, accuracy = s.accuracy, maxAccuracy = s.maxAccuracy,
             bearing = s.bearing, gpsTs = s.gpsTs, rt = s.rt,
             isJump = s.isJump, isTrajectoryPromoted = s.isTrajectoryPromoted,
-            jumpTier = s.jumpTier, isAdaptiveJump = s.isAdaptiveJump,
+            jumpTier = s.jumpTier,
             verticalVelocity = s.verticalVelocity, kineticEnergy = s.kineticEnergy
         )
 
@@ -184,6 +183,8 @@ object SettingsMapper {
             .setForensicReliabilityDegradationStartRt(state.forensicReliabilityDegradationStartRt)
             .setLastRelayOnlineRt(state.lastRelayOnlineRt)
             .setLastRelayOfflineRt(state.lastRelayOfflineRt)
+            .setLastSirenStopRt(state.lastSirenStopRt)
+            .setBootId(state.bootId)
             .build()
     }
 
@@ -198,5 +199,7 @@ object SettingsMapper {
         state.forensicReliabilityDegradationStartRt = p.forensicReliabilityDegradationStartRt
         state.lastRelayOnlineRt = p.lastRelayOnlineRt
         state.lastRelayOfflineRt = p.lastRelayOfflineRt
+        state.lastSirenStopRt = p.lastSirenStopRt
+        state.bootId = p.bootId
     }
 }

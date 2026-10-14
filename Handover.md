@@ -1,22 +1,23 @@
-# Project Handover - Oct13.20
+# Project Handover - Oct13.30
 
-## 🟢 Current Status
-- **Version**: Oct13.20 (Hardening & Modernization)
-- **Focus**: GPS Engine Reliability & API Compliance.
+## ✅ Current Status: Build Restored & Hygiene Phase 1 Complete
+- **Version**: Oct13.30
+- **Focus**: Build stabilization and debt reduction.
 - **Key Changes**:
-    - **Signaling**: Hardened `SmartSignalingDispatcher` by replacing delicate channel state checks with `Job` tracking and explicit exception handling. Resolved potential resource leaks during re-initialization.
-    - **Manifest**: Removed legacy `extractNativeLibs` attribute to align with modern AGP standards.
-    - **UI/API Migrations**: Migrated `VibratorManager` (API 31+), `AutoMirrored` icons, and `LocalLifecycleOwner` to compliant packages.
-    - **Code Hygiene**: Removed unused `androidSpeedMps` and `nowRt` from `LocationProcessor.kt`.
+    - **Build Recovery**: Restored `JUMP_HOLD_DURATION_MS` and `GPS_INDEX_AGE_SCALING` to `EngineConstants.kt`.
+    - **Compiler Fixes**: Resolved `onServiceInitialize` signature mismatch and `appMode` reference issues in `SettingsComponents.kt`.
+    - **Integrity Audit Fix**: Fixed `verifyProjectIntegrity` to correctly parse `autoVersionCode`.
+    - **Dead Code Pruning (ISSUE-OCT13.21-L1)**: 
+        - Removed `isAdaptiveJump` from `EngineModels.kt`, `LocationUpdate.kt`, `LocationProcessor.kt`, and `MainAlarmLogic.kt`.
+        - Removed unused `qScale` and `nowTs` from `LocationSentinel.kt` and `LocationProcessor.kt`.
+    - **Pure Event Transition**: Refactored `SettingsOverlay` and `PhoneSetupOverlay` to use centralized event bubbling.
 
 ## 🛠️ Pending Debt
-- **ISSUE-OCT13.20-L1**: Remaining ~45 unused parameter/variable warnings in `ViewerScreen.kt`, `EngineModels.kt`, and `IntegrityMonitor.kt`.
-- **Redundant Cast**: `MapOverlayManager.kt:241`.
-- **Simplification**: Unify Map vs Object conflation logic in `SmartSignalingDispatcher`.
+- **ISSUE-OCT13.21-L2**: Audit build system for Gradle 9.0 deprecations (Warnings check).
+- **SIMP-OCT13.21-S2**: Complete "Pure Event" transition for remaining Activity-level launchers in `MainAppContent`.
+    - Refactor `MainActivity` to remove lambda injection into `MainAppContent`.
+    - Handle `StartService`, `StopTracking`, and `CleanupAndExit` directly via `UiEffect` in `AppEffectAggregator`.
 
 ## 🔍 Forensic Pulse
 - **SOT Metrics**: 252 Architectural Rules / 403 Total Requirements.
-- **High Priority**: 0 Open.
-- **Medium Priority**: 0 Open.
-- **Low Priority**: 1 Open (Cleanup).
-- **Next Step**: Complete the code hygiene cleanup in the `:app` module UI screens.
+- **Audit Baseline**: Oct13.30: [SOT Count: 403, Open: H:0, M:1, L:2, Ideas: H:0, M:10, L:11, QA: 298]

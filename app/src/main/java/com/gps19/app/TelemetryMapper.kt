@@ -6,13 +6,12 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.13.30:
+ * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
  * Oct.10.10:
  * - Issue #SIMP-1010-3: Signal Decay Audit. Corrected SNR reconstruction scaling 
  *   to use RIBBON_SNR_SCALE_DB (45.0) instead of hardcoded 5.0. Ensured snrSnapshot 
  *   precedence over indexed fallback in mapProtoToSnapshot and mapStatusToSnapshot.
- * Oct.7.11:
- * - Issue #SIMP-1007-17: Strategic Simplification. Updated mapTickToOutputs and 
- *   mapProcessedToSnapshot to promote behavioral pending reasons from the processor.
  */
 object TelemetryMapper {
 
@@ -105,7 +104,6 @@ object TelemetryMapper {
                 maxAccuracy = proto.maxAccuracy
                 isJump = processed.status == SentinelStatus.JUMP
                 kineticEnergy = proto.kineticEnergy
-                isAdaptiveJump = proto.isAdaptiveJump
                 jumpTier = proto.jumpTier
                 activityType = try { 
                     ActivityType.valueOf(proto.activityType) 
@@ -220,7 +218,6 @@ object TelemetryMapper {
                 maxAccuracy = data.optDouble("max_accuracy", current.kinetic.maxAccuracy)
                 isJump = processed.status == SentinelStatus.JUMP
                 kineticEnergy = data.optDouble("kinetic_energy", current.kinetic.kineticEnergy)
-                isAdaptiveJump = data.optBoolean("is_adaptive_jump", current.kinetic.isAdaptiveJump)
                 jumpTier = data.optInt("jump_tier", current.kinetic.jumpTier)
                 verticalVelocity = data.optDouble("vertical_velocity", current.kinetic.verticalVelocity)
                 activityType = try { 
@@ -524,7 +521,6 @@ object TelemetryMapper {
             this.status = processed.status
             this.integrity.isJammer = processed.jammerDetected
             this.kinetic.jumpTier = processed.jumpTier
-            this.kinetic.isAdaptiveJump = processed.isAdaptiveJump
             kinetic.apply {
                 lat = processed.optimizedPoint.lat
                 lng = processed.optimizedPoint.lng
@@ -566,7 +562,6 @@ object TelemetryMapper {
             this.status = s.status
             this.integrity.isJammer = s.integrity.isJammer
             this.kinetic.jumpTier = s.kinetic.jumpTier
-            this.kinetic.isAdaptiveJump = s.kinetic.isAdaptiveJump
             kinetic.copyFrom(s.kinetic)
             integrity.copyFrom(s.integrity)
             atmospheric.copyFrom(s.atmospheric)
@@ -830,7 +825,6 @@ object TelemetryMapper {
                 accuracy = entity.accuracy; maxAccuracy = entity.maxAccuracy
                 bearing = entity.bearing; gpsTs = entity.gpsTs
                 verticalVelocity = entity.verticalVelocity; kineticEnergy = 0.0
-                isAdaptiveJump = false
                 activityType = try { 
                     ActivityType.valueOf(entity.activityType) 
                 } catch (e: Exception) { ActivityType.UNKNOWN }

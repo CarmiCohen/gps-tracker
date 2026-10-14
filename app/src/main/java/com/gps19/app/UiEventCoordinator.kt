@@ -16,12 +16,13 @@ import javax.inject.Singleton
 
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
+ * Oct.13.21:
+ * - SIMP-OCT13.21-S1: Pure Event Architecture. Routed all file management, 
+ *   initialization, and permission events (ExportTrails, ImportTrails, ExportLogs, 
+ *   ImportConfig, TriggerFullInitialization, ShowPhoneSetup, RequestBatteryExemption, 
+ *   etc.) to achieve minimal UI signatures.
  * Oct.13.1:
- * - SIMP-OCT12.16-S1: Unified HUD Overlay. Added ClearTrails event routing 
- *   to support the unified overlay toolset.
- * Oct.10.2:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
- *   TimeProvider API.
+ * - SIMP-OCT12.16-S1: Unified HUD Overlay. Added ClearTrails event routing.
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -305,6 +306,21 @@ class UiEventCoordinator @Inject constructor(
                 }
             }
             is UiEvent.RequestTestAlarm -> repository.sendCommand(UiCommand.ExecuteTestAlarm)
+
+            // --- Pure Event Routing ---
+            UiEvent.ExportTrails -> onUiEffect(UiEffect.LaunchTrailExport)
+            UiEvent.ImportTrails -> onUiEffect(UiEffect.LaunchTrailImport)
+            UiEvent.ExportLogs -> onUiEffect(UiEffect.LaunchLogExport)
+            UiEvent.ImportConfig -> onUiEffect(UiEffect.LaunchConfigImport)
+            UiEvent.TriggerFullInitialization -> onUiEffect(UiEffect.LaunchFullInitialization)
+            UiEvent.ShowPhoneSetup -> {
+                onStateUpdate { it.copy(navigation = it.navigation.copy(isSettingsOpen = false, isPhoneSetupVisible = true)) }
+            }
+            UiEvent.RequestBatteryExemption -> onUiEffect(UiEffect.LaunchBatteryExemption)
+            UiEvent.RequestOverlayPermission -> onUiEffect(UiEffect.LaunchOverlayPermission)
+            UiEvent.RequestAppInfo -> onUiEffect(UiEffect.LaunchAppInfo)
+            UiEvent.RequestExactAlarm -> onUiEffect(UiEffect.LaunchExactAlarm)
+            UiEvent.RequestHardwarePermission -> onUiEffect(UiEffect.LaunchHardwarePermission)
 
             else -> {}
         }

@@ -24,17 +24,18 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayManager: Unified HUD management for GPS Tracker.
+ * Oct.13.21:
+ * - SIMP-OCT13.21-S1: Pure Event HUD. Pruned onSaveTrail and onLoadTrail 
+ *   lambdas in favor of centralized event bubbling via onMainEvent.
  * Oct.13.1:
  * - SIMP-OCT12.16-S1: Unified HUD Overlay. Merged HeaderBar, GlobalStatusBar, 
- *   and map overlays into a single layout to prevent Z-order collisions.
+ *   and map overlays into a single layout.
  */
 
 @Composable
 fun UnifiedHUDOverlay(
     stateProvider: UiStateProvider,
-    onMainEvent: (UiEvent) -> Unit,
-    onSaveTrail: () -> Unit = {},
-    onLoadTrail: () -> Unit = {}
+    onMainEvent: (UiEvent) -> Unit
 ) {
     val nav by stateProvider.navigation.collectAsStateWithLifecycle()
     val session by stateProvider.session.collectAsStateWithLifecycle()
@@ -58,14 +59,12 @@ fun UnifiedHUDOverlay(
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. Map Overlays (Lower Z-Order than Header/Status if overlapping, but here they are managed together)
+        // 1. Map Overlays (Lower Z-Order than Header/Status if overlapping)
         if (isMapVisible && !isAnyOverlayOpen && session.hydrationLevel >= 4) {
             MapSpecificOverlays(
                 mapState = mapState,
                 isLandscape = isLandscape,
-                onMainEvent = onMainEvent,
-                onSaveTrail = onSaveTrail,
-                onLoadTrail = onLoadTrail
+                onMainEvent = onMainEvent
             )
         }
 
@@ -114,9 +113,7 @@ fun UnifiedHUDOverlay(
 private fun MapSpecificOverlays(
     mapState: MapViewState,
     isLandscape: Boolean,
-    onMainEvent: (UiEvent) -> Unit,
-    onSaveTrail: () -> Unit,
-    onLoadTrail: () -> Unit
+    onMainEvent: (UiEvent) -> Unit
 ) {
     val toggleTopPadding = if (isLandscape) 12.dp else 110.dp
 
@@ -156,9 +153,6 @@ private fun MapSpecificOverlays(
                 Box(Modifier.align(Alignment.CenterStart).padding(start = 8.dp).fillMaxHeight(0.85f).width(140.dp)) {
                     MapToolsOverlay(
                         state = mapState,
-                        onClear = { onMainEvent(UiEvent.ClearTrails) },
-                        onSave = onSaveTrail,
-                        onLoad = onLoadTrail,
                         onEvent = onMainEvent
                     )
                 }

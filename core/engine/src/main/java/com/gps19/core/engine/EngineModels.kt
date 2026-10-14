@@ -6,11 +6,10 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
- * Oct.12.2:
- * - Issue #SIMP-1012-2: Network Buffer Hardening. Added SignalingPriority.CRITICAL.
- * Oct.11.8:
- * - Issue #SIMP-1011-22: Performance Tier Alignment. Added performanceTier 
- *   to LocationProcessingState to support hardware-aware Bayesian expansion.
+ * Oct.13.21:
+ * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump from all models (R-ID 601).
+ * Oct.13.21:
+ * - ISSUE-OCT13.20-L1: Dead Code Cleanup. Removed unused bootId from AlarmEvaluationState.
  */
 
 @Serializable
@@ -525,7 +524,6 @@ class ProcessedLocation {
     var receiptRt: Long = 0L
     var isTrajectoryPromoted: Boolean = false
     var jumpTier: Int = 0
-    var isAdaptiveJump: Boolean = false
     var distToHome: Double? = null
     var isSpatiallyValid: Boolean = false
     var geofenceViolationDetected: Boolean = false
@@ -548,7 +546,6 @@ class ProcessedLocation {
         receiptRt = 0L
         isTrajectoryPromoted = false
         jumpTier = 0
-        isAdaptiveJump = false
         distToHome = null
         isSpatiallyValid = false
         geofenceViolationDetected = false
@@ -576,7 +573,6 @@ class ProcessedLocation {
         this.receiptRt = other.receiptRt
         this.isTrajectoryPromoted = other.isTrajectoryPromoted
         this.jumpTier = other.jumpTier
-        this.isAdaptiveJump = other.isAdaptiveJump
         this.distToHome = other.distToHome
         this.isSpatiallyValid = other.isSpatiallyValid
         this.geofenceViolationDetected = other.geofenceViolationDetected
@@ -740,7 +736,6 @@ class AlarmEvaluationState {
     var firstViolationWasJump: Boolean = false
     var wasDistanceViolated: Boolean = false
     var distanceViolationCounter: Int = 0
-    val isAdaptiveJump: Boolean = false
     var lastGpsPacketTs: Long = 0L
     var lastGpsPacketRt: Long = 0L
     var serviceStartTime: Long = 0L
@@ -795,7 +790,7 @@ class AlarmEvaluationState {
         trackerLat: Double, trackerLng: Double, trackerGpsAccuracy: Double,
         maxTrackerAccuracy: Double, lastGpsPacketTs: Long, lastGpsPacketRt: Long,
         trackerLastValidFixTs: Long, trackerLastValidFixRt: Long,
-        trackerSpeed: Double, jumpTier: Int, isAdaptiveJump: Boolean,
+        trackerSpeed: Double, jumpTier: Int,
         trackerBattery: Int, trackerTemp: Double, wasDistanceViolated: Boolean,
         distanceViolationCounter: Int, firstViolationTs: Long, firstViolationRt: Long,
         firstViolationWasJump: Boolean, maxDistance: Double,
@@ -861,12 +856,12 @@ class SentinelResult(
 @Serializable
 class JumpConfidence(
     var score: Int = 0, var isJump: Boolean = false, var isOutlier: Boolean = false,
-    var tier: Int = 0, var reason: String = "", var isAdaptiveJump: Boolean = false
+    var tier: Int = 0, var reason: String = ""
 ) {
-    fun reset() { score = 0; isJump = false; isOutlier = false; tier = 0; reason = ""; isAdaptiveJump = false }
+    fun reset() { score = 0; isJump = false; isOutlier = false; tier = 0; reason = "" }
     fun copyFrom(other: JumpConfidence) {
         this.score = other.score; this.isJump = other.isJump; this.isOutlier = other.isOutlier
-        this.tier = other.tier; this.reason = other.reason; this.isAdaptiveJump = other.isAdaptiveJump
+        this.tier = other.tier; this.reason = other.reason
     }
 }
 

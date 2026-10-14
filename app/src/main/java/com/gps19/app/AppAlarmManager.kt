@@ -13,12 +13,11 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Oct.13.30:
+ * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
  * Oct.10.2:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
  *   TimeProvider and BootLifecycleAuthority APIs.
- * Oct.7.6:
- * - Issue #SIMP-1007-16: JNI FastPath Expansion. Updated AlarmEvent emission 
- *   to utilize the unified ForensicSnapshot container.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -343,7 +342,6 @@ class AppAlarmManager @Inject constructor(
             trackerLastValidFixRt = update.lastValidFixRt,
             trackerSpeed = update.kinetic.speed, 
             jumpTier = update.jumpTier, 
-            isAdaptiveJump = update.isAdaptiveJump, 
             trackerBattery = update.integrity.battery, 
             trackerTemp = update.atmospheric.temp,
             wasDistanceViolated = evaluationState.wasDistanceViolated, 

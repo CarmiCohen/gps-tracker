@@ -26,14 +26,12 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.13.21:
+ * - ISSUE-OCT13.20-L1: Dead Code Cleanup. Removed unused lastGpsBearing, 
+ *   lastKnownLocation, and lastGpsSpeed.
+ * - Fix: Corrected typo RIBBON_NOIE_SCALE_DB to RIBBON_NOISE_SCALE_DB.
  * Oct.12.18:
- * - Issue #ISSUE-OCT12.13-11: Temporal Jitter Hardening. Synchronized HardwareSuite active 
- *   role during initialization and dynamic transition to ensure role-isolated 
- *   GNSS audits.
- * Oct.12.1:
- * - Issue #SIMP-1012-1: Memory Pressure Hardening. Integrated OfflineRepository 
- *   adaptive pruning and HardwareSuite buffer trimming into performMemoryFlush(). 
- *   Propagated memoryPressureLevel for sub-sampling.
+ * - Issue #ISSUE-OCT12.13-11: Temporal Jitter Hardening.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -74,7 +72,6 @@ class MonitorService : BaseMonitorService() {
     private var lastForensicTilt = 0.0
     private var lastWasCooling = false
     
-    private var lastGpsBearing = 0.0
     private var lastGpsAccuracy = 0.0
 
     private var isManualJammerActive = false
@@ -93,8 +90,10 @@ class MonitorService : BaseMonitorService() {
     }
 
     override suspend fun onServiceInitialize() {
-        repository.saveLongSync(currentRole, LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis)
-        repository.saveLongSync(currentRole, LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime)
+        withContext(Dispatchers.IO) {
+            repository.saveLongSync(currentRole, LAST_SERVICE_TICK_TS_KEY, timeProvider.currentTimeMillis)
+            repository.saveLongSync(currentRole, LAST_SERVICE_TICK_REALTIME_KEY, timeProvider.elapsedRealtime)
+        }
 
         val trackerId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
         val viewerId = repository.getString(VIEWER_ID_KEY, SettingsRepository.DEFAULT_VIEWER_ID)
@@ -114,11 +113,12 @@ class MonitorService : BaseMonitorService() {
         connectivitySuite.updateRemoteProcessor(remoteProcessor)
         connectivitySuite.start(configManager.relayUrl, configManager.deviceId, configManager.viewerId, isTrackerMode)
         
-        loadLogicState()
+        withContext(Dispatchers.IO) {
+            loadLogicState()
+        }
 
         historyManager.initialize(lifecycleScope, currentRole)
         
-        // Issue #ISSUE-OCT12.13-11: Synchronize role before starting hardware
         hardwareSuite.setActiveRole(currentRole)
         hardwareSuite.start()
 
@@ -268,7 +268,6 @@ class MonitorService : BaseMonitorService() {
         notificationManager.setTrackerMode(isTrackerMode)
         configManager.isTrackerMode = isTrackerMode
 
-        // Issue #ISSUE-OCT12.13-11: Synchronize role before starting hardware
         hardwareSuite.setActiveRole(currentRole)
 
         val trackerId = repository.getString(TRACKER_ID_KEY, SettingsRepository.DEFAULT_TRACKER_ID)
@@ -383,7 +382,6 @@ class MonitorService : BaseMonitorService() {
     }
 
     private fun onLocationChanged(location: Location) {
-        lastGpsBearing = location.bearing.toDouble()
         lastGpsAccuracy = location.accuracy.toDouble()
         locationBuffer.add(location)
     }
@@ -609,7 +607,7 @@ class MonitorService : BaseMonitorService() {
             }
             lastProcessedLocation = primaryProcessor.processGpsPoint(update = pointSnapshot, isViewerTrail = !isTrackerMode, lastGpsTs = sessionManager.lastGpsTs, isLocal = true)
             if (lastProcessedLocation?.isClockRegression == false) { sessionManager.lastGpsTs = loc.time }
-            lastGpsBearing = loc.bearing.toDouble(); lastGpsAccuracy = loc.accuracy.toDouble()
+            lastGpsAccuracy = loc.accuracy.toDouble()
         }
 
         val proc = lastProcessedLocation
@@ -641,8 +639,10 @@ class MonitorService : BaseMonitorService() {
         ))
 
         lastServiceTickTs = now; lastServiceTickRealtime = nowRt
-        repository.saveLongSync(currentRole, LAST_SERVICE_TICK_TS_KEY, now)
-        repository.saveLongSync(currentRole, LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
+        lifecycleScope.launch(Dispatchers.IO) {
+            repository.saveLongSync(currentRole, LAST_SERVICE_TICK_TS_KEY, now)
+            repository.saveLongSync(currentRole, LAST_SERVICE_TICK_REALTIME_KEY, nowRt)
+        }
         serviceTickCounter++
         triggerForensicSample()
     }
@@ -767,9 +767,6 @@ class MonitorService : BaseMonitorService() {
         val perms = systemStatusProvider.getPermissionState(forceRefresh = true)
         capabilities = HardwareCapabilities(hasBackgroundRestriction = perms.hasBackgroundRestriction, backgroundStatus = perms.backgroundStatus, autostartStatus = perms.autostartStatus, requiresWakeLockRenewal = perms.requiresWakeLockRenewal, requiresExtraTopPadding = perms.requiresExtraTopPadding, isManualOverrideActive = perms.isManualOverride, isA15Device = perms.isA15Device, isSamsungDevice = perms.isSamsungDevice, isHuaweiDevice = perms.isHuaweiDevice, isMicrophoneGranted = perms.isMicrophoneGranted, performanceTier = perms.performanceTier)
     }
-
-    private var lastKnownLocation: Location? = null
-    private var lastGpsSpeed = 0.0
 
     private fun executeAutomatedStressTest() {
         lifecycleScope.launch(Dispatchers.Default) {
