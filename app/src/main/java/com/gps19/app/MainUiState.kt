@@ -170,7 +170,7 @@ data class SessionUiState(
                          (permissions.backgroundStatus == CapabilityStatus.GRANTED || 
                           permissions.autostartStatus == CapabilityStatus.GRANTED) &&
                          !(permissions.backgroundStatus == CapabilityStatus.UNKNOWN && permissions.isManualOverride)
-        if (count == 0 && configIssue) count++
+        if (count == 0 && count == 0 && configIssue) count++
         
         return count
     }
@@ -454,7 +454,9 @@ data class NavigationState(
     val pendingMode: String? = null,
     val replayCursorTs: Long? = null,
     val serviceRecoveryTrigger: Int = 0
-)
+) {
+    val isAnyOverlayOpen: Boolean get() = isSettingsOpen || isLogVisible || isRibbonsVisible || isGnssDetailVisible || isPhoneSetupVisible
+}
 
 enum class SubSettings { ALERTS, SOUND, CLEAN }
 

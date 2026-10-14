@@ -2,10 +2,6 @@
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
-### 🚩 Result Flags Legend:
-*   **Logical Status**: Verifies that the code implementation follows the architectural requirements and emits correct log signatures (e.g., pulses triggering in Logcat).
-*   **Physical Status**: Verifies that the hardware (A15/S21FE) and environment (Relay) physically resolve the failure state (e.g., SRV turns Green, GPS fix is regained).
-
 ---
 
 ## Chapter 1 - Deployment & Initial Launch
@@ -22,7 +18,6 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **1.5 Role Selection UX Branding (Issue #1177):**
     *   **Action:** Launch app with no remote peer active.
     *   **Verification:** Confirm "VIEWER MODE" card is dimmed (`Slate500`). Activate a remote tracker and verify card color transitions to `ViewerCyan` automatically.
-    *   **Status (Sep.22.00):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 2 - Setup and Configuration
 **Goal:** Validate the configuration pipeline and diagnostic tools.
@@ -35,19 +30,15 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **2.4 Geofence & Home Point Management (Issue #1179):**
     *   **Action:** Enter geofence addition/removal mode and execute high-frequency rapid updates/taps to add and remove multiple home points.
     *   **Verification:** Verify that `geofenceMode` persists (does not reset to `IDLE`) during batch operations, enabling friction-less batch updates. Confirm `isFenceVisible` is forced to `true` upon entry for immediate visual feedback. Ensure atomic DataStore mutations prevent any list mutation corruption or race conditions.
-    *   **Status (Sep.22.03):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 *   **2.5 DataStore Mutation Extension (Issue #1180):**
     *   **Action:** Invoke consecutive save operations for configuration values, metrics, and home points.
     *   **Verification:** Confirm all updates compile correctly under the unified `mutate` extension and resolve sequentially without data race visibility or state inconsistency under high load.
-    *   **Status (Sep.22.04):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 *   **2.6 UseCase Functional Consolidation (Issue #1181):**
     *   **Action:** Invoke map overlays, geofence mutations, and spatial events simultaneously under rapid screen interactions.
     *   **Verification:** Verify that all calls flow flawlessly into `SpatialLogicUseCase` without any race conditions, data inconsistencies, or behavioral regression compared to old standalone models.
-    *   **Status (Sep.22.05):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 *   **2.7 Connection Sticky-State (Issue #1422):**
     *   **Action:** Change Relay URL or Device IDs while the app is actively connected (SRV green).
     *   **Verification:** Confirm the app immediately disconnects and attempts a new connection with the updated parameters. Verify `CommunicationManager` does not "stick" to the previous configuration.
-    *   **Status (Oct.03.6):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 3 - Tracker Mode Operation
 **Goal:** Verify telemetry accuracy and sentinel logic.
@@ -62,7 +53,6 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **3.4 Status Row Presentation (Issue #1176, #1178):**
     *   **1176 SI Unit Suffix:** Verify temperature displays as `X°` (e.g., `35°`).
     *   **1178 GNSS Initialization:** Verify satellite counts show `--/--` before hardware initialization, then transition to numeric values.
-    *   **Status (Sep.22.00):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 *   **3.5 Tracker Map Stability (Issue #1383):**
     *   **Action:** Tap zoom buttons and perform pinch gestures on the map.
     *   **Verification:** Verify map does not enter "Autonomous Zoom-In" loop. Confirm zoom-out functions correctly.
@@ -72,11 +62,9 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **3.7 Dashboard Continuity (Issue #1414):**
     *   **Action:** Run Tracker mode without any connected Viewers.
     *   **Verification:** Confirm behavioral state (MOVING/PARKING) is displayed on the local dashboard. Bypasses peer connectivity gate for local-only diagnostic sessions.
-    *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 *   **3.8 StatusBar Visual & Logic Hardening (Issue #1423):**
     *   **Action:** Switch to Portrait mode and observe the StatusBar telemetry rows.
     *   **Verification:** Confirm that "Viewer" and "Tracker" sub-rows are stacked vertically with clear spacing. Confirm speed text color matches tracker state color (Gray when `UNKNOWN`). Verify GPS age is a positive number (e.g., "5s") and not negative.
-    *   **Status (Oct.03.7):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 4 - Viewer Mode & Remote Sync
 **Goal:** Validate real-time synchronization.
@@ -105,15 +93,12 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **4.9 Mode-Based Alert Restriction (Issue #1413):**
     *   **Action:** Induce violations while in Tracker Mode.
     *   **Verification:** Confirm the Red Alert Screen (AlarmOverlay) is NEVER promoted on the Tracker. Only status bar badges (ALM) and logs should reflect the violation to preserve stealth.
-    *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 *   **4.10 Alarm Acknowledgment Idempotency (Issue #1410):**
     *   **Action:** Acknowledge an alert on the Viewer during a 500ms network jitter event.
     *   **Verification:** Confirm the alert does not "re-trigger" on the Tracker. Uses `violationStartTs` to ensure stale telemetry cannot revive a resolved alarm.
-    *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 *   **4.11 HUD Visibility & Occlusion (Issue #1421):**
     *   **Action:** Open Settings or Log overlays in Portrait mode.
     *   **Verification:** Confirm that the Header and HUD (StatusBar) hide automatically to prevent overlapping with overlay controls. Confirm the map remains visible behind the HUD surface (alpha 0.4).
-    *   **Status (Oct.03.5):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 5 - Recovery and Edge Cases
 **Goal:** Verify system resilience against signal loss.
@@ -134,29 +119,23 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **7.3 Engine Thread Safety (Issue #1410 / R-ID 585):**
     *   **Action:** Run Automated Stress Test (250Hz sensor audit).
     *   **Verification:** Confirm zero `ConcurrentModificationException` crashes. Map mutations in `MainAlarmLogic` must be synchronized with `AppAlarmManager` iteration.
-    *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 *   **7.4 WindowManager Resource Lifecycle (Issue #1402-B / R-ID 582):**
     *   **Action:** Sustained 1-hour alert cycle on low-memory device (A15).
     *   **Verification:** Confirm `AlarmOverlayService` cleans up all views on `stopSelf()`. No cumulative memory growth from orphaned `ComposeView` instances.
-    *   **Status (Oct.01.8):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 *   **7.5 Native Stationary Convergence (Issue #SIMP-1510-1):**
     *   **Action:** Monitor sensor diagnostics while the device is stationary on a desk.
     *   **Verification:** Confirm stationary detection and vibration floor EMA calculations are handled by JNI (no JVM floating point errors). Verify zero lag in "STATIONARY" status update.
-    *   **Status (Oct.03.1):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 *   **7.6 Granular HUD Binding (Issue #1420):**
     *   **Action:** Update remote battery level and observe HUD recomposition counts via Layout Inspector.
     *   **Verification:** Confirm that only the battery-related sub-components recompose. The map and other telemetry slices must remain unaffected due to granular interface slicing.
-    *   **Status (Oct.03.1):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapter 8 - Validation Hooks & Aggregation
 *   **8.1 Forensic Stall Simulation:** EMA reliability drop check.
 *   **8.2 State Aggregation Stability:** Rapid HUD transitions.
 
 ## Chapters 9-20: Hardening Baselines
-*   **Status (Sep.22.05):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ## Chapters 21-100: Advanced Forensic & System Chapters
-*   **Status (Sep.22.05):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED**.
 
 ---
 **Total Testing Chapters: 100**

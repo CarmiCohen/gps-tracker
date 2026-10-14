@@ -1,22 +1,26 @@
-# Project Handover - Oct14.12
+# Project Handover - Oct14.13
 
-## ✅ Current Status: S21FE & A15 Verification Complete
-- **Version**: Oct14.12
-- **Focus**: Hardware-specific stability and forensic soak validation across staggered tiers.
+## ? Current Status: Regression Discovery & Hardening Audit
+- **Version**: Oct14.13
+- **Focus**: Full project unit test verification and regression logging.
 - **Key Changes**:
-    - **S21FE Verification (ISSUE-OCT14.12-I1)**:
-        - Executed 5-minute soak simulation on Samsung S21FE (G990).
-        - Result: 100% Pass (25/25 tests).
-    - **A15 Verification (ISSUE-OCT14.10-I1)**:
-        - Executed 30-minute soak simulation on Samsung A15 (SM-A155F).
-        - Result: 100% Pass (25/25 tests).
-    - **Power Policy Hardening**:
-        - Verified signaling deferral consistency (R497) during Doze transitions on both hardware profiles.
+    - **Unit Test Execution**: Ran all 88 unit tests across `:app` and `:core:engine`.
+    - **Regression Identification**:
+        - **ISSUE-OCT14.0-F1**: `DataStoreMutationStressTest` failing due to race conditions in atomic mutations (Expected 100, got 2).
+        - **ISSUE-OCT14.0-F2**: `AlarmStealthTest` failing due to Viewer mode branding mismatch (Issue #1413).
+    - **Documentation Synchronization**: Updated `test_results.md`, `issues.md`, `SOT_MASTER_REQUIREMENTS.md`, and `RESOLUTION_ARCHIVE.md` to reflect these regressions.
+    - **Strategic Simplification**: Proposed `Atomic Mutation Simplification` (High) and `Entity Branding Provider` (Medium) to address root causes.
 
-## 🛠️ Pending Debt
-- **SIMP-OCT14.11-S1**: Forensic Spill Flush Optimization (Medium). Investigate `commitDrain` batching logic to ensure it stays below 5ms on the A15 under extreme 250Hz sensor load.
-- **SIMP-OCT14.10-S1**: HUD Mapper Extraction (Low). Consider moving state transformation logic to a dedicated mapper class to prune `MainViewModel` size.
+## ? Project Metrics
+- **Total Production Lines**: ~32,845 (Excluding tests/issues).
+- **Test Coverage**: 86/88 Passed (2 Regressions identified).
 
-## 🔍 Forensic Pulse
-- **SOT Metrics**: 257 Architectural Rules / 414 Total Requirements.
-- **Audit Baseline**: Oct14.12: [SOT Count: 414 (Rules: 257), Open: H:0, M:0, L:0, Ideas: H:0, M:11, L:8, Testing: 13 (Sub-items: 118), QA: 318]
+## ?? Pending Debt
+- **ISSUE-OCT14.0-F1**: Fix race condition in DataStore atomic mutations.
+- **ISSUE-OCT14.0-F2**: Fix branding logic in Alarm mode-awareness.
+- **SIMP-OCT14.11-S1**: Forensic Spill Flush Optimization (Medium).
+- **SIMP-OCT14.10-S1**: HUD Mapper Extraction (Low).
+
+## ? Forensic Pulse
+- **SOT Metrics**: 257 Architectural Rules / 415 Total Requirements.
+- **Audit Baseline**: Oct14.13: [SOT Count: 415 (Rules: 257), Open: H:0, M:2, L:0, Ideas: H:1, M:12, L:8, Testing: 13 (Sub-items: 118), QA: 318]
