@@ -1,13 +1,14 @@
 # Project Issues & Hardening Tracking (Rigorous Audit) - Oct14.1
 
-## 🎯 Current Resumption Focus: COMPLETED Buffer Constructor Refactoring (SIMP-OCT15.4-S2).
+## 🎯 Current Resumption Focus: COMPLETED Persistence Policy & Repository Consolidation (ISSUE-OCT15.7-F1).
 
 ## 🟢 Open Gaps & Unfinished Integration Points
 *   *No active gaps.*
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 26)
+## 💡 Strategic Simplification Ideas (Ideas: 27)
+*   **SIMP-OCT15.7-S1: Persistence Policy Consolidation (Low).** RESOLVED Oct14.1. Expanded `PersistencePolicy` to cover all IO types and moved trail mapping to `TelemetryMapper`.
 *   **SIMP-OCT15.4-S2: Buffer Constructor Refactoring (Low).** RESOLVED Oct14.1. Encapsulated `HistoryBuffer` construction and merging logic into its companion object.
 *   **SIMP-OCT15.4-S1: Mapper Consolidation (Low).** RESOLVED OCT15.5. Centralized `HistoryBuffer` mapping logic in `TelemetryMapper`.
 *   **SIMP-OCT15.2-S1: Ribbon Selector Consolidation (Medium).** RESOLVED OCT15.4. Pre-calculated normalized ribbon data within `HistoryBuffer` to offload calculations from the UI thread.
@@ -21,6 +22,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT15.7-F1: Persistence Policy & Repository Consolidation.** Resolved Oct14.1. Expanded `PersistencePolicy` and consolidated all mapping into `TelemetryMapper`. Enforced strict IO gating for Mali anomalies across all repository paths.
 *   **ISSUE-OCT15.6-F1: Buffer Constructor Refactoring (SIMP-OCT15.4-S2).** Resolved Oct14.1. Encapsulated complex array initialization and normalization into `HistoryBuffer.Companion.fromPoints`. Simplified UseCase merging logic with `HistoryBuffer.merge`.
 *   **ISSUE-OCT15.5-F1: Mapper Consolidation (SIMP-OCT15.4-S1).** Resolved OCT15.5. Centralized redundant `HistoryBuffer` mapping logic into `TelemetryMapper.kt`.
 *   **ISSUE-OCT15.4-F1: Ribbon Selector Consolidation (SIMP-OCT15.2-S1).** Resolved OCT15.4. Offloaded telemetry scaling (0.0-1.0) to background mapping pipelines, storing results in `HistoryBuffer` primitive arrays.
@@ -31,6 +33,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct14.1: [SOT Count: 429 (Rules: 268), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:7, Testing: 16 (Sub-items: 125), QA: 331]**
 - **Oct14.1: [SOT Count: 428 (Rules: 267), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:6, Testing: 16 (Sub-items: 125), QA: 331]**
 - **Oct14.1: [SOT Count: 427 (Rules: 266), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:7, Testing: 16 (Sub-items: 125), QA: 330]**
 - **OCT15.4: [SOT Count: 426 (Rules: 265), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:7, Testing: 16 (Sub-items: 125), QA: 329]**

@@ -6,18 +6,11 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.15.7:
+ * - ISSUE-OCT15.7-F1: Consolidated TrailBuffer mapping logic from MainRepository.
  * Oct.15.6:
  * - SIMP-OCT15.4-S2: Buffer Constructor Refactoring. Offloaded HistoryBuffer 
  *   mapping logic to HistoryBuffer.Companion.fromPoints.
- * Oct.15.5:
- * - SIMP-OCT15.4-S1: Mapper Consolidation. Centralized HistoryBuffer mapping 
- *   logic to eliminate redundancy and ensure normalization consistency.
- * Oct.13.30:
- * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
- * Oct.10.10:
- * - Issue #SIMP-1010-3: Signal Decay Audit. Corrected SNR reconstruction scaling 
- *   to use RIBBON_SNR_SCALE_DB (45.0) instead of hardcoded 5.0. Ensured snrSnapshot 
- *   precedence over indexed fallback in mapProtoToSnapshot and mapStatusToSnapshot.
  */
 object TelemetryMapper {
 
@@ -893,5 +886,30 @@ object TelemetryMapper {
             ConnectionPoint().also { mapEntityToApp(entity, it) }
         }
         return HistoryBuffer.fromPoints(points)
+    }
+
+    /**
+     * mapEntitiesToTrailBuffer: Authority for converting Room entities to 
+     * primitive-backed TrailBuffer (ISSUE-OCT15.7-F1).
+     */
+    fun mapEntitiesToTrailBuffer(entities: List<TrailEntity>): TrailBuffer {
+        val size = entities.size
+        val lats = DoubleArray(size)
+        val lngs = DoubleArray(size)
+        val timestamps = LongArray(size)
+        val statuses = IntArray(size)
+        val accuracies = DoubleArray(size)
+        val maxAccuracies = DoubleArray(size)
+        
+        entities.forEachIndexed { i, entity ->
+            lats[i] = entity.lat
+            lngs[i] = entity.lng
+            timestamps[i] = entity.timestamp
+            statuses[i] = try { SentinelStatus.valueOf(entity.status).ordinal } catch(e: Exception) { SentinelStatus.VALID.ordinal }
+            accuracies[i] = entity.accuracy
+            maxAccuracies[i] = entity.maxAccuracy
+        }
+        
+        return TrailBuffer(lats, lngs, timestamps, statuses, accuracies, maxAccuracies, size)
     }
 }

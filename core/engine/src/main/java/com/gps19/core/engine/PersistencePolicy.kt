@@ -2,11 +2,12 @@ package com.gps19.core.engine
 
 /**
  * PersistencePolicy: Rules for determining if data should be written to disk.
+ * Oct.15.7:
+ * - ISSUE-OCT15.7-F1: Expanded policy to include Violation and Maintenance gating.
+ *   Ensured Mali anomalies block all IO to prevent driver-level contention.
  * Oct.11.1:
  * - Issue #SIMP-1011-8: I/O Pressure Test. Integrated isMaliAnomaly into 
- *   persistence gating to inhibit IO during driver-level stalls.
- * July.16.18:
- * - Issue #516: De-duplicate "Status" Logic. Use SystemHealthState.
+ *   persistence gating.
  */
 object PersistencePolicy {
 
@@ -17,7 +18,7 @@ object PersistencePolicy {
         health: SystemHealthState,
         status: SentinelStatus
     ): Boolean {
-        // Issue #SIMP-1011-8: Block trail IO during Mali anomalies to mitigate contention.
+        // Block trail IO during Mali anomalies or critical storage.
         if (health.isStorageCritical || health.isMaliAnomaly) return false
         
         // On low storage, we only save high-priority forensic points (JUMP or TAMPER).
@@ -30,7 +31,24 @@ object PersistencePolicy {
      * Determines if history/telemetry points should be saved.
      */
     fun shouldSaveHistoryPoint(health: SystemHealthState): Boolean {
-        // Issue #SIMP-1011-8: Block history IO during Mali anomalies.
+        // Block history IO during Mali anomalies or critical storage.
         return !health.isStorageCritical && !health.isMaliAnomaly
+    }
+
+    /**
+     * Determines if a violation should be saved. 
+     * Violations are higher priority than trails but must respect critical failures.
+     */
+    fun shouldSaveViolation(health: SystemHealthState): Boolean {
+        return !health.isStorageCritical && !health.isMaliAnomaly
+    }
+
+    /**
+     * Determines if background maintenance (pruning) should run.
+     * Pruning is heavy IO; inhibit during driver stalls or battery stress.
+     */
+    fun shouldPerformMaintenance(health: SystemHealthState): Boolean {
+        // Pruning helps storage but must wait if there's a driver-level stall (Mali).
+        return !health.isBatteryCritical && !health.isMaliAnomaly
     }
 }

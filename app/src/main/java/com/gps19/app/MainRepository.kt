@@ -29,15 +29,14 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.15.7:
+ * - ISSUE-OCT15.7-F1: Persistence Policy & Repository Consolidation.
+ *   Consolidated trail mapping into TelemetryMapper. Enforced strict IO gating 
+ *   using expanded PersistencePolicy for violations and maintenance. Fixed 
+ *   loadActiveAlarms method call error.
  * Oct.15.5:
  * - SIMP-OCT15.4-S1: Mapper Consolidation. Refactored to use centralized 
  *   TelemetryMapper for HistoryBuffer transformations.
- * Oct.15.3:
- * - SIMP-OCT15.2-S1: Ribbon Selector Consolidation. Pre-calculating normalized 
- *   telemetry within HistoryBuffer to offload UI thread. Fixed missing commNorm.
- * Oct.15.2:
- * - SIMP-OCT15.1-S1: Primitive History Buffers. Applied TrailBuffer pattern to 
- *   history flows to reduce GC pressure. Transitioned to HistoryBuffer.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -112,36 +111,12 @@ class MainRepository @Inject constructor(
 
     fun eventLogsFlow(limit: Int): Flow<List<LogEntry>> = logRepository.eventLogsFlow(limit)
 
-    /**
-     * mapEntitiesToBuffer: Converts Room entities to primitive-backed TrailBuffer (SIMP-OCT15.0-S1).
-     */
-    private fun mapEntitiesToBuffer(entities: List<TrailEntity>): TrailBuffer {
-        val size = entities.size
-        val lats = DoubleArray(size)
-        val lngs = DoubleArray(size)
-        val timestamps = LongArray(size)
-        val statuses = IntArray(size)
-        val accuracies = DoubleArray(size)
-        val maxAccuracies = DoubleArray(size)
-        
-        entities.forEachIndexed { i, entity ->
-            lats[i] = entity.lat
-            lngs[i] = entity.lng
-            timestamps[i] = entity.timestamp
-            statuses[i] = try { SentinelStatus.valueOf(entity.status).ordinal } catch(e: Exception) { SentinelStatus.VALID.ordinal }
-            accuracies[i] = entity.accuracy
-            maxAccuracies[i] = entity.maxAccuracy
-        }
-        
-        return TrailBuffer(lats, lngs, timestamps, statuses, accuracies, maxAccuracies, size)
-    }
-
     val trackerTrailFlow: Flow<TrailBuffer> = trailDao.getTrail(false).map { entities -> 
-        mapEntitiesToBuffer(entities)
+        TelemetryMapper.mapEntitiesToTrailBuffer(entities)
     }.flowOn(Dispatchers.Default)
 
     val viewerTrailFlow: Flow<TrailBuffer> = trailDao.getTrail(true).map { entities -> 
-        mapEntitiesToBuffer(entities)
+        TelemetryMapper.mapEntitiesToTrailBuffer(entities)
     }.flowOn(Dispatchers.Default)
 
     val violationsFlow: Flow<List<ViolationPoint>> = violationDao.getAllFlow().map { entities -> 
@@ -368,13 +343,15 @@ class MainRepository @Inject constructor(
         trailDao.clearTrail(false); trailDao.clearTrail(true); violationDao.clearAll()
     }
 
-    suspend fun loadTrailStatic(isViewer: Boolean): TrailBuffer = mapEntitiesToBuffer(trailDao.getTrailStatic(isViewer))
+    suspend fun loadTrailStatic(isViewer: Boolean): TrailBuffer = TelemetryMapper.mapEntitiesToTrailBuffer(trailDao.getTrailStatic(isViewer))
 
     suspend fun resetStats() = withContext(Dispatchers.IO) {
         settings.resetStatsBulk(); clearTrails(); historyDao.clearAll(); logRepository.clearLogs(); offlineRepository.clear()
     }
 
     fun addViolation(lat: Double, lng: Double, type: String, accuracy: Double = 0.0, maxAccuracy: Double = 0.0, adaptiveRadius: Double = 0.0, timestamp: Long? = null) {
+        val health = telemetryRepository.systemHealth.value
+        if (!PersistencePolicy.shouldSaveViolation(health)) return
         if (!violationProcessor.shouldRecordViolation(lat, lng, type, accuracy, maxAccuracy)) return
         val wallTs = timestamp ?: timeProvider.currentTimeMillis
         scope.launch { 
@@ -445,7 +422,8 @@ class MainRepository @Inject constructor(
      */
     private fun triggerBackgroundPruning() {
         if (metrics.isPruningActive.getAndSet(true)) return
-        if (telemetryRepository.systemHealth.value.isBatteryCritical) { metrics.isPruningActive.set(false); return }
+        val health = telemetryRepository.systemHealth.value
+        if (!PersistencePolicy.shouldPerformMaintenance(health)) { metrics.isPruningActive.set(false); return }
         
         scope.launch {
             try {
