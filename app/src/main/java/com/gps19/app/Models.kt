@@ -12,6 +12,8 @@ import java.util.*
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
  * Oct.15.3:
+ * - SIMP-OCT15.2-S1: Ribbon Selector Consolidation. Pre-calculated normalized 
+ *   arrays in HistoryBuffer to offload UI thread calculations.
  * - SIMP-OCT15.1-S2: Map Rendering Primitive Integration. Transitioned 
  *   MapTrailSegment to use DoubleArrays to avoid GeoPoint creation in mapper.
  * Oct.15.2:
@@ -20,9 +22,6 @@ import java.util.*
  * Oct.15.1:
  * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Introduced TrailBuffer with 
  *   primitive arrays to reduce GC pressure during long tracking sessions.
- * Oct.12.3:
- * - Issue #SIMP-1012-3: Forensic Integrity. Added checksum to LogEntry to 
- *   support storage-level corruption detection for forensic traces.
  */
 
 @Serializable
@@ -120,6 +119,7 @@ data class TrailBuffer(
 /**
  * HistoryBuffer: Optimized container for connection history points using primitive arrays.
  * Designed to minimize GC pressure during ribbon rendering (SIMP-OCT15.1-S1).
+ * Oct.15.3 (SIMP-OCT15.2-S1): Added pre-calculated normalized arrays to offload UI thread.
  */
 @Serializable
 data class HistoryBuffer(
@@ -152,6 +152,25 @@ data class HistoryBuffer(
     val ioWait: DoubleArray,
     val maxIoLatency: LongArray,
     val kineticEnergy: DoubleArray,
+    val snrNorm: FloatArray,
+    val noiseNorm: FloatArray,
+    val kineticNorm: FloatArray,
+    val luxNorm: FloatArray,
+    val vibeNorm: FloatArray,
+    val proxNorm: FloatArray,
+    val liftNorm: FloatArray,
+    val batNorm: FloatArray,
+    val thmNorm: FloatArray,
+    val curNorm: FloatArray,
+    val sitNorm: FloatArray,
+    val tltNorm: FloatArray,
+    val baroNorm: FloatArray,
+    val svzNorm: FloatArray,
+    val sdzNorm: FloatArray,
+    val cpuNorm: FloatArray,
+    val iowNorm: FloatArray,
+    val latNorm: FloatArray,
+    val commNorm: FloatArray,
     val size: Int
 ) {
     fun getPoint(index: Int): ConnectionPoint {
@@ -221,6 +240,25 @@ data class HistoryBuffer(
         if (!ioWait.contentEquals(other.ioWait)) return false
         if (!maxIoLatency.contentEquals(other.maxIoLatency)) return false
         if (!kineticEnergy.contentEquals(other.kineticEnergy)) return false
+        if (!snrNorm.contentEquals(other.snrNorm)) return false
+        if (!noiseNorm.contentEquals(other.noiseNorm)) return false
+        if (!kineticNorm.contentEquals(other.kineticNorm)) return false
+        if (!luxNorm.contentEquals(other.luxNorm)) return false
+        if (!vibeNorm.contentEquals(other.vibeNorm)) return false
+        if (!proxNorm.contentEquals(other.proxNorm)) return false
+        if (!liftNorm.contentEquals(other.liftNorm)) return false
+        if (!batNorm.contentEquals(other.batNorm)) return false
+        if (!thmNorm.contentEquals(other.thmNorm)) return false
+        if (!curNorm.contentEquals(other.curNorm)) return false
+        if (!sitNorm.contentEquals(other.sitNorm)) return false
+        if (!tltNorm.contentEquals(other.tltNorm)) return false
+        if (!baroNorm.contentEquals(other.baroNorm)) return false
+        if (!svzNorm.contentEquals(other.svzNorm)) return false
+        if (!sdzNorm.contentEquals(other.sdzNorm)) return false
+        if (!cpuNorm.contentEquals(other.cpuNorm)) return false
+        if (!iowNorm.contentEquals(other.iowNorm)) return false
+        if (!latNorm.contentEquals(other.latNorm)) return false
+        if (!commNorm.contentEquals(other.commNorm)) return false
         return true
     }
 
@@ -254,6 +292,25 @@ data class HistoryBuffer(
         result = 31 * result + ioWait.contentHashCode()
         result = 31 * result + maxIoLatency.contentHashCode()
         result = 31 * result + kineticEnergy.contentHashCode()
+        result = 31 * result + snrNorm.contentHashCode()
+        result = 31 * result + noiseNorm.contentHashCode()
+        result = 31 * result + kineticNorm.contentHashCode()
+        result = 31 * result + luxNorm.contentHashCode()
+        result = 31 * result + vibeNorm.contentHashCode()
+        result = 31 * result + proxNorm.contentHashCode()
+        result = 31 * result + liftNorm.contentHashCode()
+        result = 31 * result + batNorm.contentHashCode()
+        result = 31 * result + thmNorm.contentHashCode()
+        result = 31 * result + curNorm.contentHashCode()
+        result = 31 * result + sitNorm.contentHashCode()
+        result = 31 * result + tltNorm.contentHashCode()
+        result = 31 * result + baroNorm.contentHashCode()
+        result = 31 * result + svzNorm.contentHashCode()
+        result = 31 * result + sdzNorm.contentHashCode()
+        result = 31 * result + cpuNorm.contentHashCode()
+        result = 31 * result + iowNorm.contentHashCode()
+        result = 31 * result + latNorm.contentHashCode()
+        result = 31 * result + commNorm.contentHashCode()
         result = 31 * result + size
         return result
     }
@@ -266,7 +323,11 @@ data class HistoryBuffer(
             DoubleArray(0), DoubleArray(0), DoubleArray(0), DoubleArray(0),
             DoubleArray(0), BooleanArray(0), BooleanArray(0), IntArray(0),
             BooleanArray(0), DoubleArray(0), LongArray(0), DoubleArray(0),
-            DoubleArray(0), DoubleArray(0), LongArray(0), DoubleArray(0), 0
+            DoubleArray(0), DoubleArray(0), LongArray(0), DoubleArray(0),
+            FloatArray(0), FloatArray(0), FloatArray(0), FloatArray(0), FloatArray(0),
+            FloatArray(0), FloatArray(0), FloatArray(0), FloatArray(0), FloatArray(0),
+            FloatArray(0), FloatArray(0), FloatArray(0), FloatArray(0), FloatArray(0),
+            FloatArray(0), FloatArray(0), FloatArray(0), FloatArray(0), 0
         )
     }
 }

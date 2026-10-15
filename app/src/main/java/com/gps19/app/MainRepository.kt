@@ -29,6 +29,9 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.15.3:
+ * - SIMP-OCT15.2-S1: Ribbon Selector Consolidation. Pre-calculating normalized 
+ *   telemetry within HistoryBuffer to offload UI thread. Fixed missing commNorm.
  * Oct.15.2:
  * - SIMP-OCT15.1-S1: Primitive History Buffers. Applied TrailBuffer pattern to 
  *   history flows to reduce GC pressure. Transitioned to HistoryBuffer.
@@ -168,6 +171,26 @@ class MainRepository @Inject constructor(
         val maxIoLatency = LongArray(size)
         val kineticEnergy = DoubleArray(size)
 
+        val snrNorm = FloatArray(size)
+        val noiseNorm = FloatArray(size)
+        val kineticNorm = FloatArray(size)
+        val luxNorm = FloatArray(size)
+        val vibeNorm = FloatArray(size)
+        val proxNorm = FloatArray(size)
+        val liftNorm = FloatArray(size)
+        val batNorm = FloatArray(size)
+        val thmNorm = FloatArray(size)
+        val curNorm = FloatArray(size)
+        val sitNorm = FloatArray(size)
+        val tltNorm = FloatArray(size)
+        val baroNorm = FloatArray(size)
+        val svzNorm = FloatArray(size)
+        val sdzNorm = FloatArray(size)
+        val cpuNorm = FloatArray(size)
+        val iowNorm = FloatArray(size)
+        val latNorm = FloatArray(size)
+        val commNorm = FloatArray(size)
+
         val tempPoint = ConnectionPoint()
         entities.forEachIndexed { i, entity ->
             tempPoint.reset()
@@ -201,13 +224,37 @@ class MainRepository @Inject constructor(
             ioWait[i] = tempPoint.ioWait
             maxIoLatency[i] = tempPoint.maxIoLatency
             kineticEnergy[i] = tempPoint.kineticEnergy
+
+            snrNorm[i] = tempPoint.snrIdx.toFloat()
+            noiseNorm[i] = tempPoint.noiseIdx.toFloat()
+            kineticNorm[i] = (tempPoint.kineticEnergy.toFloat() / RIBBON_KINETIC_ENERGY_SCALE.toFloat()).coerceIn(0f, 1f)
+            luxNorm[i] = tempPoint.luxIdx.toFloat()
+            vibeNorm[i] = tempPoint.vibeIdx.toFloat()
+            proxNorm[i] = tempPoint.proxIdx.toFloat()
+            liftNorm[i] = tempPoint.liftIdx.toFloat()
+            batNorm[i] = if (tempPoint.isBatterySteepDischarge) 1f else 0f
+            thmNorm[i] = if (tempPoint.isCoolingModeActive) 1f else 0f
+            curNorm[i] = (kotlin.math.abs(tempPoint.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f)
+            sitNorm[i] = if (tempPoint.isSitActive) 1f else 0f
+            tltNorm[i] = tempPoint.tiltIdx.toFloat()
+            baroNorm[i] = tempPoint.baroIdx.toFloat()
+            svzNorm[i] = (kotlin.math.abs(tempPoint.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f)
+            sdzNorm[i] = (kotlin.math.abs(tempPoint.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f)
+            cpuNorm[i] = (tempPoint.cpuLoad.toFloat() / RIBBON_CPU_LOAD_SCALE.toFloat()).coerceIn(0f, 1f)
+            iowNorm[i] = (tempPoint.ioWait.toFloat() / RIBBON_IO_WAIT_SCALE.toFloat()).coerceIn(0f, 1f)
+            latNorm[i] = (tempPoint.maxIoLatency.toFloat() / RIBBON_LATENCY_SCALE_MS.toFloat()).coerceIn(0f, 1f)
+            val commIdx = TelemetryUtils.calculateCommIndex(tempPoint.rtt, tempPoint.localSig, tempPoint.remoteSig).toFloat()
+            commNorm[i] = if (tempPoint.isConnected) (commIdx / 10f).coerceIn(0.1f, 1f) else 1f
         }
 
         return HistoryBuffer(
             ts, rt, rtt, localSig, remoteSig, isConnected, isGap, isRecoveryEvent, hasGps,
             gpsIndex, snrIdx, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, tiltIdx, baroIdx,
             isBatterySteepDischarge, isCoolingModeActive, currentMa, isSitActive,
-            sitVz, sitVzTs, sitDz, cpuLoad, ioWait, maxIoLatency, kineticEnergy, size
+            sitVz, sitVzTs, sitDz, cpuLoad, ioWait, maxIoLatency, kineticEnergy,
+            snrNorm, noiseNorm, kineticNorm, luxNorm, vibeNorm, proxNorm, liftNorm,
+            batNorm, thmNorm, curNorm, sitNorm, tltNorm, baroNorm, svzNorm, sdzNorm,
+            cpuNorm, iowNorm, latNorm, commNorm, size
         )
     }
 
@@ -499,35 +546,40 @@ class MainRepository @Inject constructor(
 
     private fun mapPointsToBuffer(points: List<ConnectionPoint>): HistoryBuffer {
         val size = points.size
-        val ts = LongArray(size)
-        val rt = LongArray(size)
-        val rtt = IntArray(size)
-        val localSig = IntArray(size)
-        val remoteSig = IntArray(size)
-        val isConnected = BooleanArray(size)
-        val isGap = BooleanArray(size)
-        val isRecoveryEvent = BooleanArray(size)
-        val hasGps = BooleanArray(size)
-        val gpsIndex = DoubleArray(size)
-        val snrIdx = DoubleArray(size)
-        val noiseIdx = DoubleArray(size)
-        val luxIdx = DoubleArray(size)
-        val vibeIdx = DoubleArray(size)
-        val proxIdx = DoubleArray(size)
-        val liftIdx = DoubleArray(size)
-        val tiltIdx = DoubleArray(size)
-        val baroIdx = DoubleArray(size)
-        val isBatterySteepDischarge = BooleanArray(size)
-        val isCoolingModeActive = BooleanArray(size)
-        val currentMa = IntArray(size)
-        val isSitActive = BooleanArray(size)
-        val sitVz = DoubleArray(size)
-        val sitVzTs = LongArray(size)
-        val sitDz = DoubleArray(size)
-        val cpuLoad = DoubleArray(size)
-        val ioWait = DoubleArray(size)
-        val maxIoLatency = LongArray(size)
-        val kineticEnergy = DoubleArray(size)
+        val ts = LongArray(size); val rt = LongArray(size); val rtt = IntArray(size)
+        val localSig = IntArray(size); val remoteSig = IntArray(size)
+        val isConnected = BooleanArray(size); val isGap = BooleanArray(size)
+        val isRecoveryEvent = BooleanArray(size); val hasGps = BooleanArray(size)
+        val gpsIndex = DoubleArray(size); val snrIdx = DoubleArray(size)
+        val noiseIdx = DoubleArray(size); val luxIdx = DoubleArray(size)
+        val vibeIdx = DoubleArray(size); val proxIdx = DoubleArray(size)
+        val liftIdx = DoubleArray(size); val tiltIdx = DoubleArray(size)
+        val baroIdx = DoubleArray(size); val isBatterySteepDischarge = BooleanArray(size)
+        val isCoolingModeActive = BooleanArray(size); val currentMa = IntArray(size)
+        val isSitActive = BooleanArray(size); val sitVz = DoubleArray(size)
+        val sitVzTs = LongArray(size); val sitDz = DoubleArray(size)
+        val cpuLoad = DoubleArray(size); val ioWait = DoubleArray(size)
+        val maxIoLatency = LongArray(size); val kineticEnergy = DoubleArray(size)
+
+        val snrNorm = FloatArray(size)
+        val noiseNorm = FloatArray(size)
+        val kineticNorm = FloatArray(size)
+        val luxNorm = FloatArray(size)
+        val vibeNorm = FloatArray(size)
+        val proxNorm = FloatArray(size)
+        val liftNorm = FloatArray(size)
+        val batNorm = FloatArray(size)
+        val thmNorm = FloatArray(size)
+        val curNorm = FloatArray(size)
+        val sitNorm = FloatArray(size)
+        val tltNorm = FloatArray(size)
+        val baroNorm = FloatArray(size)
+        val svzNorm = FloatArray(size)
+        val sdzNorm = FloatArray(size)
+        val cpuNorm = FloatArray(size)
+        val iowNorm = FloatArray(size)
+        val latNorm = FloatArray(size)
+        val commNorm = FloatArray(size)
 
         points.forEachIndexed { i, p ->
             ts[i] = p.ts; rt[i] = p.rt; rtt[i] = p.rtt; localSig[i] = p.localSig; remoteSig[i] = p.remoteSig
@@ -538,13 +590,37 @@ class MainRepository @Inject constructor(
             isCoolingModeActive[i] = p.isCoolingModeActive; currentMa[i] = p.currentMa; isSitActive[i] = p.isSitActive
             sitVz[i] = p.sitVz; sitVzTs[i] = p.sitVzTs; sitDz[i] = p.sitDz
             cpuLoad[i] = p.cpuLoad; ioWait[i] = p.ioWait; maxIoLatency[i] = p.maxIoLatency; kineticEnergy[i] = p.kineticEnergy
+
+            snrNorm[i] = p.snrIdx.toFloat()
+            noiseNorm[i] = p.noiseIdx.toFloat()
+            kineticNorm[i] = (p.kineticEnergy.toFloat() / RIBBON_KINETIC_ENERGY_SCALE.toFloat()).coerceIn(0f, 1f)
+            luxNorm[i] = p.luxIdx.toFloat()
+            vibeNorm[i] = p.vibeIdx.toFloat()
+            proxNorm[i] = p.proxIdx.toFloat()
+            liftNorm[i] = p.liftIdx.toFloat()
+            batNorm[i] = if (p.isBatterySteepDischarge) 1f else 0f
+            thmNorm[i] = if (p.isCoolingModeActive) 1f else 0f
+            curNorm[i] = (kotlin.math.abs(p.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f)
+            sitNorm[i] = if (p.isSitActive) 1f else 0f
+            tltNorm[i] = p.tiltIdx.toFloat()
+            baroNorm[i] = p.baroIdx.toFloat()
+            svzNorm[i] = (kotlin.math.abs(p.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f)
+            sdzNorm[i] = (kotlin.math.abs(p.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f)
+            cpuNorm[i] = (p.cpuLoad.toFloat() / RIBBON_CPU_LOAD_SCALE.toFloat()).coerceIn(0f, 1f)
+            iowNorm[i] = (p.ioWait.toFloat() / RIBBON_IO_WAIT_SCALE.toFloat()).coerceIn(0f, 1f)
+            latNorm[i] = (p.maxIoLatency.toFloat() / RIBBON_LATENCY_SCALE_MS.toFloat()).coerceIn(0f, 1f)
+            val commIdx = TelemetryUtils.calculateCommIndex(p.rtt, p.localSig, p.remoteSig).toFloat()
+            commNorm[i] = if (p.isConnected) (commIdx / 10f).coerceIn(0.1f, 1f) else 1f
         }
 
         return HistoryBuffer(
             ts, rt, rtt, localSig, remoteSig, isConnected, isGap, isRecoveryEvent, hasGps,
             gpsIndex, snrIdx, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, tiltIdx, baroIdx,
             isBatterySteepDischarge, isCoolingModeActive, currentMa, isSitActive,
-            sitVz, sitVzTs, sitDz, cpuLoad, ioWait, maxIoLatency, kineticEnergy, size
+            sitVz, sitVzTs, sitDz, cpuLoad, ioWait, maxIoLatency, kineticEnergy,
+            snrNorm, noiseNorm, kineticNorm, luxNorm, vibeNorm, proxNorm, liftNorm,
+            batNorm, thmNorm, curNorm, sitNorm, tltNorm, baroNorm, svzNorm, sdzNorm,
+            cpuNorm, iowNorm, latNorm, commNorm, size
         )
     }
 

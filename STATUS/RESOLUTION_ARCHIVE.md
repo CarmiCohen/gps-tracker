@@ -2,6 +2,13 @@
 
 ...
 
+## 🏁 OCT15.4: Ribbon Selector Consolidation (SIMP-OCT15.2-S1)
+- **Problem**: Forensic connection ribbons performed telemetry normalization (scaling values to 0.0-1.0) on the UI thread during every recomposition, causing unnecessary computational overhead and potential frame drops during high-frequency updates.
+- **Root Cause**: UI components were responsible for data transformation logic that belongs in the data pipeline.
+- **Remediation**: Moved normalization logic into `MainRepository` and `StateSubscriptionUseCase`. Added pre-calculated `FloatArray`s to `HistoryBuffer` to store normalized values. Refactored `SharedUiComponents` to consume these arrays directly.
+- **Impact**: Eliminated runtime scaling calculations on the main thread. Hardened the primitive pipeline by ensuring all UI-ready data is pre-calculated in background threads.
+- **Files**: `Models.kt`, `MainRepository.kt`, `StateSubscriptionUseCase.kt`, `SharedUiComponents.kt`.
+
 ## 🏁 OCT15.3: Map Rendering Primitive Integration (SIMP-OCT15.1-S2)
 - **Problem**: `MapTrailSegment` used `List<GeoPoint>`, causing thousands of `GeoPoint` objects to be created in the `MapStateMapper` during every map update, leading to GC pressure and potential UI stalls.
 - **Root Cause**: Use of object-based coordinate lists in the intermediate UI mapping pipeline.

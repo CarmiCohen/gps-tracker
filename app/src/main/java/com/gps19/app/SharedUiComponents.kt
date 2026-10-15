@@ -48,13 +48,14 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.15.3:
+ * - SIMP-OCT15.2-S1: Ribbon Selector Consolidation. Refactored ribbons to consume 
+ *   pre-calculated normalized arrays in HistoryBuffer, eliminating runtime 
+ *   normalization overhead on the UI thread.
  * Oct.15.2:
  * - SIMP-OCT15.1-S1: Primitive History Buffers. Refactored ribbons to consume 
  *   HistoryBuffer, eliminating thousands of ConnectionPoint object allocations 
  *   during UI updates.
- * Oct.14.9:
- * - SIMP-OCT14.8-S1: HUD State Consolidation. Refactored GlobalStatusBar to 
- *   consume consolidated hudState flow, reducing subscription overhead.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -116,26 +117,6 @@ fun AnalyticalRibbons(
 
     val history by activeHistoryFlow.collectAsStateWithLifecycle()
 
-    val snrSelector = remember { { b: HistoryBuffer, i: Int -> b.snrIdx[i].toFloat() } }
-    val noiseSelector = remember { { b: HistoryBuffer, i: Int -> b.noiseIdx[i].toFloat() } }
-    val kineticSelector = remember { { b: HistoryBuffer, i: Int -> (b.kineticEnergy[i].toFloat() / RIBBON_KINETIC_ENERGY_SCALE.toFloat()).coerceIn(0f, 1f) } }
-    val luxSelector = remember { { b: HistoryBuffer, i: Int -> b.luxIdx[i].toFloat() } }
-    val vibeSelector = remember { { b: HistoryBuffer, i: Int -> b.vibeIdx[i].toFloat() } }
-    val proxSelector = remember { { b: HistoryBuffer, i: Int -> b.proxIdx[i].toFloat() } }
-    val liftSelector = remember { { b: HistoryBuffer, i: Int -> b.liftIdx[i].toFloat() } }
-    val batSelector = remember { { b: HistoryBuffer, i: Int -> if (b.isBatterySteepDischarge[i]) 1f else 0f } }
-    val thmSelector = remember { { b: HistoryBuffer, i: Int -> if (b.isCoolingModeActive[i]) 1f else 0f } }
-    val curSelector = remember { { b: HistoryBuffer, i: Int -> (kotlin.math.abs(b.currentMa[i]).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f) } }
-    val sitSelector = remember { { b: HistoryBuffer, i: Int -> if (b.isSitActive[i]) 1f else 0f } }
-    val tltSelector = remember { { b: HistoryBuffer, i: Int -> b.tiltIdx[i].toFloat() } }
-    val baroSelector = remember { { b: HistoryBuffer, i: Int -> b.baroIdx[i].toFloat() } }
-    val svzSelector = remember { { b: HistoryBuffer, i: Int -> (kotlin.math.abs(b.sitVz[i]).toFloat() / 2.0f).coerceIn(0f, 1f) } }
-    val svzDriftSelector = remember { { b: HistoryBuffer, i: Int -> if (b.sitVzTs[i] > 0) kotlin.math.abs(b.ts[i] - b.sitVzTs[i]) else 0L } }
-    val sdzSelector = remember { { b: HistoryBuffer, i: Int -> (kotlin.math.abs(b.sitDz[i]).toFloat() / 0.5f).coerceIn(0f, 1f) } }
-    val cpuSelector = remember { { b: HistoryBuffer, i: Int -> (b.cpuLoad[i].toFloat() / RIBBON_CPU_LOAD_SCALE.toFloat()).coerceIn(0f, 1f) } }
-    val iowSelector = remember { { b: HistoryBuffer, i: Int -> (b.ioWait[i].toFloat() / RIBBON_IO_WAIT_SCALE.toFloat()).coerceIn(0f, 1f) } }
-    val latSelector = remember { { b: HistoryBuffer, i: Int -> (b.maxIoLatency[i].toFloat() / RIBBON_LATENCY_SCALE_MS.toFloat()).coerceIn(0f, 1f) } }
-
     val amberColor = Color(0xFFF59E0B)
     val roseColor = Color(0xFFF43F5E)
     val violetColor = Color(0xFF8B5CF6)
@@ -162,25 +143,25 @@ fun AnalyticalRibbons(
         ConnectionQualityRibbon(history, "CON", selectedScale, isStrictMode, replayCursorTs, onEvent)
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
 
-        GenericSensorRibbon(history, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), isStrictMode = isStrictMode, valueSelector = snrSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "NOI", selectedScale, lineColor = amberColor, isStrictMode = isStrictMode, valueSelector = noiseSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "KNT", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, valueSelector = kineticSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "LUX", selectedScale, lineColor = Color.White, isStrictMode = isStrictMode, valueSelector = luxSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "VIB", selectedScale, lineColor = Color.Magenta, isStrictMode = isStrictMode, valueSelector = vibeSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "PRX", selectedScale, lineColor = roseColor, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = proxSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "LIF", selectedScale, lineColor = Color(0xFFFACC15), isStrictMode = isStrictMode, valueSelector = liftSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "BAT", selectedScale, lineColor = roseColor, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = batSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = thmSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "CUR", selectedScale, lineColor = Color(0xFFFB923C), isStrictMode = isStrictMode, valueSelector = curSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "SIT", selectedScale, lineColor = Color(0xFFF97316), renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, valueSelector = sitSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "TLT", selectedScale, lineColor = Color(0xFF818CF8), isStrictMode = isStrictMode, valueSelector = tltSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), isStrictMode = isStrictMode, valueSelector = baroSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "SVZ", selectedScale, lineColor = violetColor, isStrictMode = isStrictMode, valueSelector = svzSelector, driftSelector = svzDriftSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "SDZ", selectedScale, lineColor = violetColor, isStrictMode = isStrictMode, valueSelector = sdzSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "SNR", selectedScale, lineColor = Color(0xFF38BDF8), isStrictMode = isStrictMode, normValues = history.snrNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "NOI", selectedScale, lineColor = amberColor, isStrictMode = isStrictMode, normValues = history.noiseNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "KNT", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, normValues = history.kineticNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "LUX", selectedScale, lineColor = Color.White, isStrictMode = isStrictMode, normValues = history.luxNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "VIB", selectedScale, lineColor = Color.Magenta, isStrictMode = isStrictMode, normValues = history.vibeNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "PRX", selectedScale, lineColor = roseColor, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, normValues = history.proxNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "LIF", selectedScale, lineColor = Color(0xFFFACC15), isStrictMode = isStrictMode, normValues = history.liftNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "BAT", selectedScale, lineColor = roseColor, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, normValues = history.batNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "THM", selectedScale, lineColor = Color.Red, renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, normValues = history.thmNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "CUR", selectedScale, lineColor = Color(0xFFFB923C), isStrictMode = isStrictMode, normValues = history.curNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "SIT", selectedScale, lineColor = Color(0xFFF97316), renderType = RibbonRenderType.BAR, isStrictMode = isStrictMode, normValues = history.sitNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "TLT", selectedScale, lineColor = Color(0xFF818CF8), isStrictMode = isStrictMode, normValues = history.tltNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "BAR", selectedScale, lineColor = Color(0xFF2DD4BF), isStrictMode = isStrictMode, normValues = history.baroNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "SVZ", selectedScale, lineColor = violetColor, isStrictMode = isStrictMode, normValues = history.svzNorm, driftSelector = { b, i -> if (b.sitVzTs[i] > 0) kotlin.math.abs(b.ts[i] - b.sitVzTs[i]) else 0L }, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "SDZ", selectedScale, lineColor = violetColor, isStrictMode = isStrictMode, normValues = history.sdzNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
         HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), thickness = 1.dp, color = Color.Gray.copy(alpha = 0.3f))
-        GenericSensorRibbon(history, "CPU", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, valueSelector = cpuSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "IOW", selectedScale, lineColor = amberColor, isStrictMode = isStrictMode, valueSelector = iowSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
-        GenericSensorRibbon(history, "LAT", selectedScale, lineColor = roseColor, isStrictMode = isStrictMode, valueSelector = latSelector, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "CPU", selectedScale, lineColor = Color(0xFF4ADE80), isStrictMode = isStrictMode, normValues = history.cpuNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "IOW", selectedScale, lineColor = amberColor, isStrictMode = isStrictMode, normValues = history.iowNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
+        GenericSensorRibbon(history, "LAT", selectedScale, lineColor = roseColor, isStrictMode = isStrictMode, normValues = history.latNorm, replayCursorTs = replayCursorTs, onEvent = onEvent)
     }
 }
 
@@ -315,19 +296,19 @@ fun GenericSensorRibbon(
     isStrictMode: Boolean = false, 
     replayCursorTs: Long? = null, 
     onEvent: (UiEvent) -> Unit = {},
-    valueSelector: (HistoryBuffer, Int) -> Float, 
+    normValues: FloatArray, 
     driftSelector: ((HistoryBuffer, Int) -> Long)? = null
 ) {
     val sensorHeight = if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) 40.dp else 24.dp
     ForensicRibbonContainer(title, lineColor, sensorHeight, history, scale, isStrictMode, replayCursorTs, onEvent) { totalPoints, pointWidth, baseLineY, maxHeight, landscape ->
-        if (history.size == 0) return@ForensicRibbonContainer
+        if (history.size == 0 || normValues.size < history.size) return@ForensicRibbonContainer
         val startOffset = totalPoints - history.size
         val rectW = maxOf(1f, pointWidth)
         if (renderType == RibbonRenderType.BAR) {
             val barPath = Path()
             for (index in 0 until history.size) { 
                 if (history.isGap[index]) continue
-                val value = valueSelector(history, index).coerceIn(0f, 1f)
+                val value = normValues[index]
                 if (value > 0.01f) { 
                     val barHeight = value * maxHeight
                     barPath.addRect(Rect(Offset((startOffset + index) * pointWidth, baseLineY - barHeight), Size(rectW, barHeight))) 
@@ -345,7 +326,7 @@ fun GenericSensorRibbon(
                     lastPos = null
                     continue 
                 }
-                val value = valueSelector(history, index).coerceIn(0f, 1f)
+                val value = normValues[index]
                 val currentPos = Offset(xPos + (rectW / 2f), baseLineY - (value * maxHeight))
                 if (isStrictMode && driftSelector != null && driftSelector(history, index) > 2000L) {
                     drawRect(Color.Yellow.copy(alpha = 0.5f), Offset((startOffset + index) * pointWidth, baseLineY - maxHeight), Size(maxOf(2f, pointWidth), maxHeight * 0.1f))
@@ -418,9 +399,6 @@ fun ConnectionQualityRibbon(
         for (index in 0 until history.size) { 
             val pTs = history.ts[index]
             val pRt = history.rt[index]
-            val pRtt = history.rtt[index]
-            val pLocalSig = history.localSig[index]
-            val pRemoteSig = history.remoteSig[index]
             val pIsConnected = history.isConnected[index]
             val pIsGap = history.isGap[index]
             val pIsRecoveryEvent = history.isRecoveryEvent[index]
@@ -429,8 +407,7 @@ fun ConnectionQualityRibbon(
 
             val xPos = (startOffset + index) * pointWidth
             if (!pIsGap) { 
-                val commIdx = TelemetryUtils.calculateCommIndex(pRtt, pLocalSig, pRemoteSig).toFloat()
-                val hFactor = if (pIsConnected) (commIdx / 10f).coerceIn(0.1f, 1f) else 1f
+                val hFactor = if (pIsConnected) history.commNorm[index] else 1f
                 val r = Rect(Offset(xPos, effectiveBaseY - (ribbonMaxHeight * hFactor)), Size(rectW, ribbonMaxHeight * hFactor))
                 if (pIsConnected) connectedPath.addRect(r) else disconnectedPath.addRect(r)
                 
