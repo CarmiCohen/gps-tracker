@@ -4,10 +4,10 @@ import com.gps19.core.engine.*
 
 /**
  * DashboardMapper: Centralized authority for dashboard state transformations.
+ * Oct.15.20:
+ * - ISSUE-OCT15.20-F1: HUD Animation Gating. Updated engine version string to Oct15.20.
  * Oct.15.12:
  * - ISSUE-OCT15.11-F1: Vibration Floor Jitter Hardening. Updated engine version string to Oct15.12.
- * Oct.15.11:
- * - ISSUE-OCT15.10-F2: Proximity Debounce Hardening. Updated engine version string to Oct15.11.
  * Oct.14.21: Extracted from MainViewModel to reduce complexity and improve testability.
  */
 object DashboardMapper {
@@ -35,7 +35,7 @@ object DashboardMapper {
             sinceDiscoMs = if (activeStats.lastDiscTs > 0) (nowRt - activeStats.lastDiscTs) else 0L,
             totalDropMs = activeStats.totalDropMs,
             maxDropMs = activeStats.maxDropMs,
-            engineVersion = "Oct15.12",
+            engineVersion = "Oct15.20",
             netInterface = diag.connectivity.netInterface,
             systemPulse = nowRt,
             isLocalOnline = diag.connectivity.isLocalOnline,

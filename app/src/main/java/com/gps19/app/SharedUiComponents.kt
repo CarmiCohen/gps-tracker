@@ -48,18 +48,14 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.15.20:
+ * - ISSUE-OCT15.20-F1: HUD Animation Gating. Updated HeaderBar to accept 
+ *   isMaliAnomaly and gated alertAlpha animation to reduce UI thread 
+ *   pressure during driver stalls.
  * Oct.15.8:
  * - ISSUE-OCT15.8-F1: UI Layer Integrity Audit. Simplified ConnectionQualityRibbon 
  *   to consume pre-calculated normalization values directly, eliminating redundant 
  *   runtime checks.
- * Oct.15.3:
- * - SIMP-OCT15.2-S1: Ribbon Selector Consolidation. Refactored ribbons to consume 
- *   pre-calculated normalized arrays in HistoryBuffer, eliminating runtime 
- *   normalization overhead on the UI thread.
- * Oct.15.2:
- * - SIMP-OCT15.1-S1: Primitive History Buffers. Refactored ribbons to consume 
- *   HistoryBuffer, eliminating thousands of ConnectionPoint object allocations 
- *   during UI updates.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -474,13 +470,21 @@ fun ConnectionQualityRibbon(
 fun HeaderBar(
     isLogVisible: Boolean, isSettingsOpen: Boolean, isRibbonsVisible: Boolean, isMapVisible: Boolean, isPhoneSetupVisible: Boolean = false, 
     requiresExtraTopPadding: Boolean, isSystemReady: Boolean, systemIssuesCount: Int, 
+    isMaliAnomaly: Boolean = false,
     onEvent: (UiEvent) -> Unit
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val isDashboardActive = !isMapVisible && !(isLogVisible || isSettingsOpen || isRibbonsVisible)
     val commitAnd = { event: UiEvent -> if (isSettingsOpen) onEvent(UiEvent.CommitSettings); onEvent(event) }
-    val alertPulse = rememberInfiniteTransition(label = "AlertPulse")
-    val alertAlpha by alertPulse.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), label = "Alpha")
+    
+    val alertAlphaState = if (isMaliAnomaly) {
+        remember { mutableStateOf(1f) }
+    } else {
+        val alertPulse = rememberInfiniteTransition(label = "AlertPulse")
+        alertPulse.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), label = "Alpha")
+    }
+    val alertAlpha by alertAlphaState
+
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         if (isLandscape) {
             Column(modifier = Modifier.fillMaxHeight().width(48.dp).background(Color.Black.copy(alpha = 0.4f)), verticalArrangement = Arrangement.Top, horizontalAlignment = Alignment.CenterHorizontally) {

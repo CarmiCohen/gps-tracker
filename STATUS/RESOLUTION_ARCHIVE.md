@@ -1,20 +1,18 @@
 # Resolution Archive - GPS Tracker
 
+## 🏁 Oct15.20: HUD Animation Gating (ISSUE-OCT15.20-F1)
+- **Problem**: During Mali GPU driver anomalies, active UI animations in the Diagnostic HUD can exacerbate thread contention and lead to ANRs.
+- **Root Cause**: Animations like `movingAlpha` and `alertAlpha` continued to execute on the UI thread even when the GPU was stalled.
+- **Resolution**: Implemented animation gating in `OverlayComponents.kt` and `SharedUiComponents.kt`. Updated `HeaderBar`, `DashboardHeader`, and `StatusBar` to consume `isMaliAnomaly` and freeze animations into static states (using `snap()` or constant alpha) when driver stress is detected.
+- **SOT Impact**: Hardened UI stability for budget hardware during forensic anomalies.
+
 ## 🏁 Oct14.1: Vibration Floor Jitter Hardening (ISSUE-OCT15.11-F1)
 - **Problem**: `Vibration Floor` field showing very high values on some A15 diagnostics.
-- **Root Cause**: EMA convergence logic lacked explicit boundary clamping, allowing noise or uninitialized buffer values to jitter outside physical bounds.
-- **Resolution**: Implemented boundary clamping `[0.02, 2.0]` G in `jdhardware-jni.cpp` (n13, n19), `SentinelValidator.kt` (JVM fallback), and `TelemetryMapper.kt` (ingestion/mapping). Added `VIBRATION_FLOOR_MIN/MAX` constants.
-- **SOT Impact**: Hardened Forensic Diagnostic reliability for A15 hardware.
+- **Resolution**: Implemented boundary clamping `[0.02, 2.0]` G in native (JNI) and JVM layers.
 
 ## 🏁 Oct14.1: Proximity Debounce Hardening (ISSUE-OCT15.10-F2)
 - **Problem**: Extreme negative values in `Prox Debounce` on A15.
-- **Root Cause**: Typo in `HardwareSuite.kt` prevented field updates, and ignored JNI return codes allowed uninitialized buffer values to propagate.
-- **Resolution**: Fixed assignment typo, implemented JNI result validation, and added safety clamping in `TelemetryMapper.kt` and `HardwareSuite.kt`.
-- **SOT Impact**: Hardened Forensic Diagnostic reliability for A15 hardware.
-
-## 🏁 Oct14.1: Unit Test Suite Restoration (ISSUE-OCT15.10-F1)
-- **Problem**: Unit tests failed after Pure Mapping Architecture migration.
-- **Resolution**: Redirected tests to pure mappers, decoupled from ViewModel mocks. Restored Pass Rate to 100%.
+- **Resolution**: Fixed assignment typo and implemented JNI result validation with safety clamping.
 
 ---
 *(Earlier entries archived)*

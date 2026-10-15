@@ -17,10 +17,12 @@ import com.gps19.core.engine.*
 
 /**
  * ViewerScreen: Viewer-mode UI.
+ * Oct.15.20:
+ * - ISSUE-OCT15.20-F1: HUD Animation Gating. Passed isMaliAnomaly from 
+ *   dashboardState to TelemetryBox to enforce driver-level freezing.
  * Oct.14.8:
  * - SIMP-OCT13.21-S1: Pure Event UI. Flattened ViewerDashboard signature by 
  *   migrating TelemetryBox and SessionTerminationButton to UiEvent bus.
- *   Updated AppMapContainer calls to pass onMainEvent.
  */
 
 @Composable
@@ -109,7 +111,8 @@ fun ViewerDashboard(
                         baroAlt = dashboardState.baroAlt, lux = dashboardState.lux, proximityCm = dashboardState.proximityCm, proximityDebounceMs = dashboardState.proximityDebounceMs, rollingVibration = dashboardState.rollingVibration, 
                         trackerMaxTemp = dashboardState.trackerMaxTemp, viewerMaxTemp = dashboardState.viewerMaxTemp, peakShock = dashboardState.peakShock, vibrationFloor = dashboardState.vibrationFloor, luxBaseline = dashboardState.luxBaseline, 
                         acousticFloorDb = dashboardState.acousticFloorDb, trackerCurrentMa = currentMaValue, gpsIdx = gpsIdx, rttValue = rttValue, cpuLoad = dashboardState.cpuLoad, ioWait = dashboardState.ioWait, 
-                        maxIoLatency = dashboardState.maxIoLatency, isUltraLongStationary = dashboardState.isUltraLongStationary, isSuspiciousNoise = dashboardState.isSuspiciousNoise, onEvent = onEvent
+                        maxIoLatency = dashboardState.maxIoLatency, isUltraLongStationary = dashboardState.isUltraLongStationary, isSuspiciousNoise = dashboardState.isSuspiciousNoise, 
+                        isMaliAnomaly = dashboardState.isMaliAnomaly, onEvent = onEvent
                     )
                     DebugTable(isLinkFresh = dashboardState.isLinkFresh, isTelemetryFresh = dashboardState.isTelemetryFresh, isGpsFresh = dashboardState.isGpsFresh, trackerStateName = dashboardState.trackerState.name, gpsAgeSec = if (gpsAge != Long.MAX_VALUE) gpsAge / 1000 else -1L, rtt = rttValue, currentMa = currentMaValue)
                 }
