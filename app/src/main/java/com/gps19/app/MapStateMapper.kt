@@ -5,6 +5,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MapStateMapper: Pure mapping logic for Map state transitions and trail rendering.
+ * Oct.15.1:
+ * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Updated computeTrailSegments to 
+ *   accept TrailBuffer, reducing object overhead during rendering cycles.
  * Oct.15.0: Extracted from MainViewModel to resolve SIMP-OCT14.21-S1.
  */
 object MapStateMapper {
@@ -99,16 +102,24 @@ object MapStateMapper {
         return state to nextSmoothed
     }
 
-    fun computeTrailSegments(trailPoints: List<TrailPoint>, color: Int, nowMs: Long): List<MapTrailSegment> {
-        if (trailPoints.isEmpty()) return emptyList()
+    /**
+     * computeTrailSegments: Optimized trail segmentation using TrailBuffer (SIMP-OCT15.0-S1).
+     */
+    fun computeTrailSegments(trailBuffer: TrailBuffer, color: Int, nowMs: Long): List<MapTrailSegment> {
+        if (trailBuffer.size == 0) return emptyList()
         val segments = mutableListOf<MapTrailSegment>()
         var currentPoints = mutableListOf<GeoPoint>()
         var currentIsStale: Boolean? = null
         val slateGray = 0xFF64748B.toInt()
         
-        trailPoints.forEach { pt ->
-            val age = nowMs - pt.timestamp
+        for (i in 0 until trailBuffer.size) {
+            val ts = trailBuffer.timestamps[i]
+            val lat = trailBuffer.lats[i]
+            val lng = trailBuffer.lngs[i]
+            
+            val age = nowMs - ts
             val isStale = age > 35000L
+            
             if (currentIsStale != null && isStale != currentIsStale) {
                 if (currentPoints.isNotEmpty()) {
                     segments.add(MapTrailSegment(currentPoints.toList(), if (currentIsStale == true) slateGray else color, currentPoints.hashCode()))
@@ -116,10 +127,13 @@ object MapStateMapper {
                     currentPoints = mutableListOf(last)
                 }
             }
-            currentPoints.add(pt.toGeoPoint())
+            currentPoints.add(GeoPoint(lat, lng))
             currentIsStale = isStale
         }
-        if (currentPoints.isNotEmpty()) segments.add(MapTrailSegment(currentPoints.toList(), if (currentIsStale == true) slateGray else color, currentPoints.hashCode()))
+        
+        if (currentPoints.isNotEmpty()) {
+            segments.add(MapTrailSegment(currentPoints.toList(), if (currentIsStale == true) slateGray else color, currentPoints.hashCode()))
+        }
         return segments
     }
 }

@@ -11,12 +11,12 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.15.1:
+ * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Introduced TrailBuffer with 
+ *   primitive arrays to reduce GC pressure during long tracking sessions.
  * Oct.12.3:
  * - Issue #SIMP-1012-3: Forensic Integrity. Added checksum to LogEntry to 
  *   support storage-level corruption detection for forensic traces.
- * Oct.11.1:
- * - Issue #SIMP-1011-7: Thermal Forensic Audit. Added coolingSnapshot to 
- *   LogEntry to authoritatively audit sampling decay during transients.
  */
 
 @Serializable
@@ -54,6 +54,60 @@ data class TrailPoint(
     fun contentEquals(other: TrailPoint): Boolean {
         return lat == other.lat && lng == other.lng && status == other.status && 
                accuracy == other.accuracy && maxAccuracy == other.maxAccuracy
+    }
+}
+
+/**
+ * TrailBuffer: Optimized container for trail points using primitive arrays.
+ * Designed to minimize GC pressure by avoiding thousands of TrailPoint objects (SIMP-OCT15.0-S1).
+ */
+@Serializable
+data class TrailBuffer(
+    val lats: DoubleArray,
+    val lngs: DoubleArray,
+    val timestamps: LongArray,
+    val statuses: IntArray,
+    val accuracies: DoubleArray,
+    val maxAccuracies: DoubleArray,
+    val size: Int
+) {
+    fun getPoint(index: Int): TrailPoint {
+        return TrailPoint(
+            lat = lats[index],
+            lng = lngs[index],
+            timestamp = timestamps[index],
+            status = SentinelStatus.entries.getOrElse(statuses[index]) { SentinelStatus.VALID },
+            accuracy = accuracies[index],
+            maxAccuracy = maxAccuracies[index]
+        )
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is TrailBuffer) return false
+        if (size != other.size) return false
+        if (!lats.contentEquals(other.lats)) return false
+        if (!lngs.contentEquals(other.lngs)) return false
+        if (!timestamps.contentEquals(other.timestamps)) return false
+        if (!statuses.contentEquals(other.statuses)) return false
+        if (!accuracies.contentEquals(other.accuracies)) return false
+        if (!maxAccuracies.contentEquals(other.maxAccuracies)) return false
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = lats.contentHashCode()
+        result = 31 * result + lngs.contentHashCode()
+        result = 31 * result + timestamps.contentHashCode()
+        result = 31 * result + statuses.contentHashCode()
+        result = 31 * result + accuracies.contentHashCode()
+        result = 31 * result + maxAccuracies.contentHashCode()
+        result = 31 * result + size
+        return result
+    }
+
+    companion object {
+        val EMPTY = TrailBuffer(DoubleArray(0), DoubleArray(0), LongArray(0), IntArray(0), DoubleArray(0), DoubleArray(0), 0)
     }
 }
 

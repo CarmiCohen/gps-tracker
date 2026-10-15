@@ -21,6 +21,9 @@ import timber.log.Timber
 
 /**
  * MainFileHelper: Handles importing and exporting configuration and telemetry data.
+ * Oct.15.1:
+ * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Updated to handle TrailBuffer 
+ *   primitive arrays during export to maintain low memory footprint.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
  *   TimeProvider API and fixed property invocation errors.
@@ -315,7 +318,7 @@ object MainFileHelper {
                 val viewerTrail = viewModel.repository.viewerTrailFlow.first()
                 val appMode = state.appMode
 
-                if (trackerTrail.isEmpty() && viewerTrail.isEmpty()) {
+                if (trackerTrail.size == 0 && viewerTrail.size == 0) {
                     withContext(Dispatchers.Main) {
                         Toast.makeText(context, "No trail data to save", Toast.LENGTH_SHORT).show()
                     }
@@ -327,7 +330,8 @@ object MainFileHelper {
                     put("device_id", deviceId)
                     put("role", appMode)
                     put("tracker_trail", JSONArray().apply {
-                        trackerTrail.forEach { pt ->
+                        for (i in 0 until trackerTrail.size) {
+                            val pt = trackerTrail.getPoint(i)
                             put(JSONObject().apply { 
                                 put("lat", pt.lat)
                                 put("lng", pt.lng)
@@ -339,7 +343,8 @@ object MainFileHelper {
                         }
                     })
                     put("viewer_trail", JSONArray().apply {
-                        viewerTrail.forEach { pt ->
+                        for (i in 0 until viewerTrail.size) {
+                            val pt = viewerTrail.getPoint(i)
                             put(JSONObject().apply { 
                                 put("lat", pt.lat)
                                 put("lng", pt.lng)
@@ -388,7 +393,7 @@ object MainFileHelper {
             val logsFile = File(getPublicAppFolder(context), logsFileName)
             FileOutputStream(logsFile).use { it.write(logsJson.toString(4).toByteArray()) }
 
-            val trackerTrail = repository.getTrackerState()?.let { repository.loadTrailStatic(isViewer = false) } ?: emptyList()
+            val trackerTrail = repository.getTrackerState()?.let { repository.loadTrailStatic(isViewer = false) } ?: TrailBuffer.EMPTY
             saveTrailDataInternal(context, trackerTrail, "trail", "tracker", deviceId, isAuto = true, timeProvider)
 
             val viewerTrail = repository.loadTrailStatic(isViewer = true)
@@ -401,12 +406,13 @@ object MainFileHelper {
         }
     }
 
-    private fun saveTrailDataInternal(context: Context, trail: List<TrailPoint>, category: String, source: String, deviceId: String, isAuto: Boolean, timeProvider: TimeProvider): Boolean {
-        if (trail.isEmpty()) return false
+    private fun saveTrailDataInternal(context: Context, trail: TrailBuffer, category: String, source: String, deviceId: String, isAuto: Boolean, timeProvider: TimeProvider): Boolean {
+        if (trail.size == 0) return false
         return try {
             val json = JSONObject().apply {
                 val arr = JSONArray()
-                trail.forEach { 
+                for (i in 0 until trail.size) {
+                    val it = trail.getPoint(i)
                     arr.put(JSONObject().apply {
                         put("lat", it.lat)
                         put("lng", it.lng)

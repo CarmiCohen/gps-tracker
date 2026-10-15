@@ -22,15 +22,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.15.1:
+ * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Integrated TrailBuffer into trail flows 
+ *   to reduce GC pressure during long tracking sessions.
  * Oct.15.0:
  * - Map Mapping Extraction: Refactored Map state mapping into MapStateMapper.kt 
  *   (SIMP-OCT14.21-S1) for complete Pure Flat architectural separation.
- * Oct.14.21:
- * - Dashboard Mapping Extraction: Refactored Dashboard state mapping into 
- *   DashboardMapper.kt (SIMP-OCT14.10-S2) for architectural consistency.
- * Oct.14.20:
- * - HUD Mapping Extraction: Refactored HUD state mapping into HudMapper.kt 
- *   (SIMP-OCT14.10-S1) to improve ViewModel maintainability and testability.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -155,20 +152,20 @@ class MainViewModel @Inject constructor(
     override val history24H: StateFlow<List<ConnectionPoint>> = repository.getHistoryFlow("24H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     override val history7D: StateFlow<List<ConnectionPoint>> = repository.getHistoryFlow("7D").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val trackerTrailFlow: StateFlow<List<TrailPoint>> = repository.trackerTrailFlow
+    private val trackerTrailFlow: StateFlow<TrailBuffer> = repository.trackerTrailFlow
         .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TrailBuffer.EMPTY)
 
-    private val viewerTrailFlow: StateFlow<List<TrailPoint>> = repository.viewerTrailFlow
+    private val viewerTrailFlow: StateFlow<TrailBuffer> = repository.viewerTrailFlow
         .distinctUntilChanged()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), TrailBuffer.EMPTY)
 
     private val trackerTrailSegments: StateFlow<List<MapTrailSegment>> = trackerTrailFlow
-        .map { trail -> MapStateMapper.computeTrailSegments(trail, BrandJd.toArgb(), timeProvider.currentTimeMillis) }
+        .map { buffer -> MapStateMapper.computeTrailSegments(buffer, BrandJd.toArgb(), timeProvider.currentTimeMillis) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val viewerTrailSegments: StateFlow<List<MapTrailSegment>> = viewerTrailFlow
-        .map { trail -> MapStateMapper.computeTrailSegments(trail, ViewerCyan.toArgb(), timeProvider.currentTimeMillis) }
+        .map { buffer -> MapStateMapper.computeTrailSegments(buffer, ViewerCyan.toArgb(), timeProvider.currentTimeMillis) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     override val dashboardState: StateFlow<DashboardState> = combine(

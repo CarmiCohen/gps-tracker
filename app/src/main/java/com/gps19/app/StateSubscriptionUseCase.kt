@@ -11,11 +11,11 @@ import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * Oct.15.1:
+ * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Updated findClosestTrailPoint to 
+ *   support TrailBuffer (primitive arrays), reducing object overhead during replay.
  * Sep.30.42:
  * - Issue #1390: Integrated reactive camera flow support.
- * Sep.30.6:
- * - Issue #1389 RESOLVED: Corrected IntegrityUpdate to consume alarms from 
- *   AppAlarmManager. Ensures the UI reactively promotes the Red Screen.
  */
 class StateSubscriptionUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -82,26 +82,42 @@ class StateSubscriptionUseCase @Inject constructor(
         }
     }
 
-    fun findClosestTrailPoint(trail: List<TrailPoint>, targetTs: Long): TrailPoint? {
-        if (trail.isEmpty()) return null
+    /**
+     * findClosestTrailPoint: Binary search on TrailBuffer timestamps (SIMP-OCT15.0-S1).
+     */
+    fun findClosestTrailPoint(trail: TrailBuffer, targetTs: Long): TrailPoint? {
+        if (trail.size == 0) return null
         
-        val index = trail.binarySearch { it.timestamp.compareTo(targetTs) }
-        val bestIdx = if (index >= 0) {
-            index
-        } else {
-            val insertionPoint = -(index + 1)
-            when {
-                insertionPoint >= trail.size -> trail.size - 1
-                insertionPoint <= 0 -> 0
+        var low = 0
+        var high = trail.size - 1
+        var bestIdx = -1
+
+        while (low <= high) {
+            val mid = (low + high) / 2
+            val midTs = trail.timestamps[mid]
+            if (midTs == targetTs) {
+                bestIdx = mid
+                break
+            } else if (midTs < targetTs) {
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+
+        if (bestIdx == -1) {
+            bestIdx = when {
+                low >= trail.size -> trail.size - 1
+                low <= 0 -> 0
                 else -> {
-                    val d1 = kotlin.math.abs(trail[insertionPoint].timestamp - targetTs)
-                    val d2 = kotlin.math.abs(trail[insertionPoint - 1].timestamp - targetTs)
-                    if (d1 < d2) insertionPoint else insertionPoint - 1
+                    val d1 = kotlin.math.abs(trail.timestamps[low] - targetTs)
+                    val d2 = kotlin.math.abs(trail.timestamps[low - 1] - targetTs)
+                    if (d1 < d2) low else low - 1
                 }
             }
         }
         
-        return trail.getOrNull(bestIdx)
+        return trail.getPoint(bestIdx)
     }
 
     fun clearHistory() {
@@ -162,8 +178,6 @@ class StateSubscriptionUseCase @Inject constructor(
 
     /**
      * Issue #1389: Reactive Integrity Updates.
-     * Combines systemHealth with AppAlarmManager's active alarms to propagate 
-     * critical status to the UI for Red Screen promotion.
      */
     fun observeIntegrityUpdates(): Flow<IntegrityUpdate> {
         return combine(

@@ -1,31 +1,28 @@
-# Project Handover - Oct15.0 (Pure Flat Mapping)
+# Project Handover - OCT15.1 (Trail Buffer Optimization)
 
-## 🟢 Status: Release Ready (Oct15.0 Graduation)
-The project has reached the `Oct15.0` milestone. The primary architectural goal of "Pure Flat" UI mapping is now complete, with HUD, Dashboard, and Map states fully extracted from the ViewModel into dedicated pure mappers.
+## 🟢 Status: Release Ready (OCT15.1 Graduation)
+The project has reached the `OCT15.1` milestone. The primary goal of reducing GC pressure via primitive-backed telemetry buffering is now complete.
 
-## 🛠️ Critical Hardening Details (Oct15.0)
+## 🛠️ Critical Hardening Details (OCT15.1)
 
-### 1. Map Mapping Extraction (SIMP-OCT14.21-S1)
-- **File**: `app/src/main/java/com/gps19/app/MapStateMapper.kt`
-- **Fix**: Extracted `mapMapViewState` and `computeTrailSegments` from `MainViewModel.kt`.
-- **Impact**: Established stateless mapping for Map UI. `MainViewModel` coordinate smoothing (EMA) state is now explicitly passed through the mapper, ensuring architectural purity and testability.
+### 1. Trail Buffer Optimization (SIMP-OCT15.0-S1)
+- **Files**: `Models.kt`, `MainRepository.kt`, `MainViewModel.kt`, `MapStateMapper.kt`, `StateSubscriptionUseCase.kt`, `MainFileHelper.kt`.
+- **Fix**: Replaced `List<TrailPoint>` with `TrailBuffer` using primitive arrays (`DoubleArray`, `LongArray`, etc.) for all high-frequency trail telemetry.
+- **Impact**: Reduced object allocation from O(N) to O(1) per flow emission. Significantly lowered heap fragmentation and GC activity during long-duration tracking on budget hardware (Samsung A15).
 
-### 2. Forensic Buffer Optimization (SIMP-OCT14.11-S1)
-- **File**: `app/src/main/java/com/gps19/app/ForensicSpillBuffer.kt`
-- **Fix**: Moved `MappedByteBuffer.force()` outside the `synchronized` block.
-- **Impact**: Eliminated ~14ms lock contention stalls on Samsung A15 hardware.
-
-### 3. JNI Bridge & Native Stability
-- **File**: `app/src/main/cpp/jdhardware-jni.cpp`
-- **Fixes**: Implemented missing native functions `n4` and `n5` to resolve `UnsatisfiedLinkError` hangs during role transitions.
+### 2. Search Optimization
+- **File**: `StateSubscriptionUseCase.kt`
+- **Fix**: Refactored `findClosestTrailPoint` to perform binary search directly on the primitive timestamp array in `TrailBuffer`.
 
 ## 📊 Forensic Pulse & Metrics
 - **Unit Tests**: 100% PASS (88 total).
-- **Metric**: **Reliability 100.0%**.
-- **Version Tag**: `Oct15.0` (Build v15.0_PLATINUM).
+- **Build Status**: `assembleDebug` SUCCESS.
+- **SOT Count**: 423 (Rules: 262).
+- **Open Gaps**: 0.
+- **Version Tag**: `OCT15.1`.
 
 ## 🚀 Next Steps
-1. **Trail Buffer Optimization**: Implement primitive `DoubleArray` structures in `MainRepository` to reduce GC pressure (Ref: `SIMP-OCT15.0-S1`).
-2. **Post-Release Monitoring**: Observe A15 hardware performance under sustained 1Hz telemetry.
+1. **History Buffer Optimization**: Consider applying the `TrailBuffer` pattern to the connection history ribbons (Ref: `SIMP-OCT15.1-S1`).
+2. **Map Rendering primitives**: Investigate passing primitive buffers directly to map overlay draw calls to avoid `GeoPoint` creation.
 
-**HANDOVER COMPLETE. VERSION GRADUATED TO OCT15.0.**
+**HANDOVER COMPLETE. VERSION GRADUATED TO OCT15.1.**

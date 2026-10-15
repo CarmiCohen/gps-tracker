@@ -1,5 +1,19 @@
 # Resolution Archive
 
+## [OCT15.1] - Trail Buffer Optimization
+**Issue ID**: #SIMP-OCT15.0-S1, #GAP-OCT15.0-P1
+**Status**: RESOLVED
+**Description**: Implemented a primitive-backed `TrailBuffer` to replace `List<TrailPoint>` for all high-frequency trail telemetry flows.
+**Root Cause**: 
+1. **GC Pressure**: The `List<TrailPoint>` architecture created thousands of short-lived objects during long tracking sessions (O(N) objects per flow emission), leading to frequent garbage collection and potential UI stutters on budget hardware like the Samsung A15.
+2. **Memory Overhead**: Each `TrailPoint` object has significant JVM overhead compared to raw primitives.
+**Remediation**:
+- **TrailBuffer**: Created a data class using `DoubleArray`, `LongArray`, and `IntArray` to hold trail data.
+- **Repository Optimization**: Refactored `MainRepository` to map database entities directly into a single `TrailBuffer` instance per flow.
+- **Pure Mapping Update**: Updated `MapStateMapper` and `MainViewModel` to consume `TrailBuffer`.
+- **Search Optimization**: Optimized `findClosestTrailPoint` in `StateSubscriptionUseCase` to use binary search over primitive arrays.
+- **Traceability**: Updated SOT Master Requirements (SOT ID 732) and added Architectural Rule 1.209.
+
 ## [Oct14.1] - Map Architectural Extraction
 **Issue ID**: #SIMP-OCT14.21-S1, #ISSUE-OCT14.21-QA1
 **Status**: RESOLVED

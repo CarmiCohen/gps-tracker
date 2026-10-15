@@ -29,13 +29,12 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.15.1:
+ * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Refactored trail flows to use 
+ *   TrailBuffer (primitive arrays) to reduce GC pressure. Removed TrailPoint caches.
  * Oct.12.18:
  * - Issue #ISSUE-OCT12.13-10: I/O Pressure Mitigation. Refactored triggerBackgroundPruning 
- *   to remove giant block-level transactions. Implemented yielded chunked pruning 
- *   to prevent UI frame drops and database contention.
- * Oct.10.9:
- * - Issue #SIMP-1014-3: Connectivity Jitter. Implemented saveLocationUpdateDebounced 
- *   to stabilize IO during native forensic bursts.
+ *   to remove giant block-level transactions.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -66,9 +65,6 @@ class MainRepository @Inject constructor(
 
     private val violationProcessor = ViolationProcessor(timeProvider)
     private val metrics = RepositoryMetrics()
-
-    private val trackerPointCache = ShadowCache<Long, TrailPoint>(3000)
-    private val viewerPointCache = ShadowCache<Long, TrailPoint>(3000)
 
     private val debounceJobs = ConcurrentHashMap<String, Job>()
 
@@ -113,20 +109,36 @@ class MainRepository @Inject constructor(
 
     fun eventLogsFlow(limit: Int): Flow<List<LogEntry>> = logRepository.eventLogsFlow(limit)
 
-    val trackerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(false).map { entities -> 
-        entities.map { entity ->
-            trackerPointCache.getOrPut(entity.timestamp) {
-                TrailPoint(entity.lat, entity.lng, entity.timestamp, SentinelStatus.valueOf(entity.status), entity.accuracy, entity.maxAccuracy)
-            }
+    /**
+     * mapEntitiesToBuffer: Converts Room entities to primitive-backed TrailBuffer (SIMP-OCT15.0-S1).
+     */
+    private fun mapEntitiesToBuffer(entities: List<TrailEntity>): TrailBuffer {
+        val size = entities.size
+        val lats = DoubleArray(size)
+        val lngs = DoubleArray(size)
+        val timestamps = LongArray(size)
+        val statuses = IntArray(size)
+        val accuracies = DoubleArray(size)
+        val maxAccuracies = DoubleArray(size)
+        
+        entities.forEachIndexed { i, entity ->
+            lats[i] = entity.lat
+            lngs[i] = entity.lng
+            timestamps[i] = entity.timestamp
+            statuses[i] = try { SentinelStatus.valueOf(entity.status).ordinal } catch(e: Exception) { SentinelStatus.VALID.ordinal }
+            accuracies[i] = entity.accuracy
+            maxAccuracies[i] = entity.maxAccuracy
         }
+        
+        return TrailBuffer(lats, lngs, timestamps, statuses, accuracies, maxAccuracies, size)
+    }
+
+    val trackerTrailFlow: Flow<TrailBuffer> = trailDao.getTrail(false).map { entities -> 
+        mapEntitiesToBuffer(entities)
     }.flowOn(Dispatchers.Default)
 
-    val viewerTrailFlow: Flow<List<TrailPoint>> = trailDao.getTrail(true).map { entities -> 
-        entities.map { entity ->
-            viewerPointCache.getOrPut(entity.timestamp) {
-                TrailPoint(entity.lat, entity.lng, entity.timestamp, SentinelStatus.valueOf(entity.status), entity.accuracy, maxAccuracy = entity.maxAccuracy)
-            }
-        }
+    val viewerTrailFlow: Flow<TrailBuffer> = trailDao.getTrail(true).map { entities -> 
+        mapEntitiesToBuffer(entities)
     }.flowOn(Dispatchers.Default)
 
     val violationsFlow: Flow<List<ViolationPoint>> = violationDao.getAllFlow().map { entities -> 
@@ -350,12 +362,10 @@ class MainRepository @Inject constructor(
     }
 
     suspend fun clearTrails() = withContext(Dispatchers.IO) {
-        trailDao.clearTrail(false); trailDao.clearTrail(true); violationDao.clearAll(); trackerPointCache.clear(); viewerPointCache.clear()
+        trailDao.clearTrail(false); trailDao.clearTrail(true); violationDao.clearAll()
     }
 
-    suspend fun loadTrailStatic(isViewer: Boolean): List<TrailPoint> = trailDao.getTrailStatic(isViewer).map { 
-        TrailPoint(it.lat, it.lng, it.timestamp, SentinelStatus.valueOf(it.status), it.accuracy, it.maxAccuracy)
-    }
+    suspend fun loadTrailStatic(isViewer: Boolean): TrailBuffer = mapEntitiesToBuffer(trailDao.getTrailStatic(isViewer))
 
     suspend fun resetStats() = withContext(Dispatchers.IO) {
         settings.resetStatsBulk(); clearTrails(); historyDao.clearAll(); logRepository.clearLogs(); offlineRepository.clear()

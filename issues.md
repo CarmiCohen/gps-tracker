@@ -1,14 +1,16 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct14.1
+# Project Issues & Hardening Tracking (Rigorous Audit) - OCT15.1
 
-## 🎯 Current Resumption Focus: Trail Buffer Optimization (SIMP-OCT15.0-S1).
+## 🎯 Current Resumption Focus: COMPLETED Trail Buffer Optimization (SIMP-OCT15.0-S1).
 
 ## 🟢 Open Gaps & Unfinished Integration Points
-*   **GAP-OCT15.0-P1: Trail Buffer Efficiency (Low).** Current `List<TrailPoint>` architecture in `MainRepository` and `MapStateMapper` creates significant object overhead during long tracking sessions.
+*   *No active gaps.*
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 24)
-*   **SIMP-OCT15.0-S1: Trail Buffer Optimization (Low).** Investigate using specialized primitive arrays for `TrailPoint` coordinates to reduce GC pressure.
+## 💡 Strategic Simplification Ideas (Ideas: 25)
+*   **SIMP-OCT15.1-S1: Primitive History Buffers (Low).** Investigate applying `TrailBuffer`-style primitive arrays to `HistoryEntity` mapping to further reduce GC pressure in repository flows.
+*   **SIMP-OCT15.1-S2: Map Rendering Primitive Integration (Low).** Transition `MapTrailSegment` to use primitive arrays or `TrailBuffer` to avoid `GeoPoint` object creation during map overlay updates.
+*   **SIMP-OCT15.0-S1: Trail Buffer Optimization (Low).** RESOLVED OCT15.1. Implemented `TrailBuffer` with primitive arrays.
 *   **SIMP-OCT14.21-S1: MapViewState Mapper Extraction (Low).** RESOLVED Oct14.1. Extracted to `MapStateMapper.kt`.
 *   **SIMP-OCT14.10-S1**: HUD Mapper Extraction (Low). RESOLVED Oct14.1. Extracted to `HudMapper.kt`.
 *   **SIMP-OCT14.10-S2**: Dashboard Mapper Extraction (Low). RESOLVED Oct14.1. Extracted to `DashboardMapper.kt`.
@@ -19,6 +21,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT15.1-F1: Trail Buffer Optimization (SIMP-OCT15.0-S1).** Resolved OCT15.1. Refactored trail flows to use primitive-backed `TrailBuffer`, reducing object overhead from O(N) to O(1) per emission.
 *   **ISSUE-OCT14.21-QA1: Manual Role Transition Audit (High).** Resolved Oct14.1. Verified physical Tracker -> Viewer mode swaps on A15 hardware; confirmed JNI and GPU stability.
 *   **ISSUE-OCT14.0-F1: DataStore Mutation Integrity.** Resolved Oct14.1. Hardened `SettingsRepository` with functional transformation API (`incrementInt`) and ensured atomic `commitDraftSettings`. Verified via `DataStoreMutationStressTest`.
 *   **ISSUE-OCT14.0-F2: Alarm mode-awareness branding (Issue #1413).** Resolved Oct14.1. Centralized branding logic in `EntityBrandingProvider` and synchronized `EngineConstants`.
@@ -30,6 +33,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **OCT15.1: [SOT Count: 423 (Rules: 262), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:8, Testing: 13 (Sub-items: 122), QA: 326]**
 - **Oct14.1: [SOT Count: 422 (Rules: 261), Open: H:0, M:0, L:1, Ideas: H:0, M:10, L:7, Testing: 13 (Sub-items: 122), QA: 326]**
 - **Oct14.1: [SOT Count: 421 (Rules: 260), Open: H:1, M:0, L:1, Ideas: H:0, M:10, L:6, Testing: 13 (Sub-items: 122), QA: 326]**
 - **Oct14.1: [SOT Count: 417 (Rules: 258), Open: H:0, M:0, L:0, Ideas: H:0, M:12, L:8, Testing: 13 (Sub-items: 120), QA: 324]**
