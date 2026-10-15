@@ -1,5 +1,17 @@
 # Resolution Archive
 
+## [Oct14.1] - Map Architectural Extraction
+**Issue ID**: #SIMP-OCT14.21-S1, #ISSUE-OCT14.21-QA1
+**Status**: RESOLVED
+**Description**: Extracted Map UI state mapping and trail segment logic from `MainViewModel.kt` to `MapStateMapper.kt`. Verified JNI/GPU stability on A15 hardware.
+**Root Cause**: 
+1. **Architectural Purity**: `MainViewModel` contained complex mapping logic for Map layers and trail segments, violating the "Pure Flat" architectural goal.
+2. **QA Verification**: Manual audit of role transitions was required to confirm resolution of A15-specific rendering stalls.
+**Remediation**:
+- **MapStateMapper**: Created a pure mapper for Map state, maintaining coordinate smoothing state through functional transitions.
+- **QA Pass**: Completed physical verification of Tracker/Viewer mode swaps on A15.
+- **Traceability**: Updated SOT Master Requirements (SOT ID 731) and added Architectural Rule 1.207.
+
 ## [Oct14.1] - Architectural Mapping & IO Optimization
 **Issue ID**: #SIMP-OCT14.10-S1, #SIMP-OCT14.10-S2, #SIMP-OCT14.11-S1
 **Status**: RESOLVED
