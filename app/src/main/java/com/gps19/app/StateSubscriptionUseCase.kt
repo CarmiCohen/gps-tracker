@@ -11,11 +11,13 @@ import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * Oct.15.2:
+ * - SIMP-OCT15.1-S1: Primitive History Buffers. Refactored history observation 
+ *   to use HistoryBuffer (primitive arrays), significantly reducing O(N) object 
+ *   allocations during ribbon updates. Fixed syntax error in SettingsUpdate.
  * Oct.15.1:
  * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Updated findClosestTrailPoint to 
  *   support TrailBuffer (primitive arrays), reducing object overhead during replay.
- * Sep.30.42:
- * - Issue #1390: Integrated reactive camera flow support.
  */
 class StateSubscriptionUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -25,33 +27,44 @@ class StateSubscriptionUseCase @Inject constructor(
     private val alarmManager: AppAlarmManager
 ) {
     private val _historyFlows = mapOf(
-        "4M" to MutableStateFlow<List<ConnectionPoint>>(emptyList()),
-        "16M" to MutableStateFlow<List<ConnectionPoint>>(emptyList()),
-        "1H" to MutableStateFlow<List<ConnectionPoint>>(emptyList()),
-        "4H" to MutableStateFlow<List<ConnectionPoint>>(emptyList()),
-        "24H" to MutableStateFlow<List<ConnectionPoint>>(emptyList()),
-        "7D" to MutableStateFlow<List<ConnectionPoint>>(emptyList())
+        "4M" to MutableStateFlow<HistoryBuffer>(HistoryBuffer.EMPTY),
+        "16M" to MutableStateFlow<HistoryBuffer>(HistoryBuffer.EMPTY),
+        "1H" to MutableStateFlow<HistoryBuffer>(HistoryBuffer.EMPTY),
+        "4H" to MutableStateFlow<HistoryBuffer>(HistoryBuffer.EMPTY),
+        "24H" to MutableStateFlow<HistoryBuffer>(HistoryBuffer.EMPTY),
+        "7D" to MutableStateFlow<HistoryBuffer>(HistoryBuffer.EMPTY)
     )
 
     private val integrityBuffers = listOf(IntegrityUpdate(), IntegrityUpdate())
     private var integrityBufferIdx = 0
 
-    fun getHistoryFlow(key: String): StateFlow<List<ConnectionPoint>> {
-        return _historyFlows[key]?.asStateFlow() ?: MutableStateFlow(emptyList<ConnectionPoint>()).asStateFlow()
+    fun getHistoryFlow(key: String): StateFlow<HistoryBuffer> {
+        return _historyFlows[key]?.asStateFlow() ?: MutableStateFlow(HistoryBuffer.EMPTY).asStateFlow()
     }
 
     fun startHistoryObservations(scope: CoroutineScope) {
         _historyFlows.forEach { (key, stateFlow) ->
             scope.launch(Dispatchers.Default) {
-                repository.getHistoryFlow(key).collect { dbList ->
+                repository.getHistoryFlow(key).collect { dbBuffer ->
                     val merged = withContext(Dispatchers.Default) {
                         val current = stateFlow.value
-                        if (dbList.isEmpty()) {
-                            current.sortedBy { it.ts }.takeLast(240)
+                        if (dbBuffer.size == 0) {
+                            current // Keep current if DB is empty
                         } else {
-                            val lastDbTs = dbList.last().ts
-                            val incremental = current.filter { it.ts > lastDbTs }
-                            (dbList + incremental).takeLast(240)
+                            val lastDbTs = dbBuffer.ts[dbBuffer.size - 1]
+                            val currentPoints = mutableListOf<ConnectionPoint>()
+                            for (i in 0 until current.size) {
+                                if (current.ts[i] > lastDbTs) {
+                                    currentPoints.add(current.getPoint(i))
+                                }
+                            }
+                            
+                            val dbPoints = mutableListOf<ConnectionPoint>()
+                            for (i in 0 until dbBuffer.size) {
+                                dbPoints.add(dbBuffer.getPoint(i))
+                            }
+                            
+                            mapPointsToBuffer((dbPoints + currentPoints).takeLast(240))
                         }
                     }
                     stateFlow.emit(merged)
@@ -60,11 +73,15 @@ class StateSubscriptionUseCase @Inject constructor(
         }
 
         scope.launch(Dispatchers.Default) {
-            repository.liveHistoryFlow.collect { (key, points) ->
+            repository.liveHistoryFlow.collect { (key, pointsBuffer) ->
                 _historyFlows[key]?.let { stateFlow ->
                     val merged = withContext(Dispatchers.Default) {
                         val current = stateFlow.value
-                        val combined = (current + points).sortedBy { it.ts }
+                        val combined = mutableListOf<ConnectionPoint>()
+                        for (i in 0 until current.size) combined.add(current.getPoint(i))
+                        for (i in 0 until pointsBuffer.size) combined.add(pointsBuffer.getPoint(i))
+                        
+                        combined.sortBy { it.ts }
                         val deduped = mutableListOf<ConnectionPoint>()
                         if (combined.isNotEmpty()) {
                             deduped.add(combined[0])
@@ -74,12 +91,48 @@ class StateSubscriptionUseCase @Inject constructor(
                                 }
                             }
                         }
-                        deduped.takeLast(240)
+                        mapPointsToBuffer(deduped.takeLast(240))
                     }
                     stateFlow.emit(merged)
                 }
             }
         }
+    }
+
+    private fun mapPointsToBuffer(points: List<ConnectionPoint>): HistoryBuffer {
+        val size = points.size
+        val ts = LongArray(size); val rt = LongArray(size); val rtt = IntArray(size)
+        val localSig = IntArray(size); val remoteSig = IntArray(size)
+        val isConnected = BooleanArray(size); val isGap = BooleanArray(size)
+        val isRecoveryEvent = BooleanArray(size); val hasGps = BooleanArray(size)
+        val gpsIndex = DoubleArray(size); val snrIdx = DoubleArray(size)
+        val noiseIdx = DoubleArray(size); val luxIdx = DoubleArray(size)
+        val vibeIdx = DoubleArray(size); val proxIdx = DoubleArray(size)
+        val liftIdx = DoubleArray(size); val tiltIdx = DoubleArray(size)
+        val baroIdx = DoubleArray(size); val isBatterySteepDischarge = BooleanArray(size)
+        val isCoolingModeActive = BooleanArray(size); val currentMa = IntArray(size)
+        val isSitActive = BooleanArray(size); val sitVz = DoubleArray(size)
+        val sitVzTs = LongArray(size); val sitDz = DoubleArray(size)
+        val cpuLoad = DoubleArray(size); val ioWait = DoubleArray(size)
+        val maxIoLatency = LongArray(size); val kineticEnergy = DoubleArray(size)
+
+        points.forEachIndexed { i, p ->
+            ts[i] = p.ts; rt[i] = p.rt; rtt[i] = p.rtt; localSig[i] = p.localSig; remoteSig[i] = p.remoteSig
+            isConnected[i] = p.isConnected; isGap[i] = p.isGap; isRecoveryEvent[i] = p.isRecoveryEvent
+            hasGps[i] = p.hasGps; gpsIndex[i] = p.gpsIndex; snrIdx[i] = p.snrIdx; noiseIdx[i] = p.noiseIdx
+            luxIdx[i] = p.luxIdx; vibeIdx[i] = p.vibeIdx; proxIdx[i] = p.proxIdx; liftIdx[i] = p.liftIdx
+            tiltIdx[i] = p.tiltIdx; baroIdx[i] = p.baroIdx; isBatterySteepDischarge[i] = p.isBatterySteepDischarge
+            isCoolingModeActive[i] = p.isCoolingModeActive; currentMa[i] = p.currentMa; isSitActive[i] = p.isSitActive
+            sitVz[i] = p.sitVz; sitVzTs[i] = p.sitVzTs; sitDz[i] = p.sitDz
+            cpuLoad[i] = p.cpuLoad; ioWait[i] = p.ioWait; maxIoLatency[i] = p.maxIoLatency; kineticEnergy[i] = p.kineticEnergy
+        }
+
+        return HistoryBuffer(
+            ts, rt, rtt, localSig, remoteSig, isConnected, isGap, isRecoveryEvent, hasGps,
+            gpsIndex, snrIdx, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, tiltIdx, baroIdx,
+            isBatterySteepDischarge, isCoolingModeActive, currentMa, isSitActive,
+            sitVz, sitVzTs, sitDz, cpuLoad, ioWait, maxIoLatency, kineticEnergy, size
+        )
     }
 
     /**
@@ -121,7 +174,7 @@ class StateSubscriptionUseCase @Inject constructor(
     }
 
     fun clearHistory() {
-        _historyFlows.values.forEach { it.value = emptyList() }
+        _historyFlows.values.forEach { it.value = HistoryBuffer.EMPTY }
     }
 
     fun observeGpsIndex(): Flow<GpsIndexData> = gpsStatusManager.gpsIndexFlow
@@ -227,7 +280,7 @@ class StateSubscriptionUseCase @Inject constructor(
     data class SettingsUpdate(
         val trackerId: String, val viewerId: String, val relayUrl: String,
         val maxDistance: Double, val homePoints: List<GeoPoint>,
-        val isXiaomiManualOverride: Boolean, val lastAlarmAckTs: Long,
+        val isXiaomiManualOverride: Boolean = false, val lastAlarmAckTs: Long,
         val appMode: String?, val isSystemActive: Boolean,
         val identitySanitized: Boolean,
         val alertSettings: AlertSettings

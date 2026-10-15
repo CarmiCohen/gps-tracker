@@ -11,6 +11,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.15.2:
+ * - SIMP-OCT15.1-S1: Primitive History Buffers. Applied TrailBuffer pattern to 
+ *   connection history ribbons to reduce GC pressure.
  * Oct.15.1:
  * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Introduced TrailBuffer with 
  *   primitive arrays to reduce GC pressure during long tracking sessions.
@@ -108,6 +111,160 @@ data class TrailBuffer(
 
     companion object {
         val EMPTY = TrailBuffer(DoubleArray(0), DoubleArray(0), LongArray(0), IntArray(0), DoubleArray(0), DoubleArray(0), 0)
+    }
+}
+
+/**
+ * HistoryBuffer: Optimized container for connection history points using primitive arrays.
+ * Designed to minimize GC pressure during ribbon rendering (SIMP-OCT15.1-S1).
+ */
+@Serializable
+data class HistoryBuffer(
+    val ts: LongArray,
+    val rt: LongArray,
+    val rtt: IntArray,
+    val localSig: IntArray,
+    val remoteSig: IntArray,
+    val isConnected: BooleanArray,
+    val isGap: BooleanArray,
+    val isRecoveryEvent: BooleanArray,
+    val hasGps: BooleanArray,
+    val gpsIndex: DoubleArray,
+    val snrIdx: DoubleArray,
+    val noiseIdx: DoubleArray,
+    val luxIdx: DoubleArray,
+    val vibeIdx: DoubleArray,
+    val proxIdx: DoubleArray,
+    val liftIdx: DoubleArray,
+    val tiltIdx: DoubleArray,
+    val baroIdx: DoubleArray,
+    val isBatterySteepDischarge: BooleanArray,
+    val isCoolingModeActive: BooleanArray,
+    val currentMa: IntArray,
+    val isSitActive: BooleanArray,
+    val sitVz: DoubleArray,
+    val sitVzTs: LongArray,
+    val sitDz: DoubleArray,
+    val cpuLoad: DoubleArray,
+    val ioWait: DoubleArray,
+    val maxIoLatency: LongArray,
+    val kineticEnergy: DoubleArray,
+    val size: Int
+) {
+    fun getPoint(index: Int): ConnectionPoint {
+        return ConnectionPoint().apply {
+            ts = this@HistoryBuffer.ts[index]
+            rt = this@HistoryBuffer.rt[index]
+            rtt = this@HistoryBuffer.rtt[index]
+            localSig = this@HistoryBuffer.localSig[index]
+            remoteSig = this@HistoryBuffer.remoteSig[index]
+            isConnected = this@HistoryBuffer.isConnected[index]
+            isGap = this@HistoryBuffer.isGap[index]
+            isRecoveryEvent = this@HistoryBuffer.isRecoveryEvent[index]
+            hasGps = this@HistoryBuffer.hasGps[index]
+            gpsIndex = this@HistoryBuffer.gpsIndex[index]
+            snrIdx = this@HistoryBuffer.snrIdx[index]
+            noiseIdx = this@HistoryBuffer.noiseIdx[index]
+            luxIdx = this@HistoryBuffer.luxIdx[index]
+            vibeIdx = this@HistoryBuffer.vibeIdx[index]
+            proxIdx = this@HistoryBuffer.proxIdx[index]
+            liftIdx = this@HistoryBuffer.liftIdx[index]
+            tiltIdx = this@HistoryBuffer.tiltIdx[index]
+            baroIdx = this@HistoryBuffer.baroIdx[index]
+            isBatterySteepDischarge = this@HistoryBuffer.isBatterySteepDischarge[index]
+            isCoolingModeActive = this@HistoryBuffer.isCoolingModeActive[index]
+            currentMa = this@HistoryBuffer.currentMa[index]
+            isSitActive = this@HistoryBuffer.isSitActive[index]
+            sitVz = this@HistoryBuffer.sitVz[index]
+            sitVzTs = this@HistoryBuffer.sitVzTs[index]
+            sitDz = this@HistoryBuffer.sitDz[index]
+            cpuLoad = this@HistoryBuffer.cpuLoad[index]
+            ioWait = this@HistoryBuffer.ioWait[index]
+            maxIoLatency = this@HistoryBuffer.maxIoLatency[index]
+            kineticEnergy = this@HistoryBuffer.kineticEnergy[index]
+        }
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is HistoryBuffer) return false
+        if (size != other.size) return false
+        if (!ts.contentEquals(other.ts)) return false
+        if (!rt.contentEquals(other.rt)) return false
+        if (!rtt.contentEquals(other.rtt)) return false
+        if (!localSig.contentEquals(other.localSig)) return false
+        if (!remoteSig.contentEquals(other.remoteSig)) return false
+        if (!isConnected.contentEquals(other.isConnected)) return false
+        if (!isGap.contentEquals(other.isGap)) return false
+        if (!isRecoveryEvent.contentEquals(other.isRecoveryEvent)) return false
+        if (!hasGps.contentEquals(other.hasGps)) return false
+        if (!gpsIndex.contentEquals(other.gpsIndex)) return false
+        if (!snrIdx.contentEquals(other.snrIdx)) return false
+        if (!noiseIdx.contentEquals(other.noiseIdx)) return false
+        if (!luxIdx.contentEquals(other.luxIdx)) return false
+        if (!vibeIdx.contentEquals(other.vibeIdx)) return false
+        if (!proxIdx.contentEquals(other.proxIdx)) return false
+        if (!liftIdx.contentEquals(other.liftIdx)) return false
+        if (!tiltIdx.contentEquals(other.tiltIdx)) return false
+        if (!baroIdx.contentEquals(other.baroIdx)) return false
+        if (!isBatterySteepDischarge.contentEquals(other.isBatterySteepDischarge)) return false
+        if (!isCoolingModeActive.contentEquals(other.isCoolingModeActive)) return false
+        if (!currentMa.contentEquals(other.currentMa)) return false
+        if (!isSitActive.contentEquals(other.isSitActive)) return false
+        if (!sitVz.contentEquals(other.sitVz)) return false
+        if (!sitVzTs.contentEquals(other.sitVzTs)) return false
+        if (!sitDz.contentEquals(other.sitDz)) return false
+        if (!cpuLoad.contentEquals(other.cpuLoad)) return false
+        if (!ioWait.contentEquals(other.ioWait)) return false
+        if (!maxIoLatency.contentEquals(other.maxIoLatency)) return false
+        if (!kineticEnergy.contentEquals(other.kineticEnergy)) return false
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = ts.contentHashCode()
+        result = 31 * result + rt.contentHashCode()
+        result = 31 * result + rtt.contentHashCode()
+        result = 31 * result + localSig.contentHashCode()
+        result = 31 * result + remoteSig.contentHashCode()
+        result = 31 * result + isConnected.contentHashCode()
+        result = 31 * result + isGap.contentHashCode()
+        result = 31 * result + isRecoveryEvent.contentHashCode()
+        result = 31 * result + hasGps.contentHashCode()
+        result = 31 * result + gpsIndex.contentHashCode()
+        result = 31 * result + snrIdx.contentHashCode()
+        result = 31 * result + noiseIdx.contentHashCode()
+        result = 31 * result + luxIdx.contentHashCode()
+        result = 31 * result + vibeIdx.contentHashCode()
+        result = 31 * result + proxIdx.contentHashCode()
+        result = 31 * result + liftIdx.contentHashCode()
+        result = 31 * result + tiltIdx.contentHashCode()
+        result = 31 * result + baroIdx.contentHashCode()
+        result = 31 * result + isBatterySteepDischarge.contentHashCode()
+        result = 31 * result + isCoolingModeActive.contentHashCode()
+        result = 31 * result + currentMa.contentHashCode()
+        result = 31 * result + isSitActive.contentHashCode()
+        result = 31 * result + sitVz.contentHashCode()
+        result = 31 * result + sitVzTs.contentHashCode()
+        result = 31 * result + sitDz.contentHashCode()
+        result = 31 * result + cpuLoad.contentHashCode()
+        result = 31 * result + ioWait.contentHashCode()
+        result = 31 * result + maxIoLatency.contentHashCode()
+        result = 31 * result + kineticEnergy.contentHashCode()
+        result = 31 * result + size
+        return result
+    }
+
+    companion object {
+        val EMPTY = HistoryBuffer(
+            LongArray(0), LongArray(0), IntArray(0), IntArray(0), IntArray(0),
+            BooleanArray(0), BooleanArray(0), BooleanArray(0), BooleanArray(0),
+            DoubleArray(0), DoubleArray(0), DoubleArray(0), DoubleArray(0),
+            DoubleArray(0), DoubleArray(0), DoubleArray(0), DoubleArray(0),
+            DoubleArray(0), BooleanArray(0), BooleanArray(0), IntArray(0),
+            BooleanArray(0), DoubleArray(0), LongArray(0), DoubleArray(0),
+            DoubleArray(0), DoubleArray(0), LongArray(0), DoubleArray(0), 0
+        )
     }
 }
 

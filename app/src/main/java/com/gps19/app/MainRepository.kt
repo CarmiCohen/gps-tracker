@@ -29,12 +29,12 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.15.2:
+ * - SIMP-OCT15.1-S1: Primitive History Buffers. Applied TrailBuffer pattern to 
+ *   history flows to reduce GC pressure. Transitioned to HistoryBuffer.
  * Oct.15.1:
  * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Refactored trail flows to use 
  *   TrailBuffer (primitive arrays) to reduce GC pressure. Removed TrailPoint caches.
- * Oct.12.18:
- * - Issue #ISSUE-OCT12.13-10: I/O Pressure Mitigation. Refactored triggerBackgroundPruning 
- *   to remove giant block-level transactions.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -131,6 +131,84 @@ class MainRepository @Inject constructor(
         }
         
         return TrailBuffer(lats, lngs, timestamps, statuses, accuracies, maxAccuracies, size)
+    }
+
+    /**
+     * mapEntitiesToHistoryBuffer: Converts Room entities to primitive-backed HistoryBuffer (SIMP-OCT15.1-S1).
+     */
+    private fun mapEntitiesToHistoryBuffer(entities: List<HistoryEntity>): HistoryBuffer {
+        val size = entities.size
+        val ts = LongArray(size)
+        val rt = LongArray(size)
+        val rtt = IntArray(size)
+        val localSig = IntArray(size)
+        val remoteSig = IntArray(size)
+        val isConnected = BooleanArray(size)
+        val isGap = BooleanArray(size)
+        val isRecoveryEvent = BooleanArray(size)
+        val hasGps = BooleanArray(size)
+        val gpsIndex = DoubleArray(size)
+        val snrIdx = DoubleArray(size)
+        val noiseIdx = DoubleArray(size)
+        val luxIdx = DoubleArray(size)
+        val vibeIdx = DoubleArray(size)
+        val proxIdx = DoubleArray(size)
+        val liftIdx = DoubleArray(size)
+        val tiltIdx = DoubleArray(size)
+        val baroIdx = DoubleArray(size)
+        val isBatterySteepDischarge = BooleanArray(size)
+        val isCoolingModeActive = BooleanArray(size)
+        val currentMa = IntArray(size)
+        val isSitActive = BooleanArray(size)
+        val sitVz = DoubleArray(size)
+        val sitVzTs = LongArray(size)
+        val sitDz = DoubleArray(size)
+        val cpuLoad = DoubleArray(size)
+        val ioWait = DoubleArray(size)
+        val maxIoLatency = LongArray(size)
+        val kineticEnergy = DoubleArray(size)
+
+        val tempPoint = ConnectionPoint()
+        entities.forEachIndexed { i, entity ->
+            tempPoint.reset()
+            TelemetryMapper.mapEntityToApp(entity, tempPoint)
+            ts[i] = tempPoint.ts
+            rt[i] = tempPoint.rt
+            rtt[i] = tempPoint.rtt
+            localSig[i] = tempPoint.localSig
+            remoteSig[i] = tempPoint.remoteSig
+            isConnected[i] = tempPoint.isConnected
+            isGap[i] = tempPoint.isGap
+            isRecoveryEvent[i] = tempPoint.isRecoveryEvent
+            hasGps[i] = tempPoint.hasGps
+            gpsIndex[i] = tempPoint.gpsIndex
+            snrIdx[i] = tempPoint.snrIdx
+            noiseIdx[i] = tempPoint.noiseIdx
+            luxIdx[i] = tempPoint.luxIdx
+            vibeIdx[i] = tempPoint.vibeIdx
+            proxIdx[i] = tempPoint.proxIdx
+            liftIdx[i] = tempPoint.liftIdx
+            tiltIdx[i] = tempPoint.tiltIdx
+            baroIdx[i] = tempPoint.baroIdx
+            isBatterySteepDischarge[i] = tempPoint.isBatterySteepDischarge
+            isCoolingModeActive[i] = tempPoint.isCoolingModeActive
+            currentMa[i] = tempPoint.currentMa
+            isSitActive[i] = tempPoint.isSitActive
+            sitVz[i] = tempPoint.sitVz
+            sitVzTs[i] = tempPoint.sitVzTs
+            sitDz[i] = tempPoint.sitDz
+            cpuLoad[i] = tempPoint.cpuLoad
+            ioWait[i] = tempPoint.ioWait
+            maxIoLatency[i] = tempPoint.maxIoLatency
+            kineticEnergy[i] = tempPoint.kineticEnergy
+        }
+
+        return HistoryBuffer(
+            ts, rt, rtt, localSig, remoteSig, isConnected, isGap, isRecoveryEvent, hasGps,
+            gpsIndex, snrIdx, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, tiltIdx, baroIdx,
+            isBatterySteepDischarge, isCoolingModeActive, currentMa, isSitActive,
+            sitVz, sitVzTs, sitDz, cpuLoad, ioWait, maxIoLatency, kineticEnergy, size
+        )
     }
 
     val trackerTrailFlow: Flow<TrailBuffer> = trailDao.getTrail(false).map { entities -> 
@@ -382,22 +460,13 @@ class MainRepository @Inject constructor(
         }
     }
 
-    fun getHistoryFlow(ribbonKey: String): Flow<List<ConnectionPoint>> = historyDao.getHistoryFlow(ribbonKey).map { l -> 
-        l.map { entity ->
-            ConnectionPoint().apply {
-                ts = entity.ts; rt = entity.rt; rtt = entity.rtt; localSig = 10; remoteSig = entity.remoteSig
-                isConnected = entity.isConnected; isGap = entity.isGap; isRecoveryEvent = entity.isRecoveryEvent
-                gpsAccuracy = entity.accuracy; maxAccuracy = entity.maxAccuracy; isTick = entity.isTick 
-                hasGps = hasGps; speed = entity.speed; bearing = entity.bearing; currentMa = entity.currentMa
-                locationPendingReason = try { LocationPendingReason.valueOf(entity.locationPendingReason) } catch(e: Exception) { LocationPendingReason.NONE }
-                TelemetryMapper.mapEntityToApp(entity, this)
-            }
-        }
+    fun getHistoryFlow(ribbonKey: String): Flow<HistoryBuffer> = historyDao.getHistoryFlow(ribbonKey).map { l -> 
+        mapEntitiesToHistoryBuffer(l)
     }.flowOn(Dispatchers.Default)
 
     private var lastBatchWriteRealtime = 0L
     private val historyBuffer = ConcurrentLinkedQueue<HistoryEntity>()
-    private val _liveHistoryFlow = MutableSharedFlow<Pair<String, List<ConnectionPoint>>>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    private val _liveHistoryFlow = MutableSharedFlow<Pair<String, HistoryBuffer>>(extraBufferCapacity = 64, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val liveHistoryFlow = _liveHistoryFlow.asSharedFlow()
     private val liveHistoryBuffer = ConcurrentLinkedQueue<Pair<String, ConnectionPoint>>()
 
@@ -421,9 +490,62 @@ class MainRepository @Inject constructor(
                 while (liveHistoryBuffer.isNotEmpty()) {
                     liveHistoryBuffer.poll()?.let { (key, point) -> batches.getOrPut(key) { mutableListOf() }.add(point) }
                 }
-                batches.forEach { (key, list) -> _liveHistoryFlow.emit(key to list) }
+                batches.forEach { (key, list) -> 
+                    _liveHistoryFlow.emit(key to mapPointsToBuffer(list)) 
+                }
             }
         }
+    }
+
+    private fun mapPointsToBuffer(points: List<ConnectionPoint>): HistoryBuffer {
+        val size = points.size
+        val ts = LongArray(size)
+        val rt = LongArray(size)
+        val rtt = IntArray(size)
+        val localSig = IntArray(size)
+        val remoteSig = IntArray(size)
+        val isConnected = BooleanArray(size)
+        val isGap = BooleanArray(size)
+        val isRecoveryEvent = BooleanArray(size)
+        val hasGps = BooleanArray(size)
+        val gpsIndex = DoubleArray(size)
+        val snrIdx = DoubleArray(size)
+        val noiseIdx = DoubleArray(size)
+        val luxIdx = DoubleArray(size)
+        val vibeIdx = DoubleArray(size)
+        val proxIdx = DoubleArray(size)
+        val liftIdx = DoubleArray(size)
+        val tiltIdx = DoubleArray(size)
+        val baroIdx = DoubleArray(size)
+        val isBatterySteepDischarge = BooleanArray(size)
+        val isCoolingModeActive = BooleanArray(size)
+        val currentMa = IntArray(size)
+        val isSitActive = BooleanArray(size)
+        val sitVz = DoubleArray(size)
+        val sitVzTs = LongArray(size)
+        val sitDz = DoubleArray(size)
+        val cpuLoad = DoubleArray(size)
+        val ioWait = DoubleArray(size)
+        val maxIoLatency = LongArray(size)
+        val kineticEnergy = DoubleArray(size)
+
+        points.forEachIndexed { i, p ->
+            ts[i] = p.ts; rt[i] = p.rt; rtt[i] = p.rtt; localSig[i] = p.localSig; remoteSig[i] = p.remoteSig
+            isConnected[i] = p.isConnected; isGap[i] = p.isGap; isRecoveryEvent[i] = p.isRecoveryEvent
+            hasGps[i] = p.hasGps; gpsIndex[i] = p.gpsIndex; snrIdx[i] = p.snrIdx; noiseIdx[i] = p.noiseIdx
+            luxIdx[i] = p.luxIdx; vibeIdx[i] = p.vibeIdx; proxIdx[i] = p.proxIdx; liftIdx[i] = p.liftIdx
+            tiltIdx[i] = p.tiltIdx; baroIdx[i] = p.baroIdx; isBatterySteepDischarge[i] = p.isBatterySteepDischarge
+            isCoolingModeActive[i] = p.isCoolingModeActive; currentMa[i] = p.currentMa; isSitActive[i] = p.isSitActive
+            sitVz[i] = p.sitVz; sitVzTs[i] = p.sitVzTs; sitDz[i] = p.sitDz
+            cpuLoad[i] = p.cpuLoad; ioWait[i] = p.ioWait; maxIoLatency[i] = p.maxIoLatency; kineticEnergy[i] = p.kineticEnergy
+        }
+
+        return HistoryBuffer(
+            ts, rt, rtt, localSig, remoteSig, isConnected, isGap, isRecoveryEvent, hasGps,
+            gpsIndex, snrIdx, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, tiltIdx, baroIdx,
+            isBatterySteepDischarge, isCoolingModeActive, currentMa, isSitActive,
+            sitVz, sitVzTs, sitDz, cpuLoad, ioWait, maxIoLatency, kineticEnergy, size
+        )
     }
 
     suspend fun flushHistory() { flushHistoryBufferInternal(timeProvider.elapsedRealtime) }

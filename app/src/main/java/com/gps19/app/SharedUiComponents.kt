@@ -48,12 +48,13 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.15.2:
+ * - SIMP-OCT15.1-S1: Primitive History Buffers. Refactored ribbons to consume 
+ *   HistoryBuffer, eliminating thousands of ConnectionPoint object allocations 
+ *   during UI updates.
  * Oct.14.9:
  * - SIMP-OCT14.8-S1: HUD State Consolidation. Refactored GlobalStatusBar to 
  *   consume consolidated hudState flow, reducing subscription overhead.
- * Oct.14.8:
- * - SIMP-OCT13.21-S1: Pure Event UI. Flattened HeaderBar, RibbonsOverlay, and 
- *   SessionTerminationButton signatures by migrating to UiEvent bus.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -115,25 +116,25 @@ fun AnalyticalRibbons(
 
     val history by activeHistoryFlow.collectAsStateWithLifecycle()
 
-    val snrSelector = remember { { p: ConnectionPoint -> p.snrIdx.toFloat() } }
-    val noiseSelector = remember { { p: ConnectionPoint -> p.noiseIdx.toFloat() } }
-    val kineticSelector = remember { { p: ConnectionPoint -> (p.kineticEnergy.toFloat() / RIBBON_KINETIC_ENERGY_SCALE.toFloat()).coerceIn(0f, 1f) } }
-    val luxSelector = remember { { p: ConnectionPoint -> p.luxIdx.toFloat() } }
-    val vibeSelector = remember { { p: ConnectionPoint -> p.vibeIdx.toFloat() } }
-    val proxSelector = remember { { p: ConnectionPoint -> p.proxIdx.toFloat() } }
-    val liftSelector = remember { { p: ConnectionPoint -> p.liftIdx.toFloat() } }
-    val batSelector = remember { { p: ConnectionPoint -> if (p.isBatterySteepDischarge) 1f else 0f } }
-    val thmSelector = remember { { p: ConnectionPoint -> if (p.isCoolingModeActive) 1f else 0f } }
-    val curSelector = remember { { p: ConnectionPoint -> (kotlin.math.abs(p.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f) } }
-    val sitSelector = remember { { p: ConnectionPoint -> if (p.isSitActive) 1f else 0f } }
-    val tltSelector = remember { { p: ConnectionPoint -> p.tiltIdx.toFloat() } }
-    val baroSelector = remember { { p: ConnectionPoint -> p.baroIdx.toFloat() } }
-    val svzSelector = remember { { p: ConnectionPoint -> (kotlin.math.abs(p.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f) } }
-    val svzDriftSelector = remember { { p: ConnectionPoint -> if (p.sitVzTs > 0) kotlin.math.abs(p.ts - p.sitVzTs) else 0L } }
-    val sdzSelector = remember { { p: ConnectionPoint -> (kotlin.math.abs(p.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f) } }
-    val cpuSelector = remember { { p: ConnectionPoint -> (p.cpuLoad.toFloat() / RIBBON_CPU_LOAD_SCALE.toFloat()).coerceIn(0f, 1f) } }
-    val iowSelector = remember { { p: ConnectionPoint -> (p.ioWait.toFloat() / RIBBON_IO_WAIT_SCALE.toFloat()).coerceIn(0f, 1f) } }
-    val latSelector = remember { { p: ConnectionPoint -> (p.maxIoLatency.toFloat() / RIBBON_LATENCY_SCALE_MS.toFloat()).coerceIn(0f, 1f) } }
+    val snrSelector = remember { { b: HistoryBuffer, i: Int -> b.snrIdx[i].toFloat() } }
+    val noiseSelector = remember { { b: HistoryBuffer, i: Int -> b.noiseIdx[i].toFloat() } }
+    val kineticSelector = remember { { b: HistoryBuffer, i: Int -> (b.kineticEnergy[i].toFloat() / RIBBON_KINETIC_ENERGY_SCALE.toFloat()).coerceIn(0f, 1f) } }
+    val luxSelector = remember { { b: HistoryBuffer, i: Int -> b.luxIdx[i].toFloat() } }
+    val vibeSelector = remember { { b: HistoryBuffer, i: Int -> b.vibeIdx[i].toFloat() } }
+    val proxSelector = remember { { b: HistoryBuffer, i: Int -> b.proxIdx[i].toFloat() } }
+    val liftSelector = remember { { b: HistoryBuffer, i: Int -> b.liftIdx[i].toFloat() } }
+    val batSelector = remember { { b: HistoryBuffer, i: Int -> if (b.isBatterySteepDischarge[i]) 1f else 0f } }
+    val thmSelector = remember { { b: HistoryBuffer, i: Int -> if (b.isCoolingModeActive[i]) 1f else 0f } }
+    val curSelector = remember { { b: HistoryBuffer, i: Int -> (kotlin.math.abs(b.currentMa[i]).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f) } }
+    val sitSelector = remember { { b: HistoryBuffer, i: Int -> if (b.isSitActive[i]) 1f else 0f } }
+    val tltSelector = remember { { b: HistoryBuffer, i: Int -> b.tiltIdx[i].toFloat() } }
+    val baroSelector = remember { { b: HistoryBuffer, i: Int -> b.baroIdx[i].toFloat() } }
+    val svzSelector = remember { { b: HistoryBuffer, i: Int -> (kotlin.math.abs(b.sitVz[i]).toFloat() / 2.0f).coerceIn(0f, 1f) } }
+    val svzDriftSelector = remember { { b: HistoryBuffer, i: Int -> if (b.sitVzTs[i] > 0) kotlin.math.abs(b.ts[i] - b.sitVzTs[i]) else 0L } }
+    val sdzSelector = remember { { b: HistoryBuffer, i: Int -> (kotlin.math.abs(b.sitDz[i]).toFloat() / 0.5f).coerceIn(0f, 1f) } }
+    val cpuSelector = remember { { b: HistoryBuffer, i: Int -> (b.cpuLoad[i].toFloat() / RIBBON_CPU_LOAD_SCALE.toFloat()).coerceIn(0f, 1f) } }
+    val iowSelector = remember { { b: HistoryBuffer, i: Int -> (b.ioWait[i].toFloat() / RIBBON_IO_WAIT_SCALE.toFloat()).coerceIn(0f, 1f) } }
+    val latSelector = remember { { b: HistoryBuffer, i: Int -> (b.maxIoLatency[i].toFloat() / RIBBON_LATENCY_SCALE_MS.toFloat()).coerceIn(0f, 1f) } }
 
     val amberColor = Color(0xFFF59E0B)
     val roseColor = Color(0xFFF43F5E)
@@ -188,7 +189,7 @@ fun ForensicRibbonContainer(
     title: String, 
     titleColor: Color, 
     height: androidx.compose.ui.unit.Dp, 
-    history: List<ConnectionPoint>, 
+    history: HistoryBuffer, 
     scale: String, 
     isStrictMode: Boolean = false, 
     replayCursorTs: Long? = null, 
@@ -229,14 +230,14 @@ fun ForensicRibbonContainer(
                             val pointWidth = size.width / totalPoints
                             val startOffset = totalPoints - history.size
                             val index = ((offset.x / pointWidth) - startOffset).toInt()
-                            if (index in history.indices) onEvent(UiEvent.SetReplayCursor(history[index].ts)) 
+                            if (index in 0 until history.size) onEvent(UiEvent.SetReplayCursor(history.ts[index])) 
                         }, 
                         onDrag = { change, _ -> 
                             val totalPoints = MAX_HISTORY_POINTS_PER_RIBBONS.toFloat()
                             val pointWidth = size.width / totalPoints
                             val startOffset = totalPoints - history.size
                             val index = ((change.position.x / pointWidth) - startOffset).toInt()
-                            if (index in history.indices) onEvent(UiEvent.SetReplayCursor(history[index].ts)) 
+                            if (index in 0 until history.size) onEvent(UiEvent.SetReplayCursor(history.ts[index])) 
                         }, 
                         onDragEnd = { onEvent(UiEvent.SetReplayCursor(null)) }, 
                         onDragCancel = { onEvent(UiEvent.SetReplayCursor(null)) }
@@ -253,28 +254,30 @@ fun ForensicRibbonContainer(
                     val gaps = Path()
                     val strictGaps = Path()
                     val ticks = Path()
-                    if (history.isNotEmpty()) {
-                        val firstTs = history[0].ts
+                    if (history.size > 0) {
+                        val firstTs = history.ts[0]
                         val baseTickTs = ((firstTs + tickAlignMs - 1) / tickAlignMs) * tickAlignMs
                         val startOffset = totalPoints - history.size
-                        for (index in history.indices) {
-                            val p = history[index]
+                        for (index in 0 until history.size) {
+                            val pTs = history.ts[index]
+                            val pIsGap = history.isGap[index]
                             val xPos = (startOffset + index) * pointWidth
-                            if (p.ts >= baseTickTs) {
-                                val tickCount = (p.ts - baseTickTs) / tickIntervalMs
+                            if (pTs >= baseTickTs) {
+                                val tickCount = (pTs - baseTickTs) / tickIntervalMs
                                 val prevTickCount = if (index > 0) { 
-                                    if (history[index - 1].ts >= baseTickTs) (history[index - 1].ts - baseTickTs) / tickIntervalMs else -1L 
+                                    if (history.ts[index - 1] >= baseTickTs) (history.ts[index - 1] - baseTickTs) / tickIntervalMs else -1L 
                                 } else -2L
                                 if (tickCount >= 0 && tickCount > prevTickCount) { 
                                     ticks.moveTo(xPos, baseLineY - maxHeight)
                                     ticks.lineTo(xPos, baseLineY + tickHeightPx) 
                                 }
                             }
-                            if (p.isGap) {
+                            if (pIsGap) {
                                 gaps.addRect(Rect(Offset(xPos, baseLineY - maxHeight), Size(maxOf(1f, pointWidth), maxHeight + tickHeightPx))) 
                             } else if (isStrictMode && index > 0) { 
-                                val prev = history[index - 1]
-                                if (!prev.isGap && (p.ts - prev.ts > tickIntervalMs * 2)) {
+                                val prevTs = history.ts[index - 1]
+                                val prevIsGap = history.isGap[index - 1]
+                                if (!prevIsGap && (pTs - prevTs > tickIntervalMs * 2)) {
                                     strictGaps.addRect(Rect(Offset(xPos - pointWidth, baseLineY - maxHeight), Size(maxOf(1f, pointWidth), maxHeight))) 
                                 }
                             }
@@ -289,9 +292,9 @@ fun ForensicRibbonContainer(
                         onDrawRibbon(totalPoints, pointWidth, baseLineY, maxHeight, isLandscape)
                         replayCursorTs?.let { cursorTs -> 
                             val startOffset = totalPoints - history.size
-                            val rawIndex = history.binarySearch { it.ts.compareTo(cursorTs) }
+                            val rawIndex = history.ts.binarySearch(cursorTs)
                             val index = if (rawIndex >= 0) rawIndex else -(rawIndex + 1)
-                            if (index in history.indices) { 
+                            if (index in 0 until history.size) { 
                                 val xPos = (startOffset + index) * pointWidth
                                 drawLine(color = Color.White, start = Offset(xPos, 0f), end = Offset(xPos, size.height), strokeWidth = 1.5.dp.toPx()) 
                             } 
@@ -304,7 +307,7 @@ fun ForensicRibbonContainer(
 
 @Composable
 fun GenericSensorRibbon(
-    history: List<ConnectionPoint>, 
+    history: HistoryBuffer, 
     title: String, 
     scale: String, 
     lineColor: Color, 
@@ -312,20 +315,19 @@ fun GenericSensorRibbon(
     isStrictMode: Boolean = false, 
     replayCursorTs: Long? = null, 
     onEvent: (UiEvent) -> Unit = {},
-    valueSelector: (ConnectionPoint) -> Float, 
-    driftSelector: ((ConnectionPoint) -> Long)? = null
+    valueSelector: (HistoryBuffer, Int) -> Float, 
+    driftSelector: ((HistoryBuffer, Int) -> Long)? = null
 ) {
     val sensorHeight = if (LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE) 40.dp else 24.dp
     ForensicRibbonContainer(title, lineColor, sensorHeight, history, scale, isStrictMode, replayCursorTs, onEvent) { totalPoints, pointWidth, baseLineY, maxHeight, landscape ->
-        if (history.isEmpty()) return@ForensicRibbonContainer
+        if (history.size == 0) return@ForensicRibbonContainer
         val startOffset = totalPoints - history.size
         val rectW = maxOf(1f, pointWidth)
         if (renderType == RibbonRenderType.BAR) {
             val barPath = Path()
-            for (index in history.indices) { 
-                val p = history[index]
-                if (p.isGap) continue
-                val value = valueSelector(p).coerceIn(0f, 1f)
+            for (index in 0 until history.size) { 
+                if (history.isGap[index]) continue
+                val value = valueSelector(history, index).coerceIn(0f, 1f)
                 if (value > 0.01f) { 
                     val barHeight = value * maxHeight
                     barPath.addRect(Rect(Offset((startOffset + index) * pointWidth, baseLineY - barHeight), Size(rectW, barHeight))) 
@@ -337,16 +339,15 @@ fun GenericSensorRibbon(
             val points = mutableListOf<Offset>()
             var lastPos: Offset? = null
             val gapLimitWidth = pointWidth * 10
-            for (index in history.indices) { 
-                val p = history[index]
+            for (index in 0 until history.size) { 
                 val xPos = (startOffset + index) * pointWidth
-                if (p.isGap) { 
+                if (history.isGap[index]) { 
                     lastPos = null
                     continue 
                 }
-                val value = valueSelector(p).coerceIn(0f, 1f)
+                val value = valueSelector(history, index).coerceIn(0f, 1f)
                 val currentPos = Offset(xPos + (rectW / 2f), baseLineY - (value * maxHeight))
-                if (isStrictMode && driftSelector != null && driftSelector(p) > 2000L) {
+                if (isStrictMode && driftSelector != null && driftSelector(history, index) > 2000L) {
                     drawRect(Color.Yellow.copy(alpha = 0.5f), Offset((startOffset + index) * pointWidth, baseLineY - maxHeight), Size(maxOf(2f, pointWidth), maxHeight * 0.1f))
                 }
                 if (lastPos != null && (currentPos.x - lastPos.x < gapLimitWidth)) {
@@ -369,7 +370,7 @@ fun GenericSensorRibbon(
 
 @Composable
 fun ConnectionQualityRibbon(
-    history: List<ConnectionPoint>, 
+    history: HistoryBuffer, 
     title: String, 
     scale: String, 
     isStrictMode: Boolean = false, 
@@ -402,40 +403,51 @@ fun ConnectionQualityRibbon(
     }
     val ribbonHeight = if (isLandscape) 68.dp else 50.dp
     ForensicRibbonContainer(title, Color.Gray, ribbonHeight, history, scale, isStrictMode, replayCursorTs, onEvent) { totalPoints, pointWidth, connectionBaseY, maxHeight, landscape ->
-        if (history.isEmpty()) return@ForensicRibbonContainer
+        if (history.size == 0) return@ForensicRibbonContainer
         val ribbonMaxHeight = if (landscape) 14.dp.toPx() else 8.dp.toPx()
         val effectiveBaseY = connectionBaseY - (if (landscape) 6.dp.toPx() else 4.dp.toPx())
         val startOffset = totalPoints - history.size
         val rectW = maxOf(1f, pointWidth)
-        val firstTs = history[0].ts
+        val firstTs = history.ts[0]
         val baseTickTs = ((firstTs + alignMs - 1) / alignMs) * alignMs
         val connectedPath = Path()
         val disconnectedPath = Path()
         val gpsPath = Path()
         val gpsPoints = mutableListOf<Offset>()
         var lastGpsPos: Offset? = null
-        for (index in history.indices) { 
-            val p = history[index]
+        for (index in 0 until history.size) { 
+            val pTs = history.ts[index]
+            val pRt = history.rt[index]
+            val pRtt = history.rtt[index]
+            val pLocalSig = history.localSig[index]
+            val pRemoteSig = history.remoteSig[index]
+            val pIsConnected = history.isConnected[index]
+            val pIsGap = history.isGap[index]
+            val pIsRecoveryEvent = history.isRecoveryEvent[index]
+            val pHasGps = history.hasGps[index]
+            val pGpsIndex = history.gpsIndex[index]
+
             val xPos = (startOffset + index) * pointWidth
-            if (!p.isGap) { 
-                val commIdx = TelemetryUtils.calculateCommIndex(p.rtt, p.localSig, p.remoteSig).toFloat()
-                val hFactor = if (p.isConnected) (commIdx / 10f).coerceIn(0.1f, 1f) else 1f
+            if (!pIsGap) { 
+                val commIdx = TelemetryUtils.calculateCommIndex(pRtt, pLocalSig, pRemoteSig).toFloat()
+                val hFactor = if (pIsConnected) (commIdx / 10f).coerceIn(0.1f, 1f) else 1f
                 val r = Rect(Offset(xPos, effectiveBaseY - (ribbonMaxHeight * hFactor)), Size(rectW, ribbonMaxHeight * hFactor))
-                if (p.isConnected) connectedPath.addRect(r) else disconnectedPath.addRect(r)
+                if (pIsConnected) connectedPath.addRect(r) else disconnectedPath.addRect(r)
                 
                 if (isStrictMode && index > 0) {
-                    val prev = history[index - 1]
-                    if (kotlin.math.abs((p.ts - p.rt) - (prev.ts - prev.rt)) > 2000L) {
+                    val prevTs = history.ts[index - 1]
+                    val prevRt = history.rt[index - 1]
+                    if (kotlin.math.abs((pTs - pRt) - (prevTs - prevRt)) > 2000L) {
                         drawRect(Color.Yellow.copy(alpha = 0.5f), Offset(xPos, effectiveBaseY - (ribbonMaxHeight * 1.5f)), Size(maxOf(2f, pointWidth), ribbonMaxHeight * 0.5f))
                     }
                 }
                 
-                if (p.isRecoveryEvent) {
+                if (pIsRecoveryEvent) {
                     drawRect(Color.White.copy(alpha = 0.8f), Offset(xPos - (rectW * 0.5f), effectiveBaseY - maxHeight), Size(maxOf(2f, rectW), maxHeight + 4.dp.toPx()))
                 }
                 
-                if (p.hasGps && p.gpsIndex > 0.0) { 
-                    val gpsOffset = (p.gpsIndex.toFloat().coerceIn(0f, 1f) * (if (landscape) 24.dp.toPx() else 14.dp.toPx()))
+                if (pHasGps && pGpsIndex > 0.0) { 
+                    val gpsOffset = (pGpsIndex.toFloat().coerceIn(0f, 1f) * (if (landscape) 24.dp.toPx() else 14.dp.toPx()))
                     val yPos = effectiveBaseY - ribbonMaxHeight - (if (landscape) 4.dp.toPx() else 2.dp.toPx()) - gpsOffset
                     val currentPos = Offset(xPos + (rectW / 2f), yPos)
                     if (lastGpsPos != null && (currentPos.x - lastGpsPos.x < pointWidth * 10)) {
@@ -450,11 +462,11 @@ fun ConnectionQualityRibbon(
                 lastGpsPos = null
             }
             
-            if (intervalMs > 0 && p.ts >= baseTickTs) { 
-                val tickCount = (p.ts - baseTickTs) / intervalMs
-                val prevTickCount = if (index > 0 && history[index-1].ts >= baseTickTs) (history[index - 1].ts - baseTickTs) / intervalMs else -1L
+            if (intervalMs > 0 && pTs >= baseTickTs) { 
+                val tickCount = (pTs - baseTickTs) / intervalMs
+                val prevTickCount = if (index > 0 && history.ts[index-1] >= baseTickTs) (history.ts[index - 1] - baseTickTs) / intervalMs else -1L
                 if (tickCount >= 0 && tickCount > prevTickCount) { 
-                    val timeStr = if (scale == "7D") dateFormatter.format(Date(p.ts)) else timeFormatter.format(Date(p.ts))
+                    val timeStr = if (scale == "7D") dateFormatter.format(Date(pTs)) else timeFormatter.format(Date(pTs))
                     drawIntoCanvas { 
                         it.nativeCanvas.drawText(
                             timeStr, 

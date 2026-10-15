@@ -22,12 +22,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.15.2:
+ * - SIMP-OCT15.1-S1: Primitive History Buffers. Transitioned history flows 
+ *   to HistoryBuffer to reduce GC pressure during long sessions.
  * Oct.15.1:
  * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Integrated TrailBuffer into trail flows 
  *   to reduce GC pressure during long tracking sessions.
- * Oct.15.0:
- * - Map Mapping Extraction: Refactored Map state mapping into MapStateMapper.kt 
- *   (SIMP-OCT14.21-S1) for complete Pure Flat architectural separation.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -145,12 +145,12 @@ class MainViewModel @Inject constructor(
     override val logFilterDetails: StateFlow<Boolean> = repository.logFilterDetails
     override val logFilterRecovered: StateFlow<Boolean> = repository.logFilterRecovered
 
-    override val history4M: StateFlow<List<ConnectionPoint>> = repository.getHistoryFlow("4M").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    override val history16M: StateFlow<List<ConnectionPoint>> = repository.getHistoryFlow("16M").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    override val history1H: StateFlow<List<ConnectionPoint>> = repository.getHistoryFlow("1H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    override val history4H: StateFlow<List<ConnectionPoint>> = repository.getHistoryFlow("4H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    override val history24H: StateFlow<List<ConnectionPoint>> = repository.getHistoryFlow("24H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    override val history7D: StateFlow<List<ConnectionPoint>> = repository.getHistoryFlow("7D").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    override val history4M: StateFlow<HistoryBuffer> = repository.getHistoryFlow("4M").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HistoryBuffer.EMPTY)
+    override val history16M: StateFlow<HistoryBuffer> = repository.getHistoryFlow("16M").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HistoryBuffer.EMPTY)
+    override val history1H: StateFlow<HistoryBuffer> = repository.getHistoryFlow("1H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HistoryBuffer.EMPTY)
+    override val history4H: StateFlow<HistoryBuffer> = repository.getHistoryFlow("4H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HistoryBuffer.EMPTY)
+    override val history24H: StateFlow<HistoryBuffer> = repository.getHistoryFlow("24H").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HistoryBuffer.EMPTY)
+    override val history7D: StateFlow<HistoryBuffer> = repository.getHistoryFlow("7D").stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HistoryBuffer.EMPTY)
 
     private val trackerTrailFlow: StateFlow<TrailBuffer> = repository.trackerTrailFlow
         .distinctUntilChanged()

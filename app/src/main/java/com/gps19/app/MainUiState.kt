@@ -7,6 +7,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Composite UI state partitioned into specialized slices.
+ * Oct.15.2:
+ * - SIMP-OCT15.1-S1: Primitive History Buffers. Transitioned history flows 
+ *   from List<ConnectionPoint> to HistoryBuffer to reduce GC pressure.
  * Oct.14.17:
  * - A15 Hardening: Disabled isMapVisible by default to prevent MapView 
  *   from obscuring the UI on devices with rendering stalls.
@@ -80,12 +83,12 @@ interface UiStateProvider {
     val eventLogs: StateFlow<List<LogEntry>>
     val logFilterDetails: StateFlow<Boolean>
     val logFilterRecovered: StateFlow<Boolean>
-    val history4M: StateFlow<List<ConnectionPoint>>
-    val history16M: StateFlow<List<ConnectionPoint>>
-    val history1H: StateFlow<List<ConnectionPoint>>
-    val history4H: StateFlow<List<ConnectionPoint>>
-    val history24H: StateFlow<List<ConnectionPoint>>
-    val history7D: StateFlow<List<ConnectionPoint>>
+    val history4M: StateFlow<HistoryBuffer>
+    val history16M: StateFlow<HistoryBuffer>
+    val history1H: StateFlow<HistoryBuffer>
+    val history4H: StateFlow<HistoryBuffer>
+    val history24H: StateFlow<HistoryBuffer>
+    val history7D: StateFlow<HistoryBuffer>
     val gpsIndexData: StateFlow<GpsIndexData>
     val rtt: StateFlow<Int>
     val remoteSignal: StateFlow<Int>
@@ -109,12 +112,12 @@ class SimpleUiStateProvider(
     override val eventLogs: StateFlow<List<LogEntry>> = MutableStateFlow(emptyList()),
     override val logFilterDetails: StateFlow<Boolean> = MutableStateFlow(false),
     override val logFilterRecovered: StateFlow<Boolean> = MutableStateFlow(false),
-    override val history4M: StateFlow<List<ConnectionPoint>> = MutableStateFlow(emptyList()),
-    override val history16M: StateFlow<List<ConnectionPoint>> = MutableStateFlow(emptyList()),
-    override val history1H: StateFlow<List<ConnectionPoint>> = MutableStateFlow(emptyList()),
-    override val history4H: StateFlow<List<ConnectionPoint>> = MutableStateFlow(emptyList()),
-    override val history24H: StateFlow<List<ConnectionPoint>> = MutableStateFlow(emptyList()),
-    override val history7D: StateFlow<List<ConnectionPoint>> = MutableStateFlow(emptyList()),
+    override val history4M: StateFlow<HistoryBuffer> = MutableStateFlow(HistoryBuffer.EMPTY),
+    override val history16M: StateFlow<HistoryBuffer> = MutableStateFlow(HistoryBuffer.EMPTY),
+    override val history1H: StateFlow<HistoryBuffer> = MutableStateFlow(HistoryBuffer.EMPTY),
+    override val history4H: StateFlow<HistoryBuffer> = MutableStateFlow(HistoryBuffer.EMPTY),
+    override val history24H: StateFlow<HistoryBuffer> = MutableStateFlow(HistoryBuffer.EMPTY),
+    override val history7D: StateFlow<HistoryBuffer> = MutableStateFlow(HistoryBuffer.EMPTY),
     override val gpsIndexData: StateFlow<GpsIndexData> = MutableStateFlow(GpsIndexData(0.0, 0.0, 0.0, 0.0)),
     override val rtt: StateFlow<Int> = MutableStateFlow(0),
     override val remoteSignal: StateFlow<Int> = MutableStateFlow(0),
