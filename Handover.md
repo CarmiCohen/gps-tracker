@@ -1,30 +1,32 @@
-# Project Handover - Oct15.11 (Proximity Hardening)
+# Project Handover - Oct15.12 (Vibration Hardening)
 
-## 🟢 Status: Release Ready (Oct15.11 Graduation)
-The project has graduated to `Oct15.11`. The Proximity Debounce overflow issue on A15 has been root-caused and remediated through ingestion-point validation and boundary clamping.
+## 🟢 Status: Release Ready (Oct15.12 Graduation)
+The project has graduated to `Oct15.12`. The Vibration Floor Jitter issue reported on A15 diagnostics has been resolved through native and JVM boundary clamping.
 
-## 🛠️ Critical Hardening Details (Oct15.11)
+## 🛠️ Critical Hardening Details (Oct15.12)
 
-### 1. Proximity Debounce Hardening (ISSUE-OCT15.10-F2)
+### 1. Vibration Floor Jitter Hardening (ISSUE-OCT15.11-F1)
 - **Remediation**: 
-    - **HardwareSuite.kt**: Fixed typo in `proximityIdx` assignment; added check for `processProximityBatch` success; added safety clamp `0L..15000L` to `proximityDebounceMs` at source.
-    - **TelemetryMapper.kt**: Implemented `clampProxDebounce()` and applied it to `mapTickToOutputs`, `mapProtoToStatus`, and `mapSnapshotToHealth`.
-    - **app_settings.proto**: Updated `RealtimeStatus` to include `proximity_cm` and `proximity_debounce_ms` for full parity.
-- **SOT Rule**: Added **1.217 Defensive Telemetry Clamping (R-ID 735)** to enforce boundary safety for forensic fields.
+    - **jdhardware-jni.cpp**: Added explicit boundary clamping `[0.02, 2.0]` G to `n13` (discrete update) and `n19` (batch update) to prevent noise propagation.
+    - **EngineConstants.kt**: Added `VIBRATION_FLOOR_MIN` (0.02) and `VIBRATION_FLOOR_MAX` (2.0) as global sources of truth.
+    - **SentinelValidator.kt**: Applied identical clamping logic to the JVM fallback provider for architectural parity.
+    - **TelemetryMapper.kt**: Implemented `clampVibrationFloor()` and integrated it into all mapping and ingestion paths (`mapTickToOutputs`, `mapProtoToStatus`, `mapJsonToStatus`, `mapProtoToSnapshot`, `mapJsonToSnapshot`, `mapSnapshotToHealth`, `mapProcessedToSnapshot`, `mapStatusToSnapshot`, `mapPendingToStatus`).
+    - **app_settings.proto**: Updated `RealtimeStatus` to include `adaptive_vibration_floor` for full parity in signaling and persistence.
+- **SOT Rule**: Updated **1.217 Defensive Telemetry Clamping (R-ID 735)** to include floor boundary safety.
 
 ### 2. Versioning & Consistency
-- **DashboardMapper.kt**: Engine version string updated to `Oct15.11`.
-- **MainAppContent.kt**: UI footer updated to `Oct15.11_PLATINUM`.
-- **app/build.gradle**: `versionName` incremented to `Oct15.11`.
+- **DashboardMapper.kt**: Engine version string updated to `Oct15.12`.
+- **MainAppContent.kt**: UI footer updated to `Oct15.12_PLATINUM`.
+- **app/build.gradle**: `versionName` incremented to `Oct15.12`.
 
 ## 📊 Forensic Pulse & Metrics
 - **Unit Tests**: 88/88 PASS (100%).
-- **A15 Stability**: Proximity diagnostic overflow eliminated.
-- **SOT Count**: 432 (Rules: 271).
+- **A15 Stability**: Vibration floor jitter eliminated; Proximity diagnostics stable.
+- **SOT Count**: 433 (Rules: 272).
 - **Open Gaps**: 0 active logical gaps.
-- **Version Tag**: `Oct15.11`.
+- **Version Tag**: `Oct15.12`.
 
 ## 🔴 Open Forensic Gaps (Priority for Next Session)
-1. **Vibration Floor Jitter**: `Vibration Floor` field showing very high values on some A15 diagnostics; verify EMA convergence logic in native fast-path (JNI) or add similar boundary clamping as done for proximity.
+1. **Unit Test Integrity & Manual UI Hardening**: Continue focus on (ISSUE-OCT15.10-F1..F6) as per roadmap.
 
-**HANDOVER COMPLETE. VERSION GRADUATED TO Oct15.11. STOP ALL PROCESSING.**
+**HANDOVER COMPLETE. VERSION GRADUATED TO Oct15.12. STOP ALL PROCESSING.**

@@ -145,7 +145,8 @@ JNIEXPORT jdouble JNICALL
 Java_com_gps19_app_JdHardwareManager_n13(JNIEnv* env, jclass clazz, jdouble currentFloor, jdouble vibration, jint isWarming, jdouble cpuLoad) {
     if (std::isnan(vibration) || vibration <= 0.0 || cpuLoad > 0.85) return currentFloor;
     double alpha = (vibration < currentFloor) ? (isWarming ? 0.5 : 0.1) : (vibration < 1.0 ? (isWarming ? 0.1 : 0.01) : 0.0);
-    return (currentFloor * (1.0 - alpha)) + (vibration * alpha);
+    double next = (currentFloor * (1.0 - alpha)) + (vibration * alpha);
+    return std::max(0.02, std::min(2.0, next));
 }
 
 JNIEXPORT jdouble JNICALL
@@ -204,6 +205,7 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     if (!std::isnan(delta) && delta > 0.0 && cpu <= 0.85) {
         double alpha = (delta < floor) ? (isWarming ? 0.5 : 0.1) : (delta < 1.0 ? (isWarming ? 0.1 : 0.01) : 0.0);
         nextFloor = (floor * (1.0 - alpha)) + (delta * alpha);
+        nextFloor = std::max(0.02, std::min(2.0, nextFloor));
     }
     double nextHpf = 0.9 * (lastHpf + delta - lastRaw);
     double nextEnergy = (energy * 0.9) + (std::abs(nextHpf) * 0.1);

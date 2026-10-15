@@ -6,19 +6,21 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.15.12:
+ * - ISSUE-OCT15.11-F1: Vibration Floor Jitter Hardening. Added clampVibrationFloor() 
+ *   to ensure adaptiveVibrationFloor stays within [0.02, 2.0] G range across 
+ *   all ingestion paths.
  * Oct.15.11:
  * - ISSUE-OCT15.10-F2: Proximity Debounce Hardening. Added safety clamping for 
  *   proximityDebounceMs in all serialization and mapping paths to prevent 
  *   overflow/underflow propagation.
  * Oct.15.7:
  * - ISSUE-OCT15.7-F1: Consolidated TrailBuffer mapping logic from MainRepository.
- * Oct.15.6:
- * - SIMP-OCT15.4-S2: Buffer Constructor Refactoring. Offloaded HistoryBuffer 
- *   mapping logic to HistoryBuffer.Companion.fromPoints.
  */
 object TelemetryMapper {
 
     private fun clampProxDebounce(ms: Long): Long = ms.coerceIn(0L, PROXIMITY_DEBOUNCE_MAX_MS)
+    private fun clampVibrationFloor(v: Double): Double = v.coerceIn(VIBRATION_FLOOR_MIN, VIBRATION_FLOOR_MAX)
 
     /**
      * mapTickToOutputs: Consolidated authority for preparing persistence and 
@@ -81,6 +83,7 @@ object TelemetryMapper {
             
             // Oct.15.11: Safety Clamp
             this.proximityDebounceMs = clampProxDebounce(this.proximityDebounceMs)
+            this.adaptiveVibrationFloor = clampVibrationFloor(this.adaptiveVibrationFloor)
         }
 
         updateOut.copyFrom(snapshot)
@@ -127,6 +130,7 @@ object TelemetryMapper {
                 tiltIdx = proto.tiltIdx
                 baroIdx = proto.baroIdx
                 proximityDebounceMs = clampProxDebounce(proto.proximityDebounceMs)
+                adaptiveVibrationFloor = clampVibrationFloor(proto.adaptiveVibrationFloor)
             }
 
             integrity.apply {
@@ -248,7 +252,7 @@ object TelemetryMapper {
                 peakVibrationShockTs = data.optLong("peak_shock_ts", current.atmospheric.peakVibrationShockTs)
                 luxBaseline = data.optDouble("lux_baseline", current.atmospheric.luxBaseline)
                 acousticFloorDb = data.optDouble("acoustic_floor_db", current.atmospheric.acousticFloorDb)
-                adaptiveVibrationFloor = data.optDouble("adaptive_vibration_floor", current.atmospheric.adaptiveVibrationFloor)
+                adaptiveVibrationFloor = clampVibrationFloor(data.optDouble("adaptive_vibration_floor", current.atmospheric.adaptiveVibrationFloor))
                 proxIdx = data.optDouble("prox_idx", current.atmospheric.proxIdx)
                 proximityCm = data.optDouble("proximity_cm", current.atmospheric.proximityCm)
                 proximityDebounceMs = clampProxDebounce(data.optLong("proximity_debounce_ms", current.atmospheric.proximityDebounceMs))
@@ -364,6 +368,7 @@ object TelemetryMapper {
             }
             atmospheric.apply {
                 proximityDebounceMs = clampProxDebounce(proto.proximityDebounceMs)
+                adaptiveVibrationFloor = clampVibrationFloor(proto.adaptiveVibrationFloor)
             }
             
             this.thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
@@ -431,6 +436,7 @@ object TelemetryMapper {
                 tiltIdx = data.optDouble("tilt_idx", current.atmospheric.tiltIdx)
                 baroIdx = data.optDouble("baro_idx", current.atmospheric.baroIdx)
                 proximityDebounceMs = clampProxDebounce(data.optLong("proximity_debounce_ms", current.atmospheric.proximityDebounceMs))
+                adaptiveVibrationFloor = clampVibrationFloor(data.optDouble("adaptive_vibration_floor", current.atmospheric.adaptiveVibrationFloor))
             }
             kinetic.jumpTier = data.optInt("jump_tier", 0)
             integrity.isJammer = data.optBoolean("is_jammer", false)
@@ -485,7 +491,7 @@ object TelemetryMapper {
             isNear = snapshot.atmospheric.isNear, 
             luxBaseline = snapshot.atmospheric.luxBaseline, 
             acousticFloorDb = snapshot.atmospheric.acousticFloorDb, 
-            adaptiveVibrationFloor = snapshot.atmospheric.adaptiveVibrationFloor, 
+            adaptiveVibrationFloor = clampVibrationFloor(snapshot.atmospheric.adaptiveVibrationFloor), 
             peakVibrationShock = snapshot.atmospheric.peakVibrationShock,
             isPowerSaveMode = snapshot.integrity.isPowerSaveMode, 
             standbyBucket = snapshot.integrity.standbyBucket, 
@@ -563,6 +569,7 @@ object TelemetryMapper {
             
             // Oct.15.11: Safety Clamp
             this.proximityDebounceMs = clampProxDebounce(snapshot.proximityDebounceMs)
+            this.adaptiveVibrationFloor = clampVibrationFloor(snapshot.adaptiveVibrationFloor)
         }
     }
 
@@ -609,6 +616,7 @@ object TelemetryMapper {
             
             // Oct.15.11: Safety Clamp
             this.proximityDebounceMs = clampProxDebounce(s.proximityDebounceMs)
+            this.adaptiveVibrationFloor = clampVibrationFloor(s.adaptiveVibrationFloor)
         }
     }
 
@@ -857,6 +865,7 @@ object TelemetryMapper {
                 vibeIdx = entity.vibeIdx; liftIdx = entity.liftIdx; tiltIdx = entity.tiltIdx
                 baroIdx = entity.baroIdx; proxIdx = entity.proxIdx
                 proximityDebounceMs = clampProxDebounce(entity.proxIdx.toLong()) // Legacy fallback
+                adaptiveVibrationFloor = clampVibrationFloor(INITIAL_VIBRATION_FLOOR)
             }
 
             integrity.apply {

@@ -213,7 +213,7 @@ message RealtimeStatus {
     int64 sit_vz_ts = 60;
     int64 sit_vz_rt = 61;
 
-    bool is_adaptive_jump = 62;
+    reserved 62;
 
     bool is_battery_low = 63;
     bool is_battery_critical = 64;
@@ -283,6 +283,9 @@ message RealtimeStatus {
     // Oct.15.11: Proximity Parity
     double proximity_cm = 112;
     int64 proximity_debounce_ms = 113;
+
+    // Oct.15.12: Vibration Floor Parity
+    double adaptive_vibration_floor = 114;
 }
 
 message GeoPointProto {
@@ -387,7 +390,7 @@ message TrackerStatusProto {
     int64 sit_vz_ts = 67;
     int64 sit_vz_rt = 68;
 
-    bool is_adaptive_jump = 69;
+    reserved 69;
 
     bool is_battery_low = 70;
     bool is_battery_critical = 71;

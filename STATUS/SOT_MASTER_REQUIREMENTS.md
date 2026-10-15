@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct15.11)
+# SOT Master Requirements & Hardening Status (Oct14.1)
 
-## 🏗️ Architectural Master Rules (271 Rules)
+## 🏗️ Architectural Master Rules (272 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.207 Pure Mapping Architecture (R-ID 725)**: UI state mapping logic MUST be extracted from `MainViewModel` into dedicated, pure mapper objects (e.g., `HudMapper`, `DashboardMapper`, `MapStateMapper`) to ensure ViewModel maintainability, testability, and separation of concerns. (Oct14.1 - SIMP-OCT14.21-S1).
@@ -13,23 +13,23 @@
 *   **1.214 Encapsulated Buffer Construction (R-ID 732)**: Instantiation, normalization, and reconciliation (merging) logic for complex primitive-backed buffers MUST be encapsulated within the buffer's companion object (e.g., `HistoryBuffer.Companion.fromPoints`) to reduce call-site complexity and leakage of imperative array-handling logic. (Oct14.1 - SIMP-OCT15.4-S2).
 *   **1.215 Explicit Persistence Gating (R-ID 733)**: All IO operations (Trails, Violations, History, Maintenance) MUST be gated by `PersistencePolicy` to ensure system stability during critical health states like Mali anomalies or low battery. (Oct14.1 - ISSUE-OCT15.7-F1).
 *   **1.216 Unified Log Gating (R-ID 734)**: Application logging MUST be gated by `PersistencePolicy.shouldSaveLog()` to prevent driver-level I/O contention during Mali anomalies and ensure consistent storage pressure handling across all diagnostic paths. (Oct14.1 - ISSUE-OCT15.9-F1).
-*   **1.217 Defensive Telemetry Clamping (R-ID 735)**: High-frequency diagnostic fields (especially timestamps and debounce values) MUST be clamped at both the hardware ingestion point and the mapping boundary to prevent JNI buffer corruption or peer-to-peer garbage from causing UI overflows. (Oct15.11 - ISSUE-OCT15.10-F2).
+*   **1.217 Defensive Telemetry Clamping (R-ID 735)**: High-frequency diagnostic fields (especially timestamps, floors, and debounce values) MUST be clamped at both the hardware ingestion point and the mapping boundary to prevent JNI buffer corruption or peer-to-peer garbage from causing UI overflows or runaway jitter. (Oct14.1 - ISSUE-OCT15.11-F1).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 741**: Proximity Debounce Hardening - PASSED. Corrected typo in HardwareSuite, added JNI result validation, and enforced boundary clamping in TelemetryMapper. (Oct15.11 - ISSUE-OCT15.10-F2).
+*   **SOT ID 742**: Vibration Floor Hardening - PASSED. Implemented [0.02, 2.0] G boundary clamping in jdhardware-jni.cpp (n13, n19), SentinelValidator JVM fallback, and TelemetryMapper ingestion paths. (Oct14.1 - ISSUE-OCT15.11-F1).
+*   **SOT ID 741**: Proximity Debounce Hardening - PASSED. Corrected typo in HardwareSuite, added JNI result validation, and enforced boundary clamping in TelemetryMapper. (Oct14.1 - ISSUE-OCT15.10-F2).
 *   **SOT ID 740**: Unit Test Restoration - PASSED. Decoupled test suite from MainViewModel and aligned with Pure Mapping Architecture, restoring 100% pass rate. (Oct14.1 - ISSUE-OCT15.10-F1).
 *   **SOT ID 739**: Log Gating Integration - PASSED. Refactored LogManager to use centralized PersistencePolicy, ensuring Mali driver protection and consistent storage pressure handling. (Oct14.1 - ISSUE-OCT15.9-F1).
 *   **SOT ID 738**: Persistence Policy Audit - PASSED. Expanded PersistencePolicy to cover all IO paths and enforced gating in MainRepository. (Oct14.1 - ISSUE-OCT15.7-F1).
-*   **SOT ID 737**: Buffer Constructor Refactoring - PASSED. Encapsulated HistoryBuffer array initialization and merging into its companion object, simplifying UseCase and Mapper layers. (Oct14.1 - SIMP-OCT15.4-S2).
 
 ...
 
 ---
 
 ## ✅ Verification Chapters
-*   **Chapter 31.816 (Diagnostic Data Integrity)**: PASSED - Verified that `proximityDebounceMs` remains within 0..15000L range even when uninitialized JNI buffers or corrupted JSON payloads are processed. (Oct15.11).
+*   **Chapter 31.817 (Vibration Floor Stability)**: PASSED - Confirmed that `adaptiveVibrationFloor` is clamped within [0.02, 2.0] G range in both native fast-path and Kotlin mapping layers, preventing the "runaway" jitter reported on A15 diagnostics. (Oct14.1).
+*   **Chapter 31.816 (Diagnostic Data Integrity)**: PASSED - Verified that `proximityDebounceMs` remains within 0..15000L range even when uninitialized JNI buffers or corrupted JSON payloads are processed. (Oct14.1).
 *   **Chapter 31.815 (Unit Test Integrity)**: PASSED - Confirmed 100% unit test pass rate (88 tests) across :app and :core:engine modules following architectural decoupling. (Oct14.1).
 *   **Chapter 31.814 (Unified Log Gating)**: PASSED - Confirmed via `StoragePressureAuditTest` that Normal and Important logs are correctly inhibited during simulated Low/Critical storage pressure, while Special logs persist. (Oct14.1).
-*   **Chapter 31.813 (Explicit Persistence Gating)**: PASSED - Verified that Violations and Pruning are strictly inhibited during simulated Mali anomalies via Logcat audit. (Oct14.1).

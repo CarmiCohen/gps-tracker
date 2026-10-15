@@ -6,15 +6,13 @@ import kotlin.math.min
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * Oct.15.12:
+ * - ISSUE-OCT15.11-F1: Vibration Floor Jitter Hardening. Integrated 
+ *   VIBRATION_FLOOR_MIN and VIBRATION_FLOOR_MAX clamping in the JVM fallback 
+ *   provider for parity with JNI.
  * Oct.11.1:
  * - Issue #SIMP-1011-5: Acoustic Profiling. Updated DefaultNativeFastPathProvider 
  *   to match the new TimeProvider-aware interface.
- * Oct.10.1 (Restoration Path):
- * - Issue #SIMP-1015-1: Non-Nullable Native Authority. Standardized on @NotNull 
- *   native providers. All high-frequency gates now route through nativeProvider 
- *   without null-checks, using DefaultNativeFastPathProvider as the baseline.
- * - Issue #SIMP-1013-3: JNI Stationary Authority. Offloaded load-aware movement 
- *   authority to JNI. Eliminated JVM gate calculation in the authoritative path.
  */
 object SentinelValidator {
 
@@ -223,7 +221,7 @@ object SentinelValidator {
         override fun updateVibrationFloor(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double): Double {
             if (vibration.isNaN() || vibration <= 0.0 || cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) return currentFloor
             
-            return if (vibration < currentFloor) {
+            val next = if (vibration < currentFloor) {
                 val alpha = accelerateAlpha(VIBRATION_EMA_DOWN_FAST, isWarming, 0.5)
                 (currentFloor * (1.0 - alpha)) + (vibration * alpha)
             } else if (vibration < 1.0) {
@@ -232,6 +230,7 @@ object SentinelValidator {
             } else {
                 currentFloor
             }
+            return next.coerceIn(VIBRATION_FLOOR_MIN, VIBRATION_FLOOR_MAX)
         }
 
         override fun computeNextHpf(lastHpfValue: Double, currentRawVibe: Double, lastRawVibe: Double): Double {

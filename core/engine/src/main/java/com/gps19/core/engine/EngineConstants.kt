@@ -2,13 +2,13 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.15.12:
+ * - ISSUE-OCT15.11-F1: Vibration Floor Jitter Hardening. Added VIBRATION_FLOOR_MIN 
+ *   and VIBRATION_FLOOR_MAX for boundary clamping in native and ingestion paths.
  * Oct.13.21:
  * - ISSUE-OCT13.21-H1: Restored JUMP_HOLD_DURATION_MS and GPS_INDEX_AGE_SCALING 
  *   required by engine logic.
  * - ISSUE-OCT13.20-L1: Dead Code Cleanup. Pruned 4 obsolete constants.
- * Oct.14.15:
- * - Issue #1413: Hardened mode-aware branding. Added "Tracker:" prefix to 
- *   baseline titles to ensure correct filtering in MainAlarmLogic (R-ID 511).
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -195,6 +195,8 @@ const val STATIONARY_FLOOR_MULT = 1.5
 const val VIBRATION_SHOCK_MULTIPLIER = 7.0
 const val VIBRATION_SUSPICIOUS_MULTIPLIER = 2.5
 const val INITIAL_VIBRATION_FLOOR = 0.05
+const val VIBRATION_FLOOR_MIN = 0.02
+const val VIBRATION_FLOOR_MAX = 2.0
 const val VIBRATION_WINDOW_SIZE = 5 
 const val PASSIVE_ZEROING_STATIONARY_MS = 30000L
 const val ROTATION_INIT_STATIONARY_MS = 3000L
