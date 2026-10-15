@@ -1,27 +1,27 @@
-# Project Handover - OCT15.4 (Ribbon Selector Consolidation)
+# Project Handover - Oct15.5 (Mapper Consolidation)
 
-## 🟢 Status: Release Ready (OCT15.4 Graduation)
-The project has reached the `OCT15.4` milestone. The forensic visualization pipeline has been hardened by offloading all telemetry normalization from the UI thread to the primitive-backed `HistoryBuffer` pipeline.
+## 🟢 Status: Release Ready (Oct15.5 Graduation)
+The project has graduated to `Oct15.5`. Redundant telemetry mapping logic has been centralized, hardening the normalization pipeline for connection ribbons.
 
-## 🛠️ Critical Hardening Details (OCT15.4)
+## 🛠️ Critical Hardening Details (Oct15.5)
 
-### 1. Ribbon Selector Consolidation (SIMP-OCT15.2-S1)
-- **Files**: `Models.kt`, `MainRepository.kt`, `StateSubscriptionUseCase.kt`, `SharedUiComponents.kt`.
-- **Fix**: Transitioned connection ribbons from runtime scaling (0.0-1.0) to pre-calculated `FloatArray`s within `HistoryBuffer`.
-- **Impact**: Eliminated hundreds of calculations per frame in `AnalyticalRibbons`. `SharedUiComponents` now performs direct index-based lookups into pre-normalized buffers, ensuring consistent performance even on ultra-budget hardware (e.g., Samsung A15) during high-frequency GPS/Sensor updates.
+### 1. Mapper Consolidation (SIMP-OCT15.4-S1)
+- **Files**: `TelemetryMapper.kt`, `MainRepository.kt`, `StateSubscriptionUseCase.kt`.
+- **Fix**: Centralized `HistoryBuffer` construction and normalization logic into `TelemetryMapper.mapPointsToHistoryBuffer` and `mapEntitiesToHistoryBuffer`.
+- **Impact**: Guaranteed identical scaling logic for both live telemetry streams and database-loaded historical data. Reduced call-site complexity and improved maintainability of the repository and use-case layers.
 
-### 2. Forensic Pipeline Integrity
-- **Status**: Stable. All 19 telemetry streams (SNR, Noise, Kinetic, etc.) are now fully normalized in background threads during DB mapping and live stream merging.
+### 2. Architectural Consistency
+- **Status**: Stable. All mapping logic now resides in dedicated mapper classes, adhering to rule **R-ID 725** (Pure Mapping Architecture).
 
 ## 📊 Forensic Pulse & Metrics
 - **Unit Tests**: 100% PASS (90 total).
 - **Build Status**: `assembleDebug` SUCCESS.
-- **SOT Count**: 426 (Rules: 265).
+- **SOT Count**: 427 (Rules: 266).
 - **Open Gaps**: 0.
-- **Version Tag**: `OCT15.4`.
+- **Version Tag**: `Oct15.5`.
 
 ## 🚀 Next Steps
-1. **Mapper Consolidation**: Extract duplicate `HistoryBuffer` mapping logic from `MainRepository` and `StateSubscriptionUseCase` into `TelemetryMapper` (Ref: `SIMP-OCT15.4-S1`).
-2. **Buffer Constructor Refactoring**: Simplify `HistoryBuffer` instantiation using a companion mapping utility to reduce call-site complexity (Ref: `SIMP-OCT15.4-S2`).
+1. **Buffer Constructor Refactoring**: Simplify `HistoryBuffer` instantiation using a companion mapping utility to reduce call-site complexity (Ref: `SIMP-OCT15.4-S2`).
+2. **Persistence Policy Audit**: Review `PersistencePolicy.kt` for potential dead code following recent mapper optimizations.
 
-**HANDOVER COMPLETE. VERSION GRADUATED TO OCT15.4.**
+**HANDOVER COMPLETE. VERSION GRADUATED TO Oct15.5.**
