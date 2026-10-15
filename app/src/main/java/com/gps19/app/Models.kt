@@ -11,6 +11,10 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.15.6:
+ * - SIMP-OCT15.4-S2: Buffer Constructor Refactoring. Encapsulated complex 
+ *   HistoryBuffer instantiation and normalization into a companion factory. 
+ *   Added efficient merge utilities to offload use-case complexity.
  * Oct.15.3:
  * - SIMP-OCT15.2-S1: Ribbon Selector Consolidation. Pre-calculated normalized 
  *   arrays in HistoryBuffer to offload UI thread calculations.
@@ -119,7 +123,7 @@ data class TrailBuffer(
 /**
  * HistoryBuffer: Optimized container for connection history points using primitive arrays.
  * Designed to minimize GC pressure during ribbon rendering (SIMP-OCT15.1-S1).
- * Oct.15.3 (SIMP-OCT15.2-S1): Added pre-calculated normalized arrays to offload UI thread.
+ * Oct.15.6: Encapsulated normalization logic and added merge helpers (SIMP-OCT15.4-S2).
  */
 @Serializable
 data class HistoryBuffer(
@@ -329,12 +333,134 @@ data class HistoryBuffer(
             FloatArray(0), FloatArray(0), FloatArray(0), FloatArray(0), FloatArray(0),
             FloatArray(0), FloatArray(0), FloatArray(0), FloatArray(0), 0
         )
+
+        /**
+         * fromPoints: Centralized authority for converting ConnectionPoints into 
+         * normalized HistoryBuffer primitive arrays (SIMP-OCT15.4-S2).
+         */
+        fun fromPoints(points: List<ConnectionPoint>, limit: Int = Int.MAX_VALUE): HistoryBuffer {
+            val finalPoints = if (points.size > limit) points.takeLast(limit) else points
+            val size = finalPoints.size
+            val ts = LongArray(size); val rt = LongArray(size); val rtt = IntArray(size)
+            val localSig = IntArray(size); val remoteSig = IntArray(size)
+            val isConnected = BooleanArray(size); val isGap = BooleanArray(size)
+            val isRecoveryEvent = BooleanArray(size); val hasGps = BooleanArray(size)
+            val gpsIndex = DoubleArray(size); val snrIdx = DoubleArray(size)
+            val noiseIdx = DoubleArray(size); val luxIdx = DoubleArray(size)
+            val vibeIdx = DoubleArray(size); val proxIdx = DoubleArray(size)
+            val liftIdx = DoubleArray(size); val tiltIdx = DoubleArray(size)
+            val baroIdx = DoubleArray(size); val isBatterySteepDischarge = BooleanArray(size)
+            val isCoolingModeActive = BooleanArray(size); val currentMa = IntArray(size)
+            val isSitActive = BooleanArray(size); val sitVz = DoubleArray(size)
+            val sitVzTs = LongArray(size); val sitDz = DoubleArray(size)
+            val cpuLoad = DoubleArray(size); val ioWait = DoubleArray(size)
+            val maxIoLatency = LongArray(size); val kineticEnergy = DoubleArray(size)
+
+            val snrNorm = FloatArray(size); val noiseNorm = FloatArray(size)
+            val kineticNorm = FloatArray(size); val luxNorm = FloatArray(size)
+            val vibeNorm = FloatArray(size); val proxNorm = FloatArray(size)
+            val liftNorm = FloatArray(size); val batNorm = FloatArray(size)
+            val thmNorm = FloatArray(size); val curNorm = FloatArray(size)
+            val sitNorm = FloatArray(size); val tltNorm = FloatArray(size)
+            val baroNorm = FloatArray(size); val svzNorm = FloatArray(size)
+            val sdzNorm = FloatArray(size); val cpuNorm = FloatArray(size)
+            val iowNorm = FloatArray(size); val latNorm = FloatArray(size)
+            val commNorm = FloatArray(size)
+
+            finalPoints.forEachIndexed { i, p ->
+                ts[i] = p.ts; rt[i] = p.rt; rtt[i] = p.rtt; localSig[i] = p.localSig; remoteSig[i] = p.remoteSig
+                isConnected[i] = p.isConnected; isGap[i] = p.isGap; isRecoveryEvent[i] = p.isRecoveryEvent
+                hasGps[i] = p.hasGps; gpsIndex[i] = p.gpsIndex; snrIdx[i] = p.snrIdx; noiseIdx[i] = p.noiseIdx
+                luxIdx[i] = p.luxIdx; vibeIdx[i] = p.vibeIdx; proxIdx[i] = p.proxIdx; liftIdx[i] = p.liftIdx
+                tiltIdx[i] = p.tiltIdx; baroIdx[i] = p.baroIdx; isBatterySteepDischarge[i] = p.isBatterySteepDischarge
+                isCoolingModeActive[i] = p.isCoolingModeActive; currentMa[i] = p.currentMa; isSitActive[i] = p.isSitActive
+                sitVz[i] = p.sitVz; sitVzTs[i] = p.sitVzTs; sitDz[i] = p.sitDz
+                cpuLoad[i] = p.cpuLoad; ioWait[i] = p.ioWait; maxIoLatency[i] = p.maxIoLatency; kineticEnergy[i] = p.kineticEnergy
+
+                snrNorm[i] = p.snrIdx.toFloat()
+                noiseNorm[i] = p.noiseIdx.toFloat()
+                kineticNorm[i] = (p.kineticEnergy.toFloat() / RIBBON_KINETIC_ENERGY_SCALE.toFloat()).coerceIn(0f, 1f)
+                luxNorm[i] = p.luxIdx.toFloat()
+                vibeNorm[i] = p.vibeIdx.toFloat()
+                proxNorm[i] = p.proxIdx.toFloat()
+                liftNorm[i] = p.liftIdx.toFloat()
+                batNorm[i] = if (p.isBatterySteepDischarge) 1f else 0f
+                thmNorm[i] = if (p.isCoolingModeActive) 1f else 0f
+                curNorm[i] = (kotlin.math.abs(p.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f)
+                sitNorm[i] = if (p.isSitActive) 1f else 0f
+                tltNorm[i] = p.tiltIdx.toFloat()
+                baroNorm[i] = p.baroIdx.toFloat()
+                svzNorm[i] = (kotlin.math.abs(p.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f)
+                sdzNorm[i] = (kotlin.math.abs(p.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f)
+                cpuNorm[i] = (p.cpuLoad.toFloat() / RIBBON_CPU_LOAD_SCALE.toFloat()).coerceIn(0f, 1f)
+                iowNorm[i] = (p.ioWait.toFloat() / RIBBON_IO_WAIT_SCALE.toFloat()).coerceIn(0f, 1f)
+                latNorm[i] = (p.maxIoLatency.toFloat() / RIBBON_LATENCY_SCALE_MS.toFloat()).coerceIn(0f, 1f)
+                val commIdx = TelemetryUtils.calculateCommIndex(p.rtt, p.localSig, p.remoteSig).toFloat()
+                commNorm[i] = if (p.isConnected) (commIdx / 10f).coerceIn(0.1f, 1f) else 1f
+            }
+
+            return HistoryBuffer(
+                ts, rt, rtt, localSig, remoteSig, isConnected, isGap, isRecoveryEvent, hasGps,
+                gpsIndex, snrIdx, noiseIdx, luxIdx, vibeIdx, proxIdx, liftIdx, tiltIdx, baroIdx,
+                isBatterySteepDischarge, isCoolingModeActive, currentMa, isSitActive,
+                sitVz, sitVzTs, sitDz, cpuLoad, ioWait, maxIoLatency, kineticEnergy,
+                snrNorm, noiseNorm, kineticNorm, luxNorm, vibeNorm, proxNorm, liftNorm,
+                batNorm, thmNorm, curNorm, sitNorm, tltNorm, baroNorm, svzNorm, sdzNorm,
+                cpuNorm, iowNorm, latNorm, commNorm, size
+            )
+        }
+
+        /**
+         * merge: Efficiently merges two HistoryBuffers with deduplication and sorting by timestamp (SIMP-OCT15.4-S2).
+         */
+        fun merge(b1: HistoryBuffer, b2: HistoryBuffer, limit: Int = 240): HistoryBuffer {
+            if (b1.size == 0) return if (b2.size > limit) fromPoints(List(b2.size) { b2.getPoint(it) }.takeLast(limit)) else b2
+            if (b2.size == 0) return if (b1.size > limit) fromPoints(List(b1.size) { b1.getPoint(it) }.takeLast(limit)) else b1
+
+            val combined = mutableListOf<ConnectionPoint>()
+            for (i in 0 until b1.size) combined.add(b1.getPoint(i))
+            for (i in 0 until b2.size) combined.add(b2.getPoint(i))
+            
+            combined.sortBy { it.ts }
+            val deduped = mutableListOf<ConnectionPoint>()
+            if (combined.isNotEmpty()) {
+                deduped.add(combined[0])
+                for (i in 1 until combined.size) {
+                    if (combined[i].ts != combined[i - 1].ts) {
+                        deduped.add(combined[i])
+                    }
+                }
+            }
+            return fromPoints(deduped, limit)
+        }
+
+        /**
+         * merge: Efficiently merges a HistoryBuffer and a list of new ConnectionPoints (SIMP-OCT15.4-S2).
+         */
+        fun merge(current: HistoryBuffer, newPoints: List<ConnectionPoint>, limit: Int = 240): HistoryBuffer {
+            if (newPoints.isEmpty()) return if (current.size > limit) fromPoints(List(current.size) { current.getPoint(it) }.takeLast(limit)) else current
+            
+            val combined = mutableListOf<ConnectionPoint>()
+            for (i in 0 until current.size) combined.add(current.getPoint(i))
+            combined.addAll(newPoints)
+            
+            combined.sortBy { it.ts }
+            val deduped = mutableListOf<ConnectionPoint>()
+            if (combined.isNotEmpty()) {
+                deduped.add(combined[0])
+                for (i in 1 until combined.size) {
+                    if (combined[i].ts != combined[i - 1].ts) {
+                        deduped.add(combined[i])
+                    }
+                }
+            }
+            return fromPoints(deduped, limit)
+        }
     }
 }
 
 /**
  * MapTrailSegment: Used for optimized map rendering of trail chunks.
- * Oct.15.3: Transitioned to primitive arrays to avoid GeoPoint overhead.
  */
 data class MapTrailSegment(
     val lats: DoubleArray,

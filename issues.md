@@ -1,6 +1,6 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - OCT15.5
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct14.1
 
-## 🎯 Current Resumption Focus: COMPLETED Mapper Consolidation (SIMP-OCT15.4-S1).
+## 🎯 Current Resumption Focus: COMPLETED Buffer Constructor Refactoring (SIMP-OCT15.4-S2).
 
 ## 🟢 Open Gaps & Unfinished Integration Points
 *   *No active gaps.*
@@ -8,8 +8,8 @@
 ---
 
 ## 💡 Strategic Simplification Ideas (Ideas: 26)
+*   **SIMP-OCT15.4-S2: Buffer Constructor Refactoring (Low).** RESOLVED Oct14.1. Encapsulated `HistoryBuffer` construction and merging logic into its companion object.
 *   **SIMP-OCT15.4-S1: Mapper Consolidation (Low).** RESOLVED OCT15.5. Centralized `HistoryBuffer` mapping logic in `TelemetryMapper`.
-*   **SIMP-OCT15.4-S2: Buffer Constructor Refactoring (Low).** Simplify `HistoryBuffer` instantiation using a companion mapping utility to reduce call-site complexity.
 *   **SIMP-OCT15.2-S1: Ribbon Selector Consolidation (Medium).** RESOLVED OCT15.4. Pre-calculated normalized ribbon data within `HistoryBuffer` to offload calculations from the UI thread.
 *   **SIMP-OCT15.1-S2: Map Rendering Primitive Integration (Low).** RESOLVED OCT15.3. Transitioned `MapTrailSegment` to use primitive arrays.
 *   **SIMP-OCT15.1-S1: Primitive History Buffers (Low).** RESOLVED OCT15.2. Implemented `HistoryBuffer` with primitive arrays for ribbon telemetry.
@@ -21,6 +21,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT15.6-F1: Buffer Constructor Refactoring (SIMP-OCT15.4-S2).** Resolved Oct14.1. Encapsulated complex array initialization and normalization into `HistoryBuffer.Companion.fromPoints`. Simplified UseCase merging logic with `HistoryBuffer.merge`.
 *   **ISSUE-OCT15.5-F1: Mapper Consolidation (SIMP-OCT15.4-S1).** Resolved OCT15.5. Centralized redundant `HistoryBuffer` mapping logic into `TelemetryMapper.kt`.
 *   **ISSUE-OCT15.4-F1: Ribbon Selector Consolidation (SIMP-OCT15.2-S1).** Resolved OCT15.4. Offloaded telemetry scaling (0.0-1.0) to background mapping pipelines, storing results in `HistoryBuffer` primitive arrays.
 *   **ISSUE-OCT15.3-F1: Map Rendering Primitive Integration (SIMP-OCT15.1-S2).** Resolved OCT15.3. Transitioned `MapTrailSegment` to primitive `DoubleArray`s, eliminating `GeoPoint` churn in the mapping pipeline.
@@ -30,7 +31,8 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct14.1: [SOT Count: 427 (Rules: 266), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:8, Testing: 16 (Sub-items: 125), QA: 330]**
+- **Oct14.1: [SOT Count: 428 (Rules: 267), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:6, Testing: 16 (Sub-items: 125), QA: 331]**
+- **Oct14.1: [SOT Count: 427 (Rules: 266), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:7, Testing: 16 (Sub-items: 125), QA: 330]**
 - **OCT15.4: [SOT Count: 426 (Rules: 265), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:7, Testing: 16 (Sub-items: 125), QA: 329]**
 - **OCT15.3: [SOT Count: 425 (Rules: 264), Open: H:0, M:0, L:0, Ideas: H:0, M:11, L:7, Testing: 15 (Sub-items: 124), QA: 328]**
 - **OCT15.2: [SOT Count: 424 (Rules: 263), Open: H:0, M:0, L:0, Ideas: H:0, M:10, L:8, Testing: 14 (Sub-items: 123), QA: 327]**

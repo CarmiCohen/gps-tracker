@@ -1,6 +1,6 @@
 # SOT Master Requirements & Hardening Status (Oct14.1)
 
-## 🏗️ Architectural Master Rules (266 Rules)
+## 🏗️ Architectural Master Rules (267 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -11,22 +11,24 @@
 *   **1.211 Primitive Map Rendering Segments (R-ID 729)**: Intermediate map rendering structures (e.g., `MapTrailSegment`) MUST use primitive arrays for coordinate storage to avoid `GeoPoint` object creation in the mapping pipeline. (Oct14.1 - SIMP-OCT15.1-S2).
 *   **1.212 Offloaded Telemetry Normalization (R-ID 730)**: Telemetry data normalization (e.g., scaling 0.0-1.0 for UI ribbons) MUST be performed within background data pipelines (e.g., `MainRepository` mapping) and stored in primitive arrays within `HistoryBuffer` to eliminate computational overhead on the UI thread. (Oct14.1 - SIMP-OCT15.2-S1).
 *   **1.213 Centralized Telemetry Mapping (R-ID 731)**: All telemetry-to-buffer and entity-to-buffer transformations MUST be centralized within `TelemetryMapper` to ensure normalization consistency and eliminate redundancy across repositories and use cases. (Oct14.1 - SIMP-OCT15.4-S1).
+*   **1.214 Encapsulated Buffer Construction (R-ID 732)**: Instantiation, normalization, and reconciliation (merging) logic for complex primitive-backed buffers MUST be encapsulated within the buffer's companion object (e.g., `HistoryBuffer.Companion.fromPoints`) to reduce call-site complexity and leakage of imperative array-handling logic. (Oct14.1 - SIMP-OCT15.4-S2).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 737**: Buffer Constructor Refactoring - PASSED. Encapsulated HistoryBuffer array initialization and merging into its companion object, simplifying UseCase and Mapper layers. (Oct14.1 - SIMP-OCT15.4-S2).
 *   **SOT ID 736**: Mapper Consolidation - PASSED. Centralized HistoryBuffer mapping in `TelemetryMapper`, eliminating duplicate logic in `MainRepository` and `StateSubscriptionUseCase`. (Oct14.1 - SIMP-OCT15.4-S1).
 *   **SOT ID 735**: Ribbon Selector Consolidation - PASSED. Pre-calculated normalized telemetry within `HistoryBuffer` primitive arrays, offloading scaling logic from the UI thread. (Oct14.1 - SIMP-OCT15.2-S1).
 *   **SOT ID 734**: Map Primitive Integration - PASSED. Transitioned `MapTrailSegment` to use primitive arrays, eliminating `GeoPoint` churn in `MapStateMapper`. (Oct14.1 - SIMP-OCT15.1-S2).
 *   **SOT ID 733**: History Buffer Optimization - PASSED. Refactored forensic history flows to use `HistoryBuffer`, reducing object allocations per emission from O(N) to O(1). (Oct14.1 - SIMP-OCT15.1-S1).
 *   **SOT ID 732**: Trail Buffer Optimization - PASSED. Implemented `TrailBuffer` using primitive arrays for all trail flows, reducing object overhead from O(N) to O(1) per flow emission. (Oct14.1 - SIMP-OCT15.0-S1).
-*   **SOT ID 731**: Map Architectural Extraction - PASSED. Extracted MapViewState and Trail Segment mapping logic into MapStateMapper, completing the pure mapping transition for all major UI slices. (Oct14.1 - SIMP-OCT14.21-S1).
 
 ...
 
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 31.812 (Encapsulated Construction)**: PASSED - Verified HistoryBuffer instantiation and merging logic is fully contained within the model, with simplified call sites in UseCase and Mapper. (Oct14.1).
 *   **Chapter 31.811 (Mapper Consolidation)**: PASSED - Verified identical normalization output for both live and DB-sourced telemetry streams. (Oct14.1).
 *   **Chapter 31.810 (Offloaded Normalization)**: PASSED - Verified zero runtime scaling overhead on UI thread during ribbon rendering via profiling. (Oct14.1).
 *   **Chapter 31.809 (Map Primitive Integration)**: PASSED - Verified zero `GeoPoint` allocation during trail mapping via memory profiler. (Oct14.1).

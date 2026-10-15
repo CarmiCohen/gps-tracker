@@ -11,16 +11,12 @@ import javax.inject.Inject
 
 /**
  * StateSubscriptionUseCase: Centralizes observation of repository flows and system states.
+ * Oct.15.6:
+ * - SIMP-OCT15.4-S2: Buffer Constructor Refactoring. Simplified history merging 
+ *   logic using new HistoryBuffer.merge utilities.
  * Oct.15.5:
  * - SIMP-OCT15.4-S1: Mapper Consolidation. Refactored to use centralized 
  *   TelemetryMapper for HistoryBuffer transformations.
- * Oct.15.3:
- * - SIMP-OCT15.2-S1: Ribbon Selector Consolidation. Pre-calculated normalized 
- *   arrays in HistoryBuffer to offload UI thread calculations. Fixed missing commNorm.
- * Oct.15.2:
- * - SIMP-OCT15.1-S1: Primitive History Buffers. Refactored history observation 
- *   to use HistoryBuffer (primitive arrays), significantly reducing O(N) object 
- *   allocations during ribbon updates. Fixed syntax error in SettingsUpdate.
  */
 class StateSubscriptionUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -50,25 +46,7 @@ class StateSubscriptionUseCase @Inject constructor(
             scope.launch(Dispatchers.Default) {
                 repository.getHistoryFlow(key).collect { dbBuffer ->
                     val merged = withContext(Dispatchers.Default) {
-                        val current = stateFlow.value
-                        if (dbBuffer.size == 0) {
-                            current // Keep current if DB is empty
-                        } else {
-                            val lastDbTs = dbBuffer.ts[dbBuffer.size - 1]
-                            val currentPoints = mutableListOf<ConnectionPoint>()
-                            for (i in 0 until current.size) {
-                                if (current.ts[i] > lastDbTs) {
-                                    currentPoints.add(current.getPoint(i))
-                                }
-                            }
-                            
-                            val dbPoints = mutableListOf<ConnectionPoint>()
-                            for (i in 0 until dbBuffer.size) {
-                                dbPoints.add(dbBuffer.getPoint(i))
-                            }
-                            
-                            TelemetryMapper.mapPointsToHistoryBuffer((dbPoints + currentPoints).takeLast(240))
-                        }
+                        HistoryBuffer.merge(dbBuffer, stateFlow.value)
                     }
                     stateFlow.emit(merged)
                 }
@@ -79,22 +57,7 @@ class StateSubscriptionUseCase @Inject constructor(
             repository.liveHistoryFlow.collect { (key, pointsBuffer) ->
                 _historyFlows[key]?.let { stateFlow ->
                     val merged = withContext(Dispatchers.Default) {
-                        val current = stateFlow.value
-                        val combined = mutableListOf<ConnectionPoint>()
-                        for (i in 0 until current.size) combined.add(current.getPoint(i))
-                        for (i in 0 until pointsBuffer.size) combined.add(pointsBuffer.getPoint(i))
-                        
-                        combined.sortBy { it.ts }
-                        val deduped = mutableListOf<ConnectionPoint>()
-                        if (combined.isNotEmpty()) {
-                            deduped.add(combined[0])
-                            for (i in 1 until combined.size) {
-                                if (combined[i].ts != combined[i - 1].ts) {
-                                    deduped.add(combined[i])
-                                }
-                            }
-                        }
-                        TelemetryMapper.mapPointsToHistoryBuffer(deduped.takeLast(240))
+                        HistoryBuffer.merge(stateFlow.value, pointsBuffer)
                     }
                     stateFlow.emit(merged)
                 }

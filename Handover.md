@@ -1,27 +1,28 @@
-# Project Handover - Oct15.5 (Mapper Consolidation)
+# Project Handover - Oct14.1 (Buffer Constructor Refactoring)
 
-## 🟢 Status: Release Ready (Oct15.5 Graduation)
-The project has graduated to `Oct15.5`. Redundant telemetry mapping logic has been centralized, hardening the normalization pipeline for connection ribbons.
+## 🟢 Status: Release Ready (Oct14.1 Graduation)
+The project has graduated to `Oct14.1`. `HistoryBuffer` instantiation and merging logic have been encapsulated into the model layer, significantly simplifying the UseCase and Mapper.
 
-## 🛠️ Critical Hardening Details (Oct15.5)
+## 🛠️ Critical Hardening Details (Oct14.1)
 
-### 1. Mapper Consolidation (SIMP-OCT15.4-S1)
-- **Files**: `TelemetryMapper.kt`, `MainRepository.kt`, `StateSubscriptionUseCase.kt`.
-- **Fix**: Centralized `HistoryBuffer` construction and normalization logic into `TelemetryMapper.mapPointsToHistoryBuffer` and `mapEntitiesToHistoryBuffer`.
-- **Impact**: Guaranteed identical scaling logic for both live telemetry streams and database-loaded historical data. Reduced call-site complexity and improved maintainability of the repository and use-case layers.
+### 1. Buffer Constructor Refactoring (SIMP-OCT15.4-S2)
+- **Files**: `Models.kt`, `TelemetryMapper.kt`, `MainRepository.kt`, `StateSubscriptionUseCase.kt`.
+- **Fix**: Encapsulated primitive array initialization and normalization into `HistoryBuffer.Companion.fromPoints`.
+- **Simplification**: Added `HistoryBuffer.merge` utilities to handle state reconciliation and deduplication.
+- **Impact**: Reduced call-site complexity. `StateSubscriptionUseCase` now performs high-level merges instead of imperative loops. Ensured normalization consistency is tied to the data structure itself.
 
 ### 2. Architectural Consistency
-- **Status**: Stable. All mapping logic now resides in dedicated mapper classes, adhering to rule **R-ID 725** (Pure Mapping Architecture).
+- **Status**: Stable. Followed rule **R-ID 732** (Encapsulated Buffer Construction). All mapping logic is now pure and centralized.
 
 ## 📊 Forensic Pulse & Metrics
 - **Unit Tests**: 100% PASS (90 total).
 - **Build Status**: `assembleDebug` SUCCESS.
-- **SOT Count**: 427 (Rules: 266).
+- **SOT Count**: 428 (Rules: 267).
 - **Open Gaps**: 0.
-- **Version Tag**: `Oct15.5`.
+- **Version Tag**: `Oct14.1`.
 
 ## 🚀 Next Steps
-1. **Buffer Constructor Refactoring**: Simplify `HistoryBuffer` instantiation using a companion mapping utility to reduce call-site complexity (Ref: `SIMP-OCT15.4-S2`).
-2. **Persistence Policy Audit**: Review `PersistencePolicy.kt` for potential dead code following recent mapper optimizations.
+1. **Persistence Policy Audit**: Review `PersistencePolicy.kt` for potential dead code following recent mapper optimizations.
+2. **UI Layer Integrity**: Audit `SharedUiComponents.kt` for potential refinements in ribbon rendering now that normalization is fully offloaded.
 
-**HANDOVER COMPLETE. VERSION GRADUATED TO Oct15.5.**
+**HANDOVER COMPLETE. VERSION GRADUATED TO Oct14.1.**
