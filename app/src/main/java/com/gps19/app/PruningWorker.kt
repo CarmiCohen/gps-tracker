@@ -13,6 +13,8 @@ import java.util.concurrent.TimeUnit
  * PruningWorker: Dedicated background task for database maintenance and log pruning.
  * Oct.13.8:
  * - Issue #SIMP-OCT12.18-S1: Pruning Scheduler. Initial implementation.
+ * Oct.14.2:
+ * - Fixed IllegalArgumentException: Removed backoff criteria for idle-mode job.
  */
 @HiltWorker
 class PruningWorker @AssistedInject constructor(
@@ -30,9 +32,9 @@ class PruningWorker @AssistedInject constructor(
                 .setRequiresStorageNotLow(true)
                 .build()
 
+            // Note: Removed setBackoffCriteria to avoid crash with setRequiresDeviceIdle(true)
             val request = PeriodicWorkRequestBuilder<PruningWorker>(6, TimeUnit.HOURS)
                 .setConstraints(constraints)
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
                 .build()
 
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(

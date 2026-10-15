@@ -22,12 +22,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
- * Oct.14.9:
- * - SIMP-OCT14.8-S1: HUD State Consolidation. Consolidated individual HUD 
- *   connectivity, telemetry, and health flows into a single hudState for atomic UI updates.
- * Oct.13.8:
- * - Issue #SIMP-OCT12.18-S1: Pruning Scheduler. Migrated proactive database 
- *   pruning to WorkManager.
+ * Oct.14.21:
+ * - Dashboard Mapping Extraction: Refactored Dashboard state mapping into 
+ *   DashboardMapper.kt (SIMP-OCT14.10-S2) for architectural consistency.
+ * Oct.14.20:
+ * - HUD Mapping Extraction: Refactored HUD state mapping into HudMapper.kt 
+ *   (SIMP-OCT14.10-S1) to improve ViewModel maintainability and testability.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -180,9 +180,9 @@ class MainViewModel @Inject constructor(
     ) { (mode, kin, diag), pulseRt, state, tMax ->
         val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
         DashboardState(
-            mapDashboardConnectivity(mode, diag, pulseRt),
-            mapDashboardTelemetry(mode, kinematic.value, pulseRt, state, isUltra),
-            mapDashboardHealth(mode, kinematic.value, diag, diag.battery.temp, tMax, pulseRt)
+            DashboardMapper.mapDashboardConnectivity(mode, diag, pulseRt),
+            DashboardMapper.mapDashboardTelemetry(mode, kinematic.value, pulseRt, state, isUltra),
+            DashboardMapper.mapDashboardHealth(mode, kinematic.value, diag, diag.battery.temp, tMax, pulseRt)
         )
     }
     .distinctUntilChanged()
@@ -193,17 +193,7 @@ class MainViewModel @Inject constructor(
         combine(_rtt, _remoteSignal, systemPulseRt) { r, sig, p -> Triple(r, sig, p) },
         combine(kinematic, _trackerState) { k, ts -> k to ts }
     ) { (session, settings, diag), (rtt, remoteSignal, pulseRt), (kin, trackerState) ->
-        val mode = session.appMode
-        val isMali = kin.localHealth.isMaliAnomaly
-        val isUltra = if (mode == "viewer") kin.trackerHealth.isUltraLongStationary else kin.localHealth.isUltraLongStationary
-        HudState(
-            connectivity = mapHudConnectivity(
-                mode, settings.deviceId, settings.viewerId, session.isSystemActive, settings.isSafeMode, 
-                session.permissions.performanceTier == PerformanceTier.STAGGERED, diag, rtt, remoteSignal, pulseRt
-            ),
-            telemetry = mapHudTelemetry(mode, kin, pulseRt, trackerState, isUltra),
-            health = mapHudHealth(diag, pulseRt, isMali)
-        )
+        HudMapper.mapHudState(session, settings, diag, rtt, remoteSignal, pulseRt, kin, trackerState)
     }
     .distinctUntilChanged()
     .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), HudState())
@@ -247,7 +237,6 @@ class MainViewModel @Inject constructor(
                 }
             }
             
-            // Issue #SIMP-OCT12.18-S1: Background pruning migrated to WorkManager.
             launch(Dispatchers.IO) { 
                 delay(STAGGERED_IO_PRUNING_DELAY_MS + 1000)
                 PruningWorker.triggerNow(context)
@@ -320,7 +309,7 @@ class MainViewModel @Inject constructor(
                     _currentMa.value = status.level 
                 } 
             }
-            // Issue #SIMP-1011-12: HUD Throttling Sync
+            
             val isMaliAnomalyFlow = kinematic.map { it.localHealth.isMaliAnomaly }.distinctUntilChanged()
             
             launch { 
@@ -379,7 +368,6 @@ class MainViewModel @Inject constructor(
                     updateDiagnosticState { it.apply { silencedUntilRt = ts; isAlarmSilenced = sirenLockoutUseCase.isLockedOut(); pulse = timeProvider.elapsedRealtime } } 
                 } 
             }
-            // Issue #SIMP-1011-12: Applied dynamic sampling to signaling metrics
             launch {
                 isMaliAnomalyFlow.flatMapLatest { isAnomaly ->
                     val interval = if (isAnomaly) HUD_STATE_SAMPLE_THROTTLED_MS else HUD_STATE_SAMPLE_MS
@@ -408,7 +396,15 @@ class MainViewModel @Inject constructor(
         uiEventCoordinator.handleEvent(event, _uiState.value, viewModelScope, { updateState(it) }, { updateKinematicState(it) }, { updateDiagnosticState(it) }, { replayCursorRequest.value = it }, { viewModelScope.launch { _cameraActions.emit(it) } }, { viewModelScope.launch { _uiEffects.emit(it) } }) 
     }
 
-    private fun updateState(update: (MainUiState) -> MainUiState) { _uiState.update { current -> update(current) } }
+    private fun updateState(update: (MainUiState) -> MainUiState) { 
+        _uiState.update { current -> 
+            val next = update(current)
+            if (next.session.hydrationLevel != current.session.hydrationLevel) {
+                Timber.d("STATE_TRACE: Hydration level transitioned: ${current.session.hydrationLevel} -> ${next.session.hydrationLevel}")
+            }
+            next
+        } 
+    }
     private fun updateKinematicState(update: (KinematicState) -> KinematicState) { _kinematicState.update { current -> update(current) } }
     private fun updateDiagnosticState(update: (DiagnosticState) -> DiagnosticState) { _diagnosticState.update { current -> update(current) } }
 
@@ -453,164 +449,6 @@ class MainViewModel @Inject constructor(
     }
 
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-    internal fun mapDashboardConnectivity(appMode: String?, diag: DiagnosticState, nowRt: Long): DashboardConnectivityState {
-        val isViewer = appMode == "viewer"
-        val activeStats = if (isViewer) diag.trackerStats else diag.stats
-        val lastSeenTs = diag.connectivity.lastRemoteActivityTs
-        val isLocalServiceAlive = (nowRt - diag.pulse) < TELEMETRY_UI_STALE_THRESHOLD_MS
-        val watchdogSec = if (isViewer && lastSeenTs > 0) maxOf(0L, (WATCH_TIMEOUT_MS - (nowRt - lastSeenTs)) / 1000) else 0L
-        return DashboardConnectivityState(
-            lastSeenTs = lastSeenTs, watchdogOk = isLocalServiceAlive, watchdogCountdownSec = if (isViewer) watchdogSec else 0L, 
-            totalUptimeMs = activeStats.uptimeMs, sessionMs = if (activeStats.lastConnTs > 0) activeStats.sessionConnectedMs else 0L, 
-            sinceConnMs = if (activeStats.lastConnTs > 0) (nowRt - activeStats.lastConnTs) else 0L, 
-            sinceDiscoMs = if (activeStats.lastDiscTs > 0) (nowRt - activeStats.lastDiscTs) else 0L, 
-            totalDropMs = activeStats.totalDropMs, maxDropMs = activeStats.maxDropMs, 
-            engineVersion = "Oct12.21", netInterface = diag.connectivity.netInterface,
-            systemPulse = nowRt, isLocalOnline = diag.connectivity.isLocalOnline, isRelayConnected = diag.connectivity.isRelayConnected
-        )
-    }
-
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-    internal fun mapDashboardTelemetry(appMode: String?, kinematicState: KinematicState, nowRt: Long, trackerState: TrackerState, isUltra: Boolean): DashboardTelemetryState {
-        val isViewer = appMode == "viewer"
-        val loc = if (isViewer) kinematicState.trackerLocation else kinematicState.localLocation
-        val fixAgeRt = if (loc.kinetic.rt > 0) nowRt - loc.kinetic.rt else Long.MAX_VALUE
-        
-        // ISSUE-OCT12.13-2: Harmonized GPS freshness with engine polling tiers.
-        // Scale threshold: Interval + 30s grace (or 15s for normal stationary).
-        val isPowerSave = if (isViewer) kinematicState.trackerHealth.isPowerSaveMode else kinematicState.localHealth.isPowerSaveMode
-        val threshold = when {
-            isUltra -> ULTRA_LONG_STATIONARY_GPS_POLLING_MS + 30000L
-            trackerState == TrackerState.PARKING -> STATIONARY_GPS_POLLING_MS + 15000L
-            isPowerSave -> SCREEN_OFF_GPS_POLLING_MS + 25000L
-            else -> GPS_UI_FAIL_THRESHOLD_MS
-        }
-        val isGpsActive = fixAgeRt < threshold && loc.kinetic.gpsTs > 0
-        
-        val telemetryAge = if (kinematicState.pulse > 0) nowRt - kinematicState.pulse else Long.MAX_VALUE
-        val isTelemetryFresh = telemetryAge < TELEMETRY_UI_STALE_THRESHOLD_MS
-        val gnss = loc.integrity.gnssDetail
-        val avgCn0 = gnss?.satellites?.map { it.cn0 }?.safeAverage() ?: 0.0
-        return DashboardTelemetryState(
-            lat = if (isGpsActive) loc.kinetic.lat else 0.0, lng = if (isGpsActive) loc.kinetic.lng else 0.0,
-            gpsSpeedMps = loc.kinetic.speed, trackerAccuracy = loc.kinetic.accuracy, 
-            trackerMaxAcc = if (loc.kinetic.maxAccuracy > 0) loc.kinetic.maxAccuracy else loc.kinetic.accuracy, 
-            viewerAccuracy = if (appMode == "tracker") 0.0 else kinematicState.localLocation.kinetic.accuracy, 
-            viewerMaxAcc = if (appMode == "tracker") 0.0 else (if(kinematicState.localLocation.kinetic.maxAccuracy > 0) kinematicState.localLocation.kinetic.maxAccuracy else kinematicState.localLocation.kinetic.accuracy), 
-            satsUsed = loc.integrity.satsUsed, satsView = loc.integrity.satsView, snr = avgCn0, 
-            distToHome = kinematicState.distanceTrackerToHome, distToViewer = kinematicState.distanceTrackerToViewer, 
-            isGpsFresh = isGpsActive, isTelemetryFresh = isTelemetryFresh, 
-            isLocationPending = if (isViewer) kinematicState.trackerHealth.isLocationPending else kinematicState.localHealth.isLocationPending, 
-            locationPendingReason = if (isViewer) kinematicState.trackerHealth.locationPendingReason else kinematicState.localHealth.locationPendingReason, 
-            trackerState = trackerState, status = loc.status, tamperReason = if (isViewer) kinematicState.trackerHealth.tamperNote else kinematicState.localHealth.tamperNote, 
-            isUltraLongStationary = isUltra, systemPulse = nowRt, gpsTs = loc.kinetic.gpsTs
-        )
-    }
-
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-    internal fun mapDashboardHealth(appMode: String?, kinematicState: KinematicState, diag: DiagnosticState, localMaxTemp: Double, trackerMaxTemp: Double, nowRt: Long): DashboardHealthState {
-        val isViewer = appMode == "viewer"
-        val health = if (isViewer) kinematicState.trackerHealth else kinematicState.localHealth
-        return DashboardHealthState(
-            batteryLevel = if (isViewer) diag.trackerBattery.level else diag.battery.level, 
-            trackerTemp = diag.trackerBattery.temp, trackerMaxTemp = trackerMaxTemp, 
-            viewerTemp = diag.battery.temp, viewerMaxTemp = localMaxTemp, 
-            vibration = health.vibration, heading = health.heading, tilt = health.tiltDegrees, 
-            acousticDb = health.acousticDb, baroAlt = health.baroAlt, lux = health.lux, 
-            isNear = health.isNear, proximityCm = health.proximityCm, proximityDebounceMs = health.proximityDebounceMs, 
-            rollingVibration = health.vibrationRollingSum, kineticEnergy = health.kineticEnergy, peakShock = health.peakVibrationShock, 
-            luxBaseline = health.luxBaseline, acousticFloorDb = health.acousticFloorDb, vibrationFloor = health.adaptiveVibrationFloor, 
-            isMicPending = health.micPending, isPowerTamper = health.isPowerTamper, violationUptimeMs = health.violationUptimeMs, 
-            violationPercentage = health.violationPercentage, isPowerSaveMode = health.isPowerSaveMode, standbyBucket = health.standbyBucket,
-            netInterface = health.netInterface, isStorageLow = health.isStorageLow, isStorageCritical = health.isStorageCritical, 
-            isBatterySteepDischarge = health.isBatterySteepDischarge, isCoolingModeActive = health.isCoolingModeActive, 
-            trackerCurrentMa = health.currentMa, isBatteryLow = health.isBatteryLow, isBatteryCritical = health.isBatteryCritical, 
-            cpuLoad = health.cpuLoad, ioWait = health.ioWait, maxIoLatency = health.maxIoLatency, isSilentFailure = health.isSilentFailure, 
-            isMaliAnomaly = health.isMaliAnomaly, isGnssThrottled = health.isGnssThrottled, lastEnergyDeltaMa = health.lastEnergyDeltaMa, 
-            lastEnergyDeltaTemp = health.lastEnergyDeltaTemp, lastEnergyDurationMs = health.lastEnergyDurationMs, 
-            systemPulse = nowRt, thermalHeadroom = health.thermalHeadroom, heapAllocatedMb = health.heapAllocatedMb,
-            isSuspiciousNoise = health.isSuspiciousNoise,
-            isMemoryPressureThrottled = health.isMemoryPressureThrottled
-        )
-    }
-
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-    internal fun mapHudConnectivity(appMode: String?, deviceId: String, viewerId: String, isSystemActive: Boolean, isSafeMode: Boolean, isStaggered: Boolean, diag: DiagnosticState, rtt: Int, remoteSignal: Int, nowRt: Long): HudConnectivityState {
-        val lastSeenTs = diag.connectivity.lastRemoteActivityTs
-        val isTelemetryFresh = if (lastSeenTs > 0) (nowRt - lastSeenTs) < TELEMETRY_UI_STALE_THRESHOLD_MS else false
-        val commIndex = if (isSystemActive && diag.connectivity.isRelayConnected) TelemetryUtils.calculateCommIndex(rtt, 10, 10) else 0
-        val remoteCommIndex = if (appMode == "viewer" && isTelemetryFresh) TelemetryUtils.calculateCommIndex(rtt, remoteSignal, 10) else 0
-        
-        // ISSUE-OCT12.14-3: Refined data health logic for tracker mode.
-        val isDataHealthy = if (appMode == "viewer") {
-            isTelemetryFresh && diag.connectivity.isLocalOnline && diag.connectivity.isRelayConnected
-        } else {
-            // For tracker, data is healthy if we are online and connected to relay. 
-            // We don't check "telemetry freshness" as we ARE the source.
-            diag.connectivity.isLocalOnline && diag.connectivity.isRelayConnected
-        }
-        
-        val isLocalServiceAlive = (nowRt - diag.pulse) < TELEMETRY_UI_STALE_THRESHOLD_MS
-        val throttled = if (appMode == "viewer") diag.trackerIsGnssThrottled else diag.isGnssThrottled
-        return HudConnectivityState(
-            appMode = appMode, isInternet = diag.connectivity.isLocalOnline, isRelayConnected = diag.connectivity.isRelayConnected, 
-            isTelemetryFresh = isTelemetryFresh, isDataHealthy = isDataHealthy, commIndex = commIndex, remoteCommIndex = remoteCommIndex, 
-            trackerId = deviceId, viewerId = viewerId, watchdogOk = isLocalServiceAlive, rtt = rtt, remoteSignal = remoteSignal, 
-            isSystemActive = isSystemActive, isSafeMode = isSafeMode, isStaggered = isStaggered, isGnssThrottled = throttled, systemPulse = nowRt
-        )
-    }
-
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-    internal fun mapHudTelemetry(appMode: String?, kinematicState: KinematicState, nowRt: Long, trackerState: TrackerState, isUltra: Boolean): HudTelemetryState {
-        val loc = if (appMode == "viewer") kinematicState.trackerLocation else kinematicState.localLocation
-        
-        // ISSUE-OCT12.13-2: Harmonized GPS freshness with engine polling tiers.
-        val isPowerSave = if (appMode == "viewer") kinematicState.trackerHealth.isPowerSaveMode else kinematicState.localHealth.isPowerSaveMode
-        val threshold = when {
-            isUltra -> ULTRA_LONG_STATIONARY_GPS_POLLING_MS + 30000L
-            trackerState == TrackerState.PARKING -> STATIONARY_GPS_POLLING_MS + 15000L
-            isPowerSave -> SCREEN_OFF_GPS_POLLING_MS + 25000L
-            else -> GPS_UI_FAIL_THRESHOLD_MS
-        }
-        val isGpsFresh = (nowRt - loc.kinetic.rt) < threshold && loc.kinetic.gpsTs > 0
-        
-        val isLocalFresh = if (appMode == "tracker") isGpsFresh else (nowRt - kinematicState.localLocation.kinetic.rt < GPS_UI_FAIL_THRESHOLD_MS && kinematicState.localLocation.kinetic.gpsTs > 0)
-
-        return HudTelemetryState(
-            isLocalGpsActive = isLocalFresh, 
-            isGpsFresh = isGpsFresh, speedMps = (if (appMode == "viewer") kinematicState.trackerLocation.kinetic.speed else 0.0).toFloat(), 
-            trackerAccuracy = kinematicState.trackerLocation.kinetic.accuracy.toFloat(), maxTrackerAccuracy = kinematicState.trackerLocation.kinetic.maxAccuracy.toFloat(), 
-            viewerAccuracy = (if (kinematicState.localLocation.kinetic.lat != 0.0) kinematicState.localLocation.kinetic.accuracy.toFloat() else 0f), 
-            maxViewerAccuracy = kinematicState.localLocation.kinetic.maxAccuracy.toFloat(), 
-            satsUsed = kinematicState.trackerLocation.integrity.satsUsed, satsView = kinematicState.trackerLocation.integrity.satsView, 
-            viewerSatsUsed = kinematicState.localLocation.integrity.satsUsed, viewerSatsView = kinematicState.localLocation.integrity.satsView, 
-            distToHome = kinematicState.distanceTrackerToHome, distToViewer = kinematicState.distanceTrackerToViewer, 
-            lastGpsTs = if (loc.kinetic.gpsTs > 0) loc.kinetic.rt else 0L, viewerGpsTs = if (kinematicState.localLocation.kinetic.gpsTs > 0) kinematicState.localLocation.kinetic.rt else 0L, 
-            trackerState = trackerState, isTrackerLocPending = kinematicState.trackerHealth.isLocationPending, 
-            locationPendingReason = kinematicState.trackerHealth.locationPendingReason, 
-            isViewerLocPending = kinematicState.localHealth.isLocationPending, 
-            viewerLocPendingReason = kinematicState.localHealth.locationPendingReason, isUltraLongStationary = isUltra, systemPulse = nowRt
-        )
-    }
-
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-    internal fun mapHudHealth(diag: DiagnosticState, nowRt: Long, isMaliAnomaly: Boolean): HudHealthState {
-        val rawPulse = diag.connectivity.lastRemoteActivityTs
-        val age = if (rawPulse > 0) nowRt - rawPulse else Long.MAX_VALUE
-        val progressValue = if (rawPulse > 0) maxOf(0f, minOf(1f, (TELEMETRY_UI_STALE_THRESHOLD_MS - age).toFloat() / TELEMETRY_UI_STALE_THRESHOLD_MS)) else 0f
-        return HudHealthState(
-            battery = diag.battery.level, remoteBattery = diag.trackerBattery.level, 
-            isCharging = diag.battery.isChargingStable, remoteCharging = diag.trackerBattery.isChargingStable, 
-            trackerTemp = diag.trackerBattery.temp.toFloat(), viewerTemp = diag.battery.temp.toFloat(), 
-            hasActiveAlarms = diag.activeAlarms.any { !it.isResolved }, 
-            isRedScreenSuppressed = (diag.activeAlarms.any { !it.isResolved } && !diag.isRedScreenVisible), 
-            isRedScreenVisible = diag.isRedScreenVisible, isAlarmSilenced = diag.isAlarmSilenced, 
-            isSirenPlaying = diag.isSirenPlaying, activeAlarms = diag.activeAlarms, 
-            progressPulse = progressValue, systemPulse = nowRt, isMaliAnomaly = isMaliAnomaly
-        )
-    }
-
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     internal fun mapMapViewState(mode: String?, hydration: Int, spatial: SpatialUiState, kinematic: KinematicState, pulseRt: Long, nowMs: Long, trkSegs: List<MapTrailSegment>, vwrSegs: List<MapTrailSegment>, vios: List<ViolationPoint>): MapViewState {
         val m = mode ?: "tracker"
         val loc = if (m == "tracker") kinematic.localLocation else kinematic.trackerLocation
@@ -627,7 +465,6 @@ class MainViewModel @Inject constructor(
             else { sTrkLat = PhysicsUtils.smoothCoordinate(sTrkLat, tLat, alpha); sTrkLng = PhysicsUtils.smoothCoordinate(sTrkLng, tLng, alpha) } 
         }
 
-        // Oct.12.17: Added Viewer Smoothing logic (Fixes Null Island for local marker)
         if (PhysicsUtils.isValidLocation(vLat, vLng)) {
             val alpha = if (kinematic.localLocation.kinetic.speed < STATIONARY_SPEED_THRESHOLD_MPS) POSITION_EMA_ALPHA_STATIONARY else POSITION_EMA_ALPHA_DEFAULT
             if (sVwrLat == 0.0 || PhysicsUtils.calculateDistance(sVwrLat, sVwrLng, vLat, vLng) > 100.0) { sVwrLat = vLat; sVwrLng = vLng } 
@@ -636,7 +473,6 @@ class MainViewModel @Inject constructor(
 
         val fixAgeRt = if (loc.kinetic.rt > 0) pulseRt - loc.kinetic.rt else Long.MAX_VALUE
         
-        // ISSUE-OCT12.13-2: Harmonized Map Freshness.
         val isPowerSave = if (m == "viewer") kinematic.trackerHealth.isPowerSaveMode else kinematic.localHealth.isPowerSaveMode
         val threshold = when {
             kinematic.trackerHealth.isUltraLongStationary -> ULTRA_LONG_STATIONARY_GPS_POLLING_MS + 30000L

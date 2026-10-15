@@ -5,14 +5,9 @@ import androidx.compose.ui.graphics.Color
 /**
  * R799: New Color System.
  * Decouples Role Identity from Semantic Status.
- * v9.1.0:
- * - R799e [Active]: JD Vivid Green (#78BE20) introduced as primary branding.
- * v9.0.4:
- * - R799d: Changed Viewer color to Cyan (#06B6D4) from Orange.
- * v8.9.40:
- * - R865/R866 [Active]: Unified Identity Green (#367C2B) enforced as Tracker Primary.
- * v8.8.3:
- * - R866 [Active]: Added BrandJd (#367C2B) to synchronize with colors.xml.
+ * Oct.14.17:
+ * - Brightened Neutral Palette: Shifted Slate950/900 to higher values 
+ *   to rule out "Black Screen" rendering bugs on A15 hardware.
  */
 
 // Forensic Authority: Standardized to DeepPink for high-visibility event marking.
@@ -46,10 +41,11 @@ val Indigo500 = Color(0xFF6366F1)
 val Purple500 = Color(0xFF800080) // Added for R805 markers
 
 // Neutral Palette (Backgrounds & Surfaces)
-val Slate950 = Color(0xFF020617)
-val Slate900 = Color(0xFF0F172A)
-val Slate800 = Color(0xFF1E293B)
-val Slate700 = Color(0xFF334155) // Added for Issue #059 UI buttons
+// Oct.14.17: Ruler-out for A15 black screen.
+val Slate950 = Color(0xFF1E293B) // Changed from #020617 (Near-black) to Slate 800 for visibility
+val Slate900 = Color(0xFF334155) // Changed from #0F172A to Slate 700
+val Slate800 = Color(0xFF475569)
+val Slate700 = Color(0xFF64748B)
 val Slate400 = Color(0xFF94A3B8)
 val Slate100 = Color(0xFFF1F5F9)
 val White = Color(0xFFFFFFFF)

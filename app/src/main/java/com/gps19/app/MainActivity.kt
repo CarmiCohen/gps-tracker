@@ -5,9 +5,9 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import androidx.lifecycle.Lifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import timber.log.Timber
@@ -15,9 +15,9 @@ import javax.inject.Inject
 
 /**
  * MainActivity: Entry point for the GPS Tracker application.
- * Oct.14.1:
- * - SIMP-OCT13.30-S1: Delegated system intent orchestration to SystemIntentHandler.
- * - SIMP-OCT13.21-S2: Finalized Pure Event transition.
+ * Oct.14.17:
+ * - Mali GPU Compatibility: Disabled immediate edge-to-edge to stabilize 
+ *   initial buffer swap on Samsung A series.
  */
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -28,7 +28,8 @@ class MainActivity : ComponentActivity() {
     lateinit var systemIntentHandler: SystemIntentHandler
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        // Oct.14.17: Temporarily disabled automatic edge-to-edge to troubleshoot 
+        // A15 "Dark Screen" rendering stalls during startup.
         super.onCreate(savedInstanceState)
         
         Timber.d("MainActivity onCreate version ${BuildConfig.VERSION_NAME} on ${Build.MODEL}")

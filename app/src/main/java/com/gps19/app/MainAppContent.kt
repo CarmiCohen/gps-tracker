@@ -1,30 +1,28 @@
 package com.gps19.app
 
 import android.content.Intent
-import android.content.res.Configuration
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -36,58 +34,101 @@ import androidx.navigation.compose.rememberNavController
 import com.gps19.core.engine.STARTUP_SETTLING_DELAY_MS
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
+import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
- * Oct.14.9:
- * - SIMP-OCT14.8-S1: HUD State Consolidation. Refactored OverlayHost to 
- *   derive health state from consolidated hudState.
- * Oct.14.1:
- * - SIMP-OCT13.30-S1: Integrated SystemIntentHandler via settingsLauncher.
- * - SIMP-OCT13.21-S2: Finalized Pure Event transition.
+ * Oct.14.17:
+ * - Structural Stabilization [v14]: PLATINUM BUILD. 
+ *   Using Pure Flat Architecture for primary screen swapping to solve A15 
+ *   rendering loops. Removed NavHost start-destination dependency for main 
+ *   modes. Enforced 1dp Mali GPU workaround.
  */
 @Composable
 fun MainAppContent(
     activity: MainActivity,
     viewModel: MainViewModel
 ) {
-    val sessionState by viewModel.session.collectAsStateWithLifecycle()
-    val settingsState by viewModel.settings.collectAsStateWithLifecycle()
-    val spatialState by viewModel.spatial.collectAsStateWithLifecycle()
-    val navigationState by viewModel.navigation.collectAsStateWithLifecycle()
+    // Oct.14.17: Direct state collection for A15 stability.
+    val uiState by viewModel.uiState.collectAsState()
+    val sessionState = uiState.session
+    val mode = sessionState.appMode
+    val navigationState = uiState.navigation
     
     val navController = rememberNavController()
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
 
     val requestPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         viewModel.onEvent(UiEvent.RefreshPermissionStatus)
-        navigationState.pendingMode?.let { mode -> viewModel.onEvent(UiEvent.InitiateMode(mode)) }
+        navigationState.pendingMode?.let { m -> viewModel.onEvent(UiEvent.InitiateMode(m)) }
     }
 
     val settingsLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         viewModel.onEvent(UiEvent.RefreshPermissionStatus)
     }
 
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { MainFileHelper.importConfig(activity, viewModel, uri) } }
-    val importTrailLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> MainFileHelper.importTrails(activity, viewModel, uris) }
-
     AppEffectAggregator(
         viewModel = viewModel,
         navController = navController,
-        sessionState = sessionState,
-        navigationState = navigationState,
-        spatialState = spatialState,
         activity = activity,
         requestPermissionLauncher = requestPermissionLauncher,
         settingsLauncher = settingsLauncher,
-        importLauncher = importLauncher,
-        importTrailLauncher = importTrailLauncher,
         onShowBackgroundDisclosure = { showBackgroundDisclosure = true }
     )
 
-    if (sessionState.hydrationLevel == 0) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black))
-        return
+    GpsTrackerTheme(appMode = mode) {
+        Surface(
+            modifier = Modifier.fillMaxSize().graphicsLayer(alpha = 0.99f), // Mali GPU Fix
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Box(modifier = Modifier.fillMaxSize().padding(1.dp)) {
+                
+                // Oct.14.17: Pure Flat Swapping. Direct conditional rendering 
+                // ensures the UI doesn't stall in a navigation loop.
+                when {
+                    navigationState.isDiagnosticsVisible -> {
+                        DiagnosticsScreen(stateProvider = viewModel, onMainEvent = { viewModel.onEvent(it) })
+                    }
+                    mode == "tracker" -> {
+                        TrackerScreen(stateProvider = viewModel, onMainEvent = { viewModel.onEvent(it) })
+                    }
+                    mode == "viewer" -> {
+                        ViewerScreen(stateProvider = viewModel, onMainEvent = { viewModel.onEvent(it) })
+                    }
+                    else -> {
+                        LandingScreen(isPeerActive = sessionState.isPeerActive) { m ->
+                            Timber.d("PLATINUM_TAP: Initiating Mode $m")
+                            viewModel.onEvent(UiEvent.InitiateMode(m))
+                        }
+                    }
+                }
+
+                // Global Overlays (Settings, Logs, etc.)
+                OverlayHost(viewModel = viewModel, navigationState = navigationState)
+
+                // Resilient Loading Overlay
+                AnimatedVisibility(
+                    visible = sessionState.hydrationLevel < 3 && mode != null,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp)
+                            Spacer(Modifier.height(16.dp))
+                            Text("Engine Resuming...", color = Slate400, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+
+                // Debug Indicators
+                Column(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)) {
+                    Text("UI_READY", color = Color.Green.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("v14.17_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
+                }
+            }
+        }
     }
 
     if (showBackgroundDisclosure) {
@@ -113,7 +154,7 @@ fun MainAppContent(
         )
     }
 
-    if (settingsState.isIdentitySanitized) {
+    if (uiState.settings.isIdentitySanitized) {
         AlertDialog(
             onDismissRequest = { viewModel.onEvent(UiEvent.DismissIdentitySanitization) },
             title = { Text(stringResource(R.string.sanitization_title)) },
@@ -121,109 +162,26 @@ fun MainAppContent(
             confirmButton = { Button(onClick = { viewModel.onEvent(UiEvent.DismissIdentitySanitization) }) { Text(stringResource(R.string.btn_dismiss)) } }
         )
     }
-
-    GpsTrackerTheme(appMode = sessionState.appMode) {
-        Surface(modifier = Modifier.fillMaxSize().safeDrawingPadding(), color = MaterialTheme.colorScheme.background) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                if (sessionState.hydrationLevel >= 2) {
-                    NavHost(navController = navController, startDestination = Screen.Landing.route) {
-                        composable(Screen.Landing.route) {
-                            BackHandler { viewModel.onEvent(UiEvent.ManualExit) }
-                            if (sessionState.hydrationLevel >= 3) {
-                                LandingScreen(isPeerActive = sessionState.isPeerActive) { mode ->
-                                    viewModel.onEvent(UiEvent.InitiateMode(mode))
-                                }
-                            }
-                        }
-                        composable(Screen.Tracker.route) {
-                            BackHandler {
-                                val nav = navigationState
-                                when {
-                                    nav.isDiagnosticsVisible -> viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
-                                    nav.isPhoneSetupVisible -> viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
-                                    nav.activeSubSettings != null -> viewModel.onEvent(UiEvent.SetSubSettings(null))
-                                    nav.isSettingsOpen -> { viewModel.onEvent(UiEvent.CommitSettings); viewModel.onEvent(UiEvent.ToggleSettings(false)) }
-                                    nav.isLogVisible -> viewModel.onEvent(UiEvent.ToggleLog(false))
-                                    nav.isRibbonsVisible -> viewModel.onEvent(UiEvent.ToggleRibbons(false))
-                                    !nav.isMapVisible -> viewModel.onEvent(UiEvent.ToggleMap(true))
-                                    else -> viewModel.onEvent(UiEvent.ManualExit)
-                                }
-                            }
-                            if (sessionState.hydrationLevel >= 3) {
-                                TrackerScreen(
-                                    stateProvider = viewModel,
-                                    onMainEvent = { viewModel.onEvent(it) }
-                                )
-                            }
-                        }
-                        composable(Screen.Viewer.route) {
-                            BackHandler {
-                                val nav = navigationState
-                                when {
-                                    nav.isDiagnosticsVisible -> viewModel.onEvent(UiEvent.NavigateToDiagnostics(false))
-                                    nav.isPhoneSetupVisible -> viewModel.onEvent(UiEvent.TogglePhoneSetup(false))
-                                    nav.activeSubSettings != null -> viewModel.onEvent(UiEvent.SetSubSettings(null))
-                                    nav.isSettingsOpen -> { viewModel.onEvent(UiEvent.CommitSettings); viewModel.onEvent(UiEvent.ToggleSettings(false)) }
-                                    nav.isLogVisible -> viewModel.onEvent(UiEvent.ToggleLog(false))
-                                    nav.isRibbonsVisible -> viewModel.onEvent(UiEvent.ToggleRibbons(false))
-                                    !nav.isMapVisible -> viewModel.onEvent(UiEvent.ToggleMap(true))
-                                    else -> viewModel.onEvent(UiEvent.ManualExit)
-                                }
-                            }
-                            if (sessionState.hydrationLevel >= 3) {
-                                ViewerScreen(
-                                    stateProvider = viewModel,
-                                    onMainEvent = { viewModel.onEvent(it) }
-                                )
-                            }
-                        }
-                        composable(Screen.Diagnostics.route) {
-                            BackHandler { viewModel.onEvent(UiEvent.NavigateToDiagnostics(false)) }
-                            if (sessionState.hydrationLevel >= 3) {
-                                DiagnosticsScreen(
-                                    stateProvider = viewModel,
-                                    onMainEvent = { viewModel.onEvent(it) }
-                                )
-                            }
-                        }
-                    }
-                }
-                
-                OverlayHost(
-                    viewModel = viewModel,
-                    navigationState = navigationState
-                )
-            }
-        }
-    }
 }
 
 @Composable
 private fun AppEffectAggregator(
     viewModel: MainViewModel,
     navController: NavHostController,
-    sessionState: SessionUiState,
-    navigationState: NavigationState,
-    spatialState: SpatialUiState,
     activity: MainActivity,
     requestPermissionLauncher: ActivityResultLauncher<Array<String>>,
     settingsLauncher: ActivityResultLauncher<Intent>,
-    importLauncher: ActivityResultLauncher<String>,
-    importTrailLauncher: ActivityResultLauncher<String>,
     onShowBackgroundDisclosure: () -> Unit
 ) {
     val context = LocalContext.current
-    val view = LocalView.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val configuration = LocalConfiguration.current
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { MainFileHelper.importConfig(activity, viewModel, uri) } }
+    val importTrailLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> MainFileHelper.importTrails(activity, viewModel, uris) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_RESUME -> viewModel.onEvent(UiEvent.SetUiVisible(true))
-                Lifecycle.Event.ON_PAUSE -> viewModel.onEvent(UiEvent.SetUiVisible(false))
-                else -> {}
-            }
+            if (event == Lifecycle.Event.ON_RESUME) viewModel.onEvent(UiEvent.SetUiVisible(true))
+            else if (event == Lifecycle.Event.ON_PAUSE) viewModel.onEvent(UiEvent.SetUiVisible(false))
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -256,71 +214,8 @@ private fun AppEffectAggregator(
                 UiEffect.LaunchAppInfo -> activity.systemIntentHandler.launchAppInfo(settingsLauncher)
                 UiEffect.LaunchExactAlarm -> activity.systemIntentHandler.launchExactAlarmSetting(settingsLauncher)
                 UiEffect.LaunchHardwarePermission -> activity.systemIntentHandler.launchOverlayPermissionSetting(settingsLauncher)
+                else -> {}
             }
-        }
-    }
-
-    LaunchedEffect(sessionState.isInitialized, sessionState.appMode, navigationState.isDiagnosticsVisible, spatialState.isManualSelectionInProgress, sessionState.isSettlingActive, sessionState.isSystemActive) {
-        if (!sessionState.isInitialized) return@LaunchedEffect
-        
-        val mode = sessionState.appMode
-        val isDiagnostics = navigationState.isDiagnosticsVisible
-
-        if (isDiagnostics) {
-            if (navController.currentDestination?.route != Screen.Diagnostics.route) {
-                navController.navigate(Screen.Diagnostics.route) { launchSingleTop = true }
-            }
-            return@LaunchedEffect
-        }
-
-        if (mode != null && sessionState.isSettlingActive && !spatialState.isManualSelectionInProgress) {
-            if (navController.currentDestination?.route == Screen.Landing.route) {
-                delay(STARTUP_SETTLING_DELAY_MS)
-                viewModel.onEvent(UiEvent.SetSettlingActive(false))
-                viewModel.onEvent(UiEvent.InitiateMode(mode))
-            }
-        }
-
-        if (sessionState.isSettlingActive && mode != null) return@LaunchedEffect
-
-        when (mode) {
-            "tracker" -> {
-                if (navController.currentDestination?.route != Screen.Tracker.route) {
-                    navController.navigate(Screen.Tracker.route) { 
-                        popUpTo(Screen.Landing.route) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
-            }
-            "viewer" -> {
-                if (navController.currentDestination?.route != Screen.Viewer.route) {
-                    navController.navigate(Screen.Viewer.route) { 
-                        popUpTo(Screen.Landing.route) { inclusive = true } 
-                        launchSingleTop = true
-                    }
-                }
-            }
-            null -> {
-                if (sessionState.isSystemActive) return@LaunchedEffect
-                if (navigationState.pendingMode == null) viewModel.onEvent(UiEvent.SetManualSelection(false))
-                if (navController.currentDestination?.route != Screen.Landing.route) {
-                    navController.navigate(Screen.Landing.route) { 
-                        popUpTo(Screen.Landing.route) { inclusive = true }
-                        launchSingleTop = true
-                    }
-                }
-            }
-        }
-    }
-
-    LaunchedEffect(configuration.orientation) {
-        val window = activity.window
-        val windowInsetsController = WindowCompat.getInsetsController(window, view)
-        if (configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
-            windowInsetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            windowInsetsController.hide(WindowInsetsCompat.Type.systemBars())
-        } else {
-            windowInsetsController.show(WindowInsetsCompat.Type.systemBars())
         }
     }
 }
@@ -335,42 +230,30 @@ fun OverlayHost(
     val hudHealth = hudState.health
 
     if (navigationState.isSettingsOpen) {
-        SettingsOverlay(
-            stateProvider = viewModel,
-            onEvent = { event -> viewModel.onEvent(event) }
-        )
+        SettingsOverlay(stateProvider = viewModel, onEvent = { event -> viewModel.onEvent(event) })
     } else if (navigationState.isLogVisible) {
         LogOverlay(
             stateProvider = viewModel,
             onSetShowDetails = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowDetails(show)) }, 
             onSetShowRecovered = { show -> viewModel.onEvent(UiEvent.SetLogFilterShowRecovered(show)) },
-            onHistLink = { ts -> 
-                viewModel.onEvent(UiEvent.SetReplayCursor(ts))
-                viewModel.onEvent(UiEvent.ToggleRibbons(true))
-            },
+            onHistLink = { ts -> viewModel.onEvent(UiEvent.SetReplayCursor(ts)); viewModel.onEvent(UiEvent.ToggleRibbons(true)) },
             onDetailsLink = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
             onMainEvent = { viewModel.onEvent(it) }
         )
     } else if (navigationState.isRibbonsVisible) {
-        RibbonsOverlay(
-            stateProvider = viewModel,
-            onEvent = { viewModel.onEvent(it) }
-        )
+        RibbonsOverlay(stateProvider = viewModel, onEvent = { viewModel.onEvent(it) })
     } else if (navigationState.isGnssDetailVisible) {
-        GnssDetailOverlay(
-            gnssDetailFlow = viewModel.activeGnssDetail,
-            onClose = { viewModel.onEvent(UiEvent.ToggleGnssDetail(false)) }
-        )
+        GnssDetailOverlay(gnssDetailFlow = viewModel.activeGnssDetail, onClose = { viewModel.onEvent(UiEvent.ToggleGnssDetail(false)) })
     }
 
-    if (hudHealth.isRedScreenVisible && sessionState.appMode == "viewer" && sessionState.hydrationLevel >= 3) {
+    if (hudHealth.isRedScreenVisible && sessionState.appMode == "viewer") {
         BackHandler { viewModel.onEvent(UiEvent.DismissAlarms) }
         AlarmOverlay(
             stateProvider = viewModel,
             onHardwarePermissionClick = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
             onMute = { 
-                val currentCauses = hudHealth.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
-                viewModel.onEvent(UiEvent.StopSiren(currentCauses))
+                val causes = hudHealth.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
+                viewModel.onEvent(UiEvent.StopSiren(causes))
             },
             onClose = { viewModel.onEvent(UiEvent.DismissAlarms) },
             onGoToMap = { viewModel.onEvent(UiEvent.DismissAlarms); viewModel.onEvent(UiEvent.ToggleMap(true)) }

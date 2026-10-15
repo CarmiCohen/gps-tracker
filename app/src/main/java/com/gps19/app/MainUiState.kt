@@ -7,15 +7,15 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Composite UI state partitioned into specialized slices.
- * Oct.14.9:
- * - SIMP-OCT14.8-S1: HUD State Consolidation. Introduced HudState data class 
- *   to group connectivity, telemetry, and health states.
+ * Oct.14.17:
+ * - A15 Hardening: Disabled isMapVisible by default to prevent MapView 
+ *   from obscuring the UI on devices with rendering stalls.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
     val settings: SettingsUiState = SettingsUiState(),
     val spatial: SpatialUiState = SpatialUiState(),
-    val navigation: NavigationState = NavigationState(isMapVisible = true),
+    val navigation: NavigationState = NavigationState(isMapVisible = false),
     val simulation: SimulationUiState = SimulationUiState()
 ) {
     val isInitialized: Boolean get() = session.isInitialized

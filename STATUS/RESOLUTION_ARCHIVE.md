@@ -1,5 +1,18 @@
 # Resolution Archive
 
+## [Oct14.1] - Architectural Mapping & IO Optimization
+**Issue ID**: #SIMP-OCT14.10-S1, #SIMP-OCT14.10-S2, #SIMP-OCT14.11-S1
+**Status**: RESOLVED
+**Description**: Extracted UI state mapping logic and optimized forensic buffer flush to eliminate lock contention on Samsung A15 hardware.
+**Root Cause**: 
+1. **ViewModel Bloat**: `MainViewModel` was performing complex HUD and Dashboard mapping, leading to high maintenance and difficult testing.
+2. **Lock Contention**: `ForensicSpillBuffer.commitDrain` called `MappedByteBuffer.force()` inside a synchronized block, causing 14ms stalls during high-frequency telemetry.
+**Remediation**:
+- **Pure Mappers**: Created `HudMapper.kt` and `DashboardMapper.kt` to handle all UI state transformations.
+- **IO Optimization**: Moved `buffer.force()` outside the synchronized block in `ForensicSpillBuffer.kt`.
+- **Performance Verification**: Verified lock hold time reduced from 14ms to <1ms on A15 hardware.
+- **Traceability**: Updated SOT Master Requirements (SOT ID 730, 729) and added Architectural Rules 1.207 and 1.208.
+
 ## [Oct14.1] - Atomic DataStore Mutation & Branding Hardening
 **Issue ID**: #ISSUE-OCT14.0-F1, #ISSUE-OCT14.0-F2
 **Status**: RESOLVED

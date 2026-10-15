@@ -12,10 +12,9 @@ import javax.inject.Singleton
 /**
  * LifecycleHydrationManager:
  * Centralizes and staggers the app hydration sequence to prevent UI stalls.
- * Sep.23.50:
- * - Issue #1338: Hardened hydration lifecycle by integrating all phases 
- *   (including Map/Overlay triggers) into the primary managed job to prevent 
- *   coroutine leaks during role transitions.
+ * Oct.14.17:
+ * - A15 Hardening: Significantly increased initial delays to allow 
+ *   low-end Samsung GPUs to stabilize before attempting UI draws.
  */
 @Singleton
 class LifecycleHydrationManager @Inject constructor() {
@@ -29,51 +28,46 @@ class LifecycleHydrationManager @Inject constructor() {
         if (hydrationJob?.isActive == true) return
         
         hydrationJob = scope.launch(Dispatchers.Main.immediate) {
-            Timber.d("Hydration: Starting sequence (staggered=$useStaggered)")
+            Timber.d("Hydration: Starting sequence (A15 Stabilized)")
             
-            // Phase 1: Core Surface
-            delay(if (useStaggered) 500 else 100)
+            // Phase 1: Core Surface - Wait longer for GPU buffer swap
+            delay(1500) // Increased from 500
             _hydrationLevel.value = 1
             
-            delay(if (useStaggered) 750 else 200)
+            delay(1000) 
             _hydrationLevel.value = 2
             
-            delay(if (useStaggered) 1000 else 300)
+            delay(1000)
             _hydrationLevel.value = 3
             
             onComplete()
 
-            // Phase 2: Map & Data Engine (Triggered on Idle)
-            // We use a suspendable check instead of a detached IdleHandler to keep it in scope
-            yield() // Give UI a chance to breath
+            // Phase 2: Map & Data Engine
+            yield() 
             
             var retryCount = 0
             while (!GpsApplication.isOsmReady.get() && retryCount < 50) {
-                delay(200)
+                delay(500)
                 retryCount++
             }
 
-            // Levels 4-7: Map Elements
-            val mapDelay = if (useStaggered) 600L else 50L
-            
+            // Levels 4-7: Map Elements (Very slow for A15 stability)
             _hydrationLevel.value = 4
-            delay(mapDelay)
+            delay(1000)
             _hydrationLevel.value = 5
-            delay(mapDelay)
+            delay(1000)
             _hydrationLevel.value = 6
-            delay(mapDelay)
+            delay(500)
             _hydrationLevel.value = 7
 
             // Phase 3: Heavy Overlays
-            val overlayDelay = if (useStaggered) 800L else 100L
-            
-            delay(overlayDelay)
+            delay(1000)
             _hydrationLevel.value = 8
-            delay(overlayDelay)
+            delay(500)
             _hydrationLevel.value = 9
-            delay(overlayDelay)
+            delay(500)
             _hydrationLevel.value = 10
-            delay(overlayDelay)
+            delay(500)
             _hydrationLevel.value = 11
             
             Timber.d("Hydration: Full sequence completed (Level 11)")
@@ -84,6 +78,6 @@ class LifecycleHydrationManager @Inject constructor() {
         hydrationJob?.cancel()
         hydrationJob = null
         _hydrationLevel.value = 0
-        Timber.d("Hydration: Manager reset to Level 0")
+        Timber.d("Hydration: Manager reset")
     }
 }

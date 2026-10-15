@@ -3,6 +3,7 @@ package com.gps19.app
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Agriculture
 import androidx.compose.material.icons.filled.Person
@@ -20,16 +21,9 @@ import com.gps19.core.engine.*
 
 /**
  * LandingComponents: Initial role selection screens.
- * Sep.22.00:
- * - Issue #1177: Static Role Branding. Added isPeerActive parameter to 
- *   LandingScreen to drive dynamic card colors based on telemetry (R-ID 398).
- * v9.1.0:
- * - R799e: Swapped legacy BrandJd (#367C2B) for JD Vivid Green (#78BE20).
- * v9.0.4:
- * - R799d: Changed Viewer color to ViewerCyan.
- * v8.9.40:
- * - R865/R866: Swapped Lime500 for authoritative BrandJd (#367C2B).
- * Extracted from OverlayComponents for Issue 115 modularization.
+ * Oct.14.17:
+ * - A15 Hardening: Removed redundant background and status bar padding to 
+ *   prevent layout conflicts with root safeDrawingPadding.
  */
 
 @Composable
@@ -37,19 +31,66 @@ fun LandingScreen(isPeerActive: Boolean, onMode: (String) -> Unit) {
     val versionDisplay = BuildConfig.VERSION_NAME
     val viewerColor = if (isPeerActive) ViewerCyan else Slate500
     
-    Column(modifier = Modifier.fillMaxSize().background(Slate950).statusBarsPadding().padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Spacer(Modifier.weight(1f)); LandingButton(stringResource(R.string.landing_tracker_title), stringResource(R.string.landing_tracker_subtitle), Icons.Default.Agriculture, BrandJd) { onMode("tracker") }
-        Spacer(Modifier.height(24.dp)); LandingButton(stringResource(R.string.landing_viewer_title), stringResource(R.string.landing_viewer_subtitle), Icons.Default.Person, viewerColor) { onMode("viewer") }
-        Spacer(Modifier.weight(1.2f)); Text(versionDisplay, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+    // Oct.14.17: Use standard Column without explicit background to allow 
+    // root Surface color to show through, preventing "Black on Black" bugs.
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Spacer(Modifier.weight(1f))
+        
+        LandingButton(
+            title = stringResource(R.string.landing_tracker_title),
+            subtitle = stringResource(R.string.landing_tracker_subtitle),
+            icon = Icons.Default.Agriculture,
+            roleColor = BrandJd
+        ) { onMode("tracker") }
+        
+        Spacer(Modifier.height(24.dp))
+        
+        LandingButton(
+            title = stringResource(R.string.landing_viewer_title),
+            subtitle = stringResource(R.string.landing_viewer_subtitle),
+            icon = Icons.Default.Person,
+            roleColor = viewerColor
+        ) { onMode("viewer") }
+        
+        Spacer(Modifier.weight(1.2f))
+        
+        Text(
+            text = versionDisplay,
+            color = Color.White.copy(alpha = 0.7f),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Bold,
+            fontFamily = FontFamily.Monospace
+        )
     }
 }
 
 @Composable
 fun LandingButton(title: String, subtitle: String, icon: androidx.compose.ui.graphics.vector.ImageVector, roleColor: Color, onClick: () -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth().height(100.dp).clickable { onClick() }, colors = CardDefaults.cardColors(containerColor = Slate900)) {
-        Row(modifier = Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.padding(16.dp)) { Icon(icon, null, tint = roleColor, modifier = Modifier.size(48.dp)) }
-            Spacer(Modifier.width(16.dp)); Column { Text(title, color = roleColor, fontSize = 22.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = Slate500, fontSize = 12.sp) }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(100.dp)
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Slate900)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(modifier = Modifier.padding(16.dp)) {
+                Icon(icon, null, tint = roleColor, modifier = Modifier.size(48.dp))
+            }
+            Spacer(Modifier.width(16.dp))
+            Column {
+                Text(title, color = roleColor, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text(subtitle, color = Slate400, fontSize = 12.sp)
+            }
         }
     }
 }
