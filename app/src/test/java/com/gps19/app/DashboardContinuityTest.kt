@@ -17,15 +17,8 @@ class DashboardContinuityTest {
         override val currentTimeMillis: Long get() = 1700000000000L
     }
 
-    private fun createViewModel(): MainViewModel {
-        return mock<MainViewModel>(defaultAnswer = Answers.CALLS_REAL_METHODS) {
-            on { timeProvider } doReturn timeProvider
-        }
-    }
-
     @Test
     fun `Verify Tracker Dashboard Continuity - Displays local state when viewer is disconnected`() {
-        val viewModel = createViewModel()
         val nowRt = timeProvider.elapsedRealtime
         
         // 1. Setup KinematicState with local movement but NO remote peer
@@ -48,7 +41,7 @@ class DashboardContinuityTest {
         }
 
         // 3. Act: Map to DashboardTelemetryState in "tracker" mode
-        val result = viewModel.mapDashboardTelemetry("tracker", kin, nowRt, TrackerState.MOVING, false)
+        val result = DashboardMapper.mapDashboardTelemetry("tracker", kin, nowRt, TrackerState.MOVING, false)
 
         // 4. Verify: Should use localLocation data
         assertTrue("Dashboard must be fresh using local GPS", result.isGpsFresh)
@@ -57,7 +50,7 @@ class DashboardContinuityTest {
         assertEquals(TrackerState.MOVING, result.trackerState)
         
         // 5. Verify connectivity mapping for tracker
-        val connResult = viewModel.mapDashboardConnectivity("tracker", diag, nowRt)
+        val connResult = DashboardMapper.mapDashboardConnectivity("tracker", diag, nowRt)
         assertTrue("Local watchdog should be OK", connResult.watchdogOk)
         assertTrue("Relay should show connected", connResult.isRelayConnected)
     }

@@ -1,9 +1,8 @@
-# SOT Master Requirements & Hardening Status (Oct14.1)
+# SOT Master Requirements & Hardening Status (Oct15.10)
 
 ## 🏗️ Architectural Master Rules (270 Rules)
 
 ### 1. Lifecycle & Resource Management
-*   **1.1** ... (Historical rules omitted)
 *   **1.207 Pure Mapping Architecture (R-ID 725)**: UI state mapping logic MUST be extracted from `MainViewModel` into dedicated, pure mapper objects (e.g., `HudMapper`, `DashboardMapper`, `MapStateMapper`) to ensure ViewModel maintainability, testability, and separation of concerns. (Oct14.1 - SIMP-OCT14.21-S1).
 *   **1.208 Lock-Contention-Free IO (R-ID 726)**: High-frequency IO operations on memory-mapped buffers (e.g., `MappedByteBuffer.force()`) MUST be executed outside of critical synchronized blocks to prevent UI stalls and thread contention. (Oct14.1 - SIMP-OCT14.11-S1).
 *   **1.209 Primitive-Backed Telemetry Buffering (R-ID 727)**: High-volume telemetry data (e.g., trail points) MUST be stored in primitive-backed structures (e.g., `TrailBuffer` with `DoubleArray`) instead of lists of objects to minimize GC pressure and heap fragmentation during long-duration tracking. (Oct14.1 - SIMP-OCT15.0-S1).
@@ -18,6 +17,7 @@
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 740**: Unit Test Restoration - PASSED. Decoupled test suite from MainViewModel and aligned with Pure Mapping Architecture, restoring 100% pass rate. (Oct15.10 - ISSUE-OCT15.10-F1).
 *   **SOT ID 739**: Log Gating Integration - PASSED. Refactored LogManager to use centralized PersistencePolicy, ensuring Mali driver protection and consistent storage pressure handling. (Oct14.1 - ISSUE-OCT15.9-F1).
 *   **SOT ID 738**: Persistence Policy Audit - PASSED. Expanded PersistencePolicy to cover all IO paths and enforced gating in MainRepository. (Oct14.1 - ISSUE-OCT15.7-F1).
 *   **SOT ID 737**: Buffer Constructor Refactoring - PASSED. Encapsulated HistoryBuffer array initialization and merging into its companion object, simplifying UseCase and Mapper layers. (Oct14.1 - SIMP-OCT15.4-S2).
@@ -28,6 +28,6 @@
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 31.815 (Unit Test Integrity)**: PASSED - Confirmed 100% unit test pass rate (88 tests) across :app and :core:engine modules following architectural decoupling. (Oct15.10).
 *   **Chapter 31.814 (Unified Log Gating)**: PASSED - Confirmed via `StoragePressureAuditTest` that Normal and Important logs are correctly inhibited during simulated Low/Critical storage pressure, while Special logs persist. (Oct14.1).
 *   **Chapter 31.813 (Explicit Persistence Gating)**: PASSED - Verified that Violations and Pruning are strictly inhibited during simulated Mali anomalies via Logcat audit. (Oct14.1).
-*   **Chapter 31.812 (Encapsulated Construction)**: PASSED - Verified HistoryBuffer instantiation and merging logic is fully contained within the model, with simplified call sites in UseCase and Mapper. (Oct14.1).

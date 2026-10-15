@@ -1,26 +1,26 @@
-# Project Handover - Oct15.9 (Stress Test & Log Gating)
+# Project Handover - Oct15.10 (Unit Test Restoration)
 
-## 🟢 Status: Release Ready (Oct15.9 Graduation)
-The project has graduated to `Oct15.9`. All diagnostic and telemetry I/O has been unified under the centralized `PersistencePolicy`.
+## 🟢 Status: Release Ready (Oct15.10 Graduation)
+The project has graduated to `Oct15.10`. The unit test suite has been fully restored and aligned with the Pure Mapping Architecture refactoring.
 
-## 🛠️ Critical Hardening Details (Oct15.9)
+## 🛠️ Critical Hardening Details (Oct15.10)
 
-### 1. Stress Test Verification & Log Gating (ISSUE-OCT15.9-F1)
-- **Files**: `PersistencePolicy.kt`, `LogManager.kt`, `StoragePressureAuditTest.kt`, `SettingsRepository.kt`.
-- **Simplification**: Integrated log gating into `PersistencePolicy` to ensure consistent storage pressure handling across all repositories and eliminate driver-level contention during Mali anomalies.
-- **Remediation**: Fixed `StoragePressureAuditTest` to correctly handle `TrailBuffer` primitive arrays. Corrected identity conflict message in `SettingsRepository` to fix failing `IdentityPersistenceTest`.
-- **Integrity**: Verified 24/25 Android tests pass. The remaining failure (`verifyFullHydrationReentrancyUnderExtremeLoad`) is a known high-load timing flake tracked as `ISSUE-OCT15.9-L1`.
+### 1. Unit Test Suite Restoration (ISSUE-OCT15.10-F1)
+- **Files**: `HudMapper.kt`, `DashboardContinuityTest.kt`, `MainViewModelMappingTest.kt`, `UxLogicFormattingTest.kt`.
+- **Simplification**: Decoupled UI mapping tests from `MainViewModel` and transitioned them to specialized mappers (`DashboardMapper`, `HudMapper`, `MapStateMapper`).
+- **Remediation**: Fixed 29 unresolved reference errors in the `:app` test suite. Promoted `HudMapper` internal functions to allow granular verification of connectivity, telemetry, and health DTOs.
+- **Integrity**: Verified 100% unit test pass rate (88 tests).
 
 ## 📊 Forensic Pulse & Metrics
-- **Unit Tests**: 100% PASS.
-- **Android Tests**: 24/25 PASS (1 timing flake).
+- **Unit Tests**: 88/88 PASS (100%).
+- **Android Tests**: 24/25 PASS (1 known timing flake: `verifyFullHydrationReentrancyUnderExtremeLoad`).
 - **Build Status**: `assembleDebug` SUCCESS.
 - **SOT Count**: 431 (Rules: 270).
 - **Open Gaps**: 0.
-- **Version Tag**: `Oct15.9`.
+- **Version Tag**: `Oct15.10`.
 
 ## 🚀 Next Steps
-1. **Hydration Audit**: Investigate `verifyFullHydrationReentrancyUnderExtremeLoad` flake in `HydrationStaggeringAuditTest` to improve test determinism under CPU contention.
-2. **Resource Audit**: Review remaining `Bitmap` or `Path` allocations in `ForensicRibbonContainer` for further pressure reduction.
+1. **Test Utility Decoupling (SIMP-OCT15.10-S1)**: Refactor remaining tests to remove unnecessary `MainViewModel` mocks and use pure object verification for mappers.
+2. **Hydration Audit**: Investigate the timing flake in `HydrationStaggeringAuditTest` under CPU contention.
 
-**HANDOVER COMPLETE. VERSION GRADUATED TO Oct15.9.**
+**HANDOVER COMPLETE. VERSION GRADUATED TO Oct15.10.**

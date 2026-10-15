@@ -31,7 +31,7 @@ object HudMapper {
         )
     }
 
-    private fun mapHudConnectivity(
+    internal fun mapHudConnectivity(
         appMode: String?, 
         deviceId: String, 
         viewerId: String, 
@@ -64,7 +64,7 @@ object HudMapper {
         )
     }
 
-    private fun mapHudTelemetry(
+    internal fun mapHudTelemetry(
         appMode: String?, 
         kinematicState: KinematicState, 
         nowRt: Long, 
@@ -101,7 +101,7 @@ object HudMapper {
         )
     }
 
-    private fun mapHudHealth(
+    internal fun mapHudHealth(
         diag: DiagnosticState, 
         nowRt: Long, 
         isMaliAnomaly: Boolean
