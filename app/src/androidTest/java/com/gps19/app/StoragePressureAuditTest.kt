@@ -16,6 +16,9 @@ import javax.inject.Inject
  * StoragePressureAuditTest: Verifies Chapter 12.3 Persistence Prioritization.
  * Validates that LogManager and PersistencePolicy correctly gate data based on 
  * storage pressure thresholds (R197).
+ * Oct.15.9:
+ * - Issue Fix: Updated TrailBuffer assertions to use primitive array access 
+ *   (lats.any) to resolve compilation errors.
  * Aug.22.05:
  * - Issue Fix: Increased flush delay to 3000ms to align with LogRepository's 
  *   LOG_BATCH_DELAY_MS (2000ms) to resolve non-deterministic test failures.
@@ -68,8 +71,8 @@ class StoragePressureAuditTest {
         assertTrue("Special log should be kept in Low Storage", logs.any { it.message == "SPECIAL_LOG" })
 
         // Verify: Normal trail dropped, Tamper (Special) kept
-        assertFalse("Normal trail point should be dropped in Low Storage", trail.any { it.lat == 1.0 })
-        assertTrue("High priority trail point should be kept in Low Storage", trail.any { it.lat == 2.0 })
+        assertFalse("Normal trail point should be dropped in Low Storage", trail.lats.any { it == 1.0 })
+        assertTrue("High priority trail point should be kept in Low Storage", trail.lats.any { it == 2.0 })
     }
 
     @Test
@@ -96,6 +99,6 @@ class StoragePressureAuditTest {
         assertTrue("Special log should be kept in Critical Storage", logs.any { it.message == "SPECIAL_LOG" })
 
         // Verify: All trails dropped in Critical Storage
-        assertTrue("All trail points should be dropped in Critical Storage", trail.isEmpty())
+        assertTrue("All trail points should be dropped in Critical Storage", trail.size == 0)
     }
 }

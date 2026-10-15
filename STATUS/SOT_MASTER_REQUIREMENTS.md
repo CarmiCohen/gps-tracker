@@ -1,6 +1,6 @@
 # SOT Master Requirements & Hardening Status (Oct14.1)
 
-## 🏗️ Architectural Master Rules (268 Rules)
+## 🏗️ Architectural Master Rules (270 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules omitted)
@@ -13,10 +13,12 @@
 *   **1.213 Centralized Telemetry Mapping (R-ID 731)**: All telemetry-to-buffer and entity-to-buffer transformations MUST be centralized within `TelemetryMapper` to ensure normalization consistency and eliminate redundancy across repositories and use cases. (Oct14.1 - SIMP-OCT15.4-S1).
 *   **1.214 Encapsulated Buffer Construction (R-ID 732)**: Instantiation, normalization, and reconciliation (merging) logic for complex primitive-backed buffers MUST be encapsulated within the buffer's companion object (e.g., `HistoryBuffer.Companion.fromPoints`) to reduce call-site complexity and leakage of imperative array-handling logic. (Oct14.1 - SIMP-OCT15.4-S2).
 *   **1.215 Explicit Persistence Gating (R-ID 733)**: All IO operations (Trails, Violations, History, Maintenance) MUST be gated by `PersistencePolicy` to ensure system stability during critical health states like Mali anomalies or low battery. (Oct14.1 - ISSUE-OCT15.7-F1).
+*   **1.216 Unified Log Gating (R-ID 734)**: Application logging MUST be gated by `PersistencePolicy.shouldSaveLog()` to prevent driver-level I/O contention during Mali anomalies and ensure consistent storage pressure handling across all diagnostic paths. (Oct14.1 - ISSUE-OCT15.9-F1).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 739**: Log Gating Integration - PASSED. Refactored LogManager to use centralized PersistencePolicy, ensuring Mali driver protection and consistent storage pressure handling. (Oct14.1 - ISSUE-OCT15.9-F1).
 *   **SOT ID 738**: Persistence Policy Audit - PASSED. Expanded PersistencePolicy to cover all IO paths and enforced gating in MainRepository. (Oct14.1 - ISSUE-OCT15.7-F1).
 *   **SOT ID 737**: Buffer Constructor Refactoring - PASSED. Encapsulated HistoryBuffer array initialization and merging into its companion object, simplifying UseCase and Mapper layers. (Oct14.1 - SIMP-OCT15.4-S2).
 *   **SOT ID 736**: Mapper Consolidation - PASSED. Centralized HistoryBuffer mapping in `TelemetryMapper`, eliminating duplicate logic in `MainRepository` and `StateSubscriptionUseCase`. (Oct14.1 - SIMP-OCT15.4-S1).
@@ -26,5 +28,6 @@
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 31.814 (Unified Log Gating)**: PASSED - Confirmed via `StoragePressureAuditTest` that Normal and Important logs are correctly inhibited during simulated Low/Critical storage pressure, while Special logs persist. (Oct14.1).
 *   **Chapter 31.813 (Explicit Persistence Gating)**: PASSED - Verified that Violations and Pruning are strictly inhibited during simulated Mali anomalies via Logcat audit. (Oct14.1).
 *   **Chapter 31.812 (Encapsulated Construction)**: PASSED - Verified HistoryBuffer instantiation and merging logic is fully contained within the model, with simplified call sites in UseCase and Mapper. (Oct14.1).

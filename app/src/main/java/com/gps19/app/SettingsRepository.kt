@@ -55,6 +55,8 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Oct.15.9:
+ * - Fixed identity conflict error message to match IdentityPersistenceTest expectations.
  * Oct.14.0:
  * - ISSUE-OCT14.0-F1: Atomic Mutation Hardening. Refactored logic to ensure 
  *   Read-Modify-Write cycles occur within the updateData atomic block.
@@ -511,7 +513,7 @@ class SettingsRepository @Inject constructor(
             val nextViewerId = if (s.hasDraftViewerId()) s.draftViewerId else s.viewerId
             
             if (!SignalingConstants.areIdsUnique(nextTrackerId, nextViewerId)) {
-                error = "Identity Conflict: Some IDs (e.g., 'viewer', 'Trk') are reserved for cross-version compatibility."
+                error = "Identity Conflict: Some IDs (e.g., 'viewer', 'Trk') are reserved for cross-version compatibility. Please choose unique IDs."
                 return@updateData s
             }
             

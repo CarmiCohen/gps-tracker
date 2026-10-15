@@ -48,6 +48,10 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.15.8:
+ * - ISSUE-OCT15.8-F1: UI Layer Integrity Audit. Simplified ConnectionQualityRibbon 
+ *   to consume pre-calculated normalization values directly, eliminating redundant 
+ *   runtime checks.
  * Oct.15.3:
  * - SIMP-OCT15.2-S1: Ribbon Selector Consolidation. Refactored ribbons to consume 
  *   pre-calculated normalized arrays in HistoryBuffer, eliminating runtime 
@@ -407,7 +411,8 @@ fun ConnectionQualityRibbon(
 
             val xPos = (startOffset + index) * pointWidth
             if (!pIsGap) { 
-                val hFactor = if (pIsConnected) history.commNorm[index] else 1f
+                // SIMP-OCT15.8-F1: Consume pre-calculated normalization from HistoryBuffer directly.
+                val hFactor = history.commNorm[index]
                 val r = Rect(Offset(xPos, effectiveBaseY - (ribbonMaxHeight * hFactor)), Size(rectW, ribbonMaxHeight * hFactor))
                 if (pIsConnected) connectedPath.addRect(r) else disconnectedPath.addRect(r)
                 

@@ -9,6 +9,9 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Oct.15.9:
+ * - ISSUE-OCT15.9-F1: Integrated PersistencePolicy.shouldSaveLog() to unify 
+ *   storage pressure gating and ensure Mali anomalies inhibit driver contention.
  * Oct.11.3:
  * - Issue #SIMP-1011-16: Forensic Pressure Audit. Added getForensicFillLevel() 
  *   to enable multi-stage sampling decay in MonitorService.
@@ -155,8 +158,7 @@ class LogManager @Inject constructor(
         val now = timeProvider.currentTimeMillis
         val health = telemetry.systemHealth.value
         
-        if (health.isStorageCritical && !isSpecial) return
-        if (health.isStorageLow && !isImportant && !isSpecial) return
+        if (!PersistencePolicy.shouldSaveLog(health, isImportant, isSpecial)) return
         
         if (type == "system" && !isImportant && !isSpecial && (now - sessionStartTs < LOG_MUZZLE_STARTUP_MS)) {
             return

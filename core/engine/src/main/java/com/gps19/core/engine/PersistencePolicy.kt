@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * PersistencePolicy: Rules for determining if data should be written to disk.
+ * Oct.15.9:
+ * - ISSUE-OCT15.9-F1: Integrated log gating into PersistencePolicy to ensure 
+ *   consistent storage pressure handling across all repositories.
  * Oct.15.7:
  * - ISSUE-OCT15.7-F1: Expanded policy to include Violation and Maintenance gating.
  *   Ensured Mali anomalies block all IO to prevent driver-level contention.
@@ -41,6 +44,23 @@ object PersistencePolicy {
      */
     fun shouldSaveViolation(health: SystemHealthState): Boolean {
         return !health.isStorageCritical && !health.isMaliAnomaly
+    }
+
+    /**
+     * Determines if a log should be saved based on storage state and log priority.
+     */
+    fun shouldSaveLog(
+        health: SystemHealthState,
+        isImportant: Boolean,
+        isSpecial: Boolean
+    ): Boolean {
+        // Mali anomalies block all standard logging to prevent I/O deadlock.
+        if (health.isMaliAnomaly && !isSpecial) return false
+        
+        if (health.isStorageCritical && !isSpecial) return false
+        if (health.isStorageLow && !isImportant && !isSpecial) return false
+        
+        return true
     }
 
     /**

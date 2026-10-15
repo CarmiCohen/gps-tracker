@@ -2,6 +2,13 @@
 
 ...
 
+## 🏁 Oct14.1: Stress Test Verification & Log Gating (ISSUE-OCT15.9-F1)
+- **Problem**: Diagnostic logs were gated using manual, fragmented rules in `LogManager`, bypassing the centralized `PersistencePolicy`. This led to inconsistent behavior during storage pressure and potential I/O driver contention during Mali anomalies. Additionally, `StoragePressureAuditTest` had compilation errors due to previous model optimizations.
+- **Root Cause**: Incomplete integration of logging into the project's persistence-gating architecture and stale test code.
+- **Remediation**: Integrated `shouldSaveLog` into `PersistencePolicy.kt` and refactored `LogManager.kt` to use it. Fixed `StoragePressureAuditTest.kt` to handle primitive-backed `TrailBuffer`. Corrected a literal string mismatch in `SettingsRepository.kt` to fix `IdentityPersistenceTest`.
+- **Impact**: Unified all persistent I/O under a single authoritative policy. Ensured Mali anomalies strictly inhibit driver contention across all diagnostic paths. Restored full pass rate for the storage audit suite.
+- **Files**: `PersistencePolicy.kt`, `LogManager.kt`, `StoragePressureAuditTest.kt`, `SettingsRepository.kt`.
+
 ## 🏁 Oct14.1: Persistence Policy & Repository Consolidation (ISSUE-OCT15.7-F1)
 - **Problem**: Fragmented IO gating logic and redundant mapping code in the repository layer. Violations and maintenance tasks lacked strict adherence to system health states like Mali anomalies.
 - **Root Cause**: Incomplete encapsulation of persistence rules and leftover imperative mapping logic in `MainRepository`.
