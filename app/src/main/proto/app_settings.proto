@@ -279,6 +279,10 @@ message RealtimeStatus {
     // Oct.7.7 Anomaly Flags
     bool is_suspicious_noise = 110;
     bool is_memory_pressure_throttled = 111;
+
+    // Oct.15.11: Proximity Parity
+    double proximity_cm = 112;
+    int64 proximity_debounce_ms = 113;
 }
 
 message GeoPointProto {

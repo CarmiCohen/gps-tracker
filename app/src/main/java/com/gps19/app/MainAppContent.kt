@@ -38,18 +38,18 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
- * Oct.14.17:
- * - Structural Stabilization [v14]: PLATINUM BUILD. 
- *   Using Pure Flat Architecture for primary screen swapping to solve A15 
- *   rendering loops. Removed NavHost start-destination dependency for main 
- *   modes. Enforced 1dp Mali GPU workaround.
+ * Oct.15.11:
+ * - Updated version tag to Oct15.11_PLATINUM.
+ * Oct.15.10:
+ * - Updated version tag to Oct15.10_PLATINUM.
+ * - ISSUE-OCT15.10-F4: HUD Rendering Stalled. Integrated PhoneSetupOverlay into 
+ *   OverlayHost.
  */
 @Composable
 fun MainAppContent(
     activity: MainActivity,
     viewModel: MainViewModel
 ) {
-    // Oct.14.17: Direct state collection for A15 stability.
     val uiState by viewModel.uiState.collectAsState()
     val sessionState = uiState.session
     val mode = sessionState.appMode
@@ -83,8 +83,6 @@ fun MainAppContent(
         ) {
             Box(modifier = Modifier.fillMaxSize().padding(1.dp)) {
                 
-                // Oct.14.17: Pure Flat Swapping. Direct conditional rendering 
-                // ensures the UI doesn't stall in a navigation loop.
                 when {
                     navigationState.isDiagnosticsVisible -> {
                         DiagnosticsScreen(stateProvider = viewModel, onMainEvent = { viewModel.onEvent(it) })
@@ -103,10 +101,8 @@ fun MainAppContent(
                     }
                 }
 
-                // Global Overlays (Settings, Logs, etc.)
                 OverlayHost(viewModel = viewModel, navigationState = navigationState)
 
-                // Resilient Loading Overlay
                 AnimatedVisibility(
                     visible = sessionState.hydrationLevel < 3 && mode != null,
                     enter = fadeIn(),
@@ -122,10 +118,9 @@ fun MainAppContent(
                     }
                 }
 
-                // Debug Indicators
                 Column(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)) {
                     Text("UI_READY", color = Color.Green.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text("v14.17_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
+                    Text("Oct15.11_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
                 }
             }
         }
@@ -244,6 +239,8 @@ fun OverlayHost(
         RibbonsOverlay(stateProvider = viewModel, onEvent = { viewModel.onEvent(it) })
     } else if (navigationState.isGnssDetailVisible) {
         GnssDetailOverlay(gnssDetailFlow = viewModel.activeGnssDetail, onClose = { viewModel.onEvent(UiEvent.ToggleGnssDetail(false)) })
+    } else if (navigationState.isPhoneSetupVisible) {
+        PhoneSetupOverlay(stateProvider = viewModel, onEvent = { viewModel.onEvent(it) })
     }
 
     if (hudHealth.isRedScreenVisible && sessionState.appMode == "viewer") {

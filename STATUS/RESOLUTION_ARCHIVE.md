@@ -1,12 +1,14 @@
-# Resolution Archive
+# Resolution Archive - GPS Tracker
 
-...
+## 🏁 Oct15.11: Proximity Debounce Hardening (ISSUE-OCT15.10-F2)
+- **Problem**: Extreme negative values in `Prox Debounce` on A15.
+- **Root Cause**: Typo in `HardwareSuite.kt` prevented field updates, and ignored JNI return codes allowed uninitialized buffer values to propagate.
+- **Resolution**: Fixed assignment typo, implemented JNI result validation, and added safety clamping in `TelemetryMapper.kt` and `HardwareSuite.kt`.
+- **SOT Impact**: Hardened Forensic Diagnostic reliability for A15 hardware.
 
 ## 🏁 Oct15.10: Unit Test Suite Restoration (ISSUE-OCT15.10-F1)
-- **Problem**: The `:app` unit test suite was failing to compile with 29 "Unresolved reference" errors following the SIMP-OCT14.21-S1 architectural refactoring (Pure Mapping Architecture).
-- **Root Cause**: Tests were still attempting to call mapping functions directly on `MainViewModel` after they had been extracted into specialized `object` mappers.
-- **Remediation**: Updated `DashboardContinuityTest.kt`, `MainViewModelMappingTest.kt`, and `UxLogicFormattingTest.kt` to use `DashboardMapper`, `HudMapper`, and `MapStateMapper`. Promoted relevant mapping functions in `HudMapper.kt` to `internal` visibility to allow verification of HUD state sub-components.
-- **Impact**: Restored 100% pass rate for the project unit test suite (88 tests). Ensured that the test suite is aligned with the latest architectural standards.
-- **Files**: `HudMapper.kt`, `DashboardContinuityTest.kt`, `MainViewModelMappingTest.kt`, `UxLogicFormattingTest.kt`.
+- **Problem**: Unit tests failed after Pure Mapping Architecture migration.
+- **Resolution**: Redirected tests to pure mappers, decoupled from ViewModel mocks. Restored Pass Rate to 100%.
 
-...
+---
+*(Earlier entries archived)*

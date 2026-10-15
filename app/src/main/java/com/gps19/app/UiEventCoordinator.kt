@@ -16,12 +16,12 @@ import javax.inject.Singleton
 
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
+ * Oct.15.10:
+ * - ISSUE-OCT15.10-F5: Tracker Restriction. Enforced "Viewer-Only" rule for 
+ *   geofence modifications. Guarded Add/Remove/Clear events and ensured 
+ *   geofenceMode resets to IDLE when entering Tracker mode.
  * Oct.13.21:
- * - SIMP-OCT13.21-S1: Pure Event Architecture. Flattened all specialized 
- *   lambdas into UiEvent bus, including FullInitialization, PhoneSetup, 
- *   and individual Permission/Setting requests.
- * Oct.13.1:
- * - SIMP-OCT12.16-S1: Unified HUD Overlay. Added ClearTrails event routing.
+ * - SIMP-OCT13.21-S1: Pure Event Architecture.
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -98,7 +98,8 @@ class UiEventCoordinator @Inject constructor(
                             appMode = event.mode,
                             appStartTime = newStartTime ?: it.session.appStartTime,
                             isSystemActive = if (event.mode != null) true else it.session.isSystemActive
-                        )
+                        ),
+                        spatial = if (event.mode == "tracker") it.spatial.copy(geofenceMode = GeofenceMode.IDLE) else it.spatial
                     )}
                 }
             }
@@ -196,6 +197,7 @@ class UiEventCoordinator @Inject constructor(
             // --- Spatial & Geofencing ---
             is UiEvent.SetFenceVisible, is UiEvent.SetViolationsVisible, is UiEvent.SetGeofenceViolationsVisible,
             is UiEvent.SetMapButtonsVisible, is UiEvent.SetMapLocked, is UiEvent.SetGeofenceMode -> {
+                if (event is UiEvent.SetGeofenceMode && currentState.session.appMode == "tracker") return
                 onStateUpdate { spatialLogicUseCase.handleMapEvent(event, it) }
             }
 
@@ -213,6 +215,7 @@ class UiEventCoordinator @Inject constructor(
             is UiEvent.MapTap -> handleMapTap(event.point, currentState, scope, onStateUpdate, onCameraAction, onUiEffect)
 
             is UiEvent.AddHomePoint -> {
+                if (currentState.session.appMode != "viewer") return
                 scope.launch(Dispatchers.IO) {
                     val newPoints = spatialLogicUseCase.addHomePoint(event.point)
                     withContext(Dispatchers.Main.immediate) {
@@ -222,6 +225,7 @@ class UiEventCoordinator @Inject constructor(
             }
 
             is UiEvent.RemoveHomePoint -> {
+                if (currentState.session.appMode != "viewer") return
                 scope.launch(Dispatchers.IO) {
                     val newPoints = spatialLogicUseCase.removeHomePoint(event.index)
                     withContext(Dispatchers.Main.immediate) {
@@ -230,10 +234,13 @@ class UiEventCoordinator @Inject constructor(
                 }
             }
 
-            is UiEvent.ClearHomePoints -> scope.launch(Dispatchers.IO) {
-                val newPoints = spatialLogicUseCase.clearHomePoints(currentState.spatial.maxDistance)
-                withContext(Dispatchers.Main.immediate) {
-                    onStateUpdate { it.copy(spatial = it.spatial.copy(homePoints = newPoints)) }
+            is UiEvent.ClearHomePoints -> {
+                if (currentState.session.appMode != "viewer") return
+                scope.launch(Dispatchers.IO) {
+                    val newPoints = spatialLogicUseCase.clearHomePoints(currentState.spatial.maxDistance)
+                    withContext(Dispatchers.Main.immediate) {
+                        onStateUpdate { it.copy(spatial = it.spatial.copy(homePoints = newPoints)) }
+                    }
                 }
             }
 
@@ -376,7 +383,6 @@ class UiEventCoordinator @Inject constructor(
         onDiagnosticUpdate: ((DiagnosticState) -> DiagnosticState) -> Unit,
         onUiEffect: (UiEffect) -> Unit
     ) {
-        // Procedure: Reset -> Save Mode -> Start Service -> Check Setup
         handleEvent(UiEvent.SetManualSelection(true), state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, {}, {}, onUiEffect)
         handleEvent(UiEvent.SetSettlingActive(false), state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, {}, {}, onUiEffect)
         handleEvent(UiEvent.SetAppMode(mode), state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, {}, {}, onUiEffect)

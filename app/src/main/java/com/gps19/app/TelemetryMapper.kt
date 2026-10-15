@@ -6,6 +6,10 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.15.11:
+ * - ISSUE-OCT15.10-F2: Proximity Debounce Hardening. Added safety clamping for 
+ *   proximityDebounceMs in all serialization and mapping paths to prevent 
+ *   overflow/underflow propagation.
  * Oct.15.7:
  * - ISSUE-OCT15.7-F1: Consolidated TrailBuffer mapping logic from MainRepository.
  * Oct.15.6:
@@ -13,6 +17,8 @@ import timber.log.Timber
  *   mapping logic to HistoryBuffer.Companion.fromPoints.
  */
 object TelemetryMapper {
+
+    private fun clampProxDebounce(ms: Long): Long = ms.coerceIn(0L, PROXIMITY_DEBOUNCE_MAX_MS)
 
     /**
      * mapTickToOutputs: Consolidated authority for preparing persistence and 
@@ -72,6 +78,9 @@ object TelemetryMapper {
             this.lastValidFixRt = snapshot.lastValidFixRt
             this.integrity.isSilentFailure = snapshot.integrity.isSilentFailure
             this.integrity.isBatteryWhitelisted = integrity.battery > 0
+            
+            // Oct.15.11: Safety Clamp
+            this.proximityDebounceMs = clampProxDebounce(this.proximityDebounceMs)
         }
 
         updateOut.copyFrom(snapshot)
@@ -117,6 +126,7 @@ object TelemetryMapper {
                 liftIdx = proto.liftIdx
                 tiltIdx = proto.tiltIdx
                 baroIdx = proto.baroIdx
+                proximityDebounceMs = clampProxDebounce(proto.proximityDebounceMs)
             }
 
             integrity.apply {
@@ -241,7 +251,7 @@ object TelemetryMapper {
                 adaptiveVibrationFloor = data.optDouble("adaptive_vibration_floor", current.atmospheric.adaptiveVibrationFloor)
                 proxIdx = data.optDouble("prox_idx", current.atmospheric.proxIdx)
                 proximityCm = data.optDouble("proximity_cm", current.atmospheric.proximityCm)
-                proximityDebounceMs = data.optLong("proximity_debounce_ms", current.atmospheric.proximityDebounceMs)
+                proximityDebounceMs = clampProxDebounce(data.optLong("proximity_debounce_ms", current.atmospheric.proximityDebounceMs))
                 vibrationRollingSum = data.optDouble("vibration_rolling_sum", current.atmospheric.vibrationRollingSum)
                 noiseIdx = data.optDouble("noise_idx", current.atmospheric.noiseIdx)
                 luxIdx = data.optDouble("lux_idx", current.atmospheric.luxIdx)
@@ -352,6 +362,9 @@ object TelemetryMapper {
                 thermalHeadroom = proto.thermalHeadroom
                 heapAllocatedMb = proto.heapAllocatedMb
             }
+            atmospheric.apply {
+                proximityDebounceMs = clampProxDebounce(proto.proximityDebounceMs)
+            }
             
             this.thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
             this.heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
@@ -417,6 +430,7 @@ object TelemetryMapper {
                 liftIdx = data.optDouble("lift_idx", current.atmospheric.liftIdx)
                 tiltIdx = data.optDouble("tilt_idx", current.atmospheric.tiltIdx)
                 baroIdx = data.optDouble("baro_idx", current.atmospheric.baroIdx)
+                proximityDebounceMs = clampProxDebounce(data.optLong("proximity_debounce_ms", current.atmospheric.proximityDebounceMs))
             }
             kinetic.jumpTier = data.optInt("jump_tier", 0)
             integrity.isJammer = data.optBoolean("is_jammer", false)
@@ -502,6 +516,9 @@ object TelemetryMapper {
             isMemoryPressureThrottled = snapshot.isMemoryPressureThrottled,
             activityType = snapshot.activityType
         )
+        // Oct.15.11: Safety Clamp
+        health.proximityDebounceMs = clampProxDebounce(snapshot.proximityDebounceMs)
+        health.proximityCm = snapshot.proximityCm
     }
 
     /**
@@ -543,6 +560,9 @@ object TelemetryMapper {
                 )
                 this.integrity.isLocationPending = true
             }
+            
+            // Oct.15.11: Safety Clamp
+            this.proximityDebounceMs = clampProxDebounce(snapshot.proximityDebounceMs)
         }
     }
 
@@ -586,6 +606,9 @@ object TelemetryMapper {
             this.trackerState = s.trackerState
             this.lastAlarmAckTs = s.lastAlarmAckTs
             this.violationStartTs = s.violationStartTs
+            
+            // Oct.15.11: Safety Clamp
+            this.proximityDebounceMs = clampProxDebounce(s.proximityDebounceMs)
         }
     }
 
@@ -833,6 +856,7 @@ object TelemetryMapper {
                 temp = entity.temp; noiseIdx = entity.noiseIdx; luxIdx = entity.luxIdx
                 vibeIdx = entity.vibeIdx; liftIdx = entity.liftIdx; tiltIdx = entity.tiltIdx
                 baroIdx = entity.baroIdx; proxIdx = entity.proxIdx
+                proximityDebounceMs = clampProxDebounce(entity.proxIdx.toLong()) // Legacy fallback
             }
 
             integrity.apply {

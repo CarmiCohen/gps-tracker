@@ -22,12 +22,11 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.15.10:
+ * - Requirement Restoration: Implemented automatic service resumption on cold start 
+ *   if a prior appMode is detected (ensures "Last Mode" persistence).
  * Oct.15.2:
- * - SIMP-OCT15.1-S1: Primitive History Buffers. Transitioned history flows 
- *   to HistoryBuffer to reduce GC pressure during long sessions.
- * Oct.15.1:
- * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Integrated TrailBuffer into trail flows 
- *   to reduce GC pressure during long tracking sessions.
+ * - SIMP-OCT15.1-S1: Primitive History Buffers.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -235,6 +234,12 @@ class MainViewModel @Inject constructor(
             withContext(Dispatchers.Main.immediate) {
                 applyInitialSettings(initialSettings)
                 
+                // R-ID 242: Last Mode Restoration. Automatically resume service if mode is present.
+                initialSettings.appMode?.let { mode ->
+                    Timber.d("MODE_RESTORE: Resuming service for mode: $mode")
+                    _uiEffects.emit(UiEffect.StartService(mode))
+                }
+
                 hydrationManager.hydrationLevel.onEach { level -> 
                     updateState { it.copy(session = it.session.copy(hydrationLevel = level)) } 
                 }.launchIn(viewModelScope)

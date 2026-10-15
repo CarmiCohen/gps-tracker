@@ -37,15 +37,15 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.15.11:
+ * - ISSUE-OCT15.10-F2: Proximity Debounce Hardening. Fixed proximityIdx assignment 
+ *   typo and added JNI result validation with safety clamping for debounce values.
  * Oct.12.21:
  * - Issue #SIMP-OCT12.17-S1: Periodic GPS Re-Zeroing. Implemented silent background 
  *   GPS provider restart every 6 hours if accuracy remains > 30m to clear thermal drift.
  * Oct.12.18:
  * - Issue #ISSUE-OCT12.13-11: Temporal Jitter Hardening. Integrated AppRole awareness 
  *   into GNSS and sensor audits to prevent cross-role forensic pollution.
- * Oct.12.17:
- * - ISSUE-OCT12.13-3: Implemented automatic recovery from GPS_HARDWARE_LOCK after 10m.
- * - ISSUE-OCT12.13-4: Added interval update debounce to mitigate GPS registration flutter.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -990,9 +990,11 @@ class HardwareSuite @Inject constructor(
                     proximityBatch.rawNear = rawProximityNear
                     proximityBatch.isFlickering = isFlickeringInWindow(nowRt)
                     
-                    nativeFastPathProvider.processProximityBatch(timeProvider, proximityBatch)
-                    proximityIdx = proximityIdx
-                    proximityDebounceMs = proximityBatch.debounceMs
+                    val res = nativeFastPathProvider.processProximityBatch(timeProvider, proximityBatch)
+                    if (res) {
+                        proximityIdx = proximityBatch.nextIdx
+                        proximityDebounceMs = proximityBatch.debounceMs.coerceIn(0L, PROXIMITY_DEBOUNCE_MAX_MS)
+                    }
                     
                     if (proximityBatch.nextRawNear != rawProximityNear) {
                         rawProximityNear = proximityBatch.nextRawNear

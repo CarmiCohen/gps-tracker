@@ -4,6 +4,8 @@ import com.gps19.core.engine.*
 
 /**
  * DashboardMapper: Centralized authority for dashboard state transformations.
+ * Oct.15.11:
+ * - ISSUE-OCT15.10-F2: Proximity Debounce Hardening. Updated engine version string to Oct15.11.
  * Oct.14.21: Extracted from MainViewModel to reduce complexity and improve testability.
  */
 object DashboardMapper {
@@ -31,7 +33,7 @@ object DashboardMapper {
             sinceDiscoMs = if (activeStats.lastDiscTs > 0) (nowRt - activeStats.lastDiscTs) else 0L,
             totalDropMs = activeStats.totalDropMs,
             maxDropMs = activeStats.maxDropMs,
-            engineVersion = "Oct14.21",
+            engineVersion = "Oct15.11",
             netInterface = diag.connectivity.netInterface,
             systemPulse = nowRt,
             isLocalOnline = diag.connectivity.isLocalOnline,
