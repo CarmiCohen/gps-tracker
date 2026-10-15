@@ -11,6 +11,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.15.3:
+ * - SIMP-OCT15.1-S2: Map Rendering Primitive Integration. Transitioned 
+ *   MapTrailSegment to use DoubleArrays to avoid GeoPoint creation in mapper.
  * Oct.15.2:
  * - SIMP-OCT15.1-S1: Primitive History Buffers. Applied TrailBuffer pattern to 
  *   connection history ribbons to reduce GC pressure.
@@ -270,12 +273,32 @@ data class HistoryBuffer(
 
 /**
  * MapTrailSegment: Used for optimized map rendering of trail chunks.
+ * Oct.15.3: Transitioned to primitive arrays to avoid GeoPoint overhead.
  */
 data class MapTrailSegment(
-    val points: List<GeoPoint>,
+    val lats: DoubleArray,
+    val lngs: DoubleArray,
     val color: Int,
     val checksum: Int = 0 
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is MapTrailSegment) return false
+        if (color != other.color) return false
+        if (checksum != other.checksum) return false
+        if (!lats.contentEquals(other.lats)) return false
+        if (!lngs.contentEquals(other.lngs)) return false
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = lats.contentHashCode()
+        result = 31 * result + lngs.contentHashCode()
+        result = 31 * result + color
+        result = 31 * result + checksum
+        return result
+    }
+}
 
 @Serializable
 data class AlertSettings(

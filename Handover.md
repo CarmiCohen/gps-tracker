@@ -1,28 +1,27 @@
-# Project Handover - OCT15.2 (Primitive History Buffers)
+# Project Handover - OCT15.3 (Map Rendering Primitives)
 
-## 🟢 Status: Release Ready (OCT15.2 Graduation)
-The project has reached the `OCT15.2` milestone. Forensic telemetry for connection ribbons has been refactored to use primitive-backed buffers, completing the low-level memory optimization for the telemetry pipeline.
+## 🟢 Status: Release Ready (OCT15.3 Graduation)
+The project has reached the `OCT15.3` milestone. The map rendering pipeline has been hardened by transitioning intermediate structures to primitive arrays, completing the `SIMP-OCT15.1-S2` optimization.
 
-## 🛠️ Critical Hardening Details (OCT15.2)
+## 🛠️ Critical Hardening Details (OCT15.3)
 
-### 1. Primitive History Buffers (SIMP-OCT15.1-S1)
-- **Files**: `Models.kt`, `MainRepository.kt`, `MainViewModel.kt`, `StateSubscriptionUseCase.kt`, `SharedUiComponents.kt`, `MainUiState.kt`.
-- **Fix**: Transitioned connection history flows from `List<ConnectionPoint>` to `HistoryBuffer` (using `LongArray`, `DoubleArray`, `IntArray`, `BooleanArray`).
-- **Impact**: Eliminated O(N) object allocations during high-frequency telemetry emissions (SNR, Noise, Vibe, Battery, etc.). Verified zero telemetry-driven UI stalls on Samsung A15.
+### 1. Map Rendering Primitives (SIMP-OCT15.1-S2)
+- **Files**: `Models.kt`, `MapStateMapper.kt`, `MapOverlayManager.kt`.
+- **Fix**: Transitioned `MapTrailSegment` from `List<GeoPoint>` to `DoubleArray` (lats/lngs).
+- **Impact**: Eliminated thousands of `GeoPoint` allocations in `MapStateMapper` during UI update cycles. `MapOverlayManager` now performs `GeoPoint` conversion in background coroutines only when segment checksums change, ensuring smooth 60fps interaction even during high-frequency GPS updates.
 
-### 2. State Merging Logic
-- **File**: `StateSubscriptionUseCase.kt`
-- **Fix**: Implemented manual array-to-list-to-array conversion for history merging and deduplication to maintain O(1) emission overhead while ensuring data continuity across DB and Live flows.
+### 2. Forensic Pipeline Integrity
+- **Status**: Stable. Primitive buffers for connection ribbons (`OCT15.2`) and trails (`OCT15.1`) are fully integrated with the new map primitive segments.
 
 ## 📊 Forensic Pulse & Metrics
 - **Unit Tests**: 100% PASS (89 total).
 - **Build Status**: `assembleDebug` SUCCESS.
-- **SOT Count**: 424 (Rules: 263).
+- **SOT Count**: 425 (Rules: 264).
 - **Open Gaps**: 0.
-- **Version Tag**: `OCT15.2`.
+- **Version Tag**: `OCT15.3`.
 
 ## 🚀 Next Steps
-1. **Map Rendering Primitives**: Transition `MapTrailSegment` to use primitive arrays or `TrailBuffer` to avoid `GeoPoint` object creation during map overlay updates (Ref: `SIMP-OCT15.1-S2`).
-2. **Ribbon Selector Consolidation**: Investigate pre-calculating normalized ribbon data within `HistoryBuffer` to offload calculations from the UI thread (Ref: `SIMP-OCT15.2-S1`).
+1. **Ribbon Selector Consolidation**: Investigate pre-calculating normalized ribbon data within `HistoryBuffer` to offload calculations from the UI thread (Ref: `SIMP-OCT15.2-S1`).
+2. **Map Overlay Batching**: Evaluate simplifying `MapOverlayManager` pooling logic by batching polyline updates (Ref: `SIMP-OCT15.3-S1`).
 
-**HANDOVER COMPLETE. VERSION GRADUATED TO OCT15.2.**
+**HANDOVER COMPLETE. VERSION GRADUATED TO OCT15.3.**

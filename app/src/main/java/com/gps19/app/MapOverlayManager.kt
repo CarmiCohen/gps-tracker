@@ -26,6 +26,9 @@ import kotlin.math.round
 
 /**
  * MapOverlayManager: Imperative manager for osmdroid overlays and pooling.
+ * Oct.15.3:
+ * - SIMP-OCT15.1-S2: Map Rendering Primitive Integration. Updated updateTrails 
+ *   to handle MapTrailSegment with primitive arrays.
  * Oct.1.5:
  * - Issue #MAP-SOT-01: Migrated legacy ArrayList pools to SnapshotStateList (mutableStateListOf) 
  *   for Compose stability and snapshot integrity.
@@ -272,6 +275,7 @@ class MapOverlayManager(
 
     /**
      * Issue #759b/880/881: Segmented trail update.
+     * Oct.15.3: Updated to handle primitive segments.
      */
     fun updateTrails(
         trackerSegments: List<MapTrailSegment>, 
@@ -295,11 +299,17 @@ class MapOverlayManager(
                         val line = if (idx < trackerPolylinePool.size) trackerPolylinePool[idx] else Polyline(mapView).also { l -> 
                             l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); trackerPolylinePool.add(l) 
                         }
-                        line.setPoints(segment.points)
+                        
+                        // Convert primitives to GeoPoints only when segment data changes
+                        val points = mutableListOf<GeoPoint>()
+                        for (i in 0 until segment.lats.size) {
+                            points.add(GeoPoint(segment.lats[i], segment.lngs[i]))
+                        }
+                        line.setPoints(points)
                         line.outlinePaint.color = segment.color
                         polylines.add(line)
                         
-                        if (segment.points.size > 200 || idx % yieldBatch == 0) yield()
+                        if (segment.lats.size > 200 || idx % yieldBatch == 0) yield()
                     }
                     trailFolder.items.clear()
                     trailFolder.items.addAll(polylines)
@@ -325,11 +335,17 @@ class MapOverlayManager(
                         val line = if (idx < viewerPolylinePool.size) viewerPolylinePool[idx] else Polyline(mapView).also { l -> 
                             l.outlinePaint.strokeWidth = 4f; l.setInfoWindow(null); viewerPolylinePool.add(l) 
                         }
-                        line.setPoints(segment.points)
+                        
+                        // Convert primitives to GeoPoints only when segment data changes
+                        val points = mutableListOf<GeoPoint>()
+                        for (i in 0 until segment.lats.size) {
+                            points.add(GeoPoint(segment.lats[i], segment.lngs[i]))
+                        }
+                        line.setPoints(points)
                         line.outlinePaint.color = segment.color
                         polylines.add(line)
                         
-                        if (segment.points.size > 200 || idx % yieldBatch == 0) yield()
+                        if (segment.lats.size > 200 || idx % yieldBatch == 0) yield()
                     }
                     viewerTrailFolder.items.clear()
                     viewerTrailFolder.items.addAll(polylines)

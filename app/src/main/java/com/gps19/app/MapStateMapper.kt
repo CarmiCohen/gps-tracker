@@ -5,6 +5,9 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MapStateMapper: Pure mapping logic for Map state transitions and trail rendering.
+ * Oct.15.3:
+ * - SIMP-OCT15.1-S2: Map Rendering Primitive Integration. Transitioned 
+ *   computeTrailSegments to use DoubleArrays, avoiding GeoPoint creation in mapper.
  * Oct.15.1:
  * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Updated computeTrailSegments to 
  *   accept TrailBuffer, reducing object overhead during rendering cycles.
@@ -103,37 +106,54 @@ object MapStateMapper {
     }
 
     /**
-     * computeTrailSegments: Optimized trail segmentation using TrailBuffer (SIMP-OCT15.0-S1).
+     * computeTrailSegments: Optimized trail segmentation using TrailBuffer (SIMP-OCT15.3).
+     * Uses primitive arrays to avoid GeoPoint overhead in the mapping logic.
      */
     fun computeTrailSegments(trailBuffer: TrailBuffer, color: Int, nowMs: Long): List<MapTrailSegment> {
         if (trailBuffer.size == 0) return emptyList()
         val segments = mutableListOf<MapTrailSegment>()
-        var currentPoints = mutableListOf<GeoPoint>()
-        var currentIsStale: Boolean? = null
         val slateGray = 0xFF64748B.toInt()
         
-        for (i in 0 until trailBuffer.size) {
-            val ts = trailBuffer.timestamps[i]
-            val lat = trailBuffer.lats[i]
-            val lng = trailBuffer.lngs[i]
-            
-            val age = nowMs - ts
-            val isStale = age > 35000L
-            
-            if (currentIsStale != null && isStale != currentIsStale) {
-                if (currentPoints.isNotEmpty()) {
-                    segments.add(MapTrailSegment(currentPoints.toList(), if (currentIsStale == true) slateGray else color, currentPoints.hashCode()))
-                    val last = currentPoints.last()
-                    currentPoints = mutableListOf(last)
-                }
+        var startIdx = 0
+        var currentIsStale = (nowMs - trailBuffer.timestamps[0]) > 35000L
+
+        for (i in 1 until trailBuffer.size) {
+            val isStale = (nowMs - trailBuffer.timestamps[i]) > 35000L
+            if (isStale != currentIsStale) {
+                // Segment boundary found.
+                val size = i - startIdx
+                val lats = DoubleArray(size)
+                val lngs = DoubleArray(size)
+                System.arraycopy(trailBuffer.lats, startIdx, lats, 0, size)
+                System.arraycopy(trailBuffer.lngs, startIdx, lngs, 0, size)
+                
+                segments.add(MapTrailSegment(
+                    lats = lats,
+                    lngs = lngs,
+                    color = if (currentIsStale) slateGray else color,
+                    checksum = lats.contentHashCode() xor lngs.contentHashCode()
+                ))
+                
+                startIdx = i - 1 // Connect to next segment
+                currentIsStale = isStale
             }
-            currentPoints.add(GeoPoint(lat, lng))
-            currentIsStale = isStale
         }
         
-        if (currentPoints.isNotEmpty()) {
-            segments.add(MapTrailSegment(currentPoints.toList(), if (currentIsStale == true) slateGray else color, currentPoints.hashCode()))
+        // Final segment
+        val size = trailBuffer.size - startIdx
+        if (size > 0) {
+            val lats = DoubleArray(size)
+            val lngs = DoubleArray(size)
+            System.arraycopy(trailBuffer.lats, startIdx, lats, 0, size)
+            System.arraycopy(trailBuffer.lngs, startIdx, lngs, 0, size)
+            segments.add(MapTrailSegment(
+                lats = lats,
+                lngs = lngs,
+                color = if (currentIsStale) slateGray else color,
+                checksum = lats.contentHashCode() xor lngs.contentHashCode()
+            ))
         }
+
         return segments
     }
 }
