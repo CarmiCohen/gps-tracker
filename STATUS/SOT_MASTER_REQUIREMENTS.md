@@ -21,6 +21,7 @@
 *   **1.221 Decoupled Utility Interface (R-ID 746)**: Utility objects (e.g., `MainFileHelper`) MUST be decoupled from `ViewModel` types by accepting functional dependencies and state snapshots, enabling pure unit testing and reducing mock complexity. (Oct14.1 - SIMP-OCT15.10-S1).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 749**: Project-Wide Test Audit - PASSED. Verified all unit, hardening, and stress tests on physical A15 hardware. Confirmed 100% pass rate across :app and :core:engine. (Oct14.1).
 *   **SOT ID 748**: Test State Pre-warming Audit - PASSED. Formalized global state reset/pre-warming in `GpsApplication` and standardized its application across the instrumented test suite to ensure isolation. (Oct14.1 - SIMP-OCT16.3-S1).
 *   **SOT ID 747**: Hydration Stability Audit - PASSED. Resolved timeout stalls on A15 hardware by pre-warming OSM state and extending coroutine grace periods during high-load tests. (Oct14.1 - ISSUE-OCT16.2-F1).
 *   **SOT ID 746**: Test Utility Decoupling - PASSED. Refactored MainFileHelper to use functional dependency injection, eliminating MainViewModel mocks in file utility tests. (Oct14.1 - SIMP-OCT15.10-S1).
@@ -36,6 +37,7 @@
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 31.825 (Full Audit)**: PASSED - Verified 100% unit test pass rate and instrumented hardening suite on A15. Confirmed version Oct14.1 deployment and branding. (Oct14.1).
 *   **Chapter 31.824 (Test State Isolation)**: PASSED - Verified that `resetTestStates()` correctly clears `ShadowCache` and OSM readiness in `HardeningAuditTest`, `ProductionReadinessAuditTest`, and `ForensicStressAuditTest`. Confirmed that standardized pre-warming eliminates intermittent race conditions in CI environments. (Oct14.1).
 *   **Chapter 31.823 (Hydration Load Resilience)**: PASSED - Verified that `LifecycleHydrationManager` reaches Level 11 under 40s of sustained CPU/IO load on Samsung A15. Confirmed that pre-setting `isOsmReady` eliminates the 25s startup stall. (Oct14.1).
 *   **Chapter 31.822 (Utility Decoupling Audit)**: PASSED - Verified that `MainFileHelper` file operations can be unit tested without `MainViewModel`. Demonstrated via `MainFileHelperTest`. (Oct14.1).

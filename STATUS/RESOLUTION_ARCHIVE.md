@@ -1,5 +1,10 @@
 # Resolution Archive
 
+## SOT ID 749: Project-Wide Test Audit
+- **Resolved**: Oct14.1
+- **Description**: Executed full unit test suite, hardening audit tests, and DataStore mutation stress tests on physical A15 hardware. 
+- **Outcome**: Confirmed 100% pass rate across `:app` and `:core:engine` modules. Validated version Oct14.1 deployment stability and role-selection UX branding.
+
 ## SIMP-OCT16.3-S1: Test State Pre-warming
 - **Resolved**: Oct14.1
 - **Description**: Formalized the pattern of pre-warming global `AtomicBoolean` states (like `isOsmReady`) in base application class (`GpsApplication.resetTestStates()`, `prewarmOsmState()`) and standardized its use across instrumented tests (`HydrationStaggeringAuditTest`, `ProductionReadinessAuditTest`, `HardeningAuditTest`, `ForensicStressAuditTest`).
