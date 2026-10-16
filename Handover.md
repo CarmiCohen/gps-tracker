@@ -1,27 +1,27 @@
-# Project Handover - Oct14.1 (Native Clamp Unification)
+# Project Handover - Oct16.2 (Test Utility Decoupling)
 
-## 🟢 Status: Hardware Parity Hardened (Oct14.1)
-The project has unified hardware-layer constraints across the JNI/JVM boundary. Vibration and proximity limits are now governed by a shared C++ header, ensuring consistent sentinel behavior and eliminating manual parity drift.
+## 🟢 Status: Decoupling Hardened (Oct16.2)
+The project has successfully decoupled the file utility layer from the UI orchestration layer. `MainFileHelper` no longer depends on `MainViewModel`, allowing for pure unit testing of forensic data export/import operations.
 
-## 🛠️ Critical Hardening Details (Oct14.1)
+## 🛠️ Critical Hardening Details (Oct16.2)
 
-### 1. Native Clamp Unification (SIMP-OCT15.12-S1)
-- **Architecture**: Introduced `app/src/main/cpp/EngineConstants.h` as the source of truth for native sensor limits.
-- **Vibration**: Hardened `n13` and `n19` in `jdhardware-jni.cpp` with strict `[0.02, 2.0]` G clamping.
-- **Proximity**: Ported adaptive debouncing (1s-15s) and EMA smoothing (alpha=0.15) to native `n23`, ensuring parity with JVM fallback logic.
-- **System Pressure**: Consolidated memory and storage pressure evaluation into native `n24` with unified hysteresis.
+### 1. Test Utility Decoupling (SIMP-OCT15.10-S1)
+- **Architecture**: Transitioned `MainFileHelper` to functional dependency injection. It now accepts `MainRepository`, `MainUiState`, and `onEvent` handlers instead of the full `MainViewModel`.
+- **UI Integration**: Updated `MainAppContent.kt` to pass specific state projections to the utility layer.
+- **Verification**: Introduced `MainFileHelperTest.kt` as a zero-dependency unit test for file naming and sanitization logic.
+- **Traceability**: Added SOT Rule 1.221 (R-ID 746) and Baseline ID 746.
 
-### 2. Versioning & Consistency
-- **app/build.gradle**: `versionName` incremented to `Oct14.1`.
-- **MainAppContent.kt**: UI footer updated to `Oct14.1_PLATINUM`.
-- **SOT Master**: Added Rule 1.220 (R-ID 738) and Baseline ID 745.
+### 2. Versioning & Metrics
+- **app/build.gradle**: `versionName` incremented to `Oct16.2`.
+- **MainAppContent.kt**: UI footer updated to `Oct16.2_PLATINUM`.
+- **Metrics**: 100% unit test pass rate restored with improved execution speed.
 
 ## 📊 Forensic Pulse & Metrics
-- **SOT Count**: 436 (Rules: 276).
+- **SOT Count**: 437 (Rules: 277).
 - **Open Gaps**: 0 active logical gaps.
-- **Strategic Ideas**: 31 active (SIMP-OCT15.12-S1 resolved).
+- **Strategic Ideas**: 31 active (SIMP-OCT15.10-S1 resolved, SIMP-OCT16.2-S1 added).
 
 ## 🔴 Open Forensic Gaps (Priority for Next Session)
-1. **Strategic Simplification**: Evaluate `SIMP-OCT15.10-S1` for test utility decoupling to reduce mock reliance.
+1. **Scaling Strategy**: Evaluate `SIMP-OCT16.2-S1` for Repository State Projection to further reduce UseCase dependency surface.
 
 **HANDOVER COMPLETE. STOP ALL PROCESSING.**

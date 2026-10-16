@@ -8,11 +8,12 @@
 ---
 
 ## 💡 Strategic Simplification Ideas (Ideas: 31)
-*   **SIMP-OCT15.10-S1: Test Utility Decoupling (Low).** Many tests currently rely on `mock<MainViewModel>` even when testing pure mappers. Transitioning these to pure unit tests without ViewModel mocks would reduce test execution time and fragility.
+*   **SIMP-OCT16.2-S1: Repository State Projection (Low).** Consider extracting a `StateProvider` interface from `MainRepository` to allow UseCases to observe specific sub-states without full repository access.
 
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **SIMP-OCT15.10-S1: Test Utility Decoupling.** Resolved Oct14.1. Decoupled `MainFileHelper` and related test suites from `MainViewModel` by utilizing functional dependency injection and state snapshots. Introduced pure unit testing for file operations. (SOT ID 746).
 *   **SIMP-OCT15.12-S1: Native Clamp Unification.** Resolved Oct14.1. Unified hardware-layer constraints (vibration floors, proximity debouncing) across JNI and JVM by introducing `EngineConstants.h`. Ported adaptive proximity logic to native fast-path for identical boundary behavior. Eliminated magic numbers and manual parity drift.
 *   **SIMP-OCT15.21-S1: Immutable Ribbon Normals.** Resolved Oct14.1. Moved ribbon normalization logic from UI-thread buffers to the ingestion point in `TelemetryMapper`. Introduced `RibbonNormals` container in `ConnectionPoint` to ensure all history points carry pre-calculated, immutable norms. Eliminated redundant UI-thread calculations across 18 analytical ribbons.
 *   **SIMP-OCT15.20-S1: Animation Controller Composition.** Resolved Oct14.1. Centralized Mali animation gating using `LocalAnimationGating` and specialized Composable wrappers (`gatedAnimateFloatAsState`, `gatedInfinitePulse`). Eliminated redundant parameter propagation across 12 UI components and ensured architectural consistency.
@@ -28,5 +29,5 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct14.1: [SOT Count: 437 (Rules: 277), Open: H:0, M:0, L:0, Ideas: H:0, M:11, L:20, Testing: 18 (Sub-items: 128), QA: 338]**
 - **Oct14.1: [SOT Count: 436 (Rules: 276), Open: H:0, M:0, L:0, Ideas: H:0, M:11, L:20, Testing: 17 (Sub-items: 127), QA: 337]**
-- **Oct14.1: [SOT Count: 435 (Rules: 275), Open: H:0, M:0, L:0, Ideas: H:0, M:11, L:20, Testing: 17 (Sub-items: 127), QA: 337]**

@@ -1,5 +1,10 @@
 # Resolution Archive
 
+## SIMP-OCT15.10-S1: Test Utility Decoupling
+- **Resolved**: Oct14.1
+- **Description**: Decoupled utility objects (specifically `MainFileHelper`) from the `MainViewModel` by utilizing functional dependency injection and state snapshots. 
+- **Outcome**: Enabled pure unit testing for file import/export operations and reduced overall mock complexity in the test suite. Restored architectural separation between UI-orchestration and file system utilities. (SOT ID 746).
+
 ## SIMP-OCT15.12-S1: Native Clamp Unification
 - **Resolved**: Oct14.1
 - **Description**: Unified hardware-layer constraints (vibration floors, proximity debouncing) across JNI and JVM by introducing `EngineConstants.h`. Ported adaptive proximity logic to native fast-path for identical boundary behavior.

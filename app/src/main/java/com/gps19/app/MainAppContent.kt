@@ -38,14 +38,10 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.16.2:
+ * - SIMP-OCT15.10-S1: Updated MainFileHelper call sites to support decoupling.
  * Oct.16.1:
  * - Updated version tag to Oct16.1_PLATINUM.
- * Oct.16.0:
- * - Updated version tag to Oct16.0_PLATINUM.
- * Oct.15.21:
- * - SIMP-OCT15.20-S1: Animation Controller Composition. Integrated 
- *   LocalAnimationGating into GpsTrackerTheme to centralize Mali GPU 
- *   anomaly handling. Updated version tag to Oct15.21_PLATINUM.
  */
 @Composable
 fun MainAppContent(
@@ -126,7 +122,7 @@ fun MainAppContent(
 
                 Column(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)) {
                     Text("UI_READY", color = Color.Green.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text("Oct16.1_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
+                    Text("Oct16.2_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
                 }
             }
         }
@@ -176,8 +172,12 @@ private fun AppEffectAggregator(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> uri?.let { MainFileHelper.importConfig(activity, viewModel, uri) } }
-    val importTrailLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> MainFileHelper.importTrails(activity, viewModel, uris) }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> 
+        uri?.let { MainFileHelper.importConfig(activity, viewModel.uiState.value.session.appMode, { viewModel.onEvent(it) }, uri) } 
+    }
+    val importTrailLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> 
+        MainFileHelper.importTrails(activity, viewModel.repository, { viewModel.onEvent(it) }, uris) 
+    }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -204,9 +204,9 @@ private fun AppEffectAggregator(
                 is UiEffect.ShowToast -> Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
                 is UiEffect.ShowBackgroundDisclosure -> onShowBackgroundDisclosure()
                 
-                UiEffect.LaunchTrailExport -> MainFileHelper.manualExportTrails(activity, viewModel, viewModel.timeProvider)
+                UiEffect.LaunchTrailExport -> MainFileHelper.manualExportTrails(activity, viewModel.uiState.value, viewModel.repository, viewModel.timeProvider)
                 UiEffect.LaunchTrailImport -> importTrailLauncher.launch("application/json")
-                UiEffect.LaunchLogExport -> MainFileHelper.manualExportLogs(activity, viewModel, viewModel.timeProvider)
+                UiEffect.LaunchLogExport -> MainFileHelper.manualExportLogs(activity, viewModel.uiState.value, viewModel.repository, viewModel.timeProvider)
                 UiEffect.LaunchConfigImport -> importLauncher.launch("application/json")
                 UiEffect.LaunchFullInitialization -> viewModel.fullInitialization(activity)
                 

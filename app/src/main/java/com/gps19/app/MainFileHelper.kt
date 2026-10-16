@@ -21,12 +21,12 @@ import timber.log.Timber
 
 /**
  * MainFileHelper: Handles importing and exporting configuration and telemetry data.
+ * Oct.16.2:
+ * - SIMP-OCT15.10-S1: Test Utility Decoupling. Decoupled from MainViewModel to 
+ *   support pure unit testing. Now accepts functional dependencies (onEvent, repository).
  * Oct.15.1:
  * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Updated to handle TrailBuffer 
  *   primitive arrays during export to maintain low memory footprint.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
- *   TimeProvider API and fixed property invocation errors.
  */
 object MainFileHelper {
 
@@ -44,7 +44,7 @@ object MainFileHelper {
         return prefix + baseName.replace("_system", "")
     }
 
-    fun importConfig(context: Context, viewModel: MainViewModel, uri: Uri) {
+    fun importConfig(context: Context, appMode: String?, onEvent: (UiEvent) -> Unit, uri: Uri) {
         try {
             val content = context.contentResolver.openInputStream(uri)?.use { stream ->
                 BufferedReader(InputStreamReader(stream)).readText()
@@ -54,7 +54,7 @@ object MainFileHelper {
                         else if (json.has("settings_snapshot")) json.getJSONObject("settings_snapshot") 
                         else json
             
-            val isTrackerMode = viewModel.uiState.value.appMode == "tracker"
+            val isTrackerMode = appMode == "tracker"
             
             var deviceId: String? = null
             var viewerId: String? = null
@@ -107,7 +107,7 @@ object MainFileHelper {
                 )
             }
             
-            viewModel.onEvent(UiEvent.BulkUpdateSettings(
+            onEvent(UiEvent.BulkUpdateSettings(
                 deviceId = deviceId,
                 viewerId = viewerId,
                 relayUrl = relayUrl,
@@ -123,12 +123,11 @@ object MainFileHelper {
         }
     }
 
-    fun importTrails(context: Context, viewModel: MainViewModel, uris: List<Uri>) {
+    fun importTrails(context: Context, repository: MainRepository, onEvent: (UiEvent) -> Unit, uris: List<Uri>) {
         if (uris.isEmpty()) return
         
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val repository = viewModel.repository
                 var totalPoints = 0
                 var filesSuccess = 0
 
@@ -190,7 +189,7 @@ object MainFileHelper {
                 
                 withContext(Dispatchers.Main) {
                     Toast.makeText(context, "Restored $totalPoints points from $filesSuccess files", Toast.LENGTH_SHORT).show()
-                    viewModel.onEvent(UiEvent.LogAction("user", "USER ACTION: Imported $filesSuccess trail files ($totalPoints points accumulated)", true))
+                    onEvent(UiEvent.LogAction("user", "USER ACTION: Imported $filesSuccess trail files ($totalPoints points accumulated)", true))
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
@@ -201,26 +200,25 @@ object MainFileHelper {
         }
     }
 
-    fun manualExportLogs(context: Context, viewModel: MainViewModel, timeProvider: TimeProvider) {
+    fun manualExportLogs(context: Context, uiState: MainUiState, repository: MainRepository, timeProvider: TimeProvider) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val state = viewModel.uiState.value
-                val deviceId = state.deviceId
-                val appMode = state.appMode
+                val deviceId = uiState.deviceId
+                val appMode = uiState.appMode
                 val settings = JSONObject().apply {
-                    put("deviceId", state.deviceId)
-                    put("viewerId", state.viewerId)
-                    put("relayUrl", state.relayUrl)
-                    put("maxDistance", state.maxDistance)
+                    put("deviceId", uiState.deviceId)
+                    put("viewerId", uiState.viewerId)
+                    put("relayUrl", uiState.relayUrl)
+                    put("maxDistance", uiState.maxDistance)
                     put("role", appMode)
                     put("home_points", JSONArray().apply {
-                        state.homePoints.forEach { pt ->
+                        uiState.homePoints.forEach { pt ->
                             put(JSONObject().apply { put("lat", pt.latitude); put("lng", pt.longitude) })
                         }
                     })
                 }
 
-                val logs = viewModel.repository.eventLogsFlow(LOG_LIMIT_STANDARD).first()
+                val logs = repository.eventLogsFlow(LOG_LIMIT_STANDARD).first()
                 val root = JSONObject().apply {
                     put("exported_at", timeProvider.currentTimeMillis)
                     put("role", appMode)
@@ -244,22 +242,21 @@ object MainFileHelper {
         }
     }
 
-    fun manualExportConfig(context: Context, viewModel: MainViewModel, timeProvider: TimeProvider) {
+    fun manualExportConfig(context: Context, uiState: MainUiState, timeProvider: TimeProvider) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val state = viewModel.uiState.value
-                val deviceId = state.deviceId
-                val alertSettings = state.alertSettings
-                val appMode = state.appMode
+                val deviceId = uiState.deviceId
+                val alertSettings = uiState.alertSettings
+                val appMode = uiState.appMode
                 
                 val settingsJson = JSONObject().apply {
-                    put("deviceId", state.deviceId)
-                    put("viewerId", state.viewerId)
-                    put("relayUrl", state.relayUrl)
-                    put("maxDistance", state.maxDistance)
+                    put("deviceId", uiState.deviceId)
+                    put("viewerId", uiState.viewerId)
+                    put("relayUrl", uiState.relayUrl)
+                    put("maxDistance", uiState.maxDistance)
                     put("role", appMode)
                     put("home_points", JSONArray().apply {
-                        state.homePoints.forEach { pt ->
+                        uiState.homePoints.forEach { pt ->
                             put(JSONObject().apply { put("lat", pt.latitude); put("lng", pt.longitude) })
                         }
                     })
@@ -309,14 +306,13 @@ object MainFileHelper {
         }
     }
 
-    fun manualExportTrails(context: Context, viewModel: MainViewModel, timeProvider: TimeProvider) {
+    fun manualExportTrails(context: Context, uiState: MainUiState, repository: MainRepository, timeProvider: TimeProvider) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val state = viewModel.uiState.value
-                val deviceId = state.deviceId
-                val trackerTrail = viewModel.repository.trackerTrailFlow.first()
-                val viewerTrail = viewModel.repository.viewerTrailFlow.first()
-                val appMode = state.appMode
+                val deviceId = uiState.deviceId
+                val trackerTrail = repository.trackerTrailFlow.first()
+                val viewerTrail = repository.viewerTrailFlow.first()
+                val appMode = uiState.appMode
 
                 if (trackerTrail.size == 0 && viewerTrail.size == 0) {
                     withContext(Dispatchers.Main) {
