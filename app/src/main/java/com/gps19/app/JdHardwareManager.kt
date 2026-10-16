@@ -39,14 +39,14 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.16.10:
+ * - ISSUE-OCT16.9-F2: Vibration NaN Hardening. Fixed shared buffer alignment for 
+ *   vibration, acoustic, proximity, and pressure batches. Ensured all 8-byte 
+ *   crossings (Double/Long) are 8-byte aligned to prevent data corruption.
  * Oct.12.1:
  * - Issue #SIMP-1012-1: Forensic Buffer Optimization. Added 'audit' parameter to 
  *   processVibrationBatchNative to reduce LatencyMonitor overhead during 100Hz 
  *   sampling.
- * Oct.11.2:
- * - Issue #SIMP-1011-10: Acoustic Floor Contraction Audit. Updated n10 to support 
- *   temporal contraction parameters (contractionEma, floorMin) and added decay 
- *   logic to evaluateFastPath/processAcousticBatch for parity with LocationSentinel.
  */
 object JdHardwareManager {
 
@@ -308,6 +308,7 @@ object JdHardwareManager {
 
     /**
      * processVibrationBatchNative: Consolidated JNI vibration path (Oct.12.1).
+     * Oct.16.10: Aligned offsets for 8-byte boundary safety.
      * @param audit If true, enables LatencyMonitor auditing for forensic tracing.
      */
     fun processVibrationBatchNative(timeProvider: TimeProvider, batch: VibrationBatch, audit: Boolean = true): Boolean {
@@ -316,22 +317,23 @@ object JdHardwareManager {
         val block = {
             synchronized(sharedStateBuffer) {
                 sharedStateBuffer.clear()
-                sharedStateBuffer.putDouble(batch.x)
-                sharedStateBuffer.putDouble(batch.y)
-                sharedStateBuffer.putDouble(batch.z)
-                sharedStateBuffer.putDouble(batch.lx)
-                sharedStateBuffer.putDouble(batch.ly)
-                sharedStateBuffer.putDouble(batch.lz)
-                sharedStateBuffer.putDouble(batch.adaptiveFloor)
-                sharedStateBuffer.putDouble(batch.cpuLoad)
-                sharedStateBuffer.putInt(if (batch.isWarming) 1 else 0)
-                sharedStateBuffer.putDouble(batch.lastRawVibe)
-                sharedStateBuffer.putDouble(batch.lastHpfValue)
-                sharedStateBuffer.putDouble(batch.currentEnergy)
-                sharedStateBuffer.putDouble(batch.snr)
-                sharedStateBuffer.putDouble(batch.thermal)
-                sharedStateBuffer.putDouble(batch.heap)
-                sharedStateBuffer.putLong(batch.nowRt)
+                sharedStateBuffer.putDouble(batch.x) // 0
+                sharedStateBuffer.putDouble(batch.y) // 8
+                sharedStateBuffer.putDouble(batch.z) // 16
+                sharedStateBuffer.putDouble(batch.lx) // 24
+                sharedStateBuffer.putDouble(batch.ly) // 32
+                sharedStateBuffer.putDouble(batch.lz) // 40
+                sharedStateBuffer.putDouble(batch.adaptiveFloor) // 48
+                sharedStateBuffer.putDouble(batch.cpuLoad) // 56
+                sharedStateBuffer.putInt(if (batch.isWarming) 1 else 0) // 64
+                sharedStateBuffer.putInt(0) // 68: PADDING for 8-byte alignment
+                sharedStateBuffer.putDouble(batch.lastRawVibe) // 72
+                sharedStateBuffer.putDouble(batch.lastHpfValue) // 80
+                sharedStateBuffer.putDouble(batch.currentEnergy) // 88
+                sharedStateBuffer.putDouble(batch.snr) // 96
+                sharedStateBuffer.putDouble(batch.thermal) // 104
+                sharedStateBuffer.putDouble(batch.heap) // 112
+                sharedStateBuffer.putLong(batch.nowRt) // 120
                 
                 val res = n19()
                 if (res == 0) {
@@ -342,9 +344,10 @@ object JdHardwareManager {
                     batch.isStationary = sharedStateBuffer.getInt(160) != 0
                     batch.isSuspiciousNoise = sharedStateBuffer.getInt(164) != 0
                     batch.isMemoryPressureThrottled = sharedStateBuffer.getInt(168) != 0
-                    batch.stationaryDuration = sharedStateBuffer.getLong(172)
-                    batch.muzzleResetTriggered = sharedStateBuffer.getInt(180) != 0
-                    batch.isJammingCandidate = sharedStateBuffer.getInt(184) != 0
+                    // Padding at 172
+                    batch.stationaryDuration = sharedStateBuffer.getLong(176)
+                    batch.muzzleResetTriggered = sharedStateBuffer.getInt(184) != 0
+                    batch.isJammingCandidate = sharedStateBuffer.getInt(188) != 0
                     true
                 } else false
             }
@@ -412,7 +415,7 @@ object JdHardwareManager {
 
     /**
      * processAcousticBatchNative: Consolidated JNI audio path (Issue #SIMP-1011-2).
-     * Includes Kotlin fallback to ensure consistent dB calculation and spike evaluation.
+     * Oct.16.10: Aligned offsets for 8-byte boundary safety.
      */
     fun processAcousticBatchNative(timeProvider: TimeProvider, batch: AcousticBatch, buffer: ShortArray): Boolean {
         if (isLibraryLoaded.get()) {
@@ -425,18 +428,21 @@ object JdHardwareManager {
             ) {
                 synchronized(sharedStateBuffer) {
                     sharedStateBuffer.clear()
-                    sharedStateBuffer.putInt(batch.readCount)
-                    sharedStateBuffer.putDouble(batch.baseAlpha)
-                    sharedStateBuffer.putDouble(batch.vibrationRollingSum)
-                    sharedStateBuffer.putLong(batch.nowRt)
-                    sharedStateBuffer.putInt(if (batch.isWarming) 1 else 0)
+                    sharedStateBuffer.putInt(batch.readCount) // 0
+                    sharedStateBuffer.putInt(0) // 4: PADDING
+                    sharedStateBuffer.putDouble(batch.baseAlpha) // 8
+                    sharedStateBuffer.putDouble(batch.vibrationRollingSum) // 16
+                    sharedStateBuffer.putLong(batch.nowRt) // 24
+                    sharedStateBuffer.putInt(if (batch.isWarming) 1 else 0) // 32
                     
                     val res = n22(buffer)
                     if (res == 0) {
                         batch.maxAmp = sharedStateBuffer.getInt(128)
-                        batch.db = sharedStateBuffer.getDouble(132)
-                        batch.isSpike = sharedStateBuffer.getInt(140) != 0
-                        batch.lastSpikeRt = sharedStateBuffer.getLong(144)
+                        // 132 Padding
+                        batch.db = sharedStateBuffer.getDouble(136)
+                        batch.isSpike = sharedStateBuffer.getInt(144) != 0
+                        // 148 Padding
+                        batch.lastSpikeRt = sharedStateBuffer.getLong(152)
                         true
                     } else false
                 }
@@ -463,7 +469,7 @@ object JdHardwareManager {
 
     /**
      * processProximityBatchNative: Consolidated JNI proximity path (Issue #SIMP-1011-3).
-     * Includes Kotlin fallback to ensure consistent index calculation and debouncing.
+     * Oct.16.10: Aligned offsets for 8-byte boundary safety.
      */
     fun processProximityBatchNative(timeProvider: TimeProvider, batch: ProximityBatch): Boolean {
         if (isLibraryLoaded.get()) {
@@ -476,21 +482,24 @@ object JdHardwareManager {
             ) {
                 synchronized(sharedStateBuffer) {
                     sharedStateBuffer.clear()
-                    sharedStateBuffer.putDouble(batch.distance)
-                    sharedStateBuffer.putDouble(batch.maxRange)
-                    sharedStateBuffer.putLong(batch.nowRt)
-                    sharedStateBuffer.putInt(if (batch.isStationary) 1 else 0)
-                    sharedStateBuffer.putLong(batch.stationaryDurationMs)
-                    sharedStateBuffer.putInt(if (batch.isHighLoad) 1 else 0)
-                    sharedStateBuffer.putDouble(batch.currentIdx)
-                    sharedStateBuffer.putInt(if (batch.rawNear) 1 else 0)
-                    sharedStateBuffer.putInt(if (batch.isFlickering) 1 else 0)
+                    sharedStateBuffer.putDouble(batch.distance) // 0
+                    sharedStateBuffer.putDouble(batch.maxRange) // 8
+                    sharedStateBuffer.putLong(batch.nowRt) // 16
+                    sharedStateBuffer.putInt(if (batch.isStationary) 1 else 0) // 24
+                    sharedStateBuffer.putInt(0) // 28: PADDING
+                    sharedStateBuffer.putLong(batch.stationaryDurationMs) // 32
+                    sharedStateBuffer.putInt(if (batch.isHighLoad) 1 else 0) // 40
+                    sharedStateBuffer.putInt(0) // 44: PADDING
+                    sharedStateBuffer.putDouble(batch.currentIdx) // 48
+                    sharedStateBuffer.putInt(if (batch.rawNear) 1 else 0) // 56
+                    sharedStateBuffer.putInt(if (batch.isFlickering) 1 else 0) // 60
                     
                     val res = n23()
                     if (res == 0) {
                         batch.nextIdx = sharedStateBuffer.getDouble(128)
                         batch.nextRawNear = sharedStateBuffer.getInt(136) != 0
-                        batch.debounceMs = sharedStateBuffer.getLong(140)
+                        // 140 Padding
+                        batch.debounceMs = sharedStateBuffer.getLong(144)
                         true
                     } else false
                 }
@@ -541,14 +550,14 @@ object JdHardwareManager {
             ) {
                 synchronized(sharedStateBuffer) {
                     sharedStateBuffer.clear()
-                    sharedStateBuffer.putDouble(batch.heapMb)
-                    sharedStateBuffer.putDouble(batch.memPressureThresholdMb)
-                    sharedStateBuffer.putDouble(batch.memCriticalThresholdMb)
-                    sharedStateBuffer.putDouble(batch.memHysteresisOffsetMb)
-                    sharedStateBuffer.putDouble(batch.storageAvailableMb)
-                    sharedStateBuffer.putDouble(batch.storageLowThresholdMb)
-                    sharedStateBuffer.putDouble(batch.storageCriticalThresholdMb)
-                    sharedStateBuffer.putDouble(batch.storageHysteresisOffsetMb)
+                    sharedStateBuffer.putDouble(batch.heapMb) // 0
+                    sharedStateBuffer.putDouble(batch.memPressureThresholdMb) // 8
+                    sharedStateBuffer.putDouble(batch.memCriticalThresholdMb) // 16
+                    sharedStateBuffer.putDouble(batch.memHysteresisOffsetMb) // 24
+                    sharedStateBuffer.putDouble(batch.storageAvailableMb) // 32
+                    sharedStateBuffer.putDouble(batch.storageLowThresholdMb) // 40
+                    sharedStateBuffer.putDouble(batch.storageCriticalThresholdMb) // 48
+                    sharedStateBuffer.putDouble(batch.storageHysteresisOffsetMb) // 56
                     
                     val res = n24()
                     if (res == 0) {

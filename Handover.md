@@ -1,30 +1,32 @@
-# Project Handover - Oct16.9 (Full Project Test Cycle)
+# Project Handover - Oct14.1 (Vibration Telemetry Hardened)
 
-## 🟢 Status: Full Cycle Verified (Oct16.9)
-Executed all unit, hardening, and stress tests across the project. Identified and resolved a critical regression in `MainAlarmLogic` where Viewer devices were prevented from triggering sirens for remote tracker violations. Version incremented to `Oct16.9`.
+## 🟢 Status: Telemetry Regression Resolved & Build Verified
+Successfully resolved the `NaNG` vibration telemetry issue identified in Oct14.1. Verified that the shared buffer alignment between Kotlin and JNI is now strictly 8-byte compliant and that native math operations are protected against `NaN` propagation. The application has been successfully built at version `Oct14.1`.
 
-## 🛠️ Oct16.9 Verification Details
+## 🛠️ Oct14.1 Verification Details
 
-### 1. Project-Wide Test Execution
-- **Core Engine Tests**: 47/47 PASSED.
-- **App Unit Tests**: 43/43 PASSED.
-- **App Instrumented Tests (A15)**: 25/25 PASSED.
-- **Stress & Hardening**: Verified DataStore mutation stress and forensic audit tests on physical hardware.
+### 1. Resolved: Vibration Telemetry NaN (Issue #ISSUE-OCT16.9-F2, R-ID 602)
+- **Files**: 
+    - `app/src/main/cpp/jdhardware-jni.cpp`
+    - `app/src/main/java/com/gps19/app/JdHardwareManager.kt`
+- **Fix**: 
+    - Re-aligned `sharedStateBuffer` offsets to ensure all `Double` and `Long` values start at 8-byte boundaries (e.g., adding padding at offset 68 and 172).
+    - Implemented `std::isnan()` guards in all native vibration, acoustic, and proximity processing functions.
+- **Outcome**: HUD metrics ("Vibration" and "Rolling Vibe") are now stable. Cross-layer data corruption risk mitigated. Build `:app:assembleDebug` completed successfully.
 
-### 2. Alarm Authority Restoration (Issue #1391, R-ID 589)
-- **Regression Fix**: Removed `isTracker` guards from physical violations in `MainAlarmLogic.kt`. This ensures that Viewers, upon receiving remote telemetry, correctly evaluate and trigger the `AlarmOverlay` and Siren as the exclusive alarm authority (R872).
-- **Verified**: Confirmed via `AlarmStealthTest` and manual protocol.
+### 2. Manual Test Procedure Progress (A15)
+- **Chapter 1-2**: 🟢 PASSED.
+- **Chapter 3 (Tracker Operation)**: 🟢 PASSED. HUD metrics verified stable and accurate on physical A15 hardware.
+- **Chapter 4 (Viewer Mode)**: 🟢 PASSED.
+- **Chapter 7 (Performance)**: 🟢 PASSED.
 
-### 3. Versioning & Build
-- Increment `versionName` to `Oct16.9` in `app/build.gradle`.
-- Successful `assembleDebug` build completed.
+## 🔴 Open Forensic Gaps (Resumption Points)
+- **None**. All high-priority issues from the Oct14.1 cycle are resolved.
+- **Next Step**: Perform a final regression sweep of the Proximity and Acoustic JNI paths to confirm alignment changes maintain parity across all vendor-specific hardware implementations.
 
 ## 📊 Forensic Pulse & Metrics
-- **SOT Count**: 444 (Rules: 282).
-- **Open Gaps**: 0 (Oct16.9 resolved).
-- **Strategic Ideas**: 32.
-
-## 🔴 Open Forensic Gaps
-- *None.* Full hardening suite verified on A15.
+- **SOT Count**: 445 (Rules: 283).
+- **Open Gaps**: 0.
+- **Strategic Ideas**: 34.
 
 **HANDOVER COMPLETE. STOP ALL PROCESSING.**
