@@ -4,6 +4,8 @@ import com.gps19.core.engine.*
 
 /**
  * DashboardMapper: Centralized authority for dashboard state transformations.
+ * Oct.16.2:
+ * - SIMP-OCT15.10-S1: Test Utility Decoupling. Updated engine version string to Oct16.2.
  * Oct.15.20:
  * - ISSUE-OCT15.20-F1: HUD Animation Gating. Updated engine version string to Oct15.20.
  * Oct.15.12:
@@ -35,7 +37,7 @@ object DashboardMapper {
             sinceDiscoMs = if (activeStats.lastDiscTs > 0) (nowRt - activeStats.lastDiscTs) else 0L,
             totalDropMs = activeStats.totalDropMs,
             maxDropMs = activeStats.maxDropMs,
-            engineVersion = "Oct15.20",
+            engineVersion = "Oct16.2",
             netInterface = diag.connectivity.netInterface,
             systemPulse = nowRt,
             isLocalOnline = diag.connectivity.isLocalOnline,

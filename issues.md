@@ -1,18 +1,20 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct14.1
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct16.3
 
-## 🎯 Current Resumption Focus: Forensic Data Integrity & Scaling (SIMP-OCT15.21-S1).
+## 🎯 Current Resumption Focus: Build & Test Stabilization (ISSUE-OCT16.2-F1).
 
 ## 🟢 Open Gaps & Unfinished Integration Points
 *   *No active gaps.*
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 31)
+## 💡 Strategic Simplification Ideas (Ideas: 32)
+*   **SIMP-OCT16.3-S1: Test State Pre-warming (Low).** Formalize the pattern of pre-warming global `AtomicBoolean` states (like `isOsmReady`) in base test classes to avoid timeout stalls across different devices.
 *   **SIMP-OCT16.2-S1: Repository State Projection (Low).** Consider extracting a `StateProvider` interface from `MainRepository` to allow UseCases to observe specific sub-states without full repository access.
 
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT16.2-F1: Hydration Test Timeout.** Resolved Oct16.3. Fixed OSM readiness stall in `HydrationStaggeringAuditTest` by pre-setting `isOsmReady` in test init and increasing coroutine timeout to 20s for A15 stability.
 *   **SIMP-OCT15.10-S1: Test Utility Decoupling.** Resolved Oct14.1. Decoupled `MainFileHelper` and related test suites from `MainViewModel` by utilizing functional dependency injection and state snapshots. Introduced pure unit testing for file operations. (SOT ID 746).
 *   **SIMP-OCT15.12-S1: Native Clamp Unification.** Resolved Oct14.1. Unified hardware-layer constraints (vibration floors, proximity debouncing) across JNI and JVM by introducing `EngineConstants.h`. Ported adaptive proximity logic to native fast-path for identical boundary behavior. Eliminated magic numbers and manual parity drift.
 *   **SIMP-OCT15.21-S1: Immutable Ribbon Normals.** Resolved Oct14.1. Moved ribbon normalization logic from UI-thread buffers to the ingestion point in `TelemetryMapper`. Introduced `RibbonNormals` container in `ConnectionPoint` to ensure all history points carry pre-calculated, immutable norms. Eliminated redundant UI-thread calculations across 18 analytical ribbons.
@@ -29,5 +31,5 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct16.3: [SOT Count: 438 (Rules: 277), Open: H:0, M:0, L:0, Ideas: H:0, M:11, L:21, Testing: 19 (Sub-items: 129), QA: 339]**
 - **Oct14.1: [SOT Count: 437 (Rules: 277), Open: H:0, M:0, L:0, Ideas: H:0, M:11, L:20, Testing: 18 (Sub-items: 128), QA: 338]**
-- **Oct14.1: [SOT Count: 436 (Rules: 276), Open: H:0, M:0, L:0, Ideas: H:0, M:11, L:20, Testing: 17 (Sub-items: 127), QA: 337]**

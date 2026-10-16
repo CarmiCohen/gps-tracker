@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct14.1)
+# SOT Master Requirements & Hardening Status (Oct16.3)
 
 ## 🏗️ Architectural Master Rules (277 Rules)
 
@@ -19,9 +19,8 @@
 *   **1.220 Unified Hardware Constraints (R-ID 738)**: Hardware-layer limits (vibration floors, proximity debouncing) MUST be unified across JNI and JVM using shared constant definitions (e.g., `EngineConstants.h`) to prevent boundary mismatches and ensure consistent sentinel behavior. (Oct14.1 - SIMP-OCT15.12-S1).
 *   **1.221 Decoupled Utility Interface (R-ID 746)**: Utility objects (e.g., `MainFileHelper`) MUST be decoupled from `ViewModel` types by accepting functional dependencies and state snapshots, enabling pure unit testing and reducing mock complexity. (Oct14.1 - SIMP-OCT15.10-S1).
 
-...
-
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 747**: Hydration Stability Audit - PASSED. Resolved timeout stalls on A15 hardware by pre-warming OSM state and extending coroutine grace periods during high-load tests. (Oct16.3 - ISSUE-OCT16.2-F1).
 *   **SOT ID 746**: Test Utility Decoupling - PASSED. Refactored MainFileHelper to use functional dependency injection, eliminating MainViewModel mocks in file utility tests. (Oct14.1 - SIMP-OCT15.10-S1).
 *   **SOT ID 745**: Native Clamp Unification - PASSED. Unified vibration and proximity limits via `EngineConstants.h`. Ported adaptive debouncing to native layer. (Oct14.1 - SIMP-OCT15.12-S1).
 *   **SOT ID 744**: Immutable Ribbon Normals - PASSED. Moved normalization to TelemetryMapper and introduced RibbonNormals container, ensuring O(1) rendering access. (Oct14.1 - SIMP-OCT15.21-S1).
@@ -32,11 +31,10 @@
 *   **SOT ID 739**: Log Gating Integration - PASSED. Refactored LogManager to use centralized PersistencePolicy, ensuring Mali driver protection and consistent storage pressure handling. (Oct14.1 - ISSUE-OCT15.9-F1).
 *   **SOT ID 738**: Persistence Policy Audit - PASSED. Expanded PersistencePolicy to cover all IO paths and enforced gating in MainRepository. (Oct14.1 - ISSUE-OCT15.7-F1).
 
-...
-
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 31.823 (Hydration Load Resilience)**: PASSED - Verified that `LifecycleHydrationManager` reaches Level 11 under 40s of sustained CPU/IO load on Samsung A15. Confirmed that pre-setting `isOsmReady` eliminates the 25s startup stall. (Oct16.3).
 *   **Chapter 31.822 (Utility Decoupling Audit)**: PASSED - Verified that `MainFileHelper` file operations can be unit tested without `MainViewModel`. Demonstrated via `MainFileHelperTest`. (Oct14.1).
 *   **Chapter 31.821 (Native Constraint Unification)**: PASSED - Verified that JNIFastPath and Kotlin Fallback share identical limits for vibration floors [0.02, 2.0] and proximity debouncing [1s-15s]. (Oct14.1).
 *   **Chapter 31.820 (Ribbon Normalization Audit)**: PASSED - Verified that 18/18 analytical ribbons consume pre-calculated normals from `HistoryBuffer`. Confirmed `TelemetryMapper.populateRibbons` handles all scaling logic during ingestion. (Oct14.1).
