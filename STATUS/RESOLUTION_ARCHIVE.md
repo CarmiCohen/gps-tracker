@@ -1,5 +1,10 @@
 # Resolution Archive
 
+## SIMP-OCT15.12-S1: Native Clamp Unification
+- **Resolved**: Oct16.1
+- **Description**: Unified hardware-layer constraints (vibration floors, proximity debouncing) across JNI and JVM by introducing `EngineConstants.h`. Ported adaptive proximity logic to native fast-path for identical boundary behavior.
+- **Outcome**: Eliminated magic numbers and manual parity drift. Ensures consistent sentinel behavior between native sensor acquisition and JVM ingestion layers.
+
 ## SIMP-OCT15.21-S1: Immutable Ribbon Normals
 - **Resolved**: Oct14.1
 - **Description**: Moved ribbon normalization logic from the UI-thread buffer creation to the ingestion point in `TelemetryMapper`. Introduced `RibbonNormals` container in `ConnectionPoint`.

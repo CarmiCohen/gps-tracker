@@ -1,14 +1,14 @@
-# Project History & Versioning (OCT15.2)
+# Project History & Versioning (Oct16.1)
 
 **For historical records (v8.9.x and older), see [docs_history_archive.md](docs_history_archive.md).**
 
-## OCT15.2 (Primitive History Buffers)
-- **History Buffer Optimization (#SIMP-OCT15.1-S1)**: Transitioned high-frequency connection history telemetry from object-heavy lists to a memory-efficient `HistoryBuffer` backed by primitive arrays (`LongArray`, `DoubleArray`). (SOT ID 733).
-- **GC Pressure Mitigation**: Reduced object allocations per emission from O(N) to O(1), eliminating telemetry-driven UI stalls on budget hardware.
+## Oct16.1 (Native Clamp Unification)
+- **Native Clamp Unification (#SIMP-OCT15.12-S1)**: Unified hardware-layer constraints (vibration floors, proximity debouncing) across JNI and JVM using `EngineConstants.h`. (SOT ID 745).
+- **Proximity Hardening**: Ported adaptive debouncing and EMA logic to native `n23` fast-path for identical boundary behavior.
 
-## OCT15.1 (Trail Buffer Optimization)
-- **Trail Buffer Optimization (#SIMP-OCT15.0-S1)**: Refactored trail flows to use `TrailBuffer` (primitive arrays), reducing object overhead from O(N) to O(1) per emission. (SOT ID 732).
-- **Search Optimization**: Refactored `findClosestTrailPoint` to use binary search on primitive timestamp arrays.
+## Oct16.0 (Immutable Ribbon Normals)
+- **Immutable Ribbon Normals (#SIMP-OCT15.21-S1)**: Moved ribbon normalization to `TelemetryMapper` ingestion point, ensuring analytical data is immutable once emitted. (SOT ID 744).
+- **Animation Controller Composition (#SIMP-OCT15.20-S1)**: Centralized Mali GPU anomaly gating via `LocalAnimationGating`.
 
 ## Oct14.1 (Pure Mapping Graduation)
 - **Pure Mapping Architecture (#SIMP-OCT14.21-S1)**: Extracted all UI state mapping logic from `MainViewModel` into specialized mappers (`HudMapper`, `DashboardMapper`, `MapStateMapper`). (SOT ID 731).

@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <cmath>
 #include <algorithm>
+#include "EngineConstants.h"
 
 #define LOG_TAG "jdHardware-JNI"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
@@ -22,7 +23,7 @@ static double g_lastCalculatedHz = 0.0;
 
 // Muzzle Hysteresis State
 static int64_t g_stationaryStartRt = 0;
-static const int64_t MUZZLE_HYSTERESIS_MS = 2000;
+static const int64_t MUZZLE_HYSTERESIS_MS = MUZZLE_HYSTERESIS_MS_VAL;
 
 // System Pressure State
 static int g_lastMemLevel = 0;
@@ -61,20 +62,11 @@ Java_com_gps19_app_JdHardwareManager_n3(JNIEnv* env, jclass clazz, jstring devic
     return 0;
 }
 
-/**
- * n4: punchHardware (Watchdog Kick)
- * Oct.14.17: Fixed UnsatisfiedLinkError by ensuring implementation exists.
- */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n4(JNIEnv* env, jclass clazz) {
-    // LOGI("jdHardware: n4 punchHardware kick");
     return 0;
 }
 
-/**
- * n5: setBudget (Thermal Throttling)
- * Oct.14.17: Added missing implementation.
- */
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n5(JNIEnv* env, jclass clazz, jint budgetLevel) {
     return 0;
@@ -146,7 +138,7 @@ Java_com_gps19_app_JdHardwareManager_n13(JNIEnv* env, jclass clazz, jdouble curr
     if (std::isnan(vibration) || vibration <= 0.0 || cpuLoad > 0.85) return currentFloor;
     double alpha = (vibration < currentFloor) ? (isWarming ? 0.5 : 0.1) : (vibration < 1.0 ? (isWarming ? 0.1 : 0.01) : 0.0);
     double next = (currentFloor * (1.0 - alpha)) + (vibration * alpha);
-    return std::max(0.02, std::min(2.0, next));
+    return std::max(VIBRATION_FLOOR_MIN, std::min(VIBRATION_FLOOR_MAX, next));
 }
 
 JNIEXPORT jdouble JNICALL
@@ -185,18 +177,11 @@ JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 256) return -1;
     uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
-    double x = *(double*)(ptr + 0);
-    double y = *(double*)(ptr + 8);
-    double z = *(double*)(ptr + 16);
-    double lx = *(double*)(ptr + 24);
-    double ly = *(double*)(ptr + 32);
-    double lz = *(double*)(ptr + 40);
-    double floor = *(double*)(ptr + 48);
-    double cpu = *(double*)(ptr + 56);
+    double x = *(double*)(ptr + 0), y = *(double*)(ptr + 8), z = *(double*)(ptr + 16);
+    double lx = *(double*)(ptr + 24), ly = *(double*)(ptr + 32), lz = *(double*)(ptr + 40);
+    double floor = *(double*)(ptr + 48), cpu = *(double*)(ptr + 56);
     int isWarming = *(int*)(ptr + 64);
-    double lastRaw = *(double*)(ptr + 68);
-    double lastHpf = *(double*)(ptr + 76);
-    double energy = *(double*)(ptr + 84);
+    double lastRaw = *(double*)(ptr + 68), lastHpf = *(double*)(ptr + 76), energy = *(double*)(ptr + 84);
     double snr = *(double*)(ptr + 92);
     int64_t nowRt = *(int64_t*)(ptr + 116);
     double dx = x - lx, dy = y - ly, dz = z - lz;
@@ -205,33 +190,25 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     if (!std::isnan(delta) && delta > 0.0 && cpu <= 0.85) {
         double alpha = (delta < floor) ? (isWarming ? 0.5 : 0.1) : (delta < 1.0 ? (isWarming ? 0.1 : 0.01) : 0.0);
         nextFloor = (floor * (1.0 - alpha)) + (delta * alpha);
-        nextFloor = std::max(0.02, std::min(2.0, nextFloor));
+        nextFloor = std::max(VIBRATION_FLOOR_MIN, std::min(VIBRATION_FLOOR_MAX, nextFloor));
     }
     double nextHpf = 0.9 * (lastHpf + delta - lastRaw);
     double nextEnergy = (energy * 0.9) + (std::abs(nextHpf) * 0.1);
-    double loadFactor = (cpu > 0.85) ? 2.0 : 1.0;
-    double dynamicGate = nextFloor * 1.5 * loadFactor;
+    double dynamicGate = nextFloor * 1.5 * ((cpu > 0.85) ? 2.0 : 1.0);
     int isStationary = (delta < dynamicGate) ? 1 : 0;
-    int isSuspiciousNoise = (snr > 0.0 && snr < 22.0 && delta > 0.5) ? 1 : 0;
-    int64_t stationaryDuration = 0;
     if (isStationary) {
         if (g_stationaryStartRt == 0) g_stationaryStartRt = nowRt;
-        stationaryDuration = nowRt - g_stationaryStartRt;
     } else { g_stationaryStartRt = 0; }
-    *(double*)(ptr + 128) = delta;
-    *(double*)(ptr + 136) = nextFloor;
-    *(double*)(ptr + 144) = nextHpf;
-    *(double*)(ptr + 152) = nextEnergy;
-    *(int*)(ptr + 160) = isStationary;
-    *(int*)(ptr + 164) = isSuspiciousNoise;
-    *(int64_t*)(ptr + 172) = stationaryDuration;
+    *(double*)(ptr + 128) = delta; *(double*)(ptr + 136) = nextFloor;
+    *(double*)(ptr + 144) = nextHpf; *(double*)(ptr + 152) = nextEnergy;
+    *(int*)(ptr + 160) = isStationary; *(int*)(ptr + 164) = (snr > 0.0 && snr < 22.0 && delta > 0.5);
+    *(int64_t*)(ptr + 172) = (isStationary && g_stationaryStartRt > 0) ? (nowRt - g_stationaryStartRt) : 0;
     return 0;
 }
 
 JNIEXPORT jdouble JNICALL
 Java_com_gps19_app_JdHardwareManager_n20(JNIEnv* env, jclass clazz, jdouble baseAlpha, jdouble vibrationRollingSum) {
-    double factor = 1.0;
-    if (vibrationRollingSum > 0.5) factor = std::max(0.01, 1.0 - ((vibrationRollingSum - 0.5) / 1.0));
+    double factor = (vibrationRollingSum > 0.5) ? std::max(0.01, 1.0 - ((vibrationRollingSum - 0.5) / 1.0)) : 1.0;
     return baseAlpha * factor;
 }
 
@@ -239,10 +216,8 @@ JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n21(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 1040) return -1;
     uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
-    int count = *(int*)(ptr + 0);
-    if (count > 64) count = 64;
-    int usedCount = 0; double snrSum = 0.0; int snrCount = 0;
-    float* cn0s = (float*)(ptr + 260); int* usedInFix = (int*)(ptr + 516);
+    int count = std::min(*(int*)(ptr + 0), 64), usedCount = 0, snrCount = 0;
+    float* cn0s = (float*)(ptr + 260); int* usedInFix = (int*)(ptr + 516); double snrSum = 0.0;
     for (int i = 0; i < count; i++) {
         if (usedInFix[i] != 0) usedCount++;
         if (cn0s[i] > 0.0f) { snrSum += cn0s[i]; snrCount++; }
@@ -259,23 +234,43 @@ Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz, jshortArray 
     int readCount = *(int*)(ptr + 0);
     jshort* samples = (jshort*)env->GetPrimitiveArrayCritical(buffer, nullptr);
     int maxAmp = 0;
-    for (int i = 0; i < readCount; i++) {
-        int amp = std::abs((int)samples[i]);
-        if (amp > maxAmp) maxAmp = amp;
-    }
+    for (int i = 0; i < readCount; i++) maxAmp = std::max(maxAmp, std::abs((int)samples[i]));
     env->ReleasePrimitiveArrayCritical(buffer, samples, JNI_ABORT);
-    double db = (maxAmp > 0) ? (20.0 * std::log10((double)maxAmp)) : 0.0;
-    *(int*)(ptr + 128) = maxAmp; *(double*)(ptr + 132) = db;
+    *(int*)(ptr + 128) = maxAmp;
+    *(double*)(ptr + 132) = (maxAmp > 0) ? (20.0 * std::log10((double)maxAmp)) : 0.0;
     return 0;
 }
 
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n23(JNIEnv* env, jclass clazz) {
-    if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 128) return -1;
+    if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 256) return -1;
     uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
-    double dist = *(double*)(ptr + 0); double maxRange = *(double*)(ptr + 8);
+    double dist = *(double*)(ptr + 0), maxRange = *(double*)(ptr + 8), currentIdx = *(double*)(ptr + 56);
+    int64_t nowRt = *(int64_t*)(ptr + 16), stationaryDuration = *(int64_t*)(ptr + 32);
+    int isStationary = *(int*)(ptr + 24), isHighLoad = *(int*)(ptr + 48), rawNear = *(int*)(ptr + 64), isFlickering = *(int*)(ptr + 72);
+
+    int newValue = (dist < maxRange);
     double rawIdx = std::max(0.0, std::min(1.0, 1.0 - (dist / maxRange)));
-    *(double*)(ptr + 128) = rawIdx; *(int*)(ptr + 136) = (dist < maxRange ? 1 : 0);
+    double nextIdx = (currentIdx * (1.0 - PROXIMITY_EMA_ALPHA)) + (rawIdx * PROXIMITY_EMA_ALPHA);
+
+    int nextRawNear = rawNear;
+    int64_t debounceMs = 0;
+
+    if (newValue != rawNear) {
+        if (!newValue && isFlickering && isStationary) {
+            nextRawNear = rawNear;
+        } else {
+            nextRawNear = newValue;
+            debounceMs = isStationary ? PROXIMITY_DEBOUNCE_STATIONARY_MS : PROXIMITY_DEBOUNCE_MOVING_MS;
+            if (isStationary && stationaryDuration > 0) {
+                debounceMs += (int64_t)((stationaryDuration / 3600000.0) * PROXIMITY_STATIONARY_SCALING_MS_PER_HOUR);
+            }
+            if (isHighLoad) debounceMs = (int64_t)(debounceMs * PROXIMITY_STRESS_SCALING_MULTIPLIER);
+            debounceMs = std::min(debounceMs, (int64_t)PROXIMITY_DEBOUNCE_MAX_MS);
+        }
+    }
+
+    *(double*)(ptr + 128) = nextIdx; *(int*)(ptr + 136) = nextRawNear; *(int64_t*)(ptr + 140) = debounceMs;
     return 0;
 }
 
@@ -283,10 +278,11 @@ JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n24(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 128) return -1;
     uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
-    double heapMb = *(double*)(ptr + 0); double memCritical = *(double*)(ptr + 16);
-    int memLevel = (heapMb >= memCritical) ? 2 : 0;
-    *(int*)(ptr + 64) = memLevel; *(int*)(ptr + 68) = (memLevel != g_lastMemLevel);
-    g_lastMemLevel = memLevel;
+    double heapMb = *(double*)(ptr + 0), memCritical = *(double*)(ptr + 16), memPressure = *(double*)(ptr + 8), hysteresis = *(double*)(ptr + 24);
+    int currentMem = (heapMb >= memCritical) ? 2 : (heapMb >= memPressure ? 1 : 0);
+    if (currentMem < g_lastMemLevel && heapMb > ((g_lastMemLevel == 2 ? memCritical : memPressure) - hysteresis)) currentMem = g_lastMemLevel;
+    *(int*)(ptr + 64) = currentMem; *(int*)(ptr + 68) = (currentMem != 0 && currentMem != g_lastMemLevel);
+    g_lastMemLevel = currentMem;
     return 0;
 }
 

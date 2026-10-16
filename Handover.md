@@ -1,29 +1,27 @@
-# Project Handover - Oct16.0 (Immutable Ribbon Normals)
+# Project Handover - Oct16.1 (Native Clamp Unification)
 
-## 🟢 Status: Architecture Hardened (Oct16.0)
-The project has moved ribbon normalization from the UI buffer construction to the ingestion point in `TelemetryMapper`. This ensures that analytical data is immutable once it enters the history pipeline, eliminating race conditions and UI-thread computational overhead.
+## 🟢 Status: Hardware Parity Hardened (Oct16.1)
+The project has unified hardware-layer constraints across the JNI/JVM boundary. Vibration and proximity limits are now governed by a shared C++ header, ensuring consistent sentinel behavior and eliminating manual parity drift.
 
-## 🛠️ Critical Hardening Details (Oct16.0)
+## 🛠️ Critical Hardening Details (Oct16.1)
 
-### 1. Ribbon Normalization Offloading (SIMP-OCT15.21-S1)
-- **Architecture**: Introduced `RibbonNormals` container in `ConnectionPoint`.
-- **Ingestion**: Centralized all scaling logic in `TelemetryMapper.populateRibbons()`. All incoming telemetry (Engine, Proto, or Entity) is now normalized immediately upon arrival.
-- **Buffers**: `HistoryBuffer` now uses these pre-calculated normals to fill its primitive arrays, ensuring O(1) access during UI render cycles with zero transformation overhead.
-- **Audit**: Verified 100% ribbon compliance (18 sensors) in `SharedUiComponents.kt`.
+### 1. Native Clamp Unification (SIMP-OCT15.12-S1)
+- **Architecture**: Introduced `app/src/main/cpp/EngineConstants.h` as the source of truth for native sensor limits.
+- **Vibration**: Hardened `n13` and `n19` in `jdhardware-jni.cpp` with strict `[0.02, 2.0]` G clamping.
+- **Proximity**: Ported adaptive debouncing (1s-15s) and EMA smoothing (alpha=0.15) to native `n23`, ensuring parity with JVM fallback logic.
+- **System Pressure**: Consolidated memory and storage pressure evaluation into native `n24` with unified hysteresis.
 
 ### 2. Versioning & Consistency
-- **app/build.gradle**: `versionName` incremented to `Oct16.0`.
-- **MainAppContent.kt**: UI footer updated to `Oct16.0_PLATINUM`.
-- **SOT Master**: Added Rule 1.219 (R-ID 737) and Baseline ID 744.
+- **app/build.gradle**: `versionName` incremented to `Oct16.1`.
+- **MainAppContent.kt**: UI footer updated to `Oct16.1_PLATINUM`.
+- **SOT Master**: Added Rule 1.220 (R-ID 738) and Baseline ID 745.
 
 ## 📊 Forensic Pulse & Metrics
-- **Unit Tests**: 88/88 PASS (100%).
-- **Build**: Successfully assembled `Oct16.0`.
-- **SOT Count**: 435 (Rules: 275).
+- **SOT Count**: 436 (Rules: 276).
 - **Open Gaps**: 0 active logical gaps.
-- **Strategic Ideas**: 32 active (Added `SIMP-OCT16.0-S1`).
+- **Strategic Ideas**: 31 active (SIMP-OCT15.12-S1 resolved).
 
 ## 🔴 Open Forensic Gaps (Priority for Next Session)
-1. **Strategic Simplification**: Evaluate `SIMP-OCT15.12-S1` for native clamp unification.
+1. **Strategic Simplification**: Evaluate `SIMP-OCT15.10-S1` for test utility decoupling to reduce mock reliance.
 
 **HANDOVER COMPLETE. STOP ALL PROCESSING.**
