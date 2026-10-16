@@ -1,5 +1,10 @@
 # Resolution Archive
 
+## SIMP-OCT15.21-S1: Immutable Ribbon Normals
+- **Resolved**: Oct14.1
+- **Description**: Moved ribbon normalization logic from the UI-thread buffer creation to the ingestion point in `TelemetryMapper`. Introduced `RibbonNormals` container in `ConnectionPoint`.
+- **Outcome**: Ensures all history points carry pre-calculated, immutable norms. Prevents race conditions during concurrent ribbon rendering and eliminates redundant UI-thread calculations.
+
 ## ISSUE-OCT15.20-F1: HUD Animation Gating (Mali Hardening)
 - **Resolved**: Oct14.1
 - **Description**: Systematically gated non-critical UI animations (Speed, Battery, Distance, Moving Status, and System Alert Pulse) based on `isMaliAnomaly` health state.

@@ -6,21 +6,48 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.16.0:
+ * - SIMP-OCT15.21-S1: Immutable Ribbon Normals. Moved ribbon normalization logic 
+ *   from UI-thread buffers to the ingestion point. Added populateRibbons() 
+ *   to ensure all ConnectionPoints carry pre-calculated normals.
  * Oct.15.12:
  * - ISSUE-OCT15.11-F1: Vibration Floor Jitter Hardening. Added clampVibrationFloor() 
  *   to ensure adaptiveVibrationFloor stays within [0.02, 2.0] G range across 
  *   all ingestion paths.
- * Oct.15.11:
- * - ISSUE-OCT15.10-F2: Proximity Debounce Hardening. Added safety clamping for 
- *   proximityDebounceMs in all serialization and mapping paths to prevent 
- *   overflow/underflow propagation.
- * Oct.15.7:
- * - ISSUE-OCT15.7-F1: Consolidated TrailBuffer mapping logic from MainRepository.
  */
 object TelemetryMapper {
 
     private fun clampProxDebounce(ms: Long): Long = ms.coerceIn(0L, PROXIMITY_DEBOUNCE_MAX_MS)
     private fun clampVibrationFloor(v: Double): Double = v.coerceIn(VIBRATION_FLOOR_MIN, VIBRATION_FLOOR_MAX)
+
+    /**
+     * populateRibbons: Centralized authority for ribbon normalization [0.0, 1.0].
+     * Moved to ingestion point to ensure architectural purity and immutability (SIMP-OCT15.21-S1).
+     */
+    fun populateRibbons(p: ConnectionPoint) {
+        p.ribbons.apply {
+            snr = p.snrIdx.toFloat()
+            noise = p.noiseIdx.toFloat()
+            kinetic = (p.kineticEnergy.toFloat() / RIBBON_KINETIC_ENERGY_SCALE.toFloat()).coerceIn(0f, 1f)
+            lux = p.luxIdx.toFloat()
+            vibe = p.vibeIdx.toFloat()
+            prox = p.proxIdx.toFloat()
+            lift = p.liftIdx.toFloat()
+            bat = if (p.isBatterySteepDischarge) 1f else 0f
+            thm = if (p.isCoolingModeActive) 1f else 0f
+            cur = (kotlin.math.abs(p.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f)
+            sit = if (p.isSitActive) 1f else 0f
+            tlt = p.tiltIdx.toFloat()
+            baro = p.baroIdx.toFloat()
+            svz = (kotlin.math.abs(p.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f)
+            sdz = (kotlin.math.abs(p.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f)
+            cpu = (p.cpuLoad.toFloat() / RIBBON_CPU_LOAD_SCALE.toFloat()).coerceIn(0f, 1f)
+            iow = (p.ioWait.toFloat() / RIBBON_IO_WAIT_SCALE.toFloat()).coerceIn(0f, 1f)
+            lat = (p.maxIoLatency.toFloat() / RIBBON_LATENCY_SCALE_MS.toFloat()).coerceIn(0f, 1f)
+            val commIdx = TelemetryUtils.calculateCommIndex(p.rtt, p.localSig, p.remoteSig).toFloat()
+            comm = if (p.isConnected) (commIdx / 10f).coerceIn(0.1f, 1f) else 1f
+        }
+    }
 
     /**
      * mapTickToOutputs: Consolidated authority for preparing persistence and 
@@ -656,6 +683,7 @@ object TelemetryMapper {
             isSuspiciousNoise = p.forensic.isSuspiciousNoise
             isMemoryPressureThrottled = p.forensic.isMemoryPressureThrottled
         }
+        populateRibbons(out)
     }
 
     /**
@@ -696,6 +724,7 @@ object TelemetryMapper {
             isSuspiciousNoise = proto.isSuspiciousNoise
             isMemoryPressureThrottled = proto.isMemoryPressureThrottled
         }
+        populateRibbons(out)
     }
 
     /**
@@ -747,6 +776,7 @@ object TelemetryMapper {
             isSuspiciousNoise = false
             isMemoryPressureThrottled = false
         }
+        populateRibbons(out)
     }
 
     /**

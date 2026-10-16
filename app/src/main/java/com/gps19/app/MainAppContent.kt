@@ -38,12 +38,12 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.16.0:
+ * - Updated version tag to Oct16.0_PLATINUM.
  * Oct.15.21:
  * - SIMP-OCT15.20-S1: Animation Controller Composition. Integrated 
  *   LocalAnimationGating into GpsTrackerTheme to centralize Mali GPU 
  *   anomaly handling. Updated version tag to Oct15.21_PLATINUM.
- * Oct.15.20:
- * - Updated version tag to Oct15.20_PLATINUM.
  */
 @Composable
 fun MainAppContent(
@@ -124,7 +124,7 @@ fun MainAppContent(
 
                 Column(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)) {
                     Text("UI_READY", color = Color.Green.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text("Oct15.21_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
+                    Text("Oct16.0_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
                 }
             }
         }

@@ -1,6 +1,6 @@
 # SOT Master Requirements & Hardening Status (Oct14.1)
 
-## 🏗️ Architectural Master Rules (274 Rules)
+## 🏗️ Architectural Master Rules (275 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.207 Pure Mapping Architecture (R-ID 725)**: UI state mapping logic MUST be extracted from `MainViewModel` into dedicated, pure mapper objects (e.g., `HudMapper`, `DashboardMapper`, `MapStateMapper`) to ensure ViewModel maintainability, testability, and separation of concerns. (Oct14.1 - SIMP-OCT14.21-S1).
@@ -15,11 +15,12 @@
 *   **1.216 Unified Log Gating (R-ID 734)**: Application logging MUST be gated by `PersistencePolicy.shouldSaveLog()` to prevent driver-level I/O contention during Mali anomalies and ensure consistent storage pressure handling across all diagnostic paths. (Oct14.1 - ISSUE-OCT15.9-F1).
 *   **1.217 Defensive Telemetry Clamping (R-ID 735)**: High-frequency diagnostic fields (especially timestamps, floors, and debounce values) MUST be clamped at both the hardware ingestion point and the mapping boundary to prevent JNI buffer corruption or peer-to-peer garbage from causing UI overflows or runaway jitter. (Oct14.1 - ISSUE-OCT15.11-F1).
 *   **1.218 Composite Animation Gating (R-ID 736)**: Non-critical UI animations MUST be centrally gated via `LocalAnimationGating` and specialized wrappers (e.g., `gatedAnimateFloatAsState`) to prevent UI thread pressure and ANRs during GPU driver stalls on budget hardware. (Oct14.1 - SIMP-OCT15.20-S1).
-*   **1.219 Immutable Ribbon Normals (R-ID 737)**: Ribbon normalization values MUST be immutable once emitted in `HistoryBuffer` to prevent race conditions during concurrent ribbon rendering. (Oct14.1).
+*   **1.219 Immutable Ribbon Normals (R-ID 737)**: Ribbon normalization values MUST be immutable once emitted in `HistoryBuffer` to prevent race conditions during concurrent ribbon rendering. Values must be calculated at the ingestion point (TelemetryMapper). (Oct14.1 - SIMP-OCT15.21-S1).
 
 ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 744**: Immutable Ribbon Normals - PASSED. Moved normalization to TelemetryMapper and introduced RibbonNormals container, ensuring O(1) rendering access. (Oct14.1 - SIMP-OCT15.21-S1).
 *   **SOT ID 743**: Animation Controller Composition - PASSED. Centralized Mali gating via `LocalAnimationGating`, eliminating redundant parameter propagation across 12 UI components. (Oct14.1 - SIMP-OCT15.20-S1).
 *   **SOT ID 742**: Vibration Floor Hardening - PASSED. Implemented [0.02, 2.0] G boundary clamping in jdhardware-jni.cpp (n13, n19), SentinelValidator JVM fallback, and TelemetryMapper ingestion paths. (Oct14.1 - ISSUE-OCT15.11-F1).
 *   **SOT ID 741**: Proximity Debounce Hardening - PASSED. Corrected typo in HardwareSuite, added JNI result validation, and enforced boundary clamping in TelemetryMapper. (Oct14.1 - ISSUE-OCT15.10-F2).
@@ -32,6 +33,7 @@
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 31.820 (Ribbon Normalization Audit)**: PASSED - Verified that 18/18 analytical ribbons consume pre-calculated normals from `HistoryBuffer`. Confirmed `TelemetryMapper.populateRibbons` handles all scaling logic during ingestion. (Oct14.1).
 *   **Chapter 31.819 (Animation Composition Audit)**: PASSED - Verified that all HUD components (Header, Status, Dashboard) consume Mali state via `LocalAnimationGating`. Confirmed static state enforcement via `snap()` in gated wrappers. (Oct14.1).
 *   **Chapter 31.818 (GPU UI Resilience)**: PASSED - Verified that `alertAlpha` and `movingAlpha` animations freeze when `isMaliAnomaly` is true, reducing UI thread load by ~40% during simulated rendering stalls. (Oct14.1).
 *   **Chapter 31.817 (Vibration Floor Stability)**: PASSED - Confirmed that `adaptiveVibrationFloor` is clamped within [0.02, 2.0] G range in both native fast-path and Kotlin mapping layers, preventing the "runaway" jitter reported on A15 diagnostics. (Oct14.1).

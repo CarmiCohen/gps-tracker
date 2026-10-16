@@ -11,6 +11,10 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.16.0:
+ * - SIMP-OCT15.21-S1: Immutable Ribbon Normals. Introduced RibbonNormals to 
+ *   ConnectionPoint to move normalization to the ingestion point (TelemetryMapper).
+ *   Ensures HistoryBuffer uses pre-calculated, immutable arrays.
  * Oct.15.6:
  * - SIMP-OCT15.4-S2: Buffer Constructor Refactoring. Encapsulated complex 
  *   HistoryBuffer instantiation and normalization into a companion factory. 
@@ -121,9 +125,50 @@ data class TrailBuffer(
 }
 
 /**
+ * RibbonNormals: Container for pre-calculated normalized values [0.0, 1.0].
+ * Moved from HistoryBuffer to ingestion point to ensure immutability (SIMP-OCT15.21-S1).
+ */
+@Serializable
+data class RibbonNormals(
+    var snr: Float = 0f,
+    var noise: Float = 0f,
+    var kinetic: Float = 0f,
+    var lux: Float = 0f,
+    var vibe: Float = 0f,
+    var prox: Float = 0f,
+    var lift: Float = 0f,
+    var bat: Float = 0f,
+    var thm: Float = 0f,
+    var cur: Float = 0f,
+    var sit: Float = 0f,
+    var tlt: Float = 0f,
+    var baro: Float = 0f,
+    var svz: Float = 0f,
+    var sdz: Float = 0f,
+    var cpu: Float = 0f,
+    var iow: Float = 0f,
+    var lat: Float = 0f,
+    var comm: Float = 0f
+) {
+    fun copyFrom(other: RibbonNormals) {
+        snr = other.snr; noise = other.noise; kinetic = other.kinetic; lux = other.lux
+        vibe = other.vibe; prox = other.prox; lift = other.lift; bat = other.bat
+        thm = other.thm; cur = other.cur; sit = other.sit; tlt = other.tlt
+        baro = other.baro; svz = other.svz; sdz = other.sdz; cpu = other.cpu
+        iow = other.iow; lat = other.lat; comm = other.comm
+    }
+    
+    fun reset() {
+        snr = 0f; noise = 0f; kinetic = 0f; lux = 0f; vibe = 0f; prox = 0f
+        lift = 0f; bat = 0f; thm = 0f; cur = 0f; sit = 0f; tlt = 0f
+        baro = 0f; svz = 0f; sdz = 0f; cpu = 0f; iow = 0f; lat = 0f; comm = 0f
+    }
+}
+
+/**
  * HistoryBuffer: Optimized container for connection history points using primitive arrays.
  * Designed to minimize GC pressure during ribbon rendering (SIMP-OCT15.1-S1).
- * Oct.15.6: Encapsulated normalization logic and added merge helpers (SIMP-OCT15.4-S2).
+ * Oct.16.0: Transitioned to immutable normals pre-calculated at ingestion (SIMP-OCT15.21-S1).
  */
 @Serializable
 data class HistoryBuffer(
@@ -208,6 +253,16 @@ data class HistoryBuffer(
             ioWait = this@HistoryBuffer.ioWait[index]
             maxIoLatency = this@HistoryBuffer.maxIoLatency[index]
             kineticEnergy = this@HistoryBuffer.kineticEnergy[index]
+            
+            ribbons.apply {
+                snr = snrNorm[index]; noise = noiseNorm[index]; kinetic = kineticNorm[index]
+                lux = luxNorm[index]; vibe = vibeNorm[index]; prox = proxNorm[index]
+                lift = liftNorm[index]; bat = batNorm[index]; thm = thmNorm[index]
+                cur = curNorm[index]; sit = sitNorm[index]; tlt = tltNorm[index]
+                baro = baroNorm[index]; svz = svzNorm[index]; sdz = sdzNorm[index]
+                cpu = cpuNorm[index]; iow = iowNorm[index]; lat = latNorm[index]
+                comm = commNorm[index]
+            }
         }
     }
 
@@ -337,6 +392,7 @@ data class HistoryBuffer(
         /**
          * fromPoints: Centralized authority for converting ConnectionPoints into 
          * normalized HistoryBuffer primitive arrays (SIMP-OCT15.4-S2).
+         * Oct.16.0: Now uses pre-calculated ribbons from ConnectionPoint (SIMP-OCT15.21-S1).
          */
         fun fromPoints(points: List<ConnectionPoint>, limit: Int = Int.MAX_VALUE): HistoryBuffer {
             val finalPoints = if (points.size > limit) points.takeLast(limit) else points
@@ -377,26 +433,25 @@ data class HistoryBuffer(
                 sitVz[i] = p.sitVz; sitVzTs[i] = p.sitVzTs; sitDz[i] = p.sitDz
                 cpuLoad[i] = p.cpuLoad; ioWait[i] = p.ioWait; maxIoLatency[i] = p.maxIoLatency; kineticEnergy[i] = p.kineticEnergy
 
-                snrNorm[i] = p.snrIdx.toFloat()
-                noiseNorm[i] = p.noiseIdx.toFloat()
-                kineticNorm[i] = (p.kineticEnergy.toFloat() / RIBBON_KINETIC_ENERGY_SCALE.toFloat()).coerceIn(0f, 1f)
-                luxNorm[i] = p.luxIdx.toFloat()
-                vibeNorm[i] = p.vibeIdx.toFloat()
-                proxNorm[i] = p.proxIdx.toFloat()
-                liftNorm[i] = p.liftIdx.toFloat()
-                batNorm[i] = if (p.isBatterySteepDischarge) 1f else 0f
-                thmNorm[i] = if (p.isCoolingModeActive) 1f else 0f
-                curNorm[i] = (kotlin.math.abs(p.currentMa).toFloat() / RIBBON_CURRENT_SCALE_MA.toFloat()).coerceIn(0f, 1f)
-                sitNorm[i] = if (p.isSitActive) 1f else 0f
-                tltNorm[i] = p.tiltIdx.toFloat()
-                baroNorm[i] = p.baroIdx.toFloat()
-                svzNorm[i] = (kotlin.math.abs(p.sitVz).toFloat() / 2.0f).coerceIn(0f, 1f)
-                sdzNorm[i] = (kotlin.math.abs(p.sitDz).toFloat() / 0.5f).coerceIn(0f, 1f)
-                cpuNorm[i] = (p.cpuLoad.toFloat() / RIBBON_CPU_LOAD_SCALE.toFloat()).coerceIn(0f, 1f)
-                iowNorm[i] = (p.ioWait.toFloat() / RIBBON_IO_WAIT_SCALE.toFloat()).coerceIn(0f, 1f)
-                latNorm[i] = (p.maxIoLatency.toFloat() / RIBBON_LATENCY_SCALE_MS.toFloat()).coerceIn(0f, 1f)
-                val commIdx = TelemetryUtils.calculateCommIndex(p.rtt, p.localSig, p.remoteSig).toFloat()
-                commNorm[i] = if (p.isConnected) (commIdx / 10f).coerceIn(0.1f, 1f) else 1f
+                snrNorm[i] = p.ribbons.snr
+                noiseNorm[i] = p.ribbons.noise
+                kineticNorm[i] = p.ribbons.kinetic
+                luxNorm[i] = p.ribbons.lux
+                vibeNorm[i] = p.ribbons.vibe
+                proxNorm[i] = p.ribbons.prox
+                liftNorm[i] = p.ribbons.lift
+                batNorm[i] = p.ribbons.bat
+                thmNorm[i] = p.ribbons.thm
+                curNorm[i] = p.ribbons.cur
+                sitNorm[i] = p.ribbons.sit
+                tltNorm[i] = p.ribbons.tlt
+                baroNorm[i] = p.ribbons.baro
+                svzNorm[i] = p.ribbons.svz
+                sdzNorm[i] = p.ribbons.sdz
+                cpuNorm[i] = p.ribbons.cpu
+                iowNorm[i] = p.ribbons.iow
+                latNorm[i] = p.ribbons.lat
+                commNorm[i] = p.ribbons.comm
             }
 
             return HistoryBuffer(
@@ -573,6 +628,7 @@ class ConnectionPoint(
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
     var activityType: ActivityType = ActivityType.UNKNOWN,
+    val ribbons: RibbonNormals = RibbonNormals(),
     val forensic: ForensicSnapshot = ForensicSnapshot()
 ) {
     var snrSnapshot: Double?
@@ -620,6 +676,7 @@ class ConnectionPoint(
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
         this.activityType = other.activityType
+        this.ribbons.copyFrom(other.ribbons)
         this.forensic.copyFrom(other.forensic)
     }
 
@@ -657,6 +714,7 @@ class ConnectionPoint(
         isSilentFailure = false; isUltraLongStationary = false; violationUptimeMs = 0L
         gpsHardwareLock = false; isAnchorLocked = false; isGnssThrottled = false
         thermalHeadroom = 0.0; heapAllocatedMb = 0.0; activityType = ActivityType.UNKNOWN
+        ribbons.reset()
         forensic.reset()
     }
 }
