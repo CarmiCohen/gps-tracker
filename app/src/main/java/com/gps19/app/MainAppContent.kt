@@ -38,16 +38,12 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.15.21:
+ * - SIMP-OCT15.20-S1: Animation Controller Composition. Integrated 
+ *   LocalAnimationGating into GpsTrackerTheme to centralize Mali GPU 
+ *   anomaly handling. Updated version tag to Oct15.21_PLATINUM.
  * Oct.15.20:
  * - Updated version tag to Oct15.20_PLATINUM.
- * Oct.15.12:
- * - Updated version tag to Oct15.12_PLATINUM.
- * Oct.15.11:
- * - Updated version tag to Oct15.11_PLATINUM.
- * Oct.15.10:
- * - Updated version tag to Oct15.10_PLATINUM.
- * - ISSUE-OCT15.10-F4: HUD Rendering Stalled. Integrated PhoneSetupOverlay into 
- *   OverlayHost.
  */
 @Composable
 fun MainAppContent(
@@ -55,6 +51,7 @@ fun MainAppContent(
     viewModel: MainViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val hudState by viewModel.hudState.collectAsStateWithLifecycle()
     val sessionState = uiState.session
     val mode = sessionState.appMode
     val navigationState = uiState.navigation
@@ -80,7 +77,10 @@ fun MainAppContent(
         onShowBackgroundDisclosure = { showBackgroundDisclosure = true }
     )
 
-    GpsTrackerTheme(appMode = mode) {
+    GpsTrackerTheme(
+        appMode = mode,
+        isMaliAnomaly = hudState.health.isMaliAnomaly
+    ) {
         Surface(
             modifier = Modifier.fillMaxSize().graphicsLayer(alpha = 0.99f), // Mali GPU Fix
             color = MaterialTheme.colorScheme.background
@@ -124,7 +124,7 @@ fun MainAppContent(
 
                 Column(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)) {
                     Text("UI_READY", color = Color.Green.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text("Oct15.20_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
+                    Text("Oct15.21_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
                 }
             }
         }

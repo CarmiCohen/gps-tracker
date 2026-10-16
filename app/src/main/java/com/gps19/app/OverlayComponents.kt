@@ -26,13 +26,14 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Oct.15.21:
+ * - SIMP-OCT15.20-S1: Animation Controller Composition. Integrated 
+ *   LocalAnimationGating into DashboardHeader and gated movingAlpha. 
+ *   Removed redundant isMaliAnomaly parameters.
  * Oct.15.20:
  * - ISSUE-OCT15.20-F1: HUD Animation Gating. Integrated isMaliAnomaly into 
  *   DashboardHeader and gated movingAlpha to prevent UI thread pressure 
  *   during driver stalls.
- * Oct.14.8:
- * - SIMP-OCT13.21-S1: Pure Event UI. Flattened TelemetryBox and MainDashboardGrid 
- *   signatures by migrating specialized lambdas to UiEvent bus.
  */
 
 @Composable
@@ -109,7 +110,6 @@ fun MainDashboardGrid(
     isGnssThrottled: Boolean = false,
     isSafeMode: Boolean = false,
     isSuspiciousNoise: Boolean = false,
-    isMaliAnomaly: Boolean = false,
     onEvent: (UiEvent) -> Unit
 ) {
     val isViewer = appMode == "viewer"
@@ -139,8 +139,7 @@ fun MainDashboardGrid(
                 isUltraLongStationary = isUltraLongStationary,
                 isGnssThrottled = isGnssThrottled,
                 isSafeMode = isSafeMode,
-                isSuspiciousNoise = isSuspiciousNoise,
-                isMaliAnomaly = isMaliAnomaly
+                isSuspiciousNoise = isSuspiciousNoise
             )
             
             HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
@@ -191,11 +190,11 @@ private fun DashboardHeader(
     isUltraLongStationary: Boolean,
     isGnssThrottled: Boolean,
     isSafeMode: Boolean,
-    isSuspiciousNoise: Boolean = false,
-    isMaliAnomaly: Boolean = false
+    isSuspiciousNoise: Boolean = false
 ) {
+    val isThrottled = LocalAnimationGating.current
     val infiniteTransition = rememberInfiniteTransition(label = "DashboardPulse")
-    val movingAlphaState = if (isMaliAnomaly) {
+    val movingAlphaState = if (isThrottled) {
         remember { mutableStateOf(1f) }
     } else {
         infiniteTransition.animateFloat(
@@ -493,7 +492,6 @@ fun TelemetryBox(
     isGnssThrottled: Boolean = false,
     isSafeMode: Boolean = false,
     isSuspiciousNoise: Boolean = false,
-    isMaliAnomaly: Boolean = false,
     onEvent: (UiEvent) -> Unit
 ) {
     MainDashboardGrid(
@@ -511,7 +509,7 @@ fun TelemetryBox(
         rollingVibration = rollingVibration, trackerMaxTemp = trackerMaxTemp, viewerMaxTemp = viewerMaxTemp, peakShock = peakShock, vibrationFloor = vibrationFloor,
         luxBaseline = luxBaseline, acousticFloorDb = acousticFloorDb, trackerCurrentMa = trackerCurrentMa, gpsIdx = gpsIdx, rttValue = rttValue,
         cpuLoad = cpuLoad, ioWait = ioWait, maxIoLatency = maxIoLatency, isUltraLongStationary = isUltraLongStationary, isGnssThrottled = isGnssThrottled, 
-        isSafeMode = isSafeMode, isSuspiciousNoise = isSuspiciousNoise, isMaliAnomaly = isMaliAnomaly, onEvent = onEvent
+        isSafeMode = isSafeMode, isSuspiciousNoise = isSuspiciousNoise, onEvent = onEvent
     )
 }
 

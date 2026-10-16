@@ -48,14 +48,10 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * Oct.15.20:
- * - ISSUE-OCT15.20-F1: HUD Animation Gating. Updated HeaderBar to accept 
- *   isMaliAnomaly and gated alertAlpha animation to reduce UI thread 
- *   pressure during driver stalls.
- * Oct.15.8:
- * - ISSUE-OCT15.8-F1: UI Layer Integrity Audit. Simplified ConnectionQualityRibbon 
- *   to consume pre-calculated normalization values directly, eliminating redundant 
- *   runtime checks.
+ * Oct.15.21:
+ * - SIMP-OCT15.20-S1: Animation Controller Composition. Integrated 
+ *   LocalAnimationGating and gatedAnimateFloatAsState to centralize Mali GPU 
+ *   anomaly handling. Removed redundant isMaliAnomaly parameters.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -71,7 +67,7 @@ data class StatusRowState(
     val overrideDistanceColor: Color? = null, val isLocPending: Boolean = false,
     val locPendingReason: LocationPendingReason = LocationPendingReason.NONE,
     val isTelemetryFresh: Boolean = true, val isGpsFresh: Boolean = true,
-    val isUltraLongStationary: Boolean = false, val isThrottled: Boolean = false
+    val isUltraLongStationary: Boolean = false
 )
 
 @Composable
@@ -470,20 +466,18 @@ fun ConnectionQualityRibbon(
 fun HeaderBar(
     isLogVisible: Boolean, isSettingsOpen: Boolean, isRibbonsVisible: Boolean, isMapVisible: Boolean, isPhoneSetupVisible: Boolean = false, 
     requiresExtraTopPadding: Boolean, isSystemReady: Boolean, systemIssuesCount: Int, 
-    isMaliAnomaly: Boolean = false,
     onEvent: (UiEvent) -> Unit
 ) {
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val isDashboardActive = !isMapVisible && !(isLogVisible || isSettingsOpen || isRibbonsVisible)
     val commitAnd = { event: UiEvent -> if (isSettingsOpen) onEvent(UiEvent.CommitSettings); onEvent(event) }
     
-    val alertAlphaState = if (isMaliAnomaly) {
-        remember { mutableStateOf(1f) }
-    } else {
-        val alertPulse = rememberInfiniteTransition(label = "AlertPulse")
-        alertPulse.animateFloat(0.4f, 1f, infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), label = "Alpha")
-    }
-    val alertAlpha by alertAlphaState
+    val alertAlpha by gatedInfinitePulse(
+        initialValue = 0.4f, 
+        targetValue = 1f, 
+        animationSpec = infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), 
+        label = "AlertPulse"
+    )
 
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         if (isLandscape) {
@@ -527,30 +521,18 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
     val trkIdLabel = connectivity.trackerId.take(6).uppercase()
     val viewIdLabel = connectivity.viewerId.take(6).uppercase()
-    val isThrottled = health.isMaliAnomaly
-    val infiniteTransition = rememberInfiniteTransition(label = "StatusBarAnimations")
     
-    val alarmAlphaState = if (isThrottled) {
-        remember { mutableStateOf(1f) }
-    } else {
-        infiniteTransition.animateFloat(
-            0.4f, 1f, 
-            infiniteRepeatable(tween(500), repeatMode = RepeatMode.Reverse), 
-            label = "AlarmAlpha"
-        )
-    }
-    val alarmAlpha by alarmAlphaState
+    val alarmAlpha by gatedInfinitePulse(
+        0.4f, 1f, 
+        infiniteRepeatable(tween(500), repeatMode = RepeatMode.Reverse), 
+        label = "AlarmAlpha"
+    )
     
-    val movingAlphaState = if (isThrottled) {
-        remember { mutableStateOf(1f) }
-    } else {
-        infiniteTransition.animateFloat(
-            0.5f, 1f, 
-            infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), 
-            label = "MovingAlpha"
-        )
-    }
-    val movingAlpha by movingAlphaState
+    val movingAlpha by gatedInfinitePulse(
+        0.5f, 1f, 
+        infiniteRepeatable(tween(800), repeatMode = RepeatMode.Reverse), 
+        label = "MovingAlpha"
+    )
     
     val localColor = if (mode == "viewer") ViewerCyan else BrandJd
     val peerColor = if (mode == "viewer") BrandJd else ViewerCyan
@@ -577,12 +559,11 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(text = telemetry.trackerState.name, color = stateColor.copy(alpha = if (telemetry.trackerState == TrackerState.MOVING && isTrackerGpsActive) movingAlpha else 1f), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)
-                        val animatedSpeedState = animateFloatAsState(
+                        val animatedSpeed by gatedAnimateFloatAsState(
                             if (isTrackerGpsActive && !telemetry.speedMps.isNaN()) telemetry.speedMps * 3.6f else 0f, 
-                            if (isThrottled) snap() else tween(1000), 
+                            tween(1000), 
                             label = "SpeedAnim"
                         )
-                        val animatedSpeed by animatedSpeedState
                         Text(
                             text = "${if (animatedSpeed < 10.0f) String.format(Locale.getDefault(), "%.1f", animatedSpeed) else animatedSpeed.toInt().toString()}km/h", 
                             color = stateColor, 
@@ -606,7 +587,7 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
                         }
 
                         Box(contentAlignment = Alignment.Center, modifier = Modifier.size(16.dp)) { 
-                            if (!isThrottled) {
+                            if (!LocalAnimationGating.current) {
                                 CircularProgressIndicator(
                                     progress = { progressValue }, 
                                     modifier = Modifier.size(14.dp), 
@@ -635,7 +616,7 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
                                 satsView = telemetry.viewerSatsView, gpsAgeMs = vAge, isLocPending = telemetry.isViewerLocPending, 
                                 locPendingReason = telemetry.viewerLocPendingReason, 
                                 isTelemetryFresh = telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), 
-                                isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS, isThrottled = isThrottled
+                                isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS
                             )
                         ) 
                     }
@@ -653,8 +634,7 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
                             isPeerActive = if(mode == "viewer") isPeerActive else true, 
                             isLocPending = telemetry.isTrackerLocPending, locPendingReason = telemetry.locationPendingReason, 
                             isTelemetryFresh = if (mode == "tracker") (telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isPeerActive, 
-                            isGpsFresh = isTrackerGpsActive, isUltraLongStationary = telemetry.isUltraLongStationary, 
-                            isThrottled = isThrottled
+                            isGpsFresh = isTrackerGpsActive, isUltraLongStationary = telemetry.isUltraLongStationary
                         )
                     )
                 }
@@ -671,24 +651,17 @@ fun StatusRowData(state: StatusRowState) {
     val contentColor = if (isConnStale) Slate500 else state.color
     val distColor = if (state.isTelemetryFresh && !isConnStale) (state.overrideDistanceColor ?: state.color) else Slate500
     
-    val infiniteTransition = rememberInfiniteTransition(label = "HandshakeAnimations")
-    val handshakeAlphaState = if (state.isThrottled) {
-        remember { mutableStateOf(1f) }
-    } else {
-        infiniteTransition.animateFloat(
-            0.3f, 1f, 
-            infiniteRepeatable(tween(1200), repeatMode = RepeatMode.Reverse),
-            label = "HandshakeAlpha"
-        )
-    }
-    val handshakeAlpha by handshakeAlphaState
+    val handshakeAlpha by gatedInfinitePulse(
+        0.3f, 1f, 
+        infiniteRepeatable(tween(1200), repeatMode = RepeatMode.Reverse),
+        label = "HandshakeAlpha"
+    )
     
-    val animatedBatteryState = animateIntAsState(
-        state.battery, 
-        if (state.isThrottled) snap() else tween(1500), 
+    val animatedBattery by gatedAnimateFloatAsState(
+        state.battery.toFloat(), 
+        tween(1500), 
         label = "BatteryAnim"
     )
-    val animatedBattery by animatedBatteryState
 
     Row(
         modifier = Modifier
@@ -697,8 +670,7 @@ fun StatusRowData(state: StatusRowState) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-             val labelAlphaState = animateFloatAsState(if (isConnStale) 0.5f else 1f, label = "LabelAlpha")
-             val labelAlpha by labelAlphaState
+             val labelAlpha by animateFloatAsState(if (isConnStale) 0.5f else 1f, label = "LabelAlpha")
              Text(
                  text = if (isConnStale) "${state.label} (OFFLINE)" else state.label,
                  color = contentColor.copy(alpha = if (isConnStale) handshakeAlpha else labelAlpha),
@@ -723,7 +695,7 @@ fun StatusRowData(state: StatusRowState) {
                      tint = if (!state.isTelemetryFresh) Slate500 else if (state.battery in 0..19) Color(0xFFF43F5E) else telemetryColor
                  )
                  Text(
-                     text = if(state.battery >= 0) "$animatedBattery%" else "--%",
+                     text = if(state.battery >= 0) "${animatedBattery.toInt()}%" else "--%",
                      color = telemetryColor,
                      fontSize = 8.sp,
                      fontWeight = FontWeight.Bold,
@@ -797,12 +769,11 @@ fun StatusRowData(state: StatusRowState) {
                     )
                 }
                 Spacer(Modifier.width(3.dp))
-                val animatedDistanceState = animateFloatAsState(
+                val animatedDistance by gatedAnimateFloatAsState(
                     if (state.distance == null || state.distance.isNaN()) 0f else state.distance.toFloat(),
-                    if (state.isThrottled) snap() else tween(1200),
+                    tween(1200),
                     label = "DistAnim"
                 )
-                val animatedDistance by animatedDistanceState
                 val distStr = when {
                     state.distance == null || state.distance.isNaN() -> "--"
                     animatedDistance >= 1000 -> String.format(Locale.getDefault(), "%.1fk", animatedDistance / 1000.0)

@@ -18,13 +18,12 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Oct.15.21:
+ * - SIMP-OCT15.20-S1: Animation Controller Composition. Removed redundant 
+ *   isMaliAnomaly parameter pass to TelemetryBox.
  * Oct.15.20:
  * - ISSUE-OCT15.20-F1: HUD Animation Gating. Passed isMaliAnomaly from 
  *   dashboardState to TelemetryBox to enforce driver-level freezing.
- * Oct.14.17:
- * - A15 Hardening [v14]: Using standard collectAsState to ensure flow 
- *   propagation on lower-end Mali GPUs. Removed NavHost logic to allow 
- *   direct rendering.
  */
 
 @Composable
@@ -122,7 +121,7 @@ fun TrackerDashboard(
                     trackerMaxTemp = dashboardState.trackerMaxTemp, viewerMaxTemp = dashboardState.viewerMaxTemp, peakShock = dashboardState.peakShock, vibrationFloor = dashboardState.vibrationFloor, luxBaseline = dashboardState.luxBaseline, 
                     acousticFloorDb = dashboardState.acousticFloorDb, trackerCurrentMa = currentMaValue, gpsIdx = gpsIdx, rttValue = rttValue, cpuLoad = dashboardState.cpuLoad, ioWait = dashboardState.ioWait, 
                     maxIoLatency = dashboardState.maxIoLatency, isUltraLongStationary = dashboardState.isUltraLongStationary, isSuspiciousNoise = dashboardState.isSuspiciousNoise, 
-                    isMaliAnomaly = dashboardState.isMaliAnomaly, onEvent = onEvent
+                    onEvent = onEvent
                 )
                 DebugTable(isLinkFresh = dashboardState.isLinkFresh, isTelemetryFresh = dashboardState.isTelemetryFresh, isGpsFresh = dashboardState.isGpsFresh, trackerStateName = dashboardState.trackerState.name, gpsAgeSec = if (kinematicState.localLocation.kinetic.gpsTs > 0) (systemPulse - kinematicState.localLocation.kinetic.gpsTs) / 1000 else -1L, rtt = rttValue, currentMa = currentMaValue)
                 Spacer(Modifier.height(16.dp))

@@ -1,18 +1,13 @@
-# Resolution Archive - GPS Tracker
+# Resolution Archive
 
-## 🏁 Oct15.20: HUD Animation Gating (ISSUE-OCT15.20-F1)
-- **Problem**: During Mali GPU driver anomalies, active UI animations in the Diagnostic HUD can exacerbate thread contention and lead to ANRs.
-- **Root Cause**: Animations like `movingAlpha` and `alertAlpha` continued to execute on the UI thread even when the GPU was stalled.
-- **Resolution**: Implemented animation gating in `OverlayComponents.kt` and `SharedUiComponents.kt`. Updated `HeaderBar`, `DashboardHeader`, and `StatusBar` to consume `isMaliAnomaly` and freeze animations into static states (using `snap()` or constant alpha) when driver stress is detected.
-- **SOT Impact**: Hardened UI stability for budget hardware during forensic anomalies.
+## ISSUE-OCT15.20-F1: HUD Animation Gating (Mali Hardening)
+- **Resolved**: Oct14.1
+- **Description**: Systematically gated non-critical UI animations (Speed, Battery, Distance, Moving Status, and System Alert Pulse) based on `isMaliAnomaly` health state.
+- **Outcome**: Reduced UI thread pressure during driver stalls. Substitutes active `InfiniteTransition` with static states.
 
-## 🏁 Oct14.1: Vibration Floor Jitter Hardening (ISSUE-OCT15.11-F1)
-- **Problem**: `Vibration Floor` field showing very high values on some A15 diagnostics.
-- **Resolution**: Implemented boundary clamping `[0.02, 2.0]` G in native (JNI) and JVM layers.
+## SIMP-OCT15.20-S1: Animation Controller Composition
+- **Resolved**: Oct14.1
+- **Description**: Centralized Mali animation gating using `LocalAnimationGating` and specialized Composable wrappers.
+- **Outcome**: Eliminated redundant parameter propagation across the UI layer and ensured architectural consistency for future components.
 
-## 🏁 Oct14.1: Proximity Debounce Hardening (ISSUE-OCT15.10-F2)
-- **Problem**: Extreme negative values in `Prox Debounce` on A15.
-- **Resolution**: Fixed assignment typo and implemented JNI result validation with safety clamping.
-
----
-*(Earlier entries archived)*
+...
