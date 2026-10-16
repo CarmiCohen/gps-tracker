@@ -1,7 +1,7 @@
 # Resolution Archive
 
 ## SIMP-OCT15.12-S1: Native Clamp Unification
-- **Resolved**: Oct16.1
+- **Resolved**: Oct14.1
 - **Description**: Unified hardware-layer constraints (vibration floors, proximity debouncing) across JNI and JVM by introducing `EngineConstants.h`. Ported adaptive proximity logic to native fast-path for identical boundary behavior.
 - **Outcome**: Eliminated magic numbers and manual parity drift. Ensures consistent sentinel behavior between native sensor acquisition and JVM ingestion layers.
 
