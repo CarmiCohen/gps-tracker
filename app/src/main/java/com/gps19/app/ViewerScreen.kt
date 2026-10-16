@@ -17,12 +17,13 @@ import com.gps19.core.engine.*
 
 /**
  * ViewerScreen: Viewer-mode UI.
+ * Oct.16.8:
+ * - ISSUE-OCT16.8-F3: HUD Occlusion Fix (Ch 4.11). Decoupled AppMapContainer 
+ *   from isAnyOverlayOpen and ensured Dashboard is suppressed when overlays 
+ *   are active in Portrait to prevent overlapping.
  * Oct.15.21:
  * - SIMP-OCT15.20-S1: Animation Controller Composition. Removed redundant 
  *   isMaliAnomaly parameter pass to TelemetryBox.
- * Oct.15.20:
- * - ISSUE-OCT15.20-F1: HUD Animation Gating. Passed isMaliAnomaly from 
- *   dashboardState to TelemetryBox to enforce driver-level freezing.
  */
 
 @Composable
@@ -34,6 +35,7 @@ fun ViewerScreen(
     val nav by stateProvider.navigation.collectAsStateWithLifecycle()
 
     val isMapVisible = nav.isMapVisible
+    val isAnyOverlayOpen = nav.isAnyOverlayOpen
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     
     Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -44,21 +46,27 @@ fun ViewerScreen(
                 Row(modifier = Modifier.fillMaxSize()) {
                     Column(modifier = Modifier.weight(1f).navigationBarsPadding()) {
                         Box(modifier = Modifier.weight(1f)) {
+                            // Issue #1421: Keep map in composition even if overlay is open
                             if (session.hydrationLevel >= 6 && isMapVisible) {
                                 AppMapContainer(stateProvider = stateProvider, onEvent = onMainEvent)
-                            } else if (session.hydrationLevel >= 4 && !isMapVisible) {
+                            }
+                            
+                            if (!isAnyOverlayOpen && session.hydrationLevel >= 4 && !isMapVisible) {
                                 ViewerDashboard(stateProvider = stateProvider, isDashboardExpanded = nav.isDashboardExpanded, onEvent = onMainEvent)
                             }
                         }
                     }
                 }
             } else {
+                // Issue #1421: Map remains visible behind HUD/Overlays (R-ID 588)
                 if (session.hydrationLevel >= 6 && isMapVisible) {
                     AppMapContainer(stateProvider = stateProvider, onEvent = onMainEvent)
                 }
+                
                 Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
                     Spacer(Modifier.height(82.dp)) // Reserve space for Unified HUD
-                    if (session.hydrationLevel >= 4 && !isMapVisible) {
+                    // Suppress dashboard if overlay is open in portrait to prevent overlap
+                    if (!isAnyOverlayOpen && session.hydrationLevel >= 4 && !isMapVisible) {
                         ViewerDashboard(stateProvider = stateProvider, isDashboardExpanded = nav.isDashboardExpanded, onEvent = onMainEvent)
                     }
                 }

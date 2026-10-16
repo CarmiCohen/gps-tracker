@@ -1,9 +1,19 @@
 # Resolution Archive
 
-## SOT ID 749: Project-Wide Hardening Audit (Oct16.7)
-- **Resolved**: Oct16.7
+## SOT ID 750: Chapter 4 Audit (Oct14.1)
+- **Resolved**: Oct14.1
+- **Description**: Completed manual testing protocol for Chapter 4 (Viewer Mode & Remote Sync). Hardened UI layering and role transition grace periods.
+- **Outcome**: 
+    - Resolved ISSUE-OCT16.8-F1 (Termination Dialog Visibility) via `DialogHost`.
+    - Resolved ISSUE-OCT16.8-F2 (Role Transition Grace) via 30s boot grace in `AppAlarmManager`.
+    - Resolved ISSUE-OCT16.8-F3 (HUD Occlusion) by decoupling map container from overlay gates.
+    - Resolved ISSUE-OCT16.8-F4 (Sentinel Z-Index) by migrating `AlarmOverlay` to a full-screen Dialog layer.
+    - Verified real-time remote alarm authority and acknowledgment idempotency.
+
+## SOT ID 749: Project-Wide Hardening Audit (Oct14.1)
+- **Resolved**: Oct14.1
 - **Description**: Completed manual testing protocol for Chapter 3 (Tracker Mode Operation) on physical A15 hardware.
-- **Outcome**: Verified stealth sentinel logic, service persistence, HUD telemetry accuracy, and map stability. Confirmed zero regressions in local diagnostic dashboard behavior. Version incremented to Oct16.7.
+- **Outcome**: Verified stealth sentinel logic, service persistence, HUD telemetry accuracy, and map stability. Confirmed zero regressions in local diagnostic dashboard behavior. Version incremented to Oct14.1.
 
 ## SOT ID 749: Project-Wide Test Audit (Oct14.1)
 - **Resolved**: Oct14.1

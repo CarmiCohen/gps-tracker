@@ -13,11 +13,11 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Oct.16.8:
+ * - ISSUE-OCT16.8-F2: Role Transition Grace Hardening. Added 30s startup grace 
+ *   to shouldPlaySiren() and fixed isTrackerMode synchronization in resetEvaluation.
  * Oct.13.30:
  * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
- * Oct.10.2:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
- *   TimeProvider and BootLifecycleAuthority APIs.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -101,6 +101,11 @@ class AppAlarmManager @Inject constructor(
     fun shouldPlaySiren(): Boolean {
         if (isTrackerMode) return false
         if (currentSettings.globalMute) return false
+        
+        // ISSUE-OCT16.8-F2: Startup Grace. Prevent immediate siren bursts 
+        // during engine initialization or role transition (R-ID 455).
+        val uptime = timeProvider.elapsedRealtime - evaluationState.serviceStartRt
+        if (uptime < HARDWARE_BOOT_GRACE_MS && evaluationState.serviceStartRt > 0) return false
         
         synchronized(evaluationState.activeAlarms) {
             val hasSpecialUnresolved = evaluationState.activeAlarms.values.any { 
@@ -414,6 +419,7 @@ class AppAlarmManager @Inject constructor(
     fun resetEvaluation(role: AppRole? = null) {
         if (role != null) {
             this.currentRole = role
+            this.isTrackerMode = (role == AppRole.TRACKER)
         }
         synchronized(evaluationState.activeAlarms) { evaluationState.activeAlarms.clear() }
         persistActiveAlarms()
