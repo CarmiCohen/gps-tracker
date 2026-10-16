@@ -17,6 +17,7 @@ import javax.inject.Inject
  * HardeningAuditTest: Verifies Chapter 12.2 Hardening requirements.
  * Validates Anomaly Correlation (R133), Heat Mitigation (R191), 
  * and Recovery Latency (R192) logic.
+ * Oct.16.3: Formalized state reset via SIMP-OCT16.3-S1.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -32,6 +33,9 @@ class HardeningAuditTest {
     @Before
     fun init() {
         hiltRule.inject()
+        // Issue #SIMP-OCT16.3-S1: Formalized global state reset.
+        GpsApplication.resetTestStates()
+
         runBlocking {
             integrityMonitor.resetStats()
         }

@@ -38,6 +38,8 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.16.4:
+ * - SIMP-OCT16.3-S1: Updated version tag to Oct16.4_PLATINUM.
  * Oct.16.3:
  * - ISSUE-OCT16.2-F1: Updated version tag to Oct16.3_PLATINUM.
  * Oct.16.2:
@@ -122,7 +124,7 @@ fun MainAppContent(
 
                 Column(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)) {
                     Text("UI_READY", color = Color.Green.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text("Oct16.3_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
+                    Text("Oct16.4_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
                 }
             }
         }

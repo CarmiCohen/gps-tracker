@@ -1,7 +1,12 @@
 # Resolution Archive
 
+## SIMP-OCT16.3-S1: Test State Pre-warming
+- **Resolved**: Oct14.1
+- **Description**: Formalized the pattern of pre-warming global `AtomicBoolean` states (like `isOsmReady`) in base application class (`GpsApplication.resetTestStates()`, `prewarmOsmState()`) and standardized its use across instrumented tests (`HydrationStaggeringAuditTest`, `ProductionReadinessAuditTest`, `HardeningAuditTest`, `ForensicStressAuditTest`).
+- **Outcome**: Standardized state reset/initialization across all instrumented tests, preventing intermittent failures due to unexpected application states or leftover residue from previous runs. (SOT ID 748).
+
 ## ISSUE-OCT16.2-F1: Hydration Test Timeout
-- **Resolved**: Oct16.3
+- **Resolved**: Oct14.1
 - **Description**: Fixed OSM readiness stall in `HydrationStaggeringAuditTest` by pre-setting `isOsmReady` in test init and increasing coroutine timeout to 20s for A15 stability.
 - **Outcome**: Restored 100% Android Test pass rate on physical A15 hardware. Prevents the 25s initialization loop from triggering test timeouts. (SOT ID 747).
 

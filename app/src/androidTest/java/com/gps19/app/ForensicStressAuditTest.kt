@@ -17,11 +17,10 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * ForensicStressAuditTest: Verifies Forensic Integrity and Stress stability.
+ * Oct.16.3: Formalized state reset via SIMP-OCT16.3-S1.
  * Oct.13.7: 
  * - Updated tearDown to runBlocking for suspendable LogRepository cleanups.
  * - Improved burst loop to track and assert successful writes (Diagnosing 755/1000 under-count).
- * Oct.13.6: 
- * - Integrated 'isTestMode' and 'resetForTest()' to guarantee strict test isolation.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -37,6 +36,9 @@ class ForensicStressAuditTest {
 
     @Before
     fun init() {
+        // Issue #SIMP-OCT16.3-S1: Formalized global state reset.
+        GpsApplication.resetTestStates()
+
         // Set test mode globally to inhibit background interference
         LogRepository.setTestMode(true)
         hiltRule.inject()

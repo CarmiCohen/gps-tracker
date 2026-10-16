@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.ComponentCallbacks2
 import android.os.Process
 import android.os.Build
+import androidx.annotation.VisibleForTesting
 import androidx.hilt.work.HiltWorkerFactory
 import org.osmdroid.tileprovider.modules.SqlTileWriter
 import org.osmdroid.config.Configuration as OsmConfig
@@ -27,15 +28,13 @@ import com.gps19.core.engine.CommandEvent
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Oct.16.3:
+ * - SIMP-OCT16.3-S1: Test State Pre-warming. Added resetTestStates() and 
+ *   prewarmOsmState() to formalize global state initialization for 
+ *   instrumented tests. Standardized LogRepository test mode reset.
  * Oct.13.8:
  * - Issue #SIMP-OCT12.18-S1: Pruning Scheduler. Integrated PruningWorker 
  *   into the deferred startup sequence.
- * Oct.2.2:
- * - Issue #1416: Memory Pressure Mitigation (R-ID 592). Integrated CommandEvent.TriggerMemoryFlush 
- *   emission into onTrimMemory to ensure the engine flushes its caches under system pressure.
- * Sep.15.04:
- * - Context Shadowing Automation (#1047): Integrated getOpPackageName shadowing 
- *   directly into the application lifecycle.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -56,6 +55,27 @@ class GpsApplication : Application(), Configuration.Provider {
 
         fun getCachedString(key: String, provider: () -> String): String {
             return stringCache.getOrPut(key, provider)
+        }
+
+        /**
+         * resetTestStates: Standardizes global state reset for instrumented tests.
+         * Part of SIMP-OCT16.3-S1.
+         */
+        @VisibleForTesting
+        fun resetTestStates() {
+            isOsmReady.set(false)
+            stringCache.clear()
+            intCache.clear()
+            LogRepository.setTestMode(false)
+        }
+
+        /**
+         * prewarmOsmState: Forces OSM to 'ready' state to bypass initialization 
+         * delays in performance-sensitive tests. Part of SIMP-OCT16.3-S1.
+         */
+        @VisibleForTesting
+        fun prewarmOsmState() {
+            isOsmReady.set(true)
         }
     }
 

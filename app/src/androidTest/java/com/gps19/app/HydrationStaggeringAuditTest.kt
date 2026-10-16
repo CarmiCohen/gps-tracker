@@ -24,6 +24,7 @@ import kotlin.math.sqrt
  * LifecycleHydrationManager across role lifecycles under extreme CPU/IO loads.
  * Resolves Strategic Resumption Goal under Issue #1338.
  * Sep.23.50: Verified full sequence 0-11 re-entrancy under peak resource contention.
+ * Oct.16.3: Formalized OSM pre-warming via SIMP-OCT16.3-S1.
  * Oct.16.2: Fixed OSM readiness stall by pre-setting isOsmReady in test init.
  */
 @HiltAndroidTest
@@ -43,9 +44,8 @@ class HydrationStaggeringAuditTest {
     fun init() {
         hiltRule.inject()
         hydrationManager.reset()
-        // Ensure OSM is marked as ready to avoid the 25s wait loop in LifecycleHydrationManager
-        // which would otherwise exceed the test timeout of 15s.
-        GpsApplication.isOsmReady.set(true)
+        // Issue #SIMP-OCT16.3-S1: Utilize formalized pre-warming to avoid 25s wait loop.
+        GpsApplication.prewarmOsmState()
     }
 
     @Test

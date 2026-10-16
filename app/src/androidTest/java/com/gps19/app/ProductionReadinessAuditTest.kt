@@ -43,6 +43,11 @@ object TestPowerModule {
         MockPowerStateProvider(delegate = real)
 }
 
+/**
+ * ProductionReadinessAuditTest: Validates system behavior under production-like 
+ * soak and pressure conditions.
+ * Oct.16.3: Formalized state reset via SIMP-OCT16.3-S1.
+ */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
 class ProductionReadinessAuditTest {
@@ -85,6 +90,9 @@ class ProductionReadinessAuditTest {
     @Before
     fun init() {
         hiltRule.inject()
+        // Issue #SIMP-OCT16.3-S1: Formalized global state reset.
+        GpsApplication.resetTestStates()
+
         mockPowerStateProvider.useDelegate = false
         mockPowerStateProvider.isIdle = false
         forensicSpillBufferProvider.get().resetBufferForTest()
