@@ -1,5 +1,10 @@
 # Resolution Archive
 
+## SOT ID 749: Project-Wide Test Audit (Oct16.6)
+- **Resolved**: Oct16.6
+- **Description**: Executed full unit test suite, hardening audit tests, and DataStore mutation stress tests on physical A15 hardware for the Oct16.6 baseline. 
+- **Outcome**: Confirmed 100% pass rate. Manual verification of TEST_PROCEDURE Chapter 2 completed successfully on A15.
+
 ## SOT ID 749: Project-Wide Test Audit
 - **Resolved**: Oct14.1
 - **Description**: Executed full unit test suite, hardening audit tests, and DataStore mutation stress tests on physical A15 hardware. 
