@@ -18,12 +18,13 @@ import com.gps19.core.engine.*
 
 /**
  * TrackerScreen: Tracker-mode UI.
+ * Oct.16.8:
+ * - ISSUE-OCT16.8-F3: HUD Occlusion Fix (Ch 4.11). Decoupled AppMapContainer 
+ *   from isAnyOverlayOpen to ensure the map remains visible in the background 
+ *   during overlay operations.
  * Oct.15.21:
  * - SIMP-OCT15.20-S1: Animation Controller Composition. Removed redundant 
  *   isMaliAnomaly parameter pass to TelemetryBox.
- * Oct.15.20:
- * - ISSUE-OCT15.20-F1: HUD Animation Gating. Passed isMaliAnomaly from 
- *   dashboardState to TelemetryBox to enforce driver-level freezing.
  */
 
 @Composable
@@ -31,7 +32,6 @@ fun TrackerScreen(
     stateProvider: UiStateProvider,
     onMainEvent: (UiEvent) -> Unit
 ) {
-    // Oct.14.17: Force direct collection to bypass A15 state stalls
     val nav by stateProvider.navigation.collectAsState()
     val session by stateProvider.session.collectAsState()
 
@@ -49,21 +49,28 @@ fun TrackerScreen(
                 Row(modifier = Modifier.fillMaxSize()) {
                     Column(modifier = Modifier.weight(1f).navigationBarsPadding()) {
                         Box(modifier = Modifier.weight(1f)) {
-                            if (isMapVisible && !isAnyOverlayOpen) {
+                            // Issue #1421: Keep map in composition even if overlay is open
+                            if (isMapVisible) {
                                 AppMapContainer(stateProvider = stateProvider, onEvent = onMainEvent)
-                            } else {
+                            }
+                            
+                            if (isAnyOverlayOpen) {
+                                // Overlay covers the map/dashboard area in landscape if not using Dialogs
+                            } else if (!isMapVisible) {
                                 TrackerDashboard(stateProvider = stateProvider, onEvent = onMainEvent)
                             }
                         }
                     }
                 }
             } else {
-                if (isMapVisible && !isAnyOverlayOpen) {
+                // Issue #1421: Ensure map is not removed when overlay is open (R-ID 588)
+                if (isMapVisible) {
                     AppMapContainer(stateProvider = stateProvider, onEvent = onMainEvent)
                 }
+                
                 Column(modifier = Modifier.fillMaxSize().navigationBarsPadding()) {
                     Spacer(Modifier.height(82.dp))
-                    if (!isMapVisible) {
+                    if (!isMapVisible && !isAnyOverlayOpen) {
                         TrackerDashboard(stateProvider = stateProvider, onEvent = onMainEvent)
                     }
                 }

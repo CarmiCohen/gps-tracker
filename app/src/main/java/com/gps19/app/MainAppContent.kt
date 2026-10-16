@@ -23,6 +23,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -31,19 +33,18 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.gps19.core.engine.STARTUP_SETTLING_DELAY_MS
+import com.gps19.core.engine.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
- * Oct.16.7:
- * - Version increment for full project audit.
- * Oct.16.5:
- * - Version increment for full project audit.
- * Oct.16.4:
- * - SIMP-OCT16.3-S1: Updated version tag to Oct16.4_PLATINUM.
+ * Oct.16.8:
+ * - ISSUE-OCT16.8-F1: Fixed missing StopTrackingConfirmationDialog.
+ * - ISSUE-OCT16.8-F4: Sentinel Z-Index Hardening (Ch 4.8). Moved AlarmOverlay 
+ *   to DialogHost to ensure it supersedes all navigation overlays.
+ * - SIMP-OCT16.8-S1: Implemented DialogHost for unified transient dialog management.
  */
 @Composable
 fun MainAppContent(
@@ -107,6 +108,17 @@ fun MainAppContent(
 
                 OverlayHost(viewModel = viewModel, navigationState = navigationState)
 
+                DialogHost(
+                    viewModel = viewModel,
+                    uiState = uiState,
+                    hudState = hudState,
+                    showBackgroundDisclosure = showBackgroundDisclosure,
+                    onBackgroundDisclosureDismiss = { confirmed ->
+                        showBackgroundDisclosure = false
+                        viewModel.onEvent(UiEvent.ConfirmBackgroundDisclosure(confirmed, navigationState.pendingMode ?: ""))
+                    }
+                )
+
                 AnimatedVisibility(
                     visible = sessionState.hydrationLevel < 3 && mode != null,
                     enter = fadeIn(),
@@ -124,35 +136,73 @@ fun MainAppContent(
 
                 Column(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)) {
                     Text("UI_READY", color = Color.Green.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text("Oct16.7_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
+                    Text("Oct16.8_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
                 }
             }
         }
     }
+}
 
+@Composable
+private fun DialogHost(
+    viewModel: MainViewModel,
+    uiState: MainUiState,
+    hudState: HudState,
+    showBackgroundDisclosure: Boolean,
+    onBackgroundDisclosureDismiss: (Boolean) -> Unit
+) {
+    val navigationState = uiState.navigation
+    val sessionState = uiState.session
+    val hudHealth = hudState.health
+    
+    // 1. Critical Alarm Sentinel (R-ID 582/1402). High-Z window priority.
+    if (hudHealth.isRedScreenVisible && sessionState.appMode == "viewer") {
+        Dialog(
+            onDismissRequest = { viewModel.onEvent(UiEvent.DismissAlarms) },
+            properties = DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            BackHandler { viewModel.onEvent(UiEvent.DismissAlarms) }
+            AlarmOverlay(
+                stateProvider = viewModel,
+                onHardwarePermissionClick = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
+                onMute = { 
+                    val causes = hudHealth.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
+                    viewModel.onEvent(UiEvent.StopSiren(causes))
+                },
+                onClose = { viewModel.onEvent(UiEvent.DismissAlarms) },
+                onGoToMap = { viewModel.onEvent(UiEvent.DismissAlarms); viewModel.onEvent(UiEvent.ToggleMap(true)) }
+            )
+        }
+    }
+
+    // 2. Stop Tracking Confirmation (R-ID 512)
+    if (navigationState.isStopTrackingConfirmationVisible) {
+        StopTrackingConfirmationDialog(
+            onConfirm = { viewModel.onEvent(UiEvent.ConfirmStopTracking) },
+            onDismiss = { viewModel.onEvent(UiEvent.ShowStopTrackingConfirmation(false)) }
+        )
+    }
+
+    // 3. Background Disclosure (R-ID 513)
     if (showBackgroundDisclosure) {
         AlertDialog(
-            onDismissRequest = { 
-                showBackgroundDisclosure = false
-                viewModel.onEvent(UiEvent.ConfirmBackgroundDisclosure(false, navigationState.pendingMode ?: ""))
-            },
+            onDismissRequest = { onBackgroundDisclosureDismiss(false) },
             title = { Text(stringResource(R.string.perm_background_title)) },
             text = { Text(stringResource(R.string.perm_background_desc)) },
             confirmButton = {
-                Button(onClick = {
-                    showBackgroundDisclosure = false
-                    viewModel.onEvent(UiEvent.ConfirmBackgroundDisclosure(true, navigationState.pendingMode ?: ""))
-                }) { Text(stringResource(R.string.perm_background_btn_accept)) }
+                Button(onClick = { onBackgroundDisclosureDismiss(true) }) {
+                    Text(stringResource(R.string.perm_background_btn_accept))
+                }
             },
             dismissButton = { 
-                Button(onClick = { 
-                    showBackgroundDisclosure = false
-                    viewModel.onEvent(UiEvent.ConfirmBackgroundDisclosure(false, navigationState.pendingMode ?: ""))
-                }) { Text(stringResource(R.string.perm_background_btn_reject)) } 
+                Button(onClick = { onBackgroundDisclosureDismiss(false) }) {
+                    Text(stringResource(R.string.perm_background_btn_reject))
+                } 
             }
         )
     }
 
+    // 4. Identity Sanitization (R-ID 514)
     if (uiState.settings.isIdentitySanitized) {
         AlertDialog(
             onDismissRequest = { viewModel.onEvent(UiEvent.DismissIdentitySanitization) },
@@ -161,6 +211,28 @@ fun MainAppContent(
             confirmButton = { Button(onClick = { viewModel.onEvent(UiEvent.DismissIdentitySanitization) }) { Text(stringResource(R.string.btn_dismiss)) } }
         )
     }
+}
+
+@Composable
+private fun StopTrackingConfirmationDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.stop_tracking_title)) },
+        text = { Text(stringResource(R.string.stop_tracking_desc, 30)) },
+        confirmButton = {
+            Button(onClick = onConfirm, colors = ButtonDefaults.buttonColors(containerColor = Rose500)) {
+                Text(stringResource(R.string.btn_stop_tracking))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.btn_cancel))
+            }
+        }
+    )
 }
 
 @Composable
@@ -228,10 +300,6 @@ fun OverlayHost(
     viewModel: MainViewModel,
     navigationState: NavigationState
 ) {
-    val hudState by viewModel.hudState.collectAsStateWithLifecycle()
-    val sessionState by viewModel.session.collectAsStateWithLifecycle()
-    val hudHealth = hudState.health
-
     if (navigationState.isSettingsOpen) {
         SettingsOverlay(stateProvider = viewModel, onEvent = { event -> viewModel.onEvent(event) })
     } else if (navigationState.isLogVisible) {
@@ -249,19 +317,5 @@ fun OverlayHost(
         GnssDetailOverlay(gnssDetailFlow = viewModel.activeGnssDetail, onClose = { viewModel.onEvent(UiEvent.ToggleGnssDetail(false)) })
     } else if (navigationState.isPhoneSetupVisible) {
         PhoneSetupOverlay(stateProvider = viewModel, onEvent = { viewModel.onEvent(it) })
-    }
-
-    if (hudHealth.isRedScreenVisible && sessionState.appMode == "viewer") {
-        BackHandler { viewModel.onEvent(UiEvent.DismissAlarms) }
-        AlarmOverlay(
-            stateProvider = viewModel,
-            onHardwarePermissionClick = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
-            onMute = { 
-                val causes = hudHealth.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
-                viewModel.onEvent(UiEvent.StopSiren(causes))
-            },
-            onClose = { viewModel.onEvent(UiEvent.DismissAlarms) },
-            onGoToMap = { viewModel.onEvent(UiEvent.DismissAlarms); viewModel.onEvent(UiEvent.ToggleMap(true)) }
-        )
     }
 }

@@ -16,12 +16,13 @@ import javax.inject.Singleton
 
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
+ * Oct.16.8:
+ * - ISSUE-OCT16.8-F1: Fixed StopTracking dialog dismissal. Explicitly reset 
+ *   isStopTrackingConfirmationVisible in ConfirmStopTracking handler.
  * Oct.15.10:
  * - ISSUE-OCT15.10-F5: Tracker Restriction. Enforced "Viewer-Only" rule for 
  *   geofence modifications. Guarded Add/Remove/Clear events and ensured 
  *   geofenceMode resets to IDLE when entering Tracker mode.
- * Oct.13.21:
- * - SIMP-OCT13.21-S1: Pure Event Architecture.
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -122,7 +123,8 @@ class UiEventCoordinator @Inject constructor(
                 onDiagnosticUpdate { it.apply { reset() } }
                 onStateUpdate { it.copy(
                     session = it.session.copy(isSystemActive = false, appMode = null),
-                    settings = it.settings.copy(isSafeMode = false)
+                    settings = it.settings.copy(isSafeMode = false),
+                    navigation = it.navigation.copy(isStopTrackingConfirmationVisible = false)
                 ) }
                 repository.setSafeMode(false)
                 scope.launch(Dispatchers.IO) { 

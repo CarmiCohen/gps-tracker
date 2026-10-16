@@ -26,12 +26,13 @@ import kotlin.math.*
 
 /**
  * MonitorService: Unified role-reactive background service for Tracker and Viewer modes.
+ * Oct.16.8:
+ * - ISSUE-OCT16.8-F2: Role Transition Grace Period. Reset serviceStartRealtime 
+ *   during handleRoleTransition to ensure grace periods (Bootstrap/Discovery) 
+ *   are honored in the new role, preventing immediate alarms (e.g. Tracker Offline).
  * Oct.13.21:
  * - ISSUE-OCT13.20-L1: Dead Code Cleanup. Removed unused lastGpsBearing, 
  *   lastKnownLocation, and lastGpsSpeed.
- * - Fix: Corrected typo RIBBON_NOIE_SCALE_DB to RIBBON_NOISE_SCALE_DB.
- * Oct.12.18:
- * - Issue #ISSUE-OCT12.13-11: Temporal Jitter Hardening.
  */
 @AndroidEntryPoint
 class MonitorService : BaseMonitorService() {
@@ -260,6 +261,11 @@ class MonitorService : BaseMonitorService() {
         
         sessionCoordinator.resetSession(role = currentRole, processors = listOf(primaryProcessor, remoteProcessor), onReset = {
             locationBuffer.clear()
+            // Issue #1428 / ISSUE-OCT16.8-F2: Reset session start times to honor 
+            // grace periods in new role. Prevents immediate false-positive alarms 
+            // during Bootstrap/Discovery phases.
+            serviceStartRealtime = timeProvider.elapsedRealtime
+            serviceStartWall = timeProvider.currentTimeMillis
         })
 
         activeMode = newMode

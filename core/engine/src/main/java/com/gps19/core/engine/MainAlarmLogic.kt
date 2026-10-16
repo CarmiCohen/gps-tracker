@@ -5,11 +5,16 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Oct.16.9:
+ * - ISSUE-OCT16.9-F1: Fixed Regression in Viewer Remote Alarm Authority. 
+ *   Removed isTracker guards from physical violations (Power, Tamper, Tilt, etc.) 
+ *   to ensure Viewers correctly detect and siren for remote tracker violations (R872).
+ * Oct.16.8:
+ * - ISSUE-OCT16.8-F2: Role Transition Grace Hardening. 
+ *   Applied isRelayRecovering grace to local connectivity and peer offline alarms.
  * Oct.14.0:
  * - SIMP-OCT14.13-S2: Integrated EntityBrandingProvider for centralized 
  *   mode-aware naming.
- * Oct.13.21:
- * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump logic (R-ID 601).
  */
 object MainAlarmLogic {
 
@@ -151,6 +156,7 @@ object MainAlarmLogic {
         val canCheckPeerErrors = phase == DiscoveryPhase.MONITORING
         val isInternetHardwareOk = health.isHardwareOnline
         val isRelayConnected = state.isRelayConnected
+        val isRelayRecovering = uptimeRt < HARDWARE_BOOT_GRACE_MS + ADAPTATION_SETTLING_MS
         
         val wasRelayOfflineRecently = (state.lastRelayOfflineRt > 0 && nowRt - state.lastRelayOfflineRt < CONNECTIVITY_HYSTERESIS_MS)
         val shouldSuppressPeerErrors = !isInternetHardwareOk || !isRelayConnected || wasRelayOfflineRecently
@@ -159,7 +165,7 @@ object MainAlarmLogic {
             type = ALERT_ID_LOCAL_INTERNET,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_LOCAL_INTERNET),
             subtitle = "This device has no internet access",
-            conditionMet = health.localInternetLoss
+            conditionMet = health.localInternetLoss && !isRelayRecovering
         )
 
         val relayOfflineSustained = !isRelayConnected && isInternetHardwareOk && 
@@ -169,14 +175,14 @@ object MainAlarmLogic {
             type = ALERT_ID_RELAY_OFFLINE,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_RELAY_OFFLINE),
             subtitle = "Internet is OK but relay unreachable",
-            conditionMet = relayOfflineSustained
+            conditionMet = relayOfflineSustained && !isRelayRecovering
         )
 
         report.getOrCreate(idx++).update(
             type = ALERT_ID_TRACKER_OFFLINE,
             title = getTrackerTitleCached(isTracker, if (isTracker) ALERT_TITLE_VIEWER_OFFLINE else ALERT_TITLE_TRACKER_OFFLINE),
             subtitle = "Device is not connected to relay server",
-            conditionMet = canCheckPeerErrors && !state.isTrackerConnected && !shouldSuppressPeerErrors
+            conditionMet = canCheckPeerErrors && !state.isTrackerConnected && !shouldSuppressPeerErrors && !isRelayRecovering
         )
 
         report.getOrCreate(idx++).update(
@@ -195,7 +201,6 @@ object MainAlarmLogic {
             technicalDetails = if (visualJumpMet) "Tier: ${state.jumpTier}" else null
         )
 
-        val isRelayRecovering = uptimeRt < HARDWARE_BOOT_GRACE_MS + ADAPTATION_SETTLING_MS
         val isSignalLossMet = canCheckPeerErrors && health.signalLoss && !shouldSuppressPeerErrors && !isGpsWarmupActive && !isRelayRecovering
 
         report.getOrCreate(idx++).update(
@@ -285,7 +290,7 @@ object MainAlarmLogic {
             type = ALERT_ID_TRACKER_TILT,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_TRACKER_TILT),
             subtitle = if (isTilt) String.format(Locale.getDefault(), "%.1f° tilt", health.tiltDegrees) else "Tilt violation",
-            conditionMet = if (isTracker) isTilt else false, 
+            conditionMet = isTilt, 
             extremeValue = health.tiltDegrees
         )
 
@@ -293,7 +298,7 @@ object MainAlarmLogic {
             type = ALERT_ID_TRACKER_ACOUSTIC,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_TRACKER_ACOUSTIC),
             subtitle = if (isAcousticMet) String.format(Locale.getDefault(), "%.1f dB peak (Base: %.1f)", health.acousticDb, health.acousticFloorDb) else "Acoustic violation",
-            conditionMet = if (isTracker) isAcousticMet else false,
+            conditionMet = isAcousticMet,
             extremeValue = health.acousticDb,
             technicalDetails = if (isAcousticMet && health.isLocationPending) "LOCATION_PENDING: ${health.locationPendingReason.name}" else null
         )
@@ -302,7 +307,7 @@ object MainAlarmLogic {
             type = ALERT_ID_TRACKER_LIFT,
             title = getTrackerTitleCached(isTracker, ALERT_TITLE_TRACKER_LIFT),
             subtitle = if (isLift) "Lift: ${String.format(Locale.getDefault(), "%.1f", liftDelta)}m" else "Lift violation",
-            conditionMet = if (isTracker) isLift else false,
+            conditionMet = isLift,
             extremeValue = abs(liftDelta)
         )
 
