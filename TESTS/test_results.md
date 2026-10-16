@@ -34,9 +34,27 @@ This document tracks the historical and current manual test results based on the
 *   **2.7 Connection Sticky-State (Issue #1422):**
     *   **Status (Oct.16.6):** 🟢 **Logical: PASSED** | 🟢 **Physical: PASSED** (URL change forces reconnection).
 
+## Chapter 3 - Tracker Mode Operation
+*   **3.1 Main Screen Completeness:**
+    *   **Status (Oct.16.7):** 🟢 **Physical: PASSED** (HUD elements verified on A15).
+*   **3.2 Physical Sentinel & Stealth Audit (Issue #1391):**
+    *   **Status (Oct.16.7):** 🟢 **Logical: PASSED** (Stealth suppression verified via logs; local device silent/dark).
+*   **3.3 Service Persistence:**
+    *   **Status (Oct.16.7):** 🟢 **Physical: PASSED** (Foreground notification persists after swiping away app).
+*   **3.4 Status Row Presentation (Issue #1176, #1178):**
+    *   **Status (Oct.16.7):** 🟢 **Physical: PASSED** (GNSS transitioned to numeric `11`; Temp shows `°`).
+*   **3.5 Tracker Map Stability (Issue #1383):**
+    *   **Status (Oct.16.7):** 🟢 **Physical: PASSED** (Zoom buttons stable; no autonomous looping).
+*   **3.6 HUD Velocity Logic (Issue #1386):**
+    *   **Status (Oct.16.7):** 🟢 **Logical: PASSED** (Speed 0.0 suppresses "MOVING" status).
+*   **3.7 Dashboard Continuity (Issue #1414):**
+    *   **Status (Oct.16.7):** 🟢 **Logical: PASSED** (Dashboard active in local-only mode).
+*   **3.8 StatusBar Visual & Logic Hardening (Issue #1423):**
+    *   **Status (Oct.16.7):** 🟢 **Logical: PASSED** (Vertical stacking and positive GPS age verified).
+
 ## Chapter 7 - Architectural Integrity & Performance
 *   **7.3 Engine Thread Safety (Issue #1410 / R-ID 585):**
     *   **Status (Oct.16.6):** 🟢 **Logical: PASSED** (250Hz sensor audit crash-free).
 
 ---
-*Updated Oct 16, 2024, for version Oct16.6 audit.*
+*Updated Oct 16, 2024, for version Oct16.7 audit (Chapter 3).*

@@ -1,18 +1,22 @@
-# Project Handover - Oct16.6 (Hardening & Chapter 2 Audit)
+# Project Handover - Oct16.7 (Chapter 3 Audit)
 
-## 🟢 Status: All Tests Verified (Oct16.6)
-The project has completed a full hardening audit and manual verification of Chapter 2 (Setup & Configuration). All tests passed on physical A15 hardware. Version incremented to `Oct16.6`.
+## 🟢 Status: Chapter 3 Verified (Oct16.7)
+Completed the manual testing protocol for **Chapter 3 (Tracker Mode Operation)** on physical A15 hardware. All telemetry, stealth, and persistence logic verified as per R872 and Issue #1391. Version incremented to `Oct16.7`.
 
-## 🛠️ Critical Hardening Details (Oct16.6)
+## 🛠️ Chapter 3 Verification Details (Oct16.7)
 
-### 1. Hardening & Stress Audit (SOT ID 749)
-- **Hardening**: Verified `HardeningAuditTest` logic for R133 (Anomaly Correlation) and R191 (Heat Mitigation). 
-- **Stress**: `DataStoreMutationStressTest` confirmed atomic safety under 250Hz load.
-- **Manual**: Chapter 2 protocol verified. Confirmed Issue #1179 (Geofence batch persistence) and Issue #1422 (Connection sticky-state resolution).
+### 1. Stealth & Sentinel (Issue #1391)
+- **Stealth Audit**: Verified Tracker remains silent and dark during violations. Suppression logged in `CommandRouter`.
+- **Persistence**: Verified foreground service resilience after task removal in Recents.
+- **HUD Formatting**: Verified SI units (`°`), satellite transition (`--/--` to numeric), and zero-velocity status suppression (`PARKING`).
 
-### 2. Versioning
-- **app/build.gradle**: `versionName` set to `Oct16.6`.
-- **Branding**: Footer reflects `Oct16.6_PLATINUM`.
+### 2. UI & Mapping Stability
+- **StatusBar**: Verified Portrait vertical stacking and positive GPS age.
+- **Map**: Verified zoom button stability and interaction safety (Issue #1383).
+
+### 3. Versioning
+- **app/build.gradle**: `versionName` set to `Oct16.7`.
+- **Branding**: Footer reflects `Oct16.7_PLATINUM`.
 
 ## 📊 Forensic Pulse & Metrics
 - **SOT Count**: 441 (Rules: 279).
@@ -20,6 +24,6 @@ The project has completed a full hardening audit and manual verification of Chap
 - **Strategic Ideas**: 31.
 
 ## 🔴 Open Forensic Gaps
-- *None.* Focused on stability baseline.
+- *None.* Focused on baseline stability.
 
 **HANDOVER COMPLETE. STOP ALL PROCESSING.**
