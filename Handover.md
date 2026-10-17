@@ -1,32 +1,24 @@
-# Project Handover - Oct14.1 (JNI Telemetry & Throttling Hardened)
+# Project Handover - Oct17.2 (Verification & Sync Complete)
 
-## 🟢 Status: JNI FastPath Autonomy & Throttling Parity Verified
-Successfully hardened the JNI telemetry pipeline. All evaluation placeholders for Acoustic and Vibration sensors have been replaced with authoritative C++ implementations. Cross-sensor memory pressure throttling is now synchronized across the native/JVM boundary.
+## 🟢 Status: JNI FastPath Autonomy & Documentation Synchronized
+Successfully verified the JNI telemetry pipeline and synchronized all documentation to the current version `Oct17.2`. The "Source of Truth" (SoT) metrics have been audited and aligned across the project dashboard.
 
-## 🛠️ Oct14.1 Implementation Details
+## 🛠️ Oct17.2 Implementation Details
 
-### 1. Resolved: JNI Telemetry Integration Hardening (ISSUE-OCT16.11-F1, R-ID 603)
-- **Files**: `app/src/main/cpp/jdhardware-jni.cpp`, `EngineConstants.h`
-- **Fix**: 
-    - Migrated Acoustic spike detection to JNI (`n22`) using shared `FastPathConfig`.
-    - Implemented Vibration status evaluation for `isJammingCandidate` and `muzzleResetTriggered` in JNI (`n19`).
-    - Synced physics thresholds between `EngineConstants.kt` and `EngineConstants.h`.
+### 1. Documentation & Version Synchronization (Oct17.2 Alignment)
+- **Files**: `issues.md`, `Handover.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, `STATUS/RESOLUTION_ARCHIVE.md`
+- **Action**: Synchronized all headers and metadata tags to `Oct17.2` to match `app/build.gradle`. Updated the Hardening Progress Dashboard to reflect the latest audit state.
 
-### 2. Resolved: JNI Memory Pressure Throttling Parity (ISSUE-OCT16.11-F2)
-- **Files**: `JdHardwareManager.kt`, `HardwareSuite.kt`, `EngineModels.kt`
-- **Fix**: 
-    - Added `isMemoryPressureThrottled` flag to `AcousticBatch` and `ProximityBatch`.
-    - Updated JNI paths `n19`, `n22`, and `n23` to propagate the global native memory pressure state (`g_lastMemLevel`).
-    - Ensured consistent load-shedding behavior across all high-frequency sensor streams.
+### 2. Forensic Metric Realignment
+- **Action**: Verified the "Testing" metric at 23 (Sub-items: 162) following the integration of `NativeThrottlingStressTest.kt`.
 
-### 3. Verified: Native Throttling Stress Test (ISSUE-OCT16.11-F3)
-- **New Test**: `NativeThrottlingStressTest.kt` (Instrumented).
-- **Result**: Confirmed that simulated critical memory pressure correctly triggers throttling flags in all sensor batches via JNI shared state.
+### 3. Simplicity Audit
+- **Action**: Documented `SIMP-OCT17.1-S1` in `issues.md` regarding centralized version management to prevent future sync overhead.
 
 ## 📊 Forensic Pulse & Metrics
 - **SOT Count**: 446 (Rules: 284).
 - **Open Gaps**: 0.
-- **Strategic Ideas**: 35.
+- **Strategic Ideas**: 36.
 - **Testing**: 23 (Sub-items: 162).
 
 **HANDOVER COMPLETE. STOP ALL PROCESSING.**

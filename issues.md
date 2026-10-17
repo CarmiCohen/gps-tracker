@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct14.1
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct17.2
 
 ## 🎯 Current Resumption Focus: Full Project Test Cycle & Hardening Verification
 
@@ -7,7 +7,8 @@
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 35)
+## 💡 Strategic Simplification Ideas (Ideas: 36)
+*   **SIMP-OCT17.1-S1: Centralized Versioning Authority (Low).** Consider moving the `versionName` to a central `constants.gradle` or `libs.versions.toml` that all `.md` status files can reference via a script to prevent manual synchronization overhead.
 *   **SIMP-OCT16.11-S1: JNI FastPath Vectorization (Medium).** Explore NEON/SIMD for vibration batch processing to further reduce CPU load on ARMv8 devices.
 *   **SIMP-OCT16.10-S1: JNI Buffer Schema Generator (High).** Create a simple script to generate both Kotlin `ByteBuffer` offsets and C++ `struct` offsets from a single YAML definition to prevent future alignment regressions.
 *   **SIMP-OCT16.2-S1: Repository State Projection (Low).** Consider extracting a `StateProvider` interface from `MainRepository` to allow UseCases to observe specific sub-states without full repository access.
@@ -17,6 +18,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **DOC-OCT17.2: Version Synchronization.** Aligned all status documentation with `app/build.gradle` (Oct17.2).
 *   **ISSUE-OCT16.11-F1: JNI Telemetry Integration Hardening.** Migrated Acoustic spike detection and advanced Vibration gates (Jamming, Muzzle, Pressure) from Kotlin placeholders to full C++ implementations. Verified physics-parity in `EngineConstants.h`. (R-ID 603, SOT ID 753).
 *   **ISSUE-OCT16.9-F2: Regression: Vibration Telemetry NaN in HUD.** Resolved HUD `NaNG` by hardening JNI `n19` with `isnan()` guards and enforcing strict 8-byte alignment for 64-bit primitives in the shared buffer. (R-ID 602).
 *   **ISSUE-OCT16.9-F1: Regression: Viewer Remote Alarm Authority Broken.** Fixed regression where `isTracker` guards prevented Viewers from siren-alerting for remote physical violations. Verified via `AlarmStealthTest`.
@@ -26,6 +28,8 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct17.2: [SOT Count: 446 (Rules: 284), Open: H:0, M:0, L:0, Ideas: H:1, M:13, L:22, Testing: 23 (Sub-items: 162), QA: 366]**
+- **Oct17.1: [SOT Count: 446 (Rules: 284), Open: H:0, M:0, L:0, Ideas: H:1, M:13, L:22, Testing: 23 (Sub-items: 162), QA: 365]**
+- **Oct14.1: [SOT Count: 446 (Rules: 284), Open: H:0, M:0, L:0, Ideas: H:1, M:13, L:21, Testing: 23 (Sub-items: 162), QA: 364]**
 - **Oct14.1: [SOT Count: 446 (Rules: 284), Open: H:0, M:0, L:0, Ideas: H:1, M:13, L:21, Testing: 22 (Sub-items: 160), QA: 362]**
 - **Oct14.1: [SOT Count: 445 (Rules: 283), Open: H:0, M:0, L:0, Ideas: H:1, M:12, L:21, Testing: 22 (Sub-items: 160), QA: 361]**
-- **Oct14.1: [SOT Count: 444 (Rules: 282), Open: H:1, M:0, L:0, Ideas: H:0, M:12, L:21, Testing: 22 (Sub-items: 160), QA: 360]**
