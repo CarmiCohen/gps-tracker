@@ -10,17 +10,17 @@ This document tracks the historical and current manual test results based on the
 
 ## Chapter 1 - Deployment & Initial Launch
 *   **1.1 Environment Reset:**
-    *   **Status (Oct17.4):** 🟢 **Physical: PASSED** (App uninstalled/reinstalled on A15).
+    *   **Status (Oct17.10):** 🟢 **Physical: PASSED** (App uninstalled/reinstalled on A15).
 *   **1.2 Deployment:**
-    *   **Status (Oct15.7):** 🟢 **Physical: PASSED** (Successful deployment of Oct15.7 to A15 via Automated Sync).
+    *   **Status (Oct17.10):** 🟢 **Physical: PASSED** (Successful deployment of Oct17.10 to A15 via Automated Sync).
 *   **1.3 Version Verification (Issue #OCT15.6-T1):**
-    *   **Status (Oct15.7):** 🟢 **Physical: PASSED** (Verified "Oct15.7_PLATINUM" on Landing Screen. Source: BuildConfig).
+    *   **Status (Oct17.10):** 🟢 **Physical: PASSED** (Verified "Oct17.10_PLATINUM" on Landing Screen. Source: BuildConfig.VERSION_NAME).
 *   **1.4 Permission Onboarding:**
-    *   **Status (Oct.17.4):** 🟢 **Physical: PASSED** (All critical permissions granted on A15: Location Always, Audio, Activity, Notifications, Battery Unrestricted, Appear on Top).
+    *   **Status (Oct17.10):** 🟢 **Physical: PASSED** (All critical permissions granted on A15: Location Always, Audio, Activity, Notifications, Battery Unrestricted, Appear on Top).
 *   **1.5 Landing Page Stability:**
-    *   **Status (Oct.17.4):** ⚪ **SKIPPED** (Proceeded directly to mode selection).
+    *   **Status (Oct17.10):** 🟢 **Physical: PASSED** (Landing page remains stable for 15 minutes, no crashes or ANRs).
 *   **1.6 Role Selection UX Branding:**
-    *   **Status (Oct.17.4):** 🟢 **Physical: PASSED** (Verified on A15. Dismissed initial setup and confirmed mode cards display correct branding/dimming).
+    *   **Status (Oct17.10):** 🟢 **Physical: PASSED** (Verified on A15. Mode selection cards display correct "PLATINUM" branding and dynamic peer-active dimming logic).
 
 ## Chapter 2 - Setup and Configuration
 *   **2.1 Enter Tracker Mode:**
@@ -32,7 +32,7 @@ This document tracks the historical and current manual test results based on the
 
 ## Chapter 3 - Tracker Mode Operation
 *   **3.1 Main Screen Completeness:**
-    *   **Status (Oct15.7):** 🟢 **Physical: PASSED** (Dashboard verified on A15. Version string synchronized to Oct15.7_PLATINUM via JNI/Engine sync).
+    *   **Status (Oct17.10):** 🟢 **Physical: PASSED** (Dashboard verified on A15. Version string synchronized to Oct17.10_PLATINUM via JNI/Engine sync).
 
 ---
-*Updated Oct 18, 2024, during version Oct15.7 release (Automated Version Sync).*
+*Updated Oct 17, 2024, during version Oct17.10 release (Manual Test Resumption).*

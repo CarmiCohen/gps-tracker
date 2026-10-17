@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct14.1)
+# SOT Master Requirements & Hardening Status (Oct17.10)
 
 ## 🏗️ Architectural Master Rules (286 Rules)
 
@@ -11,8 +11,8 @@
 ...
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 757**: Automated Version Synchronization - PASSED. Centralized versioning in `gradle.properties` and refactored UI/Engine to use `BuildConfig.VERSION_NAME`. (Oct14.1 - SIMP-OCT15.6-S1).
-*   **SOT ID 756**: Version Name Verification - PASSED. Implemented formal version verification step in Chapter 1.3 of the Test Procedure. (Oct14.1 - ISSUE-OCT15.6-T1).
+*   **SOT ID 757**: Automated Version Synchronization - PASSED. Centralized versioning in `gradle.properties` and refactored UI/Engine to use `BuildConfig.VERSION_NAME`. (Oct17.10 - TEST-OCT17.10-1).
+*   **SOT ID 756**: Version Name Verification - PASSED. Implemented formal version verification step in Chapter 1.3 of the Test Procedure. (Oct17.10 - TEST-OCT17.10-1).
 *   **SOT ID 734**: JNI Alignment Hardening - PASSED. Replaced direct pointer casting with `memcpy` for all 8-byte primitives in `jdhardware-jni.cpp`, resolving `NaNG` telemetry on Samsung A15. (Oct14.1 - ISSUE-OCT17.4-F1).
 *   **SOT ID 733**: History Buffer Optimization - PASSED. Refactored forensic history flows to use `HistoryBuffer`. (Oct14.1 - SIMP-OCT15.1-S1).
 
@@ -21,5 +21,6 @@
 ---
 
 ## ✅ Verification Chapters
-*   **Chapter 1.3 (Version Verification)**: PASSED - Verified "Oct14.1_PLATINUM" on Landing Screen of A15 via automated sync. (Oct14.1).
+*   **Chapter 1.3 (Version Verification)**: PASSED - Verified "Oct17.10_PLATINUM" on Landing Screen of A15 via automated sync. (Oct17.10).
+*   **Chapter 1.4 (Permission Onboarding)**: PASSED - Verified all critical permission gates on A15 hardware. (Oct17.10).
 *   **Chapter 31.809 (JNI Alignment Hardening)**: PASSED - Verified numeric telemetry pulse on A15 Dashboard after JNI refactor. (Oct14.1).
