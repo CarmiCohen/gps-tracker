@@ -17,6 +17,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * ForensicStressAuditTest: Verifies Forensic Integrity and Stress stability.
+ * Oct.17.11: Fixed verifySpillBufferWrapAroundStability by inhibiting drainer during the test.
  * Oct.16.3: Formalized state reset via SIMP-OCT16.3-S1.
  * Oct.13.7: 
  * - Updated tearDown to runBlocking for suspendable LogRepository cleanups.
@@ -54,8 +55,7 @@ class ForensicStressAuditTest {
             // 3. Clear the memory-mapped buffer
             spillBuffer.resetBufferForTest()
             
-            // 4. Now that we are isolated, manually start the drainer for this test session
-            logRepository.triggerManualDrainer()
+            // 4. Manual trigger of drainer only for burst tests where we want to see convergence
         }
     }
     
@@ -70,6 +70,9 @@ class ForensicStressAuditTest {
 
     @Test
     fun verifySustainedBurstIntegrity() = runBlocking {
+        // Explicitly start drainer for convergence test
+        logRepository.triggerManualDrainer()
+
         // 1. High-frequency 100Hz burst (10ms)
         val burstCount = 1000 
         val intervalMs = 10L
@@ -132,6 +135,9 @@ class ForensicStressAuditTest {
 
     @Test
     fun verifySpillBufferWrapAroundStability() = runBlocking {
+        // Ensure drainer is STOPPED for this test to verify "Full" reporting correctly
+        logRepository.stopBackgroundTasks()
+
         val overflowCount = FORENSIC_SPILL_CAPACITY + 100
         var writes = 0
         repeat(overflowCount) {
@@ -143,7 +149,7 @@ class ForensicStressAuditTest {
             if (success) writes++
         }
         
-        assertTrue("Buffer should have accepted at least capacity", writes >= FORENSIC_SPILL_CAPACITY)
-        assertTrue("Buffer should report full", spillBuffer.isFull())
+        assertTrue("Buffer should have accepted at least capacity (Actual: $writes)", writes >= FORENSIC_SPILL_CAPACITY)
+        assertTrue("Buffer should report full (Actual count: ${spillBuffer.getPendingCount()})", spillBuffer.isFull())
     }
 }
