@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vOct.3.7)
+# Test Procedure - GPS Tracker (vOct15.6)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -11,11 +11,14 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   Uninstall any existing versions of the app from the test device to clear shared preferences and local databases.
 *   **1.2 Deployment:** 
     *   Deploy the latest build via Android Studio.
-*   **1.3 Permission Onboarding:** 
+*   **1.3 Version Verification (Issue #OCT15.6-T1):**
+    *   **Action:** Observe the version string displayed at the bottom of the Landing Screen or in Settings.
+    *   **Verification:** Confirm the string matches the expected release version (e.g., `Oct15.6_PLATINUM`).
+*   **1.4 Permission Onboarding:** 
     *   Launch the app and grant all requested permissions.
-*   **1.4 Landing Page Stability:** 
+*   **1.5 Landing Page Stability:** 
     *   Stay on the landing page for 15 minutes.
-*   **1.5 Role Selection UX Branding (Issue #1177):**
+*   **1.6 Role Selection UX Branding (Issue #1177):**
     *   **Action:** Launch app with no remote peer active.
     *   **Verification:** Confirm "VIEWER MODE" card is dimmed (`Slate500`). Activate a remote tracker and verify card color transitions to `ViewerCyan` automatically.
 
@@ -139,4 +142,4 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ---
 **Total Testing Chapters: 100**
-*(Full historical procedure synchronized Oct.3.7)*
+*(Full historical procedure synchronized Oct15.6)*

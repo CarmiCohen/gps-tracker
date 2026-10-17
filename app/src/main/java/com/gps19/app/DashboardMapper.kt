@@ -4,13 +4,12 @@ import com.gps19.core.engine.*
 
 /**
  * DashboardMapper: Centralized authority for dashboard state transformations.
+ * Oct.15.6:
+ * - Version Synchronization (Issue #OCT15.6-T1): Updated engine version string to Oct15.6.
+ * Oct.17.4:
+ * - Version Synchronization: Updated engine version string to Oct17.4.
  * Oct.16.2:
  * - SIMP-OCT15.10-S1: Test Utility Decoupling. Updated engine version string to Oct16.2.
- * Oct.15.20:
- * - ISSUE-OCT15.20-F1: HUD Animation Gating. Updated engine version string to Oct15.20.
- * Oct.15.12:
- * - ISSUE-OCT15.11-F1: Vibration Floor Jitter Hardening. Updated engine version string to Oct15.12.
- * Oct.14.21: Extracted from MainViewModel to reduce complexity and improve testability.
  */
 object DashboardMapper {
 
@@ -37,7 +36,7 @@ object DashboardMapper {
             sinceDiscoMs = if (activeStats.lastDiscTs > 0) (nowRt - activeStats.lastDiscTs) else 0L,
             totalDropMs = activeStats.totalDropMs,
             maxDropMs = activeStats.maxDropMs,
-            engineVersion = "Oct16.2",
+            engineVersion = "Oct15.6",
             netInterface = diag.connectivity.netInterface,
             systemPulse = nowRt,
             isLocalOnline = diag.connectivity.isLocalOnline,

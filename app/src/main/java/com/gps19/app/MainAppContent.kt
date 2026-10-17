@@ -40,6 +40,10 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.15.6:
+ * - Version Synchronization (Issue #OCT15.6-T1): Updated hardcoded version label to Oct15.6_PLATINUM.
+ * Oct.17.4:
+ * - Version Synchronization: Updated hardcoded version label to Oct17.4_PLATINUM.
  * Oct.16.8:
  * - ISSUE-OCT16.8-F1: Fixed missing StopTrackingConfirmationDialog.
  * - ISSUE-OCT16.8-F4: Sentinel Z-Index Hardening (Ch 4.8). Moved AlarmOverlay 
@@ -136,7 +140,7 @@ fun MainAppContent(
 
                 Column(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)) {
                     Text("UI_READY", color = Color.Green.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text("Oct16.8_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
+                    Text("Oct15.6_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
                 }
             }
         }

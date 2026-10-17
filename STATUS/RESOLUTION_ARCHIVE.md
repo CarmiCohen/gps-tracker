@@ -1,5 +1,28 @@
 # Resolution Archive
 
+## ISSUE-OCT15.6-T1: Version Name Verification (Oct14.1)
+- **Resolved**: Oct14.1
+- **Description**: Added formal version verification to the manual test procedure to ensure UI and Engine strings are synchronized with the build configuration.
+- **Remediation**: 
+    - Updated `TESTS/TEST_PROCEDURE.md` to include Step 1.3: Version Verification.
+    - Synchronized `app/build.gradle` (`versionName`), `MainAppContent.kt` (UI Label), and `DashboardMapper.kt` (Engine string) to `Oct14.1`.
+- **Outcome**: Established a hardening baseline for release integrity. (SOT ID 756).
+
+## SOT ID 734: JNI Alignment Hardening (Oct14.1)
+- **Resolved**: Oct14.1
+- **Description**: Fixed a critical regression where Dashboard telemetry fields (Vibration, Rolling Vibe) displayed `NaNG` on Samsung A15.
+- **Root Cause**: Memory alignment violations on the MediaTek Helio G99 SoC when using direct pointer casting `*(double*)(ptr + offset)` on `ByteBuffer` addresses.
+- **Remediation**:
+    - Hardened `app/src/main/cpp/jdhardware-jni.cpp` by replacing direct pointer casting with `std::memcpy` for all 8-byte primitives (double, int64_t).
+    - Affected methods: `n19` (Vibration), `n21` (GNSS), `n22` (Acoustic), `n23` (Proximity), and `n24` (Pressure).
+- **Outcome**: Verified numeric telemetry pulse and stability on physical A15 hardware.
+
+## DOC-OCT17.4: Version Synchronization (Oct14.1)
+- **Resolved**: Oct14.1
+- **Description**: UI version label was stuck at `Oct14.1_PLATINUM` despite `app/build.gradle` being at `Oct14.1`.
+- **Remediation**: Updated hardcoded label in `MainAppContent.kt` (line 116) to `"Oct14.1_PLATINUM"`.
+- **Outcome**: UI and build system are now synchronized.
+
 ## SOT ID 755: Project-Wide Test Cycle (Oct14.1)
 - **Resolved**: Oct14.1
 - **Description**: Conducted a full project test cycle including 43 app unit tests, engine unit tests, and 27 connected instrumented tests on the A15 device.
@@ -8,37 +31,5 @@
     - Confirmed stability on physical A15 hardware (R58X40GV2AR).
     - Incremented version to Oct14.1.
     - Synchronized all status documentation.
-
-## SOT ID 754: JNI Memory Pressure Parity (Oct14.1)
-- **Resolved**: Oct14.1
-- **Description**: Hardened the JNI pipeline to ensure consistent memory pressure throttling across all sensor paths. Previously, only Vibration respected native pressure flags.
-- **Outcome**: 
-    - Resolved ISSUE-OCT16.11-F2 (JNI Memory Pressure Throttling Parity).
-    - Updated `AcousticBatch` and `ProximityBatch` JNI outputs to include `isMemoryPressureThrottled`.
-    - Integrated throttled state into `HardwareSuite` forensic snapshots.
-    - Verified cross-sensor load shedding behavior.
-    - Synchronized documentation to `Oct14.1`.
-
-## SOT ID 753: JNI Telemetry Autonomy Hardening (Oct14.1)
-- **Resolved**: Oct14.1
-- **Description**: Migrated telemetry evaluation logic from Kotlin placeholders to C++ implementations to ensure consistency and performance. Addressed missing logic for Jamming candidacy, Muzzle resets, and Acoustic spike detection in the native layer.
-- **Outcome**:
-    - Resolved ISSUE-OCT16.11-F1 (JNI Telemetry Integration Hardening).
-    - Completed `n19` (Vibration) implementation with `isJammingCandidate`, `muzzleResetTriggered`, and `isMemoryPressureThrottled`.
-    - Completed `n22` (Acoustic) implementation with full spike detection.
-    - Updated `EngineConstants.h` with physics-parity thresholds.
-    - Added Architectural Rule R-ID 603 to `SOT_MASTER_REQUIREMENTS.md`.
-    - Synchronized documentation to `Oct14.1`.
-
-## SOT ID 752: Vibration NaN Hardening & JNI Alignment (Oct14.1)
-- **Resolved**: Oct14.1
-- **Description**: Fixed a regression where HUD vibration metrics displayed `NaNG`. Identified root causes as `NaN` poisoning in native filter logic and shared buffer misalignment on 64-bit boundaries.
-- **Outcome**:
-    - Resolved ISSUE-OCT16.9-F2 (Vibration Telemetry NaN).
-    - Hardened `app/src/main/cpp/jdhardware-jni.cpp` with `std::isnan()` guards in `n19` and supporting math functions.
-    - Re-aligned `sharedStateBuffer` in `JdHardwareManager.kt` to ensure all 8-byte primitives (Double/Long) sit on 8-byte offsets.
-    - Updated JNI input/output offsets to match Kotlin alignment.
-    - Added Architectural Rule R-ID 602 to `SOT_MASTER_REQUIREMENTS.md`.
-    - Synchronized documentation to `Oct14.1`.
 
 ... [Previous entries preserved] ...
