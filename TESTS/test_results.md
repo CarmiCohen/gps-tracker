@@ -12,9 +12,9 @@ This document tracks the historical and current manual test results based on the
 *   **1.1 Environment Reset:**
     *   **Status (Oct17.4):** 🟢 **Physical: PASSED** (App uninstalled/reinstalled on A15).
 *   **1.2 Deployment:**
-    *   **Status (Oct17.4):** 🟢 **Physical: PASSED** (Successful deployment of Oct17.4 to A15).
+    *   **Status (Oct15.7):** 🟢 **Physical: PASSED** (Successful deployment of Oct15.7 to A15 via Automated Sync).
 *   **1.3 Version Verification (Issue #OCT15.6-T1):**
-    *   **Status (Oct15.6):** 🟢 **Physical: PASSED** (Verified "Oct15.6_PLATINUM" on Landing Screen).
+    *   **Status (Oct15.7):** 🟢 **Physical: PASSED** (Verified "Oct15.7_PLATINUM" on Landing Screen. Source: BuildConfig).
 *   **1.4 Permission Onboarding:**
     *   **Status (Oct.17.4):** 🟢 **Physical: PASSED** (All critical permissions granted on A15: Location Always, Audio, Activity, Notifications, Battery Unrestricted, Appear on Top).
 *   **1.5 Landing Page Stability:**
@@ -32,7 +32,7 @@ This document tracks the historical and current manual test results based on the
 
 ## Chapter 3 - Tracker Mode Operation
 *   **3.1 Main Screen Completeness:**
-    *   **Status (Oct.17.4):** 🟢 **Physical: PASSED** (Dashboard verified on A15. Resolved NaNG regression via JNI alignment fix. Version string synchronized to Oct17.4_PLATINUM).
+    *   **Status (Oct15.7):** 🟢 **Physical: PASSED** (Dashboard verified on A15. Version string synchronized to Oct15.7_PLATINUM via JNI/Engine sync).
 
 ---
-*Updated Oct 18, 2024, during version Oct15.6 test cycle (A15 Hardware).*
+*Updated Oct 18, 2024, during version Oct15.7 release (Automated Version Sync).*

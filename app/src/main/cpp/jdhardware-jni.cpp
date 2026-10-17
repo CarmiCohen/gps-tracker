@@ -192,15 +192,27 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 256) return -1;
     uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
 
-    // Aligned Inputs (matching Kotlin Oct.16.10 offsets)
-    double x = *(double*)(ptr + 0), y = *(double*)(ptr + 8), z = *(double*)(ptr + 16);
-    double lx = *(double*)(ptr + 24), ly = *(double*)(ptr + 32), lz = *(double*)(ptr + 40);
-    double floor = *(double*)(ptr + 48), cpu = *(double*)(ptr + 56);
-    int isWarming = *(int*)(ptr + 64);
-    // 68: Padding
-    double lastRaw = *(double*)(ptr + 72), lastHpf = *(double*)(ptr + 80), energy = *(double*)(ptr + 88);
-    double snr = *(double*)(ptr + 96), thermal = *(double*)(ptr + 104), heap = *(double*)(ptr + 112);
-    int64_t nowRt = *(int64_t*)(ptr + 120);
+    // ISSUE-OCT17.4-F1: Hardened alignment-safe access using memcpy for MediaTek SoC stability.
+    double x, y, z, lx, ly, lz, floor, cpu, lastRaw, lastHpf, energy, snr, thermal, heap;
+    int32_t isWarming;
+    int64_t nowRt;
+
+    std::memcpy(&x, ptr + 0, 8);
+    std::memcpy(&y, ptr + 8, 8);
+    std::memcpy(&z, ptr + 16, 8);
+    std::memcpy(&lx, ptr + 24, 8);
+    std::memcpy(&ly, ptr + 32, 8);
+    std::memcpy(&lz, ptr + 40, 8);
+    std::memcpy(&floor, ptr + 48, 8);
+    std::memcpy(&cpu, ptr + 56, 8);
+    std::memcpy(&isWarming, ptr + 64, 4);
+    std::memcpy(&lastRaw, ptr + 72, 8);
+    std::memcpy(&lastHpf, ptr + 80, 8);
+    std::memcpy(&energy, ptr + 88, 8);
+    std::memcpy(&snr, ptr + 96, 8);
+    std::memcpy(&thermal, ptr + 104, 8);
+    std::memcpy(&heap, ptr + 112, 8);
+    std::memcpy(&nowRt, ptr + 120, 8);
 
     if (std::isnan(x)) x = 0.0; if (std::isnan(y)) y = 0.0; if (std::isnan(z)) z = 0.0;
     if (std::isnan(lx)) lx = 0.0; if (std::isnan(ly)) ly = 0.0; if (std::isnan(lz)) lz = 0.0;
@@ -227,31 +239,31 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     if (std::isnan(nextEnergy)) nextEnergy = 0.0;
 
     double dynamicGate = nextFloor * 1.5 * ((cpu > SENSOR_LOAD_GATE_CPU_THRESHOLD_VAL) ? 2.0 : 1.0);
-    int isStationary = (delta < dynamicGate) ? 1 : 0;
+    int32_t isStationary = (delta < dynamicGate) ? 1 : 0;
     if (isStationary) {
         if (g_stationaryStartRt == 0) g_stationaryStartRt = nowRt;
     } else { g_stationaryStartRt = 0; }
 
-    // Oct.16.11: Implementation of formerly placeholder logic
     double loadFactor = (cpu > SENSOR_LOAD_GATE_CPU_THRESHOLD_VAL) ? 1.5 : 1.0;
     double suspiciousThreshold = std::max((0.05 + (0.45 - 0.05) * 0.5) * loadFactor, nextFloor * VIBRATION_SUSPICIOUS_MULTIPLIER_VAL * loadFactor);
-    int isSuspicious = (delta > suspiciousThreshold) ? 1 : 0;
-    int isMemThrottled = (g_lastMemLevel > 0) ? 1 : 0;
-    int muzzleReset = (delta > VIBRATION_SHOCK_THRESHOLD_G_VAL) ? 1 : 0;
-    int isJamming = (snr > 0.0 && snr < JUMP_GATE_LOW_SNR_THRESHOLD_VAL && delta > 0.5) ? 1 : 0;
+    int32_t isSuspicious = (delta > suspiciousThreshold) ? 1 : 0;
+    int32_t isMemThrottled = (g_lastMemLevel > 0) ? 1 : 0;
+    int32_t muzzleReset = (delta > VIBRATION_SHOCK_THRESHOLD_G_VAL) ? 1 : 0;
+    int32_t isJamming = (snr > 0.0 && snr < JUMP_GATE_LOW_SNR_THRESHOLD_VAL && delta > 0.5) ? 1 : 0;
 
     // Aligned Outputs
-    *(double*)(ptr + 128) = delta;
-    *(double*)(ptr + 136) = nextFloor;
-    *(double*)(ptr + 144) = nextHpf;
-    *(double*)(ptr + 152) = nextEnergy;
-    *(int*)(ptr + 160) = isStationary;
-    *(int*)(ptr + 164) = isSuspicious;
-    *(int*)(ptr + 168) = isMemThrottled;
-    // 172: Padding
-    *(int64_t*)(ptr + 176) = (isStationary && g_stationaryStartRt > 0) ? (nowRt - g_stationaryStartRt) : 0;
-    *(int*)(ptr + 184) = muzzleReset;
-    *(int*)(ptr + 188) = isJamming;
+    std::memcpy(ptr + 128, &delta, 8);
+    std::memcpy(ptr + 136, &nextFloor, 8);
+    std::memcpy(ptr + 144, &nextHpf, 8);
+    std::memcpy(ptr + 152, &nextEnergy, 8);
+    std::memcpy(ptr + 160, &isStationary, 4);
+    std::memcpy(ptr + 164, &isSuspicious, 4);
+    std::memcpy(ptr + 168, &isMemThrottled, 4);
+
+    int64_t stationaryDur = (isStationary && g_stationaryStartRt > 0) ? (nowRt - g_stationaryStartRt) : 0;
+    std::memcpy(ptr + 176, &stationaryDur, 8);
+    std::memcpy(ptr + 184, &muzzleReset, 4);
+    std::memcpy(ptr + 188, &isJamming, 4);
 
     return 0;
 }
@@ -268,14 +280,27 @@ JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n21(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 1040) return -1;
     uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
-    int count = std::min(*(int*)(ptr + 0), 64), usedCount = 0, snrCount = 0;
+
+    int32_t rawCount;
+    std::memcpy(&rawCount, ptr + 0, 4);
+    int count = std::min(rawCount, 64), usedCount = 0, snrCount = 0;
+
     float* cn0s = (float*)(ptr + 260); int* usedInFix = (int*)(ptr + 516); double snrSum = 0.0;
     for (int i = 0; i < count; i++) {
-        if (usedInFix[i] != 0) usedCount++;
-        if (cn0s[i] > 0.0f && !std::isnan(cn0s[i])) { snrSum += cn0s[i]; snrCount++; }
+        int32_t used;
+        std::memcpy(&used, usedInFix + i, 4);
+        if (used != 0) usedCount++;
+
+        float cn0;
+        std::memcpy(&cn0, cn0s + i, 4);
+        if (cn0 > 0.0f && !std::isnan(cn0)) { snrSum += cn0; snrCount++; }
     }
-    *(int*)(ptr + 1040) = count; *(int*)(ptr + 1044) = usedCount;
-    *(double*)(ptr + 1048) = (snrCount > 0) ? (snrSum / snrCount) : 0.0;
+
+    std::memcpy(ptr + 1040, &count, 4);
+    std::memcpy(ptr + 1044, &usedCount, 4);
+    double avgSnr = (snrCount > 0) ? (snrSum / snrCount) : 0.0;
+    std::memcpy(ptr + 1048, &avgSnr, 8);
+
     return 0;
 }
 
@@ -285,12 +310,16 @@ Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz, jshortArray 
     uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
 
     // Aligned Inputs
-    int readCount = *(int*)(ptr + 0);
-    // 4: Padding
-    double baseAlpha = *(double*)(ptr + 8);
-    double vibeRolling = *(double*)(ptr + 16);
-    int64_t nowRt = *(int64_t*)(ptr + 24);
-    int isWarming = *(int*)(ptr + 32);
+    int32_t readCount;
+    double baseAlpha, vibeRolling;
+    int64_t nowRt;
+    int32_t isWarming;
+
+    std::memcpy(&readCount, ptr + 0, 4);
+    std::memcpy(&baseAlpha, ptr + 8, 8);
+    std::memcpy(&vibeRolling, ptr + 16, 8);
+    std::memcpy(&nowRt, ptr + 24, 8);
+    std::memcpy(&isWarming, ptr + 32, 4);
 
     if (std::isnan(baseAlpha)) baseAlpha = 0.01;
     if (std::isnan(vibeRolling)) vibeRolling = 0.0;
@@ -303,7 +332,6 @@ Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz, jshortArray 
     double db = (maxAmp > 0) ? (20.0 * std::log10((double)maxAmp)) : 0.0;
     if (std::isnan(db)) db = 0.0;
 
-    // Oct.16.11: Spike detection implementation
     FastPathConfig& cfg = g_fastPathConfigs[FASTPATH_ACOUSTIC];
     double vibeFactor = (vibeRolling > 0.5) ? std::max(0.01, 1.0 - ((vibeRolling - 0.5) / 1.0)) : 1.0;
     double alpha = (isWarming) ? 0.0 : (baseAlpha * vibeFactor);
@@ -316,7 +344,7 @@ Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz, jshortArray 
         }
     }
 
-    int isSpike = 0;
+    int32_t isSpike = 0;
     if ((db - cfg.baseline) > cfg.threshold && db >= cfg.minThreshold) {
         if (nowRt - cfg.lastTriggerRt > cfg.debounceMs) {
             cfg.lastTriggerRt = nowRt;
@@ -325,13 +353,12 @@ Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz, jshortArray 
     }
 
     // Aligned Outputs
-    *(int*)(ptr + 128) = maxAmp;
-    // 132 Padding
-    *(double*)(ptr + 136) = db;
-    *(int*)(ptr + 144) = isSpike;
-    // 148 Padding
-    *(int64_t*)(ptr + 152) = cfg.lastTriggerRt;
-    *(int*)(ptr + 160) = (g_lastMemLevel > 0) ? 1 : 0; // Oct.16.11: Memory pressure throttling
+    std::memcpy(ptr + 128, &maxAmp, 4);
+    std::memcpy(ptr + 136, &db, 8);
+    std::memcpy(ptr + 144, &isSpike, 4);
+    std::memcpy(ptr + 152, &cfg.lastTriggerRt, 8);
+    int32_t isMemThrottled = (g_lastMemLevel > 0) ? 1 : 0;
+    std::memcpy(ptr + 160, &isMemThrottled, 4);
 
     return 0;
 }
@@ -342,25 +369,29 @@ Java_com_gps19_app_JdHardwareManager_n23(JNIEnv* env, jclass clazz) {
     uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
 
     // Aligned Inputs
-    double dist = *(double*)(ptr + 0), maxRange = *(double*)(ptr + 8);
-    int64_t nowRt = *(int64_t*)(ptr + 16);
-    int isStationary = *(int*)(ptr + 24);
-    // 28: Padding
-    int64_t stationaryDuration = *(int64_t*)(ptr + 32);
-    int isHighLoad = *(int*)(ptr + 40);
-    // 44: Padding
-    double currentIdx = *(double*)(ptr + 48);
-    int rawNear = *(int*)(ptr + 56), isFlickering = *(int*)(ptr + 60);
+    double dist, maxRange, currentIdx;
+    int64_t nowRt, stationaryDuration;
+    int32_t isStationary, isHighLoad, rawNear, isFlickering;
+
+    std::memcpy(&dist, ptr + 0, 8);
+    std::memcpy(&maxRange, ptr + 8, 8);
+    std::memcpy(&nowRt, ptr + 16, 8);
+    std::memcpy(&isStationary, ptr + 24, 4);
+    std::memcpy(&stationaryDuration, ptr + 32, 8);
+    std::memcpy(&isHighLoad, ptr + 40, 4);
+    std::memcpy(&currentIdx, ptr + 48, 8);
+    std::memcpy(&rawNear, ptr + 56, 4);
+    std::memcpy(&isFlickering, ptr + 60, 4);
 
     if (std::isnan(dist)) dist = maxRange + 1.0;
     if (std::isnan(currentIdx)) currentIdx = 0.0;
 
-    int newValue = (dist < maxRange);
+    int32_t newValue = (dist < maxRange);
     double rawIdx = std::max(0.0, std::min(1.0, 1.0 - (dist / maxRange)));
     double nextIdx = (currentIdx * (1.0 - PROXIMITY_EMA_ALPHA)) + (rawIdx * PROXIMITY_EMA_ALPHA);
     if (std::isnan(nextIdx)) nextIdx = currentIdx;
 
-    int nextRawNear = rawNear;
+    int32_t nextRawNear = rawNear;
     int64_t debounceMs = 0;
 
     if (newValue != rawNear) {
@@ -378,11 +409,11 @@ Java_com_gps19_app_JdHardwareManager_n23(JNIEnv* env, jclass clazz) {
     }
 
     // Aligned Outputs
-    *(double*)(ptr + 128) = nextIdx;
-    *(int*)(ptr + 136) = nextRawNear;
-    // 140 Padding
-    *(int64_t*)(ptr + 144) = debounceMs;
-    *(int*)(ptr + 152) = (g_lastMemLevel > 0) ? 1 : 0; // Oct.16.11: Memory pressure throttling
+    std::memcpy(ptr + 128, &nextIdx, 8);
+    std::memcpy(ptr + 136, &nextRawNear, 4);
+    std::memcpy(ptr + 144, &debounceMs, 8);
+    int32_t isMemThrottled = (g_lastMemLevel > 0) ? 1 : 0;
+    std::memcpy(ptr + 152, &isMemThrottled, 4);
 
     return 0;
 }
@@ -393,20 +424,22 @@ Java_com_gps19_app_JdHardwareManager_n24(JNIEnv* env, jclass clazz) {
     uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
 
     // Aligned Inputs
-    double heapMb = *(double*)(ptr + 0);
-    double memPressure = *(double*)(ptr + 8);
-    double memCritical = *(double*)(ptr + 16);
-    double hysteresis = *(double*)(ptr + 24);
+    double heapMb, memPressure, memCritical, hysteresis;
+    std::memcpy(&heapMb, ptr + 0, 8);
+    std::memcpy(&memPressure, ptr + 8, 8);
+    std::memcpy(&memCritical, ptr + 16, 8);
+    std::memcpy(&hysteresis, ptr + 24, 8);
 
     if (std::isnan(heapMb)) return 0;
 
-    int currentMem = (heapMb >= memCritical) ? 2 : (heapMb >= memPressure ? 1 : 0);
+    int32_t currentMem = (heapMb >= memCritical) ? 2 : (heapMb >= memPressure ? 1 : 0);
     if (currentMem < g_lastMemLevel && heapMb > ((g_lastMemLevel == 2 ? memCritical : memPressure) - hysteresis)) {
         currentMem = g_lastMemLevel;
     }
 
-    *(int*)(ptr + 64) = currentMem;
-    *(int*)(ptr + 68) = (currentMem != 0 && currentMem != g_lastMemLevel);
+    std::memcpy(ptr + 64, &currentMem, 4);
+    int32_t needsFlush = (currentMem != 0 && currentMem != g_lastMemLevel);
+    std::memcpy(ptr + 68, &needsFlush, 4);
     g_lastMemLevel = currentMem;
 
     return 0;

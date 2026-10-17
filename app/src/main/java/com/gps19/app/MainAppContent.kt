@@ -49,6 +49,8 @@ import timber.log.Timber
  * - ISSUE-OCT16.8-F4: Sentinel Z-Index Hardening (Ch 4.8). Moved AlarmOverlay 
  *   to DialogHost to ensure it supersedes all navigation overlays.
  * - SIMP-OCT16.8-S1: Implemented DialogHost for unified transient dialog management.
+ * Oct.15.7:
+ * - SIMP-OCT15.6-S1: Automated Version Synchronization. Using BuildConfig.VERSION_NAME.
  */
 @Composable
 fun MainAppContent(
@@ -140,7 +142,7 @@ fun MainAppContent(
 
                 Column(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)) {
                     Text("UI_READY", color = Color.Green.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    Text("Oct15.6_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
+                    Text("${BuildConfig.VERSION_NAME}_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
                 }
             }
         }

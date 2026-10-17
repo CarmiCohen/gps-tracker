@@ -10,6 +10,8 @@ import com.gps19.core.engine.*
  * - Version Synchronization: Updated engine version string to Oct17.4.
  * Oct.16.2:
  * - SIMP-OCT15.10-S1: Test Utility Decoupling. Updated engine version string to Oct16.2.
+ * Oct.15.7:
+ * - SIMP-OCT15.6-S1: Automated Version Synchronization. Using BuildConfig.VERSION_NAME.
  */
 object DashboardMapper {
 
@@ -36,7 +38,7 @@ object DashboardMapper {
             sinceDiscoMs = if (activeStats.lastDiscTs > 0) (nowRt - activeStats.lastDiscTs) else 0L,
             totalDropMs = activeStats.totalDropMs,
             maxDropMs = activeStats.maxDropMs,
-            engineVersion = "Oct15.6",
+            engineVersion = BuildConfig.VERSION_NAME,
             netInterface = diag.connectivity.netInterface,
             systemPulse = nowRt,
             isLocalOnline = diag.connectivity.isLocalOnline,

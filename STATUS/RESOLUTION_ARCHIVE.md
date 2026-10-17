@@ -1,5 +1,14 @@
 # Resolution Archive
 
+## SIMP-OCT15.6-S1: Automated Version Synchronization (Oct14.1)
+- **Resolved**: Oct14.1
+- **Description**: Centralized the version name to prevent desynchronization between the build system, UI, and Engine.
+- **Remediation**:
+    - Moved `versionName` to `gradle.properties` as `APP_VERSION_NAME`.
+    - Configured `app/build.gradle` to use this property for `versionName` and ensured `buildConfig true` was active.
+    - Refactored `MainAppContent.kt` and `DashboardMapper.kt` to dynamically reference `BuildConfig.VERSION_NAME`.
+- **Outcome**: Eliminated manual string updates for versioning, ensuring a single source of truth. (SOT ID 757).
+
 ## ISSUE-OCT15.6-T1: Version Name Verification (Oct14.1)
 - **Resolved**: Oct14.1
 - **Description**: Added formal version verification to the manual test procedure to ensure UI and Engine strings are synchronized with the build configuration.

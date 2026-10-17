@@ -32,6 +32,10 @@ import kotlinx.coroutines.delay
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Oct.17.4:
+ * - ISSUE-OCT17.4-F2: RTL Slider Inversion. Wrapped SensitivitySlider in 
+ *   CompositionLocalProvider for Ltr direction to prevent value inversion 
+ *   in RTL locales (e.g., A15 test environment).
  * Oct.13.21:
  * - SIMP-OCT13.21-S1: Pure Event UI. Pruned all specific lambda parameters 
  *   from SettingsOverlay and PhoneSetupOverlay. Standardized on onEvent bubbling.
@@ -327,7 +331,7 @@ fun PhoneSetupOverlay(
                     if (visibleCount >= 6) {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                             Spacer(Modifier.height(16.dp)); GuideSection(title = "Background Location", description = "Allows tracking and geofencing to work while the screen is off or app is in background.", onClick = { onEvent(UiEvent.RequestAppInfo) }, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isBackgroundLocationGranted, icon = Icons.Default.LocationOn, reason = if (!permissions.isBackgroundLocationGranted) "Background Location: Set to 'Allow all the time' in system settings" else null)
-                            Spacer(Modifier.height(16.dp)); GuideSection(title = "Physical Activity", description = "Required for Step Detector and stay-alive pulsing to stabilize background performance.", onClick = { onEvent(UiEvent.RequestAppInfo) }, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isActivityRecognitionGranted, icon = Icons.AutoMirrored.Filled.DirectionsRun, reason = if (!permissions.isActivityRecognitionGranted) "Physical Activity: Permission NOT granted" else null)
+                            Spacer(Modifier.height(16.dp)); GuideSection(title = "Activity Awareness", description = "Uses movement sensors to stabilize telemetry in background. Critical for low-power reliability.", onClick = { onEvent(UiEvent.RequestAppInfo) }, buttonText = stringResource(R.string.btn_app_info), isCompleted = permissions.isActivityRecognitionGranted, icon = Icons.AutoMirrored.Filled.DirectionsRun, reason = if (!permissions.isActivityRecognitionGranted) "Physical Activity: Permission NOT granted" else null)
                         }
                     }
 
@@ -387,9 +391,16 @@ fun AlarmToggle(label: String, checked: Boolean, onCheckedChange: (Boolean) -> U
 
 @Composable
 fun SensitivitySlider(label: String, value: Float, onValueChange: (Float) -> Unit) {
-    Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
-        Text(label + ": ${(value * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
-        Slider(value = value, onValueChange = onValueChange, valueRange = 0f..1f, colors = SliderDefaults.colors(thumbColor = BrandJd, activeTrackColor = BrandJd))
+    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)) {
+            Text(label + ": ${(value * 100).toInt()}%", color = Color.White, fontSize = 12.sp)
+            Slider(
+                value = value,
+                onValueChange = onValueChange,
+                valueRange = 0f..1f,
+                colors = SliderDefaults.colors(thumbColor = BrandJd, activeTrackColor = BrandJd)
+            )
+        }
     }
 }
 
