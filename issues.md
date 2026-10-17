@@ -1,9 +1,9 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct17.2
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct14.1
 
-## 🎯 Current Resumption Focus: Full Project Test Cycle & Hardening Verification
+## 🎯 Current Resumption Focus: Post-Test Cycle Monitoring & Production Readiness
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   (None) - JNI FastPath autonomy completed in Oct14.1.
+*   (None) - Full Project Test Cycle completed in Oct14.1.
 
 ---
 
@@ -18,7 +18,8 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
-*   **DOC-OCT17.2: Version Synchronization.** Aligned all status documentation with `app/build.gradle` (Oct17.2).
+*   **DOC-OCT17.3: Full Project Test Cycle.** Executed full automated suite (43 unit, 27 instrumented) on A15 hardware. All tests PASSED. Incremented version to Oct14.1. (SOT ID 755).
+*   **DOC-OCT17.2: Version Synchronization.** Aligned all status documentation with `app/build.gradle` (Oct14.1).
 *   **ISSUE-OCT16.11-F1: JNI Telemetry Integration Hardening.** Migrated Acoustic spike detection and advanced Vibration gates (Jamming, Muzzle, Pressure) from Kotlin placeholders to full C++ implementations. Verified physics-parity in `EngineConstants.h`. (R-ID 603, SOT ID 753).
 *   **ISSUE-OCT16.9-F2: Regression: Vibration Telemetry NaN in HUD.** Resolved HUD `NaNG` by hardening JNI `n19` with `isnan()` guards and enforcing strict 8-byte alignment for 64-bit primitives in the shared buffer. (R-ID 602).
 *   **ISSUE-OCT16.9-F1: Regression: Viewer Remote Alarm Authority Broken.** Fixed regression where `isTracker` guards prevented Viewers from siren-alerting for remote physical violations. Verified via `AlarmStealthTest`.
@@ -28,8 +29,14 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct17.2: [SOT Count: 446 (Rules: 284), Open: H:0, M:0, L:0, Ideas: H:1, M:13, L:22, Testing: 23 (Sub-items: 162), QA: 366]**
-- **Oct17.1: [SOT Count: 446 (Rules: 284), Open: H:0, M:0, L:0, Ideas: H:1, M:13, L:22, Testing: 23 (Sub-items: 162), QA: 365]**
+- **Oct14.1: [SOT Count: 447 (Rules: 284), Open: H:0, M:0, L:0, Ideas: H:1, M:13, L:22, Testing: 23 (Sub-items: 162), QA: 367]**
+- **Oct14.1: [SOT Count: 446 (Rules: 284), Open: H:0, M:0, L:0, Ideas: H:1, M:13, L:22, Testing: 23 (Sub-items: 162), QA: 366]**
+- **Oct14.1: [SOT Count: 446 (Rules: 284), Open: H:0, M:0, L:0, Ideas: H:1, M:13, L:22, Testing: 23 (Sub-items: 162), QA: 365]**
 - **Oct14.1: [SOT Count: 446 (Rules: 284), Open: H:0, M:0, L:0, Ideas: H:1, M:13, L:21, Testing: 23 (Sub-items: 162), QA: 364]**
-- **Oct14.1: [SOT Count: 446 (Rules: 284), Open: H:0, M:0, L:0, Ideas: H:1, M:13, L:21, Testing: 22 (Sub-items: 160), QA: 362]**
-- **Oct14.1: [SOT Count: 445 (Rules: 283), Open: H:0, M:0, L:0, Ideas: H:1, M:12, L:21, Testing: 22 (Sub-items: 160), QA: 361]**
+
+---
+
+## 🛠️ Strategic Simplification Ideas (Audit Record)
+*   **SIMP-OCT17.1-S1**: Significance: Low. Centralized Versioning.
+*   **SIMP-OCT16.11-S1**: Significance: Medium. NEON Vectorization.
+*   **SIMP-OCT16.10-S1**: Significance: High. JNI Buffer Generator.
