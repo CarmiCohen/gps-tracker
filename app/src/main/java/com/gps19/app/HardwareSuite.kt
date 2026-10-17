@@ -37,15 +37,12 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.16.11:
+ * - ISSUE-OCT16.11-F2: Memory Pressure Throttling Parity. Added synchronization 
+ *   of isMemoryPressureThrottled from Acoustic and Proximity JNI paths.
  * Oct.15.11:
  * - ISSUE-OCT15.10-F2: Proximity Debounce Hardening. Fixed proximityIdx assignment 
  *   typo and added JNI result validation with safety clamping for debounce values.
- * Oct.12.21:
- * - Issue #SIMP-OCT12.17-S1: Periodic GPS Re-Zeroing. Implemented silent background 
- *   GPS provider restart every 6 hours if accuracy remains > 30m to clear thermal drift.
- * Oct.12.18:
- * - Issue #ISSUE-OCT12.13-11: Temporal Jitter Hardening. Integrated AppRole awareness 
- *   into GNSS and sensor audits to prevent cross-role forensic pollution.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -994,6 +991,7 @@ class HardwareSuite @Inject constructor(
                     if (res) {
                         proximityIdx = proximityBatch.nextIdx
                         proximityDebounceMs = proximityBatch.debounceMs.coerceIn(0L, PROXIMITY_DEBOUNCE_MAX_MS)
+                        isMemoryPressureThrottled = proximityBatch.isMemoryPressureThrottled
                     }
                     
                     if (proximityBatch.nextRawNear != rawProximityNear) {
@@ -1096,6 +1094,7 @@ class HardwareSuite @Inject constructor(
                                     if (acousticBatch.isSpike) {
                                         lastAcousticLockoutRt = acousticBatch.lastSpikeRt
                                     }
+                                    isMemoryPressureThrottled = acousticBatch.isMemoryPressureThrottled
                                     
                                     val db = currentAcousticDb
                                     if (db > logicPeakDb) logicPeakDb = db

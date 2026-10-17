@@ -130,14 +130,14 @@ Java_com_gps19_app_JdHardwareManager_n11(JNIEnv* env, jclass clazz, jint type, j
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n12(JNIEnv* env, jclass clazz, jdouble vibration, jdouble adaptiveFloor, jdouble cpuLoad) {
     if (std::isnan(vibration) || std::isnan(adaptiveFloor)) return 1;
-    double loadFactor = (cpuLoad > 0.85) ? 2.0 : 1.0;
+    double loadFactor = (cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD_VAL) ? 2.0 : 1.0;
     double dynamicGate = adaptiveFloor * 1.5 * loadFactor;
     return (vibration < dynamicGate) ? 1 : 0;
 }
 
 JNIEXPORT jdouble JNICALL
 Java_com_gps19_app_JdHardwareManager_n13(JNIEnv* env, jclass clazz, jdouble currentFloor, jdouble vibration, jint isWarming, jdouble cpuLoad) {
-    if (std::isnan(vibration) || std::isnan(currentFloor) || vibration <= 0.0 || cpuLoad > 0.85) {
+    if (std::isnan(vibration) || std::isnan(currentFloor) || vibration <= 0.0 || cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD_VAL) {
         return std::isnan(currentFloor) ? VIBRATION_FLOOR_MIN : currentFloor;
     }
     double alpha = (vibration < currentFloor) ? (isWarming ? 0.5 : 0.1) : (vibration < 1.0 ? (isWarming ? 0.1 : 0.01) : 0.0);
@@ -172,18 +172,18 @@ Java_com_gps19_app_JdHardwareManager_n16(JNIEnv* env, jclass clazz, jdouble x, j
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n17(JNIEnv* env, jclass clazz, jdouble peak, jdouble floor, jfloat sens, jdouble cpu) {
     if (std::isnan(peak) || std::isnan(floor)) return 0;
-    double loadFactor = (cpu > 0.85) ? 1.5 : 1.0;
+    double loadFactor = (cpu > SENSOR_LOAD_GATE_CPU_THRESHOLD_VAL) ? 1.5 : 1.0;
     double baseThreshold = (0.2 + (1.4 - 0.2) * (1.0 - (double)sens)) * loadFactor;
-    double dynamicThreshold = std::max(baseThreshold, floor * 7.0 * loadFactor);
+    double dynamicThreshold = std::max(baseThreshold, floor * VIBRATION_SHOCK_MULTIPLIER_VAL * loadFactor);
     return (peak > dynamicThreshold) ? 1 : 0;
 }
 
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n18(JNIEnv* env, jclass clazz, jdouble vibe, jdouble floor, jfloat sens, jdouble cpu) {
     if (std::isnan(vibe) || std::isnan(floor)) return 0;
-    double loadFactor = (cpu > 0.85) ? 1.5 : 1.0;
+    double loadFactor = (cpu > SENSOR_LOAD_GATE_CPU_THRESHOLD_VAL) ? 1.5 : 1.0;
     double baseThreshold = (0.05 + (0.45 - 0.05) * (1.0 - (double)sens)) * loadFactor;
-    double dynamicThreshold = std::max(baseThreshold, floor * 2.5 * loadFactor);
+    double dynamicThreshold = std::max(baseThreshold, floor * VIBRATION_SUSPICIOUS_MULTIPLIER_VAL * loadFactor);
     return (vibe > dynamicThreshold) ? 1 : 0;
 }
 
@@ -214,7 +214,7 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     if (std::isnan(delta)) delta = 0.0;
 
     double nextFloor = floor;
-    if (delta > 0.0 && cpu <= 0.85) {
+    if (delta > 0.0 && cpu <= SENSOR_LOAD_GATE_CPU_THRESHOLD_VAL) {
         double alpha = (delta < floor) ? (isWarming ? 0.5 : 0.1) : (delta < 1.0 ? (isWarming ? 0.1 : 0.01) : 0.0);
         nextFloor = (floor * (1.0 - alpha)) + (delta * alpha);
         if (std::isnan(nextFloor)) nextFloor = floor;
@@ -226,11 +226,19 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     double nextEnergy = (energy * 0.9) + (std::abs(nextHpf) * 0.1);
     if (std::isnan(nextEnergy)) nextEnergy = 0.0;
 
-    double dynamicGate = nextFloor * 1.5 * ((cpu > 0.85) ? 2.0 : 1.0);
+    double dynamicGate = nextFloor * 1.5 * ((cpu > SENSOR_LOAD_GATE_CPU_THRESHOLD_VAL) ? 2.0 : 1.0);
     int isStationary = (delta < dynamicGate) ? 1 : 0;
     if (isStationary) {
         if (g_stationaryStartRt == 0) g_stationaryStartRt = nowRt;
     } else { g_stationaryStartRt = 0; }
+
+    // Oct.16.11: Implementation of formerly placeholder logic
+    double loadFactor = (cpu > SENSOR_LOAD_GATE_CPU_THRESHOLD_VAL) ? 1.5 : 1.0;
+    double suspiciousThreshold = std::max((0.05 + (0.45 - 0.05) * 0.5) * loadFactor, nextFloor * VIBRATION_SUSPICIOUS_MULTIPLIER_VAL * loadFactor);
+    int isSuspicious = (delta > suspiciousThreshold) ? 1 : 0;
+    int isMemThrottled = (g_lastMemLevel > 0) ? 1 : 0;
+    int muzzleReset = (delta > VIBRATION_SHOCK_THRESHOLD_G_VAL) ? 1 : 0;
+    int isJamming = (snr > 0.0 && snr < JUMP_GATE_LOW_SNR_THRESHOLD_VAL && delta > 0.5) ? 1 : 0;
 
     // Aligned Outputs
     *(double*)(ptr + 128) = delta;
@@ -238,12 +246,12 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     *(double*)(ptr + 144) = nextHpf;
     *(double*)(ptr + 152) = nextEnergy;
     *(int*)(ptr + 160) = isStationary;
-    *(int*)(ptr + 164) = (snr > 0.0 && snr < 22.0 && delta > 0.5);
-    *(int*)(ptr + 168) = 0; // isMemoryPressureThrottled placeholder
+    *(int*)(ptr + 164) = isSuspicious;
+    *(int*)(ptr + 168) = isMemThrottled;
     // 172: Padding
     *(int64_t*)(ptr + 176) = (isStationary && g_stationaryStartRt > 0) ? (nowRt - g_stationaryStartRt) : 0;
-    *(int*)(ptr + 184) = 0; // muzzleResetTriggered placeholder
-    *(int*)(ptr + 188) = 0; // isJammingCandidate placeholder
+    *(int*)(ptr + 184) = muzzleReset;
+    *(int*)(ptr + 188) = isJamming;
 
     return 0;
 }
@@ -273,7 +281,7 @@ Java_com_gps19_app_JdHardwareManager_n21(JNIEnv* env, jclass clazz) {
 
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz, jshortArray buffer) {
-    if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 128) return -1;
+    if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 256) return -1;
     uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
 
     // Aligned Inputs
@@ -284,6 +292,9 @@ Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz, jshortArray 
     int64_t nowRt = *(int64_t*)(ptr + 24);
     int isWarming = *(int*)(ptr + 32);
 
+    if (std::isnan(baseAlpha)) baseAlpha = 0.01;
+    if (std::isnan(vibeRolling)) vibeRolling = 0.0;
+
     jshort* samples = (jshort*)env->GetPrimitiveArrayCritical(buffer, nullptr);
     int maxAmp = 0;
     for (int i = 0; i < readCount; i++) maxAmp = std::max(maxAmp, std::abs((int)samples[i]));
@@ -292,11 +303,35 @@ Java_com_gps19_app_JdHardwareManager_n22(JNIEnv* env, jclass clazz, jshortArray 
     double db = (maxAmp > 0) ? (20.0 * std::log10((double)maxAmp)) : 0.0;
     if (std::isnan(db)) db = 0.0;
 
+    // Oct.16.11: Spike detection implementation
+    FastPathConfig& cfg = g_fastPathConfigs[FASTPATH_ACOUSTIC];
+    double vibeFactor = (vibeRolling > 0.5) ? std::max(0.01, 1.0 - ((vibeRolling - 0.5) / 1.0)) : 1.0;
+    double alpha = (isWarming) ? 0.0 : (baseAlpha * vibeFactor);
+
+    if (!std::isnan(db)) {
+        if (cfg.baseline < 0 || std::isnan(cfg.baseline)) {
+            cfg.baseline = db;
+        } else if (alpha > 0.0) {
+            cfg.baseline = (cfg.baseline * (1.0 - alpha)) + (db * alpha);
+        }
+    }
+
+    int isSpike = 0;
+    if ((db - cfg.baseline) > cfg.threshold && db >= cfg.minThreshold) {
+        if (nowRt - cfg.lastTriggerRt > cfg.debounceMs) {
+            cfg.lastTriggerRt = nowRt;
+            isSpike = 1;
+        }
+    }
+
     // Aligned Outputs
     *(int*)(ptr + 128) = maxAmp;
     // 132 Padding
     *(double*)(ptr + 136) = db;
-    // Further outputs (isSpike, lastSpikeRt) are handled by Kotlin for now or added here
+    *(int*)(ptr + 144) = isSpike;
+    // 148 Padding
+    *(int64_t*)(ptr + 152) = cfg.lastTriggerRt;
+    *(int*)(ptr + 160) = (g_lastMemLevel > 0) ? 1 : 0; // Oct.16.11: Memory pressure throttling
 
     return 0;
 }
@@ -347,6 +382,7 @@ Java_com_gps19_app_JdHardwareManager_n23(JNIEnv* env, jclass clazz) {
     *(int*)(ptr + 136) = nextRawNear;
     // 140 Padding
     *(int64_t*)(ptr + 144) = debounceMs;
+    *(int*)(ptr + 152) = (g_lastMemLevel > 0) ? 1 : 0; // Oct.16.11: Memory pressure throttling
 
     return 0;
 }

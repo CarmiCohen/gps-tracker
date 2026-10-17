@@ -39,14 +39,13 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.16.11:
+ * - ISSUE-OCT16.11-F2: Memory Pressure Throttling. Added output synchronization 
+ *   for isMemoryPressureThrottled in Acoustic and Proximity batches.
  * Oct.16.10:
  * - ISSUE-OCT16.9-F2: Vibration NaN Hardening. Fixed shared buffer alignment for 
  *   vibration, acoustic, proximity, and pressure batches. Ensured all 8-byte 
  *   crossings (Double/Long) are 8-byte aligned to prevent data corruption.
- * Oct.12.1:
- * - Issue #SIMP-1012-1: Forensic Buffer Optimization. Added 'audit' parameter to 
- *   processVibrationBatchNative to reduce LatencyMonitor overhead during 100Hz 
- *   sampling.
  */
 object JdHardwareManager {
 
@@ -415,7 +414,7 @@ object JdHardwareManager {
 
     /**
      * processAcousticBatchNative: Consolidated JNI audio path (Issue #SIMP-1011-2).
-     * Oct.16.10: Aligned offsets for 8-byte boundary safety.
+     * Oct.16.11: Synced isMemoryPressureThrottled from offset 160.
      */
     fun processAcousticBatchNative(timeProvider: TimeProvider, batch: AcousticBatch, buffer: ShortArray): Boolean {
         if (isLibraryLoaded.get()) {
@@ -443,6 +442,7 @@ object JdHardwareManager {
                         batch.isSpike = sharedStateBuffer.getInt(144) != 0
                         // 148 Padding
                         batch.lastSpikeRt = sharedStateBuffer.getLong(152)
+                        batch.isMemoryPressureThrottled = sharedStateBuffer.getInt(160) != 0
                         true
                     } else false
                 }
@@ -463,13 +463,14 @@ object JdHardwareManager {
         if (batch.isSpike) {
             batch.lastSpikeRt = batch.nowRt
         }
+        batch.isMemoryPressureThrottled = (lastMemLevel > 0)
         
         return true
     }
 
     /**
      * processProximityBatchNative: Consolidated JNI proximity path (Issue #SIMP-1011-3).
-     * Oct.16.10: Aligned offsets for 8-byte boundary safety.
+     * Oct.16.11: Synced isMemoryPressureThrottled from offset 152.
      */
     fun processProximityBatchNative(timeProvider: TimeProvider, batch: ProximityBatch): Boolean {
         if (isLibraryLoaded.get()) {
@@ -500,6 +501,7 @@ object JdHardwareManager {
                         batch.nextRawNear = sharedStateBuffer.getInt(136) != 0
                         // 140 Padding
                         batch.debounceMs = sharedStateBuffer.getLong(144)
+                        batch.isMemoryPressureThrottled = sharedStateBuffer.getInt(152) != 0
                         true
                     } else false
                 }
@@ -531,6 +533,7 @@ object JdHardwareManager {
             batch.nextRawNear = batch.rawNear
             batch.debounceMs = 0
         }
+        batch.isMemoryPressureThrottled = (lastMemLevel > 0)
         
         return true
     }
@@ -566,6 +569,9 @@ object JdHardwareManager {
                         batch.needsMemFlush = sharedStateBuffer.getInt(68) != 0
                         batch.currentStorageLevel = sharedStateBuffer.getInt(72)
                         batch.needsStoragePrune = sharedStateBuffer.getInt(76) != 0
+                        
+                        lastMemLevel = batch.currentMemLevel
+                        lastStorageLevel = batch.currentStorageLevel
                         true
                     } else false
                 }

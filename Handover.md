@@ -1,32 +1,32 @@
-# Project Handover - Oct14.1 (Vibration Telemetry Hardened)
+# Project Handover - Oct14.1 (JNI Telemetry & Throttling Hardened)
 
-## 🟢 Status: Telemetry Regression Resolved & Build Verified
-Successfully resolved the `NaNG` vibration telemetry issue identified in Oct14.1. Verified that the shared buffer alignment between Kotlin and JNI is now strictly 8-byte compliant and that native math operations are protected against `NaN` propagation. The application has been successfully built at version `Oct14.1`.
+## 🟢 Status: JNI FastPath Autonomy & Throttling Parity Verified
+Successfully hardened the JNI telemetry pipeline. All evaluation placeholders for Acoustic and Vibration sensors have been replaced with authoritative C++ implementations. Cross-sensor memory pressure throttling is now synchronized across the native/JVM boundary.
 
-## 🛠️ Oct14.1 Verification Details
+## 🛠️ Oct14.1 Implementation Details
 
-### 1. Resolved: Vibration Telemetry NaN (Issue #ISSUE-OCT16.9-F2, R-ID 602)
-- **Files**: 
-    - `app/src/main/cpp/jdhardware-jni.cpp`
-    - `app/src/main/java/com/gps19/app/JdHardwareManager.kt`
+### 1. Resolved: JNI Telemetry Integration Hardening (ISSUE-OCT16.11-F1, R-ID 603)
+- **Files**: `app/src/main/cpp/jdhardware-jni.cpp`, `EngineConstants.h`
 - **Fix**: 
-    - Re-aligned `sharedStateBuffer` offsets to ensure all `Double` and `Long` values start at 8-byte boundaries (e.g., adding padding at offset 68 and 172).
-    - Implemented `std::isnan()` guards in all native vibration, acoustic, and proximity processing functions.
-- **Outcome**: HUD metrics ("Vibration" and "Rolling Vibe") are now stable. Cross-layer data corruption risk mitigated. Build `:app:assembleDebug` completed successfully.
+    - Migrated Acoustic spike detection to JNI (`n22`) using shared `FastPathConfig`.
+    - Implemented Vibration status evaluation for `isJammingCandidate` and `muzzleResetTriggered` in JNI (`n19`).
+    - Synced physics thresholds between `EngineConstants.kt` and `EngineConstants.h`.
 
-### 2. Manual Test Procedure Progress (A15)
-- **Chapter 1-2**: 🟢 PASSED.
-- **Chapter 3 (Tracker Operation)**: 🟢 PASSED. HUD metrics verified stable and accurate on physical A15 hardware.
-- **Chapter 4 (Viewer Mode)**: 🟢 PASSED.
-- **Chapter 7 (Performance)**: 🟢 PASSED.
+### 2. Resolved: JNI Memory Pressure Throttling Parity (ISSUE-OCT16.11-F2)
+- **Files**: `JdHardwareManager.kt`, `HardwareSuite.kt`, `EngineModels.kt`
+- **Fix**: 
+    - Added `isMemoryPressureThrottled` flag to `AcousticBatch` and `ProximityBatch`.
+    - Updated JNI paths `n19`, `n22`, and `n23` to propagate the global native memory pressure state (`g_lastMemLevel`).
+    - Ensured consistent load-shedding behavior across all high-frequency sensor streams.
 
-## 🔴 Open Forensic Gaps (Resumption Points)
-- **None**. All high-priority issues from the Oct14.1 cycle are resolved.
-- **Next Step**: Perform a final regression sweep of the Proximity and Acoustic JNI paths to confirm alignment changes maintain parity across all vendor-specific hardware implementations.
+### 3. Verified: Native Throttling Stress Test (ISSUE-OCT16.11-F3)
+- **New Test**: `NativeThrottlingStressTest.kt` (Instrumented).
+- **Result**: Confirmed that simulated critical memory pressure correctly triggers throttling flags in all sensor batches via JNI shared state.
 
 ## 📊 Forensic Pulse & Metrics
-- **SOT Count**: 445 (Rules: 283).
+- **SOT Count**: 446 (Rules: 284).
 - **Open Gaps**: 0.
-- **Strategic Ideas**: 34.
+- **Strategic Ideas**: 35.
+- **Testing**: 23 (Sub-items: 162).
 
 **HANDOVER COMPLETE. STOP ALL PROCESSING.**

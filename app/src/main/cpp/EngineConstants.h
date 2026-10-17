@@ -4,11 +4,15 @@
 /**
  * EngineConstants.h: Shared hardware limits for JNI.
  * MUST be kept in parity with EngineConstants.kt.
+ * Oct.16.11: Added SNR, Load, Shock and Acoustic thresholds.
  */
 
 // Vibration limits (G)
 #define VIBRATION_FLOOR_MIN 0.02
 #define VIBRATION_FLOOR_MAX 2.0
+#define VIBRATION_SHOCK_MULTIPLIER_VAL 7.0
+#define VIBRATION_SUSPICIOUS_MULTIPLIER_VAL 2.5
+#define VIBRATION_SHOCK_THRESHOLD_G_VAL 0.8
 
 // Proximity constants
 #define PROXIMITY_EMA_ALPHA 0.15
@@ -20,5 +24,18 @@
 
 // Muzzle Hysteresis
 #define MUZZLE_HYSTERESIS_MS_VAL 2000
+
+// Load & SNR Gates
+#define SENSOR_LOAD_GATE_CPU_THRESHOLD_VAL 0.85
+#define JUMP_GATE_LOW_SNR_THRESHOLD_VAL 22.0
+
+// Acoustic Constants
+#define ACOUSTIC_THRESHOLD_DB_JUMP_VAL 40.0
+#define ACOUSTIC_MIN_THRESHOLD_DB_VAL 50.0
+
+// FastPath Identifiers
+#define FASTPATH_ACOUSTIC 0
+#define FASTPATH_LIGHT 1
+#define FASTPATH_STATIONARY 2
 
 #endif // ENGINE_CONSTANTS_H

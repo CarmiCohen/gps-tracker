@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.16.11:
+ * - ISSUE-OCT16.11-F1: JNI Telemetry Hardening. Added isMemoryPressureThrottled 
+ *   to AcousticBatch and ProximityBatch for native parity.
  * Oct.13.21:
  * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump from all models (R-ID 601).
  * Oct.13.21:
@@ -384,6 +387,7 @@ class AcousticBatch {
     var db: Double = 0.0
     var isSpike: Boolean = false
     var lastSpikeRt: Long = 0L
+    var isMemoryPressureThrottled: Boolean = false
 }
 
 /**
@@ -403,6 +407,7 @@ class ProximityBatch {
     var nextIdx: Double = 0.0
     var nextRawNear: Boolean = false
     var debounceMs: Long = 0L
+    var isMemoryPressureThrottled: Boolean = false
 }
 
 /**
