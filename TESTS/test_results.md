@@ -83,8 +83,20 @@ This document tracks the historical and current manual test results based on the
 ## Chapter 5 - Recovery and Edge Cases
 *   **5.1 GNSS Zombie Recovery:**
     *   **Status (Oct17.11):** 🟢 **Physical: PASSED** (Signal loss clears within 30s).
+*   **5.2 Power Loss Recovery:**
+    *   **Status:** 🟡 **PENDING**
+
+## Chapter 6 - Forensic Stress Testing
+*   **6.1 Manual Forensic Stress Test:**
+    *   **Status:** 🟡 **PENDING**
+*   **6.2 Heat Mitigation Validation:**
+    *   **Status:** 🟡 **PENDING**
 
 ## Chapter 7 - Architectural Integrity & Performance
+*   **7.1 UI Performance Audit:**
+    *   **Status:** 🟡 **PENDING**
+*   **7.2 DI/Hilt Stability:**
+    *   **Status:** 🟡 **PENDING**
 *   **7.3 Engine Thread Safety:**
     *   **Status (Oct17.11):** 🟢 **Logical: PASSED** (Zero CME in stress test).
 *   **7.4 WindowManager Resource Lifecycle:**
@@ -93,6 +105,65 @@ This document tracks the historical and current manual test results based on the
     *   **Status (Oct17.11):** 🟢 **Logical: PASSED** (JNI EMA convergence verified).
 *   **7.6 Granular HUD Binding:**
     *   **Status (Oct17.11):** 🟢 **Logical: PASSED** (Recomposition counts audited).
+
+## Chapter 8 - Validation Hooks & Aggregation
+*   **8.1 Forensic Stall Simulation:**
+    *   **Status:** 🟡 **PENDING**
+*   **8.2 State Aggregation Stability:**
+    *   **Status:** 🟡 **PENDING**
+
+## Chapter 9 - Audio, Alerts, and Notification Latency
+*   **9.1 Siren Validation:** 🟡 **PENDING**
+*   **9.2 Notification Latency:** 🟡 **PENDING**
+
+## Chapter 10 - Native Resource Lifecycle
+*   **10.1 Bridge Disposal:** 🟡 **PENDING**
+
+## Chapter 11 - Geofence Edge Cases & Uncertainty
+*   **11.1 Uncertainty Drift:** 🟡 **PENDING**
+*   **11.2 Recovery Hysteresis:** 🟡 **PENDING**
+
+## Chapter 12 - Database Stress & Adaptive Pruning
+*   **12.1 Pruning Sequence:** 🟡 **PENDING**
+
+## Chapter 13 - Remote Command Execution
+*   **13.1 Remote Siren:** 🟡 **PENDING**
+*   **13.2 Remote Mode Switch:** 🟡 **PENDING**
+
+## Chapter 14 - Forensic Ribbon Audit
+*   **14.1 Ribbon Persistence:** 🟡 **PENDING**
+*   **14.2 High-Frequency Rendering:** 🟡 **PENDING**
+
+## Chapter 15 - Battery & Power Management
+*   **15.1 Power Disconnect Audit:** 🟡 **PENDING**
+*   **15.2 Battery Drain Scaling:** 🟡 **PENDING**
+
+## Chapter 16 - Network Resilience & Relay Failover
+*   **16.1 Socket Recovery:** 🟡 **PENDING**
+*   **16.2 Internet Loss Recovery:** 🟡 **PENDING**
+
+## Chapter 17 - Forensic Log Export & Sharing
+*   **17.1 Export Integrity:** 🟡 **PENDING**
+
+## Chapter 18 - Physical Tamper Escalation
+*   **18.1 Light Jump:** 🟡 **PENDING**
+*   **18.2 Acoustic Breach Audit:** 🟡 **PENDING**
+
+## Chapter 19 - Multi-Viewer Consistency & Synchronization
+*   **19.1 Parallel Viewers:** 🟡 **PENDING**
+
+## Chapter 20 - Forensic Continuity across App Upgrades
+*   **20.1 Schema Migration Validation:** 🟡 **PENDING**
+
+## Chapters 21-100: Advanced Hardening Baseline
+*   **Chapters 21-30 (UI & Connectivity):** 🟡 **PENDING**
+*   **Chapters 31-40 (Logic & Resilience):** 🟡 **PENDING**
+*   **Chapters 41-50 (Storage & Hardware):** 🟡 **PENDING**
+*   **Chapters 51-60 (Security & Performance):** 🟡 **PENDING**
+*   **Chapters 61-70 (Advanced Forensics):** 🟡 **PENDING**
+*   **Chapters 71-80 (System Integration):** 🟡 **PENDING**
+*   **Chapters 81-90 (Reliability Benchmarks):** 🟡 **PENDING**
+*   **Chapters 91-100 (Final SOT Compliance):** 🟡 **PENDING**
 
 ---
 *Updated Oct 17, 2024, during version Oct17.11 release (Full System Audit).*
