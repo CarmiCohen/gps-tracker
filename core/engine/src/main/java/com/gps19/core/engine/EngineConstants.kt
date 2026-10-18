@@ -2,6 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.18.10:
+ * - ISSUE-OCT18.10-F1: Adaptive Vibration Floor Convergence. Added 
+ *   VIBRATION_EMA_DOWN_STEEP_ALPHA and VIBRATION_STEEP_DROP_RATIO to accelerate 
+ *   recovery from high-vibration states (In-Vehicle -> Stationary).
  * Oct.18.8:
  * - ISSUE-OCT18.8-F1: Urban Multi-path Hardening. Added SNR Latch (Issue #452) 
  *   thresholds and durations.
@@ -247,6 +251,8 @@ const val ACOUSTIC_EMA_UP_SLOW = 0.0001
 const val ACOUSTIC_EMA_UP_FAST = 0.01
 const val VIBRATION_EMA_DOWN_SLOW = 0.01
 const val VIBRATION_EMA_DOWN_FAST = 0.1
+const val VIBRATION_EMA_DOWN_STEEP_ALPHA = 0.35 // Issue #OCT18.10-F1: Rapid reset
+const val VIBRATION_STEEP_DROP_RATIO = 0.4      // Issue #OCT18.10-F1: 40% threshold
 const val VIBRATION_EMA_UP_SLOW = 0.001
 const val VIBRATION_EMA_UP_FAST = 0.01
 const val BARO_EMA_SLOW = 0.001 

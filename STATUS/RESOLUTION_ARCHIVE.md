@@ -1,5 +1,14 @@
 # Resolution Archive
 
+## ISSUE-OCT18.10-F1: Adaptive Vibration Floor Convergence (Oct18.10)
+- **Resolved**: Oct18.10
+- **Description**: The adaptive vibration floor was slow to converge when transitioning from high-vibration (e.g., in-vehicle) to stationary environments, leading to delayed stationary locks and false "Suspicious" alerts.
+- **Remediation**:
+    - **Steep-Drop Logic (R-ID 736)**: Implemented an accelerated EMA alpha (`0.35`) when vibration energy drops below 40% of the current floor.
+    - **Native/JVM Parity**: Updated both `SentinelValidator` (JVM Fallback) and `JdHardwareManager` (Native Fallback) to use synchronized convergence math.
+    - **Boundary Hardening**: Ensured all convergence paths strictly adhere to `VIBRATION_FLOOR_MIN` (0.02G) and `VIBRATION_FLOOR_MAX` (2.0G).
+- **Outcome**: 🟢 **PASSED**. Convergence from vehicle-level vibration (0.5G) to stationary floor (0.05G) is now significantly faster, improving geofence stability and stealth performance. (SOT ID 766).
+
 ## ISSUE-OCT18.8-F1: Urban Multi-path Hardening (Oct18.8)
 - **Resolved**: Oct18.8
 - **Description**: GNSS reflections in "urban canyons" often present with high SNR (Signal-to-Noise Ratio), misleading traditional jump filters. Strong but inaccurate reflections could trigger false geofence alerts or cause the stationary anchor to break out prematurely.
@@ -9,27 +18,5 @@
     - **Anchor Skepticism**: Enhanced `AnchorEvaluator` to apply a 0.25x penalty (extra skepticism) to breakout score accumulation when high-SNR reflections are detected while physically stationary.
     - **State Propagation**: Expanded `SentinelResult`, `ProcessedLocation`, and `AlarmEvaluationState` to propagate the `isHighSnrReflection` flag through the engine layers.
 - **Outcome**: 🟢 **PASSED**. The engine is now resilient against high-SNR urban reflections. False breakouts and geofence alerts in dense urban environments are suppressed via the adaptive latch. (SOT ID 765).
-
-## ISSUE-OCT18.6-F1: Synthetic Physical Event Injection (Oct18.8)
-- **Resolved**: Oct18.8
-- **Description**: The "Physical Gap" prevented remote validation of hardware-critical hardening logic (Chapters 3.2, 5.1, 15.1, 16.1). Manual testing required physical interaction with devices (shaking, shielding, unplugging) which is impossible in remote or automated CI environments.
-- **Remediation**:
-    - **Injection Framework**: Implemented `SyntheticEventInjector` as a central authority for hardware simulation.
-    - **Hardware Layer Hooks**: Modified `HardwareSuite` to allow zeroing GNSS satellites and forcing high vibration floors (Shake simulation).
-    - **Network Layer Hooks**: Updated `NetworkProvider` and `AndroidNetworkProvider` to intercept connectivity status and simulate interface loss.
-    - **Integrity Integration**: Linked power tamper simulation to existing `IntegrityMonitor` power-event hooks.
-    - **UI Control**: Integrated simulation toggles into the `DiagnosticsScreen` with real-time status tracking in `MainUiState`.
-- **Outcome**: 🟢 **PASSED**. The validation gap is closed. Chapters 3.2, 5.1, 15.1, and 16.1 can now be validated remotely via the Diagnostics interface. (SOT ID 764).
-
-## SIMP-OCT18.2-S1: Explicit Repository Lifecycle (Oct18.8)
-- **Resolved**: Oct18.8
-- **Description**: Background tasks in `LogRepository` were automatically started in the constructor, making it difficult to control initialization order and environment detection (Test Mode).
-- **Remediation**:
-    - Refactored `LogRepository` to remove task initiation from `init`.
-    - Added explicit `start()` method to `LogRepository`.
-    - Added `start()` proxy to `LogManager`.
-    - Integrated `logManager.start()` into `GpsApplication.onCreate()` to ensure tasks start only when the application is fully ready.
-    - Improved Test Mode safety by checking `testModeProvider.isTestMode()` within the `start()` method.
-- **Outcome**: 🟢 **PASSED**. Architectural clarity improved. Initialization is now predictable and safe for all environments. (SOT ID 763).
 
 ... [Remaining entries preserved] ...

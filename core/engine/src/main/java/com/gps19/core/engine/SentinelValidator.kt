@@ -6,13 +6,14 @@ import kotlin.math.min
 
 /**
  * SentinelValidator: Centralized "Sentinel Hard Gates" and baseline logic.
+ * Oct.18.10:
+ * - ISSUE-OCT18.10-F1: Adaptive Vibration Floor Convergence. Implemented 
+ *   Steep-Drop Convergence to accelerate floor reset when vibration drops 
+ *   significantly (e.g., In-Vehicle -> Stationary).
  * Oct.15.12:
  * - ISSUE-OCT15.11-F1: Vibration Floor Jitter Hardening. Integrated 
  *   VIBRATION_FLOOR_MIN and VIBRATION_FLOOR_MAX clamping in the JVM fallback 
  *   provider for parity with JNI.
- * Oct.11.1:
- * - Issue #SIMP-1011-5: Acoustic Profiling. Updated DefaultNativeFastPathProvider 
- *   to match the new TimeProvider-aware interface.
  */
 object SentinelValidator {
 
@@ -222,7 +223,11 @@ object SentinelValidator {
             if (vibration.isNaN() || vibration <= 0.0 || cpuLoad > SENSOR_LOAD_GATE_CPU_THRESHOLD) return currentFloor
             
             val next = if (vibration < currentFloor) {
-                val alpha = accelerateAlpha(VIBRATION_EMA_DOWN_FAST, isWarming, 0.5)
+                // Issue #OCT18.10-F1: Detect steep drop for accelerated convergence
+                val isSteepDrop = vibration < (currentFloor * VIBRATION_STEEP_DROP_RATIO)
+                val baseAlpha = if (isSteepDrop) VIBRATION_EMA_DOWN_STEEP_ALPHA else VIBRATION_EMA_DOWN_FAST
+                
+                val alpha = accelerateAlpha(baseAlpha, isWarming, 0.5)
                 (currentFloor * (1.0 - alpha)) + (vibration * alpha)
             } else if (vibration < 1.0) {
                 val alpha = accelerateAlpha(VIBRATION_EMA_UP_FAST, isWarming, 0.1)
