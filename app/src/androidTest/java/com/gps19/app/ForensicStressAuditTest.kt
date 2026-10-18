@@ -17,6 +17,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * ForensicStressAuditTest: Verifies Forensic Integrity and Stress stability.
+ * Oct.18.2: 
+ * - SIMP-OCT17.11-S1: Migrated to injected TestModeProvider, removing static LogRepository.setTestMode calls.
  * Oct.17.11: Fixed verifySpillBufferWrapAroundStability by inhibiting drainer during the test.
  * Oct.16.3: Formalized state reset via SIMP-OCT16.3-S1.
  * Oct.13.7: 
@@ -40,8 +42,6 @@ class ForensicStressAuditTest {
         // Issue #SIMP-OCT16.3-S1: Formalized global state reset.
         GpsApplication.resetTestStates()
 
-        // Set test mode globally to inhibit background interference
-        LogRepository.setTestMode(true)
         hiltRule.inject()
         
         runBlocking {
@@ -64,7 +64,6 @@ class ForensicStressAuditTest {
         runBlocking {
             // Stop background tasks to prevent leakage into the next test
             logRepository.stopBackgroundTasks()
-            LogRepository.setTestMode(false)
         }
     }
 

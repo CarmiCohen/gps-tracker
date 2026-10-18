@@ -28,6 +28,8 @@ import com.gps19.core.engine.CommandEvent
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Oct.18.2:
+ * - SIMP-OCT17.11-S1: Removed static LogRepository.setTestMode call in resetTestStates.
  * Oct.16.3:
  * - SIMP-OCT16.3-S1: Test State Pre-warming. Added resetTestStates() and 
  *   prewarmOsmState() to formalize global state initialization for 
@@ -66,7 +68,7 @@ class GpsApplication : Application(), Configuration.Provider {
             isOsmReady.set(false)
             stringCache.clear()
             intCache.clear()
-            LogRepository.setTestMode(false)
+            // LogRepository.setTestMode is now handled by Hilt injection (SIMP-OCT17.11-S1)
         }
 
         /**

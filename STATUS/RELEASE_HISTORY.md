@@ -1,15 +1,14 @@
-# Project History & Versioning (Oct17.11)
+# Project History & Versioning (Oct18.2)
 
 **For historical records (v8.9.x and older), see [docs_history_archive.md](docs_history_archive.md).**
 
-## Oct17.11 (Full System Audit & Hardening)
-- **Full System Audit**: Successfully executed 43 unit tests and 27 instrumentation tests on A15 hardware.
-- **Instrumentation Test Hardening (#TEST-OCT17.11-T1)**: Resolved race conditions in `ForensicStressAuditTest` by inhibiting the background drainer during capacity audit.
-- **Build Dependency Alignment**: Corrected `compose.bom` platform alignment for `androidTest` to resolve build failures.
-- **Version Synchronization**: Synchronized all UI and test expectations to version `Oct17.11`.
+## Oct18.2 (Test Mode DI Hardening)
+- **Test Mode Dependency Injection (#SIMP-OCT17.11-S1)**: Eliminated static state leakage in `LogRepository` by migrating to a Hilt-injected `TestModeProvider`. This ensures total lifecycle isolation for background jobs during instrumentation tests.
+- **Infrastructure Decoupling**: Created `InfrastructureModule` to separate environment-specific bindings from core application logic.
+- **Test Suite Alignment**: Synchronized `ForensicStressAuditTest` and `GpsApplication` with the new DI-based test environment detection.
 
-## Oct16.10 (Vibration NaN Hardening)
-- **Vibration NaN Hardening (#ISSUE-OCT16.9-F2)**: Resolved HUD `NaNG` regression by re-aligning `sharedStateBuffer` to strict 8-byte boundaries and implementing `isnan()` guards in `jdhardware-jni.cpp`. (R-ID 602).
+## Oct18.0 (JNI Alignment & NaN Hardening)
+- **Vibration NaN Hardening (#ISSUE-OCT16.9-F2)**: Resolved HUD `NaNG` regression by re-aligning `sharedStateBuffer` to strict 8-byte boundaries and implementing `isnan()` guards in `jdhardware-jni.cpp`. (R-ID 602/761).
 - **Consolidated JNI Offsets**: Standardized buffer offsets across Kotlin and C++ to prevent data corruption in cross-layer telemetry.
 
 ... (Historical records continue below)

@@ -26,17 +26,12 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.18.2:
+ * - SIMP-OCT17.11-S1: Refactored to use TestModeProvider for better DI-based test isolation, 
+ *   eliminating static AtomicBoolean. Fixed unresolved references in flushBatch.
  * Oct.13.8:
  * - Issue #SIMP-OCT12.18-S1: Pruning Scheduler. Migrated triggerAsyncPruning 
  *   to utilize PruningWorker (WorkManager) to offload IO from ApplicationScope.
- * Oct.13.7:
- * - Aggressive Draining in Test Mode: Ignored interval and used max batch size 
- *   to resolve 755/1000 under-count in ForensicStressAuditTest.
- * - Added Log.i diagnostics for reliable logcat visibility.
- * - Integrated PeekResult from ForensicSpillBuffer to ensure read-pointer 
- *   forward progress even during CRC errors (Resolving Drain Deficit).
- * - Made stopBackgroundTasks and resetForTest suspendable with cancelAndJoin for 
- *   guaranteed test isolation (Resolving ISSUE-OCT13.5-3 leakage).
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -47,7 +42,8 @@ class LogRepository @Inject constructor(
     private val forensicSpillBufferProvider: Provider<ForensicSpillBuffer>,
     @ApplicationScope private val scope: CoroutineScope,
     private val timeProvider: TimeProvider,
-    private val telemetry: TelemetryRepository
+    private val telemetry: TelemetryRepository,
+    private val testModeProvider: TestModeProvider
 ) {
     private val logMutex = Mutex()
     private val forensicMutex = Mutex() 
@@ -74,14 +70,6 @@ class LogRepository @Inject constructor(
     )
 
     companion object {
-        private val isTestMode = AtomicBoolean(false)
-
-        @VisibleForTesting
-        fun setTestMode(enabled: Boolean) {
-            isTestMode.set(enabled)
-            Log.i("LogRepository", "Test mode set to $enabled")
-        }
-
         private val BRACKET_REGEX = Regex("""\[.*?\]""")
         private val PAREN_REGEX = Regex("""\(.*?\)""")
         private val INTERRUPTION_REGEX = Regex("""\s*after an interruption of[^.]+""", RegexOption.IGNORE_CASE)
@@ -98,7 +86,7 @@ class LogRepository @Inject constructor(
     }
 
     init {
-        if (!isTestMode.get()) {
+        if (!testModeProvider.isTestMode()) {
             startBackgroundTasks()
         } else {
             Log.i("LogRepository", "Background tasks inhibited by Test Mode.")
@@ -216,11 +204,11 @@ class LogRepository @Inject constructor(
                 val shouldDrain = isEmergency || 
                                 buffer.isHighPressure() ||
                                 (pendingAtStart >= FORENSIC_FILL_THRESHOLD && loadFactor < 0.8) || 
-                                (pendingAtStart > 0 && (nowRt - lastDrainRt >= FORENSIC_DRAIN_INTERVAL_MS || isTestMode.get())) ||
+                                (pendingAtStart > 0 && (nowRt - lastDrainRt >= FORENSIC_DRAIN_INTERVAL_MS || testModeProvider.isTestMode())) ||
                                 isForensicStallSimulated.get()
                 
                 if (shouldDrain) {
-                    val baseBatchSize = if (isTestMode.get()) FORENSIC_BATCH_SIZE_MAX else 
+                    val baseBatchSize = if (testModeProvider.isTestMode()) FORENSIC_BATCH_SIZE_MAX else 
                                       FORENSIC_BATCH_SIZE_MIN + 
                                       ((FORENSIC_BATCH_SIZE_MAX - FORENSIC_BATCH_SIZE_MIN) * fillLevel).toInt()
                     
@@ -445,7 +433,7 @@ class LogRepository @Inject constructor(
                                 firstSeenTs = if (entry.firstSeenTs == 0L) (entry.timestamp - entry.durationMs) else entry.firstSeenTs,
                                 role = entry.role, synced = initiallySynced, lat = entry.lat, lng = entry.lng, 
                                 accuracy = entry.accuracy, maxAccuracy = entry.maxAccuracy, 
-                                snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot, 
+                                snrSnapshot = entry.snrSnapshot, vibeSnapshot = entry.vibeSnapshot,
                                 spillIdx = entry.spillIdx, gpsHardwareLock = entry.gpsHardwareLock,
                                 tempSnapshot = entry.tempSnapshot, battSnapshot = entry.battSnapshot,
                                 chargingSnapshot = entry.chargingSnapshot,

@@ -1,25 +1,25 @@
-# Project Handover - Oct18.0 (Hardened)
+# Project Handover - Oct18.2 (DI Hardened)
 
-## 🟢 Status: JNI Alignment & NaN Hardening Verified
-The project has successfully remediated **#ISSUE-OCT16.9-F2**. The JNI communication layer is now hardened against buffer misalignment and `NaN` propagation, specifically addressing stability issues on Samsung A15 (ARMv8) hardware during extreme I/O pressure.
+## 🟢 Status: Test Mode DI Hardening Verified
+The project has successfully resolved **#SIMP-OCT17.11-S1**. The system no longer relies on static `AtomicBoolean` flags for environmental detection, which previously caused intermittent race conditions in background job isolation during stress audits.
 
-## 🛠️ Remediation Details (#ISSUE-OCT16.9-F2)
+## 🛠️ Remediation Details (#SIMP-OCT17.11-S1)
 
-### 1. JNI Buffer Alignment (Hardening)
-- **Problem**: `GnssHealthBatch` internal arrays were not aligned to 8-byte boundaries, causing potential data corruption or CPU stalls on strict-alignment architectures.
-- **Fix**: Re-aligned `JdHardwareManager.kt` offsets. Added padding to ensure `svid`, `cn0`, and `usedInFix` arrays start at 8-byte intervals.
-- **Native Implementation**: Migrated `jdhardware-jni.cpp` (`n21`) to use `std::memcpy` for all buffer reads and writes, ensuring alignment-agnostic data transfer.
+### 1. Test Mode Dependency Injection
+- **Problem**: `LogRepository` used a static flag to inhibit background jobs during tests. This flag persisted across test instances if not manually reset, leaking state and interfering with convergence audits.
+- **Fix**: Introduced `TestModeProvider` interface.
+- **Infrastructure**: Added `InfrastructureModule` for production and `TestModeModule` (in `androidTest`) for automatic Hilt-based replacement.
+- **Isolation**: `LogRepository` now injects the provider, ensuring it always receives the correct environmental state without static side effects.
 
-### 2. NaN Sanitization (Forensic Integrity)
-- **Problem**: `NaN` values from sensor drift or I/O stalls were propagating to HUD fields, displaying as `NaNG`.
-- **Fix**: Reinforced `n19` (Vibration batch) and `n21` (GNSS batch) with explicit `isnan()` checks. Inputs for `snr`, `thermal`, and `heap` are now sanitized to `0.0` if invalid.
+### 2. Forensic Convergence Reliability
+- **Outcome**: `ForensicStressAuditTest` now executes with guaranteed isolation. The background drainer correctly remains inhibited unless manually triggered, ensuring `verifySpillBufferWrapAroundStability` accurately measures buffer capacity.
 
 ### 3. Versioning
-- **Version Name**: Incremented to `Oct18.0`.
-- **SOT Alignment**: New SOT ID 761 assigned to JNI GNSS Alignment Hardening.
+- **Version Name**: Incremented to `Oct18.2`.
+- **SOT Alignment**: New SOT ID 762 assigned to Test Mode DI Refactoring. New Rule R-ID 732 (Test Isolation via DI) added.
 
 ## ⏸️ Resumption Instructions: The Physical Gap
-The following chapters from the manual protocol remain **UNVERIFIED** and require a human at the physical device:
+The following chapters from the manual protocol remain **UNVERIFIED** and require a human at the physical device (Samsung A15):
 
 1.  **3.2 Stealth Audit**: Shake device (Confirm silent/dark).
 2.  **5.1 GNSS Zombie**: Shield device in metal (Confirm `SIGNAL LOSS` recovery).
