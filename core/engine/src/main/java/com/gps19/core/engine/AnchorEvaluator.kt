@@ -5,6 +5,9 @@ import kotlin.math.max
 
 /**
  * AnchorEvaluator: Manages stationary anchor state and breakout logic.
+ * Oct.18.8:
+ * - ISSUE-OCT18.8-F1: Urban Multi-path Hardening. Integrated high-SNR reflection 
+ *   skepticism (Issue #452) to prevent breakout during signal bouncing.
  * Sep.27.5:
  * - Issue #1349: Mutability Reduction. Adapted to access fields via state.anchor.
  */
@@ -35,7 +38,10 @@ object AnchorEvaluator {
         var finalPoint = point
 
         val isLowSnr = snr > 0 && snr < JUMP_GATE_LOW_SNR_THRESHOLD
-        val shouldHoldAnchor = state.anchor.isActive && isPhysicallyStationary && isLowSnr
+        val isHighSnrReflection = snr >= JUMP_GATE_HIGH_SNR_LATCH_THRESHOLD
+        
+        // Issue #452: Hold anchor if we have either low SNR (flicker) or high SNR reflection (bounce) while stationary
+        val shouldHoldAnchor = state.anchor.isActive && isPhysicallyStationary && (isLowSnr || isHighSnrReflection)
         
         if (!isSuspicious && !isAdaptationMuzzled && (stationaryProb > ANCHOR_ENGAGEMENT_PROBABILITY || shouldHoldAnchor)) {
             // 1. Engagement Logic
@@ -90,7 +96,13 @@ object AnchorEvaluator {
                         } else 1.0
 
                         val imuDamping = if (isPhysicallyStationary) ANCHOR_IMU_DAMPING_FACTOR else 1.0
-                        val snrDamping = if (isLowSnr) ANCHOR_SKEPTICISM_LOW_SNR_FACTOR else 1.0
+                        
+                        // Issue #452: Higher skepticism for high SNR reflections
+                        val snrDamping = when {
+                            isHighSnrReflection -> ANCHOR_SKEPTICISM_LOW_SNR_FACTOR * 0.5 // Extra skeptical
+                            isLowSnr -> ANCHOR_SKEPTICISM_LOW_SNR_FACTOR
+                            else -> 1.0
+                        }
 
                         val zoneProgress = (distFromAnchor - transitionZoneStart) / (breakoutThreshold - transitionZoneStart)
                         var increment = (zoneProgress * 25.0).coerceIn(0.0, 50.0)

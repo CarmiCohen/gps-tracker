@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * LocationProcessor: Handles accuracy filtering and coordinate processing.
+ * Oct.18.8:
+ * - ISSUE-OCT18.8-F1: Urban Multi-path Hardening. Propagated isHighSnrReflection 
+ *   flag from SentinelResult to ProcessedLocation.
  * Oct.13.21:
  * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed unused nowTs from processLocation calls (R-ID 601).
  * Oct.13.20:
@@ -312,6 +315,7 @@ class LocationProcessor(
                     this.jammerDetected = update.integrity.isJammer
                     this.kineticEnergy = update.kinetic.kineticEnergy
                     this.locationPendingReason = LocationPendingReason.NONE
+                    this.isHighSnrReflection = false
                 }
             }
 
@@ -338,6 +342,7 @@ class LocationProcessor(
                         this.jammerDetected = update.integrity.isJammer
                         this.kineticEnergy = update.kinetic.kineticEnergy
                         this.locationPendingReason = LocationPendingReason.NONE
+                        this.isHighSnrReflection = false
                     }
                 }
             }
@@ -432,6 +437,7 @@ class LocationProcessor(
                     this.suppressionNote = finalSuppressionNote
                     this.kineticEnergy = if (isLocal) state.kineticEnergy else update.kinetic.kineticEnergy
                     this.locationPendingReason = sentinelResult.locationPendingReason
+                    this.isHighSnrReflection = sentinelResult.isHighSnrReflection
                 }
             }
 
@@ -527,6 +533,7 @@ class LocationProcessor(
                 this.suppressionNote = finalSuppressionNote
                 this.kineticEnergy = if (isLocal) state.kineticEnergy else update.kinetic.kineticEnergy
                 this.locationPendingReason = sentinelResult.locationPendingReason
+                this.isHighSnrReflection = sentinelResult.isHighSnrReflection
             }
         }
     }
@@ -569,6 +576,9 @@ class LocationProcessor(
     fun resetFilter() { 
         LocationSentinel.reset(state)
         AnchorEvaluator.reset(state)
+    }
+    fun shouldHoldAnchor(snr: Double, isPhysicallyStationary: Boolean): Boolean {
+        return snr >= JUMP_GATE_HIGH_SNR_LATCH_THRESHOLD && isPhysicallyStationary
     }
     fun invalidateHomePointsCache() { state.cachedHomePoints = null }
     fun resetStats() {

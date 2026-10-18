@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * LocationSentinel: A multi-layered location validation engine.
+ * Oct.18.8:
+ * - ISSUE-OCT18.8-F1: Urban Multi-path Hardening. Populated isHighSnrReflection 
+ *   flag in SentinelResult for SNR Latch support.
  * Oct.13.21:
  * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Pruned unused qScale and nowTs (R-ID 601).
  * Oct.13.21:
@@ -263,6 +266,9 @@ object LocationSentinel {
         
         conf.score = augmentedScore
         conf.isJump = augmentedScore >= 50 || conf.isJump
+        
+        // Issue #452: SNR Latch Population
+        result.isHighSnrReflection = snr >= JUMP_GATE_HIGH_SNR_LATCH_THRESHOLD && conf.isJump
 
         if (conf.isOutlier) {
             result.status = SentinelStatus.JUMP

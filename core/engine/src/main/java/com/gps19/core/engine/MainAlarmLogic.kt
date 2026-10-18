@@ -5,6 +5,9 @@ import kotlin.math.*
 
 /**
  * MainAlarmLogic: Detection logic for system violations.
+ * Oct.18.8:
+ * - ISSUE-OCT18.8-F1: Urban Multi-path Hardening. Integrated SNR Latch (Issue #452) 
+ *   into evaluateGeofence, extending security hold to 360s for high-SNR reflections.
  * Oct.16.9:
  * - ISSUE-OCT16.9-F1: Fixed Regression in Viewer Remote Alarm Authority. 
  *   Removed isTracker guards from physical violations (Power, Tamper, Tilt, etc.) 
@@ -12,9 +15,6 @@ import kotlin.math.*
  * Oct.16.8:
  * - ISSUE-OCT16.8-F2: Role Transition Grace Hardening. 
  *   Applied isRelayRecovering grace to local connectivity and peer offline alarms.
- * Oct.14.0:
- * - SIMP-OCT14.13-S2: Integrated EntityBrandingProvider for centralized 
- *   mode-aware naming.
  */
 object MainAlarmLogic {
 
@@ -377,18 +377,34 @@ object MainAlarmLogic {
                     state.firstViolationTs = state.now
                     state.firstViolationRt = nowRt
                     state.firstViolationWasJump = isJump && (jumpTier == 1 || jumpTier == 2)
+                    
+                    // Issue #452: High SNR Reflection (Urban Multipath Latch)
+                    state.firstViolationWasHighSnr = health.locationPendingReason == LocationPendingReason.JAMMER_SUSPICION || 
+                                                     (isJump && health.snrIdx >= JUMP_GATE_HIGH_SNR_LATCH_THRESHOLD / RIBBON_SNR_SCALE_DB)
                 }
                 if (isPredictedExit) {
                     state.wasDistanceViolated = true
                     state.firstViolationWasJump = false 
+                    state.firstViolationWasHighSnr = false
                 }
                 if (!isJump || jumpTier == 3) {
                     if (!isPredictedExit) state.distanceViolationCounter++
                 }
 
                 val timeSinceFirstRt = nowRt - state.firstViolationRt
-                val effectiveHoldMs = JUMP_HOLD_DURATION_MS
-                val isSustained = if (state.firstViolationWasJump) timeSinceFirstRt >= effectiveHoldMs else state.distanceViolationCounter >= DISTANCE_ALARM_SAMPLES_REQUIRED
+                
+                // Issue #452: Adaptive Hold Duration
+                val effectiveHoldMs = if (state.firstViolationWasHighSnr) {
+                    JUMP_HOLD_HIGH_SNR_DURATION_MS 
+                } else {
+                    JUMP_HOLD_DURATION_MS
+                }
+
+                val isSustained = if (state.firstViolationWasJump || state.firstViolationWasHighSnr) {
+                    timeSinceFirstRt >= effectiveHoldMs 
+                } else {
+                    state.distanceViolationCounter >= DISTANCE_ALARM_SAMPLES_REQUIRED
+                }
 
                 if (isSustained || isPredictedExit) state.wasDistanceViolated = true
                 
@@ -398,7 +414,8 @@ object MainAlarmLogic {
                     val debounceStr = when {
                         isPredictedExit -> "PREDICTIVE EXIT"
                         isSustained -> "ALARM ACTIVE"
-                        state.firstViolationWasJump -> "Jump Hold: ${durationSec}s"
+                        state.firstViolationWasHighSnr -> "SNR Latch: ${durationSec}s/360s"
+                        state.firstViolationWasJump -> "Jump Hold: ${durationSec}s/180s"
                         else -> "Wait: ${state.distanceViolationCounter}/$DISTANCE_ALARM_SAMPLES_REQUIRED"
                     }
                     String.format(Locale.getDefault(), "Dev: %.1fm (Dist: %.1fm) (%s)", maxOf(0.1, deviation), dValue, debounceStr)
@@ -426,6 +443,7 @@ object MainAlarmLogic {
                 state.firstViolationTs = 0L
                 state.firstViolationRt = 0L
                 state.firstViolationWasJump = false
+                state.firstViolationWasHighSnr = false
                 
                 report.getOrCreate(idx++).update(
                     type = ALERT_ID_TRACKER_GEOFENCE,
@@ -442,7 +460,7 @@ object MainAlarmLogic {
                  )
             }
         } else {
-            state.distanceViolationCounter = 0; state.firstViolationTs = 0L; state.firstViolationRt = 0L; state.firstViolationWasJump = false
+            state.distanceViolationCounter = 0; state.firstViolationTs = 0L; state.firstViolationRt = 0L; state.firstViolationWasJump = false; state.firstViolationWasHighSnr = false
             report.getOrCreate(idx++).update(
                 type = ALERT_ID_TRACKER_GEOFENCE,
                 title = getTrackerTitleCached(isTracker, ALERT_TITLE_TRACKER_GEOFENCE),

@@ -6,6 +6,10 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.18.8:
+ * - ISSUE-OCT18.8-F1: Urban Multi-path Hardening. Added isHighSnrReflection 
+ *   to SentinelResult and ProcessedLocation. Added firstViolationWasHighSnr 
+ *   to AlarmEvaluationState for SNR Latch (Issue #452) support.
  * Oct.16.11:
  * - ISSUE-OCT16.11-F1: JNI Telemetry Hardening. Added isMemoryPressureThrottled 
  *   to AcousticBatch and ProximityBatch for native parity.
@@ -538,6 +542,7 @@ class ProcessedLocation {
     var suppressionNote: String? = null
     var kineticEnergy: Double = 0.0
     var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
+    var isHighSnrReflection: Boolean = false
 
     fun reset() {
         status = SentinelStatus.VALID
@@ -560,6 +565,7 @@ class ProcessedLocation {
         suppressionNote = null
         kineticEnergy = 0.0
         locationPendingReason = LocationPendingReason.NONE
+        isHighSnrReflection = false
         rawPoint.update(0.0, 0.0)
         optimizedPoint.update(0.0, 0.0)
     }
@@ -587,6 +593,7 @@ class ProcessedLocation {
         this.suppressionNote = other.suppressionNote
         this.kineticEnergy = other.kineticEnergy
         this.locationPendingReason = other.locationPendingReason
+        this.isHighSnrReflection = other.isHighSnrReflection
     }
 }
 
@@ -739,6 +746,7 @@ class AlarmEvaluationState {
     var firstViolationTs: Long = 0L
     var firstViolationRt: Long = 0L
     var firstViolationWasJump: Boolean = false
+    var firstViolationWasHighSnr: Boolean = false
     var wasDistanceViolated: Boolean = false
     var distanceViolationCounter: Int = 0
     var lastGpsPacketTs: Long = 0L
@@ -802,7 +810,8 @@ class AlarmEvaluationState {
         distToHomeAuthority: Double?, isGpsGap: Boolean, trackerBaroAltEma: Double,
         isTrackerMode: Boolean, capabilities: HardwareCapabilities,
         vibrationSensitivity: Float = 0.5f, tiltSensitivity: Float = 0.5f,
-        powerAlarmPending: Boolean = false, lastGlobalTriggerRt: Long = 0L
+        powerAlarmPending: Boolean = false, lastGlobalTriggerRt: Long = 0L,
+        firstViolationWasHighSnr: Boolean = false
     ) {
         this.now = now; this.nowRt = nowRt; this.serviceStartTime = serviceStartTime
         this.serviceStartRt = serviceStartRt; this.lastAlarmAckTs = lastAlarmAckTs
@@ -822,6 +831,7 @@ class AlarmEvaluationState {
         this.capabilities = capabilities; this.vibrationSensitivity = vibrationSensitivity
         this.tiltSensitivity = tiltSensitivity; this.powerAlarmPending = powerAlarmPending
         this.lastGlobalTriggerRt = lastGlobalTriggerRt
+        this.firstViolationWasHighSnr = firstViolationWasHighSnr
     }
 }
 
@@ -835,12 +845,14 @@ class SentinelResult(
     var status: SentinelStatus = SentinelStatus.VALID, var reason: String = "",
     var optimizedPoint: EngineGeoPoint? = null, var jumpConfidence: JumpConfidence? = null,
     var suppressionNote: String? = null, var promotedPoints: List<EngineGeoPoint>? = null,
-    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE
+    var locationPendingReason: LocationPendingReason = LocationPendingReason.NONE,
+    var isHighSnrReflection: Boolean = false
 ) {
     fun reset(status: SentinelStatus = SentinelStatus.VALID) {
         this.status = status; this.reason = ""; this.optimizedPoint = null
         this.jumpConfidence?.reset(); this.suppressionNote = null; this.promotedPoints = null
         this.locationPendingReason = LocationPendingReason.NONE
+        this.isHighSnrReflection = false
     }
 
     fun copyFrom(other: SentinelResult) {
@@ -855,6 +867,7 @@ class SentinelResult(
         this.suppressionNote = other.suppressionNote
         this.promotedPoints = other.promotedPoints?.toList()
         this.locationPendingReason = other.locationPendingReason
+        this.isHighSnrReflection = other.isHighSnrReflection
     }
 }
 

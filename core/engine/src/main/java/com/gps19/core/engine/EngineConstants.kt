@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.18.8:
+ * - ISSUE-OCT18.8-F1: Urban Multi-path Hardening. Added SNR Latch (Issue #452) 
+ *   thresholds and durations.
  * Oct.15.12:
  * - ISSUE-OCT15.11-F1: Vibration Floor Jitter Hardening. Added VIBRATION_FLOOR_MIN 
  *   and VIBRATION_FLOOR_MAX for boundary clamping in native and ingestion paths.
@@ -132,6 +135,7 @@ const val JUMP_WEIGHT_TRADITIONAL_SPEED = 50
 const val JUMP_WEIGHT_ACCURACY_LOW = 30
 const val JUMP_WEIGHT_ACCURACY_HIGH = 20
 const val JUMP_WEIGHT_LOW_SNR = 40 
+const val JUMP_WEIGHT_HIGH_SNR_REFLECTION = 55 // Issue #452: Urban Reflection
 
 const val JUMP_GATE_SENSOR_MISMATCH_MPS = 2.0
 const val JUMP_GATE_SPEED_ACCURACY_LOW_MPS = 22.2
@@ -140,6 +144,7 @@ const val JUMP_GATE_ACCURACY_LOW_THRESHOLD = 40.0
 const val JUMP_GATE_ACCURACY_HIGH_THRESHOLD = 150.0
 const val JUMP_GATE_VISUAL_JITTER_METERS = 10.0
 const val JUMP_GATE_LOW_SNR_THRESHOLD = 22.0 
+const val JUMP_GATE_HIGH_SNR_LATCH_THRESHOLD = 35.0 // Issue #452
 
 // Bayesian Uncertainty Growth
 const val PENDING_UNCERTAINTY_GROWTH_RATE_MPS = 15.0 
@@ -251,6 +256,7 @@ const val PROXIMITY_EMA_ALPHA = 0.15
 const val BOOTSTRAP_PHASE_MS = 60000L
 const val DISCOVERY_PHASE_MS = 60000L
 const val JUMP_HOLD_DURATION_MS = 180000L
+const val JUMP_HOLD_HIGH_SNR_DURATION_MS = 360000L // Issue #452: 6 Minutes
 const val MOVING_HOLD_DURATION_MS = 60000L
 const val GPS_GAP_THRESHOLD_MS = 15000L    
 const val GPS_STALL_THRESHOLD_MS = 15000L  

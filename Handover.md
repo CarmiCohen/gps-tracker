@@ -1,25 +1,23 @@
-# Project Handover - Oct18.6 (Physical Gap Bridged)
+# Project Handover - Oct18.8 (Multipath Hardened)
 
-## 🟢 Status: Synthetic Physical Validation Framework Operational
-The project has successfully resolved **ISSUE-OCT18.6-F1**. The "Physical Gap" that blocked remote validation is now bridged. Chapters 3.2, 5.1, 15.1, and 16.1 can now be validated using simulation hooks in the Diagnostics interface.
+## 🟢 Status: GNSS Engine Urban-Canyon Optimized
+The project has successfully resolved **ISSUE-OCT18.8-F1**. The GNSS engine is now hardened against high-SNR signal reflections typically encountered in dense urban environments ("Urban Canyons").
 
-## 🛠️ Remediation Details (ISSUE-OCT18.6-F1)
+## 🛠️ Remediation Details (ISSUE-OCT18.8-F1)
 
-### 1. Synthetic Event Injection
-- **Framework**: Introduced `SyntheticEventInjector` to coordinate hardware overrides across layers.
-- **Hardware Hooks**: `HardwareSuite` now supports `simulateGnssLoss()` (zeroing satellites) and `simulateShake()` (high vibration floor).
-- **Network Hooks**: `AndroidNetworkProvider` supports `simulateNetworkLoss()`, dropping all connectivity updates at the provider level.
-- **Power Hooks**: Power tamper simulation is wired directly to `IntegrityMonitor` debounce logic.
+### 1. SNR Latch Mechanism
+- **Logic**: Introduced `JUMP_HOLD_HIGH_SNR_DURATION_MS` (360s) for any coordinate jump where SNR ≥ 35.0.
+- **Trigger**: `MainAlarmLogic` detects the reflection flag and switches from the standard 180s hold to the 360s latch.
+- **Persistence**: Added `firstViolationWasHighSnr` to `AlarmEvaluationState` to ensure the latch persists even if the device momentarily drops connectivity.
 
-### 2. UI Control
-- **Interface**: New "Validation Hooks" section added to `DiagnosticsScreen`.
-- **State**: `SimulationUiState` and `UiCommand` routing expanded to support real-time toggling of synthetic events.
+### 2. Anchor Skepticism (Stationary)
+- **Refinement**: `AnchorEvaluator` now treats high-SNR fixes with extreme skepticism when physically stationary (IMU-confirmed).
+- **Penalty**: Breakout score accumulation is reduced by 75% (`0.25x`) during high-SNR erratic behavior to prevent "blue-dot jitter" from breaking the stationary lock.
 
-### 3. Versioning & Traceability
-- **Version Name**: `Oct18.6`.
-- **SOT Alignment**: New SOT ID 764 assigned. Rule R-ID 734 (Synthetic Physical Validation) added to Master Requirements.
+### 3. State Propagation
+- **Layers**: Reflection detection is initiated in `PhysicsUtils`, captured in `SentinelResult`, propagated via `ProcessedLocation`, and enforced in `MainAlarmLogic`.
 
-## 🎯 Next Resumption Focus: Urban Multi-path Hardening (Chapter 6)
-With the physical validation gap closed, the next phase will focus on hardening the GNSS engine against urban multipath errors and signal reflections.
+## 🎯 Next Resumption Focus: Adaptive Vibration Floor Convergence (Chapter 34)
+The next phase will focus on optimizing the adaptive vibration floor convergence speed, especially during transitions from high-vibration (in-vehicle) to stationary environments.
 
 **HANDOVER COMPLETE. STOP ALL PROCESSING.**

@@ -4,6 +4,9 @@ import kotlin.math.*
 
 /**
  * PhysicsUtils: High-performance geospatial and kinematic calculations.
+ * Oct.18.8:
+ * - ISSUE-OCT18.8-F1: Urban Multi-path Hardening. Added high-SNR reflection 
+ *   weighting to isVisualJump (Issue #452).
  * Aug.18.05:
  * - Issue #201: Urban Edge Case Multipath Mitigation. Incorporated SNR-based 
  *   weighting into isVisualJump to harden detection against signal bouncing (R201).
@@ -194,6 +197,13 @@ object PhysicsUtils {
             score += JUMP_WEIGHT_LOW_SNR
         }
 
+        // Issue #452: High SNR Reflection (Urban Canyon Multipath)
+        var isHighSnrReflection = false
+        if (snr >= JUMP_GATE_HIGH_SNR_LATCH_THRESHOLD) {
+            score += JUMP_WEIGHT_HIGH_SNR_REFLECTION
+            isHighSnrReflection = true
+        }
+
         // Issue #529: Accuracy Recovery Mitigation
         val isAccuracyImproving = lastAccuracy > 0.0 && accuracy < (lastAccuracy * 0.8)
         val isWithinPreviousError = lastAccuracy > 0.0 && dist < lastAccuracy
@@ -215,6 +225,7 @@ object PhysicsUtils {
         result.tier = if (isTier2) 2 else if (isTier3) 3 else 0
         result.reason = when {
             isSnap -> "Suppressed Accuracy Snap"
+            isHighSnrReflection && isJump -> "High SNR Reflection (Multipath Latch)"
             !hasPhysicalMotion && speedMps > mismatchGate -> {
                 if (snr > 0 && snr < JUMP_GATE_LOW_SNR_THRESHOLD) "Multipath Signal Bounce (Low SNR)"
                 else "Sensor Mismatch Jump (Urban Canyon)"
