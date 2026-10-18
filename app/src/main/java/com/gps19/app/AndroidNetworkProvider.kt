@@ -13,6 +13,7 @@ import com.gps19.core.engine.NetworkProvider
 import com.gps19.core.engine.TimeProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
 import timber.log.Timber
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -20,6 +21,9 @@ import javax.inject.Singleton
  * AndroidNetworkProvider: Production implementation of NetworkProvider 
  * using ConnectivityManager.NetworkCallback.
  * 
+ * Oct.18.6:
+ * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Implemented simulateNetworkLoss 
+ *   to allow manual triggering of connectivity failover logic.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Implemented isNetworkAvailable 
  *   property for unified state access.
@@ -36,9 +40,11 @@ class AndroidNetworkProvider @Inject constructor(
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val listeners = mutableSetOf<NetworkListener>()
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val isLossSimulated = AtomicBoolean(false)
     
     override val isNetworkAvailable: Boolean
         get() {
+            if (isLossSimulated.get()) return false
             val network = connectivityManager.activeNetwork ?: return false
             val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
             return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
@@ -46,12 +52,14 @@ class AndroidNetworkProvider @Inject constructor(
 
     private val networkCallback = object : ManagedNetworkCallback() {
         override fun onAvailable(network: Network) {
+            if (isLossSimulated.get()) return
             synchronized(listeners) {
                 listeners.forEach { it.onNetworkAvailable() }
             }
         }
 
         override fun onLost(network: Network) {
+            if (isLossSimulated.get()) return
             synchronized(listeners) {
                 listeners.forEach { it.onNetworkLost() }
             }
@@ -71,6 +79,19 @@ class AndroidNetworkProvider @Inject constructor(
         synchronized(listeners) {
             listeners.remove(listener)
             ensureCorrectRegistrationState()
+        }
+    }
+
+    override fun simulateNetworkLoss(active: Boolean) {
+        if (isLossSimulated.getAndSet(active) != active) {
+            Timber.i("AndroidNetworkProvider: Network Loss Simulation -> $active")
+            synchronized(listeners) {
+                if (active) {
+                    listeners.forEach { it.onNetworkLost() }
+                } else if (isNetworkAvailable) {
+                    listeners.forEach { it.onNetworkAvailable() }
+                }
+            }
         }
     }
 

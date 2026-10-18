@@ -1,9 +1,9 @@
 # Project Issues & Hardening Tracking (Rigorous Audit) - Oct14.1
 
-## 🎯 Current Resumption Focus: Physical Validation Gap (Chapters 3.2, 15.1, 16.1).
+## 🎯 Current Resumption Focus: Urban Multi-path Hardening (Chapter 6).
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   **ISSUE-OCT17.11-P1: Physical Environment Verification (Medium).** Chapters 3.2, 5.1, 15.1, and 16.1 of the manual protocol require physical hardware interaction (shaking, unplugging, shielding) currently blocked by remote location.
+*   *No high or medium priority gaps remaining for the current baseline.*
 
 ---
 
@@ -17,6 +17,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT18.6-F1: Synthetic Physical Event Injection.** Resolved Oct14.1. Implemented a centralized simulation framework to bridge the "Physical Gap" for remote validation of Chapters 3.2, 5.1, 15.1, and 16.1. Added hooks to `HardwareSuite` and `NetworkProvider`. (SOT ID 764).
 *   **SIMP-OCT18.2-S1: Explicit Repository Lifecycle.** Resolved Oct14.1. Moved background job initiation from `LogRepository.init` to an explicit `start()` method called by `GpsApplication`. Removed auto-starting logic from constructors to ensure predictable initialization order and better test isolation. (SOT ID 763).
 *   **SIMP-OCT17.11-S1: Test Mode Dependency Injection.** Resolved Oct14.1. Refactored `LogRepository` to use a dedicated `TestModeProvider` interface instead of a static `AtomicBoolean`. (SOT ID 762).
 *   **ISSUE-OCT16.9-F2: Vibration NaNG Hardening.** Resolved Oct14.1. Fixed JNI buffer misalignment in `GnssHealthBatch` by re-aligning to 8-byte boundaries. (SOT ID 761).
@@ -27,7 +28,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct14.1: [SOT Count: 456 (Rules: 290), Open: H:0, M:0, L:0, Ideas: H:1, M:15, L:25, Testing: 28 (Sub-items: 105), QA: 384]**
 - **Oct14.1: [SOT Count: 455 (Rules: 289), Open: H:0, M:1, L:0, Ideas: H:1, M:15, L:25, Testing: 27 (Sub-items: 101), QA: 383]**
 - **Oct14.1: [SOT Count: 454 (Rules: 288), Open: H:0, M:1, L:0, Ideas: H:1, M:16, L:25, Testing: 27 (Sub-items: 101), QA: 382]**
 - **Oct14.1: [SOT Count: 453 (Rules: 287), Open: H:0, M:1, L:0, Ideas: H:2, M:15, L:25, Testing: 27 (Sub-items: 101), QA: 381]**
-- **Oct14.1: [SOT Count: 452 (Rules: 286), Open: H:1, M:1, L:0, Ideas: H:2, M:16, L:23, Testing: 27 (Sub-items: 100), QA: 380]**

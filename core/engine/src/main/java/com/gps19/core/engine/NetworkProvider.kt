@@ -12,6 +12,9 @@ interface NetworkListener {
  * NetworkProvider: Abstract interface for monitoring network availability.
  * Decouples engine logic from Android's ConnectivityManager for testability.
  * 
+ * Oct.18.6:
+ * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Added simulateNetworkLoss 
+ *   to allow remote validation of failover logic.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Migrated to property-based 
  *   availability check for Hilt/Compose interoperability.
@@ -24,6 +27,11 @@ interface NetworkProvider {
 
     fun registerListener(listener: NetworkListener)
     fun unregisterListener(listener: NetworkListener)
+
+    /**
+     * simulateNetworkLoss: Simulation hook for failover validation.
+     */
+    fun simulateNetworkLoss(active: Boolean)
 }
 
 /**

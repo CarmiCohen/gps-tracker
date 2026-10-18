@@ -7,12 +7,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Composite UI state partitioned into specialized slices.
+ * Oct.18.6:
+ * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Added shake, GNSS loss, 
+ *   power tamper, and network loss to SimulationUiState.
  * Oct.15.2:
  * - SIMP-OCT15.1-S1: Primitive History Buffers. Transitioned history flows 
  *   from List<ConnectionPoint> to HistoryBuffer to reduce GC pressure.
- * Oct.14.17:
- * - A15 Hardening: Disabled isMapVisible by default to prevent MapView 
- *   from obscuring the UI on devices with rendering stalls.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -217,7 +217,11 @@ data class SimulationUiState(
     val isStorageSimulated: Boolean = false,
     val isStorageCriticalSimulated: Boolean = false,
     val isMemorySimulated: Boolean = false,
-    val simulatedMemoryLevel: MemoryPressureLevel = MemoryPressureLevel.NORMAL
+    val simulatedMemoryLevel: MemoryPressureLevel = MemoryPressureLevel.NORMAL,
+    val isShakeSimulated: Boolean = false,
+    val isGnssLossSimulated: Boolean = false,
+    val isNetworkLossSimulated: Boolean = false,
+    val isPowerTamperSimulated: Boolean = false
 )
 
 data class MapViewState(
@@ -546,6 +550,10 @@ sealed class UiEvent {
     object ExecuteNetworkStressTest : UiEvent()
     data class SetStorageSimulation(val active: Boolean, val isCritical: Boolean) : UiEvent()
     data class SetMemoryPressureSimulation(val active: Boolean, val level: MemoryPressureLevel) : UiEvent()
+    data class SetShakeSimulation(val active: Boolean) : UiEvent()
+    data class SetGnssLossSimulation(val active: Boolean) : UiEvent()
+    data class SetPowerTamperSimulation(val active: Boolean) : UiEvent()
+    data class SetNetworkLossSimulation(val active: Boolean) : UiEvent()
     data class SetManualSelection(val active: Boolean) : UiEvent()
     data class SetSettlingActive(val active: Boolean) : UiEvent()
     data class ToggleSetupBypass(val active: Boolean) : UiEvent()
@@ -609,4 +617,8 @@ sealed class UiCommand {
     object ExecuteNetworkStressTest : UiCommand()
     data class SimulateStoragePressure(val active: Boolean, val isCritical: Boolean) : UiCommand()
     data class SimulateMemoryPressure(val active: Boolean, val level: MemoryPressureLevel) : UiCommand()
+    data class SimulateShake(val active: Boolean) : UiCommand()
+    data class SimulateGnssLoss(val active: Boolean) : UiCommand()
+    data class SimulatePowerTamper(val active: Boolean) : UiCommand()
+    data class SimulateNetworkLoss(val active: Boolean) : UiCommand()
 }

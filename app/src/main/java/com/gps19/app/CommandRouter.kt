@@ -18,6 +18,9 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Oct.18.6:
+ * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Integrated simulation 
+ *   routing for SHAKE, GNSS_LOSS, POWER_TAMPER, and NETWORK_LOSS.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
  *   TimeProvider API and fixed property invocation errors.
@@ -39,7 +42,8 @@ class CommandRouter @Inject constructor(
     private val audioSynthesizer: AudioSynthesizer,
     private val historyManager: HistoryManager,
     private val domainEventBus: DomainEventBus,
-    private val sirenLockoutUseCase: SirenLockoutUseCase
+    private val sirenLockoutUseCase: SirenLockoutUseCase,
+    private val syntheticEventInjector: SyntheticEventInjector
 ) {
     private val isRegistered = AtomicBoolean(false)
     private val isObserving = AtomicBoolean(false)
@@ -114,6 +118,7 @@ class CommandRouter @Inject constructor(
                             connectivitySuite.resetPeerStats()
                             historyManager.reset()
                             integrityMonitor.resetStats()
+                            syntheticEventInjector.reset()
                         }
                         is UiCommand.SettingsUpdated -> {
                             domainEventBus.emit(CommandEvent.SyncSensors)
@@ -129,6 +134,7 @@ class CommandRouter @Inject constructor(
                             historyManager.reset()
                             integrityMonitor.resetStats()
                             domainEventBus.emit(CommandEvent.SyncSensors)
+                            syntheticEventInjector.reset()
                         }
                         is UiCommand.ExecuteTestAlarm -> {
                             if (configManager.isTrackerMode) {
@@ -174,6 +180,18 @@ class CommandRouter @Inject constructor(
                         }
                         is UiCommand.SimulateMemoryPressure -> {
                             integrityMonitor.simulateMemoryPressure(command.active, command.level)
+                        }
+                        is UiCommand.SimulateShake -> {
+                            syntheticEventInjector.simulateShake(command.active)
+                        }
+                        is UiCommand.SimulateGnssLoss -> {
+                            syntheticEventInjector.simulateGnssLoss(command.active)
+                        }
+                        is UiCommand.SimulatePowerTamper -> {
+                            syntheticEventInjector.simulatePowerTamper(command.active)
+                        }
+                        is UiCommand.SimulateNetworkLoss -> {
+                            syntheticEventInjector.simulateNetworkLoss(command.active)
                         }
                     }
                 } catch (e: Exception) {

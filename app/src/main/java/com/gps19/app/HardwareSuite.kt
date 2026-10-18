@@ -37,6 +37,9 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.18.6:
+ * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Added simulateGnssLoss 
+ *   to zero out satellite status for Signal Loss validation.
  * Oct.16.11:
  * - ISSUE-OCT16.11-F2: Memory Pressure Throttling Parity. Added synchronization 
  *   of isMemoryPressureThrottled from Acoustic and Proximity JNI paths.
@@ -258,6 +261,22 @@ class HardwareSuite @Inject constructor(
     private val _isGnssThrottled = MutableSharedFlow<Boolean>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val isGnssThrottledFlow: SharedFlow<Boolean> = _isGnssThrottled.asSharedFlow()
     var isGnssThrottled = false; private set
+    
+    @Volatile private var isGnssLossSimulated = false
+
+    fun setGnssThrottled(throttled: Boolean) {
+        if (this.isGnssThrottled != throttled) {
+            this.isGnssThrottled = throttled
+            _isGnssThrottled.tryEmit(throttled)
+            Timber.i("HardwareSuite: GNSS Throttling manually set to $throttled (Simulation/Injection)")
+        }
+    }
+
+    fun simulateGnssLoss(active: Boolean) {
+        this.isGnssLossSimulated = active
+        Timber.i("HardwareSuite: GNSS Loss simulation set to $active")
+        updateLocationStatus()
+    }
 
     private val _locationStatus = MutableSharedFlow<LocationStatus>(replay = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     val locationStatusFlow: SharedFlow<LocationStatus> = _locationStatus.asSharedFlow()
@@ -432,15 +451,22 @@ class HardwareSuite @Inject constructor(
             val nowRt = timeProvider.elapsedRealtime
             
             synchronized(gnssHealthBatch) {
-                gnssHealthBatch.count = status.satelliteCount.coerceAtMost(64)
-                for (i in 0 until gnssHealthBatch.count) {
-                    gnssHealthBatch.svid[i] = status.getSvid(i)
-                    gnssHealthBatch.cn0[i] = status.getCn0DbHz(i)
-                    gnssHealthBatch.usedInFix[i] = status.usedInFix(i)
-                    gnssHealthBatch.constellation[i] = status.getConstellationType(i)
+                if (isGnssLossSimulated) {
+                    gnssHealthBatch.count = 0
+                    gnssHealthBatch.satellitesInView = 0
+                    gnssHealthBatch.satellitesUsed = 0
+                    gnssHealthBatch.averageSnr = 0.0
+                } else {
+                    gnssHealthBatch.count = status.satelliteCount.coerceAtMost(64)
+                    for (i in 0 until gnssHealthBatch.count) {
+                        gnssHealthBatch.svid[i] = status.getSvid(i)
+                        gnssHealthBatch.cn0[i] = status.getCn0DbHz(i)
+                        gnssHealthBatch.usedInFix[i] = status.usedInFix(i)
+                        gnssHealthBatch.constellation[i] = status.getConstellationType(i)
+                    }
+                    nativeFastPathProvider.processGnssBatch(timeProvider, gnssHealthBatch)
                 }
 
-                nativeFastPathProvider.processGnssBatch(timeProvider, gnssHealthBatch)
                 satellitesInView = gnssHealthBatch.satellitesInView
                 satellitesUsed = gnssHealthBatch.satellitesUsed
                 averageSnr = gnssHealthBatch.averageSnr
@@ -461,8 +487,10 @@ class HardwareSuite @Inject constructor(
             if (nowRt - lastGnssEmitRt >= currentInterval) {
                 lastGnssEmitRt = nowRt
                 val satList = mutableListOf<SatelliteInfo>()
-                for (i in 0 until status.satelliteCount) {
-                    satList.add(SatelliteInfo(svid = status.getSvid(i), cn0 = status.getCn0DbHz(i).toDouble(), usedInFix = status.usedInFix(i), constellation = status.getConstellationType(i)))
+                if (!isGnssLossSimulated) {
+                    for (i in 0 until status.satelliteCount) {
+                        satList.add(SatelliteInfo(svid = status.getSvid(i), cn0 = status.getCn0DbHz(i).toDouble(), usedInFix = status.usedInFix(i), constellation = status.getConstellationType(i)))
+                    }
                 }
                 _internalGpsFlow.tryEmit(GpsUpdate.GnssUpdate(GnssDetail(satellites = satList.sortedByDescending { it.cn0 })))
             }

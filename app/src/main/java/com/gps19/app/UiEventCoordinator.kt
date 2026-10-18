@@ -16,13 +16,12 @@ import javax.inject.Singleton
 
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
+ * Oct.18.6:
+ * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Integrated simulation 
+ *   triggers for SHAKE, GNSS_LOSS, POWER_TAMPER, and NETWORK_LOSS.
  * Oct.16.8:
  * - ISSUE-OCT16.8-F1: Fixed StopTracking dialog dismissal. Explicitly reset 
  *   isStopTrackingConfirmationVisible in ConfirmStopTracking handler.
- * Oct.15.10:
- * - ISSUE-OCT15.10-F5: Tracker Restriction. Enforced "Viewer-Only" rule for 
- *   geofence modifications. Guarded Add/Remove/Clear events and ensured 
- *   geofenceMode resets to IDLE when entering Tracker mode.
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -37,7 +36,8 @@ class UiEventCoordinator @Inject constructor(
     private val audioSynthesizer: AudioSynthesizer,
     private val sirenLockoutUseCase: SirenLockoutUseCase,
     private val systemStatusProvider: SystemStatusProvider,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val syntheticEventInjector: SyntheticEventInjector
 ) {
 
     private var autoSaveJob: Job? = null
@@ -267,6 +267,22 @@ class UiEventCoordinator @Inject constructor(
             is UiEvent.SetMemoryPressureSimulation -> {
                 onStateUpdate { it.copy(simulation = it.simulation.copy(isMemorySimulated = event.active, simulatedMemoryLevel = event.level)) }
                 repository.sendCommand(UiCommand.SimulateMemoryPressure(event.active, event.level))
+            }
+            is UiEvent.SetShakeSimulation -> {
+                onStateUpdate { it.copy(simulation = it.simulation.copy(isShakeSimulated = event.active)) }
+                repository.sendCommand(UiCommand.SimulateShake(event.active))
+            }
+            is UiEvent.SetGnssLossSimulation -> {
+                onStateUpdate { it.copy(simulation = it.simulation.copy(isGnssLossSimulated = event.active)) }
+                repository.sendCommand(UiCommand.SimulateGnssLoss(event.active))
+            }
+            is UiEvent.SetPowerTamperSimulation -> {
+                onStateUpdate { it.copy(simulation = it.simulation.copy(isPowerTamperSimulated = event.active)) }
+                repository.sendCommand(UiCommand.SimulatePowerTamper(event.active))
+            }
+            is UiEvent.SetNetworkLossSimulation -> {
+                onStateUpdate { it.copy(simulation = it.simulation.copy(isNetworkLossSimulated = event.active)) }
+                repository.sendCommand(UiCommand.SimulateNetworkLoss(event.active))
             }
             is UiEvent.ExecuteStressTest -> repository.sendCommand(UiCommand.ExecuteStressTest)
             is UiEvent.ExecuteLogPressureTest -> repository.sendCommand(UiCommand.ExecuteLogPressureTest)

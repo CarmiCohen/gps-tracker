@@ -25,6 +25,9 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Oct.18.6:
+ * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Added UI controls for 
+ *   SHAKE, GNSS_LOSS, POWER_TAMPER, and NETWORK_LOSS simulations.
  * Oct.13.30:
  * - SIMP-OCT13.21-S1: Pure Event UI. Refactored to use centralized onMainEvent 
  *   bubbling for all actions, unifying signature with Tracker/Viewer screens.
@@ -279,6 +282,54 @@ fun DiagnosticsScreen(
                     }
                     Switch(checked = isStorageSimulated, onCheckedChange = { onMainEvent(UiEvent.SetStorageSimulation(it, isStorageCriticalSimulated)) })
                 }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Physical Shake Simulation", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Chapter 3.2 Stealth Audit", color = if (simulationState.isShakeSimulated) Color.Yellow else Color.Gray, fontSize = 12.sp)
+                }
+                Switch(checked = simulationState.isShakeSimulated, onCheckedChange = { onMainEvent(UiEvent.SetShakeSimulation(it)) })
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("GNSS Signal Loss Simulation", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Chapter 5.1 GNSS Zombie", color = if (simulationState.isGnssLossSimulated) Color.Yellow else Color.Gray, fontSize = 12.sp)
+                }
+                Switch(checked = simulationState.isGnssLossSimulated, onCheckedChange = { onMainEvent(UiEvent.SetGnssLossSimulation(it)) })
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Power Tamper Simulation", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Chapter 15.1 Power Tamper", color = if (simulationState.isPowerTamperSimulated) Color.Yellow else Color.Gray, fontSize = 12.sp)
+                }
+                Switch(checked = simulationState.isPowerTamperSimulated, onCheckedChange = { onMainEvent(UiEvent.SetPowerTamperSimulation(it)) })
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Network Loss Simulation", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Chapter 16.1 Failover Audit", color = if (simulationState.isNetworkLossSimulated) Color.Yellow else Color.Gray, fontSize = 12.sp)
+                }
+                Switch(checked = simulationState.isNetworkLossSimulated, onCheckedChange = { onMainEvent(UiEvent.SetNetworkLossSimulation(it)) })
             }
 
             Spacer(modifier = Modifier.height(8.dp))
