@@ -37,6 +37,10 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.18.22:
+ * - ISSUE-OCT18.22-F1: Incomplete Battery Saver Signaling Policy. Updated 
+ *   shouldDeferSignaling to include isPowerSaveMode check for Battery Saver 
+ *   awareness.
  * Oct.18.16:
  * - Issue #SIMP-OCT18.16-P1: Doze Mode White-listing. Updated 
  *   shouldDeferSignaling to allow signaling during Doze mode if the application 
@@ -309,7 +313,7 @@ class HardwareSuite @Inject constructor(
     private var teardownJob: Job? = null
     private var revivalPulseJob: Job? = null
     private var lastDisplayState = Display.STATE_UNKNOWN
-    @Volatile private var lastDisplayTransitionRt = 0L
+    @Volatile var lastDisplayTransitionRt = 0L
     private val isDisplayFlickering = AtomicBoolean(false)
     @Volatile private var lastStayAliveRt = 0L
 
@@ -1222,6 +1226,7 @@ class HardwareSuite @Inject constructor(
                     forensicMinDb = 100.0
                 } else {
                     logicPeakVibration = 0.0
+                    logicPeakVibration = 0.0
                     logicPeakVerticalVelocity = 0.0
                     logicPeakVerticalVelocityTs = 0L
                     logicPeakVerticalVelocityRt = 0L
@@ -1532,9 +1537,11 @@ class HardwareSuite @Inject constructor(
      * shouldDeferSignaling: Determines if telemetry signaling should be deferred 
      * to conserve power. Signaling is allowed if the system is in violation, 
      * or if the application is white-listed to ignore battery optimizations.
+     * Oct.18.22: Included isPowerSaveMode check for Battery Saver restrictions.
      */
     fun shouldDeferSignaling(isInViolation: Boolean): Boolean {
-        return powerStateProvider.isDeviceIdleMode && !isInViolation && !powerStateProvider.isIgnoringBatteryOptimizations
+        val isPowerRestricted = powerStateProvider.isDeviceIdleMode || powerStateProvider.isPowerSaveMode
+        return isPowerRestricted && !isInViolation && !powerStateProvider.isIgnoringBatteryOptimizations
     }
 
     fun calculateNextBackoff(attempt: Int, isConnected: Boolean): Long {

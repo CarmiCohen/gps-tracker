@@ -1,9 +1,11 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct18.8
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct18.22
 
 ## 🎯 Current Resumption Focus: Battery Saver Restricted Network behavior (Chapter 38).
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   *No high or medium priority gaps remaining for the current baseline.*
+*   **ISSUE-OCT18.22-F1: Incomplete Battery Saver Signaling Policy (Medium).** `HardwareSuite.shouldDeferSignaling` lacks `isPowerSaveMode` check, risking unreliable signaling during Battery Saver.
+*   **ISSUE-OCT18.22-F2: Redundant Network Callback Registrations (Low).** Observed frequent `registerNetworkCallback` stack logs; requires audit of `ManagedNetworkCallback` lifecycle.
+*   **ISSUE-OCT18.22-F3: Storage Test Race Conditions (Low).** Intermittent failures in `StoragePressureAuditTest` suggest non-determinism in manual log flushing.
 
 ---
 
@@ -32,7 +34,5 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct18.22: [SOT Count: 462 (Rules: 296), Open: H:0, M:1, L:2, Ideas: H:1, M:19, L:27, Testing: 100 (Sub-items: 100), QA: 390]**
 - **Oct18.8: [SOT Count: 462 (Rules: 296), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:27, Testing: 100 (Sub-items: 100), QA: 390]**
-- **Oct18.8: [SOT Count: 462 (Rules: 296), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:27, Testing: 100 (Sub-items: 100), QA: 390]**
-- **Oct18.8: [SOT Count: 461 (Rules: 295), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:26, Testing: 28 (Sub-items: 105), QA: 389]**
-- **Oct18.8: [SOT Count: 460 (Rules: 294), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:25, Testing: 28 (Sub-items: 105), QA: 388]**

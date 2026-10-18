@@ -68,7 +68,7 @@ protobuf {
         artifact = "com.google.protobuf:protoc:3.25.1"
     }
     generateProtoTasks {
-        all().each { task ->
+        all().configureEach { task ->
             task.builtins {
                 java {
                     option 'lite'

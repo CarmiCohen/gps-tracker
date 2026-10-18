@@ -157,12 +157,19 @@ tasks.register('verifyProjectIntegrity') {
 }
 
 // Lifecycle Integration (R-ID 336) - Optimized via Task Deduplication
+// Modernized for Gradle 9.0 Compatibility: Replaced afterEvaluate with plugins.withId
 subprojects {
-    afterEvaluate { subproject ->
-        if (subproject.plugins.hasPlugin('com.android.application') || subproject.plugins.hasPlugin('com.android.library')) {
-            subproject.tasks.matching { it.name == "preBuild" }.all {
-                dependsOn rootProject.tasks.verifyProjectIntegrity
-            }
+    def integrityTask = rootProject.tasks.named('verifyProjectIntegrity')
+    
+    plugins.withId('com.android.application') {
+        tasks.matching { it.name == "preBuild" }.configureEach {
+            dependsOn integrityTask
+        }
+    }
+    
+    plugins.withId('com.android.library') {
+        tasks.matching { it.name == "preBuild" }.configureEach {
+            dependsOn integrityTask
         }
     }
 }
