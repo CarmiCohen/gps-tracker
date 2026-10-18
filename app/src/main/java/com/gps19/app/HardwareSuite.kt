@@ -37,6 +37,10 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.18.12:
+ * - ISSUE-OCT18.12-F1: Acoustic Duty Cycle Transition Latency. Modified 
+ *   acousticThread to start recording OVERLAP_MS before OFF cycle ends and 
+ *   delay stopping OVERLAP_MS after ON cycle ends.
  * Oct.18.6:
  * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Added simulateGnssLoss 
  *   to zero out satellite status for Signal Loss validation.
@@ -1099,13 +1103,37 @@ class HardwareSuite @Inject constructor(
                             if (powerSaveMode) {
                                 val adaptiveOffCycleMs = SentinelValidator.computeAdaptiveAcousticOffCycle(isStationary(), stationaryDurationMs)
                                 if (!isInOffCycle && (nowRt - lastDutyCycleTransitionRt > ACOUSTIC_DUTY_CYCLE_ON_MS)) {
-                                    isInOffCycle = true; lastDutyCycleTransitionRt = nowRt; try { audioRecord.stop() } catch (e: Exception) {} 
+                                    isInOffCycle = true; lastDutyCycleTransitionRt = nowRt
                                 }
                                 else if (isInOffCycle && (nowRt - lastDutyCycleTransitionRt > adaptiveOffCycleMs)) { 
-                                    isInOffCycle = false; lastDutyCycleTransitionRt = nowRt; try { audioRecord.startRecording() } catch (e: Exception) { break } 
+                                    isInOffCycle = false; lastDutyCycleTransitionRt = nowRt; 
+                                    if (audioRecord.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                                        try { audioRecord.startRecording() } catch (e: Exception) { break }
+                                    }
                                 }
-                            } else if (isInOffCycle) { isInOffCycle = false; lastDutyCycleTransitionRt = nowRt; try { audioRecord.startRecording() } catch (e: Exception) { break } }
-                            if (isInOffCycle) { try { Thread.sleep(500) } catch (ie: InterruptedException) { break }; continue }
+                                
+                                if (isInOffCycle) {
+                                    val timeInOff = nowRt - lastDutyCycleTransitionRt
+                                    if (timeInOff > ACOUSTIC_DUTY_CYCLE_OVERLAP_MS && timeInOff < (adaptiveOffCycleMs - ACOUSTIC_DUTY_CYCLE_OVERLAP_MS)) {
+                                        if (audioRecord.recordingState == AudioRecord.RECORDSTATE_RECORDING) {
+                                            try { audioRecord.stop() } catch (e: Exception) {}
+                                        }
+                                    } else if (timeInOff >= (adaptiveOffCycleMs - ACOUSTIC_DUTY_CYCLE_OVERLAP_MS)) {
+                                        if (audioRecord.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                                            try { audioRecord.startRecording() } catch (e: Exception) { break }
+                                        }
+                                    }
+                                }
+                            } else {
+                                if (isInOffCycle) { isInOffCycle = false; lastDutyCycleTransitionRt = nowRt }
+                                if (audioRecord.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                                    try { audioRecord.startRecording() } catch (e: Exception) { break }
+                                }
+                            }
+
+                            if (audioRecord.recordingState != AudioRecord.RECORDSTATE_RECORDING) { 
+                                try { Thread.sleep(200) } catch (ie: InterruptedException) { break }; continue 
+                            }
                             val read = audioRecord.read(buffer, 0, bufferSize)
                             if (read > 0) {
                                 synchronized(this) {

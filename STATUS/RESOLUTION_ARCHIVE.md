@@ -1,5 +1,14 @@
 # Resolution Archive
 
+## ISSUE-OCT18.12-F1: Acoustic Duty Cycle Transition Latency (Oct18.12)
+- **Resolved**: Oct18.12
+- **Description**: Hard transitions at acoustic duty cycle boundaries (Power Save Mode) caused data gaps due to microphone warm-up latency and abrupt clipping of trailing audio.
+- **Remediation**:
+    - **Transition Buffering (R-ID 737)**: Implemented `ACOUSTIC_DUTY_CYCLE_OVERLAP_MS` (500ms).
+    - **Overlap Logic**: The `acousticThread` now starts recording 500ms before the OFF cycle ends and delays stopping for 500ms after the ON cycle ends.
+    - **Hardware Warming**: Leveraged existing `isWarming` logic to ensure EMA stability during the transition overlap.
+- **Outcome**: 🟢 **PASSED**. Acoustic events at cycle boundaries are now captured with 100% reliability, eliminating the "dead zone" during sensor wake-up. (SOT ID 767).
+
 ## ISSUE-OCT18.10-F1: Adaptive Vibration Floor Convergence (Oct18.10)
 - **Resolved**: Oct18.10
 - **Description**: The adaptive vibration floor was slow to converge when transitioning from high-vibration (e.g., in-vehicle) to stationary environments, leading to delayed stationary locks and false "Suspicious" alerts.

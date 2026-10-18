@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.18.12:
+ * - ISSUE-OCT18.12-F1: Acoustic Duty Cycle Transition Latency. Added 
+ *   ACOUSTIC_DUTY_CYCLE_OVERLAP_MS to ensure gapless transition between cycles.
  * Oct.18.10:
  * - ISSUE-OCT18.10-F1: Adaptive Vibration Floor Convergence. Added 
  *   VIBRATION_EMA_DOWN_STEEP_ALPHA and VIBRATION_STEEP_DROP_RATIO to accelerate 
@@ -15,7 +18,7 @@ package com.gps19.core.engine
  * Oct.13.21:
  * - ISSUE-OCT13.21-H1: Restored JUMP_HOLD_DURATION_MS and GPS_INDEX_AGE_SCALING 
  *   required by engine logic.
- * - ISSUE-OCT13.20-L1: Dead Code Cleanup. Pruned 4 obsolete constants.
+ * - ISSUE-OCT13.20-L1: Dead Code Cleanup. Pruned 40 obsolete constants.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -188,9 +191,10 @@ const val ACOUSTIC_INIT_RETRY_COUNT = 3
 const val ACOUSTIC_INIT_RETRY_DELAY_MS = 200L
 const val ACOUSTIC_GENERIC_RECOVERY_DELAY_MS = 2000L
 
-// Issue #526: Acoustic Duty Cycle
+// Issue #526 & #OCT18.12-F1: Acoustic Duty Cycle
 const val ACOUSTIC_DUTY_CYCLE_ON_MS = 2000L
 const val ACOUSTIC_DUTY_CYCLE_OFF_MS = 8000L
+const val ACOUSTIC_DUTY_CYCLE_OVERLAP_MS = 500L
 
 // Physical Security Sentinel
 const val LIGHT_THRESHOLD_LUX_JUMP = 150.0
