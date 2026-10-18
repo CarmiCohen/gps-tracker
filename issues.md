@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct18.18
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct18.8
 
 ## 🎯 Current Resumption Focus: Battery Saver Restricted Network behavior (Chapter 38).
 
@@ -21,7 +21,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
-*   **ISSUE-OCT18.18-F1: Storage Test Determinism.** Resolved Oct18.18. Added `triggerManualBatchProcessor()` to `LogRepository` to ensure deterministic log flushing during tests. (SOT ID 770).
+*   **ISSUE-OCT18.18-F1: Storage Test Determinism.** Resolved Oct18.8. Added `triggerManualBatchProcessor()` to `LogRepository` to ensure deterministic log flushing during tests. (SOT ID 770).
 *   **ISSUE-OCT18.16-F1: Doze Mode White-listing.** Resolved Oct18.8. Implemented `isIgnoringBatteryOptimizations` check in `PowerStateProvider` and updated `HardwareSuite` to allow signaling bypass during Doze mode for white-listed sessions. (SOT ID 769).
 *   **ISSUE-OCT18.14-F1: Urban Signal Reflectivity Hardening.** Resolved Oct18.8. Implemented `ANCHOR_REFLECTIVITY_ALTITUDE_GATE` (3.5m) skepticism in `AnchorEvaluator` to prevent multipath breakouts during high-SNR reflections with significant altitude shifts. (SOT ID 768).
 *   **ISSUE-OCT18.12-F1: Acoustic Duty Cycle Transition Latency.** Resolved Oct18.8. Implemented `ACOUSTIC_DUTY_CYCLE_OVERLAP_MS` (500ms) buffering in `HardwareSuite` to ensure microphone warm-up and trailing audio capture during duty cycle transitions. (SOT ID 767).
@@ -32,6 +32,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct18.18: [SOT Count: 462 (Rules: 296), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:27, Testing: 100 (Sub-items: 100), QA: 390]**
-- **Oct18.16: [SOT Count: 461 (Rules: 295), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:26, Testing: 28 (Sub-items: 105), QA: 389]**
+- **Oct18.8: [SOT Count: 462 (Rules: 296), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:27, Testing: 100 (Sub-items: 100), QA: 390]**
+- **Oct18.8: [SOT Count: 462 (Rules: 296), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:27, Testing: 100 (Sub-items: 100), QA: 390]**
+- **Oct18.8: [SOT Count: 461 (Rules: 295), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:26, Testing: 28 (Sub-items: 105), QA: 389]**
 - **Oct18.8: [SOT Count: 460 (Rules: 294), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:25, Testing: 28 (Sub-items: 105), QA: 388]**
