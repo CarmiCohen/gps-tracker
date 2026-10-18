@@ -28,15 +28,11 @@ import com.gps19.core.engine.CommandEvent
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Oct.18.4:
+ * - SIMP-OCT18.2-S1: Explicit Repository Lifecycle. Now explicitly starts 
+ *   LogManager (and thus LogRepository background tasks) during onCreate.
  * Oct.18.2:
- * - SIMP-OCT17.11-S1: Removed static LogRepository.setTestMode call in resetTestStates.
- * Oct.16.3:
- * - SIMP-OCT16.3-S1: Test State Pre-warming. Added resetTestStates() and 
- *   prewarmOsmState() to formalize global state initialization for 
- *   instrumented tests. Standardized LogRepository test mode reset.
- * Oct.13.8:
- * - Issue #SIMP-OCT12.18-S1: Pruning Scheduler. Integrated PruningWorker 
- *   into the deferred startup sequence.
+ * - SIMP-OCT17.11-S1: Removed static LogRepository.setTestMode call.
  */
 @HiltAndroidApp
 class GpsApplication : Application(), Configuration.Provider {
@@ -61,19 +57,16 @@ class GpsApplication : Application(), Configuration.Provider {
 
         /**
          * resetTestStates: Standardizes global state reset for instrumented tests.
-         * Part of SIMP-OCT16.3-S1.
          */
         @VisibleForTesting
         fun resetTestStates() {
             isOsmReady.set(false)
             stringCache.clear()
             intCache.clear()
-            // LogRepository.setTestMode is now handled by Hilt injection (SIMP-OCT17.11-S1)
         }
 
         /**
-         * prewarmOsmState: Forces OSM to 'ready' state to bypass initialization 
-         * delays in performance-sensitive tests. Part of SIMP-OCT16.3-S1.
+         * prewarmOsmState: Forces OSM to 'ready' state.
          */
         @VisibleForTesting
         fun prewarmOsmState() {
@@ -111,6 +104,9 @@ class GpsApplication : Application(), Configuration.Provider {
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
+
+        // SIMP-OCT18.2-S1: Explicitly start the logging subsystem
+        logManager.start()
 
         Timber.plant(object : Timber.Tree() {
             override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
@@ -151,7 +147,6 @@ class GpsApplication : Application(), Configuration.Provider {
                 
                 try {
                     SqlTileWriter()
-                    Timber.d("Issue #758: SqlTileWriter pre-warmed.")
                 } catch (e: Exception) {
                     Timber.e(e, "Issue #758: SqlTileWriter pre-warm failed")
                 }
@@ -189,7 +184,6 @@ class GpsApplication : Application(), Configuration.Provider {
     private fun trimCaches() {
         applicationScope.launch(Dispatchers.IO) {
             try {
-                // Issue #1416: Trigger global engine flush
                 domainEventBus.emit(CommandEvent.TriggerMemoryFlush)
 
                 val pkg = stringCache.get("pkg")

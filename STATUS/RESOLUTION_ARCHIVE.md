@@ -1,5 +1,16 @@
 # Resolution Archive
 
+## SIMP-OCT18.2-S1: Explicit Repository Lifecycle (Oct14.1)
+- **Resolved**: Oct14.1
+- **Description**: Background tasks in `LogRepository` were automatically started in the constructor, making it difficult to control initialization order and environment detection (Test Mode).
+- **Remediation**:
+    - Refactored `LogRepository` to remove task initiation from `init`.
+    - Added explicit `start()` method to `LogRepository`.
+    - Added `start()` proxy to `LogManager`.
+    - Integrated `logManager.start()` into `GpsApplication.onCreate()` to ensure tasks start only when the application is fully ready.
+    - Improved Test Mode safety by checking `testModeProvider.isTestMode()` within the `start()` method.
+- **Outcome**: 🟢 **PASSED**. Architectural clarity improved. Initialization is now predictable and safe for all environments. (SOT ID 763).
+
 ## SIMP-OCT17.11-S1: Test Mode Dependency Injection (Oct14.1)
 - **Resolved**: Oct14.1
 - **Description**: `LogRepository` relied on a static `AtomicBoolean` for test mode, which caused background job leakage and race conditions between instrumentation tests.

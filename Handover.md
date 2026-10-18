@@ -1,25 +1,21 @@
-# Project Handover - Oct18.2 (DI Hardened)
+# Project Handover - Oct18.4 (Lifecycle Hardened)
 
-## 🟢 Status: Test Mode DI Hardening Verified
-The project has successfully resolved **#SIMP-OCT17.11-S1**. The system no longer relies on static `AtomicBoolean` flags for environmental detection, which previously caused intermittent race conditions in background job isolation during stress audits.
+## 🟢 Status: Explicit Repository Lifecycle Verified
+The project has successfully resolved **#SIMP-OCT18.2-S1**. The system now follows a predictable startup sequence where background tasks are explicitly started by the Application class rather than automatically in constructors.
 
-## 🛠️ Remediation Details (#SIMP-OCT17.11-S1)
+## 🛠️ Remediation Details (#SIMP-OCT18.2-S1)
 
-### 1. Test Mode Dependency Injection
-- **Problem**: `LogRepository` used a static flag to inhibit background jobs during tests. This flag persisted across test instances if not manually reset, leaking state and interfering with convergence audits.
-- **Fix**: Introduced `TestModeProvider` interface.
-- **Infrastructure**: Added `InfrastructureModule` for production and `TestModeModule` (in `androidTest`) for automatic Hilt-based replacement.
-- **Isolation**: `LogRepository` now injects the provider, ensuring it always receives the correct environmental state without static side effects.
+### 1. Explicit Lifecycle Control
+- **Problem**: `LogRepository` initiated three long-running coroutine jobs in its `init` block. This made it difficult to manage initialization order and created potential race conditions in high-frequency logging tests.
+- **Fix**: Moved `startBackgroundTasks()` into a public `start()` method.
+- **Orchestration**: `LogManager` now proxies this `start()` call, and it is invoked during `GpsApplication.onCreate()`.
 
-### 2. Forensic Convergence Reliability
-- **Outcome**: `ForensicStressAuditTest` now executes with guaranteed isolation. The background drainer correctly remains inhibited unless manually triggered, ensuring `verifySpillBufferWrapAroundStability` accurately measures buffer capacity.
-
-### 3. Versioning
-- **Version Name**: Incremented to `Oct18.2`.
-- **SOT Alignment**: New SOT ID 762 assigned to Test Mode DI Refactoring. New Rule R-ID 732 (Test Isolation via DI) added.
+### 2. Versioning & Traceability
+- **Version Name**: Incremented to `Oct18.4`.
+- **SOT Alignment**: New SOT ID 763 assigned to Explicit Repository Lifecycle. New Rule R-ID 733 (Explicit Component Lifecycle) added to Master Requirements.
 
 ## ⏸️ Resumption Instructions: The Physical Gap
-The following chapters from the manual protocol remain **UNVERIFIED** and require a human at the physical device (Samsung A15):
+The following manual validation chapters for version **Oct18.4** remain blocked by remote environment:
 
 1.  **3.2 Stealth Audit**: Shake device (Confirm silent/dark).
 2.  **5.1 GNSS Zombie**: Shield device in metal (Confirm `SIGNAL LOSS` recovery).

@@ -9,18 +9,11 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Oct.18.4:
+ * - SIMP-OCT18.2-S1: Explicit Repository Lifecycle. Added start() to manage 
+ *   LogRepository background tasks.
  * Oct.15.9:
- * - ISSUE-OCT15.9-F1: Integrated PersistencePolicy.shouldSaveLog() to unify 
- *   storage pressure gating and ensure Mali anomalies inhibit driver contention.
- * Oct.11.3:
- * - Issue #SIMP-1011-16: Forensic Pressure Audit. Added getForensicFillLevel() 
- *   to enable multi-stage sampling decay in MonitorService.
- * Oct.11.1:
- * - Issue #SIMP-1011-7: Thermal Forensic Audit. Integrated coolingSnapshot into 
- *   forensic trace paths for authoritative decay auditing.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
- *   TimeProvider and ConnectivitySuite APIs.
+ * - ISSUE-OCT15.9-F1: Integrated PersistencePolicy.shouldSaveLog().
  */
 @Singleton
 class LogManager @Inject constructor(
@@ -36,6 +29,15 @@ class LogManager @Inject constructor(
 
     private val connectivitySuite: ConnectivitySuite by lazy(LazyThreadSafetyMode.PUBLICATION) {
         connectivitySuiteProvider.get()
+    }
+
+    /**
+     * start: Explicitly starts background repository tasks.
+     * Part of SIMP-OCT18.2-S1.
+     */
+    fun start() {
+        logRepository.start()
+        Timber.i("LogManager started.")
     }
 
     fun startNewSession() {

@@ -26,12 +26,11 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.18.4:
+ * - SIMP-OCT18.2-S1: Explicit Repository Lifecycle. Background tasks are no longer 
+ *   started in init. Added start() method for explicit lifecycle control.
  * Oct.18.2:
- * - SIMP-OCT17.11-S1: Refactored to use TestModeProvider for better DI-based test isolation, 
- *   eliminating static AtomicBoolean. Fixed unresolved references in flushBatch.
- * Oct.13.8:
- * - Issue #SIMP-OCT12.18-S1: Pruning Scheduler. Migrated triggerAsyncPruning 
- *   to utilize PruningWorker (WorkManager) to offload IO from ApplicationScope.
+ * - SIMP-OCT17.11-S1: Refactored to use TestModeProvider for better DI-based test isolation.
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -86,11 +85,20 @@ class LogRepository @Inject constructor(
     }
 
     init {
-        if (!testModeProvider.isTestMode()) {
-            startBackgroundTasks()
-        } else {
-            Log.i("LogRepository", "Background tasks inhibited by Test Mode.")
+        Log.i("LogRepository", "Initialized. Awaiting explicit start().")
+    }
+
+    /**
+     * start: Explicitly starts background tasks.
+     * Part of SIMP-OCT18.2-S1.
+     */
+    fun start() {
+        if (testModeProvider.isTestMode()) {
+            Log.i("LogRepository", "Start inhibited by Test Mode.")
+            return
         }
+        startBackgroundTasks()
+        Log.i("LogRepository", "Background tasks started explicitly.")
     }
 
     private fun startBackgroundTasks() {
