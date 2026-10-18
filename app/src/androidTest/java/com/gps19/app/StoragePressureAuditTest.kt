@@ -16,6 +16,8 @@ import javax.inject.Inject
  * StoragePressureAuditTest: Verifies Chapter 12.3 Persistence Prioritization.
  * Validates that LogManager and PersistencePolicy correctly gate data based on 
  * storage pressure thresholds (R197).
+ * Oct.18.18:
+ * - Maintenance: Explicitly triggered manual batch processor for test isolation.
  * Oct.15.9:
  * - Issue Fix: Updated TrailBuffer assertions to use primitive array access 
  *   (lats.any) to resolve compilation errors.
@@ -33,12 +35,15 @@ class StoragePressureAuditTest {
     @Inject lateinit var integrityMonitor: IntegrityMonitor
     @Inject lateinit var logManager: LogManager
     @Inject lateinit var repository: MainRepository
+    @Inject lateinit var logRepository: LogRepository
     @Inject lateinit var timeProvider: TimeProvider
 
     @Before
     fun init() {
         hiltRule.inject()
         runBlocking {
+            logRepository.resetForTest()
+            logRepository.triggerManualBatchProcessor()
             repository.clearLogs()
             repository.clearTrails()
         }

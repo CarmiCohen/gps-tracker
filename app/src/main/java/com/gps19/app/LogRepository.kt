@@ -26,6 +26,8 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.18.18:
+ * - Maintenance: Added triggerManualBatchProcessor for test isolation.
  * Oct.18.4:
  * - SIMP-OCT18.2-S1: Explicit Repository Lifecycle. Background tasks are no longer 
  *   started in init. Added start() method for explicit lifecycle control.
@@ -148,6 +150,16 @@ class LogRepository @Inject constructor(
         if (drainerJob?.isActive == true) return
         drainerJob = scope.launch(Dispatchers.IO) { runForensicDrainer() }
         Log.i("LogRepository", "Manual drainer triggered.")
+    }
+
+    /**
+     * Manually starts the log batch processor. Useful in Test Mode.
+     */
+    @VisibleForTesting
+    fun triggerManualBatchProcessor() {
+        if (batchJob?.isActive == true) return
+        batchJob = scope.launch(Dispatchers.IO) { runBatchProcessor() }
+        Log.i("LogRepository", "Manual batch processor triggered.")
     }
 
     fun setForensicStallSimulation(active: Boolean) {

@@ -1,5 +1,13 @@
 # Resolution Archive
 
+## ISSUE-OCT18.18-F1: Storage Test Determinism (Oct18.8)
+- **Resolved**: Oct18.8
+- **Description**: `StoragePressureAuditTest` was failing due to non-deterministic log flushing. The background batch processor in `LogRepository` was inhibited by `TestModeProvider`, preventing logs from reaching the database for verification.
+- **Remediation**:
+    - **Test Isolation Lifecycle (R-ID 740)**: Added `triggerManualBatchProcessor()` to `LogRepository` to allow explicit control over background tasks during testing.
+    - **Test Setup**: Updated `StoragePressureAuditTest` to reset the repository and start the manual processor in `@Before`.
+- **Outcome**: 🟢 **PASSED**. Storage pressure prioritization is now verified deterministically on hardware (A15). (SOT ID 770).
+
 ## ISSUE-OCT18.16-F1: Doze Mode White-listing (Oct18.8)
 - **Resolved**: Oct18.8
 - **Description**: Android Doze Mode (Device Idle) was deferring network activity, potentially causing gaps in forensic telemetry. High-persistence sessions require the ability to bypass these restrictions if the app is white-listed.
