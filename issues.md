@@ -1,13 +1,14 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct18.8
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct18.16
 
-## 🎯 Current Resumption Focus: Doze Mode White-listing (Chapter 37).
+## 🎯 Current Resumption Focus: Battery Saver Restricted Network behavior (Chapter 38).
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 *   *No high or medium priority gaps remaining for the current baseline.*
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 45)
+## 💡 Strategic Simplification Ideas (Ideas: 46)
+*   **SIMP-OCT18.16-S1: Unified Power Intent Handler (Low).** Consolidate `ACTION_POWER_SAVE_MODE_CHANGED` and `ACTION_DEVICE_IDLE_MODE_CHANGED` into a single reactive stream in `AndroidPowerStateProvider` to reduce receiver overhead.
 *   **SIMP-OCT18.14-S1: Altitude-Baro Fusion for Anchors (Medium).** Use barometric trends to further validate GNSS altitude shifts during high-SNR reflections to prevent false breakouts.
 *   **SIMP-OCT18.12-S1: Acoustic State Machine (Medium).** Refactor the nested duty-cycle logic in `HardwareSuite.kt` into a formal state machine to improve readability and testability of transition overlaps.
 *   **SIMP-OCT18.10-S1: PID-Controlled Vibration Floor (Medium).** Replace multi-stage EMA with a simple PID controller to allow smoother but faster convergence to the vibration noise floor.
@@ -19,6 +20,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT18.16-F1: Doze Mode White-listing.** Resolved Oct18.16. Implemented `isIgnoringBatteryOptimizations` check in `PowerStateProvider` and updated `HardwareSuite` to allow signaling bypass during Doze mode for white-listed sessions. (SOT ID 769).
 *   **ISSUE-OCT18.14-F1: Urban Signal Reflectivity Hardening.** Resolved Oct18.8. Implemented `ANCHOR_REFLECTIVITY_ALTITUDE_GATE` (3.5m) skepticism in `AnchorEvaluator` to prevent multipath breakouts during high-SNR reflections with significant altitude shifts. (SOT ID 768).
 *   **ISSUE-OCT18.12-F1: Acoustic Duty Cycle Transition Latency.** Resolved Oct18.8. Implemented `ACOUSTIC_DUTY_CYCLE_OVERLAP_MS` (500ms) buffering in `HardwareSuite` to ensure microphone warm-up and trailing audio capture during duty cycle transitions. (SOT ID 767).
 *   **ISSUE-OCT18.10-F1: Adaptive Vibration Floor Convergence.** Resolved Oct18.8. Implemented Steep-Drop convergence logic (R-ID 736) to accelerate floor reset during high-to-low vibration transitions. Synchronized JNI and JVM paths. (SOT ID 766).
@@ -28,5 +30,5 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct18.16: [SOT Count: 461 (Rules: 295), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:26, Testing: 28 (Sub-items: 105), QA: 389]**
 - **Oct18.8: [SOT Count: 460 (Rules: 294), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:25, Testing: 28 (Sub-items: 105), QA: 388]**
-- **Oct18.8: [SOT Count: 459 (Rules: 293), Open: H:0, M:0, L:0, Ideas: H:1, M:18, L:25, Testing: 28 (Sub-items: 105), QA: 387]**

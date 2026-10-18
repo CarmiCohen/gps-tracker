@@ -1,5 +1,14 @@
 # Resolution Archive
 
+## ISSUE-OCT18.16-F1: Doze Mode White-listing (Oct18.8)
+- **Resolved**: Oct18.8
+- **Description**: Android Doze Mode (Device Idle) was deferring network activity, potentially causing gaps in forensic telemetry. High-persistence sessions require the ability to bypass these restrictions if the app is white-listed.
+- **Remediation**:
+    - **Power Policy Hardening (R-ID 739)**: Extended `PowerStateProvider` to expose `isIgnoringBatteryOptimizations`.
+    - **Signaling Bypass**: Updated `HardwareSuite.shouldDeferSignaling` to allow network transmission during Doze mode if the application is white-listed ("Ignoring Battery Optimizations").
+    - **Android Integration**: Implemented the check in `AndroidPowerStateProvider` using `PowerManager.isIgnoringBatteryOptimizations`.
+- **Outcome**: 🟢 **PASSED**. The application now maintains active signaling during idle modes when white-listed, ensuring continuous remote monitoring. (SOT ID 769).
+
 ## ISSUE-OCT18.14-F1: Urban Signal Reflectivity Hardening (Oct18.8)
 - **Resolved**: Oct18.8
 - **Description**: GNSS reflections in urban canyons (high-SNR) often manifest with significant vertical (altitude) shifts without corresponding physical movement. This was causing premature stationary anchor breakouts.

@@ -9,6 +9,9 @@ import javax.inject.Singleton
 
 /**
  * Android-specific implementation of [PowerStateProvider] using PowerManager.
+ * Oct.18.16:
+ * - Issue #SIMP-OCT18.16-P1: Doze Mode White-listing. Implemented 
+ *   isIgnoringBatteryOptimizations check for high-persistence signaling.
  * Oct.10.2:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Migrated isDeviceIdleMode to property.
  */
@@ -20,4 +23,7 @@ class AndroidPowerStateProvider @Inject constructor(
 
     override val isDeviceIdleMode: Boolean
         get() = powerManager.isDeviceIdleMode
+
+    override val isIgnoringBatteryOptimizations: Boolean
+        get() = powerManager.isIgnoringBatteryOptimizations(GpsApplication.PACKAGE_NAME)
 }

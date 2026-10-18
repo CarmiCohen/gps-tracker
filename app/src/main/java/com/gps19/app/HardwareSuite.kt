@@ -37,6 +37,10 @@ import kotlin.math.*
 
 /**
  * HardwareSuite: Unified authority for all device hardware and power policies.
+ * Oct.18.16:
+ * - Issue #SIMP-OCT18.16-P1: Doze Mode White-listing. Updated 
+ *   shouldDeferSignaling to allow signaling during Doze mode if the application 
+ *   is white-listed (Ignoring Battery Optimizations).
  * Oct.18.12:
  * - ISSUE-OCT18.12-F1: Acoustic Duty Cycle Transition Latency. Modified 
  *   acousticThread to start recording OVERLAP_MS before OFF cycle ends and 
@@ -44,12 +48,6 @@ import kotlin.math.*
  * Oct.18.6:
  * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Added simulateGnssLoss 
  *   to zero out satellite status for Signal Loss validation.
- * Oct.16.11:
- * - ISSUE-OCT16.11-F2: Memory Pressure Throttling Parity. Added synchronization 
- *   of isMemoryPressureThrottled from Acoustic and Proximity JNI paths.
- * Oct.15.11:
- * - ISSUE-OCT15.10-F2: Proximity Debounce Hardening. Fixed proximityIdx assignment 
- *   typo and added JNI result validation with safety clamping for debounce values.
  */
 @Singleton
 class HardwareSuite @Inject constructor(
@@ -404,7 +402,7 @@ class HardwareSuite @Inject constructor(
     @Volatile var currentVerticalVelocity = 0.0; private set
     @Volatile var currentVerticalDisplacement = 0.0; private set
 
-    @Volatile private var lastLinearAccelTs = 0L
+    private var lastLinearAccelTs = 0L
     @Volatile private var stationaryDurationMs = 0L
     @Volatile private var lastStationaryCheckRt = 0L
     
@@ -1530,7 +1528,14 @@ class HardwareSuite @Inject constructor(
         } else { revivalAttemptCount = 0; isHardwareLocked = false }
     }
 
-    fun shouldDeferSignaling(isInViolation: Boolean): Boolean = powerStateProvider.isDeviceIdleMode && !isInViolation
+    /**
+     * shouldDeferSignaling: Determines if telemetry signaling should be deferred 
+     * to conserve power. Signaling is allowed if the system is in violation, 
+     * or if the application is white-listed to ignore battery optimizations.
+     */
+    fun shouldDeferSignaling(isInViolation: Boolean): Boolean {
+        return powerStateProvider.isDeviceIdleMode && !isInViolation && !powerStateProvider.isIgnoringBatteryOptimizations
+    }
 
     fun calculateNextBackoff(attempt: Int, isConnected: Boolean): Long {
         if (isConnected) return NET_REJOIN_THRESHOLD_MS
