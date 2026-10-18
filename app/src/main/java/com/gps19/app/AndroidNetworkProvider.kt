@@ -12,6 +12,9 @@ import com.gps19.core.engine.NetworkListener
 import com.gps19.core.engine.NetworkProvider
 import com.gps19.core.engine.TimeProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.*
 import timber.log.Timber
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
@@ -21,124 +24,120 @@ import javax.inject.Singleton
  * AndroidNetworkProvider: Production implementation of NetworkProvider 
  * using ConnectivityManager.NetworkCallback.
  * 
+ * Oct.18.24:
+ * - ISSUE-OCT18.22-F2: Redundant Network Callback Registrations. Consolidated 
+ *   all callback management into a single provider and added isNetworkAvailableFlow.
+ *   Unified listener management via Flow collection.
  * Oct.18.6:
  * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Implemented simulateNetworkLoss 
  *   to allow manual triggering of connectivity failover logic.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Implemented isNetworkAvailable 
  *   property for unified state access.
- * Sep.28.12:
- * - Issue #1360: Mismatched unregistration signatures. Injected TimeProvider
- *   to comply with updated ManagedNetworkCallback.unregister requirement.
  */
 @Singleton
 class AndroidNetworkProvider @Inject constructor(
     @ApplicationContext private val context: Context,
+    @ApplicationScope private val externalScope: CoroutineScope,
     private val timeProvider: TimeProvider
 ) : NetworkProvider {
 
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     private val listeners = mutableSetOf<NetworkListener>()
+    private val listenerJobs = mutableMapOf<NetworkListener, Job>()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val isLossSimulated = AtomicBoolean(false)
     
     override val isNetworkAvailable: Boolean
         get() {
             if (isLossSimulated.get()) return false
-            val network = connectivityManager.activeNetwork ?: return false
-            val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-            return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            return try {
+                val network = connectivityManager.activeNetwork ?: return false
+                val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            } catch (e: Exception) { false }
         }
 
-    private val networkCallback = object : ManagedNetworkCallback() {
-        override fun onAvailable(network: Network) {
-            if (isLossSimulated.get()) return
-            synchronized(listeners) {
-                listeners.forEach { it.onNetworkAvailable() }
+    override val isNetworkAvailableFlow: Flow<Boolean> = callbackFlow {
+        val callback = object : ManagedNetworkCallback() {
+            override fun onAvailable(network: Network) {
+                if (!isLossSimulated.get()) {
+                    trySend(true)
+                }
+            }
+            override fun onLost(network: Network) {
+                if (!isLossSimulated.get()) {
+                    trySend(false)
+                }
+            }
+            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                if (!isLossSimulated.get()) {
+                    val available = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                    trySend(available)
+                }
             }
         }
 
-        override fun onLost(network: Network) {
-            if (isLossSimulated.get()) return
-            synchronized(listeners) {
-                listeners.forEach { it.onNetworkLost() }
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        
+        try {
+            Timber.d("AndroidNetworkProvider: Registering system network callback.")
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                connectivityManager.registerNetworkCallback(request, callback, mainHandler)
+            } else {
+                connectivityManager.registerNetworkCallback(request, callback)
             }
+            trySend(isNetworkAvailable)
+        } catch (e: Exception) {
+            Timber.e(e, "AndroidNetworkProvider: Registration failed")
+            trySend(false)
         }
-    }
 
-    private var isRegistered = false
+        awaitClose {
+            Timber.d("AndroidNetworkProvider: Unregistering system network callback.")
+            callback.unregister(connectivityManager, timeProvider, mainHandler)
+        }
+    }.flowOn(Dispatchers.IO)
+     .distinctUntilChanged()
+     .shareIn(
+        scope = externalScope,
+        started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5000, replayExpirationMillis = 0),
+        replay = 1
+     )
 
     override fun registerListener(listener: NetworkListener) {
         synchronized(listeners) {
-            listeners.add(listener)
-            ensureCorrectRegistrationState()
+            if (listeners.add(listener)) {
+                val job = externalScope.launch {
+                    isNetworkAvailableFlow.collect { available ->
+                        if (available) listener.onNetworkAvailable() else listener.onNetworkLost()
+                    }
+                }
+                listenerJobs[listener] = job
+            }
         }
     }
 
     override fun unregisterListener(listener: NetworkListener) {
         synchronized(listeners) {
-            listeners.remove(listener)
-            ensureCorrectRegistrationState()
+            if (listeners.remove(listener)) {
+                listenerJobs.remove(listener)?.cancel()
+            }
         }
     }
 
     override fun simulateNetworkLoss(active: Boolean) {
         if (isLossSimulated.getAndSet(active) != active) {
             Timber.i("AndroidNetworkProvider: Network Loss Simulation -> $active")
+            // Emission will be triggered if the flow is active
+            // but we need to notify listeners immediately if simulated
             synchronized(listeners) {
-                if (active) {
-                    listeners.forEach { it.onNetworkLost() }
-                } else if (isNetworkAvailable) {
-                    listeners.forEach { it.onNetworkAvailable() }
+                listeners.toList().forEach {
+                    if (active) it.onNetworkLost() else if (isNetworkAvailable) it.onNetworkAvailable()
                 }
             }
         }
-    }
-
-    private fun ensureCorrectRegistrationState() {
-        if (Looper.myLooper() == mainHandler.looper) {
-            updateRegistrationState()
-        } else {
-            mainHandler.post { updateRegistrationState() }
-        }
-    }
-
-    private fun updateRegistrationState() {
-        synchronized(listeners) {
-            val shouldBeRegistered = listeners.isNotEmpty()
-            if (shouldBeRegistered && !isRegistered) {
-                performRegistration()
-            } else if (!shouldBeRegistered && isRegistered) {
-                performUnregistration()
-            }
-        }
-    }
-
-    private fun performRegistration() {
-        try {
-            val request = NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                connectivityManager.registerNetworkCallback(
-                    request, 
-                    networkCallback, 
-                    mainHandler
-                )
-            } else {
-                connectivityManager.registerNetworkCallback(request, networkCallback)
-            }
-            isRegistered = true
-            Timber.d("AndroidNetworkProvider: Registered callback")
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to register network callback")
-        }
-    }
-
-    private fun performUnregistration() {
-        networkCallback.unregister(connectivityManager, timeProvider, mainHandler)
-        isRegistered = false
-        Timber.d("AndroidNetworkProvider: Unregistered callback")
     }
 }

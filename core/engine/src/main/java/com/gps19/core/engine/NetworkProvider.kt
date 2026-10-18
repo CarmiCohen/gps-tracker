@@ -1,5 +1,7 @@
 package com.gps19.core.engine
 
+import kotlinx.coroutines.flow.Flow
+
 /**
  * NetworkListener: Reactive callback for network state changes.
  */
@@ -12,6 +14,9 @@ interface NetworkListener {
  * NetworkProvider: Abstract interface for monitoring network availability.
  * Decouples engine logic from Android's ConnectivityManager for testability.
  * 
+ * Oct.18.24:
+ * - ISSUE-OCT18.22-F2: Redundant Network Callback Registrations. Added 
+ *   isNetworkAvailableFlow for unified reactive observation.
  * Oct.18.6:
  * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Added simulateNetworkLoss 
  *   to allow remote validation of failover logic.
@@ -24,6 +29,11 @@ interface NetworkProvider {
      * Returns true if the network interface is currently available.
      */
     val isNetworkAvailable: Boolean
+
+    /**
+     * isNetworkAvailableFlow: Reactive stream of network availability.
+     */
+    val isNetworkAvailableFlow: Flow<Boolean>
 
     fun registerListener(listener: NetworkListener)
     fun unregisterListener(listener: NetworkListener)

@@ -9,9 +9,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.net.ConnectivityManager
-import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
@@ -24,7 +22,6 @@ import androidx.core.content.ContextCompat
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -60,6 +57,10 @@ data class PowerStatus(
 
 /**
  * SystemStatusProvider: Centralizes observation of OS-level states and hardware capabilities.
+ * Oct.18.24:
+ * - ISSUE-OCT18.22-F2: Redundant Network Callback Registrations. Consolidated 
+ *   internet status observation into NetworkProvider to ensure single system 
+ *   callback registration.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
  *   TimeProvider API and fixed property invocation errors.
@@ -102,7 +103,8 @@ interface SystemStatusProvider {
 class SystemStatusProviderImpl @Inject constructor(
     @ApplicationContext private val context: Context,
     @ApplicationScope private val externalScope: CoroutineScope,
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val networkProvider: NetworkProvider
 ) : SystemStatusProvider {
 
     private val powerManager by lazy { context.getSystemService(Context.POWER_SERVICE) as PowerManager }
@@ -141,7 +143,6 @@ class SystemStatusProviderImpl @Inject constructor(
     private val VITALITY_POLL_INTERVAL_MS = 60_000L
     
     private var lastInternetCheckRt = 0L
-    private var cachedInternetStatus = false
     private var cachedNetworkInterface = "UNKNOWN"
     private val INTERNET_CACHE_TTL_MS = 10000L
 
@@ -165,7 +166,7 @@ class SystemStatusProviderImpl @Inject constructor(
     override suspend fun isLocalOnline(): Boolean = internetMutex.withLock {
         val now = timeProvider.elapsedRealtime
         if (now - lastInternetCheckRt < INTERNET_CACHE_TTL_MS && lastInternetCheckRt != 0L) {
-            return cachedInternetStatus
+            return networkProvider.isNetworkAvailable
         }
 
         val caps = try {
@@ -174,7 +175,6 @@ class SystemStatusProviderImpl @Inject constructor(
             }
         } catch (e: Exception) { null }
         
-        val status = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
         val netInterface = when {
             caps == null -> "OFFLINE"
             caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "WIFI"
@@ -183,10 +183,9 @@ class SystemStatusProviderImpl @Inject constructor(
             else -> "OTHER"
         }
         
-        cachedInternetStatus = status
         cachedNetworkInterface = netInterface
         lastInternetCheckRt = now
-        return status
+        return networkProvider.isNetworkAvailable
     }
 
     override suspend fun getNetworkInterface(): String {
@@ -272,44 +271,7 @@ class SystemStatusProviderImpl @Inject constructor(
         }
     }
 
-    private val sharedInternetStatusFlow = callbackFlow<Boolean> {
-        val callback = object : ManagedNetworkCallback() {
-            override fun onAvailable(network: Network) { trySend(true) }
-            override fun onLost(network: Network) { trySend(false) }
-            override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                trySend(caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
-            }
-        }
-        val request = NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET).build()
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                connectivityManager.registerNetworkCallback(request, callback, Handler(Looper.getMainLooper()))
-            } else {
-                connectivityManager.registerNetworkCallback(request, callback)
-            }
-            
-            launch { 
-                while (isActive) {
-                    trySend(isLocalOnline())
-                    delay(VITALITY_POLL_INTERVAL_MS)
-                }
-            }
-        } catch (e: Exception) {
-            Timber.e(e, "Connectivity callback registration failed")
-            trySend(false)
-        }
-        awaitClose { 
-            callback.unregister(connectivityManager, timeProvider, Handler(Looper.getMainLooper()))
-        }
-    }.flowOn(Dispatchers.IO)
-     .conflate()
-     .shareIn(
-        scope = externalScope,
-        started = SharingStarted.Eagerly,
-        replay = 1
-     )
-
-    override fun observeInternetStatus(): Flow<Boolean> = sharedInternetStatusFlow
+    override fun observeInternetStatus(): Flow<Boolean> = networkProvider.isNetworkAvailableFlow
 
     private val sharedBatteryStatusFlow = callbackFlow<BatteryStatus> {
         val receiver = object : ManagedBroadcastReceiver() {

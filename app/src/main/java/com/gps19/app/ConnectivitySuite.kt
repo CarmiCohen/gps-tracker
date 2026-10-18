@@ -22,6 +22,9 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.18.24:
+ * - ISSUE-OCT18.22-F1: Battery Saver Restricted Network behavior. Updated 
+ *   deferral logs to "(Doze/PowerSave active)" for Chapter 38 compliance.
  * Oct.13.30:
  * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
  * Oct.11.9:
@@ -281,7 +284,11 @@ class ConnectivitySuite @Inject constructor(
                 delay(delayMs)
 
                 if (isTrackerMode && isConnected && !isStopped.get()) {
-                    if (localStatusFlyweight.ts > 0 && !hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) {
+                    if (localStatusFlyweight.ts > 0) {
+                        if (hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) {
+                            Timber.d("ConnectivitySuite: Heartbeat deferred (Doze/PowerSave active)")
+                            continue
+                        }
                         Timber.d("ConnectivitySuite: Issuing Bypass Heartbeat to stabilize peer link.")
                         sendTelemetryInternal(localStatusFlyweight, SignalingPriority.NORMAL)
                     }
@@ -302,7 +309,7 @@ class ConnectivitySuite @Inject constructor(
                 delay(60000) 
                 if (isConnected && !isStopped.get()) {
                     if (hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) {
-                        Timber.d("ConnectivitySuite: Identity sync deferred (Doze active)")
+                        Timber.d("ConnectivitySuite: Identity sync deferred (Doze/PowerSave active)")
                         continue
                     }
                     Timber.d("ConnectivitySuite: Periodic identity sync (R254)")
@@ -384,7 +391,7 @@ class ConnectivitySuite @Inject constructor(
                     }
                     
                     if (hardwareSuite.shouldDeferSignaling(inViolation)) {
-                        Timber.v("ConnectivitySuite: Telemetry sync deferred (Doze active)")
+                        Timber.v("ConnectivitySuite: Telemetry sync deferred (Doze/PowerSave active)")
                     } else {
                         _isSyncing.value = true
                         try { 
