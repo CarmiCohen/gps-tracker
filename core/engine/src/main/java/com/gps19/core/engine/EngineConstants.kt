@@ -2,6 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.18.14:
+ * - ISSUE-OCT18.14-F1: Urban Signal Reflectivity Hardening. Added 
+ *   ANCHOR_REFLECTIVITY_ALTITUDE_GATE (3.5m) to refine stationary anchor 
+ *   skepticism during high-SNR reflections.
  * Oct.18.12:
  * - ISSUE-OCT18.12-F1: Acoustic Duty Cycle Transition Latency. Added 
  *   ACOUSTIC_DUTY_CYCLE_OVERLAP_MS to ensure gapless transition between cycles.
@@ -328,6 +332,7 @@ const val ANCHOR_DISPLACEMENT_WEIGHT = 8.0
 const val ANCHOR_IMU_DAMPING_FACTOR = 0.5 
 const val ANCHOR_ACCURACY_PENALTY_LIMIT = 40.0 
 const val ANCHOR_SKEPTICISM_LOW_SNR_FACTOR = 0.5 
+const val ANCHOR_REFLECTIVITY_ALTITUDE_GATE = 3.5 // Issue #452: Urban Reflection
 
 const val DEDUPLICATION_SPATIAL_GATE_FACTOR = 0.5 
 

@@ -1,15 +1,19 @@
 package com.gps19.core.engine
 
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.max
 
 /**
  * AnchorEvaluator: Manages stationary anchor state and breakout logic.
+ * Oct.18.14:
+ * - ISSUE-OCT18.14-F1: Urban Signal Reflectivity Hardening. Added 
+ *   ANCHOR_REFLECTIVITY_ALTITUDE_GATE (3.5m) skepticism. High-SNR updates 
+ *   with significant altitude shifts are treated with increased skepticism 
+ *   to prevent multipath breakouts.
  * Oct.18.8:
  * - ISSUE-OCT18.8-F1: Urban Multi-path Hardening. Integrated high-SNR reflection 
  *   skepticism (Issue #452) to prevent breakout during signal bouncing.
- * Sep.27.5:
- * - Issue #1349: Mutability Reduction. Adapted to access fields via state.anchor.
  */
 object AnchorEvaluator {
 
@@ -97,8 +101,12 @@ object AnchorEvaluator {
 
                         val imuDamping = if (isPhysicallyStationary) ANCHOR_IMU_DAMPING_FACTOR else 1.0
                         
-                        // Issue #452: Higher skepticism for high SNR reflections
+                        // Issue #452 & OCT18.14: Higher skepticism for high SNR reflections with altitude shifts
+                        val altDelta = abs(point.alt - state.anchor.parkingPoint.alt)
+                        val isReflectiveAltJump = isHighSnrReflection && altDelta > ANCHOR_REFLECTIVITY_ALTITUDE_GATE
+
                         val snrDamping = when {
+                            isReflectiveAltJump -> ANCHOR_SKEPTICISM_LOW_SNR_FACTOR * 0.25 // Extremely skeptical
                             isHighSnrReflection -> ANCHOR_SKEPTICISM_LOW_SNR_FACTOR * 0.5 // Extra skeptical
                             isLowSnr -> ANCHOR_SKEPTICISM_LOW_SNR_FACTOR
                             else -> 1.0
