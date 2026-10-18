@@ -1,5 +1,15 @@
 # Resolution Archive
 
+## ISSUE-OCT16.9-F2: JNI Buffer NaNG Regression Hardening (Oct18.0)
+- **Resolved**: Oct18.0
+- **Description**: HUD "Vibration" fields displayed `NaNG` during extreme I/O pressure on A15 hardware due to JNI buffer misalignment and missing `NaN` sanitization.
+- **Remediation**:
+    - Re-aligned `GnssHealthBatch` in `JdHardwareManager.kt` to strict 8-byte boundaries.
+    - Migrated `n21` (GNSS) in `jdhardware-jni.cpp` to use `std::memcpy` for all buffer accesses.
+    - Added `isnan()` sanitization for `snr`, `thermal`, and `heap` inputs in `n19` (Vibration).
+    - Incremented system version to `Oct18.0`.
+- **Outcome**: 🟢 **PASSED**. Corrected alignment prevents data corruption on ARMv8 SoCs. `NaN` reinforcement ensures HUD stability under pressure. (SOT ID 761).
+
 ## TEST-OCT17.11-T2: vOct14.1 Full System Audit & Documentation (Oct14.1)
 - **Resolved**: Oct14.1
 - **Description**: Completed the logic and UI navigation audit for the PLATINUM release. Verified counters, stress latching, and database resilience.

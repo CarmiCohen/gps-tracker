@@ -192,7 +192,7 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 256) return -1;
     uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
 
-    // ISSUE-OCT17.4-F1: Hardened alignment-safe access using memcpy for MediaTek SoC stability.
+    // ISSUE-OCT18.0-F2: Reinforced NaN sanitization and alignment safety.
     double x, y, z, lx, ly, lz, floor, cpu, lastRaw, lastHpf, energy, snr, thermal, heap;
     int32_t isWarming;
     int64_t nowRt;
@@ -220,6 +220,9 @@ Java_com_gps19_app_JdHardwareManager_n19(JNIEnv* env, jclass clazz) {
     if (std::isnan(lastRaw)) lastRaw = 0.0;
     if (std::isnan(lastHpf)) lastHpf = 0.0;
     if (std::isnan(energy)) energy = 0.0;
+    if (std::isnan(snr)) snr = 0.0;
+    if (std::isnan(thermal)) thermal = 0.0;
+    if (std::isnan(heap)) heap = 0.0;
 
     double dx = x - lx, dy = y - ly, dz = z - lz;
     double delta = std::sqrt(dx * dx + dy * dy + dz * dz) / 9.80665;
@@ -278,27 +281,35 @@ Java_com_gps19_app_JdHardwareManager_n20(JNIEnv* env, jclass clazz, jdouble base
 
 JNIEXPORT jint JNICALL
 Java_com_gps19_app_JdHardwareManager_n21(JNIEnv* env, jclass clazz) {
-    if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 1040) return -1;
+    if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 1060) return -1;
     uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
 
+    // ISSUE-OCT18.0-F2: Hardened GNSS batch alignment and memcpy migration.
     int32_t rawCount;
     std::memcpy(&rawCount, ptr + 0, 4);
     int count = std::min(rawCount, 64), usedCount = 0, snrCount = 0;
 
-    float* cn0s = (float*)(ptr + 260); int* usedInFix = (int*)(ptr + 516); double snrSum = 0.0;
+    // New re-aligned offsets: svid@8, cn0@264, usedInFix@520
+    uint8_t* svidPtr = ptr + 8;
+    uint8_t* cn0Ptr = ptr + 264;
+    uint8_t* usedInFixPtr = ptr + 520;
+    double snrSum = 0.0;
+
     for (int i = 0; i < count; i++) {
         int32_t used;
-        std::memcpy(&used, usedInFix + i, 4);
+        std::memcpy(&used, usedInFixPtr + (i * 4), 4);
         if (used != 0) usedCount++;
 
         float cn0;
-        std::memcpy(&cn0, cn0s + i, 4);
+        std::memcpy(&cn0, cn0Ptr + (i * 4), 4);
         if (cn0 > 0.0f && !std::isnan(cn0)) { snrSum += cn0; snrCount++; }
     }
 
+    // Outputs re-aligned: View@1040, Used@1044, AvgSnr@1048
     std::memcpy(ptr + 1040, &count, 4);
     std::memcpy(ptr + 1044, &usedCount, 4);
     double avgSnr = (snrCount > 0) ? (snrSum / snrCount) : 0.0;
+    if (std::isnan(avgSnr)) avgSnr = 0.0;
     std::memcpy(ptr + 1048, &avgSnr, 8);
 
     return 0;

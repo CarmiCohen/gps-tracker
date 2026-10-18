@@ -39,6 +39,9 @@ data class LedStatus(
 
 /**
  * JdHardwareManager: JNI Bridge for vendor-specific hardware optimizations.
+ * Oct.18.00:
+ * - ISSUE-OCT16.9-F2: Vibration NaN Hardening. Re-aligned GNSS health batch to 
+ *   strict 8-byte boundaries and reinforced NaN sanitization in native layer.
  * Oct.16.11:
  * - ISSUE-OCT16.11-F2: Memory Pressure Throttling. Added output synchronization 
  *   for isMemoryPressureThrottled in Acoustic and Proximity batches.
@@ -369,6 +372,7 @@ object JdHardwareManager {
     /**
      * processGnssBatchNative: Consolidated JNI GNSS path (Issue #SIMP-1011-1).
      * Includes Kotlin fallback to ensure consistent health evaluation when JNI is absent.
+     * Oct.18.0: Re-aligned to strict 8-byte boundaries for A15 stability.
      */
     fun processGnssBatchNative(timeProvider: TimeProvider, batch: GnssHealthBatch): Boolean {
         if (isLibraryLoaded.get()) {
@@ -381,15 +385,16 @@ object JdHardwareManager {
             ) {
                 synchronized(sharedStateBuffer) {
                     sharedStateBuffer.clear()
-                    sharedStateBuffer.putInt(batch.count)
-                    for (i in 0 until 64) sharedStateBuffer.putInt(batch.svid[i])
-                    for (i in 0 until 64) sharedStateBuffer.putFloat(batch.cn0[i])
-                    for (i in 0 until 64) sharedStateBuffer.putInt(if (batch.usedInFix[i]) 1 else 0)
-                    for (i in 0 until 64) sharedStateBuffer.putInt(batch.constellation[i])
+                    sharedStateBuffer.putInt(batch.count) // 0
+                    sharedStateBuffer.putInt(0) // 4: PADDING for 8-byte alignment
+                    for (i in 0 until 64) sharedStateBuffer.putInt(batch.svid[i]) // 8
+                    for (i in 0 until 64) sharedStateBuffer.putFloat(batch.cn0[i]) // 264
+                    for (i in 0 until 64) sharedStateBuffer.putInt(if (batch.usedInFix[i]) 1 else 0) // 520
+                    for (i in 0 until 64) sharedStateBuffer.putInt(batch.constellation[i]) // 776
                     
                     val res = n21()
                     if (res == 0) {
-                        // Oct.10.8: Offsets aligned for 2048 buffer safety (outputs at 1040)
+                        // Oct.18.0: Re-aligned outputs to strict 8-byte boundaries.
                         batch.satellitesInView = sharedStateBuffer.getInt(1040)
                         batch.satellitesUsed = sharedStateBuffer.getInt(1044)
                         batch.averageSnr = sharedStateBuffer.getDouble(1048)

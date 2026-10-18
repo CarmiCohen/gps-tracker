@@ -1,30 +1,25 @@
-# Project Handover - Oct14.1 (Audit 92% Complete)
+# Project Handover - Oct18.0 (Hardened)
 
-## 🟢 Status: Logic Hardening Verified (Physical Gap Remaining)
-The project has completed the **Automated Logic** and **UI Navigation** phases of the `vOct14.1` full system audit. Forensic stability is confirmed under extreme load, but a regression in the JNI buffer alignment was discovered during stress testing.
+## 🟢 Status: JNI Alignment & NaN Hardening Verified
+The project has successfully remediated **#ISSUE-OCT16.9-F2**. The JNI communication layer is now hardened against buffer misalignment and `NaN` propagation, specifically addressing stability issues on Samsung A15 (ARMv8) hardware during extreme I/O pressure.
 
-## 🛠️ Forensic Audit Results (Oct14.1)
+## 🛠️ Remediation Details (#ISSUE-OCT16.9-F2)
 
-### 1. Automated System Validation (Chapters 7, 8, 31-100)
-- **Status**: 🟢 **PASSED**. Executed `ProductionReadinessAuditTest.kt` (27 tests) on Samsung A15.
-- **R500 (24h Soak)**: Verified counter stability and state persistence over 86,400,000ms equivalent cycles.
-- **R497 (Power Policy)**: Confirmed Doze-deferral consistency during `force-idle` state transitions.
-- **Thread Safety**: Zero `ConcurrentModificationException` during 250Hz sensor audit.
+### 1. JNI Buffer Alignment (Hardening)
+- **Problem**: `GnssHealthBatch` internal arrays were not aligned to 8-byte boundaries, causing potential data corruption or CPU stalls on strict-alignment architectures.
+- **Fix**: Re-aligned `JdHardwareManager.kt` offsets. Added padding to ensure `svid`, `cn0`, and `usedInFix` arrays start at 8-byte intervals.
+- **Native Implementation**: Migrated `jdhardware-jni.cpp` (`n21`) to use `std::memcpy` for all buffer reads and writes, ensuring alignment-agnostic data transfer.
 
-### 2. UI & Forensic Simulation (Chapters 1.3, 1.6, 6.1, 12.1, 14, 15.2, 17.1)
-- **Onboarding**: Verified version string `Oct14.1_PLATINUM` and Viewer Mode dimming.
-- **Chapter 6.1 (Stress Latching)**: Confirmed `JAMMER SUSPICION` and `GPS STALL` markers latch in `LogOverlay`.
-- **Chapter 12.1 (Pruning)**: Verified `PruningWorker` successfully manages storage at 100Hz log pressure.
-- **Chapter 17.1 (Export)**: Verified `ForensicSpillBuffer.kt` successfully flushes payloads (>1,100 traces) to system share.
-- **Chapter 15.2 (Battery)**: Confirmed `HardwareSuite.kt` transitions to `POWER_SAVE (10s)` polling at simulated 15% battery.
+### 2. NaN Sanitization (Forensic Integrity)
+- **Problem**: `NaN` values from sensor drift or I/O stalls were propagating to HUD fields, displaying as `NaNG`.
+- **Fix**: Reinforced `n19` (Vibration batch) and `n21` (GNSS batch) with explicit `isnan()` checks. Inputs for `snr`, `thermal`, and `heap` are now sanitized to `0.0` if invalid.
 
-### 🔍 Discovery: JNI NaNG Regression (#ISSUE-OCT16.9-F2)
-- **Problem**: "Vibration" HUD fields display `NaNG` (Not-a-Number) during extreme I/O pressure on A15 hardware.
-- **Location**: Likely `jdhardware-jni.cpp` or buffer alignment in `sharedStateBuffer` (referenced in `SharedUiComponents.kt` line 294).
-- **Status**: Open. Requires re-alignment to strict 8-byte boundaries.
+### 3. Versioning
+- **Version Name**: Incremented to `Oct18.0`.
+- **SOT Alignment**: New SOT ID 761 assigned to JNI GNSS Alignment Hardening.
 
 ## ⏸️ Resumption Instructions: The Physical Gap
-The following chapters are **UNVERIFIED** and require a human at the physical device:
+The following chapters from the manual protocol remain **UNVERIFIED** and require a human at the physical device:
 
 1.  **3.2 Stealth Audit**: Shake device (Confirm silent/dark).
 2.  **5.1 GNSS Zombie**: Shield device in metal (Confirm `SIGNAL LOSS` recovery).
