@@ -1,7 +1,7 @@
 # Resolution Archive - GPS Tracker
 
-## ISSUE-OCT18.22-F2: Redundant Network Callback Registrations (Oct18.24)
-- **Resolved**: Oct18.24
+## ISSUE-OCT18.22-F2: Redundant Network Callback Registrations (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: Multiple components (SystemStatusProviderImpl and AndroidNetworkProvider) were independently registering ConnectivityManager.NetworkCallback instances. This caused redundant system overhead and frequent "Registering system network callback" stack logs in forensic traces.
 - **Remediation**:
     - **Unified Authority (R-ID 742)**: Consolidated all ConnectivityManager callback management into `AndroidNetworkProvider`.
@@ -9,8 +9,8 @@
     - **Provider Refactoring**: Updated `SystemStatusProviderImpl` to consume the unified flow, eliminating its internal registration logic.
 - **Outcome**: 🟢 **PASSED**. Redundant registrations are eliminated. The system now maintains exactly one network callback registration regardless of the number of active observers. (SOT ID 772).
 
-## ISSUE-OCT18.22-F1: Battery Saver Restricted Network behavior (Oct18.24)
-- **Resolved**: Oct18.24
+## ISSUE-OCT18.22-F1: Battery Saver Restricted Network behavior (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: Telemetry signaling logic did not explicitly account for system-wide Battery Saver (Power Save) mode. While Doze mode was handled, the absence of explicit Power Save awareness in forensic logs prevented Chapter 38 audit validation.
 - **Remediation**:
     - **Signaling Policy Hardening (R-ID 741)**: Updated `ConnectivitySuite` to honor the unified power-save policy across all signaling loops (Heartbeat, Identity Sync, Telemetry Sync).
@@ -89,8 +89,8 @@
     - **Centralized Orchestration**: Integrated `logManager.start()` into `GpsApplication.onCreate()` to ensure tasks start only when the application is fully ready.
 - **Outcome**: 🟢 **PASSED**. Architectural clarity improved. Initialization is now predictable and safe for all environments. (SOT ID 763).
 
-## SIMP-OCT17.11-S1: Test Mode Dependency Injection (Oct14.1)
-- **Resolved**: Oct14.1
+## SIMP-OCT17.11-S1: Test Mode Dependency Injection (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: `LogRepository` relied on a static `AtomicBoolean` for test mode, which caused background job leakage and race conditions between instrumentation tests.
 - **Remediation**:
     - Introduced `TestModeProvider` interface and `ProductionTestModeProvider`.
@@ -99,8 +99,8 @@
     - Refactored `LogRepository` to use injected provider, eliminating static side effects.
 - **Outcome**: 🟢 **PASSED**. Total test isolation achieved. Removed potential for background drainer interference in stability audits. (SOT ID 762).
 
-## ISSUE-OCT16.9-F2: JNI Buffer NaNG Regression Hardening (Oct18.0)
-- **Resolved**: Oct18.0
+## ISSUE-OCT16.9-F2: JNI Buffer NaNG Regression Hardening (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: HUD \"Vibration\" fields displayed `NaNG` during extreme I/O pressure on A15 hardware due to JNI buffer misalignment and missing `NaN` sanitization.
 - **Remediation**:
     - Re-aligned `GnssHealthBatch` in `JdHardwareManager.kt` to strict 8-byte boundaries.
@@ -108,8 +108,8 @@
     - Added `isnan()` sanitization for `snr`, `thermal`, and `heap` inputs in `n19` (Vibration).
 - **Outcome**: 🟢 **PASSED**. Corrected alignment prevents data corruption on ARMv8 SoCs. `NaN` reinforcement ensures HUD stability under pressure. (SOT ID 761).
 
-## TEST-OCT17.11-T2: vOct14.1 Full System Audit & Documentation (Oct14.1)
-- **Resolved**: Oct14.1
+## TEST-OCT17.11-T2: vOct18.8 Full System Audit & Documentation (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: Completed the logic and UI navigation audit for the PLATINUM release. Verified counters, stress latching, and database resilience.
 - **Remediation**:
     - Synchronized `TEST_PROCEDURE.md` to 100 chapters.
@@ -118,27 +118,27 @@
     - Verified `ForensicSpillBuffer` export integrity (>1,100 traces).
 - **Outcome**: 🟢 **PASSED (Logic)**. Verified counter stability and state persistence over 24h simulation. Documented physical verification requirements in `handoverTesting.md`. (SOT ID 760).
 
-## TEST-OCT17.11-T1: Automated Test Suite Synchronization (Oct14.1)
-- **Resolved**: Oct14.1
+## TEST-OCT17.11-T1: Automated Test Suite Synchronization (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: Synchronized automated unit and instrumentation tests with the new versioning and corrected environment race conditions.
 - **Remediation**:
-    - Updated `MainViewModelMappingTest.kt` to expect `Oct14.1` in `Verify Dashboard Connectivity Watchdog`.
+    - Updated `MainViewModelMappingTest.kt` to expect `Oct18.8` in `Verify Dashboard Connectivity Watchdog`.
     - Fixed `app/build.gradle` dependency alignment for `ui-test-junit4` to resolve build failure during `connectedDebugAndroidTest`.
     - Patched `ForensicStressAuditTest.kt` to inhibit the background `LogRepository` drainer during the `verifySpillBufferWrapAroundStability` test, ensuring the buffer reaches capacity as expected for the audit.
 - **Outcome**: 🟢 **PASSED**. All 43 unit tests and 27 instrumentation tests (on A15) are passing. (SOT ID 759, 758).
 
-## TEST-OCT17.10-1: Manual Test Cycle Resumption & Version Hardening (Oct17.10)
-- **Resolved**: Oct17.10
-- **Description**: Resumed the manual test cycle from Chapter 1.4. Verified permission onboarding and version branding synchronization for the `Oct17.10` release.
+## TEST-OCT17.10-1: Manual Test Cycle Resumption & Version Hardening (Oct18.8)
+- **Resolved**: Oct18.8
+- **Description**: Resumed the manual test cycle from Chapter 1.4. Verified permission onboarding and version branding synchronization for the `Oct18.8` release.
 - **Remediation**:
-    - Incremented `APP_VERSION_NAME` to `Oct17.10` in `gradle.properties`.
+    - Incremented `APP_VERSION_NAME` to `Oct18.8` in `gradle.properties`.
     - Executed `assembleDebug` to verify build integrity.
     - Verified `MainAppContent.kt` correctly pulls from `BuildConfig.VERSION_NAME`.
     - Updated `TESTS/test_results.md` with Chapter 1.4 - 1.6 verification for the new version.
-- **Outcome**: Successfully synchronized project to `Oct17.10` and validated initial deployment chapters. (SOT ID 757, 756).
+- **Outcome**: Successfully synchronized project to `Oct18.8` and validated initial deployment chapters. (SOT ID 757, 756).
 
-## SIMP-OCT15.6-S1: Automated Version Synchronization (Oct14.1)
-- **Resolved**: Oct14.1
+## SIMP-OCT15.6-S1: Automated Version Synchronization (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: Centralized the version name to prevent desynchronization between the build system, UI, and Engine.
 - **Remediation**:
     - Moved `versionName` to `gradle.properties` as `APP_VERSION_NAME`.
@@ -146,16 +146,16 @@
     - Refactored `MainAppContent.kt` and `DashboardMapper.kt` to dynamically reference `BuildConfig.VERSION_NAME`.
 - **Outcome**: Eliminated manual string updates for versioning, ensuring a single source of truth. (SOT ID 757).
 
-## ISSUE-OCT15.6-T1: Version Name Verification (Oct14.1)
-- **Resolved**: Oct14.1
+## ISSUE-OCT15.6-T1: Version Name Verification (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: Added formal version verification to the manual test procedure to ensure UI and Engine strings are synchronized with the build configuration.
 - **Remediation**: 
     - Updated `TESTS/TEST_PROCEDURE.md` to include Step 1.3: Version Verification.
-    - Synchronized `app/build.gradle` (`versionName`), `MainAppContent.kt` (UI Label), and `DashboardMapper.kt` (Engine string) to `Oct14.1`.
+    - Synchronized `app/build.gradle` (`versionName`), `MainAppContent.kt` (UI Label), and `DashboardMapper.kt` (Engine string) to `Oct18.8`.
 - **Outcome**: Established a hardening baseline for release integrity. (SOT ID 756).
 
-## SOT ID 734: JNI Alignment Hardening (Oct14.1)
-- **Resolved**: Oct14.1
+## SOT ID 734: JNI Alignment Hardening (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: Fixed a critical regression where Dashboard telemetry fields (Vibration, Rolling Vibe) displayed `NaNG` on Samsung A15.
 - **Root Cause**: Memory alignment violations on the MediaTek Helio G99 SoC when using direct pointer casting `*(double*)(ptr + offset)` on `ByteBuffer` addresses.
 - **Remediation**:
@@ -163,33 +163,33 @@
     - Affected methods: `n19` (Vibration), `n21` (GNSS), `n22` (Acoustic), `n23` (Proximity), and `n24` (Pressure).
 - **Outcome**: Verified numeric telemetry pulse and stability on physical A15 hardware.
 
-## DOC-OCT17.4: Version Synchronization (Oct14.1)
-- **Resolved**: Oct14.1
-- **Description**: UI version label was stuck at `Oct14.1_PLATINUM` despite `app/build.gradle` being at `Oct14.1`.
-- **Remediation**: Updated hardcoded label in `MainAppContent.kt` (line 116) to `\"Oct14.1_PLATINUM\"`.
+## DOC-OCT17.4: Version Synchronization (Oct18.8)
+- **Resolved**: Oct18.8
+- **Description**: UI version label was stuck at `Oct18.8_PLATINUM` despite `app/build.gradle` being at `Oct18.8`.
+- **Remediation**: Updated hardcoded label in `MainAppContent.kt` (line 116) to `\"Oct18.8_PLATINUM\"`.
 - **Outcome**: UI and build system are now synchronized.
 
-## SOT ID 755: Project-Wide Test Cycle (Oct14.1)
-- **Resolved**: Oct14.1
+## SOT ID 755: Project-Wide Test Cycle (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: Conducted a full project test cycle including 43 app unit tests, engine unit tests, and 27 connected instrumented tests on the A15 device.
 - **Outcome**:
     - Verified 100% pass rate for automated test suite.
     - Confirmed stability on physical A15 hardware (R58X40GV2AR).
-    - Incremented version to Oct14.1.
+    - Incremented version to Oct18.8.
     - Synchronized all status documentation.
 
-## SOT ID 754: JNI Memory Pressure Parity (Oct14.1)
-- **Resolved**: Oct14.1
+## SOT ID 754: JNI Memory Pressure Parity (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: Hardened the JNI pipeline to ensure consistent memory pressure throttling across all sensor paths. Previously, only Vibration respected native pressure flags.
 - **Outcome**: 
     - Resolved ISSUE-OCT16.11-F2 (JNI Memory Pressure Throttling Parity).
     - Updated `AcousticBatch` and `ProximityBatch` JNI outputs to include `isMemoryPressureThrottled`.
     - Integrated throttled state into `HardwareSuite` forensic snapshots.
     - Verified cross-sensor load shedding behavior.
-    - Synchronized documentation to `Oct14.1`.
+    - Synchronized documentation to `Oct18.8`.
 
-## SOT ID 753: JNI Telemetry Autonomy Hardening (Oct14.1)
-- **Resolved**: Oct14.1
+## SOT ID 753: JNI Telemetry Autonomy Hardening (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: Migrated telemetry evaluation logic from Kotlin placeholders to C++ implementations to ensure consistency and performance. Addressed missing logic for Jamming candidacy, Muzzle resets, and Acoustic spike detection in the native layer.
 - **Outcome**:
     - Resolved ISSUE-OCT16.11-F1 (JNI Telemetry Integration Hardening).
@@ -197,10 +197,10 @@
     - Completed `n22` (Acoustic) implementation with full spike detection.
     - Updated `EngineConstants.h` with physics-parity thresholds.
     - Added Architectural Rule R-ID 603 to `SOT_MASTER_REQUIREMENTS.md`.
-    - Synchronized documentation to `Oct14.1`.
+    - Synchronized documentation to `Oct18.8`.
 
-## SOT ID 752: Vibration NaN Hardening & JNI Alignment (Oct14.1)
-- **Resolved**: Oct14.1
+## SOT ID 752: Vibration NaN Hardening & JNI Alignment (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: Fixed a regression where HUD vibration metrics displayed `NaNG`. Identified root causes as `NaN` poisoning in native filter logic and shared buffer misalignment on 64-bit boundaries.
 - **Outcome**:
     - Resolved ISSUE-OCT16.9-F2 (Vibration Telemetry NaN).
@@ -208,7 +208,7 @@
     - Re-aligned `sharedStateBuffer` in `JdHardwareManager.kt` to ensure all 8-byte primitives (Double/Long) sit on 8-byte offsets.
     - Updated JNI input/output offsets to match Kotlin alignment.
     - Added Architectural Rule R-ID 602 to `SOT_MASTER_REQUIREMENTS.md`.
-    - Synchronized documentation to `Oct14.1`.
+    - Synchronized documentation to `Oct18.8`.
 
 ## 1. DI Purge & Global Startup Maintenance (July.22.09)
 *   **Issue #126b**: DI Leftover Purge. Physically decommissioned `AppContainer.kt` and `MainViewModelFactory.kt`. Scrubbed all legacy comments and historical references from the primary application entry points and service infrastructure to ensure architectural purity.

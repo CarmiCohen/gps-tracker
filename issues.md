@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct18.24
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct18.8
 
 ## 🎯 Current Resumption Focus: Storage Test Race Conditions (#OCT18.22-F3).
 
@@ -22,8 +22,8 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
-*   **ISSUE-OCT18.22-F2: Redundant Network Callback Registrations.** Resolved Oct18.24. Consolidated all ConnectivityManager callback management into `AndroidNetworkProvider` and refactored `SystemStatusProviderImpl` to consume the unified flow. (SOT ID 772).
-*   **ISSUE-OCT18.22-F1: Battery Saver Restricted Network behavior.** Resolved Oct18.24. Updated `ConnectivitySuite` logging to explicitly reflect `PowerSave` status in forensic traces, ensuring compliance with Chapter 38 audit signatures. (SOT ID 771).
+*   **ISSUE-OCT18.22-F2: Redundant Network Callback Registrations.** Resolved Oct18.8. Consolidated all ConnectivityManager callback management into `AndroidNetworkProvider` and refactored `SystemStatusProviderImpl` to consume the unified flow. (SOT ID 772).
+*   **ISSUE-OCT18.22-F1: Battery Saver Restricted Network behavior.** Resolved Oct18.8. Updated `ConnectivitySuite` logging to explicitly reflect `PowerSave` status in forensic traces, ensuring compliance with Chapter 38 audit signatures. (SOT ID 771).
 *   **ISSUE-OCT18.18-F1: Storage Test Determinism.** Resolved Oct18.8. Added `triggerManualBatchProcessor()` to `LogRepository` to ensure deterministic log flushing during tests. (SOT ID 770).
 *   **ISSUE-OCT18.16-F1: Doze Mode White-listing.** Resolved Oct18.8. Implemented `isIgnoringBatteryOptimizations` check in `PowerStateProvider` and updated `HardwareSuite` to allow signaling bypass during Doze mode for white-listed sessions. (SOT ID 769).
 *   **ISSUE-OCT18.14-F1: Urban Signal Reflectivity Hardening.** Resolved Oct18.8. Implemented `ANCHOR_REFLECTIVITY_ALTITUDE_GATE` (3.5m) in `AnchorEvaluator` to prevent multipath breakouts during high-SNR reflections with significant altitude shifts. (SOT ID 768).
@@ -35,6 +35,6 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct18.24: [SOT Count: 464 (Rules: 298), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:28, Testing: 100 (Sub-items: 100), QA: 392]**
-- **Oct18.22: [SOT Count: 462 (Rules: 296), Open: H:0, M:1, L:2, Ideas: H:1, M:19, L:27, Testing: 100 (Sub-items: 100), QA: 390]**
+- **Oct18.8: [SOT Count: 464 (Rules: 298), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:28, Testing: 100 (Sub-items: 100), QA: 392]**
+- **Oct18.8: [SOT Count: 462 (Rules: 296), Open: H:0, M:1, L:2, Ideas: H:1, M:19, L:27, Testing: 100 (Sub-items: 100), QA: 390]**
 - **Oct18.8: [SOT Count: 462 (Rules: 296), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:27, Testing: 100 (Sub-items: 100), QA: 390]**

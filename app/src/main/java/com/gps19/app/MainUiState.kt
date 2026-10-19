@@ -221,7 +221,8 @@ data class SimulationUiState(
     val isShakeSimulated: Boolean = false,
     val isGnssLossSimulated: Boolean = false,
     val isNetworkLossSimulated: Boolean = false,
-    val isPowerTamperSimulated: Boolean = false
+    val isPowerTamperSimulated: Boolean = false,
+    val isPeerPresenceSimulated: Boolean = false
 )
 
 data class MapViewState(
@@ -554,6 +555,7 @@ sealed class UiEvent {
     data class SetGnssLossSimulation(val active: Boolean) : UiEvent()
     data class SetPowerTamperSimulation(val active: Boolean) : UiEvent()
     data class SetNetworkLossSimulation(val active: Boolean) : UiEvent()
+    data class SetPeerPresenceSimulation(val active: Boolean) : UiEvent()
     data class SetManualSelection(val active: Boolean) : UiEvent()
     data class SetSettlingActive(val active: Boolean) : UiEvent()
     data class ToggleSetupBypass(val active: Boolean) : UiEvent()
@@ -621,4 +623,5 @@ sealed class UiCommand {
     data class SimulateGnssLoss(val active: Boolean) : UiCommand()
     data class SimulatePowerTamper(val active: Boolean) : UiCommand()
     data class SimulateNetworkLoss(val active: Boolean) : UiCommand()
+    data class SimulatePeerPresence(val active: Boolean) : UiCommand()
 }

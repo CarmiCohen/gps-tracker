@@ -28,9 +28,8 @@ import kotlinx.coroutines.flow.StateFlow
  * Oct.18.6:
  * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Added UI controls for 
  *   SHAKE, GNSS_LOSS, POWER_TAMPER, and NETWORK_LOSS simulations.
- * Oct.13.30:
- * - SIMP-OCT13.21-S1: Pure Event UI. Refactored to use centralized onMainEvent 
- *   bubbling for all actions, unifying signature with Tracker/Viewer screens.
+ * Oct.18.25:
+ * - Added Virtual Peer Presence simulation toggle.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -330,6 +329,18 @@ fun DiagnosticsScreen(
                     Text("Chapter 16.1 Failover Audit", color = if (simulationState.isNetworkLossSimulated) Color.Yellow else Color.Gray, fontSize = 12.sp)
                 }
                 Switch(checked = simulationState.isNetworkLossSimulated, onCheckedChange = { onMainEvent(UiEvent.SetNetworkLossSimulation(it)) })
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Virtual Peer Presence", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Simulates ${if (sessionState.appMode == "tracker") "Viewer" else "Tracker"}", color = if (simulationState.isPeerPresenceSimulated) Color.Green else Color.Gray, fontSize = 12.sp)
+                }
+                Switch(checked = simulationState.isPeerPresenceSimulated, onCheckedChange = { onMainEvent(UiEvent.SetPeerPresenceSimulation(it)) })
             }
 
             Spacer(modifier = Modifier.height(8.dp))

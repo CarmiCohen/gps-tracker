@@ -193,6 +193,9 @@ class CommandRouter @Inject constructor(
                         is UiCommand.SimulateNetworkLoss -> {
                             syntheticEventInjector.simulateNetworkLoss(command.active)
                         }
+                        is UiCommand.SimulatePeerPresence -> {
+                            syntheticEventInjector.simulatePeerPresence(command.active, configManager.isTrackerMode, scope)
+                        }
                     }
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e

@@ -207,11 +207,11 @@ class UiEventCoordinator @Inject constructor(
             is UiEvent.MapZoomOut -> onCameraAction(CameraAction.ZoomOut)
             is UiEvent.CenterTracker -> {
                 onStateUpdate { spatialLogicUseCase.handleMapEvent(event, it) }
-                onCameraAction(CameraAction.CenterTracker)
+                onCameraAction.invoke(CameraAction.CenterTracker)
             }
             is UiEvent.CenterViewer -> {
                 onStateUpdate { spatialLogicUseCase.handleMapEvent(event, it) }
-                onCameraAction(CameraAction.CenterViewer)
+                onCameraAction.invoke(CameraAction.CenterViewer)
             }
 
             is UiEvent.MapTap -> handleMapTap(event.point, currentState, scope, onStateUpdate, onCameraAction, onUiEffect)
@@ -283,6 +283,10 @@ class UiEventCoordinator @Inject constructor(
             is UiEvent.SetNetworkLossSimulation -> {
                 onStateUpdate { it.copy(simulation = it.simulation.copy(isNetworkLossSimulated = event.active)) }
                 repository.sendCommand(UiCommand.SimulateNetworkLoss(event.active))
+            }
+            is UiEvent.SetPeerPresenceSimulation -> {
+                onStateUpdate { it.copy(simulation = it.simulation.copy(isPeerPresenceSimulated = event.active)) }
+                repository.sendCommand(UiCommand.SimulatePeerPresence(event.active))
             }
             is UiEvent.ExecuteStressTest -> repository.sendCommand(UiCommand.ExecuteStressTest)
             is UiEvent.ExecuteLogPressureTest -> repository.sendCommand(UiCommand.ExecuteLogPressureTest)
