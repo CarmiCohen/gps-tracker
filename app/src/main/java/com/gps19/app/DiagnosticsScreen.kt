@@ -25,6 +25,8 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * DiagnosticsScreen: Detailed health check for system permissions and background stability.
+ * Oct.19.19:
+ * - ISSUE-OCT19.19-F1: Added "Skip Mode Restoration" toggle to bypass R-ID 242.
  * Oct.18.6:
  * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Added UI controls for 
  *   SHAKE, GNSS_LOSS, POWER_TAMPER, and NETWORK_LOSS simulations.
@@ -240,6 +242,18 @@ fun DiagnosticsScreen(
             }
 
             Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Skip Mode Restoration", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Bypasses R-ID 242 on cold start", color = if (simulationState.isRestorationDisabled) Color.Green else Color.Gray, fontSize = 12.sp)
+                }
+                Switch(checked = simulationState.isRestorationDisabled, onCheckedChange = { onMainEvent(UiEvent.SetRestorationDisabled(it)) }, colors = SwitchDefaults.colors(checkedThumbColor = Color.Green, checkedTrackColor = Color.Green.copy(alpha = 0.5f)))
+            }
 
             Row(
                 modifier = Modifier.fillMaxWidth().background(Color(0xFF1A1A1A), shape = MaterialTheme.shapes.small).padding(16.dp),

@@ -29,6 +29,8 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.19.19:
+ * - ISSUE-OCT19.19-F1: Exposed isRestorationDisabled flow and setter.
  * Oct.15.7:
  * - ISSUE-OCT15.7-F1: Persistence Policy & Repository Consolidation.
  *   Consolidated trail mapping into TelemetryMapper. Enforced strict IO gating 
@@ -153,6 +155,7 @@ class MainRepository @Inject constructor(
     val isXiaomiManualOverrideFlow = settings.isXiaomiManualOverrideFlow
     val recoveryCountFlow = settings.recoveryCountFlow
     val cumulativeRecoveryBlackoutMsFlow = settings.cumulativeRecoveryBlackoutMsFlow
+    val isRestorationDisabledFlow = settings.isRestorationDisabledFlow
     
     val trackerAlarmAckTsFlow = settings.trackerAlarmAckTsFlow
     val viewerAlarmAckTsFlow = settings.viewerAlarmAckTsFlow
@@ -511,5 +514,9 @@ class MainRepository @Inject constructor(
 
     suspend fun saveLogicState(state: AlarmEvaluationState, role: AppRole) {
         settings.saveLogicState(state, role)
+    }
+
+    suspend fun setRestorationDisabled(disabled: Boolean) {
+        settings.setRestorationDisabled(disabled)
     }
 }

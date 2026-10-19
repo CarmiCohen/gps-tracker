@@ -1,36 +1,34 @@
-# Project Handover - Oct18.8 (Network & Power Hardening Complete)
+# Project Handover - Oct19.19 (Restoration Bypass Hook Complete)
 
-## 🟢 Status: Forensic Audit Baseline Oct18.8 Established
-The project has successfully resolved two critical hardening issues related to system power states and network callback lifecycle. The forensic integrity of the documentation has been restored and verified.
+## 🟢 Status: Forensic Audit Baseline Oct19.19 Established
+The project has successfully resolved the mode-restoration "boot loop" issue by providing a persistent bypass hook for testing.
 
-## 🛠️ Validation Details (Oct18.8)
+## 🛠️ Validation Details (Oct19.19)
 
-### 1. Battery Saver Signaling Policy (#OCT18.22-F1)
-- **Implementation**: Updated `ConnectivitySuite.kt` to honor unified power restrictions.
-- **Forensic Signatures**: Added `(Doze/PowerSave active)` to logs in:
-    - `startHeartbeatLoop()` (Line ~282)
-    - `startIdentitySyncLoop()` (Line ~301)
-    - `startSyncLoop()` (Line ~386)
-- **Compliance**: Rule **R-ID 741** (Rule 1.223) added to `SOT_MASTER_REQUIREMENTS.md`. Resolution **SOT ID 771** added to `RESOLUTION_ARCHIVE.md`.
+### 1. Test Mode Restoration Bypass (#OCT19.19-F1)
+- **Problem**: Automatic service resumption (R-ID 242) prevented clean mode transitions during tests.
+- **Solution**: Implemented `isRestorationDisabled` persistence.
+- **ViewModel Logic**: `MainViewModel.init` now conditionally skips `UiEffect.StartService` based on this flag.
+- **UI Hook**: Added "Skip Mode Restoration" toggle to `DiagnosticsScreen.kt` under "Validation Hooks".
+- **Compliance**: Rule **R-ID 743** added to `SOT_MASTER_REQUIREMENTS.md`. Resolution **SOT ID 773** added to `RESOLUTION_ARCHIVE.md`.
 
-### 2. Unified Network Callback Management (#OCT18.22-F2)
-- **Implementation**: Consolidated `ConnectivityManager.NetworkCallback` into a singleton authority.
-- **Files Affected**:
-    - `AndroidNetworkProvider.kt`: Implemented shared `isNetworkAvailableFlow` using `callbackFlow` (Line ~65).
-    - `SystemStatusProviderImpl.kt`: Refactored `observeInternetStatus()` (Line ~236) to consume the unified provider, eliminating redundant system registrations.
-- **Compliance**: Rule **R-ID 742** (Rule 1.224) added to `SOT_MASTER_REQUIREMENTS.md`. Resolution **SOT ID 772** added to `RESOLUTION_ARCHIVE.md`.
+### 2. Versioning Audit
+- **Status**: Application successfully synchronized to **Oct19.19 PLATINUM**.
+- **Source**: `gradle.properties` updated to `APP_VERSION_NAME=Oct19.19`.
 
-### 3. Forensic Traceability Restoration
-- **Restoration**: Successfully recovered `RESOLUTION_ARCHIVE.md` (342 entries) and `SOT_MASTER_REQUIREMENTS.md` (298 rules) from Git baselines after accidental truncation. Full project history is now intact.
-- **Dashboard**: `issues.md` Hardening Progress Dashboard updated to `Oct18.8`.
+## 🎯 Next Resumption Focus: Viewer with Simulated Tracker (#OCT19.0-F1)
+Now that the restoration bypass is active, the tester can cleanly enter Viewer mode without auto-starting the Tracker.
+1. Enable "Skip Mode Restoration" in Diagnostics.
+2. Force stop the app.
+3. Relaunch (should land on Landing Screen).
+4. Enter Viewer Mode.
+5. Enable "Virtual Peer Presence" in Diagnostics.
+6. Verify mock tracker telemetry on the map.
 
-## 🎯 Next Resumption Focus: Storage Test Race Conditions (#OCT18.22-F3)
-The next session should investigate intermittent failures in `StoragePressureAuditTest.kt`.
-
-**Current Forensic Metrics (Oct18.8):**
-- **SOT Count**: 464 (Rules: 298)
+**Current Forensic Metrics (Oct19.19):**
+- **SOT Count**: 465 (Rules: 299)
 - **Open Gaps**: H:0, M:0, L:1
-- **Testing Chapters**: 100/100 PASSED
-- **QA Resolutions**: 392
+- **Testing Chapters**: 100/100 PASSED (+ Chapter 8.4 validated)
+- **QA Resolutions**: 393
 
 **HANDOVER COMPLETE. STOP ALL PROCESSING.**

@@ -16,6 +16,8 @@ import javax.inject.Singleton
 
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
+ * Oct.19.19:
+ * - ISSUE-OCT19.19-F1: Handled SetRestorationDisabled event for bypass R-ID 242.
  * Oct.18.6:
  * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Integrated simulation 
  *   triggers for SHAKE, GNSS_LOSS, POWER_TAMPER, and NETWORK_LOSS.
@@ -287,6 +289,11 @@ class UiEventCoordinator @Inject constructor(
             is UiEvent.SetPeerPresenceSimulation -> {
                 onStateUpdate { it.copy(simulation = it.simulation.copy(isPeerPresenceSimulated = event.active)) }
                 repository.sendCommand(UiCommand.SimulatePeerPresence(event.active))
+            }
+            is UiEvent.SetRestorationDisabled -> {
+                onStateUpdate { it.copy(simulation = it.simulation.copy(isRestorationDisabled = event.disabled)) }
+                scope.launch(Dispatchers.IO) { repository.setRestorationDisabled(event.disabled) }
+                repository.sendCommand(UiCommand.SetRestorationDisabled(event.disabled))
             }
             is UiEvent.ExecuteStressTest -> repository.sendCommand(UiCommand.ExecuteStressTest)
             is UiEvent.ExecuteLogPressureTest -> repository.sendCommand(UiCommand.ExecuteLogPressureTest)

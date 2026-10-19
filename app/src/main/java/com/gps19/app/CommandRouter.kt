@@ -18,6 +18,8 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Oct.19.19:
+ * - ISSUE-OCT19.19-F1: Handled SetRestorationDisabled command for exhaustiveness.
  * Oct.18.6:
  * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Integrated simulation 
  *   routing for SHAKE, GNSS_LOSS, POWER_TAMPER, and NETWORK_LOSS.
@@ -195,6 +197,9 @@ class CommandRouter @Inject constructor(
                         }
                         is UiCommand.SimulatePeerPresence -> {
                             syntheticEventInjector.simulatePeerPresence(command.active, configManager.isTrackerMode, scope)
+                        }
+                        is UiCommand.SetRestorationDisabled -> {
+                            // No-op on service side, primarily used by MainViewModel to bypass R-ID 242.
                         }
                     }
                 } catch (e: Exception) {

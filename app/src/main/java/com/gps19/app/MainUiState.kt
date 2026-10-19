@@ -7,12 +7,13 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Composite UI state partitioned into specialized slices.
+ * Oct.19.19:
+ * - ISSUE-OCT19.19-F1: Added isRestorationDisabled to SimulationUiState to bypass R-ID 242.
+ * - Fix: Corrected typo 'other' in DiagnosticState.copyFrom.
+ * - Fix: Corrected RequestAppInfo to extend UiEvent.
  * Oct.18.6:
  * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Added shake, GNSS loss, 
  *   power tamper, and network loss to SimulationUiState.
- * Oct.15.2:
- * - SIMP-OCT15.1-S1: Primitive History Buffers. Transitioned history flows 
- *   from List<ConnectionPoint> to HistoryBuffer to reduce GC pressure.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -53,6 +54,7 @@ data class MainUiState(
     val isSettlingActive: Boolean get() = session.isSettlingActive
     val isSetupBypassActive: Boolean get() = session.isSetupBypassActive
     val isPeerActive: Boolean get() = session.isPeerActive
+    val isRestorationDisabled: Boolean get() = simulation.isRestorationDisabled
 
     val isFullyHydrated: Boolean get() = hydrationLevel >= 3
     val isMapHydrated: Boolean get() = hydrationLevel >= 4
@@ -222,7 +224,8 @@ data class SimulationUiState(
     val isGnssLossSimulated: Boolean = false,
     val isNetworkLossSimulated: Boolean = false,
     val isPowerTamperSimulated: Boolean = false,
-    val isPeerPresenceSimulated: Boolean = false
+    val isPeerPresenceSimulated: Boolean = false,
+    val isRestorationDisabled: Boolean = false
 )
 
 data class MapViewState(
@@ -556,6 +559,7 @@ sealed class UiEvent {
     data class SetPowerTamperSimulation(val active: Boolean) : UiEvent()
     data class SetNetworkLossSimulation(val active: Boolean) : UiEvent()
     data class SetPeerPresenceSimulation(val active: Boolean) : UiEvent()
+    data class SetRestorationDisabled(val disabled: Boolean) : UiEvent()
     data class SetManualSelection(val active: Boolean) : UiEvent()
     data class SetSettlingActive(val active: Boolean) : UiEvent()
     data class ToggleSetupBypass(val active: Boolean) : UiEvent()
@@ -624,4 +628,5 @@ sealed class UiCommand {
     data class SimulatePowerTamper(val active: Boolean) : UiCommand()
     data class SimulateNetworkLoss(val active: Boolean) : UiCommand()
     data class SimulatePeerPresence(val active: Boolean) : UiCommand()
+    data class SetRestorationDisabled(val disabled: Boolean) : UiCommand()
 }

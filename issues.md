@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct18.8
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct19.19
 
 ## 🎯 Current Resumption Focus: Storage Test Race Conditions (#OCT18.22-F3).
 
@@ -7,7 +7,8 @@
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 48)
+## 💡 Strategic Simplification Ideas (Ideas: 49)
+*   **SIMP-OCT19.19-S1: Unified Restoration Policy (Low).** Consider moving the restoration bypass logic from `MainViewModel` into `SessionUseCase` to centralize all session startup decisions and reduce ViewModel complexity.
 *   **SIMP-OCT18.24-S1: Reactive Signaling Deferral (Low).** Consider unifying the shouldDeferSignaling check into a single Flow<Boolean> that ConnectivitySuite can collect, reducing repetitive polling and improving state synchronization.
 *   **SIMP-OCT18.18-S1: Manual Processor Reification (Low).** Formalize the `triggerManualBatchProcessor` into a `TestingCommand` stream to avoid adding `@VisibleForTesting` methods to production repositories.
 *   **SIMP-OCT18.16-S1: Unified Power Intent Handler (Low).** Consolidate `ACTION_POWER_SAVE_MODE_CHANGED` and `ACTION_DEVICE_IDLE_MODE_CHANGED` into a single reactive stream in `AndroidPowerStateProvider` to reduce receiver overhead.
@@ -22,6 +23,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT19.19-F1: Test Mode Restoration Bypass.** Resolved Oct19.19. Implemented persistent `isRestorationDisabled` flag and ViewModel hook to bypass R-ID 242, enabling deterministic cross-mode testing. (SOT ID 773).
 *   **ISSUE-OCT18.22-F2: Redundant Network Callback Registrations.** Resolved Oct18.8. Consolidated all ConnectivityManager callback management into `AndroidNetworkProvider` and refactored `SystemStatusProviderImpl` to consume the unified flow. (SOT ID 772).
 *   **ISSUE-OCT18.22-F1: Battery Saver Restricted Network behavior.** Resolved Oct18.8. Updated `ConnectivitySuite` logging to explicitly reflect `PowerSave` status in forensic traces, ensuring compliance with Chapter 38 audit signatures. (SOT ID 771).
 *   **ISSUE-OCT18.18-F1: Storage Test Determinism.** Resolved Oct18.8. Added `triggerManualBatchProcessor()` to `LogRepository` to ensure deterministic log flushing during tests. (SOT ID 770).
@@ -35,6 +37,5 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct19.19: [SOT Count: 465 (Rules: 299), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:29, Testing: 100 (Sub-items: 101), QA: 393]**
 - **Oct18.8: [SOT Count: 464 (Rules: 298), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:28, Testing: 100 (Sub-items: 100), QA: 392]**
-- **Oct18.8: [SOT Count: 462 (Rules: 296), Open: H:0, M:1, L:2, Ideas: H:1, M:19, L:27, Testing: 100 (Sub-items: 100), QA: 390]**
-- **Oct18.8: [SOT Count: 462 (Rules: 296), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:27, Testing: 100 (Sub-items: 100), QA: 390]**

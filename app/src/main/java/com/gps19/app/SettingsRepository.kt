@@ -55,6 +55,8 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Oct.19.19:
+ * - ISSUE-OCT19.19-F1: Added isRestorationDisabled persistence. Corrected typo in lastDisconnectionTs accessor.
  * Oct.15.9:
  * - Fixed identity conflict error message to match IdentityPersistenceTest expectations.
  * Oct.14.0:
@@ -130,6 +132,8 @@ class SettingsRepository @Inject constructor(
     val isXiaomiManualOverrideFlow: Flow<Boolean> = dataStore.data.map { it.isXiaomiManualOverride }
     val recoveryCountFlow: Flow<Int> = dataStore.data.map { it.recoveryCount }
     val cumulativeRecoveryBlackoutMsFlow: Flow<Long> = dataStore.data.map { it.totalDrop }
+
+    val isRestorationDisabledFlow: Flow<Boolean> = dataStore.data.map { it.isRestorationDisabled }
 
     suspend fun getSettingsSnapshot(): AppSettings = dataStore.data.first()
 
@@ -413,6 +417,10 @@ class SettingsRepository @Inject constructor(
 
     suspend fun setAppMode(mode: String?) {
         dataStore.mutate { setAppMode(mode ?: "") }
+    }
+
+    suspend fun setRestorationDisabled(disabled: Boolean) {
+        dataStore.mutate { setIsRestorationDisabled(disabled) }
     }
 
     suspend fun loadHomePoints(): List<GeoPoint> = dataStore.data.first().homePointsList.map { GeoPoint(it.lat, it.lng) }

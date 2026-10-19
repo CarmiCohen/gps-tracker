@@ -22,6 +22,8 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.19.19:
+ * - ISSUE-OCT19.19-F1: Integrated Skip Restoration Hook into init block to bypass R-ID 242.
  * Oct.15.10:
  * - Requirement Restoration: Implemented automatic service resumption on cold start 
  *   if a prior appMode is detected (ensures "Last Mode" persistence).
@@ -235,9 +237,13 @@ class MainViewModel @Inject constructor(
                 applyInitialSettings(initialSettings)
                 
                 // R-ID 242: Last Mode Restoration. Automatically resume service if mode is present.
-                initialSettings.appMode?.let { mode ->
-                    Timber.d("MODE_RESTORE: Resuming service for mode: $mode")
-                    _uiEffects.emit(UiEffect.StartService(mode))
+                if (!initialSettings.isRestorationDisabled) {
+                    initialSettings.appMode?.let { mode ->
+                        Timber.d("MODE_RESTORE: Resuming service for mode: $mode")
+                        _uiEffects.emit(UiEffect.StartService(mode))
+                    }
+                } else {
+                    Timber.d("MODE_RESTORE: Bypassing R-ID 242 as restoration is disabled.")
                 }
 
                 hydrationManager.hydrationLevel.onEach { level -> 
@@ -287,6 +293,11 @@ class MainViewModel @Inject constructor(
                         session = it.session.copy(appMode = update.appMode, isSystemActive = update.isSystemActive, permissions = it.permissions.copy(isManualOverride = update.isXiaomiManualOverride))
                     ) } 
                 } 
+            }
+            launch {
+                repository.isRestorationDisabledFlow.collect { disabled ->
+                    updateState { it.copy(simulation = it.simulation.copy(isRestorationDisabled = disabled)) }
+                }
             }
             launch { 
                 stateSubscriptionUseCase.observeInternetStatus().collect { online -> 
@@ -439,7 +450,7 @@ class MainViewModel @Inject constructor(
     }
 
     private fun applyInitialSettings(initial: InitialSettings) { 
-        updateState { it.copy(settings = it.settings.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, isIdentitySanitized = initial.identitySanitized, alertSettings = initial.alertSettings, draftSettings = initial.draftSettings ?: it.settings.draftSettings, lastAlarmAckTs = initial.lastAlarmAckTs), session = it.session.copy(appMode = initial.appMode, isSystemActive = initial.isSystemActive, appStartTime = initial.appStartTime)) } 
+        updateState { it.copy(settings = it.settings.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, isIdentitySanitized = initial.identitySanitized, alertSettings = initial.alertSettings, draftSettings = initial.draftSettings ?: it.settings.draftSettings, lastAlarmAckTs = initial.lastAlarmAckTs), session = it.session.copy(appMode = initial.appMode, isSystemActive = initial.isSystemActive, appStartTime = initial.appStartTime), simulation = it.simulation.copy(isRestorationDisabled = initial.isRestorationDisabled)) }
     }
 
     fun fullInitialization(context: Context) { 

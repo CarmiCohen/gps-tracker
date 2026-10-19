@@ -9,6 +9,8 @@ import javax.inject.Inject
 
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
+ * Oct.19.19:
+ * - ISSUE-OCT19.19-F1: Added isRestorationDisabled to InitialSettings.
  * Oct.10.3:
  * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
  *   TimeProvider API and fixed property invocation errors.
@@ -92,6 +94,7 @@ class SettingsUseCase @Inject constructor(
         val lMaxTemp = s.maxTemp
         val sanitized = s.identitySanitized
         val isActive = s.isSystemActive
+        val restorationDisabled = s.isRestorationDisabled
         
         var appStartTime = s.appStartTime
         if (appStartTime == 0L) {
@@ -118,7 +121,7 @@ class SettingsUseCase @Inject constructor(
             selectedSirenType = sSiren, lastAlarmAckTs = lAlarmAck, maxTemp = lMaxTemp,
             appStartTime = appStartTime, draftSettings = draftSettings,
             trackerStatus = trackerStatus, identitySanitized = sanitized,
-            isSystemActive = isActive
+            isSystemActive = isActive, isRestorationDisabled = restorationDisabled
         )
     }
 
@@ -186,5 +189,5 @@ data class InitialSettings(
     val appMode: String?, val selectedSirenType: String, val lastAlarmAckTs: Long,
     val maxTemp: Double, val appStartTime: Long, val draftSettings: DraftSettings?,
     val trackerStatus: LocationUpdate?, val identitySanitized: Boolean = false,
-    val isSystemActive: Boolean = false
+    val isSystemActive: Boolean = false, val isRestorationDisabled: Boolean = false
 )

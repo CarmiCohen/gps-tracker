@@ -11,7 +11,7 @@ As requested by the user, the test procedure and test results must remain strict
 *   **Test Results (`test_results.md`)**: This file is the dynamic record for tracking outcomes.
     *   **Action**: Log the test results onto `test_results.md`. On future tests, just update this file.
 *   **Issue Tracking**: Add each new identified issue to `issues.md`.
-*   **Fixing Policy**: Do not stop to fix issues unless it is impossible to continue the test procedure.
+*   **Fixing Policy**: Do not fix issues, just document them. Do not continue the test procedure after detecting an issue.
 
 ## 2. Separation of Concerns
 All historical results have been removed from the procedure document and migrated to the results document. This ensures that the testing workflow remains clean and the audit trail is preserved without cluttering the instructions.

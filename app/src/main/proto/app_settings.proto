@@ -98,6 +98,9 @@ message AppSettings {
     optional bool is_cooling_mode_active = 82;
     optional int64 cooling_entered_rt = 83;
 
+    // Issue #OCT19.19-F1: Skip Restoration flag
+    optional bool is_restoration_disabled = 84;
+
     map<string, int64> role_longs = 100;
     map<string, double> role_doubles = 101;
     map<string, bool> role_bools = 102;
