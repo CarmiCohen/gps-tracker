@@ -1,12 +1,30 @@
 # Resolution Archive - GPS Tracker
 
+## ISSUE-OCT20.0-F2: Testing Guideline Hardening (Oct20.0)
+- **Resolved**: Oct20.0
+- **Description**: The "Fixing Policy" in the Testing Guidelines was ambiguous regarding the immediate actions required upon defect detection during active testing sessions.
+- **Remediation**:
+    - **Non-Intervention Directive**: Updated `TESTS/TEST_GUIDELINES.md` to strictly prohibit immediate code changes during testing.
+    - **Forensic Termination**: Mandated immediate session termination upon failure detection to preserve the device state for root-cause analysis.
+    - **Integrity Alignment**: Integrated Rule 8 (Forensic Integrity Check) into the testing documentation standards to ensure zero placeholders in defect reports.
+- **Outcome**: 🟢 **PASSED**. Testing protocols now strictly enforce forensic preservation and documentation integrity. (SOT ID 777).
+
 ## ISSUE-OCT20.0-F1: Document Integrity Baseline (Oct20.0)
 - **Resolved**: Oct20.0
-- **Description**: To prevent future accidental truncations of the project's historical audit trail, a read-only (by convention) baseline directory was established.
+- **Description**: Recent accidental truncations highlighted a vulnerability in the project's historical audit trail due to the lack of immutable reference points.
 - **Remediation**:
-    - **Baseline Creation (R-ID 744)**: Created `STATUS/BASELINE/Oct19.20/` containing the verified restoration of `SOT_MASTER_REQUIREMENTS.md` and `RESOLUTION_ARCHIVE.md`.
-    - **Policy Enforcement**: Updated `DEVELOPER_GUIDELINES.md` to require versioned baselines at the end of each version cycle.
-- **Outcome**: 🟢 **PASSED**. Forensic documents are now protected by a multi-layered versioning strategy. (SOT ID 775).
+    - **Baseline Creation (R-ID 744)**: Established a versioned baseline directory (`STATUS/BASELINE/`) to store read-only snapshots of SOT and Resolution logs.
+    - **Recovery Snapshot**: Created the `Oct19.20` baseline containing the verified forensic recovery state.
+    - **Protocol Hardening**: Updated `DEVELOPER_GUIDELINES.md` to require baseline synchronization at the conclusion of every version cycle.
+- **Outcome**: 🟢 **PASSED**. Forensic documents are now protected by a multi-layered versioning and baseline strategy. (SOT ID 775).
+
+## ISSUE-OCT19.20-F2: Completion Sequence Hardening (Oct20.0)
+- **Resolved**: Oct20.0
+- **Description**: The completion sequence lacked a dedicated step for verifying the forensic integrity of documentation, increasing the risk of Rule 8 violations (placeholders/truncations).
+- **Remediation**:
+    - **Forensic Doc-Check (Rule 8)**: Added a mandatory step in `DEVELOPER_GUIDELINES.md` to rigorously verify all modified `.md` files for correctness and completeness.
+    - **Sequence Optimization**: Reordered the completion sequence to prioritize integrity locks before version tagging.
+- **Outcome**: 🟢 **PASSED**. The release process now enforces a mandatory integrity audit for all status and protocol documents. (SOT ID 776).
 
 ## ISSUE-OCT19.20-F1: Forensic Document Recovery (Oct19.20)
 - **Resolved**: Oct19.20
@@ -276,7 +294,7 @@
 
 ## 9. Forensic Continuity & Startup Hardening (July.20.01)
 *   **Issue #105**: Forensic Ribbon Continuity Verification. Remediated \"monotonic reset\" bug. Reconstructed monotonic timeline on startup using persisted drift references.
-*   **Issue #104**: Startup ANR Hardening (Proactive Log Pruning). Integrated proactive pruning into `MainViewModel startup sequence.
+*   **Issue #104**: Startup ANR Hardening (Proactive Log Pruning). Integrated proactive pruning into `MainViewModel` startup sequence.
 
 ## 10. Temporal Integrity & Persistence (July.19.04)
 *   **Issue #103**: Drift Reference Persistence. Ensured `clockDriftRef` survives process death.
@@ -298,4 +316,4 @@
 *   **Issue #014**: System-Wide Type Safety. Standardized telemetry fields to `Double` (v9.1.7).
 *   **Issue #043**: Migration Integrity Audit (R985). Verified and hardened v53 Room database migration (v9.1.7).
 
-**TOTAL UNIQUE RESOLUTIONS: 346**
+**TOTAL UNIQUE RESOLUTIONS: 348**

@@ -11,7 +11,7 @@ As requested by the user, the test procedure and test results must remain strict
 *   **Test Results (`test_results.md`)**: This file is the dynamic record for tracking outcomes.
     *   **Action**: Log the test results onto `test_results.md`. On future tests, just update this file.
 *   **Issue Tracking**: Add each new identified issue to `issues.md`.
-*   **Fixing Policy**: Do not fix issues, just document them. Do not continue the test procedure after detecting an issue.
+*   **Fixing Policy (Non-Intervention Directive)**: Immediate remediation of identified defects during active testing is strictly prohibited. All findings MUST be formally cataloged in `issues.md` and `test_results.md`. Upon failure detection, the testing session MUST be terminated immediately to lock the forensic state. All documentation must strictly adhere to the **Forensic Integrity Check** (Developer Rule 8): zero placeholders, absolute completeness, and verified correctness.
 
 ## 2. Separation of Concerns
 All historical results have been removed from the procedure document and migrated to the results document. This ensures that the testing workflow remains clean and the audit trail is preserved without cluttering the instructions.
@@ -21,4 +21,4 @@ All historical results have been removed from the procedure document and migrate
 *   **Physical Status**: Verifies hardware resolution (e.g., A15/S21FE) and environment states.
 
 ---
-*Established on Oct 14, 2024, to ensure forensic integrity and procedure stability.*
+*Established on Oct 14, 2024. Hardened on Oct 20, 2024 (Oct20.0) to enforce strict forensic termination and Rule 8 integrity.*
