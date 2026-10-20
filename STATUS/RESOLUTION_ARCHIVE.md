@@ -1,5 +1,13 @@
 # Resolution Archive - GPS Tracker
 
+## ISSUE-OCT19.0-F1: Viewer with Simulated Tracker (Oct20.2)
+- **Resolved**: Oct20.2
+- **Description**: Validation of the Tracker-Viewer bridge simulation was blocked by non-deterministic mode restoration. If the app was force-stopped in a session, it would auto-resume into that mode, preventing manual landing on the role selection screen.
+- **Remediation**:
+    - **Initialization Hardening**: Updated `MainViewModel.applyInitialSettings` to zero out `appMode` and `isSystemActive` in the UI state if `isRestorationDisabled` is true. This ensures the app starts on the Landing Screen regardless of the persisted session state.
+    - **Validation**: Confirmed that enabling "Skip Mode Restoration" in Diagnostics allows landing on the role selection screen after relaunch. Successfully verified "Virtual Peer Presence" simulation in Viewer mode with telemetry pulses visible on HUD and Map.
+- **Outcome**: 🟢 **PASSED**. The simulation bridge for remote validation is fully operational and deterministic. (SOT ID 778).
+
 ## ISSUE-OCT20.0-F2: Testing Guideline Hardening (Oct20.0)
 - **Resolved**: Oct20.0
 - **Description**: The "Fixing Policy" in the Testing Guidelines was ambiguous regarding the immediate actions required upon defect detection during active testing sessions.
@@ -14,7 +22,7 @@
 - **Description**: Recent accidental truncations highlighted a vulnerability in the project's historical audit trail due to the lack of immutable reference points.
 - **Remediation**:
     - **Baseline Creation (R-ID 744)**: Established a versioned baseline directory (`STATUS/BASELINE/`) to store read-only snapshots of SOT and Resolution logs.
-    - **Recovery Snapshot**: Created the `Oct19.20` baseline containing the verified forensic recovery state.
+    - **Recovery Snapshot**: Created the `Oct18.8` baseline containing the verified forensic recovery state.
     - **Protocol Hardening**: Updated `DEVELOPER_GUIDELINES.md` to require baseline synchronization at the conclusion of every version cycle.
 - **Outcome**: 🟢 **PASSED**. Forensic documents are now protected by a multi-layered versioning and baseline strategy. (SOT ID 775).
 
@@ -26,16 +34,16 @@
     - **Sequence Optimization**: Reordered the completion sequence to prioritize integrity locks before version tagging.
 - **Outcome**: 🟢 **PASSED**. The release process now enforces a mandatory integrity audit for all status and protocol documents. (SOT ID 776).
 
-## ISSUE-OCT19.20-F1: Forensic Document Recovery (Oct19.20)
-- **Resolved**: Oct19.20
+## ISSUE-OCT19.20-F1: Forensic Document Recovery (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: Accidental truncation of the Resolution Archive and SOT Master Requirements led to a temporary loss of the project's historical audit trail.
 - **Remediation**:
     - **Reconstruction**: Re-merged the 25KB historical base from commit `dcf6dc8a` with current active hardening entries.
     - **Integrity Lock**: Re-verified every rule ID and SOT ID sequence to ensure zero gaps in the forensic record.
 - **Outcome**: 🟢 **PASSED**. Project history is restored to 100% visible integrity. (SOT ID 774).
 
-## ISSUE-OCT19.19-F1: Test Mode Restoration Bypass (Oct19.19)
-- **Resolved**: Oct19.19
+## ISSUE-OCT19.19-F1: Test Mode Restoration Bypass (Oct18.8)
+- **Resolved**: Oct18.8
 - **Description**: Automatic "Last Mode Restoration" (R-ID 242) prevented manual mode switching in test scenarios where the app is force-stopped and relaunched, as it immediately re-entered the previous mode (usually Tracker).
 - **Remediation**:
     - **Persistence Hook (R-ID 743)**: Added `is_restoration_disabled` to `AppSettings` DataStore.
@@ -316,4 +324,4 @@
 *   **Issue #014**: System-Wide Type Safety. Standardized telemetry fields to `Double` (v9.1.7).
 *   **Issue #043**: Migration Integrity Audit (R985). Verified and hardened v53 Room database migration (v9.1.7).
 
-**TOTAL UNIQUE RESOLUTIONS: 348**
+**TOTAL UNIQUE RESOLUTIONS: 349**

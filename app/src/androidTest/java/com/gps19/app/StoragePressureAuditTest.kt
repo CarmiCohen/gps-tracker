@@ -16,6 +16,9 @@ import javax.inject.Inject
  * StoragePressureAuditTest: Verifies Chapter 12.3 Persistence Prioritization.
  * Validates that LogManager and PersistencePolicy correctly gate data based on 
  * storage pressure thresholds (R197).
+ * Oct.20.2:
+ * - ISSUE-OCT18.22-F3: Replaced delay(3000) with deterministic logRepository.flushLogs() 
+ *   and flushForensicTraces() to eliminate race conditions.
  * Oct.18.18:
  * - Maintenance: Explicitly triggered manual batch processor for test isolation.
  * Oct.15.9:
@@ -64,8 +67,9 @@ class StoragePressureAuditTest {
         repository.saveTrailPoint(1.0, 1.0, isViewer = false, status = SentinelStatus.VALID)
         repository.saveTrailPoint(2.0, 2.0, isViewer = false, status = SentinelStatus.TAMPER)
 
-        // R197 Audit: Must exceed LOG_BATCH_DELAY_MS (2000ms) to guarantee flush
-        delay(3000) 
+        // Oct.20.2: Deterministic flush instead of delay
+        logRepository.flushLogs()
+        logRepository.flushForensicTraces()
 
         val logs = repository.loadAllLogsStatic(100)
         val trail = repository.loadTrailStatic(false)
@@ -93,8 +97,9 @@ class StoragePressureAuditTest {
         // 3. Attempt to save trail points
         repository.saveTrailPoint(2.0, 2.0, isViewer = false, status = SentinelStatus.TAMPER)
 
-        // R197 Audit: Wait for batch processor
-        delay(3000)
+        // Oct.20.2: Deterministic flush
+        logRepository.flushLogs()
+        logRepository.flushForensicTraces()
 
         val logs = repository.loadAllLogsStatic(100)
         val trail = repository.loadTrailStatic(false)

@@ -1,39 +1,27 @@
-# Project Handover - Oct20.0 (Forensic & Testing Protocol Hardened)
+# Project Handover - Oct20.2 (Viewer Simulation Validated)
 
-## 🟢 Status: Oct20.0 Baseline Synchronized
-The project's forensic documentation and testing protocols have been rigorously hardened. Immutable baselines are established, and the "Non-Intervention Directive" is now in effect for all testing cycles.
+## 🟢 Status: Oct20.2 Baseline Synchronized
+Validated the Tracker-Viewer bridge using the simulation framework. Hardened the "Skip Mode Restoration" logic in `MainViewModel.kt` to ensure deterministic role selection after cold starts.
 
-## 🛠️ Validation Details (Oct20.0)
+## 🛠️ Validation Details (Oct20.2)
 
-### 1. Document Integrity & Baselines (#OCT20.0-F1)
-- **Baseline Directory**: Established `STATUS/BASELINE/` with snapshots for `Oct19.20` and `Oct20.0`.
-- **R-ID 744**: Mandatory baseline synchronization added to the Completion Sequence.
-- **Outcome**: 🟢 **PASSED**. Historical record protected against accidental truncation.
+### 1. Viewer with Simulated Tracker (#OCT19.0-F1) - 🟢 PASSED
+- **Root Cause**: `MainViewModel.applyInitialSettings` was restoring `appMode` from DataStore even if `isRestorationDisabled` was active.
+- **Fix**: Updated `MainViewModel.kt` (lines 351-368) to zero out session state if restoration is bypassed.
+- **Verification**: Verified Landing Screen landing after force-stop. Verified mock telemetry pulses on HUD and Map in Viewer mode with "Virtual Peer Presence" simulation.
 
-### 2. Testing Guideline Hardening (#OCT20.0-F2)
-- **Fixing Policy**: Rephrased to **"Non-Intervention Directive"** in `TESTS/TEST_GUIDELINES.md`.
-- **Forensic Lock**: Mandated immediate session termination upon failure detection.
-- **Integrity**: Integrated Developer Rule 8 (Forensic Integrity Check) into testing standards.
-- **Outcome**: 🟢 **PASSED**. Testing now enforces total state preservation.
+### 2. Storage Test Race Conditions (#ISSUE-OCT18.22-F3) - 🟡 IN_PROGRESS
+- **Hardening**: Implemented synchronous flush hooks in `LogRepository.kt` to eliminate non-deterministic delays in forensic audits.
+- **New APIs**: 
+    - `LogRepository.flushLogs()`: Drains the memory channel and commits to DB.
+    - `LogRepository.flushForensicTraces()`: Synchronously triggers a MappedByteBuffer drain.
+- **Integration**: Updated `StoragePressureAuditTest.kt` to use these deterministic triggers.
+- **Next Step**: Final hardware verification on A15 to confirm zero race-induced flakes.
 
-### 3. Resolution Archive Recovery
-- **Remediation**: Fully restored `RESOLUTION_ARCHIVE.md` to 348 entries after a truncation event. Verified sections 1–12 are complete and placeholder-free.
+## 🏗️ Architectural Updates
+- **Rule 1.227 (R-ID 745)**: "Deterministic Test Flushing" mandated for repositories with asynchronous buffers.
 
-### 4. Guideline Optimization
-- **Completion Sequence**: Rule 7 now mandates a rigorous "Forensic Integrity Check" for modified `.md` files.
-
-## 🎯 Next Resumption Focus: Viewer with Simulated Tracker (#OCT19.0-F1)
-With the forensic trail locked and testing protocols hardened, focus returns to the remote validation of the Tracker-Viewer bridge.
-1. Enable "Skip Mode Restoration" in Diagnostics.
-2. Force stop and relaunch to land on Landing Screen.
-3. Enter Viewer Mode.
-4. Enable "Virtual Peer Presence" simulation.
-5. Verify mock telemetry pulse on HUD and Map.
-
-**Current Forensic Metrics (Oct20.0):**
-- **SOT Count**: 777 (Rules: 300)
-- **Open Gaps**: H:0, M:0, L:1 (Storage Test Race Conditions - #OCT18.22-F3)
-- **Testing Chapters**: 100/100 PASSED
-- **QA Resolutions**: 348
+**Current Forensic Metrics (Oct20.2):**
+- **[Oct20.2]: [SOT Count: 778 (Rules: 301), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:31, Testing: 100 (Sub-items: 101), QA: 349]**
 
 **HANDOVER COMPLETE. STOP ALL PROCESSING.**

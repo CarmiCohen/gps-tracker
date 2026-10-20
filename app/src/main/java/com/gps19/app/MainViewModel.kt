@@ -22,6 +22,9 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.20.2:
+ * - ISSUE-OCT19.0-F1: Updated applyInitialSettings to respect isRestorationDisabled 
+ *   during UI state initialization to ensure Landing Screen landing.
  * Oct.19.19:
  * - ISSUE-OCT19.19-F1: Integrated Skip Restoration Hook into init block to bypass R-ID 242.
  * Oct.15.10:
@@ -449,8 +452,26 @@ class MainViewModel @Inject constructor(
         } 
     }
 
-    private fun applyInitialSettings(initial: InitialSettings) { 
-        updateState { it.copy(settings = it.settings.copy(deviceId = initial.deviceId, viewerId = initial.viewerId, relayUrl = initial.relayUrl, isIdentitySanitized = initial.identitySanitized, alertSettings = initial.alertSettings, draftSettings = initial.draftSettings ?: it.settings.draftSettings, lastAlarmAckTs = initial.lastAlarmAckTs), session = it.session.copy(appMode = initial.appMode, isSystemActive = initial.isSystemActive, appStartTime = initial.appStartTime), simulation = it.simulation.copy(isRestorationDisabled = initial.isRestorationDisabled)) }
+    private fun applyInitialSettings(initial: InitialSettings) {
+        val restoredMode = if (initial.isRestorationDisabled) null else initial.appMode
+        val restoredActive = if (initial.isRestorationDisabled) false else initial.isSystemActive
+        updateState { it.copy(
+            settings = it.settings.copy(
+                deviceId = initial.deviceId,
+                viewerId = initial.viewerId,
+                relayUrl = initial.relayUrl,
+                isIdentitySanitized = initial.identitySanitized,
+                alertSettings = initial.alertSettings,
+                draftSettings = initial.draftSettings ?: it.settings.draftSettings,
+                lastAlarmAckTs = initial.lastAlarmAckTs
+            ),
+            session = it.session.copy(
+                appMode = restoredMode,
+                isSystemActive = restoredActive,
+                appStartTime = initial.appStartTime
+            ),
+            simulation = it.simulation.copy(isRestorationDisabled = initial.isRestorationDisabled)
+        ) }
     }
 
     fun fullInitialization(context: Context) { 

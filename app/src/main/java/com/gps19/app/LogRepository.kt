@@ -26,6 +26,8 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.20.2:
+ * - ISSUE-OCT18.22-F3: Added flushLogs() and flushForensicTraces() for deterministic testing.
  * Oct.18.18:
  * - Maintenance: Added triggerManualBatchProcessor for test isolation.
  * Oct.18.4:
@@ -160,6 +162,35 @@ class LogRepository @Inject constructor(
         if (batchJob?.isActive == true) return
         batchJob = scope.launch(Dispatchers.IO) { runBatchProcessor() }
         Log.i("LogRepository", "Manual batch processor triggered.")
+    }
+
+    /**
+     * flushLogs: Synchronously drains the log buffer and writes to DB.
+     * Useful for deterministic testing.
+     */
+    @VisibleForTesting
+    suspend fun flushLogs() {
+        val batch = mutableListOf<BufferedLog>()
+        while (true) {
+            val result = logBuffer.tryReceive()
+            if (result.isSuccess) {
+                batch.add(result.getOrThrow())
+            } else {
+                break
+            }
+        }
+        if (batch.isNotEmpty()) {
+            flushBatch(batch)
+        }
+    }
+
+    /**
+     * flushForensicTraces: Manually triggers a forensic drain.
+     * Useful for deterministic testing.
+     */
+    @VisibleForTesting
+    suspend fun flushForensicTraces() {
+        performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = false)
     }
 
     fun setForensicStallSimulation(active: Boolean) {
