@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct20.24)
+# SOT Master Requirements & Hardening Status (Oct20.25)
 
-## 🏗️ Architectural Master Rules (303 Rules)
+## 🏗️ Architectural Master Rules (304 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -53,9 +53,10 @@
 *   **1.228 Forensic Circular Overwrite (R-ID 746)**: The `ForensicSpillBuffer` MUST implement a circular overwrite policy during overflow to ensure the most recent telemetry is always preserved. (Oct20.21 - ISSUE-OCT20.10-F1).
 *   **1.229 Trajectory Promotion Policy (R-ID 747)**: (Historical rule preserved in `STATUS/sot_master_archive.md`).
 *   **1.230 Singleton Network Callback Authority (R-ID 748)**: `AndroidNetworkProvider` MUST utilize a singleton-lifecycle Flow (`SharingStarted.Eagerly`) to prevent redundant system callback registrations and associated forensic leaks. (Oct20.24 - ISSUE-OCT20.23-F1).
+*   **1.231 Deterministic Audit Synchronization (R-ID 749)**: All persistence repositories MUST expose `flush` or synchronous execution tracking to ensure deterministic behavior during automated audits. (Oct20.24 - ISSUE-OCT20.23-F2).
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 786**: Storage Pressure Audit Flakiness - OPEN. Detected non-deterministic failures in `StoragePressureAuditTest` during Oct20.23 audit. (Oct20.23 - ISSUE-OCT20.23-F2).
+*   **SOT ID 786**: Storage Pressure Audit Flakiness - PASSED. Resolved race conditions in `StoragePressureAuditTest` by implementing `repository.flushTrails()` and making `clearLogs()` suspendable. (Oct20.24 - ISSUE-OCT20.23-F2).
 *   **SOT ID 785**: Redundant Connectivity Callback Leaks - PASSED. Transitioned to `SharingStarted.Eagerly` in `AndroidNetworkProvider` to eliminate redundant registrations. (Oct20.24 - ISSUE-OCT20.23-F1).
 *   **SOT ID 784**: Test Suite Version Regression - PASSED. (Oct20.22).
 *   **SOT ID 783**: Forensic Circular Overwrite - PASSED. (Oct20.21).
@@ -67,7 +68,7 @@
 
 ## ✅ Verification Chapters
 *   **Chapter 92.1 (Connectivity Audit)**: PASSED - Verified zero redundant callback registrations in Logcat using `SharingStarted.Eagerly`. (Oct20.24).
-*   **Chapter 12.2 (Test Determinism)**: FAILED - Detected non-deterministic failures in `StoragePressureAuditTest`. (Oct20.23).
+*   **Chapter 12.2 (Test Determinism)**: PASSED - Verified deterministic behavior in `StoragePressureAuditTest` after implementing repository flush mechanisms. (Oct20.24).
 *   **Chapter 12.5 (Regression Audit)**: PASSED - Verified full test suite passability after versioning alignment. (Oct20.22).
 *   **Chapter 12.4 (Overflow Resiliency)**: PASSED - Validated circular overwrite in `ForensicBufferSchemaTest`. (Oct20.21).
 *   **Chapter 12.3 (Persistence Prioritization)**: PASSED - Validated deterministic flushing in `StoragePressureAuditTest`. (Oct20.10).

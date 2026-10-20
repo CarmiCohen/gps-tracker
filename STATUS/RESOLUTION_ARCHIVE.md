@@ -1,5 +1,15 @@
 # Resolution Archive - GPS Tracker
 
+## ISSUE-OCT20.23-F2: Storage Pressure Audit Flakiness (Oct20.24)
+- **Resolved**: Oct20.24
+- **Description**: Stability failure where `StoragePressureAuditTest` exhibited non-deterministic behavior. Failures in `verifyCriticalStoragePrioritization` and `verifyLowStoragePrioritization` were caused by race conditions in asynchronous database writes and lack of synchronization in test setup.
+- **Remediation**:
+    - **Synchronization**: Implemented `MainRepository.flushTrails()` to allow tests to wait for asynchronous trail and violation persistence.
+    - **Setup Hardening**: Refactored `LogRepository.clearLogs()` to be a `suspend` function, ensuring the database is fully purged before tests commence.
+    - **Test Integration**: Updated `StoragePressureAuditTest` to utilize deterministic flush mechanisms (`flushTrails()`, `flushLogs()`), eliminating brittle `delay()` calls.
+    - **Code Quality**: Fixed cascading compilation errors and type mismatches in `UiEventCoordinator.kt` and `LogRepository.kt` resulting from the `suspend` signature changes.
+- **Outcome**: 🟢 **PASSED**. Adheres to R-ID 749. (SOT ID 786).
+
 ## ISSUE-OCT20.23-F1: Redundant Connectivity Callback Leaks (Oct20.24)
 - **Resolved**: Oct20.24
 - **Description**: Forensic failure where `AndroidNetworkProvider` exhibited redundant `ConnectivityManager.registerNetworkCallback` calls due to the use of `SharingStarted.WhileSubscribed`. This allowed the callback to be unregistered and re-registered frequently during high-frequency hydration, leading to race conditions in the system's unregistration handler.

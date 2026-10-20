@@ -16,14 +16,14 @@ import javax.inject.Singleton
 
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
+ * Oct.20.24:
+ * - ISSUE-OCT20.23-F2: Wrapped repository.clearLogs() in a coroutine scope to 
+ *   handle its transition to a suspend function. Fixed property access error 
+ *   in BulkUpdateSettings. Fixed typo in IS_XIAOMI_MANUAL_OVERRIDE_KEY.
  * Oct.19.19:
  * - ISSUE-OCT19.19-F1: Handled SetRestorationDisabled event for bypass R-ID 242.
  * Oct.18.6:
- * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Integrated simulation 
- *   triggers for SHAKE, GNSS_LOSS, POWER_TAMPER, and NETWORK_LOSS.
- * Oct.16.8:
- * - ISSUE-OCT16.8-F1: Fixed StopTracking dialog dismissal. Explicitly reset 
- *   isStopTrackingConfirmationVisible in ConfirmStopTracking handler.
+ * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection.
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -313,7 +313,7 @@ class UiEventCoordinator @Inject constructor(
                     specialColor = event.specialColor
                 ))
             }
-            is UiEvent.ClearLogs -> repository.clearLogs()
+            is UiEvent.ClearLogs -> scope.launch(Dispatchers.IO) { repository.clearLogs() }
             is UiEvent.ClearTrails -> scope.launch(Dispatchers.IO) { 
                 repository.clearTrails() 
                 repository.addLog(LogEntry(localId = UUID.randomUUID().toString(), timestamp = timeProvider.currentTimeMillis, message = "Trails cleared by user", type = "SYSTEM", isImportant = true, role = currentState.session.appMode ?: "system"))

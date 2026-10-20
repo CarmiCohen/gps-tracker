@@ -1,13 +1,14 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct20.24
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct20.25
 
 ## 🎯 Current Resumption Focus: Forensic Remediation of Storage Leaks.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   **ISSUE-OCT20.23-F2: Storage Pressure Audit Flakiness (High).** Stability failure. `StoragePressureAuditTest` exhibits non-deterministic behavior; failures in `verifyCriticalStoragePrioritization` and `verifyLowStoragePrioritization` were observed in initial runs but cleared upon retry. Indicates unresolved race conditions in the manual batch processor.
+*   (None)
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 56)
+## 💡 Strategic Simplification Ideas (Ideas: 57)
+*   **SIMP-OCT20.25-S1: Deterministic Test Rule (Low).** Consider creating a `PersistenceTestRule` that automatically handles `repository.flushTrails()` and `logRepository.flushLogs()` in `@After` hooks to ensure test-to-test isolation and reduce boilerplate in audit suites.
 *   **SIMP-OCT20.24-S1: Flow-Based Network State Sentinel (Low).** Consider removing the legacy `registerListener` / `unregisterListener` logic in `AndroidNetworkProvider` and purely exposing `isNetworkAvailableFlow` to consumers, further simplifying state management.
 *   **SIMP-OCT20.22-S1: Automated Version Injector for Tests (Low).** Consider using `BuildConfig` values directly in unit tests to avoid manual version string updates during baseline synchronization.
 *   **SIMP-OCT20.21-S1: Unified Forensic Writer (Low).** Consider overloading `writeTrace` to accept a primitive parameter set directly, reducing the need for two distinct internal paths in `ForensicSpillBuffer`.
@@ -30,6 +31,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT20.23-F2: Storage Pressure Audit Flakiness.** Resolved Oct20.24. Integrated `repository.flushTrails()` in `StoragePressureAuditTest` to ensure deterministic synchronization of asynchronous trail and violation writes. (SOT ID 786).
 *   **ISSUE-OCT20.23-F1: Redundant Connectivity Callback Leaks.** Resolved Oct20.24. Transitioned `AndroidNetworkProvider` to `SharingStarted.Eagerly` to ensure a singleton-lifecycle for system callback registrations. (SOT ID 785).
 *   **ISSUE-OCT20.22-F1: Test Suite Version Regression.** Resolved Oct20.22. Fixed `MainViewModelMappingTest` to align with the `Oct20.21` engine version baseline. (SOT ID 783).
 *   **ISSUE-OCT20.10-F1: Forensic Buffer Overflow Handling.** Resolved Oct20.21. Hardened `ForensicSpillBuffer` against extreme overflow scenarios by implementing a circular overwrite policy. (SOT ID 782).
@@ -43,7 +45,8 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct20.24: [SOT Count: 786 (Rules: 303), Open: H:1, M:0, L:0, Ideas: H:1, M:20, L:35, Testing: 5 (Sub-items: 8), QA: 357]**
+- **Oct20.25: [SOT Count: 786 (Rules: 304), Open: H:0, M:0, L:0, Ideas: H:1, M:20, L:36, Testing: 5 (Sub-items: 8), QA: 357]**
+- **Oct20.24: [SOT Count: 786 (Rules: 303), Open: H:0, M:0, L:0, Ideas: H:1, M:20, L:35, Testing: 5 (Sub-items: 8), QA: 357]**
 - **Oct20.23: [SOT Count: 785 (Rules: 302), Open: H:2, M:0, L:0, Ideas: H:1, M:20, L:35, Testing: 5 (Sub-items: 8), QA: 356]**
 - **Oct20.22: [SOT Count: 783 (Rules: 302), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:35, Testing: 103 (Sub-items: 104), QA: 354]**
 - **Oct20.21: [SOT Count: 782 (Rules: 302), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:34, Testing: 102 (Sub-items: 103), QA: 353]**

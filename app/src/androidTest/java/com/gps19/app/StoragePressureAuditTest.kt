@@ -16,21 +16,13 @@ import javax.inject.Inject
  * StoragePressureAuditTest: Verifies Chapter 12.3 Persistence Prioritization.
  * Validates that LogManager and PersistencePolicy correctly gate data based on 
  * storage pressure thresholds (R197).
+ * Oct.20.24:
+ * - ISSUE-OCT20.23-F2: Integrated repository.flushTrails() for deterministic 
+ *   synchronization of trail and violation writes, eliminating race conditions.
  * Oct.20.10:
  * - ISSUE-OCT18.22-F3: Removed triggerManualBatchProcessor() from init to prevent race 
  *   conditions where background processing steals logs from the buffer before flushLogs().
  *   Added delay(500) before assertions to ensure async trail persistence completes.
- * Oct.20.2:
- * - ISSUE-OCT18.22-F3: Replaced delay(3000) with deterministic logRepository.flushLogs() 
- *   and flushForensicTraces() to eliminate race conditions.
- * Oct.18.18:
- * - Maintenance: Explicitly triggered manual batch processor for test isolation.
- * Oct.15.9:
- * - Issue Fix: Updated TrailBuffer assertions to use primitive array access 
- *   (lats.any) to resolve compilation errors.
- * Aug.22.05:
- * - Issue Fix: Increased flush delay to 3000ms to align with LogRepository's 
- *   LOG_BATCH_DELAY_MS (2000ms) to resolve non-deterministic test failures.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -50,8 +42,6 @@ class StoragePressureAuditTest {
         hiltRule.inject()
         runBlocking {
             logRepository.resetForTest()
-            // Oct.20.10: triggerManualBatchProcessor() removed to avoid theft of logs 
-            // from the buffer by the background loop during deterministic testing.
             repository.clearLogs()
             repository.clearTrails()
         }
@@ -76,8 +66,8 @@ class StoragePressureAuditTest {
         logRepository.flushLogs()
         logRepository.flushForensicTraces()
 
-        // Oct.20.10: Brief delay for async trail persistence (which uses repository.scope)
-        delay(500)
+        // Oct.20.24: Deterministic trail flush (ISSUE-OCT20.23-F2)
+        repository.flushTrails()
 
         val logs = repository.loadAllLogsStatic(100)
         val trail = repository.loadTrailStatic(false)
@@ -109,8 +99,8 @@ class StoragePressureAuditTest {
         logRepository.flushLogs()
         logRepository.flushForensicTraces()
 
-        // Oct.20.10: Brief delay for async trail persistence
-        delay(500)
+        // Oct.20.24: Deterministic trail flush (ISSUE-OCT20.23-F2)
+        repository.flushTrails()
 
         val logs = repository.loadAllLogsStatic(100)
         val trail = repository.loadTrailStatic(false)

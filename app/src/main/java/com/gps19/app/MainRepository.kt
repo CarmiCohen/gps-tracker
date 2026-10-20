@@ -1,6 +1,7 @@
 package com.gps19.app
 
 import android.content.Context
+import androidx.annotation.VisibleForTesting
 import androidx.room.withTransaction
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -29,16 +30,12 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
- * Oct.19.19:
- * - ISSUE-OCT19.19-F1: Exposed isRestorationDisabled flow and setter.
- * Oct.15.7:
- * - ISSUE-OCT15.7-F1: Persistence Policy & Repository Consolidation.
- *   Consolidated trail mapping into TelemetryMapper. Enforced strict IO gating 
- *   using expanded PersistencePolicy for violations and maintenance. Fixed 
- *   loadActiveAlarms method call error.
- * Oct.15.5:
- * - SIMP-OCT15.4-S1: Mapper Consolidation. Refactored to use centralized 
- *   TelemetryMapper for HistoryBuffer transformations.
+ * Oct.20.25:
+ * - Maintenance: Restored full role-based API surface and debouncing logic to 
+ *   resolve build regressions while preserving deterministic flush hooks.
+ * Oct.20.24:
+ * - ISSUE-OCT20.23-F2: Added flushTrails() for deterministic testing.
+ *   Updated clearLogs() to be suspend.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -71,6 +68,7 @@ class MainRepository @Inject constructor(
     private val metrics = RepositoryMetrics()
 
     private val debounceJobs = ConcurrentHashMap<String, Job>()
+    private val pendingTrailJobs = ConcurrentLinkedQueue<Job>()
 
     companion object {
         const val DEFAULT_RELAY_URL = SettingsRepository.DEFAULT_RELAY_URL
@@ -325,7 +323,12 @@ class MainRepository @Inject constructor(
     ) = settings.saveSessionMetricsBulk(totalConnected, uptime, totalDrop, maxDrop, maxDropTs, lastGpsTs, violationUptimeMs)
 
     fun addLog(entry: LogEntry, initiallySynced: Boolean = false) { logRepository.addLog(entry, initiallySynced) }
-    fun clearLogs() { logRepository.clearLogs() }
+    
+    /**
+     * clearLogs: Suspend function for deterministic audit clearing.
+     */
+    suspend fun clearLogs() { logRepository.clearLogs() }
+    
     suspend fun loadAllLogsStatic(limit: Int = LOG_LIMIT_STANDARD): List<LogEntry> = logRepository.loadAllLogsStatic(limit)
     suspend fun proactivePruning() = logRepository.proactivePruning()
 
@@ -333,12 +336,25 @@ class MainRepository @Inject constructor(
         if (lat == 0.0 || lng == 0.0) return
         val health = telemetryRepository.systemHealth.value
         if (!PersistencePolicy.shouldSaveTrailPoint(health, status)) return
-        scope.launch {
+        val job = scope.launch {
             val wallTs = timestamp ?: timeProvider.currentTimeMillis
             trailDao.insert(TrailEntity(lat = lat, lng = lng, timestamp = wallTs, isViewerTrail = isViewer, status = status.name, accuracy = accuracy, maxAccuracy = maxAccuracy))
             if (force || metrics.trailWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
                 metrics.trailWriteCount.set(0); triggerBackgroundPruning()
             }
+        }
+        pendingTrailJobs.add(job)
+        job.invokeOnCompletion { pendingTrailJobs.remove(job) }
+    }
+
+    /**
+     * flushTrails: Synchronously waits for all pending trail and violation writes.
+     * Oct.20.24: Part of ISSUE-OCT20.23-F2 remediation.
+     */
+    @VisibleForTesting
+    suspend fun flushTrails() {
+        while (pendingTrailJobs.isNotEmpty()) {
+            pendingTrailJobs.poll()?.join()
         }
     }
 
@@ -357,12 +373,14 @@ class MainRepository @Inject constructor(
         if (!PersistencePolicy.shouldSaveViolation(health)) return
         if (!violationProcessor.shouldRecordViolation(lat, lng, type, accuracy, maxAccuracy)) return
         val wallTs = timestamp ?: timeProvider.currentTimeMillis
-        scope.launch { 
+        val job = scope.launch { 
             violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
             if (metrics.violationWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
                 metrics.violationWriteCount.set(0); triggerBackgroundPruning()
             }
         }
+        pendingTrailJobs.add(job)
+        job.invokeOnCompletion { pendingTrailJobs.remove(job) }
     }
 
     fun getHistoryFlow(ribbonKey: String): Flow<HistoryBuffer> = historyDao.getHistoryFlow(ribbonKey).map { l -> 
