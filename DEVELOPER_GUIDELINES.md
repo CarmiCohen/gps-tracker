@@ -19,9 +19,10 @@ The following rules **MUST** be followed strictly for every task:
 8.  **Large File Protection**:
     *   Use `replace_text` for targeted updates in large files (especially `.md` and `.xml`) to prevent data loss or truncation.
     *   Never use summaries or placeholders when using `write_file`.
-9.  **Completion Adherence**: Execute the **Completion Sequence** in strict order after finishing an issue.
-10. **Strict Termination**: Once the completion sequence is finished, do not implement anything else. **STOP ALL PROCESSING.**
-11. **Traceability Rule**: Remember to add the issue # to the git and to the relevant doc files.
+9.  **Archival Integrity**: Ensure that all archived rules, historical baselines, and sunset requirements are explicitly preserved in their respective archive files. Pruning active files MUST NOT result in the loss of historical forensic data.
+10. **Completion Adherence**: Execute the **Completion Sequence** in strict order after finishing an issue.
+11. **Strict Termination**: Once the completion sequence is finished, do not implement anything else. **STOP ALL PROCESSING.**
+12. **Traceability Rule**: Remember to add the issue # to the git and to the relevant doc files.
 
 ---
 

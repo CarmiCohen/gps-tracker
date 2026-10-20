@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct20.2)
+# SOT Master Requirements & Hardening Status (Oct20.3)
 
 ## 🏗️ Architectural Master Rules (301 Rules)
 
@@ -35,6 +35,41 @@
 *   **SOT ID 775**: Document Integrity Baseline - PASSED. Established versioned baseline directory and recorded R-ID 744 to protect against future document truncation. (Oct20.0 - ISSUE-OCT20.0-F1).
 *   **SOT ID 774**: SOT Master Requirements Recovery - PASSED. Fully restored missing rules and baseline entries from historical stable commits after accidental shortening. (Oct18.8 - ISSUE-OCT19.20-F1).
 *   **SOT ID 773**: Test Mode Restoration Bypass - PASSED. Implemented persistent `isRestorationDisabled` flag and ViewModel hook to bypass R-ID 242. (Oct18.8 - ISSUE-OCT19.19-F1).
+*   **SOT ID 772**: Unified Network Callback Management - PASSED. Consolidated all `ConnectivityManager` registrations into `AndroidNetworkProvider` and refactored `SystemStatusProviderImpl` to consume the unified flow. (Oct18.8 - ISSUE-OCT18.22-F2).
+*   **SOT ID 771**: Battery Saver Signaling Policy - PASSED. Updated `ConnectivitySuite` logging to explicitly reflect `PowerSave` status in forensic traces, ensuring compliance with Chapter 38 audit signatures. (Oct18.8 - ISSUE-OCT18.22-F1).
+*   **SOT ID 770**: Test Isolation Lifecycle - PASSED. Added `triggerManualBatchProcessor` and improved test synchronization in `StoragePressureAuditTest`. (Oct18.8 - ISSUE-OCT18.18-F1).
+*   **SOT ID 769**: Doze Mode White-listing - PASSED. Implemented `isIgnoringBatteryOptimizations` check in `PowerStateProvider` and updated `HardwareSuite` to allow signaling bypass for white-listed sessions. (Oct18.8 - ISSUE-OCT18.16-F1).
+*   **SOT ID 768**: Urban Signal Reflectivity Hardening - PASSED. Implemented 3.5m altitude gate skepticism in `AnchorEvaluator` for high-SNR reflections. (Oct18.8 - ISSUE-OCT18.14-F1).
+*   **SOT ID 767**: Acoustic Duty Cycle Overlap - PASSED. Implemented 500ms transition buffering in `HardwareSuite.acousticThread`. (Oct18.8 - ISSUE-OCT18.12-F1).
+*   **SOT ID 766**: Adaptive Vibration Floor Convergence - PASSED. Implemented Steep-Drop convergence logic. (Oct18.8 - ISSUE-OCT18.10-F1).
+*   **SOT ID 765**: Urban Multipath Hardening - PASSED. Implemented 360s SNR Latch and high-SNR anchor skepticism. (Oct18.8 - ISSUE-OCT18.8-F1).
+*   **SOT ID 764**: Synthetic Physical Injection - PASSED. Implemented `SyntheticEventInjector`. (Oct18.8 - ISSUE-OCT18.6-F1).
+*   **SOT ID 763**: Explicit Repository Lifecycle - PASSED. Refactored `LogRepository` and `LogManager` to use explicit `start()` triggers. (Oct18.8 - SIMP-OCT18.2-S1).
+*   **SOT ID 762**: Test Mode DI Refactoring - PASSED. Migrated `LogRepository` to `TestModeProvider` injection, eliminating static leakage. (Oct18.8 - SIMP-OCT17.11-S1).
+*   **SOT ID 761**: JNI GNSS Alignment Hardening - PASSED. Re-aligned `GnssHealthBatch` to 8-byte boundaries to resolve A15 `NaNG` regression. (Oct18.8 - ISSUE-OCT16.9-F2).
+*   **SOT ID 760**: System Audit & Procedure Synchronization - PASSED. Synchronized `TEST_PROCEDURE.md` to 100 chapters and verified all logic. (Oct18.8 - TEST-OCT17.11-T2).
+*   **SOT ID 759**: Instrumentation Test Isolation - PASSED. Inhibited background drainer during wrap-around stability tests. (Oct18.8 - TEST-OCT17.11-T1).
+*   **SOT ID 758**: Build Dependency Hardening - PASSED. Corrected Compose BOM platform alignment for AndroidTest. (Oct18.8 - TEST-OCT17.11-T1).
+*   **SOT ID 757**: Automated Version Synchronization - PASSED. Centralized versioning in `gradle.properties` and injected via `BuildConfig`. (Oct18.8 - SIMP-OCT15.6-S1).
+*   **SOT ID 756**: Version Name Verification - PASSED. Implemented formal version verification step in Chapter 1.3. (Oct18.8 - ISSUE-OCT15.6-T1).
+*   **SOT ID 755**: Project-Wide Test Cycle - PASSED. Verified 100% pass rate for automated test suite. (Oct18.8).
+*   **SOT ID 754**: JNI Memory Pressure Parity - PASSED. Hardened JNI pipeline for consistent memory pressure throttling across all sensor paths. (Oct18.8 - SOT ID 754).
+*   **SOT ID 753**: JNI Telemetry Autonomy Hardening - PASSED. Migrated telemetry evaluation logic to C++ to ensure consistency. (Oct18.8 - SOT ID 753).
+*   **SOT ID 752**: Vibration NaN Hardening & JNI Alignment - PASSED. Resolved NaNG regression on Samsung A15. (Oct18.8 - SOT ID 752).
+*   **SOT ID 751**: Native Clamp Unification - PASSED. Unified vibration and proximity limits via EngineConstants.h. (Oct18.8 - SIMP-OCT15.12-S1).
+*   **SOT ID 750**: Unit Test Restoration - PASSED. Decoupled test suite from MainViewModel. (Oct18.8 - ISSUE-OCT15.10-F1).
+*   **SOT ID 749**: Log Gating Integration - PASSED. Refactored LogManager to use centralized PersistencePolicy. (Oct18.8 - ISSUE-OCT15.9-F1).
+*   **SOT ID 748**: Persistence Policy Audit - PASSED. Expanded PersistencePolicy to cover all IO paths. (Oct18.8 - ISSUE-OCT15.7-F1).
+*   **SOT ID 747**: Test Utility Decoupling - PASSED. Refactored MainFileHelper. (Oct18.8 - SIMP-OCT15.10-S1).
+*   **SOT ID 746**: Hydration Stability Audit - PASSED. Resolved timeout stalls by pre-warming OSM state. (Oct18.8 - ISSUE-OCT16.2-F1).
+*   **SOT ID 745**: Test State Pre-warming Audit - PASSED. Formalized global state reset in GpsApplication. (Oct18.8 - SIMP-OCT16.3-S1).
+*   **SOT ID 744**: Immutable Ribbon Normals - PASSED. Moved normalization to TelemetryMapper and introduced RibbonNormals container. (Oct18.8 - SIMP-OCT15.21-S1).
+*   **SOT ID 743**: Animation Controller Composition - PASSED. Centralized Mali gating via LocalAnimationGating. (Oct18.8 - SIMP-OCT15.20-S1).
+*   **SOT ID 742**: Vibration Floor Hardening - PASSED. Implemented G boundary clamping in native and JVM layers. (Oct18.8 - ISSUE-OCT15.11-F1).
+*   **SOT ID 741**: Proximity Debounce Hardening - PASSED. Corrected typo and added JNI result validation. (Oct18.8 - ISSUE-OCT15.10-F2).
+*   **SOT ID 740**: Synthetic Physical Injection - PASSED. Implemented SyntheticEventInjector. (Oct18.8 - ISSUE-OCT18.6-F1).
+*   **SOT ID 739**: SNR Latch for Urban Multipath - PASSED. Implemented 360s security hold. (Oct18.8 - ISSUE-OCT18.8-F1).
+*   **SOT ID 738**: Urban Reflectivity Altitude Gating - PASSED. Implemented 3.5m altitude gate. (Oct18.8 - ISSUE-OCT18.14-F1).
 
 ... [Remaining baseline entries preserved in historical archives] ...
 

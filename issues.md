@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct20.2
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct20.3
 
 ## 🎯 Current Resumption Focus: Storage Test Race Conditions (#ISSUE-OCT18.22-F3).
 
@@ -26,6 +26,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT20.3-F1: Hardware Profile Test Regression.** Resolved Oct20.3. Fixed compilation failure in `HardwareSuiteProfileTest.kt` by updating mocks for R-ID 742 compliance. (SOT ID 779).
 *   **ISSUE-OCT19.0-F1: Viewer with Simulated Tracker.** Resolved Oct20.2. Hardened mode restoration bypass in `MainViewModel` and validated peer simulation. (SOT ID 778).
 *   **ISSUE-OCT20.0-F2: Testing Guideline Hardening.** Resolved Oct20.0. Updated protocol to enforce forensic preservation and Rule 8 doc-checks. (SOT ID 777).
 *   **ISSUE-OCT20.0-F1: Document Integrity Baseline.** Resolved Oct20.0. Established a versioned baseline directory (`STATUS/BASELINE/Oct18.8/`) for critical status documents to prevent accidental truncation. (SOT ID 775).
@@ -36,7 +37,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct20.3: [SOT Count: 779 (Rules: 301), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:31, Testing: 100 (Sub-items: 101), QA: 350]**
 - **Oct20.2: [SOT Count: 778 (Rules: 301), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:31, Testing: 100 (Sub-items: 101), QA: 349]**
 - **Oct20.0: [SOT Count: 777 (Rules: 299), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:30, Testing: 100 (Sub-items: 101), QA: 348]**
 - **Oct18.8: [SOT Count: 774 (Rules: 299), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:29, Testing: 100 (Sub-items: 101), QA: 345]**
-- **Oct18.8: [SOT Count: 465 (Rules: 299), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:29, Testing: 100 (Sub-items: 101), QA: 393]**

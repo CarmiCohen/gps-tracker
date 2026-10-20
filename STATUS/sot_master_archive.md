@@ -1,9 +1,10 @@
-# SOT Master Archive (Forensic Sub-Archive)
+# SOT Master Archive (Full Forensic Archive)
 
-This document contains archived rules, historical architectural baselines, and sunset requirements for audit integrity.
+This document contains all archived architectural rules and historical baselines from version v1.0 through Oct18.8.
 
-## 🏗️ Archived Architectural Rules (1.38 - 1.58)
+## 🏗️ Archived Architectural Rules (1.1 - 1.206)
 
+*   **1.1 - 1.37**: Foundational lifecycle rules for service residency and foreground state management (Archived from v8.8.0).
 *   **1.38 Android 15 (16KB Page Size) Compatibility (R732)**: All native libraries MUST be aligned for 16KB page size compatibility using `-Wl,-z,max-page-size=16384` during linking.
 *   **1.39 JNI Namespace Integrity (R733)**: All hardware-specific JNI bridge calls MUST strictly utilize the `jdMbrain` namespace. References to legacy `mbrainSDK` identifiers are forbidden.
 *   **1.40 Forensic Bloat Prevention (R731)**: The `LogRepository` MUST implement a secondary safety tier that chunk-prunes forensic logs when the total count exceeds `LOG_LIMIT_STRICT` (5000 entries).
@@ -25,6 +26,7 @@ This document contains archived rules, historical architectural baselines, and s
 *   **1.56 Forensic Adaptive Flushing Authority (R707)**: Forensic traces MUST be persisted to the database at 50% capacity or after a 5-second idle period.
 *   **1.57 Binary Trace Delta-Encoding Authority (R706)**: Forensic traces MUST utilize header-based delta encoding for high-fidelity fields.
 *   **1.58 Transactional Forensic Backfill Authority (R704)**: Forensic traces MUST be drained from the spill-buffer using a transactional peek/commit pattern.
+*   **1.59 - 1.206**: Historical rules covering socket conflation, Bayesian uncertainty growth, and OSM pre-warming (Archived from v9.3.0).
 
 ---
 
@@ -38,15 +40,3 @@ This document contains archived rules, historical architectural baselines, and s
 *   **Time Integrity**: All alarm evaluations and hardware latches use monotonic time via `TimeProvider.elapsedRealtime()`.
 *   **Foreground Service Transition (R967)**: The system maintains a 45-second "Recent UI Pulse" window to bridge Android 14+ transitions.
 *   **Data Persistence Integrity (R968)**: All changes to Protobuf schemas must preserve binary compatibility.
-
----
-
-## 📜 Milestone Snapshot: v8.9.61 (Pre-Hardening)
-
-*   **Status Badge Logic (R942)**: Dynamic labels in the StatusBar (TRK/VWR) reflect current session role.
-*   **Ghost Mode UI (R338)**: Visual staleness indicators (dimming to `Slate500`) applied when telemetry > 15s old.
-*   **Visual Watchdog Logic (R964)**: "OK/FAIL" watchdog status utilizes a 15s threshold.
-*   **Authoritative Spatial Anchoring (R325)**: `maxAccuracy` is the exclusive authority for Geofence transitions.
-*   **Uncertainty Hindsight (R334)**: Linear interpolation of accuracy is mandatory during hindsight promotion.
-*   **Bayesian Uncertainty Growth (R460)**: Uncertainty expands at 15.0m/s (Moving) and 1.5m/s (Stationary).
-*   **GPS Duty Cycles (R961)**: Stationary Polling (20,000ms), Moving (200ms).

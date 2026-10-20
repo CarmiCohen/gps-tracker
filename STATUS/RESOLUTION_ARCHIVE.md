@@ -1,5 +1,13 @@
 # Resolution Archive - GPS Tracker
 
+## ISSUE-OCT20.3-F1: Hardware Profile Test Regression (Oct20.3)
+- **Resolved**: Oct20.3
+- **Description**: `HardwareSuiteProfileTest.kt` failed to compile due to a missing `networkProvider` argument in the `HardwareSuite` constructor, caused by an upstream architectural change (R-ID 742).
+- **Remediation**: 
+    - **Test Hardening**: Updated `mockSystemStatusProvider` in `HardwareSuiteProfileTest.kt` to include a functional `NetworkProvider` mock.
+    - **Interface Compliance**: Implemented missing `registerListener` and `unregisterListener` stubs in the anonymous `NetworkProvider` instance to satisfy the interface contract.
+- **Outcome**: 🟢 **PASSED**. Test suite compilation restored and verified. (SOT ID 779).
+
 ## ISSUE-OCT19.0-F1: Viewer with Simulated Tracker (Oct20.2)
 - **Resolved**: Oct20.2
 - **Description**: Validation of the Tracker-Viewer bridge simulation was blocked by non-deterministic mode restoration. If the app was force-stopped in a session, it would auto-resume into that mode, preventing manual landing on the role selection screen.

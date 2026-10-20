@@ -6,12 +6,17 @@ import com.gps19.core.engine.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
  * HardwareSuiteProfileTest: Automated profiling study for the staggered performance tier.
+ * Oct.20.3:
+ * - Maintenance: Updated mockSystemStatusProvider to include networkProvider mock with 
+ *   required interface members.
  * Oct.12.14: Updated to property-based API and fixed TelemetryRepository instantiation.
  * Oct.14.2:
  * - SIMP-OCT14.2-S1: Migrated to unified MockTimeProvider.
@@ -95,7 +100,14 @@ class HardwareSuiteProfileTest {
     }
 
     private fun mockSystemStatusProvider(): SystemStatusProvider {
-        return SystemStatusProviderImpl(ApplicationProvider.getApplicationContext(), testScope, mockTimeProvider)
+        val mockNetworkProvider = object : NetworkProvider {
+            override val isNetworkAvailable: Boolean = true
+            override val isNetworkAvailableFlow: Flow<Boolean> = flowOf(true)
+            override fun registerListener(listener: NetworkListener) {}
+            override fun unregisterListener(listener: NetworkListener) {}
+            override fun simulateNetworkLoss(active: Boolean) {}
+        }
+        return SystemStatusProviderImpl(ApplicationProvider.getApplicationContext(), testScope, mockTimeProvider, mockNetworkProvider)
     }
 
     private fun mockForensicAuditor(): ForensicAuditor {
