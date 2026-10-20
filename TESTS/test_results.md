@@ -9,7 +9,17 @@ This document tracks the historical and current manual test results based on the
 
 ---
 
-## 📅 Current Audit: vOct20.23 (TERMINATED - FAILURE DETECTED)
+## 📅 Current Audit: vOct20.27 (ACTIVE)
+
+### Chapter 12 - Database Stress & Adaptive Pruning
+*   **12.7 Adaptive Pruning Audit (Issue #OCT20.27-F1):**
+    *   **Status (Oct20.27):** 🟢 **Logical: PASSED**. Verified that `LogRepository` correctly selects dynamic thresholds based on `SystemHealthState`.
+*   **12.2 Test Determinism (Issue #OCT18.22-F3):**
+    *   **Status (Oct20.23):** 🟡 **Logical: STABILITY CONCERN**. `StoragePressureAuditTest` failed with `AssertionError` in the first instrumented run but passed in the second. Indicates potential residual race conditions despite previous fixes.
+
+---
+
+## 📅 Historical Record: vOct20.23 (TERMINATED - FAILURE DETECTED)
 
 ### Chapter 0 - Operational Forensic Audit
 *   **0.1 Logcat Anomaly Monitoring:**
@@ -24,10 +34,6 @@ This document tracks the historical and current manual test results based on the
 
 ### Chapter 7 - Architectural Integrity & Performance
 *   **7.5 Native Stationary Convergence:** 🟢 **Logical: PASSED**. Logcat confirms `jdHardware: n3 native initialization complete`.
-
-### Chapter 12 - Database Stress & Adaptive Pruning
-*   **12.2 Test Determinism (Issue #OCT18.22-F3):**
-    *   **Status (Oct20.23):** 🟡 **Logical: STABILITY CONCERN**. `StoragePressureAuditTest` failed with `AssertionError` in the first instrumented run but passed in the second. Indicates potential residual race conditions despite previous fixes.
 
 ### Chapter 92 - Redundant Permission & Callback Suppression
 *   **92.1 Connectivity Callback Audit:**

@@ -1,5 +1,14 @@
 # Resolution Archive - GPS Tracker
 
+## ISSUE-OCT20.27-F1: Storage-Aware Adaptive Pruning Gaps (Oct20.27)
+- **Resolved**: Oct20.27
+- **Description**: Forensic failure where `LogRepository.proactivePruning()` used static thresholds and did not respect device storage pressure levels (R728, R712). It also failed to prune `FORENSIC_TRACE` entries, risking storage exhaustion.
+- **Remediation**:
+    - **Adaptive Thresholds**: Implemented dynamic pruning limits that scale based on `isStorageLow`, `isStorageCritical`, and `isCharging` health states.
+    - **Forensic Pruning**: Added Tier 4 pruning for `FORENSIC_TRACE` entries with dedicated limits.
+    - **Chunked Maintenance**: Integrated `pruneForensicByThreshold` into the transactional maintenance loop to ensure deterministic cleanup.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 788).
+
 ## ISSUE-OCT20.25-F1: Test Suite Version Regression (Oct20.25)
 - **Resolved**: Oct20.25
 - **Description**: The unit test `MainViewModelMappingTest` failed due to a version mismatch between the test expectation (`Oct20.22`) and the actual project version (`Oct20.25`).

@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct20.25)
+# SOT Master Requirements & Hardening Status (Oct20.27)
 
 ## 🏗️ Architectural Master Rules (304 Rules)
 
@@ -56,6 +56,7 @@
 *   **1.231 Deterministic Audit Synchronization (R-ID 749)**: All persistence repositories MUST expose `flush` or synchronous execution tracking to ensure deterministic behavior during automated audits. (Oct20.24 - ISSUE-OCT20.23-F2).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 788**: Storage-Aware Adaptive Pruning - PASSED. Implemented health-aware dynamic pruning thresholds in `LogRepository` (R728, R712). (Oct20.27 - ISSUE-OCT20.27-F1).
 *   **SOT ID 787**: Test Suite Version Regression - PASSED. Aligned `MainViewModelMappingTest` with `Oct20.25` baseline. (Oct20.25 - ISSUE-OCT20.25-F1).
 *   **SOT ID 786**: Storage Pressure Audit Flakiness - PASSED. Resolved race conditions in `StoragePressureAuditTest` by implementing `repository.flushTrails()` and making `clearLogs()` suspendable. (Oct20.24 - ISSUE-OCT20.23-F2).
 *   **SOT ID 785**: Redundant Connectivity Callback Leaks - PASSED. Transitioned to `SharingStarted.Eagerly` in `AndroidNetworkProvider` to eliminate redundant registrations. (Oct20.24 - ISSUE-OCT20.23-F1).
@@ -68,6 +69,7 @@
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 12.7 (Adaptive Pruning Audit)**: PASSED - Verified health-aware dynamic pruning thresholds in `LogRepository`. (Oct20.27).
 *   **Chapter 12.6 (Regression Audit)**: PASSED - Verified full test suite passability after versioning alignment to Oct20.25. (Oct20.25).
 *   **Chapter 92.1 (Connectivity Audit)**: PASSED - Verified zero redundant callback registrations in Logcat using `SharingStarted.Eagerly`. (Oct20.24).
 *   **Chapter 12.2 (Test Determinism)**: PASSED - Verified deterministic behavior in `StoragePressureAuditTest` after implementing repository flush mechanisms. (Oct20.24).

@@ -26,6 +26,10 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.20.27:
+ * - ISSUE-OCT20.27-F1: Implemented Storage-Aware Adaptive Pruning (R728, R712).
+ *   Pruning thresholds now scale dynamically based on storage pressure and charging state.
+ *   Added forensic-aware chunked pruning for all log tiers including FORENSIC_TRACE.
  * Oct.20.24:
  * - ISSUE-OCT20.23-F2: Finalized remediation. Made clearLogs() suspendable and 
  *   resolved type mismatches in mapping functions to ensure deterministic test setup.
@@ -448,16 +452,62 @@ class LogRepository @Inject constructor(
         }
     }
 
+    /**
+     * proactivePruning: Implements R728 and R712 (Storage-Aware Adaptive Pruning).
+     * Thresholds scale dynamically based on storage pressure and charging state.
+     */
     suspend fun proactivePruning() {
+        if (!PersistencePolicy.shouldPerformMaintenance(telemetry.systemHealth.value)) return
+        
         try {
-            val count = logDao.getCount()
-            if (count > ADAPTIVE_PRUNE_THRESHOLD_NORMAL) {
-                db.withTransaction {
-                    logDao.pruneHeartbeatsByThreshold(logDao.getHeartbeatPruneThreshold(500) ?: 0L, REFINED_PRUNE_CHUNK_SIZE)
-                    logDao.pruneGeneralByThreshold(logDao.getGeneralPruneThreshold(1000) ?: 0L, REFINED_PRUNE_CHUNK_SIZE)
-                }
+            val health = telemetry.systemHealth.value
+            val isCharging = health.isCharging
+            
+            // R728: Storage-aware granular thresholds
+            val generalLimit = when {
+                health.isStorageCritical -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
+                health.isStorageLow -> ADAPTIVE_PRUNE_THRESHOLD_LOW
+                isCharging -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING
+                else -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL
             }
-        } catch (e: Exception) { Timber.e(e, "Error during proactive pruning") }
+
+            // R712: Forensic-specific retention limits
+            val forensicLimit = when {
+                health.isStorageCritical -> FORENSIC_PRUNE_LIMIT_CRITICAL
+                health.isStorageLow -> FORENSIC_PRUNE_LIMIT_LOW
+                isCharging -> FORENSIC_PRUNE_LIMIT_CHARGING
+                else -> FORENSIC_PRUNE_LIMIT_NORMAL
+            }
+
+            db.withTransaction {
+                // Tier 1: Heartbeats (Aggressive pruning)
+                logDao.pruneHeartbeatsByThreshold(
+                    logDao.getHeartbeatPruneThreshold(generalLimit / 5) ?: 0L, 
+                    REFINED_PRUNE_CHUNK_SIZE
+                )
+                
+                // Tier 2: General Logs
+                logDao.pruneGeneralByThreshold(
+                    logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, 
+                    REFINED_PRUNE_CHUNK_SIZE
+                )
+                
+                // Tier 3: Important Logs (Keep more)
+                logDao.pruneImportantByThreshold(
+                    logDao.getImportantPruneThreshold(generalLimit * 2) ?: 0L, 
+                    REFINED_PRUNE_CHUNK_SIZE
+                )
+                
+                // Tier 4: Forensic Traces (High storage consumer)
+                logDao.pruneForensicByThreshold(
+                    logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, 
+                    REFINED_PRUNE_CHUNK_SIZE
+                )
+            }
+            Timber.i("Adaptive Pruning: Completed. Limits: Gen=$generalLimit, Forensic=$forensicLimit")
+        } catch (e: Exception) { 
+            Timber.e(e, "Error during proactive pruning") 
+        }
     }
 
     suspend fun getUnsyncedLogs(limit: Int): List<LogEntry> = logDao.getUnsyncedLogs(limit).map { 
