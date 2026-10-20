@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct20.21)
+# SOT Master Requirements & Hardening Status (Oct20.22)
 
 ## 🏗️ Architectural Master Rules (302 Rules)
 
@@ -54,6 +54,7 @@
 *   **1.229 - 1.302**: (Historical rules covering trajectory promotion and noise floors archived in `STATUS/sot_master_archive.md`).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 783**: Test Suite Version Regression - PASSED. Fixed `MainViewModelMappingTest` to align with the current versioning baseline. (Oct20.22 - ISSUE-OCT20.22-F1).
 *   **SOT ID 782**: Forensic Circular Overwrite - PASSED. Implemented circular overwrite in `ForensicSpillBuffer` to prevent data loss of recent traces under extreme pressure. (Oct20.21 - ISSUE-OCT20.10-F1).
 *   **SOT ID 781**: Storage Test Race Conditions - PASSED. Eliminated race conditions in `StoragePressureAuditTest` by disabling background batch processing during deterministic flushing. (Oct20.10 - ISSUE-OCT18.22-F3).
 *   **SOT ID 780**: Forensic Document Archival - PASSED. (Oct20.7 - ISSUE-OCT20.7-F1).
@@ -65,6 +66,7 @@
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 12.5 (Regression Audit)**: PASSED - Verified full test suite passability after versioning alignment. (Oct20.22).
 *   **Chapter 12.4 (Overflow Resiliency)**: PASSED - Validated circular overwrite in `ForensicBufferSchemaTest`. (Oct20.21).
 *   **Chapter 12.3 (Persistence Prioritization)**: PASSED - Validated deterministic flushing in `StoragePressureAuditTest`. (Oct20.10).
 *   **Chapter 1-100 (Full Hardening Cycle)**: PASSED - Verified counter stability and state persistence over 24h soak simulation. (Oct18.8).

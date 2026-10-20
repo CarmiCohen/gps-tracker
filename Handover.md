@@ -1,29 +1,31 @@
-# Project Handover - Oct20.21 (Forensic Overflow Hardening)
+# Project Handover - Oct20.22 (Audit Baseline Sync)
 
-## 🟢 Status: Oct20.21 Baseline Synchronized
+## 🟢 Status: Oct20.22 Baseline Synchronized
 
-Hardened the `ForensicSpillBuffer` against extreme overflow scenarios by implementing a circular overwrite policy (R746). This ensures zero data loss of the most recent traces during periods of high system pressure or thermal throttling.
+Executed full project audit including unit, hardening, and stress tests. Remediated a version-mismatch regression in the unit test suite that was blocking the baseline synchronization.
 
-## 🛠️ Validation & Remediation Details (Oct20.21)
+## 🛠️ Validation & Remediation Details (Oct20.22)
 
-### 1. Forensic Circular Overwrite - 🟢 FIXED
-- **Issue**: Under extreme pressure (thermal throttling/high IO wait), the forensic spill-buffer could fill up, leading to the dropping of new (and likely most relevant) telemetry.
-- **Remediation**: 
-    - Implemented `forceCircularAdvance()` in `ForensicSpillBuffer` to move the read pointer and overwrite the oldest entry when the buffer is full.
-    - Updated `LogManager.handleOverflow()` to reflect that circular overwrite is now engaged instead of dropping data.
-- **Verification**: `ForensicBufferSchemaTest.verifyOverflowOverwrite` passed, confirming that the oldest entry is dropped and the newest is preserved when capacity is exceeded. (SOT ID 782).
+### 1. Test Suite Version Regression - 🟢 FIXED
+- **Issue**: `MainViewModelMappingTest` failed due to an outdated engine version expectation (`Oct18.18` vs current `Oct20.21`).
+- **Remediation**: Updated the expected version string to `Oct20.21` to match the current baseline.
+- **Verification**: All unit tests passed (47/47 in `:core:engine`, 43/43 in `:app`). (SOT ID 783).
 
-### 2. Architectural Rule Integration - 🟢 PASSED
-- **Action**: Established R-ID 746 (Forensic Circular Overwrite).
-- **Rule**: "The ForensicSpillBuffer MUST implement a circular overwrite policy during overflow to ensure the most recent telemetry is always preserved."
+### 2. Hardening & Stress Audit - 🟢 PASSED
+- **Action**: Executed `connectedDebugAndroidTest` on physical device.
+- **Verification**: 28 instrumented tests passed, including:
+    - `StoragePressureAuditTest` (Persistence reliability).
+    - `ForensicStressAuditTest` (Buffer integrity under load).
+    - `ProductionReadinessAuditTest` (System-wide behavioral audit).
+    - `HydrationStaggeringAuditTest` (Startup performance).
 
 ### 3. Version & Baseline - 🟢 PASSED
-- **Action**: Incremented version to **Oct20.21**. Synchronized `STATUS/BASELINE/Oct20.21/` directory with `SOT_MASTER_REQUIREMENTS.md` and `RESOLUTION_ARCHIVE.md`.
+- **Action**: Incremented version to **Oct20.22**. Synchronized `STATUS/BASELINE/Oct20.22/` directory.
 
-## 🎯 Next Resumption Focus: Adaptive Sampling Policy (#ISSUE-OCT21.0-F1)
-The forensic persistence layer is now resilient to overflow. The next phase should focus on refining the adaptive sampling frequency based on real-time CPU load and thermal headroom (R709/R700) to proactively prevent buffer pressure.
+## 🎯 Next Resumption Focus: Adaptive Sampling Policy Refinement (#ISSUE-OCT21.0-F1)
+With the test baseline fully restored and synchronized, focus can return to refining the adaptive sampling frequency based on real-time CPU load and thermal headroom (R709/R700).
 
-**Current Forensic Metrics (Oct20.21):**
-- **[Oct20.21]: [SOT Count: 782 (Rules: 302), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:34, Testing: 102 (Sub-items: 103), QA: 353]**
+**Current Forensic Metrics (Oct20.22):**
+- **[Oct20.22]: [SOT Count: 783 (Rules: 302), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:35, Testing: 103 (Sub-items: 104), QA: 354]**
 
 **HANDOVER COMPLETE. STOP ALL PROCESSING.**
