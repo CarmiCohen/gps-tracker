@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct20.10)
+# SOT Master Requirements & Hardening Status (Oct20.21)
 
-## 🏗️ Architectural Master Rules (301 Rules)
+## 🏗️ Architectural Master Rules (302 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -50,9 +50,11 @@
 *   **1.225 Test Mode Restoration Bypass (R-ID 743)**: Provide a persistent bypass for service resumption. (Oct18.8 - ISSUE-OCT19.19-F1).
 *   **1.226 Document Integrity Baseline (R-ID 744)**: Maintain a versioned baseline directory (`STATUS/BASELINE/`). (Oct20.0 - ISSUE-OCT20.0-F1).
 *   **1.227 Deterministic Test Flushing (R-ID 745)**: Repositories MUST provide synchronous `flush` mechanisms. (Oct20.2 - ISSUE-OCT18.22-F3).
-*   **1.228 - 1.301**: (Historical rules covering trajectory promotion and noise floors archived in `STATUS/sot_master_archive.md`).
+*   **1.228 Forensic Circular Overwrite (R-ID 746)**: The `ForensicSpillBuffer` MUST implement a circular overwrite policy during overflow to ensure the most recent telemetry is always preserved. (Oct20.21 - ISSUE-OCT20.10-F1).
+*   **1.229 - 1.302**: (Historical rules covering trajectory promotion and noise floors archived in `STATUS/sot_master_archive.md`).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 782**: Forensic Circular Overwrite - PASSED. Implemented circular overwrite in `ForensicSpillBuffer` to prevent data loss of recent traces under extreme pressure. (Oct20.21 - ISSUE-OCT20.10-F1).
 *   **SOT ID 781**: Storage Test Race Conditions - PASSED. Eliminated race conditions in `StoragePressureAuditTest` by disabling background batch processing during deterministic flushing. (Oct20.10 - ISSUE-OCT18.22-F3).
 *   **SOT ID 780**: Forensic Document Archival - PASSED. (Oct20.7 - ISSUE-OCT20.7-F1).
 *   **SOT ID 779**: Hardware Profile Test Regression - PASSED. (Oct20.3).
@@ -63,5 +65,6 @@
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 12.4 (Overflow Resiliency)**: PASSED - Validated circular overwrite in `ForensicBufferSchemaTest`. (Oct20.21).
 *   **Chapter 12.3 (Persistence Prioritization)**: PASSED - Validated deterministic flushing in `StoragePressureAuditTest`. (Oct20.10).
 *   **Chapter 1-100 (Full Hardening Cycle)**: PASSED - Verified counter stability and state persistence over 24h soak simulation. (Oct18.8).

@@ -1,5 +1,14 @@
 # Resolution Archive - GPS Tracker
 
+## ISSUE-OCT20.10-F1: Forensic Buffer Overflow Handling (Oct20.21)
+- **Resolved**: Oct20.21
+- **Description**: Hardened `ForensicSpillBuffer` against extreme overflow scenarios by implementing a circular overwrite policy (R746). This ensures that the most recent telemetry data is always preserved, even if the buffer cannot be drained to the database fast enough (e.g., during thermal throttling or high I/O wait).
+- **Remediation**:
+    - **Implementation**: Added `forceCircularAdvance()` to `ForensicSpillBuffer` to move the read pointer when the buffer is full before writing a new entry.
+    - **Optimization**: Maintained zero-allocation path for optimized traces.
+    - **Telemetry**: Updated `LogManager` to trigger an overflow alert when circular overwrite is first engaged in a session.
+- **Outcome**: 🟢 **PASSED**. Verified circular overwrite behavior in `ForensicBufferSchemaTest`. (SOT ID 782).
+
 ## ISSUE-OCT18.22-F3: Storage Test Race Conditions (Oct20.10)
 - **Resolved**: Oct20.10
 - **Description**: Intermittent failures in `StoragePressureAuditTest` due to non-deterministic log flushing and async trail persistence.

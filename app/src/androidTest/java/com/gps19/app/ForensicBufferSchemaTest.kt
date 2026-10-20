@@ -50,4 +50,41 @@ class ForensicBufferSchemaTest {
         assertTrue("Traces should not be empty", traces.isNotEmpty())
         assertEquals(entry.message, traces.last().message)
     }
+
+    /**
+     * verifyOverflowOverwrite: Ensures the buffer overwrites oldest entries when full (R746).
+     */
+    @Test
+    fun verifyOverflowOverwrite() {
+        spillBuffer.resetBufferForTest()
+        
+        // Fill the buffer to capacity
+        repeat(FORENSIC_SPILL_CAPACITY) { i ->
+            spillBuffer.writeTraceOptimized(
+                timestamp = 1000L + i, lat = 1.0, lng = 2.0, accuracy = 3.0, maxAccuracy = 4.0,
+                vibe = 0.5, snr = 30.0, batteryLevel = 50, isCharging = true, batteryTemp = 30.0
+            )
+        }
+        
+        assertEquals(FORENSIC_SPILL_CAPACITY, spillBuffer.getPendingCount())
+        assertTrue(spillBuffer.isFull())
+        
+        // Write one more to trigger overwrite
+        val overflowTs = 1000L + FORENSIC_SPILL_CAPACITY + 1
+        spillBuffer.writeTraceOptimized(
+            timestamp = overflowTs, lat = 1.0, lng = 2.0, accuracy = 3.0, maxAccuracy = 4.0,
+            vibe = 0.5, snr = 30.0, batteryLevel = 50, isCharging = true, batteryTemp = 30.0
+        )
+        
+        assertEquals(FORENSIC_SPILL_CAPACITY, spillBuffer.getPendingCount())
+        
+        // Peek to verify the oldest (1000L) was dropped and the newest (overflowTs) is present
+        val peekResult = spillBuffer.peekToEntities(FORENSIC_SPILL_CAPACITY)
+        val entities = peekResult.entities
+        
+        assertEquals(FORENSIC_SPILL_CAPACITY, entities.size)
+        assertFalse("Oldest entry should be overwritten", entities.any { it.timestamp == 1000L })
+        assertTrue("Newest entry should be present", entities.any { it.timestamp == overflowTs })
+        assertEquals("Head of buffer should be the second entry", 1001L, entities.first().timestamp)
+    }
 }

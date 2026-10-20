@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct20.10
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct20.21
 
 ## 🎯 Current Resumption Focus: Session Hardening & Final Audit.
 
@@ -7,7 +7,8 @@
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 53)
+## 💡 Strategic Simplification Ideas (Ideas: 54)
+*   **SIMP-OCT20.21-S1: Unified Forensic Writer (Low).** Consider overloading `writeTrace` to accept a primitive parameter set directly, reducing the need for two distinct internal paths in `ForensicSpillBuffer`.
 *   **SIMP-OCT20.10-S1: Test-Only Log Buffer Draining (Low).** Consider adding a `isManualFlushingOnly` flag to `LogRepository` during tests to completely inhibit the background `runBatchProcessor` without needing to cancel jobs, further reducing race risks.
 *   **SIMP-OCT20.7-S1: Automated Documentation Sharding (Low).** Consider implementing a build-time check or script that automatically shards `.md` files into archives when they exceed a specific line count (e.g., 500 lines).
 *   **SIMP-OCT20.2-S1: Deterministic Audit Verification (Low).** Consider integrating `logRepository.flushLogs()` into a base test rule to automatically ensure deterministic persistence.
@@ -27,6 +28,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT20.10-F1: Forensic Buffer Overflow Handling.** Resolved Oct20.21. Hardened `ForensicSpillBuffer` against extreme overflow scenarios by implementing a circular overwrite policy to ensure zero data loss of recent traces. (SOT ID 782).
 *   **ISSUE-OCT18.22-F3: Storage Test Race Conditions.** Resolved Oct20.10. Eliminated race conditions in `StoragePressureAuditTest` by disabling background batch processing during deterministic flushing and adding async propagation delays for trail points. (SOT ID 781).
 *   **ISSUE-OCT20.7-F1: Forensic Document Archival.** Resolved Oct20.7. Optimized documentation by migrating legacy SOT IDs and resolutions to `docs_history_archive.md`. (SOT ID 780).
 *   **ISSUE-OCT20.3-F1: Hardware Profile Test Regression.** Resolved Oct20.3. Fixed compilation failure in `HardwareSuiteProfileTest.kt`. (SOT ID 779).
@@ -37,6 +39,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct20.21: [SOT Count: 782 (Rules: 302), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:34, Testing: 102 (Sub-items: 103), QA: 353]**
 - **Oct20.10: [SOT Count: 781 (Rules: 301), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:33, Testing: 101 (Sub-items: 102), QA: 352]**
 - **Oct20.7: [SOT Count: 780 (Rules: 301), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:32, Testing: 100 (Sub-items: 101), QA: 351]**
 - **Oct20.3: [SOT Count: 779 (Rules: 301), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:31, Testing: 100 (Sub-items: 101), QA: 350]**

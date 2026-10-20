@@ -1,29 +1,29 @@
-# Project Handover - Oct20.10 (Deterministic Test Hardening)
+# Project Handover - Oct20.21 (Forensic Overflow Hardening)
 
-## 🟢 Status: Oct20.10 Baseline Synchronized
+## 🟢 Status: Oct20.21 Baseline Synchronized
 
-Resolved non-deterministic failures in the storage pressure audit suite. The system now enforces synchronous log flushing and stable propagation delays during forensic testing, ensuring consistent pass rates on hardware.
+Hardened the `ForensicSpillBuffer` against extreme overflow scenarios by implementing a circular overwrite policy (R746). This ensures zero data loss of the most recent traces during periods of high system pressure or thermal throttling.
 
-## 🛠️ Validation & Remediation Details (Oct20.10)
+## 🛠️ Validation & Remediation Details (Oct20.21)
 
-### 1. Storage Pressure Audit Test - 🟢 FIXED
-- **Issue**: Intermittent `AssertionError` in `verifyLowStoragePrioritization` and `verifyCriticalStoragePrioritization` due to race conditions between background batch processing and test assertions.
+### 1. Forensic Circular Overwrite - 🟢 FIXED
+- **Issue**: Under extreme pressure (thermal throttling/high IO wait), the forensic spill-buffer could fill up, leading to the dropping of new (and likely most relevant) telemetry.
 - **Remediation**: 
-    - Disabled background batch processor during tests via `resetForTest()` and avoided re-triggering it before `flushLogs()`.
-    - Added a 500ms delay to allow async `MainRepository` trail writes to commit to the DB.
-- **Verification**: `StoragePressureAuditTest` passed 27/27 iterations on device `R58X40GV2AR`. (SOT ID 781).
+    - Implemented `forceCircularAdvance()` in `ForensicSpillBuffer` to move the read pointer and overwrite the oldest entry when the buffer is full.
+    - Updated `LogManager.handleOverflow()` to reflect that circular overwrite is now engaged instead of dropping data.
+- **Verification**: `ForensicBufferSchemaTest.verifyOverflowOverwrite` passed, confirming that the oldest entry is dropped and the newest is preserved when capacity is exceeded. (SOT ID 782).
 
-### 2. Forensic Infrastructure Hardening - 🟢 PASSED
-- **Action**: Verified `LogRepository.flushLogs()` and `flushForensicTraces()` on hardware.
-- **Architectural Rule**: Established R-ID 745 (Deterministic Test Flushing).
+### 2. Architectural Rule Integration - 🟢 PASSED
+- **Action**: Established R-ID 746 (Forensic Circular Overwrite).
+- **Rule**: "The ForensicSpillBuffer MUST implement a circular overwrite policy during overflow to ensure the most recent telemetry is always preserved."
 
 ### 3. Version & Baseline - 🟢 PASSED
-- **Action**: Incremented version to **Oct20.10**. Synchronized `STATUS/BASELINE/Oct20.10/` directory.
+- **Action**: Incremented version to **Oct20.21**. Synchronized `STATUS/BASELINE/Oct20.21/` directory with `SOT_MASTER_REQUIREMENTS.md` and `RESOLUTION_ARCHIVE.md`.
 
-## 🎯 Next Resumption Focus: Forensic Buffer Overflow Handling (#ISSUE-OCT20.10-F1)
-The storage pressure logic is stable. The next phase should focus on hardening the `ForensicSpillBuffer` against extreme overflow scenarios (R713) to ensure zero data loss during thermal throttling.
+## 🎯 Next Resumption Focus: Adaptive Sampling Policy (#ISSUE-OCT21.0-F1)
+The forensic persistence layer is now resilient to overflow. The next phase should focus on refining the adaptive sampling frequency based on real-time CPU load and thermal headroom (R709/R700) to proactively prevent buffer pressure.
 
-**Current Forensic Metrics (Oct20.10):**
-- **[Oct20.10]: [SOT Count: 781 (Rules: 301), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:33, Testing: 101 (Sub-items: 102), QA: 352]**
+**Current Forensic Metrics (Oct20.21):**
+- **[Oct20.21]: [SOT Count: 782 (Rules: 302), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:34, Testing: 102 (Sub-items: 103), QA: 353]**
 
 **HANDOVER COMPLETE. STOP ALL PROCESSING.**

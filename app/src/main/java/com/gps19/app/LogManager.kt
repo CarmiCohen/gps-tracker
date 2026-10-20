@@ -9,6 +9,8 @@ import javax.inject.Singleton
 
 /**
  * LogManager: Centralizes logging logic, handling local storage and remote relay emission.
+ * Oct.20.21:
+ * - ISSUE-OCT20.10-F1: Updated handleOverflow to reflect circular overwrite behavior (R746).
  * Oct.18.4:
  * - SIMP-OCT18.2-S1: Explicit Repository Lifecycle. Added start() to manage 
  *   LogRepository background tasks.
@@ -125,9 +127,9 @@ class LogManager @Inject constructor(
 
     private fun handleOverflow() {
         if (isOverflowLogged.compareAndSet(false, true)) {
-            Timber.w("Forensic Spill-Buffer Overflow! Dropping new traces until space is cleared.")
+            Timber.w("Forensic Spill-Buffer Overflow! Circular overwrite engaged.")
             submitToLogSink(
-                message = "FORENSIC AUDIT: Spill-buffer overflow detected. Sampling inhibited to protect un-persisted data.",
+                message = "FORENSIC AUDIT: Spill-buffer overflow detected. Circular overwrite engaged to preserve latest traces.",
                 type = ALERT_ID_FORENSIC_OVERFLOW,
                 isImportant = true,
                 isSpecial = true,

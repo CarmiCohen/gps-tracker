@@ -18,6 +18,9 @@ import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for forensic traces.
+ * Oct.20.21:
+ * - ISSUE-OCT20.10-F1: Hardened against overflow with circular overwrite (R746).
+ *   Ensures latest forensic data is preserved during extreme pressure.
  * Oct.14.18:
  * - Optimized commitDrain by moving MappedByteBuffer.force() outside the synchronized block.
  *   This eliminates lock contention spikes (14ms -> <1ms lock hold time) identified on A15.
@@ -160,7 +163,10 @@ class ForensicSpillBuffer @Inject constructor(
             val localCrc = CRC32()
 
             synchronized(this) {
-                if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
+                val wasFull = totalCount.get() >= FORENSIC_SPILL_CAPACITY
+                if (wasFull) {
+                    forceCircularAdvance(buffer)
+                }
 
                 localWriteBuffer.putLong(entry.timestamp)
                 localWriteBuffer.putDouble(entry.lat)
@@ -203,7 +209,7 @@ class ForensicSpillBuffer @Inject constructor(
                 buffer.put(localWriteBuffer.array())
                 
                 advanceWritePointer(buffer)
-                true
+                !wasFull
             }
         }
     }
@@ -226,7 +232,10 @@ class ForensicSpillBuffer @Inject constructor(
             val localCrc = CRC32()
             
             synchronized(this) {
-                if (totalCount.get() >= FORENSIC_SPILL_CAPACITY) return@synchronized false
+                val wasFull = totalCount.get() >= FORENSIC_SPILL_CAPACITY
+                if (wasFull) {
+                    forceCircularAdvance(buffer)
+                }
                 
                 localWriteBuffer.putLong(timestamp)
                 localWriteBuffer.putDouble(lat)
@@ -262,9 +271,22 @@ class ForensicSpillBuffer @Inject constructor(
                 buffer.put(localWriteBuffer.array())
 
                 advanceWritePointer(buffer)
-                true
+                !wasFull
             }
         }
+    }
+
+    /**
+     * forceCircularAdvance: Overwrites the oldest entry by moving the read pointer.
+     * Part of R713 hardening to ensure latest traces are always preserved.
+     */
+    private fun forceCircularAdvance(buffer: MappedByteBuffer) {
+        val currentRead = readIdx.get()
+        val nextRead = (currentRead + 1) % FORENSIC_SPILL_CAPACITY
+        readIdx.set(nextRead)
+        buffer.putInt(OFF_READ_IDX, nextRead)
+        totalCount.decrementAndGet()
+        // Note: OFF_COUNT will be updated by the subsequent advanceWritePointer call.
     }
 
     private fun advanceWritePointer(buffer: MappedByteBuffer) {
