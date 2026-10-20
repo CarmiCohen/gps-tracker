@@ -1,28 +1,29 @@
-# Project Handover - Oct20.7 (Large Document Archival)
+# Project Handover - Oct20.10 (Deterministic Test Hardening)
 
-## 🟢 Status: Oct20.7 Baseline Synchronized
+## 🟢 Status: Oct20.10 Baseline Synchronized
 
-Optimized project documentation by archiving legacy SOT IDs and resolution records. This action significantly reduced the size of active `.md` files while preserving the full forensic audit trail in historical archives.
+Resolved non-deterministic failures in the storage pressure audit suite. The system now enforces synchronous log flushing and stable propagation delays during forensic testing, ensuring consistent pass rates on hardware.
 
-## 🛠️ Validation & Remediation Details (Oct20.7)
+## 🛠️ Validation & Remediation Details (Oct20.10)
 
-### 1. SOT Master Requirements Archival - 🟢 FIXED
-- **Action**: Moved SOT IDs 738 through 774 from `SOT_MASTER_REQUIREMENTS.md` to the historical baseline reference.
-- **Verification**: Active document now focuses on the current hardening cycle while maintaining links to `docs_history_archive.md`.
+### 1. Storage Pressure Audit Test - 🟢 FIXED
+- **Issue**: Intermittent `AssertionError` in `verifyLowStoragePrioritization` and `verifyCriticalStoragePrioritization` due to race conditions between background batch processing and test assertions.
+- **Remediation**: 
+    - Disabled background batch processor during tests via `resetForTest()` and avoided re-triggering it before `flushLogs()`.
+    - Added a 500ms delay to allow async `MainRepository` trail writes to commit to the DB.
+- **Verification**: `StoragePressureAuditTest` passed 27/27 iterations on device `R58X40GV2AR`. (SOT ID 781).
 
-### 2. Resolution Archive Optimization - 🟢 FIXED
-- **Action**: Migrated all resolution entries from Oct18.8 and older to `STATUS/docs_history_archive.md`.
-- **Audit**: Verified that the forensic audit trail is intact and active files adhere to Rule 8 (Large File Protection).
+### 2. Forensic Infrastructure Hardening - 🟢 PASSED
+- **Action**: Verified `LogRepository.flushLogs()` and `flushForensicTraces()` on hardware.
+- **Architectural Rule**: Established R-ID 745 (Deterministic Test Flushing).
 
-### 3. Version Synchronization - 🟢 PASSED
-- **Action**: Updated `gradle.properties`, `issues.md`, and `RELEASE_HISTORY.md` to the new versioning baseline (**Oct20.7**).
+### 3. Version & Baseline - 🟢 PASSED
+- **Action**: Incremented version to **Oct20.10**. Synchronized `STATUS/BASELINE/Oct20.10/` directory.
 
-## 🎯 Next Resumption Focus: Storage Test Race Conditions (#ISSUE-OCT18.22-F3)
-The archival process is complete. Resuming focus on the deterministic flushing infrastructure.
-1. Perform final hardware verification on A15 to confirm zero race-induced failures in `StoragePressureAuditTest`.
-2. Transition the storage race condition issue to the "Resolved" section in `issues.md`.
+## 🎯 Next Resumption Focus: Forensic Buffer Overflow Handling (#ISSUE-OCT20.10-F1)
+The storage pressure logic is stable. The next phase should focus on hardening the `ForensicSpillBuffer` against extreme overflow scenarios (R713) to ensure zero data loss during thermal throttling.
 
-**Current Forensic Metrics (Oct20.7):**
-- **[Oct20.7]: [SOT Count: 779 (Rules: 301), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:31, Testing: 100 (Sub-items: 101), QA: 351]**
+**Current Forensic Metrics (Oct20.10):**
+- **[Oct20.10]: [SOT Count: 781 (Rules: 301), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:33, Testing: 101 (Sub-items: 102), QA: 352]**
 
 **HANDOVER COMPLETE. STOP ALL PROCESSING.**

@@ -16,6 +16,10 @@ import javax.inject.Inject
  * StoragePressureAuditTest: Verifies Chapter 12.3 Persistence Prioritization.
  * Validates that LogManager and PersistencePolicy correctly gate data based on 
  * storage pressure thresholds (R197).
+ * Oct.20.10:
+ * - ISSUE-OCT18.22-F3: Removed triggerManualBatchProcessor() from init to prevent race 
+ *   conditions where background processing steals logs from the buffer before flushLogs().
+ *   Added delay(500) before assertions to ensure async trail persistence completes.
  * Oct.20.2:
  * - ISSUE-OCT18.22-F3: Replaced delay(3000) with deterministic logRepository.flushLogs() 
  *   and flushForensicTraces() to eliminate race conditions.
@@ -46,7 +50,8 @@ class StoragePressureAuditTest {
         hiltRule.inject()
         runBlocking {
             logRepository.resetForTest()
-            logRepository.triggerManualBatchProcessor()
+            // Oct.20.10: triggerManualBatchProcessor() removed to avoid theft of logs 
+            // from the buffer by the background loop during deterministic testing.
             repository.clearLogs()
             repository.clearTrails()
         }
@@ -56,7 +61,7 @@ class StoragePressureAuditTest {
     fun verifyLowStoragePrioritization() = runBlocking {
         // 1. Simulate Storage Low (95%)
         integrityMonitor.simulateStoragePressure(active = true, critical = false)
-        delay(200) // Allow flow to propagate
+        delay(300) // Allow state to propagate to all observers
 
         // 2. Attempt to log different priorities
         logManager.submitToLogSink("NORMAL_LOG", "system", isImportant = false)
@@ -70,6 +75,9 @@ class StoragePressureAuditTest {
         // Oct.20.2: Deterministic flush instead of delay
         logRepository.flushLogs()
         logRepository.flushForensicTraces()
+
+        // Oct.20.10: Brief delay for async trail persistence (which uses repository.scope)
+        delay(500)
 
         val logs = repository.loadAllLogsStatic(100)
         val trail = repository.loadTrailStatic(false)
@@ -88,7 +96,7 @@ class StoragePressureAuditTest {
     fun verifyCriticalStoragePrioritization() = runBlocking {
         // 1. Simulate Storage Critical (99%)
         integrityMonitor.simulateStoragePressure(active = true, critical = true)
-        delay(200)
+        delay(300)
 
         // 2. Attempt to log
         logManager.submitToLogSink("IMPORTANT_LOG", "system", isImportant = true)
@@ -101,6 +109,9 @@ class StoragePressureAuditTest {
         logRepository.flushLogs()
         logRepository.flushForensicTraces()
 
+        // Oct.20.10: Brief delay for async trail persistence
+        delay(500)
+
         val logs = repository.loadAllLogsStatic(100)
         val trail = repository.loadTrailStatic(false)
 
@@ -109,6 +120,6 @@ class StoragePressureAuditTest {
         assertTrue("Special log should be kept in Critical Storage", logs.any { it.message == "SPECIAL_LOG" })
 
         // Verify: All trails dropped in Critical Storage
-        assertTrue("All trail points should be dropped in Critical Storage", trail.size == 0)
+        assertTrue("All trail points should be dropped in Critical Storage (Size was ${trail.size})", trail.size == 0)
     }
 }

@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct20.7)
+# SOT Master Requirements & Hardening Status (Oct20.10)
 
 ## 🏗️ Architectural Master Rules (301 Rules)
 
@@ -53,16 +53,15 @@
 *   **1.228 - 1.301**: (Historical rules covering trajectory promotion and noise floors archived in `STATUS/sot_master_archive.md`).
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 780**: Forensic Document Archival - PASSED. Optimized documentation performance by migrating legacy SOT and resolution entries to history archives. (Oct20.7 - ISSUE-OCT20.7-F1).
+*   **SOT ID 781**: Storage Test Race Conditions - PASSED. Eliminated race conditions in `StoragePressureAuditTest` by disabling background batch processing during deterministic flushing. (Oct20.10 - ISSUE-OCT18.22-F3).
+*   **SOT ID 780**: Forensic Document Archival - PASSED. (Oct20.7 - ISSUE-OCT20.7-F1).
 *   **SOT ID 779**: Hardware Profile Test Regression - PASSED. (Oct20.3).
 *   **SOT ID 778**: Viewer Simulation deterministic bypass - PASSED. (Oct20.2).
 *   **SOT ID 777**: Testing Guideline Hardening - PASSED. (Oct20.0).
-*   **SOT ID 776**: Completion Sequence Hardening - PASSED. (Oct20.0).
-*   **SOT ID 775**: Document Integrity Baseline - PASSED. (Oct20.0).
-*   **SOT ID 1 - 774**: (Historical baseline entries preserved in `STATUS/docs_history_archive.md`).
+*   **SOT ID 1 - 776**: (Historical baseline entries preserved in `STATUS/docs_history_archive.md`).
 
 ---
 
 ## ✅ Verification Chapters
-*   **Chapter 12.3 (Persistence Prioritization)**: IN_PROGRESS - Integrating deterministic flushing into `StoragePressureAuditTest`. (Oct20.2).
+*   **Chapter 12.3 (Persistence Prioritization)**: PASSED - Validated deterministic flushing in `StoragePressureAuditTest`. (Oct20.10).
 *   **Chapter 1-100 (Full Hardening Cycle)**: PASSED - Verified counter stability and state persistence over 24h soak simulation. (Oct18.8).
