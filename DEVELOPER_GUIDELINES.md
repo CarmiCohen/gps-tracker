@@ -34,13 +34,13 @@ Perform these steps in strict sequence once an issue is resolved:
 2.  **State Tracking Update**: Synchronize `issues.md`, `STATUS/SOT_MASTER_REQUIREMENTS.md`, and `STATUS/RESOLUTION_ARCHIVE.md`. Assign issue numbers to all new concerns.
 3.  **Dashboard Synchronization**: Update the **Hardening Progress Dashboard** in `issues.md` with the latest **Audit Baseline** entry, prefixed with the current **Version Name** (e.g., `Sep.27.9`).
 4.  **App Build & Versioning**: Rebuild the application and increment the `versionName` in `app/build.gradle`.
-5.  **Git Release Block**: Generate a Git command block for staging, committing, tagging the version, and pushing to the remote. Remember to add the issue # to the git and to the relevant doc files.
-6.  **Simplicity Audit**: Evaluate potential architectural simplifications. Document these in the "Strategic Simplification Ideas" section of `issues.md` with unique IDs and significance levels (High, Medium, Low).
-7.  **Forensic Integrity Check (Rule 8)**: Rigorously verify all modified `.md` and `.xml` files for correctness, completeness, and the absolute absence of placeholders or summaries. Confirm that Rule 8 (Large File Protection) was strictly followed for all files changed during the last fix, implementation, or remediation.
-8.  **Baseline Synchronization (R-ID 744)**: Synchronize the `STATUS/BASELINE/` directory with the current state of critical forensic documents for the version being closed.
-9.  **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot for the next session.
-10. **Session Termination**: Stop the chat immediately. Do not attempt further fixes.
-11. **Audit Recalculation**: Display final metrics in the format:  
+5.  **Simplicity Audit**: Evaluate potential architectural simplifications. Document these in the "Strategic Simplification Ideas" section of `issues.md` with unique IDs and significance levels (High, Medium, Low).
+6.  **Forensic Integrity Check (Rule 8)**: Rigorously verify all modified `.md` and `.xml` files for correctness, completeness, and the absolute absence of placeholders or summaries. Confirm that Rule 8 (Large File Protection) was strictly followed for all files changed during the last fix, implementation, or remediation.
+7.  **Baseline Synchronization (R-ID 744)**: Synchronize the `STATUS/BASELINE/` directory with the current state of critical forensic documents for the version being closed.
+8.  **Final Handover**: Update `Handover.md` with a comprehensive forensic state snapshot for the next session.
+9.  **Session Termination**: Stop the chat immediately. Do not attempt further fixes.
+10. **Audit Recalculation**: Display final metrics in the format:  
     **[Version Name]: [SOT Count: X (Rules: Y), Open: H:xx, M:xx, L:xx, Ideas: H:xx, M:xx, L:xx, Testing: C (Sub-items: D), QA: F]**  
     *(Example current baseline line: `- **Sep.27.9: [SOT Count: 171 (Rules: 41), Open: H:0, M:0, L:0, Ideas: H:0, M:6, L:4, Testing: 3 (Sub-items: 15), QA: 284]**`)*
-12. **Final Stop**: After the audit recalculation, **STOP ALL PROCESSING.**
+11. **Git Release Block**: Generate a Git command block for staging, committing, tagging the version, and pushing to the remote. Remember to add the issue # to the git and to the relevant doc files.
+12. **Final Stop**: After the Git Release Block, **STOP ALL PROCESSING.**

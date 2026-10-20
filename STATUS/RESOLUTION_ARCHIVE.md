@@ -1,5 +1,14 @@
 # Resolution Archive - GPS Tracker
 
+## ISSUE-OCT20.23-F1: Redundant Connectivity Callback Leaks (Oct20.24)
+- **Resolved**: Oct20.24
+- **Description**: Forensic failure where `AndroidNetworkProvider` exhibited redundant `ConnectivityManager.registerNetworkCallback` calls due to the use of `SharingStarted.WhileSubscribed`. This allowed the callback to be unregistered and re-registered frequently during high-frequency hydration, leading to race conditions in the system's unregistration handler.
+- **Remediation**:
+    - **Architecture**: Transitioned `isNetworkAvailableFlow` to use `SharingStarted.Eagerly`.
+    - **Lifecycle**: Guaranteed a single registration for the entire singleton lifecycle of the provider, adhering to R-ID 748.
+    - **Verification**: Verified zero redundant registrations in Logcat.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 785).
+
 ## ISSUE-OCT20.22-F1: Test Suite Version Regression (Oct20.22)
 - **Resolved**: Oct20.22
 - **Description**: The unit test `MainViewModelMappingTest` was failing due to a mismatch between the expected engine version (`Oct18.8`) and the current project version (`Oct20.21`). This regression was identified during a full audit execution.

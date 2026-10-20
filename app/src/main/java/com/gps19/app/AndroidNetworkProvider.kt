@@ -24,6 +24,10 @@ import javax.inject.Singleton
  * AndroidNetworkProvider: Production implementation of NetworkProvider 
  * using ConnectivityManager.NetworkCallback.
  * 
+ * Oct.20.23:
+ * - ISSUE-OCT20.23-F1: Redundant Connectivity Callback Leaks. Transitioned to 
+ *   SharingStarted.Eagerly to ensure a single registration for the provider's 
+ *   entire lifecycle, preventing redundant calls detected by StackLog.
  * Oct.18.24:
  * - ISSUE-OCT18.22-F2: Redundant Network Callback Registrations. Consolidated 
  *   all callback management into a single provider and added isNetworkAvailableFlow.
@@ -31,9 +35,6 @@ import javax.inject.Singleton
  * Oct.18.6:
  * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Implemented simulateNetworkLoss 
  *   to allow manual triggering of connectivity failover logic.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Implemented isNetworkAvailable 
- *   property for unified state access.
  */
 @Singleton
 class AndroidNetworkProvider @Inject constructor(
@@ -103,7 +104,7 @@ class AndroidNetworkProvider @Inject constructor(
      .distinctUntilChanged()
      .shareIn(
         scope = externalScope,
-        started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5000, replayExpirationMillis = 0),
+        started = SharingStarted.Eagerly,
         replay = 1
      )
 

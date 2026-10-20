@@ -1,13 +1,14 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct20.22
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct20.24
 
-## 🎯 Current Resumption Focus: Final Audit & Release Preparation.
+## 🎯 Current Resumption Focus: Forensic Remediation of Storage Leaks.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   *(No high-priority open gaps identified for this cycle)*
+*   **ISSUE-OCT20.23-F2: Storage Pressure Audit Flakiness (High).** Stability failure. `StoragePressureAuditTest` exhibits non-deterministic behavior; failures in `verifyCriticalStoragePrioritization` and `verifyLowStoragePrioritization` were observed in initial runs but cleared upon retry. Indicates unresolved race conditions in the manual batch processor.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 55)
+## 💡 Strategic Simplification Ideas (Ideas: 56)
+*   **SIMP-OCT20.24-S1: Flow-Based Network State Sentinel (Low).** Consider removing the legacy `registerListener` / `unregisterListener` logic in `AndroidNetworkProvider` and purely exposing `isNetworkAvailableFlow` to consumers, further simplifying state management.
 *   **SIMP-OCT20.22-S1: Automated Version Injector for Tests (Low).** Consider using `BuildConfig` values directly in unit tests to avoid manual version string updates during baseline synchronization.
 *   **SIMP-OCT20.21-S1: Unified Forensic Writer (Low).** Consider overloading `writeTrace` to accept a primitive parameter set directly, reducing the need for two distinct internal paths in `ForensicSpillBuffer`.
 *   **SIMP-OCT20.10-S1: Test-Only Log Buffer Draining (Low).** Consider adding a `isManualFlushingOnly` flag to `LogRepository` during tests to completely inhibit the background `runBatchProcessor` without needing to cancel jobs, further reducing race risks.
@@ -29,18 +30,21 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
-*   **ISSUE-OCT20.22-F1: Test Suite Version Regression.** Resolved Oct20.22. Fixed `MainViewModelMappingTest` to align with the `Oct20.21` engine version baseline, ensuring full suite passability. (SOT ID 783).
-*   **ISSUE-OCT20.10-F1: Forensic Buffer Overflow Handling.** Resolved Oct20.21. Hardened `ForensicSpillBuffer` against extreme overflow scenarios by implementing a circular overwrite policy to ensure zero data loss of recent traces. (SOT ID 782).
-*   **ISSUE-OCT18.22-F3: Storage Test Race Conditions.** Resolved Oct20.10. Eliminated race conditions in `StoragePressureAuditTest` by disabling background batch processing during deterministic flushing and adding async propagation delays for trail points. (SOT ID 781).
-*   **ISSUE-OCT20.7-F1: Forensic Document Archival.** Resolved Oct20.7. Optimized documentation by migrating legacy SOT IDs and resolutions to `docs_history_archive.md`. (SOT ID 780).
-*   **ISSUE-OCT20.3-F1: Hardware Profile Test Regression.** Resolved Oct20.3. Fixed compilation failure in `HardwareSuiteProfileTest.kt`. (SOT ID 779).
-*   **ISSUE-OCT19.0-F1: Viewer with Simulated Tracker.** Resolved Oct20.2. Hardened mode restoration bypass in `MainViewModel`. (SOT ID 778).
-*   **ISSUE-OCT20.0-F2: Testing Guideline Hardening.** Resolved Oct20.0. Updated protocol to enforce forensic preservation. (SOT ID 777).
-*   **ISSUE-OCT20.0-F1: Document Integrity Baseline.** Resolved Oct20.0. Established versioned baseline directory. (SOT ID 775).
+*   **ISSUE-OCT20.23-F1: Redundant Connectivity Callback Leaks.** Resolved Oct20.24. Transitioned `AndroidNetworkProvider` to `SharingStarted.Eagerly` to ensure a singleton-lifecycle for system callback registrations. (SOT ID 785).
+*   **ISSUE-OCT20.22-F1: Test Suite Version Regression.** Resolved Oct20.22. Fixed `MainViewModelMappingTest` to align with the `Oct20.21` engine version baseline. (SOT ID 783).
+*   **ISSUE-OCT20.10-F1: Forensic Buffer Overflow Handling.** Resolved Oct20.21. Hardened `ForensicSpillBuffer` against extreme overflow scenarios by implementing a circular overwrite policy. (SOT ID 782).
+*   **ISSUE-OCT18.22-F3: Storage Test Race Conditions.** Resolved Oct20.10. Eliminated race conditions in `StoragePressureAuditTest` by disabling background batch processing. (SOT ID 781).
+*   **ISSUE-OCT20.7-F1: Forensic Document Archival.** Resolved Oct20.7. (SOT ID 780).
+*   **ISSUE-OCT20.3-F1: Hardware Profile Test Regression.** Resolved Oct20.3. (SOT ID 779).
+*   **ISSUE-OCT19.0-F1: Viewer with Simulated Tracker.** Resolved Oct20.2. (SOT ID 778).
+*   **ISSUE-OCT20.0-F2: Testing Guideline Hardening.** Resolved Oct20.0. (SOT ID 777).
+*   **ISSUE-OCT20.0-F1: Document Integrity Baseline.** Resolved Oct20.0. (SOT ID 775).
 
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct20.24: [SOT Count: 786 (Rules: 303), Open: H:1, M:0, L:0, Ideas: H:1, M:20, L:35, Testing: 5 (Sub-items: 8), QA: 357]**
+- **Oct20.23: [SOT Count: 785 (Rules: 302), Open: H:2, M:0, L:0, Ideas: H:1, M:20, L:35, Testing: 5 (Sub-items: 8), QA: 356]**
 - **Oct20.22: [SOT Count: 783 (Rules: 302), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:35, Testing: 103 (Sub-items: 104), QA: 354]**
 - **Oct20.21: [SOT Count: 782 (Rules: 302), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:34, Testing: 102 (Sub-items: 103), QA: 353]**
 - **Oct20.10: [SOT Count: 781 (Rules: 301), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:33, Testing: 101 (Sub-items: 102), QA: 352]**
