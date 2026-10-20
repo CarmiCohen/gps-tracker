@@ -1,41 +1,16 @@
-# Test Procedure - GPS Tracker (vOct20.32)
+# Test Procedure - GPS Tracker (vOct20.33)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
 ---
 
-## Chapter 0 - Operational Forensic Audit (vOct20.32)
-**Goal:** Verify system health via runtime telemetry and log signatures during deployment.
+## Chapter 0 - Operational Forensic Audit
+**Status:** 📂 Moved to separate file to ensure persistence and integrity.
+**Link:** [OPERATIONAL_FORENSIC_AUDIT.md](OPERATIONAL_FORENSIC_AUDIT.md)
 
-*   **0.1 Logcat Anomaly Monitoring:** 
-    *   **Action:** Deploy the app and filter Logcat for `StackLog`, `Davey`, or `Exception`.
-    *   **Verification:** Confirm zero `StackLog` leaks during steady-state operation. Monitor for `Davey` events > 500ms during 100Hz sensor bursts.
-*   **0.2 Event Log Continuity:** 
-    *   **Action:** Observe "Stay-alive pulse" and "PRUNING" signatures in Logcat.
-    *   **Verification:** Confirm pulses trigger every 30s. Confirm maintenance tasks execute without blocking the main thread.
-*   **0.3 Tracker Stealth & Authority Audit (Issue #Oct20.31-F1):**
-    *   **Action:** Deploy the app in Tracker Mode and inspect the UI, HUD, and Settings.
-    *   **Verification:** **ABSOLUTE STEALTH (R872)**. 
-        1. Confirm HUD contains NO **ALM** badge or **ALARM** indicators.
-        2. Confirm HUD contains NO **LOCK** or interactive alarm control buttons.
-        3. Confirm HUD contains NO **SIREN** indicators or audio activity.
-        4. Confirm Settings contains NO **Alerts**, **Sound**, or **Calibration** menus.
-        5. Confirm Map contains NO **Home Point** management tools (ADD/DEL).
-        6. Tracker must remain a pure telemetry provider; all logic/alarm authority resides exclusively on the Viewer.
-        7. The "TERMINATE TRACKING" button must be the only high-impact action allowed, ensuring no other logic-altering buttons exist.
-*   **0.4 Back Button Lifecycle (Issue #1424):**
-    *   **Action:** Tap the system "Return/Back" button while on the Viewer or Tracker screen.
-    *   **Verification:** Confirm the app DOES NOT close or cease operations. It should either stay on the current screen (if it's the root) or navigate back correctly without process termination.
-*   **0.5 UI Alignment & Occlusion Audit (Issue #1425, #1426):**
-    *   **Action:** Inspect the Viewer UI in various orientations.
-    *   **Verification:** 
-        1. **Version Position**: Confirm the version string (e.g., `Oct20.32`) is at the absolute bottom-start edge of the screen.
-        2. **HUD Visibility**: Confirm the upper HUD header (containing Settings, Info, etc.) has a Slate900 scrim ensuring contrast against the map.
-*   **0.6 Peer Sync & Connectivity Audit (Issue #1427, #1428):**
-    *   **Action:** Connect a Viewer and a Tracker. Add/Remove home points on the Viewer.
-    *   **Verification:** 
-        1. **VWR Badge**: Confirm the VWR badge on the Tracker turns Green/Cyan when the Viewer is active.
-        2. **Geofence Sync**: Confirm the Tracker receives and logs "Received geofences from remote Viewer" when points are modified on the Viewer.
+*This chapter must be completed first for every build. It covers Logcat monitoring, Stealth Audit (R872), Back Button lifecycle, and Peer Sync.*
+
+---
 
 ## Chapter 1 - Deployment & Initial Launch
 **Goal:** Verify clean installation and landing page stability.
@@ -46,7 +21,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   Deploy the latest build via Android Studio.
 *   **1.3 Version Verification (Issue #OCT15.6-T1):**
     *   **Action:** Observe the version string displayed at the bottom of the Landing Screen or in Settings.
-    *   **Verification:** Confirm the string matches the expected release version (e.g., `Oct20.32_PLATINUM`).
+    *   **Verification:** Confirm the string matches the expected release version (e.g., `Oct20.33_PLATINUM`).
 *   **1.4 Permission Onboarding:** 
     *   Launch the app and grant all requested permissions.
 *   **1.5 Landing Page Stability:** 
@@ -179,7 +154,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   **Action:** Update remote battery level and observe HUD recomposition counts via Layout Inspector.
     *   **Verification:** Confirm that only the battery-related sub-components recompose. The map and other telemetry slices must remain unaffected due to granular interface slicing.
 
-## Chapter 8 - Validation Hooks & Aggregation (vOct20.32)
+## Chapter 8 - Validation Hooks & Aggregation (vOct20.33)
 **Goal:** Verify the new simulation hooks and UI state aggregation logic.
 *   **8.1 Forensic Stall Simulation:** Toggle simulation in Diagnostics.
     *   **Verification:** Observe Logcat for `Forensic Audit: Simulation mode ENABLED` and verify `ALERT_ID_PERFORMANCE_SPIKE` triggers if EMA reliability drops below 0.85.
@@ -344,4 +319,4 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ---
 **Total Testing Chapters: 100**
-*(Full historical procedure restored and synchronized Oct20.32)*
+*(Full historical procedure restored and synchronized Oct20.33)*

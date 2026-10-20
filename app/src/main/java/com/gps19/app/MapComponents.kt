@@ -41,6 +41,10 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Oct.20.33:
+ * - Tracker Stealth Audit (ISSUE-OCT20.31-F1): Forbidden interactive elements 
+ *   (Home Point ADD/DEL) are now strictly removed from the MapToolsOverlay 
+ *   in Tracker mode to comply with R872 (Absolute Stealth).
  * Oct.14.8:
  * - SIMP-OCT13.21-S1: Pure Event Map. Refactored AppMapContainer and OsmMap 
  *   signatures to use onEvent bubbling, removing MainViewModel casting.
@@ -220,10 +224,15 @@ fun MapToolsOverlay(
             MapToolButton(icon = Icons.Default.Upload, label = "LOAD", onClick = { onEvent(UiEvent.ImportTrails) }, iconColor = BrandJd)
             MapToolButton(icon = Icons.Default.Save, label = "SAVE", onClick = { onEvent(UiEvent.ExportTrails) }, iconColor = Indigo500)
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(sp)) { 
-            MapToolButton(icon = Icons.Default.AddLocation, label = "ADD", onClick = { if (!isTrackerMode) onEvent(UiEvent.SetGeofenceMode(GeofenceMode.ADD)) }, iconColor = if (state.geofenceMode == GeofenceMode.ADD) Color.White else BrandJd, containerColor = if (state.geofenceMode == GeofenceMode.ADD) BrandJd else Color.White)
-            MapToolButton(icon = Icons.Default.WrongLocation, label = "DEL", onClick = { if (!isTrackerMode) onEvent(UiEvent.SetGeofenceMode(GeofenceMode.REMOVE)) }, iconColor = if (state.geofenceMode == GeofenceMode.REMOVE) Color.White else Rose500, containerColor = if (state.geofenceMode == GeofenceMode.REMOVE) Rose500 else Color.White)
+        
+        // R872: Geofence management (ADD/DEL) is peer-controlled and forbidden on Trackers.
+        if (!isTrackerMode) {
+            Row(horizontalArrangement = Arrangement.spacedBy(sp)) { 
+                MapToolButton(icon = Icons.Default.AddLocation, label = "ADD", onClick = { onEvent(UiEvent.SetGeofenceMode(GeofenceMode.ADD)) }, iconColor = if (state.geofenceMode == GeofenceMode.ADD) Color.White else BrandJd, containerColor = if (state.geofenceMode == GeofenceMode.ADD) BrandJd else Color.White)
+                MapToolButton(icon = Icons.Default.WrongLocation, label = "DEL", onClick = { onEvent(UiEvent.SetGeofenceMode(GeofenceMode.REMOVE)) }, iconColor = if (state.geofenceMode == GeofenceMode.REMOVE) Color.White else Rose500, containerColor = if (state.geofenceMode == GeofenceMode.REMOVE) Rose500 else Color.White)
+            }
         }
+
         Row(horizontalArrangement = Arrangement.spacedBy(sp)) { 
             MapToolButton(icon = if (state.isFenceVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff, label = "FENCE", onClick = { onEvent(UiEvent.SetFenceVisible(!state.isFenceVisible)) }, iconColor = if (state.isFenceVisible) BrandJd else Color.Gray)
             MapToolButton(icon = Icons.Default.Delete, label = "CLEAR", onClick = { onEvent(UiEvent.CenterTracker); onEvent(UiEvent.ClearTrails) }, iconColor = Rose500)

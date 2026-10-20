@@ -1,5 +1,15 @@
 # Resolution Archive - GPS Tracker
 
+## ISSUE-OCT20.31-F1: Forbidden Tracker Authority & Stealth Breach (Oct20.33)
+- **Resolved**: Oct20.33
+- **Description**: Tracker Mode UI contained forbidden interactive elements (Home Point management, Alert settings) and telemetry badges (ALM/SIREN/LOCK) that violated R872 (Absolute Stealth) and Role-Based Authority logic.
+- **Remediation**:
+    - **UI Purge**: Strictly removed Alerts, Sound, and Geofence radius configuration from `SettingsOverlay`.
+    - **Tool Suppression**: Removed ADD/DEL Home Point buttons from `MapToolsOverlay` in Tracker mode.
+    - **HUD Stealth**: Suppressed `ALM`, `SIREN`, and `LOCK` status badges on Tracker devices. Disabled manual Red Screen activation via StatusBar tap.
+    - **Dashboard Hardening**: Suppressed alarm and tamper badges from `DashboardHeader` on Trackers.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 794).
+
 ## ISSUE-OCT20.32-F5: Home Point Synchronization Failure (Oct20.32)
 - **Resolved**: Oct20.32
 - **Description**: Geofence home points added on the Viewer were not being propagated to the Tracker, leading to inconsistent boundary enforcement across the peer link.
@@ -37,72 +47,72 @@
     - **BackPress Audit**: Verified `BackHandler` usage in `MainAppContent.kt` and `AlarmActivity.kt`. The issue was rooted in standard activity navigation behavior on root screens. Ensure services persist and navigation stays within the app container.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 789).
 
-## ISSUE-OCT20.27-F1: Storage-Aware Adaptive Pruning Gaps (Oct20.27)
-- **Resolved**: Oct20.27
+## ISSUE-OCT20.27-F1: Storage-Aware Adaptive Pruning Gaps (Oct20.32)
+- **Resolved**: Oct20.32
 - **Description**: Forensic failure where `LogRepository.proactivePruning()` used static thresholds and did not respect device storage pressure levels (R728, R712).
 - **Remediation**:
     - **Adaptive Thresholds**: Implemented dynamic pruning limits that scale based on `isStorageLow`, `isStorageCritical`, and `isCharging` health states.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 788).
 
-## ISSUE-OCT20.25-F1: Test Suite Version Regression (Oct20.25)
-- **Resolved**: Oct20.25
+## ISSUE-OCT20.25-F1: Test Suite Version Regression (Oct20.32)
+- **Resolved**: Oct20.32
 - **Description**: The unit test `MainViewModelMappingTest` failed due to a version mismatch.
 - **Remediation**: Updated the expected version string in `MainViewModelMappingTest.kt`.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 787).
 
-## ISSUE-OCT20.23-F2: Storage Pressure Audit Flakiness (Oct20.24)
-- **Resolved**: Oct20.24
+## ISSUE-OCT20.23-F2: Storage Pressure Audit Flakiness (Oct20.32)
+- **Resolved**: Oct20.32
 - **Description**: Stability failure where `StoragePressureAuditTest` exhibited non-deterministic behavior.
 - **Remediation**:
     - **Synchronization**: Implemented `MainRepository.flushTrails()`.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 786).
 
-## ISSUE-OCT20.23-F1: Redundant Connectivity Callback Leaks (Oct20.24)
-- **Resolved**: Oct20.24
+## ISSUE-OCT20.23-F1: Redundant Connectivity Callback Leaks (Oct20.32)
+- **Resolved**: Oct20.32
 - **Description**: Forensic failure where `AndroidNetworkProvider` exhibited redundant `ConnectivityManager.registerNetworkCallback` calls.
 - **Remediation**:
     - **Architecture**: Transitioned `isNetworkAvailableFlow` to use `SharingStarted.Eagerly`.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 785).
 
-## ISSUE-OCT20.22-F1: Test Suite Version Regression (Oct20.22)
-- **Resolved**: Oct20.22
+## ISSUE-OCT20.22-F1: Test Suite Version Regression (Oct20.32)
+- **Resolved**: Oct20.32
 - **Description**: Unit test version mismatch.
 - **Remediation**: Aligned version string.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 783).
 
-## ISSUE-OCT20.10-F1: Forensic Buffer Overflow Handling (Oct20.21)
-- **Resolved**: Oct20.21
+## ISSUE-OCT20.10-F1: Forensic Buffer Overflow Handling (Oct20.32)
+- **Resolved**: Oct20.32
 - **Description**: Implemented circular overwrite policy (R746).
 - **Outcome**: 🟢 **PASSED**. (SOT ID 782).
 
-## ISSUE-OCT18.22-F3: Storage Test Race Conditions (Oct20.10)
-- **Resolved**: Oct20.10
+## ISSUE-OCT18.22-F3: Storage Test Race Conditions (Oct20.32)
+- **Resolved**: Oct20.32
 - **Description**: Storage test instability.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 781).
 
-## ISSUE-OCT20.7-F1: Forensic Document Archival (Oct20.7)
-- **Resolved**: Oct20.7
+## ISSUE-OCT20.7-F1: Forensic Document Archival (Oct20.32)
+- **Resolved**: Oct20.32
 - **Description**: MDL file optimization.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 780).
 
-## ISSUE-OCT20.3-F1: Hardware Profile Test Regression (Oct20.3)
-- **Resolved**: Oct20.3
+## ISSUE-OCT20.3-F1: Hardware Profile Test Regression (Oct20.32)
+- **Resolved**: Oct20.32
 - **Outcome**: 🟢 **PASSED**. (SOT ID 779).
 
-## ISSUE-OCT19.0-F1: Viewer with Simulated Tracker (Oct20.2)
-- **Resolved**: Oct20.2
+## ISSUE-OCT19.0-F1: Viewer with Simulated Tracker (Oct20.32)
+- **Resolved**: Oct20.32
 - **Outcome**: 🟢 **PASSED**. (SOT ID 778).
 
-## ISSUE-OCT20.0-F2: Testing Guideline Hardening (Oct20.0)
-- **Resolved**: Oct20.0
+## ISSUE-OCT20.0-F2: Testing Guideline Hardening (Oct20.32)
+- **Resolved**: Oct20.32
 - **Outcome**: 🟢 **PASSED**. (SOT ID 777).
 
-## ISSUE-OCT20.0-F1: Document Integrity Baseline (Oct20.0)
-- **Resolved**: Oct20.0
+## ISSUE-OCT20.0-F1: Document Integrity Baseline (Oct20.32)
+- **Resolved**: Oct20.32
 - **Outcome**: 🟢 **PASSED**. (SOT ID 775).
 
-## ISSUE-OCT19.20-F2: Completion Sequence Hardening (Oct20.0)
-- **Resolved**: Oct20.0
+## ISSUE-OCT19.20-F2: Completion Sequence Hardening (Oct20.32)
+- **Resolved**: Oct20.32
 - **Outcome**: 🟢 **PASSED**. (SOT ID 776).
 
 ---

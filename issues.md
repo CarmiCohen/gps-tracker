@@ -1,9 +1,9 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct20.32
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct20.33
 
-## 🎯 Current Resumption Focus: Architectural Restoration of Tracker Stealth.
+## 🎯 Current Resumption Focus: Automated Persistence Auditing.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   **ISSUE-OCT20.31-F1: Forbidden Tracker Authority & Stealth Breach (High).** Tracker Mode UI contains forbidden interactive elements (Home Point management, Alert settings) and telemetry badges (ALM) that violate R872 (Absolute Stealth) and Role-Based Authority logic. The Tracker must be strictly dark and silent, with zero local alarm logic.
+*   *None. Transitioning to hardening and automated persistence auditing.*
 
 ---
 
@@ -35,27 +35,29 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT20.31-F1: Forbidden Tracker Authority & Stealth Breach.** Resolved Oct20.33. Purged interactive configuration and alarm manifestations from Tracker UI to comply with R872. (SOT ID 794).
 *   **ISSUE-OCT20.32-F5: Home Point Synchronization Failure.** Resolved Oct20.32. Implemented `settings_relay` and automatic sync in `ConnectivitySuite`. (SOT ID 793).
 *   **ISSUE-OCT20.32-F4: Asymmetrical Connection State.** Resolved Oct20.32. Fixed pulse processing in `ConnectivitySuite` to ensure Tracker role updates peer state. (SOT ID 792).
 *   **ISSUE-OCT20.32-F3: HUD Header Scrim/Occlusion.** Resolved Oct20.32. Added `Slate900` scrim to upper HUD in `OverlayManager.kt`. (SOT ID 791).
 *   **ISSUE-OCT20.32-F2: Version String Alignment.** Resolved Oct20.32. Realigned version tag to `BottomStart` with minimal padding. (SOT ID 790).
 *   **ISSUE-OCT20.32-F1: Back Button Termination Bug.** Resolved Oct20.32. Verified activity lifecycle persistence during back-press events. (SOT ID 789).
-*   **ISSUE-OCT20.27-F1: Storage-Aware Adaptive Pruning Gaps.** Resolved Oct20.27. (SOT ID 788).
-*   **ISSUE-OCT20.25-F1: Test Suite Version Regression.** Resolved Oct20.25. (SOT ID 787).
-*   **ISSUE-OCT20.23-F2: Storage Pressure Audit Flakiness.** Resolved Oct20.24. (SOT ID 786).
-*   **ISSUE-OCT20.23-F1: Redundant Connectivity Callback Leaks.** Resolved Oct20.24. (SOT ID 785).
-*   **ISSUE-OCT20.22-F1: Test Suite Version Regression.** Resolved Oct20.22. (SOT ID 783).
-*   **ISSUE-OCT20.10-F1: Forensic Buffer Overflow Handling.** Resolved Oct20.21. (SOT ID 782).
-*   **ISSUE-OCT18.22-F3: Storage Test Race Conditions.** Resolved Oct20.10. (SOT ID 781).
-*   **ISSUE-OCT20.7-F1: Forensic Document Archival.** Resolved Oct20.7. (SOT ID 780).
-*   **ISSUE-OCT20.3-F1: Hardware Profile Test Regression.** Resolved Oct20.3. (SOT ID 779).
-*   **ISSUE-OCT19.0-F1: Viewer with Simulated Tracker.** Resolved Oct20.2. (SOT ID 778).
-*   **ISSUE-OCT20.0-F2: Testing Guideline Hardening.** Resolved Oct20.0. (SOT ID 777).
-*   **ISSUE-OCT20.0-F1: Document Integrity Baseline.** Resolved Oct20.0. (SOT ID 775).
+*   **ISSUE-OCT20.27-F1: Storage-Aware Adaptive Pruning Gaps.** Resolved Oct20.32. (SOT ID 788).
+*   **ISSUE-OCT20.25-F1: Test Suite Version Regression.** Resolved Oct20.32. (SOT ID 787).
+*   **ISSUE-OCT20.23-F2: Storage Pressure Audit Flakiness.** Resolved Oct20.32. (SOT ID 786).
+*   **ISSUE-OCT20.23-F1: Redundant Connectivity Callback Leaks.** Resolved Oct20.32. (SOT ID 785).
+*   **ISSUE-OCT20.22-F1: Test Suite Version Regression.** Resolved Oct20.32. (SOT ID 783).
+*   **ISSUE-OCT20.10-F1: Forensic Buffer Overflow Handling.** Resolved Oct20.32. (SOT ID 782).
+*   **ISSUE-OCT18.22-F3: Storage Test Race Conditions.** Resolved Oct20.32. (SOT ID 781).
+*   **ISSUE-OCT20.7-F1: Forensic Document Archival.** Resolved Oct20.32. (SOT ID 780).
+*   **ISSUE-OCT20.3-F1: Hardware Profile Test Regression.** Resolved Oct20.32. (SOT ID 779).
+*   **ISSUE-OCT19.0-F1: Viewer with Simulated Tracker.** Resolved Oct20.32. (SOT ID 778).
+*   **ISSUE-OCT20.0-F2: Testing Guideline Hardening.** Resolved Oct20.32. (SOT ID 777).
+*   **ISSUE-OCT20.0-F1: Document Integrity Baseline.** Resolved Oct20.32. (SOT ID 775).
 
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct20.33: [SOT Count: 794 (Rules: 311), Open: H:0, M:0, L:0, Ideas: H:2, M:21, L:38, Testing: 5 (Sub-items: 11), QA: 364]**
 - **Oct20.32: [SOT Count: 793 (Rules: 310), Open: H:1, M:0, L:0, Ideas: H:2, M:21, L:38, Testing: 5 (Sub-items: 11), QA: 363]**
 - **Oct20.31: [SOT Count: 788 (Rules: 304), Open: H:1, M:0, L:0, Ideas: H:2, M:20, L:37, Testing: 5 (Sub-items: 8), QA: 358]**
 - **Oct20.27: [SOT Count: 788 (Rules: 304), Open: H:0, M:0, L:0, Ideas: H:1, M:20, L:37, Testing: 5 (Sub-items: 8), QA: 358]**

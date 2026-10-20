@@ -24,6 +24,9 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayManager: Unified HUD management for GPS Tracker.
+ * Oct.20.33:
+ * - Tracker Stealth Audit (ISSUE-OCT20.31-F1): Disabled Red Screen tap 
+ *   gesture on GlobalStatusBar in Tracker mode to adhere to R872.
  * Oct.20.32:
  * - HUD Header Scrim (#1426): Replaced Transparent surface with Slate900 scrim 
  *   to ensure header buttons are visible over map content.
@@ -46,6 +49,7 @@ fun UnifiedHUDOverlay(
     val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val isMapVisible = nav.isMapVisible
     val isAnyOverlayOpen = nav.isSettingsOpen || nav.isLogVisible || nav.isRibbonsVisible || nav.isGnssDetailVisible || nav.isPhoneSetupVisible
+    val isTracker = session.appMode == "tracker"
     
     val isSystemReady = session.isSystemReady(spatial.homePoints.size)
     val systemIssuesCount = session.systemIssuesCount(spatial.homePoints.size)
@@ -73,7 +77,11 @@ fun UnifiedHUDOverlay(
                         Column(modifier = Modifier.weight(1f)) {
                             GlobalStatusBar(
                                 stateProvider = stateProvider,
-                                modifier = Modifier.pointerInput(Unit) { detectTapGestures(onTap = { onMainEvent(UiEvent.SetRedScreenVisible(true)) }) }
+                                modifier = Modifier.pointerInput(Unit) { 
+                                    detectTapGestures(onTap = { 
+                                        if (!isTracker) onMainEvent(UiEvent.SetRedScreenVisible(true)) 
+                                    }) 
+                                }
                             )
                         }
                     }
@@ -94,7 +102,11 @@ fun UnifiedHUDOverlay(
                             if (session.hydrationLevel >= 5) {
                                 GlobalStatusBar(
                                     stateProvider = stateProvider,
-                                    modifier = Modifier.pointerInput(Unit) { detectTapGestures(onTap = { onMainEvent(UiEvent.SetRedScreenVisible(true)) }) }
+                                    modifier = Modifier.pointerInput(Unit) { 
+                                        detectTapGestures(onTap = { 
+                                            if (!isTracker) onMainEvent(UiEvent.SetRedScreenVisible(true)) 
+                                        }) 
+                                    }
                                 )
                             }
                         }

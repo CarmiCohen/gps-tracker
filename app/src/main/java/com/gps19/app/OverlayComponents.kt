@@ -26,14 +26,13 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayComponents: Dashboard and telemetry visualization components.
+ * Oct.20.33:
+ * - Tracker Stealth Audit (ISSUE-OCT20.31-F1): Suppressed alarm and tamper 
+ *   badges in DashboardHeader for Tracker mode to adhere to R872.
  * Oct.15.21:
  * - SIMP-OCT15.20-S1: Animation Controller Composition. Integrated 
  *   LocalAnimationGating into DashboardHeader and gated movingAlpha. 
  *   Removed redundant isMaliAnomaly parameters.
- * Oct.15.20:
- * - ISSUE-OCT15.20-F1: HUD Animation Gating. Integrated isMaliAnomaly into 
- *   DashboardHeader and gated movingAlpha to prevent UI thread pressure 
- *   during driver stalls.
  */
 
 @Composable
@@ -139,7 +138,8 @@ fun MainDashboardGrid(
                 isUltraLongStationary = isUltraLongStationary,
                 isGnssThrottled = isGnssThrottled,
                 isSafeMode = isSafeMode,
-                isSuspiciousNoise = isSuspiciousNoise
+                isSuspiciousNoise = isSuspiciousNoise,
+                isTrackerMode = appMode == "tracker"
             )
             
             HorizontalDivider(color = Color.White.copy(alpha = 0.1f), thickness = 1.dp)
@@ -190,7 +190,8 @@ private fun DashboardHeader(
     isUltraLongStationary: Boolean,
     isGnssThrottled: Boolean,
     isSafeMode: Boolean,
-    isSuspiciousNoise: Boolean = false
+    isSuspiciousNoise: Boolean = false,
+    isTrackerMode: Boolean = false
 ) {
     val isThrottled = LocalAnimationGating.current
     val infiniteTransition = rememberInfiniteTransition(label = "DashboardPulse")
@@ -236,14 +237,18 @@ private fun DashboardHeader(
             if (isSafeMode) Badge("[SAFE MODE]", Rose500)
             if (isGnssThrottled) Badge("[THROTTLED]", Amber500)
             if (isSuspiciousNoise) Badge("[NOISE ANOMALY]", Amber500)
-            if (status == SentinelStatus.TAMPER) {
-                val label = if (tamperReason.isNullOrBlank()) "[TAMPER]" else "[TAMPER: ${tamperReason.uppercase()}]"
-                Badge(label, if (isTelemetryFresh) Rose500 else Slate500)
+            
+            // R872: Absolute Stealth. Trackers must never show alarm/tamper badges.
+            if (!isTrackerMode) {
+                if (status == SentinelStatus.TAMPER) {
+                    val label = if (tamperReason.isNullOrBlank()) "[TAMPER]" else "[TAMPER: ${tamperReason.uppercase()}]"
+                    Badge(label, if (isTelemetryFresh) Rose500 else Slate500)
+                }
+                if (isTamperDetected) Badge("[HW TAMPER]", if (isTelemetryFresh) Rose500 else Slate500)
+                if (isBatterySteepDischarge) Badge("[BATT HEALTH]", if (isTelemetryFresh) Rose500 else Slate500)
+                if (isBatteryCritical) Badge("[BATT CRITICAL]", if (isTelemetryFresh) Rose500 else Slate500)
+                else if (isBatteryLow) Badge("[BATT LOW]", if (isTelemetryFresh) Amber500 else Slate500)
             }
-            if (isTamperDetected) Badge("[HW TAMPER]", if (isTelemetryFresh) Rose500 else Slate500)
-            if (isBatterySteepDischarge) Badge("[BATT HEALTH]", if (isTelemetryFresh) Rose500 else Slate500)
-            if (isBatteryCritical) Badge("[BATT CRITICAL]", if (isTelemetryFresh) Rose500 else Slate500)
-            else if (isBatteryLow) Badge("[BATT LOW]", if (isTelemetryFresh) Amber500 else Slate500)
         }
     }
 }

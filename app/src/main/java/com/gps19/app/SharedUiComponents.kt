@@ -48,6 +48,9 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.20.33:
+ * - Tracker Stealth Audit (ISSUE-OCT20.31-F1): Suppressed ALM/SIREN/LOCK badges 
+ *   in StatusBar for Tracker mode to adhere to R872 (Absolute Stealth).
  * Oct.15.21:
  * - SIMP-OCT15.20-S1: Animation Controller Composition. Integrated 
  *   LocalAnimationGating and gatedAnimateFloatAsState to centralize Mali GPU 
@@ -521,6 +524,7 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
     val trkIdLabel = connectivity.trackerId.take(6).uppercase()
     val viewIdLabel = connectivity.viewerId.take(6).uppercase()
+    val isTracker = mode == "tracker"
     
     val alarmAlpha by gatedInfinitePulse(
         0.4f, 1f, 
@@ -547,15 +551,19 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
                         StatusBadge(label = "INT", active = connectivity.isInternet, activeColor = localColor, isBold = true)
                         StatusBadge(label = "SRV", active = connectivity.isRelayConnected, activeColor = localColor, isBold = true)
                         StatusBadge(label = "GPS", active = telemetry.isLocalGpsActive, activeColor = localColor)
-                        StatusBadge(label = if (mode == "tracker") "VWR" else "TRK", active = isPeerActive, activeColor = peerColor)
+                        StatusBadge(label = if (isTracker) "VWR" else "TRK", active = isPeerActive, activeColor = peerColor)
                         StatusBadge(label = "DAT", active = connectivity.isDataHealthy, activeColor = localColor)
                         StatusBadge(label = "WDG", active = connectivity.watchdogOk, activeColor = localColor, isBold = true)
                         if (connectivity.isSafeMode) { StatusBadge(label = "SAF", active = false, isBold = true) }
                         if (connectivity.isStaggered) { StatusBadge(label = "STG", active = true, activeColor = localColor, isBold = true) }
                         if (connectivity.isGnssThrottled) { StatusBadge(label = "THR", active = true, activeColor = Amber500, isBold = true) }
                         if (health.isMaliAnomaly) { StatusBadge(label = "MAL", active = true, activeColor = Color(0xFFF43F5E), isBold = true) }
-                        if (health.hasActiveAlarms) { StatusBadge(label = "ALM", active = true, activeColor = Color(0xFFF43F5E).copy(alpha = alarmAlpha), isBold = true) }
-                        if (health.isRedScreenSuppressed) { Box(modifier = Modifier.background(if (health.isSirenPlaying) Color(0xFFF43F5E).copy(alpha = alarmAlpha) else Slate500, RoundedCornerShape(2.dp)).padding(horizontal = 2.dp)) { Text(text = if (health.isSirenPlaying) "SIREN" else "LOCK", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Bold, style = compactStyle) } }
+                        
+                        // R872: Absolute Stealth. Trackers must never show alarm/siren status badges.
+                        if (!isTracker) {
+                            if (health.hasActiveAlarms) { StatusBadge(label = "ALM", active = true, activeColor = Color(0xFFF43F5E).copy(alpha = alarmAlpha), isBold = true) }
+                            if (health.isRedScreenSuppressed) { Box(modifier = Modifier.background(if (health.isSirenPlaying) Color(0xFFF43F5E).copy(alpha = alarmAlpha) else Slate500, RoundedCornerShape(2.dp)).padding(horizontal = 2.dp)) { Text(text = if (health.isSirenPlaying) "SIREN" else "LOCK", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Bold, style = compactStyle) } }
+                        }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(text = telemetry.trackerState.name, color = stateColor.copy(alpha = if (telemetry.trackerState == TrackerState.MOVING && isTrackerGpsActive) movingAlpha else 1f), fontSize = 9.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, style = compactStyle)

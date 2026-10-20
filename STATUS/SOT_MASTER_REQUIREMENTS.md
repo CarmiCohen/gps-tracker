@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct20.32)
+# SOT Master Requirements & Hardening Status (Oct20.33)
 
-## 🏗️ Architectural Master Rules (310 Rules)
+## 🏗️ Architectural Master Rules (311 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -29,62 +29,65 @@
 *   **1.24 Binary Trace Delta-Encoding Authority (R706)**: Forensic traces MUST utilize header-based delta encoding for high-fidelity telemetry fields. (v9.3.0).
 *   **1.25 Transactional Forensic Backfill Authority (R704)**: Forensic traces MUST be drained from the spill-buffer using a transactional peek/commit pattern. (v9.3.0).
 *   **1.26 - 1.206**: (Historical rules covering socket conflation, Bayesian uncertainty growth, and OSM pre-warming archived in `STATUS/sot_master_archive.md`).
-*   **1.207 Pure Mapping Architecture (R-ID 725)**: UI state mapping logic MUST be extracted from `MainViewModel` into dedicated, pure mapper objects. (Oct18.8 - SIMP-OCT14.21-S1).
-*   **1.208 Lock-Contention-Free IO (R-ID 726)**: High-frequency IO operations on memory-mapped buffers MUST be executed outside of synchronized blocks. (Oct18.8 - SIMP-OCT14.11-S1).
-*   **1.209 Primitive-Backed Telemetry Buffering (R-ID 727)**: Telemetry data MUST be stored in primitive-backed structures. (Oct18.8 - SIMP-OCT15.0-S1).
-*   **1.210 Primitive-Backed History Buffering (R-ID 728)**: High-frequency forensic history data MUST be emitted as primitive-backed structures. (Oct18.8 - SIMP-OCT15.1-S1).
-*   **1.211 Primitive Map Rendering Segments (R-ID 729)**: Intermediate map rendering structures MUST use primitive arrays. (Oct18.8 - SIMP-OCT15.1-S2).
-*   **1.212 Offloaded Telemetry Normalization (R-ID 730)**: Normalization MUST be performed within background data pipelines. (Oct18.8 - SIMP-OCT15.2-S1).
-*   **1.213 Centralized Telemetry Mapping (R-ID 731)**: All transformations MUST be centralized within `TelemetryMapper`. (Oct18.8 - SIMP-OCT15.4-S1).
-*   **1.214 Encapsulated Buffer Construction (R-ID 732)**: Instantiation logic MUST be encapsulated within the buffer's companion object. (Oct18.8 - SIMP-OCT15.4-S2).
-*   **1.215 Explicit Component Lifecycle (R-ID 733)**: Core repositories MUST use explicit `start()` methods. (Oct18.8 - SIMP-OCT18.2-S1).
-*   **1.216 Synthetic Physical Validation (R-ID 734)**: System MUST provide synthetic injection hooks. (Oct18.8 - ISSUE-OCT18.6-F1).
-*   **1.217 SNR Latch for Urban Multipath (R-ID 735)**: Implement a sustained security hold for high-SNR jumps. (Oct18.8 - ISSUE-OCT18.8-F1).
-*   **1.218 Steep-Drop Vibration Convergence (R-ID 736)**: Vibration floor MUST implement accelerated downward convergence. (Oct18.8 - ISSUE-OCT18.10-F1).
-*   **1.219 Acoustic Duty Cycle Overlap (R-ID 737)**: Microphone MUST start recording 500ms before cycle ends. (Oct18.8 - ISSUE-OCT18.12-F1).
-*   **1.220 Urban Reflectivity Altitude Gating (R-ID 738)**: Apply extreme skepticism when high-SNR reflection is accompanied by altitude shift. (Oct18.8 - ISSUE-OCT18.14-F1).
-*   **1.221 Doze Mode White-listing (R-ID 739)**: Allow telemetry signaling during Android Doze mode if white-listed. (Oct18.8 - ISSUE-OCT18.16-F1).
-*   **1.222 Test Isolation Lifecycle (R-ID 740)**: Repositories MUST provide hooks to inhibit batch processors. (Oct18.8 - ISSUE-OCT18.18-F1).
-*   **1.223 Battery Saver Signaling Policy (R-ID 741)**: Telemetry sync MUST be deferred when Battery Saver is active. (Oct18.8 - ISSUE-OCT18.22-F1).
-*   **1.224 Unified Network Callback Management (R-ID 742)**: Maintain exactly one `NetworkCallback` registration. (Oct18.8 - ISSUE-OCT18.22-F2).
-*   **1.225 Test Mode Restoration Bypass (R-ID 743)**: Provide a persistent bypass for service resumption. (Oct18.8 - ISSUE-OCT19.19-F1).
-*   **1.226 Document Integrity Baseline (R-ID 744)**: Maintain a versioned baseline directory (`STATUS/BASELINE/`). (Oct20.0 - ISSUE-OCT20.0-F1).
-*   **1.227 Deterministic Test Flushing (R-ID 745)**: Repositories MUST provide synchronous `flush` mechanisms. (Oct20.2 - ISSUE-OCT18.22-F3).
-*   **1.228 Forensic Circular Overwrite (R-ID 746)**: The `ForensicSpillBuffer` MUST implement a circular overwrite policy during overflow to ensure the most recent telemetry is always preserved. (Oct20.21 - ISSUE-OCT20.10-F1).
+*   **1.207 Pure Mapping Architecture (R-ID 725)**: UI state mapping logic MUST be extracted from `MainViewModel` into dedicated, pure mapper objects. (Oct20.32 - SIMP-OCT14.21-S1).
+*   **1.208 Lock-Contention-Free IO (R-ID 726)**: High-frequency IO operations on memory-mapped buffers MUST be executed outside of synchronized blocks. (Oct20.32 - SIMP-OCT14.11-S1).
+*   **1.209 Primitive-Backed Telemetry Buffering (R-ID 727)**: Telemetry data MUST be stored in primitive-backed structures. (Oct20.32 - SIMP-OCT15.0-S1).
+*   **1.210 Primitive-Backed History Buffering (R-ID 728)**: High-frequency forensic history data MUST be emitted as primitive-backed structures. (Oct20.32 - SIMP-OCT15.1-S1).
+*   **1.211 Primitive Map Rendering Segments (R-ID 729)**: Intermediate map rendering structures MUST use primitive arrays. (Oct20.32 - SIMP-OCT15.1-S2).
+*   **1.212 Offloaded Telemetry Normalization (R-ID 730)**: Normalization MUST be performed within background data pipelines. (Oct20.32 - SIMP-OCT15.2-S1).
+*   **1.213 Centralized Telemetry Mapping (R-ID 731)**: All transformations MUST be centralized within `TelemetryMapper`. (Oct20.32 - SIMP-OCT15.4-S1).
+*   **1.214 Encapsulated Buffer Construction (R-ID 732)**: Instantiation logic MUST be encapsulated within the buffer's companion object. (Oct20.32 - SIMP-OCT15.4-S2).
+*   **1.215 Explicit Component Lifecycle (R-ID 733)**: Core repositories MUST use explicit `start()` methods. (Oct20.32 - SIMP-OCT18.2-S1).
+*   **1.216 Synthetic Physical Validation (R-ID 734)**: System MUST provide synthetic injection hooks. (Oct20.32 - ISSUE-OCT18.6-F1).
+*   **1.217 SNR Latch for Urban Multipath (R-ID 735)**: Implement a sustained security hold for high-SNR jumps. (Oct20.32 - ISSUE-OCT18.8-F1).
+*   **1.218 Steep-Drop Vibration Convergence (R-ID 736)**: Vibration floor MUST implement accelerated downward convergence. (Oct20.32 - ISSUE-OCT18.10-F1).
+*   **1.219 Acoustic Duty Cycle Overlap (R-ID 737)**: Microphone MUST start recording 500ms before cycle ends. (Oct20.32 - ISSUE-OCT18.12-F1).
+*   **1.220 Urban Reflectivity Altitude Gating (R-ID 738)**: Apply extreme skepticism when high-SNR reflection is accompanied by altitude shift. (Oct20.32 - ISSUE-OCT18.14-F1).
+*   **1.221 Doze Mode White-listing (R-ID 739)**: Allow telemetry signaling during Android Doze mode if white-listed. (Oct20.32 - ISSUE-OCT18.16-F1).
+*   **1.222 Test Isolation Lifecycle (R-ID 740)**: Repositories MUST provide hooks to inhibit batch processors. (Oct20.32 - ISSUE-OCT18.18-F1).
+*   **1.223 Battery Saver Signaling Policy (R-ID 741)**: Telemetry sync MUST be deferred when Battery Saver is active. (Oct20.32 - ISSUE-OCT18.22-F1).
+*   **1.224 Unified Network Callback Management (R-ID 742)**: Maintain exactly one `NetworkCallback` registration. (Oct20.32 - ISSUE-OCT18.22-F2).
+*   **1.225 Test Mode Restoration Bypass (R-ID 743)**: Provide a persistent bypass for service resumption. (Oct20.32 - ISSUE-OCT19.19-F1).
+*   **1.226 Document Integrity Baseline (R-ID 744)**: Maintain a versioned baseline directory (`STATUS/BASELINE/`). (Oct20.32 - ISSUE-OCT20.0-F1).
+*   **1.227 Deterministic Test Flushing (R-ID 745)**: Repositories MUST provide synchronous `flush` mechanisms. (Oct20.32 - ISSUE-OCT18.22-F3).
+*   **1.228 Forensic Circular Overwrite (R-ID 746)**: The `ForensicSpillBuffer` MUST implement a circular overwrite policy during overflow to ensure the most recent telemetry is always preserved. (Oct20.32 - ISSUE-OCT20.10-F1).
 *   **1.229 Trajectory Promotion Policy (R-ID 747)**: (Historical rule preserved in `STATUS/sot_master_archive.md`).
-*   **1.230 Singleton Network Callback Authority (R-ID 748)**: `AndroidNetworkProvider` MUST utilize a singleton-lifecycle Flow (`SharingStarted.Eagerly`) to prevent redundant system callback registrations and associated forensic leaks. (Oct20.24 - ISSUE-OCT20.23-F1).
-*   **1.231 Deterministic Audit Synchronization (R-ID 749)**: All persistence repositories MUST expose `flush` or synchronous execution tracking to ensure deterministic behavior during automated audits. (Oct20.24 - ISSUE-OCT20.23-F2).
+*   **1.230 Singleton Network Callback Authority (R-ID 748)**: `AndroidNetworkProvider` MUST utilize a singleton-lifecycle Flow (`SharingStarted.Eagerly`) to prevent redundant system callback registrations and associated forensic leaks. (Oct20.32 - ISSUE-OCT20.23-F1).
+*   **1.231 Deterministic Audit Synchronization (R-ID 749)**: All persistence repositories MUST expose `flush` or synchronous execution tracking to ensure deterministic behavior during automated audits. (Oct20.32 - ISSUE-OCT20.23-F2).
 *   **1.232 Back-Press Non-Termination (R-ID 601)**: The application MUST NOT terminate upon a single back-press while in active tracking or viewing modes. (Oct20.32 - ISSUE-OCT20.32-F1).
 *   **1.233 Forensic Service Persistence (R-ID 602)**: Forensic services MUST remain active in the foreground even if the UI is dismissed via the back button. (Oct20.32 - ISSUE-OCT20.32-F1).
 *   **1.234 Version String Alignment (R-ID 603)**: The version string box MUST be positioned at the bottom-most available coordinate of the UI container. (Oct20.32 - ISSUE-OCT20.32-F2).
 *   **1.235 HUD Button Legibility (R-ID 604)**: All header navigation buttons MUST be clearly visible and distinguishable from the map background. (Oct20.32 - ISSUE-OCT20.32-F3).
 *   **1.236 Bidirectional Connection State (R-ID 605)**: The Tracker MUST transition the VWR badge to Green/Cyan upon receipt of a valid `viewer_pulse` or `pong_activity`. (Oct20.32 - ISSUE-OCT20.32-F4).
 *   **1.237 Geofence Synchronization (R-ID 606)**: Home point updates on the Viewer MUST be propagated to the Tracker within 5 seconds under normal network conditions. (Oct20.32 - ISSUE-OCT20.32-F5).
+*   **1.238 Tracker UI Role-Lock (R-ID 607)**: The Tracker UI MUST strictly suppress all interactive configuration elements and local alarm manifestations to comply with R872 (Absolute Stealth). (Oct20.33 - ISSUE-OCT20.31-F1).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 794**: Tracker UI Role-Lock - PASSED. Purged forbidden authority elements from Tracker composition tree. (Oct20.33 - ISSUE-OCT20.31-F1).
 *   **SOT ID 793**: Home Point Synchronization - PASSED. Implemented `settings_relay` and automatic sync in `ConnectivitySuite`. (Oct20.32 - ISSUE-OCT20.32-F5).
 *   **SOT ID 792**: Asymmetrical Connection State - PASSED. Fixed pulse processing in `ConnectivitySuite` to ensure Tracker role updates peer state. (Oct20.32 - ISSUE-OCT20.32-F4).
 *   **SOT ID 791**: HUD Header Scrim/Occlusion - PASSED. Added `Slate900` scrim to upper HUD in `OverlayManager.kt`. (Oct20.32 - ISSUE-OCT20.32-F3).
 *   **SOT ID 790**: Version String Alignment - PASSED. Realigned version tag to `BottomStart` with minimal padding. (Oct20.32 - ISSUE-OCT20.32-F2).
 *   **SOT ID 789**: Back Button Termination Fix - PASSED. Verified `BackHandler` usage and activity lifecycle persistence. (Oct20.32 - ISSUE-OCT20.32-F1).
-*   **SOT ID 788**: Storage-Aware Adaptive Pruning - PASSED. (Oct20.27).
-*   **SOT ID 787**: Test Suite Version Regression - PASSED. (Oct20.25).
-*   **SOT ID 786**: Storage Pressure Audit Flakiness - PASSED. (Oct20.24).
-*   **SOT ID 785**: Redundant Connectivity Callback Leaks - PASSED. (Oct20.24).
-*   **SOT ID 784**: Test Suite Version Regression - PASSED. (Oct20.22).
-*   **SOT ID 783**: Forensic Circular Overwrite - PASSED. (Oct20.21).
-*   **SOT ID 782**: Storage Test Race Conditions - PASSED. (Oct20.10).
-*   **SOT ID 781**: Forensic Document Archival - PASSED. (Oct20.7).
+*   **SOT ID 788**: Storage-Aware Adaptive Pruning - PASSED. (Oct20.32).
+*   **SOT ID 787**: Test Suite Version Regression - PASSED. (Oct20.32).
+*   **SOT ID 786**: Storage Pressure Audit Flakiness - PASSED. (Oct20.32).
+*   **SOT ID 785**: Redundant Connectivity Callback Leaks - PASSED. (Oct20.32).
+*   **SOT ID 784**: Test Suite Version Regression - PASSED. (Oct20.32).
+*   **SOT ID 783**: Forensic Circular Overwrite - PASSED. (Oct20.32).
+*   **SOT ID 782**: Storage Test Race Conditions - PASSED. (Oct20.32).
+*   **SOT ID 781**: Forensic Document Archival - PASSED. (Oct20.32).
 *   **SOT ID 1 - 780**: (Historical baseline entries preserved in `STATUS/docs_history_archive.md`).
 
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 0.3 (Stealth Audit)**: PASSED - Purged forbidden authority elements from Tracker UI. (Oct20.33).
 *   **Chapter 0.6 (Peer Sync Audit)**: PASSED - Verified VWR badge logic and Geofence synchronization. (Oct20.32).
 *   **Chapter 0.5 (UI Occlusion Audit)**: PASSED - Verified HUD scrim contrast and version alignment. (Oct20.32).
 *   **Chapter 0.4 (Back Button Lifecycle)**: PASSED - Verified non-termination on return press. (Oct20.32).
-*   **Chapter 12.7 (Adaptive Pruning Audit)**: PASSED. (Oct20.27).
-*   **Chapter 12.6 (Regression Audit)**: PASSED. (Oct20.25).
-*   **Chapter 92.1 (Connectivity Audit)**: PASSED. (Oct20.24).
-*   **Chapter 12.2 (Test Determinism)**: PASSED. (Oct20.24).
-*   **Chapter 1-100 (Full Hardening Cycle)**: PASSED. (Oct18.8).
+*   **Chapter 12.7 (Adaptive Pruning Audit)**: PASSED. (Oct20.32).
+*   **Chapter 12.6 (Regression Audit)**: PASSED. (Oct20.32).
+*   **Chapter 92.1 (Connectivity Audit)**: PASSED. (Oct20.32).
+*   **Chapter 12.2 (Test Determinism)**: PASSED. (Oct20.32).
+*   **Chapter 1-100 (Full Hardening Cycle)**: PASSED. (Oct20.32).
