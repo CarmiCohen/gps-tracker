@@ -1,10 +1,10 @@
-# Test Procedure - GPS Tracker (vOct20.31)
+# Test Procedure - GPS Tracker (vOct20.32)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
 ---
 
-## Chapter 0 - Operational Forensic Audit (vOct20.31)
+## Chapter 0 - Operational Forensic Audit (vOct20.32)
 **Goal:** Verify system health via runtime telemetry and log signatures during deployment.
 
 *   **0.1 Logcat Anomaly Monitoring:** 
@@ -23,6 +23,19 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
         5. Confirm Map contains NO **Home Point** management tools (ADD/DEL).
         6. Tracker must remain a pure telemetry provider; all logic/alarm authority resides exclusively on the Viewer.
         7. The "TERMINATE TRACKING" button must be the only high-impact action allowed, ensuring no other logic-altering buttons exist.
+*   **0.4 Back Button Lifecycle (Issue #1424):**
+    *   **Action:** Tap the system "Return/Back" button while on the Viewer or Tracker screen.
+    *   **Verification:** Confirm the app DOES NOT close or cease operations. It should either stay on the current screen (if it's the root) or navigate back correctly without process termination.
+*   **0.5 UI Alignment & Occlusion Audit (Issue #1425, #1426):**
+    *   **Action:** Inspect the Viewer UI in various orientations.
+    *   **Verification:** 
+        1. **Version Position**: Confirm the version string (e.g., `Oct20.32`) is at the absolute bottom-start edge of the screen.
+        2. **HUD Visibility**: Confirm the upper HUD header (containing Settings, Info, etc.) has a Slate900 scrim ensuring contrast against the map.
+*   **0.6 Peer Sync & Connectivity Audit (Issue #1427, #1428):**
+    *   **Action:** Connect a Viewer and a Tracker. Add/Remove home points on the Viewer.
+    *   **Verification:** 
+        1. **VWR Badge**: Confirm the VWR badge on the Tracker turns Green/Cyan when the Viewer is active.
+        2. **Geofence Sync**: Confirm the Tracker receives and logs "Received geofences from remote Viewer" when points are modified on the Viewer.
 
 ## Chapter 1 - Deployment & Initial Launch
 **Goal:** Verify clean installation and landing page stability.
@@ -33,7 +46,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   Deploy the latest build via Android Studio.
 *   **1.3 Version Verification (Issue #OCT15.6-T1):**
     *   **Action:** Observe the version string displayed at the bottom of the Landing Screen or in Settings.
-    *   **Verification:** Confirm the string matches the expected release version (e.g., `Oct20.31_PLATINUM`).
+    *   **Verification:** Confirm the string matches the expected release version (e.g., `Oct20.32_PLATINUM`).
 *   **1.4 Permission Onboarding:** 
     *   Launch the app and grant all requested permissions.
 *   **1.5 Landing Page Stability:** 
@@ -166,7 +179,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   **Action:** Update remote battery level and observe HUD recomposition counts via Layout Inspector.
     *   **Verification:** Confirm that only the battery-related sub-components recompose. The map and other telemetry slices must remain unaffected due to granular interface slicing.
 
-## Chapter 8 - Validation Hooks & Aggregation (vOct20.31)
+## Chapter 8 - Validation Hooks & Aggregation (vOct20.32)
 **Goal:** Verify the new simulation hooks and UI state aggregation logic.
 *   **8.1 Forensic Stall Simulation:** Toggle simulation in Diagnostics.
     *   **Verification:** Observe Logcat for `Forensic Audit: Simulation mode ENABLED` and verify `ALERT_ID_PERFORMANCE_SPIKE` triggers if EMA reliability drops below 0.85.
@@ -295,7 +308,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **71: Forensic Spatial Quantization Efficiency (R701).**
 *   **72: WorkManager Expedited Execution Recovery.**
 *   **73: Signaling Emit Delay Throttle Stability.**
-*   **74: History Ribbon Point Rendering Precision.**
+*   **74: History Ribbon Point Rendering precision.**
 *   **75: Native Direct Buffer Allocation Safety.**
 *   **76: Activity Recognition Settling Logic (2s deferral).**
 *   **77: Acoustic Floor Contraction Stability. (SIMP-OCT18.10-S1)**
@@ -309,7 +322,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **83: App Standby Bucket Policy Compliance.**
 *   **84: RT vs Wall-clock Authority Delta Audit.**
 *   **85: RTL HUD Mirroring Integrity.**
-*   **86: Adaptive Proximity特色 Debounce Stress Test.**
+*   **86: Adaptive Proximity Debounce Stress Test.**
 *   **87: Mali Driver Configuration Recovery (GPU Stall).**
 *   **88: Telemetry Push Nullability Safety.**
 *   **89: PINK_COLOR Contrast A11y Audit.**
@@ -331,4 +344,4 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ---
 **Total Testing Chapters: 100**
-*(Full historical procedure restored and synchronized Oct20.31)*
+*(Full historical procedure restored and synchronized Oct20.32)*

@@ -21,15 +21,11 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Oct.20.32:
+ * - Home Point Sync: Added listener for "settings_relay" to support geofence 
+ *   synchronization between Viewer and Tracker.
  * Oct.12.19:
- * - ISSUE-OCT12.16-5: Hardened connect() with idempotency check to prevent socket 
- *   churn and reset-bombing during rapid network handovers.
- * Oct.12.17:
- * - ISSUE-OCT12.13-7: Hardened connection logic with error event handling 
- *   and safety timeouts to prevent isConnecting latch stalls.
- * Oct.11.9:
- * - Issue #SIMP-1011-23: Adaptive Signaling. Propagated PerformanceTier and RTT 
- *   to SmartSignalingDispatcher for adaptive conflation.
+ * - ISSUE-OCT12.16-5: Hardened connect() with idempotency check.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -106,7 +102,7 @@ class CommunicationManager @Inject constructor(
         return mapOf(
             "id" to SignalingConstants.getTransmissionId(deviceId),
             "role" to if (isTrackerMode) "tracker" else "viewer",
-            "ver" to "Oct12.19"
+            "ver" to "Oct20.32"
         )
     }
 
@@ -145,7 +141,6 @@ class CommunicationManager @Inject constructor(
         val newDeviceId = deviceId.trim()
         val newViewerId = viewerId.trim()
 
-        // ISSUE-OCT12.16-5: Idempotency check to prevent socket churn during rapid handover.
         if (!isStopped && socket != null && (socket?.connected() == true || isConnectingInternal.get())) {
             if (this.relayUrl == newUrl && this.deviceId == newDeviceId && this.viewerId == newViewerId && this.isTrackerMode == isTracker) {
                 logToApp("Connect: Session already active/connecting for $newUrl. Skipping reconstruction.")
@@ -193,7 +188,6 @@ class CommunicationManager @Inject constructor(
             registerSocketListeners(sessionId)
             socket?.connect()
             
-            // Safety fallback to prevent latch stall
             scope.launch {
                 delay(35000)
                 if (sessionId == currentSessionId.get() && isConnectingInternal.get()) {
@@ -268,6 +262,9 @@ class CommunicationManager @Inject constructor(
         s.on("viewer_status_relay") { args -> checkSession { markTraffic(); handleViewerStatusRelay(args) } }
         s.on("ping_relay") { args -> checkSession { markTraffic(); handlePingRelay(args) } }
         s.on("pong_relay") { args -> checkSession { markTraffic(); handlePongRelay(args) } }
+        
+        // Oct.20.32: Relay for arbitrary settings/home-points synchronization.
+        s.on("settings_relay") { args -> checkSession { markTraffic(); handleSettingsRelay(args) } }
     }
 
     private fun handleLocationRelay(args: Array<Any>) {
@@ -317,6 +314,22 @@ class CommunicationManager @Inject constructor(
                 put("type", "viewer_pulse"); put("id", deviceId); put("viewer_id", incomingViewerId); put("from_viewer", true)
             }))
         } catch (e: Exception) { Timber.e(e, "viewer_status_relay parse error") }
+    }
+
+    private fun handleSettingsRelay(args: Array<Any>) {
+        try {
+            val data = if (args.size > 1 && args[1] is JSONObject) args[1] as JSONObject 
+                       else args[0] as JSONObject
+            val wrapped = JSONObject()
+            val keys = data.keys()
+            while(keys.hasNext()) { 
+                val k = keys.next() as String
+                val v = data.opt(k)
+                if (v != null) wrapped.put(k, v) 
+            }
+            wrapped.put("type", "settings_relay")
+            _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(wrapped))
+        } catch (e: Exception) { Timber.e(e, "settings_relay parse error") }
     }
 
     private fun handlePingRelay(args: Array<Any>) {

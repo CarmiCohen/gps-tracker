@@ -16,14 +16,11 @@ import javax.inject.Singleton
 
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
+ * Oct.20.32:
+ * - Home Point Sync: Triggering connectivitySuite.syncHomePoints() on geofence mutations
+ *   to ensure remote tracker parity.
  * Oct.20.24:
- * - ISSUE-OCT20.23-F2: Wrapped repository.clearLogs() in a coroutine scope to 
- *   handle its transition to a suspend function. Fixed property access error 
- *   in BulkUpdateSettings. Fixed typo in IS_XIAOMI_MANUAL_OVERRIDE_KEY.
- * Oct.19.19:
- * - ISSUE-OCT19.19-F1: Handled SetRestorationDisabled event for bypass R-ID 242.
- * Oct.18.6:
- * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection.
+ * - ISSUE-OCT20.23-F2: Wrapped repository.clearLogs() in a coroutine scope.
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -39,7 +36,8 @@ class UiEventCoordinator @Inject constructor(
     private val sirenLockoutUseCase: SirenLockoutUseCase,
     private val systemStatusProvider: SystemStatusProvider,
     private val sessionManager: SessionManager,
-    private val syntheticEventInjector: SyntheticEventInjector
+    private val syntheticEventInjector: SyntheticEventInjector,
+    private val connectivitySuite: ConnectivitySuite
 ) {
 
     private var autoSaveJob: Job? = null
@@ -225,6 +223,7 @@ class UiEventCoordinator @Inject constructor(
                     withContext(Dispatchers.Main.immediate) {
                         onStateUpdate { it.copy(spatial = it.spatial.copy(homePoints = newPoints, isFenceVisible = true)) }
                     }
+                    connectivitySuite.syncHomePoints()
                 }
             }
 
@@ -235,6 +234,7 @@ class UiEventCoordinator @Inject constructor(
                     withContext(Dispatchers.Main.immediate) {
                         onStateUpdate { it.copy(spatial = it.spatial.copy(homePoints = newPoints)) }
                     }
+                    connectivitySuite.syncHomePoints()
                 }
             }
 
@@ -245,6 +245,7 @@ class UiEventCoordinator @Inject constructor(
                     withContext(Dispatchers.Main.immediate) {
                         onStateUpdate { it.copy(spatial = it.spatial.copy(homePoints = newPoints)) }
                     }
+                    connectivitySuite.syncHomePoints()
                 }
             }
 

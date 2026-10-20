@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct20.27)
+# SOT Master Requirements & Hardening Status (Oct20.32)
 
-## 🏗️ Architectural Master Rules (304 Rules)
+## 🏗️ Architectural Master Rules (310 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -54,12 +54,23 @@
 *   **1.229 Trajectory Promotion Policy (R-ID 747)**: (Historical rule preserved in `STATUS/sot_master_archive.md`).
 *   **1.230 Singleton Network Callback Authority (R-ID 748)**: `AndroidNetworkProvider` MUST utilize a singleton-lifecycle Flow (`SharingStarted.Eagerly`) to prevent redundant system callback registrations and associated forensic leaks. (Oct20.24 - ISSUE-OCT20.23-F1).
 *   **1.231 Deterministic Audit Synchronization (R-ID 749)**: All persistence repositories MUST expose `flush` or synchronous execution tracking to ensure deterministic behavior during automated audits. (Oct20.24 - ISSUE-OCT20.23-F2).
+*   **1.232 Back-Press Non-Termination (R-ID 601)**: The application MUST NOT terminate upon a single back-press while in active tracking or viewing modes. (Oct20.32 - ISSUE-OCT20.32-F1).
+*   **1.233 Forensic Service Persistence (R-ID 602)**: Forensic services MUST remain active in the foreground even if the UI is dismissed via the back button. (Oct20.32 - ISSUE-OCT20.32-F1).
+*   **1.234 Version String Alignment (R-ID 603)**: The version string box MUST be positioned at the bottom-most available coordinate of the UI container. (Oct20.32 - ISSUE-OCT20.32-F2).
+*   **1.235 HUD Button Legibility (R-ID 604)**: All header navigation buttons MUST be clearly visible and distinguishable from the map background. (Oct20.32 - ISSUE-OCT20.32-F3).
+*   **1.236 Bidirectional Connection State (R-ID 605)**: The Tracker MUST transition the VWR badge to Green/Cyan upon receipt of a valid `viewer_pulse` or `pong_activity`. (Oct20.32 - ISSUE-OCT20.32-F4).
+*   **1.237 Geofence Synchronization (R-ID 606)**: Home point updates on the Viewer MUST be propagated to the Tracker within 5 seconds under normal network conditions. (Oct20.32 - ISSUE-OCT20.32-F5).
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 788**: Storage-Aware Adaptive Pruning - PASSED. Implemented health-aware dynamic pruning thresholds in `LogRepository` (R728, R712). (Oct20.27 - ISSUE-OCT20.27-F1).
-*   **SOT ID 787**: Test Suite Version Regression - PASSED. Aligned `MainViewModelMappingTest` with `Oct20.25` baseline. (Oct20.25 - ISSUE-OCT20.25-F1).
-*   **SOT ID 786**: Storage Pressure Audit Flakiness - PASSED. Resolved race conditions in `StoragePressureAuditTest` by implementing `repository.flushTrails()` and making `clearLogs()` suspendable. (Oct20.24 - ISSUE-OCT20.23-F2).
-*   **SOT ID 785**: Redundant Connectivity Callback Leaks - PASSED. Transitioned to `SharingStarted.Eagerly` in `AndroidNetworkProvider` to eliminate redundant registrations. (Oct20.24 - ISSUE-OCT20.23-F1).
+*   **SOT ID 793**: Home Point Synchronization - PASSED. Implemented `settings_relay` and automatic sync in `ConnectivitySuite`. (Oct20.32 - ISSUE-OCT20.32-F5).
+*   **SOT ID 792**: Asymmetrical Connection State - PASSED. Fixed pulse processing in `ConnectivitySuite` to ensure Tracker role updates peer state. (Oct20.32 - ISSUE-OCT20.32-F4).
+*   **SOT ID 791**: HUD Header Scrim/Occlusion - PASSED. Added `Slate900` scrim to upper HUD in `OverlayManager.kt`. (Oct20.32 - ISSUE-OCT20.32-F3).
+*   **SOT ID 790**: Version String Alignment - PASSED. Realigned version tag to `BottomStart` with minimal padding. (Oct20.32 - ISSUE-OCT20.32-F2).
+*   **SOT ID 789**: Back Button Termination Fix - PASSED. Verified `BackHandler` usage and activity lifecycle persistence. (Oct20.32 - ISSUE-OCT20.32-F1).
+*   **SOT ID 788**: Storage-Aware Adaptive Pruning - PASSED. (Oct20.27).
+*   **SOT ID 787**: Test Suite Version Regression - PASSED. (Oct20.25).
+*   **SOT ID 786**: Storage Pressure Audit Flakiness - PASSED. (Oct20.24).
+*   **SOT ID 785**: Redundant Connectivity Callback Leaks - PASSED. (Oct20.24).
 *   **SOT ID 784**: Test Suite Version Regression - PASSED. (Oct20.22).
 *   **SOT ID 783**: Forensic Circular Overwrite - PASSED. (Oct20.21).
 *   **SOT ID 782**: Storage Test Race Conditions - PASSED. (Oct20.10).
@@ -69,11 +80,11 @@
 ---
 
 ## ✅ Verification Chapters
-*   **Chapter 12.7 (Adaptive Pruning Audit)**: PASSED - Verified health-aware dynamic pruning thresholds in `LogRepository`. (Oct20.27).
-*   **Chapter 12.6 (Regression Audit)**: PASSED - Verified full test suite passability after versioning alignment to Oct20.25. (Oct20.25).
-*   **Chapter 92.1 (Connectivity Audit)**: PASSED - Verified zero redundant callback registrations in Logcat using `SharingStarted.Eagerly`. (Oct20.24).
-*   **Chapter 12.2 (Test Determinism)**: PASSED - Verified deterministic behavior in `StoragePressureAuditTest` after implementing repository flush mechanisms. (Oct20.24).
-*   **Chapter 12.5 (Regression Audit)**: PASSED - Verified full test suite passability after versioning alignment. (Oct20.22).
-*   **Chapter 12.4 (Overflow Resiliency)**: PASSED - Validated circular overwrite in `ForensicBufferSchemaTest`. (Oct20.21).
-*   **Chapter 12.3 (Persistence Prioritization)**: PASSED - Validated deterministic flushing in `StoragePressureAuditTest`. (Oct20.10).
-*   **Chapter 1-100 (Full Hardening Cycle)**: PASSED - Verified counter stability and state persistence over 24h soak simulation. (Oct18.8).
+*   **Chapter 0.6 (Peer Sync Audit)**: PASSED - Verified VWR badge logic and Geofence synchronization. (Oct20.32).
+*   **Chapter 0.5 (UI Occlusion Audit)**: PASSED - Verified HUD scrim contrast and version alignment. (Oct20.32).
+*   **Chapter 0.4 (Back Button Lifecycle)**: PASSED - Verified non-termination on return press. (Oct20.32).
+*   **Chapter 12.7 (Adaptive Pruning Audit)**: PASSED. (Oct20.27).
+*   **Chapter 12.6 (Regression Audit)**: PASSED. (Oct20.25).
+*   **Chapter 92.1 (Connectivity Audit)**: PASSED. (Oct20.24).
+*   **Chapter 12.2 (Test Determinism)**: PASSED. (Oct20.24).
+*   **Chapter 1-100 (Full Hardening Cycle)**: PASSED. (Oct18.8).

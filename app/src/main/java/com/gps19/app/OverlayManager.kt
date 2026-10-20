@@ -24,12 +24,13 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayManager: Unified HUD management for GPS Tracker.
+ * Oct.20.32:
+ * - HUD Header Scrim (#1426): Replaced Transparent surface with Slate900 scrim 
+ *   to ensure header buttons are visible over map content.
+ * - Version Alignment (#1425): Reduced bottom padding and shifted version 
+ *   tag to BottomStart to match user requested alignment and visibility.
  * Oct.14.8:
- * - SIMP-OCT13.21-S1: Pure Event HUD. Flattened HeaderBar and GlobalStatusBar 
- *   integration by migrating to centralized onMainEvent bubbling.
- * Oct.13.21:
- * - SIMP-OCT13.21-S1: Pure Event HUD. Pruned onSaveTrail and onLoadTrail 
- *   lambdas in favor of centralized event bubbling via onMainEvent.
+ * - SIMP-OCT13.21-S1: Pure Event HUD.
  */
 
 @Composable
@@ -79,7 +80,11 @@ fun UnifiedHUDOverlay(
                 }
             } else {
                 Column(modifier = Modifier.fillMaxWidth().zIndex(10f)) {
-                    Surface(color = if (isMapVisible) Color.Transparent else MaterialTheme.colorScheme.background, modifier = Modifier.fillMaxWidth()) {
+                    // Issue #1426: Added Slate900 scrim for contrast
+                    Surface(
+                        color = if (isMapVisible) Slate900.copy(alpha = 0.6f) else MaterialTheme.colorScheme.background, 
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Column {
                             HeaderBar(
                                 isLogVisible = nav.isLogVisible, isSettingsOpen = nav.isSettingsOpen, isRibbonsVisible = nav.isRibbonsVisible, isMapVisible = nav.isMapVisible, isPhoneSetupVisible = nav.isPhoneSetupVisible,
@@ -109,18 +114,18 @@ private fun MapSpecificOverlays(
     val toggleTopPadding = if (isLandscape) 12.dp else 110.dp
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Version Tag
+        // Issue #1425: Version Tag alignment fix
         Text(
             text = BuildConfig.VERSION_NAME,
             color = Color.White,
-            fontSize = 9.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Black,
             modifier = Modifier
-                .align(Alignment.BottomEnd)
+                .align(Alignment.BottomStart) // Shifted to BottomStart per screenshot
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(end = 6.dp, bottom = 44.dp)
+                .padding(start = 8.dp, bottom = 4.dp) // Reduced bottom padding to pin to bottom
                 .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(2.dp))
-                .padding(horizontal = 4.dp, vertical = 1.dp)
+                .padding(horizontal = 6.dp, vertical = 2.dp)
         )
 
         if (mapState.showSettingsButton) {

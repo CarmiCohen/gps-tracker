@@ -11,6 +11,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.*
+import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
 import java.util.concurrent.PriorityBlockingQueue
@@ -22,14 +23,13 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.20.32:
+ * - Connection Asymmetry Fix: Ensure setTrackerConnected(true) is called for 
+ *   all valid pulses (TRK/VWR) to resolve red-badge bug.
+ * - Home Point Sync: Implemented syncSettings relay to copy geofences from 
+ *   Viewer to Tracker.
  * Oct.18.24:
- * - ISSUE-OCT18.22-F1: Battery Saver Restricted Network behavior. Updated 
- *   deferral logs to "(Doze/PowerSave active)" for Chapter 38 compliance.
- * Oct.13.30:
- * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
- * Oct.11.9:
- * - Issue #SIMP-1011-23: Latency Compensation. Implemented arrival-time 
- *   jitter correction for remote updates to prevent UI trail stutter.
+ * - ISSUE-OCT18.22-F1: Battery Saver Restricted Network behavior.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -625,6 +625,18 @@ class ConnectivitySuite @Inject constructor(
             handleRemoteLog(LogEntry.fromJSONObject(data))
             return
         }
+        
+        // Oct.20.32: Handle remote settings relay (Home Points)
+        if (type == "settings_relay") {
+            if (isTrackerMode && fromViewer) {
+                if (data.has("home_points")) {
+                    handleRemoteHomePointsSync(data.getJSONArray("home_points"))
+                }
+            }
+            domainEventBus.emit(ConnectivityEvent.PeerPulse(peerId))
+            remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt)
+            return
+        }
 
         if (isTrackerMode && fromViewer && type == "acknowledge_alarm") {
             val ackTs = data.optLong("ack_ts", 0L)
@@ -672,9 +684,9 @@ class ConnectivitySuite @Inject constructor(
         }
 
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
-            if (!isTrackerMode && !fromViewer) {
-                remoteStatusRepository.setTrackerConnected(true)
-            }
+            // Oct.20.32: Fixed red-badge bug by ensuring tracker sets connected=true for viewer_pulse
+            remoteStatusRepository.setTrackerConnected(true)
+            
             domainEventBus.emit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt)
             mainRepository.updateRemoteActivity(nowRt)
@@ -732,6 +744,48 @@ class ConnectivitySuite @Inject constructor(
                 domainEventBus.emit(DomainEvent.PeerStatusReceived(statusFlyweight.duplicate()))
 
                 statusFlyweight
+            }
+        }
+    }
+    
+    private fun handleRemoteHomePointsSync(array: JSONArray) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val points = mutableListOf<org.osmdroid.util.GeoPoint>()
+                for (i in 0 until array.length()) {
+                    val obj = array.getJSONObject(i)
+                    points.add(org.osmdroid.util.GeoPoint(obj.getDouble("lat"), obj.getDouble("lng")))
+                }
+                mainRepository.saveHomePoints(points)
+                logManagerProvider.get().logServiceEvent("SYNC: Received ${points.size} geofences from remote Viewer.", true)
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to sync remote home points")
+            }
+        }
+    }
+
+    fun syncHomePoints() {
+        if (isTrackerMode || !isConnected || isStopped.get()) return
+        scope.launch(Dispatchers.IO) {
+            try {
+                val points = mainRepository.loadHomePoints()
+                val array = JSONArray()
+                points.forEach { pt ->
+                    array.put(JSONObject().apply { put("lat", pt.latitude); put("lng", pt.longitude) })
+                }
+                
+                val payload = JSONObject().apply {
+                    put("type", "settings_update")
+                    put("id", SignalingConstants.getTransmissionId(deviceId))
+                    put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
+                    put("from_viewer", true)
+                    put("home_points", array)
+                }
+                
+                signalingProvider.emit("settings_update", payload, SignalingPriority.HIGH)
+                Timber.i("ConnectivitySuite: Emitted home_points sync to Tracker.")
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to emit home_points sync")
             }
         }
     }
