@@ -1,10 +1,10 @@
-# Test Procedure - GPS Tracker (vOct18.24)
+# Test Procedure - GPS Tracker (vOct20.31)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
 ---
 
-## Chapter 0 - Operational Forensic Audit (vOct18.24)
+## Chapter 0 - Operational Forensic Audit (vOct20.31)
 **Goal:** Verify system health via runtime telemetry and log signatures during deployment.
 
 *   **0.1 Logcat Anomaly Monitoring:** 
@@ -13,6 +13,16 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **0.2 Event Log Continuity:** 
     *   **Action:** Observe "Stay-alive pulse" and "PRUNING" signatures in Logcat.
     *   **Verification:** Confirm pulses trigger every 30s. Confirm maintenance tasks execute without blocking the main thread.
+*   **0.3 Tracker Stealth & Authority Audit (Issue #Oct20.31-F1):**
+    *   **Action:** Deploy the app in Tracker Mode and inspect the UI, HUD, and Settings.
+    *   **Verification:** **ABSOLUTE STEALTH (R872)**. 
+        1. Confirm HUD contains NO **ALM** badge or **ALARM** indicators.
+        2. Confirm HUD contains NO **LOCK** or interactive alarm control buttons.
+        3. Confirm HUD contains NO **SIREN** indicators or audio activity.
+        4. Confirm Settings contains NO **Alerts**, **Sound**, or **Calibration** menus.
+        5. Confirm Map contains NO **Home Point** management tools (ADD/DEL).
+        6. Tracker must remain a pure telemetry provider; all logic/alarm authority resides exclusively on the Viewer.
+        7. The "TERMINATE TRACKING" button must be the only high-impact action allowed, ensuring no other logic-altering buttons exist.
 
 ## Chapter 1 - Deployment & Initial Launch
 **Goal:** Verify clean installation and landing page stability.
@@ -23,7 +33,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   Deploy the latest build via Android Studio.
 *   **1.3 Version Verification (Issue #OCT15.6-T1):**
     *   **Action:** Observe the version string displayed at the bottom of the Landing Screen or in Settings.
-    *   **Verification:** Confirm the string matches the expected release version (e.g., `Oct18.24_PLATINUM`).
+    *   **Verification:** Confirm the string matches the expected release version (e.g., `Oct20.31_PLATINUM`).
 *   **1.4 Permission Onboarding:** 
     *   Launch the app and grant all requested permissions.
 *   **1.5 Landing Page Stability:** 
@@ -156,7 +166,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   **Action:** Update remote battery level and observe HUD recomposition counts via Layout Inspector.
     *   **Verification:** Confirm that only the battery-related sub-components recompose. The map and other telemetry slices must remain unaffected due to granular interface slicing.
 
-## Chapter 8 - Validation Hooks & Aggregation (vOct18.24)
+## Chapter 8 - Validation Hooks & Aggregation (vOct20.31)
 **Goal:** Verify the new simulation hooks and UI state aggregation logic.
 *   **8.1 Forensic Stall Simulation:** Toggle simulation in Diagnostics.
     *   **Verification:** Observe Logcat for `Forensic Audit: Simulation mode ENABLED` and verify `ALERT_ID_PERFORMANCE_SPIKE` triggers if EMA reliability drops below 0.85.
@@ -276,7 +286,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **64: Large Status Push RTT Impact.**
 *   **65: Spill-Buffer Mapped Memory Overhead Audit.**
 *   **66: GNSS Satellite Detail Depth (SNR Snapshot).**
-*   **67: Proximity Debounce Scaling (Stationary R742).**
+*   **67: Proximity Debug Scaling (Stationary R742).**
 *   **68: HistoryDao Buffer Flushing Atomicity. (ISSUE-OCT18.18-F1)**
 *   **69: Theme Stability across Configuration Changes.**
 *   **70: Spill-Buffer Replay Latency (<500ms).**
@@ -299,7 +309,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **83: App Standby Bucket Policy Compliance.**
 *   **84: RT vs Wall-clock Authority Delta Audit.**
 *   **85: RTL HUD Mirroring Integrity.**
-*   **86: Adaptive Proximity Debounce Stress Test.**
+*   **86: Adaptive Proximity特色 Debounce Stress Test.**
 *   **87: Mali Driver Configuration Recovery (GPU Stall).**
 *   **88: Telemetry Push Nullability Safety.**
 *   **89: PINK_COLOR Contrast A11y Audit.**
@@ -321,4 +331,4 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 
 ---
 **Total Testing Chapters: 100**
-*(Full historical procedure restored and synchronized Oct18.24)*
+*(Full historical procedure restored and synchronized Oct20.31)*

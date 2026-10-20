@@ -1,13 +1,14 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct20.27
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct20.31
 
-## 🎯 Current Resumption Focus: Forensic Remediation of Storage Leaks.
+## 🎯 Current Resumption Focus: Architectural Restoration of Tracker Stealth.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   (None)
+*   **ISSUE-OCT20.31-F1: Forbidden Tracker Authority & Stealth Breach (High).** Tracker Mode UI contains forbidden interactive elements (Home Point management, Alert settings) and telemetry badges (ALM) that violate R872 (Absolute Stealth) and Role-Based Authority logic. The Tracker must be strictly dark and silent, with zero local alarm logic.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 58)
+## 💡 Strategic Simplification Ideas (Ideas: 59)
+*   **SIMP-OCT20.31-S1: Tracker UI Role-Lock (High).** Consider a hard-coded UI branching logic that completely removes all interactive configuration and alarm-related components from the Tracker composition tree, ensuring R872 cannot be violated by navigation state drifts.
 *   **SIMP-OCT20.27-S1: Pruning Threshold Telemetry (Low).** Consider adding a specific log event that reports the effective pruning thresholds selected during a maintenance cycle to verify adaptive logic in the field.
 *   **SIMP-OCT20.25-S1: Deterministic Test Rule (Low).** Consider creating a `PersistenceTestRule` that automatically handles `repository.flushTrails()` and `logRepository.flushLogs()` in `@After` hooks to ensure test-to-test isolation and reduce boilerplate in audit suites.
 *   **SIMP-OCT20.24-S1: Flow-Based Network State Sentinel (Low).** Consider removing the legacy `registerListener` / `unregisterListener` logic in `AndroidNetworkProvider` and purely exposing `isNetworkAvailableFlow` to consumers, further simplifying state management.
@@ -48,6 +49,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct20.31: [SOT Count: 788 (Rules: 304), Open: H:1, M:0, L:0, Ideas: H:2, M:20, L:37, Testing: 5 (Sub-items: 8), QA: 358]**
 - **Oct20.27: [SOT Count: 788 (Rules: 304), Open: H:0, M:0, L:0, Ideas: H:1, M:20, L:37, Testing: 5 (Sub-items: 8), QA: 358]**
 - **Oct20.25: [SOT Count: 787 (Rules: 304), Open: H:0, M:0, L:0, Ideas: H:1, M:20, L:36, Testing: 5 (Sub-items: 8), QA: 357]**
 - **Oct20.24: [SOT Count: 786 (Rules: 303), Open: H:0, M:0, L:0, Ideas: H:1, M:20, L:35, Testing: 5 (Sub-items: 8), QA: 357]**
