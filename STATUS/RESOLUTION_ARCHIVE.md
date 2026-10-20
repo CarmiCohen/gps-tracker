@@ -1,5 +1,13 @@
 # Resolution Archive - GPS Tracker
 
+## ISSUE-OCT20.0-F1: Document Integrity Baseline (Oct20.0)
+- **Resolved**: Oct20.0
+- **Description**: To prevent future accidental truncations of the project's historical audit trail, a read-only (by convention) baseline directory was established.
+- **Remediation**:
+    - **Baseline Creation (R-ID 744)**: Created `STATUS/BASELINE/Oct19.20/` containing the verified restoration of `SOT_MASTER_REQUIREMENTS.md` and `RESOLUTION_ARCHIVE.md`.
+    - **Policy Enforcement**: Updated `DEVELOPER_GUIDELINES.md` to require versioned baselines at the end of each version cycle.
+- **Outcome**: 🟢 **PASSED**. Forensic documents are now protected by a multi-layered versioning strategy. (SOT ID 775).
+
 ## ISSUE-OCT19.20-F1: Forensic Document Recovery (Oct19.20)
 - **Resolved**: Oct19.20
 - **Description**: Accidental truncation of the Resolution Archive and SOT Master Requirements led to a temporary loss of the project's historical audit trail.
@@ -268,7 +276,7 @@
 
 ## 9. Forensic Continuity & Startup Hardening (July.20.01)
 *   **Issue #105**: Forensic Ribbon Continuity Verification. Remediated \"monotonic reset\" bug. Reconstructed monotonic timeline on startup using persisted drift references.
-*   **Issue #104**: Startup ANR Hardening (Proactive Log Pruning). Integrated proactive pruning into `MainViewModel` startup sequence.
+*   **Issue #104**: Startup ANR Hardening (Proactive Log Pruning). Integrated proactive pruning into `MainViewModel startup sequence.
 
 ## 10. Temporal Integrity & Persistence (July.19.04)
 *   **Issue #103**: Drift Reference Persistence. Ensured `clockDriftRef` survives process death.
@@ -290,4 +298,4 @@
 *   **Issue #014**: System-Wide Type Safety. Standardized telemetry fields to `Double` (v9.1.7).
 *   **Issue #043**: Migration Integrity Audit (R985). Verified and hardened v53 Room database migration (v9.1.7).
 
-**TOTAL UNIQUE RESOLUTIONS: 345**
+**TOTAL UNIQUE RESOLUTIONS: 346**

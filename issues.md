@@ -1,13 +1,14 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct19.20
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct20.0
 
-## 🎯 Current Resumption Focus: Storage Test Race Conditions (#OCT18.22-F3).
+## 🎯 Current Resumption Focus: Viewer with Simulated Tracker (#OCT19.0-F1).
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 *   **ISSUE-OCT18.22-F3: Storage Test Race Conditions (Low).** Intermittent failures in `StoragePressureAuditTest` suggest non-determinism in manual log flushing.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 49)
+## 💡 Strategic Simplification Ideas (Ideas: 50)
+*   **SIMP-OCT19.20-S1: Automated Doc-Sync Hook (Low).** Consider implementing a pre-commit hook that verifies `SOT_MASTER_REQUIREMENTS.md` length and header count against `RESOLUTION_ARCHIVE.md` to prevent future accidental truncations.
 *   **SIMP-OCT19.19-S1: Unified Restoration Policy (Low).** Consider moving the restoration bypass logic from `MainViewModel` into `SessionUseCase` to centralize all session startup decisions and reduce ViewModel complexity.
 *   **SIMP-OCT18.24-S1: Reactive Signaling Deferral (Low).** Consider unifying the shouldDeferSignaling check into a single Flow<Boolean> that ConnectivitySuite can collect, reducing repetitive polling and improving state synchronization.
 *   **SIMP-OCT18.18-S1: Manual Processor Reification (Low).** Formalize the `triggerManualBatchProcessor` into a `TestingCommand` stream to avoid adding `@VisibleForTesting` methods to production repositories.
@@ -23,8 +24,10 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
-*   **ISSUE-OCT19.20-F1: SOT Master Requirements Recovery.** Resolved Oct19.20. Fully restored `SOT_MASTER_REQUIREMENTS.md` by merging historical rules and baseline entries with Oct19.19 additions.
-*   **ISSUE-OCT19.19-F1: Test Mode Restoration Bypass.** Resolved Oct19.19. Implemented persistent `isRestorationDisabled` flag and ViewModel hook to bypass R-ID 242, enabling deterministic cross-mode testing. (SOT ID 773).
+*   **ISSUE-OCT20.0-F1: Document Integrity Baseline.** Resolved Oct20.0. Established a versioned baseline directory (`STATUS/BASELINE/Oct19.20/`) for critical status documents to prevent accidental truncation. (SOT ID 775).
+*   **ISSUE-OCT19.20-F2: Completion Sequence Hardening.** Resolved Oct20.0. Updated `DEVELOPER_GUIDELINES.md` to include a dedicated Forensic Doc-Check (Rule 8) in the completion sequence.
+*   **ISSUE-OCT19.20-F1: SOT Master Requirements Recovery.** Resolved Oct18.8. Fully restored `SOT_MASTER_REQUIREMENTS.md` by merging historical rules and baseline entries with Oct18.8 additions.
+*   **ISSUE-OCT19.19-F1: Test Mode Restoration Bypass.** Resolved Oct18.8. Implemented persistent `isRestorationDisabled` flag and ViewModel hook to bypass R-ID 242, enabling deterministic cross-mode testing. (SOT ID 773).
 *   **ISSUE-OCT18.22-F2: Redundant Network Callback Registrations.** Resolved Oct18.8. Consolidated all ConnectivityManager callback management into `AndroidNetworkProvider` and refactored `SystemStatusProviderImpl` to consume the unified flow. (SOT ID 772).
 *   **ISSUE-OCT18.22-F1: Battery Saver Restricted Network behavior.** Resolved Oct18.8. Updated `ConnectivitySuite` logging to explicitly reflect `PowerSave` status in forensic traces, ensuring compliance with Chapter 38 audit signatures. (SOT ID 771).
 *   **ISSUE-OCT18.18-F1: Storage Test Determinism.** Resolved Oct18.8. Added `triggerManualBatchProcessor()` to `LogRepository` to ensure deterministic log flushing during tests. (SOT ID 770).
@@ -38,6 +41,6 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct19.20: [SOT Count: 465 (Rules: 299), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:29, Testing: 100 (Sub-items: 101), QA: 393]**
-- **Oct19.19: [SOT Count: 465 (Rules: 299), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:29, Testing: 100 (Sub-items: 101), QA: 393]**
-- **Oct18.8: [SOT Count: 464 (Rules: 298), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:28, Testing: 100 (Sub-items: 100), QA: 392]**
+- **Oct20.0: [SOT Count: 775 (Rules: 299), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:30, Testing: 100 (Sub-items: 101), QA: 345]**
+- **Oct19.20: [SOT Count: 774 (Rules: 299), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:29, Testing: 100 (Sub-items: 101), QA: 345]**
+- **Oct18.8: [SOT Count: 465 (Rules: 299), Open: H:0, M:0, L:1, Ideas: H:1, M:19, L:29, Testing: 100 (Sub-items: 101), QA: 393]**

@@ -1,9 +1,10 @@
-# SOT Master Requirements & Hardening Status (Oct19.20)
+# SOT Master Requirements & Hardening Status (Oct20.0)
 
-## 🏗️ Architectural Master Rules (299 Rules)
+## 🏗️ Architectural Master Rules (300 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1** ... (Historical rules 1.1 - 1.206 archived in sot_master_archive.md)
+*   **1.226 Document Integrity Baseline (R-ID 744)**: To protect against accidental truncation or corruption of critical status documents, the system MUST maintain a versioned baseline directory (`STATUS/BASELINE/[Version]/`). At the end of each version cycle, the current `SOT_MASTER_REQUIREMENTS.md` and `RESOLUTION_ARCHIVE.md` MUST be copied to this directory as immutable references. (Oct20.0 - ISSUE-OCT20.0-F1).
 *   **1.225 Test Mode Restoration Bypass (R-ID 743)**: To allow deterministic testing of mode transitions and prevent "boot loops" into Tracker mode, the system MUST provide a persistent bypass for automatic service resumption (R-ID 242). This bypass MUST be toggleable via Diagnostics and respected by the MainViewModel during cold-start initialization. (Oct19.19 - ISSUE-OCT19.19-F1).
 *   **1.224 Unified Network Callback Management (R-ID 742)**: To prevent redundant system overhead and log flooding, the system MUST maintain exactly one `ConnectivityManager.NetworkCallback` registration. This authority MUST reside in `NetworkProvider`. All other system status observers MUST consume the unified reactive stream provided by this provider. (Oct18.24 - ISSUE-OCT18.22-F2).
 *   **1.223 Battery Saver Signaling Policy (R-ID 741)**: The system MUST explicitly account for system-wide Battery Saver (Power Save) mode in its signaling logic. Non-critical telemetry sync MUST be deferred when Battery Saver is active to preserve power, while ensuring immediate resumption if a security violation occurs. Forensic logs MUST reflect the unified "(Doze/PowerSave active)" state for auditability. (Oct18.24 - ISSUE-OCT18.22-F1).
@@ -27,6 +28,8 @@
 ... [Remaining historical rules archived in STATUS/sot_master_archive.md] ...
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 776**: Completion Sequence Hardening - PASSED. Updated DEVELOPER_GUIDELINES.md to enforce Forensic Integrity Checks (Rule 8) and Baseline Synchronization. (Oct20.0 - ISSUE-OCT19.20-F2).
+*   **SOT ID 775**: Document Integrity Baseline - PASSED. Established versioned baseline directory and recorded R-ID 744 to protect against future document truncation. (Oct20.0 - ISSUE-OCT20.0-F1).
 *   **SOT ID 774**: SOT Master Requirements Recovery - PASSED. Fully restored missing rules and baseline entries from historical stable commits after accidental shortening. (Oct19.20 - ISSUE-OCT19.20-F1).
 *   **SOT ID 773**: Test Mode Restoration Bypass - PASSED. Implemented persistent `isRestorationDisabled` flag and ViewModel hook to bypass R-ID 242. (Oct19.19 - ISSUE-OCT19.19-F1).
 *   **SOT ID 772**: Unified Network Callback Management - PASSED. Consolidated all `ConnectivityManager` registrations into `AndroidNetworkProvider` and refactored `SystemStatusProviderImpl` to consume the unified flow. (Oct18.24 - ISSUE-OCT18.22-F2).

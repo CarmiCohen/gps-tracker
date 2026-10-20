@@ -1,39 +1,37 @@
-# Project Handover - Oct19.20 (Forensic Recovery Complete)
+# Project Handover - Oct20.0 (Document Integrity Hardened)
 
-## 🟢 Status: Forensic Audit Baseline Oct19.20 Established
-The project status documents (SOT Master Requirements and Resolution Archive) have been fully restored following an accidental truncation. The audit trail is now 100% complete and verified under forensic integrity protocols.
+## 🟢 Status: Oct20.0 Baseline Established
+The project's forensic documentation system has been hardened against accidental truncation. A versioned baseline strategy is now in effect, and the developer guidelines have been updated to enforce these checks.
 
-## 🛠️ Validation Details (Oct19.20)
+## 🛠️ Validation Details (Oct20.0)
 
-### 1. SOT Document Forensic Recovery (#OCT19.20-F1)
-- **Problem**: Accidental truncation and Rule 8 violation (use of placeholders) in `SOT_MASTER_REQUIREMENTS.md` and `RESOLUTION_ARCHIVE.md`.
-- **Solution**: Reconstructed files using a historical baseline (commit `dcf6dc8a`) merged with current hardening resolutions.
-- **Outcome**: 
-    - Restored Architectural Rules 1.207–1.231 (Total Rule Count: 299).
-    - Restored Core Hardening Baseline entries SOT ID 738–774.
-    - Verified 100% visible integrity; all placeholders removed.
-- **Compliance**: Verified against **Master Rule 8** (No placeholders in status logs).
+### 1. Document Integrity Baseline (#OCT20.0-F1)
+- **Problem**: Recent accidental truncation highlighted a lack of immutable references for status documents.
+- **Solution**:
+    - Created `STATUS/BASELINE/Oct19.20/` containing forensic-verified archives of SOT and Resolution logs.
+    - Implemented **R-ID 744**: Mandatory baseline synchronization at every version close.
+- **Outcome**: 🟢 **PASSED**. Historical trail is protected by versioned snapshots.
 
-### 2. Test Mode Restoration Bypass (#OCT19.19-F1)
-- **Status**: Verified active. Diagnostic toggle `isRestorationDisabled` allows clean mode transitions.
-- **Compliance**: Rule **R-ID 743** and **SOT ID 773** are fully integrated into the master record.
+### 2. Completion Sequence Hardening
+- **Guideline Update**: Rule 7 now explicitly mandates a "Forensic Integrity Check" for modified `.md` files to ensure they are placeholder-free and correct.
+- **Simplification**: Added `SIMP-OCT19.20-S1` (Automated Doc-Sync Hook) to investigate pre-commit validation of file lengths and headers.
 
 ### 3. Versioning Audit
-- **Status**: Documentation synchronized to **Oct19.20**.
-- **Metrics**: 299 Architectural Rules, 774 SOT IDs.
+- **Status**: Documentation synchronized to **Oct20.0**.
+- **Metrics**: 299 Architectural Rules, 775 SOT IDs.
 
 ## 🎯 Next Resumption Focus: Viewer with Simulated Tracker (#OCT19.0-F1)
-With the forensic trail secured, focus returns to the remote validation of the Tracker-Viewer bridge.
+With the forensic trail locked and guidelines hardened, focus returns to the remote validation of the Tracker-Viewer bridge.
 1. Enable "Skip Mode Restoration" in Diagnostics.
 2. Force stop and relaunch to land on Landing Screen.
 3. Enter Viewer Mode.
 4. Enable "Virtual Peer Presence" simulation.
 5. Verify mock telemetry pulse on HUD and Map.
 
-**Current Forensic Metrics (Oct19.20):**
-- **SOT Count**: 774 (Rules: 299)
-- **Open Gaps**: H:0, M:0, L:0 (Forensic integrity gap closed)
+**Current Forensic Metrics (Oct20.0):**
+- **SOT Count**: 775 (Rules: 299)
+- **Open Gaps**: H:0, M:0, L:1 (Storage Test Race)
 - **Testing Chapters**: 100/100 PASSED
-- **QA Resolutions**: 345
+- **QA Resolutions**: 346
 
 **HANDOVER COMPLETE. STOP ALL PROCESSING.**
