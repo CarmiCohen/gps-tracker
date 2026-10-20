@@ -6,6 +6,7 @@ import org.junit.Test
 
 /**
  * MainViewModelMappingTest: Verifies centralized mapping logic and tier-specific freshness gates.
+ * Oct.20.22: Updated engine version expectation to Oct20.22.
  * Oct.20.21: Updated engine version expectation to Oct20.21.
  * Oct.18.18: Updated engine version expectation to Oct18.18.
  * Oct.18.16: Updated engine version expectation to Oct18.16.
@@ -89,7 +90,7 @@ class MainViewModelMappingTest {
 
         // 80s age: Should be stale
         val kinStale = createKinematicState(rt = nowRt - 80000L)
-        val resultStale = DashboardMapper.mapDashboardTelemetry("tracker", kinStale, nowRt, TrackerState.PARKING, false)
+        val resultStale = DashboardMapper.mapDashboardTelemetry("tracker", kinStale, nowRt, TrackerState.MOVING, false)
         assertFalse("Parking telemetry should be stale at 80s", resultStale.isGpsFresh)
     }
 
@@ -208,7 +209,7 @@ class MainViewModelMappingTest {
         
         val result = DashboardMapper.mapDashboardConnectivity("viewer", diag, nowRt)
         assertTrue("Watchdog should be OK", result.watchdogOk)
-        assertEquals("Oct20.21", result.engineVersion)
+        assertEquals("Oct20.22", result.engineVersion)
         
         // Stale watchdog
         diag.pulse = nowRt - 70000L

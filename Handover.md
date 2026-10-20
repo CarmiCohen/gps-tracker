@@ -7,7 +7,7 @@ Executed full project audit including unit, hardening, and stress tests. Remedia
 ## 🛠️ Validation & Remediation Details (Oct20.22)
 
 ### 1. Test Suite Version Regression - 🟢 FIXED
-- **Issue**: `MainViewModelMappingTest` failed due to an outdated engine version expectation (`Oct18.18` vs current `Oct20.21`).
+- **Issue**: `MainViewModelMappingTest` failed due to an outdated engine version expectation (`Oct18.8` vs current `Oct20.21`).
 - **Remediation**: Updated the expected version string to `Oct20.21` to match the current baseline.
 - **Verification**: All unit tests passed (47/47 in `:core:engine`, 43/43 in `:app`). (SOT ID 783).
 
