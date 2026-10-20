@@ -31,6 +31,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT20.25-F1: Test Suite Version Regression.** Resolved Oct20.25. Aligned `MainViewModelMappingTest` with `Oct20.25` baseline. (SOT ID 787).
 *   **ISSUE-OCT20.23-F2: Storage Pressure Audit Flakiness.** Resolved Oct20.24. Integrated `repository.flushTrails()` in `StoragePressureAuditTest` to ensure deterministic synchronization of asynchronous trail and violation writes. (SOT ID 786).
 *   **ISSUE-OCT20.23-F1: Redundant Connectivity Callback Leaks.** Resolved Oct20.24. Transitioned `AndroidNetworkProvider` to `SharingStarted.Eagerly` to ensure a singleton-lifecycle for system callback registrations. (SOT ID 785).
 *   **ISSUE-OCT20.22-F1: Test Suite Version Regression.** Resolved Oct20.22. Fixed `MainViewModelMappingTest` to align with the `Oct20.21` engine version baseline. (SOT ID 783).
@@ -45,7 +46,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct20.25: [SOT Count: 786 (Rules: 304), Open: H:0, M:0, L:0, Ideas: H:1, M:20, L:36, Testing: 5 (Sub-items: 8), QA: 357]**
+- **Oct20.25: [SOT Count: 787 (Rules: 304), Open: H:0, M:0, L:0, Ideas: H:1, M:20, L:36, Testing: 5 (Sub-items: 8), QA: 357]**
 - **Oct20.24: [SOT Count: 786 (Rules: 303), Open: H:0, M:0, L:0, Ideas: H:1, M:20, L:35, Testing: 5 (Sub-items: 8), QA: 357]**
 - **Oct20.23: [SOT Count: 785 (Rules: 302), Open: H:2, M:0, L:0, Ideas: H:1, M:20, L:35, Testing: 5 (Sub-items: 8), QA: 356]**
 - **Oct20.22: [SOT Count: 783 (Rules: 302), Open: H:0, M:0, L:0, Ideas: H:1, M:19, L:35, Testing: 103 (Sub-items: 104), QA: 354]**

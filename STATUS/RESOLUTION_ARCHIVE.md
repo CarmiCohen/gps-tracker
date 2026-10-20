@@ -1,5 +1,11 @@
 # Resolution Archive - GPS Tracker
 
+## ISSUE-OCT20.25-F1: Test Suite Version Regression (Oct20.25)
+- **Resolved**: Oct20.25
+- **Description**: The unit test `MainViewModelMappingTest` failed due to a version mismatch between the test expectation (`Oct20.22`) and the actual project version (`Oct20.25`).
+- **Remediation**: Updated the expected version string in `MainViewModelMappingTest.kt` to `Oct20.25`.
+- **Outcome**: 🟢 **PASSED**. All 43 unit tests passed. (SOT ID 787).
+
 ## ISSUE-OCT20.23-F2: Storage Pressure Audit Flakiness (Oct20.24)
 - **Resolved**: Oct20.24
 - **Description**: Stability failure where `StoragePressureAuditTest` exhibited non-deterministic behavior. Failures in `verifyCriticalStoragePrioritization` and `verifyLowStoragePrioritization` were caused by race conditions in asynchronous database writes and lack of synchronization in test setup.
