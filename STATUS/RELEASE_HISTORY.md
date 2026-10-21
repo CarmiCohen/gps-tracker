@@ -1,8 +1,17 @@
-# Project History & Versioning (Oct21.02)
+# Project History & Versioning (Oct21.05)
 
 **For historical records (v9.3.0 and older), see [docs_history_archive.md](docs_history_archive.md).**
 
-## Oct21.02 (Current - Settings Restoration)
+## Oct21.05 (Current - Unit Test Remediation)
+- **Unit Test Version Synchronization (#ISSUE-OCT21.05-F1)**: Synchronized `MainViewModelMappingTest` with version string `Oct21.05` to resolve release-blocking forensic watchdog failure. Verified 43/43 tests PASS.
+
+## Oct21.04 (UI & Map Hardening)
+- **UI Overlap Resolution (#OCT20.33-F4)**: Explicitly anchored `ScaleBarOverlay` to bottom-right corner to resolve layout conflict with version tag in bottom-left.
+
+## Oct21.03 (Debug Artifact Suppression)
+- **Debug Artifact Suppression (#OCT20.33-F5)**: Wrapped `UI_READY` label in `BuildConfig.DEBUG` check to ensure zero-visibility in production PLATINUM builds.
+
+## Oct21.02 (Settings Restoration)
 - **Settings Gear Restoration (#OCT20.33-F3)**: Reverted the R872 purge of Settings capabilities on Trackers. Restored Geofence Radius, Alerts, and Sound sub-settings to allow field diagnostic verification of device state.
 
 ## Oct21.01 (Signaling & Connection Hardening)

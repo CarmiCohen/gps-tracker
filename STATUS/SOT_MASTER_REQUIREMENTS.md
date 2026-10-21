@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct21.04)
+# SOT Master Requirements & Hardening Status (Oct21.05)
 
 ## 🏗️ Architectural Master Rules (314 Rules)
 
@@ -66,25 +66,26 @@
 *   **1.241 Debug Artifact Suppression (R-ID 610)**: All diagnostic status labels (e.g., `UI_READY`) MUST be wrapped in `BuildConfig.DEBUG` checks to ensure zero-visibility in production (PLATINUM) builds. (Oct21.03 - ISSUE-OCT20.33-F5).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 800**: Unit Test Version Mismatch Resolution - PASSED. Synchronized `MainViewModelMappingTest.kt` with release version `Oct21.05` to restore release-blocking forensic watchdog validation. (Oct21.05 - ISSUE-OCT21.05-F1).
 *   **SOT ID 799**: UI Overlap Resolution - PASSED. Explicitly anchored `ScaleBarOverlay` to bottom-right corner in `MapComponents.kt` to resolve layout conflict with version tag. (Oct21.04 - ISSUE-OCT20.33-F4).
 *   **SOT ID 798**: Debug Artifact Suppression - PASSED. Wrapped `UI_READY` label in `BuildConfig.DEBUG` in `MainAppContent.kt`. (Oct21.03 - ISSUE-OCT20.33-F5).
 *   **SOT ID 797**: Settings Gear Restoration - PASSED. Restored Settings gear and associated sub-settings (Geofence Radius, Alerts, Sound) to Tracker role for diagnostic verification, reversing partial R872 purge. (Oct21.02 - ISSUE-OCT20.33-F3).
 *   **SOT ID 796**: Protocol Routing Integrity - PASSED. Restored bidirectional telemetry trust by fixing missing routing IDs in signaling pulses and handling viewer status events. (Oct21.01 - ISSUE-OCT20.33-F1).
 *   **SOT ID 795**: HUD Vertical Spacing / Touch Targets - PASSED. Optimized `SharedUiComponents.kt` for A15 display densities. (Oct21.00 - ISSUE-OCT20.33-F2).
 *   **SOT ID 794**: Tracker UI Role-Lock - PASSED. Purged forbidden authority elements from Tracker composition tree. (Oct21.00 - ISSUE-OCT20.31-F1).
-*   **SOT ID 793**: Home Point Synchronization - PASSED. Implemented `settings_relay` and automatic sync in `ConnectivitySuite`. (Oct21.00 - ISSUE-OCT20.32-F5).
-*   **SOT ID 792**: Asymmetrical Connection State - PASSED. Fixed pulse processing in `ConnectivitySuite` to ensure Tracker role updates peer state. (Oct21.00 - ISSUE-OCT20.32-F4).
-*   **SOT ID 791**: HUD Header Scrim/Occlusion - PASSED. Added `Slate900` scrim to upper HUD in `OverlayManager.kt`. (Oct21.00 - ISSUE-OCT20.32-F3).
-*   **SOT ID 790**: Version String Alignment - PASSED. Realigned version tag to `BottomStart` with minimal padding. (Oct21.00 - ISSUE-OCT20.32-F2).
-*   **SOT ID 789**: Back Button Termination Fix - PASSED. Verified `BackHandler` usage and activity lifecycle persistence. (Oct21.00 - ISSUE-OCT20.32-F1).
-*   **SOT ID 788**: Storage-Aware Adaptive Pruning - PASSED. (Oct21.00).
-*   **SOT ID 787**: Test Suite Version Regression - PASSED. (Oct21.00).
-*   **SOT ID 786**: Storage Pressure Audit Flakiness - PASSED. (Oct21.00).
-*   **SOT ID 785**: Redundant Connectivity Callback Leaks - PASSED. (Oct21.00).
-*   **SOT ID 784**: Test Suite Version Regression - PASSED. (Oct21.00).
-*   **SOT ID 783**: Forensic Circular Overwrite - PASSED. (Oct21.00).
-*   **SOT ID 782**: Storage Test Race Conditions - PASSED. (Oct21.00).
-*   **SOT ID 781**: Forensic Document Archival - PASSED. (Oct21.00).
+*   **SOT ID 793**: Home Point Synchronization - PASSED. Implemented `settings_relay` listener to CommunicationManager.
+*   **SOT ID 792**: Asymmetrical Connection State - PASSED. Fixed pulse processing in `ConnectivitySuite` to ensure Tracker role updates peer state.
+*   **SOT ID 791**: HUD Header Scrim/Occlusion - PASSED. Added `Slate900` scrim to upper HUD in `OverlayManager.kt`.
+*   **SOT ID 790**: Version String Alignment - PASSED. Realigned version tag to `BottomStart` with minimal padding.
+*   **SOT ID 789**: Back Button Termination Fix - PASSED. Verified `BackHandler` usage and activity lifecycle persistence.
+*   **SOT ID 788**: Storage-Aware Adaptive Pruning - PASSED.
+*   **SOT ID 787**: Test Suite Version Regression - PASSED.
+*   **SOT ID 786**: Storage Pressure Audit Flakiness - PASSED.
+*   **SOT ID 785**: Redundant Connectivity Callback Leaks - PASSED.
+*   **SOT ID 784**: Test Suite Version Regression - PASSED.
+*   **SOT ID 783**: Forensic Circular Overwrite - PASSED.
+*   **SOT ID 782**: Storage Test Race Conditions - PASSED.
+*   **SOT ID 781**: Forensic Document Archival - PASSED.
 *   **SOT ID 1 - 780**: (Historical baseline entries preserved in `STATUS/docs_history_archive.md`).
 
 ---

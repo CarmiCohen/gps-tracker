@@ -1,4 +1,12 @@
-# Resolution Archive - GPS Tracker (Oct21.04)
+# Resolution Archive - GPS Tracker (Oct21.05)
+
+## ISSUE-OCT21.05-F1: Unit Test Version Mismatch (Oct21.05)
+- **Resolved**: Oct21.05
+- **Description**: The unit test `MainViewModelMappingTest > Verify Dashboard Connectivity Watchdog` was failing due to a hardcoded version string expectation that did not match the release target `Oct21.05`.
+- **Remediation**:
+    - **Test Synchronization**: Updated the `expected` version string literal in `MainViewModelMappingTest.kt` to match `Oct21.05`.
+    - **Audit Continuity**: Verified 43/43 unit tests passing following the fix.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 800).
 
 ## ISSUE-OCT20.33-F4: UI Overlap (Version/Scale) (Oct21.04)
 - **Resolved**: Oct21.04
