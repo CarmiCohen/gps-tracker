@@ -1,4 +1,4 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct21.05
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct21.06
 
 ## 🎯 Current Resumption Focus: Forensic Audit.
 
@@ -17,6 +17,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT21.05-F2: Asymmetric Connectivity & Geofence Sync Failure.** Resolved Oct21.06. Integrated `viewer_status` pulses and proactive Geofence synchronization.
 *   **ISSUE-OCT21.05-F1: Unit Test Version Mismatch.** Resolved Oct21.05. Synchronized `MainViewModelMappingTest` with the current release version.
 *   **ISSUE-OCT20.33-F4: UI Overlap (Version/Scale).** Resolved Oct21.04. Explicitly anchored ScaleBarOverlay to bottom-right corner to resolve layout conflict with version tag.
 *   **ISSUE-OCT20.33-F5: Debug Artifact Leak.** Resolved Oct21.03. Wrapped `UI_READY` status label in `BuildConfig.DEBUG` check to suppress it in production builds.
@@ -33,5 +34,5 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct21.05: [SOT Count: 806 (Rules: 314), Open: H:0, M:0, L:0, Ideas: H:2, M:24, L:41, Testing: 4 (Sub-items: 43), QA: 1]**
-- **Oct21.04: [SOT Count: 805 (Rules: 314), Open: H:0, M:0, L:0, Ideas: H:2, M:23, L:41, Testing: 9 (Sub-items: 17), QA: 379]**
+- **Oct21.06: [SOT Count: 807 (Rules: 314), Open: H:0, M:0, L:0, Ideas: H:2, M:24, L:41, Testing: 6 (Sub-items: 28), QA: 381]**
+- **Oct21.05: [SOT Count: 806 (Rules: 314), Open: H:0, M:0, L:0, Ideas: H:2, M:24, L:41, Testing: 6 (Sub-items: 27), QA: 380]**

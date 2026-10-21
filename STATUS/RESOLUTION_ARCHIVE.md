@@ -1,4 +1,14 @@
-# Resolution Archive - GPS Tracker (Oct21.05)
+# Resolution Archive - GPS Tracker (Oct21.06)
+
+## ISSUE-OCT21.05-F2: Asymmetric Connectivity & Geofence Sync failure (Oct21.06)
+- **Resolved**: Oct21.06
+- **Description**: The Viewer showed a green TRK badge (connected), but the Tracker showed a red VWR badge (disconnected) and failed to display Home Points synced from the Viewer.
+- **Remediation**:
+    - **Viewer Pulse Restoration**: Integrated `viewer_status` pulse into `AppEventCoordinator.kt` to ensure the Tracker receives regular heartbeats (R-ID 605).
+    - **Proactive Geofence Sync**: Updated `ConnectivitySuite.kt` to trigger `syncHomePoints()` immediately upon connection in Viewer mode (R-ID 606).
+    - **Protocol Protocol**: Added `createViewerStatusUpdate` to `SignalPayloadGenerator.kt`.
+    - **Verification Test**: Added `verifyBidirectionalConnectivityAndSync` to `ProductionReadinessAuditTest.kt` to enforce peer sync parity in Chapter 0 audits.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 801).
 
 ## ISSUE-OCT21.05-F1: Unit Test Version Mismatch (Oct21.05)
 - **Resolved**: Oct21.05

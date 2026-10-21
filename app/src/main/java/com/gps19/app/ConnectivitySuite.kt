@@ -23,6 +23,9 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.21.06:
+ * - Connection Asymmetry Fix (#ISSUE-OCT21.05-F2): Proactive Geofence Sync. 
+ *   Added observer for isConnected to trigger syncHomePoints() on Viewer connect.
  * Oct.21.01:
  * - Connection Asymmetry Fix (#OCT20.33-F1): Explicitly handled "viewer_status" 
  *   as a valid pulse and ensured all valid peer signals update activity timestamps 
@@ -32,8 +35,6 @@ import javax.inject.Singleton
  *   all valid pulses (TRK/VWR) to resolve red-badge bug.
  * - Home Point Sync: Implemented syncSettings relay to copy geofences from 
  *   Viewer to Tracker.
- * Oct.18.24:
- * - ISSUE-OCT18.22-F1: Battery Saver Restricted Network behavior.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -83,6 +84,7 @@ class ConnectivitySuite @Inject constructor(
     private var identitySyncJob: Job? = null
     private var heartbeatJob: Job? = null
     private var jitterCorrectionJob: Job? = null
+    private var connectionObserverJob: Job? = null
 
     // Latency Compensation Buffer
     private val remoteJitterBuffer = PriorityBlockingQueue<JitterEntry>(50, compareBy { it.gpsTs })
@@ -241,6 +243,20 @@ class ConnectivitySuite @Inject constructor(
         startHeartbeatLoop()
         startJitterCorrectionLoop()
         initializePeerState()
+        
+        // Oct.21.06: Proactive sync when connection established.
+        connectionObserverJob?.cancel()
+        connectionObserverJob = scope.launch {
+            telemetryRepository.isRelayConnected
+                .distinctUntilChanged()
+                .filter { it }
+                .collect {
+                    if (!isTrackerMode) {
+                        Timber.d("ConnectivitySuite: Connection established. Triggering geofence sync.")
+                        syncHomePoints()
+                    }
+                }
+        }
     }
 
     private fun startSignalingObservation() {
@@ -824,6 +840,7 @@ class ConnectivitySuite @Inject constructor(
         identitySyncJob?.cancel(); identitySyncJob = null
         heartbeatJob?.cancel(); heartbeatJob = null
         jitterCorrectionJob?.cancel(); jitterCorrectionJob = null
+        connectionObserverJob?.cancel(); connectionObserverJob = null
         scope.cancel()
         
         networkProvider.unregisterListener(networkListener)

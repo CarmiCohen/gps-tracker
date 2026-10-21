@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct21.05)
+# SOT Master Requirements & Hardening Status (Oct21.06)
 
 ## 🏗️ Architectural Master Rules (314 Rules)
 
@@ -58,14 +58,15 @@
 *   **1.233 Forensic Service Persistence (R-ID 602)**: Forensic services MUST remain active in the foreground even if the UI is dismissed via the back button. (Oct21.00 - ISSUE-OCT20.32-F1).
 *   **1.234 Version String Alignment (R-ID 603)**: The version string box MUST be positioned at the bottom-most available coordinate of the UI container. (Oct21.00 - ISSUE-OCT20.32-F2).
 *   **1.235 HUD Button Legibility (R-ID 604)**: All header navigation buttons MUST be clearly visible and distinguishable from the map background. (Oct21.00 - ISSUE-OCT20.32-F3).
-*   **1.236 Bidirectional Connection State (R-ID 605)**: The Tracker MUST transition the VWR badge to Green/Cyan upon receipt of a valid `viewer_pulse` or `pong_activity`. (Oct21.00 - ISSUE-OCT20.32-F4).
-*   **1.237 Geofence Synchronization (R-ID 606)**: Home point updates on the Viewer MUST be propagated to the Tracker within 5 seconds under normal network conditions. (Oct21.00 - ISSUE-OCT20.32-F5).
+*   **1.236 Bidirectional Connection State (R-ID 605)**: The Tracker MUST transition the VWR badge to Green/Cyan upon receipt of a valid `viewer_pulse`, `viewer_status`, or `pong_activity`. (Oct21.06 - ISSUE-OCT21.05-F2).
+*   **1.237 Geofence Synchronization (R-ID 606)**: Home point updates on the Viewer MUST be propagated to the Tracker within 5 seconds under normal network conditions and proactively synchronized upon connection establishment. (Oct21.06 - ISSUE-OCT21.05-F2).
 *   **1.238 Tracker UI Role-Lock (R-ID 607)**: The Tracker UI MUST strictly suppress all interactive configuration elements and local alarm manifestations to comply with R872 (Absolute Stealth). (Oct21.00 - ISSUE-OCT20.31-F1).
 *   **1.239 HUD Vertical Spacing (R-ID 608)**: The telemetry HUD MUST maintain a minimum of 2dp vertical padding between status rows and use 40dp touch targets for header buttons to prevent layout compression on high-DPI A15 devices. (Oct21.00 - ISSUE-OCT20.33-F2).
 *   **1.240 Protocol Routing Integrity (R-ID 609)**: All signaling pulses (TRK/VWR) MUST include both the source role ID and the target routing ID to satisfy cross-talk validation logic in `SignalingValidator`. (Oct21.01 - ISSUE-OCT20.33-F1).
 *   **1.241 Debug Artifact Suppression (R-ID 610)**: All diagnostic status labels (e.g., `UI_READY`) MUST be wrapped in `BuildConfig.DEBUG` checks to ensure zero-visibility in production (PLATINUM) builds. (Oct21.03 - ISSUE-OCT20.33-F5).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 801**: Asymmetric Connectivity & Geofence Sync Resolution - PASSED. Restored bidirectional signaling trust by integrating `viewer_status` pulses and proactive geofence synchronization. (Oct21.06 - ISSUE-OCT21.05-F2).
 *   **SOT ID 800**: Unit Test Version Mismatch Resolution - PASSED. Synchronized `MainViewModelMappingTest.kt` with release version `Oct21.05` to restore release-blocking forensic watchdog validation. (Oct21.05 - ISSUE-OCT21.05-F1).
 *   **SOT ID 799**: UI Overlap Resolution - PASSED. Explicitly anchored `ScaleBarOverlay` to bottom-right corner in `MapComponents.kt` to resolve layout conflict with version tag. (Oct21.04 - ISSUE-OCT20.33-F4).
 *   **SOT ID 798**: Debug Artifact Suppression - PASSED. Wrapped `UI_READY` label in `BuildConfig.DEBUG` in `MainAppContent.kt`. (Oct21.03 - ISSUE-OCT20.33-F5).
@@ -91,13 +92,13 @@
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 0.6 (Peer Sync Audit)**: PASSED - Verified VWR badge logic and proactive Geofence synchronization using `ProductionReadinessAuditTest.kt`. (Oct21.06).
 *   **Chapter 1.3 (UI Hardening Audit)**: PASSED - Verified corner separation between Scale Bar and Version tag. (Oct21.04).
 *   **Chapter 1.2 (Debug Artifacts Audit)**: PASSED - Verified suppression of diagnostic labels in non-debug builds. (Oct21.03).
 *   **Chapter 0.9 (Settings Audit)**: PASSED - Verified restoration of Settings gear and sub-settings on Tracker. (Oct21.02).
 *   **Chapter 0.8 (Signaling Audit)**: PASSED - Verified bidirectional pulse routing and routing ID integrity. (Oct21.01).
 *   **Chapter 0.7 (Layout Audit)**: PASSED - Verified HUD element spacing and touch target sizing. (Oct21.00).
 *   **Chapter 0.3 (Stealth Audit)**: PASSED - Purged forbidden authority elements from Tracker UI. (Oct21.00).
-*   **Chapter 0.6 (Peer Sync Audit)**: PASSED - Verified VWR badge logic and Geofence synchronization. (Oct21.00).
 *   **Chapter 0.5 (UI Occlusion Audit)**: PASSED - Verified HUD scrim contrast and version alignment. (Oct21.00).
 *   **Chapter 0.4 (Back Button Lifecycle)**: PASSED - Verified non-termination on return press. (Oct21.00).
 *   **Chapter 12.7 (Adaptive Pruning Audit)**: PASSED. (Oct21.00).

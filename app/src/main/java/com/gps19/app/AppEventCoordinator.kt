@@ -5,6 +5,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import org.json.JSONObject
 import timber.log.Timber
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -13,6 +14,9 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Oct.21.06:
+ * - Connection Asymmetry Fix (#ISSUE-OCT21.05-F2): Integrated viewer_status pulse 
+ *   into handleTickEvaluated to resolve Red VWR badge on Tracker.
  * Oct.10.1 (Restoration Path):
  * - Issue #SIMP-1014-2: Unified Pressure Path. Updated handleIntegrityEvent 
  *   to handle consolidated StoragePressureChanged events.
@@ -79,10 +83,17 @@ class AppEventCoordinator @Inject constructor(
             updateOut = updateFlyweight
         )
         repository.updateLocation(updateFlyweight)
+        
         if (event.isTrackerMode) {
             connectivitySuite.updateLocalTelemetry(updateFlyweight)
             if (event.isPeerActive || event.serviceTickCounter < 300) {
                 connectivitySuite.sendTelemetry(updateFlyweight)
+            }
+        } else {
+            // Oct.21.06: Viewer sends regular pulses to satisfy Tracker's VWR connectivity logic.
+            if (connectivitySuite.isConnected) {
+                val pulse = SignalPayloadGenerator.createViewerStatusUpdate(configManager.deviceId, configManager.viewerId)
+                connectivitySuite.emit("viewer_status", JSONObject(pulse), SignalingPriority.NORMAL)
             }
         }
         historyManager.updateRibbons(event)

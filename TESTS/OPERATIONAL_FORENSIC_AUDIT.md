@@ -1,4 +1,4 @@
-# Operational Forensic Audit - GPS Tracker (vOct20.33)
+# Operational Forensic Audit - GPS Tracker (vOct21.06)
 
 **Goal:** Verify system health via runtime telemetry and log signatures during deployment. This chapter contains high-frequency audit points that must be verified for every production-ready build.
 
@@ -14,11 +14,11 @@
 
 ## 0.3 Tracker Stealth & Authority Audit (Issue #Oct20.31-F1)
 *   **Action:** Deploy the app in Tracker Mode and inspect the UI, HUD, and Settings.
-*   **Verification:** **STEALTH BALANCE (Updated Oct20.33)**. 
+*   **Verification:** **STEALTH BALANCE (Updated Oct21.06)**. 
     1. Confirm HUD contains NO **ALM** badge or **ALARM** indicators.
     2. Confirm HUD contains NO **LOCK** or interactive alarm control buttons.
     3. Confirm HUD contains NO **SIREN** indicators or audio activity.
-    4. **Settings Gear (RESTORED)**: Confirm settings gear is visible to allow geofence (fence) state verification.
+    4. **Settings Gear (RESTORED)**: Confirm settings gear is visible to allow geofence (fence) state verification (R797).
     5. Confirm Map contains NO **Home Point** management tools (ADD/DEL).
     6. Tracker must remain a pure telemetry provider; all logic/alarm authority resides exclusively on the Viewer.
 
@@ -29,16 +29,17 @@
 ## 0.5 UI Alignment & Occlusion Audit (Issue #1425, #1426, #OCT20.33-F2)
 *   **Action:** Inspect the Viewer UI in various orientations.
 *   **Verification:** 
-    1. **Version Position**: Confirm the version string (e.g., `Oct20.33`) is at the absolute bottom-start edge and does NOT overlap with the Map Scale bar.
+    1. **Version Position**: Confirm the version string (e.g., `Oct21.06`) is at the absolute bottom-start edge and does NOT overlap with the Map Scale bar (R-ID 603).
     2. **HUD Visibility**: Confirm the upper HUD header has a Slate900 scrim.
     3. **HUD Compression**: Verify the telemetry HUD is NOT squeezed and buttons have proportional padding.
-    4. **Debug Suppression**: Confirm `UI_READY` label is suppressed in PLATINUM builds.
+    4. **Debug Suppression**: Confirm `UI_READY` label is suppressed in PLATINUM builds (R-ID 610).
 
-## 0.6 Peer Sync & Connectivity Audit (Issue #1427, #1428, #OCT20.33-F1)
-*   **Action:** Connect a Viewer and a Tracker. Observe `VWR` badge on Tracker.
+## 0.6 Peer Sync & Connectivity Audit (Issue #ISSUE-OCT21.05-F2)
+*   **Action:** Connect a Viewer and a Tracker. 
 *   **Verification:** 
-    1. **VWR Badge Consistency**: Confirm the VWR badge on the Tracker turns Green/Cyan when the Viewer is active. Red on Tracker while Green on Viewer is a failure (Asymmetry).
-    2. **Geofence Sync**: Confirm the Tracker receives and logs "Received geofences from remote Viewer" when points are modified on the Viewer.
+    1. **VWR Badge Consistency (R-ID 605)**: Confirm the **VWR** badge on the Tracker turns Green/Cyan within 10s of the Viewer starting. Red on Tracker while Green on Viewer is a failure (Asymmetry).
+    2. **Proactive Geofence Sync (R-ID 606)**: Upon initial connection (without manual mutation), verify the Tracker receives and logs "SYNC: Received geofences from remote Viewer."
+    3. **Manual Geofence Sync**: Confirm that adding/removing a point on the Viewer propagates to the Tracker map within 5 seconds.
 
 ---
 *This document is a specialized shard of TEST_PROCEDURE.md to ensure the integrity of the critical Operational Forensic Audit phase.*

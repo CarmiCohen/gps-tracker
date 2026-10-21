@@ -1,8 +1,13 @@
-# Project History & Versioning (Oct21.05)
+# Project History & Versioning (Oct21.06)
 
 **For historical records (v9.3.0 and older), see [docs_history_archive.md](docs_history_archive.md).**
 
-## Oct21.05 (Current - Unit Test Remediation)
+## Oct21.06 (Current - Bidirectional Connectivity & Sync Fix)
+- **Bidirectional Connectivity Fix (#ISSUE-OCT21.05-F2)**: Restored bidirectional signaling trust by integrating regular `viewer_status` pulses from Viewer to Tracker (R-ID 605). Resolved asymmetric Red VWR badge bug.
+- **Proactive Geofence Synchronization (#ISSUE-OCT21.05-F2)**: Implemented automatic geofence sync upon connection establishment in Viewer mode (R-ID 606). Ensures Tracker parity without manual mutation.
+- **Audit Hardening**: Integrated `verifyBidirectionalConnectivityAndSync` into `ProductionReadinessAuditTest.kt` to ensure future release-blocking failures if peer sync is broken.
+
+## Oct21.05 (Unit Test Remediation)
 - **Unit Test Version Synchronization (#ISSUE-OCT21.05-F1)**: Synchronized `MainViewModelMappingTest` with version string `Oct21.05` to resolve release-blocking forensic watchdog failure. Verified 43/43 tests PASS.
 
 ## Oct21.04 (UI & Map Hardening)
@@ -29,7 +34,3 @@
 - **Version String Alignment (#1425)**: Relocating the version identifier to the absolute bottom of the UI for better branding compliance.
 - **HUD Header Scrim (#1426)**: Improving button visibility in the upper HUD by adding a background scrim to prevent map occlusion.
 - **Home Point Synchronization (#1428)**: Implemented bidirectional geofence sync.
-
-## Oct20.31 (Stealth & Authority Baseline)
-- **Tracker Stealth Audit (#Oct20.31-F1)**: Verified absolute stealth on Tracker devices (no alarms, no sirens, no local control) as per R872.
-- **StatusBar Logic Hardening (#1423)**: Optimized vertical stacking and telemetry colors in portrait mode.

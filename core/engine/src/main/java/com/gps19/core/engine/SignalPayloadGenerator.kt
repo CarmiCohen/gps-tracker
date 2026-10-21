@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * SignalPayloadGenerator: Pure Kotlin logic for constructing relay messages.
+ * Oct.21.06:
+ * - Connection Asymmetry Fix (#ISSUE-OCT21.05-F2): Added createViewerStatusUpdate 
+ *   to provide regular pulses from Viewer to Tracker.
  * Oct.21.01:
  * - Connection Asymmetry Fix (#OCT20.33-F1): Added mandatory 'id' (Tracker ID) 
  *   to pulse updates to satisfy SignalingValidator routing requirements.
@@ -60,6 +63,18 @@ object SignalPayloadGenerator {
             "id" to SignalingConstants.getTransmissionId(deviceId),
             "viewer_id" to SignalingConstants.getTransmissionId(viewerId),
             "from_viewer" to isFromViewer
+        )
+    }
+
+    /**
+     * Oct.21.06: Explicit pulse for Viewer to notify Tracker of its presence.
+     */
+    fun createViewerStatusUpdate(deviceId: String, viewerId: String): Map<String, Any> {
+        return mapOf(
+            "type" to "viewer_status",
+            "id" to SignalingConstants.getTransmissionId(deviceId),
+            "viewer_id" to SignalingConstants.getTransmissionId(viewerId),
+            "from_viewer" to true
         )
     }
 }

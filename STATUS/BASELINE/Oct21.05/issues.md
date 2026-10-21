@@ -33,5 +33,5 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct21.05: [SOT Count: 806 (Rules: 314), Open: H:0, M:0, L:0, Ideas: H:2, M:24, L:41, Testing: 4 (Sub-items: 43), QA: 1]**
+- **Oct21.05: [SOT Count: 806 (Rules: 314), Open: H:0, M:0, L:0, Ideas: H:2, M:24, L:41, Testing: 6 (Sub-items: 27), QA: 380]**
 - **Oct21.04: [SOT Count: 805 (Rules: 314), Open: H:0, M:0, L:0, Ideas: H:2, M:23, L:41, Testing: 9 (Sub-items: 17), QA: 379]**
