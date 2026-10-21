@@ -48,6 +48,10 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.21.00:
+ * - HUD Layout Correction (ISSUE-OCT20.33-F2): Optimized HeaderBar button 
+ *   padding and increased StatusBar row vertical spacing to prevent "squeezing" 
+ *   on A15 devices. Reduced portrait icon buttons to 40dp.
  * Oct.20.33:
  * - Tracker Stealth Audit (ISSUE-OCT20.31-F1): Suppressed ALM/SIREN/LOCK badges 
  *   in StatusBar for Tracker mode to adhere to R872 (Absolute Stealth).
@@ -494,14 +498,14 @@ fun HeaderBar(
                 Spacer(Modifier.height(8.dp))
             }
         } else {
-            Column(modifier = Modifier.fillMaxWidth().padding(top = if (requiresExtraTopPadding) 8.dp else 2.dp)) {
+            Column(modifier = Modifier.fillMaxWidth().padding(top = if (requiresExtraTopPadding) 12.dp else 4.dp)) {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Start) { 
-                    IconButton(onClick = { commitAnd(UiEvent.ToggleSettings(!isSettingsOpen)); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Settings button clicked", false)) }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Settings, null, tint = if (isSettingsOpen) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
-                    IconButton(onClick = { commitAnd(UiEvent.NavigateToDashboard); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Dashboard button clicked", false)) }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Info, "Dashboard", tint = if (isDashboardActive) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
-                    IconButton(onClick = { commitAnd(UiEvent.ToggleRibbons(!isRibbonsVisible)) }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.BarChart, null, tint = if (isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
-                    Spacer(Modifier.weight(1f)); if (!isSystemReady && !isPhoneSetupVisible) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }, modifier = Modifier.size(48.dp)) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.ReportProblem, "System Issues", tint = Color(0xFFF43F5E).copy(alpha = alertAlpha), modifier = Modifier.size(28.dp)); Text(text = systemIssuesCount.toString(), color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) } }
-                    IconButton(onClick = { commitAnd(UiEvent.ToggleLog(!isLogVisible)); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false)) }, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Filled.List, null, tint = if (isLogVisible) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
-                    IconButton(onClick = { commitAnd(UiEvent.ToggleMap(!isMapVisible)) }, modifier = Modifier.size(48.dp)) { Icon(Icons.Default.Map, null, tint = if (isMapVisible && !(isLogVisible || isSettingsOpen || isRibbonsVisible)) Color.Gray else Color.White, modifier = Modifier.size(24.dp)) }
+                    IconButton(onClick = { commitAnd(UiEvent.ToggleSettings(!isSettingsOpen)); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Settings button clicked", false)) }, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.Settings, null, tint = if (isSettingsOpen) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
+                    IconButton(onClick = { commitAnd(UiEvent.NavigateToDashboard); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Dashboard button clicked", false)) }, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.Info, "Dashboard", tint = if (isDashboardActive) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
+                    IconButton(onClick = { commitAnd(UiEvent.ToggleRibbons(!isRibbonsVisible)) }, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.BarChart, null, tint = if (isRibbonsVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
+                    Spacer(Modifier.weight(1f)); if (!isSystemReady && !isPhoneSetupVisible) IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(true)) }, modifier = Modifier.size(40.dp)) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Default.ReportProblem, "System Issues", tint = Color(0xFFF43F5E).copy(alpha = alertAlpha), modifier = Modifier.size(26.dp)); Text(text = systemIssuesCount.toString(), color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp)) } }
+                    IconButton(onClick = { commitAnd(UiEvent.ToggleLog(!isLogVisible)); onEvent(UiEvent.LogAction("hidden", "USER ACTION: Header - Log button clicked", false)) }, modifier = Modifier.size(40.dp)) { Icon(Icons.AutoMirrored.Filled.List, null, tint = if (isLogVisible) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
+                    IconButton(onClick = { commitAnd(UiEvent.ToggleMap(!isMapVisible)) }, modifier = Modifier.size(40.dp)) { Icon(Icons.Default.Map, null, tint = if (isMapVisible && !(isLogVisible || isSettingsOpen || isRibbonsVisible)) Color.Gray else Color.White, modifier = Modifier.size(22.dp)) }
                 }
             }
         }
@@ -544,8 +548,8 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
     val stateColor = if (trackerStateActive) BrandJd else Slate500
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
         Card(modifier = modifier.fillMaxWidth(), shape = androidx.compose.ui.graphics.RectangleShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)), elevation = CardDefaults.cardElevation(0.dp)) {
-            Column(modifier = Modifier.fillMaxWidth().padding(top = 1.dp, bottom = 2.dp)) {
-                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp)) {
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                         StatusBadge(label = "SYS", active = connectivity.isSystemActive, activeColor = localColor, isBold = true)
                         StatusBadge(label = "INT", active = connectivity.isInternet, activeColor = localColor, isBold = true)
@@ -674,7 +678,7 @@ fun StatusRowData(state: StatusRowState) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = state.horizontalPadding),
+            .padding(horizontal = state.horizontalPadding, vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
