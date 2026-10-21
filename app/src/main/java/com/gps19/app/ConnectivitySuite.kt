@@ -23,6 +23,10 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.21.07:
+ * - Signaling Audit: Added explicit INFO logs for pulse and geofence reception 
+ *   to aid physical verification of R-ID 605/606. Removed redundant distinctUntilChanged 
+ *   on StateFlow to resolve build error.
  * Oct.21.06:
  * - Connection Asymmetry Fix (#ISSUE-OCT21.05-F2): Proactive Geofence Sync. 
  *   Added observer for isConnected to trigger syncHomePoints() on Viewer connect.
@@ -248,11 +252,10 @@ class ConnectivitySuite @Inject constructor(
         connectionObserverJob?.cancel()
         connectionObserverJob = scope.launch {
             telemetryRepository.isRelayConnected
-                .distinctUntilChanged()
                 .filter { it }
                 .collect {
                     if (!isTrackerMode) {
-                        Timber.d("ConnectivitySuite: Connection established. Triggering geofence sync.")
+                        Timber.i("Signaling: Connection established. Proactively triggering geofence sync (R-ID 606).")
                         syncHomePoints()
                     }
                 }
@@ -650,6 +653,7 @@ class ConnectivitySuite @Inject constructor(
         if (type == "settings_relay") {
             if (isTrackerMode && fromViewer) {
                 if (data.has("home_points")) {
+                    Timber.i("Signaling: Received proactive geofence sync from Viewer (R-ID 606).")
                     handleRemoteHomePointsSync(data.getJSONArray("home_points"))
                 }
             }
@@ -706,6 +710,7 @@ class ConnectivitySuite @Inject constructor(
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity" || type == "viewer_status") {
             // Oct.20.32: Fixed red-badge bug by ensuring tracker sets connected=true for viewer_pulse
             remoteStatusRepository.setTrackerConnected(true)
+            Timber.i("Signaling: Received peer pulse [Type: $type] (R-ID 605).")
             
             domainEventBus.emit(ConnectivityEvent.PeerPulse(peerId))
             remoteStatusRepository.updatePeerActivity(nowRt)
@@ -803,7 +808,7 @@ class ConnectivitySuite @Inject constructor(
                 }
                 
                 signalingProvider.emit("settings_update", payload, SignalingPriority.HIGH)
-                Timber.i("ConnectivitySuite: Emitted home_points sync to Tracker.")
+                Timber.i("Signaling: Emitted home_points sync to Tracker.")
             } catch (e: Exception) {
                 Timber.e(e, "Failed to emit home_points sync")
             }

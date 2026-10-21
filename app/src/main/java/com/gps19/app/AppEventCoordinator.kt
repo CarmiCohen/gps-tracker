@@ -14,6 +14,8 @@ import kotlin.math.round
 
 /**
  * AppEventCoordinator: Unified domain event orchestrator.
+ * Oct.21.07:
+ * - Signaling Audit: Promoted viewer_status pulse log to INFO for physical verification.
  * Oct.21.06:
  * - Connection Asymmetry Fix (#ISSUE-OCT21.05-F2): Integrated viewer_status pulse 
  *   into handleTickEvaluated to resolve Red VWR badge on Tracker.
@@ -92,6 +94,7 @@ class AppEventCoordinator @Inject constructor(
         } else {
             // Oct.21.06: Viewer sends regular pulses to satisfy Tracker's VWR connectivity logic.
             if (connectivitySuite.isConnected) {
+                Timber.i("Signaling: Emitting viewer_status pulse to Tracker.")
                 val pulse = SignalPayloadGenerator.createViewerStatusUpdate(configManager.deviceId, configManager.viewerId)
                 connectivitySuite.emit("viewer_status", JSONObject(pulse), SignalingPriority.NORMAL)
             }

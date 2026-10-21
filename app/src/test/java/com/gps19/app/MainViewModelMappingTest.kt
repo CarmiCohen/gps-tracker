@@ -6,6 +6,7 @@ import org.junit.Test
 
 /**
  * MainViewModelMappingTest: Verifies centralized mapping logic and tier-specific freshness gates.
+ * Oct.21.07: Updated engine version expectation to Oct21.07.
  * Oct.21.05: Updated engine version expectation to Oct21.05 (Remediation).
  * Oct.20.30: Updated engine version expectation to Oct20.30.
  * Oct.20.27: Updated engine version expectation to Oct20.27.
@@ -214,7 +215,7 @@ class MainViewModelMappingTest {
         
         val result = DashboardMapper.mapDashboardConnectivity("viewer", diag, nowRt)
         assertTrue("Watchdog should be OK", result.watchdogOk)
-        assertEquals("Oct21.05", result.engineVersion)
+        assertEquals("Oct21.07", result.engineVersion)
         
         // Stale watchdog
         diag.pulse = nowRt - 70000L
