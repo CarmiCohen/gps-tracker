@@ -1,4 +1,12 @@
-# Resolution Archive - GPS Tracker (Oct21.02)
+# Resolution Archive - GPS Tracker (Oct21.03)
+
+## ISSUE-OCT20.33-F5: Debug Artifact Leak (Oct21.03)
+- **Resolved**: Oct21.03
+- **Description**: The `UI_READY` status label was visible in production builds (PLATINUM), leaking internal state and violating stealth aesthetics.
+- **Remediation**:
+    - **UI Suppression**: Wrapped the `UI_READY` Text component in `MainAppContent.kt` with a `BuildConfig.DEBUG` check.
+    - **Architecture**: Introduced R-ID 610 (Debug Artifact Suppression) to establish a baseline rule for diagnostic label management.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 798).
 
 ## ISSUE-OCT20.33-F3: Settings Gear Restoration (Oct21.02)
 - **Resolved**: Oct21.02

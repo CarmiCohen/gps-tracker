@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct21.02)
+# SOT Master Requirements & Hardening Status (Oct21.03)
 
-## 🏗️ Architectural Master Rules (313 Rules)
+## 🏗️ Architectural Master Rules (314 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -63,8 +63,10 @@
 *   **1.238 Tracker UI Role-Lock (R-ID 607)**: The Tracker UI MUST strictly suppress all interactive configuration elements and local alarm manifestations to comply with R872 (Absolute Stealth). (Oct21.00 - ISSUE-OCT20.31-F1).
 *   **1.239 HUD Vertical Spacing (R-ID 608)**: The telemetry HUD MUST maintain a minimum of 2dp vertical padding between status rows and use 40dp touch targets for header buttons to prevent layout compression on high-DPI A15 devices. (Oct21.00 - ISSUE-OCT20.33-F2).
 *   **1.240 Protocol Routing Integrity (R-ID 609)**: All signaling pulses (TRK/VWR) MUST include both the source role ID and the target routing ID to satisfy cross-talk validation logic in `SignalingValidator`. (Oct21.01 - ISSUE-OCT20.33-F1).
+*   **1.241 Debug Artifact Suppression (R-ID 610)**: All diagnostic status labels (e.g., `UI_READY`) MUST be wrapped in `BuildConfig.DEBUG` checks to ensure zero-visibility in production (PLATINUM) builds. (Oct21.03 - ISSUE-OCT20.33-F5).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 798**: Debug Artifact Suppression - PASSED. Wrapped `UI_READY` label in `BuildConfig.DEBUG` in `MainAppContent.kt`. (Oct21.03 - ISSUE-OCT20.33-F5).
 *   **SOT ID 797**: Settings Gear Restoration - PASSED. Restored Settings gear and associated sub-settings (Geofence Radius, Alerts, Sound) to Tracker role for diagnostic verification, reversing partial R872 purge. (Oct21.02 - ISSUE-OCT20.33-F3).
 *   **SOT ID 796**: Protocol Routing Integrity - PASSED. Restored bidirectional telemetry trust by fixing missing routing IDs in signaling pulses and handling viewer status events. (Oct21.01 - ISSUE-OCT20.33-F1).
 *   **SOT ID 795**: HUD Vertical Spacing / Touch Targets - PASSED. Optimized `SharedUiComponents.kt` for A15 display densities. (Oct21.00 - ISSUE-OCT20.33-F2).
@@ -87,6 +89,7 @@
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 1.2 (Debug Artifacts Audit)**: PASSED - Verified suppression of diagnostic labels in non-debug builds. (Oct21.03).
 *   **Chapter 0.9 (Settings Audit)**: PASSED - Verified restoration of Settings gear and sub-settings on Tracker. (Oct21.02).
 *   **Chapter 0.8 (Signaling Audit)**: PASSED - Verified bidirectional pulse routing and routing ID integrity. (Oct21.01).
 *   **Chapter 0.7 (Layout Audit)**: PASSED - Verified HUD element spacing and touch target sizing. (Oct21.00).

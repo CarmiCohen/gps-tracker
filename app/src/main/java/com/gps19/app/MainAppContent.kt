@@ -40,6 +40,9 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.21.03:
+ * - ISSUE-OCT20.33-F5: Debug Artifact Leak. Wrapped UI_READY label in 
+ *   BuildConfig.DEBUG check to suppress it in production builds.
  * Oct.15.6:
  * - Version Synchronization (Issue #OCT15.6-T1): Updated hardcoded version label to Oct15.6_PLATINUM.
  * Oct.17.4:
@@ -141,7 +144,9 @@ fun MainAppContent(
                 }
 
                 Column(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)) {
-                    Text("UI_READY", color = Color.Green.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    if (BuildConfig.DEBUG) {
+                        Text("UI_READY", color = Color.Green.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
                     Text("${BuildConfig.VERSION_NAME}_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
                 }
             }
