@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct21.00)
+# SOT Master Requirements & Hardening Status (Oct21.01)
 
-## 🏗️ Architectural Master Rules (312 Rules)
+## 🏗️ Architectural Master Rules (313 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -62,8 +62,10 @@
 *   **1.237 Geofence Synchronization (R-ID 606)**: Home point updates on the Viewer MUST be propagated to the Tracker within 5 seconds under normal network conditions. (Oct21.00 - ISSUE-OCT20.32-F5).
 *   **1.238 Tracker UI Role-Lock (R-ID 607)**: The Tracker UI MUST strictly suppress all interactive configuration elements and local alarm manifestations to comply with R872 (Absolute Stealth). (Oct21.00 - ISSUE-OCT20.31-F1).
 *   **1.239 HUD Vertical Spacing (R-ID 608)**: The telemetry HUD MUST maintain a minimum of 2dp vertical padding between status rows and use 40dp touch targets for header buttons to prevent layout compression on high-DPI A15 devices. (Oct21.00 - ISSUE-OCT20.33-F2).
+*   **1.240 Protocol Routing Integrity (R-ID 609)**: All signaling pulses (TRK/VWR) MUST include both the source role ID and the target routing ID to satisfy cross-talk validation logic in `SignalingValidator`. (Oct21.01 - ISSUE-OCT20.33-F1).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 796**: Protocol Routing Integrity - PASSED. Restored bidirectional telemetry trust by fixing missing routing IDs in signaling pulses and handling viewer status events. (Oct21.01 - ISSUE-OCT20.33-F1).
 *   **SOT ID 795**: HUD Vertical Spacing / Touch Targets - PASSED. Optimized `SharedUiComponents.kt` for A15 display densities. (Oct21.00 - ISSUE-OCT20.33-F2).
 *   **SOT ID 794**: Tracker UI Role-Lock - PASSED. Purged forbidden authority elements from Tracker composition tree. (Oct21.00 - ISSUE-OCT20.31-F1).
 *   **SOT ID 793**: Home Point Synchronization - PASSED. Implemented `settings_relay` and automatic sync in `ConnectivitySuite`. (Oct21.00 - ISSUE-OCT20.32-F5).
@@ -84,6 +86,7 @@
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 0.8 (Signaling Audit)**: PASSED - Verified bidirectional pulse routing and routing ID integrity. (Oct21.01).
 *   **Chapter 0.7 (Layout Audit)**: PASSED - Verified HUD element spacing and touch target sizing. (Oct21.00).
 *   **Chapter 0.3 (Stealth Audit)**: PASSED - Purged forbidden authority elements from Tracker UI. (Oct21.00).
 *   **Chapter 0.6 (Peer Sync Audit)**: PASSED - Verified VWR badge logic and Geofence synchronization. (Oct21.00).

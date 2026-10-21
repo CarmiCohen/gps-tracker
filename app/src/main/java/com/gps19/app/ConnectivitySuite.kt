@@ -23,6 +23,10 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.21.01:
+ * - Connection Asymmetry Fix (#OCT20.33-F1): Explicitly handled "viewer_status" 
+ *   as a valid pulse and ensured all valid peer signals update activity timestamps 
+ *   to transition VWR badge to Green.
  * Oct.20.32:
  * - Connection Asymmetry Fix: Ensure setTrackerConnected(true) is called for 
  *   all valid pulses (TRK/VWR) to resolve red-badge bug.
@@ -660,7 +664,7 @@ class ConnectivitySuite @Inject constructor(
                 ownViewerId = viewerId,
                 isTrackerMode = isTrackerMode
         )) {
-            val isPulse = (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity")
+            val isPulse = (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity" || type == "viewer_status")
             val reason = SignalingValidator.getDropReason(fromId, deviceId, fromViewer, fromViewerId, viewerId, isTrackerMode)
             
             if (!isPulse || (reason != null && !reason.contains("Echo suppression"))) {
@@ -683,7 +687,7 @@ class ConnectivitySuite @Inject constructor(
             return
         }
 
-        if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity") {
+        if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity" || type == "viewer_status") {
             // Oct.20.32: Fixed red-badge bug by ensuring tracker sets connected=true for viewer_pulse
             remoteStatusRepository.setTrackerConnected(true)
             

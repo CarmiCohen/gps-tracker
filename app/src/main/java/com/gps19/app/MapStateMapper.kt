@@ -5,6 +5,10 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MapStateMapper: Pure mapping logic for Map state transitions and trail rendering.
+ * Oct.21.01:
+ * - Settings Gear Restoration (#OCT20.33-F3): Explicitly enabled showSettingsButton 
+ *   and showToolsOverlay for all modes (including Tracker) to allow geofence 
+ *   verification, reversing partial R872 purge.
  * Oct.15.3:
  * - SIMP-OCT15.1-S2: Map Rendering Primitive Integration. Transitioned 
  *   computeTrailSegments to use DoubleArrays, avoiding GeoPoint creation in mapper.
@@ -99,7 +103,9 @@ object MapStateMapper {
             isTrackerFresh = isTrackerFresh, isTrackerValid = isTrackerValid, isViewerValid = isViewerValid,
             smoothedTrackerLat = sTrkLat, smoothedTrackerLng = sTrkLng,
             smoothedViewerLat = sVwrLat, smoothedViewerLng = sVwrLng,
-            initialCenter = initialCenter
+            initialCenter = initialCenter,
+            showSettingsButton = true, // Restore Gear for all roles (ISSUE-OCT20.33-F3)
+            showToolsOverlay = true
         )
 
         return state to nextSmoothed

@@ -1,4 +1,13 @@
-# Resolution Archive - GPS Tracker (Oct21.00)
+# Resolution Archive - GPS Tracker (Oct21.01)
+
+## ISSUE-OCT20.33-F1: VWR Connection Asymmetry (Oct21.01)
+- **Resolved**: Oct21.01
+- **Description**: Tracker reports a Red (Disconnected) VWR badge while the Viewer reports Green. Root cause was missing mandatory routing IDs in signaling pulses and unhandled viewer status events.
+- **Remediation**:
+    - **Protocol Protocol**: Updated `SignalPayloadGenerator.kt` to include mandatory `id` (Tracker ID) in `createViewerPulseUpdate` and `createTrackerPulseUpdate`.
+    - **Event Handling**: Hardened `ConnectivitySuite.kt` to explicitly process `viewer_status` messages and update peer activity timestamps for all valid signals.
+    - **Versioning**: Incremented protocol version to `Oct21.01` in `CommunicationManager.kt`.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 796).
 
 ## ISSUE-OCT20.33-F2: HUD Layout Compression (Oct21.00)
 - **Resolved**: Oct21.00

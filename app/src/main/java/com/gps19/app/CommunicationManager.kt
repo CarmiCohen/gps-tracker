@@ -21,6 +21,8 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Oct.21.01:
+ * - Maintenance: Updated protocol version to Oct21.01.
  * Oct.20.32:
  * - Home Point Sync: Added listener for "settings_relay" to support geofence 
  *   synchronization between Viewer and Tracker.
@@ -102,7 +104,7 @@ class CommunicationManager @Inject constructor(
         return mapOf(
             "id" to SignalingConstants.getTransmissionId(deviceId),
             "role" to if (isTrackerMode) "tracker" else "viewer",
-            "ver" to "Oct20.32"
+            "ver" to "Oct21.01"
         )
     }
 

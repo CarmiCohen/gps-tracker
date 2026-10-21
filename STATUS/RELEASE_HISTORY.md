@@ -1,8 +1,11 @@
-# Project History & Versioning (Oct21.00)
+# Project History & Versioning (Oct21.01)
 
 **For historical records (v9.3.0 and older), see [docs_history_archive.md](docs_history_archive.md).**
 
-## Oct21.00 (Current - HUD & Layout Hardening)
+## Oct21.01 (Current - Signaling & Connection Hardening)
+- **Bidirectional Signaling Fix (#OCT20.33-F1)**: Restored telemetry trust by adding mandatory routing IDs to signaling pulses and explicitly handling `viewer_status` events. Ensured peer activity timestamps are updated for all valid incoming signals.
+
+## Oct21.00 (HUD & Layout Hardening)
 - **HUD Layout Correction (#OCT20.33-F2)**: Optimized HeaderBar button padding and increased StatusBar row vertical spacing to prevent "squeezing" on high-DPI A15 devices.
 
 ## Oct20.33 (Stealth Hardening)

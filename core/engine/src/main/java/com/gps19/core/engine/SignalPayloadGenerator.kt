@@ -2,13 +2,12 @@ package com.gps19.core.engine
 
 /**
  * SignalPayloadGenerator: Pure Kotlin logic for constructing relay messages.
+ * Oct.21.01:
+ * - Connection Asymmetry Fix (#OCT20.33-F1): Added mandatory 'id' (Tracker ID) 
+ *   to pulse updates to satisfy SignalingValidator routing requirements.
  * v9.3.24:
  * - Protocol Optimization: Integrated SignalingConstants.getTransmissionId() 
  *   to ensure legacy version compatibility (T -> Trk, V -> viewer).
- * v8.8.21:
- * - Decentralized signaling: Moved payload construction from :app to :core:engine.
- * v8.8.28: Standardized signaling keys to snake_case (viewer_id).
- * v8.8.32: Removed vid from signaling.
  */
 object SignalPayloadGenerator {
 
@@ -46,17 +45,19 @@ object SignalPayloadGenerator {
         return incomingPing
     }
 
-    fun createViewerPulseUpdate(viewerId: String, isFromViewer: Boolean): Map<String, Any> {
+    fun createViewerPulseUpdate(deviceId: String, viewerId: String, isFromViewer: Boolean): Map<String, Any> {
         return mapOf(
             "type" to "viewer_pulse",
+            "id" to SignalingConstants.getTransmissionId(deviceId),
             "viewer_id" to SignalingConstants.getTransmissionId(viewerId),
             "from_viewer" to isFromViewer
         )
     }
 
-    fun createTrackerPulseUpdate(viewerId: String, isFromViewer: Boolean): Map<String, Any> {
+    fun createTrackerPulseUpdate(deviceId: String, viewerId: String, isFromViewer: Boolean): Map<String, Any> {
         return mapOf(
             "type" to "tracker_pulse",
+            "id" to SignalingConstants.getTransmissionId(deviceId),
             "viewer_id" to SignalingConstants.getTransmissionId(viewerId),
             "from_viewer" to isFromViewer
         )
