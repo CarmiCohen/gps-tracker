@@ -32,6 +32,10 @@ import kotlinx.coroutines.delay
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Oct.21.02:
+ * - Settings Gear Restoration (#OCT20.33-F3): Restored Geofence Radius and 
+ *   Alerts/Sound sub-settings for Trackers to allow state verification, 
+ *   reversing partial R872 purge.
  * Oct.20.33:
  * - Tracker Stealth Audit (ISSUE-OCT20.31-F1): Forbidden interactive elements 
  *   (Alerts, Sound, Home Point management) are now strictly removed from the 
@@ -113,11 +117,21 @@ fun SettingsOverlay(
                     }
 
                     if (visibleCount >= 2) {
-                        // R872: Geofence radius is peer-controlled in Tracker mode.
-                        if (!isTracker) {
-                            OutlinedTextField(value = draft.maxDistance, onValueChange = { onEvent(UiEvent.UpdateDraftMaxDistance(it)) }, label = { Text(stringResource(R.string.settings_label_geofence), fontSize = 12.sp) }, placeholder = { Text(stringResource(R.string.settings_placeholder_radius), color = Slate500) }, leadingIcon = { Icon(Icons.Default.RadioButtonChecked, null, tint = Color.White, modifier = Modifier.size(18.dp)) }, trailingIcon = { Text(stringResource(R.string.settings_unit_meters), color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(end = 8.dp)) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth(), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.White, unfocusedBorderColor = Color.White.copy(alpha = 0.3f), focusedLabelColor = Color.White, unfocusedLabelColor = Slate500, focusedTextColor = Color.White, unfocusedTextColor = Color.White), singleLine = true, textStyle = LocalTextStyle.current.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace))
-                            Spacer(Modifier.height(24.dp))
-                        }
+                        // Restore Geofence radius for Tracker verification (ISSUE-OCT20.33-F3)
+                        OutlinedTextField(
+                            value = draft.maxDistance, 
+                            onValueChange = { onEvent(UiEvent.UpdateDraftMaxDistance(it)) }, 
+                            label = { Text(stringResource(R.string.settings_label_geofence), fontSize = 12.sp) }, 
+                            placeholder = { Text(stringResource(R.string.settings_placeholder_radius), color = Slate500) }, 
+                            leadingIcon = { Icon(Icons.Default.RadioButtonChecked, null, tint = Color.White, modifier = Modifier.size(18.dp)) }, 
+                            trailingIcon = { Text(stringResource(R.string.settings_unit_meters), color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(end = 8.dp)) }, 
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                            modifier = Modifier.fillMaxWidth(), 
+                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.White, unfocusedBorderColor = Color.White.copy(alpha = 0.3f), focusedLabelColor = Color.White, unfocusedLabelColor = Slate500, focusedTextColor = Color.White, unfocusedTextColor = Color.White), 
+                            singleLine = true, 
+                            textStyle = LocalTextStyle.current.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                        )
+                        Spacer(Modifier.height(24.dp))
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.CLEAN)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteSweep, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clean)) }
@@ -127,14 +141,12 @@ fun SettingsOverlay(
                     }
 
                     if (visibleCount >= 3) {
-                        // R872: Alerts and Sound management is strictly FORBIDDEN on Trackers.
-                        if (!isTracker) {
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.ALERTS)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.Default.NotificationsActive, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_alerts)) }
-                                Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.SOUND)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Violet500.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.VolumeUp, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_sound)) }
-                            }
-                            Spacer(Modifier.height(16.dp))
+                        // Restore Alerts and Sound buttons for Tracker (ISSUE-OCT20.33-F3)
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.ALERTS)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.Default.NotificationsActive, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_alerts)) }
+                            Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.SOUND)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Violet500.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.VolumeUp, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_sound)) }
                         }
+                        Spacer(Modifier.height(16.dp))
                     }
 
                     if (visibleCount >= 4) {
@@ -160,8 +172,8 @@ fun SettingsOverlay(
         if (isHydrated && visibleCount >= 5) {
             when (activeSubSettings) {
                 SubSettings.CLEAN -> CleanSetupOverlay(isTracker = isTracker, onEvent = onEvent)
-                SubSettings.ALERTS -> if (!isTracker) AlertManagementOverlay(draftAlertSettings = draft.alertSettings, onUpdateAlertSettings = { onEvent(UiEvent.UpdateDraftAlertSettings(it)) }, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
-                SubSettings.SOUND -> if (!isTracker) AlarmSoundOverlay(draftAlertSettings = draft.alertSettings, selectedSirenType = settingsState.selectedSirenType, isSirenPlaying = isSirenPlaying, onUpdateAlertSettings = { onEvent(UiEvent.UpdateDraftAlertSettings(it)) }, onUpdateSirenType = { onEvent(UiEvent.SetSirenType(it)) }, onUpdateAlarmVolume = { onEvent(UiEvent.UpdateDraftAlarmVolume(it)) }, onTestSiren = { onEvent(UiEvent.ToggleTestSiren) }, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
+                SubSettings.ALERTS -> AlertManagementOverlay(isTracker = isTracker, draftAlertSettings = draft.alertSettings, onUpdateAlertSettings = { onEvent(UiEvent.UpdateDraftAlertSettings(it)) }, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
+                SubSettings.SOUND -> AlarmSoundOverlay(isTracker = isTracker, draftAlertSettings = draft.alertSettings, selectedSirenType = settingsState.selectedSirenType, isSirenPlaying = isSirenPlaying, onUpdateAlertSettings = { onEvent(UiEvent.UpdateDraftAlertSettings(it)) }, onUpdateSirenType = { onEvent(UiEvent.SetSirenType(it)) }, onUpdateAlarmVolume = { onEvent(UiEvent.UpdateDraftAlarmVolume(it)) }, onTestSiren = { onEvent(UiEvent.ToggleTestSiren) }, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
                 else -> {}
             }
         }
@@ -187,7 +199,7 @@ fun CleanSetupOverlay(isTracker: Boolean, onEvent: (UiEvent) -> Unit) {
 }
 
 @Composable
-fun AlertManagementOverlay(draftAlertSettings: AlertSettings, onUpdateAlertSettings: (AlertSettings) -> Unit, onClose: () -> Unit) {
+fun AlertManagementOverlay(isTracker: Boolean, draftAlertSettings: AlertSettings, onUpdateAlertSettings: (AlertSettings) -> Unit, onClose: () -> Unit) {
     Surface(modifier = Modifier.fillMaxSize(), color = Slate900) {
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.alert_mgmt_title), color = ViewerCyan, fontSize = 22.sp, fontWeight = FontWeight.Bold); IconButton(onClick = onClose) { Icon(Icons.Default.Close, null, tint = Color.White) } }
@@ -251,7 +263,7 @@ fun AlertManagementOverlay(draftAlertSettings: AlertSettings, onUpdateAlertSetti
 }
 
 @Composable
-fun AlarmSoundOverlay(draftAlertSettings: AlertSettings, selectedSirenType: String, isSirenPlaying: Boolean, onUpdateAlertSettings: (AlertSettings) -> Unit, onUpdateSirenType: (String) -> Unit, onUpdateAlarmVolume: (Float) -> Unit, onTestSiren: () -> Unit, onClose: () -> Unit) {
+fun AlarmSoundOverlay(isTracker: Boolean, draftAlertSettings: AlertSettings, selectedSirenType: String, isSirenPlaying: Boolean, onUpdateAlertSettings: (AlertSettings) -> Unit, onUpdateSirenType: (String) -> Unit, onUpdateAlarmVolume: (Float) -> Unit, onTestSiren: () -> Unit, onClose: () -> Unit) {
     val sirenOptions = listOf("Siren", "Chimes", "Pulse")
     Surface(modifier = Modifier.fillMaxSize(), color = Slate900) {
         Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) {

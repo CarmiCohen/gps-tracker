@@ -1,4 +1,12 @@
-# Resolution Archive - GPS Tracker (Oct21.01)
+# Resolution Archive - GPS Tracker (Oct21.02)
+
+## ISSUE-OCT20.33-F3: Settings Gear Restoration (Oct21.02)
+- **Resolved**: Oct21.02
+- **Description**: Reversal of the partial R872 purge. The Settings gear and associated sub-settings (Geofence Radius, Alerts, Sound) are now available on the Tracker for diagnostic verification.
+- **Remediation**:
+    - **UI Restoration**: Updated `SettingsComponents.kt` to remove role-based suppression for `maxDistance` and the `ALERTS`/`SOUND` navigation buttons.
+    - **Diagnostic Parity**: Restored read/write access to core configuration fields on the Tracker to allow field-level state audits without requiring a Viewer connection.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 797).
 
 ## ISSUE-OCT20.33-F1: VWR Connection Asymmetry (Oct21.01)
 - **Resolved**: Oct21.01

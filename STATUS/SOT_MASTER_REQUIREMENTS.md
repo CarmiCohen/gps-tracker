@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct21.01)
+# SOT Master Requirements & Hardening Status (Oct21.02)
 
 ## 🏗️ Architectural Master Rules (313 Rules)
 
@@ -65,6 +65,7 @@
 *   **1.240 Protocol Routing Integrity (R-ID 609)**: All signaling pulses (TRK/VWR) MUST include both the source role ID and the target routing ID to satisfy cross-talk validation logic in `SignalingValidator`. (Oct21.01 - ISSUE-OCT20.33-F1).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 797**: Settings Gear Restoration - PASSED. Restored Settings gear and associated sub-settings (Geofence Radius, Alerts, Sound) to Tracker role for diagnostic verification, reversing partial R872 purge. (Oct21.02 - ISSUE-OCT20.33-F3).
 *   **SOT ID 796**: Protocol Routing Integrity - PASSED. Restored bidirectional telemetry trust by fixing missing routing IDs in signaling pulses and handling viewer status events. (Oct21.01 - ISSUE-OCT20.33-F1).
 *   **SOT ID 795**: HUD Vertical Spacing / Touch Targets - PASSED. Optimized `SharedUiComponents.kt` for A15 display densities. (Oct21.00 - ISSUE-OCT20.33-F2).
 *   **SOT ID 794**: Tracker UI Role-Lock - PASSED. Purged forbidden authority elements from Tracker composition tree. (Oct21.00 - ISSUE-OCT20.31-F1).
@@ -86,6 +87,7 @@
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 0.9 (Settings Audit)**: PASSED - Verified restoration of Settings gear and sub-settings on Tracker. (Oct21.02).
 *   **Chapter 0.8 (Signaling Audit)**: PASSED - Verified bidirectional pulse routing and routing ID integrity. (Oct21.01).
 *   **Chapter 0.7 (Layout Audit)**: PASSED - Verified HUD element spacing and touch target sizing. (Oct21.00).
 *   **Chapter 0.3 (Stealth Audit)**: PASSED - Purged forbidden authority elements from Tracker UI. (Oct21.00).

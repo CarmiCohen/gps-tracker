@@ -1,8 +1,11 @@
-# Project History & Versioning (Oct21.01)
+# Project History & Versioning (Oct21.02)
 
 **For historical records (v9.3.0 and older), see [docs_history_archive.md](docs_history_archive.md).**
 
-## Oct21.01 (Current - Signaling & Connection Hardening)
+## Oct21.02 (Current - Settings Restoration)
+- **Settings Gear Restoration (#OCT20.33-F3)**: Reverted the R872 purge of Settings capabilities on Trackers. Restored Geofence Radius, Alerts, and Sound sub-settings to allow field diagnostic verification of device state.
+
+## Oct21.01 (Signaling & Connection Hardening)
 - **Bidirectional Signaling Fix (#OCT20.33-F1)**: Restored telemetry trust by adding mandatory routing IDs to signaling pulses and explicitly handling `viewer_status` events. Ensured peer activity timestamps are updated for all valid incoming signals.
 
 ## Oct21.00 (HUD & Layout Hardening)
