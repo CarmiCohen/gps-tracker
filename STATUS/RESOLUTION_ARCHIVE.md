@@ -1,4 +1,13 @@
-# Resolution Archive - GPS Tracker (Oct21.03)
+# Resolution Archive - GPS Tracker (Oct21.04)
+
+## ISSUE-OCT20.33-F4: UI Overlap (Version/Scale) (Oct21.04)
+- **Resolved**: Oct21.04
+- **Description**: The version tag was overlapping with the Map Scale bar in the bottom-left corner of the Tracker UI on certain screen densities.
+- **Remediation**:
+    - **Scale Bar Alignment**: Updated `MapComponents.kt` to explicitly anchor the `ScaleBarOverlay` to the bottom-right corner (`setAlignBottom(true)`, `setAlignRight(true)`).
+    - **Corner Separation**: Maintained version tag at `BottomStart` (bottom-left) per R-ID 603 to ensure zero overlap.
+    - **Regression Fix**: Corrected typo in `MapToolsOverlay` geofence button container color logic.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 799).
 
 ## ISSUE-OCT20.33-F5: Debug Artifact Leak (Oct21.03)
 - **Resolved**: Oct21.03

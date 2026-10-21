@@ -41,6 +41,10 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Oct.21.04:
+ * - UI Overlap Fix (#OCT20.33-F4): Explicitly aligned ScaleBarOverlay to 
+ *   bottom-right corner to resolve layout conflict with the version tag 
+ *   which is pinned to BottomStart per R-ID 603.
  * Oct.20.33:
  * - Tracker Stealth Audit (ISSUE-OCT20.31-F1): Forbidden interactive elements 
  *   (Home Point ADD/DEL) are now strictly removed from the MapToolsOverlay 
@@ -171,6 +175,9 @@ fun OsmMap(
             
             val scaleBar = ScaleBarOverlay(this).apply { 
                 setUnitsOfMeasure(ScaleBarOverlay.UnitsOfMeasure.metric)
+                // Issue #OCT20.33-F4: Move scale bar to bottom-right to avoid version tag overlap
+                setAlignBottom(true)
+                setAlignRight(true)
                 setScaleBarOffset(20, 20)
                 setCentred(false)
             }

@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct21.03)
+# SOT Master Requirements & Hardening Status (Oct21.04)
 
 ## 🏗️ Architectural Master Rules (314 Rules)
 
@@ -66,6 +66,7 @@
 *   **1.241 Debug Artifact Suppression (R-ID 610)**: All diagnostic status labels (e.g., `UI_READY`) MUST be wrapped in `BuildConfig.DEBUG` checks to ensure zero-visibility in production (PLATINUM) builds. (Oct21.03 - ISSUE-OCT20.33-F5).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 799**: UI Overlap Resolution - PASSED. Explicitly anchored `ScaleBarOverlay` to bottom-right corner in `MapComponents.kt` to resolve layout conflict with version tag. (Oct21.04 - ISSUE-OCT20.33-F4).
 *   **SOT ID 798**: Debug Artifact Suppression - PASSED. Wrapped `UI_READY` label in `BuildConfig.DEBUG` in `MainAppContent.kt`. (Oct21.03 - ISSUE-OCT20.33-F5).
 *   **SOT ID 797**: Settings Gear Restoration - PASSED. Restored Settings gear and associated sub-settings (Geofence Radius, Alerts, Sound) to Tracker role for diagnostic verification, reversing partial R872 purge. (Oct21.02 - ISSUE-OCT20.33-F3).
 *   **SOT ID 796**: Protocol Routing Integrity - PASSED. Restored bidirectional telemetry trust by fixing missing routing IDs in signaling pulses and handling viewer status events. (Oct21.01 - ISSUE-OCT20.33-F1).
@@ -89,6 +90,7 @@
 ---
 
 ## ✅ Verification Chapters
+*   **Chapter 1.3 (UI Hardening Audit)**: PASSED - Verified corner separation between Scale Bar and Version tag. (Oct21.04).
 *   **Chapter 1.2 (Debug Artifacts Audit)**: PASSED - Verified suppression of diagnostic labels in non-debug builds. (Oct21.03).
 *   **Chapter 0.9 (Settings Audit)**: PASSED - Verified restoration of Settings gear and sub-settings on Tracker. (Oct21.02).
 *   **Chapter 0.8 (Signaling Audit)**: PASSED - Verified bidirectional pulse routing and routing ID integrity. (Oct21.01).

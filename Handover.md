@@ -1,27 +1,28 @@
-# Project Handover - Oct21.03 (Debug Suppression)
+# Project Handover - Oct21.04 (UI Hardening)
 
-## 🟢 Status: ACTIVE
+## 🟢 Status: COMPLETED
 
-The session for version `Oct21.03` has successfully suppressed the `UI_READY` debug label in production builds. This ensures adherence to R872 (Absolute Stealth) and establishes R-ID 610 as the authority for debug artifact management.
+The session for version `Oct21.04` has successfully resolved the UI overlap between the map scale bar and the version identifier. This ensures adherence to R-ID 603 (Version String Alignment) and enhances forensic visibility.
 
-## 🔴 Current Open Gaps (Oct21.03)
+## 🔴 Current Open Gaps (Oct21.04)
 
-### 1. UI Overlap (Version/Scale) - 🔴 OPEN (#OCT20.33-F4)
-- **Status**: Version tag overlaps the Map Scale bar in the bottom-right corner.
+### *(No high-priority UI or connectivity gaps remaining in current cycle).*
 
-## 🛠️ Remediation Details (Oct21.03)
+## 🛠️ Remediation Details (Oct21.04)
 
-### 1. Debug Artifact Leak - ✅ RESOLVED (#OCT20.33-F5)
-- **Fix**: Wrapped `UI_READY` label in `BuildConfig.DEBUG` check in `MainAppContent.kt`. Established R-ID 610 (Debug Artifact Suppression).
-- **Outcome**: 🟢 **PASSED**. Production stealth aesthetics restored. (SOT ID 798).
+### 1. UI Overlap (Version/Scale) - ✅ RESOLVED (#OCT20.33-F4)
+- **Fix**: Updated `MapComponents.kt` to explicitly anchor the `ScaleBarOverlay` to the bottom-right corner (`setAlignBottom(true)`, `setAlignRight(true)`). 
+- **Corner Separation**: Maintained the version tag at `BottomStart` (bottom-left) per R-ID 603, ensuring zero collision between map metadata and forensic identifiers.
+- **Regression Fix**: Corrected a typo in the `MapToolsOverlay` geofence button container color logic that was introduced during the hardening process.
+- **Outcome**: 🟢 **PASSED**. UI aesthetics and forensic legibility restored. (SOT ID 799).
 
-### 2. Settings Gear Restoration - ✅ RESOLVED (#OCT20.33-F3)
-- **Fix**: Reversed the R872 purge in `SettingsComponents.kt`. Restored visibility and interactivity for Geofence Radius, Alerts sub-settings, and Sound sub-settings on the Tracker UI. (Resolved in Oct21.02).
+## 💡 Strategic Simplification Ideas
+- **SIMP-OCT21.04-S1: Scale Bar Configuration Decoupling (Low).** Move osmdroid scale bar offsets and alignment logic to a dedicated `MapConfig` object.
 
-## 🎯 Next Resumption Focus: UI Overlap.
-The primary focus is to resolve the layout conflict between the version tag and the map scale bar in the bottom-right corner.
+## 🎯 Next Resumption Focus: Forensic Audit.
+The next step is to perform a full forensic audit of the telemetry pipeline to ensure zero-loss propagation under heavy I/O load.
 
-**Current Forensic Metrics (Oct21.03):**
-- **[Oct21.03]: [SOT Count: 804 (Rules: 314), Open: H:0, M:0, L:1, Ideas: H:2, M:23, L:40, Testing: 9 (Sub-items: 17), QA: 378]**
+**Current Forensic Metrics (Oct21.04):**
+- **[Oct21.04]: [SOT Count: 805 (Rules: 314), Open: H:0, M:0, L:0, Ideas: H:2, M:23, L:41, Testing: 9 (Sub-items: 17), QA: 379]**
 
 **HANDOVER UPDATE COMPLETE.**
