@@ -6,17 +6,12 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.22.15:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added violationPercentage and 
+ *   isJammingCandidate to EngineConnectionPoint for parity.
  * Oct.18.8:
  * - ISSUE-OCT18.8-F1: Urban Multi-path Hardening. Added isHighSnrReflection 
- *   to SentinelResult and ProcessedLocation. Added firstViolationWasHighSnr 
- *   to AlarmEvaluationState for SNR Latch (Issue #452) support.
- * Oct.16.11:
- * - ISSUE-OCT16.11-F1: JNI Telemetry Hardening. Added isMemoryPressureThrottled 
- *   to AcousticBatch and ProximityBatch for native parity.
- * Oct.13.21:
- * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump from all models (R-ID 601).
- * Oct.13.21:
- * - ISSUE-OCT13.20-L1: Dead Code Cleanup. Removed unused bootId from AlarmEvaluationState.
+ *   to SentinelResult and ProcessedLocation.
  */
 
 @Serializable
@@ -53,9 +48,8 @@ enum class AppRole(val prefix: String) {
 
     companion object {
         fun fromKey(key: String): Pair<AppRole, String>? {
-            val role = entries.sortedByDescending { it.prefix.length }
-                .find { key.startsWith(it.prefix) } ?: return null
-            return role to key.removePrefix(role.prefix)
+            return entries.sortedByDescending { it.prefix.length }
+                .find { key.startsWith(it.prefix) }?.let { it to key.removePrefix(it.prefix) }
         }
     }
 }
@@ -145,6 +139,7 @@ class EngineConnectionPoint(
     var isSilentFailure: Boolean = false,
     var isUltraLongStationary: Boolean = false,
     var violationUptimeMs: Long = 0L,
+    var violationPercentage: Double = 0.0,
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
     var activityType: ActivityType = ActivityType.UNKNOWN,
@@ -162,6 +157,11 @@ class EngineConnectionPoint(
     var heapSnapshot: Double?
         get() = forensic.heap
         set(value) { forensic.heap = value }
+
+    // Oct.22.15 Delegate
+    var isJammingCandidate: Boolean
+        get() = forensic.isJammingCandidate
+        set(value) { forensic.isJammingCandidate = value }
 
     fun copyFrom(other: EngineConnectionPoint) {
         this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt; this.remoteSig = other.remoteSig
@@ -182,6 +182,7 @@ class EngineConnectionPoint(
         this.cpuLoad = other.cpuLoad; this.ioWait = other.ioWait; this.maxIoLatency = other.maxIoLatency
         this.isSilentFailure = other.isSilentFailure
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
+        this.violationPercentage = other.violationPercentage
         this.thermalHeadroom = other.thermalHeadroom; this.heapAllocatedMb = other.heapAllocatedMb
         this.activityType = other.activityType
         this.forensic.copyFrom(other.forensic)
@@ -206,9 +207,6 @@ data class AlarmServiceContext(
     val role: AppRole = AppRole.TRACKER
 )
 
-/**
- * EventPriority: Defines the criticality of domain events for backpressure handling.
- */
 enum class EventPriority { LOW, NORMAL, HIGH, CRITICAL }
 
 sealed class DomainEvent(open val priority: EventPriority = EventPriority.NORMAL) {
@@ -330,12 +328,8 @@ interface DeviceIdentity {
     val viewerId: String
 }
 
-/**
- * VibrationBatch: Data transfer object for JNI batching (Issue #1450).
- */
 @Serializable
 class VibrationBatch {
-    // Inputs
     var x: Double = 0.0; var y: Double = 0.0; var z: Double = 0.0
     var lx: Double = 0.0; var ly: Double = 0.0; var lz: Double = 0.0
     var adaptiveFloor: Double = 0.0
@@ -349,7 +343,6 @@ class VibrationBatch {
     var heap: Double = -1.0
     var nowRt: Long = 0L
     
-    // Outputs
     var delta: Double = 0.0
     var nextFloor: Double = 0.0
     var nextHpf: Double = 0.0
@@ -362,9 +355,6 @@ class VibrationBatch {
     var isJammingCandidate: Boolean = false
 }
 
-/**
- * GnssHealthBatch: Data transfer object for JNI GNSS processing (Issue #SIMP-1011-1).
- */
 @Serializable
 class GnssHealthBatch {
     var count: Int = 0
@@ -377,9 +367,6 @@ class GnssHealthBatch {
     var averageSnr: Double = 0.0
 }
 
-/**
- * AcousticBatch: Data transfer object for JNI audio processing (Issue #SIMP-1011-2).
- */
 @Serializable
 class AcousticBatch {
     var readCount: Int = 0
@@ -394,9 +381,6 @@ class AcousticBatch {
     var isMemoryPressureThrottled: Boolean = false
 }
 
-/**
- * ProximityBatch: Data transfer object for JNI proximity processing (Issue #SIMP-1012-2).
- */
 @Serializable
 class ProximityBatch {
     var distance: Double = 0.0
@@ -414,10 +398,6 @@ class ProximityBatch {
     var isMemoryPressureThrottled: Boolean = false
 }
 
-/**
- * SystemPressureBatch: Unified container for Memory and Storage pressure evaluation.
- * Issue #SIMP-1014-2: Consolidation of pressure gates into a single JNI crossing.
- */
 @Serializable
 class SystemPressureBatch {
     var heapMb: Double = 0.0
@@ -428,15 +408,12 @@ class SystemPressureBatch {
     var storageLowThresholdMb: Double = 0.0
     var storageCriticalThresholdMb: Double = 0.0
     var storageHysteresisOffsetMb: Double = 0.0
-    var currentMemLevel: Int = 0 // 0: Normal, 1: High, 2: Critical
+    var currentMemLevel: Int = 0
     var needsMemFlush: Boolean = false
-    var currentStorageLevel: Int = 0 // 0: Normal, 1: Low, 2: Critical
+    var currentStorageLevel: Int = 0
     var needsStoragePrune: Boolean = false
 }
 
-/**
- * ForensicSample: Unified container for forensic telemetry samples (Issue #SIMP-1011-3).
- */
 @Serializable
 class ForensicSample(
     var ts: Long = 0L,
@@ -471,9 +448,6 @@ class ForensicSample(
     }
 }
 
-/**
- * NativeFastPathProvider: Interface for offloading math to JNI (Issue #SIMP-1510-1).
- */
 interface NativeFastPathProvider {
     fun isStationary(vibration: Double, adaptiveFloor: Double, cpuLoad: Double): Boolean
     fun updateVibrationFloor(currentFloor: Double, vibration: Double, isWarming: Boolean, cpuLoad: Double): Double

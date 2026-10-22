@@ -8,12 +8,10 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
- * Oct.12.3:
- * - Issue #SIMP-1012-3: Forensic Integrity. Added checksum column to 
- *   LogEntity for storage-level corruption detection. Incremented version 
- *   to 83 with migration. Fixed SQL syntax and duplicate migrations.
- * - Issue #SIMP-1012-4: Batch Persistence. Added insertAll to PendingStatusDao 
- *   to support bulk buffering.
+ * Oct.22.15:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added rtt to PendingStatusEntity 
+ *   and isJammingCandidate to ViolationEntity for full parity. Incremented 
+ *   version to 85.
  */
 @Entity(
     tableName = "logs", 
@@ -60,7 +58,8 @@ data class LogEntity(
     val thermalSnapshot: Double? = null,
     val heapSnapshot: Double? = null,
     val coolingSnapshot: Boolean? = null,
-    val checksum: Long? = null
+    val checksum: Long? = null,
+    @ColumnInfo(defaultValue = "0") val isJammingCandidate: Boolean = false
 )
 
 data class ForensicSignature(
@@ -125,6 +124,7 @@ data class HistoryEntity(
     @ColumnInfo(defaultValue = "0") val isBatteryLow: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isBatteryCritical: Boolean = false,
     @ColumnInfo(defaultValue = "0") val violationUptimeMs: Long = 0L,
+    @ColumnInfo(defaultValue = "0") val violationPercentage: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val isUltraLongStationary: Boolean = false,
     @ColumnInfo(defaultValue = "0") val gpsHardwareLock: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isGnssThrottled: Boolean = false,
@@ -132,7 +132,8 @@ data class HistoryEntity(
     @ColumnInfo(defaultValue = "0") val isBatteryWhitelisted: Boolean = false,
     @ColumnInfo(defaultValue = "0") val thermalHeadroom: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val heapAllocatedMb: Double = 0.0,
-    @ColumnInfo(defaultValue = "UNKNOWN") val activityType: String = "UNKNOWN"
+    @ColumnInfo(defaultValue = "UNKNOWN") val activityType: String = "UNKNOWN",
+    @ColumnInfo(defaultValue = "0") val isJammingCandidate: Boolean = false
 )
 
 @Entity(tableName = "violations", indices = [Index(value = ["ts"])])
@@ -140,7 +141,8 @@ data class ViolationEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val lat: Double, val lng: Double, val type: String, val ts: Long,
     @ColumnInfo(defaultValue = "0") val accuracy: Double = 0.0,
-    @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0
+    @ColumnInfo(defaultValue = "0") val maxAccuracy: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val isJammingCandidate: Boolean = false
 )
 
 @Entity(tableName = "pending_status_updates", indices = [Index(value = ["timestamp"])])
@@ -188,13 +190,16 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "0") val isBatteryCritical: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isUltraLongStationary: Boolean = false,
     @ColumnInfo(defaultValue = "0") val violationUptimeMs: Long = 0L,
+    @ColumnInfo(defaultValue = "0") val violationPercentage: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val gpsHardwareLock: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isGnssThrottled: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isSilentFailure: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isBatteryWhitelisted: Boolean = false,
     @ColumnInfo(defaultValue = "0") val thermalHeadroom: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val heapAllocatedMb: Double = 0.0,
-    @ColumnInfo(defaultValue = "UNKNOWN") val activityType: String = "UNKNOWN"
+    @ColumnInfo(defaultValue = "UNKNOWN") val activityType: String = "UNKNOWN",
+    @ColumnInfo(defaultValue = "0") val isJammingCandidate: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val rtt: Int = 0
 )
 
 @Dao
@@ -218,7 +223,6 @@ abstract class LogDao {
     @Query("SELECT timestamp, spillIdx FROM logs WHERE type = 'FORENSIC_TRACE' AND timestamp >= :minTs AND timestamp <= :maxTs") 
     abstract suspend fun getExistingForensicSignaturesInRange(minTs: Long, maxTs: Long): List<ForensicSignature>
 
-    // Optimized Pruning Support (R177, R197)
     @Query("SELECT timestamp FROM logs WHERE type IN ('watchdog_stats', 'viewer_pulse', 'tracker_pulse', 'pong_activity') ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
     abstract suspend fun getHeartbeatPruneThreshold(limit: Int): Long?
 
@@ -318,7 +322,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 83, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 85, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -342,9 +346,30 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_84_85 = object : Migration(84, 85) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #ISSUE-OCT22.0-F4: Forensic Sync Hardening.
+                try {
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN rtt INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE violations ADD COLUMN isJammingCandidate INTEGER NOT NULL DEFAULT 0")
+                } catch (e: Exception) {}
+            }
+        }
+
+        val MIGRATION_83_84 = object : Migration(83, 84) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                try {
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN violationPercentage REAL NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN isJammingCandidate INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN violationPercentage REAL NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isJammingCandidate INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE logs ADD COLUMN isJammingCandidate INTEGER NOT NULL DEFAULT 0")
+                } catch (e: Exception) {}
+            }
+        }
+
         val MIGRATION_82_83 = object : Migration(82, 83) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #SIMP-1012-3: Forensic Integrity.
                 try {
                     db.execSQL("ALTER TABLE logs ADD COLUMN checksum INTEGER")
                 } catch (e: Exception) {}
@@ -353,7 +378,6 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_81_82 = object : Migration(81, 82) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #SIMP-1011-7: Thermal Forensic Audit.
                 try {
                     db.execSQL("ALTER TABLE logs ADD COLUMN coolingSnapshot INTEGER")
                 } catch (e: Exception) {}
@@ -362,7 +386,6 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_80_81 = object : Migration(80, 81) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #1173: Protobuf-First Persistence.
                 try {
                     db.execSQL("ALTER TABLE connection_history ADD COLUMN payload BLOB NOT NULL DEFAULT (X'')")
                     db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN payload BLOB NOT NULL DEFAULT (X'')")
@@ -372,7 +395,6 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_79_80 = object : Migration(79, 80) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #1205: Context-Aware Power Optimization - activityType parity.
                 try {
                     db.execSQL("ALTER TABLE connection_history ADD COLUMN activityType TEXT NOT NULL DEFAULT 'UNKNOWN'")
                     db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN activityType TEXT NOT NULL DEFAULT 'UNKNOWN'")
@@ -382,7 +404,6 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_78_79 = object : Migration(78, 79) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Issue #1344: Forensic diagnostic expansion - thermalSnapshot and heapSnapshot for LogEntity.
                 try {
                     db.execSQL("ALTER TABLE logs ADD COLUMN thermalSnapshot REAL")
                     db.execSQL("ALTER TABLE logs ADD COLUMN heapSnapshot REAL")
@@ -392,7 +413,6 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_77_78 = object : Migration(77, 78) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // R-ID 502: Expanded parity for thermal headroom and heap allocation forensic probes.
                 try {
                     db.execSQL("ALTER TABLE connection_history ADD COLUMN thermalHeadroom REAL NOT NULL DEFAULT 0")
                     db.execSQL("ALTER TABLE connection_history ADD COLUMN heapAllocatedMb REAL NOT NULL DEFAULT 0")
@@ -404,7 +424,6 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_76_77 = object : Migration(76, 77) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // R-ID 501: Expanded parity for silent failure and battery whitelisting.
                 try {
                     db.execSQL("ALTER TABLE connection_history ADD COLUMN isSilentFailure INTEGER NOT NULL DEFAULT 0")
                     db.execSQL("ALTER TABLE connection_history ADD COLUMN isBatteryWhitelisted INTEGER NOT NULL DEFAULT 0")
@@ -416,7 +435,6 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_75_76 = object : Migration(75, 76) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // R-ID 378: Forensic diagnostic expansion - gpsHardwareLock and isGnssThrottled.
                 try {
                     db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN gpsHardwareLock INTEGER NOT NULL DEFAULT 0")
                     db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isGnssThrottled INTEGER NOT NULL DEFAULT 0")
@@ -428,7 +446,6 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_74_75 = object : Migration(74, 75) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // R782: Binary Schema Expansion - violationUptimeMs and isUltraLongStationary for parity.
                 try {
                     db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN violationUptimeMs INTEGER NOT NULL DEFAULT 0")
                     db.execSQL("ALTER TABLE connection_history ADD COLUMN violationUptimeMs INTEGER NOT NULL DEFAULT 0")
@@ -439,7 +456,6 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_73_74 = object : Migration(73, 74) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // R765: Adding isUltraLongStationary for forensic status transparency
                 try {
                     db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN isUltraLongStationary INTEGER NOT NULL DEFAULT 0")
                 } catch (e: Exception) {}
@@ -448,7 +464,6 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_72_73 = object : Migration(72, 73) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // R224: Synchronizing sitVzRt in pending_status_updates for forensic parity
                 try {
                     db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN sitVzRt INTEGER NOT NULL DEFAULT 0")
                 } catch (e: Exception) {}
@@ -457,7 +472,6 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_71_72 = object : Migration(71, 72) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // R195: Hardened recovery for connection_history schema mismatch
                 try {
                     db.execSQL("ALTER TABLE connection_history ADD COLUMN sitVzRt INTEGER NOT NULL DEFAULT 0")
                 } catch (e: Exception) { }

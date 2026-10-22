@@ -2,6 +2,8 @@ package com.gps19.core.engine
 
 /**
  * TelemetryMerger: Pure logic for aggregating and merging telemetry updates.
+ * Oct.22.15:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Ensured isJammingCandidate is merged.
  * Oct.22.14:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Expanded preferCached block 
  *   to ensure all forensic metadata (adaptive thresholds, anomaly flags, 
@@ -76,6 +78,7 @@ object TelemetryMerger {
             // Anomaly Flags
             target.isSuspiciousNoise = incoming.isSuspiciousNoise
             target.isMemoryPressureThrottled = incoming.isMemoryPressureThrottled
+            target.isJammingCandidate = incoming.isJammingCandidate
             
             // Forensic Snapshots
             target.thermalSnapshot = incoming.thermalSnapshot

@@ -1,20 +1,21 @@
-# Project Handover - Oct22.14 (Forensic Sync Hardened)
+# Project Handover - Oct22.15 (Forensic Sync & Jammer Parity Hardened)
 
 ## 🟢 Status: STABILIZED
 
-The critical **Telemetry Sync and Violation Propagation (F4)** has been fully hardened. Beyond basic relay established in Oct22.13, this version (Oct22.14) ensures complete forensic parity by synchronizing adaptive thresholds (Vibration Floor, Proximity Debounce) and session audit metrics (Violation Percentage) across Protobuf and JSON layers.
+The **Telemetry Sync and Violation Propagation (F4)** has been comprehensively hardened. This version (Oct22.15) fixes critical gaps from previous attempts, specifically ensuring that **Jammer Discrimination flags** (`isJammingCandidate`) and **RTT persistence** are synchronized across the entire stack. JSON serialization was also strictly standardized to snake_case.
 
 ## ✅ Completed in this Session
-- **Remediation Recheck & Hardening (#ISSUE-OCT22.0-F4)**:
-    - **Protobuf Schema Integrity**: Added `violation_percentage` to `RealtimeStatus` to enable remote session audit visibility.
-    - **Signaling Symmetry**: Synchronized `proximity_debounce_ms` and `adaptive_vibration_floor` in `TelemetryProtobufMapper.mapToRealtime`.
-    - **Mapping Ingestion**: 
-        - `TelemetryMapper.kt`: Fixed omissions of `proximity_cm`, `proximity_debounce_ms`, and `violation_percentage` in Snapshot and Status ingestion.
-        - `LocationUpdate.kt`: Resolved JSON key mismatch for `adaptive_vibration_floor` in `toMap()`.
-    - **Merge Consistency**: Updated `TelemetryMerger.mergeInto` to preserve `violationPercentage` when coordinates are stale.
-- **Versioning**: Incremented to `Oct22.14`.
-- **Baseline Synchronization**: Created `STATUS/BASELINE/Oct22.14` and updated all forensic tracking documents.
-- **Traceability**: New Rule **1.249 (Forensic State Symmetry)** added to `SOT_MASTER_REQUIREMENTS.md`.
+- **Comprehensive Remediation Recheck (#ISSUE-OCT22.0-F4)**:
+    - **Protobuf Parity**: Added `is_jamming_candidate` to `RealtimeStatus` and `TrackerStatusProto`. Added `rtt` to `TrackerStatusProto` to ensure connection quality is archived in history.
+    - **Mapping Hardening**: 
+        - `TelemetryProtobufMapper.kt`: Integrated `isJammingCandidate` and `rtt` into all persistence and realtime mapping paths.
+    - **JSON Schema Standardization**: 
+        - `LocationUpdate.kt`: Standardized all JSON keys in `toMap()` to snake_case (`is_cooling_mode_active`, `last_energy_duration_ms`, `is_jamming_candidate`).
+    - **Model Consistency**: 
+        - `Models.kt`: Injected `isJammingCandidate` into `ConnectionPoint`, `LogEntry`, `DashboardHealthState`, and `HudHealthState` to ensure parity from engine to UI.
+    - **Merge Logic**: Updated `TelemetryMerger.kt` to ensure jammer candidates survive coordinate-stale packets.
+- **Versioning**: Incremented to `Oct22.15`.
+- **Traceability**: New Rule **1.250 (Jammer Discrimination Parity)** added to `SOT_MASTER_REQUIREMENTS.md`.
 
 ## 🔴 Current Open Gaps (LOW)
 - **UI UX Simplification**:
@@ -22,9 +23,9 @@ The critical **Telemetry Sync and Violation Propagation (F4)** has been fully ha
     - **SIMP-OCT22.0-S1**: Centralize identity and regex validation into `ConfigValidator`.
 
 ## 🎯 Next Resumption Focus: UI/UX Refinement.
-Telemtry sync is now physically and logically hardened. Focus shifts to architectural simplification and centralized validation as per `issues.md`.
+The forensic telemetry core is now logically and physically sealed. Focus shifts to architectural simplicity.
 
-**Current Forensic Metrics (Oct22.14):**
-- **[Oct22.14]: [SOT Count: 813 (Rules: 322), Open: H:0, M:0, L:0, Ideas: H:2, M:25, L:42, Testing: 11 (Sub-items: 45), QA: 385]**
+**Current Forensic Metrics (Oct22.15):**
+- **[Oct22.15]: [SOT Count: 813 (Rules: 323), Open: H:0, M:0, L:0, Ideas: H:2, M:25, L:42, Testing: 11 (Sub-items: 45), QA: 385]**
 
 **HANDOVER UPDATED.**

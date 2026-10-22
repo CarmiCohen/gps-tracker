@@ -203,6 +203,11 @@ data class IntegrityState(
     var rtt: Int = 0,
     val forensic: ForensicSnapshot = ForensicSnapshot()
 ) {
+    // Oct.22.15: Forensic delegates for integrity.apply access
+    var isJammingCandidate: Boolean
+        get() = forensic.isJammingCandidate
+        set(value) { forensic.isJammingCandidate = value }
+
     fun copyFrom(other: IntegrityState) {
         this.battery = other.battery; this.isCharging = other.isCharging; this.currentMa = other.currentMa
         this.satsView = other.satsView; this.satsUsed = other.satsUsed; this.snrIdx = other.snrIdx
@@ -263,16 +268,10 @@ data class IntegrityState(
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
- * Oct.22.14:
- * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Fixed JSON key inconsistency 
- *   for adaptive_vibration_floor in toMap().
- * Oct.22.13:
- * - ISSUE-OCT22.0-F4: Forensic Parity. Added rtt accessor to map to RealtimeStatus.
- * Oct.13.30:
- * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
- * Oct.7.10:
- * - Issue #SIMP-1010-3: SNR Decay Modeling. Added isJammingCandidate delegate 
- *   to ForensicSnapshot.
+ * Oct.22.15:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Fixed JSON key snake_case 
+ *   consistency for cooling mode, energy duration, and jamming candidate.
+ *   Added isJammingCandidate delegate to IntegrityState.
  */
 @Serializable
 data class LocationUpdate(
@@ -799,12 +798,13 @@ data class LocationUpdate(
         put("standby_bucket", standbyBucket)
         put("net_interface", netInterface)
         put("is_storage_low", isStorageLow); put("is_storage_critical", isStorageCritical)
-        put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_modeActive", isCoolingModeActive)
+        put("is_battery_steep_discharge", isBatterySteepDischarge); put("is_cooling_mode_active", isCoolingModeActive)
         put("tracker_state", trackerState.name); put("is_sit_detected", isSitDetected); put("last_sit_ts", lastSitTs)
         put("is_jump", isJump); put("mic_pending", micPending); put("snr_idx", snrIdx); put("noise_idx", noiseIdx)
         put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("lift_idx", liftIdx)
         put("tilt_idx", tiltIdx); put("baro_idx", baroIdx); put("is_sit_active", isSitActive)
         put("sit_vz", sitVz); put("sit_vz_ts", integrity.sitVzTs); put("sit_vz_rt", integrity.sitVzRt)
+        put("sit_vz_rt", integrity.sitVzRt)
         put("sit_dz", sitDz); put("sit_baro", sitBaro); put("sit_tilt", sitTilt); put("sit_shock", sitShock)
         put("vertical_velocity", verticalVelocity); put("kinetic_energy", kineticEnergy)
         put("is_battery_low", isBatteryLow)
@@ -815,7 +815,7 @@ data class LocationUpdate(
         put("activity_type", activityType.name)
         put("last_energy_delta_ma", lastEnergyDeltaMa)
         put("last_energy_delta_temp", lastEnergyDeltaTemp)
-        put("last_energy_durationMs", lastEnergyDurationMs)
+        put("last_energy_duration_ms", lastEnergyDurationMs)
         put("tamper_note", tamperNote)
         put("thermal_headroom", thermalHeadroom)
         put("heap_allocated_mb", heapAllocatedMb)
@@ -849,7 +849,7 @@ data class LocationUpdate(
         put("stationary_duration_ms", stationaryDuration)
 
         // Oct.7.10 Jammer Discrimination
-        put("is_jammingCandidate", isJammingCandidate)
+        put("is_jamming_candidate", isJammingCandidate)
     }
 
     companion object {

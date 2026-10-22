@@ -11,25 +11,13 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.22.15:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added violationPercentage and 
+ *   isJammingCandidate to ConnectionPoint and LogEntry for parity.
  * Oct.16.0:
  * - SIMP-OCT15.21-S1: Immutable Ribbon Normals. Introduced RibbonNormals to 
  *   ConnectionPoint to move normalization to the ingestion point (TelemetryMapper).
  *   Ensures HistoryBuffer uses pre-calculated, immutable arrays.
- * Oct.15.6:
- * - SIMP-OCT15.4-S2: Buffer Constructor Refactoring. Encapsulated complex 
- *   HistoryBuffer instantiation and normalization into a companion factory. 
- *   Added efficient merge utilities to offload use-case complexity.
- * Oct.15.3:
- * - SIMP-OCT15.2-S1: Ribbon Selector Consolidation. Pre-calculated normalized 
- *   arrays in HistoryBuffer to offload UI thread calculations.
- * - SIMP-OCT15.1-S2: Map Rendering Primitive Integration. Transitioned 
- *   MapTrailSegment to use DoubleArrays to avoid GeoPoint creation in mapper.
- * Oct.15.2:
- * - SIMP-OCT15.1-S1: Primitive History Buffers. Applied TrailBuffer pattern to 
- *   connection history ribbons to reduce GC pressure.
- * Oct.15.1:
- * - SIMP-OCT15.0-S1: Trail Buffer Optimization. Introduced TrailBuffer with 
- *   primitive arrays to reduce GC pressure during long tracking sessions.
  */
 
 @Serializable
@@ -167,8 +155,6 @@ data class RibbonNormals(
 
 /**
  * HistoryBuffer: Optimized container for connection history points using primitive arrays.
- * Designed to minimize GC pressure during ribbon rendering (SIMP-OCT15.1-S1).
- * Oct.16.0: Transitioned to immutable normals pre-calculated at ingestion (SIMP-OCT15.21-S1).
  */
 @Serializable
 data class HistoryBuffer(
@@ -389,11 +375,6 @@ data class HistoryBuffer(
             FloatArray(0), FloatArray(0), FloatArray(0), FloatArray(0), 0
         )
 
-        /**
-         * fromPoints: Centralized authority for converting ConnectionPoints into 
-         * normalized HistoryBuffer primitive arrays (SIMP-OCT15.4-S2).
-         * Oct.16.0: Now uses pre-calculated ribbons from ConnectionPoint (SIMP-OCT15.21-S1).
-         */
         fun fromPoints(points: List<ConnectionPoint>, limit: Int = Int.MAX_VALUE): HistoryBuffer {
             val finalPoints = if (points.size > limit) points.takeLast(limit) else points
             val size = finalPoints.size
@@ -465,9 +446,6 @@ data class HistoryBuffer(
             )
         }
 
-        /**
-         * merge: Efficiently merges two HistoryBuffers with deduplication and sorting by timestamp (SIMP-OCT15.4-S2).
-         */
         fun merge(b1: HistoryBuffer, b2: HistoryBuffer, limit: Int = 240): HistoryBuffer {
             if (b1.size == 0) return if (b2.size > limit) fromPoints(List(b2.size) { b2.getPoint(it) }.takeLast(limit)) else b2
             if (b2.size == 0) return if (b1.size > limit) fromPoints(List(b1.size) { b1.getPoint(it) }.takeLast(limit)) else b1
@@ -489,9 +467,6 @@ data class HistoryBuffer(
             return fromPoints(deduped, limit)
         }
 
-        /**
-         * merge: Efficiently merges a HistoryBuffer and a list of new ConnectionPoints (SIMP-OCT15.4-S2).
-         */
         fun merge(current: HistoryBuffer, newPoints: List<ConnectionPoint>, limit: Int = 240): HistoryBuffer {
             if (newPoints.isEmpty()) return if (current.size > limit) fromPoints(List(current.size) { current.getPoint(it) }.takeLast(limit)) else current
             
@@ -561,7 +536,7 @@ data class AlertSettings(
     val vibrationEnabled: Boolean = true,
     val alarmVolume: Float = 0.8f,
     val useCustomVolume: Boolean = false,
-    val vibrationEnabledV2: Boolean = true, // Placeholders for future expansion
+    val vibrationEnabledV2: Boolean = true, 
     val alarmVolumeV2: Float = 0.8f,
     val tiltAlert: Boolean = true,
     val acousticAlert: Boolean = true,
@@ -622,6 +597,7 @@ class ConnectionPoint(
     var isSilentFailure: Boolean = false,
     var isUltraLongStationary: Boolean = false,
     var violationUptimeMs: Long = 0L,
+    var violationPercentage: Double = 0.0,
     var gpsHardwareLock: Boolean = false,
     var isAnchorLocked: Boolean = false,
     var isGnssThrottled: Boolean = false,
@@ -652,6 +628,11 @@ class ConnectionPoint(
         get() = forensic.isMemoryPressureThrottled
         set(value) { forensic.isMemoryPressureThrottled = value }
 
+    // Oct.7.10 Jammer Discrimination
+    var isJammingCandidate: Boolean
+        get() = forensic.isJammingCandidate
+        set(value) { forensic.isJammingCandidate = value }
+
     fun copyFrom(other: ConnectionPoint) {
         this.localId = other.localId; this.ts = other.ts; this.rt = other.rt; this.rtt = other.rtt
         this.localSig = other.localSig; this.remoteSig = other.remoteSig; this.isConnected = other.isConnected
@@ -671,6 +652,7 @@ class ConnectionPoint(
         this.kineticEnergy = other.kineticEnergy; this.cpuLoad = other.cpuLoad; this.ioWait = other.ioWait
         this.maxIoLatency = other.maxIoLatency; this.isSilentFailure = other.isSilentFailure
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
+        this.violationPercentage = other.violationPercentage
         this.gpsHardwareLock = other.gpsHardwareLock; this.isAnchorLocked = other.isAnchorLocked
         this.isGnssThrottled = other.isGnssThrottled
         this.thermalHeadroom = other.thermalHeadroom
@@ -691,13 +673,15 @@ class ConnectionPoint(
                luxIdx == other.luxIdx && noiseIdx == other.noiseIdx && liftIdx == other.liftIdx &&
                tiltIdx == other.tiltIdx && baroIdx == other.baroIdx && isSitActive == other.isSitActive &&
                isUltraLongStationary == other.isUltraLongStationary && violationUptimeMs == other.violationUptimeMs &&
+               violationPercentage == other.violationPercentage &&
                gpsHardwareLock == other.gpsHardwareLock && isAnchorLocked == other.isAnchorLocked &&
                isGnssThrottled == other.isGnssThrottled && thermalHeadroom == other.thermalHeadroom && 
                heapAllocatedMb == other.heapAllocatedMb && activityType == other.activityType &&
                forensic.snr == other.forensic.snr && forensic.vibe == other.forensic.vibe &&
                forensic.thermal == other.forensic.thermal && forensic.heap == other.forensic.heap &&
                forensic.isSuspiciousNoise == other.forensic.isSuspiciousNoise &&
-               forensic.isMemoryPressureThrottled == other.forensic.isMemoryPressureThrottled
+               forensic.isMemoryPressureThrottled == other.forensic.isMemoryPressureThrottled &&
+               forensic.isJammingCandidate == other.forensic.isJammingCandidate
     }
 
     fun reset() {
@@ -712,6 +696,7 @@ class ConnectionPoint(
         sitVz = 0.0; sitVzTs = 0L; sitVzRt = 0L; sitDz = 0.0; sitBaro = 0.0; sitTilt = 0.0
         sitShock = 0.0; kineticEnergy = 0.0; cpuLoad = 0.0; ioWait = 0.0; maxIoLatency = 0L
         isSilentFailure = false; isUltraLongStationary = false; violationUptimeMs = 0L
+        violationPercentage = 0.0
         gpsHardwareLock = false; isAnchorLocked = false; isGnssThrottled = false
         thermalHeadroom = 0.0; heapAllocatedMb = 0.0; activityType = ActivityType.UNKNOWN
         ribbons.reset()
@@ -788,6 +773,11 @@ data class LogEntry(
         get() = forensic.heap
         set(value) { forensic.heap = value }
 
+    // Oct.7.10 Jammer Discrimination
+    var isJammingCandidate: Boolean
+        get() = forensic.isJammingCandidate
+        set(value) { forensic.isJammingCandidate = value }
+
     /**
      * contentEquals: Deep parity check to suppress redundant Logcat/UI noise (R312).
      */
@@ -799,6 +789,7 @@ data class LogEntry(
                forensic.thermal == other.forensic.thermal && forensic.heap == other.forensic.heap &&
                forensic.isSuspiciousNoise == other.forensic.isSuspiciousNoise &&
                forensic.isMemoryPressureThrottled == other.forensic.isMemoryPressureThrottled &&
+               forensic.isJammingCandidate == other.forensic.isJammingCandidate &&
                coolingSnapshot == other.coolingSnapshot && checksum == other.checksum
     }
 
@@ -807,7 +798,6 @@ data class LogEntry(
             put("localId", localId); put("timestamp", timestamp)
             put("localTime", SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date(timestamp)))
             
-            // R779: Forensic scrubbing of paths and hardware identifiers in messages.
             val sanitizedMsg = ForensicSanitizer.sanitizeMessage(message)
             val finalMsg = ForensicSanitizer.scrubHardwareInfo(sanitizedMsg, isSpecial)
             put("message", finalMsg)
@@ -818,7 +808,6 @@ data class LogEntry(
             put("count", count); put("duration_ms", durationMs); put("is_special", isSpecial)
             put("first_seen_ts", if (firstSeenTs == 0L) timestamp else firstSeenTs); put("role", role)
             
-            // Oct.6.21: Hardened numeric puts to prevent JSONExceptions (Rule 1.125)
             if (lat != 0.0) put("lat", safeDouble(lat))
             if (lng != 0.0) put("lng", safeDouble(lng))
             if (accuracy != 0.0) put("accuracy", safeDouble(accuracy))
@@ -838,9 +827,9 @@ data class LogEntry(
             heapSnapshot?.let { put("heap_snapshot", safeDouble(it)) }
             checksum?.let { put("checksum", it) }
             
-            // Oct.7.7 Anomaly Flags
             put("is_suspicious_noise", forensic.isSuspiciousNoise)
             put("is_memory_pressure_throttled", forensic.isMemoryPressureThrottled)
+            put("is_jamming_candidate", forensic.isJammingCandidate)
         }
     }
 
@@ -853,7 +842,8 @@ data class LogEntry(
                 thermal = if (obj.has("thermal_snapshot")) obj.optDouble("thermal_snapshot") else null,
                 heap = if (obj.has("heap_snapshot")) obj.optDouble("heap_snapshot") else null,
                 isSuspiciousNoise = obj.optBoolean("is_suspicious_noise", false),
-                isMemoryPressureThrottled = obj.optBoolean("is_memory_pressure_throttled", false)
+                isMemoryPressureThrottled = obj.optBoolean("is_memory_pressure_throttled", false),
+                isJammingCandidate = obj.optBoolean("is_jamming_candidate", false)
             )
             return LogEntry(
                 localId = obj.optString("localId"), timestamp = ts, message = obj.optString("message"),
@@ -981,7 +971,8 @@ data class DashboardHealthState(
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
     var isSuspiciousNoise: Boolean = false,
-    var isMemoryPressureThrottled: Boolean = false
+    var isMemoryPressureThrottled: Boolean = false,
+    var isJammingCandidate: Boolean = false
 ) : BatteryProvider {
     override val battery: Int get() = batteryLevel
     override val isCharging: Boolean get() = trackerCurrentMa < 0
@@ -1219,5 +1210,6 @@ data class HudHealthState(
     val systemPulse: Long = 0L,
     val isMaliAnomaly: Boolean = false,
     val isSuspiciousNoise: Boolean = false,
-    val isMemoryPressureThrottled: Boolean = false
+    val isMemoryPressureThrottled: Boolean = false,
+    val isJammingCandidate: Boolean = false
 ) : BatteryProvider

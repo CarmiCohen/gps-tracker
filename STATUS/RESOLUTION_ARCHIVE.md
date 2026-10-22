@@ -1,15 +1,16 @@
-# Resolution Archive - GPS Tracker (Oct22.14)
+# Resolution Archive - GPS Tracker (Oct22.15)
 
-## ISSUE-OCT22.0-F4: Telemetry Sync & Violation Propagation Hardening (Oct22.14)
-- **Resolved**: Oct22.14
-- **Description**: Forensic sensor data (Noise/Lux/Vibe) and Ping (RTT) values were not reaching the Viewer HUD (showing 0). Tracker violations were also not mirroring on the remote Viewer. Initial Oct22.13 fix had gaps in Protobuf sync and a JSON key mismatch.
+## ISSUE-OCT22.0-F4: Telemetry Sync & Violation Propagation Hardening (Oct22.15)
+- **Resolved**: Oct22.15
+- **Description**: Forensic sensor data (Noise/Lux/Vibe/Proximity) and Ping (RTT) values were not reaching the Viewer HUD (showing 0). Tracker violations were also not mirroring on the remote Viewer. Initial Oct22.13/Oct22.14 fixes had gaps in Protobuf sync, JSON key mismatches, and lacked Jammer Discrimination flag parity.
 - **Remediation**:
-    - **Protobuf Schema**: Expanded `RealtimeStatus` in `app_settings.proto` to include raw forensic fields, `rtt`, and `violation_percentage`.
+    - **Protobuf Schema**: Expanded `RealtimeStatus` and `TrackerStatusProto` in `app_settings.proto` to include raw forensic fields, `rtt`, `violation_percentage`, and `is_jamming_candidate`.
     - **Mapping Hardening**: 
-        - `TelemetryProtobufMapper.kt`: Updated `mapToRealtime` and `mapProtoToSnapshot` to include raw sensor indices, RTT, proximity debounce, and vibration floor.
-        - `TelemetryMapper.kt`: Fixed field omissions in all Snapshots and status mappers. Synchronized `violationPercentage`.
-        - `TelemetryMerger.kt`: Ensured forensic data and session audit metrics survive coordinate-stale packets.
-        - `LocationUpdate.kt`: Fixed JSON key inconsistency for `adaptive_vibration_floor` in `toMap()`.
+        - `TelemetryProtobufMapper.kt`: Updated `mapToRealtime` and `mapToPersistence` to include all forensic indices, RTT, proximity metrics, vibration floor, and jammer flags.
+        - `TelemetryMapper.kt`: Fixed field omissions in all Snapshots and status mappers. Synchronized `violationPercentage` and `isJammingCandidate`.
+        - `TelemetryMerger.kt`: Ensured forensic data, session audit metrics, and jammer flags survive coordinate-stale packets.
+        - `LocationUpdate.kt`: Fixed JSON key snake_case consistency for `adaptive_vibration_floor`, `is_cooling_mode_active`, `last_energy_duration_ms`, and `is_jamming_candidate`.
+    - **Model Integrity**: Updated `ConnectionPoint` and `LogEntry` in `Models.kt` to include `isJammingCandidate` for history parity.
     - **Relay Mechanism**:
         - `relay-server/index.js`: Implemented `violation_event` routing.
         - `ConnectivitySuite.kt`: Added `emitViolation` and `violation_relay` handler to mirror remote violations in the local `MainRepository`.

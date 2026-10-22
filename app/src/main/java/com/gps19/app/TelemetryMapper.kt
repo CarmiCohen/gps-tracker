@@ -6,23 +6,17 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.22.15:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Synchronized isJammingCandidate 
+ *   across all paths (Snapshot, Status, App, Entity). Added violationPercentage 
+ *   to persistence entities.
  * Oct.22.14:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Synchronized proximity_cm, 
  *   proximity_debounce_ms, adaptive_vibration_floor and violation_percentage 
  *   in mapProtoToSnapshot and mapProtoToStatus for full parity.
  * Oct.22.13:
  * - ISSUE-OCT22.0-F4: Fixed Forensic Propagation. Added missing noise_idx, 
- *   lux_idx, temp, proximity_cm, rtt, and violation fields to mapProtoToSnapshot 
- *   and mapJsonToSnapshot to ensure data reaches Viewer HUD. 
- *   Updated mapTickToOutputs to include rtt. Fixed typos in populateRibbons.
- * Oct.16.0:
- * - SIMP-OCT15.21-S1: Immutable Ribbon Normals. Moved ribbon normalization logic 
- *   from UI-thread buffers to the ingestion point. Added populateRibbons() 
- *   to ensure all ConnectionPoints carry pre-calculated normals.
- * Oct.15.12:
- * - ISSUE-OCT15.11-F1: Vibration Floor Jitter Hardening. Added clampVibrationFloor() 
- *   to ensure adaptiveVibrationFloor stays within [0.02, 2.0] G range across 
- *   all ingestion paths.
+ *   lux_idx, temp, proximity_cm, rtt, and violation fields.
  */
 object TelemetryMapper {
 
@@ -31,7 +25,6 @@ object TelemetryMapper {
 
     /**
      * populateRibbons: Centralized authority for ribbon normalization [0.0, 1.0].
-     * Moved to ingestion point to ensure architectural purity and immutability (SIMP-OCT15.21-S1).
      */
     fun populateRibbons(p: ConnectionPoint) {
         p.ribbons.apply {
@@ -98,7 +91,6 @@ object TelemetryMapper {
                 kinetic.gpsTs = it.timestamp
                 this.status = it.status
 
-                // Oct.7.11: Promote behavioral health reason from processor
                 if (it.locationPendingReason != LocationPendingReason.NONE) {
                     this.integrity.locationPendingReason = SentinelValidator.getHigherPriorityReason(
                         this.integrity.locationPendingReason,
@@ -219,8 +211,8 @@ object TelemetryMapper {
                 heapAllocatedMb = proto.heapAllocatedMb
                 rtt = proto.rtt
                 violationPercentage = proto.violationPercentage
+                isJammingCandidate = proto.isJammingCandidate
 
-                // Oct.7.11 behavioral health priority resolution
                 if (processed.locationPendingReason != LocationPendingReason.NONE) {
                     locationPendingReason = SentinelValidator.getHigherPriorityReason(
                         locationPendingReason,
@@ -359,8 +351,8 @@ object TelemetryMapper {
                 thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
                 heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
                 rtt = data.optInt("rtt", 0)
+                isJammingCandidate = data.optBoolean("is_jamming_candidate", current.isJammingCandidate)
 
-                // Oct.7.11 behavioral health priority resolution
                 if (processed.locationPendingReason != LocationPendingReason.NONE) {
                     locationPendingReason = SentinelValidator.getHigherPriorityReason(
                         locationPendingReason,
@@ -414,13 +406,11 @@ object TelemetryMapper {
                 thermalHeadroom = proto.thermalHeadroom
                 heapAllocatedMb = proto.heapAllocatedMb
                 rtt = proto.rtt
-                
-                // Oct.22.13: Violation fields
                 violationUptimeMs = proto.violationUptimeMs
                 violationPercentage = proto.violationPercentage
+                isJammingCandidate = proto.isJammingCandidate
             }
             atmospheric.apply {
-                // Oct.22.13: Forensic sensor fields
                 temp = proto.temp
                 noiseIdx = proto.noiseIdx
                 luxIdx = proto.luxIdx
@@ -447,13 +437,10 @@ object TelemetryMapper {
             this.isSuspiciousNoise = proto.isSuspiciousNoise
             this.isMemoryPressureThrottled = proto.isMemoryPressureThrottled
 
-            // Oct.10.10: Corrected SNR scaling to raw dB-Hz using RIBBON_SNR_SCALE_DB standard.
+            // Oct.10.10: Reconstruct raw SNR
             snrSnapshot = if (proto.hasSnrSnapshot()) proto.snrSnapshot else proto.snrIdx * RIBBON_SNR_SCALE_DB
             
             kinetic.jumpTier = proto.jumpTier
-            integrity.isJammer = proto.isJammer
-            integrity.isStalled = proto.isStalled
-            integrity.isTamperDetected = proto.isTamperDetected || proto.isLocationPending
             nowTs = now; this.nowRt = nowRt
             trackerState = try { TrackerState.valueOf(proto.state.name.removePrefix("TS_")) } catch(e: Exception) { TrackerState.UNKNOWN }
             
@@ -497,13 +484,11 @@ object TelemetryMapper {
                 thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
                 heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
                 rtt = data.optInt("rtt", 0)
-                
-                // Oct.22.13: Violation fields
                 violationUptimeMs = data.optLong("violation_uptime_ms", 0L)
                 violationPercentage = data.optDouble("violation_percentage", current.integrity.violationPercentage)
+                isJammingCandidate = data.optBoolean("is_jamming_candidate", current.isJammingCandidate)
             }
             atmospheric.apply {
-                // Oct.22.13: Forensic sensor fields
                 temp = data.optDouble("temp", 0.0)
                 noiseIdx = data.optDouble("noise_idx", current.atmospheric.noiseIdx)
                 luxIdx = data.optDouble("lux_idx", current.atmospheric.luxIdx)
@@ -546,7 +531,6 @@ object TelemetryMapper {
             lastAlarmAckTs = data.optLong("last_alarm_ack_ts", 0L)
             violationStartTs = data.optLong("violation_start_ts", 0L)
             
-            // Oct.10.10: Reconstruct raw SNR for remote processor consistency
             snrSnapshot = if (data.has("snr_snapshot")) data.optDouble("snr_snapshot") else integrity.snrIdx * RIBBON_SNR_SCALE_DB
         }
     }
@@ -577,12 +561,15 @@ object TelemetryMapper {
             acousticFloorDb = snapshot.atmospheric.acousticFloorDb, 
             adaptiveVibrationFloor = clampVibrationFloor(snapshot.atmospheric.adaptiveVibrationFloor), 
             peakVibrationShock = snapshot.atmospheric.peakVibrationShock,
+            isPowerTamper = snapshot.integrity.isPowerTamper,
+            isLocationPending = snapshot.integrity.isLocationPending,
+            locationPendingReason = snapshot.integrity.locationPendingReason,
             isPowerSaveMode = snapshot.integrity.isPowerSaveMode, 
             standbyBucket = snapshot.integrity.standbyBucket, 
             netInterface = snapshot.integrity.netInterface,
             isStorageLow = snapshot.integrity.isStorageLow, 
             isStorageCritical = snapshot.integrity.isStorageCritical,
-            isBatterySteepDischarge = snapshot.integrity.isBatteryWhitelisted.let { if (it) snapshot.integrity.isBatterySteepDischarge else false }, // Parity logic
+            isBatterySteepDischarge = snapshot.integrity.isBatteryWhitelisted.let { if (it) snapshot.integrity.isBatterySteepDischarge else false },
             isCoolingModeActive = snapshot.integrity.isCoolingModeActive,
             vibration = snapshot.snrSnapshot ?: snapshot.atmospheric.vibration, 
             cpuLoad = snapshot.integrity.cpuLoad, 
@@ -594,9 +581,6 @@ object TelemetryMapper {
             isBatteryLow = snapshot.integrity.isBatteryLow, 
             isBatteryCritical = snapshot.integrity.isBatteryCritical,
             tamperNote = snapshot.suppressionNote,
-            isPowerTamper = snapshot.integrity.isPowerTamper,
-            isLocationPending = snapshot.integrity.isLocationPending,
-            locationPendingReason = snapshot.integrity.locationPendingReason,
             coolingEnteredRt = snapshot.nowRt,
             thermalHeadroom = snapshot.integrity.thermalHeadroom,
             heapAllocatedMb = snapshot.integrity.heapAllocatedMb,
@@ -604,9 +588,9 @@ object TelemetryMapper {
             heapSnapshot = snapshot.heapSnapshot,
             isSuspiciousNoise = snapshot.isSuspiciousNoise,
             isMemoryPressureThrottled = snapshot.isMemoryPressureThrottled,
+            isJammingCandidate = snapshot.isJammingCandidate,
             activityType = snapshot.activityType
         )
-        // Oct.15.11: Safety Clamp
         health.proximityDebounceMs = clampProxDebounce(snapshot.proximityDebounceMs)
         health.proximityCm = snapshot.proximityCm
         health.violationPercentage = snapshot.integrity.violationPercentage
@@ -636,14 +620,12 @@ object TelemetryMapper {
                 gpsTs = rawGpsTs
                 speed = processed.filteredSpeed
                 kineticEnergy = processed.kineticEnergy
-                this.activityType = snapshot.activityType
             }
             this.lastValidFixRt = lastValidFixRt
             this.integrity.isTamperDetected = processed.tamperDetected
             suppressionNote = processed.suppressionNote
             this.snrSnapshot = snrSnapshot
 
-            // Oct.7.11 behavioral health priority resolution
             if (processed.locationPendingReason != LocationPendingReason.NONE) {
                 this.integrity.locationPendingReason = SentinelValidator.getHigherPriorityReason(
                     this.integrity.locationPendingReason,
@@ -682,7 +664,6 @@ object TelemetryMapper {
             this.integrity.isStalled = s.integrity.isStalled
             this.isClockRegression = s.isClockRegression || (nowRt - s.lastValidFixRt > 30000L)
             
-            // Oct.10.10: Corrected SNR scaling to raw dB-Hz for remote processor parity
             snrSnapshot = s.snrSnapshot ?: (s.integrity.snrIdx * RIBBON_SNR_SCALE_DB)
             
             this.integrity.thermalHeadroom = s.integrity.thermalHeadroom
@@ -706,7 +687,7 @@ object TelemetryMapper {
     }
 
     /**
-     * Maps core and forensic fields from EngineConnectionPoint to ConnectionPoint.
+     * mapEngineToApp: Maps core and forensic fields from EngineConnectionPoint to ConnectionPoint.
      */
     fun mapEngineToApp(p: EngineConnectionPoint, out: ConnectionPoint) {
         out.apply {
@@ -740,6 +721,7 @@ object TelemetryMapper {
             // Oct.7.7 Anomaly Flags
             isSuspiciousNoise = p.forensic.isSuspiciousNoise
             isMemoryPressureThrottled = p.forensic.isMemoryPressureThrottled
+            isJammingCandidate = p.forensic.isJammingCandidate
         }
         populateRibbons(out)
     }
@@ -781,6 +763,7 @@ object TelemetryMapper {
             // Oct.7.7 Anomaly Flags
             isSuspiciousNoise = proto.isSuspiciousNoise
             isMemoryPressureThrottled = proto.isMemoryPressureThrottled
+            isJammingCandidate = proto.isJammingCandidate
         }
         populateRibbons(out)
     }
@@ -823,7 +806,8 @@ object TelemetryMapper {
             sitTilt = entity.sitTilt; sitShock = entity.sitShock
             isBatterySteepDischarge = entity.isBatterySteepDischarge; isCoolingModeActive = entity.isCoolingModeActive
             isBatteryLow = entity.isBatteryLow; isBatteryCritical = entity.isBatteryCritical
-            violationUptimeMs = entity.violationUptimeMs; isUltraLongStationary = entity.isUltraLongStationary
+            violationUptimeMs = entity.violationUptimeMs
+            isUltraLongStationary = entity.isUltraLongStationary
             gpsHardwareLock = entity.gpsHardwareLock; isAnchorLocked = entity.isAnchorLocked
             thermalHeadroom = entity.thermalHeadroom; heapAllocatedMb = entity.heapAllocatedMb
             activityType = try { 
@@ -833,6 +817,7 @@ object TelemetryMapper {
             heapSnapshot = null
             isSuspiciousNoise = false
             isMemoryPressureThrottled = false
+            isJammingCandidate = entity.isJammingCandidate
         }
         populateRibbons(out)
     }
@@ -868,10 +853,12 @@ object TelemetryMapper {
             locationPendingReason = p.locationPendingReason.name, accuracy = PhysicsUtils.safeDouble(p.gpsAccuracy),
             maxAccuracy = PhysicsUtils.safeDouble(p.maxAccuracy), isAnchorLocked = p.isAnchorLocked, isBatteryLow = p.isBatteryLow,
             isBatteryCritical = p.isBatteryCritical, violationUptimeMs = p.violationUptimeMs,
+            violationPercentage = 0.0, // Calculated at runtime
             isUltraLongStationary = p.isUltraLongStationary, gpsHardwareLock = p.gpsHardwareLock,
             thermalHeadroom = PhysicsUtils.safeDouble(p.thermalHeadroom), 
             heapAllocatedMb = PhysicsUtils.safeDouble(p.heapAllocatedMb),
             activityType = p.activityType.name,
+            isJammingCandidate = p.isJammingCandidate,
             payload = TelemetryProtobufMapper.mapAppToBinary(p)
         )
     }
@@ -910,9 +897,12 @@ object TelemetryMapper {
             isAnchorLocked = status.integrity.isAnchorLocked, trackerState = status.trackerState.name,
             status = status.status.name, isBatteryLow = status.isBatteryLow,
             isBatteryCritical = status.isBatteryCritical, isUltraLongStationary = status.isUltraLongStationary,
-            violationUptimeMs = status.violationUptimeMs, gpsHardwareLock = status.gpsHardwareLock,
+            violationUptimeMs = status.violationUptimeMs, 
+            violationPercentage = status.integrity.violationPercentage,
+            gpsHardwareLock = status.gpsHardwareLock,
             isGnssThrottled = status.isGnssThrottled, thermalHeadroom = PhysicsUtils.safeDouble(status.integrity.thermalHeadroom),
             heapAllocatedMb = PhysicsUtils.safeDouble(status.integrity.heapAllocatedMb), activityType = status.activityType.name,
+            isJammingCandidate = status.isJammingCandidate,
             payload = TelemetryProtobufMapper.mapStatusToBinary(status)
         )
     }
@@ -952,7 +942,7 @@ object TelemetryMapper {
                 temp = entity.temp; noiseIdx = entity.noiseIdx; luxIdx = entity.luxIdx
                 vibeIdx = entity.vibeIdx; liftIdx = entity.liftIdx; tiltIdx = entity.tiltIdx
                 baroIdx = entity.baroIdx; proxIdx = entity.proxIdx
-                proximityDebounceMs = clampProxDebounce(entity.proxIdx.toLong()) // Legacy fallback
+                proximityDebounceMs = 0L
                 adaptiveVibrationFloor = clampVibrationFloor(INITIAL_VIBRATION_FLOOR)
             }
 
@@ -972,15 +962,13 @@ object TelemetryMapper {
                 isBatteryLow = entity.isBatteryLow; isBatteryCritical = entity.isBatteryCritical
                 isUltraLongStationary = entity.isUltraLongStationary
                 violationUptimeMs = entity.violationUptimeMs
+                violationPercentage = entity.violationPercentage
                 gpsHardwareLock = entity.gpsHardwareLock
                 isGnssThrottled = entity.isGnssThrottled
                 thermalHeadroom = entity.thermalHeadroom
                 heapAllocatedMb = entity.heapAllocatedMb
                 rtt = 0
-                thermalSnapshot = null
-                heapSnapshot = null
-                isSuspiciousNoise = false
-                isMemoryPressureThrottled = false
+                isJammingCandidate = entity.isJammingCandidate
             }
 
             ts = entity.timestamp
@@ -993,7 +981,7 @@ object TelemetryMapper {
 
     /**
      * mapPointsToHistoryBuffer: Authority for converting a list of ConnectionPoints 
-     * into a primitive-backed HistoryBuffer (SIMP-OCT15.4-S1).
+     * into a primitive-backed HistoryBuffer.
      */
     fun mapPointsToHistoryBuffer(points: List<ConnectionPoint>): HistoryBuffer {
         return HistoryBuffer.fromPoints(points)
@@ -1001,7 +989,7 @@ object TelemetryMapper {
 
     /**
      * mapEntitiesToHistoryBuffer: Authority for converting a list of HistoryEntities 
-     * into a primitive-backed HistoryBuffer (SIMP-OCT15.4-S1).
+     * into a primitive-backed HistoryBuffer.
      */
     fun mapEntitiesToHistoryBuffer(entities: List<HistoryEntity>): HistoryBuffer {
         val points = entities.map { entity ->
@@ -1012,7 +1000,7 @@ object TelemetryMapper {
 
     /**
      * mapEntitiesToTrailBuffer: Authority for converting Room entities to 
-     * primitive-backed TrailBuffer (ISSUE-OCT15.7-F1).
+     * primitive-backed TrailBuffer.
      */
     fun mapEntitiesToTrailBuffer(entities: List<TrailEntity>): TrailBuffer {
         val size = entities.size

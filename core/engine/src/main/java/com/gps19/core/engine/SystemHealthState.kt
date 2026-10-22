@@ -4,18 +4,12 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Oct.22.15:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added isJammingCandidate parity.
+ *   Fixed proximityCm reset consistency (-1.0).
  * Oct.7.7:
  * - Issue #SIMP-1007-16: Flag Propagation. Integrated native isSuspiciousNoise and 
  *   isMemoryPressureThrottled flags for HUD and decision logic.
- * Oct.7.4:
- * - Issue #SIMP-1007-15: Unified Snapshot Container. Migrated thermalSnapshot 
- *   and heapSnapshot into ForensicSnapshot container for architectural parity.
- * Oct.5.2:
- * - Issue #1344: Forensic Diagnostic Expansion. Added thermalSnapshot and 
- *   heapSnapshot for high-fidelity correlation with GPS stalls (R1344).
- * Oct.3.1:
- * - Issue #1420: Granular HUD Binding. Implemented Locatable interface to 
- *   support decoupled UI slicing and automated HUD status projection.
  */
 @Serializable
 class SystemHealthState(
@@ -144,6 +138,11 @@ class SystemHealthState(
         get() = forensic.isMemoryPressureThrottled
         set(value) { forensic.isMemoryPressureThrottled = value }
 
+    // Oct.22.15 Delegate
+    var isJammingCandidate: Boolean
+        get() = forensic.isJammingCandidate
+        set(value) { forensic.isJammingCandidate = value }
+
     fun copyFrom(other: SystemHealthState) {
         this.signalLoss = other.signalLoss
         this.gpsStalled = other.gpsStalled
@@ -263,6 +262,7 @@ class SystemHealthState(
         thermalHeadroom: Double = 0.0, heapAllocatedMb: Double = 0.0,
         thermalSnapshot: Double? = null, heapSnapshot: Double? = null,
         isSuspiciousNoise: Boolean = false, isMemoryPressureThrottled: Boolean = false,
+        isJammingCandidate: Boolean = false,
         activityType: ActivityType = ActivityType.UNKNOWN
     ) {
         this.signalLoss = signalLoss
@@ -308,6 +308,7 @@ class SystemHealthState(
         this.forensic.heap = heapSnapshot
         this.forensic.isSuspiciousNoise = isSuspiciousNoise
         this.forensic.isMemoryPressureThrottled = isMemoryPressureThrottled
+        this.forensic.isJammingCandidate = isJammingCandidate
         this.forensicReliability = forensicReliability
         this.vibration = vibration
         this.isBatteryLow = isBatteryLow
@@ -396,7 +397,7 @@ class SystemHealthState(
         acousticFloorDb = 0.0
         adaptiveVibrationFloor = 0.12
         proxIdx = 1.0
-        proximityCm = 0.0
+        proximityCm = -1.0
         proximityDebounceMs = 0L
         vibrationRollingSum = 0.0
         kineticEnergy = 0.0

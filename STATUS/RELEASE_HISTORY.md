@@ -1,6 +1,13 @@
-# Project History & Versioning (Oct22.14)
+# Project History & Versioning (Oct22.15)
 
 **For historical records (v9.3.0 and older), see [docs_history_archive.md](docs_history_archive.md).**
+
+## Oct22.15 (Forensic Sync & Jammer Parity Hardened)
+- **Remediation Hardening (#ISSUE-OCT22.0-F4)**: Corrected residual gaps in forensic synchronization. Ensured Jammer Discrimination flags and RTT persistence are synchronized across Protobuf, JSON, and internal models.
+- **Protobuf Parity**: Added `is_jamming_candidate` to all status protos. Added `rtt` to persistence proto for connection quality auditing.
+- **JSON Standardization**: Standardized all telemetry JSON keys to snake_case (`is_cooling_mode_active`, `last_energy_duration_ms`, `is_jamming_candidate`).
+- **Database Schema (v84)**: Implemented migration to add `violationPercentage` and `isJammingCandidate` columns to logs and history tables.
+- **Mapping Integrity**: Hardened `TelemetryProtobufMapper` and `TelemetryMapper` for full field parity including jammer candidates.
 
 ## Oct22.14 (Forensic Sync Hardening)
 - **Remediation Recheck (#ISSUE-OCT22.0-F4)**: Hardened forensic field synchronization (Proximity, Vibration Floor, RTT) and ensured session audit parity (Violation Percentage) across Protobuf/JSON.

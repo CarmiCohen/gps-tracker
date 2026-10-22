@@ -5,6 +5,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.22.15:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added isJammingCandidate to all paths.
+ *   Added rtt to mapToPersistence.
  * Oct.22.14:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added proximityDebounceMs, 
  *   adaptiveVibrationFloor, and violationPercentage to mapToRealtime.
@@ -202,6 +205,9 @@ object TelemetryProtobufMapper {
         builder.setProximityDebounceMs(status.atmospheric.proximityDebounceMs)
         builder.setAdaptiveVibrationFloor(PhysicsUtils.safeDouble(status.atmospheric.adaptiveVibrationFloor))
         builder.setViolationPercentage(PhysicsUtils.safeDouble(status.integrity.violationPercentage))
+
+        // Oct.22.15: Jammer Discrimination Parity
+        builder.setIsJammingCandidate(status.isJammingCandidate)
     }
 
     /**
@@ -230,6 +236,7 @@ object TelemetryProtobufMapper {
         builder.setMaxDropTs(status.integrity.maxDropTs)
         builder.setLastConnTs(status.integrity.lastConnTs)
         builder.setLastDiscTs(status.integrity.lastDiscTs)
+        builder.setRtt(status.rtt)
         
         builder.setBattery(status.battery)
         builder.setTemp(PhysicsUtils.safeDouble(status.temp))
@@ -348,6 +355,9 @@ object TelemetryProtobufMapper {
         // Oct.7.7 Anomaly Flags
         builder.setIsSuspiciousNoise(status.isSuspiciousNoise)
         builder.setIsMemoryPressureThrottled(status.isMemoryPressureThrottled)
+
+        // Oct.22.15: Jammer Discrimination Parity
+        builder.setIsJammingCandidate(status.isJammingCandidate)
     }
 
     /**
