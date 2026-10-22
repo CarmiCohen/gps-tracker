@@ -263,6 +263,9 @@ data class IntegrityState(
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
+ * Oct.22.14:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Fixed JSON key inconsistency 
+ *   for adaptive_vibration_floor in toMap().
  * Oct.22.13:
  * - ISSUE-OCT22.0-F4: Forensic Parity. Added rtt accessor to map to RealtimeStatus.
  * Oct.13.30:
@@ -787,7 +790,7 @@ data class LocationUpdate(
         put("status", status.name); put("is_jammer", isJammer); put("is_stalled", isStalled)
         put("is_tamper_detected", tamperDetected); put("vibration", vibration); put("heading", heading); put("tilt_degrees", tiltDegrees)
         put("acoustic_db", acousticDb); put("baro_alt", baroAlt); put("lux", lux); put("is_near", isNear)
-        put("lux_baseline", luxBaseline); put("acoustic_floor_db", acousticFloorDb); put("adaptiveVibrationFloor", adaptiveVibrationFloor)
+        put("lux_baseline", luxBaseline); put("acoustic_floor_db", acousticFloorDb); put("adaptive_vibration_floor", adaptiveVibrationFloor)
         put("prox_idx", proxIdx); put("proximity_cm", proximityCm); put("proximity_debounce_ms", proximityDebounceMs)
         put("vibration_rolling_sum", vibrationRollingSum); put("is_clock_regression", isClockRegression)
         put("jump_tier", jumpTier); put("is_location_pending", isLocationPending)

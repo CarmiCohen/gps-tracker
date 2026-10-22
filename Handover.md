@@ -1,23 +1,20 @@
-# Project Handover - Oct22.13 (Telemetry Sync Hardened)
+# Project Handover - Oct22.14 (Forensic Sync Hardened)
 
-## 🟢 Status: STABILIZING
+## 🟢 Status: STABILIZED
 
-The critical **Telemetry Sync and Violation Propagation (F4)** has been resolved. Forensic data (Noise, Lux, Vibration) and real-time RTT are now correctly serialized via Protobuf and JSON, ensuring the Viewer HUD accurately reflects the Tracker's environment. Violation events are now proactively propagated to remote peers.
+The critical **Telemetry Sync and Violation Propagation (F4)** has been fully hardened. Beyond basic relay established in Oct22.13, this version (Oct22.14) ensures complete forensic parity by synchronizing adaptive thresholds (Vibration Floor, Proximity Debounce) and session audit metrics (Violation Percentage) across Protobuf and JSON layers.
 
 ## ✅ Completed in this Session
-- **Telemetry Propagation & Sync (#ISSUE-OCT22.0-F4)**:
-    - **Protobuf Schema Hardening**: Expanded `RealtimeStatus` in `app_settings.proto` to include raw forensic fields (Lux, Acoustic, Vibration, VibrationRollingSum) and `rtt`.
-    - **Telemetry Mapping Integrity**:
-        - `TelemetryProtobufMapper.kt`: Updated `mapToRealtime` and `mapProtoToSnapshot` to synchronize raw sensor fields and RTT across the wire.
-        - `TelemetryMapper.kt`: Fixed omissions in `mapProtoToSnapshot` and `mapJsonToSnapshot`; added RTT to `mapTickToOutputs`. Fixed a typo in `populateRibbons` affecting `sdz` and `baro` normalization.
-        - `TelemetryMerger.kt`: Hardened `mergeInto` to ensure forensic indices (Noise/Lux/Vibe/RTT) are updated even when coordinates are rejected as stale.
-    - **Violation Relay**:
-        - `CommunicationManager.kt` & `relay-server/index.js`: Implemented `violation_relay` event path.
-        - `ConnectivitySuite.kt`: Added `emitViolation()` to propagate local violations to remote peers.
-        - `AppAlarmManager.kt` & `ServiceForensicUseCase.kt`: Integrated evaluation logic with the signaling layer to record and emit violation markers simultaneously.
-- **Versioning**: Incremented to `Oct22.13`.
-- **Traceability**: Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md`.
-- **Build Integrity**: Verified successful `app:assembleDebug`.
+- **Remediation Recheck & Hardening (#ISSUE-OCT22.0-F4)**:
+    - **Protobuf Schema Integrity**: Added `violation_percentage` to `RealtimeStatus` to enable remote session audit visibility.
+    - **Signaling Symmetry**: Synchronized `proximity_debounce_ms` and `adaptive_vibration_floor` in `TelemetryProtobufMapper.mapToRealtime`.
+    - **Mapping Ingestion**: 
+        - `TelemetryMapper.kt`: Fixed omissions of `proximity_cm`, `proximity_debounce_ms`, and `violation_percentage` in Snapshot and Status ingestion.
+        - `LocationUpdate.kt`: Resolved JSON key mismatch for `adaptive_vibration_floor` in `toMap()`.
+    - **Merge Consistency**: Updated `TelemetryMerger.mergeInto` to preserve `violationPercentage` when coordinates are stale.
+- **Versioning**: Incremented to `Oct22.14`.
+- **Baseline Synchronization**: Created `STATUS/BASELINE/Oct22.14` and updated all forensic tracking documents.
+- **Traceability**: New Rule **1.249 (Forensic State Symmetry)** added to `SOT_MASTER_REQUIREMENTS.md`.
 
 ## 🔴 Current Open Gaps (LOW)
 - **UI UX Simplification**:
@@ -25,9 +22,9 @@ The critical **Telemetry Sync and Violation Propagation (F4)** has been resolved
     - **SIMP-OCT22.0-S1**: Centralize identity and regex validation into `ConfigValidator`.
 
 ## 🎯 Next Resumption Focus: UI/UX Refinement.
-With core telemetry and signaling hardened, the next phase should focus on strategic simplification of the UI architecture (CompositionLocals) and validation centralization.
+Telemtry sync is now physically and logically hardened. Focus shifts to architectural simplification and centralized validation as per `issues.md`.
 
-**Current Forensic Metrics (Oct22.13):**
-- **[Oct22.13]: [SOT Count: 813 (Rules: 321), Open: H:0, M:0, L:0, Ideas: H:2, M:25, L:42, Testing: 11 (Sub-items: 45), QA: 385]**
+**Current Forensic Metrics (Oct22.14):**
+- **[Oct22.14]: [SOT Count: 813 (Rules: 322), Open: H:0, M:0, L:0, Ideas: H:2, M:25, L:42, Testing: 11 (Sub-items: 45), QA: 385]**
 
 **HANDOVER UPDATED.**

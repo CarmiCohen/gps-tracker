@@ -297,6 +297,9 @@ message RealtimeStatus {
     double acoustic_floor_db = 118;
     double vibration = 119;
     double vibration_rolling_sum = 120;
+
+    // Oct.22.14: Session Audit Parity
+    double violation_percentage = 121;
 }
 
 message GeoPointProto {

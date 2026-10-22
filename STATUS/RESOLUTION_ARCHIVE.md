@@ -1,14 +1,15 @@
-# Resolution Archive - GPS Tracker (Oct22.13)
+# Resolution Archive - GPS Tracker (Oct22.14)
 
-## ISSUE-OCT22.0-F4: Telemetry Sync & Violation Propagation Failure (Oct22.13)
-- **Resolved**: Oct22.13
-- **Description**: Forensic sensor data (Noise/Lux/Vibe) and Ping (RTT) values were not reaching the Viewer HUD (showing 0). Tracker violations were also not mirroring on the remote Viewer.
+## ISSUE-OCT22.0-F4: Telemetry Sync & Violation Propagation Hardening (Oct22.14)
+- **Resolved**: Oct22.14
+- **Description**: Forensic sensor data (Noise/Lux/Vibe) and Ping (RTT) values were not reaching the Viewer HUD (showing 0). Tracker violations were also not mirroring on the remote Viewer. Initial Oct22.13 fix had gaps in Protobuf sync and a JSON key mismatch.
 - **Remediation**:
-    - **Protobuf Schema**: Expanded `RealtimeStatus` in `app_settings.proto` to include raw forensic fields and `rtt`.
+    - **Protobuf Schema**: Expanded `RealtimeStatus` in `app_settings.proto` to include raw forensic fields, `rtt`, and `violation_percentage`.
     - **Mapping Hardening**: 
-        - `TelemetryProtobufMapper.kt`: Updated `mapToRealtime` and `mapProtoToSnapshot` to include raw sensor indices and RTT.
-        - `TelemetryMapper.kt`: Fixed field omissions in all Snapshots and status mappers. Added RTT to tick outputs.
-        - `TelemetryMerger.kt`: Ensured forensic data survives coordinate-stale packets.
+        - `TelemetryProtobufMapper.kt`: Updated `mapToRealtime` and `mapProtoToSnapshot` to include raw sensor indices, RTT, proximity debounce, and vibration floor.
+        - `TelemetryMapper.kt`: Fixed field omissions in all Snapshots and status mappers. Synchronized `violationPercentage`.
+        - `TelemetryMerger.kt`: Ensured forensic data and session audit metrics survive coordinate-stale packets.
+        - `LocationUpdate.kt`: Fixed JSON key inconsistency for `adaptive_vibration_floor` in `toMap()`.
     - **Relay Mechanism**:
         - `relay-server/index.js`: Implemented `violation_event` routing.
         - `ConnectivitySuite.kt`: Added `emitViolation` and `violation_relay` handler to mirror remote violations in the local `MainRepository`.

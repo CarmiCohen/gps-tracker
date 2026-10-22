@@ -6,6 +6,10 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.22.14:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Synchronized proximity_cm, 
+ *   proximity_debounce_ms, adaptive_vibration_floor and violation_percentage 
+ *   in mapProtoToSnapshot and mapProtoToStatus for full parity.
  * Oct.22.13:
  * - ISSUE-OCT22.0-F4: Fixed Forensic Propagation. Added missing noise_idx, 
  *   lux_idx, temp, proximity_cm, rtt, and violation fields to mapProtoToSnapshot 
@@ -170,6 +174,7 @@ object TelemetryMapper {
                 acousticFloorDb = proto.acousticFloorDb
                 vibration = proto.vibration
                 vibrationRollingSum = proto.vibrationRollingSum
+                proximityCm = proto.proximityCm
             }
 
             integrity.apply {
@@ -213,6 +218,7 @@ object TelemetryMapper {
                 thermalHeadroom = proto.thermalHeadroom
                 heapAllocatedMb = proto.heapAllocatedMb
                 rtt = proto.rtt
+                violationPercentage = proto.violationPercentage
 
                 // Oct.7.11 behavioral health priority resolution
                 if (processed.locationPendingReason != LocationPendingReason.NONE) {
@@ -345,6 +351,7 @@ object TelemetryMapper {
                 sitShock = data.optDouble("sit_shock", current.integrity.sitShock)
                 isSitActive = data.optBoolean("is_sit_active", current.integrity.isSitActive)
                 violationUptimeMs = data.optLong("violation_uptime_ms", current.integrity.violationUptimeMs)
+                violationPercentage = data.optDouble("violation_percentage", current.integrity.violationPercentage)
                 isUltraLongStationary = data.optBoolean("is_ultra_long_stationary", current.integrity.isUltraLongStationary)
                 gpsHardwareLock = data.optBoolean("gps_hw_lock", current.integrity.gpsHardwareLock)
                 isGnssThrottled = data.optBoolean("is_gnss_throttled", current.integrity.isGnssThrottled)
@@ -410,6 +417,7 @@ object TelemetryMapper {
                 
                 // Oct.22.13: Violation fields
                 violationUptimeMs = proto.violationUptimeMs
+                violationPercentage = proto.violationPercentage
             }
             atmospheric.apply {
                 // Oct.22.13: Forensic sensor fields
@@ -492,6 +500,7 @@ object TelemetryMapper {
                 
                 // Oct.22.13: Violation fields
                 violationUptimeMs = data.optLong("violation_uptime_ms", 0L)
+                violationPercentage = data.optDouble("violation_percentage", current.integrity.violationPercentage)
             }
             atmospheric.apply {
                 // Oct.22.13: Forensic sensor fields
@@ -600,6 +609,7 @@ object TelemetryMapper {
         // Oct.15.11: Safety Clamp
         health.proximityDebounceMs = clampProxDebounce(snapshot.proximityDebounceMs)
         health.proximityCm = snapshot.proximityCm
+        health.violationPercentage = snapshot.integrity.violationPercentage
     }
 
     /**

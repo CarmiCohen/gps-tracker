@@ -2,13 +2,14 @@ package com.gps19.core.engine
 
 /**
  * TelemetryMerger: Pure logic for aggregating and merging telemetry updates.
+ * Oct.22.14:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Expanded preferCached block 
+ *   to ensure all forensic metadata (adaptive thresholds, anomaly flags, 
+ *   audit metrics) are merged even when coordinates are stale.
  * Oct.22.13:
  * - ISSUE-OCT22.0-F4: Telemetry Sync Hardening. Ensured RTT and forensic sensor 
  *   indices (noise, lux, vibe, etc.) are merged even when coordinates are 
  *   preferred from cache to ensure Viewer HUD parity.
- * Sep.09.10:
- * - Legacy Field Cleanup: Migrated to partitioned states (.kinetic, .integrity) 
- *   to support bridge removal in LocationUpdate (R-ID 284).
  */
 object TelemetryMerger {
 
@@ -38,6 +39,7 @@ object TelemetryMerger {
             target.trackerState = incoming.trackerState
             target.status = incoming.status
             target.lastValidFixRt = incoming.lastValidFixRt
+            target.isClockRegression = incoming.isClockRegression
             
             if (incoming.kinetic.maxAccuracy > 0) {
                 target.kinetic.maxAccuracy = incoming.kinetic.maxAccuracy
@@ -48,10 +50,11 @@ object TelemetryMerger {
             target.integrity.rtt = incoming.integrity.rtt
             target.integrity.battery = incoming.integrity.battery
             target.integrity.isCharging = incoming.integrity.isCharging
+            target.integrity.currentMa = incoming.integrity.currentMa
             target.integrity.isLocationPending = incoming.integrity.isLocationPending
             target.integrity.locationPendingReason = incoming.integrity.locationPendingReason
             
-            // Forensic Sensor Indices
+            // Forensic Sensor Indices & Metadata
             target.integrity.snrIdx = incoming.integrity.snrIdx
             target.atmospheric.noiseIdx = incoming.atmospheric.noiseIdx
             target.atmospheric.luxIdx = incoming.atmospheric.luxIdx
@@ -61,8 +64,33 @@ object TelemetryMerger {
             target.atmospheric.baroIdx = incoming.atmospheric.baroIdx
             target.atmospheric.temp = incoming.atmospheric.temp
             target.atmospheric.proximityCm = incoming.atmospheric.proximityCm
+            target.atmospheric.proximityDebounceMs = incoming.atmospheric.proximityDebounceMs
+            target.atmospheric.adaptiveVibrationFloor = incoming.atmospheric.adaptiveVibrationFloor
             
+            // Session Audit Parity
             target.violationUptimeMs = incoming.violationUptimeMs
+            target.integrity.violationPercentage = incoming.integrity.violationPercentage
+            target.violationStartTs = incoming.violationStartTs
+            target.lastAlarmAckTs = incoming.lastAlarmAckTs
+            
+            // Anomaly Flags
+            target.isSuspiciousNoise = incoming.isSuspiciousNoise
+            target.isMemoryPressureThrottled = incoming.isMemoryPressureThrottled
+            
+            // Forensic Snapshots
+            target.thermalSnapshot = incoming.thermalSnapshot
+            target.heapSnapshot = incoming.heapSnapshot
+            target.snrSnapshot = incoming.snrSnapshot
+            target.vibeSnapshot = incoming.vibeSnapshot
+
+            // Session Stats
+            target.integrity.uptimeMs = incoming.integrity.uptimeMs
+            target.integrity.totalConnectedMs = incoming.integrity.totalConnectedMs
+            target.integrity.sessionConnectedMs = incoming.integrity.sessionConnectedMs
+            target.integrity.totalDropMs = incoming.integrity.totalDropMs
+            target.integrity.maxDropMs = incoming.integrity.maxDropMs
+            target.integrity.lastConnTs = incoming.integrity.lastConnTs
+            target.integrity.lastDiscTs = incoming.integrity.lastDiscTs
         } else {
             // Overwrite target with incoming data
             target.copyFrom(incoming)

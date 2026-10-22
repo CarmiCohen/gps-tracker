@@ -1,0 +1,29 @@
+# Project History & Versioning (Oct22.14)
+
+**For historical records (v9.3.0 and older), see [docs_history_archive.md](docs_history_archive.md).**
+
+## Oct22.14 (Forensic Sync Hardening)
+- **Remediation Recheck (#ISSUE-OCT22.0-F4)**: Hardened forensic field synchronization (Proximity, Vibration Floor, RTT) and ensured session audit parity (Violation Percentage) across Protobuf/JSON.
+- **Protobuf Schema**: Expanded `RealtimeStatus` to include `violation_percentage`.
+- **Mapping Integrity**: Fixed omissions in `TelemetryMapper` ingestion and resolved JSON key inconsistency in `LocationUpdate.toMap`.
+- **Merge Reliability**: Hardened `TelemetryMerger.mergeInto` to ensure all diagnostic metadata survives stale coordinate merges.
+
+## Oct22.13 (Telemetry Propagation Hardening)
+- **Telemetry Propagation & Sync (#ISSUE-OCT22.0-F4)**: Corrected critical failure where forensic sensor data and RTT were not reaching the Viewer.
+- **Protobuf Extension**: Added raw forensic fields (Lux, Acoustic, Vibration) to `RealtimeStatus` schema to ensure wire-level parity.
+- **Violation Relay**: Implemented Tracker-to-Viewer violation propagation path in `CommunicationManager` and `relay-server`.
+- **Mapping Integrity**: Hardened `TelemetryMapper` and `TelemetryMerger` to ensure sensor indices survive even when coordinates are rejected as stale.
+
+## Oct22.12 (Signaling Identity Symmetry)
+- **Signaling Identity Symmetry (#ISSUE-OCT22.0-F3)**: Enforced strict Viewer ID symmetry in `SignalingValidator` for all signaling events (pulses, pings, pongs, telemetry).
+- **Leak Prevention**: Explicitly blocked cross-viewer traffic in Viewer mode to prevent erroneous activity indications from unauthorized peers (R-ID 616).
+- **Communication Hardening**: Integrated validator into `CommunicationManager` relay handlers to ensure UI status badges only transition to Green for authenticated peers.
+
+## Oct22.10 (Setup Lifecycle Hardening)
+- **Setup Exit Authority (#ISSUE-OCT22.0-F2)**: Integrated `BackHandler` into `SettingsOverlay` and `PhoneSetupOverlay` to prevent unintended application termination during configuration (R-ID 614).
+- **Exit Authority Parity**: Added explicit Close (X) icon to `PhoneSetupOverlay` to ensure consistent exit mechanisms across all setup flows (R-ID 615).
+
+## Oct22.0 (Setup & Configuration Hardening)
+- **Setup Configuration Fix (#ISSUE-OCT22.0-F1)**: Resolved ID persistence blocks in `SettingsUseCase` to ensure customized Tracker/Viewer IDs are properly committed to DataStore.
+- **Factory Reset Authority**: Implemented `LoadDefaults` to allow users to recover from invalid configurations.
+- **UI Visibility**: Promoted Relay URL visibility and contrast in the Settings UI.

@@ -5,6 +5,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.22.14:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added proximityDebounceMs, 
+ *   adaptiveVibrationFloor, and violationPercentage to mapToRealtime.
  * Oct.22.13:
  * - ISSUE-OCT22.0-F4: Forensic Parity. Added raw sensor fields (Lux, Acoustic, 
  *   Vibration) and RTT to mapToRealtime to ensure propagation to Viewer HUD.
@@ -194,6 +197,11 @@ object TelemetryProtobufMapper {
         builder.setVibration(PhysicsUtils.safeDouble(status.atmospheric.vibration))
         builder.setVibrationRollingSum(PhysicsUtils.safeDouble(status.atmospheric.vibrationRollingSum))
         builder.setProximityCm(PhysicsUtils.safeDouble(status.atmospheric.proximityCm))
+
+        // Oct.22.14 Forensic Sync Hardening
+        builder.setProximityDebounceMs(status.atmospheric.proximityDebounceMs)
+        builder.setAdaptiveVibrationFloor(PhysicsUtils.safeDouble(status.atmospheric.adaptiveVibrationFloor))
+        builder.setViolationPercentage(PhysicsUtils.safeDouble(status.integrity.violationPercentage))
     }
 
     /**
