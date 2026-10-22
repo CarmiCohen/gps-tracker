@@ -200,6 +200,7 @@ data class IntegrityState(
     var isBatteryWhitelisted: Boolean = false,
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
+    var rtt: Int = 0,
     val forensic: ForensicSnapshot = ForensicSnapshot()
 ) {
     fun copyFrom(other: IntegrityState) {
@@ -236,6 +237,7 @@ data class IntegrityState(
         this.isBatteryWhitelisted = other.isBatteryWhitelisted
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
+        this.rtt = other.rtt
         this.forensic.copyFrom(other.forensic)
     }
 
@@ -255,12 +257,14 @@ data class IntegrityState(
         locationPendingReason = LocationPendingReason.NONE; signal = null; tamperNote = null
         lastValidFixRt = 0L; isSilentFailure = false; isMaliAnomaly = false; cpuLoad = 0.0
         ioWait = 0.0; maxIoLatency = 0L; isBatteryWhitelisted = false
-        thermalHeadroom = 0.0; heapAllocatedMb = 0.0; forensic.reset()
+        thermalHeadroom = 0.0; heapAllocatedMb = 0.0; rtt = 0; forensic.reset()
     }
 }
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
+ * Oct.22.13:
+ * - ISSUE-OCT22.0-F4: Forensic Parity. Added rtt accessor to map to RealtimeStatus.
  * Oct.13.30:
  * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
  * Oct.7.10:
@@ -625,6 +629,10 @@ data class LocationUpdate(
         get() = integrity.heapAllocatedMb
         set(value) { integrity.heapAllocatedMb = value }
     
+    var rtt: Int
+        get() = integrity.rtt
+        set(value) { integrity.rtt = value }
+
     // Unified Forensic Snapshots
     var snrSnapshot: Double? 
         get() = integrity.forensic.snr
@@ -814,6 +822,7 @@ data class LocationUpdate(
         put("violation_start_ts", violationStartTs)
         put("dist_to_tracker", distToTracker)
         put("dist_to_home", distToHome)
+        put("rtt", rtt)
         
         // Extended Forensic Sensors
         put("is_muzzled", isMuzzled)

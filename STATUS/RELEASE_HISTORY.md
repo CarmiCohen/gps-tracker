@@ -1,6 +1,12 @@
-# Project History & Versioning (Oct22.12)
+# Project History & Versioning (Oct22.13)
 
 **For historical records (v9.3.0 and older), see [docs_history_archive.md](docs_history_archive.md).**
+
+## Oct22.13 (Telemetry Propagation Hardening)
+- **Telemetry Propagation & Sync (#ISSUE-OCT22.0-F4)**: Corrected critical failure where forensic sensor data and RTT were not reaching the Viewer.
+- **Protobuf Extension**: Added raw forensic fields (Lux, Acoustic, Vibration) to `RealtimeStatus` schema to ensure wire-level parity.
+- **Violation Relay**: Implemented Tracker-to-Viewer violation propagation path in `CommunicationManager` and `relay-server`.
+- **Mapping Integrity**: Hardened `TelemetryMapper` and `TelemetryMerger` to ensure sensor indices survive even when coordinates are rejected as stale.
 
 ## Oct22.12 (Signaling Identity Symmetry)
 - **Signaling Identity Symmetry (#ISSUE-OCT22.0-F3)**: Enforced strict Viewer ID symmetry in `SignalingValidator` for all signaling events (pulses, pings, pongs, telemetry).

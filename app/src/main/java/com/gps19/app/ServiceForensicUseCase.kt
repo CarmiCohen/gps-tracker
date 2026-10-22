@@ -2,20 +2,21 @@ package com.gps19.app
 
 import com.gps19.core.engine.*
 import javax.inject.Inject
+import javax.inject.Provider
 import javax.inject.Singleton
 
 /**
  * ServiceForensicUseCase: Manages state-latched violation recording for background services.
+ * Oct.22.13:
+ * - ISSUE-OCT22.0-F4: Telemetry Sync Hardening. Integrated ConnectivitySuite 
+ *   to propagate violation events to remote Viewers via emitViolation().
  * July.22.00:
  * - Hilt Hardening: Added @Inject constructor and @Singleton.
- * July.21.00:
- * - Issue #102: Temporal Forensic Integrity. Standardized 'maxTrackerAccuracy'.
- * - Restored Sit Detection (ALERT_ID_TRACKER_CHAIR) forensic markers.
- * - Maintained Hilt compatibility as per hardened Golden Master architecture.
  */
 @Singleton
 class ServiceForensicUseCase @Inject constructor(
-    private val repository: MainRepository
+    private val repository: MainRepository,
+    private val connectivitySuite: Provider<ConnectivitySuite>
 ) {
     private val latches = mutableMapOf<String, Boolean>()
 
@@ -48,6 +49,9 @@ class ServiceForensicUseCase @Inject constructor(
         if (active && !wasRecorded) {
             latches[id] = true
             repository.addViolation(lat, lng, id, accuracy, maxTrackerAccuracy, timestamp = now)
+            
+            // vOct22.13: Propagate violation to remote peer (Viewer)
+            connectivitySuite.get().emitViolation(id, lat, lng, accuracy, maxTrackerAccuracy)
         } else if (!active) {
             latches[id] = false
         }

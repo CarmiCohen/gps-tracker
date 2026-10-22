@@ -289,6 +289,14 @@ message RealtimeStatus {
 
     // Oct.15.12: Vibration Floor Parity
     double adaptive_vibration_floor = 114;
+
+    // Oct.22.13: Forensic Parity (Raw Sensor Propagation)
+    double lux = 115;
+    double lux_baseline = 116;
+    double acoustic_db = 117;
+    double acoustic_floor_db = 118;
+    double vibration = 119;
+    double vibration_rolling_sum = 120;
 }
 
 message GeoPointProto {

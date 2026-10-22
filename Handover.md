@@ -1,34 +1,33 @@
-# Project Handover - Oct22.12 (Signaling Hardening)
+# Project Handover - Oct22.13 (Telemetry Sync Hardened)
 
 ## 🟢 Status: STABILIZING
 
-The critical **Connection Asymmetry and Telemetry Leak (F3)** has been resolved. Signaling events (pulses, pings, pongs) are now strictly validated against configured Viewer IDs, ensuring that mismatched peers remain in a RED (disconnected) state and do not leak telemetry.
+The critical **Telemetry Sync and Violation Propagation (F4)** has been resolved. Forensic data (Noise, Lux, Vibration) and real-time RTT are now correctly serialized via Protobuf and JSON, ensuring the Viewer HUD accurately reflects the Tracker's environment. Violation events are now proactively propagated to remote peers.
 
 ## ✅ Completed in this Session
-- **Connection Identity Symmetry (#ISSUE-OCT22.0-F3)**:
-    - **SignalingValidator.kt Logic**: Hardened `shouldProcessLocationUpdate` to require strict `viewer_id` parity. Added logic to block cross-viewer traffic in Viewer mode (R-ID 616).
-    - **Discovery Mode**: Implemented symmetrical default-to-default acceptance ("Discovery") for factory reset states (where both IDs are 'T'/'V').
-    - **CommunicationManager.kt Integration**: Integrated strict identity validation into `handleViewerStatusRelay` (Line 318), `handlePingRelay` (Line 354), and `handlePongRelay` (Line 383) to ensure UI badges (TRK/VWR) only transition to Green for authenticated peers.
-- **Versioning**: Incremented to `Oct22.12`.
-- **Traceability**: Updated `issues.md`, `SOT_MASTER_REQUIREMENTS.md` (added R-ID 616 / SOT ID 812), and `RESOLUTION_ARCHIVE.md`.
+- **Telemetry Propagation & Sync (#ISSUE-OCT22.0-F4)**:
+    - **Protobuf Schema Hardening**: Expanded `RealtimeStatus` in `app_settings.proto` to include raw forensic fields (Lux, Acoustic, Vibration, VibrationRollingSum) and `rtt`.
+    - **Telemetry Mapping Integrity**:
+        - `TelemetryProtobufMapper.kt`: Updated `mapToRealtime` and `mapProtoToSnapshot` to synchronize raw sensor fields and RTT across the wire.
+        - `TelemetryMapper.kt`: Fixed omissions in `mapProtoToSnapshot` and `mapJsonToSnapshot`; added RTT to `mapTickToOutputs`. Fixed a typo in `populateRibbons` affecting `sdz` and `baro` normalization.
+        - `TelemetryMerger.kt`: Hardened `mergeInto` to ensure forensic indices (Noise/Lux/Vibe/RTT) are updated even when coordinates are rejected as stale.
+    - **Violation Relay**:
+        - `CommunicationManager.kt` & `relay-server/index.js`: Implemented `violation_relay` event path.
+        - `ConnectivitySuite.kt`: Added `emitViolation()` to propagate local violations to remote peers.
+        - `AppAlarmManager.kt` & `ServiceForensicUseCase.kt`: Integrated evaluation logic with the signaling layer to record and emit violation markers simultaneously.
+- **Versioning**: Incremented to `Oct22.13`.
+- **Traceability**: Updated `issues.md`, `RESOLUTION_ARCHIVE.md`, and `SOT_MASTER_REQUIREMENTS.md`.
 - **Build Integrity**: Verified successful `app:assembleDebug`.
 
-## 🔴 Current Open Gaps (CRITICAL)
-- **ISSUE-OCT22.0-F4 (High)**: Telemetry Sync failure—Ping missing, Sensor data (Noise/Lux) and Violations not propagating to Viewer.
-    - **Forensic Status**: 
-        - `CommunicationManager.kt`: Calculates RTT in `handlePongRelay`, but HUD continues to show 0 or stale values.
-        - `TelemetryMapper.kt`: Contains mapping for `noise_idx` and `lux_idx`, but values are arriving as 0 at the Viewer. 
-        - **Next Audit Point**: Inspect `AppSignalingEncoder.kt` and `SignalPayloadGenerator.kt` for field omissions in Protobuf and JSON payloads.
-        - **Violation Relay**: `ConnectivitySuite.kt` lacks a handler for remote violation reception; Tracker needs to emit violations as signaling events.
+## 🔴 Current Open Gaps (LOW)
+- **UI UX Simplification**:
+    - **SIMP-OCT22.10-S1**: BackHandler Composition Local to reduce boilerplate in overlays.
+    - **SIMP-OCT22.0-S1**: Centralize identity and regex validation into `ConfigValidator`.
 
-## 💡 Strategic Simplification Ideas
-- **SIMP-OCT22.10-S1: BackHandler Composition Local (Low).** Consolidate back button interception into a reusable utility.
-- **SIMP-OCT22.0-S1: Settings Validation Centralization (Medium).** Move identity uniqueness and regex validation to `ConfigValidator`.
+## 🎯 Next Resumption Focus: UI/UX Refinement.
+With core telemetry and signaling hardened, the next phase should focus on strategic simplification of the UI architecture (CompositionLocals) and validation centralization.
 
-## 🎯 Next Resumption Focus: F4 Telemetry Propagation.
-The priority is now resolving the Telemetry Sync failure, ensuring RTT, Noise/Lux, and Violation events flow correctly to the Viewer.
-
-**Current Forensic Metrics (Oct22.12):**
-- **[Oct22.12]: [SOT Count: 812 (Rules: 320), Open: H:1, M:0, L:0, Ideas: H:2, M:25, L:42, Testing: 10 (Sub-items: 41), QA: 385]**
+**Current Forensic Metrics (Oct22.13):**
+- **[Oct22.13]: [SOT Count: 813 (Rules: 321), Open: H:0, M:0, L:0, Ideas: H:2, M:25, L:42, Testing: 11 (Sub-items: 45), QA: 385]**
 
 **HANDOVER UPDATED.**

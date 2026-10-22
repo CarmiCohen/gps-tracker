@@ -21,6 +21,9 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Oct.22.13:
+ * - ISSUE-OCT22.0-F4: Telemetry Sync Hardening. Added "violation_relay" listener 
+ *   to support remote violation propagation.
  * Oct.22.12:
  * - Connection Asymmetry Fix (#ISSUE-OCT22.0-F3): Migrated all manual ID 
  *   checks to SignalingValidator to enforce strict symmetry and prevent 
@@ -193,7 +196,7 @@ class CommunicationManager @Inject constructor(
             scope.launch {
                 delay(35000)
                 if (sessionId == currentSessionId.get() && isConnectingInternal.get()) {
-                    Timber.w("Comm: Connection session $sessionId timed out in latch. Resetting.")
+                    Timber.w("CommunicationManager: Connection session $sessionId timed out in latch. Resetting.")
                     isConnectingInternal.set(false)
                 }
             }
@@ -265,6 +268,7 @@ class CommunicationManager @Inject constructor(
         s.on("ping_relay") { args -> checkSession { markTraffic(); handlePingRelay(args) } }
         s.on("pong_relay") { args -> checkSession { markTraffic(); handlePongRelay(args) } }
         s.on("settings_relay") { args -> checkSession { markTraffic(); handleSettingsRelay(args) } }
+        s.on("violation_relay") { args -> checkSession { markTraffic(); handleViolationRelay(args) } }
     }
 
     private fun handleLocationRelay(args: Array<Any>) {
@@ -410,6 +414,22 @@ class CommunicationManager @Inject constructor(
                 }
             }
         } catch (e: Exception) { Timber.e(e, "pong_relay parse error") }
+    }
+
+    private fun handleViolationRelay(args: Array<Any>) {
+        try {
+            val data = if (args.size > 1 && args[1] is JSONObject) args[1] as JSONObject 
+                       else args[0] as JSONObject
+            val wrapped = JSONObject()
+            val keys = data.keys()
+            while(keys.hasNext()) { 
+                val k = keys.next() as String
+                val v = data.opt(k)
+                if (v != null) wrapped.put(k, v) 
+            }
+            wrapped.put("type", "violation_relay")
+            _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(wrapped))
+        } catch (e: Exception) { Timber.e(e, "violation_relay parse error") }
     }
 
     override fun setConnectionLostCallback(callback: () -> Unit) { this.onConnectionLost = callback }

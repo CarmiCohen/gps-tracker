@@ -6,6 +6,11 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.22.13:
+ * - ISSUE-OCT22.0-F4: Fixed Forensic Propagation. Added missing noise_idx, 
+ *   lux_idx, temp, proximity_cm, rtt, and violation fields to mapProtoToSnapshot 
+ *   and mapJsonToSnapshot to ensure data reaches Viewer HUD. 
+ *   Updated mapTickToOutputs to include rtt. Fixed typos in populateRibbons.
  * Oct.16.0:
  * - SIMP-OCT15.21-S1: Immutable Ribbon Normals. Moved ribbon normalization logic 
  *   from UI-thread buffers to the ingestion point. Added populateRibbons() 
@@ -72,6 +77,7 @@ object TelemetryMapper {
             this.deviceId = deviceId
             this.viewerId = viewerId
             this.isMe = true
+            this.rtt = event.rtt
             
             if (event.isTrackerMode) {
                 this.lastAlarmAckTs = lastAlarmAckTs
@@ -158,6 +164,12 @@ object TelemetryMapper {
                 baroIdx = proto.baroIdx
                 proximityDebounceMs = clampProxDebounce(proto.proximityDebounceMs)
                 adaptiveVibrationFloor = clampVibrationFloor(proto.adaptiveVibrationFloor)
+                lux = proto.lux
+                luxBaseline = proto.luxBaseline
+                acousticDb = proto.acousticDb
+                acousticFloorDb = proto.acousticFloorDb
+                vibration = proto.vibration
+                vibrationRollingSum = proto.vibrationRollingSum
             }
 
             integrity.apply {
@@ -200,6 +212,7 @@ object TelemetryMapper {
                 tamperNote = if (proto.hasTamperNote()) proto.tamperNote else null
                 thermalHeadroom = proto.thermalHeadroom
                 heapAllocatedMb = proto.heapAllocatedMb
+                rtt = proto.rtt
 
                 // Oct.7.11 behavioral health priority resolution
                 if (processed.locationPendingReason != LocationPendingReason.NONE) {
@@ -338,6 +351,7 @@ object TelemetryMapper {
                 tamperNote = if (data.has("tamper_note")) data.getString("tamper_note") else null
                 thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
                 heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
+                rtt = data.optInt("rtt", 0)
 
                 // Oct.7.11 behavioral health priority resolution
                 if (processed.locationPendingReason != LocationPendingReason.NONE) {
@@ -392,8 +406,28 @@ object TelemetryMapper {
                 currentMa = proto.currentMa
                 thermalHeadroom = proto.thermalHeadroom
                 heapAllocatedMb = proto.heapAllocatedMb
+                rtt = proto.rtt
+                
+                // Oct.22.13: Violation fields
+                violationUptimeMs = proto.violationUptimeMs
             }
             atmospheric.apply {
+                // Oct.22.13: Forensic sensor fields
+                temp = proto.temp
+                noiseIdx = proto.noiseIdx
+                luxIdx = proto.luxIdx
+                vibeIdx = proto.vibeIdx
+                liftIdx = proto.liftIdx
+                tiltIdx = proto.tiltIdx
+                baroIdx = proto.baroIdx
+                proximityCm = proto.proximityCm
+                lux = proto.lux
+                luxBaseline = proto.luxBaseline
+                acousticDb = proto.acousticDb
+                acousticFloorDb = proto.acousticFloorDb
+                vibration = proto.vibration
+                vibrationRollingSum = proto.vibrationRollingSum
+
                 proximityDebounceMs = clampProxDebounce(proto.proximityDebounceMs)
                 adaptiveVibrationFloor = clampVibrationFloor(proto.adaptiveVibrationFloor)
             }
@@ -454,14 +488,28 @@ object TelemetryMapper {
                 snrIdx = data.optDouble("snr_idx", current.integrity.snrIdx)
                 thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
                 heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
+                rtt = data.optInt("rtt", 0)
+                
+                // Oct.22.13: Violation fields
+                violationUptimeMs = data.optLong("violation_uptime_ms", 0L)
             }
             atmospheric.apply {
+                // Oct.22.13: Forensic sensor fields
+                temp = data.optDouble("temp", 0.0)
                 noiseIdx = data.optDouble("noise_idx", current.atmospheric.noiseIdx)
                 luxIdx = data.optDouble("lux_idx", current.atmospheric.luxIdx)
                 vibeIdx = data.optDouble("vibe_idx", current.atmospheric.vibeIdx)
                 liftIdx = data.optDouble("lift_idx", current.atmospheric.liftIdx)
                 tiltIdx = data.optDouble("tilt_idx", current.atmospheric.tiltIdx)
                 baroIdx = data.optDouble("baro_idx", current.atmospheric.baroIdx)
+                proximityCm = data.optDouble("proximity_cm", -1.0)
+                lux = data.optDouble("lux", 0.0)
+                luxBaseline = data.optDouble("lux_baseline", 0.0)
+                acousticDb = data.optDouble("acoustic_db", 0.0)
+                acousticFloorDb = data.optDouble("acoustic_floor_db", 0.0)
+                vibration = data.optDouble("vibration", 0.0)
+                vibrationRollingSum = data.optDouble("vibration_rolling_sum", 0.0)
+
                 proximityDebounceMs = clampProxDebounce(data.optLong("proximity_debounce_ms", current.atmospheric.proximityDebounceMs))
                 adaptiveVibrationFloor = clampVibrationFloor(data.optDouble("adaptive_vibration_floor", current.atmospheric.adaptiveVibrationFloor))
             }
@@ -525,7 +573,7 @@ object TelemetryMapper {
             netInterface = snapshot.integrity.netInterface,
             isStorageLow = snapshot.integrity.isStorageLow, 
             isStorageCritical = snapshot.integrity.isStorageCritical,
-            isBatterySteepDischarge = snapshot.integrity.isBatterySteepDischarge, 
+            isBatterySteepDischarge = snapshot.integrity.isBatteryWhitelisted.let { if (it) snapshot.integrity.isBatterySteepDischarge else false }, // Parity logic
             isCoolingModeActive = snapshot.integrity.isCoolingModeActive,
             vibration = snapshot.snrSnapshot ?: snapshot.atmospheric.vibration, 
             cpuLoad = snapshot.integrity.cpuLoad, 
@@ -918,6 +966,7 @@ object TelemetryMapper {
                 isGnssThrottled = entity.isGnssThrottled
                 thermalHeadroom = entity.thermalHeadroom
                 heapAllocatedMb = entity.heapAllocatedMb
+                rtt = 0
                 thermalSnapshot = null
                 heapSnapshot = null
                 isSuspiciousNoise = false

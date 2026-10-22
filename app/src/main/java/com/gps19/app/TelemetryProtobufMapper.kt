@@ -5,6 +5,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.22.13:
+ * - ISSUE-OCT22.0-F4: Forensic Parity. Added raw sensor fields (Lux, Acoustic, 
+ *   Vibration) and RTT to mapToRealtime to ensure propagation to Viewer HUD.
  * Oct.13.30:
  * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
  * Oct.7.7:
@@ -90,6 +93,7 @@ object TelemetryProtobufMapper {
         builder.setMaxDropMs(status.integrity.maxDropMs)
         builder.setLastConnTs(status.integrity.lastConnTs)
         builder.setLastDiscTs(status.integrity.lastDiscTs)
+        builder.setRtt(status.rtt)
         
         builder.setBattery(status.battery)
         builder.setTemp(PhysicsUtils.safeDouble(status.temp))
@@ -112,7 +116,7 @@ object TelemetryProtobufMapper {
         builder.setLuxIdx(PhysicsUtils.safeDouble(status.luxIdx))
         builder.setVibeIdx(PhysicsUtils.safeDouble(status.vibeIdx))
         builder.setLiftIdx(PhysicsUtils.safeDouble(status.atmospheric.liftIdx))
-        builder.setTiltIdx(PhysicsUtils.safeDouble(status.tiltIdx))
+        builder.setTiltIdx(PhysicsUtils.safeDouble(status.atmospheric.tiltIdx))
         builder.setBaroIdx(PhysicsUtils.safeDouble(status.baroIdx))
         builder.setProxIdx(PhysicsUtils.safeDouble(status.proxIdx))
         
@@ -181,6 +185,15 @@ object TelemetryProtobufMapper {
         // Oct.7.7 Anomaly Flags
         builder.setIsSuspiciousNoise(status.isSuspiciousNoise)
         builder.setIsMemoryPressureThrottled(status.isMemoryPressureThrottled)
+
+        // Oct.22.13 Forensic Sensor Parity
+        builder.setLux(PhysicsUtils.safeDouble(status.atmospheric.lux))
+        builder.setLuxBaseline(PhysicsUtils.safeDouble(status.atmospheric.luxBaseline))
+        builder.setAcousticDb(PhysicsUtils.safeDouble(status.atmospheric.acousticDb))
+        builder.setAcousticFloorDb(PhysicsUtils.safeDouble(status.atmospheric.acousticFloorDb))
+        builder.setVibration(PhysicsUtils.safeDouble(status.atmospheric.vibration))
+        builder.setVibrationRollingSum(PhysicsUtils.safeDouble(status.atmospheric.vibrationRollingSum))
+        builder.setProximityCm(PhysicsUtils.safeDouble(status.atmospheric.proximityCm))
     }
 
     /**
@@ -238,7 +251,7 @@ object TelemetryProtobufMapper {
         builder.setLuxIdx(PhysicsUtils.safeDouble(status.luxIdx))
         builder.setVibeIdx(PhysicsUtils.safeDouble(status.vibeIdx))
         builder.setLiftIdx(PhysicsUtils.safeDouble(status.atmospheric.liftIdx))
-        builder.setTiltIdx(PhysicsUtils.safeDouble(status.tiltIdx))
+        builder.setTiltIdx(PhysicsUtils.safeDouble(status.atmospheric.tiltIdx))
         builder.setBaroIdx(PhysicsUtils.safeDouble(status.baroIdx))
         builder.setProxIdx(PhysicsUtils.safeDouble(status.proxIdx))
         

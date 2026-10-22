@@ -1,12 +1,9 @@
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct22.12
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct22.13
 
-## 🎯 Current Resumption Focus: Telemetry Sync & Violation Propagation.
+## 🎯 Current Resumption Focus: UI/UX Refinement.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   **ISSUE-OCT22.0-F4: Telemetry Sync & Violation Propagation Failure (High).** 
-    - Ping values are missing on both devices even when connected via factory defaults.
-    - Sensor data (Noise/Lux) is not propagating to the Viewer (shows 0dB/0lx while Tracker has active readings).
-    - Acoustic violations visible on Tracker are not mirrored on the Viewer.
+*   None. (F4 Telemetry Sync resolved).
 
 ---
 
@@ -21,6 +18,7 @@
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT22.0-F4: Telemetry Sync & Violation Propagation Failure.** Resolved Oct22.13. Synchronized raw forensic fields (Lux, Acoustic, Vibration) and RTT across Protobuf/JSON. Implemented violation relay path from Tracker to Viewer. (SOT ID 813).
 *   **ISSUE-OCT22.0-F3: Connection State Asymmetry & Telemetry Leak.** Resolved Oct22.12. Enforced strict ID symmetry in `SignalingValidator` for all signaling events (pulses, pings, pongs) and blocked cross-viewer traffic in Viewer mode. (SOT ID 812).
 *   **ISSUE-OCT22.0-F2: Setup Exit Authority & Lifecycle Failure.** Resolved Oct22.10. Implemented `BackHandler` for `SettingsOverlay` and `PhoneSetupOverlay` to prevent app exit. Added Close icon to `PhoneSetupOverlay` header. (SOT ID 811).
 *   **ISSUE-OCT22.0-F1: Setup Configuration Failure.** Resolved Oct22.0. Fixed ID persistence block in `SettingsUseCase`, added explicit Exit/Close authority to `SettingsOverlay`, and implemented `LoadDefaults` for factory reset. Promoted Relay URL visibility and contrast. (Formerly ISSUE-OCT21.07-F1).
@@ -35,6 +33,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct22.13: [SOT Count: 813 (Rules: 321), Open: H:0, M:0, L:0, Ideas: H:2, M:25, L:42, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct22.12: [SOT Count: 812 (Rules: 320), Open: H:1, M:0, L:0, Ideas: H:2, M:25, L:42, Testing: 10 (Sub-items: 41), QA: 385]**
 - **Oct22.10: [SOT Count: 811 (Rules: 319), Open: H:2, M:0, L:0, Ideas: H:2, M:25, L:42, Testing: 10 (Sub-items: 41), QA: 385]**
 - **Oct22.0: [SOT Count: 810 (Rules: 317), Open: H:3, M:0, L:0, Ideas: H:2, M:25, L:41, Testing: 10 (Sub-items: 41), QA: 385]**

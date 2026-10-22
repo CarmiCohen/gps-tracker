@@ -13,11 +13,12 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Oct.22.13:
+ * - ISSUE-OCT22.0-F4: Telemetry Sync Hardening. Integrated ServiceForensicUseCase 
+ *   to ensure violation markers are recorded and propagated during evaluation.
  * Oct.16.8:
  * - ISSUE-OCT16.8-F2: Role Transition Grace Hardening. Added 30s startup grace 
  *   to shouldPlaySiren() and fixed isTrackerMode synchronization in resetEvaluation.
- * Oct.13.30:
- * - ISSUE-OCT13.21-L1: Dead Code Cleanup. Removed isAdaptiveJump (R-ID 601).
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -28,7 +29,8 @@ class AppAlarmManager @Inject constructor(
     private val timeProvider: TimeProvider,
     private val bootLifecycleAuthority: BootLifecycleAuthority,
     private val domainEventBus: DomainEventBus,
-    private val sirenLockoutUseCase: SirenLockoutUseCase
+    private val sirenLockoutUseCase: SirenLockoutUseCase,
+    private val forensicUseCase: ServiceForensicUseCase
 ) {
     private val scope = CoroutineScope(Dispatchers.IO)
     
@@ -292,6 +294,20 @@ class AppAlarmManager @Inject constructor(
                            evaluationState.lastGlobalTriggerRt != oldGlobalTriggerRt
         if (stateChanged) {
             saveLogicState()
+        }
+
+        if (isTrackerMode) {
+            val activeViolations = evaluationReport.reports.filter { it.conditionMet }.map { it.type }.toSet()
+            val unresolvedAlarms = evaluationState.activeAlarms.values.filter { !it.isResolved }.map { it.type }.toSet()
+            forensicUseCase.recordViolationMarkers(
+                now = timeProvider.currentTimeMillis,
+                lat = update.kinetic.lat,
+                lng = update.kinetic.lng,
+                accuracy = update.kinetic.accuracy,
+                maxTrackerAccuracy = update.kinetic.maxAccuracy,
+                activeViolations = activeViolations,
+                unresolvedAlarms = unresolvedAlarms
+            )
         }
 
         syncActiveAlarmsFlow()

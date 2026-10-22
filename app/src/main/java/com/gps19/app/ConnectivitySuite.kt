@@ -23,22 +23,14 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.22.13:
+ * - ISSUE-OCT22.0-F4: Telemetry Sync failure remediation. Added "violation_relay" 
+ *   handler to mirror remote tracker violations on Viewer. Implemented 
+ *   emitViolation() for Tracker-to-Viewer propagation.
  * Oct.21.07:
  * - Signaling Audit: Added explicit INFO logs for pulse and geofence reception 
  *   to aid physical verification of R-ID 605/606. Removed redundant distinctUntilChanged 
  *   on StateFlow to resolve build error.
- * Oct.21.06:
- * - Connection Asymmetry Fix (#ISSUE-OCT21.05-F2): Proactive Geofence Sync. 
- *   Added observer for isConnected to trigger syncHomePoints() on Viewer connect.
- * Oct.21.01:
- * - Connection Asymmetry Fix (#OCT20.33-F1): Explicitly handled "viewer_status" 
- *   as a valid pulse and ensured all valid peer signals update activity timestamps 
- *   to transition VWR badge to Green.
- * Oct.20.32:
- * - Connection Asymmetry Fix: Ensure setTrackerConnected(true) is called for 
- *   all valid pulses (TRK/VWR) to resolve red-badge bug.
- * - Home Point Sync: Implemented syncSettings relay to copy geofences from 
- *   Viewer to Tracker.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -510,6 +502,10 @@ class ConnectivitySuite @Inject constructor(
     private fun sendTelemetryInternal(status: LocationUpdate, priority: SignalingPriority): Boolean {
         if (!isConnected) return false
         if (hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) return false
+        
+        // vOct22.13: Ensure RTT is embedded in outgoing telemetry for Viewer HUD parity.
+        status.rtt = signalingProvider.rtt
+        
         signalingProvider.transmit(status, priority, fromViewer = !isTrackerMode)
         return true
     }
@@ -649,6 +645,26 @@ class ConnectivitySuite @Inject constructor(
             return
         }
         
+        // vOct22.13: Handle remote violation relay
+        if (type == "violation_relay") {
+            if (!isTrackerMode && !fromViewer) {
+                val violationType = data.optString("violation_type")
+                if (violationType.isNotEmpty()) {
+                    Timber.i("Signaling: Received remote violation from Tracker: $violationType")
+                    val lat = data.optDouble("lat", 0.0)
+                    val lng = data.optDouble("lng", 0.0)
+                    val acc = data.optDouble("accuracy", 0.0)
+                    val maxAcc = data.optDouble("max_accuracy", 0.0)
+                    if (lat != 0.0) {
+                        mainRepository.addViolation(lat, lng, violationType, acc, maxAcc, timestamp = data.optLong("ts", now))
+                    }
+                }
+            }
+            domainEventBus.emit(ConnectivityEvent.PeerPulse(peerId))
+            remoteStatusRepository.updatePeerActivity(nowRt); mainRepository.updateRemoteActivity(nowRt)
+            return
+        }
+
         // Oct.20.32: Handle remote settings relay (Home Points)
         if (type == "settings_relay") {
             if (isTrackerMode && fromViewer) {
@@ -813,6 +829,24 @@ class ConnectivitySuite @Inject constructor(
                 Timber.e(e, "Failed to emit home_points sync")
             }
         }
+    }
+
+    fun emitViolation(type: String, lat: Double, lng: Double, acc: Double, maxAcc: Double) {
+        if (!isTrackerMode || !isConnected || isStopped.get()) return
+        
+        val payload = JSONObject().apply {
+            put("id", SignalingConstants.getTransmissionId(deviceId))
+            put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
+            put("from_viewer", false)
+            put("violation_type", type)
+            put("lat", lat)
+            put("lng", lng)
+            put("accuracy", acc)
+            put("max_accuracy", maxAcc)
+            put("ts", timeProvider.currentTimeMillis)
+        }
+        signalingProvider.emit("violation_event", payload, SignalingPriority.HIGH)
+        Timber.i("Signaling: Emitted violation event to Viewer: $type")
     }
 
     fun resetPeerStats() {
