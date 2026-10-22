@@ -1,4 +1,4 @@
-# Operational Forensic Audit - GPS Tracker (vOct21.06)
+# Operational Forensic Audit - GPS Tracker (vOct22.0)
 
 **Goal:** Verify system health via runtime telemetry and log signatures during deployment. This chapter contains high-frequency audit points that must be verified for every production-ready build.
 
@@ -40,6 +40,25 @@
     1. **VWR Badge Consistency (R-ID 605)**: Confirm the **VWR** badge on the Tracker turns Green/Cyan within 10s of the Viewer starting. Red on Tracker while Green on Viewer is a failure (Asymmetry).
     2. **Proactive Geofence Sync (R-ID 606)**: Upon initial connection (without manual mutation), verify the Tracker receives and logs "SYNC: Received geofences from remote Viewer."
     3. **Manual Geofence Sync**: Confirm that adding/removing a point on the Viewer propagates to the Tracker map within 5 seconds.
+
+## 0.7 Setup Closure & Exit Authority (Issue #ISSUE-OCT22.0-F2)
+*   **Action:** Open Setup. Attempt to close via UI button (X). If missing or failing, use system Back button.
+*   **Verification:** 
+    1. UI Button (X) must exist and successfully close the overlay.
+    2. System Back button must close the overlay ONLY and NOT cause the entire application to exit.
+
+## 0.8 ID Isolation & Asymmetry Audit (Issue #ISSUE-OCT22.0-F3)
+*   **Action:** Configure mismatched IDs (e.g., Viewer: T2/V2 vs Tracker: T/V).
+*   **Verification:** 
+    1. **Strict Isolation**: Viewer TRK badge must remain RED. Tracker VWR badge must remain RED.
+    2. **Telemetry Suppression**: The Info screen must NOT show active/green values when no authorized connection exists.
+
+## 0.9 Factory Default & Telemetry Continuity Audit (Issue #ISSUE-OCT22.0-F4)
+*   **Action:** Load Factory Defaults on both units. Observe telemetry flow.
+*   **Verification:**
+    1. **Ping Integrity**: Ping values must be visible on both devices' info pages once connected.
+    2. **Sensor Parity**: Telemetry values (Noise dB, Lux lx) must match between Tracker (Source) and Viewer (Remote).
+    3. **Violation Propagation**: If Tracker displays an "Acoustic Violation," the Viewer HUD/Info must mirror this state immediately.
 
 ---
 *This document is a specialized shard of TEST_PROCEDURE.md to ensure the integrity of the critical Operational Forensic Audit phase.*

@@ -1,6 +1,7 @@
 package com.gps19.app
 
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -32,13 +33,14 @@ import kotlinx.coroutines.delay
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Oct.22.0:
+ * - Setup Hardening (ISSUE-OCT22.0-F2): Implemented BackHandler for Settings and Phone Setup
+ *   overlays to prevent app exit on Back button. Added explicit Close authority to 
+ *   PhoneSetupOverlay header.
  * Oct.21.07:
  * - Setup Hardening (ISSUE-OCT21.06-F1): Added Close icon to main SettingsOverlay 
  *   to allow exiting the setup. Added "Load Defaults" button for factory reset.
  *   Promoted Relay URL field visibility to prevent perceived erasure.
- * Oct.21.02:
- * - Settings Gear Restoration (#OCT20.33-F3): Restored Geofence Radius and 
- *   Alerts/Sound sub-settings for Trackers to allow state verification.
  */
 
 @Composable
@@ -64,6 +66,15 @@ fun SettingsOverlay(
         repeat(5) { 
             visibleCount++
             delay(100) 
+        }
+    }
+
+    // ISSUE-OCT22.0-F2: Exit Authority (Back Button)
+    BackHandler {
+        if (activeSubSettings != null) {
+            onEvent(UiEvent.SetSubSettings(null))
+        } else {
+            onEvent(UiEvent.ToggleSettings(false))
         }
     }
 
@@ -316,6 +327,11 @@ fun PhoneSetupOverlay(
         }
     }
 
+    // ISSUE-OCT22.0-F2: Exit Authority (Back Button)
+    BackHandler {
+        onEvent(UiEvent.TogglePhoneSetup(false))
+    }
+
     val manufacturer = remember { Build.MANUFACTURER.uppercase() }
     val model = remember { Build.MODEL.uppercase() }
     val recentsLockDesc = remember { getRecentsLockDescription() }
@@ -331,9 +347,16 @@ fun PhoneSetupOverlay(
                             Text("Phone Setup", color = BrandJd, fontSize = 24.sp, fontWeight = FontWeight.Bold); 
                             Text(stringResource(R.string.setup_detected_device, manufacturer, model), color = Slate500, fontSize = 10.sp) 
                         } 
-                        if (isSetupBypassActive) {
-                            Card(colors = CardDefaults.cardColors(containerColor = Color.Green.copy(alpha = 0.2f))) {
-                                Text("BYPASS ACTIVE", color = Color.Green, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (isSetupBypassActive) {
+                                Card(colors = CardDefaults.cardColors(containerColor = Color.Green.copy(alpha = 0.2f))) {
+                                    Text("BYPASS ACTIVE", color = Color.Green, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+                                }
+                                Spacer(Modifier.width(8.dp))
+                            }
+                            // ISSUE-OCT22.0-F2: Exit Authority (Close Button)
+                            IconButton(onClick = { onEvent(UiEvent.TogglePhoneSetup(false)) }) {
+                                Icon(Icons.Default.Close, null, tint = Color.White)
                             }
                         }
                     }

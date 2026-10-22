@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct22.10)
+# SOT Master Requirements & Hardening Status (Oct22.12)
 
-## 🏗️ Architectural Master Rules (319 Rules)
+## 🏗️ Architectural Master Rules (320 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -13,8 +13,10 @@
 *   **1.244 Identity Uniqueness (R-ID 613)**: The system MUST prevent commitment of non-unique or reserved IDs (e.g., T/V vs Trk/viewer) to prevent relay cross-talk and validation errors. (Oct22.0 - ISSUE-OCT22.0-F1).
 *   **1.245 Overlay Lifecycle Guard (R-ID 614)**: Critical setup overlays MUST implement `BackHandler` to intercept system navigation and prevent unintended application termination during configuration. (Oct22.10 - ISSUE-OCT22.0-F2).
 *   **1.246 Setup Exit Parity (R-ID 615)**: The Phone Setup overlay MUST provide an explicit Close (X) mechanism identical to the Settings overlay to ensure consistent exit authority. (Oct22.10 - ISSUE-OCT22.0-F2).
+*   **1.247 Signaling Identity Symmetry (R-ID 616)**: All signaling events (pulses, pings, pongs, telemetry) MUST undergo strict identity validation against the target role's configured ID to prevent telemetry leaks and erroneous connectivity badges. (Oct22.12 - ISSUE-OCT22.0-F3).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 812**: Signaling Identity Symmetry & Leak Prevention - PASSED. Enforced strict ID symmetry in SignalingValidator and blocked cross-viewer traffic. (Oct22.12 - ISSUE-OCT22.0-F3).
 *   **SOT ID 811**: Setup Exit Authority & Lifecycle Hardening - PASSED. Implemented BackHandler and Close icons for all setup overlays. (Oct22.10 - ISSUE-OCT22.0-F2).
 *   **SOT ID 810**: Setup & Configuration Hardening - PASSED. Resolved ID persistence blocks, added Load Defaults, and implemented explicit Exit authority. (Oct22.0 - ISSUE-OCT22.0-F1).
 *   **SOT ID 801**: Asymmetric Connectivity & Geofence Sync Resolution - PASSED. (Oct21.06).
@@ -26,6 +28,7 @@
 *   **SOT ID 795**: HUD Vertical Spacing / Touch Targets - PASSED. (Oct21.00).
 
 ## ✅ Verification Chapters
+*   **Chapter 3.0 (Signaling Identity Audit)**: PASSED - Enforced strict symmetry in SignalingValidator; verified pulse/ping/pong isolation. (Oct22.12).
 *   **Chapter 2.9 (Overlay Lifecycle Audit)**: PASSED - Verified BackHandler interception and Exit authority in Phone Setup. (Oct22.10).
 *   **Chapter 2.8 (Setup Persistence Audit)**: PASSED - Verified ID saving, Relay URL visibility, and Load Defaults behavior. (Oct22.0).
 *   **Chapter 0.6 (Peer Sync Audit)**: PASSED - (Oct21.06).

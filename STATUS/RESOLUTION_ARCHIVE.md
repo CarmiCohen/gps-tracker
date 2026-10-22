@@ -1,4 +1,14 @@
-# Resolution Archive - GPS Tracker (Oct22.10)
+# Resolution Archive - GPS Tracker (Oct22.12)
+
+## ISSUE-OCT22.0-F3: Connection State Asymmetry & Telemetry Leak (Oct22.12)
+- **Resolved**: Oct22.12
+- **Description**: When IDs were mismatched (e.g., V2 on Viewer vs V on Tracker), the Viewer erroneously showed a GREEN "TRK" badge and active telemetry despite no authenticated connection.
+- **Remediation**:
+    - **SignalingValidator Hardening**: Refactored `shouldProcessLocationUpdate` to strictly enforce `viewer_id` symmetry for both Tracker and Viewer roles. (R-ID 616).
+    - **Cross-Viewer Blocking**: Implemented logic in `SignalingValidator` to explicitly reject all Viewer-to-Viewer traffic in Viewer mode, preventing erroneous peer activity indications.
+    - **CommunicationManager Integration**: Integrated strict identity validation into `handleViewerStatusRelay`, `handlePingRelay`, and `handlePongRelay` to ensure UI status badges only transition to Green for authenticated peers.
+    - **Discovery Mode Symmetry**: Aligned acceptance rules for default IDs ("Discovery Mode") to ensure seamless factory-reset connectivity while maintaining strict isolation for customized IDs.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 812).
 
 ## ISSUE-OCT22.0-F2: Setup Exit Authority & Lifecycle Failure (Oct22.10)
 - **Resolved**: Oct22.10
@@ -17,16 +27,6 @@
     - **Authority Restoration**: Added Close icon to `SettingsOverlay`.
     - **Factory Reset**: Implemented `LoadDefaults` in `UiEventCoordinator`.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 810).
-
-## ISSUE-OCT21.05-F2: Asymmetric Connectivity & Geofence Sync failure (Oct21.06)
-- **Resolved**: Oct21.06
-- **Description**: The Viewer showed a green TRK badge (connected), but the Tracker showed a red VWR badge (disconnected) and failed to display Home Points synced from the Viewer.
-- **Remediation**:
-    - **Viewer Pulse Restoration**: Integrated `viewer_status` pulse into `AppEventCoordinator.kt` to ensure the Tracker receives regular heartbeats (R-ID 605).
-    - **Proactive Geofence Sync**: Updated `ConnectivitySuite.kt` to trigger `syncHomePoints()` immediately upon connection in Viewer mode (R-ID 606).
-    - **Protocol Protocol**: Added `createViewerStatusUpdate` to `SignalPayloadGenerator.kt`.
-    - **Verification Test**: Added `verifyBidirectionalConnectivityAndSync` to `ProductionReadinessAuditTest.kt` to enforce peer sync parity in Chapter 0 audits.
-- **Outcome**: 🟢 **PASSED**. (SOT ID 801).
 
 ---
 **NOTE**: Historical resolutions (SOT ID 1-800) preserved in `STATUS/docs_history_archive.md`.

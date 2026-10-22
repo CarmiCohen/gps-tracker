@@ -21,13 +21,15 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
+ * Oct.22.12:
+ * - Connection Asymmetry Fix (#ISSUE-OCT22.0-F3): Migrated all manual ID 
+ *   checks to SignalingValidator to enforce strict symmetry and prevent 
+ *   telemetry leaks.
  * Oct.21.01:
  * - Maintenance: Updated protocol version to Oct21.01.
  * Oct.20.32:
  * - Home Point Sync: Added listener for "settings_relay" to support geofence 
  *   synchronization between Viewer and Tracker.
- * Oct.12.19:
- * - ISSUE-OCT12.16-5: Hardened connect() with idempotency check.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -89,8 +91,6 @@ class CommunicationManager @Inject constructor(
     )
 
     override val signalingMetrics: StateFlow<SignalingPipeline.Metrics> = dispatcher.metricsFlow
-
-    private fun isDefaultViewer(id: String) = id == SignalingConstants.DEFAULT_VIEWER_ID || id.isEmpty()
 
     private fun logToApp(message: String, important: Boolean = false) {
         if (isStopped) return
@@ -264,8 +264,6 @@ class CommunicationManager @Inject constructor(
         s.on("viewer_status_relay") { args -> checkSession { markTraffic(); handleViewerStatusRelay(args) } }
         s.on("ping_relay") { args -> checkSession { markTraffic(); handlePingRelay(args) } }
         s.on("pong_relay") { args -> checkSession { markTraffic(); handlePongRelay(args) } }
-        
-        // Oct.20.32: Relay for arbitrary settings/home-points synchronization.
         s.on("settings_relay") { args -> checkSession { markTraffic(); handleSettingsRelay(args) } }
     }
 
@@ -307,11 +305,17 @@ class CommunicationManager @Inject constructor(
             val data = if (args.size > 1 && args[1] is JSONObject) args[1] as JSONObject 
                        else args[0] as JSONObject
             val incomingViewerId = data.optString("viewer_id")
-            if (isTrackerMode) {
-                if (!SignalingConstants.isViewerMatch(incomingViewerId, viewerId) && !isDefaultViewer(viewerId)) return
-            } else {
-                if (SignalingConstants.isViewerMatch(incomingViewerId, viewerId)) return
-            }
+            
+            // Oct.22.12: Unified identity check to ensure symmetry and block unauthorized pulses.
+            if (!SignalingValidator.shouldProcessLocationUpdate(
+                incomingId = deviceId, 
+                ownDeviceId = deviceId, 
+                isFromViewer = true, 
+                viewerId = incomingViewerId, 
+                ownViewerId = viewerId, 
+                isTrackerMode = isTrackerMode
+            )) return
+
             _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply {
                 put("type", "viewer_pulse"); put("id", deviceId); put("viewer_id", incomingViewerId); put("from_viewer", true)
             }))
@@ -342,7 +346,17 @@ class CommunicationManager @Inject constructor(
             val incomingViewerId = data.optString("viewer_id", "")
             if (SignalingConstants.isTrackerMatch(pingDeviceId, deviceId) && deviceId.isNotEmpty()) {
                 val isViewerPing = SignalingValidator.isViewerRole(data.optString("from"))
-                if (isTrackerMode && isViewerPing && !SignalingConstants.isViewerMatch(incomingViewerId, viewerId) && !isDefaultViewer(viewerId)) return
+                
+                // Oct.22.12: Enforce strict ID symmetry for Pings.
+                if (!SignalingValidator.shouldProcessLocationUpdate(
+                    incomingId = pingDeviceId,
+                    ownDeviceId = deviceId,
+                    isFromViewer = isViewerPing,
+                    viewerId = incomingViewerId,
+                    ownViewerId = viewerId,
+                    isTrackerMode = isTrackerMode
+                )) return
+
                 if ((isTrackerMode && isViewerPing) || (!isTrackerMode && !isViewerPing)) {
                     val incomingMap = mutableMapOf<String, Any>()
                     val keys = data.keys()
@@ -370,6 +384,17 @@ class CommunicationManager @Inject constructor(
             val pongViewerId = data.optString("viewer_id", "")
             if (SignalingConstants.isTrackerMatch(pingDeviceId, deviceId) && deviceId.isNotEmpty()) {
                 val isFromViewer = SignalingValidator.isViewerRole(data.optString("from"))
+                
+                // Oct.22.12: Enforce strict ID symmetry for Pongs.
+                if (!SignalingValidator.shouldProcessLocationUpdate(
+                    incomingId = pingDeviceId,
+                    ownDeviceId = deviceId,
+                    isFromViewer = isFromViewer,
+                    viewerId = pongViewerId,
+                    ownViewerId = viewerId,
+                    isTrackerMode = isTrackerMode
+                )) return
+
                 val isMyPong = if (isTrackerMode) !isFromViewer else isFromViewer
                 if (isMyPong) {
                     _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply { put("type", "pong_activity"); put("id", deviceId); put("viewer_id", pongViewerId); put("from_viewer", isFromViewer) }))
@@ -379,7 +404,6 @@ class CommunicationManager @Inject constructor(
                         lastRttInternal = rtts.minOrNull() ?: rtt; telemetryRepository.updateLastRtt(lastRttInternal)
                     }
                 } else {
-                    if (isTrackerMode && !SignalingConstants.isViewerMatch(pongViewerId, viewerId) && !isDefaultViewer(viewerId)) return
                     _signalingFlow.tryEmit(SignalingEvent.JsonUpdate(JSONObject().apply {
                         put("type", SignalingConstants.getPulseType(isTrackerMode)); put("id", deviceId); put("viewer_id", pongViewerId); put("from_viewer", isFromViewer)
                     }))

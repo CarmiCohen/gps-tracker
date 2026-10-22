@@ -1,8 +1,22 @@
-# Project History & Versioning (Oct21.06)
+# Project History & Versioning (Oct22.12)
 
 **For historical records (v9.3.0 and older), see [docs_history_archive.md](docs_history_archive.md).**
 
-## Oct21.06 (Current - Bidirectional Connectivity & Sync Fix)
+## Oct22.12 (Signaling Identity Symmetry)
+- **Signaling Identity Symmetry (#ISSUE-OCT22.0-F3)**: Enforced strict Viewer ID symmetry in `SignalingValidator` for all signaling events (pulses, pings, pongs, telemetry).
+- **Leak Prevention**: Explicitly blocked cross-viewer traffic in Viewer mode to prevent erroneous activity indications from unauthorized peers (R-ID 616).
+- **Communication Hardening**: Integrated validator into `CommunicationManager` relay handlers to ensure UI status badges only transition to Green for authenticated peers.
+
+## Oct22.10 (Setup Lifecycle Hardening)
+- **Setup Exit Authority (#ISSUE-OCT22.0-F2)**: Integrated `BackHandler` into `SettingsOverlay` and `PhoneSetupOverlay` to prevent unintended application termination during configuration (R-ID 614).
+- **Exit Authority Parity**: Added explicit Close (X) icon to `PhoneSetupOverlay` to ensure consistent exit mechanisms across all setup flows (R-ID 615).
+
+## Oct22.0 (Setup & Configuration Hardening)
+- **Setup Configuration Fix (#ISSUE-OCT22.0-F1)**: Resolved ID persistence blocks in `SettingsUseCase` to ensure customized Tracker/Viewer IDs are properly committed to DataStore.
+- **Factory Reset Authority**: Implemented `LoadDefaults` to allow users to recover from invalid configurations.
+- **UI Visibility**: Promoted Relay URL visibility and contrast in the Settings UI.
+
+## Oct21.06 (Bidirectional Connectivity & Sync Fix)
 - **Bidirectional Connectivity Fix (#ISSUE-OCT21.05-F2)**: Restored bidirectional signaling trust by integrating regular `viewer_status` pulses from Viewer to Tracker (R-ID 605). Resolved asymmetric Red VWR badge bug.
 - **Proactive Geofence Synchronization (#ISSUE-OCT21.05-F2)**: Implemented automatic geofence sync upon connection establishment in Viewer mode (R-ID 606). Ensures Tracker parity without manual mutation.
 - **Audit Hardening**: Integrated `verifyBidirectionalConnectivityAndSync` into `ProductionReadinessAuditTest.kt` to ensure future release-blocking failures if peer sync is broken.
@@ -24,13 +38,3 @@
 
 ## Oct21.00 (HUD & Layout Hardening)
 - **HUD Layout Correction (#OCT20.33-F2)**: Optimized HeaderBar button padding and increased StatusBar row vertical spacing to prevent "squeezing" on high-DPI A15 devices.
-
-## Oct20.33 (Stealth Hardening)
-- **Tracker UI Role-Lock (#Oct20.31-F1)**: Architectural enforcement of R872. Purged all forbidden interactive elements (Alerts, Sound, Geofence management) and alarm manifestations from Tracker devices.
-- **Operational Forensic Audit Sharding**: Decoupled Chapter 0 of the test procedure into `OPERATIONAL_FORENSIC_AUDIT.md` for better preservation and audit focus.
-
-## Oct20.32 (UI Hardening & Navigation Fixes)
-- **Back Button Termination Fix (#1424)**: Addressing critical bug where the system "return" button closes the app.
-- **Version String Alignment (#1425)**: Relocating the version identifier to the absolute bottom of the UI for better branding compliance.
-- **HUD Header Scrim (#1426)**: Improving button visibility in the upper HUD by adding a background scrim to prevent map occlusion.
-- **Home Point Synchronization (#1428)**: Implemented bidirectional geofence sync.

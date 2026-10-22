@@ -2,13 +2,15 @@ package com.gps19.core.engine
 
 /**
  * SignalingValidator: Pure logic for enforcing role-based message filtering.
+ * Oct.22.12:
+ * - Connection Asymmetry Fix (#ISSUE-OCT22.0-F3): Enforced strict Viewer ID 
+ *   symmetry and blocks cross-viewer traffic to prevent erroneous activity 
+ *   badges and telemetry leaks.
+ * - SOT ID 812: Unified identity validation for all signaling events with 
+ *   symmetrical discovery mode logic.
  * Oct.11.5:
  * - Forensic Alignment: Refined getDropReason for Tracker mode to correctly 
  *   identify self-echoes as "Echo suppression" rather than "another Tracker".
- * Oct.3.6:
- * - Bug Fix: Corrected inverted logic in shouldProcessLogRelay which was 
- *   dropping legitimate tracker logs on the viewer.
- * - Forensic Alignment: Aligned getDropReason with new Log Relay rules (R1422).
  */
 object SignalingValidator {
 
@@ -24,7 +26,7 @@ object SignalingValidator {
     }
 
     /**
-     * Determines if a location update should be processed by the current device.
+     * Determines if a location update (or generic signaling event) should be processed.
      */
     fun shouldProcessLocationUpdate(
         incomingId: String,
@@ -37,17 +39,25 @@ object SignalingValidator {
         // R182: Strict Tracker ID match is always required.
         if (!SignalingConstants.isTrackerMatch(incomingId, ownDeviceId)) return false
 
-        // Tracker Mode: Only accept from our authorized Viewer or if we are in "Discovery"
+        val isDirectMatch = SignalingConstants.isViewerMatch(viewerId, ownViewerId)
+        val isDiscoveryMode = isDefault(ownViewerId) && isDefault(viewerId)
+
         if (isTrackerMode) {
-            return isFromViewer && (SignalingConstants.isViewerMatch(viewerId, ownViewerId) || isDefault(ownViewerId))
+            // Tracker accepts packets from a Viewer if it's a direct match or both are defaults.
+            return isFromViewer && (isDirectMatch || isDiscoveryMode)
+        } else {
+            // Viewer Mode: 
+            // 1. Suppress self-echoes.
+            if (isFromViewer && isDirectMatch) return false
+            
+            // 2. Acceptance logic for packets from the Tracker:
+            if (!isFromViewer) {
+                return isDirectMatch || isDiscoveryMode
+            }
+            
+            // 3. Reject packets from other Viewers to prevent false activity badges.
+            return false
         }
-        
-        // Viewer Mode: 
-        // 1. Suppress self-echoes.
-        if (!isTrackerMode && isFromViewer && SignalingConstants.isViewerMatch(viewerId, ownViewerId)) return false
-        
-        // 2. Accept all packets from the target Tracker ID (even if coordinates are 0,0 heartbeat).
-        return true
     }
 
     /**
@@ -65,17 +75,26 @@ object SignalingValidator {
             return "ID mismatch: PacketID=$incomingId (Expected=$ownDeviceId)"
         }
 
+        val isDirectMatch = SignalingConstants.isViewerMatch(viewerId, ownViewerId)
+        val isDiscoveryMode = isDefault(ownViewerId) && isDefault(viewerId)
+
         if (isTrackerMode) {
             if (!isFromViewer) {
-                // Oct.11.5: Identify self-echoes to prevent false "another tracker" forensic alarms.
                 return "Echo suppression: Ignored own reflected pulse"
             }
-            if (!SignalingConstants.isViewerMatch(viewerId, ownViewerId) && !isDefault(ownViewerId)) {
+            if (!isDirectMatch && !isDiscoveryMode) {
                 return "Unauthorized Viewer: Incoming=$viewerId (Authorized=$ownViewerId)"
             }
         } else {
-            if (isFromViewer && SignalingConstants.isViewerMatch(viewerId, ownViewerId)) {
+            if (isFromViewer && isDirectMatch) {
                 return "Echo suppression: Ignored own reflected command"
+            }
+            if (!isFromViewer) {
+                if (!isDirectMatch && !isDiscoveryMode) {
+                    return "Viewer ID mismatch: Packet target=$viewerId (Own=$ownViewerId)"
+                }
+            } else {
+                return "Unauthorized Peer: Ignored packet from another Viewer ($viewerId)"
             }
         }
         return null
@@ -89,15 +108,7 @@ object SignalingValidator {
         isTrackerMode: Boolean,
         isFromViewer: Boolean
     ): Boolean {
-        if (!SignalingConstants.isTrackerMatch(incomingId, ownDeviceId)) return false
-        
-        if (isTrackerMode) {
-            // Tracker only processes logs from its authorized viewer
-            return isFromViewer && (SignalingConstants.isViewerMatch(incomingViewerId, ownViewerId) || isDefault(ownViewerId))
-        } else {
-            // Viewer processes all logs for its tracker, except self-echoes
-            if (isFromViewer && SignalingConstants.isViewerMatch(incomingViewerId, ownViewerId)) return false
-            return true
-        }
+        // Oct.22.12: Unified identity check to ensure symmetry and prevent cross-viewer leaks.
+        return shouldProcessLocationUpdate(incomingId, ownDeviceId, isFromViewer, incomingViewerId, ownViewerId, isTrackerMode)
     }
 }
