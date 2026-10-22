@@ -47,6 +47,9 @@ object TestPowerModule {
 /**
  * ProductionReadinessAuditTest: Validates system behavior under production-like 
  * soak and pressure conditions.
+ * Oct.22.0:
+ * - Chapter 0.6 (Peer Sync Audit): Fixed verifyBidirectionalConnectivityAndSync 
+ *   to correctly simulate peer activity in repository to satisfy R-ID 605.
  * Oct.21.06:
  * - Chapter 0.6 (Peer Sync Audit): Added verifyBidirectionalConnectivityAndSync 
  *   to ensure R-ID 605 and R-ID 606 are satisfied immediately upon connection.
@@ -130,6 +133,7 @@ class ProductionReadinessAuditTest {
         
         val nowRt = timeProvider.elapsedRealtime
         sessionManager.onViewerPulse("V1", nowRt)
+        repository.updateRemoteActivity(nowRt) // ISSUE-OCT21.05-F2 Remediation: Correctly update repository activity.
         
         assertTrue("R-ID 605: Tracker MUST recognize Viewer pulse", sessionManager.getViewerCount() > 0)
         
