@@ -9,11 +9,11 @@ import javax.inject.Inject
 
 /**
  * SettingsUseCase: Encapsulates business logic for application configuration.
+ * Oct.21.07:
+ * - Setup Hardening (ISSUE-OCT21.06-F1): Removed early return in saveDraftToRepo 
+ *   to allow saving Relay URL and Max Distance even if IDs are unchanged.
  * Oct.19.19:
  * - ISSUE-OCT19.19-F1: Added isRestorationDisabled to InitialSettings.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
- *   TimeProvider API and fixed property invocation errors.
  */
 class SettingsUseCase @Inject constructor(
     private val repository: MainRepository,
@@ -43,8 +43,7 @@ class SettingsUseCase @Inject constructor(
     }
 
     suspend fun saveDraftToRepo(draft: DraftSettings) {
-        if (draft.deviceId.isEmpty() && draft.viewerId.isEmpty()) return
-        
+        // Removed early return. Allow saving non-identity fields.
         repository.saveDraftSettings(
             deviceId = draft.deviceId.trim(),
             viewerId = draft.viewerId.trim(),
@@ -77,8 +76,6 @@ class SettingsUseCase @Inject constructor(
         val mMode = s.appMode.ifEmpty { null }
         val sSiren = s.selectedSiren.ifEmpty { "Siren" }
         
-        // R-ID 453/565/571: Standardized Role Identity Authority
-        // In Viewer mode, the primary authority for alarms is the Remote Tracker partition.
         val role = when(mMode) {
             "tracker" -> AppRole.TRACKER
             "viewer" -> AppRole.VIEWER_REMOTE
@@ -165,10 +162,6 @@ class SettingsUseCase @Inject constructor(
         repository.saveString(RELAY_URL_KEY, url)
     }
 
-    /**
-     * Performs a bulk update of settings.
-     * v9.3.3: Enforces validation via MainRepository.
-     */
     suspend fun bulkUpdateSettings(
         deviceId: String? = null,
         viewerId: String? = null,

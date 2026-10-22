@@ -1,27 +1,33 @@
-# Project Handover - Oct21.06 (Success/Transition)
+# Project Handover - Oct22.0 (Success/Setup Hardening)
 
 ## 🟢 Status: STABLE (VERSION CLOSED)
 
-Version `Oct21.06` has successfully resolved the bidirectional connectivity asymmetry and geofence synchronization failure. The system now ensures the Tracker's VWR badge transitions to Green upon Viewer connection and proactively pushes Home Points.
+Version `Oct22.0` has successfully addressed critical usability and persistence issues within the main Setup/Settings page. The configuration pipeline is now resilient, providing clear feedback and explicit control over identity and connection parameters.
 
 ## ✅ Completed in this Session
-- **Bidirectional Connectivity Fix (#ISSUE-OCT21.05-F2)**:
-    - **Viewer Pulse**: Integrated `viewer_status` pulses into `AppEventCoordinator.kt` to satisfy peer-presence requirements (R-ID 605).
-    - **Proactive Sync**: Updated `ConnectivitySuite.kt` to trigger `syncHomePoints()` immediately upon connection in Viewer mode (R-ID 606).
-    - **Protocol Protocol**: Added `createViewerStatusUpdate` to `SignalPayloadGenerator.kt`.
-- **Audit Hardening**: Added `verifyBidirectionalConnectivityAndSync` to `ProductionReadinessAuditTest.kt` to ensure Chapter 0.6 Peer Sync Audit fails if parity is not established.
+- **Setup & Configuration Hardening (#ISSUE-OCT22.0-F1)**:
+    - **Identity Persistence**: Fixed a logic block in `SettingsUseCase.saveDraftToRepo` that prevented saving configuration fields if ID fields were empty.
+    - **Exit Authority**: Added a Close (X) icon to the `SettingsOverlay` header, providing a non-destructive way to exit setup (R-ID 611).
+    - **Factory Reset**: Implemented "Load Factory Defaults" button to quickly restore known-good parameters (`T`, `V`, and production relay).
+    - **Commit Feedback**: Integrated Toast notifications in `UiEventCoordinator` to inform users of identity conflicts or reserved ID violations (R-ID 613).
+    - **Relay Visibility**: Promoted the Relay URL field and standardized its text color to white for better legibility.
+    - **Atomic State transitions**: Refactored `updateDraft` and `commitSettings` in `UiEventCoordinator` to ensure reliable background persistence and prevented overlay closure on validation failure.
+- **Traceability Updates**: 
+    - Updated `issues.md`, `SOT_MASTER_REQUIREMENTS.md` (R-ID 611-613), and `TEST_PROCEDURE.md` (Chapter 2.8) to reflect the hardening baseline.
+- **Version Bump**: Promoted system to `Oct22.0` across all metadata, properties, and test suites.
 
-## 🔴 Current Open Gaps (Oct21.07 Transition)
-- **Manual Protocol Gaps**: Chapter 4.7 (Alarm Suppression) and 4.8 (Z-Index) are pending physical validation.
+## 🔴 Current Open Gaps
+- **Manual Protocol Gaps**: Chapter 4.7 (Alarm Suppression) and 4.8 (Z-Index) are still pending final physical validation on physical A15 hardware.
 - **Physical Handover Required**: Chapters 5, 7–100 remain for full release coverage.
 
 ## 💡 Strategic Simplification Ideas
-- **SIMP-OCT21.01-S1: Unified Peer Heartbeat (Medium).** Consolidate `viewer_pulse`, `viewer_status`, and `location_update` into a single peer-presence state machine.
+- **SIMP-OCT22.0-S1: Settings Validation Centralization (Medium).** Move identity uniqueness and regex validation from `SettingsRepository` and `UiEventCoordinator` into a pure `ConfigValidator` utility.
+- **SIMP-OCT21.01-S1: Unified Peer Heartbeat (Medium).** Consolidate `viewer_pulse`, `viewer_status`, and `location_update`.
 
 ## 🎯 Next Resumption Focus: Chapter 4.7 & 4.8.
-The next session should continue manual testing on A15 and S21FE, verifying alarm overlay priority and connectivity suppression.
+Manual verification of the alarm priority system and connection failure behavior.
 
-**Current Forensic Metrics (Oct21.06):**
-- **[Oct21.06]: [SOT Count: 807 (Rules: 314), Open: H:0, M:0, L:0, Ideas: H:2, M:24, L:41, Testing: 6 (Sub-items: 28), QA: 381]**
+**Current Forensic Metrics (Oct22.0):**
+- **[Oct22.0]: [SOT Count: 810 (Rules: 317), Open: H:0, M:0, L:0, Ideas: H:2, M:25, L:41, Testing: 7 (Sub-items: 32), QA: 385]**
 
 **HANDOVER COMPLETE.**

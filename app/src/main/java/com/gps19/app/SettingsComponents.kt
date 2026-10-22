@@ -32,21 +32,13 @@ import kotlinx.coroutines.delay
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Oct.21.07:
+ * - Setup Hardening (ISSUE-OCT21.06-F1): Added Close icon to main SettingsOverlay 
+ *   to allow exiting the setup. Added "Load Defaults" button for factory reset.
+ *   Promoted Relay URL field visibility to prevent perceived erasure.
  * Oct.21.02:
  * - Settings Gear Restoration (#OCT20.33-F3): Restored Geofence Radius and 
- *   Alerts/Sound sub-settings for Trackers to allow state verification, 
- *   reversing partial R872 purge.
- * Oct.20.33:
- * - Tracker Stealth Audit (ISSUE-OCT20.31-F1): Forbidden interactive elements 
- *   (Alerts, Sound, Home Point management) are now strictly removed from the 
- *   Tracker UI to comply with R872 (Absolute Stealth).
- * Oct.17.4:
- * - ISSUE-OCT17.4-F2: RTL Slider Inversion. Wrapped SensitivitySlider in 
- *   CompositionLocalProvider for Ltr direction to prevent value inversion 
- *   in RTL locales (e.g., A15 test environment).
- * Oct.13.21:
- * - SIMP-OCT13.21-S1: Pure Event UI. Pruned all specific lambda parameters 
- *   from SettingsOverlay and PhoneSetupOverlay. Standardized on onEvent bubbling.
+ *   Alerts/Sound sub-settings for Trackers to allow state verification.
  */
 
 @Composable
@@ -80,7 +72,13 @@ fun SettingsOverlay(
             if (isHydrated && visibleCount > 0) {
                 Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) { 
                     if (visibleCount >= 1) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.settings_title), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold) }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { 
+                            Text(stringResource(R.string.settings_title), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                            // ISSUE-OCT21.06-F1: Exit Setup Authority
+                            IconButton(onClick = { onEvent(UiEvent.ToggleSettings(false)) }) {
+                                Icon(Icons.Default.Close, null, tint = Color.White)
+                            }
+                        }
                         Spacer(Modifier.height(16.dp))
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -117,7 +115,6 @@ fun SettingsOverlay(
                     }
 
                     if (visibleCount >= 2) {
-                        // Restore Geofence radius for Tracker verification (ISSUE-OCT20.33-F3)
                         OutlinedTextField(
                             value = draft.maxDistance, 
                             onValueChange = { onEvent(UiEvent.UpdateDraftMaxDistance(it)) }, 
@@ -141,7 +138,6 @@ fun SettingsOverlay(
                     }
 
                     if (visibleCount >= 3) {
-                        // Restore Alerts and Sound buttons for Tracker (ISSUE-OCT20.33-F3)
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.ALERTS)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.Default.NotificationsActive, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_alerts)) }
                             Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.SOUND)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Violet500.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.VolumeUp, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_sound)) }
@@ -151,6 +147,14 @@ fun SettingsOverlay(
 
                     if (visibleCount >= 4) {
                         Button(onClick = { onEvent(UiEvent.ToggleSettings(false)); onEvent(UiEvent.NavigateToDiagnostics(true)) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Slate700)) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_diagnostics)) }
+                        Spacer(Modifier.height(16.dp))
+                        
+                        // ISSUE-OCT21.06-F1: Load Defaults Authority
+                        Button(onClick = { onEvent(UiEvent.LoadDefaults) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Slate800)) {
+                            Icon(Icons.Default.SettingsBackupRestore, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Load Factory Defaults") 
+                        }
                         Spacer(Modifier.height(24.dp))
 
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -161,7 +165,14 @@ fun SettingsOverlay(
 
                     if (visibleCount >= 5) {
                         Spacer(Modifier.height(24.dp))
-                        OutlinedTextField(value = draft.relayUrl, onValueChange = { onEvent(UiEvent.UpdateDraftRelayUrl(it)) }, label = { Text(stringResource(R.string.settings_label_relay_url)) }, modifier = Modifier.fillMaxWidth())
+                        // Promoted Relay URL for better visibility (ISSUE-OCT21.06-F1)
+                        OutlinedTextField(
+                            value = draft.relayUrl, 
+                            onValueChange = { onEvent(UiEvent.UpdateDraftRelayUrl(it)) }, 
+                            label = { Text(stringResource(R.string.settings_label_relay_url)) }, 
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
+                        )
                         Spacer(Modifier.height(56.dp))
                     }
                 } 
@@ -187,7 +198,6 @@ fun CleanSetupOverlay(isTracker: Boolean, onEvent: (UiEvent) -> Unit) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.clean_init_title), color = Rose500, fontSize = 22.sp, fontWeight = FontWeight.Bold); IconButton(onClick = { onEvent(UiEvent.SetSubSettings(null)) }) { Icon(Icons.Default.Close, null, tint = Color.White) } }
             Spacer(Modifier.height(16.dp)); SettingsGroupHeader(stringResource(R.string.clean_group_maintenance), Rose500)
             
-            // R872: Trackers cannot manage Home Points locally.
             if (!isTracker) {
                 Button(onClick = { onEvent(UiEvent.ClearHomePoints); onEvent(UiEvent.SetSubSettings(null)) }, modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteForever, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clear_home), fontSize = 13.sp) }; Spacer(Modifier.height(16.dp))
             }
@@ -386,7 +396,6 @@ fun PhoneSetupOverlay(
                             }
                         }
                         
-                        // R872: Geofence setup is forbidden on Trackers.
                         if (!isTrackerMode) { Spacer(Modifier.height(16.dp)); GuideSection(title = stringResource(R.string.setup_step9_title), description = stringResource(R.string.setup_step9_desc), onClick = { onEvent(UiEvent.TogglePhoneSetup(false)); onEvent(UiEvent.ToggleMap(true)) }, buttonText = stringResource(R.string.btn_open_map), isCompleted = homePointsCount > 0, icon = Icons.Default.Map, reason = if (homePointsCount == 0) "Geofence: No Home Points defined" else null) }
                     }
 
@@ -397,7 +406,6 @@ fun PhoneSetupOverlay(
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             Button(onClick = { onEvent(UiEvent.RefreshPermissionStatus) }, modifier = Modifier.weight(1f).heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan)) { Icon(Icons.Default.Refresh, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_refresh), fontSize = 13.sp) }
                             
-                            // R872: Test Alarm is forbidden on Trackers.
                             if (!isTrackerMode) {
                                 Button(onClick = { onEvent(UiEvent.RequestTestAlarm) }, modifier = Modifier.weight(1f).heightIn(min = 56.dp), colors = ButtonDefaults.buttonColors(containerColor = Violet500)) { Icon(Icons.Default.NotificationImportant, null); Spacer(Modifier.width(4.dp)); Text(stringResource(R.string.btn_test_alarm), fontSize = 13.sp) }
                             }

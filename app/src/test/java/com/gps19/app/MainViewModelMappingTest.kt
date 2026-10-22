@@ -6,19 +6,7 @@ import org.junit.Test
 
 /**
  * MainViewModelMappingTest: Verifies centralized mapping logic and tier-specific freshness gates.
- * Oct.21.07: Updated engine version expectation to Oct21.07.
- * Oct.21.05: Updated engine version expectation to Oct21.05 (Remediation).
- * Oct.20.30: Updated engine version expectation to Oct20.30.
- * Oct.20.27: Updated engine version expectation to Oct20.27.
- * Oct.20.26: Updated engine version expectation to Oct20.26.
- * Oct.20.25: Updated engine version expectation to Oct20.25.
- * Oct.20.22: Updated engine version expectation to Oct20.22.
- * Oct.20.21: Updated engine version expectation to Oct20.21.
- * Oct.18.18: Updated engine version expectation to Oct18.18.
- * Oct.18.16: Updated engine version expectation to Oct18.16.
- * Oct.17.11: Updated engine version expectation to Oct17.11.
- * Oct.16.2: Updated engine version expectation to Oct16.2.
- * Oct.15.10: Updated to use decoupled Mapper objects (DashboardMapper, HudMapper, MapStateMapper).
+ * Oct.22.0: Updated engine version expectation to Oct22.0.
  */
 class MainViewModelMappingTest {
 
@@ -196,12 +184,13 @@ class MainViewModelMappingTest {
         val nowRt = timeProvider.elapsedRealtime
         val nowMs = timeProvider.currentTimeMillis
         val kin = createKinematicState(rt = nowRt - 65000L, isPowerSave = true)
+        val spatial = SpatialUiState()
         
-        val (mapState, _) = MapStateMapper.mapMapViewState("tracker", 4, SpatialUiState(), kin, nowRt, nowMs, emptyList(), emptyList(), emptyList(), MapStateMapper.SmoothedCoordinates(0.0, 0.0, 0.0, 0.0))
+        val (mapState, _) = MapStateMapper.mapMapViewState("tracker", 4, spatial, kin, nowRt, nowMs, emptyList(), emptyList(), emptyList(), MapStateMapper.SmoothedCoordinates(0.0, 0.0, 0.0, 0.0))
         assertTrue("Map should be fresh at 65s in Power Save", mapState.isTrackerFresh)
         
         val kinStale = createKinematicState(rt = nowRt - 80000L, isPowerSave = true)
-        val (mapStateStale, _) = MapStateMapper.mapMapViewState("tracker", 4, SpatialUiState(), kinStale, nowRt, nowMs, emptyList(), emptyList(), emptyList(), MapStateMapper.SmoothedCoordinates(0.0, 0.0, 0.0, 0.0))
+        val (mapStateStale, _) = MapStateMapper.mapMapViewState("tracker", 4, spatial, kinStale, nowRt, nowMs, emptyList(), emptyList(), emptyList(), MapStateMapper.SmoothedCoordinates(0.0, 0.0, 0.0, 0.0))
         assertFalse("Map should be stale at 80s in Power Save", mapStateStale.isTrackerFresh)
     }
 
@@ -215,7 +204,7 @@ class MainViewModelMappingTest {
         
         val result = DashboardMapper.mapDashboardConnectivity("viewer", diag, nowRt)
         assertTrue("Watchdog should be OK", result.watchdogOk)
-        assertEquals("Oct21.07", result.engineVersion)
+        assertEquals("Oct22.0", result.engineVersion)
         
         // Stale watchdog
         diag.pulse = nowRt - 70000L

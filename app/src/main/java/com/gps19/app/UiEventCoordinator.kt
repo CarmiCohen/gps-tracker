@@ -16,11 +16,15 @@ import javax.inject.Singleton
 
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
+ * Oct.22.0:
+ * - Setup Hardening (ISSUE-OCT21.07-F1) Remediation: 
+ *   1. Conditional Navigation: Settings overlay now only closes if the commit 
+ *      succeeds, preventing silent data loss on validation errors (reserved IDs).
+ *   2. Atomic Auto-Save: Refactored updateDraft to ensure background persistence 
+ *      captures the latest state transitions without race conditions.
+ *   3. Default Restoration: Unified LoadDefaults to use persistent draft channel.
  * Oct.20.32:
- * - Home Point Sync: Triggering connectivitySuite.syncHomePoints() on geofence mutations
- *   to ensure remote tracker parity.
- * Oct.20.24:
- * - ISSUE-OCT20.23-F2: Wrapped repository.clearLogs() in a coroutine scope.
+ * - Home Point Sync: Triggering connectivitySuite.syncHomePoints() on geofence mutations.
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -61,12 +65,14 @@ class UiEventCoordinator @Inject constructor(
             is UiEvent.NavigateToDiagnostics, is UiEvent.SetPendingMode, UiEvent.NavigateToDashboard -> {
                 if (event is UiEvent.ToggleSettings) {
                     if (event.visible) {
-                        onStateUpdate { it.copy(settings = it.settings.copy(draftSettings = settingsUseCase.prepareDraft(it))) }
+                        onStateUpdate { it.copy(
+                            settings = it.settings.copy(draftSettings = settingsUseCase.prepareDraft(it)),
+                            navigation = navigationUseCase.handleNavigationEvent(event, it)
+                        ) }
                     } else {
-                        commitSettings(currentState.settings.draftSettings, scope, onStateUpdate)
+                        commitSettings(currentState.settings.draftSettings, scope, onStateUpdate, onUiEffect)
                     }
-                }
-                if (event is UiEvent.NavigateToDashboard) {
+                } else if (event is UiEvent.NavigateToDashboard) {
                     onStateUpdate { it.copy(navigation = it.navigation.copy(
                         isMapVisible = false, isLogVisible = false, isSettingsOpen = false,
                         isRibbonsVisible = false, isGnssDetailVisible = false, isPhoneSetupVisible = false
@@ -79,7 +85,7 @@ class UiEventCoordinator @Inject constructor(
             is UiEvent.SetUiVisible -> {
                 repository.sendCommand(UiCommand.UiVisibilityChanged(event.visible))
                 if (!event.visible && currentState.navigation.isSettingsOpen) {
-                    commitSettings(currentState.settings.draftSettings, scope, onStateUpdate)
+                    commitSettings(currentState.settings.draftSettings, scope, onStateUpdate, onUiEffect)
                 }
             }
 
@@ -167,16 +173,28 @@ class UiEventCoordinator @Inject constructor(
             }
 
             // --- Settings & Drafts (Debounced) ---
-            is UiEvent.UpdateDraftDeviceId -> updateDraft(scope, onStateUpdate) { it.copy(deviceId = event.id) }
-            is UiEvent.UpdateDraftViewerId -> updateDraft(scope, onStateUpdate) { it.copy(viewerId = event.id) }
-            is UiEvent.UpdateDraftRelayUrl -> updateDraft(scope, onStateUpdate) { it.copy(relayUrl = event.url) }
-            is UiEvent.UpdateDraftMaxDistance -> updateDraft(scope, onStateUpdate) { it.copy(maxDistance = event.distance) }
-            is UiEvent.UpdateDraftAlertSettings -> updateDraft(scope, onStateUpdate) { it.copy(alertSettings = event.settings) }
-            is UiEvent.UpdateDraftAlarmVolume -> updateDraft(scope, onStateUpdate) { 
+            is UiEvent.UpdateDraftDeviceId -> updateDraft(scope, onStateUpdate, currentState) { it.copy(deviceId = event.id) }
+            is UiEvent.UpdateDraftViewerId -> updateDraft(scope, onStateUpdate, currentState) { it.copy(viewerId = event.id) }
+            is UiEvent.UpdateDraftRelayUrl -> updateDraft(scope, onStateUpdate, currentState) { it.copy(relayUrl = event.url) }
+            is UiEvent.UpdateDraftMaxDistance -> updateDraft(scope, onStateUpdate, currentState) { it.copy(maxDistance = event.distance) }
+            is UiEvent.UpdateDraftAlertSettings -> updateDraft(scope, onStateUpdate, currentState) { it.copy(alertSettings = event.settings) }
+            is UiEvent.UpdateDraftAlarmVolume -> updateDraft(scope, onStateUpdate, currentState) { 
                 val newAlerts = it.alertSettings.copy(alarmVolume = event.volume)
                 it.copy(alertSettings = newAlerts)
             }
-            is UiEvent.CommitSettings -> commitSettings(currentState.settings.draftSettings, scope, onStateUpdate)
+            is UiEvent.CommitSettings -> commitSettings(currentState.settings.draftSettings, scope, onStateUpdate, onUiEffect)
+
+            is UiEvent.LoadDefaults -> {
+                updateDraft(scope, onStateUpdate, currentState) { 
+                    DraftSettings(
+                        deviceId = SignalingConstants.DEFAULT_TRACKER_ID,
+                        viewerId = SignalingConstants.DEFAULT_VIEWER_ID,
+                        relayUrl = SettingsRepository.DEFAULT_RELAY_URL,
+                        maxDistance = SettingsRepository.DEFAULT_MAX_DISTANCE.toInt().toString(),
+                        alertSettings = AlertSettings()
+                    )
+                }
+            }
 
             is UiEvent.BulkUpdateSettings -> {
                 scope.launch(Dispatchers.IO) {
@@ -440,21 +458,31 @@ class UiEventCoordinator @Inject constructor(
     private fun updateDraft(
         scope: CoroutineScope, 
         onStateUpdate: ((MainUiState) -> MainUiState) -> Unit, 
+        currentState: MainUiState,
         update: (DraftSettings) -> DraftSettings
     ) {
-        onStateUpdate { it.copy(settings = it.settings.copy(draftSettings = update(it.settings.draftSettings))) }
+        val nextDraft = update(currentState.settings.draftSettings)
+        onStateUpdate { it.copy(settings = it.settings.copy(draftSettings = nextDraft)) }
         autoSaveJob?.cancel()
         autoSaveJob = scope.launch(Dispatchers.IO) {
-            delay(300L)
+            delay(1000L)
+            settingsUseCase.saveDraftToRepo(nextDraft)
         }
     }
 
-    private fun commitSettings(draft: DraftSettings, scope: CoroutineScope, onStateUpdate: ( (MainUiState) -> MainUiState ) -> Unit) {
+    private fun commitSettings(draft: DraftSettings, scope: CoroutineScope, onStateUpdate: ( (MainUiState) -> MainUiState ) -> Unit, onUiEffect: (UiEffect) -> Unit) {
         scope.launch(Dispatchers.IO) {
             settingsUseCase.saveDraftToRepo(draft)
-            settingsUseCase.commitDraft()
+            val result = settingsUseCase.commitDraft()
             withContext(Dispatchers.Main.immediate) {
-                onStateUpdate { it.copy(settings = it.settings.copy(draftSettings = DraftSettings())) }
+                if (result.error != null) {
+                    onUiEffect(UiEffect.ShowToast(result.error))
+                } else {
+                    onStateUpdate { it.copy(
+                        settings = it.settings.copy(draftSettings = DraftSettings()),
+                        navigation = it.navigation.copy(isSettingsOpen = false, activeSubSettings = null)
+                    ) }
+                }
             }
         }
     }

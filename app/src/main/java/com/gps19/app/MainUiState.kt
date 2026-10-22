@@ -7,13 +7,13 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Composite UI state partitioned into specialized slices.
+ * Oct.21.07:
+ * - ISSUE-OCT21.06-F1: Setup Hardening. Added LoadDefaults to UiEvent to support 
+ *   restoration of factory parameters.
  * Oct.19.19:
  * - ISSUE-OCT19.19-F1: Added isRestorationDisabled to SimulationUiState to bypass R-ID 242.
  * - Fix: Corrected typo 'other' in DiagnosticState.copyFrom.
  * - Fix: Corrected RequestAppInfo to extend UiEvent.
- * Oct.18.6:
- * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Added shake, GNSS loss, 
- *   power tamper, and network loss to SimulationUiState.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -581,6 +581,9 @@ sealed class UiEvent {
     object RequestAppInfo : UiEvent()
     object RequestExactAlarm : UiEvent()
     object RequestHardwarePermission : UiEvent()
+
+    // Oct.21.07: Setup Hardening
+    object LoadDefaults : UiEvent()
 }
 
 sealed class UiEffect {

@@ -40,20 +40,11 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.22.0:
+ * - Version Synchronization: Updated engine version string to Oct22.0.
  * Oct.21.03:
  * - ISSUE-OCT20.33-F5: Debug Artifact Leak. Wrapped UI_READY label in 
  *   BuildConfig.DEBUG check to suppress it in production builds.
- * Oct.15.6:
- * - Version Synchronization (Issue #OCT15.6-T1): Updated hardcoded version label to Oct15.6_PLATINUM.
- * Oct.17.4:
- * - Version Synchronization: Updated hardcoded version label to Oct17.4_PLATINUM.
- * Oct.16.8:
- * - ISSUE-OCT16.8-F1: Fixed missing StopTrackingConfirmationDialog.
- * - ISSUE-OCT16.8-F4: Sentinel Z-Index Hardening (Ch 4.8). Moved AlarmOverlay 
- *   to DialogHost to ensure it supersedes all navigation overlays.
- * - SIMP-OCT16.8-S1: Implemented DialogHost for unified transient dialog management.
- * Oct.15.7:
- * - SIMP-OCT15.6-S1: Automated Version Synchronization. Using BuildConfig.VERSION_NAME.
  */
 @Composable
 fun MainAppContent(

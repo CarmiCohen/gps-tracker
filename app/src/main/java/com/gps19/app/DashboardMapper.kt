@@ -4,14 +4,8 @@ import com.gps19.core.engine.*
 
 /**
  * DashboardMapper: Centralized authority for dashboard state transformations.
- * Oct.15.6:
- * - Version Synchronization (Issue #OCT15.6-T1): Updated engine version string to Oct15.6.
- * Oct.17.4:
- * - Version Synchronization: Updated engine version string to Oct17.4.
- * Oct.16.2:
- * - SIMP-OCT15.10-S1: Test Utility Decoupling. Updated engine version string to Oct16.2.
- * Oct.15.7:
- * - SIMP-OCT15.6-S1: Automated Version Synchronization. Using BuildConfig.VERSION_NAME.
+ * Oct.22.0:
+ * - Version Synchronization: Updated to Oct22.0.
  */
 object DashboardMapper {
 
