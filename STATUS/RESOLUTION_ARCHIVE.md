@@ -1,4 +1,10 @@
-# Resolution Archive - GPS Tracker (Oct23.106)
+# Resolution Archive - GPS Tracker (Oct23.107)
+
+## ISSUE-OCT23.102-F7: Delta Compression Drift Prevention (Oct23.107)
+- **Resolved**: Oct23.107
+- **Description**: `TelemetryProtobufMapper` lacked a periodic absolute coordinate refresh, risking permanent drift if delta packets were lost.
+- **Remediation**: Implemented `DELTA_REFRESH_INTERVAL` (50 packets) in `SignalingConstants.kt` and updated `TelemetryProtobufMapper.mapToRealtime` to force absolute coordinates when the `packetCounter` in `SignalingDeltaState` reaches the interval.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 819).
 
 ## ISSUE-OCT23.101-F2: JSON Mapping State Overwrite (Oct23.106)
 - **Resolved**: Oct23.106

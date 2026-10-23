@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * SignalingConstants: Core rules for relay communication and role enforcement.
+ * Oct23.107:
+ * - ISSUE-OCT23.102-F7: Added DELTA_REFRESH_INTERVAL for periodic absolute 
+ *   coordinate refresh to prevent delta drift.
  * v9.3.23:
  * - Robust Aliasing: Broadened matchers to support bidirectional cross-version 
  *   identity mapping (e.g. T vs Trk) to ensure connectivity between old and new apps.
@@ -18,6 +21,11 @@ object SignalingConstants {
     // Legacy Aliases
     const val LEGACY_TRACKER_ID = "Trk"
     const val LEGACY_VIEWER_ID = "viewer"
+    
+    /**
+     * R183: Periodic absolute refresh interval (packets) to prevent delta drift.
+     */
+    const val DELTA_REFRESH_INTERVAL = 50
     
     private val ID_REGEX = Regex("^[a-zA-Z0-9_-]{1,32}$")
 

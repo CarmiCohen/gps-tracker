@@ -5,6 +5,9 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct23.107:
+ * - ISSUE-OCT23.102-F7: Implemented periodic absolute coordinate refresh 
+ *   (every DELTA_REFRESH_INTERVAL packets) in mapToRealtime to prevent delta drift.
  * Oct.22.16:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added luxSnapshot and 
  *   acousticSnapshot to all paths (Realtime & Persistence). Added 
@@ -72,7 +75,11 @@ object TelemetryProtobufMapper {
             val prevLat = deltaState.getAndSetLat(currentLatE7)
             val prevLng = deltaState.getAndSetLng(currentLngE7)
             
-            if (prevLat == 0 || Math.abs(currentLatE7 - prevLat) > 10000000) {
+            // Oct23.107: Periodic absolute refresh (R183)
+            val packetCount = deltaState.incrementPacketCount()
+            val isPeriodicRefresh = packetCount % SignalingConstants.DELTA_REFRESH_INTERVAL == 0
+            
+            if (prevLat == 0 || Math.abs(currentLatE7 - prevLat) > 10000000 || isPeriodicRefresh) {
                 builder.setLat(PhysicsUtils.safeDouble(status.lat))
                 builder.setLng(PhysicsUtils.safeDouble(status.lng))
                 builder.setLatE7(currentLatE7)

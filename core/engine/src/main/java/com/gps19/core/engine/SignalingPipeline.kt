@@ -6,17 +6,26 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * SignalingDeltaState: Encapsulates reference coordinates for delta-encoding.
+ * Oct23.107:
+ * - ISSUE-OCT23.102-F7: Added packetCounter for periodic absolute refresh.
  */
 class SignalingDeltaState {
     private val latE7 = AtomicInteger(0)
     private val lngE7 = AtomicInteger(0)
+    private val packetCounter = AtomicInteger(0)
 
     fun getAndSetLat(value: Int): Int = latE7.getAndSet(value)
     fun getAndSetLng(value: Int): Int = lngE7.getAndSet(value)
+    
+    /**
+     * Increments and returns the current packet count for this state.
+     */
+    fun incrementPacketCount(): Int = packetCounter.incrementAndGet()
 
     fun reset() {
         latE7.set(0)
         lngE7.set(0)
+        packetCounter.set(0)
     }
 }
 

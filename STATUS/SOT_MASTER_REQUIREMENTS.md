@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct23.106)
+# SOT Master Requirements & Hardening Status (Oct23.107)
 
-## 🏗️ Architectural Master Rules (328 Rules)
+## 🏗️ Architectural Master Rules (329 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -17,13 +17,15 @@
 *   **1.248 Telemetry Sync Parity (R-ID 617)**: The signaling protocol MUST ensure raw forensic sensor data (Lux, Acoustic, Vibration) and real-time RTT are synchronized across peers to ensure Viewer HUD accuracy. (Oct22.13 - ISSUE-OCT22.0-F4).
 *   **1.249 Forensic State Symmetry (R-ID 618)**: The system MUST ensure session audit metrics (e.g., Violation Percentage) and adaptive sensor thresholds (e.g., Vibration Floor) are synchronized across peers to maintain forensic parity between Tracker and Viewer evaluation engines. (Oct22.16 - ISSUE-OCT22.0-F4).
 *   **1.250 Jammer Discrimination Parity (R-ID 619)**: The system MUST synchronize the `isJammingCandidate` flag across all signaling (Protobuf/JSON) and persistence layers to ensure the Viewer HUD correctly reflects the Tracker's jammer discrimination state. (Oct22.16 - ISSUE-OCT22.0-F4).
-*   **1.251 Forensic Raw Sensor Parity (R-ID 620)**: The system MUST ensure raw sensor snapshots (Lux, Acoustic) are preserved in forensic traces and synchronized across all signaling and persistence layers to enable high-fidelity post-mortem analysis. (Oct23.00 - ISSUE-OCT22.16-F1).
+*   **1.251 Forensic State Raw Sensor Parity (R-ID 620)**: The system MUST ensure raw sensor snapshots (Lux, Acoustic) are preserved in forensic traces and synchronized across all signaling and persistence layers to enable high-fidelity post-mortem analysis. (Oct23.00 - ISSUE-OCT22.16-F1).
 *   **1.252 Discovery Mode Asymmetry (R-ID 621)**: The signaling validator MUST permit Trackers in a default state (no Viewer ID assigned) to accept incoming pulses from any viewer, enabling initial discovery and pairing (ISSUE-OCT24.00-F2).
 *   **1.253 Broadcast Export Security (R-ID 622)**: All internal broadcast receivers MUST be registered with `RECEIVER_NOT_EXPORTED` unless explicit cross-app communication is required, satisfying Android 14+ security mandates (ISSUE-OCT24.00-F3).
 *   **1.254 BackHandler Composition Local (R-ID 623)**: Back button interception MUST be consolidated into a reusable `LocalBackAction` Composition Local to reduce boilerplate and ensure consistent navigation behavior across all overlays (Oct23.100 - SIMP-OCT22.10-S1).
 *   **1.255 Telemetry State Preservation (R-ID 624)**: Telemetry mapping logic MUST utilize the current cached state as the fallback for optional fields during JSON/Protobuf deserialization to prevent state regression (flicker) when keys are missing. (Oct23.106 - ISSUE-OCT23.101-F2).
+*   **1.256 Delta Drift Prevention (R-ID 625)**: `TelemetryProtobufMapper` MUST perform a periodic absolute coordinate refresh (every 50 packets) to prevent permanent coordinate drift in delta-compressed signaling streams. (Oct23.107 - ISSUE-OCT23.102-F7).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 819**: Delta Compression Drift Prevention - PASSED. Implemented periodic absolute coordinate refresh in `TelemetryProtobufMapper` (R-ID 625). (Oct23.107 - ISSUE-OCT23.102-F7).
 *   **SOT ID 818**: Telemetry Mapping State Preservation - PASSED. Hardened `TelemetryMapper.kt` to preserve cached values (prox, rtt, snapshots) during JSON mapping. (Oct23.106 - ISSUE-OCT23.101-F2).
 *   **SOT ID 817**: BackHandler Consolidation - PASSED. Implemented `LocalBackAction` and `BackPressInterceptor` to unify back navigation across all overlays. (Oct23.100 - SIMP-OCT22.10-S1).
 *   **SOT ID 816**: Build Stabilization & Lint Hardening - PASSED. Resolved dependency conflicts, upgraded to JVM 17, and applied mandatory broadcast receiver export flags. (Oct24.00 - ISSUE-OCT24.00-F1/F3).
@@ -36,6 +38,7 @@
 *   **SOT ID 801**: Asymmetric Connectivity & Geofence Sync Resolution - PASSED. (Oct21.06).
 
 ## ✅ Verification Chapters
+*   **Chapter 4.2 (Signaling Protocol Hardening)**: PASSED - Implemented delta drift prevention via periodic absolute coordinate refresh. (Oct23.107).
 *   **Chapter 4.0 (Telemetry Continuity Audit)**: PARTIALLY REMEDIATED - Resolved logic gaps in TelemetryMerger (Oct23.105) and mapping in TelemetryMapper (Oct23.106). (Oct23.106).
 *   **Chapter 4.1 (Build & Infrastructure Audit)**: PASSED - Verified JVM 17 alignment, Hilt Test compatibility, and Broadcast Export security. (Oct24.00).
 *   **Chapter 3.0 (Signaling Identity Audit)**: PASSED - Enforced strict symmetry in SignalingValidator; verified pulse/ping/pong isolation. (Oct22.12).
