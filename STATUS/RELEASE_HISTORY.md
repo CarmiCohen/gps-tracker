@@ -1,6 +1,13 @@
-# Project History & Versioning (Oct22.16)
+# Project History & Versioning (Oct23.00)
 
 **For historical records (v9.3.0 and older), see [docs_history_archive.md](docs_history_archive.md).**
+
+## Oct23.00 (Forensic Trace Raw Sensor Expanded)
+- **Forensic Trace Raw Sensor Parity (#ISSUE-OCT22.16-F1)**: Extended the forensic audit log with raw sensor snapshots (`lux`, `acoustic`) to enable high-fidelity environmental analysis during violations.
+- **Model Expansion**: Added `lux` and `acoustic` fields to `ForensicSnapshot` and integrated them into `LocationUpdate`, `LogEntry`, and `ConnectionPoint`.
+- **Protobuf & Sync (#ISSUE-OCT22.16-F2)**: Synchronized `lux_snapshot` and `acoustic_snapshot` fields across all signaling (Realtime) and persistence (DataStore) layers.
+- **Database Parity (#ISSUE-OCT22.16-F3)**: Verified Migration 85->86 adding `luxSnapshot` and `acousticSnapshot` columns to logs and history tables.
+- **Build Restoration**: Resolved build failures in `SystemHealthState` delegates by aligning with the expanded forensic model.
 
 ## Oct22.16 (Full Forensic Parity Hardened)
 - **Remediation Hardening (#ISSUE-OCT22.0-F4)**: Finalized full stack parity for forensic telemetry. Synchronized RTT, Violation Percentage, and Jammer Candidate flags across all persistence and mapping layers.

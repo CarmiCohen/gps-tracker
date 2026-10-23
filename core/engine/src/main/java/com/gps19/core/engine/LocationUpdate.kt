@@ -104,6 +104,8 @@ data class AtmosphericState(
 
 /**
  * ForensicSnapshot: Unified container for diagnostic sensor probes.
+ * Oct.23.00:
+ * - ISSUE-OCT22.16-F1: Added lux and acoustic snapshots for raw sensor parity.
  */
 @Serializable
 data class ForensicSnapshot(
@@ -111,6 +113,8 @@ data class ForensicSnapshot(
     var vibe: Double? = null,
     var thermal: Double? = null,
     var heap: Double? = null,
+    var lux: Double? = null,
+    var acoustic: Double? = null,
     var isSuspiciousNoise: Boolean = false,
     var isMemoryPressureThrottled: Boolean = false,
     
@@ -122,12 +126,14 @@ data class ForensicSnapshot(
         this.vibe = other.vibe
         this.thermal = other.thermal
         this.heap = other.heap
+        this.lux = other.lux
+        this.acoustic = other.acoustic
         this.isSuspiciousNoise = other.isSuspiciousNoise
         this.isMemoryPressureThrottled = other.isMemoryPressureThrottled
         this.isJammingCandidate = other.isJammingCandidate
     }
     fun reset() {
-        snr = null; vibe = null; thermal = null; heap = null
+        snr = null; vibe = null; thermal = null; heap = null; lux = null; acoustic = null
         isSuspiciousNoise = false; isMemoryPressureThrottled = false
         isJammingCandidate = false
     }
@@ -268,6 +274,8 @@ data class IntegrityState(
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
+ * Oct.23.00:
+ * - ISSUE-OCT22.16-F1: Integrated lux and acoustic snapshots into forensic mapping.
  * Oct.22.15:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Fixed JSON key snake_case 
  *   consistency for cooling mode, energy duration, and jamming candidate.
@@ -648,6 +656,12 @@ data class LocationUpdate(
     var heapSnapshot: Double? 
         get() = integrity.forensic.heap
         set(value) { integrity.forensic.heap = value }
+    var luxSnapshot: Double?
+        get() = integrity.forensic.lux
+        set(value) { integrity.forensic.lux = value }
+    var acousticSnapshot: Double?
+        get() = integrity.forensic.acoustic
+        set(value) { integrity.forensic.acoustic = value }
 
     // Oct.7.7 Anomaly Flags
     var isSuspiciousNoise: Boolean
@@ -821,6 +835,8 @@ data class LocationUpdate(
         put("heap_allocated_mb", heapAllocatedMb)
         put("thermal_snapshot", thermalSnapshot)
         put("heap_snapshot", heapSnapshot)
+        put("lux_snapshot", luxSnapshot)
+        put("acoustic_snapshot", acousticSnapshot)
         put("last_alarm_ack_ts", lastAlarmAckTs)
         put("violation_start_ts", violationStartTs)
         put("dist_to_tracker", distToTracker)

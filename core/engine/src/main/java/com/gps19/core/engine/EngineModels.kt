@@ -6,6 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.23.00:
+ * - ISSUE-OCT22.16-F1: Added luxSnapshot and acousticSnapshot delegates to 
+ *   EngineConnectionPoint for raw sensor parity.
  * Oct.22.15:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added violationPercentage and 
  *   isJammingCandidate to EngineConnectionPoint for parity.
@@ -157,6 +160,12 @@ class EngineConnectionPoint(
     var heapSnapshot: Double?
         get() = forensic.heap
         set(value) { forensic.heap = value }
+    var luxSnapshot: Double?
+        get() = forensic.lux
+        set(value) { forensic.lux = value }
+    var acousticSnapshot: Double?
+        get() = forensic.acoustic
+        set(value) { forensic.acoustic = value }
 
     // Oct.22.15 Delegate
     var isJammingCandidate: Boolean

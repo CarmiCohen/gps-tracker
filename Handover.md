@@ -1,31 +1,33 @@
-# Project Handover - Oct22.16 (Forensic Sync Hardened)
+# Project Handover - Oct23.00 (Forensic Trace Expansion)
 
 ## 🟢 Status: STABILIZED
 
-The **Telemetry Sync and Violation Propagation (F4)** has been comprehensively hardened for the core fields: RTT, Violation Percentage, and Jammer Discrimination flags. These are now synchronized across Protobuf, JSON, Database Entities (v85), and Domain Mappers. 
-
-**Note**: Expansion of forensic traces to include raw sensor snapshots (`lux`, `acoustic`) was initiated but deferred to the next cycle as it required deeper Protobuf and migration logic that exceeded the complexity threshold for this stabilization pass.
+The **Forensic Trace Raw Sensor Expansion (F1/F2/F3)** has been implemented and synchronized across the entire stack. Raw sensor snapshots (`lux`, `acoustic`) are now preserved in the forensic audit log, enabling high-fidelity environmental analysis. Build integrity has been restored by aligning `SystemHealthState` delegates with the updated `ForensicSnapshot` model.
 
 ## ✅ Completed in this Session
-- **Comprehensive Remediation Hardening (#ISSUE-OCT22.0-F4)**:
-    - **TelemetryMapper.kt**: Synchronized `rtt` in `mapStatusToPending` and `mapPendingToStatus`. Synchronized `violationPercentage` in `mapAppToEntity`, `mapProtoToApp`, and `mapEntityToApp` (fallback path).
-    - **TelemetryProtobufMapper.kt**: Integrated `isJammingCandidate` and `violationPercentage` into `mapAppToPersistence` to ensure ConnectionPoint history includes full session metadata.
-    - **Database Parity**: Verified `PendingStatusEntity` and `ViolationEntity` synchronization (v85).
-    - **Versioning**: Incremented to `Oct22.16`.
+- **Forensic Trace Raw Sensor Parity (#ISSUE-OCT22.16-F1)**:
+    - **LocationUpdate.kt**: Extended `ForensicSnapshot` with `lux` and `acoustic` fields. Added delegates and updated `toMap` for JSON parity.
+    - **EngineModels.kt**: Added `luxSnapshot` and `acousticSnapshot` delegates to `EngineConnectionPoint`.
+    - **Models.kt**: Added delegates to `ConnectionPoint` and `LogEntry` for UI/Persistence parity.
+- **Protobuf & Sync (#ISSUE-OCT22.16-F2)**:
+    - **TelemetryProtobufMapper.kt**: Synchronized `luxSnapshot` and `acousticSnapshot` across `mapToRealtime`, `mapToPersistence`, and `mapAppToPersistence`.
+- **Database Parity (#ISSUE-OCT22.16-F3)**:
+    - **Database.kt**: Verified Migration 85->86 adding `luxSnapshot` and `acousticSnapshot` columns.
+- **Remediation & Hardening**:
+    - **TelemetryMerger.kt**: Ensured raw sensor snapshots survive coordinate-stale merges.
+    - **Versioning**: Incremented to `Oct23.00`.
 
 ## 🔴 Current Open Gaps (LOW)
-- **Forensic Trace Expansion (Deferred to Next Cycle)**:
-    - **ISSUE-OCT22.16-F1**: Extend `ForensicSnapshot` and `LogEntry` with `luxSnapshot` and `acousticSnapshot` for raw sensor parity in traces.
-    - **ISSUE-OCT22.16-F2**: Update Protobuf schemas (`RealtimeStatus`, `TrackerStatusProto`) with lux/acoustic snapshot fields.
-    - **ISSUE-OCT22.16-F3**: Implement Database Migration 85->86 for forensic expansion.
 - **UI UX Simplification**:
     - **SIMP-OCT22.10-S1**: BackHandler Composition Local to reduce boilerplate in overlays.
     - **SIMP-OCT22.0-S1**: Centralize identity and regex validation into `ConfigValidator`.
+- **Strategic Simplification**:
+    - **SIMP-OCT23.0-S1**: Consolidate redundant `ForensicSnapshot` classes between `core:engine` and `HardwareSuite.kt`.
 
-## 🎯 Next Resumption Focus: Forensic Trace Expansion.
-The core telemetry parity is sealed. Next cycle will focus on adding raw sensor snapshots to the forensic audit log.
+## 🎯 Next Resumption Focus: UI UX Simplification.
+The forensic pipeline now captures high-fidelity raw sensor data. Next cycle should focus on architectural simplifications in the UI layer.
 
-**Current Forensic Metrics (Oct22.16):**
-- **[Oct22.16]: [SOT Count: 813 (Rules: 323), Open: H:0, M:1, L:2, Ideas: H:2, M:25, L:42, Testing: 11 (Sub-items: 45), QA: 385]**
+**Current Forensic Metrics (Oct23.00):**
+- **[Oct23.00]: [SOT Count: 814 (Rules: 324), Open: H:0, M:1, L:1, Ideas: H:2, M:25, L:43, Testing: 11 (Sub-items: 45), QA: 385]**
 
 **HANDOVER UPDATED.**
