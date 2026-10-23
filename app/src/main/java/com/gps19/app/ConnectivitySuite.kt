@@ -24,15 +24,14 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct23.120:
+ * - ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps. Updated 
+ *   emitViolation() and violation_relay handler to propagate isJammingCandidate.
  * Oct23.109:
  * - ISSUE-OCT23.102-F9: Telemetry Flyweight Race Condition Remediation. Replaced 
  *   shared member flyweights with local instances in processing paths. 
  *   Migrated coordinate reconstruction state and local telemetry to atomic 
  *   structures to ensure thread safety across concurrent signaling events.
- * Oct.22.13:
- * - ISSUE-OCT22.0-F4: Telemetry Sync failure remediation. Added "violation_relay" 
- *   handler to mirror remote tracker violations on Viewer. Implemented 
- *   emitViolation() for Tracker-to-Viewer propagation.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -653,8 +652,9 @@ class ConnectivitySuite @Inject constructor(
                     val lng = data.optDouble("lng", 0.0)
                     val acc = data.optDouble("accuracy", 0.0)
                     val maxAcc = data.optDouble("max_accuracy", 0.0)
+                    val isJamming = data.optBoolean("is_jamming_candidate", false)
                     if (lat != 0.0) {
-                        mainRepository.addViolation(lat, lng, violationType, acc, maxAcc, timestamp = data.optLong("ts", now))
+                        mainRepository.addViolation(lat, lng, violationType, acc, maxAcc, timestamp = data.optLong("ts", now), isJammingCandidate = isJamming)
                     }
                 }
             }
@@ -830,7 +830,7 @@ class ConnectivitySuite @Inject constructor(
         }
     }
 
-    fun emitViolation(type: String, lat: Double, lng: Double, acc: Double, maxAcc: Double) {
+    fun emitViolation(type: String, lat: Double, lng: Double, acc: Double, maxAcc: Double, isJammingCandidate: Boolean = false) {
         if (!isTrackerMode || !isConnected || isStopped.get()) return
         
         val payload = JSONObject().apply {
@@ -842,10 +842,11 @@ class ConnectivitySuite @Inject constructor(
             put("lng", lng)
             put("accuracy", acc)
             put("max_accuracy", maxAcc)
+            put("is_jamming_candidate", isJammingCandidate)
             put("ts", timeProvider.currentTimeMillis)
         }
         signalingProvider.emit("violation_event", payload, SignalingPriority.HIGH)
-        Timber.i("Signaling: Emitted violation event to Viewer: $type")
+        Timber.i("Signaling: Emitted violation event to Viewer: $type [Jamming: $isJammingCandidate]")
     }
 
     fun resetPeerStats() {

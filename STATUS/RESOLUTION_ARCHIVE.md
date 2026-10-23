@@ -1,4 +1,25 @@
-# Resolution Archive - GPS Tracker (Oct23.109)
+# Resolution Archive - GPS Tracker (Oct23.121)
+
+## ISSUE-OCT23.101-F4: Violation Persistence Integrity Remediation (Oct23.121)
+- **Resolved**: Oct23.121
+- **Description**: `isJammingCandidate` was missing from violation reporting and persistence paths, leading to potential loss of critical forensic metadata during jammer detection events.
+- **Remediation**:
+    - Updated `ViolationPoint` UI model and `ViolationEntity` to include `isJammingCandidate`.
+    - Hardened `MainRepository.addViolation` and its mapping logic to store/retrieve the flag.
+    - Updated `ConnectivitySuite.emitViolation` and `violation_relay` signaling handler to propagate the flag.
+    - Updated `ServiceForensicUseCase` and `AppAlarmManager` to pass the flag from the evaluation engine to the repository and signaling layers.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 823).
+
+## ISSUE-OCT23.101-F3: Stationary Duration Propagation Remediation (Oct23.120)
+- **Resolved**: Oct23.120
+- **Description**: `stationary_duration_ms` was serialized in `toMap()` but ignored in all deserialization and persistence paths, causing duty-cycle logic (e.g., adaptive acoustic intervals) to fail after peer updates or offline restoration.
+- **Remediation**:
+    - Updated `app_settings.proto` to include `stationary_duration_ms` in `RealtimeStatus` and `TrackerStatusProto`.
+    - Extended `LogEntity`, `HistoryEntity`, and `PendingStatusEntity` in `Database.kt` with `stationaryDurationMs`.
+    - Incremented Room database version to `87` and implemented `MIGRATION_86_87`.
+    - Hardened `TelemetryMapper.kt` and `TelemetryProtobufMapper.kt` to synchronize `stationaryDurationMs` across all signaling (JSON/Proto), persistence, and engine mapping paths.
+    - Synchronized `EngineConnectionPoint` and `SystemHealthState` in `:core:engine` to preserve hysteresis state during evaluations.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 822).
 
 ## ISSUE-OCT23.102-F9: Telemetry Flyweight Race Condition (Oct23.109)
 - **Resolved**: Oct23.109
@@ -27,7 +48,7 @@
 
 ## ISSUE-OCT23.101-F2: JSON Mapping State Overwrite (Oct23.106)
 - **Resolved**: Oct23.106
-- **Description**: `TelemetryMapper.kt` overwrote multiple fields with hardcoded defaults (e.g., `-1.0` for `proximityCm`, `0` for `rtt`) in `mapJsonToStatus` instead of preserving current cached values when keys were missing in JSON.
+- **Description**: `TelemetryMapper.kt` overwrote multiple fields with hardcoded defaults (e.g., `-1.0` for `proximityCm`, `0` for `rtt`) in `mapJsonToStatus` instead of preserving current cached values when keys are missing in JSON.
 - **Remediation**: Hardened `mapJsonToStatus` and `mapJsonToSnapshot` to use the `current` state as fallback for all optional telemetry fields (proximity, rtt, snapshots, battery flags, etc.).
 - **Outcome**: 🟢 **PASSED**. (SOT ID 818).
 

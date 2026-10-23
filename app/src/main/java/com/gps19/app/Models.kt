@@ -11,16 +11,13 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.23.120:
+ * - ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps. Added 
+ *   isJammingCandidate to ViolationPoint for UI parity.
+ * - ISSUE-OCT23.101-F3: Added stationaryDurationMs to ConnectionPoint for hysteresis parity.
  * Oct.22.16:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added luxSnapshot and 
  *   acousticSnapshot delegates to ConnectionPoint and LogEntry for parity.
- * Oct.22.15:
- * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added violationPercentage and 
- *   isJammingCandidate to ConnectionPoint and LogEntry for parity.
- * Oct.16.0:
- * - SIMP-OCT15.21-S1: Immutable Ribbon Normals. Introduced RibbonNormals to 
- *   ConnectionPoint to move normalization to the ingestion point (TelemetryMapper).
- *   Ensures HistoryBuffer uses pre-calculated, immutable arrays.
  */
 
 @Serializable
@@ -606,6 +603,7 @@ class ConnectionPoint(
     var isGnssThrottled: Boolean = false,
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
+    var stationaryDurationMs: Long = 0L,
     var activityType: ActivityType = ActivityType.UNKNOWN,
     val ribbons: RibbonNormals = RibbonNormals(),
     val forensic: ForensicSnapshot = ForensicSnapshot()
@@ -666,6 +664,7 @@ class ConnectionPoint(
         this.isGnssThrottled = other.isGnssThrottled
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
+        this.stationaryDurationMs = other.stationaryDurationMs
         this.activityType = other.activityType
         this.ribbons.copyFrom(other.ribbons)
         this.forensic.copyFrom(other.forensic)
@@ -685,8 +684,9 @@ class ConnectionPoint(
                violationPercentage == other.violationPercentage &&
                gpsHardwareLock == other.gpsHardwareLock && isAnchorLocked == other.isAnchorLocked &&
                isGnssThrottled == other.isGnssThrottled && thermalHeadroom == other.thermalHeadroom && 
-               heapAllocatedMb == other.heapAllocatedMb && activityType == other.activityType &&
-               forensic.snr == other.forensic.snr && forensic.vibe == other.forensic.vibe &&
+               heapAllocatedMb == other.heapAllocatedMb && stationaryDurationMs == other.stationaryDurationMs &&
+               activityType == other.activityType &&
+               forensic.snr == other.forensic.snr && forensic.vibe == other.vibeSnapshot &&
                forensic.thermal == other.forensic.thermal && forensic.heap == other.forensic.heap &&
                forensic.lux == other.forensic.lux && forensic.acoustic == other.forensic.acoustic &&
                forensic.isSuspiciousNoise == other.forensic.isSuspiciousNoise &&
@@ -708,7 +708,7 @@ class ConnectionPoint(
         isSilentFailure = false; isUltraLongStationary = false; violationUptimeMs = 0L
         violationPercentage = 0.0
         gpsHardwareLock = false; isAnchorLocked = false; isGnssThrottled = false
-        thermalHeadroom = 0.0; heapAllocatedMb = 0.0; activityType = ActivityType.UNKNOWN
+        thermalHeadroom = 0.0; heapAllocatedMb = 0.0; stationaryDurationMs = 0L; activityType = ActivityType.UNKNOWN
         ribbons.reset()
         forensic.reset()
     }
@@ -724,7 +724,8 @@ class ViolationPoint(
     var type: String = "", 
     var ts: Long = 0,
     var accuracy: Double = 0.0,
-    var maxAccuracy: Double = 0.0
+    var maxAccuracy: Double = 0.0,
+    var isJammingCandidate: Boolean = false
 ) {
     private var _cachedGeoPoint: GeoPoint? = null
     fun toGeoPoint(): GeoPoint {
@@ -735,6 +736,7 @@ class ViolationPoint(
     fun copyFrom(other: ViolationPoint) {
         this.localId = other.localId; this.lat = other.lat; this.lng = other.lng; this.type = other.type
         this.ts = other.ts; this.accuracy = other.accuracy; this.maxAccuracy = other.maxAccuracy
+        this.isJammingCandidate = other.isJammingCandidate
     }
 
     /**
@@ -742,7 +744,8 @@ class ViolationPoint(
      */
     fun contentEquals(other: ViolationPoint): Boolean {
         return lat == other.lat && lng == other.lng && type == other.type && 
-               ts == other.ts && accuracy == other.accuracy && maxAccuracy == other.maxAccuracy
+               ts == other.ts && accuracy == other.accuracy && maxAccuracy == other.maxAccuracy &&
+               isJammingCandidate == other.isJammingCandidate
     }
 }
 

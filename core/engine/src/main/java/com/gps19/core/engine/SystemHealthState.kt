@@ -4,6 +4,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Oct.23.110:
+ * - ISSUE-OCT23.101-F3: Added stationaryDurationMs for hysteresis parity.
  * Oct.22.16:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added luxSnapshot and 
  *   acousticSnapshot delegates and updated update() signature.
@@ -123,7 +125,8 @@ class SystemHealthState(
     var lastEnergyDeltaTemp: Double = 0.0,
     var lastEnergyDurationMs: Long = 0L,
     var tamperNote: String? = null,
-    var activityType: ActivityType = ActivityType.UNKNOWN
+    var activityType: ActivityType = ActivityType.UNKNOWN,
+    var stationaryDurationMs: Long = 0L
 ) : Locatable {
 
     var thermalSnapshot: Double?
@@ -248,6 +251,7 @@ class SystemHealthState(
         this.lastEnergyDurationMs = other.lastEnergyDurationMs
         this.tamperNote = other.tamperNote
         this.activityType = other.activityType
+        this.stationaryDurationMs = other.stationaryDurationMs
     }
 
     fun update(
@@ -273,7 +277,8 @@ class SystemHealthState(
         luxSnapshot: Double? = null, acousticSnapshot: Double? = null,
         isSuspiciousNoise: Boolean = false, isMemoryPressureThrottled: Boolean = false,
         isJammingCandidate: Boolean = false,
-        activityType: ActivityType = ActivityType.UNKNOWN
+        activityType: ActivityType = ActivityType.UNKNOWN,
+        stationaryDurationMs: Long = 0L
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -335,6 +340,7 @@ class SystemHealthState(
         this.tamperNote = tamperNote
         this.coolingEnteredRt = coolingEnteredRt
         this.activityType = activityType
+        this.stationaryDurationMs = stationaryDurationMs
     }
     
     fun reset() {
@@ -433,5 +439,6 @@ class SystemHealthState(
         lastEnergyDurationMs = 0L
         tamperNote = null
         activityType = ActivityType.UNKNOWN
+        stationaryDurationMs = 0L
     }
 }

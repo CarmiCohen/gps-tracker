@@ -30,12 +30,13 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct23.120:
+ * - ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps. Updated 
+ *   addViolation() and violationsFlow mapping to propagate and store 
+ *   isJammingCandidate in ViolationEntity and ViolationPoint.
  * Oct.20.25:
  * - Maintenance: Restored full role-based API surface and debouncing logic to 
  *   resolve build regressions while preserving deterministic flush hooks.
- * Oct.20.24:
- * - ISSUE-OCT20.23-F2: Added flushTrails() for deterministic testing.
- *   Updated clearLogs() to be suspend.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -120,7 +121,7 @@ class MainRepository @Inject constructor(
     }.flowOn(Dispatchers.Default)
 
     val violationsFlow: Flow<List<ViolationPoint>> = violationDao.getAllFlow().map { entities -> 
-        entities.map { ViolationPoint(lat = it.lat, lng = it.lng, type = it.type, ts = it.ts, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy) }
+        entities.map { ViolationPoint(lat = it.lat, lng = it.lng, type = it.type, ts = it.ts, accuracy = it.accuracy, maxAccuracy = it.maxAccuracy, isJammingCandidate = it.isJammingCandidate) }
     }.flowOn(Dispatchers.Default)
 
     private val _uiCommands = MutableSharedFlow<UiCommand>(
@@ -368,13 +369,13 @@ class MainRepository @Inject constructor(
         settings.resetStatsBulk(); clearTrails(); historyDao.clearAll(); logRepository.clearLogs(); offlineRepository.clear()
     }
 
-    fun addViolation(lat: Double, lng: Double, type: String, accuracy: Double = 0.0, maxAccuracy: Double = 0.0, adaptiveRadius: Double = 0.0, timestamp: Long? = null) {
+    fun addViolation(lat: Double, lng: Double, type: String, accuracy: Double = 0.0, maxAccuracy: Double = 0.0, adaptiveRadius: Double = 0.0, timestamp: Long? = null, isJammingCandidate: Boolean = false) {
         val health = telemetryRepository.systemHealth.value
         if (!PersistencePolicy.shouldSaveViolation(health)) return
         if (!violationProcessor.shouldRecordViolation(lat, lng, type, accuracy, maxAccuracy)) return
         val wallTs = timestamp ?: timeProvider.currentTimeMillis
         val job = scope.launch { 
-            violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy))
+            violationDao.insert(ViolationEntity(lat = lat, lng = lng, type = type, ts = wallTs, accuracy = accuracy, maxAccuracy = maxAccuracy, isJammingCandidate = isJammingCandidate))
             if (metrics.violationWriteCount.incrementAndGet() >= DB_PRUNE_THRESHOLD_TRAIL) {
                 metrics.violationWriteCount.set(0); triggerBackgroundPruning()
             }

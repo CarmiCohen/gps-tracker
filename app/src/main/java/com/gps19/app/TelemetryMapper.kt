@@ -6,6 +6,9 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.23.120:
+ * - ISSUE-OCT23.101-F3: Missing Stationary Duration Propagation. Added 
+ *   stationaryDurationMs to all mapping paths (JSON, Proto, Persistence, Engine).
  * Oct23.108:
  * - ISSUE-OCT23.102-F8: Protobuf Default Value Pollution. Updated mapProtoToStatus,
  *   mapProtoToSnapshot, and mapProtoToApp to use hasField() checks for all optional
@@ -14,23 +17,6 @@ import timber.log.Timber
  * - ISSUE-OCT23.101-F2: JSON Mapping State Overwrite. Fixed mapJsonToStatus 
  *   and mapJsonToSnapshot to preserve current cached values (proximityCm, 
  *   rtt, snapshots, battery flags, etc.) when keys are missing in JSON.
- * Oct.22.16:
- * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Synchronized luxSnapshot and 
- *   acousticSnapshot across all paths (Snapshot, Status, Health, App).
- *   Synchronized rtt in mapStatusToPending/mapPendingToStatus. 
- *   Synchronized violationPercentage in mapAppToEntity, mapProtoToApp and 
- *   mapEntityToApp (fallback).
- * Oct.22.15:
- * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Synchronized isJammingCandidate 
- *   across all paths (Snapshot, Status, App, Entity). Added violationPercentage 
- *   to persistence entities.
- * Oct.22.14:
- * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Synchronized proximity_cm, 
- *   proximity_debounce_ms, adaptive_vibration_floor and violation_percentage 
- *   in mapProtoToSnapshot and mapProtoToStatus for full parity.
- * Oct.22.13:
- * - ISSUE-OCT22.0-F4: Fixed Forensic Propagation. Added missing noise_idx, 
- *   lux_idx, temp, proximity_cm, rtt, and violation fields.
  */
 object TelemetryMapper {
 
@@ -183,6 +169,7 @@ object TelemetryMapper {
                 if (proto.hasVibration()) vibration = proto.vibration
                 if (proto.hasVibrationRollingSum()) vibrationRollingSum = proto.vibrationRollingSum
                 if (proto.hasProximityCm()) proximityCm = proto.proximityCm
+                if (proto.hasStationaryDurationMs()) stationaryDurationMs = proto.stationaryDurationMs
             }
 
             integrity.apply {
@@ -323,6 +310,7 @@ object TelemetryMapper {
                 liftIdx = data.optDouble("lift_idx", current.atmospheric.liftIdx)
                 tiltIdx = data.optDouble("tilt_idx", current.atmospheric.tiltIdx)
                 baroIdx = data.optDouble("baro_idx", current.atmospheric.baroIdx)
+                stationaryDurationMs = data.optLong("stationary_duration_ms", current.atmospheric.stationaryDurationMs)
             }
 
             integrity.apply {
@@ -458,6 +446,7 @@ object TelemetryMapper {
 
                 if (proto.hasProximityDebounceMs()) proximityDebounceMs = clampProxDebounce(proto.proximityDebounceMs)
                 if (proto.hasAdaptiveVibrationFloor()) adaptiveVibrationFloor = clampVibrationFloor(proto.adaptiveVibrationFloor)
+                if (proto.hasStationaryDurationMs()) stationaryDurationMs = proto.stationaryDurationMs
             }
             
             this.thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
@@ -539,6 +528,7 @@ object TelemetryMapper {
                 acousticFloorDb = data.optDouble("acoustic_floor_db", current.atmospheric.acousticFloorDb)
                 vibration = data.optDouble("vibration", current.atmospheric.vibration)
                 vibrationRollingSum = data.optDouble("vibration_rolling_sum", current.atmospheric.vibrationRollingSum)
+                stationaryDurationMs = data.optLong("stationary_duration_ms", current.atmospheric.stationaryDurationMs)
 
                 proximityDebounceMs = clampProxDebounce(data.optLong("proximity_debounce_ms", current.atmospheric.proximityDebounceMs))
                 adaptiveVibrationFloor = clampVibrationFloor(data.optDouble("adaptive_vibration_floor", current.atmospheric.adaptiveVibrationFloor))
@@ -629,7 +619,8 @@ object TelemetryMapper {
             isSuspiciousNoise = snapshot.isSuspiciousNoise,
             isMemoryPressureThrottled = snapshot.isMemoryPressureThrottled,
             isJammingCandidate = snapshot.isJammingCandidate,
-            activityType = snapshot.activityType
+            activityType = snapshot.activityType,
+            stationaryDurationMs = snapshot.atmospheric.stationaryDurationMs
         )
         health.proximityDebounceMs = clampProxDebounce(snapshot.proximityDebounceMs)
         health.proximityCm = snapshot.proximityCm
@@ -757,6 +748,7 @@ object TelemetryMapper {
             ioWait = p.ioWait; maxIoLatency = p.maxIoLatency; isSilentFailure = p.isSilentFailure
             thermalHeadroom = p.thermalHeadroom; heapAllocatedMb = p.heapAllocatedMb
             activityType = p.activityType
+            stationaryDurationMs = p.stationaryDurationMs
             thermalSnapshot = p.thermalSnapshot
             heapSnapshot = p.heapSnapshot
             luxSnapshot = p.forensic.lux
@@ -825,6 +817,8 @@ object TelemetryMapper {
             if (proto.hasActivityType()) {
                 activityType = try { ActivityType.valueOf(proto.activityType) } catch (e: Exception) { ActivityType.UNKNOWN }
             }
+            if (proto.hasStationaryDurationMs()) stationaryDurationMs = proto.stationaryDurationMs
+
             thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
             heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
             luxSnapshot = if (proto.hasLuxSnapshot()) proto.luxSnapshot else null
@@ -886,6 +880,7 @@ object TelemetryMapper {
             activityType = try { 
                 ActivityType.valueOf(entity.activityType) 
             } catch (e: Exception) { ActivityType.UNKNOWN }
+            stationaryDurationMs = entity.stationaryDurationMs
             thermalSnapshot = null
             heapSnapshot = null
             luxSnapshot = entity.luxSnapshot
@@ -939,6 +934,7 @@ object TelemetryMapper {
             isJammingCandidate = p.isJammingCandidate,
             luxSnapshot = p.luxSnapshot,
             acousticSnapshot = p.acousticSnapshot,
+            stationaryDurationMs = p.stationaryDurationMs,
             payload = TelemetryProtobufMapper.mapAppToBinary(p)
         )
     }
@@ -986,6 +982,7 @@ object TelemetryMapper {
             rtt = status.rtt,
             luxSnapshot = status.luxSnapshot,
             acousticSnapshot = status.acousticSnapshot,
+            stationaryDurationMs = status.atmospheric.stationaryDurationMs,
             payload = TelemetryProtobufMapper.mapStatusToBinary(status)
         )
     }
@@ -1029,6 +1026,7 @@ object TelemetryMapper {
                 baroIdx = entity.baroIdx; proxIdx = entity.proxIdx
                 proximityDebounceMs = 0L
                 adaptiveVibrationFloor = clampVibrationFloor(INITIAL_VIBRATION_FLOOR)
+                stationaryDurationMs = entity.stationaryDurationMs
             }
 
             integrity.apply {

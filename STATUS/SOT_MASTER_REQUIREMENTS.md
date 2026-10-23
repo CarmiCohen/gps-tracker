@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct23.109)
+# SOT Master Requirements & Hardening Status (Oct23.121)
 
-## 🏗️ Architectural Master Rules (331 Rules)
+## 🏗️ Architectural Master Rules (333 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -25,8 +25,12 @@
 *   **1.256 Delta Drift Prevention (R-ID 625)**: `TelemetryProtobufMapper` MUST perform a periodic absolute coordinate refresh (every 50 packets) to prevent permanent coordinate drift in delta-compressed signaling streams. (Oct23.107 - ISSUE-OCT23.102-F7).
 *   **1.257 Protobuf State Protection (R-ID 626)**: Telemetry mapping MUST utilize hasField() checks for all optional Protobuf scalar fields to prevent default value pollution during deserialization. (Oct23.108 - ISSUE-OCT23.102-F8).
 *   **1.258 Concurrency-Safe Telemetry Processing (R-ID 627)**: `ConnectivitySuite` MUST NOT utilize shared member flyweights for telemetry processing; local instances or thread-safe atomic references MUST be used to prevent data corruption during concurrent signaling events. (Oct23.109 - ISSUE-OCT23.102-F9).
+*   **1.259 Hysteresis State Parity (R-ID 628)**: The system MUST synchronize `stationaryDurationMs` across all signaling (JSON/Protobuf) and persistence (Room/Log) layers to ensure consistent sensor evaluation and duty-cycle logic across peer and offline states. (Oct23.120 - ISSUE-OCT23.101-F3).
+*   **1.260 Violation Integrity Propagation (R-ID 629)**: Violation events MUST propagate the `isJammingCandidate` flag through all reporting and persistence layers (Repository, Room, Signaling) to ensure high-fidelity historical analysis on the Viewer. (Oct23.121 - ISSUE-OCT23.101-F4).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 823**: Violation Persistence Integrity Remediation - PASSED. Synchronized `isJammingCandidate` across violation reporting and persistence layers (R-ID 629). (Oct23.121 - ISSUE-OCT23.101-F4).
+*   **SOT ID 822**: Stationary Duration Propagation Remediation - PASSED. Synchronized `stationaryDurationMs` across Protobuf, JSON, and Room persistence layers (R-ID 628). (Oct23.120 - ISSUE-OCT23.101-F3).
 *   **SOT ID 821**: Telemetry Flyweight Race Condition Remediation - PASSED. Replaced shared flyweights in `ConnectivitySuite.kt` with local instances and atomic references to ensure concurrency safety. (Oct23.109 - ISSUE-OCT23.102-F9).
 *   **SOT ID 820**: Protobuf Default Value Pollution Remediation - PASSED. Applied `optional` keyword to scalar fields in `app_settings.proto` and hardened `TelemetryMapper.kt` with `hasField()` checks. (Oct23.108 - ISSUE-OCT23.102-F8).
 *   **SOT ID 819**: Delta Compression Drift Prevention - PASSED. Implemented periodic absolute coordinate refresh in `TelemetryProtobufMapper` (R-ID 625). (Oct23.107 - ISSUE-OCT23.102-F7).
@@ -43,7 +47,7 @@
 
 ## ✅ Verification Chapters
 *   **Chapter 4.2 (Signaling Protocol Hardening)**: PASSED - Remediation of telemetry flyweight race condition (Oct23.109), Protobuf default pollution (Oct23.108) and delta drift prevention (Oct23.107).
-*   **Chapter 4.0 (Telemetry Continuity Audit)**: PARTIALLY REMEDIATED - Resolved logic gaps in TelemetryMerger (Oct23.105) and mapping in TelemetryMapper (Oct23.106). (Oct23.106).
+*   **Chapter 4.0 (Telemetry Continuity Audit)**: PASSED - Resolved logic gaps in TelemetryMerger (Oct23.105), mapping in TelemetryMapper (Oct23.106), stationary duration propagation (Oct23.120), and violation integrity (Oct23.121). (Oct23.121).
 *   **Chapter 4.1 (Build & Infrastructure Audit)**: PASSED - Verified JVM 17 alignment, Hilt Test compatibility, and Broadcast Export security. (Oct24.00).
 *   **Chapter 3.0 (Signaling Identity Audit)**: PASSED - Enforced strict symmetry in SignalingValidator; verified pulse/ping/pong isolation. (Oct22.12).
 *   **Chapter 2.9 (Overlay Lifecycle Audit)**: PASSED - Verified BackHandler interception and Exit authority in Phone Setup. Migrated to Composition Local in Oct23.100. (Oct23.100).

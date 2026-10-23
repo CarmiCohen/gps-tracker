@@ -6,6 +6,8 @@ import java.util.concurrent.ConcurrentHashMap
 
 /**
  * EngineModels: Data structures for the core tracking engine.
+ * Oct.23.110:
+ * - ISSUE-OCT23.101-F3: Added stationaryDurationMs to EngineConnectionPoint for propagation.
  * Oct.23.00:
  * - ISSUE-OCT22.16-F1: Added luxSnapshot and acousticSnapshot delegates to 
  *   EngineConnectionPoint for raw sensor parity.
@@ -145,6 +147,7 @@ class EngineConnectionPoint(
     var violationPercentage: Double = 0.0,
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
+    var stationaryDurationMs: Long = 0L,
     var activityType: ActivityType = ActivityType.UNKNOWN,
     val forensic: ForensicSnapshot = ForensicSnapshot()
 ) {
@@ -193,6 +196,7 @@ class EngineConnectionPoint(
         this.isUltraLongStationary = other.isUltraLongStationary; this.violationUptimeMs = other.violationUptimeMs
         this.violationPercentage = other.violationPercentage
         this.thermalHeadroom = other.thermalHeadroom; this.heapAllocatedMb = other.heapAllocatedMb
+        this.stationaryDurationMs = other.stationaryDurationMs
         this.activityType = other.activityType
         this.forensic.copyFrom(other.forensic)
     }

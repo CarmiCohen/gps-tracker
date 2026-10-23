@@ -1,21 +1,21 @@
 git add .
-git commit -m "Remediation: Resolved ISSUE-OCT23.102-F9. Telemetry Flyweight Race Condition (R-ID 627). Migrated ConnectivitySuite to local instances and atomic references for thread safety. Oct23.109."
-git tag -a Oct23.109 -m "Oct23.109 Remediation Baseline"
-git push origin Oct23.109
+git commit -m "Remediation: Resolved ISSUE-OCT23.101-F4. Violation Persistence Integrity Gaps. Propagated isJammingCandidate across repository, database, and signaling layers. Oct23.121."
+git tag -a Oct23.121 -m "Oct23.121 Remediation Baseline"
+git push origin Oct23.121
 
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct23.109
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct23.121
 
-## 🎯 Current Resumption Focus: Remediation of ISSUE-OCT23.101-F3 (Missing Stationary Duration Propagation).
+## 🎯 Current Resumption Focus: Remediation of ISSUE-OCT23.101-F6 (Offline Violation Event Sync).
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   **ISSUE-OCT23.101-F3: Missing Stationary Duration Propagation (Medium).** `stationary_duration_ms` is serialized in `toMap()` but ignored in all deserialization (`mapJsonToStatus`, `mapProtoToStatus`) paths.
-*   **ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps (Medium).** `MainRepository.addViolation` and `ConnectivitySuite.emitViolation` fail to propagate or store the `isJammingCandidate` field added to `ViolationEntity` in v85.
 *   **ISSUE-OCT23.101-F6: Offline Violation Event Sync (Low).** Discrete violation markers emitted via `emitViolation` are real-time only and are not buffered or synchronized after recovery from an offline state.
 *   **SIMP-OCT22.0-S1: Settings Validation Centralization (Medium).** Move identity uniqueness and regex validation to a pure `ConfigValidator`.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 77)
+## 💡 Strategic Simplification Ideas (Ideas: 79)
+*   **SIMP-OCT23.121-S1: Violation Event Buffering (Medium).** Implement a local buffer for `violation_event` signaling to enable reliable delivery after network recovery.
+*   **SIMP-OCT23.120-S1: Database Schema Migration Automation (Low).** Explore automated Room schema export verification to prevent manual SQL drift during forensic field expansion.
 *   **SIMP-OCT23.109-S1: Atomic Telemetry Accessors (Low).** Refactor `ConnectivitySuite` to use `AtomicReference` for all transient peer states to further reduce boilerplate in atomic update blocks.
 *   **SIMP-OCT23.108-S1: Protobuf Mapping Boilerplate Reduction (Medium).** Utilize a generated mapping layer or generic field visitor to reduce the manual `hasField()` boilerplate in `TelemetryMapper.kt`.
 *   **SIMP-OCT23.107-S1: Signaling Refresh Strategy Pattern (Medium).** Encapsulate delta-reset logic (spatial jump vs. temporal/packet frequency) into a dedicated `SignalingStrategy` to decouple `TelemetryProtobufMapper` from specific optimization thresholds.
@@ -28,6 +28,8 @@ git push origin Oct23.109
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps.** Resolved Oct23.121. Synchronized `isJammingCandidate` across violation reporting, signaling (JSON), and persistence layers (Room) for full forensic parity. (SOT ID 823).
+*   **ISSUE-OCT23.101-F3: Missing Stationary Duration Propagation.** Resolved Oct23.120. Synchronized `stationaryDurationMs` across Protobuf schemas, TelemetryMapper (JSON/Proto), Room entities, and Database migrations. (SOT ID 822).
 *   **ISSUE-OCT23.102-F9: Telemetry Flyweight Race Condition.** Resolved Oct23.109. Replaced shared flyweights in `ConnectivitySuite.kt` with local instances and atomic references to ensure concurrency safety. (SOT ID 821).
 *   **ISSUE-OCT23.102-F8: Protobuf Default Value Pollution.** Resolved Oct23.108. Applied `optional` keyword to all scalar fields in `app_settings.proto` and hardened `TelemetryMapper.kt` with `hasField()` checks to prevent state regression. (SOT ID 820).
 *   **ISSUE-OCT23.102-F7: Delta Compression Drift Prevention.** Resolved Oct23.107. Implemented periodic absolute coordinate refresh (every 50 packets) in `TelemetryProtobufMapper` (R-ID 625) to prevent permanent drift. (SOT ID 819).
@@ -43,6 +45,8 @@ git push origin Oct23.109
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct23.121: [SOT Count: 823 (Rules: 333), Open: H:0, M:1, L:1, Ideas: H:3, M:29, L:47, Testing: 11 (Sub-items: 45), QA: 385]**
+- **Oct23.120: [SOT Count: 822 (Rules: 332), Open: H:0, M:2, L:1, Ideas: H:3, M:29, L:46, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct23.109: [SOT Count: 821 (Rules: 331), Open: H:0, M:2, L:1, Ideas: H:3, M:29, L:45, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct23.108: [SOT Count: 820 (Rules: 330), Open: H:1, M:3, L:1, Ideas: H:3, M:29, L:44, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct23.107: [SOT Count: 819 (Rules: 329), Open: H:2, M:3, L:1, Ideas: H:3, M:28, L:44, Testing: 11 (Sub-items: 45), QA: 385]**

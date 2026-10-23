@@ -13,12 +13,12 @@ import javax.inject.Singleton
 
 /**
  * AppAlarmManager: Evaluates system health and manages siren states.
+ * Oct.23.120:
+ * - ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps. Updated 
+ *   evaluateAlarms() to propagate isJammingCandidate to forensicUseCase.
  * Oct.22.13:
  * - ISSUE-OCT22.0-F4: Telemetry Sync Hardening. Integrated ServiceForensicUseCase 
  *   to ensure violation markers are recorded and propagated during evaluation.
- * Oct.16.8:
- * - ISSUE-OCT16.8-F2: Role Transition Grace Hardening. Added 30s startup grace 
- *   to shouldPlaySiren() and fixed isTrackerMode synchronization in resetEvaluation.
  */
 @Singleton
 class AppAlarmManager @Inject constructor(
@@ -306,7 +306,8 @@ class AppAlarmManager @Inject constructor(
                 accuracy = update.kinetic.accuracy,
                 maxTrackerAccuracy = update.kinetic.maxAccuracy,
                 activeViolations = activeViolations,
-                unresolvedAlarms = unresolvedAlarms
+                unresolvedAlarms = unresolvedAlarms,
+                isJammingCandidate = update.integrity.isJammingCandidate
             )
         }
 

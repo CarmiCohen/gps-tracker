@@ -5,6 +5,8 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.23.110:
+ * - ISSUE-OCT23.101-F3: Added stationaryDurationMs to all paths for hysteresis parity.
  * Oct23.107:
  * - ISSUE-OCT23.102-F7: Implemented periodic absolute coordinate refresh 
  *   (every DELTA_REFRESH_INTERVAL packets) in mapToRealtime to prevent delta drift.
@@ -221,6 +223,9 @@ object TelemetryProtobufMapper {
 
         // Oct.22.15: Jammer Discrimination Parity
         builder.setIsJammingCandidate(status.isJammingCandidate)
+
+        // Oct.23.110: Hysteresis Parity
+        builder.setStationaryDurationMs(status.stationaryDuration)
     }
 
     /**
@@ -373,6 +378,9 @@ object TelemetryProtobufMapper {
 
         // Oct.22.15: Jammer Discrimination Parity
         builder.setIsJammingCandidate(status.isJammingCandidate)
+
+        // Oct.23.110: Hysteresis Parity
+        builder.setStationaryDurationMs(status.stationaryDuration)
     }
 
     /**
@@ -409,7 +417,10 @@ object TelemetryProtobufMapper {
         p.snrSnapshot?.let { builder.setSnrSnapshot(PhysicsUtils.safeDouble(it)) }
         p.vibeSnapshot?.let { builder.setVibeSnapshot(PhysicsUtils.safeDouble(it)) }
         p.thermalSnapshot?.let { builder.setThermalSnapshot(PhysicsUtils.safeDouble(it)) }
-        p.heapSnapshot?.let { builder.setHeapSnapshot(PhysicsUtils.safeDouble(it)) }
+        
+        val heap = p.heapSnapshot
+        if (heap != null) builder.setHeapSnapshot(PhysicsUtils.safeDouble(heap))
+
         p.luxSnapshot?.let { builder.setLuxSnapshot(PhysicsUtils.safeDouble(it)) }
         p.acousticSnapshot?.let { builder.setAcousticSnapshot(PhysicsUtils.safeDouble(it)) }
 
@@ -423,5 +434,8 @@ object TelemetryProtobufMapper {
         // Oct.22.16 Parity
         builder.setViolationPercentage(PhysicsUtils.safeDouble(p.violationPercentage))
         builder.setIsJammingCandidate(p.isJammingCandidate)
+
+        // Oct.23.110: Hysteresis Parity
+        builder.setStationaryDurationMs(p.stationaryDurationMs)
     }
 }

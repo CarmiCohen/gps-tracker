@@ -8,6 +8,9 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Oct.23.110:
+ * - ISSUE-OCT23.101-F3: Added stationaryDurationMs to LogEntity, HistoryEntity, 
+ *   and PendingStatusEntity for hysteresis parity. Incremented version to 87.
  * Oct.22.16:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added luxSnapshot and 
  *   acousticSnapshot to LogEntity, HistoryEntity, and PendingStatusEntity 
@@ -65,7 +68,8 @@ data class LogEntity(
     val acousticSnapshot: Double? = null,
     val coolingSnapshot: Boolean? = null,
     val checksum: Long? = null,
-    @ColumnInfo(defaultValue = "0") val isJammingCandidate: Boolean = false
+    @ColumnInfo(defaultValue = "0") val isJammingCandidate: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val stationaryDurationMs: Long = 0L
 )
 
 data class ForensicSignature(
@@ -142,7 +146,8 @@ data class HistoryEntity(
     @ColumnInfo(defaultValue = "UNKNOWN") val activityType: String = "UNKNOWN",
     @ColumnInfo(defaultValue = "0") val isJammingCandidate: Boolean = false,
     val luxSnapshot: Double? = null,
-    val acousticSnapshot: Double? = null
+    val acousticSnapshot: Double? = null,
+    @ColumnInfo(defaultValue = "0") val stationaryDurationMs: Long = 0L
 )
 
 @Entity(tableName = "violations", indices = [Index(value = ["ts"])])
@@ -210,7 +215,8 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "0") val isJammingCandidate: Boolean = false,
     @ColumnInfo(defaultValue = "0") val rtt: Int = 0,
     val luxSnapshot: Double? = null,
-    val acousticSnapshot: Double? = null
+    val acousticSnapshot: Double? = null,
+    @ColumnInfo(defaultValue = "0") val stationaryDurationMs: Long = 0L
 )
 
 @Dao
@@ -333,7 +339,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 86, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 87, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -357,6 +363,17 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_86_87 = object : Migration(86, 87) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #ISSUE-OCT23.101-F3: Hysteresis Parity.
+                try {
+                    db.execSQL("ALTER TABLE logs ADD COLUMN stationaryDurationMs INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN stationaryDurationMs INTEGER NOT NULL DEFAULT 0")
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN stationaryDurationMs INTEGER NOT NULL DEFAULT 0")
+                } catch (e: Exception) {}
+            }
+        }
+
         val MIGRATION_85_86 = object : Migration(85, 86) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #ISSUE-OCT22.0-F4: Forensic Sync Hardening.
