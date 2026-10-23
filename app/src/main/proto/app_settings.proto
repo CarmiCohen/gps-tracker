@@ -132,177 +132,177 @@ enum LocationPendingReasonProto {
 }
 
 message LogicStateProto {
-    int64 first_violation_ts = 1;
-    int64 first_violation_rt = 2;
-    bool first_violation_was_jump = 3;
-    int32 distance_violation_counter = 4;
-    bool was_distance_violated = 5;
-    bool power_alarm_pending = 6;
-    int64 last_global_trigger_rt = 7;
-    int64 forensic_reliability_degradation_start_rt = 8;
-    int64 last_siren_stop_rt = 9;
-    int64 last_relay_online_rt = 10;
-    int64 last_relay_offline_rt = 11;
-    string boot_id = 12;
+    optional int64 first_violation_ts = 1;
+    optional int64 first_violation_rt = 2;
+    optional bool first_violation_was_jump = 3;
+    optional int32 distance_violation_counter = 4;
+    optional bool was_distance_violated = 5;
+    optional bool power_alarm_pending = 6;
+    optional int64 last_global_trigger_rt = 7;
+    optional int64 forensic_reliability_degradation_start_rt = 8;
+    optional int64 last_siren_stop_rt = 9;
+    optional int64 last_relay_online_rt = 10;
+    optional int64 last_relay_offline_rt = 11;
+    optional string boot_id = 12;
 }
 
 message RealtimeStatus {
-    string id = 1;
-    string viewer_id = 2;
-    bool from_viewer = 3;
-    double lat = 4;
-    double lng = 5;
-    double speed = 6;
-    double bearing = 7;
-    double accuracy = 8;
-    double max_accuracy = 9;
-    int32 battery = 10;
-    double temp = 11;
-    bool is_charging = 12;
-    int64 ts = 13;
-    int64 gps_ts = 14;
-    int32 sats_view = 15;
-    int32 sats_used = 16;
-    int64 uptime_ms = 17;
-    int32 rtt = 18;
-    int64 total_connected_ms = 19;
-    int64 session_connected_ms = 20;
-    int64 total_drop_ms = 21;
-    int64 max_drop_ms = 22;
-    int64 last_conn_ts = 24;
-    int64 last_disc_ts = 25;
-    bool is_historical = 26;
-    double alt = 27;
+    optional string id = 1;
+    optional string viewer_id = 2;
+    optional bool from_viewer = 3;
+    optional double lat = 4;
+    optional double lng = 5;
+    optional double speed = 6;
+    optional double bearing = 7;
+    optional double accuracy = 8;
+    optional double max_accuracy = 9;
+    optional int32 battery = 10;
+    optional double temp = 11;
+    optional bool is_charging = 12;
+    optional int64 ts = 13;
+    optional int64 gps_ts = 14;
+    optional int32 sats_view = 15;
+    optional int32 sats_used = 16;
+    optional int64 uptime_ms = 17;
+    optional int32 rtt = 18;
+    optional int64 total_connected_ms = 19;
+    optional int64 session_connected_ms = 20;
+    optional int64 total_drop_ms = 21;
+    optional int64 max_drop_ms = 22;
+    optional int64 last_conn_ts = 24;
+    optional int64 last_disc_ts = 25;
+    optional bool is_historical = 26;
+    optional double alt = 27;
 
-    TrackerStateProto state = 28;
+    optional TrackerStateProto state = 28;
     reserved 29;
-    bool is_location_pending = 30;
-    LocationPendingReasonProto pending_reason = 31;
+    optional bool is_location_pending = 30;
+    optional LocationPendingReasonProto pending_reason = 31;
 
-    int64 last_valid_fix_rt = 32;
-    bool is_battery_steep_discharge = 33;
-    bool is_cooling_mode_active = 34;
+    optional int64 last_valid_fix_rt = 32;
+    optional bool is_battery_steep_discharge = 33;
+    optional bool is_cooling_mode_active = 34;
 
     // Forensic Fields
-    double snr_idx = 35;
-    double noise_idx = 36;
-    double lux_idx = 37;
-    double vibe_idx = 38;
-    double lift_idx = 39;
-    double prox_idx = 40;
-    bool is_sit_detected = 41;
-    bool is_sit_active = 42;
-    int64 last_sit_ts = 43;
-    double sit_vz = 44;
-    double sit_dz = 45;
-    double tilt_idx = 46;
-    double baro_idx = 47;
-    double sit_baro = 48;
-    double sit_tilt = 49;
-    double sit_shock = 50;
-    double vertical_velocity = 51;
+    optional double snr_idx = 35;
+    optional double noise_idx = 36;
+    optional double lux_idx = 37;
+    optional double vibe_idx = 38;
+    optional double lift_idx = 39;
+    optional double prox_idx = 40;
+    optional bool is_sit_detected = 41;
+    optional bool is_sit_active = 42;
+    optional int64 last_sit_ts = 43;
+    optional double sit_vz = 44;
+    optional double sit_dz = 45;
+    optional double tilt_idx = 46;
+    optional double baro_idx = 47;
+    optional double sit_baro = 48;
+    optional double sit_tilt = 49;
+    optional double sit_shock = 50;
+    optional double vertical_velocity = 51;
 
-    bool is_jammer = 52;
-    bool is_stalled = 53;
-    bool is_tamper_detected = 54;
-    int32 jump_tier = 55;
-    int64 gps_age_ms = 56;
-    string sentinel_status = 57;
+    optional bool is_jammer = 52;
+    optional bool is_stalled = 53;
+    optional bool is_tamper_detected = 54;
+    optional int32 jump_tier = 55;
+    optional int64 gps_age_ms = 56;
+    optional string sentinel_status = 57;
 
-    bool is_clock_regression = 58;
+    optional bool is_clock_regression = 58;
 
-    double kinetic_energy = 59;
+    optional double kinetic_energy = 59;
 
-    int64 sit_vz_ts = 60;
-    int64 sit_vz_rt = 61;
+    optional int64 sit_vz_ts = 60;
+    optional int64 sit_vz_rt = 61;
 
     reserved 62;
 
-    bool is_battery_low = 63;
-    bool is_battery_critical = 64;
+    optional bool is_battery_low = 63;
+    optional bool is_battery_critical = 64;
 
-    bool is_silent_failure = 65;
+    optional bool is_silent_failure = 65;
 
-    int64 violation_uptime_ms = 66;
-    bool is_ultra_long_stationary = 67;
-    bool gps_hardware_lock = 68;
+    optional int64 violation_uptime_ms = 66;
+    optional bool is_ultra_long_stationary = 67;
+    optional bool gps_hardware_lock = 68;
 
-    int64 rt = 69;
+    optional int64 rt = 69;
 
-    bool is_gnss_throttled = 70;
+    optional bool is_gnss_throttled = 70;
 
-    int32 energy_delta_ma = 71;
-    double energy_delta_temp = 72;
-    int64 energy_duration_ms = 73;
+    optional int32 energy_delta_ma = 71;
+    optional double energy_delta_temp = 72;
+    optional int64 energy_duration_ms = 73;
     optional string tamper_note = 74;
-    bool is_power_tamper = 75;
+    optional bool is_power_tamper = 75;
 
     optional string activity_type = 76;
 
     optional int64 last_alarm_ack_ts = 77;
     optional int64 violation_start_ts = 78;
 
-    int32 current_ma = 79;
-    double thermal_headroom = 80;
-    double heap_allocated_mb = 81;
-    bool is_anchor_locked = 82;
-    bool is_battery_whitelisted = 83;
-    bool is_storage_low = 84;
-    bool is_storage_critical = 85;
-    bool is_power_save_mode = 86;
-    int32 standby_bucket = 87;
-    string net_interface = 88;
+    optional int32 current_ma = 79;
+    optional double thermal_headroom = 80;
+    optional double heap_allocated_mb = 81;
+    optional bool is_anchor_locked = 82;
+    optional bool is_battery_whitelisted = 83;
+    optional bool is_storage_low = 84;
+    optional bool is_storage_critical = 85;
+    optional bool is_power_save_mode = 86;
+    optional int32 standby_bucket = 87;
+    optional string net_interface = 88;
     optional string name = 89;
-    double dist_to_tracker = 90;
-    double dist_to_home = 91;
-    string sentinel_status_enum = 92;
+    optional double dist_to_tracker = 90;
+    optional double dist_to_home = 91;
+    optional string sentinel_status_enum = 92;
 
     optional double thermal_snapshot = 93;
     optional double heap_snapshot = 94;
 
     // Issue #AUDIT-1006-9: Protocol Efficiency Optimization
-    sint32 lat_e7 = 95;
-    sint32 lng_e7 = 96;
+    optional sint32 lat_e7 = 95;
+    optional sint32 lng_e7 = 96;
     optional bool is_delta = 97;
 
     // Issue #QA-1007-1: Forensic Expansion
-    bool is_muzzled = 98;
-    bool is_siren_active = 99;
-    bool is_hardware_online = 100;
-    bool local_internet_loss = 101;
+    optional bool is_muzzled = 98;
+    optional bool is_siren_active = 99;
+    optional bool is_hardware_online = 100;
+    optional bool local_internet_loss = 101;
     optional string suppression_note = 102;
-    bool is_warming = 103;
+    optional bool is_warming = 103;
     optional double snr_snapshot = 104;
     optional double vibe_snapshot = 105;
-    int64 acoustic_lockout_rt = 106;
-    int64 light_spike_rt = 107;
-    double provided_adaptive_floor = 108;
-    double acoustic_min_db = 109;
+    optional int64 acoustic_lockout_rt = 106;
+    optional int64 light_spike_rt = 107;
+    optional double provided_adaptive_floor = 108;
+    optional double acoustic_min_db = 109;
 
     // Oct.7.7 Anomaly Flags
-    bool is_suspicious_noise = 110;
-    bool is_memory_pressure_throttled = 111;
+    optional bool is_suspicious_noise = 110;
+    optional bool is_memory_pressure_throttled = 111;
 
     // Oct.15.11: Proximity Parity
-    double proximity_cm = 112;
-    int64 proximity_debounce_ms = 113;
+    optional double proximity_cm = 112;
+    optional int64 proximity_debounce_ms = 113;
 
     // Oct.15.12: Vibration Floor Parity
-    double adaptive_vibration_floor = 114;
+    optional double adaptive_vibration_floor = 114;
 
     // Oct.22.13: Forensic Parity (Raw Sensor Propagation)
-    double lux = 115;
-    double lux_baseline = 116;
-    double acoustic_db = 117;
-    double acoustic_floor_db = 118;
-    double vibration = 119;
-    double vibration_rolling_sum = 120;
+    optional double lux = 115;
+    optional double lux_baseline = 116;
+    optional double acoustic_db = 117;
+    optional double acoustic_floor_db = 118;
+    optional double vibration = 119;
+    optional double vibration_rolling_sum = 120;
 
     // Oct.22.14: Session Audit Parity
-    double violation_percentage = 121;
+    optional double violation_percentage = 121;
 
     // Oct.22.15: Jammer Discrimination Parity
-    bool is_jamming_candidate = 122;
+    optional bool is_jamming_candidate = 122;
 
     // Oct.22.16: Forensic Snapshot Parity
     optional double lux_snapshot = 123;
@@ -310,159 +310,159 @@ message RealtimeStatus {
 }
 
 message GeoPointProto {
-    double lat = 1;
-    double lng = 2;
+    optional double lat = 1;
+    optional double lng = 2;
 }
 
 message AlertSettingsProto {
-    bool local_internet = 1;
-    bool server_connection = 2;
-    bool jammer_detection = 3;
-    bool signalLoss = 4;
-    bool gps_stalling = 5;
-    bool distance = 6;
-    bool power = 7;
-    bool low_battery = 8;
-    bool long_time_gap = 9;
-    bool high_temperature = 10;
-    bool override_silence = 11;
-    bool use_max_volume = 12;
-    bool vibration_enabled = 13;
-    float alarm_volume = 14;
-    bool use_custom_volume = 15;
-    bool relay_connection = 16;
-    bool tilt_alert = 17;
-    bool acoustic_alert = 18;
-    bool lift_alert = 19;
-    bool tamper_alert = 20;
-    bool chair_occupied = 21;
-    bool global_mute = 22;
-    bool system_storage_low = 23;
-    bool battery_health = 24;
+    optional bool local_internet = 1;
+    optional bool server_connection = 2;
+    optional bool jammer_detection = 3;
+    optional bool signalLoss = 4;
+    optional bool gps_stalling = 5;
+    optional bool distance = 6;
+    optional bool power = 7;
+    optional bool low_battery = 8;
+    optional bool long_time_gap = 9;
+    optional bool high_temperature = 10;
+    optional bool override_silence = 11;
+    optional bool use_max_volume = 12;
+    optional bool vibration_enabled = 13;
+    optional float alarm_volume = 14;
+    optional bool use_custom_volume = 15;
+    optional bool relay_connection = 16;
+    optional bool tilt_alert = 17;
+    optional bool acoustic_alert = 18;
+    optional bool lift_alert = 19;
+    optional bool tamper_alert = 20;
+    optional bool chair_occupied = 21;
+    optional bool global_mute = 22;
+    optional bool system_storage_low = 23;
+    optional bool battery_health = 24;
 }
 
 message TrackerStatusProto {
-    double lat = 1;
-    double lng = 2;
-    double speed = 3;
-    double bearing = 4;
-    double accuracy = 5;
-    double max_accuracy = 22;
-    int64 gps_ts = 6;
-    int64 ts = 7;
-    int64 uptime_ms = 8;
-    int64 last_conn_ts = 9;
-    int64 last_disc_ts = 10;
-    int64 total_drop_ms = 11;
-    int64 max_drop_ms = 12;
-    int32 rtt = 13;
-    int64 total_connected_ms = 15;
-    int64 session_connected_ms = 16;
-    int32 battery = 17;
-    double temp = 18;
-    bool is_charging = 19;
-    int32 sats_view = 20;
-    int32 sats_used = 21;
-    double alt = 23;
-    double max_temp = 24;
+    optional double lat = 1;
+    optional double lng = 2;
+    optional double speed = 3;
+    optional double bearing = 4;
+    optional double accuracy = 5;
+    optional double max_accuracy = 22;
+    optional int64 gps_ts = 6;
+    optional int64 ts = 7;
+    optional int64 uptime_ms = 8;
+    optional int64 last_conn_ts = 9;
+    optional int64 last_disc_ts = 10;
+    optional int64 total_drop_ms = 11;
+    optional int64 max_drop_ms = 12;
+    optional int32 rtt = 13;
+    optional int64 total_connected_ms = 15;
+    optional int64 session_connected_ms = 16;
+    optional int32 battery = 17;
+    optional double temp = 18;
+    optional bool is_charging = 19;
+    optional int32 sats_view = 20;
+    optional int32 sats_used = 21;
+    optional double alt = 23;
+    optional double max_temp = 24;
 
     reserved 25, 26, 27, 28, 29, 30, 31, 32;
 
-    int64 max_drop_ts = 33;
-    int64 violation_uptime_ms = 34;
-    double violation_percentage = 35;
-    bool is_power_tamper = 36;
+    optional int64 max_drop_ts = 33;
+    optional int64 violation_uptime_ms = 34;
+    optional double violation_percentage = 35;
+    optional bool is_power_tamper = 36;
 
-    double vibration = 37;
-    double heading = 38;
-    double baro_alt = 39;
-    double lux = 40;
-    bool is_near = 41;
-    double tilt_degrees = 42;
-    double acoustic_db = 43;
-    double peak_shock = 44;
-    int64 peak_shock_ts = 45;
-    double lux_baseline = 46;
-    double acoustic_floor = 47;
-    double adaptive_vibration_floor = 48;
-    double prox_idx = 49;
+    optional double vibration = 37;
+    optional double heading = 38;
+    optional double baro_alt = 39;
+    optional double lux = 40;
+    optional bool is_near = 41;
+    optional double tilt_degrees = 42;
+    optional double acoustic_db = 43;
+    optional double peak_shock = 44;
+    optional int64 peak_shock_ts = 45;
+    optional double lux_baseline = 46;
+    optional double acoustic_floor = 47;
+    optional double adaptive_vibration_floor = 48;
+    optional double prox_idx = 49;
     reserved 50;
-    bool is_tamper_detected = 51;
-    string ver = 52;
+    optional bool is_tamper_detected = 51;
+    optional string ver = 52;
 
-    bool is_power_save_mode = 53;
-    int32 standby_bucket = 54;
-    string net_interface = 55;
-    bool is_storage_low = 56;
+    optional bool is_power_save_mode = 53;
+    optional int32 standby_bucket = 54;
+    optional string net_interface = 55;
+    optional bool is_storage_low = 56;
 
-    bool is_battery_steep_discharge = 57;
+    optional bool is_battery_steep_discharge = 57;
 
     reserved 58;
-    bool is_cooling_mode_active = 60;
-    bool is_storage_critical = 61;
+    optional bool is_cooling_mode_active = 60;
+    optional bool is_storage_critical = 61;
 
-    int32 current_ma = 62;
+    optional int32 current_ma = 62;
     reserved 63;
-    string tracker_state = 64;
+    optional string tracker_state = 64;
     optional string status = 65;
 
-    double kinetic_energy = 66;
+    optional double kinetic_energy = 66;
 
-    int64 sit_vz_ts = 67;
-    int64 sit_vz_rt = 68;
+    optional int64 sit_vz_ts = 67;
+    optional int64 sit_vz_rt = 68;
 
     reserved 69;
 
-    bool is_battery_low = 70;
-    bool is_battery_critical = 71;
+    optional bool is_battery_low = 70;
+    optional bool is_battery_critical = 71;
 
-    bool is_silent_failure = 72;
+    optional bool is_silent_failure = 72;
 
-    int64 last_sit_ts = 73;
-    double sit_vz = 74;
-    double sit_dz = 75;
-    double sit_baro = 76;
-    double sit_tilt = 77;
-    double sit_shock = 78;
-    double vertical_velocity = 79;
+    optional int64 last_sit_ts = 73;
+    optional double sit_vz = 74;
+    optional double sit_dz = 75;
+    optional double sit_baro = 76;
+    optional double sit_tilt = 77;
+    optional double sit_shock = 78;
+    optional double vertical_velocity = 79;
 
-    int64 rt = 80;
-    bool is_jammer = 81;
-    bool is_stalled = 82;
-    bool is_clock_regression = 83;
-    int32 jump_tier = 84;
-    bool is_location_pending = 85;
-    LocationPendingReasonProto location_pending_reason = 86;
-    int64 last_valid_fix_rt = 87;
-    double snr_idx = 88;
-    double noise_idx = 89;
-    double lux_idx = 90;
-    double vibe_idx = 91;
-    double lift_idx = 92;
-    double tilt_idx = 93;
-    double baro_idx = 94;
-    bool is_sit_detected = 95;
-    bool is_sit_active = 96;
-    bool is_ultra_long_stationary = 97;
-    bool is_jump = 98;
-    bool mic_pending = 99;
+    optional int64 rt = 80;
+    optional bool is_jammer = 81;
+    optional bool is_stalled = 82;
+    optional bool is_clock_regression = 83;
+    optional int32 jump_tier = 84;
+    optional bool is_location_pending = 85;
+    optional LocationPendingReasonProto location_pending_reason = 86;
+    optional int64 last_valid_fix_rt = 87;
+    optional double snr_idx = 88;
+    optional double noise_idx = 89;
+    optional double lux_idx = 90;
+    optional double vibe_idx = 91;
+    optional double lift_idx = 92;
+    optional double tilt_idx = 93;
+    optional double baro_idx = 94;
+    optional bool is_sit_detected = 95;
+    optional bool is_sit_active = 96;
+    optional bool is_ultra_long_stationary = 97;
+    optional bool is_jump = 98;
+    optional bool mic_pending = 99;
 
-    string device_id = 100;
-    string viewer_id = 101;
-    double proximity_cm = 102;
-    int64 proximity_debounce_ms = 103;
-    double vibration_rolling_sum = 104;
-    bool is_trajectory_promoted = 105;
-    bool is_suspicious = 106;
-    bool is_anchor_locked = 107;
-    bool is_battery_whitelisted = 108;
-    bool gps_hardware_lock = 109;
+    optional string device_id = 100;
+    optional string viewer_id = 101;
+    optional double proximity_cm = 102;
+    optional int64 proximity_debounce_ms = 103;
+    optional double vibration_rolling_sum = 104;
+    optional bool is_trajectory_promoted = 105;
+    optional bool is_suspicious = 106;
+    optional bool is_anchor_locked = 107;
+    optional bool is_battery_whitelisted = 108;
+    optional bool gps_hardware_lock = 109;
 
-    bool is_gnss_throttled = 110;
+    optional bool is_gnss_throttled = 110;
 
-    int32 energy_delta_ma = 111;
-    double energy_delta_temp = 112;
-    int64 energy_duration_ms = 113;
+    optional int32 energy_delta_ma = 111;
+    optional double energy_delta_temp = 112;
+    optional int64 energy_duration_ms = 113;
     optional string tamper_note = 114;
 
     optional string activity_type = 115;
@@ -470,38 +470,38 @@ message TrackerStatusProto {
     optional int64 last_alarm_ack_ts = 116;
     optional int64 violation_start_ts = 117;
 
-    double thermal_headroom = 118;
-    double heap_allocated_mb = 119;
+    optional double thermal_headroom = 118;
+    optional double heap_allocated_mb = 119;
     optional string name = 120;
-    double dist_to_tracker = 121;
-    double dist_to_home = 122;
+    optional double dist_to_tracker = 121;
+    optional double dist_to_home = 122;
 
     optional double thermal_snapshot = 123;
     optional double heap_snapshot = 124;
 
-    sint32 lat_e7 = 125;
-    sint32 lng_e7 = 126;
+    optional sint32 lat_e7 = 125;
+    optional sint32 lng_e7 = 126;
 
     // Issue #QA-1007-1: Forensic Expansion
-    bool is_muzzled = 127;
-    bool is_siren_active = 128;
-    bool is_hardware_online = 129;
-    bool local_internet_loss = 130;
+    optional bool is_muzzled = 127;
+    optional bool is_siren_active = 128;
+    optional bool is_hardware_online = 129;
+    optional bool local_internet_loss = 130;
     optional string suppression_note = 131;
-    bool is_warming = 132;
+    optional bool is_warming = 132;
     optional double snr_snapshot = 133;
     optional double vibe_snapshot = 134;
-    int64 acoustic_lockout_rt = 135;
-    int64 light_spike_rt = 136;
-    double provided_adaptive_floor = 137;
-    double acoustic_min_db = 138;
+    optional int64 acoustic_lockout_rt = 135;
+    optional int64 light_spike_rt = 136;
+    optional double provided_adaptive_floor = 137;
+    optional double acoustic_min_db = 138;
 
     // Oct.7.7 Anomaly Flags
-    bool is_suspicious_noise = 139;
-    bool is_memory_pressure_throttled = 140;
+    optional bool is_suspicious_noise = 139;
+    optional bool is_memory_pressure_throttled = 140;
 
     // Oct.22.15: Jammer Discrimination Parity
-    bool is_jamming_candidate = 141;
+    optional bool is_jamming_candidate = 141;
 
     // Oct.22.16: Forensic Snapshot Parity
     optional double lux_snapshot = 142;
@@ -509,15 +509,15 @@ message TrackerStatusProto {
 }
 
 message ActiveAlarmProto {
-    string type = 1;
-    string title = 2;
-    string subtitle = 3;
-    bool is_triggered = 4;
-    int64 first_trigger_ts = 5;
-    int64 first_trigger_rt = 6;
-    int64 last_log_ts = 7;
-    int64 last_log_rt = 8;
-    bool is_resolved = 9;
+    optional string type = 1;
+    optional string title = 2;
+    optional string subtitle = 3;
+    optional bool is_triggered = 4;
+    optional int64 first_trigger_ts = 5;
+    optional int64 first_trigger_rt = 6;
+    optional int64 last_log_ts = 7;
+    optional int64 last_log_rt = 8;
+    optional bool is_resolved = 9;
 }
 
 message ActiveAlarmsListProto {

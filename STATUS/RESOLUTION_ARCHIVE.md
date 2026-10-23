@@ -1,4 +1,13 @@
-# Resolution Archive - GPS Tracker (Oct23.107)
+# Resolution Archive - GPS Tracker (Oct23.108)
+
+## ISSUE-OCT23.102-F8: Protobuf Default Value Pollution (Oct23.108)
+- **Resolved**: Oct23.108
+- **Description**: Many scalar telemetry fields in `RealtimeStatus` and `TrackerStatusProto` lacked the `optional` keyword, causing `TelemetryMapper` to overwrite valid local state with Protobuf defaults (0, false) when fields were omitted by the sender.
+- **Remediation**: 
+    - Applied `optional` keyword to all scalar fields in `app_settings.proto` (RealtimeStatus, TrackerStatusProto, LogicStateProto, AlertSettingsProto, ActiveAlarmProto).
+    - Hardened `TelemetryMapper.kt` mapping methods (`mapProtoToStatus`, `mapProtoToSnapshot`, `mapProtoToApp`) with explicit `hasField()` checks to prevent default value pollution.
+    - Synchronized `SOT_MASTER_REQUIREMENTS.md` with new architectural rule (R-ID 626).
+- **Outcome**: 🟢 **PASSED**. (SOT ID 820).
 
 ## ISSUE-OCT23.102-F7: Delta Compression Drift Prevention (Oct23.107)
 - **Resolved**: Oct23.107
@@ -8,7 +17,7 @@
 
 ## ISSUE-OCT23.101-F2: JSON Mapping State Overwrite (Oct23.106)
 - **Resolved**: Oct23.106
-- **Description**: `TelemetryMapper.kt` overwrote multiple fields with hardcoded defaults (e.g., `-1.0` for `proximityCm`, `0` for `rtt`) in `mapJsonToStatus` instead of preserving current cached values when keys were missing.
+- **Description**: `TelemetryMapper.kt` overwrote multiple fields with hardcoded defaults (e.g., `-1.0` for `proximityCm`, `0` for `rtt`) in `mapJsonToStatus` instead of preserving current cached values when keys were missing in JSON.
 - **Remediation**: Hardened `mapJsonToStatus` and `mapJsonToSnapshot` to use the `current` state as fallback for all optional telemetry fields (proximity, rtt, snapshots, battery flags, etc.).
 - **Outcome**: 🟢 **PASSED**. (SOT ID 818).
 
@@ -44,5 +53,5 @@
 
 ## ISSUE-OCT22.16-F1/F2/F3: Forensic Trace Raw Sensor Expansion (Oct23.00)
 - **Resolved**: Oct23.00
-- **Remediation**: Extended `ForensicSnapshot` and synchronized mapping across Protobuf, JSON, and Database (v86) for raw sensor parity.
+- **Remediation**: Extended `ForensicSnapshot` and `LocationUpdate` with `lux` and `acoustic` fields for full raw sensor trace parity.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 814).

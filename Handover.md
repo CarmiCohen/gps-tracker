@@ -1,25 +1,24 @@
-# Project Handover - Oct23.107 (ISSUE-OCT23.102-F7 Resolved)
+# Project Handover - Oct23.108 (ISSUE-OCT23.102-F8 Resolved)
 
 ## 🟢 Status: COMPLETED
 
-Remediation of **ISSUE-OCT23.102-F7** (Delta Compression Drift Risk) is complete. `TelemetryProtobufMapper` now performs a periodic absolute coordinate refresh every 50 packets to prevent permanent drift. Version incremented to **Oct23.107**.
+Remediation of **ISSUE-OCT23.102-F8** (Protobuf Default Value Pollution) is complete. Scalar fields in `RealtimeStatus` and `TrackerStatusProto` are now marked as `optional`, and `TelemetryMapper.kt` utilizes `hasField()` checks to prevent overwriting cached state with defaults. Version incremented to **Oct23.108**.
 
 ## ✅ Completed in this Session
-- **ISSUE-OCT23.102-F7**: Implemented periodic absolute coordinate refresh in `TelemetryProtobufMapper.mapToRealtime`.
-- **Architectural Rule 1.256**: Formalized Delta Drift Prevention (R-ID 625).
-- **Versioning**: Incremented to `Oct23.107`.
-- **Signaling Hardening**: Added `packetCounter` to `SignalingDeltaState` and `DELTA_REFRESH_INTERVAL` to `SignalingConstants`.
+- **ISSUE-OCT23.102-F8**: Applied `optional` to scalar fields in `app_settings.proto` and hardened `TelemetryMapper.kt` mapping logic.
+- **Architectural Rule 1.257**: Formalized Protobuf State Protection (R-ID 626).
+- **Versioning**: Incremented to `Oct23.108`.
+- **Integrity**: Verified build stability after Protobuf regeneration and mapper hardening.
 
 ## 🔴 Current Open Gaps (HIGH)
-- **ISSUE-OCT23.102-F8**: Protobuf Default Value Pollution (High).
 - **ISSUE-OCT23.102-F9**: Telemetry Flyweight Race Condition (High).
-- **ISSUE-OCT23.101-F3**: Missing Stationary Duration Deserialization (Medium).
+- **ISSUE-OCT23.101-F3**: Missing Stationary Duration Propagation (Medium).
 - **ISSUE-OCT23.101-F4**: Violation Persistence Integrity Gaps (Medium).
 
-## 🎯 Next Resumption Focus: Remediation of ISSUE-OCT23.102-F8.
-Apply `optional` keyword to scalar fields in `RealtimeStatus` protobuf and update mapper to avoid overwriting state with default values.
+## 🎯 Next Resumption Focus: Remediation of ISSUE-OCT23.102-F9.
+Address the flyweight race condition in `ConnectivitySuite.kt` by replacing shared members with local instances or thread-safe immutable structures.
 
-**Current Forensic Metrics (Oct23.107):**
-- **[Oct23.107]: [SOT Count: 819 (Rules: 329), Open: H:2, M:3, L:1, Ideas: H:3, M:28, L:44, Testing: 11 (Sub-items: 45), QA: 385]**
+**Current Forensic Metrics (Oct23.108):**
+- **[Oct23.108]: [SOT Count: 820 (Rules: 330), Open: H:1, M:3, L:1, Ideas: H:3, M:29, L:44, Testing: 11 (Sub-items: 45), QA: 385]**
 
 **HANDOVER FINALIZED.**

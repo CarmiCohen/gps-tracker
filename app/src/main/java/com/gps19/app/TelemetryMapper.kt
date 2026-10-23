@@ -6,6 +6,10 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct23.108:
+ * - ISSUE-OCT23.102-F8: Protobuf Default Value Pollution. Updated mapProtoToStatus,
+ *   mapProtoToSnapshot, and mapProtoToApp to use hasField() checks for all optional
+ *   scalar fields, preventing omitted fields from overwriting valid state with defaults.
  * Oct.23.106:
  * - ISSUE-OCT23.101-F2: JSON Mapping State Overwrite. Fixed mapJsonToStatus 
  *   and mapJsonToSnapshot to preserve current cached values (proximityCm, 
@@ -141,87 +145,91 @@ object TelemetryMapper {
     ): LocationUpdate {
         out.copyFrom(current)
         return out.apply {
-            deviceId = proto.id
-            viewerId = proto.viewerId
+            if (proto.hasId()) deviceId = proto.id
+            if (proto.hasViewerId()) viewerId = proto.viewerId
             
             kinetic.apply {
                 lat = if (processed.optimizedPoint.lat != 0.0) processed.optimizedPoint.lat else current.kinetic.lat
                 lng = if (processed.optimizedPoint.lng != 0.0) processed.optimizedPoint.lng else current.kinetic.lng
                 gpsTs = if (processed.optimizedPoint.ts != 0L) processed.optimizedPoint.ts else current.kinetic.gpsTs
                 speed = processed.filteredSpeed
-                bearing = proto.bearing
-                accuracy = proto.accuracy
-                maxAccuracy = proto.maxAccuracy
+                if (proto.hasBearing()) bearing = proto.bearing
+                if (proto.hasAccuracy()) accuracy = proto.accuracy
+                if (proto.hasMaxAccuracy()) maxAccuracy = proto.maxAccuracy
                 isJump = processed.status == SentinelStatus.JUMP
-                kineticEnergy = proto.kineticEnergy
-                jumpTier = proto.jumpTier
-                activityType = try { 
-                    ActivityType.valueOf(proto.activityType) 
-                } catch (e: Exception) { ActivityType.UNKNOWN }
+                if (proto.hasKineticEnergy()) kineticEnergy = proto.kineticEnergy
+                if (proto.hasJumpTier()) jumpTier = proto.jumpTier
+                if (proto.hasActivityType()) {
+                    activityType = try { 
+                        ActivityType.valueOf(proto.activityType) 
+                    } catch (e: Exception) { ActivityType.UNKNOWN }
+                }
             }
 
             atmospheric.apply {
-                temp = proto.temp
-                noiseIdx = proto.noiseIdx
-                luxIdx = proto.luxIdx
-                vibeIdx = proto.vibeIdx
-                liftIdx = proto.liftIdx
-                tiltIdx = proto.tiltIdx
-                baroIdx = proto.baroIdx
-                proximityDebounceMs = clampProxDebounce(proto.proximityDebounceMs)
-                adaptiveVibrationFloor = clampVibrationFloor(proto.adaptiveVibrationFloor)
-                lux = proto.lux
-                luxBaseline = proto.luxBaseline
-                acousticDb = proto.acousticDb
-                acousticFloorDb = proto.acousticFloorDb
-                vibration = proto.vibration
-                vibrationRollingSum = proto.vibrationRollingSum
-                proximityCm = proto.proximityCm
+                if (proto.hasTemp()) temp = proto.temp
+                if (proto.hasNoiseIdx()) noiseIdx = proto.noiseIdx
+                if (proto.hasLuxIdx()) luxIdx = proto.luxIdx
+                if (proto.hasVibeIdx()) vibeIdx = proto.vibeIdx
+                if (proto.hasLiftIdx()) liftIdx = proto.liftIdx
+                if (proto.hasTiltIdx()) tiltIdx = proto.tiltIdx
+                if (proto.hasBaroIdx()) baroIdx = proto.baroIdx
+                if (proto.hasProximityDebounceMs()) proximityDebounceMs = clampProxDebounce(proto.proximityDebounceMs)
+                if (proto.hasAdaptiveVibrationFloor()) adaptiveVibrationFloor = clampVibrationFloor(proto.adaptiveVibrationFloor)
+                if (proto.hasLux()) lux = proto.lux
+                if (proto.hasLuxBaseline()) luxBaseline = proto.luxBaseline
+                if (proto.hasAcousticDb()) acousticDb = proto.acousticDb
+                if (proto.hasAcousticFloorDb()) acousticFloorDb = proto.acousticFloorDb
+                if (proto.hasVibration()) vibration = proto.vibration
+                if (proto.hasVibrationRollingSum()) vibrationRollingSum = proto.vibrationRollingSum
+                if (proto.hasProximityCm()) proximityCm = proto.proximityCm
             }
 
             integrity.apply {
-                battery = proto.battery
-                isCharging = proto.isCharging
-                satsView = proto.satsView
-                satsUsed = proto.satsUsed
-                snrIdx = proto.snrIdx
-                isLocationPending = proto.isLocationPending
-                locationPendingReason = try { LocationPendingReason.valueOf(proto.pendingReason.name.removePrefix("LPR_")) } catch(e: Exception) { LocationPendingReason.NONE }
-                isBatterySteepDischarge = proto.isBatterySteepDischarge
-                isCoolingModeActive = proto.isCoolingModeActive
-                isBatteryLow = proto.isBatteryLow
-                isBatteryCritical = proto.isBatteryCritical
-                isSitDetected = proto.isSitDetected
-                lastSitTs = proto.lastSitTs
-                sitVz = proto.sitVz
-                sitVzTs = proto.sitVzTs
-                sitVzRt = proto.sitVzRt
-                sitDz = proto.sitDz
-                sitBaro = proto.sitBaro
-                sitTilt = proto.sitTilt
-                sitShock = proto.sitShock
-                isSitActive = proto.isSitActive
-                uptimeMs = proto.uptimeMs
-                totalConnectedMs = proto.totalConnectedMs
-                sessionConnectedMs = proto.sessionConnectedMs
-                totalDropMs = proto.totalDropMs
-                maxDropMs = proto.maxDropMs
-                lastConnTs = proto.lastConnTs
-                lastDiscTs = proto.lastDiscTs
-                isJammer = proto.isJammer
-                isStalled = proto.isStalled
-                isTamperDetected = proto.isTamperDetected
-                isPowerTamper = proto.isPowerTamper
-                violationUptimeMs = proto.violationUptimeMs
-                isUltraLongStationary = proto.isUltraLongStationary
-                gpsHardwareLock = proto.gpsHardwareLock
-                isGnssThrottled = proto.isGnssThrottled
+                if (proto.hasBattery()) battery = proto.battery
+                if (proto.hasIsCharging()) isCharging = proto.isCharging
+                if (proto.hasSatsView()) satsView = proto.satsView
+                if (proto.hasSatsUsed()) satsUsed = proto.satsUsed
+                if (proto.hasSnrIdx()) snrIdx = proto.snrIdx
+                if (proto.hasIsLocationPending()) isLocationPending = proto.isLocationPending
+                if (proto.hasPendingReason()) {
+                    locationPendingReason = try { LocationPendingReason.valueOf(proto.pendingReason.name.removePrefix("LPR_")) } catch(e: Exception) { LocationPendingReason.NONE }
+                }
+                if (proto.hasIsBatterySteepDischarge()) isBatterySteepDischarge = proto.isBatterySteepDischarge
+                if (proto.hasIsCoolingModeActive()) isCoolingModeActive = proto.isCoolingModeActive
+                if (proto.hasIsBatteryLow()) isBatteryLow = proto.isBatteryLow
+                if (proto.hasIsBatteryCritical()) isBatteryCritical = proto.isBatteryCritical
+                if (proto.hasIsSitDetected()) isSitDetected = proto.isSitDetected
+                if (proto.hasLastSitTs()) lastSitTs = proto.lastSitTs
+                if (proto.hasSitVz()) sitVz = proto.sitVz
+                if (proto.hasSitVzTs()) sitVzTs = proto.sitVzTs
+                if (proto.hasSitVzRt()) sitVzRt = proto.sitVzRt
+                if (proto.hasSitDz()) sitDz = proto.sitDz
+                if (proto.hasSitBaro()) sitBaro = proto.sitBaro
+                if (proto.hasSitTilt()) sitTilt = proto.sitTilt
+                if (proto.hasSitShock()) sitShock = proto.sitShock
+                if (proto.hasIsSitActive()) isSitActive = proto.isSitActive
+                if (proto.hasUptimeMs()) uptimeMs = proto.uptimeMs
+                if (proto.hasTotalConnectedMs()) totalConnectedMs = proto.totalConnectedMs
+                if (proto.hasSessionConnectedMs()) sessionConnectedMs = proto.sessionConnectedMs
+                if (proto.hasTotalDropMs()) totalDropMs = proto.totalDropMs
+                if (proto.hasMaxDropMs()) maxDropMs = proto.maxDropMs
+                if (proto.hasLastConnTs()) lastConnTs = proto.lastConnTs
+                if (proto.hasLastDiscTs()) lastDiscTs = proto.lastDiscTs
+                if (proto.hasIsJammer()) isJammer = proto.isJammer
+                if (proto.hasIsStalled()) isStalled = proto.isStalled
+                if (proto.hasIsTamperDetected()) isTamperDetected = proto.isTamperDetected
+                if (proto.hasIsPowerTamper()) isPowerTamper = proto.isPowerTamper
+                if (proto.hasViolationUptimeMs()) violationUptimeMs = proto.violationUptimeMs
+                if (proto.hasIsUltraLongStationary()) isUltraLongStationary = proto.isUltraLongStationary
+                if (proto.hasGpsHardwareLock()) gpsHardwareLock = proto.gpsHardwareLock
+                if (proto.hasIsGnssThrottled()) isGnssThrottled = proto.isGnssThrottled
                 tamperNote = if (proto.hasTamperNote()) proto.tamperNote else null
-                thermalHeadroom = proto.thermalHeadroom
-                heapAllocatedMb = proto.heapAllocatedMb
-                rtt = proto.rtt
-                violationPercentage = proto.violationPercentage
-                isJammingCandidate = proto.isJammingCandidate
+                if (proto.hasThermalHeadroom()) thermalHeadroom = proto.thermalHeadroom
+                if (proto.hasHeapAllocatedMb()) heapAllocatedMb = proto.heapAllocatedMb
+                if (proto.hasRtt()) rtt = proto.rtt
+                if (proto.hasViolationPercentage()) violationPercentage = proto.violationPercentage
+                if (proto.hasIsJammingCandidate()) isJammingCandidate = proto.isJammingCandidate
 
                 if (processed.locationPendingReason != LocationPendingReason.NONE) {
                     locationPendingReason = SentinelValidator.getHigherPriorityReason(
@@ -238,16 +246,18 @@ object TelemetryMapper {
             this.acousticSnapshot = if (proto.hasAcousticSnapshot()) proto.acousticSnapshot else null
             
             // Oct.7.7 Anomaly Flags
-            this.isSuspiciousNoise = proto.isSuspiciousNoise
-            this.isMemoryPressureThrottled = proto.isMemoryPressureThrottled
+            if (proto.hasIsSuspiciousNoise()) this.isSuspiciousNoise = proto.isSuspiciousNoise
+            if (proto.hasIsMemoryPressureThrottled()) this.isMemoryPressureThrottled = proto.isMemoryPressureThrottled
 
             status = processed.status
             ts = now
-            trackerState = try { TrackerState.valueOf(proto.state.name.removePrefix("TS_")) } catch(e: Exception) { TrackerState.UNKNOWN }
-            isClockRegression = proto.isClockRegression
+            if (proto.hasState()) {
+                trackerState = try { TrackerState.valueOf(proto.state.name.removePrefix("TS_")) } catch(e: Exception) { TrackerState.UNKNOWN }
+            }
+            if (proto.hasIsClockRegression()) isClockRegression = proto.isClockRegression
             lastValidFixRt = lastFixRt
-            lastAlarmAckTs = proto.lastAlarmAckTs
-            violationStartTs = proto.violationStartTs
+            if (proto.hasLastAlarmAckTs()) lastAlarmAckTs = proto.lastAlarmAckTs
+            if (proto.hasViolationStartTs()) violationStartTs = proto.violationStartTs
         }
     }
 
@@ -399,49 +409,55 @@ object TelemetryMapper {
     fun mapProtoToSnapshot(proto: RealtimeStatus, now: Long, nowRt: Long, out: LocationUpdate): LocationUpdate {
         return out.apply {
             reset()
-            deviceId = proto.id
-            viewerId = proto.viewerId
+            if (proto.hasId()) deviceId = proto.id
+            if (proto.hasViewerId()) viewerId = proto.viewerId
             
             kinetic.apply {
-                lat = proto.lat; lng = proto.lng; alt = proto.alt
-                speed = proto.speed.coerceAtLeast(0.0)
-                gpsTs = proto.gpsTs; accuracy = proto.accuracy.coerceAtLeast(0.0)
-                bearing = proto.bearing; maxAccuracy = proto.maxAccuracy
-                kineticEnergy = proto.kineticEnergy
+                if (proto.hasLat()) lat = proto.lat
+                if (proto.hasLng()) lng = proto.lng
+                if (proto.hasAlt()) alt = proto.alt
+                if (proto.hasSpeed()) speed = proto.speed.coerceAtLeast(0.0)
+                if (proto.hasGpsTs()) gpsTs = proto.gpsTs
+                if (proto.hasAccuracy()) accuracy = proto.accuracy.coerceAtLeast(0.0)
+                if (proto.hasBearing()) bearing = proto.bearing
+                if (proto.hasMaxAccuracy()) maxAccuracy = proto.maxAccuracy
+                if (proto.hasKineticEnergy()) kineticEnergy = proto.kineticEnergy
             }
             integrity.apply {
-                isJammer = proto.isJammer
-                isStalled = proto.isStalled
-                isTamperDetected = proto.isTamperDetected || proto.isLocationPending
-                satsUsed = proto.satsUsed
-                satsView = proto.satsView
-                snrIdx = proto.snrIdx
-                currentMa = proto.currentMa
-                thermalHeadroom = proto.thermalHeadroom
-                heapAllocatedMb = proto.heapAllocatedMb
-                rtt = proto.rtt
-                violationUptimeMs = proto.violationUptimeMs
-                violationPercentage = proto.violationPercentage
-                isJammingCandidate = proto.isJammingCandidate
+                if (proto.hasIsJammer()) isJammer = proto.isJammer
+                if (proto.hasIsStalled()) isStalled = proto.isStalled
+                if (proto.hasIsTamperDetected() || proto.hasIsLocationPending()) {
+                    isTamperDetected = proto.isTamperDetected || proto.isLocationPending
+                }
+                if (proto.hasSatsUsed()) satsUsed = proto.satsUsed
+                if (proto.hasSatsView()) satsView = proto.satsView
+                if (proto.hasSnrIdx()) snrIdx = proto.snrIdx
+                if (proto.hasCurrentMa()) currentMa = proto.currentMa
+                if (proto.hasThermalHeadroom()) thermalHeadroom = proto.thermalHeadroom
+                if (proto.hasHeapAllocatedMb()) heapAllocatedMb = proto.heapAllocatedMb
+                if (proto.hasRtt()) rtt = proto.rtt
+                if (proto.hasViolationUptimeMs()) violationUptimeMs = proto.violationUptimeMs
+                if (proto.hasViolationPercentage()) violationPercentage = proto.violationPercentage
+                if (proto.hasIsJammingCandidate()) isJammingCandidate = proto.isJammingCandidate
             }
             atmospheric.apply {
-                temp = proto.temp
-                noiseIdx = proto.noiseIdx
-                luxIdx = proto.luxIdx
-                vibeIdx = proto.vibeIdx
-                liftIdx = proto.liftIdx
-                tiltIdx = proto.tiltIdx
-                baroIdx = proto.baroIdx
-                proximityCm = proto.proximityCm
-                lux = proto.lux
-                luxBaseline = proto.luxBaseline
-                acousticDb = proto.acousticDb
-                acousticFloorDb = proto.acousticFloorDb
-                vibration = proto.vibration
-                vibrationRollingSum = proto.vibrationRollingSum
+                if (proto.hasTemp()) temp = proto.temp
+                if (proto.hasNoiseIdx()) noiseIdx = proto.noiseIdx
+                if (proto.hasLuxIdx()) luxIdx = proto.luxIdx
+                if (proto.hasVibeIdx()) vibeIdx = proto.vibeIdx
+                if (proto.hasLiftIdx()) liftIdx = proto.liftIdx
+                if (proto.hasTiltIdx()) tiltIdx = proto.tiltIdx
+                if (proto.hasBaroIdx()) baroIdx = proto.baroIdx
+                if (proto.hasProximityCm()) proximityCm = proto.proximityCm
+                if (proto.hasLux()) lux = proto.lux
+                if (proto.hasLuxBaseline()) luxBaseline = proto.luxBaseline
+                if (proto.hasAcousticDb()) acousticDb = proto.acousticDb
+                if (proto.hasAcousticFloorDb()) acousticFloorDb = proto.acousticFloorDb
+                if (proto.hasVibration()) vibration = proto.vibration
+                if (proto.hasVibrationRollingSum()) vibrationRollingSum = proto.vibrationRollingSum
 
-                proximityDebounceMs = clampProxDebounce(proto.proximityDebounceMs)
-                adaptiveVibrationFloor = clampVibrationFloor(proto.adaptiveVibrationFloor)
+                if (proto.hasProximityDebounceMs()) proximityDebounceMs = clampProxDebounce(proto.proximityDebounceMs)
+                if (proto.hasAdaptiveVibrationFloor()) adaptiveVibrationFloor = clampVibrationFloor(proto.adaptiveVibrationFloor)
             }
             
             this.thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
@@ -450,22 +466,26 @@ object TelemetryMapper {
             this.acousticSnapshot = if (proto.hasAcousticSnapshot()) proto.acousticSnapshot else null
             
             // Oct.7.7 Anomaly Flags
-            this.isSuspiciousNoise = proto.isSuspiciousNoise
-            this.isMemoryPressureThrottled = proto.isMemoryPressureThrottled
+            if (proto.hasIsSuspiciousNoise()) this.isSuspiciousNoise = proto.isSuspiciousNoise
+            if (proto.hasIsMemoryPressureThrottled()) this.isMemoryPressureThrottled = proto.isMemoryPressureThrottled
 
             // Oct.10.10: Reconstruct raw SNR
-            snrSnapshot = if (proto.hasSnrSnapshot()) proto.snrSnapshot else proto.snrIdx * RIBBON_SNR_SCALE_DB
+            snrSnapshot = if (proto.hasSnrSnapshot()) proto.snrSnapshot else if (proto.hasSnrIdx()) proto.snrIdx * RIBBON_SNR_SCALE_DB else null
             
-            kinetic.jumpTier = proto.jumpTier
+            if (proto.hasJumpTier()) kinetic.jumpTier = proto.jumpTier
             nowTs = now; this.nowRt = nowRt
-            trackerState = try { TrackerState.valueOf(proto.state.name.removePrefix("TS_")) } catch(e: Exception) { TrackerState.UNKNOWN }
+            if (proto.hasState()) {
+                trackerState = try { TrackerState.valueOf(proto.state.name.removePrefix("TS_")) } catch(e: Exception) { TrackerState.UNKNOWN }
+            }
             
-            kinetic.activityType = try { 
-                ActivityType.valueOf(proto.activityType) 
-            } catch (e: Exception) { ActivityType.UNKNOWN }
+            if (proto.hasActivityType()) {
+                kinetic.activityType = try { 
+                    ActivityType.valueOf(proto.activityType) 
+                } catch (e: Exception) { ActivityType.UNKNOWN }
+            }
             
-            lastAlarmAckTs = proto.lastAlarmAckTs
-            violationStartTs = proto.violationStartTs
+            if (proto.hasLastAlarmAckTs()) lastAlarmAckTs = proto.lastAlarmAckTs
+            if (proto.hasViolationStartTs()) violationStartTs = proto.violationStartTs
         }
     }
 
@@ -544,7 +564,7 @@ object TelemetryMapper {
             
             kinetic.activityType = try { 
                 ActivityType.valueOf(data.optString("activity_type", current.kinetic.activityType.name)) 
-            } catch (e: Exception) { ActivityType.UNKNOWN }
+                } catch (e: Exception) { ActivityType.UNKNOWN }
             
             lastAlarmAckTs = data.optLong("last_alarm_ack_ts", current.lastAlarmAckTs)
             violationStartTs = data.optLong("violation_start_ts", current.violationStartTs)
@@ -756,43 +776,67 @@ object TelemetryMapper {
      */
     fun mapProtoToApp(proto: TrackerStatusProto, out: ConnectionPoint) {
         out.apply {
-            ts = proto.ts; rt = proto.rt; rtt = proto.rtt; isConnected = true
-            isGap = false; isRecoveryEvent = false; hasGps = proto.accuracy > 0
-            isTick = false; gpsAccuracy = proto.accuracy; maxAccuracy = proto.maxAccuracy
-            speed = proto.speed; bearing = proto.bearing; currentMa = proto.currentMa
-            locationPendingReason = try { LocationPendingReason.valueOf(proto.locationPendingReason.name.removePrefix("LPR_")) } catch(e: Exception) { LocationPendingReason.NONE }
+            if (proto.hasTs()) ts = proto.ts
+            if (proto.hasRt()) rt = proto.rt
+            if (proto.hasRtt()) rtt = proto.rtt
+            isConnected = true
+            isGap = false
+            isRecoveryEvent = false
+            if (proto.hasAccuracy()) hasGps = proto.accuracy > 0
+            isTick = false
+            if (proto.hasAccuracy()) gpsAccuracy = proto.accuracy
+            if (proto.hasMaxAccuracy()) maxAccuracy = proto.maxAccuracy
+            if (proto.hasSpeed()) speed = proto.speed
+            if (proto.hasBearing()) bearing = proto.bearing
+            if (proto.hasCurrentMa()) currentMa = proto.currentMa
+            if (proto.hasLocationPendingReason()) {
+                locationPendingReason = try { LocationPendingReason.valueOf(proto.locationPendingReason.name.removePrefix("LPR_")) } catch(e: Exception) { LocationPendingReason.NONE }
+            }
 
-            snrIdx = PhysicsUtils.safeDouble(proto.snrIdx)
-            noiseIdx = PhysicsUtils.safeDouble(proto.noiseIdx)
-            luxIdx = PhysicsUtils.safeDouble(proto.luxIdx)
-            vibeIdx = PhysicsUtils.safeDouble(proto.vibeIdx)
-            proxIdx = PhysicsUtils.safeDouble(proto.proxIdx)
-            liftIdx = PhysicsUtils.safeDouble(proto.liftIdx)
-            tiltIdx = PhysicsUtils.safeDouble(proto.tiltIdx)
-            baroIdx = PhysicsUtils.safeDouble(proto.baroIdx)
+            if (proto.hasSnrIdx()) snrIdx = PhysicsUtils.safeDouble(proto.snrIdx)
+            if (proto.hasNoiseIdx()) noiseIdx = PhysicsUtils.safeDouble(proto.noiseIdx)
+            if (proto.hasLuxIdx()) luxIdx = PhysicsUtils.safeDouble(proto.luxIdx)
+            if (proto.hasVibeIdx()) vibeIdx = PhysicsUtils.safeDouble(proto.vibeIdx)
+            if (proto.hasProxIdx()) proxIdx = PhysicsUtils.safeDouble(proto.proxIdx)
+            if (proto.hasLiftIdx()) liftIdx = PhysicsUtils.safeDouble(proto.liftIdx)
+            if (proto.hasTiltIdx()) tiltIdx = PhysicsUtils.safeDouble(proto.tiltIdx)
+            if (proto.hasBaroIdx()) baroIdx = PhysicsUtils.safeDouble(proto.baroIdx)
 
-            isSitDetected = proto.isSitDetected; isSitActive = proto.isSitActive
-            verticalVelocity = proto.verticalVelocity; sitVz = proto.sitVz; sitVzTs = proto.sitVzTs
-            sitVzRt = proto.sitVzRt; sitDz = proto.sitDz; sitBaro = proto.sitBaro
-            sitTilt = proto.sitTilt; sitShock = proto.sitShock
-            isBatterySteepDischarge = proto.isBatterySteepDischarge; isCoolingModeActive = proto.isCoolingModeActive
-            isBatteryLow = proto.isBatteryLow; isBatteryCritical = proto.isBatteryCritical
-            violationUptimeMs = proto.violationUptimeMs; isUltraLongStationary = proto.isUltraLongStationary
-            gpsHardwareLock = proto.gpsHardwareLock; isAnchorLocked = proto.isAnchorLocked
-            thermalHeadroom = proto.thermalHeadroom; heapAllocatedMb = proto.heapAllocatedMb
-            activityType = try { ActivityType.valueOf(proto.activityType) } catch (e: Exception) { ActivityType.UNKNOWN }
+            if (proto.hasIsSitDetected()) isSitDetected = proto.isSitDetected
+            if (proto.hasIsSitActive()) isSitActive = proto.isSitActive
+            if (proto.hasVerticalVelocity()) verticalVelocity = proto.verticalVelocity
+            if (proto.hasSitVz()) sitVz = proto.sitVz
+            if (proto.hasSitVzTs()) sitVzTs = proto.sitVzTs
+            if (proto.hasSitVzRt()) sitVzRt = proto.sitVzRt
+            if (proto.hasSitDz()) sitDz = proto.sitDz
+            if (proto.hasSitBaro()) sitBaro = proto.sitBaro
+            if (proto.hasSitTilt()) sitTilt = proto.sitTilt
+            if (proto.hasSitShock()) sitShock = proto.sitShock
+            if (proto.hasIsBatterySteepDischarge()) isBatterySteepDischarge = proto.isBatterySteepDischarge
+            if (proto.hasIsCoolingModeActive()) isCoolingModeActive = proto.isCoolingModeActive
+            if (proto.hasIsBatteryLow()) isBatteryLow = proto.isBatteryLow
+            if (proto.hasIsBatteryCritical()) isBatteryCritical = proto.isBatteryCritical
+            if (proto.hasViolationUptimeMs()) violationUptimeMs = proto.violationUptimeMs
+            if (proto.hasIsUltraLongStationary()) isUltraLongStationary = proto.isUltraLongStationary
+            if (proto.hasGpsHardwareLock()) gpsHardwareLock = proto.gpsHardwareLock
+            if (proto.hasIsAnchorLocked()) isAnchorLocked = proto.isAnchorLocked
+            if (proto.hasThermalHeadroom()) thermalHeadroom = proto.thermalHeadroom
+            if (proto.hasHeapAllocatedMb()) heapAllocatedMb = proto.heapAllocatedMb
+            if (proto.hasActivityType()) {
+                activityType = try { ActivityType.valueOf(proto.activityType) } catch (e: Exception) { ActivityType.UNKNOWN }
+            }
             thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
             heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
             luxSnapshot = if (proto.hasLuxSnapshot()) proto.luxSnapshot else null
             acousticSnapshot = if (proto.hasAcousticSnapshot()) proto.acousticSnapshot else null
             
             // Oct.7.7 Anomaly Flags
-            isSuspiciousNoise = proto.isSuspiciousNoise
-            isMemoryPressureThrottled = proto.isMemoryPressureThrottled
-            isJammingCandidate = proto.isJammingCandidate
+            if (proto.hasIsSuspiciousNoise()) isSuspiciousNoise = proto.isSuspiciousNoise
+            if (proto.hasIsMemoryPressureThrottled()) isMemoryPressureThrottled = proto.isMemoryPressureThrottled
+            if (proto.hasIsJammingCandidate()) isJammingCandidate = proto.isJammingCandidate
             
             // Oct.22.16 Parity
-            violationPercentage = proto.violationPercentage
+            if (proto.hasViolationPercentage()) violationPercentage = proto.violationPercentage
         }
         populateRibbons(out)
     }
@@ -955,7 +999,9 @@ object TelemetryMapper {
             try {
                 val proto = RealtimeStatus.parseFrom(entity.payload)
                 mapProtoToSnapshot(proto, entity.timestamp, proto.rt, out)
-                out.status = try { SentinelStatus.valueOf(proto.sentinelStatus) } catch(e: Exception) { SentinelStatus.VALID }
+                if (proto.hasSentinelStatus()) {
+                    out.status = try { SentinelStatus.valueOf(proto.sentinelStatus) } catch(e: Exception) { SentinelStatus.VALID }
+                }
                 return out
             } catch (e: Exception) {
                 Timber.e(e, "Binary pending status restoration failed")
