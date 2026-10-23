@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct23.101)
+# SOT Master Requirements & Hardening Status (Oct23.105)
 
 ## 🏗️ Architectural Master Rules (327 Rules)
 
@@ -27,7 +27,7 @@
 *   **SOT ID 816**: Build Stabilization & Lint Hardening - PASSED. Resolved dependency conflicts, upgraded to JVM 17, and applied mandatory broadcast receiver export flags. (Oct24.00 - ISSUE-OCT24.00-F1/F3).
 *   **SOT ID 815**: Discovery Mode & Pairing Logic - PASSED. Relaxed SignalingValidator discovery mode to allow Trackers with default IDs to adopt custom viewers. (Oct24.00 - ISSUE-OCT24.00-F2).
 *   **SOT ID 814**: Forensic Trace Raw Sensor Parity - PASSED. Extended ForensicSnapshot and LocationUpdate with lux and acoustic fields for full raw sensor trace parity. (Oct23.00 - ISSUE-OCT22.16-F1).
-*   **SOT ID 813**: Telemetry Propagation & Violation Relay - RE-AUDIT FAILED (Oct23.101). Identified residual gaps in forensic field synchronization (Stationary Duration, Jammer/Stall flags in merger, JSON mapping defaults). (ISSUE-OCT22.0-F4).
+*   **SOT ID 813**: Telemetry Propagation & Violation Relay - PARTIALLY REMEDIATED (Oct23.105). Resolved merge gaps in `TelemetryMerger` for critical integrity flags, SIT metrics, and sensor parity (F1, F5, F10, F11). Residual gaps remain in JSON mapping (F2) and persistence (F4). (ISSUE-OCT22.0-F4).
 *   **SOT ID 812**: Signaling Identity Symmetry & Leak Prevention - PASSED. Enforced strict ID symmetry in SignalingValidator and blocked cross-viewer traffic. (Oct22.12 - ISSUE-OCT22.0-F3).
 *   **SOT ID 811**: Setup Exit Authority & Lifecycle Hardening - PASSED. Implemented BackHandler and Close icons for all setup overlays. (Oct22.10 - ISSUE-OCT22.0-F2).
 *   **SOT ID 810**: Setup & Configuration Hardening - PASSED. Resolved ID persistence blocks, added Load Defaults, and implemented explicit Exit authority. (Oct22.0 - ISSUE-OCT22.0-F1).
@@ -35,7 +35,7 @@
 
 ## ✅ Verification Chapters
 *   **Chapter 4.1 (Build & Infrastructure Audit)**: PASSED - Verified JVM 17 alignment, Hilt Test compatibility, and Broadcast Export security. (Oct24.00).
-*   **Chapter 4.0 (Telemetry Continuity Audit)**: RE-AUDIT FAILED - Identified residual gaps in Noise/Lux/Vibe/RTT/Jammer propagation and violation mirroring. Residual issues documented in issues.md (Oct23.101). (Oct23.101).
+*   **Chapter 4.0 (Telemetry Continuity Audit)**: PARTIALLY REMEDIATED - Resolved logic gaps in TelemetryMerger (Oct23.105). Residual mapping and persistence issues documented in issues.md (Oct23.105).
 *   **Chapter 3.0 (Signaling Identity Audit)**: PASSED - Enforced strict symmetry in SignalingValidator; verified pulse/ping/pong isolation. (Oct22.12).
 *   **Chapter 2.9 (Overlay Lifecycle Audit)**: PASSED - Verified BackHandler interception and Exit authority in Phone Setup. Migrated to Composition Local in Oct23.100. (Oct23.100).
 *   **Chapter 2.8 (Setup Persistence Audit)**: PASSED - Verified ID saving, Relay URL visibility, and Load Defaults behavior. (Oct22.0).

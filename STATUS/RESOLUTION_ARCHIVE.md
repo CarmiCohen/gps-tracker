@@ -1,4 +1,10 @@
-# Resolution Archive - GPS Tracker (Oct23.101)
+# Resolution Archive - GPS Tracker (Oct23.105)
+
+## ISSUE-OCT23.101-F1: Incomplete Telemetry Merge Logic (Oct23.105)
+- **Resolved**: Oct23.105
+- **Description**: `TelemetryMerger.kt` failed to merge critical integrity flags and SIT metrics when GPS was stale.
+- **Remediation**: Expanded `preferCached` block in `TelemetryMerger.kt` to include `isJammer`, `isStalled`, SIT metrics, raw sensor values, and proximity/index metadata.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 813).
 
 ## ISSUE-OCT22.0-F4: Telemetry Sync & Violation Propagation Hardening (Oct22.16 / Oct23.101)
 - **Resolved**: Oct22.16 (Initial) / **RE-AUDIT FAILED**: Oct23.101
