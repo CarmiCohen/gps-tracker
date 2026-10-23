@@ -11,6 +11,9 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
+ * Oct.22.16:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added luxSnapshot and 
+ *   acousticSnapshot delegates to ConnectionPoint and LogEntry for parity.
  * Oct.22.15:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added violationPercentage and 
  *   isJammingCandidate to ConnectionPoint and LogEntry for parity.
@@ -619,6 +622,12 @@ class ConnectionPoint(
     var heapSnapshot: Double?
         get() = forensic.heap
         set(value) { forensic.heap = value }
+    var luxSnapshot: Double?
+        get() = forensic.lux
+        set(value) { forensic.lux = value }
+    var acousticSnapshot: Double?
+        get() = forensic.acoustic
+        set(value) { forensic.acoustic = value }
 
     // Oct.7.7 Anomaly Flags
     var isSuspiciousNoise: Boolean
@@ -679,6 +688,7 @@ class ConnectionPoint(
                heapAllocatedMb == other.heapAllocatedMb && activityType == other.activityType &&
                forensic.snr == other.forensic.snr && forensic.vibe == other.forensic.vibe &&
                forensic.thermal == other.forensic.thermal && forensic.heap == other.forensic.heap &&
+               forensic.lux == other.forensic.lux && forensic.acoustic == other.forensic.acoustic &&
                forensic.isSuspiciousNoise == other.forensic.isSuspiciousNoise &&
                forensic.isMemoryPressureThrottled == other.forensic.isMemoryPressureThrottled &&
                forensic.isJammingCandidate == other.forensic.isJammingCandidate
@@ -772,6 +782,12 @@ data class LogEntry(
     var heapSnapshot: Double? 
         get() = forensic.heap
         set(value) { forensic.heap = value }
+    var luxSnapshot: Double?
+        get() = forensic.lux
+        set(value) { forensic.lux = value }
+    var acousticSnapshot: Double?
+        get() = forensic.acoustic
+        set(value) { forensic.acoustic = value }
 
     // Oct.7.10 Jammer Discrimination
     var isJammingCandidate: Boolean
@@ -787,6 +803,7 @@ data class LogEntry(
                lat == other.lat && lng == other.lng && accuracy == other.accuracy &&
                forensic.snr == other.forensic.snr && forensic.vibe == other.forensic.vibe &&
                forensic.thermal == other.forensic.thermal && forensic.heap == other.forensic.heap &&
+               forensic.lux == other.forensic.lux && forensic.acoustic == other.forensic.acoustic &&
                forensic.isSuspiciousNoise == other.forensic.isSuspiciousNoise &&
                forensic.isMemoryPressureThrottled == other.forensic.isMemoryPressureThrottled &&
                forensic.isJammingCandidate == other.forensic.isJammingCandidate &&
@@ -825,6 +842,8 @@ data class LogEntry(
             coolingSnapshot?.let { put("cooling_snapshot", it) }
             thermalSnapshot?.let { put("thermal_snapshot", safeDouble(it)) }
             heapSnapshot?.let { put("heap_snapshot", safeDouble(it)) }
+            luxSnapshot?.let { put("lux_snapshot", safeDouble(it)) }
+            acousticSnapshot?.let { put("acoustic_snapshot", safeDouble(it)) }
             checksum?.let { put("checksum", it) }
             
             put("is_suspicious_noise", forensic.isSuspiciousNoise)
@@ -841,6 +860,8 @@ data class LogEntry(
                 vibe = if (obj.has("vibe_snapshot")) obj.optDouble("vibe_snapshot") else null,
                 thermal = if (obj.has("thermal_snapshot")) obj.optDouble("thermal_snapshot") else null,
                 heap = if (obj.has("heap_snapshot")) obj.optDouble("heap_snapshot") else null,
+                lux = if (obj.has("lux_snapshot")) obj.optDouble("lux_snapshot") else null,
+                acoustic = if (obj.has("acoustic_snapshot")) obj.optDouble("acoustic_snapshot") else null,
                 isSuspiciousNoise = obj.optBoolean("is_suspicious_noise", false),
                 isMemoryPressureThrottled = obj.optBoolean("is_memory_pressure_throttled", false),
                 isJammingCandidate = obj.optBoolean("is_jamming_candidate", false)

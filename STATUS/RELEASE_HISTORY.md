@@ -1,13 +1,19 @@
-# Project History & Versioning (Oct22.15)
+# Project History & Versioning (Oct22.16)
 
 **For historical records (v9.3.0 and older), see [docs_history_archive.md](docs_history_archive.md).**
+
+## Oct22.16 (Full Forensic Parity Hardened)
+- **Remediation Hardening (#ISSUE-OCT22.0-F4)**: Finalized full stack parity for forensic telemetry. Synchronized RTT, Violation Percentage, and Jammer Candidate flags across all persistence and mapping layers.
+- **Protobuf Parity**: Synchronized `violationPercentage` and `isJammingCandidate` in `TelemetryProtobufMapper.mapAppToPersistence` to ensure history binary parity.
+- **Mapping Integrity**: Synchronized `rtt` and `violationPercentage` in all `TelemetryMapper` paths (Snapshot, Status, App, Entity) to resolve residuals from Oct22.15.
+- **Database Alignment**: Confirmed `PendingStatusEntity`, `HistoryEntity`, and `ViolationEntity` parity in v85.
 
 ## Oct22.15 (Forensic Sync & Jammer Parity Hardened)
 - **Remediation Hardening (#ISSUE-OCT22.0-F4)**: Corrected residual gaps in forensic synchronization. Ensured Jammer Discrimination flags and RTT persistence are synchronized across Protobuf, JSON, and internal models.
 - **Protobuf Parity**: Added `is_jamming_candidate` to all status protos. Added `rtt` to persistence proto for connection quality auditing.
 - **JSON Standardization**: Standardized all telemetry JSON keys to snake_case (`is_cooling_mode_active`, `last_energy_duration_ms`, `is_jamming_candidate`).
-- **Database Schema (v84)**: Implemented migration to add `violationPercentage` and `isJammingCandidate` columns to logs and history tables.
-- **Mapping Integrity**: Hardened `TelemetryProtobufMapper` and `TelemetryMapper` for full field parity including jammer candidates.
+- **Database Schema (v85)**: Implemented migration to add `violationPercentage` and `isJammingCandidate` columns to logs and history tables. Incremented to version 85 to add `rtt` to `PendingStatusEntity`.
+- **Mapping Integrity**: Hardened `TelemetryProtobufMapper` and `TelemetryMapper` for field parity including jammer candidates.
 
 ## Oct22.14 (Forensic Sync Hardening)
 - **Remediation Recheck (#ISSUE-OCT22.0-F4)**: Hardened forensic field synchronization (Proximity, Vibration Floor, RTT) and ensured session audit parity (Violation Percentage) across Protobuf/JSON.

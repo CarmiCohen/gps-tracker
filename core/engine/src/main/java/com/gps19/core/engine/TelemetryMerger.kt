@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * TelemetryMerger: Pure logic for aggregating and merging telemetry updates.
+ * Oct.22.16:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Ensured luxSnapshot and 
+ *   acousticSnapshot are merged in preferCached block for full trace parity.
  * Oct.22.15:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Ensured isJammingCandidate is merged.
  * Oct.22.14:
@@ -85,6 +88,8 @@ object TelemetryMerger {
             target.heapSnapshot = incoming.heapSnapshot
             target.snrSnapshot = incoming.snrSnapshot
             target.vibeSnapshot = incoming.vibeSnapshot
+            target.luxSnapshot = incoming.luxSnapshot
+            target.acousticSnapshot = incoming.acousticSnapshot
 
             // Session Stats
             target.integrity.uptimeMs = incoming.integrity.uptimeMs

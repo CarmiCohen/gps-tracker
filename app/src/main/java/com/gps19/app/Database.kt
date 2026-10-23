@@ -8,6 +8,10 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Oct.22.16:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added luxSnapshot and 
+ *   acousticSnapshot to LogEntity, HistoryEntity, and PendingStatusEntity 
+ *   for full parity. Incremented version to 86.
  * Oct.22.15:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added rtt to PendingStatusEntity 
  *   and isJammingCandidate to ViolationEntity for full parity. Incremented 
@@ -57,6 +61,8 @@ data class LogEntity(
     val chargingSnapshot: Boolean? = null,
     val thermalSnapshot: Double? = null,
     val heapSnapshot: Double? = null,
+    val luxSnapshot: Double? = null,
+    val acousticSnapshot: Double? = null,
     val coolingSnapshot: Boolean? = null,
     val checksum: Long? = null,
     @ColumnInfo(defaultValue = "0") val isJammingCandidate: Boolean = false
@@ -110,6 +116,7 @@ data class HistoryEntity(
     @ColumnInfo(defaultValue = "10") val remoteSig: Int = 10,
     @ColumnInfo(defaultValue = "0") val isCoolingModeActive: Boolean = false,
     @ColumnInfo(defaultValue = "0") val speed: Double = 0.0,
+    @ColumnInfo(defaultValue = "0") val vibeNorm: Float = 0f, 
     @ColumnInfo(defaultValue = "0") val bearing: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val isSitDetected: Boolean = false,
     @ColumnInfo(defaultValue = "0") val isSitActive: Boolean = false,
@@ -133,7 +140,9 @@ data class HistoryEntity(
     @ColumnInfo(defaultValue = "0") val thermalHeadroom: Double = 0.0,
     @ColumnInfo(defaultValue = "0") val heapAllocatedMb: Double = 0.0,
     @ColumnInfo(defaultValue = "UNKNOWN") val activityType: String = "UNKNOWN",
-    @ColumnInfo(defaultValue = "0") val isJammingCandidate: Boolean = false
+    @ColumnInfo(defaultValue = "0") val isJammingCandidate: Boolean = false,
+    val luxSnapshot: Double? = null,
+    val acousticSnapshot: Double? = null
 )
 
 @Entity(tableName = "violations", indices = [Index(value = ["ts"])])
@@ -199,7 +208,9 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "0") val heapAllocatedMb: Double = 0.0,
     @ColumnInfo(defaultValue = "UNKNOWN") val activityType: String = "UNKNOWN",
     @ColumnInfo(defaultValue = "0") val isJammingCandidate: Boolean = false,
-    @ColumnInfo(defaultValue = "0") val rtt: Int = 0
+    @ColumnInfo(defaultValue = "0") val rtt: Int = 0,
+    val luxSnapshot: Double? = null,
+    val acousticSnapshot: Double? = null
 )
 
 @Dao
@@ -322,7 +333,7 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 85, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 86, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -346,6 +357,20 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_85_86 = object : Migration(85, 86) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #ISSUE-OCT22.0-F4: Forensic Sync Hardening.
+                try {
+                    db.execSQL("ALTER TABLE logs ADD COLUMN luxSnapshot REAL")
+                    db.execSQL("ALTER TABLE logs ADD COLUMN acousticSnapshot REAL")
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN luxSnapshot REAL")
+                    db.execSQL("ALTER TABLE connection_history ADD COLUMN acousticSnapshot REAL")
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN luxSnapshot REAL")
+                    db.execSQL("ALTER TABLE pending_status_updates ADD COLUMN acousticSnapshot REAL")
+                } catch (e: Exception) {}
+            }
+        }
+
         val MIGRATION_84_85 = object : Migration(84, 85) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #ISSUE-OCT22.0-F4: Forensic Sync Hardening.

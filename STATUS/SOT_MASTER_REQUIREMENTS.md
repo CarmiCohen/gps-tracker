@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct22.15)
+# SOT Master Requirements & Hardening Status (Oct22.16)
 
 ## 🏗️ Architectural Master Rules (323 Rules)
 
@@ -15,11 +15,11 @@
 *   **1.246 Setup Exit Parity (R-ID 615)**: The Phone Setup overlay MUST provide an explicit Close (X) mechanism identical to the Settings overlay to ensure consistent exit authority. (Oct22.10 - ISSUE-OCT22.0-F2).
 *   **1.247 Signaling Identity Symmetry (R-ID 616)**: All signaling events (pulses, pings, pongs, telemetry) MUST undergo strict identity validation against the target role's configured ID to prevent telemetry leaks and erroneous connectivity badges. (Oct22.12 - ISSUE-OCT22.0-F3).
 *   **1.248 Telemetry Sync Parity (R-ID 617)**: The signaling protocol MUST ensure raw forensic sensor data (Lux, Acoustic, Vibration) and real-time RTT are synchronized across peers to ensure Viewer HUD accuracy. (Oct22.13 - ISSUE-OCT22.0-F4).
-*   **1.249 Forensic State Symmetry (R-ID 618)**: The system MUST ensure session audit metrics (e.g., Violation Percentage) and adaptive sensor thresholds (e.g., Vibration Floor) are synchronized across peers to maintain forensic parity between Tracker and Viewer evaluation engines. (Oct22.14 - ISSUE-OCT22.0-F4).
-*   **1.250 Jammer Discrimination Parity (R-ID 619)**: The system MUST synchronize the `isJammingCandidate` flag across all signaling (Protobuf/JSON) and persistence layers to ensure the Viewer HUD correctly reflects the Tracker's jammer discrimination state. (Oct22.15 - ISSUE-OCT22.0-F4).
+*   **1.249 Forensic State Symmetry (R-ID 618)**: The system MUST ensure session audit metrics (e.g., Violation Percentage) and adaptive sensor thresholds (e.g., Vibration Floor) are synchronized across peers to maintain forensic parity between Tracker and Viewer evaluation engines. (Oct22.16 - ISSUE-OCT22.0-F4).
+*   **1.250 Jammer Discrimination Parity (R-ID 619)**: The system MUST synchronize the `isJammingCandidate` flag across all signaling (Protobuf/JSON) and persistence layers to ensure the Viewer HUD correctly reflects the Tracker's jammer discrimination state. (Oct22.16 - ISSUE-OCT22.0-F4).
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 813**: Telemetry Propagation & Violation Relay - PASSED. Hardened forensic field synchronization (Proximity, Vibration Floor, RTT, Jamming Candidate) and ensured session audit parity (Violation Percentage) across Protobuf/JSON. (Oct22.15 - ISSUE-OCT22.0-F4).
+*   **SOT ID 813**: Telemetry Propagation & Violation Relay - PASSED. Finalized forensic field synchronization (RTT, Violation Percentage, Jamming Candidate) across Protobuf, JSON, and Database (v85). (Oct22.16 - ISSUE-OCT22.0-F4).
 *   **SOT ID 812**: Signaling Identity Symmetry & Leak Prevention - PASSED. Enforced strict ID symmetry in SignalingValidator and blocked cross-viewer traffic. (Oct22.12 - ISSUE-OCT22.0-F3).
 *   **SOT ID 811**: Setup Exit Authority & Lifecycle Hardening - PASSED. Implemented BackHandler and Close icons for all setup overlays. (Oct22.10 - ISSUE-OCT22.0-F2).
 *   **SOT ID 810**: Setup & Configuration Hardening - PASSED. Resolved ID persistence blocks, added Load Defaults, and implemented explicit Exit authority. (Oct22.0 - ISSUE-OCT22.0-F1).
@@ -32,7 +32,7 @@
 *   **SOT ID 795**: HUD Vertical Spacing / Touch Targets - PASSED. (Oct21.00).
 
 ## ✅ Verification Chapters
-*   **Chapter 4.0 (Telemetry Continuity Audit)**: PASSED - Verified Noise/Lux/Vibe/RTT/Jammer propagation and violation mirroring on Viewer. Hardened forensic parity in Oct22.15. (Oct22.15).
+*   **Chapter 4.0 (Telemetry Continuity Audit)**: PASSED - Verified Noise/Lux/Vibe/RTT/Jammer propagation and violation mirroring on Viewer. Full parity hardened in Oct22.16. (Oct22.16).
 *   **Chapter 3.0 (Signaling Identity Audit)**: PASSED - Enforced strict symmetry in SignalingValidator; verified pulse/ping/pong isolation. (Oct22.12).
 *   **Chapter 2.9 (Overlay Lifecycle Audit)**: PASSED - Verified BackHandler interception and Exit authority in Phone Setup. (Oct22.10).
 *   **Chapter 2.8 (Setup Persistence Audit)**: PASSED - Verified ID saving, Relay URL visibility, and Load Defaults behavior. (Oct22.0).

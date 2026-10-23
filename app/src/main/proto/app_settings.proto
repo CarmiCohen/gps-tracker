@@ -303,6 +303,10 @@ message RealtimeStatus {
 
     // Oct.22.15: Jammer Discrimination Parity
     bool is_jamming_candidate = 122;
+
+    // Oct.22.16: Forensic Snapshot Parity
+    optional double lux_snapshot = 123;
+    optional double acoustic_snapshot = 124;
 }
 
 message GeoPointProto {
@@ -498,6 +502,10 @@ message TrackerStatusProto {
 
     // Oct.22.15: Jammer Discrimination Parity
     bool is_jamming_candidate = 141;
+
+    // Oct.22.16: Forensic Snapshot Parity
+    optional double lux_snapshot = 142;
+    optional double acoustic_snapshot = 143;
 }
 
 message ActiveAlarmProto {

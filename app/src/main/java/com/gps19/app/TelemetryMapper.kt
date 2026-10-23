@@ -6,6 +6,12 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.22.16:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Synchronized luxSnapshot and 
+ *   acousticSnapshot across all paths (Snapshot, Status, Health, App).
+ *   Synchronized rtt in mapStatusToPending/mapPendingToStatus. 
+ *   Synchronized violationPercentage in mapAppToEntity, mapProtoToApp and 
+ *   mapEntityToApp (fallback).
  * Oct.22.15:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Synchronized isJammingCandidate 
  *   across all paths (Snapshot, Status, App, Entity). Added violationPercentage 
@@ -224,6 +230,8 @@ object TelemetryMapper {
 
             this.thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
             this.heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
+            this.luxSnapshot = if (proto.hasLuxSnapshot()) proto.luxSnapshot else null
+            this.acousticSnapshot = if (proto.hasAcousticSnapshot()) proto.acousticSnapshot else null
             
             // Oct.7.7 Anomaly Flags
             this.isSuspiciousNoise = proto.isSuspiciousNoise
@@ -292,7 +300,7 @@ object TelemetryMapper {
                 acousticFloorDb = data.optDouble("acoustic_floor_db", current.atmospheric.acousticFloorDb)
                 adaptiveVibrationFloor = clampVibrationFloor(data.optDouble("adaptive_vibration_floor", current.atmospheric.adaptiveVibrationFloor))
                 proxIdx = data.optDouble("prox_idx", current.atmospheric.proxIdx)
-                proximityCm = data.optDouble("proximity_cm", current.atmospheric.proximityCm)
+                proximityCm = data.optDouble("proximity_cm", -1.0)
                 proximityDebounceMs = clampProxDebounce(data.optLong("proximity_debounce_ms", current.atmospheric.proximityDebounceMs))
                 vibrationRollingSum = data.optDouble("vibration_rolling_sum", current.atmospheric.vibrationRollingSum)
                 noiseIdx = data.optDouble("noise_idx", current.atmospheric.noiseIdx)
@@ -364,6 +372,8 @@ object TelemetryMapper {
 
             this.thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else null
             this.heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else null
+            this.luxSnapshot = if (data.has("lux_snapshot")) data.optDouble("lux_snapshot") else null
+            this.acousticSnapshot = if (data.has("acoustic_snapshot")) data.optDouble("acoustic_snapshot") else null
             
             // Oct.7.7 Anomaly Flags
             this.isSuspiciousNoise = data.optBoolean("is_suspicious_noise", current.isSuspiciousNoise)
@@ -432,6 +442,8 @@ object TelemetryMapper {
             
             this.thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
             this.heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
+            this.luxSnapshot = if (proto.hasLuxSnapshot()) proto.luxSnapshot else null
+            this.acousticSnapshot = if (proto.hasAcousticSnapshot()) proto.acousticSnapshot else null
             
             // Oct.7.7 Anomaly Flags
             this.isSuspiciousNoise = proto.isSuspiciousNoise
@@ -517,6 +529,8 @@ object TelemetryMapper {
             
             this.thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else null
             this.heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else null
+            this.luxSnapshot = if (data.has("lux_snapshot")) data.optDouble("lux_snapshot") else null
+            this.acousticSnapshot = if (data.has("acoustic_snapshot")) data.optDouble("acoustic_snapshot") else null
             
             // Oct.7.7 Anomaly Flags
             this.isSuspiciousNoise = data.optBoolean("is_suspicious_noise", false)
@@ -586,6 +600,8 @@ object TelemetryMapper {
             heapAllocatedMb = snapshot.integrity.heapAllocatedMb,
             thermalSnapshot = snapshot.thermalSnapshot,
             heapSnapshot = snapshot.heapSnapshot,
+            luxSnapshot = snapshot.luxSnapshot,
+            acousticSnapshot = snapshot.acousticSnapshot,
             isSuspiciousNoise = snapshot.isSuspiciousNoise,
             isMemoryPressureThrottled = snapshot.isMemoryPressureThrottled,
             isJammingCandidate = snapshot.isJammingCandidate,
@@ -673,6 +689,8 @@ object TelemetryMapper {
             this.integrity.heapAllocatedMb = s.integrity.heapAllocatedMb
             this.thermalSnapshot = s.thermalSnapshot
             this.heapSnapshot = s.heapSnapshot
+            this.luxSnapshot = s.luxSnapshot
+            this.acousticSnapshot = s.acousticSnapshot
             this.isSuspiciousNoise = s.isSuspiciousNoise
             this.isMemoryPressureThrottled = s.isMemoryPressureThrottled
             this.kinetic.activityType = s.activityType
@@ -717,6 +735,8 @@ object TelemetryMapper {
             activityType = p.activityType
             thermalSnapshot = p.thermalSnapshot
             heapSnapshot = p.heapSnapshot
+            luxSnapshot = p.forensic.lux
+            acousticSnapshot = p.forensic.acoustic
             
             // Oct.7.7 Anomaly Flags
             isSuspiciousNoise = p.forensic.isSuspiciousNoise
@@ -759,11 +779,16 @@ object TelemetryMapper {
             activityType = try { ActivityType.valueOf(proto.activityType) } catch (e: Exception) { ActivityType.UNKNOWN }
             thermalSnapshot = if (proto.hasThermalSnapshot()) proto.thermalSnapshot else null
             heapSnapshot = if (proto.hasHeapSnapshot()) proto.heapSnapshot else null
+            luxSnapshot = if (proto.hasLuxSnapshot()) proto.luxSnapshot else null
+            acousticSnapshot = if (proto.hasAcousticSnapshot()) proto.acousticSnapshot else null
             
             // Oct.7.7 Anomaly Flags
             isSuspiciousNoise = proto.isSuspiciousNoise
             isMemoryPressureThrottled = proto.isMemoryPressureThrottled
             isJammingCandidate = proto.isJammingCandidate
+            
+            // Oct.22.16 Parity
+            violationPercentage = proto.violationPercentage
         }
         populateRibbons(out)
     }
@@ -815,9 +840,14 @@ object TelemetryMapper {
             } catch (e: Exception) { ActivityType.UNKNOWN }
             thermalSnapshot = null
             heapSnapshot = null
+            luxSnapshot = entity.luxSnapshot
+            acousticSnapshot = entity.acousticSnapshot
             isSuspiciousNoise = false
             isMemoryPressureThrottled = false
             isJammingCandidate = entity.isJammingCandidate
+            
+            // Oct.22.16 Parity
+            violationPercentage = entity.violationPercentage
         }
         populateRibbons(out)
     }
@@ -853,12 +883,14 @@ object TelemetryMapper {
             locationPendingReason = p.locationPendingReason.name, accuracy = PhysicsUtils.safeDouble(p.gpsAccuracy),
             maxAccuracy = PhysicsUtils.safeDouble(p.maxAccuracy), isAnchorLocked = p.isAnchorLocked, isBatteryLow = p.isBatteryLow,
             isBatteryCritical = p.isBatteryCritical, violationUptimeMs = p.violationUptimeMs,
-            violationPercentage = 0.0, // Calculated at runtime
+            violationPercentage = p.violationPercentage, 
             isUltraLongStationary = p.isUltraLongStationary, gpsHardwareLock = p.gpsHardwareLock,
             thermalHeadroom = PhysicsUtils.safeDouble(p.thermalHeadroom), 
             heapAllocatedMb = PhysicsUtils.safeDouble(p.heapAllocatedMb),
             activityType = p.activityType.name,
             isJammingCandidate = p.isJammingCandidate,
+            luxSnapshot = p.luxSnapshot,
+            acousticSnapshot = p.acousticSnapshot,
             payload = TelemetryProtobufMapper.mapAppToBinary(p)
         )
     }
@@ -903,6 +935,9 @@ object TelemetryMapper {
             isGnssThrottled = status.isGnssThrottled, thermalHeadroom = PhysicsUtils.safeDouble(status.integrity.thermalHeadroom),
             heapAllocatedMb = PhysicsUtils.safeDouble(status.integrity.heapAllocatedMb), activityType = status.activityType.name,
             isJammingCandidate = status.isJammingCandidate,
+            rtt = status.rtt,
+            luxSnapshot = status.luxSnapshot,
+            acousticSnapshot = status.acousticSnapshot,
             payload = TelemetryProtobufMapper.mapStatusToBinary(status)
         )
     }
@@ -967,7 +1002,7 @@ object TelemetryMapper {
                 isGnssThrottled = entity.isGnssThrottled
                 thermalHeadroom = entity.thermalHeadroom
                 heapAllocatedMb = entity.heapAllocatedMb
-                rtt = 0
+                rtt = entity.rtt
                 isJammingCandidate = entity.isJammingCandidate
             }
 
@@ -975,6 +1010,8 @@ object TelemetryMapper {
             status = try { SentinelStatus.valueOf(entity.status) } catch(e: Exception) { SentinelStatus.VALID }
             trackerState = try { TrackerState.valueOf(entity.trackerState) } catch(e: Exception) { TrackerState.UNKNOWN }
             lastValidFixRt = entity.lastValidFixRt
+            luxSnapshot = entity.luxSnapshot
+            acousticSnapshot = entity.acousticSnapshot
         }
         return out
     }

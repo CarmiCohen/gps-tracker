@@ -5,6 +5,10 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * TelemetryProtobufMapper: Centralized authority for telemetry serialization.
+ * Oct.22.16:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added luxSnapshot and 
+ *   acousticSnapshot to all paths (Realtime & Persistence). Added 
+ *   violationPercentage and isJammingCandidate to mapAppToPersistence.
  * Oct.22.15:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added isJammingCandidate to all paths.
  *   Added rtt to mapToPersistence.
@@ -170,6 +174,8 @@ object TelemetryProtobufMapper {
 
         status.thermalSnapshot?.let { builder.setThermalSnapshot(PhysicsUtils.safeDouble(it)) }
         status.heapSnapshot?.let { builder.setHeapSnapshot(PhysicsUtils.safeDouble(it)) }
+        status.luxSnapshot?.let { builder.setLuxSnapshot(PhysicsUtils.safeDouble(it)) }
+        status.acousticSnapshot?.let { builder.setAcousticSnapshot(PhysicsUtils.safeDouble(it)) }
 
         builder.setState(TrackerStateProto.valueOf("TS_" + status.trackerState.name))
         builder.setPendingReason(LocationPendingReasonProto.valueOf("LPR_" + status.locationPendingReason.name))
@@ -333,6 +339,8 @@ object TelemetryProtobufMapper {
 
         status.thermalSnapshot?.let { builder.setThermalSnapshot(PhysicsUtils.safeDouble(it)) }
         status.heapSnapshot?.let { builder.setHeapSnapshot(PhysicsUtils.safeDouble(it)) }
+        status.luxSnapshot?.let { builder.setLuxSnapshot(PhysicsUtils.safeDouble(it)) }
+        status.acousticSnapshot?.let { builder.setAcousticSnapshot(PhysicsUtils.safeDouble(it)) }
 
         builder.setTrackerState(status.trackerState.name)
         builder.setStatus(status.status.name)
@@ -395,6 +403,8 @@ object TelemetryProtobufMapper {
         p.vibeSnapshot?.let { builder.setVibeSnapshot(PhysicsUtils.safeDouble(it)) }
         p.thermalSnapshot?.let { builder.setThermalSnapshot(PhysicsUtils.safeDouble(it)) }
         p.heapSnapshot?.let { builder.setHeapSnapshot(PhysicsUtils.safeDouble(it)) }
+        p.luxSnapshot?.let { builder.setLuxSnapshot(PhysicsUtils.safeDouble(it)) }
+        p.acousticSnapshot?.let { builder.setAcousticSnapshot(PhysicsUtils.safeDouble(it)) }
 
         // Oct.7.7 Anomaly Flags
         builder.setIsSuspiciousNoise(p.isSuspiciousNoise)
@@ -402,5 +412,9 @@ object TelemetryProtobufMapper {
 
         builder.setStatus(p.status.name)
         builder.setLocationPendingReason(LocationPendingReasonProto.valueOf("LPR_" + p.locationPendingReason.name))
+
+        // Oct.22.16 Parity
+        builder.setViolationPercentage(PhysicsUtils.safeDouble(p.violationPercentage))
+        builder.setIsJammingCandidate(p.isJammingCandidate)
     }
 }

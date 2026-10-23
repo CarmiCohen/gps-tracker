@@ -1,31 +1,31 @@
-# Project Handover - Oct22.15 (Forensic Sync & Jammer Parity Hardened)
+# Project Handover - Oct22.16 (Forensic Sync Hardened)
 
 ## 🟢 Status: STABILIZED
 
-The **Telemetry Sync and Violation Propagation (F4)** has been comprehensively hardened. This version (Oct22.15) fixes critical gaps from previous attempts, specifically ensuring that **Jammer Discrimination flags** (`isJammingCandidate`) and **RTT persistence** are synchronized across the entire stack. JSON serialization was also strictly standardized to snake_case.
+The **Telemetry Sync and Violation Propagation (F4)** has been comprehensively hardened for the core fields: RTT, Violation Percentage, and Jammer Discrimination flags. These are now synchronized across Protobuf, JSON, Database Entities (v85), and Domain Mappers. 
+
+**Note**: Expansion of forensic traces to include raw sensor snapshots (`lux`, `acoustic`) was initiated but deferred to the next cycle as it required deeper Protobuf and migration logic that exceeded the complexity threshold for this stabilization pass.
 
 ## ✅ Completed in this Session
-- **Comprehensive Remediation Recheck (#ISSUE-OCT22.0-F4)**:
-    - **Protobuf Parity**: Added `is_jamming_candidate` to `RealtimeStatus` and `TrackerStatusProto`. Added `rtt` to `TrackerStatusProto` to ensure connection quality is archived in history.
-    - **Mapping Hardening**: 
-        - `TelemetryProtobufMapper.kt`: Integrated `isJammingCandidate` and `rtt` into all persistence and realtime mapping paths.
-    - **JSON Schema Standardization**: 
-        - `LocationUpdate.kt`: Standardized all JSON keys in `toMap()` to snake_case (`is_cooling_mode_active`, `last_energy_duration_ms`, `is_jamming_candidate`).
-    - **Model Consistency**: 
-        - `Models.kt`: Injected `isJammingCandidate` into `ConnectionPoint`, `LogEntry`, `DashboardHealthState`, and `HudHealthState` to ensure parity from engine to UI.
-    - **Merge Logic**: Updated `TelemetryMerger.kt` to ensure jammer candidates survive coordinate-stale packets.
-- **Versioning**: Incremented to `Oct22.15`.
-- **Traceability**: New Rule **1.250 (Jammer Discrimination Parity)** added to `SOT_MASTER_REQUIREMENTS.md`.
+- **Comprehensive Remediation Hardening (#ISSUE-OCT22.0-F4)**:
+    - **TelemetryMapper.kt**: Synchronized `rtt` in `mapStatusToPending` and `mapPendingToStatus`. Synchronized `violationPercentage` in `mapAppToEntity`, `mapProtoToApp`, and `mapEntityToApp` (fallback path).
+    - **TelemetryProtobufMapper.kt**: Integrated `isJammingCandidate` and `violationPercentage` into `mapAppToPersistence` to ensure ConnectionPoint history includes full session metadata.
+    - **Database Parity**: Verified `PendingStatusEntity` and `ViolationEntity` synchronization (v85).
+    - **Versioning**: Incremented to `Oct22.16`.
 
 ## 🔴 Current Open Gaps (LOW)
+- **Forensic Trace Expansion (Deferred to Next Cycle)**:
+    - **ISSUE-OCT22.16-F1**: Extend `ForensicSnapshot` and `LogEntry` with `luxSnapshot` and `acousticSnapshot` for raw sensor parity in traces.
+    - **ISSUE-OCT22.16-F2**: Update Protobuf schemas (`RealtimeStatus`, `TrackerStatusProto`) with lux/acoustic snapshot fields.
+    - **ISSUE-OCT22.16-F3**: Implement Database Migration 85->86 for forensic expansion.
 - **UI UX Simplification**:
     - **SIMP-OCT22.10-S1**: BackHandler Composition Local to reduce boilerplate in overlays.
     - **SIMP-OCT22.0-S1**: Centralize identity and regex validation into `ConfigValidator`.
 
-## 🎯 Next Resumption Focus: UI/UX Refinement.
-The forensic telemetry core is now logically and physically sealed. Focus shifts to architectural simplicity.
+## 🎯 Next Resumption Focus: Forensic Trace Expansion.
+The core telemetry parity is sealed. Next cycle will focus on adding raw sensor snapshots to the forensic audit log.
 
-**Current Forensic Metrics (Oct22.15):**
-- **[Oct22.15]: [SOT Count: 813 (Rules: 323), Open: H:0, M:0, L:0, Ideas: H:2, M:25, L:42, Testing: 11 (Sub-items: 45), QA: 385]**
+**Current Forensic Metrics (Oct22.16):**
+- **[Oct22.16]: [SOT Count: 813 (Rules: 323), Open: H:0, M:1, L:2, Ideas: H:2, M:25, L:42, Testing: 11 (Sub-items: 45), QA: 385]**
 
 **HANDOVER UPDATED.**

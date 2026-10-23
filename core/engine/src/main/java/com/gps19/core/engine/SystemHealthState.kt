@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Oct.22.16:
+ * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added luxSnapshot and 
+ *   acousticSnapshot delegates and updated update() signature.
  * Oct.22.15:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added isJammingCandidate parity.
  *   Fixed proximityCm reset consistency (-1.0).
@@ -129,6 +132,12 @@ class SystemHealthState(
     var heapSnapshot: Double?
         get() = forensic.heap
         set(value) { forensic.heap = value }
+    var luxSnapshot: Double?
+        get() = forensic.lux
+        set(value) { forensic.lux = value }
+    var acousticSnapshot: Double?
+        get() = forensic.acoustic
+        set(value) { forensic.acoustic = value }
 
     // Oct.7.7 Delegates
     var isSuspiciousNoise: Boolean
@@ -261,6 +270,7 @@ class SystemHealthState(
         tamperNote: String? = null, coolingEnteredRt: Long = 0L,
         thermalHeadroom: Double = 0.0, heapAllocatedMb: Double = 0.0,
         thermalSnapshot: Double? = null, heapSnapshot: Double? = null,
+        luxSnapshot: Double? = null, acousticSnapshot: Double? = null,
         isSuspiciousNoise: Boolean = false, isMemoryPressureThrottled: Boolean = false,
         isJammingCandidate: Boolean = false,
         activityType: ActivityType = ActivityType.UNKNOWN
@@ -306,6 +316,8 @@ class SystemHealthState(
         this.heapAllocatedMb = heapAllocatedMb
         this.forensic.thermal = thermalSnapshot
         this.forensic.heap = heapSnapshot
+        this.forensic.lux = luxSnapshot
+        this.forensic.acoustic = acousticSnapshot
         this.forensic.isSuspiciousNoise = isSuspiciousNoise
         this.forensic.isMemoryPressureThrottled = isMemoryPressureThrottled
         this.forensic.isJammingCandidate = isJammingCandidate

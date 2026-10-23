@@ -1,13 +1,13 @@
-# Resolution Archive - GPS Tracker (Oct22.15)
+# Resolution Archive - GPS Tracker (Oct22.16)
 
-## ISSUE-OCT22.0-F4: Telemetry Sync & Violation Propagation Hardening (Oct22.15)
-- **Resolved**: Oct22.15
+## ISSUE-OCT22.0-F4: Telemetry Sync & Violation Propagation Hardening (Oct22.16)
+- **Resolved**: Oct22.16
 - **Description**: Forensic sensor data (Noise/Lux/Vibe/Proximity) and Ping (RTT) values were not reaching the Viewer HUD (showing 0). Tracker violations were also not mirroring on the remote Viewer. Initial Oct22.13/Oct22.14 fixes had gaps in Protobuf sync, JSON key mismatches, and lacked Jammer Discrimination flag parity.
 - **Remediation**:
     - **Protobuf Schema**: Expanded `RealtimeStatus` and `TrackerStatusProto` in `app_settings.proto` to include raw forensic fields, `rtt`, `violation_percentage`, and `is_jamming_candidate`.
     - **Mapping Hardening**: 
-        - `TelemetryProtobufMapper.kt`: Updated `mapToRealtime` and `mapToPersistence` to include all forensic indices, RTT, proximity metrics, vibration floor, and jammer flags.
-        - `TelemetryMapper.kt`: Fixed field omissions in all Snapshots and status mappers. Synchronized `violationPercentage` and `isJammingCandidate`.
+        - `TelemetryProtobufMapper.kt`: Updated `mapToRealtime` and `mapToPersistence` to include all forensic indices, RTT, proximity metrics, vibration floor, and jammer flags. Fixed missing `violationPercentage` and `isJammingCandidate` in `mapAppToPersistence`.
+        - `TelemetryMapper.kt`: Fixed field omissions in all Snapshots and status mappers. Synchronized `violationPercentage` and `isJammingCandidate`. Hardened `mapStatusToPending` and `mapPendingToStatus`.
         - `TelemetryMerger.kt`: Ensured forensic data, session audit metrics, and jammer flags survive coordinate-stale packets.
         - `LocationUpdate.kt`: Fixed JSON key snake_case consistency for `adaptive_vibration_floor`, `is_cooling_mode_active`, `last_energy_duration_ms`, and `is_jamming_candidate`.
     - **Model Integrity**: Updated `ConnectionPoint` and `LogEntry` in `Models.kt` to include `isJammingCandidate` for history parity.
