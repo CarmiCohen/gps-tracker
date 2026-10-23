@@ -17,20 +17,22 @@ import timber.log.Timber
 import java.util.concurrent.PriorityBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Provider
 import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct23.109:
+ * - ISSUE-OCT23.102-F9: Telemetry Flyweight Race Condition Remediation. Replaced 
+ *   shared member flyweights with local instances in processing paths. 
+ *   Migrated coordinate reconstruction state and local telemetry to atomic 
+ *   structures to ensure thread safety across concurrent signaling events.
  * Oct.22.13:
  * - ISSUE-OCT22.0-F4: Telemetry Sync failure remediation. Added "violation_relay" 
  *   handler to mirror remote tracker violations on Viewer. Implemented 
  *   emitViolation() for Tracker-to-Viewer propagation.
- * Oct.21.07:
- * - Signaling Audit: Added explicit INFO logs for pulse and geofence reception 
- *   to aid physical verification of R-ID 605/606. Removed redundant distinctUntilChanged 
- *   on StateFlow to resolve build error.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -62,9 +64,9 @@ class ConnectivitySuite @Inject constructor(
     private var lastReconnectTs = 0L 
     private var reconnectAttempt = 0
 
-    // Coordinate Reconstruction State
-    private var remoteLastLatE7 = 0
-    private var remoteLastLngE7 = 0
+    // Coordinate Reconstruction State (Thread-safe)
+    private val remoteLastLatE7 = AtomicInteger(0)
+    private val remoteLastLngE7 = AtomicInteger(0)
 
     private val suiteExceptionHandler = CoroutineExceptionHandler { _, throwable ->
         if (throwable is CancellationException || isStopped.get()) return@CoroutineExceptionHandler
@@ -88,11 +90,9 @@ class ConnectivitySuite @Inject constructor(
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing = _isSyncing.asStateFlow()
 
-    private val snapshotFlyweight = LocationUpdate()
-    private val statusFlyweight = LocationUpdate()
-    private val pendingStatusFlyweight = LocationUpdate()
-    
-    private val localStatusFlyweight = LocationUpdate()
+    // Oct23.109: Removed shared flyweights to prevent race conditions.
+    // localStatus is now thread-safe for heartbeat and local updates.
+    private val localStatus = AtomicReference(LocationUpdate())
 
     private data class JitterEntry(
         val data: ByteArray?,
@@ -240,7 +240,6 @@ class ConnectivitySuite @Inject constructor(
         startJitterCorrectionLoop()
         initializePeerState()
         
-        // Oct.21.06: Proactive sync when connection established.
         connectionObserverJob?.cancel()
         connectionObserverJob = scope.launch {
             telemetryRepository.isRelayConnected
@@ -294,18 +293,20 @@ class ConnectivitySuite @Inject constructor(
         heartbeatJob?.cancel()
         heartbeatJob = scope.launch(Dispatchers.IO) {
             while (isActive) {
-                val isUltra = if (isTrackerMode) localStatusFlyweight.isUltraLongStationary else trackerStatus.isUltraLongStationary
+                val currentLocal = localStatus.get()
+                val isUltra = if (isTrackerMode) currentLocal.isUltraLongStationary else trackerStatus.isUltraLongStationary
                 val delayMs = if (isUltra) 300000L else 30000L
                 delay(delayMs)
 
                 if (isTrackerMode && isConnected && !isStopped.get()) {
-                    if (localStatusFlyweight.ts > 0) {
+                    val statusToSend = localStatus.get()
+                    if (statusToSend.ts > 0) {
                         if (hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) {
                             Timber.d("ConnectivitySuite: Heartbeat deferred (Doze/PowerSave active)")
                             continue
                         }
                         Timber.d("ConnectivitySuite: Issuing Bypass Heartbeat to stabilize peer link.")
-                        sendTelemetryInternal(localStatusFlyweight, SignalingPriority.NORMAL)
+                        sendTelemetryInternal(statusToSend, SignalingPriority.NORMAL)
                     }
                 }
             }
@@ -441,7 +442,6 @@ class ConnectivitySuite @Inject constructor(
                 val nowRt = timeProvider.elapsedRealtime
                 val rtt = signalingProvider.rtt
                 
-                // Adaptive Jitter Window: 2x RTT or 1s minimum for bursty cellular links.
                 val jitterWindowMs = maxOf(1000L, rtt * 2L).coerceAtMost(5000L)
                 
                 val nextEntry = remoteJitterBuffer.peek()
@@ -458,7 +458,6 @@ class ConnectivitySuite @Inject constructor(
                     }
                 }
                 
-                // Adaptive poll: faster if buffer is filling up
                 val pollInterval = if (remoteJitterBuffer.size > 5) 50L else 200L
                 delay(pollInterval)
             }
@@ -469,7 +468,8 @@ class ConnectivitySuite @Inject constructor(
         val pending = offlineRepository.getPendingStatusUpdates(limit)
         if (pending.isEmpty()) return
         pending.forEach { entity ->
-            val status = TelemetryMapper.mapPendingToStatus(entity, deviceId, viewerId, pendingStatusFlyweight)
+            // Oct23.109: Use local instance instead of shared flyweight
+            val status = TelemetryMapper.mapPendingToStatus(entity, deviceId, viewerId, LocationUpdate())
             if (sendTelemetryInternal(status, SignalingPriority.NORMAL)) {
                 offlineRepository.deletePendingStatusUpdate(entity.id)
             } else {
@@ -479,7 +479,8 @@ class ConnectivitySuite @Inject constructor(
     }
 
     fun updateLocalTelemetry(status: LocationUpdate) {
-        localStatusFlyweight.copyFrom(status)
+        // Oct23.109: Thread-safe update of local status reference
+        localStatus.set(status.duplicate())
     }
 
     suspend fun sendTelemetry(status: LocationUpdate): Boolean {
@@ -503,7 +504,6 @@ class ConnectivitySuite @Inject constructor(
         if (!isConnected) return false
         if (hardwareSuite.shouldDeferSignaling(sessionManager.isInViolation)) return false
         
-        // vOct22.13: Ensure RTT is embedded in outgoing telemetry for Viewer HUD parity.
         status.rtt = signalingProvider.rtt
         
         signalingProvider.transmit(status, priority, fromViewer = !isTrackerMode)
@@ -519,11 +519,9 @@ class ConnectivitySuite @Inject constructor(
     private fun handleBinaryUpdate(data: ByteArray) {
         if (isStopped.get()) return
         try {
-            // Quick parse for jitter buffer sequencing
             val rawProto = RealtimeStatus.parseFrom(data)
             val gpsTs = rawProto.gpsTs
             
-            // Only buffer remote updates if we are in Viewer mode
             if (!isTrackerMode && !rawProto.fromViewer) {
                 remoteJitterBuffer.add(JitterEntry(data, null, gpsTs, timeProvider.elapsedRealtime))
             } else {
@@ -531,7 +529,7 @@ class ConnectivitySuite @Inject constructor(
             }
         } catch (e: Exception) {
             Timber.e(e, "Binary update quick parse failed")
-            processBinaryUpdateInternal(data) // Fallback to immediate
+            processBinaryUpdateInternal(data) 
         }
     }
 
@@ -540,19 +538,18 @@ class ConnectivitySuite @Inject constructor(
         try {
             val rawProto = RealtimeStatus.parseFrom(data)
             
-            // Issue #AUDIT-1006-9: Coordinate Reconstruction logic
             val builder = rawProto.toBuilder()
             if (rawProto.isDelta) {
-                remoteLastLatE7 += rawProto.latE7
-                remoteLastLngE7 += rawProto.lngE7
-                builder.setLat(remoteLastLatE7.toDouble() / 1e7)
-                builder.setLng(remoteLastLngE7.toDouble() / 1e7)
+                val newLatE7 = remoteLastLatE7.addAndGet(rawProto.latE7)
+                val newLngE7 = remoteLastLngE7.addAndGet(rawProto.lngE7)
+                builder.setLat(newLatE7.toDouble() / 1e7)
+                builder.setLng(newLngE7.toDouble() / 1e7)
             } else {
-                remoteLastLatE7 = rawProto.latE7
-                remoteLastLngE7 = rawProto.lngE7
-                if (rawProto.lat == 0.0 && rawProto.lng == 0.0 && (remoteLastLatE7 != 0 || remoteLastLngE7 != 0)) {
-                    builder.setLat(remoteLastLatE7.toDouble() / 1e7)
-                    builder.setLng(remoteLastLngE7.toDouble() / 1e7)
+                remoteLastLatE7.set(rawProto.latE7)
+                remoteLastLngE7.set(rawProto.lngE7)
+                if (rawProto.lat == 0.0 && rawProto.lng == 0.0 && (rawProto.latE7 != 0 || rawProto.lngE7 != 0)) {
+                    builder.setLat(rawProto.latE7.toDouble() / 1e7)
+                    builder.setLng(rawProto.lngE7.toDouble() / 1e7)
                 }
             }
             val statusProto = builder.build()
@@ -589,21 +586,24 @@ class ConnectivitySuite @Inject constructor(
             }
 
             remoteStatusRepository.updateStatusAtomic { current ->
-                TelemetryMapper.mapProtoToSnapshot(statusProto, now, nowRt, snapshotFlyweight)
+                // Oct23.109: Use local instances instead of shared flyweights
+                val snapshot = LocationUpdate()
+                TelemetryMapper.mapProtoToSnapshot(statusProto, now, nowRt, snapshot)
 
                 val processed = locationProcessor.processGpsPoint(
-                    update = snapshotFlyweight, 
+                    update = snapshot, 
                     isViewerTrail = false,
                     lastGpsTs = current.gpsTs,
                     isLocal = false
                 )
                 
                 val lastFixRt = if (processed.optimizedPoint.lat != 0.0 && processed.optimizedPoint.lng != 0.0) nowRt else statusProto.lastValidFixRt
-                TelemetryMapper.mapProtoToStatus(statusProto, current, processed, now, lastFixRt, statusFlyweight)
+                val resultStatus = LocationUpdate()
+                TelemetryMapper.mapProtoToStatus(statusProto, current, processed, now, lastFixRt, resultStatus)
 
-                domainEventBus.emit(DomainEvent.PeerStatusReceived(statusFlyweight.duplicate()))
+                domainEventBus.emit(DomainEvent.PeerStatusReceived(resultStatus.duplicate()))
                 
-                statusFlyweight
+                resultStatus
             }
         } catch (e: Exception) {
             Timber.e(e, "Protobuf direct parse error")
@@ -620,7 +620,6 @@ class ConnectivitySuite @Inject constructor(
         if (isStopped.get()) return
         val type = data.optString("type", "")
         
-        // Jitter Buffering for location updates in Viewer mode
         if (!isTrackerMode && type == "location_update") {
             val gpsTs = data.optLong("gps_ts", data.optLong("ts"))
             remoteJitterBuffer.add(JitterEntry(null, data, gpsTs, timeProvider.elapsedRealtime))
@@ -645,7 +644,6 @@ class ConnectivitySuite @Inject constructor(
             return
         }
         
-        // vOct22.13: Handle remote violation relay
         if (type == "violation_relay") {
             if (!isTrackerMode && !fromViewer) {
                 val violationType = data.optString("violation_type")
@@ -665,7 +663,6 @@ class ConnectivitySuite @Inject constructor(
             return
         }
 
-        // Oct.20.32: Handle remote settings relay (Home Points)
         if (type == "settings_relay") {
             if (isTrackerMode && fromViewer) {
                 if (data.has("home_points")) {
@@ -724,7 +721,6 @@ class ConnectivitySuite @Inject constructor(
         }
 
         if (type == "viewer_pulse" || type == "tracker_pulse" || type == "pong_activity" || type == "viewer_status") {
-            // Oct.20.32: Fixed red-badge bug by ensuring tracker sets connected=true for viewer_pulse
             remoteStatusRepository.setTrackerConnected(true)
             Timber.i("Signaling: Received peer pulse [Type: $type] (R-ID 605).")
             
@@ -756,10 +752,12 @@ class ConnectivitySuite @Inject constructor(
             }
 
             remoteStatusRepository.updateStatusAtomic { current ->
-                TelemetryMapper.mapJsonToSnapshot(data, current, now, nowRt, snapshotFlyweight)
+                // Oct23.109: Use local instances instead of shared flyweights
+                val snapshot = LocationUpdate()
+                TelemetryMapper.mapJsonToSnapshot(data, current, now, nowRt, snapshot)
 
                 val processed = locationProcessor.processGpsPoint(
-                    update = snapshotFlyweight, 
+                    update = snapshot, 
                     isViewerTrail = false,
                     lastGpsTs = current.gpsTs,
                     isLocal = false
@@ -780,11 +778,12 @@ class ConnectivitySuite @Inject constructor(
                     } catch (e: Exception) { Timber.e(e, "GNSS detail parse error") }
                 }
 
-                TelemetryMapper.mapJsonToStatus(data, current, processed, now, lastFixRt, gnssDetail, statusFlyweight)
+                val resultStatus = LocationUpdate()
+                TelemetryMapper.mapJsonToStatus(data, current, processed, now, lastFixRt, gnssDetail, resultStatus)
 
-                domainEventBus.emit(DomainEvent.PeerStatusReceived(statusFlyweight.duplicate()))
+                domainEventBus.emit(DomainEvent.PeerStatusReceived(resultStatus.duplicate()))
 
-                statusFlyweight
+                resultStatus
             }
         }
     }
@@ -853,8 +852,8 @@ class ConnectivitySuite @Inject constructor(
         remoteStatusRepository.reset()
         mainRepository.updateRemoteActivity(0L) 
         trackerGpsStallStartTs = 0L
-        remoteLastLatE7 = 0
-        remoteLastLngE7 = 0
+        remoteLastLatE7.set(0)
+        remoteLastLngE7.set(0)
         remoteJitterBuffer.clear()
         
         val role = if (isTrackerMode) AppRole.TRACKER else AppRole.VIEWER_REMOTE

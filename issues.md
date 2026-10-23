@@ -1,14 +1,13 @@
 git add .
-git commit -m "Remediation: Resolved ISSUE-OCT23.102-F8. Protobuf Default Value Pollution (R-ID 626). Hardened TelemetryMapper with hasField checks and applied optional keywords to proto. Oct23.108."
-git tag -a Oct23.108 -m "Oct23.108 Remediation Baseline"
-git push origin Oct23.108
+git commit -m "Remediation: Resolved ISSUE-OCT23.102-F9. Telemetry Flyweight Race Condition (R-ID 627). Migrated ConnectivitySuite to local instances and atomic references for thread safety. Oct23.109."
+git tag -a Oct23.109 -m "Oct23.109 Remediation Baseline"
+git push origin Oct23.109
 
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct23.108
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct23.109
 
-## 🎯 Current Resumption Focus: Remediation Hardening of ISSUE-OCT23.102-F9 (Telemetry Flyweight Race).
+## 🎯 Current Resumption Focus: Remediation of ISSUE-OCT23.101-F3 (Missing Stationary Duration Propagation).
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   **ISSUE-OCT23.102-F9: Telemetry Flyweight Race Condition (High).** `ConnectivitySuite.kt` uses shared member flyweights across multiple asynchronous processing paths, causing data corruption during concurrent telemetry updates.
 *   **ISSUE-OCT23.101-F3: Missing Stationary Duration Propagation (Medium).** `stationary_duration_ms` is serialized in `toMap()` but ignored in all deserialization (`mapJsonToStatus`, `mapProtoToStatus`) paths.
 *   **ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps (Medium).** `MainRepository.addViolation` and `ConnectivitySuite.emitViolation` fail to propagate or store the `isJammingCandidate` field added to `ViolationEntity` in v85.
 *   **ISSUE-OCT23.101-F6: Offline Violation Event Sync (Low).** Discrete violation markers emitted via `emitViolation` are real-time only and are not buffered or synchronized after recovery from an offline state.
@@ -16,7 +15,8 @@ git push origin Oct23.108
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 76)
+## 💡 Strategic Simplification Ideas (Ideas: 77)
+*   **SIMP-OCT23.109-S1: Atomic Telemetry Accessors (Low).** Refactor `ConnectivitySuite` to use `AtomicReference` for all transient peer states to further reduce boilerplate in atomic update blocks.
 *   **SIMP-OCT23.108-S1: Protobuf Mapping Boilerplate Reduction (Medium).** Utilize a generated mapping layer or generic field visitor to reduce the manual `hasField()` boilerplate in `TelemetryMapper.kt`.
 *   **SIMP-OCT23.107-S1: Signaling Refresh Strategy Pattern (Medium).** Encapsulate delta-reset logic (spatial jump vs. temporal/packet frequency) into a dedicated `SignalingStrategy` to decouple `TelemetryProtobufMapper` from specific optimization thresholds.
 *   **SIMP-OCT23.106-S1: Unified Telemetry Property Resolver (Medium).** Create a generic property resolver for `LocationUpdate` that handles both Protobuf and JSON optional values with a single authoritative fallback policy to eliminate manual ternary drift.
@@ -28,6 +28,7 @@ git push origin Oct23.108
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT23.102-F9: Telemetry Flyweight Race Condition.** Resolved Oct23.109. Replaced shared flyweights in `ConnectivitySuite.kt` with local instances and atomic references to ensure concurrency safety. (SOT ID 821).
 *   **ISSUE-OCT23.102-F8: Protobuf Default Value Pollution.** Resolved Oct23.108. Applied `optional` keyword to all scalar fields in `app_settings.proto` and hardened `TelemetryMapper.kt` with `hasField()` checks to prevent state regression. (SOT ID 820).
 *   **ISSUE-OCT23.102-F7: Delta Compression Drift Prevention.** Resolved Oct23.107. Implemented periodic absolute coordinate refresh (every 50 packets) in `TelemetryProtobufMapper` (R-ID 625) to prevent permanent drift. (SOT ID 819).
 *   **ISSUE-OCT23.101-F2: JSON Mapping State Overwrite.** Resolved Oct23.106. Fixed `mapJsonToStatus` and `mapJsonToSnapshot` in `TelemetryMapper.kt` to preserve current cached values (proximityCm, rtt, snapshots, etc.) when keys are missing in JSON. (SOT ID 818).
@@ -42,6 +43,7 @@ git push origin Oct23.108
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct23.109: [SOT Count: 821 (Rules: 331), Open: H:0, M:2, L:1, Ideas: H:3, M:29, L:45, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct23.108: [SOT Count: 820 (Rules: 330), Open: H:1, M:3, L:1, Ideas: H:3, M:29, L:44, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct23.107: [SOT Count: 819 (Rules: 329), Open: H:2, M:3, L:1, Ideas: H:3, M:28, L:44, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct23.106: [SOT Count: 818 (Rules: 328), Open: H:3, M:3, L:1, Ideas: H:3, M:27, L:44, Testing: 11 (Sub-items: 45), QA: 385]**

@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct23.108)
+# SOT Master Requirements & Hardening Status (Oct23.109)
 
-## 🏗️ Architectural Master Rules (330 Rules)
+## 🏗️ Architectural Master Rules (331 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -24,8 +24,10 @@
 *   **1.255 Telemetry State Preservation (R-ID 624)**: Telemetry mapping logic MUST utilize the current cached state as the fallback for optional fields during JSON/Protobuf deserialization to prevent state regression (flicker) when keys are missing. (Oct23.106 - ISSUE-OCT23.101-F2).
 *   **1.256 Delta Drift Prevention (R-ID 625)**: `TelemetryProtobufMapper` MUST perform a periodic absolute coordinate refresh (every 50 packets) to prevent permanent coordinate drift in delta-compressed signaling streams. (Oct23.107 - ISSUE-OCT23.102-F7).
 *   **1.257 Protobuf State Protection (R-ID 626)**: Telemetry mapping MUST utilize hasField() checks for all optional Protobuf scalar fields to prevent default value pollution during deserialization. (Oct23.108 - ISSUE-OCT23.102-F8).
+*   **1.258 Concurrency-Safe Telemetry Processing (R-ID 627)**: `ConnectivitySuite` MUST NOT utilize shared member flyweights for telemetry processing; local instances or thread-safe atomic references MUST be used to prevent data corruption during concurrent signaling events. (Oct23.109 - ISSUE-OCT23.102-F9).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 821**: Telemetry Flyweight Race Condition Remediation - PASSED. Replaced shared flyweights in `ConnectivitySuite.kt` with local instances and atomic references to ensure concurrency safety. (Oct23.109 - ISSUE-OCT23.102-F9).
 *   **SOT ID 820**: Protobuf Default Value Pollution Remediation - PASSED. Applied `optional` keyword to scalar fields in `app_settings.proto` and hardened `TelemetryMapper.kt` with `hasField()` checks. (Oct23.108 - ISSUE-OCT23.102-F8).
 *   **SOT ID 819**: Delta Compression Drift Prevention - PASSED. Implemented periodic absolute coordinate refresh in `TelemetryProtobufMapper` (R-ID 625). (Oct23.107 - ISSUE-OCT23.102-F7).
 *   **SOT ID 818**: Telemetry Mapping State Preservation - PASSED. Hardened `TelemetryMapper.kt` to preserve cached values (prox, rtt, snapshots) during JSON mapping. (Oct23.106 - ISSUE-OCT23.101-F2).
@@ -40,7 +42,7 @@
 *   **SOT ID 801**: Asymmetric Connectivity & Geofence Sync Resolution - PASSED. (Oct21.06).
 
 ## ✅ Verification Chapters
-*   **Chapter 4.2 (Signaling Protocol Hardening)**: PASSED - Remediation of Protobuf default pollution (Oct23.108) and delta drift prevention (Oct23.107).
+*   **Chapter 4.2 (Signaling Protocol Hardening)**: PASSED - Remediation of telemetry flyweight race condition (Oct23.109), Protobuf default pollution (Oct23.108) and delta drift prevention (Oct23.107).
 *   **Chapter 4.0 (Telemetry Continuity Audit)**: PARTIALLY REMEDIATED - Resolved logic gaps in TelemetryMerger (Oct23.105) and mapping in TelemetryMapper (Oct23.106). (Oct23.106).
 *   **Chapter 4.1 (Build & Infrastructure Audit)**: PASSED - Verified JVM 17 alignment, Hilt Test compatibility, and Broadcast Export security. (Oct24.00).
 *   **Chapter 3.0 (Signaling Identity Audit)**: PASSED - Enforced strict symmetry in SignalingValidator; verified pulse/ping/pong isolation. (Oct22.12).

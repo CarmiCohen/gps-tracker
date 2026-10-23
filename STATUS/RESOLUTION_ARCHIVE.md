@@ -1,4 +1,14 @@
-# Resolution Archive - GPS Tracker (Oct23.108)
+# Resolution Archive - GPS Tracker (Oct23.109)
+
+## ISSUE-OCT23.102-F9: Telemetry Flyweight Race Condition (Oct23.109)
+- **Resolved**: Oct23.109
+- **Description**: `ConnectivitySuite.kt` used shared member flyweights (`snapshotFlyweight`, `statusFlyweight`, etc.) across multiple asynchronous processing paths, leading to data corruption and inconsistent state when multiple signaling updates arrived concurrently.
+- **Remediation**:
+    - Replaced shared `LocationUpdate` flyweights with local instances within `processBinaryUpdateInternal`, `processJsonUpdateInternal`, and `flushPendingUpdates`.
+    - Migrated `localStatusFlyweight` to a thread-safe `AtomicReference<LocationUpdate>` named `localStatus`.
+    - Converted coordinate reconstruction fields (`remoteLastLatE7`, `remoteLastLngE7`) to `AtomicInteger` to ensure thread-safe delta calculations.
+    - Updated `updateLocalTelemetry` to use `AtomicReference.set()` with a deep copy (`duplicate()`) of the incoming status.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 821).
 
 ## ISSUE-OCT23.102-F8: Protobuf Default Value Pollution (Oct23.108)
 - **Resolved**: Oct23.108
