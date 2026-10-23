@@ -1,4 +1,10 @@
-# Resolution Archive - GPS Tracker (Oct23.105)
+# Resolution Archive - GPS Tracker (Oct23.106)
+
+## ISSUE-OCT23.101-F2: JSON Mapping State Overwrite (Oct23.106)
+- **Resolved**: Oct23.106
+- **Description**: `TelemetryMapper.kt` overwrote multiple fields with hardcoded defaults (e.g., `-1.0` for `proximityCm`, `0` for `rtt`) in `mapJsonToStatus` instead of preserving current cached values when keys were missing.
+- **Remediation**: Hardened `mapJsonToStatus` and `mapJsonToSnapshot` to use the `current` state as fallback for all optional telemetry fields (proximity, rtt, snapshots, battery flags, etc.).
+- **Outcome**: 🟢 **PASSED**. (SOT ID 818).
 
 ## ISSUE-OCT23.101-F1: Incomplete Telemetry Merge Logic (Oct23.105)
 - **Resolved**: Oct23.105

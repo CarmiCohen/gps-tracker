@@ -1,14 +1,13 @@
 git add .
-git commit -m "Remediation: Resolved ISSUE-OCT23.101-F1. TelemetryMerger now synchronizes all critical integrity, SIT, and sensor flags during GPS signal loss. Oct23.105."
-git tag -a Oct23.105 -m "Oct23.105 Remediation Baseline"
-git push origin Oct23.105
+git commit -m "Remediation: Resolved ISSUE-OCT23.101-F2. TelemetryMapper now preserves cached telemetry state (prox, rtt, snapshots) during JSON mapping. Oct23.106."
+git tag -a Oct23.106 -m "Oct23.106 Remediation Baseline"
+git push origin Oct23.106
 
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct23.105
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct23.106
 
 ## 🎯 Current Resumption Focus: Remediation Hardening of ISSUE-OCT22.0-F4 & Forensic Parity.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   **ISSUE-OCT23.101-F2: JSON Mapping State Overwrite (High).** `TelemetryMapper.kt` overwrites multiple fields with hardcoded defaults (e.g., `-1.0` for `proximityCm`, `0` for `rtt`) in `mapJsonToStatus` instead of preserving current cached values when keys are missing.
 *   **ISSUE-OCT23.102-F7: Delta Compression Drift Risk (High).** `TelemetryProtobufMapper` lacks a periodic absolute coordinate refresh. If a delta packet is lost or signaling is interrupted, the Viewer's reconstructed coordinates will drift permanently until a large spatial jump triggers an absolute update.
 *   **ISSUE-OCT23.102-F8: Protobuf Default Value Pollution (High).** Many scalar telemetry fields (battery, isCharging, etc.) in `RealtimeStatus` lack the `optional` keyword. `TelemetryMapper` blindly assigns these fields, causing valid local state to be overwritten with defaults (0, false) if the sender omits them.
 *   **ISSUE-OCT23.102-F9: Telemetry Flyweight Race Condition (High).** `ConnectivitySuite.kt` uses shared member flyweights across multiple asynchronous processing paths, causing data corruption during concurrent telemetry updates.
@@ -19,7 +18,8 @@ git push origin Oct23.105
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 73)
+## 💡 Strategic Simplification Ideas (Ideas: 74)
+*   **SIMP-OCT23.106-S1: Unified Telemetry Property Resolver (Medium).** Create a generic property resolver for `LocationUpdate` that handles both Protobuf and JSON optional values with a single authoritative fallback policy to eliminate manual ternary drift.
 *   **SIMP-OCT23.101-S1: Telemetry Merger Polymorphism (High).** Replace the manual field-by-field merge in `TelemetryMerger.kt` with a reflection-free metadata-aware visitor to ensure all forensic fields are automatically included in `preferCached` blocks.
 *   **SIMP-OCT24.0-S1: Signaling Validator discovery logic simplification (Medium).** Relax `isDiscoveryMode` to allow asymmetric pairing when one peer is using a default ID.
 *   **SIMP-OCT23.0-S1: Forensic Snapshot Consolidation (Low).** Consolidate redundant `ForensicSnapshot` class definitions between `core:engine` and `HardwareSuite.kt` into a single shared domain model.
@@ -28,6 +28,7 @@ git push origin Oct23.105
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT23.101-F2: JSON Mapping State Overwrite.** Resolved Oct23.106. Fixed `mapJsonToStatus` and `mapJsonToSnapshot` in `TelemetryMapper.kt` to preserve current cached values (proximityCm, rtt, snapshots, etc.) when keys are missing in JSON. (SOT ID 818).
 *   **ISSUE-OCT23.101-F1: Incomplete Telemetry Merge Logic.** Resolved Oct23.105. Updated `TelemetryMerger.kt` to merge all critical integrity flags, SIT metrics (F5), raw sensor values (F10), and proximity/index gaps (F11) during GPS outages. (SOT ID 813).
 *   **SIMP-OCT22.10-S1: BackHandler Composition Local.** Resolved Oct23.100. Consolidated back button interception into `LocalBackAction` and `BackPressInterceptor` to reduce boilerplate across all overlays. (SOT ID 817).
 *   **ISSUE-OCT24.00-F1: Build Stabilization (Infra).** Resolved Oct24.00. Corrected `activity-compose` dependency, upgraded Kotlin to 1.9.24 / JVM 17, and fixed Compose compiler compatibility. (SOT ID 816).
@@ -39,6 +40,7 @@ git push origin Oct23.105
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct23.106: [SOT Count: 818 (Rules: 328), Open: H:3, M:3, L:1, Ideas: H:3, M:27, L:44, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct23.105: [SOT Count: 817 (Rules: 327), Open: H:4, M:3, L:1, Ideas: H:3, M:26, L:44, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct23.102: [SOT Count: 817 (Rules: 327), Open: H:5, M:7, L:1, Ideas: H:3, M:26, L:44, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct23.101: [SOT Count: 817 (Rules: 327), Open: H:2, M:4, L:1, Ideas: H:3, M:26, L:44, Testing: 11 (Sub-items: 45), QA: 385]**

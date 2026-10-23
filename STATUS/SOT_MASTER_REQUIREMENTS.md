@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct23.105)
+# SOT Master Requirements & Hardening Status (Oct23.106)
 
-## 🏗️ Architectural Master Rules (327 Rules)
+## 🏗️ Architectural Master Rules (328 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -21,21 +21,23 @@
 *   **1.252 Discovery Mode Asymmetry (R-ID 621)**: The signaling validator MUST permit Trackers in a default state (no Viewer ID assigned) to accept incoming pulses from any viewer, enabling initial discovery and pairing (ISSUE-OCT24.00-F2).
 *   **1.253 Broadcast Export Security (R-ID 622)**: All internal broadcast receivers MUST be registered with `RECEIVER_NOT_EXPORTED` unless explicit cross-app communication is required, satisfying Android 14+ security mandates (ISSUE-OCT24.00-F3).
 *   **1.254 BackHandler Composition Local (R-ID 623)**: Back button interception MUST be consolidated into a reusable `LocalBackAction` Composition Local to reduce boilerplate and ensure consistent navigation behavior across all overlays (Oct23.100 - SIMP-OCT22.10-S1).
+*   **1.255 Telemetry State Preservation (R-ID 624)**: Telemetry mapping logic MUST utilize the current cached state as the fallback for optional fields during JSON/Protobuf deserialization to prevent state regression (flicker) when keys are missing. (Oct23.106 - ISSUE-OCT23.101-F2).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 818**: Telemetry Mapping State Preservation - PASSED. Hardened `TelemetryMapper.kt` to preserve cached values (prox, rtt, snapshots) during JSON mapping. (Oct23.106 - ISSUE-OCT23.101-F2).
 *   **SOT ID 817**: BackHandler Consolidation - PASSED. Implemented `LocalBackAction` and `BackPressInterceptor` to unify back navigation across all overlays. (Oct23.100 - SIMP-OCT22.10-S1).
 *   **SOT ID 816**: Build Stabilization & Lint Hardening - PASSED. Resolved dependency conflicts, upgraded to JVM 17, and applied mandatory broadcast receiver export flags. (Oct24.00 - ISSUE-OCT24.00-F1/F3).
 *   **SOT ID 815**: Discovery Mode & Pairing Logic - PASSED. Relaxed SignalingValidator discovery mode to allow Trackers with default IDs to adopt custom viewers. (Oct24.00 - ISSUE-OCT24.00-F2).
 *   **SOT ID 814**: Forensic Trace Raw Sensor Parity - PASSED. Extended ForensicSnapshot and LocationUpdate with lux and acoustic fields for full raw sensor trace parity. (Oct23.00 - ISSUE-OCT22.16-F1).
-*   **SOT ID 813**: Telemetry Propagation & Violation Relay - PARTIALLY REMEDIATED (Oct23.105). Resolved merge gaps in `TelemetryMerger` for critical integrity flags, SIT metrics, and sensor parity (F1, F5, F10, F11). Residual gaps remain in JSON mapping (F2) and persistence (F4). (ISSUE-OCT22.0-F4).
+*   **SOT ID 813**: Telemetry Propagation & Violation Relay - PARTIALLY REMEDIATED (Oct23.106). Resolved merge gaps in `TelemetryMerger` (F1) and mapping gaps in `TelemetryMapper` (F2). Residual gaps remain in persistence (F4). (ISSUE-OCT22.0-F4).
 *   **SOT ID 812**: Signaling Identity Symmetry & Leak Prevention - PASSED. Enforced strict ID symmetry in SignalingValidator and blocked cross-viewer traffic. (Oct22.12 - ISSUE-OCT22.0-F3).
 *   **SOT ID 811**: Setup Exit Authority & Lifecycle Hardening - PASSED. Implemented BackHandler and Close icons for all setup overlays. (Oct22.10 - ISSUE-OCT22.0-F2).
 *   **SOT ID 810**: Setup & Configuration Hardening - PASSED. Resolved ID persistence blocks, added Load Defaults, and implemented explicit Exit authority. (Oct22.0 - ISSUE-OCT22.0-F1).
 *   **SOT ID 801**: Asymmetric Connectivity & Geofence Sync Resolution - PASSED. (Oct21.06).
 
 ## ✅ Verification Chapters
+*   **Chapter 4.0 (Telemetry Continuity Audit)**: PARTIALLY REMEDIATED - Resolved logic gaps in TelemetryMerger (Oct23.105) and mapping in TelemetryMapper (Oct23.106). (Oct23.106).
 *   **Chapter 4.1 (Build & Infrastructure Audit)**: PASSED - Verified JVM 17 alignment, Hilt Test compatibility, and Broadcast Export security. (Oct24.00).
-*   **Chapter 4.0 (Telemetry Continuity Audit)**: PARTIALLY REMEDIATED - Resolved logic gaps in TelemetryMerger (Oct23.105). Residual mapping and persistence issues documented in issues.md (Oct23.105).
 *   **Chapter 3.0 (Signaling Identity Audit)**: PASSED - Enforced strict symmetry in SignalingValidator; verified pulse/ping/pong isolation. (Oct22.12).
 *   **Chapter 2.9 (Overlay Lifecycle Audit)**: PASSED - Verified BackHandler interception and Exit authority in Phone Setup. Migrated to Composition Local in Oct23.100. (Oct23.100).
 *   **Chapter 2.8 (Setup Persistence Audit)**: PASSED - Verified ID saving, Relay URL visibility, and Load Defaults behavior. (Oct22.0).

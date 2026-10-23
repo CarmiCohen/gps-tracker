@@ -1,30 +1,25 @@
-# Project Handover - Oct23.105 (ISSUE-OCT23.101-F1 Remediation)
+# Project Handover - Oct23.106 (ISSUE-OCT23.101-F2 Resolved)
 
-## 🟢 Status: IN PROGRESS (F1 Resolved)
+## 🟢 Status: COMPLETED
 
-Remediation of **ISSUE-OCT23.101-F1** (Incomplete Telemetry Merge Logic) has been completed. `TelemetryMerger.kt` now preserves all critical integrity flags, SIT metrics, and raw sensor values during GPS outages (preferCached block).
+Remediation of **ISSUE-OCT23.101-F2** (JSON Mapping State Overwrite) is complete. `TelemetryMapper.kt` has been hardened to preserve cached state during partial JSON/Protobuf updates. Version incremented to **Oct23.106**.
 
 ## ✅ Completed in this Session
-- **Remediation of ISSUE-OCT23.101-F1**:
-    - Updated `TelemetryMerger.kt` to merge `isJammer`, `isStalled`, `battery low` flags, and other integrity metadata even when GPS coordinates are stale.
-    - Included SIT metrics (`sitVz`, `sitBaro`, etc.) in the merge logic (Addresses **F5** partially).
-    - Included raw sensor values (`vibration`, `acousticDb`, `lux`, etc.) in the merge logic (Addresses **F10**).
-    - Included `stationaryDurationMs` and proximity flags (`isNear`, `proxIdx`) (Addresses **F3** and **F11** merge gaps).
-    - Verified build of `:core:engine`.
+- **ISSUE-OCT23.101-F2**: Resolved hardcoded default overwrites in `TelemetryMapper.mapJsonToStatus` and `mapJsonToSnapshot`.
+- **Architectural Rule 1.255**: Formalized Telemetry State Preservation (R-ID 624).
+- **Versioning**: Incremented to `Oct23.106`.
 
 ## 🔴 Current Open Gaps (HIGH)
-- **ISSUE-OCT23.101-F2**: JSON Mapping State Overwrite (High).
 - **ISSUE-OCT23.102-F7**: Delta Compression Drift Risk (High).
 - **ISSUE-OCT23.102-F8**: Protobuf Default Value Pollution (High).
 - **ISSUE-OCT23.102-F9**: Telemetry Flyweight Race Condition (High).
 - **ISSUE-OCT23.101-F3**: Missing Stationary Duration Deserialization (Medium).
 - **ISSUE-OCT23.101-F4**: Violation Persistence Integrity Gaps (Medium).
-- **ISSUE-OCT23.101-F6**: Offline Violation Event Sync (Low).
 
-## 🎯 Next Resumption Focus: Remediation of ISSUE-OCT23.101-F2.
-Priority is fixing `TelemetryMapper.kt` to prevent state overwrites with hardcoded defaults.
+## 🎯 Next Resumption Focus: Remediation of ISSUE-OCT23.102-F7.
+Implement periodic absolute coordinate refresh in `TelemetryProtobufMapper` to prevent delta drift.
 
-**Current Forensic Metrics (Oct23.105):**
-- **[Oct23.105]: [SOT Count: 817 (Rules: 327), Open: H:4, M:3, L:1, Ideas: H:3, M:26, L:44, Testing: 11 (Sub-items: 45), QA: 385]**
+**Current Forensic Metrics (Oct23.106):**
+- **[Oct23.106]: [SOT Count: 818 (Rules: 328), Open: H:3, M:3, L:1, Ideas: H:3, M:27, L:44, Testing: 11 (Sub-items: 45), QA: 385]**
 
-**HANDOVER UPDATED.**
+**HANDOVER FINALIZED.**

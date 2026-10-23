@@ -6,6 +6,10 @@ import timber.log.Timber
 
 /**
  * TelemetryMapper: Centralized authority for telemetry data transformation.
+ * Oct.23.106:
+ * - ISSUE-OCT23.101-F2: JSON Mapping State Overwrite. Fixed mapJsonToStatus 
+ *   and mapJsonToSnapshot to preserve current cached values (proximityCm, 
+ *   rtt, snapshots, battery flags, etc.) when keys are missing in JSON.
  * Oct.22.16:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Synchronized luxSnapshot and 
  *   acousticSnapshot across all paths (Snapshot, Status, Health, App).
@@ -300,7 +304,7 @@ object TelemetryMapper {
                 acousticFloorDb = data.optDouble("acoustic_floor_db", current.atmospheric.acousticFloorDb)
                 adaptiveVibrationFloor = clampVibrationFloor(data.optDouble("adaptive_vibration_floor", current.atmospheric.adaptiveVibrationFloor))
                 proxIdx = data.optDouble("prox_idx", current.atmospheric.proxIdx)
-                proximityCm = data.optDouble("proximity_cm", -1.0)
+                proximityCm = data.optDouble("proximity_cm", current.atmospheric.proximityCm)
                 proximityDebounceMs = clampProxDebounce(data.optLong("proximity_debounce_ms", current.atmospheric.proximityDebounceMs))
                 vibrationRollingSum = data.optDouble("vibration_rolling_sum", current.atmospheric.vibrationRollingSum)
                 noiseIdx = data.optDouble("noise_idx", current.atmospheric.noiseIdx)
@@ -319,12 +323,12 @@ object TelemetryMapper {
                 satsUsed = data.optInt("sats_used", current.integrity.satsUsed)
                 isTamperDetected = data.optBoolean("is_tamper_detected", current.integrity.isTamperDetected)
                 isPowerTamper = data.optBoolean("is_power_tamper", current.integrity.isPowerTamper)
-                isLocationPending = data.optBoolean("is_location_pending", false)
-                locationPendingReason = try { LocationPendingReason.valueOf(data.optString("location_pending_reason", "NONE")) } catch(e: Exception) { LocationPendingReason.NONE }
-                isBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", false)
-                isCoolingModeActive = data.optBoolean("is_cooling_mode_active", false)
-                isBatteryLow = data.optBoolean("is_battery_low", false)
-                isBatteryCritical = data.optBoolean("is_battery_critical", false)
+                isLocationPending = data.optBoolean("is_location_pending", current.integrity.isLocationPending)
+                locationPendingReason = try { LocationPendingReason.valueOf(data.optString("location_pending_reason", current.integrity.locationPendingReason.name)) } catch(e: Exception) { current.integrity.locationPendingReason }
+                isBatterySteepDischarge = data.optBoolean("is_battery_steep_discharge", current.integrity.isBatterySteepDischarge)
+                isCoolingModeActive = data.optBoolean("is_cooling_mode_active", current.integrity.isCoolingModeActive)
+                isBatteryLow = data.optBoolean("is_battery_low", current.integrity.isBatteryLow)
+                isBatteryCritical = data.optBoolean("is_battery_critical", current.integrity.isBatteryCritical)
                 isPowerSaveMode = data.optBoolean("is_power_save_mode", current.integrity.isPowerSaveMode)
                 standbyBucket = data.optInt("standby_bucket", current.integrity.standbyBucket)
                 netInterface = data.optString("net_interface", current.integrity.netInterface)
@@ -356,9 +360,9 @@ object TelemetryMapper {
                 gpsHardwareLock = data.optBoolean("gps_hw_lock", current.integrity.gpsHardwareLock)
                 isGnssThrottled = data.optBoolean("is_gnss_throttled", current.integrity.isGnssThrottled)
                 tamperNote = if (data.has("tamper_note")) data.getString("tamper_note") else null
-                thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
-                heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
-                rtt = data.optInt("rtt", 0)
+                thermalHeadroom = data.optDouble("thermal_headroom", current.integrity.thermalHeadroom)
+                heapAllocatedMb = data.optDouble("heap_allocated_mb", current.integrity.heapAllocatedMb)
+                rtt = data.optInt("rtt", current.integrity.rtt)
                 isJammingCandidate = data.optBoolean("is_jamming_candidate", current.isJammingCandidate)
 
                 if (processed.locationPendingReason != LocationPendingReason.NONE) {
@@ -370,10 +374,10 @@ object TelemetryMapper {
                 }
             }
 
-            this.thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else null
-            this.heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else null
-            this.luxSnapshot = if (data.has("lux_snapshot")) data.optDouble("lux_snapshot") else null
-            this.acousticSnapshot = if (data.has("acoustic_snapshot")) data.optDouble("acoustic_snapshot") else null
+            this.thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else current.thermalSnapshot
+            this.heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else current.heapSnapshot
+            this.luxSnapshot = if (data.has("lux_snapshot")) data.optDouble("lux_snapshot") else current.luxSnapshot
+            this.acousticSnapshot = if (data.has("acoustic_snapshot")) data.optDouble("acoustic_snapshot") else current.acousticSnapshot
             
             // Oct.7.7 Anomaly Flags
             this.isSuspiciousNoise = data.optBoolean("is_suspicious_noise", current.isSuspiciousNoise)
@@ -384,8 +388,8 @@ object TelemetryMapper {
             this.trackerState = try { TrackerState.valueOf(data.optString("tracker_state", current.trackerState.name)) } catch(e: Exception) { current.trackerState }
             this.isClockRegression = processed.isClockRegression
             this.lastValidFixRt = lastFixRt
-            lastAlarmAckTs = data.optLong("last_alarm_ack_ts", 0L)
-            violationStartTs = data.optLong("violation_start_ts", 0L)
+            lastAlarmAckTs = data.optLong("last_alarm_ack_ts", current.lastAlarmAckTs)
+            violationStartTs = data.optLong("violation_start_ts", current.violationStartTs)
         }
     }
 
@@ -493,48 +497,48 @@ object TelemetryMapper {
                 satsUsed = data.optInt("sats_used", -1)
                 satsView = data.optInt("sats_view", -1)
                 snrIdx = data.optDouble("snr_idx", current.integrity.snrIdx)
-                thermalHeadroom = data.optDouble("thermal_headroom", 0.0)
-                heapAllocatedMb = data.optDouble("heap_allocated_mb", 0.0)
-                rtt = data.optInt("rtt", 0)
-                violationUptimeMs = data.optLong("violation_uptime_ms", 0L)
+                thermalHeadroom = data.optDouble("thermal_headroom", current.integrity.thermalHeadroom)
+                heapAllocatedMb = data.optDouble("heap_allocated_mb", current.integrity.heapAllocatedMb)
+                rtt = data.optInt("rtt", current.integrity.rtt)
+                violationUptimeMs = data.optLong("violation_uptime_ms", current.integrity.violationUptimeMs)
                 violationPercentage = data.optDouble("violation_percentage", current.integrity.violationPercentage)
                 isJammingCandidate = data.optBoolean("is_jamming_candidate", current.isJammingCandidate)
             }
             atmospheric.apply {
-                temp = data.optDouble("temp", 0.0)
+                temp = data.optDouble("temp", current.atmospheric.temp)
                 noiseIdx = data.optDouble("noise_idx", current.atmospheric.noiseIdx)
                 luxIdx = data.optDouble("lux_idx", current.atmospheric.luxIdx)
                 vibeIdx = data.optDouble("vibe_idx", current.atmospheric.vibeIdx)
                 liftIdx = data.optDouble("lift_idx", current.atmospheric.liftIdx)
                 tiltIdx = data.optDouble("tilt_idx", current.atmospheric.tiltIdx)
                 baroIdx = data.optDouble("baro_idx", current.atmospheric.baroIdx)
-                proximityCm = data.optDouble("proximity_cm", -1.0)
-                lux = data.optDouble("lux", 0.0)
-                luxBaseline = data.optDouble("lux_baseline", 0.0)
-                acousticDb = data.optDouble("acoustic_db", 0.0)
-                acousticFloorDb = data.optDouble("acoustic_floor_db", 0.0)
-                vibration = data.optDouble("vibration", 0.0)
-                vibrationRollingSum = data.optDouble("vibration_rolling_sum", 0.0)
+                proximityCm = data.optDouble("proximity_cm", current.atmospheric.proximityCm)
+                lux = data.optDouble("lux", current.atmospheric.lux)
+                luxBaseline = data.optDouble("lux_baseline", current.atmospheric.luxBaseline)
+                acousticDb = data.optDouble("acoustic_db", current.atmospheric.acousticDb)
+                acousticFloorDb = data.optDouble("acoustic_floor_db", current.atmospheric.acousticFloorDb)
+                vibration = data.optDouble("vibration", current.atmospheric.vibration)
+                vibrationRollingSum = data.optDouble("vibration_rolling_sum", current.atmospheric.vibrationRollingSum)
 
                 proximityDebounceMs = clampProxDebounce(data.optLong("proximity_debounce_ms", current.atmospheric.proximityDebounceMs))
                 adaptiveVibrationFloor = clampVibrationFloor(data.optDouble("adaptive_vibration_floor", current.atmospheric.adaptiveVibrationFloor))
             }
             kinetic.jumpTier = data.optInt("jump_tier", 0)
-            integrity.isJammer = data.optBoolean("is_jammer", false)
+            integrity.isJammer = data.optBoolean("is_jammer", current.integrity.isJammer)
             integrity.isStalled = data.optDouble("is_stalled", 0.0) != 0.0 || data.optBoolean("is_stalled", false)
             integrity.isTamperDetected = data.optBoolean("is_tamper_detected", current.integrity.isTamperDetected) || 
                              data.optBoolean("is_location_pending", false) || 
                              statusVar == SentinelStatus.TAMPER
             nowTs = now; this.nowRt = nowRt
             
-            this.thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else null
-            this.heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else null
-            this.luxSnapshot = if (data.has("lux_snapshot")) data.optDouble("lux_snapshot") else null
-            this.acousticSnapshot = if (data.has("acoustic_snapshot")) data.optDouble("acoustic_snapshot") else null
+            this.thermalSnapshot = if (data.has("thermal_snapshot")) data.optDouble("thermal_snapshot") else current.thermalSnapshot
+            this.heapSnapshot = if (data.has("heap_snapshot")) data.optDouble("heap_snapshot") else current.heapSnapshot
+            this.luxSnapshot = if (data.has("lux_snapshot")) data.optDouble("lux_snapshot") else current.luxSnapshot
+            this.acousticSnapshot = if (data.has("acoustic_snapshot")) data.optDouble("acoustic_snapshot") else current.acousticSnapshot
             
             // Oct.7.7 Anomaly Flags
-            this.isSuspiciousNoise = data.optBoolean("is_suspicious_noise", false)
-            this.isMemoryPressureThrottled = data.optBoolean("is_memory_pressure_throttled", false)
+            this.isSuspiciousNoise = data.optBoolean("is_suspicious_noise", current.isSuspiciousNoise)
+            this.isMemoryPressureThrottled = data.optBoolean("is_memory_pressure_throttled", current.isMemoryPressureThrottled)
 
             trackerState = try { TrackerState.valueOf(data.optString("tracker_state", current.trackerState.name)) } catch(e: Exception) { current.trackerState }
             
@@ -542,8 +546,8 @@ object TelemetryMapper {
                 ActivityType.valueOf(data.optString("activity_type", current.kinetic.activityType.name)) 
             } catch (e: Exception) { ActivityType.UNKNOWN }
             
-            lastAlarmAckTs = data.optLong("last_alarm_ack_ts", 0L)
-            violationStartTs = data.optLong("violation_start_ts", 0L)
+            lastAlarmAckTs = data.optLong("last_alarm_ack_ts", current.lastAlarmAckTs)
+            violationStartTs = data.optLong("violation_start_ts", current.violationStartTs)
             
             snrSnapshot = if (data.has("snr_snapshot")) data.optDouble("snr_snapshot") else integrity.snrIdx * RIBBON_SNR_SCALE_DB
         }
