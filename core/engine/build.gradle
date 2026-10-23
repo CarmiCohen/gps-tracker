@@ -5,6 +5,8 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+group = 'com.gps19.core'
+
 java {
     sourceCompatibility = JavaVersion.VERSION_17
     targetCompatibility = JavaVersion.VERSION_17
@@ -25,4 +27,5 @@ dependencies {
     testImplementation libs.kotlinx.coroutines.test
 
     testFixturesApi libs.kotlinx.coroutines.core
+    testFixturesApi libs.junit
 }

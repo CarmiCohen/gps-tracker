@@ -9,6 +9,10 @@ import org.junit.Test
 
 /**
  * SignalingTest: Verifies role-based message filtering and payload generation.
+ * Oct.24.00:
+ * - Forensic Alignment (ISSUE-OCT24.00-F2): Updated Multi-Viewer test to 
+ *   expect rejection, aligning with strict asymmetry and cross-viewer blocking 
+ *   introduced in OCT22.12.
  * July.23.09:
  * - Remediated: Removed orphaned tests for purged shouldProcessSettingsUpdate (Issue #521 leftover).
  */
@@ -72,8 +76,8 @@ class SignalingTest {
             )
         )
 
-        // 5. Multi-Viewer: Viewer accepts packets from other viewers (Relay mode)
-        assertTrue("Viewer should accept packets from other viewers",
+        // 5. Multi-Viewer: Viewer REJECTS packets from other viewers (Oct.24.00 Alignment)
+        assertFalse("Viewer should reject packets from other viewers to prevent leaks",
             SignalingValidator.shouldProcessLocationUpdate(
                 incomingId = trackerId, ownDeviceId = trackerId,
                 isFromViewer = true, viewerId = customViewer, ownViewerId = hackerViewer,

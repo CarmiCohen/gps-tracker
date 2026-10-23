@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
+import androidx.core.content.ContextCompat
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
@@ -18,14 +19,11 @@ import javax.inject.Singleton
 
 /**
  * CommandRouter: Handles incoming UI commands via SharedFlow and system events via broadcasts.
+ * Oct.24.00:
+ * - Lint Fix: Used ContextCompat.registerReceiver to safely handle 
+ *   broadcast receiver flags across API levels (Issue #ISSUE-OCT24.00-F3).
  * Oct.19.19:
  * - ISSUE-OCT19.19-F1: Handled SetRestorationDisabled command for exhaustiveness.
- * Oct.18.6:
- * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Integrated simulation 
- *   routing for SHAKE, GNSS_LOSS, POWER_TAMPER, and NETWORK_LOSS.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to use property-based 
- *   TimeProvider API and fixed property invocation errors.
  */
 @Singleton
 class CommandRouter @Inject constructor(
@@ -221,13 +219,20 @@ class CommandRouter @Inject constructor(
             addAction(Intent.ACTION_POWER_CONNECTED); addAction(Intent.ACTION_POWER_DISCONNECTED)
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(legacyReceiver, legacyFilter, Context.RECEIVER_NOT_EXPORTED)
-            context.registerReceiver(powerReceiver, powerFilter, Context.RECEIVER_EXPORTED)
-        } else {
-            context.registerReceiver(legacyReceiver, legacyFilter)
-            context.registerReceiver(powerReceiver, powerFilter)
-        }
+        // Oct.24.00: Use ContextCompat for safer flag handling on all versions.
+        ContextCompat.registerReceiver(
+            context, 
+            legacyReceiver, 
+            legacyFilter, 
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        
+        ContextCompat.registerReceiver(
+            context, 
+            powerReceiver, 
+            powerFilter, 
+            ContextCompat.RECEIVER_EXPORTED
+        )
     }
 
     fun unregister() {

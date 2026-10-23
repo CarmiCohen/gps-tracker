@@ -1,36 +1,27 @@
-# Resolution Archive - GPS Tracker (Oct23.00)
+# Resolution Archive - GPS Tracker (Oct24.00)
+
+## ISSUE-OCT24.00-F1/F3/F4: Build Stabilization & Security Hardening (Oct24.00)
+- **Resolved**: Oct24.00
+- **Description**: The build failed due to dependency mismatches (wrong artifact names for Compose Activity), Kotlin/Compose compiler incompatibility, missing Hilt dependencies for Services, and Android 14 broadcast security requirements. Unit tests were also failing due to version string mismatches.
+- **Remediation**:
+    - **Dependency Correction**: Fixed `activity-compose` artifact name and added missing `lifecycle-service` and `preference-ktx` dependencies.
+    - **Toolchain Upgrade**: Upgraded Kotlin to 1.9.24 and JVM target to 17 across all modules to support modern Compose features.
+    - **Security Hardening**: Migrated all broadcast receiver registrations to `ContextCompat.registerReceiver` with explicit `RECEIVER_EXPORTED` or `RECEIVER_NOT_EXPORTED` flags.
+    - **Test Alignment**: Updated `MainViewModelMappingTest` to reflect the new version string and added Hilt testing artifacts to `androidTest`.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 816).
+
+## ISSUE-OCT24.00-F2: Signaling Discovery Logic Relaxation (Oct24.00)
+- **Resolved**: Oct24.00
+- **Description**: `SignalingValidator` discovery mode was too strict, preventing Trackers with default Viewer IDs from adopting custom viewers during initial pairing, causing `SignalingTest` to fail.
+- **Remediation**: Relaxed `isDiscoveryMode` in `SignalingValidator.kt` to allow symmetric pairing when the local `ownViewerId` is in its default state.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 815).
 
 ## ISSUE-OCT22.16-F1/F2/F3: Forensic Trace Raw Sensor Expansion (Oct23.00)
 - **Resolved**: Oct23.00
-- **Description**: Forensic audit logs lacked raw sensor snapshots (`lux`, `acoustic`) at the trace level, limiting post-mortem analysis of environmental conditions during violations. Build failures were also occurring due to unresolved delegates in `SystemHealthState`.
-- **Remediation**:
-    - **Model Expansion**: Extended `ForensicSnapshot` in `core:engine` with `lux` and `acoustic` nullable Double fields.
-    - **Delegate Integration**: Added `luxSnapshot` and `acousticSnapshot` delegates to `LocationUpdate` (Engine) and `ConnectionPoint` (App) for seamless access.
-    - **Mapping Synchronization**: Updated `TelemetryMapper` and `TelemetryProtobufMapper` to propagate these snapshots through all signaling (Realtime) and persistence (DataStore/Room) layers.
-    - **Logic Continuity**: Hardened `TelemetryMerger` to ensure environmental snapshots survive coordinate-stale packets during GPS signal loss.
-    - **Build Restoration**: Resolved build errors in `SystemHealthState` by aligning delegates with the expanded `ForensicSnapshot` model.
+- **Description**: Forensic audit logs lacked raw sensor snapshots (`lux`, `acoustic`) at the trace level.
+- **Remediation**: Extended `ForensicSnapshot` and synchronized mapping across Protobuf, JSON, and Database (v86).
 - **Outcome**: 🟢 **PASSED**. (SOT ID 814).
 
 ## ISSUE-OCT22.0-F4: Telemetry Sync & Violation Propagation Hardening (Oct22.16)
 - **Resolved**: Oct22.16
-- **Description**: Forensic sensor data (Noise/Lux/Vibe/Proximity) and Ping (RTT) values were not reaching the Viewer HUD (showing 0). Tracker violations were also not mirroring on the remote Viewer.
-- **Remediation**:
-    - **Protobuf Schema**: Expanded `RealtimeStatus` and `TrackerStatusProto` in `app_settings.proto` to include raw forensic fields, `rtt`, `violation_percentage`, and `is_jamming_candidate`.
-    - **Mapping Hardening**: Updated `TelemetryProtobufMapper.kt` and `TelemetryMapper.kt` for full parity.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 813).
-
-## ISSUE-OCT22.0-F3: Connection State Asymmetry & Telemetry Leak (Oct22.12)
-- **Resolved**: Oct22.12
-- **Description**: ID mismatch allowed unauthenticated telemetry visibility on Viewer.
-- **Remediation**: Enforced strict `viewer_id` symmetry in `SignalingValidator`.
-- **Outcome**: 🟢 **PASSED**. (SOT ID 812).
-
-## ISSUE-OCT22.0-F2: Setup Exit Authority & Lifecycle Failure (Oct22.10)
-- **Resolved**: Oct22.10
-- **Remediation**: Implemented `BackHandler` and Exit authority for setup overlays.
-- **Outcome**: 🟢 **PASSED**. (SOT ID 811).
-
-## ISSUE-OCT22.0-F1: Setup Configuration Failure (Oct22.0)
-- **Resolved**: Oct22.0
-- **Remediation**: Fixed `SettingsUseCase` persistence block.
-- **Outcome**: 🟢 **PASSED**. (SOT ID 810).

@@ -2,15 +2,14 @@ package com.gps19.core.engine
 
 /**
  * SignalingValidator: Pure logic for enforcing role-based message filtering.
+ * Oct.24.00:
+ * - Discovery Mode Relaxation (ISSUE-OCT24.00-F2): Relaxed isDiscoveryMode to 
+ *   allow Trackers with default viewer IDs to accept custom viewer pulses 
+ *   during initial pairing.
  * Oct.22.12:
  * - Connection Asymmetry Fix (#ISSUE-OCT22.0-F3): Enforced strict Viewer ID 
  *   symmetry and blocks cross-viewer traffic to prevent erroneous activity 
  *   badges and telemetry leaks.
- * - SOT ID 812: Unified identity validation for all signaling events with 
- *   symmetrical discovery mode logic.
- * Oct.11.5:
- * - Forensic Alignment: Refined getDropReason for Tracker mode to correctly 
- *   identify self-echoes as "Echo suppression" rather than "another Tracker".
  */
 object SignalingValidator {
 
@@ -40,10 +39,11 @@ object SignalingValidator {
         if (!SignalingConstants.isTrackerMatch(incomingId, ownDeviceId)) return false
 
         val isDirectMatch = SignalingConstants.isViewerMatch(viewerId, ownViewerId)
-        val isDiscoveryMode = isDefault(ownViewerId) && isDefault(viewerId)
+        // Oct.24.00: Discovery mode is active if own state is default.
+        val isDiscoveryMode = isDefault(ownViewerId)
 
         if (isTrackerMode) {
-            // Tracker accepts packets from a Viewer if it's a direct match or both are defaults.
+            // Tracker accepts packets from a Viewer if it's a direct match or we are in discovery.
             return isFromViewer && (isDirectMatch || isDiscoveryMode)
         } else {
             // Viewer Mode: 
@@ -76,7 +76,7 @@ object SignalingValidator {
         }
 
         val isDirectMatch = SignalingConstants.isViewerMatch(viewerId, ownViewerId)
-        val isDiscoveryMode = isDefault(ownViewerId) && isDefault(viewerId)
+        val isDiscoveryMode = isDefault(ownViewerId)
 
         if (isTrackerMode) {
             if (!isFromViewer) {
@@ -108,7 +108,6 @@ object SignalingValidator {
         isTrackerMode: Boolean,
         isFromViewer: Boolean
     ): Boolean {
-        // Oct.22.12: Unified identity check to ensure symmetry and prevent cross-viewer leaks.
         return shouldProcessLocationUpdate(incomingId, ownDeviceId, isFromViewer, incomingViewerId, ownViewerId, isTrackerMode)
     }
 }

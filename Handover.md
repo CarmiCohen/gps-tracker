@@ -1,33 +1,34 @@
-# Project Handover - Oct23.00 (Forensic Trace Expansion)
+# Project Handover - Oct24.00 (Build Stabilization & Infrastructure Hardening)
 
 ## 🟢 Status: STABILIZED
 
-The **Forensic Trace Raw Sensor Expansion (F1/F2/F3)** has been implemented and synchronized across the entire stack. Raw sensor snapshots (`lux`, `acoustic`) are now preserved in the forensic audit log, enabling high-fidelity environmental analysis. Build integrity has been restored by aligning `SystemHealthState` delegates with the updated `ForensicSnapshot` model.
+The project infrastructure has been upgraded to support modern Android standards (Android 14/U) and Kotlin toolchains. Critical build failures related to dependency mismatches, Compose compiler versioning, and JVM target alignment (now JVM 17) have been resolved. Signaling discovery logic has been relaxed to restore initial pairing functionality, and broadcast security has been hardened.
 
 ## ✅ Completed in this Session
-- **Forensic Trace Raw Sensor Parity (#ISSUE-OCT22.16-F1)**:
-    - **LocationUpdate.kt**: Extended `ForensicSnapshot` with `lux` and `acoustic` fields. Added delegates and updated `toMap` for JSON parity.
-    - **EngineModels.kt**: Added `luxSnapshot` and `acousticSnapshot` delegates to `EngineConnectionPoint`.
-    - **Models.kt**: Added delegates to `ConnectionPoint` and `LogEntry` for UI/Persistence parity.
-- **Protobuf & Sync (#ISSUE-OCT22.16-F2)**:
-    - **TelemetryProtobufMapper.kt**: Synchronized `luxSnapshot` and `acousticSnapshot` across `mapToRealtime`, `mapToPersistence`, and `mapAppToPersistence`.
-- **Database Parity (#ISSUE-OCT22.16-F3)**:
-    - **Database.kt**: Verified Migration 85->86 adding `luxSnapshot` and `acousticSnapshot` columns.
-- **Remediation & Hardening**:
-    - **TelemetryMerger.kt**: Ensured raw sensor snapshots survive coordinate-stale merges.
-    - **Versioning**: Incremented to `Oct23.00`.
+- **Build Infrastructure Hardening (#ISSUE-OCT24.00-F1)**:
+    - **app/build.gradle**: Upgraded to Kotlin `1.9.24` and JVM `17`. Corrected `androidx.activity:activity-compose` and added missing `lifecycle-service` / `preference-ktx`.
+    - **core:engine/build.gradle**: Aligned to JVM `17` to prevent inlining errors.
+- **Signaling & Discovery Logic (#ISSUE-OCT24.00-F2)**:
+    - **SignalingValidator.kt**: Relaxed `isDiscoveryMode` to allow Trackers with default `ownViewerId` ("V") to accept pulses from custom viewers.
+    - **SignalingTest.kt**: Aligned unit tests with strict cross-viewer blocking introduced in Oct22.12 while maintaining pairing flexibility.
+- **Security & Android 14 Alignment (#ISSUE-OCT24.00-F3)**:
+    - **ActivityContextProvider.kt** & **CommandRouter.kt**: Migrated to `ContextCompat.registerReceiver` with mandatory `RECEIVER_NOT_EXPORTED` flags for internal system/alarm events.
+- **Test Suite Alignment (#ISSUE-OCT24.00-F4)**:
+    - **MainViewModelMappingTest.kt**: Synchronized engine version expectations to `Oct24.00`.
+    - **app/build.gradle**: Fixed missing `hilt-android-testing` dependencies in `androidTest` configuration.
 
 ## 🔴 Current Open Gaps (LOW)
 - **UI UX Simplification**:
     - **SIMP-OCT22.10-S1**: BackHandler Composition Local to reduce boilerplate in overlays.
     - **SIMP-OCT22.0-S1**: Centralize identity and regex validation into `ConfigValidator`.
 - **Strategic Simplification**:
-    - **SIMP-OCT23.0-S1**: Consolidate redundant `ForensicSnapshot` classes between `core:engine` and `HardwareSuite.kt`.
+    - **SIMP-OCT24.0-S1**: Signaling Validator discovery logic simplification.
+    - **SIMP-OCT23.0-S1**: Consolidate redundant `ForensicSnapshot` classes.
 
 ## 🎯 Next Resumption Focus: UI UX Simplification.
-The forensic pipeline now captures high-fidelity raw sensor data. Next cycle should focus on architectural simplifications in the UI layer.
+Infrastructure is now robust and tests are passing. Resuming work on UI layer simplifications (BackHandler logic).
 
-**Current Forensic Metrics (Oct23.00):**
-- **[Oct23.00]: [SOT Count: 814 (Rules: 324), Open: H:0, M:1, L:1, Ideas: H:2, M:25, L:43, Testing: 11 (Sub-items: 45), QA: 385]**
+**Current Forensic Metrics (Oct24.00):**
+- **[Oct24.00]: [SOT Count: 816 (Rules: 326), Open: H:0, M:1, L:1, Ideas: H:2, M:26, L:43, Testing: 11 (Sub-items: 45), QA: 385]**
 
 **HANDOVER UPDATED.**

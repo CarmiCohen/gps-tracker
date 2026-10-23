@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
+import androidx.core.content.ContextCompat
 import com.google.android.gms.location.ActivityRecognition
 import com.google.android.gms.location.ActivityRecognitionResult
 import com.google.android.gms.location.DetectedActivity
@@ -20,9 +21,9 @@ import javax.inject.Singleton
 
 /**
  * ActivityContextProvider: Unified authority for tracking user activity context.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
- *   TimeProvider API and fixed property invocation errors.
+ * Oct.24.00:
+ * - Lint Fix: Used ContextCompat.registerReceiver to safely handle 
+ *   RECEIVER_NOT_EXPORTED flags across API levels (Issue #ISSUE-OCT24.00-F3).
  */
 @Singleton
 class ActivityContextProvider @Inject constructor(
@@ -77,8 +78,13 @@ class ActivityContextProvider @Inject constructor(
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
             )
             
-            context.registerReceiver(activityReceiver, IntentFilter(ACTIVITY_RECEIVER_ACTION), 
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) Context.RECEIVER_NOT_EXPORTED else 0
+            val filter = IntentFilter(ACTIVITY_RECEIVER_ACTION)
+            // Oct.24.00: Use ContextCompat for safer flag handling on all versions.
+            ContextCompat.registerReceiver(
+                context, 
+                activityReceiver, 
+                filter, 
+                ContextCompat.RECEIVER_NOT_EXPORTED
             )
 
             activityRecognitionClient.requestActivityUpdates(60000L, activityPendingIntent!!)
