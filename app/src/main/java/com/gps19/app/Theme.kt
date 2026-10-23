@@ -1,13 +1,20 @@
 package com.gps19.app
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
 
 /**
  * R799: Dynamic Theme based on Role (Tracker/Viewer).
+ * Oct.23.100:
+ * - SIMP-OCT22.10-S1: BackHandler Composition Local. Introduced LocalBackAction 
+ *   and Modifier.backPressHandler to consolidate back button interception and 
+ *   reduce boilerplate in overlays.
  * Oct.15.21:
  * - SIMP-OCT15.20-S1: Animation Controller Composition. Introduced 
  *   LocalAnimationGating, gatedAnimateFloatAsState, and gatedInfinitePulse 
@@ -18,6 +25,36 @@ import androidx.compose.ui.graphics.Color
  */
 
 val LocalAnimationGating = staticCompositionLocalOf { false }
+
+/**
+ * LocalBackAction: Provides a way to register back button behavior via CompositionLocal.
+ * SIMP-OCT22.10-S1.
+ */
+val LocalBackAction = compositionLocalOf<(() -> Unit)?> { null }
+
+/**
+ * Modifier.backPressHandler: Reusable modifier to intercept back button presses.
+ * Reduces boilerplate in overlay components.
+ */
+fun Modifier.backPressHandler(onBack: (() -> Unit)?): Modifier = composed {
+    BackHandler(enabled = onBack != null) {
+        onBack?.invoke()
+    }
+    this
+}
+
+/**
+ * BackPressInterceptor: Composable that automatically hooks the LocalBackAction 
+ * into the system BackHandler. Place this inside a CompositionLocalProvider 
+ * that provides a back action.
+ */
+@Composable
+fun BackPressInterceptor() {
+    val action = LocalBackAction.current
+    BackHandler(enabled = action != null) {
+        action?.invoke()
+    }
+}
 
 /**
  * gatedAnimateFloatAsState: Specialized wrapper that automatically snaps 
@@ -113,7 +150,10 @@ fun GpsTrackerTheme(
         if (darkTheme) getDarkColorScheme(appMode) else getLightColorScheme(appMode)
     }
 
-    CompositionLocalProvider(LocalAnimationGating provides isMaliAnomaly) {
+    CompositionLocalProvider(
+        LocalAnimationGating provides isMaliAnomaly,
+        LocalBackAction provides null
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             content = content

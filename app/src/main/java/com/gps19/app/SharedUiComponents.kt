@@ -48,17 +48,12 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.23.100:
+ * - SIMP-OCT22.10-S1: BackHandler Composition Local. Integrated LocalBackAction 
+ *   to intercept back button and close the ribbons overlay.
  * Oct.21.00:
  * - HUD Layout Correction (ISSUE-OCT20.33-F2): Optimized HeaderBar button 
- *   padding and increased StatusBar row vertical spacing to prevent "squeezing" 
- *   on A15 devices. Reduced portrait icon buttons to 40dp.
- * Oct.20.33:
- * - Tracker Stealth Audit (ISSUE-OCT20.31-F1): Suppressed ALM/SIREN/LOCK badges 
- *   in StatusBar for Tracker mode to adhere to R872 (Absolute Stealth).
- * Oct.15.21:
- * - SIMP-OCT15.20-S1: Animation Controller Composition. Integrated 
- *   LocalAnimationGating and gatedAnimateFloatAsState to centralize Mali GPU 
- *   anomaly handling. Removed redundant isMaliAnomaly parameters.
+ *   padding and increased StatusBar row vertical spacing.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -85,15 +80,18 @@ fun RibbonsOverlay(
     val navState by stateProvider.navigation.collectAsStateWithLifecycle()
     
     Dialog(onDismissRequest = { onEvent(UiEvent.ToggleRibbons(false)) }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(modifier = Modifier.fillMaxSize(), color = Color.Black.copy(alpha = 0.95f)) {
-            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-                Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                    AnalyticalRibbons(
-                        stateProvider = stateProvider,
-                        isStrictMode = navState.isStrictMode,
-                        replayCursorTs = navState.replayCursorTs,
-                        onEvent = onEvent
-                    )
+        CompositionLocalProvider(LocalBackAction provides { onEvent(UiEvent.ToggleRibbons(false)) }) {
+            BackPressInterceptor()
+            Surface(modifier = Modifier.fillMaxSize(), color = Color.Black.copy(alpha = 0.95f)) {
+                Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                    Box(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                        AnalyticalRibbons(
+                            stateProvider = stateProvider,
+                            isStrictMode = navState.isStrictMode,
+                            replayCursorTs = navState.replayCursorTs,
+                            onEvent = onEvent
+                        )
+                    }
                 }
             }
         }

@@ -31,6 +31,9 @@ import java.util.*
 
 /**
  * LogComponents: UI for system logs and diagnostic history.
+ * Oct.23.100:
+ * - SIMP-OCT22.10-S1: BackHandler Composition Local. Integrated LocalBackAction 
+ *   to intercept back button and close the log overlay.
  * Oct.13.21:
  * - SIMP-OCT13.21-S1: Pure Event UI. Pruned onExport, onToggle, and onClear 
  *   lambdas in favor of centralized ExportLogs event bubbling.
@@ -69,58 +72,61 @@ fun LogOverlay(
 
     var selectedLog by remember { mutableStateOf<LogEntry?>(null) }
 
-    Surface(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = Slate950) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) { 
-                    Text("${filteredLogs.size} / ${logs.size}", color = Slate500, fontSize = 9.sp, fontWeight = FontWeight.Normal) 
+    CompositionLocalProvider(LocalBackAction provides { onMainEvent(UiEvent.ToggleLog(false)) }) {
+        BackPressInterceptor()
+        Surface(modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(), color = Slate950) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) { 
+                        Text("${filteredLogs.size} / ${logs.size}", color = Slate500, fontSize = 9.sp, fontWeight = FontWeight.Normal) 
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        LogFilterButton(stringResource(R.string.log_filter_details), showDetails, BrandJd, onSetShowDetails)
+                        LogFilterButton(stringResource(R.string.log_filter_hist), showRecovered, Amber500, onSetShowRecovered)
+                        IconButton(onClick = { onMainEvent(UiEvent.ExportLogs) }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Download, "Save", tint = Color.White, modifier = Modifier.size(20.dp)) }
+                        IconButton(onClick = { onMainEvent(UiEvent.ClearLogs) }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.DeleteSweep, "Clear", tint = Rose500, modifier = Modifier.size(20.dp)) }
+                        IconButton(onClick = { onMainEvent(UiEvent.ToggleLog(false)) }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(20.dp)) }
+                    }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    LogFilterButton(stringResource(R.string.log_filter_details), showDetails, BrandJd, onSetShowDetails)
-                    LogFilterButton(stringResource(R.string.log_filter_hist), showRecovered, Amber500, onSetShowRecovered)
-                    IconButton(onClick = { onMainEvent(UiEvent.ExportLogs) }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Download, "Save", tint = Color.White, modifier = Modifier.size(20.dp)) }
-                    IconButton(onClick = { onMainEvent(UiEvent.ClearLogs) }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.DeleteSweep, "Clear", tint = Rose500, modifier = Modifier.size(20.dp)) }
-                    IconButton(onClick = { onMainEvent(UiEvent.ToggleLog(false)) }, modifier = Modifier.size(36.dp)) { Icon(Icons.Default.Close, "Close", tint = Color.White, modifier = Modifier.size(20.dp)) }
-                }
-            }
-            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(filteredLogs, key = { it.localId }) { log ->
-                        val time = remember(log.timestamp) { try { timeFormatter.format(Date(log.timestamp)) } catch(e: Exception) { "--:--:--" } }
-                        val isRecovered = remember(log.timestamp, appStartTime, now) { (log.timestamp < appStartTime) || (log.timestamp < now - 43200000L) }
-                        val msgPrefix = if (isRecovered) stringResource(R.string.log_hist_prefix) else ""
-                        val renderingConfig = remember(log.message, log.isImportant, log.isSpecial, log.specialColor) { 
-                            getLogRenderingConfig(log, true) 
-                        }
-                        val isHebrewMsg = remember(log.message) { log.message.any { it in '\u0590'..'\u05FF' } }
-                        val cleanMsg = remember(log.message) { FormatterUtils.cleanLogDisplayMessage(log.message) }
-                        
-                        val baseMsg = remember(log.count, log.durationMs, log.firstSeenTs, log.timestamp, cleanMsg) {
-                            val countText = if (log.count > 1) " (x${log.count})" else ""
-                            val durationText = if (log.count > 1 && log.durationMs > 0) {
-                                val windowMs = maxOf(1000L, log.timestamp - log.firstSeenTs)
-                                val pct = (log.durationMs * 100.0 / windowMs).coerceIn(0.0, 100.0)
-                                val generalized = if (log.durationMs < 15000L) "less than 15s" else FormatterUtils.formatDurationSimple(log.durationMs)
-                                " - persistence was $generalized, ${String.format(Locale.getDefault(), "%.1f", pct)}% of window"
-                            } else if (log.durationMs > 0) {
-                                " [${FormatterUtils.formatDurationSimple(log.durationMs)}]"
-                            } else ""
-                            "$cleanMsg$countText$durationText"
-                        }
-                        val displayMessage = "$msgPrefix$baseMsg"
-                        val isSelected = selectedLog?.localId == log.localId
+                Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        items(filteredLogs, key = { it.localId }) { log ->
+                            val time = remember(log.timestamp) { try { timeFormatter.format(Date(log.timestamp)) } catch(e: Exception) { "--:--:--" } }
+                            val isRecovered = remember(log.timestamp, appStartTime, now) { (log.timestamp < appStartTime) || (log.timestamp < now - 43200000L) }
+                            val msgPrefix = if (isRecovered) stringResource(R.string.log_hist_prefix) else ""
+                            val renderingConfig = remember(log.message, log.isImportant, log.isSpecial, log.specialColor) { 
+                                getLogRenderingConfig(log, true) 
+                            }
+                            val isHebrewMsg = remember(log.message) { log.message.any { it in '\u0590'..'\u05FF' } }
+                            val cleanMsg = remember(log.message) { FormatterUtils.cleanLogDisplayMessage(log.message) }
+                            
+                            val baseMsg = remember(log.count, log.durationMs, log.firstSeenTs, log.timestamp, cleanMsg) {
+                                val countText = if (log.count > 1) " (x${log.count})" else ""
+                                val durationText = if (log.count > 1 && log.durationMs > 0) {
+                                    val windowMs = maxOf(1000L, log.timestamp - log.firstSeenTs)
+                                    val pct = (log.durationMs * 100.0 / windowMs).coerceIn(0.0, 100.0)
+                                    val generalized = if (log.durationMs < 15000L) "less than 15s" else FormatterUtils.formatDurationSimple(log.durationMs)
+                                    " - persistence was $generalized, ${String.format(Locale.getDefault(), "%.1f", pct)}% of window"
+                                } else if (log.durationMs > 0) {
+                                    " [${FormatterUtils.formatDurationSimple(log.durationMs)}]"
+                                } else ""
+                                "$cleanMsg$countText$durationText"
+                            }
+                            val displayMessage = "$msgPrefix$baseMsg"
+                            val isSelected = selectedLog?.localId == log.localId
 
-                        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 0.5.dp, horizontal = 8.dp).background(if (isSelected) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.02f)).clickable { selectedLog = if (isSelected) null else log }, verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = time, color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.requiredWidth(95.dp), maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
-                            Spacer(Modifier.width(4.dp))
-                            CompositionLocalProvider(LocalLayoutDirection provides if (isHebrewMsg) LayoutDirection.Rtl else LayoutDirection.Ltr) { 
-                                Text(text = displayMessage, color = renderingConfig.color, fontSize = 11.sp, fontWeight = renderingConfig.fontWeight, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f)) 
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 0.5.dp, horizontal = 8.dp).background(if (isSelected) Color.White.copy(alpha = 0.1f) else Color.White.copy(alpha = 0.02f)).clickable { selectedLog = if (isSelected) null else log }, verticalAlignment = Alignment.CenterVertically) {
+                                Text(text = time, color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.requiredWidth(95.dp), maxLines = 1, softWrap = false, overflow = TextOverflow.Clip)
+                                Spacer(Modifier.width(4.dp))
+                                CompositionLocalProvider(LocalLayoutDirection provides if (isHebrewMsg) LayoutDirection.Rtl else LayoutDirection.Ltr) { 
+                                    Text(text = displayMessage, color = renderingConfig.color, fontSize = 11.sp, fontWeight = renderingConfig.fontWeight, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f)) 
+                                }
                             }
                         }
                     }
                 }
+                if (selectedLog != null) { LogDetailPane(log = selectedLog!!, onClose = { selectedLog = null }, onHistLink = onHistLink, onDetailsLink = onDetailsLink) }
             }
-            if (selectedLog != null) { LogDetailPane(log = selectedLog!!, onClose = { selectedLog = null }, onHistLink = onHistLink, onDetailsLink = onDetailsLink) }
         }
     }
 }

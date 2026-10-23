@@ -6,7 +6,6 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -23,11 +22,11 @@ import kotlinx.coroutines.flow.onEach
 
 /**
  * AlarmActivity: Full-screen alarm overlay that bypasses the lock screen.
+ * Oct.23.100:
+ * - SIMP-OCT22.10-S1: BackHandler Composition Local. Migrated to LocalBackAction.
  * Oct.14.9:
  * - SIMP-OCT14.8-S1: Updated to consolidated HudState. Derived health 
  *   sub-state from viewModel.hudState.
- * Oct.5.20:
- * - SIMP-1426-3: Updated AlarmOverlay call to use unified UiStateProvider (viewModel).
  */
 @AndroidEntryPoint
 class AlarmActivity : ComponentActivity() {
@@ -68,49 +67,52 @@ class AlarmActivity : ComponentActivity() {
             val sessionState by viewModel.session.collectAsStateWithLifecycle()
 
             GpsTrackerTheme(appMode = sessionState.appMode) {
-                BackHandler {
-                    viewModel.onEvent(UiEvent.DismissAlarms)
-                    finish()
-                }
-
-                Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
-                    AlarmOverlay(
-                        stateProvider = viewModel,
-                        onMute = {
-                            val hudHealth = viewModel.hudState.value.health
-                            val currentAlarms = hudHealth.activeAlarms
-                            val currentCauses = currentAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
-                            viewModel.onEvent(UiEvent.StopSiren(currentCauses))
-                        },
-                        onClose = {
-                            viewModel.onEvent(UiEvent.DismissAlarms)
-                            finish()
-                        },
-                        onGoToMap = {
-                            viewModel.onEvent(UiEvent.DismissAlarms)
-                            
-                            val hudHealth = viewModel.hudState.value.health
-                            val currentAlarms = hudHealth.activeAlarms
-                            val currentCauses = currentAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Map Navigation" }
-                            viewModel.onEvent(UiEvent.StopSiren(currentCauses))
-                            
-                            val intent = Intent(this, MainActivity::class.java).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                                action = ACTION_NAVIGATE_TO_MAP
+                CompositionLocalProvider(
+                    LocalBackAction provides {
+                        viewModel.onEvent(UiEvent.DismissAlarms)
+                        finish()
+                    }
+                ) {
+                    BackPressInterceptor()
+                    Surface(modifier = Modifier.fillMaxSize(), color = Color.Transparent) {
+                        AlarmOverlay(
+                            stateProvider = viewModel,
+                            onMute = {
+                                val hudHealth = viewModel.hudState.value.health
+                                val currentAlarms = hudHealth.activeAlarms
+                                val currentCauses = currentAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
+                                viewModel.onEvent(UiEvent.StopSiren(currentCauses))
+                            },
+                            onClose = {
+                                viewModel.onEvent(UiEvent.DismissAlarms)
+                                finish()
+                            },
+                            onGoToMap = {
+                                viewModel.onEvent(UiEvent.DismissAlarms)
+                                
+                                val hudHealth = viewModel.hudState.value.health
+                                val currentAlarms = hudHealth.activeAlarms
+                                val currentCauses = currentAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Map Navigation" }
+                                viewModel.onEvent(UiEvent.StopSiren(currentCauses))
+                                
+                                val intent = Intent(this, MainActivity::class.java).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                                    action = ACTION_NAVIGATE_TO_MAP
+                                }
+                                startActivity(intent)
+                                finish()
+                            },
+                            onHardwarePermissionClick = {
+                                viewModel.onEvent(UiEvent.NavigateToDiagnostics(true))
+                                val intent = Intent(this, MainActivity::class.java).apply {
+                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                                    action = "com.gps19.app.ACTION_VIEW_DIAGNOSTICS"
+                                }
+                                startActivity(intent)
+                                finish()
                             }
-                            startActivity(intent)
-                            finish()
-                        },
-                        onHardwarePermissionClick = {
-                            viewModel.onEvent(UiEvent.NavigateToDiagnostics(true))
-                            val intent = Intent(this, MainActivity::class.java).apply {
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-                                action = "com.gps19.app.ACTION_VIEW_DIAGNOSTICS"
-                            }
-                            startActivity(intent)
-                            finish()
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }

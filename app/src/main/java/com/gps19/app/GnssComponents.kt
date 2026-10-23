@@ -9,8 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.GpsFixed
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -25,12 +24,11 @@ import java.util.*
 
 /**
  * GnssComponents: Detailed satellite signal and constellation visualization.
+ * Oct.23.100:
+ * - SIMP-OCT22.10-S1: BackHandler Composition Local. Integrated LocalBackAction 
+ *   to intercept back button and close the GNSS detail overlay.
  * Sep.04.95:
- * - Issue #914 HARDENED: GNSS UI Performance Optimization. Added stable keys to 
- *   LazyVerticalGrid items to prevent redundant recompositions on budget 
- *   hardware (Samsung A15).
- * v9.1.0:
- * - R799e: Swapped legacy BrandJd (#367C2B) for JD Vivid Green (#78BE20).
+ * - Issue #914 HARDENED: GNSS UI Performance Optimization.
  */
 
 @Composable
@@ -40,59 +38,60 @@ fun GnssDetailOverlay(
 ) {
     val gnssDetail by gnssDetailFlow.collectAsStateWithLifecycle()
     
-    Surface(
-        modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(),
-        color = Color.Black.copy(alpha = 0.9f)
-    ) {
-        Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "GNSS SATELLITE DETAIL",
-                    color = BrandJd,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-                IconButton(onClick = onClose) {
-                    Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
-                }
-            }
-            
-            Spacer(Modifier.height(16.dp))
-            
-            if (gnssDetail == null || gnssDetail!!.satellites.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text("NO SATELLITE DATA AVAILABLE", color = Slate500, fontSize = 14.sp)
-                }
-            } else {
-                val stats = gnssDetail!!.satellites
-                val usedCount = stats.count { it.usedInFix }
-                
-                Text(
-                    text = "TOTAL: ${stats.size}  |  USED: $usedCount",
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace
-                )
-                
-                Spacer(Modifier.height(8.dp))
-                
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(2),
-                    modifier = Modifier.weight(1f),
-                    contentPadding = PaddingValues(bottom = 32.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+    CompositionLocalProvider(LocalBackAction provides onClose) {
+        BackPressInterceptor()
+        Surface(
+            modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding(),
+            color = Color.Black.copy(alpha = 0.9f)
+        ) {
+            Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Issue #914: Added stable keys based on SVID and constellation to optimize 
-                    // budget hardware performance during high-frequency GNSS updates.
-                    items(stats, key = { "${it.constellation}_${it.svid}" }) { sat ->
-                        SatelliteCard(sat)
+                    Text(
+                        text = "GNSS SATELLITE DETAIL",
+                        color = BrandJd,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                    }
+                }
+                
+                Spacer(Modifier.height(16.dp))
+                
+                if (gnssDetail == null || gnssDetail!!.satellites.isEmpty()) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("NO SATELLITE DATA AVAILABLE", color = Slate500, fontSize = 14.sp)
+                    }
+                } else {
+                    val stats = gnssDetail!!.satellites
+                    val usedCount = stats.count { it.usedInFix }
+                    
+                    Text(
+                        text = "TOTAL: ${stats.size}  |  USED: $usedCount",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace
+                    )
+                    
+                    Spacer(Modifier.height(8.dp))
+                    
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
+                        modifier = Modifier.weight(1f),
+                        contentPadding = PaddingValues(bottom = 32.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(stats, key = { "${it.constellation}_${it.svid}" }) { sat ->
+                            SatelliteCard(sat)
+                        }
                     }
                 }
             }

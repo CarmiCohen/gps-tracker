@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct24.00)
+# SOT Master Requirements & Hardening Status (Oct23.101)
 
-## 🏗️ Architectural Master Rules (326 Rules)
+## 🏗️ Architectural Master Rules (327 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -20,12 +20,14 @@
 *   **1.251 Forensic Raw Sensor Parity (R-ID 620)**: The system MUST ensure raw sensor snapshots (Lux, Acoustic) are preserved in forensic traces and synchronized across all signaling and persistence layers to enable high-fidelity post-mortem analysis. (Oct23.00 - ISSUE-OCT22.16-F1).
 *   **1.252 Discovery Mode Asymmetry (R-ID 621)**: The signaling validator MUST permit Trackers in a default state (no Viewer ID assigned) to accept incoming pulses from any viewer, enabling initial discovery and pairing (ISSUE-OCT24.00-F2).
 *   **1.253 Broadcast Export Security (R-ID 622)**: All internal broadcast receivers MUST be registered with `RECEIVER_NOT_EXPORTED` unless explicit cross-app communication is required, satisfying Android 14+ security mandates (ISSUE-OCT24.00-F3).
+*   **1.254 BackHandler Composition Local (R-ID 623)**: Back button interception MUST be consolidated into a reusable `LocalBackAction` Composition Local to reduce boilerplate and ensure consistent navigation behavior across all overlays (Oct23.100 - SIMP-OCT22.10-S1).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 817**: BackHandler Consolidation - PASSED. Implemented `LocalBackAction` and `BackPressInterceptor` to unify back navigation across all overlays. (Oct23.100 - SIMP-OCT22.10-S1).
 *   **SOT ID 816**: Build Stabilization & Lint Hardening - PASSED. Resolved dependency conflicts, upgraded to JVM 17, and applied mandatory broadcast receiver export flags. (Oct24.00 - ISSUE-OCT24.00-F1/F3).
 *   **SOT ID 815**: Discovery Mode & Pairing Logic - PASSED. Relaxed SignalingValidator discovery mode to allow Trackers with default IDs to adopt custom viewers. (Oct24.00 - ISSUE-OCT24.00-F2).
 *   **SOT ID 814**: Forensic Trace Raw Sensor Parity - PASSED. Extended ForensicSnapshot and LocationUpdate with lux and acoustic fields for full raw sensor trace parity. (Oct23.00 - ISSUE-OCT22.16-F1).
-*   **SOT ID 813**: Telemetry Propagation & Violation Relay - PASSED. Finalized forensic field synchronization (RTT, Violation Percentage, Jamming Candidate) across Protobuf, JSON, and Database (v85). (Oct22.16 - ISSUE-OCT22.0-F4).
+*   **SOT ID 813**: Telemetry Propagation & Violation Relay - RE-AUDIT FAILED (Oct23.101). Identified residual gaps in forensic field synchronization (Stationary Duration, Jammer/Stall flags in merger, JSON mapping defaults). (ISSUE-OCT22.0-F4).
 *   **SOT ID 812**: Signaling Identity Symmetry & Leak Prevention - PASSED. Enforced strict ID symmetry in SignalingValidator and blocked cross-viewer traffic. (Oct22.12 - ISSUE-OCT22.0-F3).
 *   **SOT ID 811**: Setup Exit Authority & Lifecycle Hardening - PASSED. Implemented BackHandler and Close icons for all setup overlays. (Oct22.10 - ISSUE-OCT22.0-F2).
 *   **SOT ID 810**: Setup & Configuration Hardening - PASSED. Resolved ID persistence blocks, added Load Defaults, and implemented explicit Exit authority. (Oct22.0 - ISSUE-OCT22.0-F1).
@@ -33,7 +35,7 @@
 
 ## ✅ Verification Chapters
 *   **Chapter 4.1 (Build & Infrastructure Audit)**: PASSED - Verified JVM 17 alignment, Hilt Test compatibility, and Broadcast Export security. (Oct24.00).
-*   **Chapter 4.0 (Telemetry Continuity Audit)**: PASSED - Verified Noise/Lux/Vibe/RTT/Jammer propagation and violation mirroring on Viewer. Full parity hardened in Oct22.16. Expanded with raw sensor snapshots in Oct23.00. (Oct23.00).
+*   **Chapter 4.0 (Telemetry Continuity Audit)**: RE-AUDIT FAILED - Identified residual gaps in Noise/Lux/Vibe/RTT/Jammer propagation and violation mirroring. Residual issues documented in issues.md (Oct23.101). (Oct23.101).
 *   **Chapter 3.0 (Signaling Identity Audit)**: PASSED - Enforced strict symmetry in SignalingValidator; verified pulse/ping/pong isolation. (Oct22.12).
-*   **Chapter 2.9 (Overlay Lifecycle Audit)**: PASSED - Verified BackHandler interception and Exit authority in Phone Setup. (Oct22.10).
+*   **Chapter 2.9 (Overlay Lifecycle Audit)**: PASSED - Verified BackHandler interception and Exit authority in Phone Setup. Migrated to Composition Local in Oct23.100. (Oct23.100).
 *   **Chapter 2.8 (Setup Persistence Audit)**: PASSED - Verified ID saving, Relay URL visibility, and Load Defaults behavior. (Oct22.0).

@@ -1,7 +1,6 @@
 package com.gps19.app
 
 import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -33,14 +32,13 @@ import kotlinx.coroutines.delay
 
 /**
  * SettingsComponents: UI for app configuration and permissions.
+ * Oct.23.100:
+ * - SIMP-OCT22.10-S1: BackHandler Composition Local. Migrated to LocalBackAction 
+ *   to consolidate back button interception.
  * Oct.22.0:
  * - Setup Hardening (ISSUE-OCT22.0-F2): Implemented BackHandler for Settings and Phone Setup
  *   overlays to prevent app exit on Back button. Added explicit Close authority to 
  *   PhoneSetupOverlay header.
- * Oct.21.07:
- * - Setup Hardening (ISSUE-OCT21.06-F1): Added Close icon to main SettingsOverlay 
- *   to allow exiting the setup. Added "Load Defaults" button for factory reset.
- *   Promoted Relay URL field visibility to prevent perceived erasure.
  */
 
 @Composable
@@ -69,8 +67,7 @@ fun SettingsOverlay(
         }
     }
 
-    // ISSUE-OCT22.0-F2: Exit Authority (Back Button)
-    BackHandler {
+    val backAction = {
         if (activeSubSettings != null) {
             onEvent(UiEvent.SetSubSettings(null))
         } else {
@@ -78,125 +75,128 @@ fun SettingsOverlay(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Card(modifier = Modifier.fillMaxSize(), colors = CardDefaults.cardColors(containerColor = Slate900), shape = androidx.compose.ui.graphics.RectangleShape) { 
-            if (isHydrated && visibleCount > 0) {
-                Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) { 
-                    if (visibleCount >= 1) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { 
-                            Text(stringResource(R.string.settings_title), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                            // ISSUE-OCT21.06-F1: Exit Setup Authority
-                            IconButton(onClick = { onEvent(UiEvent.ToggleSettings(false)) }) {
-                                Icon(Icons.Default.Close, null, tint = Color.White)
+    CompositionLocalProvider(LocalBackAction provides backAction) {
+        BackPressInterceptor()
+        Box(modifier = Modifier.fillMaxSize()) {
+            Card(modifier = Modifier.fillMaxSize(), colors = CardDefaults.cardColors(containerColor = Slate900), shape = androidx.compose.ui.graphics.RectangleShape) { 
+                if (isHydrated && visibleCount > 0) {
+                    Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally) { 
+                        if (visibleCount >= 1) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) { 
+                                Text(stringResource(R.string.settings_title), color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                                // ISSUE-OCT21.06-F1: Exit Setup Authority
+                                IconButton(onClick = { onEvent(UiEvent.ToggleSettings(false)) }) {
+                                    Icon(Icons.Default.Close, null, tint = Color.White)
+                                }
+                            }
+                            Spacer(Modifier.height(16.dp))
+
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                OutlinedTextField(
+                                    value = draft.deviceId, 
+                                    onValueChange = { onEvent(UiEvent.UpdateDraftDeviceId(it)) }, 
+                                    label = { Text(stringResource(R.string.settings_label_tracker_id), fontSize = 12.sp) }, 
+                                    leadingIcon = { Icon(Icons.Default.Agriculture, null, tint = BrandJd, modifier = Modifier.size(18.dp)) }, 
+                                    modifier = Modifier.weight(1f), 
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = BrandJd, unfocusedBorderColor = BrandJd.copy(alpha = 0.5f), 
+                                        focusedLabelColor = BrandJd, unfocusedLabelColor = BrandJd.copy(alpha = 0.7f), 
+                                        focusedTextColor = BrandJd, unfocusedTextColor = BrandJd, cursorColor = BrandJd
+                                    ), 
+                                    singleLine = true, 
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                )
+                                OutlinedTextField(
+                                    value = draft.viewerId, 
+                                    onValueChange = { onEvent(UiEvent.UpdateDraftViewerId(it)) }, 
+                                    label = { Text(stringResource(R.string.settings_label_viewer_id), fontSize = 12.sp) }, 
+                                    leadingIcon = { Icon(Icons.Default.Person, null, tint = ViewerCyan, modifier = Modifier.size(18.dp)) }, 
+                                    modifier = Modifier.weight(1f), 
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = ViewerCyan, unfocusedBorderColor = ViewerCyan.copy(alpha = 0.5f), 
+                                        focusedLabelColor = ViewerCyan, unfocusedLabelColor = ViewerCyan.copy(alpha = 0.7f), 
+                                        focusedTextColor = ViewerCyan, unfocusedTextColor = ViewerCyan, cursorColor = ViewerCyan
+                                    ), 
+                                    singleLine = true, 
+                                    textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                ) 
+                            }
+                            Spacer(Modifier.height(16.dp))
+                        }
+
+                        if (visibleCount >= 2) {
+                            OutlinedTextField(
+                                value = draft.maxDistance, 
+                                onValueChange = { onEvent(UiEvent.UpdateDraftMaxDistance(it)) }, 
+                                label = { Text(stringResource(R.string.settings_label_geofence), fontSize = 12.sp) }, 
+                                placeholder = { Text(stringResource(R.string.settings_placeholder_radius), color = Slate500) }, 
+                                leadingIcon = { Icon(Icons.Default.RadioButtonChecked, null, tint = Color.White, modifier = Modifier.size(18.dp)) }, 
+                                trailingIcon = { Text(stringResource(R.string.settings_unit_meters), color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(end = 8.dp)) }, 
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
+                                modifier = Modifier.fillMaxWidth(), 
+                                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.White, unfocusedBorderColor = Color.White.copy(alpha = 0.3f), focusedLabelColor = Color.White, unfocusedLabelColor = Slate500, focusedTextColor = Color.White, unfocusedTextColor = Color.White), 
+                                singleLine = true, 
+                                textStyle = LocalTextStyle.current.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                            )
+                            Spacer(Modifier.height(24.dp))
+
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.CLEAN)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteSweep, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clean)) }
+                                Button(onClick = { onEvent(UiEvent.ShowPhoneSetup) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.HelpCenter, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_phone_setup)) }
+                            }
+                            Spacer(Modifier.height(16.dp))
+                        }
+
+                        if (visibleCount >= 3) {
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.ALERTS)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.Default.NotificationsActive, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_alerts)) }
+                                Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.SOUND)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Violet500.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.VolumeUp, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_sound)) }
+                            }
+                            Spacer(Modifier.height(16.dp))
+                        }
+
+                        if (visibleCount >= 4) {
+                            Button(onClick = { onEvent(UiEvent.ToggleSettings(false)); onEvent(UiEvent.NavigateToDiagnostics(true)) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Slate700)) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_diagnostics)) }
+                            Spacer(Modifier.height(16.dp))
+                            
+                            // ISSUE-OCT21.06-F1: Load Defaults Authority
+                            Button(onClick = { onEvent(UiEvent.LoadDefaults) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Slate800)) {
+                                Icon(Icons.Default.SettingsBackupRestore, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text("Load Factory Defaults") 
+                            }
+                            Spacer(Modifier.height(24.dp))
+
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Button(onClick = { onEvent(UiEvent.ImportConfig) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_load_config), fontSize = 11.sp) }
+                                if (!isTracker) { Button(onClick = { onEvent(UiEvent.ExportLogs) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_save_logs), fontSize = 11.sp) } }
                             }
                         }
-                        Spacer(Modifier.height(16.dp))
 
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        if (visibleCount >= 5) {
+                            Spacer(Modifier.height(24.dp))
+                            // Promoted Relay URL for better visibility (ISSUE-OCT21.06-F1)
                             OutlinedTextField(
-                                value = draft.deviceId, 
-                                onValueChange = { onEvent(UiEvent.UpdateDraftDeviceId(it)) }, 
-                                label = { Text(stringResource(R.string.settings_label_tracker_id), fontSize = 12.sp) }, 
-                                leadingIcon = { Icon(Icons.Default.Agriculture, null, tint = BrandJd, modifier = Modifier.size(18.dp)) }, 
-                                modifier = Modifier.weight(1f), 
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = BrandJd, unfocusedBorderColor = BrandJd.copy(alpha = 0.5f), 
-                                    focusedLabelColor = BrandJd, unfocusedLabelColor = BrandJd.copy(alpha = 0.7f), 
-                                    focusedTextColor = BrandJd, unfocusedTextColor = BrandJd, cursorColor = BrandJd
-                                ), 
-                                singleLine = true, 
-                                textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
+                                value = draft.relayUrl, 
+                                onValueChange = { onEvent(UiEvent.UpdateDraftRelayUrl(it)) }, 
+                                label = { Text(stringResource(R.string.settings_label_relay_url)) }, 
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
                             )
-                            OutlinedTextField(
-                                value = draft.viewerId, 
-                                onValueChange = { onEvent(UiEvent.UpdateDraftViewerId(it)) }, 
-                                label = { Text(stringResource(R.string.settings_label_viewer_id), fontSize = 12.sp) }, 
-                                leadingIcon = { Icon(Icons.Default.Person, null, tint = ViewerCyan, modifier = Modifier.size(18.dp)) }, 
-                                modifier = Modifier.weight(1f), 
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = ViewerCyan, unfocusedBorderColor = ViewerCyan.copy(alpha = 0.5f), 
-                                    focusedLabelColor = ViewerCyan, unfocusedLabelColor = ViewerCyan.copy(alpha = 0.7f), 
-                                    focusedTextColor = ViewerCyan, unfocusedTextColor = ViewerCyan, cursorColor = ViewerCyan
-                                ), 
-                                singleLine = true, 
-                                textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                            ) 
+                            Spacer(Modifier.height(56.dp))
                         }
-                        Spacer(Modifier.height(16.dp))
-                    }
-
-                    if (visibleCount >= 2) {
-                        OutlinedTextField(
-                            value = draft.maxDistance, 
-                            onValueChange = { onEvent(UiEvent.UpdateDraftMaxDistance(it)) }, 
-                            label = { Text(stringResource(R.string.settings_label_geofence), fontSize = 12.sp) }, 
-                            placeholder = { Text(stringResource(R.string.settings_placeholder_radius), color = Slate500) }, 
-                            leadingIcon = { Icon(Icons.Default.RadioButtonChecked, null, tint = Color.White, modifier = Modifier.size(18.dp)) }, 
-                            trailingIcon = { Text(stringResource(R.string.settings_unit_meters), color = Slate500, fontSize = 10.sp, modifier = Modifier.padding(end = 8.dp)) }, 
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), 
-                            modifier = Modifier.fillMaxWidth(), 
-                            colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Color.White, unfocusedBorderColor = Color.White.copy(alpha = 0.3f), focusedLabelColor = Color.White, unfocusedLabelColor = Slate500, focusedTextColor = Color.White, unfocusedTextColor = Color.White), 
-                            singleLine = true, 
-                            textStyle = LocalTextStyle.current.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace)
-                        )
-                        Spacer(Modifier.height(24.dp))
-
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.CLEAN)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Rose500)) { Icon(Icons.Default.DeleteSweep, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_clean)) }
-                            Button(onClick = { onEvent(UiEvent.ShowPhoneSetup) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.HelpCenter, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_phone_setup)) }
-                        }
-                        Spacer(Modifier.height(16.dp))
-                    }
-
-                    if (visibleCount >= 3) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.ALERTS)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = ViewerCyan.copy(alpha = 0.8f))) { Icon(Icons.Default.NotificationsActive, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_alerts)) }
-                            Button(onClick = { onEvent(UiEvent.SetSubSettings(SubSettings.SOUND)) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Violet500.copy(alpha = 0.8f))) { Icon(Icons.AutoMirrored.Filled.VolumeUp, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_sound)) }
-                        }
-                        Spacer(Modifier.height(16.dp))
-                    }
-
-                    if (visibleCount >= 4) {
-                        Button(onClick = { onEvent(UiEvent.ToggleSettings(false)); onEvent(UiEvent.NavigateToDiagnostics(true)) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Slate700)) { Icon(Icons.Default.HealthAndSafety, null); Spacer(Modifier.width(8.dp)); Text(stringResource(R.string.btn_diagnostics)) }
-                        Spacer(Modifier.height(16.dp))
-                        
-                        // ISSUE-OCT21.06-F1: Load Defaults Authority
-                        Button(onClick = { onEvent(UiEvent.LoadDefaults) }, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Slate800)) {
-                            Icon(Icons.Default.SettingsBackupRestore, null)
-                            Spacer(Modifier.width(8.dp))
-                            Text("Load Factory Defaults") 
-                        }
-                        Spacer(Modifier.height(24.dp))
-
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Button(onClick = { onEvent(UiEvent.ImportConfig) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_load_config), fontSize = 11.sp) }
-                            if (!isTracker) { Button(onClick = { onEvent(UiEvent.ExportLogs) }, modifier = Modifier.weight(1f), colors = ButtonDefaults.buttonColors(containerColor = Slate500.copy(alpha = 0.8f))) { Text(stringResource(R.string.btn_save_logs), fontSize = 11.sp) } }
-                        }
-                    }
-
-                    if (visibleCount >= 5) {
-                        Spacer(Modifier.height(24.dp))
-                        // Promoted Relay URL for better visibility (ISSUE-OCT21.06-F1)
-                        OutlinedTextField(
-                            value = draft.relayUrl, 
-                            onValueChange = { onEvent(UiEvent.UpdateDraftRelayUrl(it)) }, 
-                            label = { Text(stringResource(R.string.settings_label_relay_url)) }, 
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Color.White, unfocusedTextColor = Color.White)
-                        )
-                        Spacer(Modifier.height(56.dp))
-                    }
-                } 
-            } else {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp, modifier = Modifier.size(32.dp)) }
+                    } 
+                } else {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = BrandJd, strokeWidth = 2.dp, modifier = Modifier.size(32.dp)) }
+                }
             }
-        }
-        if (isHydrated && visibleCount >= 5) {
-            when (activeSubSettings) {
-                SubSettings.CLEAN -> CleanSetupOverlay(isTracker = isTracker, onEvent = onEvent)
-                SubSettings.ALERTS -> AlertManagementOverlay(isTracker = isTracker, draftAlertSettings = draft.alertSettings, onUpdateAlertSettings = { onEvent(UiEvent.UpdateDraftAlertSettings(it)) }, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
-                SubSettings.SOUND -> AlarmSoundOverlay(isTracker = isTracker, draftAlertSettings = draft.alertSettings, selectedSirenType = settingsState.selectedSirenType, isSirenPlaying = isSirenPlaying, onUpdateAlertSettings = { onEvent(UiEvent.UpdateDraftAlertSettings(it)) }, onUpdateSirenType = { onEvent(UiEvent.SetSirenType(it)) }, onUpdateAlarmVolume = { onEvent(UiEvent.UpdateDraftAlarmVolume(it)) }, onTestSiren = { onEvent(UiEvent.ToggleTestSiren) }, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
-                else -> {}
+            if (isHydrated && visibleCount >= 5) {
+                when (activeSubSettings) {
+                    SubSettings.CLEAN -> CleanSetupOverlay(isTracker = isTracker, onEvent = onEvent)
+                    SubSettings.ALERTS -> AlertManagementOverlay(isTracker = isTracker, draftAlertSettings = draft.alertSettings, onUpdateAlertSettings = { onEvent(UiEvent.UpdateDraftAlertSettings(it)) }, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
+                    SubSettings.SOUND -> AlarmSoundOverlay(isTracker = isTracker, draftAlertSettings = draft.alertSettings, selectedSirenType = settingsState.selectedSirenType, isSirenPlaying = isSirenPlaying, onUpdateAlertSettings = { onEvent(UiEvent.UpdateDraftAlertSettings(it)) }, onUpdateSirenType = { onEvent(UiEvent.SetSirenType(it)) }, onUpdateAlarmVolume = { onEvent(UiEvent.UpdateDraftAlarmVolume(it)) }, onTestSiren = { onEvent(UiEvent.ToggleTestSiren) }, onClose = { onEvent(UiEvent.SetSubSettings(null)) })
+                    else -> {}
+                }
             }
         }
     }
@@ -327,18 +327,17 @@ fun PhoneSetupOverlay(
         }
     }
 
-    // ISSUE-OCT22.0-F2: Exit Authority (Back Button)
-    BackHandler {
-        onEvent(UiEvent.TogglePhoneSetup(false))
-    }
-
     val manufacturer = remember { Build.MANUFACTURER.uppercase() }
     val model = remember { Build.MODEL.uppercase() }
     val recentsLockDesc = remember { getRecentsLockDescription() }
     val batteryOptDesc = remember { getBatteryOptimizationDescription() }
     val autoStartDesc = remember { getAutoStartDescription() }
 
-    CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+    CompositionLocalProvider(
+        LocalLayoutDirection provides LayoutDirection.Ltr,
+        LocalBackAction provides { onEvent(UiEvent.TogglePhoneSetup(false)) }
+    ) {
+        BackPressInterceptor()
         Card(modifier = Modifier.fillMaxSize().padding(16.dp), colors = CardDefaults.cardColors(containerColor = Slate950)) {
             if (isHydrated && visibleCount > 0) {
                 Column(modifier = Modifier.padding(20.dp).verticalScroll(rememberScrollState())) {

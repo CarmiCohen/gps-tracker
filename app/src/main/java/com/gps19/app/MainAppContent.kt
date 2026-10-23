@@ -3,7 +3,6 @@ package com.gps19.app
 import android.content.Intent
 import android.os.Build
 import android.widget.Toast
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -40,11 +39,10 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.23.100:
+ * - SIMP-OCT22.10-S1: BackHandler Composition Local. Migrated to LocalBackAction.
  * Oct.22.0:
  * - Version Synchronization: Updated engine version string to Oct22.0.
- * Oct.21.03:
- * - ISSUE-OCT20.33-F5: Debug Artifact Leak. Wrapped UI_READY label in 
- *   BuildConfig.DEBUG check to suppress it in production builds.
  */
 @Composable
 fun MainAppContent(
@@ -163,17 +161,19 @@ private fun DialogHost(
             onDismissRequest = { viewModel.onEvent(UiEvent.DismissAlarms) },
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
-            BackHandler { viewModel.onEvent(UiEvent.DismissAlarms) }
-            AlarmOverlay(
-                stateProvider = viewModel,
-                onHardwarePermissionClick = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
-                onMute = { 
-                    val causes = hudHealth.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
-                    viewModel.onEvent(UiEvent.StopSiren(causes))
-                },
-                onClose = { viewModel.onEvent(UiEvent.DismissAlarms) },
-                onGoToMap = { viewModel.onEvent(UiEvent.DismissAlarms); viewModel.onEvent(UiEvent.ToggleMap(true)) }
-            )
+            CompositionLocalProvider(LocalBackAction provides { viewModel.onEvent(UiEvent.DismissAlarms) }) {
+                BackPressInterceptor()
+                AlarmOverlay(
+                    stateProvider = viewModel,
+                    onHardwarePermissionClick = { viewModel.onEvent(UiEvent.NavigateToDiagnostics(true)) },
+                    onMute = { 
+                        val causes = hudHealth.activeAlarms.filter { !it.isResolved }.joinToString { it.title }.ifBlank { "Muted" }
+                        viewModel.onEvent(UiEvent.StopSiren(causes))
+                    },
+                    onClose = { viewModel.onEvent(UiEvent.DismissAlarms) },
+                    onGoToMap = { viewModel.onEvent(UiEvent.DismissAlarms); viewModel.onEvent(UiEvent.ToggleMap(true)) }
+                )
+            }
         }
     }
 
