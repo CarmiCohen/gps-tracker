@@ -1,4 +1,13 @@
-# Resolution Archive - GPS Tracker (Oct24.2)
+# Resolution Archive - GPS Tracker (Oct24.12)
+
+## ISSUE-OCT24.10-F1: Native SDK Initialization Failure (Oct24.12)
+- **Resolved**: Oct24.12
+- **Description**: `NativeThrottlingStressTest` failed because `libjdHardware.so` was not packaged in the APK, leading to `JdHardwareManager.initialize` returning false.
+- **Remediation**:
+    - Added `externalNativeBuild` configuration to `app/build.gradle` to integrate CMake build process.
+    - Specified C++17 and the path to `src/main/cpp/CMakeLists.txt`.
+    - Verified that `libjdHardware.so` is correctly built, linked, and loaded during instrumentation tests.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 825).
 
 ## ISSUE-OCT23.101-F6: Offline Violation Event Sync Remediation (Oct24.2)
 - **Resolved**: Oct24.2

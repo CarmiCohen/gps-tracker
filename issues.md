@@ -1,19 +1,19 @@
 git add .
-git commit -m "Remediation: Updated version to Oct24.10. Executed full test suite. Halted on Native SDK failure in stress tests. #ISSUE-OCT24.10-F1"
-git tag -a Oct24.10 -m "Oct24.10 Test Baseline (Failure Halted)"
-git push origin Oct24.10
+git commit -m "Remediation: Fixed Native SDK initialization by adding externalNativeBuild to app/build.gradle. Verified all stress tests pass. #ISSUE-OCT24.10-F1"
+git tag -a Oct24.12 -m "Oct24.12 Release: Native Throttling Hardened"
+git push origin Oct24.12
 
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct24.10
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct24.12
 
-## 🎯 Current Resumption Focus: Remediation of ISSUE-OCT24.10-F1 (Native SDK Initialization).
+## 🎯 Current Resumption Focus: Remediation of SIMP-OCT22.0-S1 (Settings Validation).
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   **ISSUE-OCT24.10-F1: Native SDK Initialization Failure (High).** `NativeThrottlingStressTest.verifyMemoryPressureThrottlingPropagation` failed because `JdHardwareManager.initialize` returned false on the target device R58X40GV2AR.
 *   **SIMP-OCT22.0-S1: Settings Validation Centralization (Medium).** Move identity uniqueness and regex validation to a pure `ConfigValidator`.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 80)
+## 💡 Strategic Simplification Ideas (Ideas: 81)
+*   **SIMP-OCT24.12-S1: JNI Buffer Mapping Automation (Medium).** Replace manual `memcpy` offsets in `jdhardware-jni.cpp` with a packed struct or a header-only code generator to eliminate alignment bugs (R-ID 620).
 *   **SIMP-OCT24.2-S1: Room Migration Unit Testing (Low).** Implement explicit migration tests for v87 -> v88 to verify `pending_violations` schema integrity automatically.
 *   **SIMP-OCT23.121-S1: Violation Event Buffering (Medium).** (Implemented Oct24.2 - Archive candidate).
 *   **SIMP-OCT23.120-S1: Database Schema Migration Automation (Low).** Explore automated Room schema export verification to prevent manual SQL drift during forensic field expansion.
@@ -29,6 +29,7 @@ git push origin Oct24.10
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT24.10-F1: Native SDK Initialization Failure.** Resolved Oct24.12. Added `externalNativeBuild` to `app/build.gradle` to package `libjdHardware.so`. Verified stress tests pass on device. (SOT ID 825).
 *   **ISSUE-OCT23.101-F6: Offline Violation Event Sync.** Resolved Oct24.2. Implemented persistent buffering for `violation_event` signaling in `OfflineRepository` and `ConnectivitySuite`. Discrete violations are now captured offline and synchronized upon recovery. (SOT ID 824).
 *   **ISSUE-OCT24.00-F5: Version Alignment Failure.** Resolved Oct24.2. Aligned `BuildConfig.VERSION_NAME` and `MainViewModelMappingTest` to `Oct24.2`.
 *   **ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps.** Resolved Oct23.121. Synchronized `isJammingCandidate` across violation reporting, signaling (JSON), and persistence layers (Room) for full forensic parity. (SOT ID 823).
@@ -44,6 +45,7 @@ git push origin Oct24.10
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct24.12: [SOT Count: 825 (Rules: 334), Open: H:0, M:1, L:0, Ideas: H:3, M:31, L:47, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct24.10: [SOT Count: 824 (Rules: 334), Open: H:1, M:1, L:0, Ideas: H:3, M:30, L:47, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct24.2: [SOT Count: 824 (Rules: 334), Open: H:0, M:1, L:0, Ideas: H:3, M:30, L:47, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct23.121: [SOT Count: 823 (Rules: 333), Open: H:0, M:1, L:1, Ideas: H:3, M:29, L:47, Testing: 11 (Sub-items: 45), QA: 385]**

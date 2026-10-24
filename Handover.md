@@ -1,25 +1,27 @@
-# Project Handover - Oct24.10 (Test Suite Execution)
+# Project Handover - Oct24.12 (Native Hardening Released)
 
-## 🔴 Status: HALTED (Test Failure Found)
+## 🟢 Status: COMPLETED
 
-The complete test suite execution was initiated for version Oct24.10. Unit tests passed, but a failure was encountered during the Hardening/Stress evaluation in `connectedDebugAndroidTest`. Testing has been halted immediately per `DEVELOPER_GUIDELINES.md`.
+The Hardening/Stress evaluation failure (ISSUE-OCT24.10-F1) has been fully remediated. All tests in `connectedDebugAndroidTest`, including the `NativeThrottlingStressTest`, are now passing on the target device (R58X40GV2AR).
 
-## ❌ Test Failure Identified
-- **Test Case**: `com.gps19.app.NativeThrottlingStressTest > verifyMemoryPressureThrottlingPropagation`
-- **Error**: `java.lang.AssertionError: Native SDK must initialize for throttling verification`
-- **Issue Recorded**: `ISSUE-OCT24.10-F1` in `issues.md`.
-- **Root Cause**: `JdHardwareManager.initialize` returned `false` on the target device (R58X40GV2AR), preventing the stress test from verifying native load-shedding signals.
+## ✅ Fixes Applied
+- **ISSUE-OCT24.10-F1: Native SDK Initialization.**
+    - **Root Cause**: The `:app` module was missing the `externalNativeBuild` configuration. This caused `libjdHardware.so` to be excluded from the APK, resulting in `java.lang.UnsatisfiedLinkError` and the specific logcat failure: `dlopen failed: library "libjdHardware.so" not found`.
+    - **Remediation**: 
+        - Configured CMake integration in `app/build.gradle` (vOct24.12).
+        - Added `externalNativeBuild { cmake { cppFlags "-std=c++17" } }` within `defaultConfig` (Lines 28-32).
+        - Integrated the CMake path in the `android` block: `externalNativeBuild { cmake { path "src/main/cpp/CMakeLists.txt"; version "3.22.1" } }` (Lines 60-65).
+    - **Verification**: `NativeThrottlingStressTest.verifyMemoryPressureThrottlingPropagation` now successfully initializes the native layer and confirms that `isMemoryPressureThrottled` propagates correctly via the JNI shared `ByteBuffer`.
 
-## ✅ Passed Tests
-- **:core:engine:test**: All tests passed.
-- **:app:testDebugUnitTest**: All tests passed.
-- **:app:connectedDebugAndroidTest**: 28 tests passed (excluding the failure).
+## ✅ Test Results (Oct24.12)
+- **:app:connectedDebugAndroidTest**: 29/29 tests PASSED.
+- **:core:engine:test**: All tests PASSED.
+- **:app:testDebugUnitTest**: All tests PASSED.
 
 ## 🔴 Current Open Gaps
-- **ISSUE-OCT24.10-F1: Native SDK Initialization Failure (High).**
-- **SIMP-OCT22.0-S1: Settings Validation Centralization (Medium).**
+- **SIMP-OCT22.0-S1: Settings Validation Centralization (Medium).** Identity uniqueness and regex validation logic is still coupled with the UI layer.
 
-## 🎯 Next Resumption Focus: Remediation of ISSUE-OCT24.10-F1.
-Investigate why `JdHardwareManager` fails to initialize on the target device during stress testing.
+## 🎯 Next Resumption Focus: Architectural Cleanup (SIMP-OCT22.0-S1).
+Migrate validation logic to `ConfigValidator` in `:core:engine` to ensure parity between UI and background configuration tasks.
 
 **HANDOVER FINALIZED.**

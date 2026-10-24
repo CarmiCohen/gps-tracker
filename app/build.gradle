@@ -16,11 +16,17 @@ android {
         minSdk 24
         targetSdk 34
         versionCode 1
-        versionName "Oct24.10"
+        versionName "Oct24.12"
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {
             useSupportLibrary true
+        }
+
+        externalNativeBuild {
+            cmake {
+                cppFlags "-std=c++17"
+            }
         }
     }
 
@@ -47,6 +53,12 @@ android {
     packagingOptions {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
+        }
+    }
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+            version "3.22.1"
         }
     }
 }

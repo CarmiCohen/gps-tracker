@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct24.10)
+# SOT Master Requirements & Hardening Status (Oct24.12)
 
 ## 🏗️ Architectural Master Rules (334 Rules)
 
@@ -30,7 +30,7 @@
 *   **1.261 Offline Violation Synchronization (R-ID 630)**: Discrete violation events (`violation_event`) MUST be buffered in persistent storage when the device is offline and synchronized automatically upon network recovery. (Oct24.2 - ISSUE-OCT23.101-F6).
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 825**: Native Throttling Propagation - FAILED. Native SDK failed to initialize during stress testing. (Oct24.10 - ISSUE-OCT24.10-F1).
+*   **SOT ID 825**: Native Throttling Propagation - PASSED. Resolved missing `externalNativeBuild` configuration in `app/build.gradle` to ensure `libjdHardware.so` is built and packaged. (Oct24.12 - ISSUE-OCT24.10-F1).
 *   **SOT ID 824**: Offline Violation Event Sync Remediation - PASSED. Implemented persistent buffering for `violation_event` signaling in `OfflineRepository` and `ConnectivitySuite` (R-ID 630). (Oct24.2 - ISSUE-OCT23.101-F6).
 *   **SOT ID 823**: Violation Persistence Integrity Remediation - PASSED. Synchronized `isJammingCandidate` across violation reporting and persistence layers (R-ID 629). (Oct23.121 - ISSUE-OCT23.101-F4).
 *   **SOT ID 822**: Stationary Duration Propagation Remediation - PASSED. Synchronized `stationaryDurationMs` across Protobuf, JSON, and Room persistence layers (R-ID 628). (Oct23.120 - ISSUE-OCT23.101-F3).
@@ -49,7 +49,7 @@
 *   **SOT ID 801**: Asymmetric Connectivity & Geofence Sync Resolution - PASSED. (Oct21.06).
 
 ## ✅ Verification Chapters
-*   **Chapter 4.4 (Native Throttling Stress Audit)**: FAILED - Native SDK failed to initialize on target device R58X40GV2AR. (Oct24.10 - ISSUE-OCT24.10-F1).
+*   **Chapter 4.4 (Native Throttling Stress Audit)**: PASSED - Verified propagation of native load-shedding signals under memory pressure after fixing native build configuration. (Oct24.12 - ISSUE-OCT24.10-F1).
 *   **Chapter 4.3 (Offline Synchronization Audit)**: PASSED - Verified persistent buffering and delivery of violation events after network recovery. (Oct24.2 - ISSUE-OCT23.101-F6).
 *   **Chapter 4.2 (Signaling Protocol Hardening)**: PASSED - Remediation of telemetry flyweight race condition (Oct23.109), Protobuf default pollution (Oct23.108) and delta drift prevention (Oct23.107).
 *   **Chapter 4.0 (Telemetry Continuity Audit)**: PASSED - Resolved logic gaps in TelemetryMerger (Oct23.105), mapping in TelemetryMapper (Oct23.106), stationary duration propagation (Oct23.120), and violation integrity (Oct23.121). (Oct23.121).
