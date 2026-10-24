@@ -434,24 +434,48 @@ Java_com_gps19_app_JdHardwareManager_n24(JNIEnv* env, jclass clazz) {
     if (g_sharedBufferPtr == nullptr || g_sharedBufferSize < 128) return -1;
     uint8_t* ptr = (uint8_t*)g_sharedBufferPtr;
 
-    // Aligned Inputs
-    double heapMb, memPressure, memCritical, hysteresis;
+    // Aligned Inputs (Offsets match JdHardwareManager.kt)
+    double heapMb, memPressure, memCritical, memHysteresis;
+    double storageMb, storageLow, storageCritical, storageHysteresis;
+
     std::memcpy(&heapMb, ptr + 0, 8);
     std::memcpy(&memPressure, ptr + 8, 8);
     std::memcpy(&memCritical, ptr + 16, 8);
-    std::memcpy(&hysteresis, ptr + 24, 8);
+    std::memcpy(&memHysteresis, ptr + 24, 8);
+    std::memcpy(&storageMb, ptr + 32, 8);
+    std::memcpy(&storageLow, ptr + 40, 8);
+    std::memcpy(&storageCritical, ptr + 48, 8);
+    std::memcpy(&storageHysteresis, ptr + 56, 8);
 
-    if (std::isnan(heapMb)) return 0;
+    // NaN Sanitization
+    if (std::isnan(heapMb)) heapMb = 0.0;
+    if (std::isnan(storageMb)) storageMb = 1024.0;
 
+    // Memory Pressure Logic (Parity with JVM Fallback)
     int32_t currentMem = (heapMb >= memCritical) ? 2 : (heapMb >= memPressure ? 1 : 0);
-    if (currentMem < g_lastMemLevel && heapMb > ((g_lastMemLevel == 2 ? memCritical : memPressure) - hysteresis)) {
-        currentMem = g_lastMemLevel;
+    if (currentMem < g_lastMemLevel) {
+        double threshold = (g_lastMemLevel == 2) ? memCritical : memPressure;
+        if (heapMb > (threshold - memHysteresis)) currentMem = g_lastMemLevel;
     }
 
+    // Storage Pressure Logic (Parity with JVM Fallback)
+    int32_t currentStorage = (storageMb <= storageCritical) ? 2 : (storageMb <= storageLow ? 1 : 0);
+    if (currentStorage < g_lastStorageLevel) {
+        double threshold = (g_lastStorageLevel == 2) ? storageCritical : storageLow;
+        if (storageMb < (threshold + storageHysteresis)) currentStorage = g_lastStorageLevel;
+    }
+
+    // Aligned Outputs
     std::memcpy(ptr + 64, &currentMem, 4);
-    int32_t needsFlush = (currentMem != 0 && currentMem != g_lastMemLevel);
-    std::memcpy(ptr + 68, &needsFlush, 4);
+    int32_t needsMemFlush = (currentMem != 0 && currentMem != g_lastMemLevel);
+    std::memcpy(ptr + 68, &needsMemFlush, 4);
+
+    std::memcpy(ptr + 72, &currentStorage, 4);
+    int32_t needsStoragePrune = (currentStorage != 0 && currentStorage != g_lastStorageLevel);
+    std::memcpy(ptr + 76, &needsStoragePrune, 4);
+
     g_lastMemLevel = currentMem;
+    g_lastStorageLevel = currentStorage;
 
     return 0;
 }

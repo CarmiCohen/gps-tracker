@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct24.26)
+# SOT Master Requirements & Hardening Status (Oct24.32)
 
-## 🏗️ Architectural Master Rules (339 Rules)
+## 🏗️ Architectural Master Rules (340 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -13,8 +13,11 @@
 *   **1.265 Debug Artifact Suppression (R-ID 610)**: All diagnostic status labels (e.g., `UI_READY`) MUST be explicitly suppressed in production (PLATINUM) builds to prevent forensic leaks. (Oct24.22 - ISSUE-OCT24.14-F4).
 *   **1.266 Dynamic Version Alignment (R-ID 611)**: All test suites verifying version-dependent fields MUST dynamically reference `BuildConfig.VERSION_NAME` to prevent regression and alignment failures during version increments. (OctX - ISSUE-OCT24.22-F1).
 *   **1.267 Diagnostic UI Hardening (R-ID 612)**: The diagnostic version and build variant indicators MUST be aligned to the bottom-right (BottomEnd) of the screen and utilize conditional suffix logic to prevent overlap and ensure clarity in both debug and production environments. (Oct24.26 - ISSUE-OCT24.26-F1).
+*   **1.268 JNI System Pressure Parity (R-ID 640)**: The native layer MUST maintain full functional parity with JVM fallback logic for memory and storage pressure evaluation, including hysteresis and NaN sanitization, to ensure consistent forensic log pruning (R104). (Oct24.32 - ISSUE-OCT24.32-F1).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 837**: JNI System Pressure Parity - PASSED. Implemented storage pressure logic in `n24` native function and synchronized shared buffer offsets (32-76). Added NaN sanitization for heap and storage inputs. (Oct24.32 - ISSUE-OCT24.32-F1).
+*   **SOT ID 836**: Forensic Integrity Sync - PASSED. Synchronized `versionName` to `Oct24.32` and updated `TEST_PROCEDURE.md`. (Oct24.32 - ISSUE-OCT24.26-F2).
 *   **SOT ID 835**: Diagnostic UI Hardening - PASSED. Refined `UI_READY` gate and version suffix logic in `MainAppContent.kt`. Aligned diagnostic indicators to `BottomEnd` to match UX specification and R-ID 612. (Oct24.26 - ISSUE-OCT24.26-F1).
 *   **SOT ID 834**: Dynamic Version Alignment - PASSED. Implemented dynamic version referencing in `MainViewModelMappingTest` using `BuildConfig.VERSION_NAME` to eliminate hardcoded version dependencies. (OctX - ISSUE-OCT24.22-F1).
 *   **SOT ID 833**: Debug Artifact Suppression - PASSED. Hardened diagnostic label suppression by introducing `IS_PLATINUM` build config flag and wrapping `UI_READY` in a conditional check. (Oct24.22 - ISSUE-OCT24.14-F4).
@@ -24,6 +27,7 @@
 *   **(Archived SOT IDs 801-826 listed in historical baselines).**
 
 ## ✅ Verification Chapters
+*   **Chapter 4.12 (System Pressure Forensic Audit)**: PASSED - Verified JNI parity for memory and storage pressure monitoring and confirmed NaN sanitization (R-ID 640). (Oct24.32 - ISSUE-OCT24.32-F1).
 *   **Chapter 4.11 (Diagnostic UI Alignment Audit)**: PASSED - Verified alignment of diagnostic indicators to BottomEnd and validated conditional suffix logic (R-ID 612). (Oct24.26 - ISSUE-OCT24.26-F1).
 *   **Chapter 4.10 (Version Alignment Resilience Audit)**: PASSED - Verified that unit tests dynamically track version changes without manual code updates (R-ID 611). (OctX - ISSUE-OCT24.22-F1).
 *   **Chapter 4.9 (Diagnostic Suppression Audit)**: PASSED - Verified suppression of `UI_READY` label in PLATINUM build variants (R-ID 610). (Oct24.22 - ISSUE-OCT24.14-F4).

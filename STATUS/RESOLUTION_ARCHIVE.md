@@ -1,4 +1,22 @@
-# Resolution Archive - GPS Tracker (Oct24.26)
+# Resolution Archive - GPS Tracker (Oct24.32)
+
+## ISSUE-OCT24.32-F1: JNI System Pressure Parity (Oct24.32)
+- **Resolved**: Oct24.32
+- **Description**: The `n24` native function lacked storage pressure evaluation and shared buffer synchronization for storage metrics, causing `needsStoragePrune` to be bypassed when JNI was active.
+- **Remediation**:
+    - Implemented storage pressure logic in `jdhardware-jni.cpp` with parity to JVM fallback.
+    - Synchronized shared buffer offsets (32-76) between `JdHardwareManager.kt` and the native layer.
+    - Added NaN sanitization for heap and storage inputs.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 837).
+
+## ISSUE-OCT24.26-F2: Forensic Integrity Violation (Oct24.32)
+- **Resolved**: Oct24.32
+- **Description**: Forensic versioning was misaligned across `app/build.gradle` and `TEST_PROCEDURE.md`. Diagnostic suppression for PLATINUM variants was not explicitly verified.
+- **Remediation**:
+    - Synchronized `versionName` to `Oct24.32`.
+    - Updated `TEST_PROCEDURE.md` to expect `Oct24.32_PLATINUM`.
+    - Hardened `UI_READY` suppression in `MainAppContent.kt` via `!BuildConfig.IS_PLATINUM` gate.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 836).
 
 ## ISSUE-OCT24.26-F1: Diagnostic UI Hardening (Oct24.26)
 - **Resolved**: Oct24.26
