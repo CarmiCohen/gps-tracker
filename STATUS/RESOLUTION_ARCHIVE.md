@@ -1,4 +1,13 @@
-# Resolution Archive - GPS Tracker (Oct24.32)
+# Resolution Archive - GPS Tracker (Oct24.34)
+
+## ISSUE-OCT24.26-F2: Forensic Integrity Violation (Oct24.34)
+- **Resolved**: Oct24.34
+- **Description**: Forensic versioning was misaligned across `app/build.gradle` and `TEST_PROCEDURE.md`. Diagnostic suppression for PLATINUM variants was not explicitly verified.
+- **Remediation**:
+    - Synchronized `versionName` to `Oct24.34`.
+    - Updated `TEST_PROCEDURE.md` to expect `Oct24.34_PLATINUM`.
+    - Hardened `UI_READY` suppression in `MainAppContent.kt` via `!BuildConfig.IS_PLATINUM` gate.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 836).
 
 ## ISSUE-OCT24.32-F1: JNI System Pressure Parity (Oct24.32)
 - **Resolved**: Oct24.32
@@ -8,15 +17,6 @@
     - Synchronized shared buffer offsets (32-76) between `JdHardwareManager.kt` and the native layer.
     - Added NaN sanitization for heap and storage inputs.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 837).
-
-## ISSUE-OCT24.26-F2: Forensic Integrity Violation (Oct24.32)
-- **Resolved**: Oct24.32
-- **Description**: Forensic versioning was misaligned across `app/build.gradle` and `TEST_PROCEDURE.md`. Diagnostic suppression for PLATINUM variants was not explicitly verified.
-- **Remediation**:
-    - Synchronized `versionName` to `Oct24.32`.
-    - Updated `TEST_PROCEDURE.md` to expect `Oct24.32_PLATINUM`.
-    - Hardened `UI_READY` suppression in `MainAppContent.kt` via `!BuildConfig.IS_PLATINUM` gate.
-- **Outcome**: 🟢 **PASSED**. (SOT ID 836).
 
 ## ISSUE-OCT24.26-F1: Diagnostic UI Hardening (Oct24.26)
 - **Resolved**: Oct24.26
@@ -49,7 +49,7 @@
 - **Description**: Detected 806ms Davey event during startup, exceeding the 500ms limit. Root cause was high Main-thread contention from immediate observation launches and redundant UI recompositions.
 - **Remediation**:
     - Decoupled monolithic `uiState` collection in `MainAppContent` into granular slices (`session`, `navigation`, `settings`, `simulation`) using `collectAsStateWithLifecycle` to minimize root recomposition scope.
-    - Deferred `startBaseObservations` and `startGlobalTimer` in `MainViewModel` until after the initial "Core Surface" hydration stabilization (Phase 1).
+    - Deferred `startBaseObservations` and `startGlobalTimer` until after the initial "Core Surface" hydration stabilization (Phase 1).
     - Hardened startup frame deadlines to ensure smooth buffer swap on Samsung A15 devices.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 832).
 
