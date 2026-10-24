@@ -1,4 +1,12 @@
-# Resolution Archive - GPS Tracker (Oct24.12)
+# Resolution Archive - GPS Tracker (Oct24.14)
+
+## ISSUE-OCT24.14-F1: Version Alignment Failure Remediation (Oct24.14)
+- **Resolved**: Oct24.14
+- **Description**: `MainViewModelMappingTest` failed because it was hardcoded to expect "Oct24.2" or "Oct24.12", causing failures as the project versioned to "Oct24.14".
+- **Remediation**:
+    - Synchronized `app/build.gradle` `versionName` to `Oct24.14`.
+    - Updated `MainViewModelMappingTest.kt` to expect `Oct24.14` in `Verify Dashboard Connectivity Watchdog`.
+- **Outcome**: 🟢 **PASSED**.
 
 ## ISSUE-OCT24.10-F1: Native SDK Initialization Failure (Oct24.12)
 - **Resolved**: Oct24.12

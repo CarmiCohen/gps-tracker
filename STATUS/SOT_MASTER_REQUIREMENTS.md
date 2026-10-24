@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct24.12)
+# SOT Master Requirements & Hardening Status (Oct24.14)
 
 ## 🏗️ Architectural Master Rules (334 Rules)
 
@@ -30,6 +30,7 @@
 *   **1.261 Offline Violation Synchronization (R-ID 630)**: Discrete violation events (`violation_event`) MUST be buffered in persistent storage when the device is offline and synchronized automatically upon network recovery. (Oct24.2 - ISSUE-OCT23.101-F6).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 826**: Version Alignment Hardening - PASSED. Resolved hardcoded version string mismatch in `MainViewModelMappingTest` that caused CI failures during version bumps. (Oct24.14 - ISSUE-OCT24.14-F1).
 *   **SOT ID 825**: Native Throttling Propagation - PASSED. Resolved missing `externalNativeBuild` configuration in `app/build.gradle` to ensure `libjdHardware.so` is built and packaged. (Oct24.12 - ISSUE-OCT24.10-F1).
 *   **SOT ID 824**: Offline Violation Event Sync Remediation - PASSED. Implemented persistent buffering for `violation_event` signaling in `OfflineRepository` and `ConnectivitySuite` (R-ID 630). (Oct24.2 - ISSUE-OCT23.101-F6).
 *   **SOT ID 823**: Violation Persistence Integrity Remediation - PASSED. Synchronized `isJammingCandidate` across violation reporting and persistence layers (R-ID 629). (Oct23.121 - ISSUE-OCT23.101-F4).
@@ -49,6 +50,7 @@
 *   **SOT ID 801**: Asymmetric Connectivity & Geofence Sync Resolution - PASSED. (Oct21.06).
 
 ## ✅ Verification Chapters
+*   **Chapter 4.5 (Version Lifecycle Audit)**: PASSED - Verified version alignment across `app/build.gradle`, `BuildConfig`, and unit tests. (Oct24.14 - ISSUE-OCT24.14-F1).
 *   **Chapter 4.4 (Native Throttling Stress Audit)**: PASSED - Verified propagation of native load-shedding signals under memory pressure after fixing native build configuration. (Oct24.12 - ISSUE-OCT24.10-F1).
 *   **Chapter 4.3 (Offline Synchronization Audit)**: PASSED - Verified persistent buffering and delivery of violation events after network recovery. (Oct24.2 - ISSUE-OCT23.101-F6).
 *   **Chapter 4.2 (Signaling Protocol Hardening)**: PASSED - Remediation of telemetry flyweight race condition (Oct23.109), Protobuf default pollution (Oct23.108) and delta drift prevention (Oct23.107).
