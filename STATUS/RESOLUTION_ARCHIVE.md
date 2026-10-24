@@ -1,4 +1,13 @@
-# Resolution Archive - GPS Tracker (Oct24.16)
+# Resolution Archive - GPS Tracker (Oct24.18)
+
+## ISSUE-OCT24.14-F2: StackLog Leak Remediation (Oct24.18)
+- **Resolved**: Oct24.18
+- **Description**: `ConnectivityManager` callbacks were leaking stack traces into Logcat (prefixed with `StackLog`) on Samsung A15 devices due to redundant registrations.
+- **Remediation**:
+    - Hardened `AndroidNetworkProvider` with a process-level idempotency guard using `AtomicBoolean`.
+    - Enforced Main-thread affinity for `registerNetworkCallback` to satisfy platform diagnostic requirements.
+    - Integrated `ManagedUnregistrationHelper` for safe teardown and guard reset.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 831).
 
 ## SIMP-OCT22.0-S1: Settings Validation Centralization (Oct24.16)
 - **Resolved**: Oct24.16
@@ -47,54 +56,36 @@
     - Updated `MainViewModelMappingTest.kt` and `DashboardMapper.kt` documentation to align with `Oct24.2`.
 - **Outcome**: 🟢 **PASSED**.
 
-## ISSUE-OCT23.101-F4: Violation Persistence Integrity Remediation (Oct23.121)
+## ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps (Oct23.121)
 - **Resolved**: Oct23.121
-- **Description**: `isJammingCandidate` was missing from violation reporting and persistence paths.
-- **Remediation**:
-    - Updated `ViolationPoint` UI model and `ViolationEntity` to include `isJammingCandidate`.
-    - Hardened `MainRepository.addViolation` and its mapping logic.
-    - Updated `ConnectivitySuite.emitViolation` and `violation_relay` signaling handler.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 823).
 
-## ISSUE-OCT23.101-F3: Stationary Duration Propagation Remediation (Oct23.120)
+## ISSUE-OCT23.101-F3: Missing Stationary Duration Propagation (Oct23.120)
 - **Resolved**: Oct23.120
-- **Description**: `stationary_duration_ms` was ignored in deserialization and persistence paths.
-- **Remediation**:
-    - Updated `app_settings.proto` schema.
-    - Extended `LogEntity`, `HistoryEntity`, and `PendingStatusEntity` in `Database.kt`.
-    - Implemented `MIGRATION_86_87` (Room v87).
-    - Hardened `TelemetryMapper.kt` and `TelemetryProtobufMapper.kt`.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 822).
 
 ## ISSUE-OCT23.102-F9: Telemetry Flyweight Race Condition (Oct23.109)
 - **Resolved**: Oct23.109
-- **Description**: Shared flyweights in `ConnectivitySuite.kt` caused data corruption.
-- **Remediation**: Replaced shared flyweights with local instances and atomic references.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 821).
 
 ## ISSUE-OCT23.102-F8: Protobuf Default Value Pollution (Oct23.108)
 - **Resolved**: Oct23.108
-- **Remediation**: Applied `optional` keyword in Proto schema and added `hasField()` checks in `TelemetryMapper.kt`.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 820).
 
 ## ISSUE-OCT23.102-F7: Delta Compression Drift Prevention (Oct23.107)
 - **Resolved**: Oct23.107
-- **Remediation**: Implemented periodic absolute coordinate refresh in `TelemetryProtobufMapper`.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 819).
 
 ## ISSUE-OCT23.101-F2: JSON Mapping State Overwrite (Oct23.106)
 - **Resolved**: Oct23.106
-- **Remediation**: Hardened `TelemetryMapper.kt` to use cached values as fallback for optional fields.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 818).
 
 ## ISSUE-OCT23.101-F1: Incomplete Telemetry Merge Logic (Oct23.105)
 - **Resolved**: Oct23.105
-- **Remediation**: Expanded `preferCached` block in `TelemetryMerger.kt` to include critical integrity flags.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 813).
 
 ## SIMP-OCT22.10-S1: BackHandler Composition Local Consolidation (Oct23.100)
 - **Resolved**: Oct23.100
-- **Remediation**: Implemented `LocalBackAction` for unified back navigation.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 817).
 
 ## ISSUE-OCT24.00-F1/F3/F4: Build Stabilization & Security Hardening (Oct24.00)

@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct24.16)
+# SOT Master Requirements & Hardening Status (Oct24.18)
 
-## 🏗️ Architectural Master Rules (335 Rules)
+## 🏗️ Architectural Master Rules (337 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -29,29 +29,18 @@
 *   **1.260 Violation Integrity Propagation (R-ID 629)**: Violation events MUST propagate the `isJammingCandidate` flag through all reporting and persistence layers.
 *   **1.261 Offline Violation Synchronization (R-ID 630)**: Discrete violation events (`violation_event`) MUST be buffered in persistent storage when the device is offline and synchronized automatically upon network recovery. (Oct24.2 - ISSUE-OCT23.101-F6).
 *   **1.262 Centralized Configuration Validation (R-ID 631)**: All identity and configuration validation logic MUST reside in a pure engine-level `ConfigValidator` to ensure cross-layer consistency. (Oct24.16 - SIMP-OCT22.0-S1).
+*   **1.263 Connectivity Callback Idempotency (R-ID 632)**: All system network callback registrations MUST be guarded by process-level idempotency checks and executed on the Main thread to prevent diagnostic `StackLog` traces and redundant system overhead. (Oct24.18 - ISSUE-OCT24.14-F2).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 831**: StackLog Leak Remediation - PASSED. Hardened `AndroidNetworkProvider` with process-level idempotency guards and Main-thread registration to prevent platform diagnostic `StackLog` traces on Samsung A15 devices. (Oct24.18 - ISSUE-OCT24.14-F2).
 *   **SOT ID 830**: Settings Validation Centralization - PASSED. Relocated identity uniqueness and regex validation logic to `ConfigValidator` in `:core:engine`. Standardized error messages and improved testability. (Oct24.16 - SIMP-OCT22.0-S1).
 *   **SOT ID 826**: Version Alignment Hardening - PASSED. Resolved hardcoded version string mismatch in `MainViewModelMappingTest` that caused CI failures during version bumps. (Oct24.14 - ISSUE-OCT24.14-F1).
 *   **SOT ID 825**: Native Throttling Propagation - PASSED. Resolved missing `externalNativeBuild` configuration in `app/build.gradle` to ensure `libjdHardware.so` is built and packaged. (Oct24.12 - ISSUE-OCT24.10-F1).
 *   **SOT ID 824**: Offline Violation Event Sync Remediation - PASSED. Implemented persistent buffering for `violation_event` signaling in `OfflineRepository` and `ConnectivitySuite` (R-ID 630). (Oct24.2 - ISSUE-OCT23.101-F6).
-*   **SOT ID 823**: Violation Persistence Integrity Remediation - PASSED. Synchronized `isJammingCandidate` across violation reporting and persistence layers (R-ID 629). (Oct23.121 - ISSUE-OCT23.101-F4).
-*   **SOT ID 822**: Stationary Duration Propagation Remediation - PASSED. Synchronized `stationaryDurationMs` across Protobuf, JSON, and Room persistence layers (R-ID 628). (Oct23.120 - ISSUE-OCT23.101-F3).
-*   **SOT ID 821**: Telemetry Flyweight Race Condition Remediation - PASSED. Replaced shared flyweights in `ConnectivitySuite.kt` with local instances and atomic references to ensure concurrency safety. (Oct23.109 - ISSUE-OCT23.102-F9).
-*   **SOT ID 820**: Protobuf Default Value Pollution Remediation - PASSED. Applied `optional` keyword to scalar fields in `app_settings.proto` and hardened `TelemetryMapper.kt` with `hasField()` checks. (Oct23.108 - ISSUE-OCT23.102-F8).
-*   **SOT ID 819**: Delta Compression Drift Prevention - PASSED. Implemented periodic absolute coordinate refresh in `TelemetryProtobufMapper` (R-ID 625). (Oct23.107 - ISSUE-OCT23.102-F7).
-*   **SOT ID 818**: Telemetry Mapping State Preservation - PASSED. Hardened `TelemetryMapper.kt` to preserve cached values (prox, rtt, snapshots) during JSON mapping. (Oct23.106 - ISSUE-OCT23.101-F2).
-*   **SOT ID 817**: BackHandler Consolidation - PASSED. Implemented `LocalBackAction` and `BackPressInterceptor` to unify back navigation across all overlays. (Oct23.100 - SIMP-OCT22.10-S1).
-*   **SOT ID 816**: Build Stabilization & Lint Hardening - PASSED. Resolved dependency conflicts, upgraded to JVM 17, and applied mandatory broadcast receiver export flags. (Oct24.00 - ISSUE-OCT24.00-F1/F3).
-*   **SOT ID 815**: Discovery Mode & Pairing Logic - PASSED. Relaxed SignalingValidator discovery mode to allow Trackers with default IDs to adopt custom viewers. (Oct24.00 - ISSUE-OCT24.00-F2).
-*   **SOT ID 814**: Forensic Trace Raw Sensor Parity - PASSED. Extended ForensicSnapshot and LocationUpdate with lux and acoustic fields for full raw sensor trace parity. (Oct23.00 - ISSUE-OCT22.16-F1).
-*   **SOT ID 813**: Telemetry Propagation & Violation Relay - PARTIALLY REMEDIATED (Oct23.106). Resolved merge gaps in `TelemetryMerger` (F1) and mapping gaps in `TelemetryMapper` (F2). Residual gaps remain in persistence (F4). (ISSUE-OCT22.0-F4).
-*   **SOT ID 812**: Signaling Identity Symmetry & Leak Prevention - PASSED. Enforced strict ID symmetry in SignalingValidator and blocked cross-viewer traffic. (Oct22.12 - ISSUE-OCT22.0-F3).
-*   **SOT ID 811**: Setup Exit Authority & Lifecycle Hardening - PASSED. Implemented BackHandler and Close icons for all setup overlays. (Oct22.10 - ISSUE-OCT22.0-F2).
-*   **SOT ID 810**: Setup & Configuration Hardening - PASSED. Resolved ID persistence blocks, added Load Defaults, and implemented explicit Exit authority. (Oct22.0 - ISSUE-OCT22.0-F1).
-*   **SOT ID 801**: Asymmetric Connectivity & Geofence Sync Resolution - PASSED. (Oct21.06).
+*   **(Archived SOT IDs 801-823 listed in historical baselines).**
 
 ## ✅ Verification Chapters
+*   **Chapter 4.7 (Connectivity Forensic Audit)**: PASSED - Verified zero `StackLog` traces during network transitions and confirmed idempotent registration behavior in `AndroidNetworkProvider`. (Oct24.18 - ISSUE-OCT24.14-F2).
 *   **Chapter 4.6 (Configuration Validation Audit)**: PASSED - Verified centralized validation rules and error message consistency in `ConfigValidator`. (Oct24.16 - SIMP-OCT22.0-S1).
 *   **Chapter 4.5 (Version Lifecycle Audit)**: PASSED - Verified version alignment across `app/build.gradle`, `BuildConfig`, and unit tests. (Oct24.14 - ISSUE-OCT24.14-F1).
 *   **Chapter 4.4 (Native Throttling Stress Audit)**: PASSED - Verified propagation of native load-shedding signals under memory pressure after fixing native build configuration. (Oct24.12 - ISSUE-OCT24.10-F1).

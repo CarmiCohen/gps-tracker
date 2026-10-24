@@ -35,6 +35,10 @@ import javax.inject.Singleton
  * Oct.18.6:
  * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Implemented simulateNetworkLoss 
  *   to allow manual triggering of connectivity failover logic.
+ * Oct.24.16:
+ * - ISSUE-OCT24.14-F2: StackLog Leak. Hardened registration lifecycle. Moved 
+ *   system callback registration to the Main thread and added a process-level 
+ *   idempotency guard to prevent StackLog diagnostic traces on Samsung A15.
  */
 @Singleton
 class AndroidNetworkProvider @Inject constructor(
@@ -48,6 +52,12 @@ class AndroidNetworkProvider @Inject constructor(
     private val listenerJobs = mutableMapOf<NetworkListener, Job>()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val isLossSimulated = AtomicBoolean(false)
+
+    companion object {
+        // Oct.24.16: Process-level guard to prevent multiple registrations 
+        // across provider instances (primarily for Hilt test stability).
+        private val isSystemCallbackRegistered = AtomicBoolean(false)
+    }
     
     override val isNetworkAvailable: Boolean
         get() {
@@ -83,22 +93,45 @@ class AndroidNetworkProvider @Inject constructor(
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
         
-        try {
-            Timber.d("AndroidNetworkProvider: Registering system network callback.")
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                connectivityManager.registerNetworkCallback(request, callback, mainHandler)
+        // Oct.24.16: Ensure registration happens on Main thread to satisfy 
+        // Samsung platform diagnostic constraints and prevent StackLog leaks.
+        withContext(Dispatchers.Main.immediate) {
+            if (isSystemCallbackRegistered.compareAndSet(false, true)) {
+                try {
+                    Timber.d("AndroidNetworkProvider: Registering system network callback.")
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        connectivityManager.registerNetworkCallback(request, callback, mainHandler)
+                    } else {
+                        connectivityManager.registerNetworkCallback(request, callback)
+                    }
+                    trySend(isNetworkAvailable)
+                } catch (e: Exception) {
+                    isSystemCallbackRegistered.set(false)
+                    Timber.e(e, "AndroidNetworkProvider: Registration failed")
+                    trySend(false)
+                }
             } else {
-                connectivityManager.registerNetworkCallback(request, callback)
+                Timber.w("AndroidNetworkProvider: System callback already registered. Skipping to prevent StackLog.")
+                trySend(isNetworkAvailable)
             }
-            trySend(isNetworkAvailable)
-        } catch (e: Exception) {
-            Timber.e(e, "AndroidNetworkProvider: Registration failed")
-            trySend(false)
         }
 
         awaitClose {
-            Timber.d("AndroidNetworkProvider: Unregistering system network callback.")
-            callback.unregister(connectivityManager, timeProvider, mainHandler)
+            Timber.d("AndroidNetworkProvider: awaitClose triggered for system network callback.")
+            // Oct.24.16: Perform unregistration via the managed helper to ensure 
+            // the static guard is reset ONLY after the platform call completes.
+            ManagedUnregistrationHelper.safeUnregister(
+                "AndroidNetworkProvider_Final",
+                mainHandler,
+                timeProvider
+            ) {
+                try {
+                    connectivityManager.unregisterNetworkCallback(callback)
+                } catch (e: Exception) {
+                    Timber.w("ManagedNetworkCallback: Unregister failed")
+                }
+                isSystemCallbackRegistered.set(false)
+            }
         }
     }.flowOn(Dispatchers.IO)
      .distinctUntilChanged()

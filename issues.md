@@ -1,38 +1,29 @@
 git add .
-git commit -m "Alignment: Synchronized versioning to Oct24.16 and centralized identity validation. #SIMP-OCT22.0-S1"
-git tag -a Oct24.16 -m "Oct24.16 Release: Validation Centralization & Hardening"
-git push origin Oct24.16
+git commit -m "Hardening: Resolved StackLog leak in ConnectivityManager callbacks. #ISSUE-OCT24.14-F2"
+git tag -a Oct24.18 -m "Oct24.18 Release: Forensic Hardening & StackLog Resolution"
+git push origin Oct24.18
 
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct24.16
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct24.18
 
-## 🎯 Current Resumption Focus: Forensic Hardening (ISSUE-OCT24.14-F2).
+## 🎯 Current Resumption Focus: Forensic Hardening (ISSUE-OCT24.14-F3).
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   **ISSUE-OCT24.14-F2: StackLog Leak (High).** ConnectivityManager callbacks are leaking stack traces into Logcat, violating Forensic Audit 0.1.
 *   **ISSUE-OCT24.14-F3: Davey Performance Violation (Medium).** Detected 806ms Davey event during startup, exceeding the 500ms limit (Audit 0.1).
 *   **ISSUE-OCT24.14-F4: UI_READY Visibility (Low).** The `UI_READY` debug label is visible in PLATINUM builds, violating R-ID 610 (Audit 0.5.4).
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 83)
+## 💡 Strategic Simplification Ideas (Ideas: 84)
+*   **SIMP-OCT24.18-S1: Managed Callback Guard (Low).** Consider moving the `isSystemCallbackRegistered` guard into `ManagedNetworkCallback` to centralize idempotency across all connectivity consumers.
 *   **SIMP-OCT24.16-S1: Validator Injection (Low).** Consider injecting `ConfigValidator` interface into `SettingsRepository` to allow for easy mocking in integration tests.
 *   **SIMP-OCT24.14-S1: Dynamic Version Injection in Tests (Low).** Reference `BuildConfig.VERSION_NAME` in `MainViewModelMappingTest` instead of hardcoded strings to prevent recurring alignment failures.
 *   **SIMP-OCT24.12-S1: JNI Buffer Mapping Automation (Medium).** Replace manual `memcpy` offsets in `jdhardware-jni.cpp` with a packed struct or a header-only code generator to eliminate alignment bugs (R-ID 620).
 *   **SIMP-OCT24.2-S1: Room Migration Unit Testing (Low).** Implement explicit migration tests for v87 -> v88 to verify `pending_violations` schema integrity automatically.
-*   **SIMP-OCT23.121-S1: Violation Event Buffering (Medium).** (Implemented Oct24.2 - Archive candidate).
-*   **SIMP-OCT23.120-S1: Database Schema Migration Automation (Low).** Explore automated Room schema export verification to prevent manual SQL drift during forensic field expansion.
-*   **SIMP-OCT23.109-S1: Atomic Telemetry Accessors (Low).** Refactor `ConnectivitySuite` to use `AtomicReference` for all transient peer states to further reduce boilerplate in atomic update blocks.
-*   **SIMP-OCT23.108-S1: Protobuf Mapping Boilerplate Reduction (Medium).** Utilize a generated mapping layer or generic field visitor to reduce the manual `hasField()` boilerplate in `TelemetryMapper.kt`.
-*   **SIMP-OCT23.107-S1: Signaling Refresh Strategy Pattern (Medium).** Encapsulate delta-reset logic (spatial jump vs. temporal/packet frequency) into a dedicated `SignalingStrategy` to decouple `TelemetryProtobufMapper` from specific optimization thresholds.
-*   **SIMP-OCT23.106-S1: Unified Telemetry Property Resolver (Medium).** Create a generic property resolver for `LocationUpdate` that handles both Protobuf and JSON optional values with a single authoritative fallback policy to eliminate manual ternary drift.
-*   **SIMP-OCT23.101-S1: Telemetry Merger Polymorphism (High).** Replace the manual field-by-field merge in `TelemetryMerger.kt` with a reflection-free metadata-aware visitor to ensure all forensic fields are automatically included in `preferCached` blocks.
-*   **SIMP-OCT24.0-S1: Signaling Validator discovery logic simplification (Medium).** Relax `isDiscoveryMode` to allow asymmetric pairing when one peer is using a default ID.
-*   **SIMP-OCT23.0-S1: Forensic Snapshot Consolidation (Low).** Consolidate redundant `ForensicSnapshot` class definitions between `core:engine` and `HardwareSuite.kt` into a single shared domain model.
-*   **SIMP-OCT23.100-S1: DialogHost Refactoring (Low).** Further simplify `MainAppContent.DialogHost` by utilizing a unified overlay/dialog state machine to reduce conditional nesting.
 
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT24.14-F2: StackLog Leak.** Resolved Oct24.18. Hardened `AndroidNetworkProvider` with process-level idempotency guards and Main-thread registration to prevent diagnostic `StackLog` traces on Samsung A15 devices. (SOT ID 831).
 *   **SIMP-OCT22.0-S1: Settings Validation Centralization.** Resolved Oct24.16. Migrated identity and regex validation from Repository/UI layer to a pure `ConfigValidator` in `:core:engine`. (SOT ID 830).
 *   **ISSUE-OCT24.14-F1: Version Alignment Failure.** Resolved Oct24.14. Synchronized `app/build.gradle` and `MainViewModelMappingTest` to `Oct24.14`. Verified all tests pass. (SOT ID 826).
 *   **ISSUE-OCT24.10-F1: Native SDK Initialization Failure.** Resolved Oct24.12. Added `externalNativeBuild` to `app/build.gradle` to package `libjdHardware.so`. Verified stress tests pass on device. (SOT ID 825).
@@ -51,6 +42,7 @@ git push origin Oct24.16
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct24.18: [SOT Count: 831 (Rules: 336), Open: H:0, M:1, L:1, Ideas: H:3, M:32, L:49, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct24.16: [SOT Count: 830 (Rules: 335), Open: H:1, M:2, L:1, Ideas: H:3, M:32, L:48, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct24.14: [SOT Count: 829 (Rules: 334), Open: H:1, M:2, L:1, Ideas: H:3, M:31, L:48, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct24.12: [SOT Count: 825 (Rules: 334), Open: H:0, M:1, L:0, Ideas: H:3, M:31, L:47, Testing: 11 (Sub-items: 45), QA: 385]**
