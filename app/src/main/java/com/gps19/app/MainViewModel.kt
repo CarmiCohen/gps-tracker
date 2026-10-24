@@ -22,16 +22,12 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.24.20:
+ * - ISSUE-OCT24.14-F3: Davey Optimization. Deferred startBaseObservations and 
+ *   startGlobalTimer until after initial hydration delay to clear startup Main-thread.
  * Oct.20.2:
  * - ISSUE-OCT19.0-F1: Updated applyInitialSettings to respect isRestorationDisabled 
  *   during UI state initialization to ensure Landing Screen landing.
- * Oct.19.19:
- * - ISSUE-OCT19.19-F1: Integrated Skip Restoration Hook into init block to bypass R-ID 242.
- * Oct.15.10:
- * - Requirement Restoration: Implemented automatic service resumption on cold start 
- *   if a prior appMode is detected (ensures "Last Mode" persistence).
- * Oct.15.2:
- * - SIMP-OCT15.1-S1: Primitive History Buffers.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -251,6 +247,15 @@ class MainViewModel @Inject constructor(
 
                 hydrationManager.hydrationLevel.onEach { level -> 
                     updateState { it.copy(session = it.session.copy(hydrationLevel = level)) } 
+                    
+                    // ISSUE-OCT24.14-F3: Defer heavy Main-thread observations until 
+                    // after Phase 1 (Core Surface) stabilization to avoid Davey violation.
+                    if (level == 1) {
+                        launch(Dispatchers.Main.immediate) {
+                            startBaseObservations()
+                            startGlobalTimer() 
+                        }
+                    }
                 }.launchIn(viewModelScope)
 
                 hydrationManager.startHydration(viewModelScope, initialPerms.performanceTier == PerformanceTier.STAGGERED) { 
@@ -261,11 +266,6 @@ class MainViewModel @Inject constructor(
             launch(Dispatchers.IO) { 
                 delay(STAGGERED_IO_PRUNING_DELAY_MS + 1000)
                 PruningWorker.triggerNow(context)
-            }
-            
-            withContext(Dispatchers.Main.immediate) { 
-                startBaseObservations()
-                startGlobalTimer() 
             }
 
             launch(Dispatchers.Default) {

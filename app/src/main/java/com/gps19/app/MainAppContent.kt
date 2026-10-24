@@ -39,21 +39,26 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.24.20:
+ * - ISSUE-OCT24.14-F3: Davey Optimization. Decoupled monolithic uiState collection 
+ *   into granular slices to reduce root recomposition overhead during startup.
+ *   Removed unused simulationState.
  * Oct.23.100:
  * - SIMP-OCT22.10-S1: BackHandler Composition Local. Migrated to LocalBackAction.
- * Oct.22.0:
- * - Version Synchronization: Updated engine version string to Oct22.0.
  */
 @Composable
 fun MainAppContent(
     activity: MainActivity,
     viewModel: MainViewModel
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    // Oct.24.20: Granular state collection to minimize recomposition scope.
+    val sessionState by viewModel.session.collectAsStateWithLifecycle()
+    val navigationState by viewModel.navigation.collectAsStateWithLifecycle()
+    val settingsState by viewModel.settings.collectAsStateWithLifecycle()
     val hudState by viewModel.hudState.collectAsStateWithLifecycle()
-    val sessionState = uiState.session
+    
     val mode = sessionState.appMode
-    val navigationState = uiState.navigation
+    val hydrationLevel = sessionState.hydrationLevel
     
     val navController = rememberNavController()
     var showBackgroundDisclosure by remember { mutableStateOf(false) }
@@ -108,7 +113,9 @@ fun MainAppContent(
 
                 DialogHost(
                     viewModel = viewModel,
-                    uiState = uiState,
+                    sessionState = sessionState,
+                    navigationState = navigationState,
+                    settingsState = settingsState,
                     hudState = hudState,
                     showBackgroundDisclosure = showBackgroundDisclosure,
                     onBackgroundDisclosureDismiss = { confirmed ->
@@ -118,7 +125,7 @@ fun MainAppContent(
                 )
 
                 AnimatedVisibility(
-                    visible = sessionState.hydrationLevel < 3 && mode != null,
+                    visible = hydrationLevel < 3 && mode != null,
                     enter = fadeIn(),
                     exit = fadeOut(),
                     modifier = Modifier.fillMaxSize()
@@ -146,13 +153,13 @@ fun MainAppContent(
 @Composable
 private fun DialogHost(
     viewModel: MainViewModel,
-    uiState: MainUiState,
+    sessionState: SessionUiState,
+    navigationState: NavigationState,
+    settingsState: SettingsUiState,
     hudState: HudState,
     showBackgroundDisclosure: Boolean,
     onBackgroundDisclosureDismiss: (Boolean) -> Unit
 ) {
-    val navigationState = uiState.navigation
-    val sessionState = uiState.session
     val hudHealth = hudState.health
     
     // 1. Critical Alarm Sentinel (R-ID 582/1402). High-Z window priority.
@@ -205,7 +212,7 @@ private fun DialogHost(
     }
 
     // 4. Identity Sanitization (R-ID 514)
-    if (uiState.settings.isIdentitySanitized) {
+    if (settingsState.isIdentitySanitized) {
         AlertDialog(
             onDismissRequest = { viewModel.onEvent(UiEvent.DismissIdentitySanitization) },
             title = { Text(stringResource(R.string.sanitization_title)) },
@@ -248,8 +255,12 @@ private fun AppEffectAggregator(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    
+    // Oct.24.20: Explicitly collect session mode for import helper.
+    val sessionState by viewModel.session.collectAsStateWithLifecycle()
+    
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> 
-        uri?.let { MainFileHelper.importConfig(activity, viewModel.uiState.value.session.appMode, { viewModel.onEvent(it) }, uri) } 
+        uri?.let { MainFileHelper.importConfig(activity, sessionState.appMode, { viewModel.onEvent(it) }, uri) }
     }
     val importTrailLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris -> 
         MainFileHelper.importTrails(activity, viewModel.repository, { viewModel.onEvent(it) }, uris) 

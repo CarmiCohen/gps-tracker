@@ -1,4 +1,13 @@
-# Resolution Archive - GPS Tracker (Oct24.18)
+# Resolution Archive - GPS Tracker (Oct24.20)
+
+## ISSUE-OCT24.14-F3: Davey Performance Violation (Oct24.20)
+- **Resolved**: Oct24.20
+- **Description**: Detected 806ms Davey event during startup, exceeding the 500ms limit. Root cause was high Main-thread contention from immediate observation launches and redundant UI recompositions.
+- **Remediation**:
+    - Decoupled monolithic `uiState` collection in `MainAppContent` into granular slices (`session`, `navigation`, `settings`, `simulation`) using `collectAsStateWithLifecycle` to minimize root recomposition scope.
+    - Deferred `startBaseObservations` and `startGlobalTimer` in `MainViewModel` until after the initial "Core Surface" hydration stabilization (Phase 1).
+    - Hardened startup frame deadlines to ensure smooth buffer swap on Samsung A15 devices.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 832).
 
 ## ISSUE-OCT24.14-F2: StackLog Leak Remediation (Oct24.18)
 - **Resolved**: Oct24.18

@@ -1,19 +1,19 @@
 git add .
-git commit -m "Hardening: Resolved StackLog leak in ConnectivityManager callbacks. #ISSUE-OCT24.14-F2"
-git tag -a Oct24.18 -m "Oct24.18 Release: Forensic Hardening & StackLog Resolution"
-git push origin Oct24.18
+git commit -m "Performance: Optimized startup frame deadlines to resolve Davey violation. #ISSUE-OCT24.14-F3"
+git tag -a Oct24.20 -m "Oct24.20 Release: Startup Performance Optimization"
+git push origin Oct24.20
 
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct24.18
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct24.20
 
-## 🎯 Current Resumption Focus: Forensic Hardening (ISSUE-OCT24.14-F3).
+## 🎯 Current Resumption Focus: Startup Performance (ISSUE-OCT24.14-F3).
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   **ISSUE-OCT24.14-F3: Davey Performance Violation (Medium).** Detected 806ms Davey event during startup, exceeding the 500ms limit (Audit 0.1).
 *   **ISSUE-OCT24.14-F4: UI_READY Visibility (Low).** The `UI_READY` debug label is visible in PLATINUM builds, violating R-ID 610 (Audit 0.5.4).
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 84)
+## 💡 Strategic Simplification Ideas (Ideas: 85)
+*   **SIMP-OCT24.20-S1: Hydration Level State Mapping (Low).** Consider mapping hydration levels to semantic enums (e.g., CORE_READY, MAP_READY) instead of raw integers to improve code readability.
 *   **SIMP-OCT24.18-S1: Managed Callback Guard (Low).** Consider moving the `isSystemCallbackRegistered` guard into `ManagedNetworkCallback` to centralize idempotency across all connectivity consumers.
 *   **SIMP-OCT24.16-S1: Validator Injection (Low).** Consider injecting `ConfigValidator` interface into `SettingsRepository` to allow for easy mocking in integration tests.
 *   **SIMP-OCT24.14-S1: Dynamic Version Injection in Tests (Low).** Reference `BuildConfig.VERSION_NAME` in `MainViewModelMappingTest` instead of hardcoded strings to prevent recurring alignment failures.
@@ -23,6 +23,7 @@ git push origin Oct24.18
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT24.14-F3: Davey Performance Violation.** Resolved Oct24.20. Optimized startup frame deadlines by decoupling monolithic UI state collection into granular slices in `MainAppContent` and deferring heavy Main-thread observations in `MainViewModel` until after initial hydration stabilization. (SOT ID 832).
 *   **ISSUE-OCT24.14-F2: StackLog Leak.** Resolved Oct24.18. Hardened `AndroidNetworkProvider` with process-level idempotency guards and Main-thread registration to prevent diagnostic `StackLog` traces on Samsung A15 devices. (SOT ID 831).
 *   **SIMP-OCT22.0-S1: Settings Validation Centralization.** Resolved Oct24.16. Migrated identity and regex validation from Repository/UI layer to a pure `ConfigValidator` in `:core:engine`. (SOT ID 830).
 *   **ISSUE-OCT24.14-F1: Version Alignment Failure.** Resolved Oct24.14. Synchronized `app/build.gradle` and `MainViewModelMappingTest` to `Oct24.14`. Verified all tests pass. (SOT ID 826).
@@ -42,6 +43,7 @@ git push origin Oct24.18
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct24.20: [SOT Count: 832 (Rules: 337), Open: H:0, M:0, L:1, Ideas: H:3, M:32, L:50, Testing: 11 (Sub-items: 45), QA: 386]**
 - **Oct24.18: [SOT Count: 831 (Rules: 336), Open: H:0, M:1, L:1, Ideas: H:3, M:32, L:49, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct24.16: [SOT Count: 830 (Rules: 335), Open: H:1, M:2, L:1, Ideas: H:3, M:32, L:48, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct24.14: [SOT Count: 829 (Rules: 334), Open: H:1, M:2, L:1, Ideas: H:3, M:31, L:48, Testing: 11 (Sub-items: 45), QA: 385]**
