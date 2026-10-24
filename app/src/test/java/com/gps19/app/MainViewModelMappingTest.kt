@@ -6,6 +6,8 @@ import org.junit.Test
 
 /**
  * MainViewModelMappingTest: Verifies centralized mapping logic and tier-specific freshness gates.
+ * Oct24.22:
+ * - Version Alignment: Dynamically reference BuildConfig.VERSION_NAME to prevent regression (SIMP-OCT24.14-S1).
  * Oct24.14:
  * - Version Alignment: Updated engine version expectation to Oct24.14.
  * Oct24.2:
@@ -210,7 +212,7 @@ class MainViewModelMappingTest {
         
         val result = DashboardMapper.mapDashboardConnectivity("viewer", diag, nowRt)
         assertTrue("Watchdog should be OK", result.watchdogOk)
-        assertEquals("Oct24.14", result.engineVersion)
+        assertEquals(BuildConfig.VERSION_NAME, result.engineVersion)
         
         // Stale watchdog
         diag.pulse = nowRt - 70000L

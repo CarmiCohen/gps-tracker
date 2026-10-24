@@ -39,12 +39,15 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
+ * Oct.24.26:
+ * - ISSUE-OCT24.26-F1: Diagnostic Hardening. Refined UI_READY gate and version 
+ *   suffix logic to strictly adhere to R-ID 610. Corrected alignment to BottomEnd.
+ * Oct.24.22:
+ * - ISSUE-OCT24.14-F4: UI_READY Suppression. Hardened diagnostic label suppression 
+ *   using BuildConfig.IS_PLATINUM to ensure R-ID 610 compliance in production.
  * Oct.24.20:
  * - ISSUE-OCT24.14-F3: Davey Optimization. Decoupled monolithic uiState collection 
  *   into granular slices to reduce root recomposition overhead during startup.
- *   Removed unused simulationState.
- * Oct.23.100:
- * - SIMP-OCT22.10-S1: BackHandler Composition Local. Migrated to LocalBackAction.
  */
 @Composable
 fun MainAppContent(
@@ -139,11 +142,16 @@ fun MainAppContent(
                     }
                 }
 
-                Column(modifier = Modifier.align(Alignment.BottomStart).padding(8.dp)) {
-                    if (BuildConfig.DEBUG) {
+                Column(
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                    horizontalAlignment = Alignment.End
+                ) {
+                    // Oct.24.26: Suppress diagnostic labels in PLATINUM builds (R-ID 610).
+                    if (BuildConfig.DEBUG && !BuildConfig.IS_PLATINUM) {
                         Text("UI_READY", color = Color.Green.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                     }
-                    Text("${BuildConfig.VERSION_NAME}_PLATINUM", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
+                    val versionSuffix = if (BuildConfig.IS_PLATINUM) "_PLATINUM" else ""
+                    Text("${BuildConfig.VERSION_NAME}$versionSuffix", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
                 }
             }
         }

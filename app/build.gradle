@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 34
         versionCode 1
-        versionName "Oct24.20"
+        versionName "Oct24.26"
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {
@@ -31,9 +31,13 @@ android {
     }
 
     buildTypes {
+        debug {
+            buildConfigField "boolean", "IS_PLATINUM", "false"
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            buildConfigField "boolean", "IS_PLATINUM", "true"
         }
     }
     compileOptions {
