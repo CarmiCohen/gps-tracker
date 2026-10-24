@@ -24,14 +24,12 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct24.2:
+ * - ISSUE-OCT23.101-F6: Offline Violation Event Sync. Updated emitViolation 
+ *   to buffer violations when offline and flush them during sync cycles.
  * Oct23.120:
  * - ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps. Updated 
  *   emitViolation() and violation_relay handler to propagate isJammingCandidate.
- * Oct23.109:
- * - ISSUE-OCT23.102-F9: Telemetry Flyweight Race Condition Remediation. Replaced 
- *   shared member flyweights with local instances in processing paths. 
- *   Migrated coordinate reconstruction state and local telemetry to atomic 
- *   structures to ensure thread safety across concurrent signaling events.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -90,7 +88,6 @@ class ConnectivitySuite @Inject constructor(
     val isSyncing = _isSyncing.asStateFlow()
 
     // Oct23.109: Removed shared flyweights to prevent race conditions.
-    // localStatus is now thread-safe for heartbeat and local updates.
     private val localStatus = AtomicReference(LocationUpdate())
 
     private data class JitterEntry(
@@ -464,10 +461,9 @@ class ConnectivitySuite @Inject constructor(
     }
 
     private suspend fun flushPendingUpdates(limit: Int = LOG_BATCH_SIZE) {
-        val pending = offlineRepository.getPendingStatusUpdates(limit)
-        if (pending.isEmpty()) return
-        pending.forEach { entity ->
-            // Oct23.109: Use local instance instead of shared flyweight
+        // Oct24.2: Flush pending status updates
+        val pendingStatus = offlineRepository.getPendingStatusUpdates(limit)
+        pendingStatus.forEach { entity ->
             val status = TelemetryMapper.mapPendingToStatus(entity, deviceId, viewerId, LocationUpdate())
             if (sendTelemetryInternal(status, SignalingPriority.NORMAL)) {
                 offlineRepository.deletePendingStatusUpdate(entity.id)
@@ -475,10 +471,30 @@ class ConnectivitySuite @Inject constructor(
                 forensicLogger.logTransmissionFailure("Pending update sync drop", if (isTrackerMode) "TRK" else "VWR", deviceId, viewerId)
             }
         }
+
+        // Oct24.2: ISSUE-OCT23.101-F6: Flush pending violations
+        val pendingViolations = offlineRepository.getPendingViolations(limit)
+        pendingViolations.forEach { pending ->
+            val payload = JSONObject().apply {
+                put("id", SignalingConstants.getTransmissionId(deviceId))
+                put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
+                put("from_viewer", false)
+                put("violation_type", pending.type)
+                put("lat", pending.lat)
+                put("lng", pending.lng)
+                put("accuracy", pending.accuracy)
+                put("max_accuracy", pending.maxAccuracy)
+                put("is_jamming_candidate", pending.isJammingCandidate)
+                put("ts", pending.timestamp)
+            }
+            if (isConnected) {
+                signalingProvider.emit("violation_event", payload, SignalingPriority.HIGH)
+                offlineRepository.deletePendingViolation(pending.id)
+            }
+        }
     }
 
     fun updateLocalTelemetry(status: LocationUpdate) {
-        // Oct23.109: Thread-safe update of local status reference
         localStatus.set(status.duplicate())
     }
 
@@ -585,7 +601,6 @@ class ConnectivitySuite @Inject constructor(
             }
 
             remoteStatusRepository.updateStatusAtomic { current ->
-                // Oct23.109: Use local instances instead of shared flyweights
                 val snapshot = LocationUpdate()
                 TelemetryMapper.mapProtoToSnapshot(statusProto, now, nowRt, snapshot)
 
@@ -752,7 +767,6 @@ class ConnectivitySuite @Inject constructor(
             }
 
             remoteStatusRepository.updateStatusAtomic { current ->
-                // Oct23.109: Use local instances instead of shared flyweights
                 val snapshot = LocationUpdate()
                 TelemetryMapper.mapJsonToSnapshot(data, current, now, nowRt, snapshot)
 
@@ -831,8 +845,9 @@ class ConnectivitySuite @Inject constructor(
     }
 
     fun emitViolation(type: String, lat: Double, lng: Double, acc: Double, maxAcc: Double, isJammingCandidate: Boolean = false) {
-        if (!isTrackerMode || !isConnected || isStopped.get()) return
+        if (!isTrackerMode || isStopped.get()) return
         
+        val wallTs = timeProvider.currentTimeMillis
         val payload = JSONObject().apply {
             put("id", SignalingConstants.getTransmissionId(deviceId))
             put("viewer_id", SignalingConstants.getTransmissionId(viewerId))
@@ -843,10 +858,27 @@ class ConnectivitySuite @Inject constructor(
             put("accuracy", acc)
             put("max_accuracy", maxAcc)
             put("is_jamming_candidate", isJammingCandidate)
-            put("ts", timeProvider.currentTimeMillis)
+            put("ts", wallTs)
         }
-        signalingProvider.emit("violation_event", payload, SignalingPriority.HIGH)
-        Timber.i("Signaling: Emitted violation event to Viewer: $type [Jamming: $isJammingCandidate]")
+
+        if (isConnected) {
+            signalingProvider.emit("violation_event", payload, SignalingPriority.HIGH)
+            Timber.i("Signaling: Emitted violation event to Viewer: $type [Jamming: $isJammingCandidate]")
+        } else {
+            // Oct24.2: ISSUE-OCT23.101-F6: Buffer violation for offline sync
+            scope.launch {
+                offlineRepository.addPendingViolation(PendingViolationEntity(
+                    type = type,
+                    lat = lat,
+                    lng = lng,
+                    accuracy = acc,
+                    maxAccuracy = maxAcc,
+                    isJammingCandidate = isJammingCandidate,
+                    timestamp = wallTs
+                ))
+            }
+            Timber.i("Signaling: Buffered violation event for offline sync: $type")
+        }
     }
 
     fun resetPeerStats() {

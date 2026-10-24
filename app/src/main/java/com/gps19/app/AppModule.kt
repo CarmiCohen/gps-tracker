@@ -67,6 +67,8 @@ abstract class AppModule {
             .addMigrations(
                 AppDatabase.MIGRATION_56_57,
                 AppDatabase.MIGRATION_57_58,
+                AppDatabase.MIGRATION_58_59,
+                AppDatabase.MIGRATION_59_60,
                 AppDatabase.MIGRATION_60_61,
                 AppDatabase.MIGRATION_61_62,
                 AppDatabase.MIGRATION_62_63,
@@ -78,7 +80,23 @@ abstract class AppModule {
                 AppDatabase.MIGRATION_68_69,
                 AppDatabase.MIGRATION_69_70,
                 AppDatabase.MIGRATION_70_71,
-                AppDatabase.MIGRATION_72_73
+                AppDatabase.MIGRATION_71_72,
+                AppDatabase.MIGRATION_72_73,
+                AppDatabase.MIGRATION_73_74,
+                AppDatabase.MIGRATION_74_75,
+                AppDatabase.MIGRATION_75_76,
+                AppDatabase.MIGRATION_76_77,
+                AppDatabase.MIGRATION_77_78,
+                AppDatabase.MIGRATION_78_79,
+                AppDatabase.MIGRATION_79_80,
+                AppDatabase.MIGRATION_80_81,
+                AppDatabase.MIGRATION_81_82,
+                AppDatabase.MIGRATION_82_83,
+                AppDatabase.MIGRATION_83_84,
+                AppDatabase.MIGRATION_84_85,
+                AppDatabase.MIGRATION_85_86,
+                AppDatabase.MIGRATION_86_87,
+                AppDatabase.MIGRATION_87_88
             )
             .fallbackToDestructiveMigration()
             .build()
@@ -98,6 +116,9 @@ abstract class AppModule {
 
         @Provides
         fun providePendingStatusDao(db: AppDatabase) = db.pendingStatusDao()
+
+        @Provides
+        fun providePendingViolationDao(db: AppDatabase) = db.pendingViolationDao()
 
         @Provides
         @Singleton

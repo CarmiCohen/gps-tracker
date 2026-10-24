@@ -8,6 +8,9 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Oct24.2:
+ * - ISSUE-OCT23.101-F6: Added PendingViolationEntity and MIGRATION_87_88 for 
+ *   offline violation synchronization. Incremented version to 88.
  * Oct.23.110:
  * - ISSUE-OCT23.101-F3: Added stationaryDurationMs to LogEntity, HistoryEntity, 
  *   and PendingStatusEntity for hysteresis parity. Incremented version to 87.
@@ -219,6 +222,18 @@ data class PendingStatusEntity(
     @ColumnInfo(defaultValue = "0") val stationaryDurationMs: Long = 0L
 )
 
+@Entity(tableName = "pending_violations", indices = [Index(value = ["timestamp"])])
+data class PendingViolationEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val type: String,
+    val lat: Double,
+    val lng: Double,
+    val accuracy: Double,
+    val maxAccuracy: Double,
+    val isJammingCandidate: Boolean,
+    val timestamp: Long
+)
+
 @Dao
 abstract class LogDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) abstract suspend fun insert(log: LogEntity): Long
@@ -339,13 +354,29 @@ interface PendingStatusDao {
     @Query("DELETE FROM pending_status_updates") suspend fun clearAll()
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class], version = 87, exportSchema = false)
+@Dao
+interface PendingViolationDao {
+    @Insert suspend fun insert(violation: PendingViolationEntity)
+    @Query("SELECT * FROM pending_violations ORDER BY timestamp ASC LIMIT :limit") suspend fun getOldestPending(limit: Int): List<PendingViolationEntity>
+    @Query("DELETE FROM pending_violations WHERE id IN (:ids)") suspend fun deletePending(ids: LongArray)
+    @Query("SELECT COUNT(*) FROM pending_violations") suspend fun getCount(): Int
+    @Query("DELETE FROM pending_violations") suspend fun clearAll()
+
+    @Query("SELECT timestamp FROM pending_violations ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
+    suspend fun getPruneThreshold(limit: Int): Long?
+
+    @Query("DELETE FROM pending_violations WHERE id IN (SELECT id FROM pending_violations WHERE timestamp < :threshold LIMIT :chunkSize)")
+    suspend fun pruneByThreshold(threshold: Long, chunkSize: Int): Int
+}
+
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class, PendingViolationEntity::class], version = 88, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
     abstract fun historyDao(): HistoryDao
     abstract fun violationDao(): ViolationDao
     abstract fun pendingStatusDao(): PendingStatusDao
+    abstract fun pendingViolationDao(): PendingViolationDao
 
     fun checkIntegrity(): String {
         val cursor = query("PRAGMA integrity_check", null)
@@ -363,6 +394,25 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_87_88 = object : Migration(87, 88) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Issue #ISSUE-OCT23.101-F6: Offline Violation Event Sync.
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS pending_violations (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        type TEXT NOT NULL,
+                        lat REAL NOT NULL,
+                        lng REAL NOT NULL,
+                        accuracy REAL NOT NULL,
+                        maxAccuracy REAL NOT NULL,
+                        isJammingCandidate INTEGER NOT NULL,
+                        timestamp INTEGER NOT NULL
+                    )
+                """.trimIndent())
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_violations_timestamp ON pending_violations (timestamp)")
+            }
+        }
+
         val MIGRATION_86_87 = object : Migration(86, 87) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #ISSUE-OCT23.101-F3: Hysteresis Parity.

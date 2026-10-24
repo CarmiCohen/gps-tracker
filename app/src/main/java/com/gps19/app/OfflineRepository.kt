@@ -13,19 +13,16 @@ import javax.inject.Singleton
 
 /**
  * OfflineRepository: Manages persistent buffering of status updates during network loss.
+ * Oct24.2:
+ * - ISSUE-OCT23.101-F6: Offline Violation Event Sync. Added support for 
+ *   PendingViolationEntity buffering and flushing.
  * Oct.13.5:
  * - Hardened persistence actor for extreme concurrent burst handling.
- * Oct.13.3:
- * - Issue #SIMP-OCT13.3-S1: Sequential Persistence Actor. Replaced concurrent 
- *   launch-based flushes with a Channel-based actor to guarantee sequential 
- *   I/O and zero data loss during high-frequency bursts.
- * Oct.12.3:
- * - Issue #SIMP-1012-4: Batch Persistence. Implemented a memory buffer and 
- *   bulk-insertion loop.
  */
 @Singleton
 class OfflineRepository @Inject constructor(
     private val pendingStatusDao: PendingStatusDao,
+    private val pendingViolationDao: PendingViolationDao,
     private val telemetry: TelemetryRepository,
     @ApplicationScope private val scope: CoroutineScope
 ) {
@@ -37,19 +34,21 @@ class OfflineRepository @Inject constructor(
     }
 
     private var memoryPressureLevel = MemoryPressureLevel.NORMAL
-    private val updateChannel = Channel<PendingStatusEntity>(Channel.UNLIMITED)
-    private val buffer = mutableListOf<PendingStatusEntity>()
+    private val updateChannel = Channel<PersistenceTask>(Channel.UNLIMITED)
+    private val statusBuffer = mutableListOf<PendingStatusEntity>()
+    private val violationBuffer = mutableListOf<PendingViolationEntity>()
     private val bufferMutex = Mutex()
     private var lastFlushRt = 0L
+
+    sealed class PersistenceTask {
+        data class Status(val entity: PendingStatusEntity) : PersistenceTask()
+        data class Violation(val entity: PendingViolationEntity) : PersistenceTask()
+    }
 
     init {
         startPersistenceActor()
     }
 
-    /**
-     * startPersistenceActor: Single-threaded consumer that processes updates 
-     * and manages periodic/threshold flushes sequentially.
-     */
     private fun startPersistenceActor() {
         scope.launch(Dispatchers.IO) {
             val ticker = launch {
@@ -60,12 +59,13 @@ class OfflineRepository @Inject constructor(
             }
 
             try {
-                updateChannel.consumeEach { update ->
+                updateChannel.consumeEach { task ->
                     bufferMutex.withLock {
-                        buffer.add(update)
-                        if (buffer.size >= BATCH_SIZE_THRESHOLD) {
-                            // Note: flushBuffer is called inside the actor loop, 
-                            // ensuring no overlapping DB writes.
+                        when (task) {
+                            is PersistenceTask.Status -> statusBuffer.add(task.entity)
+                            is PersistenceTask.Violation -> violationBuffer.add(task.entity)
+                        }
+                        if (statusBuffer.size + violationBuffer.size >= BATCH_SIZE_THRESHOLD) {
                             flushInternal()
                         }
                     }
@@ -91,47 +91,63 @@ class OfflineRepository @Inject constructor(
     suspend fun addPendingStatusUpdate(update: PendingStatusEntity) {
         val health = telemetry.systemHealth.value
         if (health.isStorageCritical) return
-        updateChannel.send(update)
+        updateChannel.send(PersistenceTask.Status(update))
     }
 
-    /**
-     * flushBuffer: Public-ish trigger for retrieval or periodic loops.
-     */
+    suspend fun addPendingViolation(violation: PendingViolationEntity) {
+        val health = telemetry.systemHealth.value
+        if (health.isStorageCritical) return
+        updateChannel.send(PersistenceTask.Violation(violation))
+    }
+
     suspend fun flushBuffer() {
         bufferMutex.withLock {
-            if (buffer.isNotEmpty()) {
+            if (statusBuffer.isNotEmpty() || violationBuffer.isNotEmpty()) {
                 flushInternal()
             }
         }
     }
 
     private suspend fun flushInternal() {
-        val toInsert = ArrayList(buffer)
-        buffer.clear()
+        val statusToInsert = ArrayList(statusBuffer)
+        val violationsToInsert = ArrayList(violationBuffer)
+        statusBuffer.clear()
+        violationBuffer.clear()
         lastFlushRt = SystemClock.elapsedRealtime()
 
         try {
-            pendingStatusDao.insertAll(toInsert)
-            
-            val limit = getEffectivePruneLimit()
-            val count = pendingStatusDao.getCount()
-            if (count > limit) {
-                val threshold = pendingStatusDao.getPruneThreshold(limit)
-                threshold?.let {
-                    pendingStatusDao.pruneByThreshold(it, PRUNE_CHUNK_SIZE)
-                }
+            if (statusToInsert.isNotEmpty()) {
+                pendingStatusDao.insertAll(statusToInsert)
+                pruneDao(pendingStatusDao)
+            }
+            if (violationsToInsert.isNotEmpty()) {
+                violationsToInsert.forEach { pendingViolationDao.insert(it) }
+                pruneDao(pendingViolationDao)
             }
         } catch (e: Exception) {
             Timber.e(e, "OfflineRepository: Batch flush failed")
-            // Re-adding to buffer is avoided to prevent retry loops on corrupt data,
-            // but in a production hardening scenario, we might consider a retry side-channel.
+        }
+    }
+
+    private suspend fun pruneDao(dao: Any) {
+        val limit = getEffectivePruneLimit()
+        when (dao) {
+            is PendingStatusDao -> {
+                if (dao.getCount() > limit) {
+                    dao.getPruneThreshold(limit)?.let { dao.pruneByThreshold(it, PRUNE_CHUNK_SIZE) }
+                }
+            }
+            is PendingViolationDao -> {
+                if (dao.getCount() > limit) {
+                    dao.getPruneThreshold(limit)?.let { dao.pruneByThreshold(it, PRUNE_CHUNK_SIZE) }
+                }
+            }
         }
     }
 
     suspend fun addPendingStatusUpdate(update: LocationUpdate) {
         val health = telemetry.systemHealth.value
         if (health.isStorageCritical) return
-        
         try {
             val entity = TelemetryMapper.mapStatusToPending(update)
             addPendingStatusUpdate(entity)
@@ -143,7 +159,6 @@ class OfflineRepository @Inject constructor(
     suspend fun getPendingStatusUpdates(limit: Int): List<PendingStatusEntity> {
         flushBuffer()
         val entities = pendingStatusDao.getOldestPending(limit)
-        
         entities.filter { it.payload.isEmpty() }.forEach { legacy ->
             try {
                 val flyweight = LocationUpdate()
@@ -154,24 +169,36 @@ class OfflineRepository @Inject constructor(
                 Timber.e(e, "Failed to migrate legacy pending update ${legacy.id}")
             }
         }
-        
         return entities
     }
 
     suspend fun deletePendingStatusUpdate(id: Long) = 
         pendingStatusDao.deletePending(longArrayOf(id))
 
+    suspend fun getPendingViolations(limit: Int): List<PendingViolationEntity> {
+        flushBuffer()
+        return pendingViolationDao.getOldestPending(limit)
+    }
+
+    suspend fun deletePendingViolation(id: Long) = 
+        pendingViolationDao.deletePending(longArrayOf(id))
+
     suspend fun clear() {
-        bufferMutex.withLock { buffer.clear() }
+        bufferMutex.withLock { 
+            statusBuffer.clear()
+            violationBuffer.clear()
+        }
         pendingStatusDao.clearAll()
+        pendingViolationDao.clearAll()
     }
 
     suspend fun trimMemory() {
-        bufferMutex.withLock { buffer.clear() }
-        val limit = getEffectivePruneLimit()
-        val threshold = pendingStatusDao.getPruneThreshold(limit)
-        threshold?.let {
-            pendingStatusDao.pruneByThreshold(it, PRUNE_CHUNK_SIZE * 2)
+        bufferMutex.withLock { 
+            statusBuffer.clear()
+            violationBuffer.clear()
         }
+        val limit = getEffectivePruneLimit()
+        pendingStatusDao.getPruneThreshold(limit)?.let { pendingStatusDao.pruneByThreshold(it, PRUNE_CHUNK_SIZE * 2) }
+        pendingViolationDao.getPruneThreshold(limit)?.let { pendingViolationDao.pruneByThreshold(it, PRUNE_CHUNK_SIZE * 2) }
     }
 }

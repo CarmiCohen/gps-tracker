@@ -1,20 +1,20 @@
 git add .
-git commit -m "Remediation: Resolved ISSUE-OCT23.101-F4. Violation Persistence Integrity Gaps. Propagated isJammingCandidate across repository, database, and signaling layers. Oct23.121."
-git tag -a Oct23.121 -m "Oct23.121 Remediation Baseline"
-git push origin Oct23.121
+git commit -m "Remediation: Resolved ISSUE-OCT23.101-F6 and ISSUE-OCT24.00-F5. Implemented offline violation event sync and aligned versioning to Oct24.2. Oct24.2."
+git tag -a Oct24.2 -m "Oct24.2 Remediation Baseline"
+git push origin Oct24.2
 
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct23.121
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct24.2
 
-## 🎯 Current Resumption Focus: Remediation of ISSUE-OCT23.101-F6 (Offline Violation Event Sync).
+## 🎯 Current Resumption Focus: Remediation of SIMP-OCT22.0-S1 (Settings Validation Centralization).
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   **ISSUE-OCT23.101-F6: Offline Violation Event Sync (Low).** Discrete violation markers emitted via `emitViolation` are real-time only and are not buffered or synchronized after recovery from an offline state.
 *   **SIMP-OCT22.0-S1: Settings Validation Centralization (Medium).** Move identity uniqueness and regex validation to a pure `ConfigValidator`.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 79)
-*   **SIMP-OCT23.121-S1: Violation Event Buffering (Medium).** Implement a local buffer for `violation_event` signaling to enable reliable delivery after network recovery.
+## 💡 Strategic Simplification Ideas (Ideas: 80)
+*   **SIMP-OCT24.2-S1: Room Migration Unit Testing (Low).** Implement explicit migration tests for v87 -> v88 to verify `pending_violations` schema integrity automatically.
+*   **SIMP-OCT23.121-S1: Violation Event Buffering (Medium).** (Implemented Oct24.2 - Archive candidate).
 *   **SIMP-OCT23.120-S1: Database Schema Migration Automation (Low).** Explore automated Room schema export verification to prevent manual SQL drift during forensic field expansion.
 *   **SIMP-OCT23.109-S1: Atomic Telemetry Accessors (Low).** Refactor `ConnectivitySuite` to use `AtomicReference` for all transient peer states to further reduce boilerplate in atomic update blocks.
 *   **SIMP-OCT23.108-S1: Protobuf Mapping Boilerplate Reduction (Medium).** Utilize a generated mapping layer or generic field visitor to reduce the manual `hasField()` boilerplate in `TelemetryMapper.kt`.
@@ -28,6 +28,8 @@ git push origin Oct23.121
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT23.101-F6: Offline Violation Event Sync.** Resolved Oct24.2. Implemented persistent buffering for `violation_event` signaling in `OfflineRepository` and `ConnectivitySuite`. Discrete violations are now captured offline and synchronized upon recovery. (SOT ID 824).
+*   **ISSUE-OCT24.00-F5: Version Alignment Failure.** Resolved Oct24.2. Aligned `BuildConfig.VERSION_NAME` and `MainViewModelMappingTest` to `Oct24.2`.
 *   **ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps.** Resolved Oct23.121. Synchronized `isJammingCandidate` across violation reporting, signaling (JSON), and persistence layers (Room) for full forensic parity. (SOT ID 823).
 *   **ISSUE-OCT23.101-F3: Missing Stationary Duration Propagation.** Resolved Oct23.120. Synchronized `stationaryDurationMs` across Protobuf schemas, TelemetryMapper (JSON/Proto), Room entities, and Database migrations. (SOT ID 822).
 *   **ISSUE-OCT23.102-F9: Telemetry Flyweight Race Condition.** Resolved Oct23.109. Replaced shared flyweights in `ConnectivitySuite.kt` with local instances and atomic references to ensure concurrency safety. (SOT ID 821).
@@ -37,14 +39,11 @@ git push origin Oct23.121
 *   **ISSUE-OCT23.101-F1: Incomplete Telemetry Merge Logic.** Resolved Oct23.105. Updated `TelemetryMerger.kt` to merge all critical integrity flags, SIT metrics (F5), raw sensor values (F10), and proximity/index gaps (F11) during GPS outages. (SOT ID 813).
 *   **SIMP-OCT22.10-S1: BackHandler Composition Local.** Resolved Oct23.100. Consolidated back button interception into `LocalBackAction` and `BackPressInterceptor` to reduce boilerplate across all overlays. (SOT ID 817).
 *   **ISSUE-OCT24.00-F1: Build Stabilization (Infra).** Resolved Oct24.00. Corrected `activity-compose` dependency, upgraded Kotlin to 1.9.24 / JVM 17, and fixed Compose compiler compatibility. (SOT ID 816).
-*   **ISSUE-OCT24.00-F2: Signaling Discovery Logic.** Resolved Oct24.00. Relaxed `isDiscoveryMode` to allow default Trackers to adopt custom viewers during initial pairing. (SOT ID 815).
-*   **ISSUE-OCT24.00-F3: Broadcast Export Security.** Resolved Oct24.00. Migrated all manual `registerReceiver` calls to `ContextCompat` with explicit export flags to satisfy Android 14 requirements. (SOT ID 816).
-*   **ISSUE-OCT24.00-F4: Test Suite Freshness.** Resolved Oct24.00. Synchronized `MainViewModelMappingTest` version expectations and fixed Hilt instrumentation test dependencies. (SOT ID 816).
-*   **ISSUE-OCT22.16-F1: Forensic trace raw sensor parity.** Resolved Oct23.00. Extended `ForensicSnapshot` and `LocationUpdate` with `lux` and `acoustic` fields for full raw sensor trace parity. (SOT ID 814).
 
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct24.2: [SOT Count: 824 (Rules: 334), Open: H:0, M:1, L:0, Ideas: H:3, M:30, L:47, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct23.121: [SOT Count: 823 (Rules: 333), Open: H:0, M:1, L:1, Ideas: H:3, M:29, L:47, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct23.120: [SOT Count: 822 (Rules: 332), Open: H:0, M:2, L:1, Ideas: H:3, M:29, L:46, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct23.109: [SOT Count: 821 (Rules: 331), Open: H:0, M:2, L:1, Ideas: H:3, M:29, L:45, Testing: 11 (Sub-items: 45), QA: 385]**

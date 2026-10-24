@@ -1,6 +1,13 @@
-# Project History & Versioning (Oct23.121)
+# Project History & Versioning (Oct24.2)
 
 **For historical records (v9.3.0 and older), see [docs_history_archive.md](docs_history_archive.md).**
+
+## Oct24.2 (Signaling: Offline Violation Sync)
+- **ISSUE-OCT23.101-F6 Remediation**: Resolved offline violation sync gaps.
+- **Persistence Layer**: Implemented `PendingViolationEntity` and Room Migration 87->88 to buffer unsent violation events.
+- **Unified Actor**: Extended `OfflineRepository` with a `PersistenceTask` actor to sequentialize status and violation storage, preventing database contention.
+- **Automatic Recovery**: Hardened `ConnectivitySuite` to buffer events during offline states and automatically flush them upon network restoration.
+- **Version Alignment (#ISSUE-OCT24.00-F5)**: Synchronized all forensic metadata and unit test expectations to version `Oct24.2`.
 
 ## Oct23.121 (Forensic: Violation Integrity)
 - **ISSUE-OCT23.101-F4 Remediation**: Finalized violation persistence integrity.

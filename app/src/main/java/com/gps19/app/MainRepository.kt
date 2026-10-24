@@ -30,13 +30,13 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct24.2:
+ * - ISSUE-OCT23.101-F6: Offline Violation Event Sync. Added support for 
+ *   PendingViolation persistence through OfflineRepository.
  * Oct23.120:
  * - ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps. Updated 
  *   addViolation() and violationsFlow mapping to propagate and store 
  *   isJammingCandidate in ViolationEntity and ViolationPoint.
- * Oct.20.25:
- * - Maintenance: Restored full role-based API surface and debouncing logic to 
- *   resolve build regressions while preserving deterministic flush hooks.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -45,6 +45,7 @@ class MainRepository @Inject constructor(
     private val historyDao: HistoryDao,
     private val violationDao: ViolationDao,
     private val pendingStatusDao: PendingStatusDao,
+    private val pendingViolationDao: PendingViolationDao,
     private val database: AppDatabase,
     private val settings: SettingsRepository,
     private val telemetryRepository: TelemetryRepository,
