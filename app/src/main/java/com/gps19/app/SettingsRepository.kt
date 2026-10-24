@@ -55,18 +55,12 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Oct24.16:
+ * - SIMP-OCT22.0-S1: Centralized identity validation via ConfigValidator.
  * Oct.19.19:
  * - ISSUE-OCT19.19-F1: Added isRestorationDisabled persistence. Corrected typo in lastDisconnectionTs accessor.
  * Oct.15.9:
  * - Fixed identity conflict error message to match IdentityPersistenceTest expectations.
- * Oct.14.0:
- * - ISSUE-OCT14.0-F1: Atomic Mutation Hardening. Refactored logic to ensure 
- *   Read-Modify-Write cycles occur within the updateData atomic block.
- * - SIMP-OCT14.13-S1: Migrated logic from non-atomic external calls to 
- *   internal transformation blocks.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
- *   TimeProvider API and fixed property invocation errors.
  */
 @Singleton
 class SettingsRepository @Inject constructor(
@@ -86,17 +80,17 @@ class SettingsRepository @Inject constructor(
             override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
                 val t = currentData.trackerId
                 val v = currentData.viewerId
-                return (t.isNotEmpty() && !SignalingConstants.isValidTrackerId(t)) ||
-                       (v.isNotEmpty() && !SignalingConstants.isValidViewerId(v))
+                return (t.isNotEmpty() && !ConfigValidator.isValidTrackerId(t)) ||
+                       (v.isNotEmpty() && !ConfigValidator.isValidViewerId(v))
             }
 
             override suspend fun migrate(currentData: AppSettings): AppSettings {
                 val builder = currentData.toBuilder()
-                if (currentData.trackerId.isNotEmpty() && !SignalingConstants.isValidTrackerId(currentData.trackerId)) {
+                if (currentData.trackerId.isNotEmpty() && !ConfigValidator.isValidTrackerId(currentData.trackerId)) {
                     builder.setTrackerId(DEFAULT_TRACKER_ID)
                     builder.setIdentitySanitized(true)
                 }
-                if (currentData.viewerId.isNotEmpty() && !SignalingConstants.isValidViewerId(currentData.viewerId)) {
+                if (currentData.viewerId.isNotEmpty() && !ConfigValidator.isValidViewerId(currentData.viewerId)) {
                     builder.setViewerId(DEFAULT_VIEWER_ID)
                     builder.setIdentitySanitized(true)
                 }
@@ -515,13 +509,15 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun commitDraftSettings(): CommitResult {
-        var error: String? = null
+        var validationError: String? = null
         val result = dataStore.updateData { s ->
             val nextTrackerId = if (s.hasDraftTrackerId()) s.draftTrackerId else s.trackerId
             val nextViewerId = if (s.hasDraftViewerId()) s.draftViewerId else s.viewerId
             
-            if (!SignalingConstants.areIdsUnique(nextTrackerId, nextViewerId)) {
-                error = "Identity Conflict: Some IDs (e.g., 'viewer', 'Trk') are reserved for cross-version compatibility. Please choose unique IDs."
+            // Oct24.16: Centralized Identity Validation (SIMP-OCT22.0-S1)
+            val validation = ConfigValidator.validateIdentityUniqueness(nextTrackerId, nextViewerId)
+            if (validation is ConfigValidator.ValidationResult.Failure) {
+                validationError = validation.message
                 return@updateData s
             }
             
@@ -536,7 +532,7 @@ class SettingsRepository @Inject constructor(
             builder.build()
         }
         
-        if (error != null) return CommitResult(error = error)
+        if (validationError != null) return CommitResult(error = validationError)
         return CommitResult(anyChanged = true) // simplified changed tracking
     }
 

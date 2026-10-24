@@ -2,17 +2,14 @@ package com.gps19.core.engine
 
 /**
  * SignalingConstants: Core rules for relay communication and role enforcement.
+ * Oct24.16:
+ * - SIMP-OCT22.0-S1: Delegated identity validation to ConfigValidator.
  * Oct23.107:
  * - ISSUE-OCT23.102-F7: Added DELTA_REFRESH_INTERVAL for periodic absolute 
  *   coordinate refresh to prevent delta drift.
  * v9.3.23:
  * - Robust Aliasing: Broadened matchers to support bidirectional cross-version 
  *   identity mapping (e.g. T vs Trk) to ensure connectivity between old and new apps.
- * v9.3.24:
- * - Alias-Aware Uniqueness: Enhanced areIdsUnique to prevent cross-role reserved ID 
- *   contamination (e.g., Tracker cannot be named 'V' or 'viewer').
- * - Transmission Mapping: Added getTransmissionId to ensure defaults map to 
- *   legacy strings (T -> Trk) for backward compatibility with older viewers.
  */
 object SignalingConstants {
     const val DEFAULT_TRACKER_ID = "T"
@@ -27,38 +24,10 @@ object SignalingConstants {
      */
     const val DELTA_REFRESH_INTERVAL = 50
     
-    private val ID_REGEX = Regex("^[a-zA-Z0-9_-]{1,32}$")
-
-    fun isValidTrackerId(id: String): Boolean {
-        val trimmed = id.trim()
-        return ID_REGEX.matches(trimmed) || trimmed == LEGACY_TRACKER_ID
-    }
-    
-    fun isValidViewerId(id: String): Boolean {
-        val trimmed = id.trim()
-        return ID_REGEX.matches(trimmed) || trimmed == LEGACY_VIEWER_ID
-    }
-    
-    /**
-     * R182: Ensures IDs are not only string-unique but also do not cross-contaminate
-     * the reserved alias sets of the opposite role.
-     */
-    fun areIdsUnique(trackerId: String, viewerId: String): Boolean {
-        val t = trackerId.trim()
-        val v = viewerId.trim()
-        if (!isValidTrackerId(t) || !isValidViewerId(v)) return false
-        
-        // 1. Strict string equality
-        if (t.lowercase() == v.lowercase()) return false
-        
-        // 2. Reserved Set Cross-Contamination
-        // Tracker cannot use Viewer reserved IDs
-        if (t == DEFAULT_VIEWER_ID || t == LEGACY_VIEWER_ID) return false
-        // Viewer cannot use Tracker reserved IDs
-        if (v == DEFAULT_TRACKER_ID || v == LEGACY_TRACKER_ID) return false
-        
-        return true
-    }
+    // Delegated to ConfigValidator (SIMP-OCT22.0-S1)
+    fun isValidTrackerId(id: String): Boolean = ConfigValidator.isValidTrackerId(id)
+    fun isValidViewerId(id: String): Boolean = ConfigValidator.isValidViewerId(id)
+    fun areIdsUnique(trackerId: String, viewerId: String): Boolean = ConfigValidator.areIdsUnique(trackerId, viewerId)
     
     /**
      * R182: Returns the ID to be used for room joining and payload labeling.

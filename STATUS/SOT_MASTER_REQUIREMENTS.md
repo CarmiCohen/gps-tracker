@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct24.14)
+# SOT Master Requirements & Hardening Status (Oct24.16)
 
-## 🏗️ Architectural Master Rules (334 Rules)
+## 🏗️ Architectural Master Rules (335 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -28,8 +28,10 @@
 *   **1.259 Hysteresis State Parity (R-ID 628)**: The system MUST synchronize `stationaryDurationMs` across all signaling and persistence layers.
 *   **1.260 Violation Integrity Propagation (R-ID 629)**: Violation events MUST propagate the `isJammingCandidate` flag through all reporting and persistence layers.
 *   **1.261 Offline Violation Synchronization (R-ID 630)**: Discrete violation events (`violation_event`) MUST be buffered in persistent storage when the device is offline and synchronized automatically upon network recovery. (Oct24.2 - ISSUE-OCT23.101-F6).
+*   **1.262 Centralized Configuration Validation (R-ID 631)**: All identity and configuration validation logic MUST reside in a pure engine-level `ConfigValidator` to ensure cross-layer consistency. (Oct24.16 - SIMP-OCT22.0-S1).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 830**: Settings Validation Centralization - PASSED. Relocated identity uniqueness and regex validation logic to `ConfigValidator` in `:core:engine`. Standardized error messages and improved testability. (Oct24.16 - SIMP-OCT22.0-S1).
 *   **SOT ID 826**: Version Alignment Hardening - PASSED. Resolved hardcoded version string mismatch in `MainViewModelMappingTest` that caused CI failures during version bumps. (Oct24.14 - ISSUE-OCT24.14-F1).
 *   **SOT ID 825**: Native Throttling Propagation - PASSED. Resolved missing `externalNativeBuild` configuration in `app/build.gradle` to ensure `libjdHardware.so` is built and packaged. (Oct24.12 - ISSUE-OCT24.10-F1).
 *   **SOT ID 824**: Offline Violation Event Sync Remediation - PASSED. Implemented persistent buffering for `violation_event` signaling in `OfflineRepository` and `ConnectivitySuite` (R-ID 630). (Oct24.2 - ISSUE-OCT23.101-F6).
@@ -50,6 +52,7 @@
 *   **SOT ID 801**: Asymmetric Connectivity & Geofence Sync Resolution - PASSED. (Oct21.06).
 
 ## ✅ Verification Chapters
+*   **Chapter 4.6 (Configuration Validation Audit)**: PASSED - Verified centralized validation rules and error message consistency in `ConfigValidator`. (Oct24.16 - SIMP-OCT22.0-S1).
 *   **Chapter 4.5 (Version Lifecycle Audit)**: PASSED - Verified version alignment across `app/build.gradle`, `BuildConfig`, and unit tests. (Oct24.14 - ISSUE-OCT24.14-F1).
 *   **Chapter 4.4 (Native Throttling Stress Audit)**: PASSED - Verified propagation of native load-shedding signals under memory pressure after fixing native build configuration. (Oct24.12 - ISSUE-OCT24.10-F1).
 *   **Chapter 4.3 (Offline Synchronization Audit)**: PASSED - Verified persistent buffering and delivery of violation events after network recovery. (Oct24.2 - ISSUE-OCT23.101-F6).

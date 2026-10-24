@@ -1,18 +1,21 @@
 git add .
-git commit -m "Alignment: Synchronized versioning to Oct24.14 and resolved test expectation mismatch. Verified all stress tests pass. #ISSUE-OCT24.14-F1"
-git tag -a Oct24.14 -m "Oct24.14 Release: Version Alignment & Stress Verified"
-git push origin Oct24.14
+git commit -m "Alignment: Synchronized versioning to Oct24.16 and centralized identity validation. #SIMP-OCT22.0-S1"
+git tag -a Oct24.16 -m "Oct24.16 Release: Validation Centralization & Hardening"
+git push origin Oct24.16
 
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct24.14
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct24.16
 
-## 🎯 Current Resumption Focus: Architectural Cleanup (SIMP-OCT22.0-S1).
+## 🎯 Current Resumption Focus: Forensic Hardening (ISSUE-OCT24.14-F2).
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   **SIMP-OCT22.0-S1: Settings Validation Centralization (Medium).** Move identity uniqueness and regex validation to a pure `ConfigValidator`.
+*   **ISSUE-OCT24.14-F2: StackLog Leak (High).** ConnectivityManager callbacks are leaking stack traces into Logcat, violating Forensic Audit 0.1.
+*   **ISSUE-OCT24.14-F3: Davey Performance Violation (Medium).** Detected 806ms Davey event during startup, exceeding the 500ms limit (Audit 0.1).
+*   **ISSUE-OCT24.14-F4: UI_READY Visibility (Low).** The `UI_READY` debug label is visible in PLATINUM builds, violating R-ID 610 (Audit 0.5.4).
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 82)
+## 💡 Strategic Simplification Ideas (Ideas: 83)
+*   **SIMP-OCT24.16-S1: Validator Injection (Low).** Consider injecting `ConfigValidator` interface into `SettingsRepository` to allow for easy mocking in integration tests.
 *   **SIMP-OCT24.14-S1: Dynamic Version Injection in Tests (Low).** Reference `BuildConfig.VERSION_NAME` in `MainViewModelMappingTest` instead of hardcoded strings to prevent recurring alignment failures.
 *   **SIMP-OCT24.12-S1: JNI Buffer Mapping Automation (Medium).** Replace manual `memcpy` offsets in `jdhardware-jni.cpp` with a packed struct or a header-only code generator to eliminate alignment bugs (R-ID 620).
 *   **SIMP-OCT24.2-S1: Room Migration Unit Testing (Low).** Implement explicit migration tests for v87 -> v88 to verify `pending_violations` schema integrity automatically.
@@ -30,6 +33,7 @@ git push origin Oct24.14
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **SIMP-OCT22.0-S1: Settings Validation Centralization.** Resolved Oct24.16. Migrated identity and regex validation from Repository/UI layer to a pure `ConfigValidator` in `:core:engine`. (SOT ID 830).
 *   **ISSUE-OCT24.14-F1: Version Alignment Failure.** Resolved Oct24.14. Synchronized `app/build.gradle` and `MainViewModelMappingTest` to `Oct24.14`. Verified all tests pass. (SOT ID 826).
 *   **ISSUE-OCT24.10-F1: Native SDK Initialization Failure.** Resolved Oct24.12. Added `externalNativeBuild` to `app/build.gradle` to package `libjdHardware.so`. Verified stress tests pass on device. (SOT ID 825).
 *   **ISSUE-OCT23.101-F6: Offline Violation Event Sync.** Resolved Oct24.2. Implemented persistent buffering for `violation_event` signaling in `OfflineRepository` and `ConnectivitySuite`. Discrete violations are now captured offline and synchronized upon recovery. (SOT ID 824).
@@ -47,7 +51,8 @@ git push origin Oct24.14
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Oct24.14: [SOT Count: 826 (Rules: 334), Open: H:0, M:1, L:0, Ideas: H:3, M:31, L:48, Testing: 11 (Sub-items: 45), QA: 385]**
+- **Oct24.16: [SOT Count: 830 (Rules: 335), Open: H:1, M:2, L:1, Ideas: H:3, M:32, L:48, Testing: 11 (Sub-items: 45), QA: 385]**
+- **Oct24.14: [SOT Count: 829 (Rules: 334), Open: H:1, M:2, L:1, Ideas: H:3, M:31, L:48, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct24.12: [SOT Count: 825 (Rules: 334), Open: H:0, M:1, L:0, Ideas: H:3, M:31, L:47, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct24.10: [SOT Count: 824 (Rules: 334), Open: H:1, M:1, L:0, Ideas: H:3, M:30, L:47, Testing: 11 (Sub-items: 45), QA: 385]**
 - **Oct24.2: [SOT Count: 824 (Rules: 334), Open: H:0, M:1, L:0, Ideas: H:3, M:30, L:47, Testing: 11 (Sub-items: 45), QA: 385]**

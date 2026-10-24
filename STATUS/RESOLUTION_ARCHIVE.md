@@ -1,4 +1,15 @@
-# Resolution Archive - GPS Tracker (Oct24.14)
+# Resolution Archive - GPS Tracker (Oct24.16)
+
+## SIMP-OCT22.0-S1: Settings Validation Centralization (Oct24.16)
+- **Resolved**: Oct24.16
+- **Description**: Identity uniqueness and regex validation logic was coupled with the UI and Repository layers. This task centralized all validation rules into a pure engine-level `ConfigValidator`.
+- **Remediation**:
+    - Created `ConfigValidator` in `:core:engine` to serve as the single source of truth for configuration rules.
+    - Delegated validation methods in `SignalingConstants` to the new validator.
+    - Updated `SettingsRepository.commitDraftSettings` to utilize `ConfigValidator.validateIdentityUniqueness` for atomic validation during commit.
+    - Standardized error messages (e.g., reserved ID conflicts) within the validator.
+    - Added comprehensive unit tests in `ConfigValidatorTest`.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 830).
 
 ## ISSUE-OCT24.14-F1: Version Alignment Failure Remediation (Oct24.14)
 - **Resolved**: Oct24.14
