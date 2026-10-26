@@ -30,6 +30,9 @@ android {
         }
     }
 
+    // Oct.24.35: Set test build type to platinum to verify forensic suppression.
+    testBuildType "platinum"
+
     buildTypes {
         debug {
             buildConfigField "boolean", "IS_PLATINUM", "false"

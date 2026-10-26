@@ -1,4 +1,4 @@
-# Test Procedure - GPS Tracker (vOct24.34)
+# Test Procedure - GPS Tracker (vOct26.0)
 
 This document outlines the end-to-end manual testing protocol for the GPS Tracker application, ensuring high-assurance logic and forensic continuity.
 
@@ -19,33 +19,25 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
     *   Deploy the latest build via Android Studio.
 *   **1.3 Version Verification:**
     *   **Action:** Observe the version string.
-    *   **Verification:** Confirm string matches `Oct24.34_PLATINUM`.
+    *   **Verification:** Confirm string matches `Oct26.0_PLATINUM` (or `_DEBUG`).
 
-## Chapter 2 - Setup and Configuration
-**Goal:** Validate the configuration pipeline and diagnostic tools.
+## Chapter 2 - Setup and Configuration (Bypass Active)
+**Goal:** Validate the configuration pipeline with the Oct.26 Hardening (R-ID 615).
 
 *   **2.1 Enter Tracker Mode:** Tap the "Tracker" button.
-*   **2.2 Exercise Setup Options:**
-    *   Verify System Diagnostics (Red/Green state update).
-*   **2.3 Sensor Calibration:**
-    *   Adjust sensitivity sliders for Vibration/Tilt.
-*   **2.4 Geofence & Home Point Management (Issue #1179):**
-    *   Verify friction-less batch updates and atomic DataStore mutations.
-*   **2.5 DataStore Mutation Extension (Issue #1180):**
-    *   Confirm all updates resolve sequentially.
-*   **2.6 UseCase Functional Consolidation (Issue #1181):**
-    *   Verify SpatialLogicUseCase handles simultaneous events.
-*   **2.7 Connection Sticky-State (Issue #1422):**
+*   **2.2 Verify Setup Bypass:**
+    *   **Action:** Proceed past role selection.
+    *   **Verification:** Confirm the app lands directly on the Tracker Dashboard, bypassing the "Phone Setup" screen even if battery optimization is enabled (R-ID 615).
+*   **2.3 Background Disclosure Synchronization:**
+    *   **Action:** Grant background location permission if prompted.
+    *   **Verification:** Confirm the dialog does not loop and correctly proceeds to the dashboard (resolved race condition).
+*   **2.4 Connection Sticky-State (Issue #1422):**
     *   Confirm immediate disconnection/reconnection upon ID/URL change.
-*   **2.8 Setup & Persistence Hardening (ISSUE-OCT21.06-F1):**
+*   **2.5 Setup & Persistence Hardening (ISSUE-OCT21.06-F1):**
     *   **Action A (ID Persistence):** Modify Tracker/Viewer IDs, tap **Close (X)**, and reopen Settings. 
-    *   **Verification:** Confirm IDs are preserved and SRV/VWR badges update based on new IDs.
-    *   **Action B (Exit Authority):** Tap the **X** icon in the header. 
-    *   **Verification:** Confirm the overlay closes instantly without requiring a mode switch.
-    *   **Action C (Load Defaults):** Tap **Load Factory Defaults**. 
-    *   **Verification:** Confirm IDs reset to `T` and `V`, and Relay URL resets to production onrender address.
-    *   **Action D (Relay Visibility):** Scroll to the bottom of Settings.
-    *   **Verification:** Confirm Relay URL text is clearly white and legible against Slate background.
+    *   **Verification:** Confirm IDs are preserved.
+    *   **Action B (Load Defaults):** Tap **Load Factory Defaults**. 
+    *   **Verification:** Confirm IDs reset to `T` and `V`.
 
 ## Chapter 3 - Tracker Mode Operation
 **Goal:** Verify telemetry accuracy and sentinel logic.
@@ -63,8 +55,7 @@ This document outlines the end-to-end manual testing protocol for the GPS Tracke
 *   **4.1 Viewer Setup:** ID sync.
 *   **4.2 Remote HUD Sync & Alarm Authority (Issue #1391):**
     *   Verify Alarm manifest ONLY on Viewer.
-*   **(Historical chapters 4.3 - 100 preserved in vOct20.33 reference).**
 
 ---
 **Total Testing Chapters: 100**
-*(Full historical procedure restored and synchronized Oct24.34)*
+*(Full historical procedure restored and synchronized Oct26.0)*

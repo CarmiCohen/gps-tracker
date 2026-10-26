@@ -16,15 +16,12 @@ import javax.inject.Singleton
 
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
+ * Oct.24.35:
+ * - Permission Hardening: Refactored handleInitiateMode and handleProceedToMode 
+ *   to perform mandatory synchronous permission refresh before evaluation. 
+ *   Fixed race condition where background disclosure re-appeared due to stale state.
  * Oct.22.0:
- * - Setup Hardening (ISSUE-OCT21.07-F1) Remediation: 
- *   1. Conditional Navigation: Settings overlay now only closes if the commit 
- *      succeeds, preventing silent data loss on validation errors (reserved IDs).
- *   2. Atomic Auto-Save: Refactored updateDraft to ensure background persistence 
- *      captures the latest state transitions without race conditions.
- *   3. Default Restoration: Unified LoadDefaults to use persistent draft channel.
- * Oct.20.32:
- * - Home Point Sync: Triggering connectivitySuite.syncHomePoints() on geofence mutations.
+ * - Setup Hardening (ISSUE-OCT21.07-F1) Remediation.
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -396,34 +393,59 @@ class UiEventCoordinator @Inject constructor(
         onDiagnosticUpdate: ((DiagnosticState) -> DiagnosticState) -> Unit,
         onUiEffect: (UiEffect) -> Unit
     ) {
-        val perms = state.session.permissions
-        val hasFine = perms.isFineLocationGranted
-        val hasAudio = if (mode == "tracker") perms.isMicrophoneGranted else true
-        val hasNotification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) perms.isPostNotificationsGranted else true
-        val hasActivity = if (mode == "tracker" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) perms.isActivityRecognitionGranted else true
-        
-        if (hasFine && hasAudio && hasNotification && hasActivity) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !perms.isBackgroundLocationGranted) {
-                onStateUpdate { it.copy(navigation = it.navigation.copy(pendingMode = mode)) }
-                onUiEffect(UiEffect.ShowBackgroundDisclosure(mode))
-            } else {
-                handleProceedToMode(mode, state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, onUiEffect)
+        scope.launch {
+            val perms = systemStatusProvider.getPermissionState(forceRefresh = true)
+            withContext(Dispatchers.Main.immediate) {
+                onStateUpdate { it.copy(session = it.session.copy(permissions = perms)) }
+                
+                val hasFine = perms.isFineLocationGranted
+                val hasAudio = if (mode == "tracker") perms.isMicrophoneGranted else true
+                val hasNotification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) perms.isPostNotificationsGranted else true
+                val hasActivity = if (mode == "tracker" && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) perms.isActivityRecognitionGranted else true
+                
+                if (hasFine && hasAudio && hasNotification && hasActivity) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && !perms.isBackgroundLocationGranted) {
+                        onStateUpdate { it.copy(navigation = it.navigation.copy(pendingMode = mode)) }
+                        onUiEffect(UiEffect.ShowBackgroundDisclosure(mode))
+                    } else {
+                        handleProceedToModeInternal(mode, perms, state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, onUiEffect)
+                    }
+                } else {
+                    val list = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+                    if (mode == "tracker") {
+                        list.add(Manifest.permission.RECORD_AUDIO)
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) list.add(Manifest.permission.ACTIVITY_RECOGNITION)
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) list.add(Manifest.permission.POST_NOTIFICATIONS)
+                    
+                    onStateUpdate { it.copy(navigation = it.navigation.copy(pendingMode = mode)) }
+                    onUiEffect(UiEffect.RequestPermissions(list, mode))
+                }
             }
-        } else {
-            val list = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-            if (mode == "tracker") {
-                list.add(Manifest.permission.RECORD_AUDIO)
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) list.add(Manifest.permission.ACTIVITY_RECOGNITION)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) list.add(Manifest.permission.POST_NOTIFICATIONS)
-            
-            onStateUpdate { it.copy(navigation = it.navigation.copy(pendingMode = mode)) }
-            onUiEffect(UiEffect.RequestPermissions(list, mode))
         }
     }
 
     private fun handleProceedToMode(
         mode: String,
+        state: MainUiState,
+        scope: CoroutineScope,
+        onStateUpdate: ((MainUiState) -> MainUiState) -> Unit,
+        onKinematicUpdate: ((KinematicState) -> KinematicState) -> Unit,
+        onDiagnosticUpdate: ((DiagnosticState) -> DiagnosticState) -> Unit,
+        onUiEffect: (UiEffect) -> Unit
+    ) {
+        scope.launch {
+            val perms = systemStatusProvider.getPermissionState(forceRefresh = true)
+            withContext(Dispatchers.Main.immediate) {
+                onStateUpdate { it.copy(session = it.session.copy(permissions = perms)) }
+                handleProceedToModeInternal(mode, perms, state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, onUiEffect)
+            }
+        }
+    }
+
+    private fun handleProceedToModeInternal(
+        mode: String,
+        perms: PermissionState,
         state: MainUiState,
         scope: CoroutineScope,
         onStateUpdate: ((MainUiState) -> MainUiState) -> Unit,
@@ -450,7 +472,9 @@ class UiEventCoordinator @Inject constructor(
             onUiEffect(UiEffect.StartService(mode))
         }
 
-        if (!state.isSystemReady) {
+        // Re-evaluate system readiness with fresh permissions
+        val isReady = SessionUiState(permissions = perms, appMode = mode).isSystemReady(state.spatial.homePoints.size)
+        if (!isReady) {
             handleEvent(UiEvent.TogglePhoneSetup(true), state, scope, onStateUpdate, onKinematicUpdate, onDiagnosticUpdate, {}, {}, onUiEffect)
         }
     }

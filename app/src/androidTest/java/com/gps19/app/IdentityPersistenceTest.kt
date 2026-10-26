@@ -16,6 +16,7 @@ import org.junit.runner.RunWith
  * IdentityPersistenceTest: Instrumented verification for Issue #027.
  * Ensures Viewer ID persistence and uniqueness enforcement logic.
  * Oct.12.13: Updated to property-based TimeProvider API.
+ * Oct.24.35: Aligned error message assertion with ConfigValidator (SOT ID 830).
  */
 @RunWith(AndroidJUnit4::class)
 class IdentityPersistenceTest {
@@ -79,7 +80,7 @@ class IdentityPersistenceTest {
         val result = repository.commitDraftSettings()
 
         assertTrue("Commit must fail due to non-unique IDs", result.error != null)
-        assertEquals("Identity Conflict: Some IDs (e.g., 'viewer', 'Trk') are reserved for cross-version compatibility. Please choose unique IDs.", result.error)
+        assertEquals("Identity Conflict: Tracker and Viewer IDs must be unique.", result.error)
         
         // Verify primary values did not change
         assertEquals("T-ORIG", repository.trackerIdFlow.first())
