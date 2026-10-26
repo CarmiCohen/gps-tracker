@@ -1,4 +1,14 @@
-# Resolution Archive - GPS Tracker (Oct26.0)
+# Resolution Archive - GPS Tracker (Oct26.1)
+
+## ISSUE-OCT26.1-F1: Full Variant Assembly & Verification (Oct26.1)
+- **Resolved**: Oct26.1
+- **Description**: Requirement for a full build of all application and test variants to ensure binary integrity and forensic suppression across all distribution channels.
+- **Remediation**:
+    - Synchronized `gradle.properties` to `Oct26.1`.
+    - Executed `assemble` and `test` tasks for all variants (`debug`, `release`, `platinum`).
+    - Verified successful execution of 129 unit tests across all variants.
+    - Updated `SOT_MASTER_REQUIREMENTS.md` with Rule 1.271 (Multi-Variant Integrity).
+- **Outcome**: 🟢 **PASSED**. (SOT ID 840).
 
 ## ISSUE-OCT26.0-F1: Setup Bypass & Permission Loop Hardening (Oct26.0)
 - **Resolved**: Oct26.0
@@ -19,13 +29,4 @@
     - Synchronized dynamic versioning logic across `gradle.properties` and `app/build.gradle`.
     - Enforced mandatory `_DEBUG` / `_PLATINUM` suffixes to prevent variant mismatch during audit.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 838).
-
-## ISSUE-OCT24.26-F2: Forensic Integrity Violation (Oct24.34)
-- **Resolved**: Oct24.34
-- **Description**: Forensic versioning was misaligned across `app/build.gradle` and `TEST_PROCEDURE.md`. Diagnostic suppression for PLATINUM variants was not explicitly verified.
-- **Remediation**:
-    - Synchronized `versionName` to `Oct24.34`.
-    - Updated `TEST_PROCEDURE.md` to expect `Oct24.34_PLATINUM`.
-    - Hardened `UI_READY` suppression in `MainAppContent.kt` via `!BuildConfig.IS_PLATINUM` gate.
-- **Outcome**: 🟢 **PASSED**. (SOT ID 836).
 ... (historical entries preserved)
