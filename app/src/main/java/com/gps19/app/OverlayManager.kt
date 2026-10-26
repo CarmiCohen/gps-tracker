@@ -24,16 +24,10 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayManager: Unified HUD management for GPS Tracker.
- * Oct.20.33:
- * - Tracker Stealth Audit (ISSUE-OCT20.31-F1): Disabled Red Screen tap 
- *   gesture on GlobalStatusBar in Tracker mode to adhere to R872.
- * Oct.20.32:
- * - HUD Header Scrim (#1426): Replaced Transparent surface with Slate900 scrim 
- *   to ensure header buttons are visible over map content.
- * - Version Alignment (#1425): Reduced bottom padding and shifted version 
- *   tag to BottomStart to match user requested alignment and visibility.
- * Oct.14.8:
- * - SIMP-OCT13.21-S1: Pure Event HUD.
+ * Oct.24.34:
+ * - ISSUE-OCT24.34-F1: Fundamental Suppression (R-ID 610). Integrated 
+ *   Source-Set decoupled DiagnosticOverlay to ensure physical removal of 
+ *   UI_READY labels from production binaries. Fixed legacy BottomStart leak.
  */
 
 @Composable
@@ -55,7 +49,7 @@ fun UnifiedHUDOverlay(
     val systemIssuesCount = session.systemIssuesCount(spatial.homePoints.size)
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. Map Overlays (Lower Z-Order than Header/Status if overlapping)
+        // 1. Map Overlays
         if (isMapVisible && !isAnyOverlayOpen && session.hydrationLevel >= 4) {
             MapSpecificOverlays(
                 mapState = mapState,
@@ -88,7 +82,6 @@ fun UnifiedHUDOverlay(
                 }
             } else {
                 Column(modifier = Modifier.fillMaxWidth().zIndex(10f)) {
-                    // Issue #1426: Added Slate900 scrim for contrast
                     Surface(
                         color = if (isMapVisible) Slate900.copy(alpha = 0.6f) else MaterialTheme.colorScheme.background, 
                         modifier = Modifier.fillMaxWidth()
@@ -126,19 +119,28 @@ private fun MapSpecificOverlays(
     val toggleTopPadding = if (isLandscape) 12.dp else 110.dp
 
     Box(modifier = Modifier.fillMaxSize()) {
-        // Issue #1425: Version Tag alignment fix
-        Text(
-            text = BuildConfig.VERSION_NAME,
-            color = Color.White,
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Black,
+        
+        Column(
             modifier = Modifier
-                .align(Alignment.BottomStart) // Shifted to BottomStart per screenshot
+                .align(Alignment.BottomStart)
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(start = 8.dp, bottom = 4.dp) // Reduced bottom padding to pin to bottom
-                .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(2.dp))
-                .padding(horizontal = 6.dp, vertical = 2.dp)
-        )
+                .padding(start = 8.dp, bottom = 4.dp),
+            horizontalAlignment = Alignment.Start
+        ) {
+            // Oct.24.34: Fundamental R-ID 610 fix. 
+            // DiagnosticOverlay is physically removed in Platinum builds.
+            DiagnosticOverlay()
+            
+            Text(
+                text = BuildConfig.VERSION_NAME,
+                color = Color.White,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Black,
+                modifier = Modifier
+                    .background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(2.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            )
+        }
 
         if (mapState.showSettingsButton) {
             MapSettingsToggle(

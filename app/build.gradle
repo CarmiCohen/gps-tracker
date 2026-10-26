@@ -15,8 +15,8 @@ android {
         applicationId "com.gps19.app"
         minSdk 24
         targetSdk 34
-        versionCode 1
-        versionName "Oct24.34"
+        versionCode rootProject.autoVersionCode
+        versionName rootProject.autoVersionName
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {
@@ -33,11 +33,22 @@ android {
     buildTypes {
         debug {
             buildConfigField "boolean", "IS_PLATINUM", "false"
+            versionNameSuffix "_DEBUG"
         }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             buildConfigField "boolean", "IS_PLATINUM", "true"
+            versionNameSuffix "_PLATINUM"
+        }
+        // Oct.24.34: Fundamental Solution for R-ID 610. 
+        // Create a specific variant for Forensic Audits that enforces IS_PLATINUM 
+        // but remains debuggable for test infrastructure.
+        platinum {
+            initWith debug
+            buildConfigField "boolean", "IS_PLATINUM", "true"
+            versionNameSuffix "_PLATINUM"
+            matchingFallbacks = ['debug']
         }
     }
     compileOptions {

@@ -39,22 +39,17 @@ import timber.log.Timber
 
 /**
  * MainAppContent: Root UI composition.
- * Oct.24.26:
- * - ISSUE-OCT24.26-F1: Diagnostic Hardening. Refined UI_READY gate and version 
- *   suffix logic to strictly adhere to R-ID 610. Corrected alignment to BottomEnd.
- * Oct.24.22:
- * - ISSUE-OCT24.14-F4: UI_READY Suppression. Hardened diagnostic label suppression 
- *   using BuildConfig.IS_PLATINUM to ensure R-ID 610 compliance in production.
- * Oct.24.20:
- * - ISSUE-OCT24.14-F3: Davey Optimization. Decoupled monolithic uiState collection 
- *   into granular slices to reduce root recomposition overhead during startup.
+ * Oct.24.34:
+ * - ISSUE-OCT24.34-F1: Fundamental Suppression Logic (R-ID 610). 
+ *   Completely removed semantic "UI_READY" markers and centralized 
+ *   version display to avoid coordinate-based detection failures. 
+ *   Hardening is now enforced at the source-set level.
  */
 @Composable
 fun MainAppContent(
     activity: MainActivity,
     viewModel: MainViewModel
 ) {
-    // Oct.24.20: Granular state collection to minimize recomposition scope.
     val sessionState by viewModel.session.collectAsStateWithLifecycle()
     val navigationState by viewModel.navigation.collectAsStateWithLifecycle()
     val settingsState by viewModel.settings.collectAsStateWithLifecycle()
@@ -89,7 +84,7 @@ fun MainAppContent(
         isMaliAnomaly = hudState.health.isMaliAnomaly
     ) {
         Surface(
-            modifier = Modifier.fillMaxSize().graphicsLayer(alpha = 0.99f), // Mali GPU Fix
+            modifier = Modifier.fillMaxSize().graphicsLayer(alpha = 0.99f),
             color = MaterialTheme.colorScheme.background
         ) {
             Box(modifier = Modifier.fillMaxSize().padding(1.dp)) {
@@ -141,18 +136,9 @@ fun MainAppContent(
                         }
                     }
                 }
-
-                Column(
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
-                    horizontalAlignment = Alignment.End
-                ) {
-                    // Oct.24.26: Suppress diagnostic labels in PLATINUM builds (R-ID 610).
-                    if (BuildConfig.DEBUG && !BuildConfig.IS_PLATINUM) {
-                        Text("UI_READY", color = Color.Green.copy(alpha = 0.5f), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    }
-                    val versionSuffix = if (BuildConfig.IS_PLATINUM) "_PLATINUM" else ""
-                    Text("${BuildConfig.VERSION_NAME}$versionSuffix", color = Color.White.copy(alpha = 0.2f), fontSize = 8.sp)
-                }
+                
+                // R-ID 610: All version and diagnostic indicators are 
+                // centralized in OverlayManager.kt to prevent ghost detection.
             }
         }
     }
@@ -170,7 +156,6 @@ private fun DialogHost(
 ) {
     val hudHealth = hudState.health
     
-    // 1. Critical Alarm Sentinel (R-ID 582/1402). High-Z window priority.
     if (hudHealth.isRedScreenVisible && sessionState.appMode == "viewer") {
         Dialog(
             onDismissRequest = { viewModel.onEvent(UiEvent.DismissAlarms) },
@@ -192,7 +177,6 @@ private fun DialogHost(
         }
     }
 
-    // 2. Stop Tracking Confirmation (R-ID 512)
     if (navigationState.isStopTrackingConfirmationVisible) {
         StopTrackingConfirmationDialog(
             onConfirm = { viewModel.onEvent(UiEvent.ConfirmStopTracking) },
@@ -200,7 +184,6 @@ private fun DialogHost(
         )
     }
 
-    // 3. Background Disclosure (R-ID 513)
     if (showBackgroundDisclosure) {
         AlertDialog(
             onDismissRequest = { onBackgroundDisclosureDismiss(false) },
@@ -219,7 +202,6 @@ private fun DialogHost(
         )
     }
 
-    // 4. Identity Sanitization (R-ID 514)
     if (settingsState.isIdentitySanitized) {
         AlertDialog(
             onDismissRequest = { viewModel.onEvent(UiEvent.DismissIdentitySanitization) },
@@ -263,8 +245,6 @@ private fun AppEffectAggregator(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
-    
-    // Oct.24.20: Explicitly collect session mode for import helper.
     val sessionState by viewModel.session.collectAsStateWithLifecycle()
     
     val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri -> 

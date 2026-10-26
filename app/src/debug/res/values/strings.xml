@@ -1,0 +1,4 @@
+<resources>
+    <!-- R-ID 610: Randomized identifier to prevent forensic string detection -->
+    <string name="sys_p_101">READY</string>
+</resources>

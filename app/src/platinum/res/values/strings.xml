@@ -1,0 +1,4 @@
+<resources>
+    <!-- R-ID 610: Hardened suppression of diagnostic labels for Platinum builds -->
+    <string name="diag_ui_ready"></string>
+</resources>
