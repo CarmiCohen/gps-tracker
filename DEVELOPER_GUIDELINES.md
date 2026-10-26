@@ -2,7 +2,7 @@
 
 The following rules **MUST** be followed strictly for every task:
 
-1.  **Display Issue**: Explicitly display the selected issue details before initiating any fix.
+1.  **Display Issue**: Explicitly display the selected issue details before initiating the issue's fixing.
 2.  **Root-Cause Remediation**:
     *   **Architecture First**: Resolve issues using root-cause-oriented solutions that align with the project's architecture and long-term maintainability.
     *   **No Workarounds**: Avoid temporary mitigations. Rigorously remove all "leftovers" from previous or current implementations.

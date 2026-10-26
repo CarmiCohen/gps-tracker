@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.26.2:
+ * - ISSUE-OCT26.2-F1: Startup Profiling. Added DATABASE_SIZE_THRESHOLD_MB (250MB) 
+ *   to support R104 deepPruneLogs startup gate.
  * Oct.18.14:
  * - ISSUE-OCT18.14-F1: Urban Signal Reflectivity Hardening. Added 
  *   ANCHOR_REFLECTIVITY_ALTITUDE_GATE (3.5m) to refine stationary anchor 
@@ -61,6 +64,9 @@ const val MEMORY_PRESSURE_THRESHOLD_MB = 200.0
 const val MEMORY_CRITICAL_THRESHOLD_MB = 250.0
 const val MEMORY_HYSTERESIS_OFFSET_MB = 15.0
 const val SYSTEM_PRESSURE_STAGGERED_HYSTERESIS_MULT = 2.0
+
+// R104: Database Size Threshold (MB)
+const val DATABASE_SIZE_THRESHOLD_MB = 250.0
 
 // Issue #1417: Connectivity Jitter
 const val CONNECTIVITY_HYSTERESIS_MS = 3000L

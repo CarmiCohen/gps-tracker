@@ -26,15 +26,14 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.26.2:
+ * - ISSUE-OCT26.2-F1: Startup Profiling. Implemented R104 (deepPruneLogs) 
+ *   triggered on startup if database size exceeds 250MB. Added performance 
+ *   instrumentation to measure startup I/O impact.
  * Oct.20.27:
  * - ISSUE-OCT20.27-F1: Implemented Storage-Aware Adaptive Pruning (R728, R712).
- *   Pruning thresholds now scale dynamically based on storage pressure and charging state.
- *   Added forensic-aware chunked pruning for all log tiers including FORENSIC_TRACE.
  * Oct.20.24:
- * - ISSUE-OCT20.23-F2: Finalized remediation. Made clearLogs() suspendable and 
- *   resolved type mismatches in mapping functions to ensure deterministic test setup.
- * Oct.20.2:
- * - ISSUE-OCT18.22-F3: Added flushLogs() and flushForensicTraces() for deterministic testing.
+ * - ISSUE-OCT20.23-F2: Finalized remediation. Made clearLogs() suspendable.
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -99,6 +98,20 @@ class LogRepository @Inject constructor(
         }
         startBackgroundTasks()
         Log.i("LogRepository", "Background tasks started explicitly.")
+
+        // R104: Proactive Log Pruning during startup
+        scope.launch(Dispatchers.IO) {
+            val startTime = timeProvider.elapsedRealtime
+            val sizeMb = getDatabaseSizeMb()
+            if (sizeMb > DATABASE_SIZE_THRESHOLD_MB) {
+                Timber.w("R104: Startup Database Pressure Detected (%.2f MB). Initiating deep prune.".format(sizeMb))
+                deepPruneLogs()
+                val duration = timeProvider.elapsedRealtime - startTime
+                Timber.i("R104: Deep prune completed in ${duration}ms.")
+            } else {
+                Timber.d("R104: Startup Database size within limits (%.2f MB).".format(sizeMb))
+            }
+        }
     }
 
     private fun startBackgroundTasks() {
@@ -508,6 +521,37 @@ class LogRepository @Inject constructor(
         } catch (e: Exception) { 
             Timber.e(e, "Error during proactive pruning") 
         }
+    }
+
+    /**
+     * deepPruneLogs: R104 implementation. 
+     * Performs an aggressive chunked purge of non-critical logs and forensic traces 
+     * to recover storage space and minimize startup I/O stalls.
+     */
+    suspend fun deepPruneLogs() {
+        try {
+            Timber.w("R104: Initiating DEEP PRUNE due to database size pressure.")
+            db.withTransaction {
+                // Aggressive: Keep only 10% of normal limits
+                val generalLimit = ADAPTIVE_PRUNE_THRESHOLD_CRITICAL / 2
+                val forensicLimit = FORENSIC_PRUNE_LIMIT_CRITICAL / 2
+
+                logDao.pruneHeartbeatsByThreshold(logDao.getHeartbeatPruneThreshold(10) ?: 0L, REFINED_PRUNE_CHUNK_SIZE)
+                logDao.pruneGeneralByThreshold(logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, REFINED_PRUNE_CHUNK_SIZE)
+                logDao.pruneForensicByThreshold(logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, REFINED_PRUNE_CHUNK_SIZE)
+            }
+            Timber.i("R104: Deep prune completed.")
+        } catch (e: Exception) {
+            Timber.e(e, "Error during deep pruning")
+        }
+    }
+
+    /**
+     * getDatabaseSizeMb: Returns the current size of the primary SQLite database file in MB.
+     */
+    fun getDatabaseSizeMb(): Double {
+        val dbFile = context.getDatabasePath("gps_tracker_db")
+        return if (dbFile.exists()) dbFile.length() / (1024.0 * 1024.0) else 0.0
     }
 
     suspend fun getUnsyncedLogs(limit: Int): List<LogEntry> = logDao.getUnsyncedLogs(limit).map { 

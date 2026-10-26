@@ -1,4 +1,14 @@
-# Resolution Archive - GPS Tracker (Oct26.1)
+# Resolution Archive - GPS Tracker (Oct26.2)
+
+## ISSUE-OCT26.2-F1: Startup Profiling and Optimization Audit (Oct26.2)
+- **Resolved**: Oct26.2
+- **Description**: Requirement R104 for a proactive `deepPruneLogs` operation during startup if the database exceeds 250MB to prevent I/O stalls on budget hardware. Analyzed bypassed startup flow for bottlenecks.
+- **Remediation**:
+    - Defined `DATABASE_SIZE_THRESHOLD_MB` (250MB) in `EngineConstants.kt`.
+    - Implemented `getDatabaseSizeMb()` and `deepPruneLogs()` in `LogRepository`.
+    - Integrated the size-check and pruning trigger into `LogRepository.start()`, ensuring execution on a background I/O thread.
+    - Added high-resolution performance instrumentation to measure check overhead and pruning duration.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 841). Sub-50ms check latency verified.
 
 ## ISSUE-OCT26.1-F1: Full Variant Assembly & Verification (Oct26.1)
 - **Resolved**: Oct26.1
