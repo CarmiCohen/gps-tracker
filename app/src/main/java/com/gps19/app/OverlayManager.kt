@@ -9,13 +9,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
@@ -24,6 +27,10 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayManager: Unified HUD management for GPS Tracker.
+ * Oct.26.4:
+ * - ISSUE-OCT26.4-F1: Enforced R-ID 612 (Diagnostic Alignment). Moved version 
+ *   tag to BottomEnd and enforced Ltr direction to resolve RTL-flip overlap 
+ *   with map scale bar (which is now moved to the left).
  * Oct.24.34:
  * - ISSUE-OCT24.34-F1: Fundamental Suppression (R-ID 610). Integrated 
  *   Source-Set decoupled DiagnosticOverlay to ensure physical removal of 
@@ -51,11 +58,14 @@ fun UnifiedHUDOverlay(
     Box(modifier = Modifier.fillMaxSize()) {
         // 1. Map Overlays
         if (isMapVisible && !isAnyOverlayOpen && session.hydrationLevel >= 4) {
-            MapSpecificOverlays(
-                mapState = mapState,
-                isLandscape = isLandscape,
-                onMainEvent = onMainEvent
-            )
+            // Force Ltr to synchronize Compose coordinates with OSMDroid Map coordinates
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+                MapSpecificOverlays(
+                    mapState = mapState,
+                    isLandscape = isLandscape,
+                    onMainEvent = onMainEvent
+                )
+            }
         }
 
         // 2. Global Header and Status Bar
@@ -122,13 +132,13 @@ private fun MapSpecificOverlays(
         
         Column(
             modifier = Modifier
-                .align(Alignment.BottomStart)
+                .align(Alignment.BottomEnd)
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(start = 8.dp, bottom = 4.dp),
-            horizontalAlignment = Alignment.Start
+                .padding(end = 8.dp, bottom = 4.dp),
+            horizontalAlignment = Alignment.End
         ) {
-            // Oct.24.34: Fundamental R-ID 610 fix. 
-            // DiagnosticOverlay is physically removed in Platinum builds.
+            // Oct.26.4: Enforced R-ID 612. Diagnostic artifacts and version name 
+            // MUST be at BottomEnd to ensure forensic parity across all variants.
             DiagnosticOverlay()
             
             Text(

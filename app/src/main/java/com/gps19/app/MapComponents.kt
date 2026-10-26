@@ -41,17 +41,17 @@ import com.gps19.core.engine.*
 
 /**
  * MapComponents: Shared map logic for Tracker and Viewer.
+ * Oct.26.4:
+ * - UI Separation Hardening (#ISSUE-OCT26.4-F1): Re-aligned ScaleBarOverlay 
+ *   to bottom-left (setAlignRight(false)) to resolve overlap with the 
+ *   version tag which is pinned to BottomEnd per R-ID 612.
  * Oct.21.04:
  * - UI Overlap Fix (#OCT20.33-F4): Explicitly aligned ScaleBarOverlay to 
- *   bottom-right corner to resolve layout conflict with the version tag 
- *   which is pinned to BottomStart per R-ID 603.
+ *   bottom-right corner. (REVERTED Oct.26.4 to accommodate R-ID 612).
  * Oct.20.33:
  * - Tracker Stealth Audit (ISSUE-OCT20.31-F1): Forbidden interactive elements 
  *   (Home Point ADD/DEL) are now strictly removed from the MapToolsOverlay 
  *   in Tracker mode to comply with R872 (Absolute Stealth).
- * Oct.14.8:
- * - SIMP-OCT13.21-S1: Pure Event Map. Refactored AppMapContainer and OsmMap 
- *   signatures to use onEvent bubbling, removing MainViewModel casting.
  */
 
 @Composable
@@ -175,9 +175,11 @@ fun OsmMap(
             
             val scaleBar = ScaleBarOverlay(this).apply { 
                 setUnitsOfMeasure(ScaleBarOverlay.UnitsOfMeasure.metric)
-                // Issue #OCT20.33-F4: Move scale bar to bottom-right to avoid version tag overlap
+                // Issue #ISSUE-OCT26.4-F1: Separation Hardening. 
+                // The version tag is at BottomEnd (bottom-right) per R-ID 612.
+                // Re-aligning scale bar to bottom-left to prevent collision.
                 setAlignBottom(true)
-                setAlignRight(true)
+                setAlignRight(false)
                 setScaleBarOffset(20, 20)
                 setCentred(false)
             }

@@ -1,4 +1,13 @@
-# Resolution Archive - GPS Tracker (Oct26.2)
+# Resolution Archive - GPS Tracker (Oct26.4)
+
+## ISSUE-OCT26.4-F1: UI Separation Hardening (Oct26.4)
+- **Resolved**: Oct26.4
+- **Description**: The version name and diagnostic indicators were overlapping with the map's scale bar. This was a conflict between R-ID 612 (mandating BottomEnd alignment for versioning) and previous scale-bar adjustments.
+- **Remediation**:
+    - Enforced **R-ID 612** in `OverlayManager.kt` by moving the diagnostic version tag to `BottomEnd` (bottom-right).
+    - Updated `MapComponents.kt` to re-align the `ScaleBarOverlay` to the left (`setAlignRight(false)`), ensuring absolute separation from the version tag.
+    - Fixed a logical color-comparison syntax error in `MapToolsOverlay`.
+- **Outcome**: 🟢 **PASSED**. (SOT ID 842). Verified separation in both portrait and landscape.
 
 ## ISSUE-OCT26.2-F1: Startup Profiling and Optimization Audit (Oct26.2)
 - **Resolved**: Oct26.2
@@ -29,14 +38,4 @@
     - Set `testBuildType` to `platinum` in `app/build.gradle` to ensure automated verification of forensic suppression.
     - Aligned `IdentityPersistenceTest.kt` with centralized validation logic.
 - **Outcome**: 🟢 **PASSED**. (SOT ID 839).
-
-## ISSUE-OCT24.34-F1: Persistent Forensic Integrity Remediation (Oct24.34)
-- **Resolved**: Oct24.34
-- **Description**: A recurring detection of the `UI_READY` label and unsuffixed version name occurred during forensic audits. Root cause was identified as stale build artifacts and variant misalignment.
-- **Remediation**:
-    - Performed a full project `clean` to eliminate shadow resources.
-    - Neutralized legacy `activity_main.xml` to prevent layout leakage.
-    - Synchronized dynamic versioning logic across `gradle.properties` and `app/build.gradle`.
-    - Enforced mandatory `_DEBUG` / `_PLATINUM` suffixes to prevent variant mismatch during audit.
-- **Outcome**: 🟢 **PASSED**. (SOT ID 838).
 ... (historical entries preserved)
