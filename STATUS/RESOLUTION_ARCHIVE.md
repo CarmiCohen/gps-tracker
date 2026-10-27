@@ -2,6 +2,17 @@
 
 ## ✅ Resolved Issues (Oct27.5)
 
+### 1. ISSUE-OCT27.7-F1: Forensic SPI Level Audit
+- **Symptoms**: Jitter in telemetry timing and intermittent I/O spikes (maxIoLatency > 500ms) on budget hardware (A15) during high-pressure 100Hz forensic bursts.
+- **Root Cause**: `MappedByteBuffer.force()` was called on every write and drain commit, triggering excessive SPI bus contention. 
+- **Resolution**: Implemented "Staggered Persistence" in `ForensicSpillBuffer`. Relaxed `force()` frequency to a 5-second interval during normal operation while relying on the memory mapping to survive application process death. Full synchronization is now gated to emergency fill levels (90%+) and explicit recovery events. Transitioned persistence auditing to `AuditType.IO` for accurate system health tracking. (Resolved GAP-OCT27.6-1).
+
+---
+
+# Resolution Archive - Oct27.5
+
+## ✅ Resolved Issues (Oct27.5)
+
 ### 1. ISSUE-OCT27.6-F1: Forensic Recovery Baseline
 - **Symptoms**: Risk of telemetry loss if the process is terminated before the `ForensicDrainer` persists traces from the memory-mapped spill-buffer to the primary database.
 - **Root Cause**: Need for a verified recovery mechanism that triggers upon process restart to drain abandoned traces.

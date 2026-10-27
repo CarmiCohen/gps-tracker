@@ -33,7 +33,7 @@ def getGitCommitCount() {
 }
 
 def getVersionName() {
-    return project.hasProperty('APP_VERSION_NAME') ? project.APP_VERSION_NAME : "Oct27.6"
+    return project.hasProperty('APP_VERSION_NAME') ? project.APP_VERSION_NAME : "Oct27.7"
 }
 
 ext {

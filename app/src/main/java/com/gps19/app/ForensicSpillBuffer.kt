@@ -12,21 +12,21 @@ import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
 import java.util.Arrays
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.CRC32
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for forensic traces.
+ * Oct.27.7:
+ * - GAP-OCT27.6-1: Forensic SPI Level Audit. Implemented Staggered Persistence to 
+ *   mitigate SPI bus contention. Transitioned to AuditType.IO and added 
+ *   staggered force() logic to prevent jitter during 100Hz bursts.
  * Oct.20.21:
  * - ISSUE-OCT20.10-F1: Hardened against overflow with circular overwrite (R746).
- *   Ensures latest forensic data is preserved during extreme pressure.
  * Oct.14.18:
  * - Optimized commitDrain by moving MappedByteBuffer.force() outside the synchronized block.
- *   This eliminates lock contention spikes (14ms -> <1ms lock hold time) identified on A15.
- * Oct.13.7:
- * - Introduced PeekResult to accurately track processed entries vs valid entities.
- * - Added logging for CRC mismatches to diagnose under-count issues.
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -40,6 +40,7 @@ class ForensicSpillBuffer @Inject constructor(
     private val writeIdx = AtomicInteger(0)
     private val totalCount = AtomicInteger(0)
     private val readIdx = AtomicInteger(0)
+    private val lastForceRt = AtomicLong(0)
 
     data class PeekResult(
         val entities: List<LogEntity>,
@@ -72,6 +73,9 @@ class ForensicSpillBuffer @Inject constructor(
         const val DEFAULT_TRACE_MSG = "FORENSIC_TRACE"
         
         const val DATA_FIELDS_SIZE = 56 
+        
+        // Staggered persistence: 5s force interval during normal operation
+        const val STAGGERED_FORCE_INTERVAL_MS = 5000L
     }
 
     init {
@@ -137,6 +141,7 @@ class ForensicSpillBuffer @Inject constructor(
             totalCount.set(0)
             readIdx.set(0)
             buffer.force()
+            lastForceRt.set(timeProvider.elapsedRealtime)
         }
     }
 
@@ -155,7 +160,7 @@ class ForensicSpillBuffer @Inject constructor(
             timeProvider = timeProvider,
             thresholdMs = WRITE_STALL_THRESHOLD_MS,
             operation = "Forensic Write",
-            type = LatencyMonitor.AuditType.PERFORMANCE,
+            type = LatencyMonitor.AuditType.IO,
             onSpike = { msg, _ -> Timber.w(msg) }
         ) {
             val buffer = mappedBuffer ?: return@measureAndAudit false
@@ -224,7 +229,7 @@ class ForensicSpillBuffer @Inject constructor(
             timeProvider = timeProvider,
             thresholdMs = WRITE_STALL_THRESHOLD_MS,
             operation = "Forensic Write Optimized",
-            type = LatencyMonitor.AuditType.PERFORMANCE,
+            type = LatencyMonitor.AuditType.IO,
             onSpike = { msg, _ -> Timber.w(msg) }
         ) {
             val buffer = mappedBuffer ?: return@measureAndAudit false
@@ -257,7 +262,7 @@ class ForensicSpillBuffer @Inject constructor(
                 
                 localWriteBuffer.put(flags.toByte())
                 localWriteBuffer.put(batteryLevel.toByte())
-                localWriteBuffer.put(0.toByte()) // msgLen = 0
+                localWriteBuffer.put(0.toByte()) 
                 localWriteBuffer.put(0.toByte())
 
                 localWriteBuffer.position(FORENSIC_SPILL_ENTRY_SIZE_V5 - CHECKSUM_SIZE)
@@ -276,17 +281,12 @@ class ForensicSpillBuffer @Inject constructor(
         }
     }
 
-    /**
-     * forceCircularAdvance: Overwrites the oldest entry by moving the read pointer.
-     * Part of R713 hardening to ensure latest traces are always preserved.
-     */
     private fun forceCircularAdvance(buffer: MappedByteBuffer) {
         val currentRead = readIdx.get()
         val nextRead = (currentRead + 1) % FORENSIC_SPILL_CAPACITY
         readIdx.set(nextRead)
         buffer.putInt(OFF_READ_IDX, nextRead)
         totalCount.decrementAndGet()
-        // Note: OFF_COUNT will be updated by the subsequent advanceWritePointer call.
     }
 
     private fun advanceWritePointer(buffer: MappedByteBuffer) {
@@ -349,7 +349,7 @@ class ForensicSpillBuffer @Inject constructor(
                         val flags = localWrapper.get().toInt()
                         val batLevel = localWrapper.get().toInt() and 0xFF
                         val msgLen = localWrapper.get().toInt() and 0xFF
-                        localWrapper.get() // read padding
+                        localWrapper.get() 
 
                         val msg = if (msgLen > 0) {
                             String(localEntryBytes, localWrapper.position(), msgLen, Charsets.UTF_8)
@@ -393,16 +393,25 @@ class ForensicSpillBuffer @Inject constructor(
         }
     }
 
-    fun commitDrain(count: Int) {
+    /**
+     * commitDrain: Finalizes the consumption of traces from the buffer.
+     * GAP-OCT27.6-1: Optimized force() logic to prevent SPI bus contention.
+     * force() is only called if explicitly requested (e.g. recovery) or if 
+     * the staggered interval has elapsed.
+     */
+    fun commitDrain(count: Int, forcePersistence: Boolean = false) {
+        val nowRt = timeProvider.elapsedRealtime
+        val shouldForce = forcePersistence || (nowRt - lastForceRt.get() >= STAGGERED_FORCE_INTERVAL_MS)
+
         LatencyMonitor.measureAndAudit<Unit>(
             timeProvider = timeProvider,
             thresholdMs = DRAIN_STALL_THRESHOLD_MS,
-            operation = "Forensic Commit",
-            type = LatencyMonitor.AuditType.PERFORMANCE,
+            operation = if (shouldForce) "Forensic Commit (Forced)" else "Forensic Commit",
+            type = LatencyMonitor.AuditType.IO,
             onSpike = { msg, _ -> Timber.w(msg) }
         ) {
             val buffer = mappedBuffer ?: return@measureAndAudit
-            var shouldForce = false
+            var executeForce = false
             synchronized(this) {
                 val actualToConsume = count.coerceAtMost(totalCount.get())
                 if (actualToConsume <= 0) return@synchronized
@@ -414,11 +423,12 @@ class ForensicSpillBuffer @Inject constructor(
                 val newCount = totalCount.get() - actualToConsume
                 totalCount.set(newCount)
                 buffer.putInt(OFF_COUNT, newCount)
-                shouldForce = true
+                executeForce = shouldForce
             }
-            if (shouldForce) {
-                // Issue #SIMP-OCT14.11-S1: Moved force() outside lock to reduce contention.
+            
+            if (executeForce) {
                 buffer.force()
+                lastForceRt.set(nowRt)
             }
         }
     }

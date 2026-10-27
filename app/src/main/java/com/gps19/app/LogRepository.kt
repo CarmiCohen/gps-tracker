@@ -26,14 +26,13 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.27.7:
+ * - GAP-OCT27.6-1: Forensic SPI Level Audit. Integrated Staggered Persistence 
+ *   support. Forced buffer sync during recovery and emergency fill levels 
+ *   to ensure zero-loss integrity while minimizing bus contention.
  * Oct.26.2:
  * - ISSUE-OCT26.2-F1: Startup Profiling. Implemented R104 (deepPruneLogs) 
- *   triggered on startup if database size exceeds 250MB. Added performance 
- *   instrumentation to measure startup I/O impact.
- * Oct.20.27:
- * - ISSUE-OCT20.27-F1: Implemented Storage-Aware Adaptive Pruning (R728, R712).
- * Oct.20.24:
- * - ISSUE-OCT20.23-F2: Finalized remediation. Made clearLogs() suspendable.
+ *   triggered on startup if database size exceeds 250MB.
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -181,7 +180,7 @@ class LogRepository @Inject constructor(
 
     @VisibleForTesting
     suspend fun flushForensicTraces() {
-        performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = false)
+        performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = false, forcePersistence = true)
     }
 
     fun setForensicStallSimulation(active: Boolean) {
@@ -221,7 +220,7 @@ class LogRepository @Inject constructor(
         val pending = buffer.getPendingCount()
         if (pending > 0) {
             Log.i("LogRepository", "Forensic Recovery: Replaying $pending abandoned traces.")
-            performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = true)
+            performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = true, forcePersistence = true)
         }
     }
 
@@ -258,7 +257,7 @@ class LogRepository @Inject constructor(
                     val dynamicBatchSize = (baseBatchSize * (1.0 - (loadFactor * loadImpact))).toInt()
                         .coerceIn(FORENSIC_BATCH_SIZE_MIN, FORENSIC_BATCH_SIZE_MAX)
 
-                    if (performForensicDrain(limit = dynamicBatchSize, isRecovery = false)) {
+                    if (performForensicDrain(limit = dynamicBatchSize, isRecovery = false, forcePersistence = isEmergency)) {
                         lastDrainRt = nowRt
                     }
                 }
@@ -269,7 +268,7 @@ class LogRepository @Inject constructor(
         }
     }
 
-    private suspend fun performForensicDrain(limit: Int, isRecovery: Boolean): Boolean = forensicMutex.withLock {
+    private suspend fun performForensicDrain(limit: Int, isRecovery: Boolean, forcePersistence: Boolean = false): Boolean = forensicMutex.withLock {
         if (isForensicStallSimulated.get() && !isRecovery) {
             forensicFailureCount.incrementAndGet()
             updateReliability(false)
@@ -284,7 +283,7 @@ class LogRepository @Inject constructor(
 
         if (entities.isEmpty()) {
             if (processedCount > 0) {
-                buffer.commitDrain(processedCount)
+                buffer.commitDrain(processedCount, forcePersistence = forcePersistence || isRecovery)
                 return@withLock true
             }
             return@withLock false
@@ -297,7 +296,7 @@ class LogRepository @Inject constructor(
 
         return@withLock try {
             if (filteredEntities.isNotEmpty()) logDao.insertAll(filteredEntities)
-            buffer.commitDrain(processedCount)
+            buffer.commitDrain(processedCount, forcePersistence = forcePersistence || isRecovery)
             forensicSuccessCount.incrementAndGet()
             updateReliability(true)
             

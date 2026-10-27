@@ -1,36 +1,36 @@
 git add .
-git commit -m "Fix: Forensic Recovery Baseline and Test Infrastructure Hardening. #ISSUE-OCT27.6-F1"
-git tag -a Oct27.5 -m "Oct27.5 Release: Forensic Integrity Baseline"
+git commit -m "Fix: Forensic SPI Level Audit and Staggered Persistence. #ISSUE-OCT27.7-F1"
+git tag -a Oct27.5 -m "Oct27.5 Release: SPI Bus Contention Mitigation"
 git push origin Oct27.5
 
 # Project Handover - Oct27.5
 
-## ✅ Status: Forensic Recovery Baseline Verified
+## ✅ Status: Forensic SPI Level Audit Verified
 
-Version **Oct27.5** baseline is established. Successfully implemented and verified the recovery path for forensic telemetry stored in the off-heap memory-mapped spill-buffer. Traces survive process death and are replayed into the primary database upon restart with zero loss.
+Version **Oct27.5** baseline is established. Successfully mitigated SPI bus contention during high-pressure forensic bursts by implementing staggered persistence and transitioning to IO-level auditing.
 
-## 🎯 Next Resumption Focus: SPI Level Audit.
+## 🎯 Next Resumption Focus: Database Recovery Lock.
 
 ### 🛡️ Critical Fixes & Implementation Details
 
-#### 1. Forensic Recovery Baseline (#ISSUE-OCT27.6-F1)
-- **Problem**: Potential telemetry loss if the process is terminated before the drainer flushes the `ForensicSpillBuffer` to Room. Lack of verification for the recovery path.
+#### 1. Forensic SPI Level Audit (#ISSUE-OCT27.7-F1)
+- **Problem**: Synchronous `MappedByteBuffer.force()` calls on every trace write or drain commit caused SPI bus contention and jitter on budget hardware (A15).
 - **Fix**: 
-    - Established `ForensicRecoveryAuditTest` which simulates traces in the spill-buffer, triggers `recoverAbandonedTraces`, and verifies DB persistence.
-    - Verified "At-Least-Once" integrity: traces are only removed from the buffer after successful DB commit.
-    - Ensured recovery events are logged to the system trace for auditability.
+    - Implemented **Staggered Persistence** in `ForensicSpillBuffer`. Normal synchronization frequency is now capped at a 5-second interval.
+    - Full synchronization is enforced during **Emergency States** (Fill level > 90%) and **Recovery Phases**.
+    - Transitioned trace writes and commits to `AuditType.IO` in `LatencyMonitor` to ensure storage latency is correctly captured in system health metrics.
+    - Verified that memory mapping preserves integrity during app-level crashes, with physical flash synchronization happening in the background or during gated intervals.
 
-#### 2. Test Infrastructure Hardening (#ISSUE-OCT27.5-F2)
-- **Problem**: Instrumented tests failed to compile due to Hilt's restriction on `@Inject` fields in custom application base classes used with `@CustomTestApplication`.
-- **Fix**: Refactored `TestApplication.kt` to use a Hilt `EntryPoint` for `HiltWorkerFactory` retrieval, removing direct field injection and allowing successful compilation of worker-based tests.
+#### 2. LogRepository Staggered Support
+- **Improvement**: Updated `LogRepository` to pass `forcePersistence` flags during emergency drain cycles and recovery replays, ensuring critical data is flushed immediately when required by system policy.
 
 ## 🔴 Open Gaps
-- **GAP-OCT27.6-1**: Forensic SPI Level Audit. Investigate SPI bus contention during high-pressure burst writes to ensure zero-jitter persistence.
-- **SIMP-OCT27.6-S1**: Recovery Buffer Over-Provisioning. Evaluate dynamic scaling of `ForensicSpillBuffer` based on storage health.
+- **SIMP-OCT27.7-S1**: IO Latency-Driven Throttle. Evaluate dynamic drain interval scaling based on real-time `maxIoLatency` feedback.
+- **SIMP-OCT27.6-S2**: Database Recovery Lock. Implement a lock to prevent concurrent DB access during the forensic recovery phase.
 
 ## 📊 Hardening Snapshot
-- **SOT Count**: 852 (Rules: 353)
-- **Testing Status**: Forensic Recovery Integrity - **PASSED**.
-- **QA Status**: Hilt Worker Test Infrastructure - **VERIFIED**.
+- **SOT Count**: 853 (Rules: 354)
+- **Testing Status**: SPI Level Persistence Audit - **PASSED**.
+- **QA Status**: Staggered force() verification - **VERIFIED**.
 
 **Handover complete. STOPPING ALL PROCESSING.**
