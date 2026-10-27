@@ -1,36 +1,36 @@
 git add .
-git commit -m "Fix: Forensic SPI Level Audit and Staggered Persistence. #ISSUE-OCT27.7-F1"
-git tag -a Oct27.5 -m "Oct27.5 Release: SPI Bus Contention Mitigation"
-git push origin Oct27.5
+git commit -m "Fix: Database Recovery Lock implementation. #ISSUE-OCT27.8-F1"
+git tag -a Oct27.8 -m "Oct27.8 Release: Database Recovery Lock"
+git push origin Oct27.8
 
-# Project Handover - Oct27.5
+# Project Handover - Oct27.8
 
-## ✅ Status: Forensic SPI Level Audit Verified
+## ✅ Status: Database Recovery Lock Verified
 
-Version **Oct27.5** baseline is established. Successfully mitigated SPI bus contention during high-pressure forensic bursts by implementing staggered persistence and transitioning to IO-level auditing.
+Version **Oct27.8** baseline is established. Successfully implemented exclusive database access control during the forensic recovery phase, eliminating potential race conditions between recovery replay and standard log drainers.
 
-## 🎯 Next Resumption Focus: Database Recovery Lock.
+## 🎯 Next Resumption Focus: IO Latency-Driven Throttle.
 
 ### 🛡️ Critical Fixes & Implementation Details
 
-#### 1. Forensic SPI Level Audit (#ISSUE-OCT27.7-F1)
-- **Problem**: Synchronous `MappedByteBuffer.force()` calls on every trace write or drain commit caused SPI bus contention and jitter on budget hardware (A15).
+#### 1. Database Recovery Lock (#ISSUE-OCT27.8-F1)
+- **Problem**: Concurrent database access during the startup recovery phase (replaying traces from off-heap buffer) could lead to I/O contention or race conditions with the primary log batch processor and proactive pruning workers.
 - **Fix**: 
-    - Implemented **Staggered Persistence** in `ForensicSpillBuffer`. Normal synchronization frequency is now capped at a 5-second interval.
-    - Full synchronization is enforced during **Emergency States** (Fill level > 90%) and **Recovery Phases**.
-    - Transitioned trace writes and commits to `AuditType.IO` in `LatencyMonitor` to ensure storage latency is correctly captured in system health metrics.
-    - Verified that memory mapping preserves integrity during app-level crashes, with physical flash synchronization happening in the background or during gated intervals.
+    - Introduced `recoveryLock` (Mutex) in `LogRepository`.
+    - Refactored `startBackgroundTasks()` to explicitly `join()` the recovery job before launching standard drainer and batch jobs.
+    - Wrapped `flushBatch`, `performForensicDrain`, and all pruning operations (`proactivePruning`, `deepPruneLogs`) in `recoveryLock.withLock`.
+    - Enforced R-ID 750: "The system MUST utilize an exclusive Mutex during the forensic recovery phase to block standard log drainers and maintenance workers."
 
-#### 2. LogRepository Staggered Support
-- **Improvement**: Updated `LogRepository` to pass `forcePersistence` flags during emergency drain cycles and recovery replays, ensuring critical data is flushed immediately when required by system policy.
+#### 2. Startup Sequencing
+- **Improvement**: LogRepository startup now follows a deterministic sequence: Prune Check -> Forensic Recovery -> Active Drainers. This ensures that storage-intensive recovery happens in isolation.
 
 ## 🔴 Open Gaps
+- **SIMP-OCT27.8-S1**: Database Transaction Timeout. Consider adding a watchdog to the `recoveryLock` to prevent permanent stalls if a recovery transaction hangs.
 - **SIMP-OCT27.7-S1**: IO Latency-Driven Throttle. Evaluate dynamic drain interval scaling based on real-time `maxIoLatency` feedback.
-- **SIMP-OCT27.6-S2**: Database Recovery Lock. Implement a lock to prevent concurrent DB access during the forensic recovery phase.
 
 ## 📊 Hardening Snapshot
-- **SOT Count**: 853 (Rules: 354)
-- **Testing Status**: SPI Level Persistence Audit - **PASSED**.
-- **QA Status**: Staggered force() verification - **VERIFIED**.
+- **SOT Count**: 854 (Rules: 355)
+- **Testing Status**: Recovery Phase Contention Audit - **PASSED**.
+- **QA Status**: recoveryLock sequence verification - **VERIFIED**.
 
 **Handover complete. STOPPING ALL PROCESSING.**

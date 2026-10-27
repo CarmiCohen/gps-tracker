@@ -26,13 +26,13 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.27.8:
+ * - SIMP-OCT27.6-S2: Database Recovery Lock. Implemented recoveryLock (Mutex) to 
+ *   ensure exclusive DB access during the Forensic Recovery phase (R-ID 750).
  * Oct.27.7:
  * - GAP-OCT27.6-1: Forensic SPI Level Audit. Integrated Staggered Persistence 
  *   support. Forced buffer sync during recovery and emergency fill levels 
  *   to ensure zero-loss integrity while minimizing bus contention.
- * Oct.26.2:
- * - ISSUE-OCT26.2-F1: Startup Profiling. Implemented R104 (deepPruneLogs) 
- *   triggered on startup if database size exceeds 250MB.
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -48,6 +48,13 @@ class LogRepository @Inject constructor(
 ) {
     private val logMutex = Mutex()
     private val forensicMutex = Mutex() 
+    
+    /**
+     * recoveryLock: Dedicated Mutex to prevent concurrent DB access during the forensic 
+     * recovery phase (R-ID 750). Standard drainers and pruning wait on this lock.
+     */
+    private val recoveryLock = Mutex()
+    
     private val logWriteCount = AtomicInteger(0)
     private val isPruning = AtomicBoolean(false)
     private val lastPruneTime = AtomicLong(0L)
@@ -116,9 +123,14 @@ class LogRepository @Inject constructor(
     private fun startBackgroundTasks() {
         if (batchJob?.isActive == true) return
         
-        batchJob = scope.launch(Dispatchers.IO) { runBatchProcessor() }
-        recoveryJob = scope.launch(Dispatchers.IO) { recoverAbandonedTraces() }
-        drainerJob = scope.launch(Dispatchers.IO) { runForensicDrainer() }
+        // R-ID 750: Explicit sequencing of recovery phase before standard drainers
+        scope.launch(Dispatchers.IO) {
+            recoveryJob = launch { recoverAbandonedTraces() }
+            recoveryJob?.join()
+            
+            batchJob = launch { runBatchProcessor() }
+            drainerJob = launch { runForensicDrainer() }
+        }
     }
 
     @VisibleForTesting
@@ -204,8 +216,11 @@ class LogRepository @Inject constructor(
 
                 val nowRt = timeProvider.elapsedRealtime
                 if (batch.size >= LOG_BATCH_SIZE || (batch.isNotEmpty() && nowRt - lastFlushRt >= LOG_BATCH_DELAY_MS)) {
-                    flushBatch(batch)
-                    batch.clear()
+                    // R-ID 750: Protect flush with recoveryLock
+                    recoveryLock.withLock {
+                        flushBatch(batch)
+                        batch.clear()
+                    }
                     lastFlushRt = nowRt
                 }
             } catch (e: Exception) {
@@ -215,12 +230,13 @@ class LogRepository @Inject constructor(
         }
     }
 
-    private suspend fun recoverAbandonedTraces() {
+    private suspend fun recoverAbandonedTraces() = recoveryLock.withLock {
         val buffer = forensicSpillBufferProvider.get()
         val pending = buffer.getPendingCount()
         if (pending > 0) {
-            Log.i("LogRepository", "Forensic Recovery: Replaying $pending abandoned traces.")
+            Log.i("LogRepository", "Forensic Recovery: Replaying $pending abandoned traces. DB Locked.")
             performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = true, forcePersistence = true)
+            Log.i("LogRepository", "Forensic Recovery: Replay complete. DB Unlocked.")
         }
     }
 
@@ -257,8 +273,11 @@ class LogRepository @Inject constructor(
                     val dynamicBatchSize = (baseBatchSize * (1.0 - (loadFactor * loadImpact))).toInt()
                         .coerceIn(FORENSIC_BATCH_SIZE_MIN, FORENSIC_BATCH_SIZE_MAX)
 
-                    if (performForensicDrain(limit = dynamicBatchSize, isRecovery = false, forcePersistence = isEmergency)) {
-                        lastDrainRt = nowRt
+                    // R-ID 750: Protect drain with recoveryLock
+                    recoveryLock.withLock {
+                        if (performForensicDrain(limit = dynamicBatchSize, isRecovery = false, forcePersistence = isEmergency)) {
+                            lastDrainRt = nowRt
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -467,9 +486,10 @@ class LogRepository @Inject constructor(
     /**
      * proactivePruning: Implements R728 and R712 (Storage-Aware Adaptive Pruning).
      * Thresholds scale dynamically based on storage pressure and charging state.
+     * R-ID 750: Inhibited during Forensic Recovery phase.
      */
-    suspend fun proactivePruning() {
-        if (!PersistencePolicy.shouldPerformMaintenance(telemetry.systemHealth.value)) return
+    suspend fun proactivePruning() = recoveryLock.withLock {
+        if (!PersistencePolicy.shouldPerformMaintenance(telemetry.systemHealth.value)) return@withLock
         
         try {
             val health = telemetry.systemHealth.value
@@ -526,10 +546,11 @@ class LogRepository @Inject constructor(
      * deepPruneLogs: R104 implementation. 
      * Performs an aggressive chunked purge of non-critical logs and forensic traces 
      * to recover storage space and minimize startup I/O stalls.
+     * R-ID 750: Inhibited during Forensic Recovery phase.
      */
-    suspend fun deepPruneLogs() {
+    suspend fun deepPruneLogs() = recoveryLock.withLock {
         try {
-            Timber.w("R104: Initiating DEEP PRUNE due to database size pressure.")
+            Timber.w("R104: Initiating DEEP PRUNE due to database size pressure. DB Locked.")
             db.withTransaction {
                 // Aggressive: Keep only 10% of normal limits
                 val generalLimit = ADAPTIVE_PRUNE_THRESHOLD_CRITICAL / 2
@@ -539,7 +560,7 @@ class LogRepository @Inject constructor(
                 logDao.pruneGeneralByThreshold(logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, REFINED_PRUNE_CHUNK_SIZE)
                 logDao.pruneForensicByThreshold(logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, REFINED_PRUNE_CHUNK_SIZE)
             }
-            Timber.i("R104: Deep prune completed.")
+            Timber.i("R104: Deep prune completed. DB Unlocked.")
         } catch (e: Exception) {
             Timber.e(e, "Error during deep pruning")
         }
