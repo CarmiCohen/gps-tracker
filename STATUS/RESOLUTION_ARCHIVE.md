@@ -1,6 +1,13 @@
-# Resolution Archive - Oct27.2
+# Resolution Archive - Oct27.5
 
-## ✅ Resolved Issues (Oct27.2)
+## ✅ Resolved Issues (Oct27.5)
+
+### 1. ISSUE-OCT27.5-F1: Unit-Based Badge Scaling
+- **Symptoms**: Redundant Compose declarations in `SharedUiComponents.kt` for various badge types (standard status, counter overlay, and background-based).
+- **Root Cause**: Lack of a unified badge component leading to boilerplate `Box` and `Text` nesting across `StatusBar`.
+- **Resolution**: Implemented `MeasurableBadge` as a shared component and refactored all HUD indicators to utilize it, ensuring consistent layout metrics and reduced emission overhead.
+
+## ✅ Resolved Issues (Oct27.0)
 
 ### 1. ISSUE-OCT27.2-F1: PruningWorker Initialization Failure in Tests
 - **Symptoms**: `java.lang.NoSuchMethodException` during `PruningWorker` instantiation in instrumented tests.

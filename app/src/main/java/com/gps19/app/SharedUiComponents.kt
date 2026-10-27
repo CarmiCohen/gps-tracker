@@ -48,6 +48,9 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.27.5:
+ * - GAP-OCT27.4-1: Unit-Based Badge Scaling. Transitioned HUD badges to use 
+ *   a shared MeasurableBadge component to reduce redundant Compose declarations.
  * Oct.27.0:
  * - GAP-OCT26.5-1: Added conflation counter overlay to DAT badge and long-press 
  *   diagnostic feedback for signaling pipeline transparency.
@@ -558,35 +561,17 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
                         StatusBadge(label = "GPS", active = telemetry.isLocalGpsActive, activeColor = localColor)
                         StatusBadge(label = if (isTracker) "VWR" else "TRK", active = isPeerActive, activeColor = peerColor)
                         
-                        // GAP-OCT26.5-1: Conflation UI Feedback. SkyBlue DAT indicates managed data flow.
-                        Box(contentAlignment = Alignment.TopEnd) {
-                            StatusBadge(
-                                label = "DAT", 
-                                active = connectivity.isDataHealthy, 
-                                activeColor = if (connectivity.conflatedCount > 0) Color(0xFF38BDF8) else localColor,
-                                modifier = Modifier.pointerInput(connectivity.conflatedCount) {
-                                    detectTapGestures(onLongPress = { 
-                                        if (connectivity.conflatedCount > 0) onEvent(UiEvent.ShowConflationStats(connectivity.conflatedCount)) 
-                                    })
-                                }
-                            )
-                            if (connectivity.conflatedCount > 0) {
-                                Box(
-                                    modifier = Modifier
-                                        .offset(x = 2.dp, y = (-2).dp)
-                                        .background(Color.Red, RoundedCornerShape(1.dp))
-                                        .padding(horizontal = 1.dp)
-                                ) {
-                                    Text(
-                                        text = if (connectivity.conflatedCount > 99) "99+" else connectivity.conflatedCount.toString(),
-                                        color = Color.White,
-                                        fontSize = 5.sp,
-                                        fontWeight = FontWeight.Black,
-                                        style = compactStyle
-                                    )
-                                }
+                        // GAP-OCT26.5-1: Conflation UI Feedback / GAP-OCT27.4-1: Unit-Based Badge Scaling.
+                        MeasurableBadge(
+                            label = "DAT",
+                            contentColor = if (connectivity.isDataHealthy) (if (connectivity.conflatedCount > 0) Color(0xFF38BDF8) else localColor) else Color(0xFFF43F5E),
+                            overlayText = if (connectivity.conflatedCount > 0) (if (connectivity.conflatedCount > 99) "99+" else connectivity.conflatedCount.toString()) else null,
+                            modifier = Modifier.pointerInput(connectivity.conflatedCount) {
+                                detectTapGestures(onLongPress = { 
+                                    if (connectivity.conflatedCount > 0) onEvent(UiEvent.ShowConflationStats(connectivity.conflatedCount)) 
+                                })
                             }
-                        }
+                        )
 
                         StatusBadge(label = "WDG", active = connectivity.watchdogOk, activeColor = localColor, isBold = true)
                         if (connectivity.isSafeMode) { StatusBadge(label = "SAF", active = false, isBold = true) }
@@ -597,7 +582,14 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
                         // R872: Absolute Stealth. Trackers must never show alarm/siren status badges.
                         if (!isTracker) {
                             if (health.hasActiveAlarms) { StatusBadge(label = "ALM", active = true, activeColor = Color(0xFFF43F5E).copy(alpha = alarmAlpha), isBold = true) }
-                            if (health.isRedScreenSuppressed) { Box(modifier = Modifier.background(if (health.isSirenPlaying) Color(0xFFF43F5E).copy(alpha = alarmAlpha) else Slate500, RoundedCornerShape(2.dp)).padding(horizontal = 2.dp)) { Text(text = if (health.isSirenPlaying) "SIREN" else "LOCK", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Bold, style = compactStyle) } }
+                            if (health.isRedScreenSuppressed) {
+                                MeasurableBadge(
+                                    label = if (health.isSirenPlaying) "SIREN" else "LOCK",
+                                    contentColor = Color.White,
+                                    backgroundColor = if (health.isSirenPlaying) Color(0xFFF43F5E).copy(alpha = alarmAlpha) else Slate500,
+                                    fontSize = 7.sp
+                                )
+                            }
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -840,23 +832,71 @@ fun CommBar(index: Int, color: Color) {
     Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(0.5.dp)) { repeat(8) { i -> Box(modifier = Modifier.width(1.dp).height((2.0 + (i * 0.6)).dp).background(if (i < index) color else Slate500.copy(alpha = 0.4f))) } }
 }
 
+/**
+ * GAP-OCT27.4-1: Shared Measurable Badge Component.
+ * Reduces redundant Compose declarations by unifying label, active state, 
+ * optional background, and optional overlay logic.
+ */
+@Composable
+fun MeasurableBadge(
+    label: String,
+    contentColor: Color,
+    modifier: Modifier = Modifier,
+    backgroundColor: Color = Color.Transparent,
+    isBold: Boolean = true,
+    overlayText: String? = null,
+    fontSize: androidx.compose.ui.unit.TextUnit = 8.sp
+) {
+    val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+    Box(contentAlignment = Alignment.TopEnd, modifier = modifier) {
+        Box(
+            modifier = Modifier
+                .then(if (backgroundColor != Color.Transparent) Modifier.background(backgroundColor, RoundedCornerShape(2.dp)).padding(horizontal = 2.dp) else Modifier),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = label,
+                color = contentColor,
+                fontSize = fontSize,
+                fontWeight = if (isBold) FontWeight.ExtraBold else FontWeight.Bold,
+                fontFamily = FontFamily.Monospace,
+                maxLines = 1,
+                style = compactStyle
+            )
+        }
+        if (overlayText != null) {
+            Box(
+                modifier = Modifier
+                    .offset(x = 2.dp, y = (-2).dp)
+                    .background(Color.Red, RoundedCornerShape(1.dp))
+                    .padding(horizontal = 1.dp)
+            ) {
+                Text(
+                    text = overlayText,
+                    color = Color.White,
+                    fontSize = 5.sp,
+                    fontWeight = FontWeight.Black,
+                    style = compactStyle
+                )
+            }
+        }
+    }
+}
+
 @Composable
 fun StatusBadge(
     label: String, 
     active: Boolean, 
     modifier: Modifier = Modifier, 
     activeColor: Color = BrandJd, 
+    inactiveColor: Color = Color(0xFFF43F5E),
     isBold: Boolean = true
 ) {
-    val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
-    Text(
-        text = label, 
-        color = if (active) activeColor else Color(0xFFF43F5E), 
-        fontSize = 8.sp, 
-        fontWeight = if(isBold) FontWeight.ExtraBold else FontWeight.Bold, 
-        fontFamily = FontFamily.Monospace, 
-        maxLines = 1, 
-        style = compactStyle, 
+    // GAP-OCT27.4-1: Refactored to use shared MeasurableBadge.
+    MeasurableBadge(
+        label = label,
+        contentColor = if (active) activeColor else inactiveColor,
+        isBold = isBold,
         modifier = modifier
     )
 }
