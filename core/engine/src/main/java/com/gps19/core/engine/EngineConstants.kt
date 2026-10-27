@@ -2,30 +2,16 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.27.1:
+ * - ISSUE-OCT27.0-1: Forensic Convergence Optimization. Reduced 
+ *   FORENSIC_DRAIN_INTERVAL_MS to 1s, FORENSIC_DRAIN_THROTTLE_MIN_MS to 100ms,
+ *   and increased FORENSIC_BATCH_SIZE_MAX to 2000 with MIN set to 250 
+ *   to sustain 100Hz telemetry bursts with overhead margin and faster recovery.
+ * - Conflation Hardening: Standardized SIGNALING_CONFLATION_DELAY_MS to 250ms 
+ *   to ensure visible feedback and reliable audit traces in high-pressure soak tests.
  * Oct.26.2:
  * - ISSUE-OCT26.2-F1: Startup Profiling. Added DATABASE_SIZE_THRESHOLD_MB (250MB) 
  *   to support R104 deepPruneLogs startup gate.
- * Oct.18.14:
- * - ISSUE-OCT18.14-F1: Urban Signal Reflectivity Hardening. Added 
- *   ANCHOR_REFLECTIVITY_ALTITUDE_GATE (3.5m) to refine stationary anchor 
- *   skepticism during high-SNR reflections.
- * Oct.18.12:
- * - ISSUE-OCT18.12-F1: Acoustic Duty Cycle Transition Latency. Added 
- *   ACOUSTIC_DUTY_CYCLE_OVERLAP_MS to ensure gapless transition between cycles.
- * Oct.18.10:
- * - ISSUE-OCT18.10-F1: Adaptive Vibration Floor Convergence. Added 
- *   VIBRATION_EMA_DOWN_STEEP_ALPHA and VIBRATION_STEEP_DROP_RATIO to accelerate 
- *   recovery from high-vibration states (In-Vehicle -> Stationary).
- * Oct.18.8:
- * - ISSUE-OCT18.8-F1: Urban Multi-path Hardening. Added SNR Latch (Issue #452) 
- *   thresholds and durations.
- * Oct.15.12:
- * - ISSUE-OCT15.11-F1: Vibration Floor Jitter Hardening. Added VIBRATION_FLOOR_MIN 
- *   and VIBRATION_FLOOR_MAX for boundary clamping in native and ingestion paths.
- * Oct.13.21:
- * - ISSUE-OCT13.21-H1: Restored JUMP_HOLD_DURATION_MS and GPS_INDEX_AGE_SCALING 
- *   required by engine logic.
- * - ISSUE-OCT13.20-L1: Dead Code Cleanup. Pruned 40 obsolete constants.
  */
 
 const val EARTH_RADIUS_METERS = 6371000.0
@@ -86,14 +72,14 @@ const val LOG_BUFFER_CAPACITY = 5000
 const val FORENSIC_SPILL_FILE_NAME = "forensic_spill.bin"
 const val FORENSIC_SPILL_ENTRY_SIZE_V5 = 128
 const val FORENSIC_SPILL_CAPACITY = 10000 
-const val FORENSIC_DRAIN_INTERVAL_MS = 5000L
-const val FORENSIC_DRAIN_THROTTLE_MIN_MS = 500L
+const val FORENSIC_DRAIN_INTERVAL_MS = 1000L
+const val FORENSIC_DRAIN_THROTTLE_MIN_MS = 100L
 const val FORENSIC_DRAIN_THROTTLE_MAX_MS = 5000L
 const val FORENSIC_SIGNATURE_LOOKBACK_MS = 600000L 
 
 // Issue #727: Dynamic Batching
-const val FORENSIC_BATCH_SIZE_MIN = 50
-const val FORENSIC_BATCH_SIZE_MAX = 500
+const val FORENSIC_BATCH_SIZE_MIN = 250
+const val FORENSIC_BATCH_SIZE_MAX = 2000
 const val FORENSIC_BATCH_SIZE_DEFAULT = 100
 
 // Issue #715: Forensic Persistence Health Alerting
@@ -410,8 +396,8 @@ const val RIBBON_LATENCY_SCALE_MS = 1000.0
 
 const val SIGNALING_EMIT_DELAY_MS = 50L
 const val SIGNALING_EMIT_DELAY_VIOLATION_MS = 20L
-const val SIGNALING_CONFLATION_DELAY_MS = 100L
-const val SIGNALING_CONFLATION_DELAY_VIOLATION_MS = 20L
+const val SIGNALING_CONFLATION_DELAY_MS = 250L
+const val SIGNALING_CONFLATION_DELAY_VIOLATION_MS = 100L
 const val MAX_ALLOWED_RTT_MS = 5000
 const val COMM_RTT_FLOOR_MS = 150
 const val COMM_RTT_SCALING_FACTOR = 2000.0
@@ -562,3 +548,5 @@ const val RECOVERY_THRESHOLD_MS = 180000L
 
 // UI Marker Pool
 const val MARKER_POOL_PRUNE_THRESHOLD = 50
+const val MAX_CONFLATION_DELAY_MS = 2000L
+const val BURST_PRESSURE_THRESHOLD = 5

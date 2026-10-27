@@ -8,26 +8,19 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Oct27.1:
+ * - ISSUE-OCT27.0-1: Forensic Convergence Hardening (R744). Added UNIQUE constraint 
+ *   to LogEntity.localId via MIGRATION_88_89 to prevent duplication during 
+ *   high-pressure drain cycles. Incremented version to 89.
  * Oct24.2:
  * - ISSUE-OCT23.101-F6: Added PendingViolationEntity and MIGRATION_87_88 for 
  *   offline violation synchronization. Incremented version to 88.
- * Oct.23.110:
- * - ISSUE-OCT23.101-F3: Added stationaryDurationMs to LogEntity, HistoryEntity, 
- *   and PendingStatusEntity for hysteresis parity. Incremented version to 87.
- * Oct.22.16:
- * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added luxSnapshot and 
- *   acousticSnapshot to LogEntity, HistoryEntity, and PendingStatusEntity 
- *   for full parity. Incremented version to 86.
- * Oct.22.15:
- * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added rtt to PendingStatusEntity 
- *   and isJammingCandidate to ViolationEntity for full parity. Incremented 
- *   version to 85.
  */
 @Entity(
     tableName = "logs", 
     indices = [
         Index(value = ["timestamp"]), 
-        Index(value = ["localId"]),
+        Index(value = ["localId"], unique = true),
         Index(value = ["isImportant"]),
         Index(value = ["isSpecial"]),
         Index(value = ["synced", "timestamp"]), 
@@ -226,8 +219,7 @@ data class PendingStatusEntity(
 data class PendingViolationEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val type: String,
-    val lat: Double,
-    val lng: Double,
+    val lat: Double, val lng: Double,
     val accuracy: Double,
     val maxAccuracy: Double,
     val isJammingCandidate: Boolean,
@@ -369,7 +361,7 @@ interface PendingViolationDao {
     suspend fun pruneByThreshold(threshold: Long, chunkSize: Int): Int
 }
 
-@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class, PendingViolationEntity::class], version = 88, exportSchema = false)
+@Database(entities = [LogEntity::class, TrailEntity::class, HistoryEntity::class, ViolationEntity::class, PendingStatusEntity::class, PendingViolationEntity::class], version = 89, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun logDao(): LogDao
     abstract fun trailDao(): TrailDao
@@ -394,6 +386,14 @@ abstract class AppDatabase : RoomDatabase() {
     }
 
     companion object {
+        val MIGRATION_88_89 = object : Migration(88, 89) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // R744: Hardening Forensic Persistence. Enforce unique localId to prevent drain-cycle duplication.
+                db.execSQL("DROP INDEX IF EXISTS index_logs_localId")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_logs_localId ON logs (localId)")
+            }
+        }
+
         val MIGRATION_87_88 = object : Migration(87, 88) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Issue #ISSUE-OCT23.101-F6: Offline Violation Event Sync.

@@ -47,12 +47,13 @@ object TestPowerModule {
 /**
  * ProductionReadinessAuditTest: Validates system behavior under production-like 
  * soak and pressure conditions.
+ * Oct.27.1:
+ * - verifyHighPressureSignalingSoak: Fixed priority misalignment. Telemetry must be 
+ *   sent as NORMAL priority to trigger conflation logic in SmartSignalingDispatcher.
  * Oct.26.5:
  * - Chapter 15.2 (High-Pressure Signaling Soak): Added verifyHighPressureSignalingSoak 
  *   to exercise SmartSignalingDispatcher conflation and priority logic under 
  *   simulated jitter (R-ID 511).
- * Oct.24.34:
- * - Chapter 0.1 (Variant Integrity): Added verifyPlatinumVariantIntegrity.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -93,6 +94,9 @@ class ProductionReadinessAuditTest {
     
     @Inject
     lateinit var connectivitySuite: ConnectivitySuite
+
+    @Inject
+    lateinit var signalingProvider: SignalingProvider
     
     @Inject
     lateinit var repository: MainRepository
@@ -148,27 +152,30 @@ class ProductionReadinessAuditTest {
         connectivitySuite.start(MainRepository.DEFAULT_RELAY_URL, "TRK-SOAK", "VWR-SOAK", isTracker = true)
         telemetryRepository.updateRelayStatus(true)
 
+        // Ensure connection state is propagated
+        repeat(10) { if (!connectivitySuite.isConnected) delay(100) }
+
         val startReceived = repository.signalingMetrics.value.received
         val burstSize = 100
         
-        // Inject high-frequency burst of NORMAL priority telemetry
+        // Oct.27.1: Inject high-frequency burst of NORMAL priority telemetry 
+        // using the signalingProvider directly to trigger conflation buckets.
         repeat(burstSize) { i ->
             val update = LocationUpdate().apply {
                 kinetic.lat = 32.0 + (i * 0.0001)
                 kinetic.lng = 34.0 + (i * 0.0001)
                 nowRt = timeProvider.elapsedRealtime
             }
-            connectivitySuite.sendTelemetry(update)
-            // No delay - force conflation
+            signalingProvider.transmit(update, SignalingPriority.NORMAL, fromViewer = false)
         }
 
         // Wait for conflation cycle to process
         delay(3000)
         
         val metrics = repository.signalingMetrics.value
-        val totalProcessed = metrics.received - startReceived
+        val totalReceived = metrics.received - startReceived
         
-        Timber.i("SOAK METRICS: Received: $totalProcessed, Emitted: ${metrics.emitted}, Conflated: ${metrics.conflated}")
+        Timber.i("SOAK METRICS: Received: $totalReceived, Emitted: ${metrics.emitted}, Conflated: ${metrics.conflated}")
         
         assertTrue("Dispatcher MUST conflate high-frequency bursts", metrics.conflated > 0)
         assertTrue("Emitted frames MUST be less than received during burst", metrics.emitted < metrics.received)

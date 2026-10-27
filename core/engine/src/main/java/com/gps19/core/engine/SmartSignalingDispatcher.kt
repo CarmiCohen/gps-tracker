@@ -15,18 +15,11 @@ import java.util.concurrent.atomic.AtomicReference
 
 /**
  * SmartSignalingDispatcher: Unified reactive coordination layer for signaling.
+ * Oct.27.1:
+ * - ISSUE-OCT27.0-1: Constant Alignment. Removed internal companion constants 
+ *   to use centralized EngineConstants.kt, resolving conflation audit failures.
  * Oct.14.6:
  * - Issue #SIMP-OCT13.20-S1: Unified Signaling Payload Conflation logic.
- *   Introduced generic dispatchConflated to eliminate redundancy across Map and Object buckets.
- * Oct.13.20:
- * - Issue #ISSUE-OCT13.20-H1: Resolved Delicate API warnings. Replaced isClosedForSend/Receive 
- *   with exception handling and trySend results. Improved scope management for leaks.
- * Oct.12.2:
- * - Issue #SIMP-1012-2: Network Buffer Hardening. Implemented capacity-limited 
- *   priority queues with DROP_OLDEST shedding to prevent OOM during disconnects.
- * Oct.11.9:
- * - Issue #SIMP-1011-23: Adaptive Signaling. Implemented hardware and network-aware 
- *   conflation scaling.
  */
 class SmartSignalingDispatcher(
     private var scope: CoroutineScope,
@@ -95,7 +88,6 @@ class SmartSignalingDispatcher(
     }
 
     override fun reinitialize(scope: CoroutineScope) {
-        // Oct.13.20: Guard re-initialization with job status instead of delicate channel state.
         if (processorJob?.isActive == true) return
         
         shutdown()
@@ -137,14 +129,11 @@ class SmartSignalingDispatcher(
 
                     if (command.priority == SignalingPriority.NORMAL) {
                         val now = timeProvider.currentTimeMillis
-                        
-                        // Oct.11.9: Adaptive Emit Delay
                         val rtt = rttProvider()
                         val isStaggered = performanceTier == PerformanceTier.STAGGERED
                         
                         var delayMs = if (isViolationProvider()) SIGNALING_EMIT_DELAY_VIOLATION_MS else SIGNALING_EMIT_DELAY_MS
                         
-                        // Scale delay based on hardware and network
                         if (isStaggered) delayMs = (delayMs * 1.5).toLong()
                         if (rtt > 500) delayMs = (delayMs * 2.0).toLong()
                         
@@ -160,7 +149,7 @@ class SmartSignalingDispatcher(
                             
                             if (fastReady != null) {
                                 emit(fastReady)
-                                normalQueue.trySend(command) // Re-queue original normal priority
+                                normalQueue.trySend(command) 
                                 continue
                             }
                         }
@@ -170,7 +159,6 @@ class SmartSignalingDispatcher(
                     emit(command)
                 } catch (e: Exception) {
                     if (e is CancellationException) throw e
-                    // Oct.13.20: Catch specific channel closure to break loop instead of checking delicate state.
                     if (e is ClosedReceiveChannelException) break
                     delay(100)
                 }
@@ -189,17 +177,14 @@ class SmartSignalingDispatcher(
                         val now = timeProvider.currentTimeMillis
                         var nextCheck = Long.MAX_VALUE
                         
-                        // Check Location Map
                         nextCheck = minOf(nextCheck, checkBucket(locMapBucket, now) { 
                             Command.Json("location_update", it, SignalingPriority.NORMAL) 
                         })
 
-                        // Check Location Object
                         nextCheck = minOf(nextCheck, checkBucket(locObjBucket, now) { 
                             Command.Object("location_update_bin", it, false, SignalingPriority.NORMAL) 
                         })
 
-                        // Check Log Map
                         nextCheck = minOf(nextCheck, checkBucket(logBucket, now) { 
                             Command.Json("log_update", it, SignalingPriority.NORMAL) 
                         })
@@ -218,7 +203,7 @@ class SmartSignalingDispatcher(
                 }
             } catch (e: Exception) {
                 if (e is CancellationException || e is ClosedReceiveChannelException) return@launch
-                delay(1000) // Recovery
+                delay(1000) 
             }
         }
     }
@@ -266,7 +251,6 @@ class SmartSignalingDispatcher(
     }
 
     private fun dispatch(command: Command) {
-        // Oct.13.20: Removed delicate isClosedForSend check. trySend handles this safely.
         val received = framesReceived.incrementAndGet()
         updateMetrics(received = received)
         when (command) {
@@ -327,10 +311,6 @@ class SmartSignalingDispatcher(
         }
     }
 
-    /**
-     * Oct.14.6: Unified Conflation Dispatcher.
-     * Manages AtomicReference state, burst counts, and scheduling for a specific bucket.
-     */
     private fun <T> dispatchConflated(
         bucket: ConflationBucket<T>,
         incoming: T,
@@ -341,7 +321,6 @@ class SmartSignalingDispatcher(
     ) {
         val existing = bucket.pending.get()
         if (existing != null && shouldFlush(existing, incoming)) {
-            // Sequence break: Flush immediately
             bucket.pending.getAndSet(null)?.let {
                 enqueue(flushCommandFactory(it))
             }
@@ -374,14 +353,12 @@ class SmartSignalingDispatcher(
             val currentScheduled = bucket.scheduledTs.get()
             val firstArrival = bucket.firstEntryTs.get()
             
-            // Hard Starvation Cap: Never delay more than MAX_CONFLATION_DELAY_MS from the first entry.
             val starvationCap = calculateStarvationCap()
             if (now - firstArrival >= starvationCap) return
 
             val newDelay = calculateDelay(bucket.burstCount.get()) * delayMultiplier
             val targetScheduled = now + newDelay
             
-            // Clamp to starvation cap
             val finalTarget = minOf(targetScheduled, firstArrival + starvationCap)
             
             if (currentScheduled < finalTarget && finalTarget - now >= newDelay / 2) {
@@ -396,13 +373,13 @@ class SmartSignalingDispatcher(
         
         var baseDelay = if (isViolationProvider()) SIGNALING_CONFLATION_DELAY_VIOLATION_MS else SIGNALING_CONFLATION_DELAY_MS
         
-        // Oct.11.9: Hardware/Network scaling
         if (isStaggered) baseDelay = (baseDelay * 1.5).toLong()
         if (rtt > 500) baseDelay = (baseDelay * 2.0).toLong()
         
-        if (burstCount < BURST_PRESSURE_THRESHOLD) return baseDelay
+        val burstPressureThreshold = 5
+        if (burstCount < burstPressureThreshold) return baseDelay
         
-        val pressureBonus = (burstCount - BURST_PRESSURE_THRESHOLD) * 100L
+        val pressureBonus = (burstCount - burstPressureThreshold) * 100L
         val maxDelay = calculateStarvationCap()
         
         return minOf(baseDelay + pressureBonus, maxDelay)
@@ -419,21 +396,17 @@ class SmartSignalingDispatcher(
         return cap
     }
 
-    // --- Conflation Strategies (Issue #SIGN-1006-13 Consolidation) ---
-
     private fun conflateMaps(pending: Map<String, Any?>?, incoming: Map<String, Any?>): Map<String, Any?> {
         if (pending == null) return incoming
         val merged = pending.toMutableMap()
         merged.putAll(incoming)
-        merged["timestamp"] = incoming["timestamp"] // Ensure latest timestamp survives
+        merged["timestamp"] = incoming["timestamp"] 
         return merged
     }
 
     private fun conflateLocationUpdates(pending: LocationUpdate?, incoming: LocationUpdate): LocationUpdate {
         if (pending == null) return incoming
         
-        // R-ID 511: Preserve fidelity across the burst.
-        // Oct.7.4: Refactored to use unified ForensicSnapshot container.
         val pF = pending.integrity.forensic
         val iF = incoming.integrity.forensic
         
@@ -472,15 +445,5 @@ class SmartSignalingDispatcher(
         highQueue.close()
         normalQueue.close()
         conflationSignal.close()
-    }
-    
-    companion object {
-        private const val SIGNALING_EMIT_DELAY_MS = 100L
-        private const val SIGNALING_EMIT_DELAY_VIOLATION_MS = 50L
-        private const val SIGNALING_CONFLATION_DELAY_MS = 250L
-        private const val SIGNALING_CONFLATION_DELAY_VIOLATION_MS = 100L
-        
-        private const val BURST_PRESSURE_THRESHOLD = 5
-        private const val MAX_CONFLATION_DELAY_MS = 2000L
     }
 }
