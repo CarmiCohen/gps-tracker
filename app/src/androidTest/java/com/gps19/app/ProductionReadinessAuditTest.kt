@@ -47,13 +47,13 @@ object TestPowerModule {
 /**
  * ProductionReadinessAuditTest: Validates system behavior under production-like 
  * soak and pressure conditions.
+ * Oct.27.2:
+ * - ISSUE-OCT27.2-F2: Signaling Conflation Audit Hardening. Added injection of 
+ *   ManualTestModeProvider and SessionManager to ensure clean test state and 
+ *   simulated connectivity during high-pressure soak tests.
  * Oct.27.1:
  * - verifyHighPressureSignalingSoak: Fixed priority misalignment. Telemetry must be 
  *   sent as NORMAL priority to trigger conflation logic in SmartSignalingDispatcher.
- * Oct.26.5:
- * - Chapter 15.2 (High-Pressure Signaling Soak): Added verifyHighPressureSignalingSoak 
- *   to exercise SmartSignalingDispatcher conflation and priority logic under 
- *   simulated jitter (R-ID 511).
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -101,12 +101,20 @@ class ProductionReadinessAuditTest {
     @Inject
     lateinit var repository: MainRepository
 
+    @Inject
+    lateinit var testModeProvider: ManualTestModeProvider
+
     private val mockPowerStateProvider get() = powerStateProvider as MockPowerStateProvider
 
     @Before
     fun init() {
         hiltRule.inject()
+        
+        // Ensure clean state for each test run
+        testModeProvider.setEnabled(true)
+        sessionManager.reset()
         GpsApplication.resetTestStates()
+        
         mockPowerStateProvider.useDelegate = false
         mockPowerStateProvider.isIdle = false
         forensicSpillBufferProvider.get().resetBufferForTest()
@@ -154,6 +162,7 @@ class ProductionReadinessAuditTest {
 
         // Ensure connection state is propagated
         repeat(10) { if (!connectivitySuite.isConnected) delay(100) }
+        assertTrue("Signaling MUST be connected for soak test", connectivitySuite.isConnected)
 
         val startReceived = repository.signalingMetrics.value.received
         val burstSize = 100
@@ -169,7 +178,8 @@ class ProductionReadinessAuditTest {
             signalingProvider.transmit(update, SignalingPriority.NORMAL, fromViewer = false)
         }
 
-        // Wait for conflation cycle to process
+        // Wait for conflation cycle to process. Conflation delay scales with burst count.
+        // With 100 packets, delay reaches MAX_CONFLATION_DELAY_MS (2000ms).
         delay(3000)
         
         val metrics = repository.signalingMetrics.value

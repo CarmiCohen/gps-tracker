@@ -1,38 +1,40 @@
-
 git add .
-git commit -m "Fix: Signaling Conflation UI Feedback and HUD Transparency. #ISSUE-OCT27.0-F1"
-git tag -a Oct27.0 -m "Oct27.0 Release: Signaling Pipeline Visibility"
-git push origin Oct27.0
+git commit -m "Fix: PruningWorker Initialization and Signaling Audit Hardening. #ISSUE-OCT27.4-F1 #ISSUE-OCT27.4-F2"
+git tag -a Oct27.4 -m "Oct27.4 Release: Test Infrastructure Hardening"
+git push origin Oct27.4
 
-# Project Handover - Oct27.0
+# Project Handover - Oct27.4
 
-## ✅ Status: Signaling Visibility Hardened & GAP-OCT26.5-1 Resolved
+## ✅ Status: Test Infrastructure & Signaling Audit Hardened
 
-Version **Oct27.0** baseline is established. Successfully implemented numerical transparency for the telemetry pipeline and closed the diagnostic gap for high-pressure environments.
+Version **Oct27.4** baseline is established. Resolved critical instantiation failures in instrumented tests and hardened the signaling audit pipeline for high-pressure soak verification.
 
-## 🎯 Next Resumption Focus: Forensic Convergence Audit.
+## 🎯 Next Resumption Focus: Unit-Based Badge Scaling.
 
 ### 🛡️ Critical Fixes & Implementation Details
 
-#### 1. Signaling Conflation UI Feedback (#ISSUE-OCT27.0-F1)
-- **Problem**: (GAP-OCT26.5-1) While the `DAT` badge turned SkyBlue during conflation, the exact volume of dropped packets was opaque, hindering forensic pressure audits.
-- **Fix**: Implemented Numerical Overlay & Diagnostic Feedback.
-    - **UI**: Added a Red numerical counter bubble (capped at "99+") to the `DAT` badge in `SharedUiComponents.kt`.
-    - **Interaction**: Integrated `detectTapGestures` for long-press on the `DAT` badge.
-    - **Feedback**: Triggers `UiEvent.ShowConflationStats` which displays a diagnostic toast with the exact conflation count.
-- **Architecture**: Refactored `GlobalStatusBar` to accept the `onEvent` coordinator, ensuring strict separation between UI presentation and event routing.
+#### 1. PruningWorker Initialization Failure (#ISSUE-OCT27.4-F1)
+- **Problem**: `PruningWorker` failed to instantiate in instrumented tests with `NoSuchMethodException` because the test application lacked a `HiltWorkerFactory` for WorkManager.
+- **Fix**: Updated `GpsTestBaseApplication` in `TestApplication.kt`.
+    - **Injection**: Added `@Inject lateinit var workerFactory: HiltWorkerFactory`.
+    - **Configuration**: Provided the factory to `Configuration.Builder()`.
+    - **Initialization**: Enforced explicit `WorkManager.initialize(this, workManagerConfiguration)` in `onCreate()`.
+- **Verification**: Verified that Hilt-injected workers now resolve correctly in the test environment.
 
-#### 2. Forensic Convergence Audit (GAP-OCT27.0-1) - IN PROGRESS
-- **Action**: Created `ForensicConvergenceAuditTest.kt` to simulate 100Hz telemetry bursts and verify `LogRepository` drain convergence.
-- **Goal**: Ensure `IOW` (I/O Wait) remains below the `SILENT_FAILURE_IOW_THRESHOLD` (0.40) during sustained pressure.
+#### 2. Signaling Conflation Audit Hardening (#ISSUE-OCT27.4-F2)
+- **Problem**: `ProductionReadinessAuditTest.verifyHighPressureSignalingSoak` failed due to synchronization gaps where `CommunicationManager` would drop bursts before they reached the conflation dispatcher.
+- **Fix**: Hardened the test environment in `ProductionReadinessAuditTest.kt`.
+    - **State Control**: Injected `ManualTestModeProvider` and `SessionManager` to ensure clean state and simulated connectivity.
+    - **Synchronization**: Added explicit connectivity assertions before burst injection.
+- **Architecture**: Enforced R-ID 746 ensuring audits use the correct priority (NORMAL) and test-mode throughput.
 
 ## 🔴 Open Gaps
-- **GAP-OCT27.0-1**: Forensic Convergence. Verify if `LogRepository` drain cycles can sustain 100Hz telemetry bursts in 24-hour simulation cycles without increasing I/O wait (`IOW` ribbon) beyond threshold.
-- **Variant Divergence Check**: Continue monitoring `testBuildType` behavior in `platinum` to ensure production-grade suppression of developer symbols.
+- **GAP-OCT27.4-1**: Unit-Based Badge Scaling. Transition HUD badges to use a shared `MeasurableBadge` component to reduce redundant Compose declarations.
+- **SIMP-OCT27.4-S1**: Evaluate consolidation of `GpsApplication` and `GpsTestBaseApplication` to reduce WorkManager boilerplate.
 
 ## 📊 Hardening Snapshot
-- **SOT Count**: 847 (Rules: 348)
-- **Testing Status**: Signaling Visibility Audit - **PASSED**.
-- **QA Status**: Conflation Counter Accuracy - **VERIFIED**.
+- **SOT Count**: 850 (Rules: 351)
+- **Testing Status**: Signaling Conflation Audit - **PASSED**.
+- **QA Status**: Hilt Worker Instantiation - **VERIFIED**.
 
 **Handover complete. STOPPING ALL PROCESSING.**
