@@ -27,14 +27,12 @@ import com.gps19.core.engine.*
 
 /**
  * OverlayManager: Unified HUD management for GPS Tracker.
+ * Oct.27.0:
+ * - GAP-OCT26.5-1: Passed onMainEvent to GlobalStatusBar for conflation feedback.
  * Oct.26.4:
  * - ISSUE-OCT26.4-F1: Enforced R-ID 612 (Diagnostic Alignment). Moved version 
  *   tag to BottomEnd and enforced Ltr direction to resolve RTL-flip overlap 
  *   with map scale bar (which is now moved to the left).
- * Oct.24.34:
- * - ISSUE-OCT24.34-F1: Fundamental Suppression (R-ID 610). Integrated 
- *   Source-Set decoupled DiagnosticOverlay to ensure physical removal of 
- *   UI_READY labels from production binaries. Fixed legacy BottomStart leak.
  */
 
 @Composable
@@ -81,6 +79,7 @@ fun UnifiedHUDOverlay(
                         Column(modifier = Modifier.weight(1f)) {
                             GlobalStatusBar(
                                 stateProvider = stateProvider,
+                                onEvent = onMainEvent,
                                 modifier = Modifier.pointerInput(Unit) { 
                                     detectTapGestures(onTap = { 
                                         if (!isTracker) onMainEvent(UiEvent.SetRedScreenVisible(true)) 
@@ -105,6 +104,7 @@ fun UnifiedHUDOverlay(
                             if (session.hydrationLevel >= 5) {
                                 GlobalStatusBar(
                                     stateProvider = stateProvider,
+                                    onEvent = onMainEvent,
                                     modifier = Modifier.pointerInput(Unit) { 
                                         detectTapGestures(onTap = { 
                                             if (!isTracker) onMainEvent(UiEvent.SetRedScreenVisible(true)) 

@@ -16,12 +16,12 @@ import javax.inject.Singleton
 
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
+ * Oct.27.0:
+ * - GAP-OCT26.5-1: Added ShowConflationStats handling to show conflation metrics.
  * Oct.24.35:
  * - Permission Hardening: Refactored handleInitiateMode and handleProceedToMode 
  *   to perform mandatory synchronous permission refresh before evaluation. 
  *   Fixed race condition where background disclosure re-appeared due to stale state.
- * Oct.22.0:
- * - Setup Hardening (ISSUE-OCT21.07-F1) Remediation.
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -379,6 +379,11 @@ class UiEventCoordinator @Inject constructor(
             UiEvent.RequestAppInfo -> onUiEffect(UiEffect.LaunchAppInfo)
             UiEvent.RequestExactAlarm -> onUiEffect(UiEffect.LaunchExactAlarm)
             UiEvent.RequestHardwarePermission -> onUiEffect(UiEffect.LaunchHardwarePermission)
+
+            // GAP-OCT26.5-1: Signaling Conflation UI Feedback
+            is UiEvent.ShowConflationStats -> {
+                onUiEffect(UiEffect.ShowToast("Conflated: ${event.count} packets"))
+            }
 
             else -> {}
         }

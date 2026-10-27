@@ -4,7 +4,7 @@ import android.content.res.Configuration
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,10 +48,12 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.27.0:
+ * - GAP-OCT26.5-1: Added conflation counter overlay to DAT badge and long-press 
+ *   diagnostic feedback for signaling pipeline transparency.
  * Oct.26.6:
  * - SIMP-OCT26.6-S1: Diagnostic Latch for SRV Badge. SRV badge turns Orange 
  *   when a connection is aborted (isConnectionAborted) to provide 5s failure visibility.
- * - GAP-OCT26.5-1: Signaling Conflation UI. DAT badge turns SkyBlue during conflation.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -509,13 +511,13 @@ fun HeaderBar(
 }
 
 @Composable
-fun GlobalStatusBar(stateProvider: UiStateProvider, modifier: Modifier = Modifier) {
+fun GlobalStatusBar(stateProvider: UiStateProvider, onEvent: (UiEvent) -> Unit, modifier: Modifier = Modifier) {
     val hudState by stateProvider.hudState.collectAsStateWithLifecycle()
-    StatusBar(connectivity = hudState.connectivity, telemetry = hudState.telemetry, health = hudState.health, modifier = modifier)
+    StatusBar(connectivity = hudState.connectivity, telemetry = hudState.telemetry, health = hudState.health, onEvent = onEvent, modifier = modifier)
 }
 
 @Composable
-fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, health: HudHealthState, modifier: Modifier = Modifier) {
+fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, health: HudHealthState, onEvent: (UiEvent) -> Unit, modifier: Modifier = Modifier) {
     val mode = connectivity.appMode ?: return
     val lastGpsTs = if (mode == "viewer") telemetry.lastGpsTs else telemetry.viewerGpsTs
     val isPeerActive = connectivity.isTelemetryFresh
@@ -557,7 +559,34 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
                         StatusBadge(label = if (isTracker) "VWR" else "TRK", active = isPeerActive, activeColor = peerColor)
                         
                         // GAP-OCT26.5-1: Conflation UI Feedback. SkyBlue DAT indicates managed data flow.
-                        StatusBadge(label = "DAT", active = connectivity.isDataHealthy, activeColor = if (connectivity.conflatedCount > 0) Color(0xFF38BDF8) else localColor)
+                        Box(contentAlignment = Alignment.TopEnd) {
+                            StatusBadge(
+                                label = "DAT", 
+                                active = connectivity.isDataHealthy, 
+                                activeColor = if (connectivity.conflatedCount > 0) Color(0xFF38BDF8) else localColor,
+                                modifier = Modifier.pointerInput(connectivity.conflatedCount) {
+                                    detectTapGestures(onLongPress = { 
+                                        if (connectivity.conflatedCount > 0) onEvent(UiEvent.ShowConflationStats(connectivity.conflatedCount)) 
+                                    })
+                                }
+                            )
+                            if (connectivity.conflatedCount > 0) {
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = 2.dp, y = (-2).dp)
+                                        .background(Color.Red, RoundedCornerShape(1.dp))
+                                        .padding(horizontal = 1.dp)
+                                ) {
+                                    Text(
+                                        text = if (connectivity.conflatedCount > 99) "99+" else connectivity.conflatedCount.toString(),
+                                        color = Color.White,
+                                        fontSize = 5.sp,
+                                        fontWeight = FontWeight.Black,
+                                        style = compactStyle
+                                    )
+                                }
+                            }
+                        }
 
                         StatusBadge(label = "WDG", active = connectivity.watchdogOk, activeColor = localColor, isBold = true)
                         if (connectivity.isSafeMode) { StatusBadge(label = "SAF", active = false, isBold = true) }
@@ -812,9 +841,24 @@ fun CommBar(index: Int, color: Color) {
 }
 
 @Composable
-fun StatusBadge(label: String, active: Boolean, activeColor: Color = BrandJd, isBold: Boolean = true) {
+fun StatusBadge(
+    label: String, 
+    active: Boolean, 
+    modifier: Modifier = Modifier, 
+    activeColor: Color = BrandJd, 
+    isBold: Boolean = true
+) {
     val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
-    Text(text = label, color = if (active) activeColor else Color(0xFFF43F5E), fontSize = 8.sp, fontWeight = if(isBold) FontWeight.ExtraBold else FontWeight.Bold, fontFamily = FontFamily.Monospace, maxLines = 1, style = compactStyle)
+    Text(
+        text = label, 
+        color = if (active) activeColor else Color(0xFFF43F5E), 
+        fontSize = 8.sp, 
+        fontWeight = if(isBold) FontWeight.ExtraBold else FontWeight.Bold, 
+        fontFamily = FontFamily.Monospace, 
+        maxLines = 1, 
+        style = compactStyle, 
+        modifier = modifier
+    )
 }
 
 @Composable

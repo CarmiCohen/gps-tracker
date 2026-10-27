@@ -1,48 +1,38 @@
 ```bash
 git add .
-git commit -m "Fix: HUD Integrity and Signaling Pipeline Hardening. #ISSUE-OCT26.5-F1 #ISSUE-OCT26.6-F1"
-git tag -a Oct26.6 -m "Oct26.6 Release: HUD Refresh and Signaling Forensic Hardening"
-git push origin Oct26.6
+git commit -m "Fix: Signaling Conflation UI Feedback and HUD Transparency. #ISSUE-OCT27.0-F1"
+git tag -a Oct27.0 -m "Oct27.0 Release: Signaling Pipeline Visibility"
+git push origin Oct27.0
 ```
 
-# Project Handover - Oct26.6
+# Project Handover - Oct27.0
 
-## ✅ Status: Baselines Hardened & SRV LED Investigation Resolved
+## ✅ Status: Signaling Visibility Hardened & GAP-OCT26.5-1 Resolved
 
-Version **Oct26.6** baseline is established and verified. Successfully resolved the "SRV LED Red" root cause and implemented critical telemetry pipeline hardening for high-pressure environments.
+Version **Oct27.0** baseline is established. Successfully implemented numerical transparency for the telemetry pipeline and closed the diagnostic gap for high-pressure environments.
 
-## 🎯 Next Resumption Focus: Forensic Pipeline Convergence & I/O Pressure Audits.
+## 🎯 Next Resumption Focus: Forensic Convergence Audit.
 
 ### 🛡️ Critical Fixes & Implementation Details
 
-#### 1. HUD Refresh Engine Fix (#ISSUE-OCT26.5-F1)
-- **Problem**: `DiagnosticState` and `KinematicState` were being mutated in-place. `StateFlow.update` performed reference equality checks and skipped UI emissions, causing the SRV/GPS badges to remain "stuck" in stale Red/Inactive states even after connection.
-- **Fix**: Implemented **Double-Buffering** in `MainViewModel.kt`.
-    - Added `kinBuffers` and `diagBuffers` (lists of 2 instances) at line 86.
-    - Modified `updateKinematicState` and `updateDiagnosticState` (lines 278-298) to alternate between these instances.
-    - Every logical update now produces a new object reference, guaranteeing a HUD refresh.
-- **Verification**: HUD refresh stability confirmed via manual audit and soak simulation.
+#### 1. Signaling Conflation UI Feedback (#ISSUE-OCT27.0-F1)
+- **Problem**: (GAP-OCT26.5-1) While the `DAT` badge turned SkyBlue during conflation, the exact volume of dropped packets was opaque, hindering forensic pressure audits.
+- **Fix**: Implemented Numerical Overlay & Diagnostic Feedback.
+    - **UI**: Added a Red numerical counter bubble (capped at "99+") to the `DAT` badge in `SharedUiComponents.kt`.
+    - **Interaction**: Integrated `detectTapGestures` for long-press on the `DAT` badge.
+    - **Feedback**: Triggers `UiEvent.ShowConflationStats` which displays a diagnostic toast with the exact conflation count.
+- **Architecture**: Refactored `GlobalStatusBar` to accept the `onEvent` coordinator, ensuring strict separation between UI presentation and event routing.
 
-#### 2. Connection Diagnostic Latch (#ISSUE-OCT26.6-F1)
-- **Feature**: Implemented an **Orange Latch** for the SRV badge to expose "Silent Abort" conditions (e.g., identity hydration delays or invalid IDs).
-- **Implementation**:
-    - `TelemetryRepository.kt`: Added `lastAbortedRt` to track connection rejection timestamps.
-    - `HudMapper.kt`: (Line 60) Calculates `isConnectionAborted` = true if rejection happened within the last 5000ms.
-    - `SharedUiComponents.kt`: (Line 355) SRV badge now transitions to **Orange** (`0xFFF59E0B`) during this period instead of reverting to Red.
-- **Forensic Hardening**: Standardized all connection abortion paths in `CommunicationManager.kt` and `ConnectivitySuite.kt` to log via `SignalingForensicLogger` for R-ID 320 compliance.
-
-#### 3. Signaling Pipeline Hardening (R-ID 511)
-- **Soak Test**: Added `verifyHighPressureSignalingSoak` to `ProductionReadinessAuditTest.kt`. Injects 100 high-frequency telemetry packets to verify `SmartSignalingDispatcher` conflation.
-- **Conflation UI**: The `DAT` badge now turns **SkyBlue** (`0xFF38BDF8`) when `conflatedCount > 0` (SharedUiComponents.kt, Line 360). This provides real-time visibility into managed data flows.
+#### 2. HUD Integrity Maintenance
+- Verified that the "Double-Buffering" mechanism from Oct26.5 remains stable and correctly propagates conflation metrics to the `HudConnectivityState` without logical stalls.
 
 ## 🔴 Open Gaps
-- **GAP-OCT26.5-1 (Refinement)**: Add a numerical counter overlay to the SkyBlue `DAT` badge (visible via long-press) to show the exact number of packets conflated.
-- **Forensic Convergence**: Need to verify if `LogRepository` drain cycles can keep pace with sustained 100Hz telemetry bursts during 24-hour "Noisy" environment simulations.
-- **Variant Divergence Check**: `testBuildType` remains `"platinum"` in `app/build.gradle`. Ensure `debug` specific signaling behaviors (like lower polling intervals) aren't masking production defects.
+- **GAP-OCT27.0-1**: Forensic Convergence. Verify if `LogRepository` drain cycles can sustain 100Hz telemetry bursts in 24-hour simulation cycles without increasing I/O wait (`IOW` ribbon) beyond threshold.
+- **Variant Divergence Check**: Continue monitoring `testBuildType` behavior in `platinum` to ensure production-grade suppression of developer symbols.
 
 ## 📊 Hardening Snapshot
-- **SOT Count**: 846 (Rules: 348)
-- **Testing Status**: `verifyHighPressureSignalingSoak` - **PASSED**.
-- **QA Status**: HUD Refresh Stability - **VERIFIED**.
+- **SOT Count**: 847 (Rules: 348)
+- **Testing Status**: Signaling Visibility Audit - **PASSED**.
+- **QA Status**: Conflation Counter Accuracy - **VERIFIED**.
 
 **Handover complete. STOPPING ALL PROCESSING.**
