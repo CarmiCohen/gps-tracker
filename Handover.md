@@ -1,33 +1,36 @@
 git add .
-git commit -m "Fix: Unit-Based Badge Scaling and Shared Component Refactoring. #ISSUE-OCT27.5-F1"
-git tag -a Oct27.5 -m "Oct27.5 Release: UI Component Hardening"
+git commit -m "Fix: Forensic Recovery Baseline and Test Infrastructure Hardening. #ISSUE-OCT27.6-F1"
+git tag -a Oct27.5 -m "Oct27.5 Release: Forensic Integrity Baseline"
 git push origin Oct27.5
 
 # Project Handover - Oct27.5
 
-## ✅ Status: Unit-Based Badge Scaling Implemented
+## ✅ Status: Forensic Recovery Baseline Verified
 
-Version **Oct27.5** baseline is established. Transitioned HUD status indicators to a unified architecture using the `MeasurableBadge` component, reducing redundant Compose declarations and ensuring consistent layout metrics across all tracking modes.
+Version **Oct27.5** baseline is established. Successfully implemented and verified the recovery path for forensic telemetry stored in the off-heap memory-mapped spill-buffer. Traces survive process death and are replayed into the primary database upon restart with zero loss.
 
-## 🎯 Next Resumption Focus: Forensic Integrity Baseline.
+## 🎯 Next Resumption Focus: SPI Level Audit.
 
 ### 🛡️ Critical Fixes & Implementation Details
 
-#### 1. Unit-Based Badge Scaling (#ISSUE-OCT27.5-F1)
-- **Problem**: Redundant and inconsistent Compose declarations for HUD badges (standard, counter-overlay, and background-based) led to maintainability overhead.
-- **Fix**: Introduced `MeasurableBadge` in `SharedUiComponents.kt`.
-    - **Unified Logic**: Consolidated label rendering, active/inactive coloring, optional background shapes, and numerical counter overlays into a single component.
-    - **Refactoring**: Replaced all inline `Box` and `Text` implementations in `StatusBar` (DAT, SIREN, LOCK) with `MeasurableBadge`.
-    - **Optimization**: Standardized text styles and density-aware padding to ensure consistent measurement across devices.
-- **Verification**: Verified build success and visual consistency in the HUD layout.
+#### 1. Forensic Recovery Baseline (#ISSUE-OCT27.6-F1)
+- **Problem**: Potential telemetry loss if the process is terminated before the drainer flushes the `ForensicSpillBuffer` to Room. Lack of verification for the recovery path.
+- **Fix**: 
+    - Established `ForensicRecoveryAuditTest` which simulates traces in the spill-buffer, triggers `recoverAbandonedTraces`, and verifies DB persistence.
+    - Verified "At-Least-Once" integrity: traces are only removed from the buffer after successful DB commit.
+    - Ensured recovery events are logged to the system trace for auditability.
+
+#### 2. Test Infrastructure Hardening (#ISSUE-OCT27.5-F2)
+- **Problem**: Instrumented tests failed to compile due to Hilt's restriction on `@Inject` fields in custom application base classes used with `@CustomTestApplication`.
+- **Fix**: Refactored `TestApplication.kt` to use a Hilt `EntryPoint` for `HiltWorkerFactory` retrieval, removing direct field injection and allowing successful compilation of worker-based tests.
 
 ## 🔴 Open Gaps
-- **GAP-OCT27.5-1**: Forensic Integrity Baseline. Establish a comprehensive baseline for database spill-buffer recovery to ensure zero-loss telemetry persistence during rapid process restarts.
-- **SIMP-OCT27.5-S1**: Evaluate `Badge Measurement Caching` to further optimize rapid-fire HUD updates during high-pressure signaling soak tests.
+- **GAP-OCT27.6-1**: Forensic SPI Level Audit. Investigate SPI bus contention during high-pressure burst writes to ensure zero-jitter persistence.
+- **SIMP-OCT27.6-S1**: Recovery Buffer Over-Provisioning. Evaluate dynamic scaling of `ForensicSpillBuffer` based on storage health.
 
 ## 📊 Hardening Snapshot
-- **SOT Count**: 851 (Rules: 352)
-- **Testing Status**: UI Component Integrity - **PASSED**.
-- **QA Status**: HUD Badge Refactoring - **VERIFIED**.
+- **SOT Count**: 852 (Rules: 353)
+- **Testing Status**: Forensic Recovery Integrity - **PASSED**.
+- **QA Status**: Hilt Worker Test Infrastructure - **VERIFIED**.
 
 **Handover complete. STOPPING ALL PROCESSING.**
