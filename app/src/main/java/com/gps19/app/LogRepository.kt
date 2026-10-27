@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
+import kotlin.math.max
 import com.gps19.core.engine.*
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -26,6 +27,9 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.27.9:
+ * - ISSUE-OCT27.9-F1: IO Latency-Driven Throttle. Implemented dynamic scaling 
+ *   of forensic drain intervals based on real-time maxIoLatency feedback (R-ID 751).
  * Oct.27.8:
  * - SIMP-OCT27.6-S2: Database Recovery Lock. Implemented recoveryLock (Mutex) to 
  *   ensure exclusive DB access during the Forensic Recovery phase (R-ID 750).
@@ -240,15 +244,25 @@ class LogRepository @Inject constructor(
         }
     }
 
+    /**
+     * runForensicDrainer: Implements R-ID 749 and R-ID 751 (IO Latency-Driven Throttle).
+     * Dynamically scales the drain interval and batch size based on CPU load and 
+     * real-time maxIoLatency feedback to mitigate storage contention.
+     */
     private suspend fun runForensicDrainer() {
         var lastDrainRt = timeProvider.elapsedRealtime
         
         while (coroutineContext.isActive) {
             try {
                 val health = telemetry.systemHealth.value
-                val loadFactor = if (health.isMaliAnomaly) 1.0 else (health.cpuLoad / 8.0).coerceIn(0.0, 1.0)
+                
+                // R-ID 751: Incorporate maxIoLatency into load factor for dynamic throttling
+                val cpuFactor = if (health.isMaliAnomaly) 1.0 else (health.cpuLoad / 8.0).coerceIn(0.0, 1.0)
+                val latencyFactor = (health.maxIoLatency.toDouble() / FORENSIC_LATENCY_THROTTLE_THRESHOLD_MS).coerceIn(0.0, 1.0)
+                val combinedLoadFactor = max(cpuFactor, latencyFactor)
+                
                 val dynamicDelay = FORENSIC_DRAIN_THROTTLE_MIN_MS + 
-                                 ((FORENSIC_DRAIN_THROTTLE_MAX_MS - FORENSIC_DRAIN_THROTTLE_MIN_MS) * loadFactor).toLong()
+                                 ((FORENSIC_DRAIN_THROTTLE_MAX_MS - FORENSIC_DRAIN_THROTTLE_MIN_MS) * combinedLoadFactor).toLong()
                 
                 delay(dynamicDelay)
                 
@@ -258,10 +272,18 @@ class LogRepository @Inject constructor(
                 val fillLevel = pendingAtStart.toDouble() / FORENSIC_SPILL_CAPACITY
                 val isEmergency = fillLevel >= FORENSIC_EMERGENCY_FILL_LEVEL
                 
+                // R-ID 751: Scale drain interval check based on latency. 
+                // Sustained high latency increases the effective interval even at high fill levels.
+                val effectiveInterval = if (health.maxIoLatency > FORENSIC_LATENCY_THROTTLE_THRESHOLD_MS) {
+                    FORENSIC_DRAIN_INTERVAL_MS * 2
+                } else {
+                    FORENSIC_DRAIN_INTERVAL_MS
+                }
+
                 val shouldDrain = isEmergency || 
                                 buffer.isHighPressure() ||
-                                (pendingAtStart >= FORENSIC_FILL_THRESHOLD && loadFactor < 0.8) || 
-                                (pendingAtStart > 0 && (nowRt - lastDrainRt >= FORENSIC_DRAIN_INTERVAL_MS || testModeProvider.isTestMode())) ||
+                                (pendingAtStart >= FORENSIC_FILL_THRESHOLD && combinedLoadFactor < 0.8) || 
+                                (pendingAtStart > 0 && (nowRt - lastDrainRt >= effectiveInterval || testModeProvider.isTestMode())) ||
                                 isForensicStallSimulated.get()
                 
                 if (shouldDrain) {
@@ -270,7 +292,7 @@ class LogRepository @Inject constructor(
                                       ((FORENSIC_BATCH_SIZE_MAX - FORENSIC_BATCH_SIZE_MIN) * fillLevel).toInt()
                     
                     val loadImpact = if (isEmergency) 0.1 else 0.4
-                    val dynamicBatchSize = (baseBatchSize * (1.0 - (loadFactor * loadImpact))).toInt()
+                    val dynamicBatchSize = (baseBatchSize * (1.0 - (combinedLoadFactor * loadImpact))).toInt()
                         .coerceIn(FORENSIC_BATCH_SIZE_MIN, FORENSIC_BATCH_SIZE_MAX)
 
                     // R-ID 750: Protect drain with recoveryLock

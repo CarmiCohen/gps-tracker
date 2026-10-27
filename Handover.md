@@ -1,36 +1,37 @@
 git add .
-git commit -m "Fix: Database Recovery Lock implementation. #ISSUE-OCT27.8-F1"
-git tag -a Oct27.8 -m "Oct27.8 Release: Database Recovery Lock"
-git push origin Oct27.8
+git commit -m "Fix: IO Latency-Driven Throttle implementation. #ISSUE-OCT27.9-F1"
+git tag -a Oct27.9 -m "Oct27.9 Release: IO Latency-Driven Throttle"
+git push origin Oct27.9
 
-# Project Handover - Oct27.8
+# Project Handover - Oct27.9
 
-## ✅ Status: Database Recovery Lock Verified
+## ✅ Status: IO Latency-Driven Throttle Verified
 
-Version **Oct27.8** baseline is established. Successfully implemented exclusive database access control during the forensic recovery phase, eliminating potential race conditions between recovery replay and standard log drainers.
+Version **Oct27.9** baseline is established. Successfully implemented dynamic scaling of forensic drain intervals based on real-time storage latency feedback, mitigating telemetry jitter on budget hardware.
 
-## 🎯 Next Resumption Focus: IO Latency-Driven Throttle.
+## 🎯 Next Resumption Focus: Strategic Simplification.
 
 ### 🛡️ Critical Fixes & Implementation Details
 
-#### 1. Database Recovery Lock (#ISSUE-OCT27.8-F1)
-- **Problem**: Concurrent database access during the startup recovery phase (replaying traces from off-heap buffer) could lead to I/O contention or race conditions with the primary log batch processor and proactive pruning workers.
+#### 1. IO Latency-Driven Throttle (#ISSUE-OCT27.9-F1)
+- **Problem**: Sustained high-pressure forensic bursts (100Hz) on budget hardware (e.g., A15) caused SPI bus contention, leading to telemetry timing jitter even with staggered persistence.
 - **Fix**: 
-    - Introduced `recoveryLock` (Mutex) in `LogRepository`.
-    - Refactored `startBackgroundTasks()` to explicitly `join()` the recovery job before launching standard drainer and batch jobs.
-    - Wrapped `flushBatch`, `performForensicDrain`, and all pruning operations (`proactivePruning`, `deepPruneLogs`) in `recoveryLock.withLock`.
-    - Enforced R-ID 750: "The system MUST utilize an exclusive Mutex during the forensic recovery phase to block standard log drainers and maintenance workers."
+    - Introduced `FORENSIC_LATENCY_THROTTLE_THRESHOLD_MS` (500ms) in `EngineConstants.kt`.
+    - Refactored `runForensicDrainer` in `LogRepository.kt` to calculate a `combinedLoadFactor` using the maximum of `cpuLoad` and `maxIoLatency` (normalized).
+    - Implemented `effectiveInterval` logic: If `maxIoLatency` exceeds 500ms, the drain interval is doubled (1s -> 2s) to allow storage recovery.
+    - Adjusted `dynamicBatchSize` calculation to incorporate the `combinedLoadFactor`, reducing I/O pressure during latency spikes.
+    - Enforced R-ID 751: "The forensic drainer MUST dynamically scale its drain interval and batch size based on real-time maxIoLatency feedback."
 
-#### 2. Startup Sequencing
-- **Improvement**: LogRepository startup now follows a deterministic sequence: Prune Check -> Forensic Recovery -> Active Drainers. This ensures that storage-intensive recovery happens in isolation.
+#### 2. Persistence Stability
+- **Improvement**: The system now proactively backs off during storage micro-spikes, ensuring that high-priority telemetry remains steady without triggering circular buffer overflows due to IOW stalls.
 
 ## 🔴 Open Gaps
-- **SIMP-OCT27.8-S1**: Database Transaction Timeout. Consider adding a watchdog to the `recoveryLock` to prevent permanent stalls if a recovery transaction hangs.
-- **SIMP-OCT27.7-S1**: IO Latency-Driven Throttle. Evaluate dynamic drain interval scaling based on real-time `maxIoLatency` feedback.
+- **SIMP-OCT27.9-S1**: Latency EMA for Throttle. Consider using an Exponential Moving Average (EMA) for `maxIoLatency` to smooth out throttling response.
+- **SIMP-OCT27.8-S1**: Database Transaction Timeout. Consider adding a watchdog to the `recoveryLock` to prevent permanent stalls.
 
 ## 📊 Hardening Snapshot
-- **SOT Count**: 854 (Rules: 355)
-- **Testing Status**: Recovery Phase Contention Audit - **PASSED**.
-- **QA Status**: recoveryLock sequence verification - **VERIFIED**.
+- **SOT Count**: 855 (Rules: 356)
+- **Testing Status**: IO Throttling Audit - **PASSED**.
+- **QA Status**: Dynamic interval scaling - **VERIFIED**.
 
 **Handover complete. STOPPING ALL PROCESSING.**

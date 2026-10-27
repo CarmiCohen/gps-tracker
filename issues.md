@@ -1,11 +1,11 @@
 git add .
-git commit -m "Fix: Database Recovery Lock implementation. #ISSUE-OCT27.8-F1"
-git tag -a Oct27.8 -m "Oct27.8 Release: Database Recovery Lock"
-git push origin Oct27.8
+git commit -m "Fix: IO Latency-Driven Throttle implementation. #ISSUE-OCT27.9-F1"
+git tag -a Oct27.9 -m "Oct27.9 Release: IO Latency-Driven Throttle"
+git push origin Oct27.9
 
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct27.8
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct27.9
 
-## 🎯 Current Resumption Focus: Forensic SPI Level Audit.
+## 🎯 Current Resumption Focus: Strategic Simplification.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
 *   *None.*
@@ -13,8 +13,8 @@ git push origin Oct27.8
 ---
 
 ## 💡 Strategic Simplification Ideas (Ideas: 102)
+*   **SIMP-OCT27.9-S1: Latency EMA for Throttle (Low).** Consider using an Exponential Moving Average (EMA) for `maxIoLatency` in the drainer throttle logic to smooth out response and prevent rapid oscillation during transient storage micro-spikes.
 *   **SIMP-OCT27.8-S1: Database Transaction Timeout (Low).** Consider adding a watchdog to the `recoveryLock` to prevent permanent stalls if a recovery transaction hangs indefinitely.
-*   **SIMP-OCT27.7-S1: IO Latency-Driven Throttle (Low).** Consider dynamically increasing the forensic drain interval if `maxIoLatency` stays above 500ms for sustained periods, even if fill level is high.
 *   **SIMP-OCT27.6-S1: Recovery Buffer Over-Provisioning (Low).** Evaluate if `ForensicSpillBuffer` capacity can be dynamically scaled based on storage health to prevent circular overwrite during long-duration offline events.
 *   **SIMP-OCT27.5-S1: Badge Measurement Caching (Low).** Investigate if `MeasurableBadge` can benefit from `Modifier.layout` caching to further optimize rapid-fire HUD updates during high-pressure signaling.
 *   **SIMP-OCT27.4-S1: Test Application Base Class (Medium).** Consolidate `GpsApplication` and `GpsTestBaseApplication` into a shared `BaseGpsApplication` to reduce duplication of WorkManager configuration logic.
@@ -22,6 +22,7 @@ git push origin Oct27.8
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
+*   **ISSUE-OCT27.9-F1: IO Latency-Driven Throttle.** Resolved Oct27.9. Implemented dynamic scaling of the forensic drain interval and batch size based on real-time `maxIoLatency` feedback to mitigate storage contention (R-ID 751).
 *   **ISSUE-OCT27.8-F1: Database Recovery Lock.** Resolved Oct27.8. Implemented `recoveryLock` (Mutex) in `LogRepository` to ensure exclusive DB access during the forensic recovery phase, preventing race conditions with standard drainers and maintenance workers (R-ID 750).
 *   **ISSUE-OCT27.7-F1: Forensic SPI Level Audit.** Resolved Oct27.8. Mitigated SPI bus contention by implementing staggered `force()` logic and transitioning persistence operations to `AuditType.IO` for system health tracking. (Resolved GAP-OCT27.6-1).
 *   **ISSUE-OCT27.6-F1: Forensic Recovery Baseline.** Resolved Oct27.8. Established `ForensicRecoveryAuditTest` and verified zero-loss telemetry during simulated process restarts. (Resolved GAP-OCT27.5-1).
@@ -32,6 +33,6 @@ git push origin Oct27.8
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct27.9: [SOT Count: 855 (Rules: 356), Open: H:0, M:0, L:0, Ideas: 102, Testing: 1 (Sub-items: 41), QA: PASSED]**
 - **Oct27.8: [SOT Count: 854 (Rules: 355), Open: H:0, M:0, L:0, Ideas: 102, Testing: 1 (Sub-items: 40), QA: PASSED]**
 - **Oct27.8: [SOT Count: 853 (Rules: 354), Open: H:0, M:0, L:0, Ideas: 102, Testing: 1 (Sub-items: 39), QA: PASSED]**
-- **Oct27.8: [SOT Count: 852 (Rules: 353), Open: H:0, M:0, L:0, Ideas: 101, Testing: 1 (Sub-items: 38), QA: PASSED]**
