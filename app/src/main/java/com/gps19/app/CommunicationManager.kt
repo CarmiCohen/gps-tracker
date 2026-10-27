@@ -21,18 +21,10 @@ import javax.inject.Singleton
 
 /**
  * Socket.io implementation of the SignalingProvider.
- * Oct.22.13:
- * - ISSUE-OCT22.0-F4: Telemetry Sync Hardening. Added "violation_relay" listener 
- *   to support remote violation propagation.
- * Oct.22.12:
- * - Connection Asymmetry Fix (#ISSUE-OCT22.0-F3): Migrated all manual ID 
- *   checks to SignalingValidator to enforce strict symmetry and prevent 
- *   telemetry leaks.
- * Oct.21.01:
- * - Maintenance: Updated protocol version to Oct21.01.
- * Oct.20.32:
- * - Home Point Sync: Added listener for "settings_relay" to support geofence 
- *   synchronization between Viewer and Tracker.
+ * Oct.26.6:
+ * - SIMP-OCT26.6-S1: Integrated updateLastAbortedRt into connection abortion 
+ *   paths to trigger the SRV badge orange latch.
+ * - Forensic Hardening: Redirected aborted connection attempts to SignalingForensicLogger.
  */
 @Singleton
 class CommunicationManager @Inject constructor(
@@ -42,7 +34,8 @@ class CommunicationManager @Inject constructor(
     private val telemetryRepository: TelemetryRepository,
     private val timeProvider: TimeProvider,
     private val sessionManagerProvider: Provider<SessionManager>,
-    private val systemStatusProvider: SystemStatusProvider
+    private val systemStatusProvider: SystemStatusProvider,
+    private val forensicLogger: SignalingForensicLogger
 ) : SignalingProvider {
 
     private var socket: Socket? = null
@@ -160,13 +153,34 @@ class CommunicationManager @Inject constructor(
         this.isTrackerMode = isTracker
         
         if (telemetryRepository.isSafeMode.value) {
-            logToApp("SAFE MODE: Connection suppressed to prevent signaling loops.", true)
+            val msg = "SAFE MODE: Connection suppressed to prevent signaling loops."
+            logToApp(msg, true)
+            forensicLogger.logTransmissionFailure(msg, if(isTracker) "TRK" else "VWR", this.deviceId, this.viewerId, force = true)
+            telemetryRepository.updateLastAbortedRt(timeProvider.elapsedRealtime)
             return
         }
 
-        if (isTracker && !SignalingConstants.isValidTrackerId(this.deviceId)) return
-        if (!isTracker && !SignalingConstants.isValidViewerId(this.viewerId)) return
-        if (relayUrl.isEmpty()) return
+        if (isTracker && !SignalingConstants.isValidTrackerId(this.deviceId)) {
+            val msg = "Connect Aborted: Invalid Tracker ID '${this.deviceId}'"
+            logToApp(msg, true)
+            forensicLogger.logTransmissionFailure(msg, "TRK", this.deviceId, this.viewerId, force = true)
+            telemetryRepository.updateLastAbortedRt(timeProvider.elapsedRealtime)
+            return
+        }
+        if (!isTracker && !SignalingConstants.isValidViewerId(this.viewerId)) {
+            val msg = "Connect Aborted: Invalid Viewer ID '${this.viewerId}'"
+            logToApp(msg, true)
+            forensicLogger.logTransmissionFailure(msg, "VWR", this.deviceId, this.viewerId, force = true)
+            telemetryRepository.updateLastAbortedRt(timeProvider.elapsedRealtime)
+            return
+        }
+        if (relayUrl.isEmpty()) {
+            val msg = "Connect Aborted: Relay URL is empty"
+            logToApp(msg, true)
+            forensicLogger.logTransmissionFailure(msg, if(isTracker) "TRK" else "VWR", this.deviceId, this.viewerId, force = true)
+            telemetryRepository.updateLastAbortedRt(timeProvider.elapsedRealtime)
+            return
+        }
         
         if (!scope.isActive) {
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + commExceptionHandler)

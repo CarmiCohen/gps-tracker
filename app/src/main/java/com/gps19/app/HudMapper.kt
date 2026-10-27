@@ -4,7 +4,11 @@ import com.gps19.core.engine.*
 
 /**
  * HudMapper: Pure mapping logic for HUD state transitions.
- * Oct.14.19: Extracted from MainViewModel to resolve SIMP-OCT14.10-S1.
+ * Oct.26.6:
+ * - SIMP-OCT26.6-S1: Implemented SRV latch logic. Added isConnectionAborted 
+ *   to support orange latching state for 5s after rejection.
+ * Oct.26.5:
+ * - GAP-OCT26.5-1: Integrated signaling conflation metrics into HudConnectivityState.
  */
 object HudMapper {
 
@@ -16,7 +20,8 @@ object HudMapper {
         remoteSignal: Int,
         pulseRt: Long,
         kin: KinematicState,
-        trackerState: TrackerState
+        trackerState: TrackerState,
+        lastAbortedRt: Long = 0L
     ): HudState {
         val mode = session.appMode
         val isMali = kin.localHealth.isMaliAnomaly
@@ -24,7 +29,7 @@ object HudMapper {
         return HudState(
             connectivity = mapHudConnectivity(
                 mode, settings.deviceId, settings.viewerId, session.isSystemActive, settings.isSafeMode, 
-                session.permissions.performanceTier == PerformanceTier.STAGGERED, diag, rtt, remoteSignal, pulseRt
+                session.permissions.performanceTier == PerformanceTier.STAGGERED, diag, rtt, remoteSignal, pulseRt, lastAbortedRt
             ),
             telemetry = mapHudTelemetry(mode, kin, pulseRt, trackerState, isUltra),
             health = mapHudHealth(diag, pulseRt, isMali)
@@ -41,7 +46,8 @@ object HudMapper {
         diag: DiagnosticState, 
         rtt: Int, 
         remoteSignal: Int, 
-        nowRt: Long
+        nowRt: Long,
+        lastAbortedRt: Long = 0L
     ): HudConnectivityState {
         val lastSeenTs = diag.connectivity.lastRemoteActivityTs
         val isTelemetryFresh = if (lastSeenTs > 0) (nowRt - lastSeenTs) < TELEMETRY_UI_STALE_THRESHOLD_MS else false
@@ -56,11 +62,16 @@ object HudMapper {
         
         val isLocalServiceAlive = (nowRt - diag.pulse) < TELEMETRY_UI_STALE_THRESHOLD_MS
         val throttled = if (appMode == "viewer") diag.trackerIsGnssThrottled else diag.isGnssThrottled
+        
+        // SIMP-OCT26.6-S1: 5s latch for connection rejections
+        val isAborted = lastAbortedRt > 0 && (nowRt - lastAbortedRt < 5000L)
+
         return HudConnectivityState(
             appMode = appMode, isInternet = diag.connectivity.isLocalOnline, isRelayConnected = diag.connectivity.isRelayConnected, 
             isTelemetryFresh = isTelemetryFresh, isDataHealthy = isDataHealthy, commIndex = commIndex, remoteCommIndex = remoteCommIndex, 
             trackerId = deviceId, viewerId = viewerId, watchdogOk = isLocalServiceAlive, rtt = rtt, remoteSignal = remoteSignal, 
-            isSystemActive = isSystemActive, isSafeMode = isSafeMode, isStaggered = isStaggered, isGnssThrottled = throttled, systemPulse = nowRt
+            isSystemActive = isSystemActive, isSafeMode = isSafeMode, isStaggered = isStaggered, isGnssThrottled = throttled, 
+            systemPulse = nowRt, conflatedCount = diag.signalingMetrics.conflated, isConnectionAborted = isAborted
         )
     }
 

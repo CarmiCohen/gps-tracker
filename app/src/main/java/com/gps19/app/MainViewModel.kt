@@ -22,12 +22,11 @@ import javax.inject.Inject
 
 /**
  * MainViewModel: Orchestrates top-level application state and global navigation.
+ * Oct.26.5:
+ * - Fix: Resolved HUD Stale State Bug. Implemented double-buffering for 
+ *   KinematicState and DiagnosticState to ensure StateFlow emission on mutation.
  * Oct.24.20:
- * - ISSUE-OCT24.14-F3: Davey Optimization. Deferred startBaseObservations and 
- *   startGlobalTimer until after initial hydration delay to clear startup Main-thread.
- * Oct.20.2:
- * - ISSUE-OCT19.0-F1: Updated applyInitialSettings to respect isRestorationDisabled 
- *   during UI state initialization to ensure Landing Screen landing.
+ * - ISSUE-OCT24.14-F3: Davey Optimization.
  */
 @HiltViewModel
 class MainViewModel @Inject constructor(
@@ -90,10 +89,15 @@ class MainViewModel @Inject constructor(
         .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SimulationUiState())
 
-    private val _kinematicState = MutableStateFlow(KinematicState())
+    // Oct.26.5: State Buffers to force emission
+    private val kinBuffers = listOf(KinematicState(), KinematicState())
+    private var kinBufIdx = 0
+    private val _kinematicState = MutableStateFlow(kinBuffers[0])
     override val kinematic: StateFlow<KinematicState> = _kinematicState.asStateFlow()
 
-    private val _diagnosticState = MutableStateFlow(DiagnosticState())
+    private val diagBuffers = listOf(DiagnosticState(), DiagnosticState())
+    private var diagBufIdx = 0
+    private val _diagnosticState = MutableStateFlow(diagBuffers[0])
     override val diagnostic: StateFlow<DiagnosticState> = _diagnosticState.asStateFlow()
 
     override val isSirenPlaying: StateFlow<Boolean> = _diagnosticState
@@ -431,8 +435,28 @@ class MainViewModel @Inject constructor(
             next
         } 
     }
-    private fun updateKinematicState(update: (KinematicState) -> KinematicState) { _kinematicState.update { current -> update(current) } }
-    private fun updateDiagnosticState(update: (DiagnosticState) -> DiagnosticState) { _diagnosticState.update { current -> update(current) } }
+
+    private fun updateKinematicState(update: (KinematicState) -> KinematicState) { 
+        _kinematicState.update { current -> 
+            val nextIdx = (kinBufIdx + 1) % 2
+            val next = kinBuffers[nextIdx]
+            next.copyFrom(current)
+            update(next)
+            kinBufIdx = nextIdx
+            next
+        } 
+    }
+
+    private fun updateDiagnosticState(update: (DiagnosticState) -> DiagnosticState) { 
+        _diagnosticState.update { current -> 
+            val nextIdx = (diagBufIdx + 1) % 2
+            val next = diagBuffers[nextIdx]
+            next.copyFrom(current)
+            update(next)
+            diagBufIdx = nextIdx
+            next
+        } 
+    }
 
     private fun startGlobalTimer() { 
         viewModelScope.launch(Dispatchers.Main.immediate + uiExceptionHandler) { 

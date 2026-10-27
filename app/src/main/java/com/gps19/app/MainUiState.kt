@@ -7,12 +7,12 @@ import org.osmdroid.util.GeoPoint
 
 /**
  * MainUiState: Composite UI state partitioned into specialized slices.
+ * Oct.26.6:
+ * - GAP-OCT26.5-1 Refinement: Added ShowConflationStats to UiEvent to support 
+ *   diagnostic feedback for signaling conflation.
  * Oct.26.0:
  * - Setup Bypass (Hardening): Set isSetupBypassActive default to true and 
- *   isSettlingActive to false to facilitate automated functional testing 
- *   and bypass hardware policy restrictions and startup delays.
- * Oct.21.07:
- * - ISSUE-OCT21.06-F1: Setup Hardening.
+ *   isSettlingActive to false to facilitate automated functional testing.
  */
 data class MainUiState(
     val session: SessionUiState = SessionUiState(),
@@ -132,7 +132,6 @@ data class SessionUiState(
     val appMode: String? = null,
     val isSystemActive: Boolean = false,
     val appStartTime: Long = 0L,
-    // Oct.26.0: Forced bypass for functional testing integrity.
     val isSettlingActive: Boolean = false,
     val isSetupBypassActive: Boolean = true,
     val isPeerActive: Boolean = false,
@@ -569,7 +568,6 @@ sealed class UiEvent {
     data class ConfirmBackgroundDisclosure(val confirmed: Boolean, val mode: String) : UiEvent()
     object NavigateToDashboard : UiEvent()
     
-    // Oct.13.21: Data Management & Permission Events
     object ExportTrails : UiEvent()
     object ImportTrails : UiEvent()
     object ExportLogs : UiEvent()
@@ -581,9 +579,10 @@ sealed class UiEvent {
     object RequestAppInfo : UiEvent()
     object RequestExactAlarm : UiEvent()
     object RequestHardwarePermission : UiEvent()
-
-    // Oct.21.07: Setup Hardening
     object LoadDefaults : UiEvent()
+
+    // GAP-OCT26.5-1: Signaling Conflation UI Feedback
+    data class ShowConflationStats(val count: Long) : UiEvent()
 }
 
 sealed class UiEffect {
@@ -595,7 +594,6 @@ sealed class UiEffect {
     data class ShowToast(val message: String) : UiEffect()
     data class ShowBackgroundDisclosure(val mode: String) : UiEffect()
     
-    // Oct.13.21: Direct File/System Actions
     object LaunchTrailExport : UiEffect()
     object LaunchTrailImport : UiEffect()
     object LaunchLogExport : UiEffect()

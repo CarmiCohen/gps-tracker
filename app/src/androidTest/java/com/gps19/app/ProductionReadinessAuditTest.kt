@@ -47,10 +47,12 @@ object TestPowerModule {
 /**
  * ProductionReadinessAuditTest: Validates system behavior under production-like 
  * soak and pressure conditions.
+ * Oct.26.5:
+ * - Chapter 15.2 (High-Pressure Signaling Soak): Added verifyHighPressureSignalingSoak 
+ *   to exercise SmartSignalingDispatcher conflation and priority logic under 
+ *   simulated jitter (R-ID 511).
  * Oct.24.34:
- * - Chapter 0.1 (Variant Integrity): Added verifyPlatinumVariantIntegrity to 
- *   fundamentally resolve R-ID 610 repetition by enforcing the PLATINUM variant 
- *   during forensic audits.
+ * - Chapter 0.1 (Variant Integrity): Added verifyPlatinumVariantIntegrity.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -108,7 +110,6 @@ class ProductionReadinessAuditTest {
 
     /**
      * Chapter 0.1: Variant Integrity (R-ID 610).
-     * Fundamental Solution: Enforce that audits only run on hardened PLATINUM artifacts.
      */
     @Test
     fun verifyPlatinumVariantIntegrity() {
@@ -134,6 +135,43 @@ class ProductionReadinessAuditTest {
         assertTrue("R-ID 605: Tracker MUST recognize Viewer pulse", sessionManager.getViewerCount() > 0)
         val lastActivity = repository.lastRemoteActivityTs.value
         assertTrue("R-ID 605: Peer activity timestamp must be fresh", nowRt - lastActivity < 5000)
+    }
+
+    /**
+     * Chapter 15.2: High-Pressure Signaling Soak (R-ID 511).
+     * Exercises SmartSignalingDispatcher conflation and priority logic.
+     */
+    @Test
+    fun verifyHighPressureSignalingSoak() = runBlocking {
+        repository.saveString(AppRole.TRACKER, TRACKER_ID_KEY, "TRK-SOAK")
+        repository.saveString(AppRole.TRACKER, VIEWER_ID_KEY, "VWR-SOAK")
+        connectivitySuite.start(MainRepository.DEFAULT_RELAY_URL, "TRK-SOAK", "VWR-SOAK", isTracker = true)
+        telemetryRepository.updateRelayStatus(true)
+
+        val startReceived = repository.signalingMetrics.value.received
+        val burstSize = 100
+        
+        // Inject high-frequency burst of NORMAL priority telemetry
+        repeat(burstSize) { i ->
+            val update = LocationUpdate().apply {
+                kinetic.lat = 32.0 + (i * 0.0001)
+                kinetic.lng = 34.0 + (i * 0.0001)
+                nowRt = timeProvider.elapsedRealtime
+            }
+            connectivitySuite.sendTelemetry(update)
+            // No delay - force conflation
+        }
+
+        // Wait for conflation cycle to process
+        delay(3000)
+        
+        val metrics = repository.signalingMetrics.value
+        val totalProcessed = metrics.received - startReceived
+        
+        Timber.i("SOAK METRICS: Received: $totalProcessed, Emitted: ${metrics.emitted}, Conflated: ${metrics.conflated}")
+        
+        assertTrue("Dispatcher MUST conflate high-frequency bursts", metrics.conflated > 0)
+        assertTrue("Emitted frames MUST be less than received during burst", metrics.emitted < metrics.received)
     }
 
     @Test

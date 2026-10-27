@@ -8,16 +8,11 @@ import javax.inject.Singleton
 
 /**
  * TelemetryRepository: In-memory store for live system status.
+ * Oct.26.6:
+ * - Diagnostic Hardening (SIMP-OCT26.6-S1): Added lastAbortedRt to track 
+ *   signaling connection rejections for UI latching.
  * Sep.10.02:
- * - Issue #941 RESOLVED: Fixed SRV Status Inconsistency. Added isRelayConnected 
- *   and lastRtt to clear() sequence to ensure clean state transitions (R941).
- * Sep.06.02:
- * - Issue #924 RESOLVED: Watchdog Safe-Mode. Added isSafeMode to prevent 
- *   signaling loops during hydration failures (R-ID 271).
- * Aug.01.10:
- * - Issue #668: Performance: Object Churn. Implemented double-buffering for 
- *   LocationUpdate and SystemHealthState to ensure zero-allocation StateFlow 
- *   emissions (R-HARDWARE-01). Refactored updateLocation to use mergeInto().
+ * - Issue #941 RESOLVED: Fixed SRV Status Inconsistency.
  */
 @Singleton
 class TelemetryRepository @Inject constructor() {
@@ -29,6 +24,9 @@ class TelemetryRepository @Inject constructor() {
 
     private val _isSafeMode = MutableStateFlow(false)
     val isSafeMode = _isSafeMode.asStateFlow()
+
+    private val _lastAbortedRt = MutableStateFlow(0L)
+    val lastAbortedRt = _lastAbortedRt.asStateFlow()
 
     // Flyweight buffers for zero-churn StateFlow emissions
     private val healthBuffers = listOf(SystemHealthState(), SystemHealthState())
@@ -61,6 +59,7 @@ class TelemetryRepository @Inject constructor() {
     fun updateRelayStatus(connected: Boolean) { _isRelayConnected.value = connected }
     fun updateLastRtt(rtt: Int) { _lastRtt.value = rtt }
     fun setSafeMode(enabled: Boolean) { _isSafeMode.value = enabled }
+    fun updateLastAbortedRt(rt: Long) { _lastAbortedRt.value = rt }
 
     /**
      * updateHealth: Swaps buffers to force StateFlow emission while reusing objects.
@@ -124,5 +123,6 @@ class TelemetryRepository @Inject constructor() {
         _lastRemoteActivityTs.value = 0L
         _gnssDetail.value = null
         _isSafeMode.value = false
+        _lastAbortedRt.value = 0L
     }
 }

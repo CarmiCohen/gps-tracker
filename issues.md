@@ -1,36 +1,33 @@
 git add .
-git commit -m "Fix: Enforced R-ID 612 and resolved UI overlap between version tag and scale bar. #ISSUE-OCT26.4-F1"
-git tag -a Oct26.4 -m "Oct26.4 Release: UI Separation Hardening Completed"
-git push origin Oct26.4
+git commit -m "Fix: Hardened forensic traceability for connection abortion events. #ISSUE-OCT26.6-F1"
+git tag -a Oct26.6 -m "Oct26.6 Release: Forensic Traceability and Connection Diagnostic Hardening"
+git push origin Oct26.6
 
-# Project Issues & Hardening Tracking (Rigorous Audit) - Oct26.4
+# Project Issues & Hardening Tracking (Rigorous Audit) - Oct26.6
 
-## 🎯 Current Resumption Focus: Telemetry Soak Simulation.
+## 🎯 Current Resumption Focus: Forensic Integrity Verification.
 
 ## 🔴 Open Gaps & Unfinished Integration Points
-*   None. UI separation and alignment rules (R-ID 612) enforced.
+*   **GAP-OCT26.5-1: Signaling Conflation UI Feedback (Refinement).** While SkyBlue color is implemented, a long-press or tooltip on the DAT badge to show the specific conflation count would improve diagnostic utility.
 
 ---
 
-## 💡 Strategic Simplification Ideas (Ideas: 92)
-*   **SIMP-OCT26.4-S1: Centralized UI Anchor Registry (Medium).** Consolidate all corner-pinned UI element coordinates (Version Tag, Scale Bar, Locked Badge) into a single `LayoutAnchorAuthority` to prevent future overlaps and ensure forensic consistency.
-*   **SIMP-OCT26.2-S1: Unified Maintenance Authority (Medium).** Consolidate `PruningWorker`, `MaintenanceWorker`, and `LogRepository.startupPruning` into a single `SystemMaintenanceCoordinator` to reduce redundant health checks and I/O scheduling overhead.
-*   **SIMP-OCT26.2-S2: Database Size Caching (Low).** Cache the database size in `SystemHealthState` with a 15-minute expiration to avoid repeated `File.length()` calls during high-frequency telemetry cycles.
-*   **SIMP-OCT26.1-S1: Gradle Variant Task Alias (Low).** Create a custom Gradle task `assembleAll` that explicitly maps all variant assembly and test tasks to a single entry point for audit consistency.
-*   **SIMP-OCT24.34-S1: Source-Set Isolation for Diagnostic Resources (High).** All strings, layouts, and icons used exclusively for diagnostics should be moved out of the `main` source set and into `debug` to guarantee zero-leakage in production binaries without relying on runtime logic.
+## 💡 Strategic Simplification Ideas (Ideas: 94)
+*   **SIMP-OCT26.6-S1: Diagnostic Latch for SRV Badge (Low).** Add a 5-second "Aborted" latch color (Orange) to the SRV badge when a connection is rejected due to identity mismatch, preventing the rapid flip back to "Inactive" (Red) that obscures the failure reason.
+*   **SIMP-OCT26.5-S1: Signaling Metric Aggregation (Low).** Combine `framesReceived`, `framesEmitted`, and `framesConflated` into a single `SignalingHealth` object in `SmartSignalingDispatcher` to reduce atomic update overhead.
+*   **SIMP-OCT26.4-S1: Centralized UI Anchor Registry (Medium).** Consolidate all corner-pinned UI element coordinates into a single `LayoutAnchorAuthority`.
 
 ---
 
 ## ✅ Resolved Traceability & Metadata Issues
-*   **ISSUE-OCT26.4-F1: UI Separation Hardening.** Resolved Oct26.4. Enforced R-ID 612 by moving version tag to `BottomEnd` and map scale bar to bottom-left. Resolved overlap conflict.
-*   **ISSUE-OCT26.2-F1: Startup Profiling and Optimization Audit.** Resolved Oct26.2. Implemented mandatory 250MB database size check (R104) in `LogRepository` and integrated aggressive `deepPruneLogs` into the cold start sequence. Verified sub-50ms check overhead.
-*   **ISSUE-OCT26.1-F1: Full Variant Assembly & Verification.** Resolved Oct26.1. Successfully generated and verified verified binaries for `debug`, `release`, and `platinum` variants, including all unit and instrumentation test stubs.
-*   **ISSUE-OCT26.0-F1: Setup Bypass & Permission Loop Hardening.** Resolved Oct26.0. Implemented architectural bypass for onboarding and fixed permission race condition.
+*   **ISSUE-OCT26.6-F1: Forensic Traceability Hardening.** Resolved Oct26.6. Standardized connection abortion logging across `CommunicationManager` and `ConnectivitySuite` using `SignalingForensicLogger` for R-ID 320 compliance. Ensured these events bypass standard log muzzling to guarantee audit visibility of identity hydration failures.
+*   **ISSUE-OCT26.5-F1: Telemetry Soak Simulation Hardening.** Resolved Oct26.5. Implemented `verifyHighPressureSignalingSoak` in `ProductionReadinessAuditTest`. Resolved HUD stale-state bug by implementing double-buffering for `KinematicState` and `DiagnosticState` in `MainViewModel`. Integrated SkyBlue color feedback for the `DAT` badge when conflation is active.
+*   **ISSUE-OCT26.4-F1: UI Separation Hardening.** Resolved Oct26.4. Enforced R-ID 612 by moving version tag to `BottomEnd`.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Oct26.6: [SOT Count: 846 (Rules: 348), Open: H:0, M:1, L:0, Ideas: 94, Testing: 1 (Sub-items: 32), QA: PASSED]**
+- **Oct26.5: [SOT Count: 844 (Rules: 346), Open: H:0, M:1, L:0, Ideas: 93, Testing: 1 (Sub-items: 31), QA: PASSED]**
 - **Oct26.4: [SOT Count: 842 (Rules: 345), Open: H:0, M:0, L:0, Ideas: 92, Testing: 1 (Sub-items: 29), QA: PASSED]**
-- **Oct26.2: [SOT Count: 841 (Rules: 344), Open: H:0, M:0, L:0, Ideas: 91, Testing: 1 (Sub-items: 29), QA: PASSED]**
-- **Oct26.1: [SOT Count: 840 (Rules: 343), Open: H:0, M:0, L:0, Ideas: 89, Testing: 1 (Sub-items: 28), QA: PASSED]**
 - **Oct26.0: [SOT Count: 839 (Rules: 342), Open: H:0, M:0, L:0, Ideas: 88, Testing: 1 (Sub-items: 28), QA: PASSED]**

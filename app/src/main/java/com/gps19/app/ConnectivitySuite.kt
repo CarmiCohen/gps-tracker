@@ -24,12 +24,13 @@ import javax.inject.Singleton
 
 /**
  * ConnectivitySuite: Unified connectivity and telemetry sync.
+ * Oct.26.6:
+ * - Forensic Hardening: Standardized on SignalingForensicLogger for all connection 
+ *   abortion events to ensure R-ID 320 compliance.
+ * Oct.26.5:
+ * - Diagnostic Hardening: Added logging to aborted connection points.
  * Oct24.2:
- * - ISSUE-OCT23.101-F6: Offline Violation Event Sync. Updated emitViolation 
- *   to buffer violations when offline and flush them during sync cycles.
- * Oct23.120:
- * - ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps. Updated 
- *   emitViolation() and violation_relay handler to propagate isJammingCandidate.
+ * - ISSUE-OCT23.101-F6: Offline Violation Event Sync.
  */
 @Singleton
 class ConnectivitySuite @Inject constructor(
@@ -172,7 +173,12 @@ class ConnectivitySuite @Inject constructor(
                 val nowRt = timeProvider.elapsedRealtime
                 if (lastReconnectTs > 0L && nowRt - lastReconnectTs < 3000L) return@launch
                 
-                if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) return@launch
+                if (!SignalingConstants.isValidTrackerId(deviceId) || !SignalingConstants.isValidViewerId(viewerId)) {
+                    val msg = "Handover Reconnect Aborted: Invalid Identity"
+                    logManagerProvider.get().submitToLogSink("$msg (D:$deviceId, V:$viewerId)", "system", true)
+                    forensicLogger.logTransmissionFailure(msg, if(isTrackerMode) "TRK" else "VWR", deviceId, viewerId, force = true)
+                    return@launch
+                }
 
                 forensicLogger.logHandover("Interface Available. Reconnecting.", "active")
                 logManagerProvider.get().logServiceEvent("Network Handover: Available. Reconnecting.", false)
@@ -197,7 +203,13 @@ class ConnectivitySuite @Inject constructor(
     fun start(url: String, dId: String, vId: String, isTracker: Boolean) {
         if (isStarted.getAndSet(true)) {
             this.relayUrl = url; this.deviceId = dId; this.viewerId = vId; this.isTrackerMode = isTracker
-            signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
+            if (SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
+                signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
+            } else {
+                val msg = "ConnectivitySuite: Restart Aborted - Invalid Identity"
+                logManagerProvider.get().submitToLogSink("$msg (D:$deviceId, V:$viewerId)", "system", true)
+                forensicLogger.logTransmissionFailure(msg, if(isTrackerMode) "TRK" else "VWR", deviceId, viewerId, force = true)
+            }
             return
         }
 
@@ -226,6 +238,10 @@ class ConnectivitySuite @Inject constructor(
             if (relayUrl.isNotEmpty() && SignalingConstants.isValidTrackerId(deviceId) && SignalingConstants.isValidViewerId(viewerId)) {
                 signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                 wakeUpRelay()
+            } else if (relayUrl.isNotEmpty()) {
+                val msg = "ConnectivitySuite: Start Aborted - Invalid Identity"
+                logManagerProvider.get().submitToLogSink("$msg (D:$deviceId, V:$viewerId)", "system", true)
+                forensicLogger.logTransmissionFailure(msg, if(isTrackerMode) "TRK" else "VWR", deviceId, viewerId, force = true)
             }
         }
 
@@ -351,6 +367,10 @@ class ConnectivitySuite @Inject constructor(
                     signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
                     wakeUpRelay()
                 }
+            } else {
+                val msg = "KeepAlive Connect Aborted: Invalid Identity"
+                logManagerProvider.get().submitToLogSink("$msg (D:$latestDeviceId, V:$latestViewerId)", "system", true)
+                forensicLogger.logTransmissionFailure(msg, if(latestIsTracker) "TRK" else "VWR", latestDeviceId, latestViewerId, force = true)
             }
             return@withContext
         }
@@ -940,7 +960,12 @@ class ConnectivitySuite @Inject constructor(
     fun updateRelayStatus(connected: Boolean) { telemetryRepository.updateRelayStatus(connected) }
     fun updateIdentity(dId: String, vId: String, isTracker: Boolean) {
         if (isStopped.get()) return
-        if (!SignalingConstants.isValidTrackerId(dId) || !SignalingConstants.isValidViewerId(vId)) return
+        if (!SignalingConstants.isValidTrackerId(dId) || !SignalingConstants.isValidViewerId(vId)) {
+            val msg = "updateIdentity Aborted: Invalid Identity"
+            logManagerProvider.get().submitToLogSink("$msg (D:$dId, V:$vId)", "system", true)
+            forensicLogger.logTransmissionFailure(msg, if(isTracker) "TRK" else "VWR", dId, vId, force = true)
+            return
+        }
         this.deviceId = dId; this.viewerId = vId; this.isTrackerMode = isTracker
         signalingProvider.updateIdentity(dId, vId, isTracker)
     }
@@ -951,6 +976,10 @@ class ConnectivitySuite @Inject constructor(
             reconnectAttempt = 0
             signalingProvider.connect(relayUrl, deviceId, viewerId, isTrackerMode)
             wakeUpRelay()
+        } else {
+            val msg = "connect(url) Aborted: Invalid Identity"
+            logManagerProvider.get().submitToLogSink("$msg (D:$deviceId, V:$viewerId)", "system", true)
+            forensicLogger.logTransmissionFailure(msg, if(isTrackerMode) "TRK" else "VWR", deviceId, viewerId, force = true)
         }
     }
 

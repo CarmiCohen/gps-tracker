@@ -48,12 +48,10 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
- * Oct.23.100:
- * - SIMP-OCT22.10-S1: BackHandler Composition Local. Integrated LocalBackAction 
- *   to intercept back button and close the ribbons overlay.
- * Oct.21.00:
- * - HUD Layout Correction (ISSUE-OCT20.33-F2): Optimized HeaderBar button 
- *   padding and increased StatusBar row vertical spacing.
+ * Oct.26.6:
+ * - SIMP-OCT26.6-S1: Diagnostic Latch for SRV Badge. SRV badge turns Orange 
+ *   when a connection is aborted (isConnectionAborted) to provide 5s failure visibility.
+ * - GAP-OCT26.5-1: Signaling Conflation UI. DAT badge turns SkyBlue during conflation.
  */
 
 enum class RibbonRenderType { BAR, LINE }
@@ -551,10 +549,16 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
                     Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                         StatusBadge(label = "SYS", active = connectivity.isSystemActive, activeColor = localColor, isBold = true)
                         StatusBadge(label = "INT", active = connectivity.isInternet, activeColor = localColor, isBold = true)
-                        StatusBadge(label = "SRV", active = connectivity.isRelayConnected, activeColor = localColor, isBold = true)
+                        
+                        // SIMP-OCT26.6-S1: SRV Latch Logic. Orange indicates aborted attempt.
+                        StatusBadge(label = "SRV", active = connectivity.isRelayConnected, activeColor = if (connectivity.isConnectionAborted) Color(0xFFF59E0B) else localColor, isBold = true)
+                        
                         StatusBadge(label = "GPS", active = telemetry.isLocalGpsActive, activeColor = localColor)
                         StatusBadge(label = if (isTracker) "VWR" else "TRK", active = isPeerActive, activeColor = peerColor)
-                        StatusBadge(label = "DAT", active = connectivity.isDataHealthy, activeColor = localColor)
+                        
+                        // GAP-OCT26.5-1: Conflation UI Feedback. SkyBlue DAT indicates managed data flow.
+                        StatusBadge(label = "DAT", active = connectivity.isDataHealthy, activeColor = if (connectivity.conflatedCount > 0) Color(0xFF38BDF8) else localColor)
+
                         StatusBadge(label = "WDG", active = connectivity.watchdogOk, activeColor = localColor, isBold = true)
                         if (connectivity.isSafeMode) { StatusBadge(label = "SAF", active = false, isBold = true) }
                         if (connectivity.isStaggered) { StatusBadge(label = "STG", active = true, activeColor = localColor, isBold = true) }

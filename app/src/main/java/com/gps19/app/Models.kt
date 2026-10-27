@@ -11,13 +11,10 @@ import java.util.*
 
 /**
  * Models: UI and Persistence data structures for GPS Tracker.
- * Oct.23.120:
- * - ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps. Added 
- *   isJammingCandidate to ViolationPoint for UI parity.
- * - ISSUE-OCT23.101-F3: Added stationaryDurationMs to ConnectionPoint for hysteresis parity.
- * Oct.22.16:
- * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added luxSnapshot and 
- *   acousticSnapshot delegates to ConnectionPoint and LogEntry for parity.
+ * Oct.26.6:
+ * - SIMP-OCT26.6-S1: Added isConnectionAborted to HudConnectivityState to 
+ *   support UI latching for signaling rejections.
+ * - GAP-OCT26.5-1: Added conflatedCount to HudConnectivityState.
  */
 
 @Serializable
@@ -1104,7 +1101,7 @@ class StatsState(
     fun copyFrom(other: StatsState) {
         this.totalConnectedMs = other.totalConnectedMs; this.sessionConnectedMs = other.sessionConnectedMs
         this.maxDropMs = other.maxDropMs; this.maxDropTs = other.maxDropTs; this.totalDropMs = other.totalDropMs
-        this.uptimeMs = other.uptimeMs; this.lastConnTs = other.lastConnTs; this.lastDiscTs = other.lastDiscTs
+        this.uptimeMs = other.uptimeMs; this.lastConnTs = other.lastConnTs; this.lastDiscTs = lastDiscTs
         this.violationUptimeMs = other.violationUptimeMs; this.violationPercentage = other.violationPercentage
     }
     fun update(totalConnectedMs: Long, sessionConnectedMs: Long, maxDropMs: Long, maxDropTs: Long, totalDropMs: Long, uptimeMs: Long, lastConnTs: Long, lastDiscTs: Long) {
@@ -1183,7 +1180,9 @@ data class HudConnectivityState(
     val isSafeMode: Boolean = false,
     val isStaggered: Boolean = false,
     val isGnssThrottled: Boolean = false,
-    val systemPulse: Long = 0L
+    val systemPulse: Long = 0L,
+    val conflatedCount: Long = 0L,
+    val isConnectionAborted: Boolean = false
 ) : DeviceIdentity
 
 @Serializable
