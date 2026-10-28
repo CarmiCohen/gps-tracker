@@ -1,6 +1,6 @@
-# Resolution Archive - Oct28.14
+# Resolution Archive - Oct27.10
 
-## ✅ Resolved Issues (Oct28.14)
+## ✅ Resolved Issues (Oct27.10)
 
 ### 1. SIMP-OCT27.5-S1: Badge Measurement Caching
 - **Symptoms**: HUD status badges were using nested `Box` structures for overlays, leading to deeper layout trees and redundant measurement passes during rapid-fire signaling updates.
@@ -9,9 +9,9 @@
 
 ---
 
-# Resolution Archive - Oct28.13
+# Resolution Archive - Oct27.10
 
-## ✅ Resolved Issues (Oct28.13)
+## ✅ Resolved Issues (Oct27.10)
 
 ### 1. SIMP-OCT28.12-S1: Settings Restoration Policy
 - **Symptoms**: Risk of the application becoming permanently unusable if the persistent settings DataStore becomes corrupted in a way that the integrity guard (R-ID 758) continuously fails across process restarts.
@@ -19,8 +19,6 @@
 - **Resolution**: Implemented an emergency factory reset fallback in `SettingsRepository.kt`. The repository now tracks `integrity_violation_count` within the `AppSettings` proto. If the `integritySignature` verification fails 3 times across process restarts, the system triggers `performFactoryReset()`, which re-initializes all settings to their default values and generates a fresh, valid SHA-256 signature. The violation count is automatically reset to zero upon any successful manual write or successful commit of draft settings, ensuring that the fallback only triggers on persistent, unrecoverable corruption. (R-ID 759).
 
 ---
-
-# Resolution Archive - Oct27.10
 
 ## ✅ Resolved Issues (Oct27.10)
 
@@ -31,7 +29,7 @@
 
 ---
 
-### 1. SIMP-OCT27.6-S1: Recovery Buffer Scaling
+### 1. SIMP-OCT27.6-S1: Recovery Buffer Over-Provisioning
 - **Symptoms**: The `ForensicSpillBuffer` used a fixed 10,000 entry capacity (approx. 1.25MB). On devices with critical storage pressure, this was over-provisioning resources, while on devices with high-capacity storage, it led to premature circular overwrites during long offline gaps.
 - **Root Cause**: Static allocation of memory-mapped buffer size regardless of device storage health.
 - **Resolution**: Implemented dynamic capacity scaling in `ForensicSpillBuffer.kt`. The buffer now calculates its target capacity (ranging from 2,000 to 50,000 entries) upon initialization based on `context.filesDir.freeSpace`. Added safeguards to `RandomAccessFile.setLength()` to ensure the physical file size matches the calculated capacity. Updated `LogRepository` and instrumented stress tests to utilize the dynamic `capacity` property, ensuring consistency across the forensic pipeline. (R-ID 757).
