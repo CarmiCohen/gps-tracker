@@ -11,10 +11,11 @@ import java.util.concurrent.TimeUnit
 
 /**
  * PruningWorker: Dedicated background task for database maintenance and log pruning.
+ * Oct.28.2:
+ * - SIMP-OCT28.0-S1: Pruning Worker Telemetry. Updated to log total purged records 
+ *   returned by MainRepository for improved maintenance cycle visibility (R-ID 754).
  * Oct.13.8:
  * - Issue #SIMP-OCT12.18-S1: Pruning Scheduler. Initial implementation.
- * Oct.14.2:
- * - Fixed IllegalArgumentException: Removed backoff criteria for idle-mode job.
  */
 @HiltWorker
 class PruningWorker @AssistedInject constructor(
@@ -62,8 +63,8 @@ class PruningWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         Timber.i("PRUNING: Starting background database maintenance task.")
         return try {
-            repository.proactivePruning()
-            Timber.i("PRUNING: Database maintenance task completed successfully.")
+            val purgedCount = repository.proactivePruning()
+            Timber.i("PRUNING: Database maintenance task completed successfully. Purged records: $purgedCount")
             Result.success()
         } catch (e: Exception) {
             Timber.e(e, "PRUNING: Database maintenance task failed.")

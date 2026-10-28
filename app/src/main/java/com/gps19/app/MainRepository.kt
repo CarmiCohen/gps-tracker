@@ -30,13 +30,13 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.28.2:
+ * - SIMP-OCT28.0-S1: Pruning Worker Telemetry. Implemented reporting of total 
+ *   purged record counts to telemetry for all maintenance cycles (R-ID 754).
  * Oct.28.0:
  * - SIMP-OCT27.10-S1: Pruning Batch Optimization. Implemented dynamic adjustment 
  *   of pruning chunk size based on the delta between current count and target 
  *   threshold to accelerate space recovery during deep maintenance.
- * Oct24.2:
- * - ISSUE-OCT23.101-F6: Offline Violation Event Sync. Added support for 
- *   PendingViolation persistence through OfflineRepository.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -331,7 +331,16 @@ class MainRepository @Inject constructor(
     suspend fun clearLogs() { logRepository.clearLogs() }
     
     suspend fun loadAllLogsStatic(limit: Int = LOG_LIMIT_STANDARD): List<LogEntry> = logRepository.loadAllLogsStatic(limit)
-    suspend fun proactivePruning() = logRepository.proactivePruning()
+
+    /**
+     * proactivePruning: Triggers comprehensive maintenance and reports purged counts.
+     * Oct.28.2: Returns total purged record count for telemetry (R-ID 754).
+     */
+    suspend fun proactivePruning(): Int {
+        val purged = logRepository.proactivePruning()
+        updateTelemetryPurgedCount(purged)
+        return purged
+    }
 
     fun saveTrailPoint(lat: Double, lng: Double, isViewer: Boolean, status: SentinelStatus = SentinelStatus.VALID, timestamp: Long? = null, force: Boolean = false, accuracy: Double = 0.0, maxAccuracy: Double = 0.0) {
         if (lat == 0.0 || lng == 0.0) return
@@ -441,6 +450,7 @@ class MainRepository @Inject constructor(
      * triggerBackgroundPruning: Oct.12.18 yielded chunked pruning. 
      * SIMP-OCT27.10-S1: Pruning chunk size is dynamically adjusted based on 
      * the pressure delta for each specific data type.
+     * Oct.28.2: Added purged count tracking for telemetry (R-ID 754).
      */
     private fun triggerBackgroundPruning() {
         if (metrics.isPruningActive.getAndSet(true)) return
@@ -448,6 +458,7 @@ class MainRepository @Inject constructor(
         if (!PersistencePolicy.shouldPerformMaintenance(health)) { metrics.isPruningActive.set(false); return }
         
         scope.launch {
+            var totalPurged = 0
             try {
                 // Yield immediately to let write callers return
                 yield()
@@ -457,7 +468,7 @@ class MainRepository @Inject constructor(
                     val currentCount = historyDao.getCount(key)
                     val dynamicChunkSize = calculateDynamicChunkSize(currentCount, PRUNE_LIMIT_HISTORY)
                     historyDao.getPruneThreshold(key, PRUNE_LIMIT_HISTORY)?.let { threshold ->
-                        historyDao.pruneByThreshold(key, threshold, dynamicChunkSize)
+                        totalPurged += historyDao.pruneByThreshold(key, threshold, dynamicChunkSize)
                     }
                     yield()
                 }
@@ -467,7 +478,7 @@ class MainRepository @Inject constructor(
                     val currentCount = trailDao.getCount(isViewer)
                     val dynamicChunkSize = calculateDynamicChunkSize(currentCount, PRUNE_LIMIT_TRAIL)
                     trailDao.getPruneThreshold(isViewer, PRUNE_LIMIT_TRAIL)?.let { threshold ->
-                        trailDao.pruneByThreshold(isViewer, threshold, dynamicChunkSize)
+                        totalPurged += trailDao.pruneByThreshold(isViewer, threshold, dynamicChunkSize)
                     }
                     yield()
                 }
@@ -476,17 +487,25 @@ class MainRepository @Inject constructor(
                 val currentCount = violationDao.getCount()
                 val dynamicChunkSize = calculateDynamicChunkSize(currentCount, PRUNE_LIMIT_VIOLATIONS)
                 violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)?.let { threshold ->
-                    violationDao.pruneByThreshold(threshold, dynamicChunkSize)
+                    totalPurged += violationDao.pruneByThreshold(threshold, dynamicChunkSize)
                 }
                 yield()
                 
-                Timber.d("MainRepository: Background yielded pruning completed successfully.")
+                updateTelemetryPurgedCount(totalPurged)
+                Timber.d("MainRepository: Background yielded pruning completed successfully. Purged: $totalPurged")
             } catch (e: Exception) { 
                 Timber.e(e, "Background pruning failed") 
             } finally { 
                 metrics.isPruningActive.set(false) 
             }
         }
+    }
+
+    private fun updateTelemetryPurgedCount(count: Int) {
+        if (count <= 0) return
+        val health = telemetryRepository.systemHealth.value
+        health.lastMaintenancePurgedCount = count
+        telemetryRepository.updateHealth(health)
     }
 
     /**

@@ -1,6 +1,17 @@
-# Resolution Archive - Oct28.1
+# Resolution Archive - Oct28.2
 
-## ✅ Resolved Issues (Oct28.1)
+## ✅ Resolved Issues (Oct28.2)
+
+### 1. SIMP-OCT28.0-S1: Pruning Worker Telemetry
+- **Symptoms**: Lack of visibility into the effectiveness of dynamic pruning batching and the volume of data removed during maintenance cycles.
+- **Root Cause**: Pruning methods in `LogRepository` and `MainRepository` did not return counts of deleted records, and telemetry lacked a field to carry this data.
+- **Resolution**: Added `lastMaintenancePurgedCount` to `SystemHealthState` and `IntegrityState`. Refactored `LogRepository` and `MainRepository` to capture and return the total count of purged records from all tables (Logs, Trail, History, Violations). Updated `PruningWorker` and telemetry transmission logic to report these counts. (R-ID 754).
+
+---
+
+# Resolution Archive - Oct27.10
+
+## ✅ Resolved Issues (Oct27.10)
 
 ### 1. SIMP-OCT27.4-S1: Test Application Base Class Consolidation
 - **Symptoms**: Redundant `WorkManager` configuration logic in `GpsApplication` and `GpsTestBaseApplication`, and risk of `NoSuchMethodException` in tests if Hilt worker factory wasn't correctly provided.
@@ -8,10 +19,6 @@
 - **Resolution**: Created `BaseGpsApplication` in the main source set. This abstract base class implements `Configuration.Provider` and retrieves the `HiltWorkerFactory` via a Hilt `EntryPoint`. Both `GpsApplication` and `GpsTestBaseApplication` (in `TestApplication.kt`) now inherit from `BaseGpsApplication`, ensuring a single source of truth for WorkManager initialization across all environments. (R-ID 745).
 
 ---
-
-# Resolution Archive - Oct27.10
-
-## ✅ Resolved Issues (Oct27.10)
 
 ### 1. SIMP-OCT27.10-S1: Pruning Batch Optimization
 - **Symptoms**: Deep database prunes during startup or high-pressure states used fixed chunk sizes, potentially extending I/O contention or taking too long to recover space.

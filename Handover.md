@@ -1,35 +1,35 @@
 git add .
-git commit -m "Fix: Test Application Base Class Consolidation. #SIMP-OCT27.4-S1"
-git tag -a Oct28.1 -m "Oct28.1 Release: Test Application Base Class Consolidation"
-git push origin Oct28.1
+git commit -m "Fix: Pruning Worker Telemetry Implementation. #SIMP-OCT28.0-S1"
+git tag -a Oct28.2 -m "Oct28.2 Release: Pruning Worker Telemetry Implementation"
+git push origin Oct28.2
 
-# Project Handover - Oct28.1
+# Project Handover - Oct28.2
 
-## ✅ Status: Test Application Base Class Consolidation Verified
+## ✅ Status: Pruning Worker Telemetry Verified
 
-Version **Oct28.1** baseline is established. Successfully consolidated `GpsApplication` and `GpsTestBaseApplication` into a shared `BaseGpsApplication` to reduce duplication of WorkManager configuration logic and ensure consistent `HiltWorkerFactory` initialization across all environments.
+Version **Oct28.2** baseline is established. Successfully implemented reporting of total purged record counts per maintenance cycle to telemetry. This provides critical visibility into the impact of dynamic batching and ensures long-term storage maintenance efficiency.
 
 ## 🎯 Next Resumption Focus: Strategic Simplification.
 
 ### 🛡️ Critical Fixes & Implementation Details
 
-#### 1. Test Application Base Class Consolidation (#SIMP-OCT27.4-S1)
-- **Problem**: Redundant `WorkManager` configuration logic and risks of Hilt injection failures in instrumented tests due to inconsistent application base classes.
+#### 1. Pruning Worker Telemetry Implementation (#SIMP-OCT28.0-S1)
+- **Problem**: Lack of visibility into the effectiveness of dynamic pruning batching and the volume of data removed during maintenance cycles.
 - **Fix**: 
-    - Created `BaseGpsApplication.kt` (abstract) in the main source set.
-    - Implemented `Configuration.Provider` in `BaseGpsApplication` using a Hilt `EntryPoint` to retrieve the `HiltWorkerFactory`.
-    - Refactored `GpsApplication` and `GpsTestBaseApplication` to inherit from `BaseGpsApplication`.
-    - Removed redundant `workManagerConfiguration` overrides from child classes.
-    - Enforced R-ID 745: "The system MUST utilize a shared BaseGpsApplication that provides HiltWorkerFactory to WorkManager via an EntryPoint to ensure consistent background job initialization."
+    - Added `lastMaintenancePurgedCount` to `SystemHealthState` and `IntegrityState`.
+    - Refactored `LogRepository` and `MainRepository` to capture and return total purged record counts for all maintenance paths.
+    - Updated `PruningWorker` to log purged counts and propagate them to `TelemetryRepository`.
+    - Included `lastMaintenancePurgedCount` in the remote telemetry transmission map.
+    - Enforced R-ID 754: "The system MUST report the total purged record count per maintenance cycle to telemetry to monitor the impact of dynamic batching."
 
 ## 🔴 Open Gaps
 - **SIMP-OCT27.8-S1**: Database Transaction Timeout. Consider adding a watchdog to the `recoveryLock` to prevent permanent stalls.
-- **SIMP-OCT28.0-S1**: Pruning Worker Telemetry. Consider reporting purged counts to telemetry.
-- **SIMP-OCT27.6-S1**: Recovery Buffer Over-Provisioning (Low). Evaluate if `ForensicSpillBuffer` capacity can be dynamically scaled.
+- **SIMP-OCT27.6-S1**: Recovery Buffer Over-Provisioning (Low). Evaluate if `ForensicSpillBuffer` capacity can be dynamically scaled based on storage health.
+- **SIMP-OCT27.5-S1**: Badge Measurement Caching (Low). Investigate if `MeasurableBadge` can benefit from `Modifier.layout` caching.
 
 ## 📊 Hardening Snapshot
-- **SOT Count**: 858 (Rules: 358)
-- **Testing Status**: Test Application Consolidation Audit - **PASSED**.
-- **QA Status**: Unified WorkManager Initialization - **VERIFIED**.
+- **SOT Count**: 859 (Rules: 359)
+- **Testing Status**: Pruning Telemetry Audit - **PASSED**.
+- **QA Status**: Maintenance Purged Reporting - **VERIFIED**.
 
 **Handover complete. STOPPING ALL PROCESSING.**

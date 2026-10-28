@@ -27,20 +27,13 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.28.2:
+ * - SIMP-OCT28.0-S1: Pruning Worker Telemetry. Updated pruning methods to 
+ *   return total deleted record counts for telemetry reporting (R-ID 754).
  * Oct.28.0:
  * - SIMP-OCT27.10-S1: Pruning Batch Optimization. Implemented dynamic adjustment 
  *   of pruning chunk size based on the delta between current count and target 
  *   threshold to accelerate deep prunes while maintaining I/O stability.
- * Oct.27.10:
- * - SIMP-OCT27.9-S1: Latency EMA for Throttle. Implemented Exponential Moving 
- *   Average (EMA) for maxIoLatency to smooth out throttling response (R-ID 752).
- *   Refinement: Initialized EMA with first reading to avoid cold-start lag.
- * Oct.27.9:
- * - ISSUE-OCT27.9-F1: IO Latency-Driven Throttle. Implemented dynamic scaling 
- *   of forensic drain intervals based on real-time maxIoLatency feedback (R-ID 751).
- * Oct.27.8:
- * - SIMP-OCT27.6-S2: Database Recovery Lock. Implemented recoveryLock (Mutex) to 
- *   ensure exclusive DB access during the Forensic Recovery phase (R-ID 750).
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -119,9 +112,9 @@ class LogRepository @Inject constructor(
             val sizeMb = getDatabaseSizeMb()
             if (sizeMb > DATABASE_SIZE_THRESHOLD_MB) {
                 Timber.w("R104: Startup Database Pressure Detected (%.2f MB). Initiating deep prune.".format(sizeMb))
-                deepPruneLogs()
+                val purged = deepPruneLogs()
                 val duration = timeProvider.elapsedRealtime - startTime
-                Timber.i("R104: Deep prune completed in ${duration}ms.")
+                Timber.i("R104: Deep prune completed in ${duration}ms. Purged: $purged")
             } else {
                 Timber.d("R104: Startup Database size within limits (%.2f MB).".format(sizeMb))
             }
@@ -524,11 +517,13 @@ class LogRepository @Inject constructor(
      * Thresholds scale dynamically based on storage pressure and charging state.
      * SIMP-OCT27.10-S1: Pruning chunk size is dynamically adjusted based on 
      * the delta between current count and target limit.
+     * Oct.28.2: Returns total purged record count for telemetry (R-ID 754).
      * R-ID 750: Inhibited during Forensic Recovery phase.
      */
-    suspend fun proactivePruning() = recoveryLock.withLock {
-        if (!PersistencePolicy.shouldPerformMaintenance(telemetry.systemHealth.value)) return@withLock
+    suspend fun proactivePruning(): Int = recoveryLock.withLock {
+        if (!PersistencePolicy.shouldPerformMaintenance(telemetry.systemHealth.value)) return@withLock 0
         
+        var totalPurged = 0
         try {
             val health = telemetry.systemHealth.value
             val isCharging = health.isCharging
@@ -554,33 +549,34 @@ class LogRepository @Inject constructor(
 
             db.withTransaction {
                 // Tier 1: Heartbeats (Aggressive pruning)
-                logDao.pruneHeartbeatsByThreshold(
+                totalPurged += logDao.pruneHeartbeatsByThreshold(
                     logDao.getHeartbeatPruneThreshold(generalLimit / 5) ?: 0L, 
                     dynamicChunkSize
                 )
                 
                 // Tier 2: General Logs
-                logDao.pruneGeneralByThreshold(
+                totalPurged += logDao.pruneGeneralByThreshold(
                     logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, 
                     dynamicChunkSize
                 )
                 
                 // Tier 3: Important Logs (Keep more)
-                logDao.pruneImportantByThreshold(
+                totalPurged += logDao.pruneImportantByThreshold(
                     logDao.getImportantPruneThreshold(generalLimit * 2) ?: 0L, 
                     dynamicChunkSize
                 )
                 
                 // Tier 4: Forensic Traces (High storage consumer)
-                logDao.pruneForensicByThreshold(
+                totalPurged += logDao.pruneForensicByThreshold(
                     logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, 
                     dynamicChunkSize
                 )
             }
-            Timber.i("Adaptive Pruning: Completed. Limits: Gen=$generalLimit, Forensic=$forensicLimit, Chunk=$dynamicChunkSize")
+            Timber.i("Adaptive Pruning: Completed. Limits: Gen=$generalLimit, Forensic=$forensicLimit, Chunk=$dynamicChunkSize, Purged=$totalPurged")
         } catch (e: Exception) { 
             Timber.e(e, "Error during proactive pruning") 
         }
+        return@withLock totalPurged
     }
 
     /**
@@ -588,9 +584,11 @@ class LogRepository @Inject constructor(
      * Performs an aggressive chunked purge of non-critical logs and forensic traces 
      * to recover storage space and minimize startup I/O stalls.
      * SIMP-OCT27.10-S1: Uses dynamic chunk size to accelerate space recovery.
+     * Oct.28.2: Returns total purged record count for telemetry (R-ID 754).
      * R-ID 750: Inhibited during Forensic Recovery phase.
      */
-    suspend fun deepPruneLogs() = recoveryLock.withLock {
+    suspend fun deepPruneLogs(): Int = recoveryLock.withLock {
+        var totalPurged = 0
         try {
             Timber.w("R104: Initiating DEEP PRUNE due to database size pressure. DB Locked.")
             
@@ -602,14 +600,15 @@ class LogRepository @Inject constructor(
             val dynamicChunkSize = calculateDynamicChunkSize(currentCount, generalLimit)
 
             db.withTransaction {
-                logDao.pruneHeartbeatsByThreshold(logDao.getHeartbeatPruneThreshold(10) ?: 0L, dynamicChunkSize)
-                logDao.pruneGeneralByThreshold(logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, dynamicChunkSize)
-                logDao.pruneForensicByThreshold(logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, dynamicChunkSize)
+                totalPurged += logDao.pruneHeartbeatsByThreshold(logDao.getHeartbeatPruneThreshold(10) ?: 0L, dynamicChunkSize)
+                totalPurged += logDao.pruneGeneralByThreshold(logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, dynamicChunkSize)
+                totalPurged += logDao.pruneForensicByThreshold(logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, dynamicChunkSize)
             }
-            Timber.i("R104: Deep prune completed. Chunk=$dynamicChunkSize. DB Unlocked.")
+            Timber.i("R104: Deep prune completed. Chunk=$dynamicChunkSize. Purged=$totalPurged. DB Unlocked.")
         } catch (e: Exception) {
             Timber.e(e, "Error during deep pruning")
         }
+        return@withLock totalPurged
     }
 
     /**

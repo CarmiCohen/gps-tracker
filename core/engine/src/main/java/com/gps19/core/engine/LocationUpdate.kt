@@ -104,8 +104,6 @@ data class AtmosphericState(
 
 /**
  * ForensicSnapshot: Unified container for diagnostic sensor probes.
- * Oct.23.00:
- * - ISSUE-OCT22.16-F1: Added lux and acoustic snapshots for raw sensor parity.
  */
 @Serializable
 data class ForensicSnapshot(
@@ -207,6 +205,7 @@ data class IntegrityState(
     var thermalHeadroom: Double = 0.0,
     var heapAllocatedMb: Double = 0.0,
     var rtt: Int = 0,
+    var lastMaintenancePurgedCount: Int = 0,
     val forensic: ForensicSnapshot = ForensicSnapshot()
 ) {
     // Oct.22.15: Forensic delegates for integrity.apply access
@@ -249,6 +248,7 @@ data class IntegrityState(
         this.thermalHeadroom = other.thermalHeadroom
         this.heapAllocatedMb = other.heapAllocatedMb
         this.rtt = other.rtt
+        this.lastMaintenancePurgedCount = other.lastMaintenancePurgedCount
         this.forensic.copyFrom(other.forensic)
     }
 
@@ -268,18 +268,17 @@ data class IntegrityState(
         locationPendingReason = LocationPendingReason.NONE; signal = null; tamperNote = null
         lastValidFixRt = 0L; isSilentFailure = false; isMaliAnomaly = false; cpuLoad = 0.0
         ioWait = 0.0; maxIoLatency = 0L; isBatteryWhitelisted = false
-        thermalHeadroom = 0.0; heapAllocatedMb = 0.0; rtt = 0; forensic.reset()
+        thermalHeadroom = 0.0; heapAllocatedMb = 0.0; rtt = 0; lastMaintenancePurgedCount = 0; forensic.reset()
     }
 }
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
+ * Oct.28.2:
+ * - SIMP-OCT28.0-S1: Pruning Worker Telemetry. Added lastMaintenancePurgedCount 
+ *   delegate and included it in toMap() for remote monitoring (R-ID 754).
  * Oct.23.00:
  * - ISSUE-OCT22.16-F1: Integrated lux and acoustic snapshots into forensic mapping.
- * Oct.22.15:
- * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Fixed JSON key snake_case 
- *   consistency for cooling mode, energy duration, and jamming candidate.
- *   Added isJammingCandidate delegate to IntegrityState.
  */
 @Serializable
 data class LocationUpdate(
@@ -643,6 +642,10 @@ data class LocationUpdate(
         get() = integrity.rtt
         set(value) { integrity.rtt = value }
 
+    var lastMaintenancePurgedCount: Int
+        get() = integrity.lastMaintenancePurgedCount
+        set(value) { integrity.lastMaintenancePurgedCount = value }
+
     // Unified Forensic Snapshots
     var snrSnapshot: Double? 
         get() = integrity.forensic.snr
@@ -742,7 +745,7 @@ data class LocationUpdate(
         
         it.nowRt = this.nowRt
         it.nowTs = this.nowTs
-        it.isMuzzled = this.isMuzzled
+        it.isMuzzled = it.isMuzzled
         it.isWarming = this.isWarming
         it.isSirenActive = this.isSirenActive
         it.isHardwareOnline = this.isHardwareOnline
@@ -818,7 +821,6 @@ data class LocationUpdate(
         put("lux_idx", luxIdx); put("vibe_idx", vibeIdx); put("lift_idx", liftIdx)
         put("tilt_idx", tiltIdx); put("baro_idx", baroIdx); put("is_sit_active", isSitActive)
         put("sit_vz", sitVz); put("sit_vz_ts", integrity.sitVzTs); put("sit_vz_rt", integrity.sitVzRt)
-        put("sit_vz_rt", integrity.sitVzRt)
         put("sit_dz", sitDz); put("sit_baro", sitBaro); put("sit_tilt", sitTilt); put("sit_shock", sitShock)
         put("vertical_velocity", verticalVelocity); put("kinetic_energy", kineticEnergy)
         put("is_battery_low", isBatteryLow)
@@ -842,6 +844,7 @@ data class LocationUpdate(
         put("dist_to_tracker", distToTracker)
         put("dist_to_home", distToHome)
         put("rtt", rtt)
+        put("last_maintenance_purged_count", lastMaintenancePurgedCount)
         
         // Extended Forensic Sensors
         put("is_muzzled", isMuzzled)

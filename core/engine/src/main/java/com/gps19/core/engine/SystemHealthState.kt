@@ -4,17 +4,14 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Oct.28.2:
+ * - SIMP-OCT28.0-S1: Pruning Worker Telemetry. Added lastMaintenancePurgedCount 
+ *   to track records removed during maintenance cycles (R-ID 754).
  * Oct.23.110:
  * - ISSUE-OCT23.101-F3: Added stationaryDurationMs for hysteresis parity.
  * Oct.22.16:
  * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added luxSnapshot and 
  *   acousticSnapshot delegates and updated update() signature.
- * Oct.22.15:
- * - ISSUE-OCT22.0-F4: Forensic Sync Hardening. Added isJammingCandidate parity.
- *   Fixed proximityCm reset consistency (-1.0).
- * Oct.7.7:
- * - Issue #SIMP-1007-16: Flag Propagation. Integrated native isSuspiciousNoise and 
- *   isMemoryPressureThrottled flags for HUD and decision logic.
  */
 @Serializable
 class SystemHealthState(
@@ -69,6 +66,7 @@ class SystemHealthState(
 
     // Forensic Persistence Health
     var forensicReliability: Double = 1.0,
+    var lastMaintenancePurgedCount: Int = 0,
 
     // Connectivity Stats
     var uptimeMs: Long = 0L,
@@ -203,6 +201,7 @@ class SystemHealthState(
         this.heapAllocatedMb = other.heapAllocatedMb
         this.forensic.copyFrom(other.forensic)
         this.forensicReliability = other.forensicReliability
+        this.lastMaintenancePurgedCount = other.lastMaintenancePurgedCount
         this.uptimeMs = other.uptimeMs
         this.lastConnTs = other.lastConnTs
         this.lastDiscTs = other.lastDiscTs
@@ -278,7 +277,8 @@ class SystemHealthState(
         isSuspiciousNoise: Boolean = false, isMemoryPressureThrottled: Boolean = false,
         isJammingCandidate: Boolean = false,
         activityType: ActivityType = ActivityType.UNKNOWN,
-        stationaryDurationMs: Long = 0L
+        stationaryDurationMs: Long = 0L,
+        lastMaintenancePurgedCount: Int = 0
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -341,6 +341,7 @@ class SystemHealthState(
         this.coolingEnteredRt = coolingEnteredRt
         this.activityType = activityType
         this.stationaryDurationMs = stationaryDurationMs
+        this.lastMaintenancePurgedCount = lastMaintenancePurgedCount
     }
     
     fun reset() {
@@ -391,6 +392,7 @@ class SystemHealthState(
         heapAllocatedMb = 0.0
         forensic.reset()
         forensicReliability = 1.0
+        lastMaintenancePurgedCount = 0
         uptimeMs = 0L
         lastConnTs = 0L
         lastDiscTs = 0L
