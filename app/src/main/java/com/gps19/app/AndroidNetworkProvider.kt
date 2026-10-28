@@ -25,9 +25,9 @@ import javax.inject.Singleton
  * using ConnectivityManager.NetworkCallback.
  * 
  * Oct.28.25:
- * - ISSUE-OCT28.23-F1: Davey/StackLog Remediation. Added 5s delay to system 
- *   callback registration during startup to prevent Main thread stalls and 
- *   platform diagnostic triggers (StackLog) on A15 hardware.
+ * - ISSUE-OCT28.23-F1: Davey/StackLog Remediation. Refined platform registration 
+ *   deferral to be stage-dependent (Hydration Level >= 3) with a 2s floor 
+ *   to prevent Main thread stalls during A15 GL initialization.
  * Oct.24.16:
  * - ISSUE-OCT24.14-F2: StackLog Leak. Hardened registration lifecycle. Moved 
  *   system callback registration to the Main thread and added a process-level 
@@ -37,7 +37,8 @@ import javax.inject.Singleton
 class AndroidNetworkProvider @Inject constructor(
     @ApplicationContext private val context: Context,
     @ApplicationScope private val externalScope: CoroutineScope,
-    private val timeProvider: TimeProvider
+    private val timeProvider: TimeProvider,
+    private val hydrationManager: LifecycleHydrationManager
 ) : NetworkProvider {
 
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -86,7 +87,7 @@ class AndroidNetworkProvider @Inject constructor(
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
         
-        // Oct.28.25: Hardened registration with startup deferral (ISSUE-OCT28.23-F1).
+        // Oct.28.25: Hardened registration with stage-dependent deferral (ISSUE-OCT28.23-F1).
         // Ensure registration happens on Main thread to satisfy Samsung platform constraints.
         withContext(Dispatchers.Main.immediate) {
             if (isSystemCallbackRegistered.compareAndSet(false, true)) {
@@ -94,10 +95,13 @@ class AndroidNetworkProvider @Inject constructor(
                     // Emit current state immediately to avoid UI "offline" flicker during deferral
                     trySend(isNetworkAvailable)
 
-                    // ISSUE-OCT28.23-F1: Defer platform registration to avoid Davey during A15 hydration
+                    // ISSUE-OCT28.23-F1: Refined Deferral. Wait for stable UI before platform registration.
                     if (timeProvider.elapsedRealtime < 10000) {
-                        Timber.d("AndroidNetworkProvider: Startup window detected. Deferring system callback registration.")
-                        delay(5000)
+                        Timber.d("AndroidNetworkProvider: Startup window detected. Waiting for UI stabilization.")
+                        delay(2000) // Hardened 2s floor for GL stability
+                        withTimeoutOrNull(4000) {
+                            hydrationManager.hydrationLevel.first { it >= 3 }
+                        }
                     }
 
                     Timber.d("AndroidNetworkProvider: Registering system network callback.")

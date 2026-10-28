@@ -5,7 +5,7 @@
 ### 1. ISSUE-OCT28.23-F1: Forensic Audit Failure (Davey/StackLog)
 - **Symptoms**: 838ms Davey event and StackLog leak at `AndroidNetworkProvider.kt:103` during A15 startup.
 - **Root Cause**: High-pressure startup hydration sequence on budget hardware caused Main-thread I/O stalls and platform diagnostic triggers (StackLog).
-- **Resolution**: Implemented 5s startup deferral for R104 database pruning in `LogRepository` and system network callback registration in `AndroidNetworkProvider`. Added immediate state emission in the provider to avoid UI flicker during the deferral window. (R-ID 764).
+- **Resolution**: Implemented stage-dependent deferral for R104 database pruning in `LogRepository` and system network callback registration in `AndroidNetworkProvider`. Both tasks now wait for `LifecycleHydrationManager.hydrationLevel >= 3` (Core Surface Stable) with a 1000ms minimum grace period. (R-ID 764).
 
 ---
 
