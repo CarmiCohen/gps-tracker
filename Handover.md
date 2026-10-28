@@ -1,36 +1,37 @@
 git add .
-git commit -m "Fix: Latency EMA Smoothing for Throttle. #ISSUE-OCT27.10-S1"
-git tag -a Oct27.10 -m "Oct27.10 Release: Latency EMA Smoothing"
-git push origin Oct27.10
+git commit -m "Fix: Pruning Batch Optimization. #SIMP-OCT27.10-S1"
+git tag -a Oct28.0 -m "Oct28.0 Release: Pruning Batch Optimization"
+git push origin Oct28.0
 
-# Project Handover - Oct27.10
+# Project Handover - Oct28.0
 
-## ✅ Status: Latency EMA Smoothing Verified
+## ✅ Status: Pruning Batch Optimization Verified
 
-Version **Oct27.10** baseline is established. Successfully implemented an Exponential Moving Average (EMA) for `maxIoLatency` feedback to smooth out forensic drain throttling and prevent oscillations during transient storage spikes.
+Version **Oct28.0** baseline is established. Successfully implemented dynamic adjustment of `PRUNE_CHUNK_SIZE` (500-5000) based on the backlog delta to accelerate database maintenance and space recovery while preventing sustained I/O stalls.
 
 ## 🎯 Next Resumption Focus: Strategic Simplification.
 
 ### 🛡️ Critical Fixes & Implementation Details
 
-#### 1. Latency EMA Smoothing (#ISSUE-OCT27.10-S1)
-- **Problem**: Potential rapid oscillation in the forensic drain throttle when storage latency spikes were transient, leading to inefficient I/O patterns.
+#### 1. Pruning Batch Optimization (#SIMP-OCT27.10-S1)
+- **Problem**: Fixed chunk sizes for database pruning were inefficient during deep prunes (e.g., at startup or under high storage pressure), either taking too long or causing unnecessary I/O contention.
 - **Fix**: 
-    - Added `IO_LATENCY_EMA_ALPHA` (0.2) to `EngineConstants.kt`.
-    - Implemented `latencyEma` tracking in `LogRepository.kt`.
-    - Refactored `runForensicDrainer` to use the EMA-smoothed latency for calculating both the `combinedLoadFactor` and the `effectiveInterval`.
-    - Enforced R-ID 752: "The forensic drainer MUST utilize an Exponential Moving Average (EMA) for maxIoLatency feedback (Alpha: 0.2) to smooth out throttling response."
+    - Added `PRUNE_CHUNK_SIZE_MIN` (500) and `PRUNE_CHUNK_SIZE_MAX` (5000) to `EngineConstants.kt`.
+    - Implemented `getCount()` in all DAOs in `Database.kt` to allow real-time pressure detection.
+    - Implemented `calculateDynamicChunkSize` logic in `LogRepository.kt` and `MainRepository.kt`.
+    - Refactored `proactivePruning` and `deepPruneLogs` to use dynamic chunking.
+    - Enforced R-ID 753: "Maintenance tasks MUST dynamically scale the pruning chunk size (500-5000) based on the backlog delta relative to retention limits."
 
-#### 2. Persistence Stability
-- **Improvement**: The system now provides a stable, smoothed response to storage pressure, improving telemetry consistency on devices with jittery I/O performance.
+#### 2. Maintenance Efficiency
+- **Improvement**: Deep prunes now recover space significantly faster by increasing batch sizes when the database is heavily over its limit, while reverting to small batches for routine maintenance to minimize foreground impact.
 
 ## 🔴 Open Gaps
-- **SIMP-OCT27.10-S1**: Pruning Batch Optimization. Consider dynamic adjustment of `REFINED_PRUNE_CHUNK_SIZE`.
 - **SIMP-OCT27.8-S1**: Database Transaction Timeout. Consider adding a watchdog to the `recoveryLock` to prevent permanent stalls.
+- **SIMP-OCT28.0-S1**: Pruning Worker Telemetry. Consider reporting purged counts to telemetry.
 
 ## 📊 Hardening Snapshot
-- **SOT Count**: 856 (Rules: 357)
-- **Testing Status**: Latency EMA Audit - **PASSED**.
-- **QA Status**: Smoothed throttle response - **VERIFIED**.
+- **SOT Count**: 857 (Rules: 358)
+- **Testing Status**: Pruning Optimization Audit - **PASSED**.
+- **QA Status**: Dynamic batching - **VERIFIED**.
 
 **Handover complete. STOPPING ALL PROCESSING.**

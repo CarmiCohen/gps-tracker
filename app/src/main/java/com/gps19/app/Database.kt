@@ -8,13 +8,13 @@ import com.gps19.core.engine.*
 
 /**
  * Database: persistence configuration for GPS Tracker.
+ * Oct.28.0:
+ * - SIMP-OCT27.10-S1: Pruning Batch Optimization. Added getCount() to all DAOs 
+ *   to support dynamic pruning chunk size calculations.
  * Oct27.1:
  * - ISSUE-OCT27.0-1: Forensic Convergence Hardening (R744). Added UNIQUE constraint 
  *   to LogEntity.localId via MIGRATION_88_89 to prevent duplication during 
  *   high-pressure drain cycles. Incremented version to 89.
- * Oct24.2:
- * - ISSUE-OCT23.101-F6: Added PendingViolationEntity and MIGRATION_87_88 for 
- *   offline violation synchronization. Incremented version to 88.
  */
 @Entity(
     tableName = "logs", 
@@ -284,6 +284,7 @@ interface TrailDao {
     @Query("SELECT * FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp ASC LIMIT 2000") fun getTrail(isViewer: Boolean): Flow<List<TrailEntity>>
     @Query("SELECT * FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp ASC LIMIT 2000") suspend fun getTrailStatic(isViewer: Boolean): List<TrailEntity>
     @Query("DELETE FROM trail_points WHERE isViewerTrail = :isViewer") suspend fun clearTrail(isViewer: Boolean)
+    @Query("SELECT COUNT(*) FROM trail_points WHERE isViewerTrail = :isViewer") suspend fun getCount(isViewer: Boolean): Int
     
     @Query("SELECT timestamp FROM trail_points WHERE isViewerTrail = :isViewer ORDER BY timestamp DESC LIMIT 1 OFFSET :limit")
     suspend fun getPruneThreshold(isViewer: Boolean, limit: Int): Long?
@@ -302,6 +303,7 @@ interface HistoryDao {
     @Query("SELECT * FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts ASC LIMIT 300") suspend fun getHistory(ribbonKey: String): List<HistoryEntity>
     @Query("DELETE FROM connection_history WHERE ribbonKey = :ribbonKey") suspend fun clearHistory(ribbonKey: String)
     @Query("DELETE FROM connection_history") suspend fun clearAll()
+    @Query("SELECT COUNT(*) FROM connection_history WHERE ribbonKey = :ribbonKey") suspend fun getCount(ribbonKey: String): Int
 
     @Query("SELECT ts FROM connection_history WHERE ribbonKey = :ribbonKey ORDER BY ts DESC LIMIT 1 OFFSET :limit")
     suspend fun getPruneThreshold(ribbonKey: String, limit: Int): Long?
@@ -318,6 +320,7 @@ interface ViolationDao {
     @Query("SELECT * FROM violations ORDER BY ts ASC LIMIT 2000") fun getAllFlow(): Flow<List<ViolationEntity>>
     @Query("SELECT * FROM violations ORDER BY ts ASC LIMIT 2000") suspend fun getAll(): List<ViolationEntity>
     @Query("DELETE FROM violations") suspend fun clearAll()
+    @Query("SELECT COUNT(*) FROM violations") suspend fun getCount(): Int
 
     @Query("SELECT ts FROM violations ORDER BY ts DESC LIMIT 1 OFFSET :limit")
     suspend fun getPruneThreshold(limit: Int): Long?

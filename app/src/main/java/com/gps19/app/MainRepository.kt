@@ -30,13 +30,13 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.28.0:
+ * - SIMP-OCT27.10-S1: Pruning Batch Optimization. Implemented dynamic adjustment 
+ *   of pruning chunk size based on the delta between current count and target 
+ *   threshold to accelerate space recovery during deep maintenance.
  * Oct24.2:
  * - ISSUE-OCT23.101-F6: Offline Violation Event Sync. Added support for 
  *   PendingViolation persistence through OfflineRepository.
- * Oct23.120:
- * - ISSUE-OCT23.101-F4: Violation Persistence Integrity Gaps. Updated 
- *   addViolation() and violationsFlow mapping to propagate and store 
- *   isJammingCandidate in ViolationEntity and ViolationPoint.
  */
 @Singleton
 class MainRepository @Inject constructor(
@@ -85,7 +85,6 @@ class MainRepository @Inject constructor(
         private const val PRUNE_LIMIT_HISTORY = 300
         private const val PRUNE_LIMIT_TRAIL = 2000
         private const val PRUNE_LIMIT_VIOLATIONS = 1000
-        private const val PRUNE_CHUNK_SIZE = 500
         private const val SAVE_DEBOUNCE_MS = 1000L
         
         private const val HISTORY_BATCH_WRITE_INTERVAL_MS = 5000L
@@ -440,8 +439,8 @@ class MainRepository @Inject constructor(
 
     /**
      * triggerBackgroundPruning: Oct.12.18 yielded chunked pruning. 
-     * Refactored to remove giant transactions and allow telemetry persistence 
-     * to interleave with maintenance.
+     * SIMP-OCT27.10-S1: Pruning chunk size is dynamically adjusted based on 
+     * the pressure delta for each specific data type.
      */
     private fun triggerBackgroundPruning() {
         if (metrics.isPruningActive.getAndSet(true)) return
@@ -455,23 +454,29 @@ class MainRepository @Inject constructor(
                 
                 // 1. History Pruning (Isolated per ribbon key)
                 listOf("4M", "16M", "1H", "4H", "24H", "7D").forEach { key ->
+                    val currentCount = historyDao.getCount(key)
+                    val dynamicChunkSize = calculateDynamicChunkSize(currentCount, PRUNE_LIMIT_HISTORY)
                     historyDao.getPruneThreshold(key, PRUNE_LIMIT_HISTORY)?.let { threshold ->
-                        historyDao.pruneByThreshold(key, threshold, PRUNE_CHUNK_SIZE)
+                        historyDao.pruneByThreshold(key, threshold, dynamicChunkSize)
                     }
                     yield()
                 }
                 
                 // 2. Trail Pruning (Isolated per role)
                 listOf(false, true).forEach { isViewer ->
+                    val currentCount = trailDao.getCount(isViewer)
+                    val dynamicChunkSize = calculateDynamicChunkSize(currentCount, PRUNE_LIMIT_TRAIL)
                     trailDao.getPruneThreshold(isViewer, PRUNE_LIMIT_TRAIL)?.let { threshold ->
-                        trailDao.pruneByThreshold(isViewer, threshold, PRUNE_CHUNK_SIZE)
+                        trailDao.pruneByThreshold(isViewer, threshold, dynamicChunkSize)
                     }
                     yield()
                 }
                 
                 // 3. Violation Pruning
+                val currentCount = violationDao.getCount()
+                val dynamicChunkSize = calculateDynamicChunkSize(currentCount, PRUNE_LIMIT_VIOLATIONS)
                 violationDao.getPruneThreshold(PRUNE_LIMIT_VIOLATIONS)?.let { threshold ->
-                    violationDao.pruneByThreshold(threshold, PRUNE_CHUNK_SIZE)
+                    violationDao.pruneByThreshold(threshold, dynamicChunkSize)
                 }
                 yield()
                 
@@ -482,6 +487,16 @@ class MainRepository @Inject constructor(
                 metrics.isPruningActive.set(false) 
             }
         }
+    }
+
+    /**
+     * calculateDynamicChunkSize: SIMP-OCT27.10-S1.
+     * Dynamically adjusts chunk size based on the delta between current count and target limit.
+     */
+    private fun calculateDynamicChunkSize(currentCount: Int, targetLimit: Int): Int {
+        val delta = currentCount - targetLimit
+        if (delta <= 0) return PRUNE_CHUNK_SIZE_MIN
+        return (delta / 10).coerceIn(PRUNE_CHUNK_SIZE_MIN, PRUNE_CHUNK_SIZE_MAX)
     }
 
     fun saveLocationUpdate(status: LocationUpdate, role: AppRole? = null) = settings.saveLocationUpdate(status, role)

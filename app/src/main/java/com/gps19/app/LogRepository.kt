@@ -27,6 +27,10 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.28.0:
+ * - SIMP-OCT27.10-S1: Pruning Batch Optimization. Implemented dynamic adjustment 
+ *   of pruning chunk size based on the delta between current count and target 
+ *   threshold to accelerate deep prunes while maintaining I/O stability.
  * Oct.27.10:
  * - SIMP-OCT27.9-S1: Latency EMA for Throttle. Implemented Exponential Moving 
  *   Average (EMA) for maxIoLatency to smooth out throttling response (R-ID 752).
@@ -37,10 +41,6 @@ import kotlin.coroutines.coroutineContext
  * Oct.27.8:
  * - SIMP-OCT27.6-S2: Database Recovery Lock. Implemented recoveryLock (Mutex) to 
  *   ensure exclusive DB access during the Forensic Recovery phase (R-ID 750).
- * Oct.27.7:
- * - GAP-OCT27.6-1: Forensic SPI Level Audit. Integrated Staggered Persistence 
- *   support. Forced buffer sync during recovery and emergency fill levels 
- *   to ensure zero-loss integrity while minimizing bus contention.
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -99,7 +99,6 @@ class LogRepository @Inject constructor(
         private val RELIABILITY_EMA_ALPHA = BigDecimal("0.1") 
         private const val PRUNE_COOLDOWN_MS = 30000L 
         private const val UI_LOG_UPDATE_SAMPLE_MS = 1000L 
-        private const val REFINED_PRUNE_CHUNK_SIZE = 1000 
     }
 
     init {
@@ -523,6 +522,8 @@ class LogRepository @Inject constructor(
     /**
      * proactivePruning: Implements R728 and R712 (Storage-Aware Adaptive Pruning).
      * Thresholds scale dynamically based on storage pressure and charging state.
+     * SIMP-OCT27.10-S1: Pruning chunk size is dynamically adjusted based on 
+     * the delta between current count and target limit.
      * R-ID 750: Inhibited during Forensic Recovery phase.
      */
     suspend fun proactivePruning() = recoveryLock.withLock {
@@ -548,32 +549,35 @@ class LogRepository @Inject constructor(
                 else -> FORENSIC_PRUNE_LIMIT_NORMAL
             }
 
+            val currentCount = logDao.getCount()
+            val dynamicChunkSize = calculateDynamicChunkSize(currentCount, generalLimit)
+
             db.withTransaction {
                 // Tier 1: Heartbeats (Aggressive pruning)
                 logDao.pruneHeartbeatsByThreshold(
                     logDao.getHeartbeatPruneThreshold(generalLimit / 5) ?: 0L, 
-                    REFINED_PRUNE_CHUNK_SIZE
+                    dynamicChunkSize
                 )
                 
                 // Tier 2: General Logs
                 logDao.pruneGeneralByThreshold(
                     logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, 
-                    REFINED_PRUNE_CHUNK_SIZE
+                    dynamicChunkSize
                 )
                 
                 // Tier 3: Important Logs (Keep more)
                 logDao.pruneImportantByThreshold(
                     logDao.getImportantPruneThreshold(generalLimit * 2) ?: 0L, 
-                    REFINED_PRUNE_CHUNK_SIZE
+                    dynamicChunkSize
                 )
                 
                 // Tier 4: Forensic Traces (High storage consumer)
                 logDao.pruneForensicByThreshold(
                     logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, 
-                    REFINED_PRUNE_CHUNK_SIZE
+                    dynamicChunkSize
                 )
             }
-            Timber.i("Adaptive Pruning: Completed. Limits: Gen=$generalLimit, Forensic=$forensicLimit")
+            Timber.i("Adaptive Pruning: Completed. Limits: Gen=$generalLimit, Forensic=$forensicLimit, Chunk=$dynamicChunkSize")
         } catch (e: Exception) { 
             Timber.e(e, "Error during proactive pruning") 
         }
@@ -583,24 +587,40 @@ class LogRepository @Inject constructor(
      * deepPruneLogs: R104 implementation. 
      * Performs an aggressive chunked purge of non-critical logs and forensic traces 
      * to recover storage space and minimize startup I/O stalls.
+     * SIMP-OCT27.10-S1: Uses dynamic chunk size to accelerate space recovery.
      * R-ID 750: Inhibited during Forensic Recovery phase.
      */
     suspend fun deepPruneLogs() = recoveryLock.withLock {
         try {
             Timber.w("R104: Initiating DEEP PRUNE due to database size pressure. DB Locked.")
-            db.withTransaction {
-                // Aggressive: Keep only 10% of normal limits
-                val generalLimit = ADAPTIVE_PRUNE_THRESHOLD_CRITICAL / 2
-                val forensicLimit = FORENSIC_PRUNE_LIMIT_CRITICAL / 2
+            
+            // Aggressive: Keep only 10% of normal limits
+            val generalLimit = ADAPTIVE_PRUNE_THRESHOLD_CRITICAL / 2
+            val forensicLimit = FORENSIC_PRUNE_LIMIT_CRITICAL / 2
+            
+            val currentCount = logDao.getCount()
+            val dynamicChunkSize = calculateDynamicChunkSize(currentCount, generalLimit)
 
-                logDao.pruneHeartbeatsByThreshold(logDao.getHeartbeatPruneThreshold(10) ?: 0L, REFINED_PRUNE_CHUNK_SIZE)
-                logDao.pruneGeneralByThreshold(logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, REFINED_PRUNE_CHUNK_SIZE)
-                logDao.pruneForensicByThreshold(logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, REFINED_PRUNE_CHUNK_SIZE)
+            db.withTransaction {
+                logDao.pruneHeartbeatsByThreshold(logDao.getHeartbeatPruneThreshold(10) ?: 0L, dynamicChunkSize)
+                logDao.pruneGeneralByThreshold(logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, dynamicChunkSize)
+                logDao.pruneForensicByThreshold(logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, dynamicChunkSize)
             }
-            Timber.i("R104: Deep prune completed. DB Unlocked.")
+            Timber.i("R104: Deep prune completed. Chunk=$dynamicChunkSize. DB Unlocked.")
         } catch (e: Exception) {
             Timber.e(e, "Error during deep pruning")
         }
+    }
+
+    /**
+     * calculateDynamicChunkSize: SIMP-OCT27.10-S1.
+     * Dynamically adjusts chunk size based on the delta between current count and target limit.
+     */
+    private fun calculateDynamicChunkSize(currentCount: Int, targetLimit: Int): Int {
+        val delta = currentCount - targetLimit
+        if (delta <= 0) return PRUNE_CHUNK_SIZE_MIN
+        // Scale factor: 10% of delta, clamped to defined engine limits
+        return (delta / 10).coerceIn(PRUNE_CHUNK_SIZE_MIN, PRUNE_CHUNK_SIZE_MAX)
     }
 
     /**

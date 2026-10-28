@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.28.0:
+ * - SIMP-OCT27.10-S1: Pruning Batch Optimization. Added PRUNE_CHUNK_SIZE_MIN (500) 
+ *   and PRUNE_CHUNK_SIZE_MAX (5000) for dynamic adjustment during deep prunes.
  * Oct.27.10:
  * - SIMP-OCT27.9-S1: Latency EMA. Added IO_LATENCY_EMA_ALPHA (0.2) to smooth 
  *   storage contention response and prevent rapid oscillation.
@@ -93,6 +96,8 @@ const val FORENSIC_RELIABILITY_DEGRADATION_DURATION_MS = 30000L
 
 // Issue #728: Storage-Aware Adaptive Pruning
 const val PRUNE_CHUNK_SIZE = 1000
+const val PRUNE_CHUNK_SIZE_MIN = 500
+const val PRUNE_CHUNK_SIZE_MAX = 5000
 const val ADAPTIVE_PRUNE_THRESHOLD_CRITICAL = 5000   
 const val ADAPTIVE_PRUNE_THRESHOLD_LOW = 10000
 const val ADAPTIVE_PRUNE_THRESHOLD_NORMAL = 25000

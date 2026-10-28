@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct27.10)
+# SOT Master Requirements & Hardening Status (Oct28.0)
 
-## 🏗️ Architectural Master Rules (357 Rules)
+## 🏗️ Architectural Master Rules (358 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -17,8 +17,10 @@
 *   **1.280 Database Recovery Lock (R-ID 750)**: The system MUST utilize an exclusive Mutex (`recoveryLock`) during the forensic recovery phase to block standard log drainers and maintenance workers, preventing database contention and ensuring recovery trace replay integrity. (Oct27.10 - ISSUE-OCT27.8-F1).
 *   **1.281 IO Latency-Driven Throttle (R-ID 751)**: The forensic drainer MUST dynamically scale its drain interval and batch size based on real-time `maxIoLatency` feedback (threshold: 500ms) to prevent storage-induced telemetry jitter on budget hardware during sustained load. (Oct27.10 - ISSUE-OCT27.9-F1).
 *   **1.282 Latency EMA Smoothing (R-ID 752)**: The forensic drainer MUST utilize an Exponential Moving Average (EMA) for `maxIoLatency` feedback (Alpha: 0.2) to smooth out throttling response and prevent rapid oscillation during transient storage micro-spikes. (Oct27.10 - ISSUE-OCT27.10-S1).
+*   **1.283 Pruning Batch Optimization (R-ID 753)**: Maintenance tasks MUST dynamically scale the pruning chunk size (500-5000) based on the backlog delta relative to retention limits. This ensures that deep prunes during startup or high-pressure states recover storage space rapidly without inducing sustained I/O stalls. (Oct28.0 - SIMP-OCT27.10-S1).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 857**: Pruning Batch Optimization - PASSED. Verified that `LogRepository` and `MainRepository` correctly calculate dynamic chunk sizes based on backlog delta. (Oct28.0 - SIMP-OCT27.10-S1).
 *   **SOT ID 856**: Latency EMA Smoothing - PASSED. Verified that `LogRepository` correctly applies EMA to `maxIoLatency` before determining the dynamic drain delay and batch size. (Oct27.10 - ISSUE-OCT27.10-S1).
 *   **SOT ID 855**: IO Latency-Driven Throttle - PASSED. Verified that LogRepository incorporates maxIoLatency into the dynamic load factor, increasing drain intervals during storage pressure. (Oct27.10 - ISSUE-OCT27.9-F1).
 *   **SOT ID 854**: Database Recovery Lock - PASSED. Verified that `LogRepository` enforces exclusive DB access during forensic replay, preventing race conditions with standard drainers. (Oct27.10 - ISSUE-OCT27.8-F1).
@@ -30,6 +32,7 @@
 *   **SOT ID 848**: Forensic Convergence Audit - PASSED. Verified 100Hz burst sustainability and enforced persistence unique constraints to prevent data duplication. (Oct27.10 - ISSUE-OCT27.1-F1).
 
 ## ✅ Verification Chapters
+*   **Chapter 4.27 (Pruning Optimization Audit)**: PASSED - Verified that pruning chunk sizes correctly scale from 500 up to 5000 based on the delta between current database counts and retention thresholds. (Oct28.0).
 *   **Chapter 4.26 (Latency EMA Audit)**: PASSED - Verified that the forensic drain throttle response is smoothed by a 0.2 Alpha EMA, preventing rapid oscillation during transient storage spikes. (Oct27.10).
 *   **Chapter 4.25 (IO Throttling Audit)**: PASSED - Verified that forensic drainers dynamically react to storage latency spikes by doubling the effective drain interval when `maxIoLatency` exceeds 500ms. (Oct27.10).
 *   **Chapter 4.24 (Recovery Phase Contention Audit)**: PASSED - Verified that `recoveryLock` correctly sequences recovery before standard drainers and blocks maintenance workers during the replay window. (Oct27.10).
