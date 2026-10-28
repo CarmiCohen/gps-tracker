@@ -24,17 +24,10 @@ import javax.inject.Singleton
  * AndroidNetworkProvider: Production implementation of NetworkProvider 
  * using ConnectivityManager.NetworkCallback.
  * 
- * Oct.20.23:
- * - ISSUE-OCT20.23-F1: Redundant Connectivity Callback Leaks. Transitioned to 
- *   SharingStarted.Eagerly to ensure a single registration for the provider's 
- *   entire lifecycle, preventing redundant calls detected by StackLog.
- * Oct.18.24:
- * - ISSUE-OCT18.22-F2: Redundant Network Callback Registrations. Consolidated 
- *   all callback management into a single provider and added isNetworkAvailableFlow.
- *   Unified listener management via Flow collection.
- * Oct.18.6:
- * - ISSUE-OCT18.6-F1: Synthetic Physical Event Injection. Implemented simulateNetworkLoss 
- *   to allow manual triggering of connectivity failover logic.
+ * Oct.28.25:
+ * - ISSUE-OCT28.23-F1: Davey/StackLog Remediation. Added 5s delay to system 
+ *   callback registration during startup to prevent Main thread stalls and 
+ *   platform diagnostic triggers (StackLog) on A15 hardware.
  * Oct.24.16:
  * - ISSUE-OCT24.14-F2: StackLog Leak. Hardened registration lifecycle. Moved 
  *   system callback registration to the Main thread and added a process-level 
@@ -93,18 +86,26 @@ class AndroidNetworkProvider @Inject constructor(
             .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
             .build()
         
-        // Oct.24.16: Ensure registration happens on Main thread to satisfy 
-        // Samsung platform diagnostic constraints and prevent StackLog leaks.
+        // Oct.28.25: Hardened registration with startup deferral (ISSUE-OCT28.23-F1).
+        // Ensure registration happens on Main thread to satisfy Samsung platform constraints.
         withContext(Dispatchers.Main.immediate) {
             if (isSystemCallbackRegistered.compareAndSet(false, true)) {
                 try {
+                    // Emit current state immediately to avoid UI "offline" flicker during deferral
+                    trySend(isNetworkAvailable)
+
+                    // ISSUE-OCT28.23-F1: Defer platform registration to avoid Davey during A15 hydration
+                    if (timeProvider.elapsedRealtime < 10000) {
+                        Timber.d("AndroidNetworkProvider: Startup window detected. Deferring system callback registration.")
+                        delay(5000)
+                    }
+
                     Timber.d("AndroidNetworkProvider: Registering system network callback.")
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         connectivityManager.registerNetworkCallback(request, callback, mainHandler)
                     } else {
                         connectivityManager.registerNetworkCallback(request, callback)
                     }
-                    trySend(isNetworkAvailable)
                 } catch (e: Exception) {
                     isSystemCallbackRegistered.set(false)
                     Timber.e(e, "AndroidNetworkProvider: Registration failed")

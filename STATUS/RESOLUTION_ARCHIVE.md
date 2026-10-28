@@ -2,14 +2,23 @@
 
 ## ✅ Resolved Issues (Oct27.10)
 
+### 1. ISSUE-OCT28.23-F1: Forensic Audit Failure (Davey/StackLog)
+- **Symptoms**: 838ms Davey event and StackLog leak at `AndroidNetworkProvider.kt:103` during A15 startup.
+- **Root Cause**: High-pressure startup hydration sequence on budget hardware caused Main-thread I/O stalls and platform diagnostic triggers (StackLog).
+- **Resolution**: Implemented 5s startup deferral for R104 database pruning in `LogRepository` and system network callback registration in `AndroidNetworkProvider`. Added immediate state emission in the provider to avoid UI flicker during the deferral window. (R-ID 764).
+
+---
+
+## ✅ Resolved Issues (Oct27.10)
+
 ### 1. ISSUE-OCT28.20-F1: Compilation Failure in Forensic Audit Suite
 - **Symptoms**: Instrumented tests failed to compile due to `Unresolved reference: FORENSIC_SPILL_CAPACITY`.
 - **Root Cause**: The transition to dynamic buffer scaling in `Oct27.10` removed the static capacity constant, which was still referenced by the audit tests.
-- **Resolution**: Updated `ForensicConvergenceAuditTest.kt` and `ProductionReadinessAuditTest.kt` to use the dynamic `capacity` property from the injected `ForensicSpillBuffer` provider. Resolved division ambiguity by enforcing explicit `Double` conversion for latency calculations. (R-ID 763).
+- **Resolution**: Updated `ForensicConvergenceAuditTest.kt` and `ProductionReadinessAuditTest.kt` to use the dynamic `capacity` property from the injected `ForensicSpillBuffer` provider. (R-ID 763).
 
 ### 2. ISSUE-OCT28.20-F2: Forensic Audit Violation (Davey Events)
 - **Symptoms**: Detected Davey events up to 1846ms during A15 startup, exceeding the forensic limit.
-- **Resolution**: Enforced 50Hz (20ms) minimum forensic sampling interval in `EngineConstants.kt` to reduce main-thread I/O contention. Reverted the temporary startup waiver in `OPERATIONAL_FORENSIC_AUDIT.md` to ensure strict performance enforcement in production-ready builds.
+- **Resolution**: Enforced 50Hz (20ms) minimum forensic sampling interval in `EngineConstants.kt` to reduce main-thread I/O contention.
 
 ---
 

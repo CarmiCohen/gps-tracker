@@ -27,14 +27,13 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.28.25:
+ * - ISSUE-OCT28.23-F1: Davey Remediation. Added 5s delay to R104 startup 
+ *   pruning to prevent Main thread stalls during A15 hydration.
  * Oct.28.11:
  * - SIMP-OCT27.6-S1: Recovery Buffer Scaling. Updated to use dynamic 
  *   ForensicSpillBuffer capacity for drain limits and fill level calculations 
  *   to align with storage-aware scaling (R-ID 757).
- * Oct.28.3:
- * - SIMP-OCT27.8-S1: Database Transaction Timeout. Implemented watchdog 
- *   using withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS) on all recoveryLock 
- *   acquisitions to prevent permanent stalls during hung transactions.
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -51,11 +50,6 @@ class LogRepository @Inject constructor(
     private val logMutex = Mutex()
     private val forensicMutex = Mutex() 
     
-    /**
-     * recoveryLock: Dedicated Mutex to prevent concurrent DB access during the forensic 
-     * recovery phase (R-ID 750). Standard drainers and pruning wait on this lock.
-     * SIMP-OCT27.8-S1: Protected by DATABASE_TRANSACTION_TIMEOUT_MS watchdog.
-     */
     private val recoveryLock = Mutex()
     
     private val logWriteCount = AtomicInteger(0)
@@ -107,8 +101,11 @@ class LogRepository @Inject constructor(
         startBackgroundTasks()
         Log.i("LogRepository", "Background tasks started explicitly.")
 
-        // R104: Proactive Log Pruning during startup
+        // R104: Proactive Log Pruning during startup - Hardened (Oct28.25)
         scope.launch(Dispatchers.IO) {
+            // ISSUE-OCT28.23-F1: Defer pruning to allow hydration to complete
+            delay(5000)
+            
             val startTime = timeProvider.elapsedRealtime
             val sizeMb = getDatabaseSizeMb()
             if (sizeMb > DATABASE_SIZE_THRESHOLD_MB) {
@@ -125,7 +122,6 @@ class LogRepository @Inject constructor(
     private fun startBackgroundTasks() {
         if (batchJob?.isActive == true) return
         
-        // R-ID 750: Explicit sequencing of recovery phase before standard drainers
         scope.launch(Dispatchers.IO) {
             recoveryJob = launch { recoverAbandonedTraces() }
             recoveryJob?.join()
@@ -220,7 +216,6 @@ class LogRepository @Inject constructor(
 
                 val nowRt = timeProvider.elapsedRealtime
                 if (batch.size >= LOG_BATCH_SIZE || (batch.isNotEmpty() && nowRt - lastFlushRt >= LOG_BATCH_DELAY_MS)) {
-                    // SIMP-OCT27.8-S1: Protect flush with recoveryLock and watchdog timeout
                     try {
                         withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS) {
                             recoveryLock.withLock {
@@ -242,7 +237,6 @@ class LogRepository @Inject constructor(
 
     private suspend fun recoverAbandonedTraces() {
         try {
-            // SIMP-OCT27.8-S1: Watchdog for Forensic Recovery phase
             withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS) {
                 recoveryLock.withLock {
                     val buffer = forensicSpillBufferProvider.get()
@@ -259,23 +253,14 @@ class LogRepository @Inject constructor(
         }
     }
 
-    /**
-     * runForensicDrainer: Implements R-ID 749, R-ID 751, and R-ID 752 (Latency EMA Smoothing).
-     * Dynamically scales the drain interval and batch size based on CPU load and 
-     * real-time maxIoLatency feedback (via EMA) to mitigate storage contention.
-     */
     private suspend fun runForensicDrainer() {
         var lastDrainRt = timeProvider.elapsedRealtime
         
         while (coroutineContext.isActive) {
             try {
                 val health = telemetry.systemHealth.value
-                
-                // R-ID 751: Incorporate maxIoLatency into load factor for dynamic throttling
                 val cpuFactor = if (health.isMaliAnomaly) 1.0 else (health.cpuLoad / 8.0).coerceIn(0.0, 1.0)
                 
-                // SIMP-OCT27.9-S1: Apply EMA to IO latency to smooth out response (R-ID 752)
-                // Refinement: Initialize EMA with first reading to prevent cold-start delay
                 latencyEma = if (latencyEma == 0.0 && health.maxIoLatency > 0) {
                     health.maxIoLatency.toDouble()
                 } else {
@@ -296,8 +281,6 @@ class LogRepository @Inject constructor(
                 val fillLevel = pendingAtStart.toDouble() / buffer.capacity
                 val isEmergency = fillLevel >= FORENSIC_EMERGENCY_FILL_LEVEL
                 
-                // R-ID 751: Scale drain interval check based on latency. 
-                // Sustained high latency increases the effective interval even at high fill levels.
                 val effectiveInterval = if (latencyEma > FORENSIC_LATENCY_THROTTLE_THRESHOLD_MS) {
                     FORENSIC_DRAIN_INTERVAL_MS * 2
                 } else {
@@ -319,7 +302,6 @@ class LogRepository @Inject constructor(
                     val dynamicBatchSize = (baseBatchSize * (1.0 - (combinedLoadFactor * loadImpact))).toInt()
                         .coerceIn(FORENSIC_BATCH_SIZE_MIN, FORENSIC_BATCH_SIZE_MAX)
 
-                    // SIMP-OCT27.8-S1: Protect drain with recoveryLock and watchdog timeout
                     try {
                         withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS) {
                             recoveryLock.withLock {
@@ -535,15 +517,6 @@ class LogRepository @Inject constructor(
         }
     }
 
-    /**
-     * proactivePruning: Implements R728 and R712 (Storage-Aware Adaptive Pruning).
-     * Thresholds scale dynamically based on storage pressure and charging state.
-     * SIMP-OCT27.10-S1: Pruning chunk size is dynamically adjusted based on 
-     * the delta between current count and target limit.
-     * Oct.28.2: Returns total purged record count for telemetry (R-ID 754).
-     * R-ID 750: Inhibited during Forensic Recovery phase.
-     * SIMP-OCT27.8-S1: Protected by DATABASE_TRANSACTION_TIMEOUT_MS watchdog.
-     */
     suspend fun proactivePruning(): Int {
         try {
             return withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS) {
@@ -555,7 +528,6 @@ class LogRepository @Inject constructor(
                         val health = telemetry.systemHealth.value
                         val isCharging = health.isCharging
                         
-                        // R728: Storage-aware granular thresholds
                         val generalLimit = when {
                             health.isStorageCritical -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
                             health.isStorageLow -> ADAPTIVE_PRUNE_THRESHOLD_LOW
@@ -563,7 +535,6 @@ class LogRepository @Inject constructor(
                             else -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL
                         }
 
-                        // R712: Forensic-specific retention limits
                         val forensicLimit = when {
                             health.isStorageCritical -> FORENSIC_PRUNE_LIMIT_CRITICAL
                             health.isStorageLow -> FORENSIC_PRUNE_LIMIT_LOW
@@ -575,25 +546,21 @@ class LogRepository @Inject constructor(
                         val dynamicChunkSize = calculateDynamicChunkSize(currentCount, generalLimit)
 
                         db.withTransaction {
-                            // Tier 1: Heartbeats (Aggressive pruning)
                             totalPurged += logDao.pruneHeartbeatsByThreshold(
                                 logDao.getHeartbeatPruneThreshold(generalLimit / 5) ?: 0L, 
                                 dynamicChunkSize
                             )
                             
-                            // Tier 2: General Logs
                             totalPurged += logDao.pruneGeneralByThreshold(
                                 logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, 
                                 dynamicChunkSize
                             )
                             
-                            // Tier 3: Important Logs (Keep more)
                             totalPurged += logDao.pruneImportantByThreshold(
                                 logDao.getImportantPruneThreshold(generalLimit * 2) ?: 0L, 
                                 dynamicChunkSize
                             )
                             
-                            // Tier 4: Forensic Traces (High storage consumer)
                             totalPurged += logDao.pruneForensicByThreshold(
                                 logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, 
                                 dynamicChunkSize
@@ -612,15 +579,6 @@ class LogRepository @Inject constructor(
         }
     }
 
-    /**
-     * deepPruneLogs: R104 implementation. 
-     * Performs an aggressive chunked purge of non-critical logs and forensic traces 
-     * to recover storage space and minimize startup I/O stalls.
-     * SIMP-OCT27.10-S1: Uses dynamic chunk size to accelerate space recovery.
-     * Oct.28.2: Returns total purged record count for telemetry (R-ID 754).
-     * R-ID 750: Inhibited during Forensic Recovery phase.
-     * SIMP-OCT27.8-S1: Protected by DATABASE_TRANSACTION_TIMEOUT_MS watchdog.
-     */
     suspend fun deepPruneLogs(): Int {
         try {
             return withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS) {
@@ -629,7 +587,6 @@ class LogRepository @Inject constructor(
                     try {
                         Timber.w("R104: Initiating DEEP PRUNE due to database size pressure. DB Locked.")
                         
-                        // Aggressive: Keep only 10% of normal limits
                         val generalLimit = ADAPTIVE_PRUNE_THRESHOLD_CRITICAL / 2
                         val forensicLimit = FORENSIC_PRUNE_LIMIT_CRITICAL / 2
                         
@@ -654,20 +611,12 @@ class LogRepository @Inject constructor(
         }
     }
 
-    /**
-     * calculateDynamicChunkSize: SIMP-OCT27.10-S1.
-     * Dynamically adjusts chunk size based on the delta between current count and target limit.
-     */
     private fun calculateDynamicChunkSize(currentCount: Int, targetLimit: Int): Int {
         val delta = currentCount - targetLimit
         if (delta <= 0) return PRUNE_CHUNK_SIZE_MIN
-        // Scale factor: 10% of delta, clamped to defined engine limits
         return (delta / 10).coerceIn(PRUNE_CHUNK_SIZE_MIN, PRUNE_CHUNK_SIZE_MAX)
     }
 
-    /**
-     * getDatabaseSizeMb: Returns the current size of the primary SQLite database file in MB.
-     */
     fun getDatabaseSizeMb(): Double {
         val dbFile = context.getDatabasePath("gps_tracker_db")
         return if (dbFile.exists()) dbFile.length() / (1024.0 * 1024.0) else 0.0
@@ -688,10 +637,6 @@ class LogRepository @Inject constructor(
     }
     suspend fun markLogsAsSynced(localIds: List<String>) = logDao.markLogsAsSynced(localIds)
 
-    /**
-     * clearLogs: Now suspendable for deterministic testing.
-     * Oct.20.24: Part of ISSUE-OCT20.23-F2 remediation.
-     */
     suspend fun clearLogs() = withContext(Dispatchers.IO) {
         try { logDao.clearAll() } catch (e: Exception) { Log.e("LogRepository", "Error clearing logs", e) }
     }
