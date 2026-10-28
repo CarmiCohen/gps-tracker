@@ -27,17 +27,14 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.28.11:
+ * - SIMP-OCT27.6-S1: Recovery Buffer Scaling. Updated to use dynamic 
+ *   ForensicSpillBuffer capacity for drain limits and fill level calculations 
+ *   to align with storage-aware scaling (R-ID 757).
  * Oct.28.3:
  * - SIMP-OCT27.8-S1: Database Transaction Timeout. Implemented watchdog 
  *   using withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS) on all recoveryLock 
  *   acquisitions to prevent permanent stalls during hung transactions.
- * Oct.28.2:
- * - SIMP-OCT28.0-S1: Pruning Worker Telemetry. Updated pruning methods to 
- *   return total deleted record counts for telemetry reporting (R-ID 754).
- * Oct.28.0:
- * - SIMP-OCT27.10-S1: Pruning Batch Optimization. Implemented dynamic adjustment 
- *   of pruning chunk size based on the delta between current count and target 
- *   threshold to accelerate deep prunes while maintaining I/O stability.
  */
 @OptIn(FlowPreview::class)
 @Singleton
@@ -91,7 +88,6 @@ class LogRepository @Inject constructor(
         private val COLON_VALUE_REGEX = Regex(""":\s*-?\d+(\.\d+)?\s*[A-Za-z%°]*""")
         private val SPACE_VALUE_REGEX = Regex("""\s+-?\d+(\.\d+)?\s*[A-Za-z%°]*""")
         
-        private const val FORENSIC_FILL_THRESHOLD = FORENSIC_SPILL_CAPACITY / 4
         private const val FORENSIC_CONVERGENCE_STALL_LIMIT = 3
         private const val FORENSIC_EMERGENCY_FILL_LEVEL = 0.9
         private val RELIABILITY_EMA_ALPHA = BigDecimal("0.1") 
@@ -199,7 +195,8 @@ class LogRepository @Inject constructor(
 
     @VisibleForTesting
     suspend fun flushForensicTraces() {
-        performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = false, forcePersistence = true)
+        val buffer = forensicSpillBufferProvider.get()
+        performForensicDrain(limit = buffer.capacity, isRecovery = false, forcePersistence = true)
     }
 
     fun setForensicStallSimulation(active: Boolean) {
@@ -252,7 +249,7 @@ class LogRepository @Inject constructor(
                     val pending = buffer.getPendingCount()
                     if (pending > 0) {
                         Log.i("LogRepository", "Forensic Recovery: Replaying $pending abandoned traces. DB Locked.")
-                        performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = true, forcePersistence = true)
+                        performForensicDrain(limit = buffer.capacity, isRecovery = true, forcePersistence = true)
                         Log.i("LogRepository", "Forensic Recovery: Replay complete. DB Unlocked.")
                     }
                 }
@@ -296,7 +293,7 @@ class LogRepository @Inject constructor(
                 val nowRt = timeProvider.elapsedRealtime
                 val buffer = forensicSpillBufferProvider.get()
                 val pendingAtStart = buffer.getPendingCount()
-                val fillLevel = pendingAtStart.toDouble() / FORENSIC_SPILL_CAPACITY
+                val fillLevel = pendingAtStart.toDouble() / buffer.capacity
                 val isEmergency = fillLevel >= FORENSIC_EMERGENCY_FILL_LEVEL
                 
                 // R-ID 751: Scale drain interval check based on latency. 
@@ -309,7 +306,7 @@ class LogRepository @Inject constructor(
 
                 val shouldDrain = isEmergency || 
                                 buffer.isHighPressure() ||
-                                (pendingAtStart >= FORENSIC_FILL_THRESHOLD && combinedLoadFactor < 0.8) || 
+                                (pendingAtStart >= buffer.capacity / 4 && combinedLoadFactor < 0.8) ||
                                 (pendingAtStart > 0 && (nowRt - lastDrainRt >= effectiveInterval || testModeProvider.isTestMode())) ||
                                 isForensicStallSimulated.get()
                 

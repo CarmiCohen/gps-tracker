@@ -10,7 +10,6 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.MappedByteBuffer
 import java.nio.channels.FileChannel
-import java.util.Arrays
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.CRC32
@@ -19,14 +18,14 @@ import javax.inject.Singleton
 
 /**
  * ForensicSpillBuffer: High-performance memory-mapped circular buffer for forensic traces.
+ * Oct.28.11:
+ * - SIMP-OCT27.6-S1: Recovery Buffer Scaling. Implemented dynamic capacity 
+ *   scaling based on storage health to prevent over-provisioning. The buffer 
+ *   now ranges from 2,000 to 50,000 entries (R-ID 757).
  * Oct.27.7:
  * - GAP-OCT27.6-1: Forensic SPI Level Audit. Implemented Staggered Persistence to 
  *   mitigate SPI bus contention. Transitioned to AuditType.IO and added 
  *   staggered force() logic to prevent jitter during 100Hz bursts.
- * Oct.20.21:
- * - ISSUE-OCT20.10-F1: Hardened against overflow with circular overwrite (R746).
- * Oct.14.18:
- * - Optimized commitDrain by moving MappedByteBuffer.force() outside the synchronized block.
  */
 @Singleton
 class ForensicSpillBuffer @Inject constructor(
@@ -36,6 +35,8 @@ class ForensicSpillBuffer @Inject constructor(
 
     private val spillFile = File(context.filesDir, FORENSIC_SPILL_FILE_NAME)
     private var mappedBuffer: MappedByteBuffer? = null
+    
+    val capacity: Int
     
     private val writeIdx = AtomicInteger(0)
     private val totalCount = AtomicInteger(0)
@@ -79,9 +80,18 @@ class ForensicSpillBuffer @Inject constructor(
     }
 
     init {
+        val targetCap = calculateTargetCapacity()
+        this.capacity = targetCap
+        
         try {
-            val size = (FORENSIC_SPILL_CAPACITY * FORENSIC_SPILL_ENTRY_SIZE_V5).toLong() + HEADER_SIZE
+            val size = (targetCap * FORENSIC_SPILL_ENTRY_SIZE_V5).toLong() + HEADER_SIZE
+            
+            // Oct.28.11: Ensure file length matches target capacity to prevent over-provisioning
             RandomAccessFile(spillFile, "rw").use { raf ->
+                if (raf.length() != size) {
+                    Timber.i("Forensic Audit: Resizing spill buffer to $targetCap entries (${size / 1024} KB)")
+                    raf.setLength(size)
+                }
                 mappedBuffer = raf.channel.map(FileChannel.MapMode.READ_WRITE, 0, size).apply {
                     order(ByteOrder.nativeOrder())
                 }
@@ -94,16 +104,16 @@ class ForensicSpillBuffer @Inject constructor(
                 val cap = if (magic == MAGIC_NUMBER) buffer.getInt(OFF_CAPACITY) else -1
                 val entrySz = if (magic == MAGIC_NUMBER) buffer.getInt(OFF_ENTRY_SIZE) else -1
 
-                if (magic != MAGIC_NUMBER || version != CURRENT_VERSION || cap != FORENSIC_SPILL_CAPACITY || entrySz != FORENSIC_SPILL_ENTRY_SIZE_V5) {
+                if (magic != MAGIC_NUMBER || version != CURRENT_VERSION || cap != targetCap || entrySz != FORENSIC_SPILL_ENTRY_SIZE_V5) {
                     resetBuffer()
                 } else {
                     val recoveredWrite = buffer.getInt(OFF_WRITE_IDX)
                     val recoveredCount = buffer.getInt(OFF_COUNT)
                     val recoveredRead = buffer.getInt(OFF_READ_IDX)
                     
-                    if (recoveredWrite in 0 until FORENSIC_SPILL_CAPACITY && 
-                        recoveredCount in 0..FORENSIC_SPILL_CAPACITY &&
-                        recoveredRead in 0 until FORENSIC_SPILL_CAPACITY) {
+                    if (recoveredWrite in 0 until capacity && 
+                        recoveredCount in 0..capacity &&
+                        recoveredRead in 0 until capacity) {
                         writeIdx.set(recoveredWrite)
                         totalCount.set(recoveredCount)
                         readIdx.set(recoveredRead)
@@ -117,6 +127,20 @@ class ForensicSpillBuffer @Inject constructor(
         }
     }
 
+    /**
+     * calculateTargetCapacity: SIMP-OCT27.6-S1.
+     * Scales the forensic spill buffer based on available storage.
+     */
+    private fun calculateTargetCapacity(): Int {
+        val freeSpaceMb = context.filesDir.freeSpace / (1024L * 1024L)
+        return when {
+            freeSpaceMb < SYSTEM_STORAGE_CRITICAL_THRESHOLD_MB -> FORENSIC_SPILL_CAPACITY_MIN
+            freeSpaceMb < SYSTEM_STORAGE_LOW_THRESHOLD_MB * 2 -> FORENSIC_SPILL_CAPACITY_DEFAULT
+            freeSpaceMb > 2000 -> FORENSIC_SPILL_CAPACITY_MAX
+            else -> FORENSIC_SPILL_CAPACITY_DEFAULT
+        }
+    }
+
     fun resetBufferForTest() {
         resetBuffer()
     }
@@ -126,7 +150,7 @@ class ForensicSpillBuffer @Inject constructor(
         synchronized(this) {
             buffer.putInt(OFF_MAGIC, MAGIC_NUMBER)
             buffer.putInt(OFF_VERSION, CURRENT_VERSION)
-            buffer.putInt(OFF_CAPACITY, FORENSIC_SPILL_CAPACITY)
+            buffer.putInt(OFF_CAPACITY, capacity)
             buffer.putInt(OFF_ENTRY_SIZE, FORENSIC_SPILL_ENTRY_SIZE_V5)
             buffer.putLong(OFF_LAST_WRITE_RT, 0L)
             buffer.putInt(OFF_WRITE_IDX, 0)
@@ -168,7 +192,7 @@ class ForensicSpillBuffer @Inject constructor(
             val localCrc = CRC32()
 
             synchronized(this) {
-                val wasFull = totalCount.get() >= FORENSIC_SPILL_CAPACITY
+                val wasFull = totalCount.get() >= capacity
                 if (wasFull) {
                     forceCircularAdvance(buffer)
                 }
@@ -237,7 +261,7 @@ class ForensicSpillBuffer @Inject constructor(
             val localCrc = CRC32()
             
             synchronized(this) {
-                val wasFull = totalCount.get() >= FORENSIC_SPILL_CAPACITY
+                val wasFull = totalCount.get() >= capacity
                 if (wasFull) {
                     forceCircularAdvance(buffer)
                 }
@@ -283,7 +307,7 @@ class ForensicSpillBuffer @Inject constructor(
 
     private fun forceCircularAdvance(buffer: MappedByteBuffer) {
         val currentRead = readIdx.get()
-        val nextRead = (currentRead + 1) % FORENSIC_SPILL_CAPACITY
+        val nextRead = (currentRead + 1) % capacity
         readIdx.set(nextRead)
         buffer.putInt(OFF_READ_IDX, nextRead)
         totalCount.decrementAndGet()
@@ -291,7 +315,7 @@ class ForensicSpillBuffer @Inject constructor(
 
     private fun advanceWritePointer(buffer: MappedByteBuffer) {
         val currentWrite = writeIdx.get()
-        val nextWrite = (currentWrite + 1) % FORENSIC_SPILL_CAPACITY
+        val nextWrite = (currentWrite + 1) % capacity
         writeIdx.set(nextWrite)
         buffer.putInt(OFF_WRITE_IDX, nextWrite)
         val newCount = totalCount.incrementAndGet()
@@ -386,7 +410,7 @@ class ForensicSpillBuffer @Inject constructor(
                     } else {
                         Timber.w("Forensic Audit: CRC mismatch at index $tempReadIdx. Stored: $storedCrcLong, Computed: ${localCrc.value}")
                     }
-                    tempReadIdx = (tempReadIdx + 1) % FORENSIC_SPILL_CAPACITY
+                    tempReadIdx = (tempReadIdx + 1) % capacity
                 }
                 PeekResult(results, toPeekCount)
             }
@@ -416,7 +440,7 @@ class ForensicSpillBuffer @Inject constructor(
                 val actualToConsume = count.coerceAtMost(totalCount.get())
                 if (actualToConsume <= 0) return@synchronized
 
-                val newRead = (readIdx.get() + actualToConsume) % FORENSIC_SPILL_CAPACITY
+                val newRead = (readIdx.get() + actualToConsume) % capacity
                 readIdx.set(newRead)
                 buffer.putInt(OFF_READ_IDX, newRead)
 
@@ -435,8 +459,8 @@ class ForensicSpillBuffer @Inject constructor(
 
     fun hasPending(): Boolean = totalCount.get() > 0
     fun getPendingCount(): Int = totalCount.get()
-    fun isFull(): Boolean = totalCount.get() >= FORENSIC_SPILL_CAPACITY
+    fun isFull(): Boolean = totalCount.get() >= capacity
     
-    fun getFillLevel(): Double = totalCount.get().toDouble() / FORENSIC_SPILL_CAPACITY
+    fun getFillLevel(): Double = totalCount.get().toDouble() / capacity
     fun isHighPressure(): Boolean = getFillLevel() >= HIGH_PRESSURE_THRESHOLD
 }

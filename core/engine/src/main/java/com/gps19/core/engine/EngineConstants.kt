@@ -2,6 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.28.11:
+ * - SIMP-OCT27.6-S1: Recovery Buffer Scaling. Transitioned FORENSIC_SPILL_CAPACITY 
+ *   to a dynamic range (2000-50000) to optimize storage usage and prevent 
+ *   circular overwrite based on device health.
  * Oct.28.4:
  * - SIMP-OCT28.2-S1: Pruning Telemetry Aggregation. Added 
  *   MAINTENANCE_PURGED_EMA_ALPHA (0.3) for rolling average tracking of 
@@ -86,7 +90,9 @@ const val LOG_BUFFER_CAPACITY = 5000
 // Issue #669: Forensic Spill-Buffer (MappedByteBuffer)
 const val FORENSIC_SPILL_FILE_NAME = "forensic_spill.bin"
 const val FORENSIC_SPILL_ENTRY_SIZE_V5 = 128
-const val FORENSIC_SPILL_CAPACITY = 10000 
+const val FORENSIC_SPILL_CAPACITY_MIN = 2000
+const val FORENSIC_SPILL_CAPACITY_MAX = 50000
+const val FORENSIC_SPILL_CAPACITY_DEFAULT = 10000
 const val FORENSIC_DRAIN_INTERVAL_MS = 1000L
 const val FORENSIC_DRAIN_THROTTLE_MIN_MS = 100L
 const val FORENSIC_DRAIN_THROTTLE_MAX_MS = 5000L

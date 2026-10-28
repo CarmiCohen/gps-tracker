@@ -17,13 +17,11 @@ import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * ForensicStressAuditTest: Verifies Forensic Integrity and Stress stability.
+ * Oct.28.11: 
+ * - SIMP-OCT27.6-S1: Recovery Buffer Scaling. Updated to use dynamic 
+ *   ForensicSpillBuffer capacity (R-ID 757).
  * Oct.18.2: 
  * - SIMP-OCT17.11-S1: Migrated to injected TestModeProvider, removing static LogRepository.setTestMode calls.
- * Oct.17.11: Fixed verifySpillBufferWrapAroundStability by inhibiting drainer during the test.
- * Oct.16.3: Formalized state reset via SIMP-OCT16.3-S1.
- * Oct.13.7: 
- * - Updated tearDown to runBlocking for suspendable LogRepository cleanups.
- * - Improved burst loop to track and assert successful writes (Diagnosing 755/1000 under-count).
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -137,7 +135,8 @@ class ForensicStressAuditTest {
         // Ensure drainer is STOPPED for this test to verify "Full" reporting correctly
         logRepository.stopBackgroundTasks()
 
-        val overflowCount = FORENSIC_SPILL_CAPACITY + 100
+        val cap = spillBuffer.capacity
+        val overflowCount = cap + 100
         var writes = 0
         repeat(overflowCount) {
             val success = spillBuffer.writeTraceOptimized(
@@ -148,7 +147,7 @@ class ForensicStressAuditTest {
             if (success) writes++
         }
         
-        assertTrue("Buffer should have accepted at least capacity (Actual: $writes)", writes >= FORENSIC_SPILL_CAPACITY)
+        assertTrue("Buffer should have accepted at least capacity (Actual: $writes)", writes >= cap)
         assertTrue("Buffer should report full (Actual count: ${spillBuffer.getPendingCount()})", spillBuffer.isFull())
     }
 }

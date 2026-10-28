@@ -1,34 +1,35 @@
 git add .
-git commit -m "Fix: Pruning Telemetry Aggregation. #SIMP-OCT28.2-S1"
-git tag -a Oct28.4 -m "Oct28.4 Release: Pruning Telemetry Aggregation"
-git push origin Oct28.4
+git commit -m "Fix: Recovery Buffer Over-Provisioning. #SIMP-OCT27.6-S1"
+git tag -a Oct28.11 -m "Oct28.11 Release: Recovery Buffer Over-Provisioning"
+git push origin Oct28.11
 
-# Project Handover - Oct28.4
+# Project Handover - Oct28.11
 
-## ✅ Status: Pruning Telemetry Aggregation Verified
+## ✅ Status: Recovery Buffer Scaling Verified
 
-Version **Oct28.4** baseline is established. Successfully implemented a rolling average (EMA) mechanism for purged record counts to improve forensic visibility into maintenance efficiency.
+Version **Oct28.11** baseline is established. Successfully implemented dynamic capacity scaling for the `ForensicSpillBuffer` to optimize storage usage and prevent over-provisioning.
 
 ## 🎯 Next Resumption Focus: Strategic Simplification.
 
 ### 🛡️ Critical Fixes & Implementation Details
 
-#### 1. Pruning Telemetry Aggregation (#SIMP-OCT28.2-S1)
-- **Problem**: Instantaneous purged counts in telemetry made it difficult to analyze long-term database maintenance trends.
+#### 1. Recovery Buffer Scaling (#SIMP-OCT27.6-S1)
+- **Problem**: The fixed 10,000 entry buffer was over-provisioning storage on constrained devices and leading to premature overwrites on high-capacity hardware.
 - **Fix**: 
-    - Implemented `MAINTENANCE_PURGED_EMA_ALPHA` (0.3) in `EngineConstants.kt`.
-    - Added `maintenancePurgedEma` to `SystemHealthState` and `IntegrityState`.
-    - Updated `MainRepository.updateTelemetryPurgedCount()` to calculate the smoothed EMA alongside the raw count.
-    - Included `maintenancePurgedEma` in the telemetry `toMap()` for remote monitoring.
-    - Enforced R-ID 756: "System MUST calculate and report an EMA of purged record counts."
+    - Transitioned `FORENSIC_SPILL_CAPACITY` to a dynamic range (2,000 - 50,000).
+    - Implemented `calculateTargetCapacity()` in `ForensicSpillBuffer.kt` based on `context.filesDir.freeSpace`.
+    - Added physical file resizing via `RandomAccessFile.setLength()` to match the dynamic capacity.
+    - Updated `LogRepository` drainer and recovery logic to use the dynamic `capacity` property.
+    - Updated instrumented schema and stress tests to align with dynamic capacity.
+    - Enforced R-ID 757: "ForensicSpillBuffer MUST dynamically scale its capacity based on available storage health."
 
 ## 🔴 Open Gaps
-- **SIMP-OCT27.6-S1**: Recovery Buffer Over-Provisioning (Low). Evaluate if `ForensicSpillBuffer` capacity can be dynamically scaled based on storage health.
+- **SIMP-OCT28.11-S1**: Settings Invalidation Guard (Low). Evaluate if `SettingsRepository` can benefit from a hash-based integrity check.
 - **SIMP-OCT27.5-S1**: Badge Measurement Caching (Low). Investigate if `MeasurableBadge` can benefit from `Modifier.layout` caching.
 
 ## 📊 Hardening Snapshot
-- **SOT Count**: 861 (Rules: 361)
-- **Testing Status**: Pruning Telemetry Aggregation Audit - **PASSED**.
-- **QA Status**: Smoothed Maintenance Metrics - **VERIFIED**.
+- **SOT Count**: 862 (Rules: 362)
+- **Testing Status**: Recovery Buffer Scaling Audit - **PASSED**.
+- **QA Status**: Dynamic Capacity Resizing - **VERIFIED**.
 
 **Handover complete. STOPPING ALL PROCESSING.**
