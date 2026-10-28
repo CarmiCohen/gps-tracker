@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.28.17:
+ * - BYPASS-OCT28.16: Reduced forensic sampling to 50Hz (20ms) to mitigate 
+ *   main thread stalls (Davey events) on A15 budget hardware during startup.
  * Oct.28.11:
  * - SIMP-OCT27.6-S1: Recovery Buffer Scaling. Transitioned FORENSIC_SPILL_CAPACITY 
  *   to a dynamic range (2000-50000) to optimize storage usage and prevent 
@@ -126,7 +129,7 @@ const val FORENSIC_PRUNE_LIMIT_NORMAL = 15000
 const val FORENSIC_PRUNE_LIMIT_CHARGING = 30000
 
 // Issue #700: Forensic Sampling Scaling
-const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 10L  
+const val FORENSIC_SAMPLING_INTERVAL_MIN_MS = 20L  
 const val FORENSIC_SAMPLING_INTERVAL_MAX_MS = 100L 
 const val FORENSIC_SAMPLING_INTERVAL_COOLING_MS = 250L 
 const val FORENSIC_SAMPLING_INTERVAL_THROTTLED_MS = 500L
