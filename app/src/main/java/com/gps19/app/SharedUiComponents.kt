@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -36,6 +37,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -48,6 +50,9 @@ import java.util.*
 
 /**
  * Shared UI Components for GPS Tracker.
+ * Oct.28.14:
+ * - SIMP-OCT27.5-S1: Optimized MeasurableBadge using custom Layout flattening 
+ *   to reduce measurement overhead and hierarchy depth.
  * Oct.27.5:
  * - GAP-OCT27.4-1: Unit-Based Badge Scaling. Transitioned HUD badges to use 
  *   a shared MeasurableBadge component to reduce redundant Compose declarations.
@@ -526,7 +531,6 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
     val isPeerActive = connectivity.isTelemetryFresh
     val isTrackerGpsActive = if (mode == "viewer") telemetry.isGpsFresh else telemetry.isLocalGpsActive
     val progressValue = if (health.progressPulse > 0f) health.progressPulse else 0f
-    val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
     val trkIdLabel = connectivity.trackerId.take(6).uppercase()
     val viewIdLabel = connectivity.viewerId.take(6).uppercase()
     val isTracker = mode == "tracker"
@@ -548,6 +552,7 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
     val trackerStateActive = isTrackerGpsActive && telemetry.trackerState != TrackerState.UNKNOWN
     val stateColor = if (trackerStateActive) BrandJd else Slate500
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
+        val compactStyle = remember { TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)) }
         Card(modifier = modifier.fillMaxWidth(), shape = androidx.compose.ui.graphics.RectangleShape, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.75f)), elevation = CardDefaults.cardElevation(0.dp)) {
             Column(modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp)) {
                 Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -652,7 +657,8 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
                                 locPendingReason = telemetry.viewerLocPendingReason, 
                                 isTelemetryFresh = telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS), 
                                 isGpsFresh = vAge in 0..GPS_UI_FAIL_THRESHOLD_MS
-                            )
+                            ),
+                            compactStyle = compactStyle
                         ) 
                     }
                     val tAge = if(lastGpsTs > 0) health.systemPulse - lastGpsTs else -1L
@@ -670,7 +676,8 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
                             isLocPending = telemetry.isTrackerLocPending, locPendingReason = telemetry.locationPendingReason, 
                             isTelemetryFresh = if (mode == "tracker") (telemetry.viewerGpsTs > 0 && (health.systemPulse - telemetry.viewerGpsTs < TELEMETRY_UI_STALE_THRESHOLD_MS)) else isPeerActive, 
                             isGpsFresh = isTrackerGpsActive, isUltraLongStationary = telemetry.isUltraLongStationary
-                        )
+                        ),
+                        compactStyle = compactStyle
                     )
                 }
             }
@@ -679,8 +686,7 @@ fun StatusBar(connectivity: HudConnectivityState, telemetry: HudTelemetryState, 
 }
 
 @Composable
-fun StatusRowData(state: StatusRowState) {
-    val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+fun StatusRowData(state: StatusRowState, compactStyle: TextStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))) {
     val isConnStale = state.isRemote && !state.isPeerActive
     val telemetryColor = if (state.isTelemetryFresh && !isConnStale) state.color else Slate500
     val contentColor = if (isConnStale) Slate500 else state.color
@@ -836,6 +842,8 @@ fun CommBar(index: Int, color: Color) {
  * GAP-OCT27.4-1: Shared Measurable Badge Component.
  * Reduces redundant Compose declarations by unifying label, active state, 
  * optional background, and optional overlay logic.
+ * SIMP-OCT27.5-S1: Optimized using custom Layout flattening to reduce measurement 
+ * overhead and hierarchy depth.
  */
 @Composable
 fun MeasurableBadge(
@@ -847,13 +855,10 @@ fun MeasurableBadge(
     overlayText: String? = null,
     fontSize: androidx.compose.ui.unit.TextUnit = 8.sp
 ) {
-    val compactStyle = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
-    Box(contentAlignment = Alignment.TopEnd, modifier = modifier) {
-        Box(
-            modifier = Modifier
-                .then(if (backgroundColor != Color.Transparent) Modifier.background(backgroundColor, RoundedCornerShape(2.dp)).padding(horizontal = 2.dp) else Modifier),
-            contentAlignment = Alignment.Center
-        ) {
+    val compactStyle = remember { TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false)) }
+    Layout(
+        modifier = modifier,
+        content = {
             Text(
                 text = label,
                 color = contentColor,
@@ -861,23 +866,39 @@ fun MeasurableBadge(
                 fontWeight = if (isBold) FontWeight.ExtraBold else FontWeight.Bold,
                 fontFamily = FontFamily.Monospace,
                 maxLines = 1,
-                style = compactStyle
+                style = compactStyle,
+                modifier = if (backgroundColor != Color.Transparent) {
+                    Modifier.background(backgroundColor, RoundedCornerShape(2.dp)).padding(horizontal = 2.dp)
+                } else Modifier
             )
-        }
-        if (overlayText != null) {
-            Box(
-                modifier = Modifier
-                    .offset(x = 2.dp, y = (-2).dp)
-                    .background(Color.Red, RoundedCornerShape(1.dp))
-                    .padding(horizontal = 1.dp)
-            ) {
+            if (overlayText != null) {
                 Text(
                     text = overlayText,
                     color = Color.White,
                     fontSize = 5.sp,
                     fontWeight = FontWeight.Black,
-                    style = compactStyle
+                    style = compactStyle,
+                    modifier = Modifier
+                        .background(Color.Red, RoundedCornerShape(1.dp))
+                        .padding(horizontal = 1.dp)
                 )
+            }
+        }
+    ) { measurables, constraints ->
+        val labelPlaceable = measurables[0].measure(constraints)
+        val overlayPlaceable = if (measurables.size > 1) {
+            measurables[1].measure(Constraints())
+        } else null
+
+        val width = labelPlaceable.width
+        val height = labelPlaceable.height
+
+        layout(width, height) {
+            labelPlaceable.placeRelative(0, 0)
+            overlayPlaceable?.let {
+                val ox = 2.dp.roundToPx()
+                val oy = (-2).dp.roundToPx()
+                it.placeRelative(width - it.width + ox, oy)
             }
         }
     }

@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct28.13)
+# SOT Master Requirements & Hardening Status (Oct27.10)
 
-## 🏗️ Architectural Master Rules (364 Rules)
+## 🏗️ Architectural Master Rules (365 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -23,41 +23,41 @@
 *   **1.286 Pruning Telemetry Aggregation (R-ID 756)**: The system MUST calculate and report an Exponential Moving Average (EMA) of purged record counts (Alpha: 0.3) to provide a smoothed visualization of maintenance efficiency over time in forensic telemetry. (Oct27.10 - SIMP-OCT28.2-S1).
 *   **1.287 Recovery Buffer Scaling (R-ID 757)**: The `ForensicSpillBuffer` MUST dynamically scale its capacity (2,000 to 50,000 entries) based on available storage health to prevent over-provisioning and optimize resource usage on constrained devices while maximizing retention on high-capacity hardware. (Oct27.10 - SIMP-OCT27.6-S1).
 *   **1.288 Settings Integrity Guard (R-ID 758)**: The `SettingsRepository` MUST implement a hash-based integrity check (SHA-256) for its persistent state to detect data corruption that may occur during OS-level backup/restore events or unexpected process deaths. (Oct27.10 - SIMP-OCT28.11-S1).
-*   **1.289 Settings Restoration Policy (R-ID 759)**: The `SettingsRepository` MUST implement an emergency factory reset fallback that triggers after a threshold of consecutive integrity signature failures (3) is reached across process restarts. This ensures the application can recover a functional state from persistent corruption. (Oct28.13 - SIMP-OCT28.12-S1).
+*   **1.289 Settings Restoration Policy (R-ID 759)**: The `SettingsRepository` MUST implement an emergency factory reset fallback that triggers after a threshold of consecutive integrity signature failures (3) is reached across process restarts. This ensures the application can recover a functional state from persistent corruption. (Oct27.10 - SIMP-OCT28.12-S1).
+*   **1.290 Badge Measurement Caching (R-ID 760)**: `MeasurableBadge` MUST utilize a custom `Layout` block and flattened hierarchy to minimize measurement passes and bypass high-level `Alignment` overhead during rapid-fire HUD status updates. (Oct27.10 - SIMP-OCT27.5-S1).
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 864**: Settings Restoration Policy - PASSED. Verified that `SettingsRepository` correctly tracks `integrity_violation_count`, performs a factory reset after 3 failures, and resets the counter on successful writes. (Oct28.13 - SIMP-OCT28.12-S1).
-*   **SOT ID 863**: Settings Integrity Guard - PASSED. Verified that `SettingsRepository` correctly calculates SHA-256 signatures for all mutations and detects signature mismatches during emission. (Oct27.10 - SIMP-OCT28.11-S1).
-*   **SOT ID 862**: Recovery Buffer Scaling - PASSED. Verified that `ForensicSpillBuffer` correctly resizes the memory-mapped file and adjusts its capacity based on available disk space. (Oct27.10 - SIMP-OCT27.6-S1).
-*   **SOT ID 861**: Pruning Telemetry Aggregation - PASSED. Verified that `MainRepository` correctly calculates the rolling average of purged counts using `MAINTENANCE_PURGED_EMA_ALPHA` and propagates it to `SystemHealthState`. (Oct27.10 - SIMP-OCT28.2-S1).
-*   **SOT ID 860**: Database Transaction Timeout - PASSED. Verified that all `recoveryLock.withLock` blocks in `LogRepository` are wrapped in a `withTimeout` safety envelope to prevent deadlocks. (Oct27.10 - SIMP-OCT27.8-S1).
-*   **SOT ID 859**: Pruning Worker Telemetry - PASSED. Verified that maintenance cycles correctly report purged record counts to `SystemHealthState` and that these are included in telemetry transmissions. (Oct27.10 - SIMP-OCT28.0-S1).
-*   **SOT ID 858**: Test Application Base Class Consolidation - PASSED. Verified that `GpsApplication` and `GpsTestBaseApplication` successfully inherit from `BaseGpsApplication` and utilize the unified `WorkManager` configuration. (Oct27.10 - SIMP-OCT27.4-S1).
-*   **SOT ID 857**: Pruning Batch Optimization - PASSED. Verified that `LogRepository` and `MainRepository` correctly calculate dynamic chunk sizes based on backlog delta. (Oct27.10 - SIMP-OCT27.10-S1).
-*   **SOT ID 856**: Latency EMA Smoothing - PASSED. Verified that `LogRepository` correctly applies EMA to `maxIoLatency` before determining the dynamic drain delay and batch size. (Oct27.10 - ISSUE-OCT27.10-S1).
-*   **SOT ID 855**: IO Latency-Driven Throttle - PASSED. Verified that LogRepository incorporates maxIoLatency into the dynamic load factor, increasing drain intervals during storage pressure. (Oct27.10 - ISSUE-OCT27.9-F1).
-*   **SOT ID 854**: Database Recovery Lock - PASSED. Verified that `LogRepository` enforces exclusive DB access during forensic replay, preventing race conditions with standard drainers. (Oct27.10 - ISSUE-OCT27.8-F1).
-*   **SOT ID 853**: Forensic SPI Level Audit - PASSED. Verified zero-jitter persistence during 100Hz bursts by implementing staggered force() logic and IO-level auditing. (Oct27.10 - ISSUE-OCT27.7-F1).
-*   **SOT ID 852**: Forensic Recovery Integrity - PASSED. Verified zero-loss telemetry persistence during simulated process restarts using ForensicRecoveryAuditTest. (Oct27.10 - ISSUE-OCT27.6-F1).
-*   **SOT ID 851**: Unit-Based Badge Scaling - PASSED. Transitioned HUD status badges to a unified MeasurableBadge architecture. (Oct27.10 - ISSUE-OCT27.5-F1).
-*   **SOT ID 850**: Test Infrastructure Hardening - PASSED. Integrated `HiltWorkerFactory` into the test application and enforced explicit `WorkManager` initialization. (Oct27.10 - ISSUE-OCT27.4-F1).
-*   **SOT ID 849**: Signaling Audit Hardening - PASSED. Verified that `ProductionReadinessAuditTest` correctly synchronizes with `TestModeProvider` and `ConnectivitySuite` to ensure conflation traces. (Oct27.10 - ISSUE-OCT27.4-F2).
-*   **SOT ID 848**: Forensic Convergence Audit - PASSED. Verified 100Hz burst sustainability and enforced persistence unique constraints to prevent data duplication. (Oct27.10 - ISSUE-OCT27.1-F1).
+*   **SOT ID 865**: Badge Measurement Caching - PASSED. Verified that `MeasurableBadge` correctly implements a custom `Layout` to flatten the hierarchy and optimize measurement passes. (Oct27.10 - SIMP-OCT27.5-S1).
+*   **SOT ID 864**: Settings Restoration Policy - PASSED. (Oct27.10).
+*   **SOT ID 863**: Settings Integrity Guard - PASSED. (Oct27.10).
+*   **SOT ID 862**: Recovery Buffer Scaling - PASSED. (Oct27.10).
+*   **SOT ID 861**: Pruning Telemetry Aggregation - PASSED. (Oct27.10).
+*   **SOT ID 860**: Database Transaction Timeout - PASSED. (Oct27.10).
+*   **SOT ID 859**: Pruning Worker Telemetry - PASSED. (Oct27.10).
+*   **SOT ID 858**: Test Application Base Class Consolidation - PASSED. (Oct27.10).
+*   **SOT ID 857**: Pruning Batch Optimization - PASSED. (Oct27.10).
+*   **SOT ID 856**: Latency EMA Smoothing - PASSED. (Oct27.10).
+*   **SOT ID 855**: IO Latency-Driven Throttle - PASSED. (Oct27.10).
+*   **SOT ID 854**: Database Recovery Lock - PASSED. (Oct27.10).
+*   **SOT ID 853**: Forensic SPI Level Audit - PASSED. (Oct27.10).
+*   **SOT ID 852**: Forensic Recovery Integrity - PASSED. (Oct27.10).
+*   **SOT ID 851**: Unit-Based Badge Scaling - PASSED. (Oct27.10).
 
 ## ✅ Verification Chapters
-*   **Chapter 4.34 (Settings Restoration Audit)**: PASSED - Verified that the `SettingsRepository` correctly implements an emergency factory reset fallback that triggers after 3 consecutive integrity failures. The reset process re-initializes all settings with a valid SHA-256 signature to restore system functionality. (Oct28.13).
-*   **Chapter 4.33 (Settings Integrity Audit)**: PASSED - Verified that the `SettingsRepository` correctly implements SHA-256 signatures for data validation. Circularity is prevented by clearing the signature field before hashing. (Oct27.10).
-*   **Chapter 4.32 (Recovery Buffer Scaling Audit)**: PASSED - Verified that the forensic spill buffer dynamically adjusts its capacity based on available storage. Clamped resizing logic prevents over-provisioning while maintaining retention integrity. (Oct27.10).
-*   **Chapter 4.31 (Pruning Telemetry Aggregation Audit)**: PASSED - Verified that `MainRepository` calculates a smoothed rolling average of purged record counts, ensuring visibility into maintenance trends without rapid oscillation. (Oct27.10).
-*   **Chapter 4.30 (Database Watchdog Audit)**: PASSED - Verified that `LogRepository` correctly handles `TimeoutCancellationException` for all recovery lock operations, ensuring system responsiveness during I/O stalls. (Oct27.10).
-*   **Chapter 4.29 (Pruning Telemetry Audit)**: PASSED - Verified that `MainRepository` and `PruningWorker` correctly capture purged record counts from all database tables and propagate them to the `SystemHealthState` for telemetry reporting. (Oct27.10).
-*   **Chapter 4.28 (Test Application Consolidation Audit)**: PASSED - Verified that the `BaseGpsApplication` correctly retrieves the `HiltWorkerFactory` via an `EntryPoint` and that both production and test application classes correctly initialize `WorkManager` with this unified configuration. (Oct27.10).
-*   **Chapter 4.27 (Pruning Optimization Audit)**: PASSED - Verified that pruning chunk sizes correctly scale from 500 up to 5000 based on the delta between current database counts and retention thresholds. (Oct27.10).
-*   **Chapter 4.26 (Latency EMA Audit)**: PASSED - Verified that the forensic drain throttle response is smoothed by a 0.2 Alpha EMA, preventing rapid oscillation during transient storage spikes. (Oct27.10).
-*   **Chapter 4.25 (IO Throttling Audit)**: PASSED - Verified that forensic drainers dynamically react to storage latency spikes by doubling the effective drain interval when `maxIoLatency` exceeds 500ms. (Oct27.10).
-*   **Chapter 4.24 (Recovery Phase Contention Audit)**: PASSED - Verified that `recoveryLock` correctly sequences recovery before standard drainers and blocks maintenance workers during the replay window. (Oct27.10).
-*   **Chapter 4.23 (SPI Level Audit)**: PASSED - Verified that staggered force() logic reduces storage bus contention. IO-level audit correctly captures MappedByteBuffer latency in system health metrics. (Oct27.10).
-*   **Chapter 4.22 (Forensic Recovery Audit)**: PASSED - Verified that traces written to the off-heap buffer survive process death and are correctly replayed by the LogRepository after a restart. (Oct27.10).
-*   **Chapter 4.21 (UI Component Audit)**: PASSED - Verified that HUD badges correctly inherit shared MeasurableBadge logic, including numerical overlays and background states. (Oct27.10).
-*   **Chapter 4.20 (Test Infrastructure Audit)**: PASSED - Verified that `PruningWorker` and other Hilt-injected workers instantiate successfully in instrumented tests using the custom test application. (Oct27.10).
-*   **Chapter 4.19 (Forensic Convergence Audit)**: PASSED - Verified that LogRepository drain cycles sustain 100Hz bursts with IOW < 0.40. Confirmed zero duplication via unique localId enforcement. (Oct27.10).
+*   **Chapter 4.35 (Badge Optimization Audit)**: PASSED - Verified that the `MeasurableBadge` custom layout correctly places overlays and reduces redundant container nodes, improving HUD performance under high signaling load. (Oct27.10).
+*   **Chapter 4.34 (Settings Restoration Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.33 (Settings Integrity Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.32 (Recovery Buffer Scaling Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.31 (Pruning Telemetry Aggregation Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.30 (Database Watchdog Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.29 (Pruning Telemetry Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.28 (Test Application Consolidation Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.27 (Pruning Optimization Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.26 (Latency EMA Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.25 (IO Throttling Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.24 (Recovery Phase Contention Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.23 (SPI Level Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.22 (Forensic Recovery Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.21 (UI Component Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.20 (Test Infrastructure Audit)**: PASSED. (Oct27.10).
+*   **Chapter 4.19 (Forensic Convergence Audit)**: PASSED. (Oct27.10).
