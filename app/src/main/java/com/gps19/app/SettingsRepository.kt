@@ -13,8 +13,10 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
+import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
+import timber.log.Timber
 
 /**
  * Extension property to ensure a single instance of DataStore per process.
@@ -32,6 +34,7 @@ private val Context.settingsDataStore: DataStore<AppSettings> by dataStore(
 
 /**
  * Generic extension function to mutate DataStore<AppSettings> atomically and race-free.
+ * Oct28.12: Integrated Integrity Guard (SIMP-OCT28.11-S1).
  */
 private suspend inline fun DataStore<AppSettings>.mutate(
     crossinline block: AppSettings.Builder.() -> Unit
@@ -39,6 +42,12 @@ private suspend inline fun DataStore<AppSettings>.mutate(
     return updateData { current ->
         val builder = current.toBuilder()
         builder.block()
+        
+        // Calculate integrity hash before building
+        val intermediate = builder.build()
+        val hash = SettingsRepository.calculateIntegrityHash(intermediate)
+        builder.setIntegritySignature(hash)
+        
         builder.build()
     }
 }
@@ -55,6 +64,8 @@ data class CommitResult(
 
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
+ * Oct28.12:
+ * - SIMP-OCT28.11-S1: Settings Invalidation Guard (R-ID 758).
  * Oct24.16:
  * - SIMP-OCT22.0-S1: Centralized identity validation via ConfigValidator.
  * Oct.19.19:
@@ -99,39 +110,66 @@ class SettingsRepository @Inject constructor(
 
             override suspend fun cleanUp() {}
         }
+
+        /**
+         * calculateIntegrityHash: Generates a SHA-256 signature for settings state.
+         * R-ID 758: Must exclude the signature field itself to prevent circularity.
+         */
+        internal fun calculateIntegrityHash(settings: AppSettings): String {
+            val clean = settings.toBuilder().clearIntegritySignature().build()
+            val bytes = clean.toByteArray()
+            val digest = MessageDigest.getInstance("SHA-256")
+            val hash = digest.digest(bytes)
+            return hash.joinToString("") { "%02x".format(it) }
+        }
     }
 
-    val appModeFlow: Flow<String?> = dataStore.data.map { it.appMode.ifEmpty { null } }
-    val trackerIdFlow: Flow<String> = dataStore.data.map { it.trackerId.ifEmpty { DEFAULT_TRACKER_ID } }
-    val viewerIdFlow: Flow<String> = dataStore.data.map { it.viewerId.ifEmpty { DEFAULT_VIEWER_ID } }
-    val relayUrlFlow: Flow<String> = dataStore.data.map { it.relayUrl.ifEmpty { DEFAULT_RELAY_URL } }
-    val isManualExitFlow: Flow<Boolean> = dataStore.data.map { it.isManualExit }
-    val lastAlarmAckTsFlow: Flow<Long> = dataStore.data.map { it.lastAlarmAckTs }
+    /**
+     * Internal flow that validates integrity on every emission.
+     */
+    private val validatedData: Flow<AppSettings> = dataStore.data.map { settings ->
+        if (settings.integritySignature.isNotEmpty()) {
+            val expected = calculateIntegrityHash(settings)
+            if (settings.integritySignature != expected) {
+                // R-ID 758: Corruption detected. In a production environment, this would 
+                // trigger a critical alert or recovery. For now, we log and proceed.
+                Timber.e("CRITICAL: Settings Integrity Violation Detected!")
+            }
+        }
+        settings
+    }
+
+    val appModeFlow: Flow<String?> = validatedData.map { it.appMode.ifEmpty { null } }
+    val trackerIdFlow: Flow<String> = validatedData.map { it.trackerId.ifEmpty { DEFAULT_TRACKER_ID } }
+    val viewerIdFlow: Flow<String> = validatedData.map { it.viewerId.ifEmpty { DEFAULT_VIEWER_ID } }
+    val relayUrlFlow: Flow<String> = validatedData.map { it.relayUrl.ifEmpty { DEFAULT_RELAY_URL } }
+    val isManualExitFlow: Flow<Boolean> = validatedData.map { it.isManualExit }
+    val lastAlarmAckTsFlow: Flow<Long> = validatedData.map { it.lastAlarmAckTs }
     
-    val trackerAlarmAckTsFlow: Flow<Long> = dataStore.data.map { 
+    val trackerAlarmAckTsFlow: Flow<Long> = validatedData.map { 
         it.roleLongsMap.getOrDefault(AppRole.TRACKER.prefix + LAST_ALARM_ACK_TS_KEY, 0L) 
     }
-    val viewerAlarmAckTsFlow: Flow<Long> = dataStore.data.map { 
+    val viewerAlarmAckTsFlow: Flow<Long> = validatedData.map { 
         it.roleLongsMap.getOrDefault(AppRole.VIEWER_SELF.prefix + LAST_ALARM_ACK_TS_KEY, 0L) 
     }
-    val viewerRemoteAlarmAckTsFlow: Flow<Long> = dataStore.data.map { 
+    val viewerRemoteAlarmAckTsFlow: Flow<Long> = validatedData.map { 
         it.roleLongsMap.getOrDefault(AppRole.VIEWER_REMOTE.prefix + LAST_ALARM_ACK_TS_KEY, 0L) 
     }
     
-    val homePointsFlow: Flow<List<GeoPoint>> = dataStore.data.map { it.homePointsList.map { p -> GeoPoint(p.lat, p.lng) } }
-    val maxDistanceFlow: Flow<Double> = dataStore.data.map { if (it.maxDistance > 0.0) it.maxDistance else DEFAULT_MAX_DISTANCE }
-    val alertSettingsFlow: Flow<AlertSettings> = dataStore.data.map { SettingsMapper.protoToAlertSettings(it.alertSettings) }
-    val identitySanitizedFlow: Flow<Boolean> = dataStore.data.map { it.identitySanitized }
-    val isSystemActiveFlow: Flow<Boolean> = dataStore.data.map { it.isSystemActive }
-    val isXiaomiManualOverrideFlow: Flow<Boolean> = dataStore.data.map { it.isXiaomiManualOverride }
-    val recoveryCountFlow: Flow<Int> = dataStore.data.map { it.recoveryCount }
-    val cumulativeRecoveryBlackoutMsFlow: Flow<Long> = dataStore.data.map { it.totalDrop }
+    val homePointsFlow: Flow<List<GeoPoint>> = validatedData.map { it.homePointsList.map { p -> GeoPoint(p.lat, p.lng) } }
+    val maxDistanceFlow: Flow<Double> = validatedData.map { if (it.maxDistance > 0.0) it.maxDistance else DEFAULT_MAX_DISTANCE }
+    val alertSettingsFlow: Flow<AlertSettings> = validatedData.map { SettingsMapper.protoToAlertSettings(it.alertSettings) }
+    val identitySanitizedFlow: Flow<Boolean> = validatedData.map { it.identitySanitized }
+    val isSystemActiveFlow: Flow<Boolean> = validatedData.map { it.isSystemActive }
+    val isXiaomiManualOverrideFlow: Flow<Boolean> = validatedData.map { it.isXiaomiManualOverride }
+    val recoveryCountFlow: Flow<Int> = validatedData.map { it.recoveryCount }
+    val cumulativeRecoveryBlackoutMsFlow: Flow<Long> = validatedData.map { it.totalDrop }
 
-    val isRestorationDisabledFlow: Flow<Boolean> = dataStore.data.map { it.isRestorationDisabled }
+    val isRestorationDisabledFlow: Flow<Boolean> = validatedData.map { it.isRestorationDisabled }
 
-    suspend fun getSettingsSnapshot(): AppSettings = dataStore.data.first()
+    suspend fun getSettingsSnapshot(): AppSettings = validatedData.first()
 
-    suspend fun getAppMode(): String? = dataStore.data.first().appMode.ifEmpty { null }
+    suspend fun getAppMode(): String? = validatedData.first().appMode.ifEmpty { null }
 
     private fun routeToNamespaced(key: String): Pair<AppRole, String>? {
         return AppRole.fromKey(key)
@@ -144,7 +182,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun getString(role: AppRole, key: String, default: String): String {
-        return dataStore.data.first().roleStringsMap.getOrDefault(role.prefix + key, default)
+        return validatedData.first().roleStringsMap.getOrDefault(role.prefix + key, default)
     }
 
     suspend fun saveLong(role: AppRole, key: String, value: Long) {
@@ -152,7 +190,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun getLong(role: AppRole, key: String, default: Long): Long {
-        return dataStore.data.first().roleLongsMap.getOrDefault(role.prefix + key, default)
+        return validatedData.first().roleLongsMap.getOrDefault(role.prefix + key, default)
     }
 
     suspend fun saveDouble(role: AppRole, key: String, value: Double) {
@@ -160,7 +198,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun getDouble(role: AppRole, key: String, default: Double): Double {
-        return dataStore.data.first().roleDoublesMap.getOrDefault(role.prefix + key, default)
+        return validatedData.first().roleDoublesMap.getOrDefault(role.prefix + key, default)
     }
 
     suspend fun saveBoolean(role: AppRole, key: String, value: Boolean) {
@@ -168,7 +206,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun getBoolean(role: AppRole, key: String, default: Boolean): Boolean {
-        return dataStore.data.first().roleBoolsMap.getOrDefault(role.prefix + key, default)
+        return validatedData.first().roleBoolsMap.getOrDefault(role.prefix + key, default)
     }
 
     suspend fun saveInt(role: AppRole, key: String, value: Int) {
@@ -176,7 +214,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun getInt(role: AppRole, key: String, default: Int): Int {
-        return dataStore.data.first().roleIntsMap.getOrDefault(role.prefix + key, default)
+        return validatedData.first().roleIntsMap.getOrDefault(role.prefix + key, default)
     }
 
     suspend fun resetRoleState(role: AppRole) {
@@ -203,7 +241,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun loadLocationUpdate(role: AppRole? = null): LocationUpdate? {
-        val settings = dataStore.data.first()
+        val settings = validatedData.first()
         if (role != null) {
             val proto = settings.roleStatesMap[role.prefix] ?: return null
             return SettingsMapper.mapLocationUpdateFromProto(proto)
@@ -225,7 +263,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun loadActiveAlarms(role: AppRole? = null): List<AlarmEvaluationState.ActiveAlarm> {
-        val settings = dataStore.data.first()
+        val settings = validatedData.first()
         val protoAlarms = if (role != null) {
             settings.roleAlarmsMap[role.prefix]?.alarmsList ?: emptyList()
         } else {
@@ -337,7 +375,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun getString(keyName: String, default: String): String {
-        val settings = dataStore.data.first()
+        val settings = validatedData.first()
         routeToNamespaced(keyName)?.let { (role, key) -> return getString(role, key, default) }
         val value = when (keyName) {
             TRACKER_ID_KEY -> settings.trackerId
@@ -349,7 +387,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun getLong(keyName: String, default: Long): Long {
-        val settings = dataStore.data.first()
+        val settings = validatedData.first()
         routeToNamespaced(keyName)?.let { (role, key) -> return getLong(role, key, default) }
         val value = when (keyName) {
             LAST_ALARM_ACK_TS_KEY -> settings.lastAlarmAckTs
@@ -373,7 +411,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun getDouble(keyName: String, default: Double): Double {
-        val settings = dataStore.data.first()
+        val settings = validatedData.first()
         routeToNamespaced(keyName)?.let { (role, key) -> return getDouble(role, key, default) }
         val value = when (keyName) {
             MAX_DISTANCE_STORAGE_KEY -> settings.maxDistance
@@ -384,7 +422,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun getBoolean(keyName: String, default: Boolean): Boolean {
-        val settings = dataStore.data.first()
+        val settings = validatedData.first()
         routeToNamespaced(keyName)?.let { (role, key) -> return getBoolean(role, key, default) }
         return when (keyName) {
             IS_MANUAL_EXIT_KEY -> settings.isManualExit
@@ -398,7 +436,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun getInt(keyName: String, default: Int): Int {
-        val settings = dataStore.data.first()
+        val settings = validatedData.first()
         routeToNamespaced(keyName)?.let { (role, key) -> return getInt(role, key, default) }
         val value = when (keyName) {
             LAST_AUTO_SAVE_HOUR_KEY -> settings.lastAutoSaveHour
@@ -417,7 +455,7 @@ class SettingsRepository @Inject constructor(
         dataStore.mutate { setIsRestorationDisabled(disabled) }
     }
 
-    suspend fun loadHomePoints(): List<GeoPoint> = dataStore.data.first().homePointsList.map { GeoPoint(it.lat, it.lng) }
+    suspend fun loadHomePoints(): List<GeoPoint> = validatedData.first().homePointsList.map { GeoPoint(it.lat, it.lng) }
 
     suspend fun saveHomePoints(points: List<GeoPoint>, maxDistance: Double? = null, timestamp: Long? = null): Long {
         val ts = timestamp ?: timeProvider.currentTimeMillis
@@ -450,7 +488,7 @@ class SettingsRepository @Inject constructor(
     }
 
     suspend fun loadAlertSettings(): AlertSettings {
-        val s = dataStore.data.first().alertSettings
+        val s = validatedData.first().alertSettings
         return SettingsMapper.protoToAlertSettings(s)
     }
 
@@ -522,12 +560,15 @@ class SettingsRepository @Inject constructor(
             }
             
             val builder = s.toBuilder()
-            var changed = false
-            if (s.hasDraftTrackerId()) { builder.setTrackerId(s.draftTrackerId).clearDraftTrackerId(); changed = true }
-            if (s.hasDraftViewerId()) { builder.setViewerId(s.draftViewerId).clearDraftViewerId(); changed = true }
-            if (s.hasDraftRelayUrl()) { builder.setRelayUrl(s.draftRelayUrl).clearDraftRelayUrl(); changed = true }
-            if (s.draftMaxDistance > 0) { builder.setMaxDistance(s.draftMaxDistance).setDraftMaxDistance(0.0); changed = true }
-            if (s.hasDraftAlertSettings()) { builder.setAlertSettings(s.draftAlertSettings).clearDraftAlertSettings(); changed = true }
+            if (s.hasDraftTrackerId()) { builder.setTrackerId(s.draftTrackerId).clearDraftTrackerId() }
+            if (s.hasDraftViewerId()) { builder.setViewerId(s.draftViewerId).clearDraftViewerId() }
+            if (s.hasDraftRelayUrl()) { builder.setRelayUrl(s.draftRelayUrl).clearDraftRelayUrl() }
+            if (s.draftMaxDistance > 0) { builder.setMaxDistance(s.draftMaxDistance).setDraftMaxDistance(0.0) }
+            if (s.hasDraftAlertSettings()) { builder.setAlertSettings(s.draftAlertSettings).clearDraftAlertSettings() }
+            
+            // Oct28.12: Update integrity signature during manual commit
+            val intermediate = builder.build()
+            builder.setIntegritySignature(SettingsRepository.calculateIntegrityHash(intermediate))
             
             builder.build()
         }

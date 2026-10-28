@@ -112,6 +112,9 @@ message AppSettings {
     map<string, ActiveAlarmsListProto> role_alarms = 107;
 
     map<string, LogicStateProto> role_logic_states = 108;
+
+    // SIMP-OCT28.11-S1: Integrity signature to detect corruption
+    optional string integrity_signature = 150;
 }
 
 enum TrackerStateProto {

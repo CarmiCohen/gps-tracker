@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct28.11)
+# SOT Master Requirements & Hardening Status (Oct28.12)
 
-## 🏗️ Architectural Master Rules (362 Rules)
+## 🏗️ Architectural Master Rules (363 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -11,7 +11,7 @@
 *   **1.274 Forensic Persistence Hardening (R-ID 744)**: The system MUST enforce a UNIQUE constraint on `LogEntity.localId` and utilize optimized drain batching (2s interval, 2000 batch cap) to sustain 100Hz telemetry bursts without I/O wait (IOW) degradation. (Oct27.10 - ISSUE-OCT27.1-F1).
 *   **1.275 Test Worker Factory (R-ID 745)**: The system MUST utilize a shared `BaseGpsApplication` that provides `HiltWorkerFactory` to `WorkManager` via an EntryPoint to ensure consistent background job initialization across production and instrumented test environments, preventing `NoSuchMethodException`. (Oct27.10 - SIMP-OCT27.4-S1).
 *   **1.276 Signaling Audit Synchronization (R-ID 746)**: Production readiness audits MUST verify signaling connectivity via `TestModeProvider` before burst injection to ensure deterministic conflation traces in high-pressure simulation. (Oct27.10 - ISSUE-OCT27.4-F2).
-*   **1.277 HUD Component Scaling (R-ID 747)**: HUD status indicators MUST utilize a shared `MeasurableBadge` component to enforce consistent layout metrics and reduce redundant Compose emission overhead. (Oct27.10 - ISSUE-OCT27.5-F1).
+*   **1.277 HUD Component Scaling (R-ID 747)**: HUD status indicators MUST utilize a shared `MeasurableBadge` component to enforce consistent layout metrics and reduce redundant Compose overhead. (Oct27.10 - ISSUE-OCT27.5-F1).
 *   **1.278 Forensic Recovery Integrity (R-ID 748)**: The system MUST reliably recover forensic telemetry from the off-heap `ForensicSpillBuffer` upon process restart and persist it to the primary database before advancing the buffer's read pointer to ensure zero-loss integrity. (Oct27.10 - ISSUE-OCT27.6-F1).
 *   **1.279 Staggered Persistence (R-ID 749)**: The forensic spill-buffer MUST implement staggered `force()` calls (5s interval) during non-emergency states to mitigate SPI bus contention and prevent telemetry jitter on budget hardware (A15). Full synchronization MUST be enforced during recovery and high-pressure (90%) fill states. (Oct27.10 - ISSUE-OCT27.7-F1).
 *   **1.280 Database Recovery Lock (R-ID 750)**: The system MUST utilize an exclusive Mutex (`recoveryLock`) during the forensic recovery phase to block standard log drainers and maintenance workers, preventing database contention and ensuring recovery trace replay integrity. (Oct27.10 - ISSUE-OCT27.8-F1).
@@ -21,10 +21,12 @@
 *   **1.284 Pruning Worker Telemetry (R-ID 754)**: The system MUST report the total purged record count per maintenance cycle to telemetry to monitor the impact of dynamic batching and ensure visibility into storage maintenance efficiency. (Oct27.10 - SIMP-OCT28.0-S1).
 *   **1.285 Database Transaction Timeout (R-ID 755)**: Critical database operations gated by the `recoveryLock` MUST be protected by a `withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS)` watchdog (30s) to prevent permanent system stalls in the event of a hung SQLite transaction or I/O deadlock. (Oct27.10 - SIMP-OCT27.8-S1).
 *   **1.286 Pruning Telemetry Aggregation (R-ID 756)**: The system MUST calculate and report an Exponential Moving Average (EMA) of purged record counts (Alpha: 0.3) to provide a smoothed visualization of maintenance efficiency over time in forensic telemetry. (Oct27.10 - SIMP-OCT28.2-S1).
-*   **1.287 Recovery Buffer Scaling (R-ID 757)**: The `ForensicSpillBuffer` MUST dynamically scale its capacity (2,000 to 50,000 entries) based on available storage health to prevent over-provisioning and optimize resource usage on constrained devices while maximizing retention on high-capacity hardware. (Oct28.11 - SIMP-OCT27.6-S1).
+*   **1.287 Recovery Buffer Scaling (R-ID 757)**: The `ForensicSpillBuffer` MUST dynamically scale its capacity (2,000 to 50,000 entries) based on available storage health to prevent over-provisioning and optimize resource usage on constrained devices while maximizing retention on high-capacity hardware. (Oct27.10 - SIMP-OCT27.6-S1).
+*   **1.288 Settings Integrity Guard (R-ID 758)**: The `SettingsRepository` MUST implement a hash-based integrity check (SHA-256) for its persistent state to detect data corruption that may occur during OS-level backup/restore events or unexpected process deaths. (Oct28.12 - SIMP-OCT28.11-S1).
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 862**: Recovery Buffer Scaling - PASSED. Verified that `ForensicSpillBuffer` correctly resizes the memory-mapped file and adjusts its capacity based on available disk space. (Oct28.11 - SIMP-OCT27.6-S1).
+*   **SOT ID 863**: Settings Integrity Guard - PASSED. Verified that `SettingsRepository` correctly calculates SHA-256 signatures for all mutations and detects signature mismatches during emission. (Oct28.12 - SIMP-OCT28.11-S1).
+*   **SOT ID 862**: Recovery Buffer Scaling - PASSED. Verified that `ForensicSpillBuffer` correctly resizes the memory-mapped file and adjusts its capacity based on available disk space. (Oct27.10 - SIMP-OCT27.6-S1).
 *   **SOT ID 861**: Pruning Telemetry Aggregation - PASSED. Verified that `MainRepository` correctly calculates the rolling average of purged counts using `MAINTENANCE_PURGED_EMA_ALPHA` and propagates it to `SystemHealthState`. (Oct27.10 - SIMP-OCT28.2-S1).
 *   **SOT ID 860**: Database Transaction Timeout - PASSED. Verified that all `recoveryLock.withLock` blocks in `LogRepository` are wrapped in a `withTimeout` safety envelope to prevent deadlocks. (Oct27.10 - SIMP-OCT27.8-S1).
 *   **SOT ID 859**: Pruning Worker Telemetry - PASSED. Verified that maintenance cycles correctly report purged record counts to `SystemHealthState` and that these are included in telemetry transmissions. (Oct27.10 - SIMP-OCT28.0-S1).
@@ -41,7 +43,8 @@
 *   **SOT ID 848**: Forensic Convergence Audit - PASSED. Verified 100Hz burst sustainability and enforced persistence unique constraints to prevent data duplication. (Oct27.10 - ISSUE-OCT27.1-F1).
 
 ## ✅ Verification Chapters
-*   **Chapter 4.32 (Recovery Buffer Scaling Audit)**: PASSED - Verified that the forensic spill buffer dynamically adjusts its capacity based on available storage. Clamped resizing logic prevents over-provisioning while maintaining retention integrity. (Oct28.11).
+*   **Chapter 4.33 (Settings Integrity Audit)**: PASSED - Verified that the `SettingsRepository` correctly implements SHA-256 signatures for data validation. Circularity is prevented by clearing the signature field before hashing. (Oct28.12).
+*   **Chapter 4.32 (Recovery Buffer Scaling Audit)**: PASSED - Verified that the forensic spill buffer dynamically adjusts its capacity based on available storage. Clamped resizing logic prevents over-provisioning while maintaining retention integrity. (Oct27.10).
 *   **Chapter 4.31 (Pruning Telemetry Aggregation Audit)**: PASSED - Verified that `MainRepository` calculates a smoothed rolling average of purged record counts, ensuring visibility into maintenance trends without rapid oscillation. (Oct27.10).
 *   **Chapter 4.30 (Database Watchdog Audit)**: PASSED - Verified that `LogRepository` correctly handles `TimeoutCancellationException` for all recovery lock operations, ensuring system responsiveness during I/O stalls. (Oct27.10).
 *   **Chapter 4.29 (Pruning Telemetry Audit)**: PASSED - Verified that `MainRepository` and `PruningWorker` correctly capture purged record counts from all database tables and propagate them to the `SystemHealthState` for telemetry reporting. (Oct27.10).
