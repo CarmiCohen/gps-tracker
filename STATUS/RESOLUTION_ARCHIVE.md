@@ -2,14 +2,23 @@
 
 ## ✅ Resolved Issues (Oct27.10)
 
+### 1. ISSUE-OCT28.16-F1: Alarm Leakage on Tracker (Issue #1391)
+- **Symptoms**: Audible sirens and red-screen overlays were manifesting locally on devices in Tracker mode during violations, compromising operational stealth.
+- **Root Cause**: Manual test triggers in `UiEventCoordinator` and procedural audio paths in `AudioSynthesizer` lacked role-based suppression logic, bypassing the general alarm manager inhibits.
+- **Resolution**: Implemented multi-layer stealth hardening. Enforced role checks in `AudioSynthesizer` (gating both `playSiren` and `playShortAlert` via `ConfigManager`), added a suppression guard to `UiEventCoordinator.ToggleTestSiren`, and implemented an auto-termination check in `AlarmOverlayService` to ensure UI overlays cannot render on trackers. (R-ID 761).
+
+---
+
+# Resolution Archive - Oct27.10
+
+## ✅ Resolved Issues (Oct27.10)
+
 ### 1. SIMP-OCT27.5-S1: Badge Measurement Caching
 - **Symptoms**: HUD status badges were using nested `Box` structures for overlays, leading to deeper layout trees and redundant measurement passes during rapid-fire signaling updates.
 - **Root Cause**: Reliance on high-level Compose containers for simple badge overlays increased hierarchy depth and measurement overhead.
 - **Resolution**: Refactored `MeasurableBadge` to use a custom `Layout` block in `SharedUiComponents.kt`. This optimization flattens the layout hierarchy by removing intermediate `Box` nodes and implements explicit measurement and placement logic for overlays. This minimizes measurement passes and bypasses generic `Alignment` overhead, significantly improving HUD performance under load. (R-ID 760).
 
 ---
-
-# Resolution Archive - Oct27.10
 
 ## ✅ Resolved Issues (Oct27.10)
 

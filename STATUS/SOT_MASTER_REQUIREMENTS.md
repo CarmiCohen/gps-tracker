@@ -1,6 +1,6 @@
 # SOT Master Requirements & Hardening Status (Oct27.10)
 
-## 🏗️ Architectural Master Rules (365 Rules)
+## 🏗️ Architectural Master Rules (366 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -25,8 +25,10 @@
 *   **1.288 Settings Integrity Guard (R-ID 758)**: The `SettingsRepository` MUST implement a hash-based integrity check (SHA-256) for its persistent state to detect data corruption that may occur during OS-level backup/restore events or unexpected process deaths. (Oct27.10 - SIMP-OCT28.11-S1).
 *   **1.289 Settings Restoration Policy (R-ID 759)**: The `SettingsRepository` MUST implement an emergency factory reset fallback that triggers after a threshold of consecutive integrity signature failures (3) is reached across process restarts. This ensures the application can recover a functional state from persistent corruption. (Oct27.10 - SIMP-OCT28.12-S1).
 *   **1.290 Badge Measurement Caching (R-ID 760)**: `MeasurableBadge` MUST utilize a custom `Layout` block and flattened hierarchy to minimize measurement passes and bypass high-level `Alignment` overhead during rapid-fire HUD status updates. (Oct27.10 - SIMP-OCT27.5-S1).
+*   **1.291 Stealth Suppression Authority (R-ID 761)**: The system MUST enforce role-based suppression of all audible sirens and visual alarm overlays on devices in Tracker mode to ensure operational stealth (R872). Suppression MUST be enforced at the engine level (AudioSynthesizer) and UI service level (AlarmOverlayService) to prevent detection during high-pressure violations. (Oct27.10 - ISSUE-OCT28.16-F1).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 866**: Stealth Suppression Authority - PASSED. Verified that sirens and overlays are inhibited on Trackers. (Oct27.10 - ISSUE-OCT28.16-F1).
 *   **SOT ID 865**: Badge Measurement Caching - PASSED. Verified that `MeasurableBadge` correctly implements a custom `Layout` to flatten the hierarchy and optimize measurement passes. (Oct27.10 - SIMP-OCT27.5-S1).
 *   **SOT ID 864**: Settings Restoration Policy - PASSED. (Oct27.10).
 *   **SOT ID 863**: Settings Integrity Guard - PASSED. (Oct27.10).
@@ -44,6 +46,7 @@
 *   **SOT ID 851**: Unit-Based Badge Scaling - PASSED. (Oct27.10).
 
 ## ✅ Verification Chapters
+*   **Chapter 4.36 (Stealth Hardening Audit)**: PASSED - Verified zero audio/visual leakage on Tracker devices during geofence and power tamper simulations. (Oct27.10).
 *   **Chapter 4.35 (Badge Optimization Audit)**: PASSED - Verified that the `MeasurableBadge` custom layout correctly places overlays and reduces redundant container nodes, improving HUD performance under high signaling load. (Oct27.10).
 *   **Chapter 4.34 (Settings Restoration Audit)**: PASSED. (Oct27.10).
 *   **Chapter 4.33 (Settings Integrity Audit)**: PASSED. (Oct27.10).

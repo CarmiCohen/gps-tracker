@@ -23,17 +23,18 @@ import kotlin.math.exp
 
 /**
  * AudioSynthesizer: Procedural audio generator for sirens and alerts.
+ * Oct.28.16:
+ * - Issue #1391: Stealth Hardening. Integrated ConfigManager to ensure 
+ *   role-based suppression in playSiren and playShortAlert, enforcing R872.
  * Oct.13.20:
  * - Issue #ISSUE-OCT13.20-M2: Resolved VIBRATOR_SERVICE deprecation by using 
  *   VibratorManager on API 31+.
- * Oct.10.3:
- * - Issue #SIMP-1010-4: HUD Interface Alignment. Refactored to property-based 
- *   TimeProvider API and fixed property invocation errors.
  */
 @Singleton
 class AudioSynthesizer @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val sirenLockoutUseCase: SirenLockoutUseCase
+    private val sirenLockoutUseCase: SirenLockoutUseCase,
+    private val configManager: ConfigManager
 ) {
     private val _isSirenPlaying = MutableStateFlow(false)
     val isSirenPlaying: StateFlow<Boolean> = _isSirenPlaying.asStateFlow()
@@ -47,6 +48,10 @@ class AudioSynthesizer @Inject constructor(
     fun isForced(): Boolean = isForced.get()
 
     fun playShortAlert() {
+        if (configManager.isTrackerMode) {
+            Timber.d("Short alert suppressed: Tracker mode (Stealth enforced)")
+            return
+        }
         scope.launch {
             try {
                 for (i in 0 until 8) {
@@ -76,7 +81,7 @@ class AudioSynthesizer @Inject constructor(
         timeProvider: TimeProvider,
         isTrackerMode: Boolean = false 
     ) {
-        if (isTrackerMode) {
+        if (isTrackerMode || configManager.isTrackerMode) {
             Timber.d("Siren suppressed: Tracker mode (Stealth enforced)")
             return
         }

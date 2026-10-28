@@ -18,17 +18,19 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.gps19.core.engine.*
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.runBlocking
+import timber.log.Timber
 import javax.inject.Inject
 
 /**
  * AlarmOverlayService: Implements SYSTEM_ALERT_WINDOW to ensure alarm visibility 
  * even when the app is in background and device is unlocked.
+ * Oct.28.16:
+ * - Issue #1391: Stealth Hardening. Added role check to self-terminate if 
+ *   started in Tracker mode, enforcing R872.
  * Oct.14.9:
  * - SIMP-OCT14.8-S1: Updated to consolidated HudState. derive hudState flow 
  *   locally for the overlay state provider.
- * Oct.6.1:
- * - AUDIT-1006-1: Refactored state preparation. Migrated flow creation out of 
- *   composition scope to service-level initialization.
  */
 @AndroidEntryPoint
 class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
@@ -37,6 +39,7 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
     @Inject lateinit var repository: MainRepository
     @Inject lateinit var sirenLockoutUseCase: SirenLockoutUseCase
     @Inject lateinit var systemStatusProvider: SystemStatusProvider
+    @Inject lateinit var configManager: ConfigManager
 
     private lateinit var windowManager: WindowManager
     private var composeView: ComposeView? = null
@@ -52,6 +55,14 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
 
     override fun onCreate() {
         super.onCreate()
+        
+        // Issue #1391: Defensive role check (R872)
+        if (configManager.isTrackerMode) {
+            Timber.w("AlarmOverlayService: Suppression enforced (Tracker Mode). Terminating.")
+            stopSelf()
+            return
+        }
+
         savedStateRegistryController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
         windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -105,6 +116,10 @@ class AlarmOverlayService : Service(), LifecycleOwner, ViewModelStoreOwner, Save
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (configManager.isTrackerMode) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         return START_NOT_STICKY
     }

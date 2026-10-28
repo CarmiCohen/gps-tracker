@@ -16,12 +16,11 @@ import javax.inject.Singleton
 
 /**
  * UiEventCoordinator: Central authority for routing UI events to domain logic.
+ * Oct.28.16:
+ * - Issue #1391: Stealth Hardening. Suppressed ToggleTestSiren in Tracker mode 
+ *   to comply with R872. Fixed broken event routing for system settings.
  * Oct.27.0:
  * - GAP-OCT26.5-1: Added ShowConflationStats handling to show conflation metrics.
- * Oct.24.35:
- * - Permission Hardening: Refactored handleInitiateMode and handleProceedToMode 
- *   to perform mandatory synchronous permission refresh before evaluation. 
- *   Fixed race condition where background disclosure re-appeared due to stale state.
  */
 @Singleton
 class UiEventCoordinator @Inject constructor(
@@ -154,6 +153,9 @@ class UiEventCoordinator @Inject constructor(
             }
 
             is UiEvent.ToggleTestSiren -> {
+                // Issue #1391: Suppress in Tracker Mode (R872)
+                if (currentState.session.appMode == "tracker") return
+
                 val isPlaying = audioSynthesizer.isPlaying()
                 if (isPlaying) {
                     audioSynthesizer.stopSiren(timeProvider = timeProvider)
