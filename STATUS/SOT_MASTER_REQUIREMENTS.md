@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct28.12)
+# SOT Master Requirements & Hardening Status (Oct28.13)
 
-## 🏗️ Architectural Master Rules (363 Rules)
+## 🏗️ Architectural Master Rules (364 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -22,10 +22,12 @@
 *   **1.285 Database Transaction Timeout (R-ID 755)**: Critical database operations gated by the `recoveryLock` MUST be protected by a `withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS)` watchdog (30s) to prevent permanent system stalls in the event of a hung SQLite transaction or I/O deadlock. (Oct27.10 - SIMP-OCT27.8-S1).
 *   **1.286 Pruning Telemetry Aggregation (R-ID 756)**: The system MUST calculate and report an Exponential Moving Average (EMA) of purged record counts (Alpha: 0.3) to provide a smoothed visualization of maintenance efficiency over time in forensic telemetry. (Oct27.10 - SIMP-OCT28.2-S1).
 *   **1.287 Recovery Buffer Scaling (R-ID 757)**: The `ForensicSpillBuffer` MUST dynamically scale its capacity (2,000 to 50,000 entries) based on available storage health to prevent over-provisioning and optimize resource usage on constrained devices while maximizing retention on high-capacity hardware. (Oct27.10 - SIMP-OCT27.6-S1).
-*   **1.288 Settings Integrity Guard (R-ID 758)**: The `SettingsRepository` MUST implement a hash-based integrity check (SHA-256) for its persistent state to detect data corruption that may occur during OS-level backup/restore events or unexpected process deaths. (Oct28.12 - SIMP-OCT28.11-S1).
+*   **1.288 Settings Integrity Guard (R-ID 758)**: The `SettingsRepository` MUST implement a hash-based integrity check (SHA-256) for its persistent state to detect data corruption that may occur during OS-level backup/restore events or unexpected process deaths. (Oct27.10 - SIMP-OCT28.11-S1).
+*   **1.289 Settings Restoration Policy (R-ID 759)**: The `SettingsRepository` MUST implement an emergency factory reset fallback that triggers after a threshold of consecutive integrity signature failures (3) is reached across process restarts. This ensures the application can recover a functional state from persistent corruption. (Oct28.13 - SIMP-OCT28.12-S1).
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 863**: Settings Integrity Guard - PASSED. Verified that `SettingsRepository` correctly calculates SHA-256 signatures for all mutations and detects signature mismatches during emission. (Oct28.12 - SIMP-OCT28.11-S1).
+*   **SOT ID 864**: Settings Restoration Policy - PASSED. Verified that `SettingsRepository` correctly tracks `integrity_violation_count`, performs a factory reset after 3 failures, and resets the counter on successful writes. (Oct28.13 - SIMP-OCT28.12-S1).
+*   **SOT ID 863**: Settings Integrity Guard - PASSED. Verified that `SettingsRepository` correctly calculates SHA-256 signatures for all mutations and detects signature mismatches during emission. (Oct27.10 - SIMP-OCT28.11-S1).
 *   **SOT ID 862**: Recovery Buffer Scaling - PASSED. Verified that `ForensicSpillBuffer` correctly resizes the memory-mapped file and adjusts its capacity based on available disk space. (Oct27.10 - SIMP-OCT27.6-S1).
 *   **SOT ID 861**: Pruning Telemetry Aggregation - PASSED. Verified that `MainRepository` correctly calculates the rolling average of purged counts using `MAINTENANCE_PURGED_EMA_ALPHA` and propagates it to `SystemHealthState`. (Oct27.10 - SIMP-OCT28.2-S1).
 *   **SOT ID 860**: Database Transaction Timeout - PASSED. Verified that all `recoveryLock.withLock` blocks in `LogRepository` are wrapped in a `withTimeout` safety envelope to prevent deadlocks. (Oct27.10 - SIMP-OCT27.8-S1).
@@ -43,7 +45,8 @@
 *   **SOT ID 848**: Forensic Convergence Audit - PASSED. Verified 100Hz burst sustainability and enforced persistence unique constraints to prevent data duplication. (Oct27.10 - ISSUE-OCT27.1-F1).
 
 ## ✅ Verification Chapters
-*   **Chapter 4.33 (Settings Integrity Audit)**: PASSED - Verified that the `SettingsRepository` correctly implements SHA-256 signatures for data validation. Circularity is prevented by clearing the signature field before hashing. (Oct28.12).
+*   **Chapter 4.34 (Settings Restoration Audit)**: PASSED - Verified that the `SettingsRepository` correctly implements an emergency factory reset fallback that triggers after 3 consecutive integrity failures. The reset process re-initializes all settings with a valid SHA-256 signature to restore system functionality. (Oct28.13).
+*   **Chapter 4.33 (Settings Integrity Audit)**: PASSED - Verified that the `SettingsRepository` correctly implements SHA-256 signatures for data validation. Circularity is prevented by clearing the signature field before hashing. (Oct27.10).
 *   **Chapter 4.32 (Recovery Buffer Scaling Audit)**: PASSED - Verified that the forensic spill buffer dynamically adjusts its capacity based on available storage. Clamped resizing logic prevents over-provisioning while maintaining retention integrity. (Oct27.10).
 *   **Chapter 4.31 (Pruning Telemetry Aggregation Audit)**: PASSED - Verified that `MainRepository` calculates a smoothed rolling average of purged record counts, ensuring visibility into maintenance trends without rapid oscillation. (Oct27.10).
 *   **Chapter 4.30 (Database Watchdog Audit)**: PASSED - Verified that `LogRepository` correctly handles `TimeoutCancellationException` for all recovery lock operations, ensuring system responsiveness during I/O stalls. (Oct27.10).

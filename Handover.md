@@ -1,34 +1,33 @@
 git add .
-git commit -m "Fix: Settings Invalidation Guard. #SIMP-OCT28.11-S1"
-git tag -a Oct28.12 -m "Oct28.12 Release: Settings Invalidation Guard"
-git push origin Oct28.12
+git commit -m "Fix: Settings Restoration Policy. #SIMP-OCT28.12-S1"
+git tag -a Oct28.13 -m "Oct28.13 Release: Settings Restoration Policy"
+git push origin Oct28.13
 
-# Project Handover - Oct28.12
+# Project Handover - Oct28.13
 
-## ✅ Status: Settings Integrity Guard Verified
+## ✅ Status: Settings Restoration Policy Verified
 
-Version **Oct28.12** baseline is established. Successfully implemented a SHA-256 integrity guard for `SettingsRepository` to detect and handle data corruption.
+Version **Oct28.13** baseline is established. Successfully implemented a factory reset fallback for `SettingsRepository` to recover from persistent configuration corruption.
 
 ## 🎯 Next Resumption Focus: Strategic Simplification.
 
 ### 🛡️ Critical Fixes & Implementation Details
 
-#### 1. Settings Invalidation Guard (#SIMP-OCT28.11-S1)
-- **Problem**: Risk of configuration corruption during OS-level events (backup/restore, process death) leading to inconsistent states or identity conflicts.
+#### 1. Settings Restoration Policy (#SIMP-OCT28.12-S1)
+- **Problem**: Risk of permanent application lockout if `SettingsRepository` detects persistent integrity mismatches (R-ID 758) across restarts.
 - **Fix**: 
-    - Added `integrity_signature` to `AppSettings` proto.
-    - Implemented `calculateIntegrityHash` (SHA-256) in `SettingsRepository`.
-    - Integrated automatic signature calculation on all `mutate` operations.
-    - Added real-time integrity verification on the `validatedData` Flow.
-    - Enforced R-ID 758: "SettingsRepository MUST implement a hash-based integrity check (SHA-256)."
+    - Added `integrity_violation_count` to `AppSettings` proto.
+    - Implemented `handleIntegrityViolation` logic in `SettingsRepository` to track consecutive failures.
+    - Enforced automated `performFactoryReset()` after 3 consecutive signature mismatches.
+    - Integrated automatic counter reset on all successful `mutate` and `commitDraftSettings` operations.
+    - Enforced R-ID 759: "SettingsRepository MUST implement an emergency factory reset fallback."
 
 ## 🔴 Open Gaps
 - **SIMP-OCT27.5-S1**: Badge Measurement Caching (Low). Investigate if `MeasurableBadge` can benefit from `Modifier.layout` caching.
-- **SIMP-OCT28.12-S1**: Settings Restoration Policy (Medium). Evaluate implementing a factory reset fallback in `SettingsRepository` if the integrity hash mismatch is detected multiple times.
 
 ## 📊 Hardening Snapshot
-- **SOT Count**: 863 (Rules: 363)
-- **Testing Status**: Settings Integrity Audit - **PASSED**.
-- **QA Status**: SHA-256 Signature Verification - **VERIFIED**.
+- **SOT Count**: 864 (Rules: 364)
+- **Testing Status**: Settings Restoration Audit - **PASSED**.
+- **QA Status**: Factory Reset Fallback - **VERIFIED**.
 
 **Handover complete. STOPPING ALL PROCESSING.**

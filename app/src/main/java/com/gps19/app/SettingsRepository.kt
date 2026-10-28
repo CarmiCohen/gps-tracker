@@ -43,6 +43,9 @@ private suspend inline fun DataStore<AppSettings>.mutate(
         val builder = current.toBuilder()
         builder.block()
         
+        // Reset violation count on successful write
+        builder.setIntegrityViolationCount(0)
+        
         // Calculate integrity hash before building
         val intermediate = builder.build()
         val hash = SettingsRepository.calculateIntegrityHash(intermediate)
@@ -65,6 +68,7 @@ data class CommitResult(
 /**
  * SettingsRepository: Manages persistent application settings using DataStore.
  * Oct28.12:
+ * - SIMP-OCT28.12-S1: Settings Restoration Policy (Factory Reset Fallback).
  * - SIMP-OCT28.11-S1: Settings Invalidation Guard (R-ID 758).
  * Oct24.16:
  * - SIMP-OCT22.0-S1: Centralized identity validation via ConfigValidator.
@@ -86,6 +90,8 @@ class SettingsRepository @Inject constructor(
         const val DEFAULT_TRACKER_ID = SignalingConstants.DEFAULT_TRACKER_ID
         const val DEFAULT_VIEWER_ID = SignalingConstants.DEFAULT_VIEWER_ID
         const val DEFAULT_MAX_DISTANCE = 60.0
+        
+        private const val MAX_INTEGRITY_VIOLATIONS = 3
 
         internal val identitySanitizationMigration = object : DataMigration<AppSettings> {
             override suspend fun shouldMigrate(currentData: AppSettings): Boolean {
@@ -113,10 +119,13 @@ class SettingsRepository @Inject constructor(
 
         /**
          * calculateIntegrityHash: Generates a SHA-256 signature for settings state.
-         * R-ID 758: Must exclude the signature field itself to prevent circularity.
+         * R-ID 758: Must exclude signature and violation count to prevent circularity.
          */
         internal fun calculateIntegrityHash(settings: AppSettings): String {
-            val clean = settings.toBuilder().clearIntegritySignature().build()
+            val clean = settings.toBuilder()
+                .clearIntegritySignature()
+                .clearIntegrityViolationCount()
+                .build()
             val bytes = clean.toByteArray()
             val digest = MessageDigest.getInstance("SHA-256")
             val hash = digest.digest(bytes)
@@ -126,17 +135,44 @@ class SettingsRepository @Inject constructor(
 
     /**
      * Internal flow that validates integrity on every emission.
+     * SIMP-OCT28.12-S1: Implements automated factory reset after repeated failures.
      */
     private val validatedData: Flow<AppSettings> = dataStore.data.map { settings ->
         if (settings.integritySignature.isNotEmpty()) {
             val expected = calculateIntegrityHash(settings)
             if (settings.integritySignature != expected) {
-                // R-ID 758: Corruption detected. In a production environment, this would 
-                // trigger a critical alert or recovery. For now, we log and proceed.
-                Timber.e("CRITICAL: Settings Integrity Violation Detected!")
+                Timber.e("CRITICAL: Settings Integrity Violation Detected! (Count: ${settings.integrityViolationCount})")
+                handleIntegrityViolation(settings)
             }
         }
         settings
+    }
+
+    private fun handleIntegrityViolation(settings: AppSettings) {
+        scope.launch {
+            val nextCount = settings.integrityViolationCount + 1
+            if (nextCount >= MAX_INTEGRITY_VIOLATIONS) {
+                Timber.e("CRITICAL: Integrity failure threshold reached. Performing Emergency Factory Reset.")
+                performFactoryReset()
+            } else {
+                dataStore.updateData { current ->
+                    current.toBuilder().setIntegrityViolationCount(nextCount).build()
+                }
+            }
+        }
+    }
+
+    /**
+     * performFactoryReset: Clears all settings and re-initializes with a valid signature.
+     */
+    private suspend fun performFactoryReset() {
+        dataStore.updateData {
+            val builder = AppSettings.getDefaultInstance().toBuilder()
+            builder.setIntegrityViolationCount(0)
+            val hash = calculateIntegrityHash(builder.build())
+            builder.setIntegritySignature(hash)
+            builder.build()
+        }
     }
 
     val appModeFlow: Flow<String?> = validatedData.map { it.appMode.ifEmpty { null } }
@@ -565,6 +601,9 @@ class SettingsRepository @Inject constructor(
             if (s.hasDraftRelayUrl()) { builder.setRelayUrl(s.draftRelayUrl).clearDraftRelayUrl() }
             if (s.draftMaxDistance > 0) { builder.setMaxDistance(s.draftMaxDistance).setDraftMaxDistance(0.0) }
             if (s.hasDraftAlertSettings()) { builder.setAlertSettings(s.draftAlertSettings).clearDraftAlertSettings() }
+            
+            // Oct28.12: Reset violation count on manual commit
+            builder.setIntegrityViolationCount(0)
             
             // Oct28.12: Update integrity signature during manual commit
             val intermediate = builder.build()

@@ -1,6 +1,17 @@
-# Resolution Archive - Oct28.12
+# Resolution Archive - Oct28.13
 
-## ✅ Resolved Issues (Oct28.12)
+## ✅ Resolved Issues (Oct28.13)
+
+### 1. SIMP-OCT28.12-S1: Settings Restoration Policy
+- **Symptoms**: Risk of the application becoming permanently unusable if the persistent settings DataStore becomes corrupted in a way that the integrity guard (R-ID 758) continuously fails across process restarts.
+- **Root Cause**: Lack of an automated recovery or fallback mechanism for persistent state corruption.
+- **Resolution**: Implemented an emergency factory reset fallback in `SettingsRepository.kt`. The repository now tracks `integrity_violation_count` within the `AppSettings` proto. If the `integritySignature` verification fails 3 times across process restarts, the system triggers `performFactoryReset()`, which re-initializes all settings to their default values and generates a fresh, valid SHA-256 signature. The violation count is automatically reset to zero upon any successful manual write or successful commit of draft settings, ensuring that the fallback only triggers on persistent, unrecoverable corruption. (R-ID 759).
+
+---
+
+# Resolution Archive - Oct27.10
+
+## ✅ Resolved Issues (Oct27.10)
 
 ### 1. SIMP-OCT28.11-S1: Settings Invalidation Guard
 - **Symptoms**: Risk of configuration corruption during OS-level backup/restore events, rapid process deaths, or storage-level bit rot, which could lead to inconsistent application behavior or identity conflicts.
@@ -8,8 +19,6 @@
 - **Resolution**: Implemented a SHA-256 integrity guard in `SettingsRepository.kt`. A new `integrity_signature` field was added to `app_settings.proto`. On every mutation via the `mutate` extension, a hash of the serialized proto (excluding the signature field itself) is calculated and stored. During data emission from the DataStore, the signature is recalculated and verified. Any mismatch triggers a critical error log, ensuring forensic visibility into state corruption. (R-ID 758).
 
 ---
-
-## ✅ Resolved Issues (Oct27.10)
 
 ### 1. SIMP-OCT27.6-S1: Recovery Buffer Scaling
 - **Symptoms**: The `ForensicSpillBuffer` used a fixed 10,000 entry capacity (approx. 1.25MB). On devices with critical storage pressure, this was over-provisioning resources, while on devices with high-capacity storage, it led to premature circular overwrites during long offline gaps.

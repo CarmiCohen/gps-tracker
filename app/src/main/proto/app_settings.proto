@@ -115,6 +115,8 @@ message AppSettings {
 
     // SIMP-OCT28.11-S1: Integrity signature to detect corruption
     optional string integrity_signature = 150;
+    // SIMP-OCT28.12-S1: Track consecutive integrity failures for factory reset fallback
+    optional int32 integrity_violation_count = 151;
 }
 
 enum TrackerStateProto {

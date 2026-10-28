@@ -71,6 +71,11 @@ fun AppSettingsMigration(context: Context) = SharedPreferencesMigration<AppSetti
         sharedPrefs.getBoolean("alert_global_mute", false).let { alertBuilder.setGlobalMute(it) }
         builder.setAlertSettings(alertBuilder.build())
 
+        // Oct28.12: Sign the migrated data (SIMP-OCT28.11-S1)
+        builder.setIntegrityViolationCount(0)
+        val intermediate = builder.build()
+        builder.setIntegritySignature(SettingsRepository.calculateIntegrityHash(intermediate))
+
         builder.build()
     }
 }
