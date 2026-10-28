@@ -1,37 +1,35 @@
 git add .
-git commit -m "Fix: Pruning Batch Optimization. #SIMP-OCT27.10-S1"
-git tag -a Oct28.0 -m "Oct28.0 Release: Pruning Batch Optimization"
-git push origin Oct28.0
+git commit -m "Fix: Test Application Base Class Consolidation. #SIMP-OCT27.4-S1"
+git tag -a Oct28.1 -m "Oct28.1 Release: Test Application Base Class Consolidation"
+git push origin Oct28.1
 
-# Project Handover - Oct28.0
+# Project Handover - Oct28.1
 
-## ✅ Status: Pruning Batch Optimization Verified
+## ✅ Status: Test Application Base Class Consolidation Verified
 
-Version **Oct28.0** baseline is established. Successfully implemented dynamic adjustment of `PRUNE_CHUNK_SIZE` (500-5000) based on the backlog delta to accelerate database maintenance and space recovery while preventing sustained I/O stalls.
+Version **Oct28.1** baseline is established. Successfully consolidated `GpsApplication` and `GpsTestBaseApplication` into a shared `BaseGpsApplication` to reduce duplication of WorkManager configuration logic and ensure consistent `HiltWorkerFactory` initialization across all environments.
 
 ## 🎯 Next Resumption Focus: Strategic Simplification.
 
 ### 🛡️ Critical Fixes & Implementation Details
 
-#### 1. Pruning Batch Optimization (#SIMP-OCT27.10-S1)
-- **Problem**: Fixed chunk sizes for database pruning were inefficient during deep prunes (e.g., at startup or under high storage pressure), either taking too long or causing unnecessary I/O contention.
+#### 1. Test Application Base Class Consolidation (#SIMP-OCT27.4-S1)
+- **Problem**: Redundant `WorkManager` configuration logic and risks of Hilt injection failures in instrumented tests due to inconsistent application base classes.
 - **Fix**: 
-    - Added `PRUNE_CHUNK_SIZE_MIN` (500) and `PRUNE_CHUNK_SIZE_MAX` (5000) to `EngineConstants.kt`.
-    - Implemented `getCount()` in all DAOs in `Database.kt` to allow real-time pressure detection.
-    - Implemented `calculateDynamicChunkSize` logic in `LogRepository.kt` and `MainRepository.kt`.
-    - Refactored `proactivePruning` and `deepPruneLogs` to use dynamic chunking.
-    - Enforced R-ID 753: "Maintenance tasks MUST dynamically scale the pruning chunk size (500-5000) based on the backlog delta relative to retention limits."
-
-#### 2. Maintenance Efficiency
-- **Improvement**: Deep prunes now recover space significantly faster by increasing batch sizes when the database is heavily over its limit, while reverting to small batches for routine maintenance to minimize foreground impact.
+    - Created `BaseGpsApplication.kt` (abstract) in the main source set.
+    - Implemented `Configuration.Provider` in `BaseGpsApplication` using a Hilt `EntryPoint` to retrieve the `HiltWorkerFactory`.
+    - Refactored `GpsApplication` and `GpsTestBaseApplication` to inherit from `BaseGpsApplication`.
+    - Removed redundant `workManagerConfiguration` overrides from child classes.
+    - Enforced R-ID 745: "The system MUST utilize a shared BaseGpsApplication that provides HiltWorkerFactory to WorkManager via an EntryPoint to ensure consistent background job initialization."
 
 ## 🔴 Open Gaps
 - **SIMP-OCT27.8-S1**: Database Transaction Timeout. Consider adding a watchdog to the `recoveryLock` to prevent permanent stalls.
 - **SIMP-OCT28.0-S1**: Pruning Worker Telemetry. Consider reporting purged counts to telemetry.
+- **SIMP-OCT27.6-S1**: Recovery Buffer Over-Provisioning (Low). Evaluate if `ForensicSpillBuffer` capacity can be dynamically scaled.
 
 ## 📊 Hardening Snapshot
-- **SOT Count**: 857 (Rules: 358)
-- **Testing Status**: Pruning Optimization Audit - **PASSED**.
-- **QA Status**: Dynamic batching - **VERIFIED**.
+- **SOT Count**: 858 (Rules: 358)
+- **Testing Status**: Test Application Consolidation Audit - **PASSED**.
+- **QA Status**: Unified WorkManager Initialization - **VERIFIED**.
 
 **Handover complete. STOPPING ALL PROCESSING.**

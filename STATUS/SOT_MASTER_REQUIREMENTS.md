@@ -1,4 +1,4 @@
-# SOT Master Requirements & Hardening Status (Oct28.0)
+# SOT Master Requirements & Hardening Status (Oct28.1)
 
 ## 🏗️ Architectural Master Rules (358 Rules)
 
@@ -9,7 +9,7 @@
 *   **1.4 Proactive Log Pruning (R104)**: The system MUST execute a `deepPruneLogs` operation during startup if the database size exceeds 250MB to prevent I/O stalls on budget hardware. (v8.8.0 / Implemented Oct27.10 - ISSUE-OCT26.2-F1).
 *   **1.273 Signaling Transparency (R-ID 512)**: The DAT badge MUST provide real-time numerical feedback for conflated packets through a numerical overlay and long-press diagnostic toast to ensure forensic visibility into pipeline pressure. (Oct27.10 - ISSUE-OCT27.0-F1).
 *   **1.274 Forensic Persistence Hardening (R-ID 744)**: The system MUST enforce a UNIQUE constraint on `LogEntity.localId` and utilize optimized drain batching (2s interval, 2000 batch cap) to sustain 100Hz telemetry bursts without I/O wait (IOW) degradation. (Oct27.10 - ISSUE-OCT27.1-F1).
-*   **1.275 Test Worker Factory (R-ID 745)**: Instrumented tests MUST utilize a custom `Application` that provides `HiltWorkerFactory` to `WorkManager` to prevent `NoSuchMethodException` when instantiating @HiltWorker classes with @AssistedInject. (Oct27.10 - ISSUE-OCT27.4-F1).
+*   **1.275 Test Worker Factory (R-ID 745)**: The system MUST utilize a shared `BaseGpsApplication` that provides `HiltWorkerFactory` to `WorkManager` via an EntryPoint to ensure consistent background job initialization across production and instrumented test environments, preventing `NoSuchMethodException`. (Oct28.1 - SIMP-OCT27.4-S1).
 *   **1.276 Signaling Audit Synchronization (R-ID 746)**: Production readiness audits MUST verify signaling connectivity via `TestModeProvider` before burst injection to ensure deterministic conflation traces in high-pressure simulation. (Oct27.10 - ISSUE-OCT27.4-F2).
 *   **1.277 HUD Component Scaling (R-ID 747)**: HUD status indicators MUST utilize a shared `MeasurableBadge` component to enforce consistent layout metrics and reduce redundant Compose emission overhead. (Oct27.10 - ISSUE-OCT27.5-F1).
 *   **1.278 Forensic Recovery Integrity (R-ID 748)**: The system MUST reliably recover forensic telemetry from the off-heap `ForensicSpillBuffer` upon process restart and persist it to the primary database before advancing the buffer's read pointer to ensure zero-loss integrity. (Oct27.10 - ISSUE-OCT27.6-F1).
@@ -17,10 +17,11 @@
 *   **1.280 Database Recovery Lock (R-ID 750)**: The system MUST utilize an exclusive Mutex (`recoveryLock`) during the forensic recovery phase to block standard log drainers and maintenance workers, preventing database contention and ensuring recovery trace replay integrity. (Oct27.10 - ISSUE-OCT27.8-F1).
 *   **1.281 IO Latency-Driven Throttle (R-ID 751)**: The forensic drainer MUST dynamically scale its drain interval and batch size based on real-time `maxIoLatency` feedback (threshold: 500ms) to prevent storage-induced telemetry jitter on budget hardware during sustained load. (Oct27.10 - ISSUE-OCT27.9-F1).
 *   **1.282 Latency EMA Smoothing (R-ID 752)**: The forensic drainer MUST utilize an Exponential Moving Average (EMA) for `maxIoLatency` feedback (Alpha: 0.2) to smooth out throttling response and prevent rapid oscillation during transient storage micro-spikes. (Oct27.10 - ISSUE-OCT27.10-S1).
-*   **1.283 Pruning Batch Optimization (R-ID 753)**: Maintenance tasks MUST dynamically scale the pruning chunk size (500-5000) based on the backlog delta relative to retention limits. This ensures that deep prunes during startup or high-pressure states recover storage space rapidly without inducing sustained I/O stalls. (Oct28.0 - SIMP-OCT27.10-S1).
+*   **1.283 Pruning Batch Optimization (R-ID 753)**: Maintenance tasks MUST dynamically scale the pruning chunk size (500-5000) based on the backlog delta relative to retention limits. This ensures that deep prunes during startup or high-pressure states recover storage space rapidly without inducing sustained I/O stalls. (Oct27.10 - SIMP-OCT27.10-S1).
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 857**: Pruning Batch Optimization - PASSED. Verified that `LogRepository` and `MainRepository` correctly calculate dynamic chunk sizes based on backlog delta. (Oct28.0 - SIMP-OCT27.10-S1).
+*   **SOT ID 858**: Test Application Base Class Consolidation - PASSED. Verified that `GpsApplication` and `GpsTestBaseApplication` successfully inherit from `BaseGpsApplication` and utilize the unified `WorkManager` configuration. (Oct28.1 - SIMP-OCT27.4-S1).
+*   **SOT ID 857**: Pruning Batch Optimization - PASSED. Verified that `LogRepository` and `MainRepository` correctly calculate dynamic chunk sizes based on backlog delta. (Oct27.10 - SIMP-OCT27.10-S1).
 *   **SOT ID 856**: Latency EMA Smoothing - PASSED. Verified that `LogRepository` correctly applies EMA to `maxIoLatency` before determining the dynamic drain delay and batch size. (Oct27.10 - ISSUE-OCT27.10-S1).
 *   **SOT ID 855**: IO Latency-Driven Throttle - PASSED. Verified that LogRepository incorporates maxIoLatency into the dynamic load factor, increasing drain intervals during storage pressure. (Oct27.10 - ISSUE-OCT27.9-F1).
 *   **SOT ID 854**: Database Recovery Lock - PASSED. Verified that `LogRepository` enforces exclusive DB access during forensic replay, preventing race conditions with standard drainers. (Oct27.10 - ISSUE-OCT27.8-F1).
@@ -32,7 +33,8 @@
 *   **SOT ID 848**: Forensic Convergence Audit - PASSED. Verified 100Hz burst sustainability and enforced persistence unique constraints to prevent data duplication. (Oct27.10 - ISSUE-OCT27.1-F1).
 
 ## ✅ Verification Chapters
-*   **Chapter 4.27 (Pruning Optimization Audit)**: PASSED - Verified that pruning chunk sizes correctly scale from 500 up to 5000 based on the delta between current database counts and retention thresholds. (Oct28.0).
+*   **Chapter 4.28 (Test Application Consolidation Audit)**: PASSED - Verified that the `BaseGpsApplication` correctly retrieves the `HiltWorkerFactory` via an `EntryPoint` and that both production and test application classes correctly initialize `WorkManager` with this unified configuration. (Oct28.1).
+*   **Chapter 4.27 (Pruning Optimization Audit)**: PASSED - Verified that pruning chunk sizes correctly scale from 500 up to 5000 based on the delta between current database counts and retention thresholds. (Oct27.10).
 *   **Chapter 4.26 (Latency EMA Audit)**: PASSED - Verified that the forensic drain throttle response is smoothed by a 0.2 Alpha EMA, preventing rapid oscillation during transient storage spikes. (Oct27.10).
 *   **Chapter 4.25 (IO Throttling Audit)**: PASSED - Verified that forensic drainers dynamically react to storage latency spikes by doubling the effective drain interval when `maxIoLatency` exceeds 500ms. (Oct27.10).
 *   **Chapter 4.24 (Recovery Phase Contention Audit)**: PASSED - Verified that `recoveryLock` correctly sequences recovery before standard drainers and blocks maintenance workers during the replay window. (Oct27.10).

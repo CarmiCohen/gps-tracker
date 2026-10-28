@@ -1,16 +1,12 @@
 package com.gps19.app
 
-import android.app.Application
 import android.util.Log
 import androidx.preference.PreferenceManager
-import androidx.work.Configuration
 import androidx.work.WorkManager
-import android.content.Context
 import android.content.ComponentCallbacks2
 import android.os.Process
 import android.os.Build
 import androidx.annotation.VisibleForTesting
-import androidx.hilt.work.HiltWorkerFactory
 import org.osmdroid.tileprovider.modules.SqlTileWriter
 import org.osmdroid.config.Configuration as OsmConfig
 import timber.log.Timber
@@ -28,16 +24,15 @@ import com.gps19.core.engine.CommandEvent
 
 /**
  * GpsApplication: Application entry point and global dependency management.
+ * Oct.28.1:
+ * - SIMP-OCT27.4-S1: Inherit from BaseGpsApplication to consolidate WorkManager config.
  * Oct.18.4:
  * - SIMP-OCT18.2-S1: Explicit Repository Lifecycle. Now explicitly starts 
  *   LogManager (and thus LogRepository background tasks) during onCreate.
- * Oct.18.2:
- * - SIMP-OCT17.11-S1: Removed static LogRepository.setTestMode call.
  */
 @HiltAndroidApp
-class GpsApplication : Application(), Configuration.Provider {
+class GpsApplication : BaseGpsApplication() {
 
-    @Inject lateinit var workerFactory: HiltWorkerFactory
     @Inject @ApplicationScope lateinit var applicationScope: CoroutineScope
     @Inject lateinit var logManager: LogManager
     @Inject lateinit var domainEventBus: DomainEventBus
@@ -73,11 +68,6 @@ class GpsApplication : Application(), Configuration.Provider {
             isOsmReady.set(true)
         }
     }
-
-    override val workManagerConfiguration: Configuration
-        get() = Configuration.Builder()
-            .setWorkerFactory(workerFactory)
-            .build()
 
     override fun getPackageName(): String {
         return stringCache.get("pkg") ?: super.getPackageName()
