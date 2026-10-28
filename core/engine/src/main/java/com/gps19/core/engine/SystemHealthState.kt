@@ -4,6 +4,9 @@ import kotlinx.serialization.Serializable
 
 /**
  * SystemHealthState: The authoritative model for all device metadata and health status.
+ * Oct.28.4:
+ * - SIMP-OCT28.2-S1: Pruning Telemetry Aggregation. Added maintenancePurgedEma 
+ *   to track the rolling average of records removed during maintenance (R-ID 756).
  * Oct.28.2:
  * - SIMP-OCT28.0-S1: Pruning Worker Telemetry. Added lastMaintenancePurgedCount 
  *   to track records removed during maintenance cycles (R-ID 754).
@@ -67,6 +70,7 @@ class SystemHealthState(
     // Forensic Persistence Health
     var forensicReliability: Double = 1.0,
     var lastMaintenancePurgedCount: Int = 0,
+    var maintenancePurgedEma: Double = 0.0,
 
     // Connectivity Stats
     var uptimeMs: Long = 0L,
@@ -202,6 +206,7 @@ class SystemHealthState(
         this.forensic.copyFrom(other.forensic)
         this.forensicReliability = other.forensicReliability
         this.lastMaintenancePurgedCount = other.lastMaintenancePurgedCount
+        this.maintenancePurgedEma = other.maintenancePurgedEma
         this.uptimeMs = other.uptimeMs
         this.lastConnTs = other.lastConnTs
         this.lastDiscTs = other.lastDiscTs
@@ -278,7 +283,8 @@ class SystemHealthState(
         isJammingCandidate: Boolean = false,
         activityType: ActivityType = ActivityType.UNKNOWN,
         stationaryDurationMs: Long = 0L,
-        lastMaintenancePurgedCount: Int = 0
+        lastMaintenancePurgedCount: Int = 0,
+        maintenancePurgedEma: Double = 0.0
     ) {
         this.signalLoss = signalLoss
         this.gpsStalled = gpsStalled
@@ -342,6 +348,7 @@ class SystemHealthState(
         this.activityType = activityType
         this.stationaryDurationMs = stationaryDurationMs
         this.lastMaintenancePurgedCount = lastMaintenancePurgedCount
+        this.maintenancePurgedEma = maintenancePurgedEma
     }
     
     fun reset() {
@@ -393,6 +400,7 @@ class SystemHealthState(
         forensic.reset()
         forensicReliability = 1.0
         lastMaintenancePurgedCount = 0
+        maintenancePurgedEma = 0.0
         uptimeMs = 0L
         lastConnTs = 0L
         lastDiscTs = 0L

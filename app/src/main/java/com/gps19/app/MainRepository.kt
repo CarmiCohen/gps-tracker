@@ -30,6 +30,9 @@ private class RepositoryMetrics {
 
 /**
  * MainRepository: Centralized data hub for the application.
+ * Oct.28.4:
+ * - SIMP-OCT28.2-S1: Pruning Telemetry Aggregation. Implemented maintenancePurgedEma 
+ *   rolling average calculation in updateTelemetryPurgedCount (R-ID 756).
  * Oct.28.2:
  * - SIMP-OCT28.0-S1: Pruning Worker Telemetry. Implemented reporting of total 
  *   purged record counts to telemetry for all maintenance cycles (R-ID 754).
@@ -501,10 +504,22 @@ class MainRepository @Inject constructor(
         }
     }
 
+    /**
+     * updateTelemetryPurgedCount: Oct.28.4.
+     * Updates both lastMaintenancePurgedCount and maintenancePurgedEma (R-ID 756).
+     */
     private fun updateTelemetryPurgedCount(count: Int) {
         if (count <= 0) return
         val health = telemetryRepository.systemHealth.value
         health.lastMaintenancePurgedCount = count
+        
+        val alpha = MAINTENANCE_PURGED_EMA_ALPHA
+        health.maintenancePurgedEma = if (health.maintenancePurgedEma == 0.0) {
+            count.toDouble()
+        } else {
+            (count * alpha) + (health.maintenancePurgedEma * (1.0 - alpha))
+        }
+
         telemetryRepository.updateHealth(health)
     }
 

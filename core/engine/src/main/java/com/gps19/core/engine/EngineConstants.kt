@@ -2,6 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.28.4:
+ * - SIMP-OCT28.2-S1: Pruning Telemetry Aggregation. Added 
+ *   MAINTENANCE_PURGED_EMA_ALPHA (0.3) for rolling average tracking of 
+ *   storage maintenance efficiency.
  * Oct.28.3:
  * - SIMP-OCT27.8-S1: Database Transaction Timeout. Added 
  *   DATABASE_TRANSACTION_TIMEOUT_MS (30s) to prevent permanent stalls in 
@@ -107,6 +111,7 @@ const val ADAPTIVE_PRUNE_THRESHOLD_CRITICAL = 5000
 const val ADAPTIVE_PRUNE_THRESHOLD_LOW = 10000
 const val ADAPTIVE_PRUNE_THRESHOLD_NORMAL = 25000
 const val ADAPTIVE_PRUNE_THRESHOLD_CHARGING = 50000 
+const val MAINTENANCE_PURGED_EMA_ALPHA = 0.3
 
 // Forensic-specific retention limits
 const val FORENSIC_PRUNE_LIMIT_CRITICAL = 1000

@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Oct27.10)
+# SOT Master Requirements & Hardening Status (Oct28.4)
 
-## 🏗️ Architectural Master Rules (360 Rules)
+## 🏗️ Architectural Master Rules (361 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -20,8 +20,10 @@
 *   **1.283 Pruning Batch Optimization (R-ID 753)**: Maintenance tasks MUST dynamically scale the pruning chunk size (500-5000) based on the backlog delta relative to retention limits. This ensures that deep prunes during startup or high-pressure states recover storage space rapidly without inducing sustained I/O stalls. (Oct27.10 - SIMP-OCT27.10-S1).
 *   **1.284 Pruning Worker Telemetry (R-ID 754)**: The system MUST report the total purged record count per maintenance cycle to telemetry to monitor the impact of dynamic batching and ensure visibility into storage maintenance efficiency. (Oct27.10 - SIMP-OCT28.0-S1).
 *   **1.285 Database Transaction Timeout (R-ID 755)**: Critical database operations gated by the `recoveryLock` MUST be protected by a `withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS)` watchdog (30s) to prevent permanent system stalls in the event of a hung SQLite transaction or I/O deadlock. (Oct27.10 - SIMP-OCT27.8-S1).
+*   **1.286 Pruning Telemetry Aggregation (R-ID 756)**: The system MUST calculate and report an Exponential Moving Average (EMA) of purged record counts (Alpha: 0.3) to provide a smoothed visualization of maintenance efficiency over time in forensic telemetry. (Oct28.4 - SIMP-OCT28.2-S1).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 861**: Pruning Telemetry Aggregation - PASSED. Verified that `MainRepository` correctly calculates the rolling average of purged counts using `MAINTENANCE_PURGED_EMA_ALPHA` and propagates it to `SystemHealthState`. (Oct28.4 - SIMP-OCT28.2-S1).
 *   **SOT ID 860**: Database Transaction Timeout - PASSED. Verified that all `recoveryLock.withLock` blocks in `LogRepository` are wrapped in a `withTimeout` safety envelope to prevent deadlocks. (Oct27.10 - SIMP-OCT27.8-S1).
 *   **SOT ID 859**: Pruning Worker Telemetry - PASSED. Verified that maintenance cycles correctly report purged record counts to `SystemHealthState` and that these are included in telemetry transmissions. (Oct27.10 - SIMP-OCT28.0-S1).
 *   **SOT ID 858**: Test Application Base Class Consolidation - PASSED. Verified that `GpsApplication` and `GpsTestBaseApplication` successfully inherit from `BaseGpsApplication` and utilize the unified `WorkManager` configuration. (Oct27.10 - SIMP-OCT27.4-S1).
@@ -37,6 +39,7 @@
 *   **SOT ID 848**: Forensic Convergence Audit - PASSED. Verified 100Hz burst sustainability and enforced persistence unique constraints to prevent data duplication. (Oct27.10 - ISSUE-OCT27.1-F1).
 
 ## ✅ Verification Chapters
+*   **Chapter 4.31 (Pruning Telemetry Aggregation Audit)**: PASSED - Verified that `MainRepository` calculates a smoothed rolling average of purged record counts, ensuring visibility into maintenance trends without rapid oscillation. (Oct28.4).
 *   **Chapter 4.30 (Database Watchdog Audit)**: PASSED - Verified that `LogRepository` correctly handles `TimeoutCancellationException` for all recovery lock operations, ensuring system responsiveness during I/O stalls. (Oct27.10).
 *   **Chapter 4.29 (Pruning Telemetry Audit)**: PASSED - Verified that `MainRepository` and `PruningWorker` correctly capture purged record counts from all database tables and propagate them to the `SystemHealthState` for telemetry reporting. (Oct27.10).
 *   **Chapter 4.28 (Test Application Consolidation Audit)**: PASSED - Verified that the `BaseGpsApplication` correctly retrieves the `HiltWorkerFactory` via an `EntryPoint` and that both production and test application classes correctly initialize `WorkManager` with this unified configuration. (Oct27.10).

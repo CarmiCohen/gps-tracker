@@ -206,6 +206,7 @@ data class IntegrityState(
     var heapAllocatedMb: Double = 0.0,
     var rtt: Int = 0,
     var lastMaintenancePurgedCount: Int = 0,
+    var maintenancePurgedEma: Double = 0.0,
     val forensic: ForensicSnapshot = ForensicSnapshot()
 ) {
     // Oct.22.15: Forensic delegates for integrity.apply access
@@ -249,6 +250,7 @@ data class IntegrityState(
         this.heapAllocatedMb = other.heapAllocatedMb
         this.rtt = other.rtt
         this.lastMaintenancePurgedCount = other.lastMaintenancePurgedCount
+        this.maintenancePurgedEma = other.maintenancePurgedEma
         this.forensic.copyFrom(other.forensic)
     }
 
@@ -268,12 +270,15 @@ data class IntegrityState(
         locationPendingReason = LocationPendingReason.NONE; signal = null; tamperNote = null
         lastValidFixRt = 0L; isSilentFailure = false; isMaliAnomaly = false; cpuLoad = 0.0
         ioWait = 0.0; maxIoLatency = 0L; isBatteryWhitelisted = false
-        thermalHeadroom = 0.0; heapAllocatedMb = 0.0; rtt = 0; lastMaintenancePurgedCount = 0; forensic.reset()
+        thermalHeadroom = 0.0; heapAllocatedMb = 0.0; rtt = 0; lastMaintenancePurgedCount = 0; maintenancePurgedEma = 0.0; forensic.reset()
     }
 }
 
 /**
  * LocationUpdate: Aggregated telemetry container (Unified Monolith).
+ * Oct.28.4:
+ * - SIMP-OCT28.2-S1: Pruning Telemetry Aggregation. Added maintenancePurgedEma 
+ *   delegate and included it in toMap() for remote monitoring (R-ID 756).
  * Oct.28.2:
  * - SIMP-OCT28.0-S1: Pruning Worker Telemetry. Added lastMaintenancePurgedCount 
  *   delegate and included it in toMap() for remote monitoring (R-ID 754).
@@ -645,6 +650,10 @@ data class LocationUpdate(
     var lastMaintenancePurgedCount: Int
         get() = integrity.lastMaintenancePurgedCount
         set(value) { integrity.lastMaintenancePurgedCount = value }
+        
+    var maintenancePurgedEma: Double
+        get() = integrity.maintenancePurgedEma
+        set(value) { integrity.maintenancePurgedEma = value }
 
     // Unified Forensic Snapshots
     var snrSnapshot: Double? 
@@ -845,6 +854,7 @@ data class LocationUpdate(
         put("dist_to_home", distToHome)
         put("rtt", rtt)
         put("last_maintenance_purged_count", lastMaintenancePurgedCount)
+        put("maintenance_purged_ema", maintenancePurgedEma)
         
         // Extended Forensic Sensors
         put("is_muzzled", isMuzzled)
@@ -862,7 +872,7 @@ data class LocationUpdate(
         
         // Oct.7.7 Anomaly Flags
         put("is_suspicious_noise", isSuspiciousNoise)
-        put("is_memory_pressure_throttled", isMemoryPressureThrottled)
+        put("is_memory_pressureThrottled", isMemoryPressureThrottled)
         
         // Oct.7.9 Native Hysteresis
         put("stationary_duration_ms", stationaryDuration)
