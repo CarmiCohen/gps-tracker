@@ -2,6 +2,10 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.28.3:
+ * - SIMP-OCT27.8-S1: Database Transaction Timeout. Added 
+ *   DATABASE_TRANSACTION_TIMEOUT_MS (30s) to prevent permanent stalls in 
+ *   recovery and maintenance locks.
  * Oct.28.0:
  * - SIMP-OCT27.10-S1: Pruning Batch Optimization. Added PRUNE_CHUNK_SIZE_MIN (500) 
  *   and PRUNE_CHUNK_SIZE_MAX (5000) for dynamic adjustment during deep prunes.
@@ -59,6 +63,7 @@ const val SYSTEM_PRESSURE_STAGGERED_HYSTERESIS_MULT = 2.0
 
 // R104: Database Size Threshold (MB)
 const val DATABASE_SIZE_THRESHOLD_MB = 250.0
+const val DATABASE_TRANSACTION_TIMEOUT_MS = 30000L
 
 // Issue #1417: Connectivity Jitter
 const val CONNECTIVITY_HYSTERESIS_MS = 3000L

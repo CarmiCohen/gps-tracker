@@ -27,6 +27,10 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.28.3:
+ * - SIMP-OCT27.8-S1: Database Transaction Timeout. Implemented watchdog 
+ *   using withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS) on all recoveryLock 
+ *   acquisitions to prevent permanent stalls during hung transactions.
  * Oct.28.2:
  * - SIMP-OCT28.0-S1: Pruning Worker Telemetry. Updated pruning methods to 
  *   return total deleted record counts for telemetry reporting (R-ID 754).
@@ -53,6 +57,7 @@ class LogRepository @Inject constructor(
     /**
      * recoveryLock: Dedicated Mutex to prevent concurrent DB access during the forensic 
      * recovery phase (R-ID 750). Standard drainers and pruning wait on this lock.
+     * SIMP-OCT27.8-S1: Protected by DATABASE_TRANSACTION_TIMEOUT_MS watchdog.
      */
     private val recoveryLock = Mutex()
     
@@ -218,10 +223,16 @@ class LogRepository @Inject constructor(
 
                 val nowRt = timeProvider.elapsedRealtime
                 if (batch.size >= LOG_BATCH_SIZE || (batch.isNotEmpty() && nowRt - lastFlushRt >= LOG_BATCH_DELAY_MS)) {
-                    // R-ID 750: Protect flush with recoveryLock
-                    recoveryLock.withLock {
-                        flushBatch(batch)
-                        batch.clear()
+                    // SIMP-OCT27.8-S1: Protect flush with recoveryLock and watchdog timeout
+                    try {
+                        withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS) {
+                            recoveryLock.withLock {
+                                flushBatch(batch)
+                                batch.clear()
+                            }
+                        }
+                    } catch (e: TimeoutCancellationException) {
+                        Timber.e("SIMP-OCT27.8-S1: recoveryLock timeout during Batch Processor flush.")
                     }
                     lastFlushRt = nowRt
                 }
@@ -232,13 +243,22 @@ class LogRepository @Inject constructor(
         }
     }
 
-    private suspend fun recoverAbandonedTraces() = recoveryLock.withLock {
-        val buffer = forensicSpillBufferProvider.get()
-        val pending = buffer.getPendingCount()
-        if (pending > 0) {
-            Log.i("LogRepository", "Forensic Recovery: Replaying $pending abandoned traces. DB Locked.")
-            performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = true, forcePersistence = true)
-            Log.i("LogRepository", "Forensic Recovery: Replay complete. DB Unlocked.")
+    private suspend fun recoverAbandonedTraces() {
+        try {
+            // SIMP-OCT27.8-S1: Watchdog for Forensic Recovery phase
+            withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS) {
+                recoveryLock.withLock {
+                    val buffer = forensicSpillBufferProvider.get()
+                    val pending = buffer.getPendingCount()
+                    if (pending > 0) {
+                        Log.i("LogRepository", "Forensic Recovery: Replaying $pending abandoned traces. DB Locked.")
+                        performForensicDrain(limit = FORENSIC_SPILL_CAPACITY, isRecovery = true, forcePersistence = true)
+                        Log.i("LogRepository", "Forensic Recovery: Replay complete. DB Unlocked.")
+                    }
+                }
+            }
+        } catch (e: TimeoutCancellationException) {
+            Timber.e("SIMP-OCT27.8-S1: recoveryLock timeout during Forensic Recovery.")
         }
     }
 
@@ -302,11 +322,17 @@ class LogRepository @Inject constructor(
                     val dynamicBatchSize = (baseBatchSize * (1.0 - (combinedLoadFactor * loadImpact))).toInt()
                         .coerceIn(FORENSIC_BATCH_SIZE_MIN, FORENSIC_BATCH_SIZE_MAX)
 
-                    // R-ID 750: Protect drain with recoveryLock
-                    recoveryLock.withLock {
-                        if (performForensicDrain(limit = dynamicBatchSize, isRecovery = false, forcePersistence = isEmergency)) {
-                            lastDrainRt = nowRt
+                    // SIMP-OCT27.8-S1: Protect drain with recoveryLock and watchdog timeout
+                    try {
+                        withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS) {
+                            recoveryLock.withLock {
+                                if (performForensicDrain(limit = dynamicBatchSize, isRecovery = false, forcePersistence = isEmergency)) {
+                                    lastDrainRt = nowRt
+                                }
+                            }
                         }
+                    } catch (e: TimeoutCancellationException) {
+                        Timber.e("SIMP-OCT27.8-S1: recoveryLock timeout during Forensic Drainer.")
                     }
                 }
             } catch (e: Exception) {
@@ -519,64 +545,74 @@ class LogRepository @Inject constructor(
      * the delta between current count and target limit.
      * Oct.28.2: Returns total purged record count for telemetry (R-ID 754).
      * R-ID 750: Inhibited during Forensic Recovery phase.
+     * SIMP-OCT27.8-S1: Protected by DATABASE_TRANSACTION_TIMEOUT_MS watchdog.
      */
-    suspend fun proactivePruning(): Int = recoveryLock.withLock {
-        if (!PersistencePolicy.shouldPerformMaintenance(telemetry.systemHealth.value)) return@withLock 0
-        
-        var totalPurged = 0
+    suspend fun proactivePruning(): Int {
         try {
-            val health = telemetry.systemHealth.value
-            val isCharging = health.isCharging
-            
-            // R728: Storage-aware granular thresholds
-            val generalLimit = when {
-                health.isStorageCritical -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
-                health.isStorageLow -> ADAPTIVE_PRUNE_THRESHOLD_LOW
-                isCharging -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING
-                else -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL
-            }
+            return withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS) {
+                recoveryLock.withLock {
+                    if (!PersistencePolicy.shouldPerformMaintenance(telemetry.systemHealth.value)) return@withLock 0
+                    
+                    var totalPurged = 0
+                    try {
+                        val health = telemetry.systemHealth.value
+                        val isCharging = health.isCharging
+                        
+                        // R728: Storage-aware granular thresholds
+                        val generalLimit = when {
+                            health.isStorageCritical -> ADAPTIVE_PRUNE_THRESHOLD_CRITICAL
+                            health.isStorageLow -> ADAPTIVE_PRUNE_THRESHOLD_LOW
+                            isCharging -> ADAPTIVE_PRUNE_THRESHOLD_CHARGING
+                            else -> ADAPTIVE_PRUNE_THRESHOLD_NORMAL
+                        }
 
-            // R712: Forensic-specific retention limits
-            val forensicLimit = when {
-                health.isStorageCritical -> FORENSIC_PRUNE_LIMIT_CRITICAL
-                health.isStorageLow -> FORENSIC_PRUNE_LIMIT_LOW
-                isCharging -> FORENSIC_PRUNE_LIMIT_CHARGING
-                else -> FORENSIC_PRUNE_LIMIT_NORMAL
-            }
+                        // R712: Forensic-specific retention limits
+                        val forensicLimit = when {
+                            health.isStorageCritical -> FORENSIC_PRUNE_LIMIT_CRITICAL
+                            health.isStorageLow -> FORENSIC_PRUNE_LIMIT_LOW
+                            isCharging -> FORENSIC_PRUNE_LIMIT_CHARGING
+                            else -> FORENSIC_PRUNE_LIMIT_NORMAL
+                        }
 
-            val currentCount = logDao.getCount()
-            val dynamicChunkSize = calculateDynamicChunkSize(currentCount, generalLimit)
+                        val currentCount = logDao.getCount()
+                        val dynamicChunkSize = calculateDynamicChunkSize(currentCount, generalLimit)
 
-            db.withTransaction {
-                // Tier 1: Heartbeats (Aggressive pruning)
-                totalPurged += logDao.pruneHeartbeatsByThreshold(
-                    logDao.getHeartbeatPruneThreshold(generalLimit / 5) ?: 0L, 
-                    dynamicChunkSize
-                )
-                
-                // Tier 2: General Logs
-                totalPurged += logDao.pruneGeneralByThreshold(
-                    logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, 
-                    dynamicChunkSize
-                )
-                
-                // Tier 3: Important Logs (Keep more)
-                totalPurged += logDao.pruneImportantByThreshold(
-                    logDao.getImportantPruneThreshold(generalLimit * 2) ?: 0L, 
-                    dynamicChunkSize
-                )
-                
-                // Tier 4: Forensic Traces (High storage consumer)
-                totalPurged += logDao.pruneForensicByThreshold(
-                    logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, 
-                    dynamicChunkSize
-                )
+                        db.withTransaction {
+                            // Tier 1: Heartbeats (Aggressive pruning)
+                            totalPurged += logDao.pruneHeartbeatsByThreshold(
+                                logDao.getHeartbeatPruneThreshold(generalLimit / 5) ?: 0L, 
+                                dynamicChunkSize
+                            )
+                            
+                            // Tier 2: General Logs
+                            totalPurged += logDao.pruneGeneralByThreshold(
+                                logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, 
+                                dynamicChunkSize
+                            )
+                            
+                            // Tier 3: Important Logs (Keep more)
+                            totalPurged += logDao.pruneImportantByThreshold(
+                                logDao.getImportantPruneThreshold(generalLimit * 2) ?: 0L, 
+                                dynamicChunkSize
+                            )
+                            
+                            // Tier 4: Forensic Traces (High storage consumer)
+                            totalPurged += logDao.pruneForensicByThreshold(
+                                logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, 
+                                dynamicChunkSize
+                            )
+                        }
+                        Timber.i("Adaptive Pruning: Completed. Limits: Gen=$generalLimit, Forensic=$forensicLimit, Chunk=$dynamicChunkSize, Purged=$totalPurged")
+                    } catch (e: Exception) { 
+                        Timber.e(e, "Error during proactive pruning") 
+                    }
+                    totalPurged
+                }
             }
-            Timber.i("Adaptive Pruning: Completed. Limits: Gen=$generalLimit, Forensic=$forensicLimit, Chunk=$dynamicChunkSize, Purged=$totalPurged")
-        } catch (e: Exception) { 
-            Timber.e(e, "Error during proactive pruning") 
+        } catch (e: TimeoutCancellationException) {
+            Timber.e("SIMP-OCT27.8-S1: recoveryLock timeout during Proactive Pruning.")
+            return 0
         }
-        return@withLock totalPurged
     }
 
     /**
@@ -586,29 +622,39 @@ class LogRepository @Inject constructor(
      * SIMP-OCT27.10-S1: Uses dynamic chunk size to accelerate space recovery.
      * Oct.28.2: Returns total purged record count for telemetry (R-ID 754).
      * R-ID 750: Inhibited during Forensic Recovery phase.
+     * SIMP-OCT27.8-S1: Protected by DATABASE_TRANSACTION_TIMEOUT_MS watchdog.
      */
-    suspend fun deepPruneLogs(): Int = recoveryLock.withLock {
-        var totalPurged = 0
+    suspend fun deepPruneLogs(): Int {
         try {
-            Timber.w("R104: Initiating DEEP PRUNE due to database size pressure. DB Locked.")
-            
-            // Aggressive: Keep only 10% of normal limits
-            val generalLimit = ADAPTIVE_PRUNE_THRESHOLD_CRITICAL / 2
-            val forensicLimit = FORENSIC_PRUNE_LIMIT_CRITICAL / 2
-            
-            val currentCount = logDao.getCount()
-            val dynamicChunkSize = calculateDynamicChunkSize(currentCount, generalLimit)
+            return withTimeout(DATABASE_TRANSACTION_TIMEOUT_MS) {
+                recoveryLock.withLock {
+                    var totalPurged = 0
+                    try {
+                        Timber.w("R104: Initiating DEEP PRUNE due to database size pressure. DB Locked.")
+                        
+                        // Aggressive: Keep only 10% of normal limits
+                        val generalLimit = ADAPTIVE_PRUNE_THRESHOLD_CRITICAL / 2
+                        val forensicLimit = FORENSIC_PRUNE_LIMIT_CRITICAL / 2
+                        
+                        val currentCount = logDao.getCount()
+                        val dynamicChunkSize = calculateDynamicChunkSize(currentCount, generalLimit)
 
-            db.withTransaction {
-                totalPurged += logDao.pruneHeartbeatsByThreshold(logDao.getHeartbeatPruneThreshold(10) ?: 0L, dynamicChunkSize)
-                totalPurged += logDao.pruneGeneralByThreshold(logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, dynamicChunkSize)
-                totalPurged += logDao.pruneForensicByThreshold(logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, dynamicChunkSize)
+                        db.withTransaction {
+                            totalPurged += logDao.pruneHeartbeatsByThreshold(logDao.getHeartbeatPruneThreshold(10) ?: 0L, dynamicChunkSize)
+                            totalPurged += logDao.pruneGeneralByThreshold(logDao.getGeneralPruneThreshold(generalLimit) ?: 0L, dynamicChunkSize)
+                            totalPurged += logDao.pruneForensicByThreshold(logDao.getForensicPruneThreshold(forensicLimit) ?: 0L, dynamicChunkSize)
+                        }
+                        Timber.i("R104: Deep prune completed. Chunk=$dynamicChunkSize. Purged=$totalPurged. DB Unlocked.")
+                    } catch (e: Exception) {
+                        Timber.e(e, "Error during deep pruning")
+                    }
+                    totalPurged
+                }
             }
-            Timber.i("R104: Deep prune completed. Chunk=$dynamicChunkSize. Purged=$totalPurged. DB Unlocked.")
-        } catch (e: Exception) {
-            Timber.e(e, "Error during deep pruning")
+        } catch (e: TimeoutCancellationException) {
+            Timber.e("SIMP-OCT27.8-S1: recoveryLock timeout during Deep Prune.")
+            return 0
         }
-        return@withLock totalPurged
     }
 
     /**
