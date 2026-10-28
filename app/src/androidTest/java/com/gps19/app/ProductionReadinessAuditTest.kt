@@ -47,13 +47,7 @@ object TestPowerModule {
 /**
  * ProductionReadinessAuditTest: Validates system behavior under production-like 
  * soak and pressure conditions.
- * Oct.27.2:
- * - ISSUE-OCT27.2-F2: Signaling Conflation Audit Hardening. Added injection of 
- *   ManualTestModeProvider and SessionManager to ensure clean test state and 
- *   simulated connectivity during high-pressure soak tests.
- * Oct.27.1:
- * - verifyHighPressureSignalingSoak: Fixed priority misalignment. Telemetry must be 
- *   sent as NORMAL priority to trigger conflation logic in SmartSignalingDispatcher.
+ * Oct.28.23: Fixed compilation errors caused by removal of FORENSIC_SPILL_CAPACITY.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -167,8 +161,6 @@ class ProductionReadinessAuditTest {
         val startReceived = repository.signalingMetrics.value.received
         val burstSize = 100
         
-        // Oct.27.1: Inject high-frequency burst of NORMAL priority telemetry 
-        // using the signalingProvider directly to trigger conflation buckets.
         repeat(burstSize) { i ->
             val update = LocationUpdate().apply {
                 kinetic.lat = 32.0 + (i * 0.0001)
@@ -178,8 +170,6 @@ class ProductionReadinessAuditTest {
             signalingProvider.transmit(update, SignalingPriority.NORMAL, fromViewer = false)
         }
 
-        // Wait for conflation cycle to process. Conflation delay scales with burst count.
-        // With 100 packets, delay reaches MAX_CONFLATION_DELAY_MS (2000ms).
         delay(3000)
         
         val metrics = repository.signalingMetrics.value
@@ -208,7 +198,7 @@ class ProductionReadinessAuditTest {
             var handoverFound = false
             var failureFound = false
             repeat(50) {
-                val traces = buffer.peekToEntities(FORENSIC_SPILL_CAPACITY).entities
+                val traces = buffer.peekToEntities(buffer.capacity).entities
                 val dbLogs = logRepository.loadAllLogsStatic(1000)
                 if (!handoverFound) handoverFound = traces.any { it.message.contains("Forensic Handover") } || dbLogs.any { it.message.contains("Forensic Handover") }
                 if (!failureFound) failureFound = traces.any { it.message.contains("Forensic TX Failure") } || dbLogs.any { it.message.contains("Forensic TX Failure") }

@@ -19,6 +19,7 @@ import kotlin.system.measureTimeMillis
  * ForensicConvergenceAuditTest: Verifies GAP-OCT27.0-1.
  * Audits the LogRepository's ability to sustain 100Hz bursts and drain performance.
  * Oct.27.1: Disabled test mode during audit to allow background drain tasks to run.
+ * Oct.28.23: Fixed compilation errors caused by removal of FORENSIC_SPILL_CAPACITY.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -128,7 +129,7 @@ class ForensicConvergenceAuditTest {
         buffer.resetBufferForTest()
         
         // Fill buffer to 50%
-        val fillCount = FORENSIC_SPILL_CAPACITY / 2
+        val fillCount = FORENSIC_SPILL_CAPACITY_DEFAULT / 2
         repeat(fillCount) { i ->
             buffer.writeTraceOptimized(
                 timestamp = 1000L + i, lat = 1.0, lng = 2.0, accuracy = 3.0, maxAccuracy = 4.0,
@@ -144,7 +145,7 @@ class ForensicConvergenceAuditTest {
         assertFalse("Buffer should be empty after flush", buffer.hasPending())
         
         // R-ID GAP-OCT27.0-1: Average latency per trace should be < 1.0ms
-        val avgLatency = timeTaken.toDouble() / fillCount
+        val avgLatency = timeTaken.toDouble() / fillCount.toDouble()
         Timber.i("AUDIT: Avg latency per trace: ${"%.3f".format(avgLatency)}ms")
         
         assertTrue("Drain efficiency too low: ${avgLatency}ms/trace", avgLatency < 1.0)

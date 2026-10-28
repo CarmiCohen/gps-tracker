@@ -1,6 +1,6 @@
 # SOT Master Requirements & Hardening Status (Oct27.10)
 
-## 🏗️ Architectural Master Rules (367 Rules)
+## 🏗️ Architectural Master Rules (368 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -27,9 +27,11 @@
 *   **1.290 Badge Measurement Caching (R-ID 760)**: `MeasurableBadge` MUST utilize a custom `Layout` block and flattened hierarchy to minimize measurement passes and bypass high-level `Alignment` overhead during rapid-fire HUD status updates. (Oct27.10 - SIMP-OCT27.5-S1).
 *   **1.291 Stealth Suppression Authority (R-ID 761)**: The system MUST enforce role-based suppression of all audible sirens and visual alarm overlays on devices in Tracker mode to ensure operational stealth (R872). Suppression MUST be enforced at the engine level (AudioSynthesizer) and UI service level (AlarmOverlayService) to prevent detection during high-pressure violations. (Oct27.10 - ISSUE-OCT28.16-F1).
 *   **1.292 Constant Syntax Integrity (R-ID 762)**: Compile-time constants (`const val`) MUST use valid Kotlin literal syntax without unsupported escape sequences to ensure build reproducibility and prevent integration blocks. (Oct27.10 - ISSUE-OCT28.17-F1).
+*   **1.293 Dynamic Buffer Test Integrity (R-ID 763)**: Instrumented audit tests verifying the forensic pipeline MUST dynamically query `ForensicSpillBuffer.capacity` to ensure test coverage across all storage health tiers and prevent unresolved reference failures during capacity transitions. (Oct27.10 - ISSUE-OCT28.20-F1).
 
 ## 🛡️ Core Hardening Baseline
-*   **SOT ID 867**: Constant Syntax Integrity - PASSED. Verified successful build and unit test execution after syntax remediation in `EngineConstants.kt`. (Oct27.10).
+*   **SOT ID 868**: Audit Suite Recovery - PASSED. Verified compilation and execution of forensic tests after migrating to dynamic buffer capacity. (Oct27.10).
+*   **SOT ID 867**: Constant Syntax Integrity - PASSED. (Oct27.10).
 *   **SOT ID 866**: Stealth Suppression Authority - PASSED. (Oct27.10).
 *   **SOT ID 865**: Badge Measurement Caching - PASSED. (Oct27.10).
 *   **SOT ID 864**: Settings Restoration Policy - PASSED. (Oct27.10).
@@ -48,7 +50,8 @@
 *   **SOT ID 851**: Unit-Based Badge Scaling - PASSED. (Oct27.10).
 
 ## ✅ Verification Chapters
-*   **Chapter 4.37 (Syntax Integrity Audit)**: PASSED - Verified zero compilation errors and full test suite pass on Oct27.10 baseline.
+*   **Chapter 4.38 (Audit Suite Recovery Audit)**: PASSED - Verified zero compilation errors and full test suite pass on Oct27.10 baseline.
+*   **Chapter 4.37 (Syntax Integrity Audit)**: PASSED. (Oct27.10).
 *   **Chapter 4.36 (Stealth Hardening Audit)**: PASSED. (Oct27.10).
 *   **Chapter 4.35 (Badge Optimization Audit)**: PASSED. (Oct27.10).
 *   **Chapter 4.34 (Settings Restoration Audit)**: PASSED. (Oct27.10).

@@ -16,7 +16,7 @@ android {
         minSdk 24
         targetSdk 34
         versionCode rootProject.autoVersionCode
-        versionName "Oct28.20"
+        versionName "Oct28.23"
 
         testInstrumentationRunner "com.gps19.app.HiltTestRunner"
         vectorDrawables {
