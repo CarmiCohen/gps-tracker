@@ -1,37 +1,36 @@
 git add .
-git commit -m "Fix: IO Latency-Driven Throttle implementation. #ISSUE-OCT27.9-F1"
-git tag -a Oct27.9 -m "Oct27.9 Release: IO Latency-Driven Throttle"
-git push origin Oct27.9
+git commit -m "Fix: Latency EMA Smoothing for Throttle. #ISSUE-OCT27.10-S1"
+git tag -a Oct27.10 -m "Oct27.10 Release: Latency EMA Smoothing"
+git push origin Oct27.10
 
-# Project Handover - Oct27.9
+# Project Handover - Oct27.10
 
-## ✅ Status: IO Latency-Driven Throttle Verified
+## ✅ Status: Latency EMA Smoothing Verified
 
-Version **Oct27.9** baseline is established. Successfully implemented dynamic scaling of forensic drain intervals based on real-time storage latency feedback, mitigating telemetry jitter on budget hardware.
+Version **Oct27.10** baseline is established. Successfully implemented an Exponential Moving Average (EMA) for `maxIoLatency` feedback to smooth out forensic drain throttling and prevent oscillations during transient storage spikes.
 
 ## 🎯 Next Resumption Focus: Strategic Simplification.
 
 ### 🛡️ Critical Fixes & Implementation Details
 
-#### 1. IO Latency-Driven Throttle (#ISSUE-OCT27.9-F1)
-- **Problem**: Sustained high-pressure forensic bursts (100Hz) on budget hardware (e.g., A15) caused SPI bus contention, leading to telemetry timing jitter even with staggered persistence.
+#### 1. Latency EMA Smoothing (#ISSUE-OCT27.10-S1)
+- **Problem**: Potential rapid oscillation in the forensic drain throttle when storage latency spikes were transient, leading to inefficient I/O patterns.
 - **Fix**: 
-    - Introduced `FORENSIC_LATENCY_THROTTLE_THRESHOLD_MS` (500ms) in `EngineConstants.kt`.
-    - Refactored `runForensicDrainer` in `LogRepository.kt` to calculate a `combinedLoadFactor` using the maximum of `cpuLoad` and `maxIoLatency` (normalized).
-    - Implemented `effectiveInterval` logic: If `maxIoLatency` exceeds 500ms, the drain interval is doubled (1s -> 2s) to allow storage recovery.
-    - Adjusted `dynamicBatchSize` calculation to incorporate the `combinedLoadFactor`, reducing I/O pressure during latency spikes.
-    - Enforced R-ID 751: "The forensic drainer MUST dynamically scale its drain interval and batch size based on real-time maxIoLatency feedback."
+    - Added `IO_LATENCY_EMA_ALPHA` (0.2) to `EngineConstants.kt`.
+    - Implemented `latencyEma` tracking in `LogRepository.kt`.
+    - Refactored `runForensicDrainer` to use the EMA-smoothed latency for calculating both the `combinedLoadFactor` and the `effectiveInterval`.
+    - Enforced R-ID 752: "The forensic drainer MUST utilize an Exponential Moving Average (EMA) for maxIoLatency feedback (Alpha: 0.2) to smooth out throttling response."
 
 #### 2. Persistence Stability
-- **Improvement**: The system now proactively backs off during storage micro-spikes, ensuring that high-priority telemetry remains steady without triggering circular buffer overflows due to IOW stalls.
+- **Improvement**: The system now provides a stable, smoothed response to storage pressure, improving telemetry consistency on devices with jittery I/O performance.
 
 ## 🔴 Open Gaps
-- **SIMP-OCT27.9-S1**: Latency EMA for Throttle. Consider using an Exponential Moving Average (EMA) for `maxIoLatency` to smooth out throttling response.
+- **SIMP-OCT27.10-S1**: Pruning Batch Optimization. Consider dynamic adjustment of `REFINED_PRUNE_CHUNK_SIZE`.
 - **SIMP-OCT27.8-S1**: Database Transaction Timeout. Consider adding a watchdog to the `recoveryLock` to prevent permanent stalls.
 
 ## 📊 Hardening Snapshot
-- **SOT Count**: 855 (Rules: 356)
-- **Testing Status**: IO Throttling Audit - **PASSED**.
-- **QA Status**: Dynamic interval scaling - **VERIFIED**.
+- **SOT Count**: 856 (Rules: 357)
+- **Testing Status**: Latency EMA Audit - **PASSED**.
+- **QA Status**: Smoothed throttle response - **VERIFIED**.
 
 **Handover complete. STOPPING ALL PROCESSING.**

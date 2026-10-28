@@ -27,6 +27,10 @@ import kotlin.coroutines.coroutineContext
 
 /**
  * LogRepository: Dedicated repository for application logs.
+ * Oct.27.10:
+ * - SIMP-OCT27.9-S1: Latency EMA for Throttle. Implemented Exponential Moving 
+ *   Average (EMA) for maxIoLatency to smooth out throttling response (R-ID 752).
+ *   Refinement: Initialized EMA with first reading to avoid cold-start lag.
  * Oct.27.9:
  * - ISSUE-OCT27.9-F1: IO Latency-Driven Throttle. Implemented dynamic scaling 
  *   of forensic drain intervals based on real-time maxIoLatency feedback (R-ID 751).
@@ -74,6 +78,7 @@ class LogRepository @Inject constructor(
     private var recoveryJob: Job? = null
     private var drainerJob: Job? = null
     private var consecutiveStalls = 0
+    private var latencyEma: Double = 0.0
 
     private data class BufferedLog(
         val entry: LogEntry, 
@@ -155,6 +160,7 @@ class LogRepository @Inject constructor(
         liveReliability = BigDecimal.ONE
         isForensicStallSimulated.set(false)
         consecutiveStalls = 0
+        latencyEma = 0.0
         while (logBuffer.tryReceive().isSuccess) { /* drain */ }
         Log.i("LogRepository", "Internal state reset for test.")
     }
@@ -245,9 +251,9 @@ class LogRepository @Inject constructor(
     }
 
     /**
-     * runForensicDrainer: Implements R-ID 749 and R-ID 751 (IO Latency-Driven Throttle).
+     * runForensicDrainer: Implements R-ID 749, R-ID 751, and R-ID 752 (Latency EMA Smoothing).
      * Dynamically scales the drain interval and batch size based on CPU load and 
-     * real-time maxIoLatency feedback to mitigate storage contention.
+     * real-time maxIoLatency feedback (via EMA) to mitigate storage contention.
      */
     private suspend fun runForensicDrainer() {
         var lastDrainRt = timeProvider.elapsedRealtime
@@ -258,7 +264,16 @@ class LogRepository @Inject constructor(
                 
                 // R-ID 751: Incorporate maxIoLatency into load factor for dynamic throttling
                 val cpuFactor = if (health.isMaliAnomaly) 1.0 else (health.cpuLoad / 8.0).coerceIn(0.0, 1.0)
-                val latencyFactor = (health.maxIoLatency.toDouble() / FORENSIC_LATENCY_THROTTLE_THRESHOLD_MS).coerceIn(0.0, 1.0)
+                
+                // SIMP-OCT27.9-S1: Apply EMA to IO latency to smooth out response (R-ID 752)
+                // Refinement: Initialize EMA with first reading to prevent cold-start delay
+                latencyEma = if (latencyEma == 0.0 && health.maxIoLatency > 0) {
+                    health.maxIoLatency.toDouble()
+                } else {
+                    (IO_LATENCY_EMA_ALPHA * health.maxIoLatency) + ((1.0 - IO_LATENCY_EMA_ALPHA) * latencyEma)
+                }
+                
+                val latencyFactor = (latencyEma / FORENSIC_LATENCY_THROTTLE_THRESHOLD_MS).coerceIn(0.0, 1.0)
                 val combinedLoadFactor = max(cpuFactor, latencyFactor)
                 
                 val dynamicDelay = FORENSIC_DRAIN_THROTTLE_MIN_MS + 
@@ -274,7 +289,7 @@ class LogRepository @Inject constructor(
                 
                 // R-ID 751: Scale drain interval check based on latency. 
                 // Sustained high latency increases the effective interval even at high fill levels.
-                val effectiveInterval = if (health.maxIoLatency > FORENSIC_LATENCY_THROTTLE_THRESHOLD_MS) {
+                val effectiveInterval = if (latencyEma > FORENSIC_LATENCY_THROTTLE_THRESHOLD_MS) {
                     FORENSIC_DRAIN_INTERVAL_MS * 2
                 } else {
                     FORENSIC_DRAIN_INTERVAL_MS

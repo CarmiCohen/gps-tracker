@@ -2,6 +2,9 @@ package com.gps19.core.engine
 
 /**
  * EngineConstants: Logic-specific thresholds for the tracking engine.
+ * Oct.27.10:
+ * - SIMP-OCT27.9-S1: Latency EMA. Added IO_LATENCY_EMA_ALPHA (0.2) to smooth 
+ *   storage contention response and prevent rapid oscillation.
  * Oct.27.1:
  * - ISSUE-OCT27.0-1: Forensic Convergence Optimization. Reduced 
  *   FORENSIC_DRAIN_INTERVAL_MS to 1s, FORENSIC_DRAIN_THROTTLE_MIN_MS to 100ms,
@@ -76,6 +79,7 @@ const val FORENSIC_DRAIN_INTERVAL_MS = 1000L
 const val FORENSIC_DRAIN_THROTTLE_MIN_MS = 100L
 const val FORENSIC_DRAIN_THROTTLE_MAX_MS = 5000L
 const val FORENSIC_LATENCY_THROTTLE_THRESHOLD_MS = 500L
+const val IO_LATENCY_EMA_ALPHA = 0.2
 const val FORENSIC_SIGNATURE_LOOKBACK_MS = 600000L 
 
 // Issue #727: Dynamic Batching
