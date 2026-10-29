@@ -1,6 +1,15 @@
 # Resolution Archive
 
-## ✅ Resolved Issues (Oct28.26)
+## ✅ Resolved Issues (Revol29.2)
+
+### 1. ISSUE-REVOL29.2-F1: Sensing Engine Logic Implementation
+- **Symptoms**: The `SensorService` bootstrap in the `:app-sensor` module was a skeleton lacking core sensing integration.
+- **Root Cause**: The transition to the Revolution architecture required a ground-up implementation of the sensing pipeline to ensure zero-allocation and orientation-independent math.
+- **Resolution**: Updated `SensorService.kt` to implement `SensorEventListener` for `TYPE_ACCELEROMETER` and `TYPE_GRAVITY`. Integrated `SensingEngine.rotateToWorldSpace` to ensure accurate horizontal/vertical decomposition regardless of device mounting. Implemented dynamic interval scaling via `SensingEngine.getOptimalIntervalMs` for thermal and battery protection. (R-ID 160, R-ID 16, R-ID 194).
+
+---
+
+## ✅ Resolved Issues (Oct27.10)
 
 ### 1. ISSUE-OCT28.23-F1: Forensic Audit Failure (Davey/StackLog)
 - **Symptoms**: 838ms Davey event and StackLog leak at `AndroidNetworkProvider.kt:103` during A15 startup.

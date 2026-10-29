@@ -1,43 +1,40 @@
-git add .
-git commit -m "Release Oct28.26: Remediate Startup Davey/StackLog (#ISSUE-OCT28.23-F1), Fix Audit Suite Compilation (#ISSUE-OCT28.20-F1), Harden Stealth Suppression (#ISSUE-OCT28.16-F1), and Resolve Engine Syntax/Latency Issues (#ISSUE-OCT28.17-F1, #ISSUE-OCT28.20-F2)."
-git tag -a Oct28.26 -m "Oct28.26 Release: Startup Hydration & Stealth Hardened"
-git push origin Oct28.26
+git add . && git commit -m "Revolution Phase Revol29.2: Sensing Engine Logic Implementation.
+- Implemented SensorEventListener in SensorService.kt to capture Accelerometer and Gravity data.
+- Integrated SensingEngine.rotateToWorldSpace for orientation-independent sensing (R-ID 160).
+- Implemented dynamic thermal and power-based interval scaling (R-ID 16).
+- Added Network Handover Watchdog for immediate socket reconnection (R-ID 194).
+- Updated versioning and hardening documentation to Revol29.2."
 
-# Project Handover - Oct28.26
+# Project Handover - REVOLUTION PHASE (Revol29.2)
 
-## ✅ Status: Startup Hydration & Stealth Hardened
+## ✅ Status: SENSING ENGINE HARDENED & VERIFIED
 
-Version **Oct28.26** baseline is established. This release represents a significant hardening of the forensic pipeline and stealth requirements. Successfully remediated critical A15 startup blockers (Davey/StackLog) and enforced absolute stealth for Tracker devices (Issue #1391).
+The core Sensing Engine logic has been implemented in the `:app-sensor` module skeleton. This includes orientation-independent math, thermal throttling, and network handover resilience.
 
-## 🎯 Next Resumption Focus: Multi-Variant Build Validation and CI Integration.
+**Resumption Token**: REVOLUTION-SENSING-REVOL29.2-COMPLETE-V1
 
-### 🛡️ Critical Fixes & Implementation Details
+---
 
-#### 1. Forensic Audit Failure (Davey/StackLog) (#ISSUE-OCT28.23-F1)
-- **Problem**: 838ms Davey events and `StackLog` diagnostic leaks during startup.
-- **Fix**: Implemented stage-dependent deferral for R104 pruning and network registration, waiting for Hydration Level 3 with a 2s floor. (R-ID 764).
+## 🎯 Next Resumption Focus: Identity Resilience & Forensic Persistence Implementation
 
-#### 2. Alarm Leakage on Tracker (#ISSUE-OCT28.16-F1 / #1391)
-- **Problem**: Audible sirens and red-screen overlays manifesting on Trackers (violating R872).
-- **Fix**: Implemented role-based suppression in `AudioSynthesizer`, `UiEventCoordinator`, and `AlarmOverlayService`. (R-ID 761).
+### 🛡️ Revolution Blueprint Implementation
+- **Module**: `:app-sensor`
+- **Component**: `SensorDataStore.kt` and `ForensicBuffer.kt`
+- **Objective**: Implement `Hash(ANDROID_ID + Salt)` identity generation in `DeviceProtectedStorage` and finalize the Atomic Sync logic in `ForensicBuffer.kt` to ensure Direct Boot recovery.
 
-#### 3. Forensic Engine Integrity (#ISSUE-OCT28.17-F1, #ISSUE-OCT28.20-F1/F2)
-- **Fixes**: 
-    - Resolved `const val` syntax errors in `EngineConstants.kt`. (R-ID 762).
-    - Fixed compilation of `ForensicConvergenceAuditTest.kt` by migrating to dynamic buffer capacity. (R-ID 763).
-    - Enforced 50Hz forensic sampling to mitigate I/O contention.
+---
 
-#### 4. Strategic Simplification (#SIMP-OCT28.25-S1)
-- **Idea**: Transitioned R104 and Network Registration to reactive observers of `LifecycleHydrationManager.hydrationLevel`.
+## 📂 Key Implementation Files (Staged in `REVOLUTION_WORKSPACE/project_skeleton/`)
+- `core-shared/src/main/java/com/gps19/core/shared/SensingEngine.kt`: Rotation math and Thermal scaling authority.
+- `app-sensor/src/main/java/com/gps19/app/sensor/SensorService.kt`: Headless sentinel engine with 10Hz World-Space sensing.
+- `app-sensor/src/main/java/com/gps19/app/sensor/SensorDataStore.kt`: (Next) Identity persistence.
+- `core-shared/src/main/java/com/gps19/core/shared/ForensicBuffer.kt`: High-integrity forensic logging.
 
-## 🔴 Open Gaps
-- *None identified.*
+---
 
-## 📊 Hardening Snapshot
-- **SOT Count**: 869 (Rules: 369)
-- **Testing Status**: Unit & Instrumented Tests - **PASSED**.
-- **QA Status**: Forensic Audit Protocol - **VERIFIED**.
+## 🔴 Immediate Resumption Tasks
+1. **Identity Generation**: Implement the salted hashing logic in `SensorDataStore.kt` using `CryptoUtils.kt`.
+2. **Direct Boot Persistence**: Ensure `SensorDataStore` correctly utilizes `createDeviceProtectedStorageContext()`.
+3. **Forensic Header Sync**: Implement atomic magic-number and pointer sync in `ForensicBuffer.kt`.
 
-**Oct28.26: [SOT Count: 869 (Rules: 369), Open: H:0, M:0, L:0, Ideas: H:1, M:1, L:101, Testing: PASSED (Sub-items: 41), QA: 869]**
-
-**Handover complete. STOPPING ALL PROCESSING.**
+**Handover complete. Sensing engine implemented and verified. Ready for Identity implementation.**
