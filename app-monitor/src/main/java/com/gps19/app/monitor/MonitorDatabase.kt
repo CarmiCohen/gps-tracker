@@ -5,13 +5,17 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * MonitorDatabase: Stores telemetry for both the local user and the remote tracker.
- * Hardened for Revol30.3: Includes sequenceId for forensic backfill gap detection (R-ID 768).
+ * Hardened for Revol30.6: Enforces unique sequenceId to prevent backfill duplicates (R-ID 770).
  */
-@Entity(tableName = "trails", primaryKeys = ["trackerId", "timestamp"])
+@Entity(
+    tableName = "trails",
+    primaryKeys = ["trackerId", "timestamp"],
+    indices = [Index(value = ["trackerId", "sequenceId"], unique = true)]
+)
 data class TrailEntity(
     val trackerId: String,
     val timestamp: Long,
-    val sequenceId: Long, // Added for gap detection
+    val sequenceId: Long, // Forensic monotonic counter
     val lat: Double,
     val lng: Double,
     val accuracy: Float,
@@ -37,7 +41,7 @@ interface TrailDao {
     suspend fun pruneLocalTrail(threshold: Long)
 }
 
-@Database(entities = [TrailEntity::class], version = 2, exportSchema = false)
+@Database(entities = [TrailEntity::class], version = 3, exportSchema = false)
 abstract class MonitorDatabase : RoomDatabase() {
     abstract fun trailDao(): TrailDao
 }

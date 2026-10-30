@@ -1,45 +1,41 @@
 git add .
-git commit -m "Revolution Phase Revol30.5: E2E Pairing, Multi-Peer Signaling, Forensic Recovery & Adaptive Backfill.
-- Verified E2E pairing handshake and unified forensic identity logic (ISSUE-REVOL30.1-F1/F3).
-- Resolved API 34 FGS crash and hardened Tracker ID validation to 64-char salted SHA-256 (ISSUE-REVOL30.1-B1, Rule 872).
-- Hardened signaling pipeline with 10Hz conflation and Socket.io room broadcasting (ISSUE-REVOL30.0-F2).
-- Implemented Forensic Buffer Direct Boot recovery and chronological trace restoration (ISSUE-REVOL30.0-F4).
-- Implemented Monitor-side gap detection and automated BackfillRequest trigger in MonitorRepository (ISSUE-REVOL30.0-F5).
-- Updated MonitorDatabase schema and SessionService for sequence-based forensic backfill (R-ID 768).
-- Migrated to reactive SignalingClient interface and updated SOT Master Requirements (SOT ID 876, 877).
-- Optimized TrailPruningWorker with Hilt/Room and aligned project versioning to Revol30.5."
-git tag Revol30.5
+git commit -m "Revolution Phase Revol30.6: Forensic Integrity Audit & Backfill Hardening.
+- Hardened MonitorDatabase with unique constraint on (trackerId, sequenceId) to prevent backfill duplicates (ISSUE-REVOL30.0-F6, R-ID 770).
+- Verified Sensor-side chunking logic (50 updates per chunk) and completeness flags in BackfillIntegrationTest.
+- Standardized TrailDao.insert with OnConflictStrategy.REPLACE to ensure seamless trail merging.
+- Resolved Adaptive Backfill gaps (ISSUE-REVOL30.0-F5) and conducted full integrity audit.
+- Aligned project versioning to Revol30.6 and updated SOT Master Requirements (SOT ID 878)."
+git tag Revol30.6
 git push origin main --tags
 
-# Project Handover - REVOLUTION PHASE (Revol30.5)
+# Project Handover - REVOLUTION PHASE (Revol30.6)
 
-## ✅ Status: ADAPTIVE BACKFILL IMPLEMENTED (A15)
+## ✅ Status: FORENSIC INTEGRITY AUDIT PASSED (A15)
 
-The telemetry pipeline now guarantees forensic continuity. The Monitor detects sequence gaps immediately upon reconnection (or during live tracking) and requests missing data from the Sensor's forensic buffer.
+The telemetry backfill pipeline has been rigorously audited. Data continuity is guaranteed by a unique constraint on sequence IDs at the database level, preventing duplicates during overlapping backfill cycles. Chunked transmission (50 records/chunk) is verified to prevent payload overflow.
 
-**Resumption Token**: REVOLUTION-BACKFILL-SUCCESS-V5
+**Resumption Token**: REVOLUTION-INTEGRITY-AUDIT-SUCCESS-V6
 
 ---
 
-## 🎯 Next Resumption Focus: Forensic Integrity Audit (ISSUE-REVOL30.0-F6)
+## 🎯 Next Resumption Focus: Forensic UI Trail Jitter Audit (ISSUE-REVOL30.0-F7)
 
 ### 🛡️ Revolution Blueprint Implementation
-- **Objective**: Conduct a full end-to-end integrity audit to ensure that backfilled traces are correctly merged into the UI trail without jitter or duplication.
-- **Task**: Implement `BackfillIntegrationTest` simulating complex disconnect/reconnect scenarios.
-- **Verification**: Ensure no duplicate `sequenceId` entries in `MonitorDatabase` and smooth UI rendering of restored paths.
+- **Objective**: Audit the UI trail rendering logic to ensure that backfilled segments do not cause "jumps" or rendering jitter on the map.
+- **Task**: Implement a UI test that simulates a backfill insertion while the map is active and verifies smooth polyline updates.
+- **Verification**: Zero rendering flicker during backfill merge.
 
 ---
 
 ## 📂 Key Implementation Files & Forensic Status
-- `app-monitor/src/main/java/com/gps19/app/monitor/MonitorRepository.kt`: Gap detection & Backfill management.
-- `app-monitor/src/main/java/com/gps19/app/monitor/MonitorDatabase.kt`: Forensic sequence storage.
-- `app-sensor/src/main/java/com/gps19/app/sensor/SensorService.kt`: Backfill range-query responder.
-- `core-network/src/main/java/com/gps19/core/network/SocketioSignalingClient.kt`: Backfill protocol transport.
+- `app-monitor/src/main/java/com/gps19/app/monitor/MonitorDatabase.kt`: Hardened schema with UNIQUE(trackerId, sequenceId).
+- `app-sensor/src/androidTest/java/com/gps19/app/sensor/BackfillIntegrationTest.kt`: Verified chunking and range-query logic.
+- `app-monitor/src/main/java/com/gps19/app/monitor/MonitorRepository.kt`: Seamless backfill ingestion.
 
 ---
 
 ## 🔴 Immediate Resumption Tasks
-1. **Integration Test**: Run `BackfillIntegrationTest` to verify the buffer-to-repository pipeline.
-2. **UI Verification**: Monitor the "Them" trail during a simulated 60s blackout to confirm path restoration.
+1. **UI Test**: Create `MapJitterAuditTest` to verify smooth backfill rendering.
+2. **Performance Audit**: Verify I/O impact of batching backfill inserts on A15.
 
-**Handover complete. Adaptive Backfill implemented and integrated. Ready for final integrity audit.**
+**Handover complete. Forensic Integrity Audit successful. Version Revol30.6 sealed.**

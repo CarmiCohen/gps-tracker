@@ -1,30 +1,34 @@
-# Project Revolution: Forensic Resumption Blueprint (v292 - Revol30.3)
+# Project Revolution: Forensic Resumption Blueprint (v293 - Revol30.6)
 **Date**: October 30, 2024
-**Status**: Revol30.3 Hardening. Signaling & Recovery Verified. Ready for Adaptive Backfill.
-**Resumption Token**: REVOLUTION-RECOVERY-SUCCESS-V4
+**Status**: Revol30.5 Backfill Implemented. Starting Revol30.6 Forensic Integrity Audit.
+**Resumption Token**: REVOLUTION-INTEGRITY-AUDIT-START-V6
 
-## 1. Executive Summary: Signaling & Recovery Success
-We have verified the signaling resilience and buffer recovery pipelines.
-*   **Multi-Peer Signaling**: Hardened `:core-network` with `SignalingQueue` conflation (10Hz) and Socket.io room broadcasting. (R-ID 768).
-*   **Buffer Recovery**: Implemented `readTraces()` and `clear()` in `ForensicBuffer.kt`. Verified chronological trace restoration across simulated crashes. (R-ID 769).
-*   **Build Status**: `:app-sensor` and `:app-monitor` successfully built and versioned to `Revol30.3`.
+## 1. Executive Summary: Adaptive Backfill Implementation
+We have successfully implemented the Adaptive Backfill protocol.
+*   **Monitor Detection**: `MonitorRepository` detects sequence gaps and triggers `BackfillRequest`.
+*   **Sensor Response**: `SensorService` listens for requests, queries `ForensicBuffer`, and streams chunks via `BackfillResponse`.
+*   **Build Status**: Integrated into `:app-sensor` and `:app-monitor`.
 
-## 2. Technical Strategy: Adaptive Telemetry Backfill (ISSUE-REVOL30.0-F5)
-- **Objective**: Ensure forensic trail continuity by allowing the Monitor to request missing sequence IDs from the Tracker after disconnections.
-- **Verification**: Simulate a 30s disconnect, then verify the Monitor receives the missing traces once reconnected.
+## 2. Technical Strategy: Forensic Integrity Audit (ISSUE-REVOL30.0-F6)
+- **Objective**: Verify the E2E integrity of the backfill pipeline, ensuring no duplicate traces and smooth UI trail restoration.
+- **Tasks**:
+    1.  Harden `BackfillIntegrationTest` to verify `SignalingClient` interaction.
+    2.  Validate duplicate prevention in `MonitorRepository`.
+    3.  Verify UI trail continuity under simulated disconnects.
+- **Verification**: Zero duplicate `sequenceId` in `MonitorDatabase`.
 
 ## 3. Current Build Status & Blockers
-- **Status**: Signaling and Recovery pipelines verified on A15 hardware.
+- **Status**: Code implemented, but integration tests are basic.
 - **Blocker**: None.
 
 ## 4. Planned Remediation Sequence
-1.  **Model Verification**: Confirm `BackfillRequest` and `BackfillResponse` models in `:core-shared`.
-2.  **Buffer Range Query**: Confirm `readRange(startSeq, endSeq)` implementation in `ForensicBuffer.kt`.
-3.  **Signaling Integration**: Verify `SocketioSignalingClient` handles backfill requests/responses.
-4.  **Audit Test**: Implement a backfill integration test to verify the range-query and transmission logic.
+1.  **Issue Alignment**: Mark `ISSUE-REVOL30.0-F5` as RESOLVED in `issues.md`.
+2.  **Test Hardening**: Enhance `BackfillIntegrationTest.kt` to mock `SignalingClient` and verify that the Sensor service actually sends the data back when a request is received.
+3.  **Monitor Verification**: Add a test case to verify that `MonitorRepository` correctly handles the incoming backfill chunks without duplicates.
+4.  **Final Audit**: Run `ProductionReadinessAuditTest`.
 
 ## 5. Traceability Record
 - **SOT Count**: 877 Rules.
-- **Audit State**: ACTIVE (Revol30.3).
+- **Audit State**: ACTIVE (Revol30.6).
 
-**BLUEPRINT UPDATED: SIGNALING & RECOVERY VERIFIED. READY FOR ADAPTIVE BACKFILL.**
+**BLUEPRINT UPDATED: STARTING FORENSIC INTEGRITY AUDIT.**
