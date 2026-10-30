@@ -24,6 +24,10 @@ class MonitorDataStore(private val context: Context) {
         context.monitorDataStore.edit { it[targetTrackerIdKey] = id }
     }
 
+    suspend fun clearTargetTrackerId() {
+        context.monitorDataStore.edit { it.remove(targetTrackerIdKey) }
+    }
+
     suspend fun setDndBypass(enabled: Boolean) {
         context.monitorDataStore.edit { it[isDndBypassEnabledKey] = enabled }
     }

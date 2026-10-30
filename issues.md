@@ -1,17 +1,17 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Revol29.4)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Revol30.0)
 
-## 🎯 Current Resumption Focus: Monitor Deployment & Multi-Peer Signaling Verification
+## 🎯 Current Resumption Focus: E2E Telemetry Audit & Sensor Activation
 
 ---
 
-## 🔴 Open Gaps (Revol29.4)
-*   **ISSUE-REVOL29.4-F2**: Monitor Deployment. Deploy `:app-monitor` to the device and verify the first-run pairing wizard and high-priority alarm overlay.
-*   **ISSUE-REVOL29.4-F3**: Multi-Peer Signaling. Verify signaling queue resilience in `:core-network` when multiple viewers are attached to a single sensor.
+## 🔴 Open Gaps (Revol30.0)
+*   **ISSUE-REVOL30.0-F2**: Multi-Peer Signaling. Verify signaling queue resilience in `:core-network` when multiple viewers are attached to a single sensor.
+*   **ISSUE-REVOL30.0-F3**: E2E Telemetry Audit. Full verification of telemetry sync between `:app-sensor` and `:app-monitor`.
 
 ---
 
 ## 🚀 Strategic Simplification Ideas
-*   **SIMP-REVOL29.4-S1**: Shared Test Fixtures. Consolidate hardware mocks into a test-only artifact within `:core-shared` to reduce duplication across app modules.
+*   **SIMP-REVOL30.0-S1**: Shared Test Fixtures. Consolidate hardware mocks into a test-only artifact within `:core-shared` to reduce duplication across app modules.
 
 ---
 
@@ -22,16 +22,17 @@
 
 ---
 
+## ✅ Resolved Traceability & Metadata Issues (Revol30.0)
+*   **ISSUE-REVOL30.0-F1**: Monitor Deployment. Successfully deployed `:app-monitor` to A15 hardware. Verified Pairing Wizard handshake and manual reset recovery. Transitioned to `MonitorScreen` with forensic identity.
+
+---
+
 ## ✅ Resolved Traceability & Metadata Issues (Revol29.4)
 *   **ISSUE-REVOL29.4-S1**: Multi-Module Build Stabilization. Aligned Kotlin (1.9.24), Compose (1.5.14), and JVM 17 across all modules. Resolved Hilt missing bindings.
 *   **ISSUE-REVOL29.4-F1**: Forensic Audit Migration & Verification. Migrated `ForensicPersistenceAuditTest` and `ProductionReadinessAuditTest` to `:app-sensor`. All core forensic tests PASSED.
-*   **ISSUE-REVOL29.3-F1**: Identity Resilience & Forensic Persistence Implementation. Resolved in Revol29.3.
-*   **ISSUE-REVOL29.2-F1**: Sensing Engine Logic Implementation. Resolved Revol29.2.
 
 ---
 
 ## 📊 Hardening Progress Dashboard
-- **Revol29.4: [SOT Count: 874 (Rules: 374), Open: H:0, M:2, L:0, Ideas: H:1, M:0, L:0, Testing: PASSED (Sub-items: 5), QA: 874]**
-- **Revol29.3: [SOT Count: 874 (Rules: 374), Open: H:0, M:0, L:0, Ideas: H:1, M:1, L:1, Testing: PASSED (Sub-items: 5), QA: 874]**
-- **Revol29.2: [SOT Count: 872 (Rules: 372), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:1, Testing: PASSED (Sub-items: 3), QA: 872]**
-- **Oct27.10: [SOT Count: 869 (Rules: 369), Open: H:0, M:0, L:0, Ideas: H:1, M:1, L:101, Testing: PASSED (Sub-items: 41), QA: 869]**
+- **Revol30.0: [SOT Count: 874 (Rules: 374), Open: H:0, M:2, L:0, Ideas: H:1, M:0, L:0, Testing: INITIALIZING, QA: 874]**
+- **Revol29.4: [SOT Count: 874 (Rules: 374), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:0, Testing: PASSED (Sub-items: 5), QA: 874]**

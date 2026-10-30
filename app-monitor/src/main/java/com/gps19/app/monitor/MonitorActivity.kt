@@ -3,11 +3,13 @@ package com.gps19.app.monitor
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -17,7 +19,7 @@ import kotlinx.coroutines.launch
 
 /**
  * MonitorActivity: The primary UI for the Monitor (Watcher).
- * Implements First-Run Pairing Wizard (Point 3).
+ * Implements First-Run Pairing Wizard (Point 3) and Reset Logic (Revol30.0).
  */
 class MonitorActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,7 +38,12 @@ class MonitorActivity : ComponentActivity() {
                         lifecycleScope.launch { dataStore.saveTargetTrackerId(id) }
                     })
                 } else {
-                    MonitorScreen(trackerId!!)
+                    MonitorScreen(
+                        trackerId = trackerId!!,
+                        onReset = {
+                            lifecycleScope.launch { dataStore.clearTargetTrackerId() }
+                        }
+                    )
                 }
             }
         }
@@ -65,7 +72,7 @@ fun PairingWizard(onPair: (String) -> Unit) {
 }
 
 @Composable
-fun MonitorScreen(trackerId: String) {
+fun MonitorScreen(trackerId: String, onReset: () -> Unit) {
     var isMapInitialized by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -75,7 +82,15 @@ fun MonitorScreen(trackerId: String) {
 
     Scaffold(
         topBar = {
-            Box(modifier = Modifier.padding(16.dp)) {
+            Box(
+                modifier = Modifier
+                    .padding(16.dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures(
+                            onLongPress = { onReset() }
+                        )
+                    }
+            ) {
                 Text(text = "Tracking: $trackerId", style = MaterialTheme.typography.headlineMedium)
             }
         }

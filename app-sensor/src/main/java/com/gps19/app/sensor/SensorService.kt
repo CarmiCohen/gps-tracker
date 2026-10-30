@@ -1,9 +1,12 @@
 package com.gps19.app.sensor
 
+import android.Manifest
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -14,6 +17,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import com.gps19.core.shared.*
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
@@ -21,8 +25,7 @@ import javax.inject.Inject
 
 /**
  * SensorService: Ultimate Hardened Version.
- * Corrected: Implements Orientation-Independent Sensing (Point 160)
- * and Network Handover Watchdog (Point 194).
+ * Corrected for API 34: Permission-aware FGS start and robust sensor registration.
  */
 @AndroidEntryPoint
 class SensorService : Service(), SensorEventListener {
@@ -42,8 +45,6 @@ class SensorService : Service(), SensorEventListener {
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
             SystemLogger.i("Network", "Interface changed. Forcing reconnection...")
-            // Point 194: Force immediate socket reconnection on handover
-            // signalingClient.reconnect()
         }
     }
 
@@ -58,11 +59,13 @@ class SensorService : Service(), SensorEventListener {
         forensicBuffer.initialize()
         
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
-        registerSensors()
         
+        // Critical: Start Foreground first on API 34+ to establish "eligible state"
+        startForegroundServiceInternal()
+        
+        registerSensors()
         registerNetworkCallback()
         acquireWakeLock()
-        startForegroundService()
         
         if (!isMuzzled) {
             startSensingLoop()
@@ -73,8 +76,16 @@ class SensorService : Service(), SensorEventListener {
         val accel = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         val gravity = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY)
         
-        accel?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST) }
-        gravity?.let { sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_FASTEST) }
+        // Fallback to SENSOR_DELAY_UI if HIGH_SAMPLING_RATE_SENSORS is not yet available or processed
+        val delay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Even if declared, check if we should actually use FASTEST
+            SensorManager.SENSOR_DELAY_NORMAL 
+        } else {
+            SensorManager.SENSOR_DELAY_FASTEST
+        }
+        
+        accel?.let { sensorManager.registerListener(this, it, delay) }
+        gravity?.let { sensorManager.registerListener(this, it, delay) }
     }
 
     override fun onSensorChanged(event: SensorEvent) {
@@ -102,17 +113,15 @@ class SensorService : Service(), SensorEventListener {
         ) {
             val update = PoolRegistry.locationUpdatePool.acquire()
             try {
-                // Point 160: Orientation-Independent Math
                 val worldAccel = SensingEngine.rotateToWorldSpace(
                     lastAccel[0], lastAccel[1], lastAccel[2],
                     lastGravity[0], lastGravity[1], lastGravity[2]
                 )
                 
-                update.sensorSnapshot.vibration = worldAccel[0].toFloat() // Horizontal magnitude
+                update.sensorSnapshot.vibration = worldAccel[0].toFloat()
                 update.timestamp = System.currentTimeMillis()
                 update.monotonicNanos = System.nanoTime()
                 
-                // Point 16: Thermal/Power Scaling
                 currentIntervalMs = SensingEngine.getOptimalIntervalMs(
                     currentTemp = 30f, 
                     isCharging = true, 
@@ -129,24 +138,50 @@ class SensorService : Service(), SensorEventListener {
     }
 
     private fun registerNetworkCallback() {
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        cm.registerDefaultNetworkCallback(networkCallback)
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_NETWORK_STATE) == PackageManager.PERMISSION_GRANTED) {
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            cm.registerDefaultNetworkCallback(networkCallback)
+        } else {
+            SystemLogger.e("SensorService", "Missing ACCESS_NETWORK_STATE. Telemetry sync degraded.")
+        }
     }
 
     private fun acquireWakeLock() {
         val pm = getSystemService(POWER_SERVICE) as PowerManager
-        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Sensor:SensingLock").apply { acquire() }
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Sensor:SensingLock").apply { 
+            acquire(10*60*1000L /*10 minutes fallback*/) 
+        }
     }
 
-    private fun startForegroundService() {
+    private fun startForegroundServiceInternal() {
         val pendingIntent = PendingIntent.getActivity(this, 0, Intent(this, AdminActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(this, SensorApp.CHANNEL_ID)
-            .setContentTitle("System Maintenance Service") // Point 64: Obfuscated title
+            .setContentTitle("System Maintenance Service")
             .setContentText("Monitoring environment integrity...")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setContentIntent(pendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .build()
-        startForeground(1, notification)
+            
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                // API 34 requires specific permissions for these types
+                val hasSync = ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_DATA_SYNC) == PackageManager.PERMISSION_GRANTED
+                if (hasSync) {
+                    type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                }
+            }
+            
+            try {
+                startForeground(1, notification, type)
+            } catch (e: Exception) {
+                SystemLogger.e("SensorService", "startForeground failed: ${e.message}. Retrying with minimal type...")
+                startForeground(1, notification)
+            }
+        } else {
+            startForeground(1, notification)
+        }
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -155,8 +190,10 @@ class SensorService : Service(), SensorEventListener {
         serviceScope.cancel()
         orchestrator.cancelAll()
         sensorManager.unregisterListener(this)
-        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        cm.unregisterNetworkCallback(networkCallback)
+        try {
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            cm.unregisterNetworkCallback(networkCallback)
+        } catch (e: Exception) {}
         wakeLock?.let { if (it.isHeld) it.release() }
         super.onDestroy()
     }

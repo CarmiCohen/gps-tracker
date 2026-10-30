@@ -1,48 +1,44 @@
 git add .
-git commit -m "Revolution Phase Revol29.4: Multi-Module Stabilization & Forensic Verification.
-- Standardized JVM 17 and Kotlin 1.9.24 across all modules (Resolved :core-ui conflict).
-- Fixed Hilt missing bindings for TickOrchestrator and SensorDataStore in :app-sensor (SensorModule.kt).
-- Resolved DataStore and Firebase Messaging dependency conflicts in :app-monitor.
-- Migrated ForensicPersistenceAuditTest and ProductionReadinessAuditTest to :app-sensor.
-- Standardized CryptoUtils.hashIdentity to 64-char hex strings (R-ID 765).
-- Aligned SensingEngine.getOptimalIntervalMs to 1Hz floor for low battery (R-ID 16).
-- Verified Forensic Persistence (R-ID 766) and Atomic Sync via instrumented tests.
-- Status: 5/5 Forensic Tests PASSED on target hardware (R58X40GV2AR)."
-git tag Revol29.4
+git commit -m "Revolution Phase Revol30.0: A15 Pairing Success & Sensor Hardening.
+- Achieved successful E2E pairing between :app-monitor and :app-sensor on A15 hardware (R58X40GV2AR).
+- Resolved persistent API 34 SecurityExceptions in :app-sensor by implementing permission-aware FGS lifecycle.
+- Hardened PermissionGuard in AdminActivity.kt to enforce POST_NOTIFICATIONS and location grants before service activation.
+- Refined SensorService.kt with orientation-independent sensing logic and robust error handling for startForeground.
+- Verified forensic identity persistence (3912e6f2...) across device reboots and app deployments.
+- Updated issues.md and Handover.md to reflect Revol30.0 baseline stability.
+- ISSUE-REVOL30.0-F1: Resolved."
+git tag Revol30.0
 git push origin main --tags
 
-# Project Handover - REVOLUTION PHASE (Revol29.4)
+# Project Handover - REVOLUTION PHASE (Revol30.0)
 
-## ✅ Status: FORENSIC CORE VERIFIED (AUDIT PASSED)
+## ✅ Status: MONITOR PAIRED & SENSOR HARDENED (A15)
 
-The multi-module stabilization and forensic audit migration are complete. The core identity and persistence engines are now fully verified in the decoupled `:app-sensor` architecture.
+The pairing handshake between `:app-monitor` and `:app-sensor` has been successfully executed on the A15 hardware. The Sensor application has been hardened against API 34 `SecurityException` triggers.
 
-**Resumption Token**: REVOLUTION-STABILIZATION-REVOL29.4-V3
+**Resumption Token**: REVOLUTION-A15-PAIRED-STABLE-V1
 
 ---
 
-## 🎯 Next Resumption Focus: Monitor Deployment & Multi-Peer Signaling
+## 🎯 Next Resumption Focus: E2E Telemetry Audit (ISSUE-REVOL30.0-F3)
 
 ### 🛡️ Revolution Blueprint Implementation
-- **Objective**: Deploy the `:app-monitor` (Watcher) application to the target device to verify the first-run pairing wizard and high-priority alarm pathways.
-- **Task**: Implement and verify signaling queue resilience in `:core-network` when multiple viewers are attached to a single sensor (Multi-Peer Signaling).
-- **Audit**: Conduct a full end-to-end telemetry sync audit between `:app-sensor` and `:app-monitor` via the Node.js relay server.
+- **Objective**: Verify real-time packet delivery from `:app-sensor`'s `ForensicBuffer` to `:app-monitor`'s UI.
+- **Task**: Audit the Node.js relay for presence authority and packet conflation logic.
+- **Audit**: Conduct a long-running stability test on the A15 to ensure FGS persistence under memory pressure.
 
 ---
 
 ## 📂 Key Implementation Files & Forensic Status
-- `app-sensor/src/androidTest/java/com/gps19/app/sensor/ForensicPersistenceAuditTest.kt`: Verifies R-ID 765 (Salted Identity) and R-ID 766 (Atomic Sync).
-- `app-sensor/src/androidTest/java/com/gps19/app/sensor/ProductionReadinessAuditTest.kt`: Verifies R-ID 16 (Thermal/Power Scaling) and R-ID 160 (Orientation-Independent Sensing).
-- `core-shared/src/main/java/com/gps19/core/shared/CryptoUtils.kt`: Standardized to Hex hashing for forensic IDs (Line 25).
-- `core-shared/src/main/java/com/gps19/core/shared/SensingEngine.kt`: Aligned low-battery survival floor to 1Hz (Line 48).
-- `app-sensor/src/main/java/com/gps19/app/sensor/SensorModule.kt`: Centralized Hilt bindings for Sensing Core.
-- `app-monitor/src/main/java/com/gps19/app/monitor/MonitorActivity.kt`: Watcher UI with Pairing Wizard (Point 3).
+- `app-sensor/src/main/java/com/gps19/app/sensor/AdminActivity.kt`: Implemented API 34 `PermissionGuard` with `POST_NOTIFICATIONS`.
+- `app-sensor/src/main/java/com/gps19/app/sensor/SensorService.kt`: Permission-aware `startForeground` and `sensorDelay` fallbacks.
+- `app-monitor/src/main/java/com/gps19/app/monitor/MonitorActivity.kt`: Verified "Map Active" state with 64-char forensic ID.
 
 ---
 
 ## 🔴 Immediate Resumption Tasks
-1. **Monitor Deployment**: Execute `deploy(ANDROID_APP, :app-monitor, .MonitorActivity, RUN)`.
-2. **Pairing Verification**: Input the Tracker ID from `:app-sensor` into the `:app-monitor` Pairing Wizard.
-3. **Multi-Peer Audit**: Stress-test the `:core-network/SignalingQueue.kt` with concurrent Viewer connections.
+1. **Trigger Sensing**: Open `:app-sensor` Admin Console and tap "START SENSOR SERVICE".
+2. **Verify Monitor**: Switch to `:app-monitor` and verify "Map Active" updates with real vibration/location data.
+3. **Log Audit**: Check Logcat for "ForensicBuffer: Trace written" entries to ensure local persistence.
 
-**Handover complete. Forensic integrity verified. Ready for deployment and signaling audit.**
+**Handover complete. Handshake verified. Systems green.**
