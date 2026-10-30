@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Revol29.2)
+# SOT Master Requirements & Hardening Status (Revol29.4)
 
-## 🏗️ Architectural Master Rules (372 Rules)
+## 🏗️ Architectural Master Rules (374 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -32,16 +32,19 @@
 *   **1.295 Orientation-Independent Sensing (R-ID 160)**: The Sensing Engine MUST utilize gravity-vector projection to rotate raw accelerometer data into world space, ensuring accurate horizontal and vertical motion decomposition regardless of device mounting orientation. (Revol29.2 - ISSUE-REVOL29.2-F1).
 *   **1.296 Thermal/Power Sensing Scaling (R-ID 16)**: The Sensing Engine MUST dynamically adjust its sampling interval (10Hz to 1Hz) based on real-time thermal telemetry (>45°C) and battery levels (<15%) to prevent device overheating and preserve operational longevity. (Revol29.2 - ISSUE-REVOL29.2-F1).
 *   **1.297 Network Handover Watchdog (R-ID 194)**: The Sensor Service MUST implement a `ConnectivityManager.NetworkCallback` to detect interface changes (e.g., Wi-Fi to LTE) and force an immediate socket reconnection to minimize telemetry gaps during transit. (Revol29.2 - ISSUE-REVOL29.2-F1).
+*   **1.298 Salted Identity Persistence (R-ID 765)**: The `SensorDataStore` MUST automatically generate and persist a salted SHA-256 identity seeded by `ANDROID_ID` during first boot to ensure immutable tracker identification. (Revol29.3 - ISSUE-REVOL29.3-F1).
+*   **1.299 Atomic Header Sync (R-ID 766)**: The `ForensicBuffer` MUST utilize atomic magic-number and pointer synchronization during initialization to ensure forensic trace integrity across Direct Boot power cycles. (Revol29.3 - ISSUE-REVOL29.3-F1).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 874**: Atomic Header Sync - PASSED. Verified atomic sync logic in ForensicBuffer. (Revol29.4).
+*   **SOT ID 873**: Salted Identity Persistence - PASSED. Verified automatic identity generation in SensorDataStore. (Revol29.4).
 *   **SOT ID 872**: Network Handover Watchdog - PASSED. Verified automatic socket reconnection trigger on interface change in SensorService. (Revol29.2).
 *   **SOT ID 871**: Thermal/Power Scaling - PASSED. Verified dynamic interval scaling logic in SensingEngine. (Revol29.2).
 *   **SOT ID 870**: Orientation-Independent Sensing - PASSED. Verified world-space rotation math in SensingEngine. (Revol29.2).
 *   **SOT ID 869**: Startup Hydration Deferral - PASSED. Verified zero Davey events > 500ms and zero StackLog leaks during A15 startup hydration. (Oct27.10).
-*   **SOT ID 868**: Audit Suite Recovery - PASSED. Verified compilation and execution of forensic tests after migrating to dynamic buffer capacity. (Oct27.10).
-*   **SOT ID 867**: Constant Syntax Integrity - PASSED. (Oct27.10).
 
 ## ✅ Verification Chapters
+*   **Chapter 5.03 (Revol29.4 Stabilization Audit)**: PASSED - Verified build stabilization, multi-module version alignment, and core forensic audit suite in Revol29.4 baseline.
+*   **Chapter 5.02 (Identity & Persistence Audit)**: PASSED - Verified salted identity generation and atomic forensic sync in Revol29.3 baseline.
 *   **Chapter 5.01 (Revolution Sensing Audit)**: PASSED - Verified world-space rotation, thermal scaling, and handover watchdog implementation in Revol29.2 baseline.
 *   **Chapter 4.39 (Startup Hydration Audit)**: PASSED - Verified Davey < 500ms and zero StackLog leaks on Oct27.10 baseline.
-*   **Chapter 4.38 (Audit Suite Recovery Audit)**: PASSED - Verified zero compilation errors and full test suite pass on Oct27.10 baseline.

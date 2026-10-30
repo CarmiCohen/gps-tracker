@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicLong
 /**
  * ForensicBuffer: Ultimate Production Version (Point 181).
  * Implements full bit-level persistence with Wrap-Around and Atomic Sync.
+ * Hardened for Direct Boot recovery (R-ID 744, 748, 749).
  */
 class ForensicBuffer(
     private val storageDir: File,
@@ -69,6 +70,7 @@ class ForensicBuffer(
             it.putInt(offHasWrapped, if (wrapped) 1 else 0)
             
             val now = System.currentTimeMillis()
+            // Staggered force (5s) to mitigate SPI bus contention (R-ID 749)
             if (force || (now - lastForceTs.get() > 5000)) {
                 it.force(0, headerSize)
                 lastForceTs.set(now)
@@ -76,6 +78,12 @@ class ForensicBuffer(
         }
     }
 
+    fun hasPending(): Boolean = count.get() > 0
+
+    /**
+     * Writes a trace record with atomic sync logic.
+     * Enforces wrap-around integrity for long-term forensic persistence.
+     */
     fun writeTrace(update: LocationUpdate, isCritical: Boolean = false) {
         val buffer = mappedBuffer ?: return
         synchronized(this) {
@@ -91,6 +99,7 @@ class ForensicBuffer(
             buffer.putLong(update.sequenceId)
             buffer.putFloat(update.sensorSnapshot.vibration)
             
+            // Critical records are forced immediately
             if (isCritical) buffer.force(offset, entrySize)
 
             var next = currentWrite + 1

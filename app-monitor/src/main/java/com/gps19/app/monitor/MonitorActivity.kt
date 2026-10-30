@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 
 /**
  * MonitorActivity: The primary UI for the Monitor (Watcher).
- * Corrected: Implements First-Run Pairing Wizard (Point 3).
+ * Implements First-Run Pairing Wizard (Point 3).
  */
 class MonitorActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

@@ -1,5 +1,19 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Revol29.4)
+
+### 1. ISSUE-REVOL29.4-S1: Multi-Module Build Stabilization
+- **Symptoms**: Compilation errors in `:core-ui` (Kotlin/Compose mismatch), missing Hilt bindings in `:app-sensor`, and dependency conflicts in `:app-monitor`.
+- **Root Cause**: Fragmented build configuration following the multi-module migration in Revol29.3.
+- **Resolution**: Standardized Kotlin `1.9.24`, Compose Compiler `1.5.14`, and JVM `17` across all modules in `libs.versions.toml` and module-level `build.gradle.kts` files. Implemented `SensorModule.kt` to provide `TickOrchestrator` and `SensorDataStore` to Hilt.
+
+### 2. ISSUE-REVOL29.4-F1: Forensic Audit Migration & Verification
+- **Symptoms**: Forensic audit tests were stuck in the legacy `:app` module, preventing verification of the new architecture.
+- **Root Cause**: Architecture shift required localized verification of `:app-sensor` and `:core-shared`.
+- **Resolution**: Migrated and adapted `ForensicPersistenceAuditTest` and `ProductionReadinessAuditTest` to `:app-sensor`. Standardized `CryptoUtils.hashIdentity` to return 64-char hex strings (R-ID 765). Aligned `SensingEngine.getOptimalIntervalMs` to 1Hz for low battery (R-ID 16). Resolved `IllegalStateException` in tests by enforcing singleton DataStore usage. All 5 core forensic tests passed.
+
+---
+
 ## ✅ Resolved Issues (Revol29.2)
 
 ### 1. ISSUE-REVOL29.2-F1: Sensing Engine Logic Implementation
@@ -34,8 +48,3 @@
 - **Symptoms**: Audible sirens and red-screen overlays were manifesting locally on devices in Tracker mode during violations, compromising operational stealth.
 - **Root Cause**: Manual test triggers in `UiEventCoordinator` and procedural audio paths in `AudioSynthesizer` lacked role-based suppression logic.
 - **Resolution**: Implemented multi-layer stealth hardening across `AudioSynthesizer`, `UiEventCoordinator`, and `AlarmOverlayService`. (R-ID 761).
-
----
-
-## ✅ Resolved Issues (Oct27.10)
-*(Historical resolutions archived in previous versions)*

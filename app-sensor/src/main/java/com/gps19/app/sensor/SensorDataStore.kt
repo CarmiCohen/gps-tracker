@@ -4,9 +4,9 @@ import android.content.Context
 import android.os.Build
 import android.provider.Settings
 import androidx.datastore.preferences.core.*
-import androidx.datastore.preferences.PreferenceDataStoreFactory
 import com.gps19.core.shared.CryptoUtils
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import java.io.File
 import java.util.*
@@ -31,16 +31,23 @@ class SensorDataStore(context: Context) {
 
     /**
      * Returns a persistent, salted, and hashed Tracker ID (Point 25).
+     * Automatically generates and persists identity if missing.
      */
     val trackerId: Flow<String> = dataStore.data.map { prefs ->
-        var id = prefs[trackerIdKey]
-        if (id == null) {
+        prefs[trackerIdKey] ?: "PENDING_IDENTITY"
+    }
+
+    suspend fun ensureIdentityGenerated() {
+        val prefs = dataStore.data.first()
+        if (prefs[trackerIdKey] == null) {
             val androidId = Settings.Secure.getString(protectedContext.contentResolver, Settings.Secure.ANDROID_ID)
             val salt = prefs[saltKey] ?: UUID.randomUUID().toString()
-            id = CryptoUtils.hashIdentity(androidId ?: "unknown", salt)
-            // Note: In real impl, we would save this back to dataStore here
+            val id = CryptoUtils.hashIdentity(androidId ?: "unknown", salt)
+            dataStore.edit {
+                it[trackerIdKey] = id
+                it[saltKey] = salt
+            }
         }
-        id
     }
 
     suspend fun saveSimHash(hash: String) {

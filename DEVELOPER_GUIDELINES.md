@@ -45,6 +45,7 @@ Perform these steps in strict sequence once an issue is resolved:
     *(Example: `- **Oct28.26: [SOT Count: 869 (Rules: 369), Open: H:0, M:0, L:0, Ideas: H:1, M:1, L:101, Testing: PASSED (Sub-items: 41), QA: 869]**`)*
 9.  **Final Handover Update**: Update the root `Handover.md` with a comprehensive forensic state snapshot. 
     *   **Git Release Block**: Generate a Git command block at the **very top**. The commit message **MUST BE EXHAUSTIVE** and summarize **ALL** issues resolved in this version (consult `RESOLUTION_ARCHIVE.md`). **Issue IDs from any `chat_session.md` MUST be included.**
+    *   **Release Integrity (CRITICAL)**: The Git block **MUST** include `git tag [Version Name]` and `git push origin main --tags` to ensure the version is anchored in the repository history. **Each command (add, commit, tag, push) MUST be on a separate line (do not use && for concatenation).**
     *   **Resumption Focus**: Update `## 🎯 Next Resumption Focus`.
 10. **Baseline Synchronization (R-ID 744)**: Create the directory `STATUS/BASELINE/[Version Name]/` and copy all final forensic documents (`issues.md`, `Handover.md`, `SOT_MASTER_REQUIREMENTS.md`, `RESOLUTION_ARCHIVE.md`) into it.
 11. **Resumption Verification**: If the session was resumed from a `chat_session.md`, verify that all "Planned Remediation" tasks identified in that export are fully addressed and documented.

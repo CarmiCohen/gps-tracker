@@ -4,8 +4,7 @@ import kotlin.math.*
 
 /**
  * SensingEngine: 100% Kotlin implementation of high-frequency sensor logic.
- * Corrected: Implements Orientation-Independent Math (Point 160) 
- * and Thermal/Power Scaling (Point 16).
+ * Corrected Revol29.4: Aligned with R-ID 16 floor (1Hz) for low battery survival.
  */
 object SensingEngine {
 
@@ -38,13 +37,14 @@ object SensingEngine {
 
     /**
      * Determines the optimal sensing interval based on device heat and power source.
+     * Aligned with R-ID 16: 10Hz (100ms) to 1Hz (1000ms).
      */
     fun getOptimalIntervalMs(currentTemp: Float, isCharging: Boolean, batteryLevel: Int): Long {
-        if (currentTemp >= THERMAL_CRITICAL_CELSIUS) return 1000L // Thermal Protection
+        if (currentTemp >= THERMAL_CRITICAL_CELSIUS) return 1000L // Thermal Protection (1Hz)
         
         return when {
             isCharging -> 100L               // 10Hz: Performance Mode
-            batteryLevel < 15 -> 30000L      // 0.03Hz: Survival Mode
+            batteryLevel < 15 -> 1000L       // 1Hz: Survival Mode (Aligned with R-ID 16)
             else -> 1000L                    // 1Hz: Battery Saving Mode
         }
     }

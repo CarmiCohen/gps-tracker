@@ -10,6 +10,7 @@ import java.security.SecureRandom
 /**
  * CryptoUtils: Hardened security for Project Revolution.
  * Implements HMAC-SHA256 for handshakes and AES-GCM for E2EE payloads (Point 5/142).
+ * Updated Revol29.4: Standardized hex output for forensic identities.
  */
 object CryptoUtils {
     
@@ -21,11 +22,13 @@ object CryptoUtils {
 
     /**
      * Hashes ANDROID_ID with a persistent salt to create a unique Tracker ID (Point 25).
+     * Returns a 64-character hex string (SHA-256).
      */
     fun hashIdentity(androidId: String, salt: String): String {
         val mac = Mac.getInstance("HmacSHA256")
         mac.init(SecretKeySpec(salt.toByteArray(), "HmacSHA256"))
-        return Base64.getEncoder().encodeToString(mac.doFinal(androidId.toByteArray()))
+        val hashBytes = mac.doFinal(androidId.toByteArray())
+        return hashBytes.joinToString("") { "%02x".format(it) }
     }
 
     /**
