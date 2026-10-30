@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Revol29.4)
+# SOT Master Requirements & Hardening Status (Revol30.3)
 
-## 🏗️ Architectural Master Rules (374 Rules)
+## 🏗️ Architectural Master Rules (377 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   **1.1 Service Residency (R101)**: The Tracker background service MUST maintain a foreground priority with a visible notification to prevent OS-level reclamation. (v8.8.0).
@@ -34,8 +34,14 @@
 *   **1.297 Network Handover Watchdog (R-ID 194)**: The Sensor Service MUST implement a `ConnectivityManager.NetworkCallback` to detect interface changes (e.g., Wi-Fi to LTE) and force an immediate socket reconnection to minimize telemetry gaps during transit. (Revol29.2 - ISSUE-REVOL29.2-F1).
 *   **1.298 Salted Identity Persistence (R-ID 765)**: The `SensorDataStore` MUST automatically generate and persist a salted SHA-256 identity seeded by `ANDROID_ID` during first boot to ensure immutable tracker identification. (Revol29.3 - ISSUE-REVOL29.3-F1).
 *   **1.299 Atomic Header Sync (R-ID 766)**: The `ForensicBuffer` MUST utilize atomic magic-number and pointer synchronization during initialization to ensure forensic trace integrity across Direct Boot power cycles. (Revol29.3 - ISSUE-REVOL29.3-F1).
+*   **1.300 Unified Identity Protocol (R-ID 767)**: The system MUST utilize a unified `ForensicIdentityManager` across all roles (Tracker and Viewer) to ensure identity consistency, hardware binding (salted SHA-256), and Direct Boot data protection. (Revol30.1 - ISSUE-REVOL30.1-F1).
+*   **1.301 Multi-Peer Signaling Resilience (R-ID 768)**: The signaling pipeline MUST utilize a conflating queue (`SignalingQueue`) and server-side room broadcasting to handle multiple concurrent Viewers without inducing sensor-side packet loss or storage I/O jitter. (Revol30.3 - ISSUE-REVOL30.0-F2).
+*   **1.302 Forensic Buffer Recovery Audit (R-ID 769)**: The `ForensicBuffer` MUST implement a chronological `readTraces()` mechanism and atomic `clear()` logic to allow the forensic recovery service to reliably drain off-heap telemetry into the primary database after an ungraceful reboot, ensuring zero-loss integrity (R-ID 748). (Revol30.3 - ISSUE-REVOL30.0-F4).
 
 ## 🛡️ Core Hardening Baseline
+*   **SOT ID 877**: Forensic Buffer Recovery - PASSED. Verified chronological trace recovery and atomic pointer reset in ForensicPersistenceAuditTest. (Revol30.3).
+*   **SOT ID 876**: Multi-Peer Signaling Resilience - PASSED. Verified queue conflation and Socket.io room broadcasting for 1-to-N telemetry. (Revol30.3).
+*   **SOT ID 875**: E2E Telemetry Pairing - PASSED. Verified SHA-256 identity handshake and map transition on A15 hardware. (Revol30.1).
 *   **SOT ID 874**: Atomic Header Sync - PASSED. Verified atomic sync logic in ForensicBuffer. (Revol29.4).
 *   **SOT ID 873**: Salted Identity Persistence - PASSED. Verified automatic identity generation in SensorDataStore. (Revol29.4).
 *   **SOT ID 872**: Network Handover Watchdog - PASSED. Verified automatic socket reconnection trigger on interface change in SensorService. (Revol29.2).
@@ -44,6 +50,9 @@
 *   **SOT ID 869**: Startup Hydration Deferral - PASSED. Verified zero Davey events > 500ms and zero StackLog leaks during A15 startup hydration. (Oct27.10).
 
 ## ✅ Verification Chapters
+*   **Chapter 5.06 (Revol30.3 Recovery Audit)**: PASSED - Verified Forensic Buffer recovery logic, chronological read traces, and atomic clear in Revol30.3 baseline.
+*   **Chapter 5.05 (Revol30.3 Signaling Audit)**: PASSED - Verified multi-peer signaling resilience, queue conflation logic, and hardened Socket.io implementation.
+*   **Chapter 5.04 (Revol30.1 Identity & E2E Audit)**: PASSED - Verified unified identity management, API 34 FGS compliance, and successful E2E pairing handshake on A15.
 *   **Chapter 5.03 (Revol29.4 Stabilization Audit)**: PASSED - Verified build stabilization, multi-module version alignment, and core forensic audit suite in Revol29.4 baseline.
 *   **Chapter 5.02 (Identity & Persistence Audit)**: PASSED - Verified salted identity generation and atomic forensic sync in Revol29.3 baseline.
 *   **Chapter 5.01 (Revolution Sensing Audit)**: PASSED - Verified world-space rotation, thermal scaling, and handover watchdog implementation in Revol29.2 baseline.

@@ -4,13 +4,14 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.media.AudioAttributes
-import android.net.Uri
 import android.os.Build
-import dagger.hilt.android.HiltAndroidApp
+import android.util.Log
 import com.gps19.core.shared.SystemLogger
+import dagger.hilt.android.HiltAndroidApp
 
 /**
- * MonitorApp: Corrected for High-Importance Alert Channels (Point 164).
+ * MonitorApp: Hardened for Revol30.1.
+ * Standardizes Alert Channels (Point 164) and initializes forensic logging.
  */
 @HiltAndroidApp
 class MonitorApp : Application() {
@@ -21,6 +22,17 @@ class MonitorApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        
+        // Initialize SystemLogger delegate to bridge to Logcat (Point 62)
+        SystemLogger.logDelegate = { level, tag, message ->
+            when(level) {
+                "I" -> Log.i("REV_$tag", message)
+                "W" -> Log.w("REV_$tag", message)
+                "E" -> Log.e("REV_$tag", message)
+                else -> Log.v("REV_$tag", message)
+            }
+        }
+
         createAlarmNotificationChannel()
     }
 
@@ -40,7 +52,7 @@ class MonitorApp : Application() {
                 setBypassDnd(true)
                 enableLights(true)
                 enableVibration(true)
-                setSound(null, audioAttributes) // Sound is managed by AlarmOverlayActivity
+                setSound(null, audioAttributes)
             }
 
             val manager = getSystemService(NotificationManager::class.java)

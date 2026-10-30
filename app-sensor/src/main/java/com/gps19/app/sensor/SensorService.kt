@@ -18,19 +18,24 @@ import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.gps19.core.network.SignalingClient
 import com.gps19.core.shared.*
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 
 /**
  * SensorService: Ultimate Hardened Version.
- * Corrected for API 34: Permission-aware FGS start and robust sensor registration.
+ * Refactored for Revol30.1: Robust API 34 compliance and periodic trace confirmation.
+ * Updated Revol30.3: Integrated Adaptive Telemetry Backfill (R-ID 768).
  */
 @AndroidEntryPoint
 class SensorService : Service(), SensorEventListener {
 
     @Inject lateinit var orchestrator: TickOrchestrator
+    @Inject lateinit var signalingClient: SignalingClient
     private lateinit var forensicBuffer: ForensicBuffer
     private lateinit var sensorManager: SensorManager
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
@@ -41,6 +46,7 @@ class SensorService : Service(), SensorEventListener {
     private var lastAccel = DoubleArray(3)
     private var lastGravity = DoubleArray(3)
     private var currentIntervalMs = 100L
+    private var sequenceIdCounter = 0L
 
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
@@ -50,6 +56,7 @@ class SensorService : Service(), SensorEventListener {
 
     override fun onCreate() {
         super.onCreate()
+        SystemLogger.i("SensorService", "onCreate called. Version: Revol30.3")
         
         val protectedContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             createDeviceProtectedStorageContext()
@@ -60,25 +67,54 @@ class SensorService : Service(), SensorEventListener {
         
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager
         
-        // Critical: Start Foreground first on API 34+ to establish "eligible state"
-        startForegroundServiceInternal()
-        
-        registerSensors()
         registerNetworkCallback()
         acquireWakeLock()
+        setupBackfillListener()
+    }
+
+    private fun setupBackfillListener() {
+        signalingClient.backfillRequestFlow
+            .onEach { request ->
+                SystemLogger.i("Backfill", "Received request for range ${request.startSequenceId} to ${request.endSequenceId}")
+                val updates = forensicBuffer.readRange(request.startSequenceId, request.endSequenceId)
+                
+                if (updates.isEmpty()) {
+                    signalingClient.sendBackfillResponse(BackfillResponse(request.requestId, emptyList(), true))
+                    return@onEach
+                }
+
+                // Batch updates in chunks of 50 to avoid payload limits
+                val chunks = updates.chunked(50)
+                chunks.forEachIndexed { index, chunk ->
+                    val response = BackfillResponse(
+                        requestId = request.requestId,
+                        updates = chunk,
+                        isComplete = index == chunks.size - 1
+                    )
+                    signalingClient.sendBackfillResponse(response)
+                }
+            }
+            .launchIn(serviceScope)
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        SystemLogger.i("SensorService", "onStartCommand received. Handling FGS activation...")
+        
+        startForegroundServiceInternal()
+        registerSensors()
         
         if (!isMuzzled) {
             startSensingLoop()
         }
+        
+        return START_STICKY
     }
 
     private fun registerSensors() {
         val accel = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         val gravity = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY)
         
-        // Fallback to SENSOR_DELAY_UI if HIGH_SAMPLING_RATE_SENSORS is not yet available or processed
         val delay = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            // Even if declared, check if we should actually use FASTEST
             SensorManager.SENSOR_DELAY_NORMAL 
         } else {
             SensorManager.SENSOR_DELAY_FASTEST
@@ -106,6 +142,7 @@ class SensorService : Service(), SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     private fun startSensingLoop() {
+        SystemLogger.i("SensorService", "Sensing loop initializing...")
         orchestrator.launchPeriodicLoop(
             name = "sensing_loop",
             scope = serviceScope,
@@ -121,6 +158,8 @@ class SensorService : Service(), SensorEventListener {
                 update.sensorSnapshot.vibration = worldAccel[0].toFloat()
                 update.timestamp = System.currentTimeMillis()
                 update.monotonicNanos = System.nanoTime()
+                update.sequenceId = sequenceIdCounter++
+                update.status = "VALID"
                 
                 currentIntervalMs = SensingEngine.getOptimalIntervalMs(
                     currentTemp = 30f, 
@@ -129,6 +168,11 @@ class SensorService : Service(), SensorEventListener {
                 )
                 
                 forensicBuffer.writeTrace(update)
+                signalingClient.sendTelemetry(update)
+
+                if (System.currentTimeMillis() % 5000 < currentIntervalMs) {
+                    SystemLogger.i("SensorService", "Telemetry sent. Seq: ${update.sequenceId}")
+                }
             } catch (e: Exception) {
                 SystemLogger.e("SensorService", "Loop error: ${e.message}")
             } finally {
@@ -141,44 +185,33 @@ class SensorService : Service(), SensorEventListener {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_NETWORK_STATE) == PackageManager.PERMISSION_GRANTED) {
             val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
             cm.registerDefaultNetworkCallback(networkCallback)
-        } else {
-            SystemLogger.e("SensorService", "Missing ACCESS_NETWORK_STATE. Telemetry sync degraded.")
         }
     }
 
     private fun acquireWakeLock() {
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Sensor:SensingLock").apply { 
-            acquire(10*60*1000L /*10 minutes fallback*/) 
+            acquire(10*60*1000L) 
         }
     }
 
     private fun startForegroundServiceInternal() {
         val pendingIntent = PendingIntent.getActivity(this, 0, Intent(this, AdminActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         val notification = NotificationCompat.Builder(this, SensorApp.CHANNEL_ID)
-            .setContentTitle("System Maintenance Service")
-            .setContentText("Monitoring environment integrity...")
+            .setContentTitle("System Maintenance")
+            .setContentText("Integrity Monitoring Active")
             .setSmallIcon(android.R.drawable.stat_notify_sync)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
             .build()
             
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             var type = ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                // API 34 requires specific permissions for these types
-                val hasSync = ContextCompat.checkSelfPermission(this, Manifest.permission.FOREGROUND_SERVICE_DATA_SYNC) == PackageManager.PERMISSION_GRANTED
-                if (hasSync) {
-                    type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-                }
+                type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_REMOTE_MESSAGING
             }
-            
-            try {
-                startForeground(1, notification, type)
-            } catch (e: Exception) {
-                SystemLogger.e("SensorService", "startForeground failed: ${e.message}. Retrying with minimal type...")
-                startForeground(1, notification)
-            }
+            startForeground(1, notification, type)
         } else {
             startForeground(1, notification)
         }
@@ -187,6 +220,7 @@ class SensorService : Service(), SensorEventListener {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        SystemLogger.i("SensorService", "onDestroy called. Cleaning up...")
         serviceScope.cancel()
         orchestrator.cancelAll()
         sensorManager.unregisterListener(this)

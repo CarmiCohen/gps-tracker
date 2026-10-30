@@ -81,6 +81,70 @@ class ForensicBuffer(
     fun hasPending(): Boolean = count.get() > 0
 
     /**
+     * Reads all traces currently stored in the buffer in chronological order.
+     * Hardened for Forensic Recovery (R-ID 748).
+     */
+    fun readTraces(): List<LocationUpdate> {
+        return readRange(0, Long.MAX_VALUE)
+    }
+
+    /**
+     * Reads traces within a specific sequence ID range (inclusive).
+     * Hardened for Adaptive Backfill (R-ID 768).
+     */
+    fun readRange(startSeq: Long, endSeq: Long): List<LocationUpdate> {
+        val buffer = mappedBuffer ?: return emptyList()
+        val result = mutableListOf<LocationUpdate>()
+        synchronized(this) {
+            val c = count.get()
+            val wIdx = writeIdx.get()
+            val startIdx = if (hasWrapped) wIdx else 0
+            
+            for (i in 0 until c) {
+                val physicalIdx = (startIdx + i) % capacity
+                val offset = headerSize + (physicalIdx * entrySize)
+                buffer.position(offset)
+                
+                // Peek sequenceId before full object creation if performance is critical,
+                // but here we align with simpler implementation for reliability.
+                val timestamp = buffer.getLong()
+                val lat = buffer.getDouble()
+                val lng = buffer.getDouble()
+                val accuracy = buffer.getFloat()
+                val speed = buffer.getFloat()
+                val seqId = buffer.getLong()
+                val vib = buffer.getFloat()
+
+                if (seqId in startSeq..endSeq) {
+                    val update = LocationUpdate().apply {
+                        this.timestamp = timestamp
+                        this.lat = lat
+                        this.lng = lng
+                        this.accuracy = accuracy
+                        this.speed = speed
+                        this.sequenceId = seqId
+                        this.sensorSnapshot.vibration = vib
+                    }
+                    result.add(update)
+                }
+            }
+        }
+        return result
+    }
+
+    /**
+     * Clears the buffer and resets all pointers.
+     */
+    fun clear() {
+        synchronized(this) {
+            writeIdx.set(0)
+            count.set(0)
+            hasWrapped = false
+            commitHeader(0, 0, false, force = true)
+        }
+    }
+
+    /**
      * Writes a trace record with atomic sync logic.
      * Enforces wrap-around integrity for long-term forensic persistence.
      */

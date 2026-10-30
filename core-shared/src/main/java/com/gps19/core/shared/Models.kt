@@ -9,6 +9,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class LocationUpdate(
+    var deviceId: String = "", // Added for Multi-Peer identification (R-ID 768)
     var lat: Double = 0.0,
     var lng: Double = 0.0,
     var accuracy: Float = 0f,
@@ -28,14 +29,15 @@ data class LocationUpdate(
     var tempCelsius: Float = 0f,
     var isThermalThrottled: Boolean = false,
     var cumulativeBytesSent: Long = 0L,
+    var status: String = "VALID", // Added for remote status visibility
     var sensorSnapshot: SensorSnapshot = SensorSnapshot()
 ) {
     fun reset() {
-        lat = 0.0; lng = 0.0; accuracy = 0f; speed = 0f; bearing = 0f; altitude = 0.0
+        deviceId = ""; lat = 0.0; lng = 0.0; accuracy = 0f; speed = 0f; bearing = 0f; altitude = 0.0
         timestamp = 0L; monotonicNanos = 0L; serverArrivalTs = 0L; sequenceId = 0L
         isCharging = false; batteryLevel = 0; gsmSignalDbm = 0; networkType = "--"
         isBuffered = false; isHistoricalLkg = false; tempCelsius = 0f
-        isThermalThrottled = false; cumulativeBytesSent = 0L
+        isThermalThrottled = false; cumulativeBytesSent = 0L; status = "VALID"
         sensorSnapshot.reset()
     }
 }
@@ -82,4 +84,25 @@ data class HandshakeRequest(
 data class Acknowledgement(
     val upToSequenceId: Long,
     val nonce: String? = null
+)
+
+/**
+ * BackfillRequest: Sent by Monitor to request missing data (R-ID 768).
+ */
+@Serializable
+data class BackfillRequest(
+    val deviceId: String,
+    val startSequenceId: Long,
+    val endSequenceId: Long,
+    val requestId: String
+)
+
+/**
+ * BackfillResponse: Sent by Sensor in response to BackfillRequest.
+ */
+@Serializable
+data class BackfillResponse(
+    val requestId: String,
+    val updates: List<LocationUpdate>,
+    val isComplete: Boolean
 )

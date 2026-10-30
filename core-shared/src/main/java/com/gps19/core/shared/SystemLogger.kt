@@ -9,7 +9,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 
 /**
  * SystemLogger: Shared logging infrastructure for Project Revolution.
- * Corrected: Implements throttled StateFlow updates to prevent GC pressure (Point 9).
+ * Hardened: Throttled StateFlow updates and platform-agnostic delegation (Revol30.1).
  */
 object SystemLogger {
 
@@ -31,7 +31,15 @@ object SystemLogger {
     private val _logs = MutableStateFlow<List<LogEntry>>(emptyList())
     val logs: StateFlow<List<LogEntry>> = _logs.asStateFlow()
 
+    /**
+     * Platform delegate to allow Android-specific logging (Logcat) without
+     * introducing Android dependencies to core-shared (Point 62).
+     */
+    var logDelegate: ((level: String, tag: String, message: String) -> Unit)? = null
+
     fun log(level: String, tag: String, message: String) {
+        logDelegate?.invoke(level, tag, message)
+
         val entry = LogEntry(System.currentTimeMillis(), level, tag, message)
         logBuffer.add(entry)
         while (logBuffer.size > MAX_BUFFER_SIZE) {
@@ -40,8 +48,7 @@ object SystemLogger {
     }
 
     /**
-     * Corrected: Batch update function to be called by a background timer (e.g., every 500ms).
-     * Prevents UI recomposition churn during high-frequency sensing.
+     * Throttled UI update to prevent recomposition churn.
      */
     fun updateUiSnapshot() {
         _logs.value = logBuffer.toList()

@@ -15,7 +15,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 1
-        versionName = "Revol30.0"
+        versionName = "Revol30.3"
 
         testInstrumentationRunner = "com.gps19.app.sensor.HiltTestRunner"
         vectorDrawables {

@@ -1,44 +1,45 @@
 git add .
-git commit -m "Revolution Phase Revol30.0: A15 Pairing Success & Sensor Hardening.
-- Achieved successful E2E pairing between :app-monitor and :app-sensor on A15 hardware (R58X40GV2AR).
-- Resolved persistent API 34 SecurityExceptions in :app-sensor by implementing permission-aware FGS lifecycle.
-- Hardened PermissionGuard in AdminActivity.kt to enforce POST_NOTIFICATIONS and location grants before service activation.
-- Refined SensorService.kt with orientation-independent sensing logic and robust error handling for startForeground.
-- Verified forensic identity persistence (3912e6f2...) across device reboots and app deployments.
-- Updated issues.md and Handover.md to reflect Revol30.0 baseline stability.
-- ISSUE-REVOL30.0-F1: Resolved."
-git tag Revol30.0
+git commit -m "Revolution Phase Revol30.5: E2E Pairing, Multi-Peer Signaling, Forensic Recovery & Adaptive Backfill.
+- Verified E2E pairing handshake and unified forensic identity logic (ISSUE-REVOL30.1-F1/F3).
+- Resolved API 34 FGS crash and hardened Tracker ID validation to 64-char salted SHA-256 (ISSUE-REVOL30.1-B1, Rule 872).
+- Hardened signaling pipeline with 10Hz conflation and Socket.io room broadcasting (ISSUE-REVOL30.0-F2).
+- Implemented Forensic Buffer Direct Boot recovery and chronological trace restoration (ISSUE-REVOL30.0-F4).
+- Implemented Monitor-side gap detection and automated BackfillRequest trigger in MonitorRepository (ISSUE-REVOL30.0-F5).
+- Updated MonitorDatabase schema and SessionService for sequence-based forensic backfill (R-ID 768).
+- Migrated to reactive SignalingClient interface and updated SOT Master Requirements (SOT ID 876, 877).
+- Optimized TrailPruningWorker with Hilt/Room and aligned project versioning to Revol30.5."
+git tag Revol30.5
 git push origin main --tags
 
-# Project Handover - REVOLUTION PHASE (Revol30.0)
+# Project Handover - REVOLUTION PHASE (Revol30.5)
 
-## ✅ Status: MONITOR PAIRED & SENSOR HARDENED (A15)
+## ✅ Status: ADAPTIVE BACKFILL IMPLEMENTED (A15)
 
-The pairing handshake between `:app-monitor` and `:app-sensor` has been successfully executed on the A15 hardware. The Sensor application has been hardened against API 34 `SecurityException` triggers.
+The telemetry pipeline now guarantees forensic continuity. The Monitor detects sequence gaps immediately upon reconnection (or during live tracking) and requests missing data from the Sensor's forensic buffer.
 
-**Resumption Token**: REVOLUTION-A15-PAIRED-STABLE-V1
+**Resumption Token**: REVOLUTION-BACKFILL-SUCCESS-V5
 
 ---
 
-## 🎯 Next Resumption Focus: E2E Telemetry Audit (ISSUE-REVOL30.0-F3)
+## 🎯 Next Resumption Focus: Forensic Integrity Audit (ISSUE-REVOL30.0-F6)
 
 ### 🛡️ Revolution Blueprint Implementation
-- **Objective**: Verify real-time packet delivery from `:app-sensor`'s `ForensicBuffer` to `:app-monitor`'s UI.
-- **Task**: Audit the Node.js relay for presence authority and packet conflation logic.
-- **Audit**: Conduct a long-running stability test on the A15 to ensure FGS persistence under memory pressure.
+- **Objective**: Conduct a full end-to-end integrity audit to ensure that backfilled traces are correctly merged into the UI trail without jitter or duplication.
+- **Task**: Implement `BackfillIntegrationTest` simulating complex disconnect/reconnect scenarios.
+- **Verification**: Ensure no duplicate `sequenceId` entries in `MonitorDatabase` and smooth UI rendering of restored paths.
 
 ---
 
 ## 📂 Key Implementation Files & Forensic Status
-- `app-sensor/src/main/java/com/gps19/app/sensor/AdminActivity.kt`: Implemented API 34 `PermissionGuard` with `POST_NOTIFICATIONS`.
-- `app-sensor/src/main/java/com/gps19/app/sensor/SensorService.kt`: Permission-aware `startForeground` and `sensorDelay` fallbacks.
-- `app-monitor/src/main/java/com/gps19/app/monitor/MonitorActivity.kt`: Verified "Map Active" state with 64-char forensic ID.
+- `app-monitor/src/main/java/com/gps19/app/monitor/MonitorRepository.kt`: Gap detection & Backfill management.
+- `app-monitor/src/main/java/com/gps19/app/monitor/MonitorDatabase.kt`: Forensic sequence storage.
+- `app-sensor/src/main/java/com/gps19/app/sensor/SensorService.kt`: Backfill range-query responder.
+- `core-network/src/main/java/com/gps19/core/network/SocketioSignalingClient.kt`: Backfill protocol transport.
 
 ---
 
 ## 🔴 Immediate Resumption Tasks
-1. **Trigger Sensing**: Open `:app-sensor` Admin Console and tap "START SENSOR SERVICE".
-2. **Verify Monitor**: Switch to `:app-monitor` and verify "Map Active" updates with real vibration/location data.
-3. **Log Audit**: Check Logcat for "ForensicBuffer: Trace written" entries to ensure local persistence.
+1. **Integration Test**: Run `BackfillIntegrationTest` to verify the buffer-to-repository pipeline.
+2. **UI Verification**: Monitor the "Them" trail during a simulated 60s blackout to confirm path restoration.
 
-**Handover complete. Handshake verified. Systems green.**
+**Handover complete. Adaptive Backfill implemented and integrated. Ready for final integrity audit.**

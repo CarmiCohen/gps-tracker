@@ -4,11 +4,13 @@ import android.app.Application
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.os.Build
+import android.util.Log
+import com.gps19.core.shared.SystemLogger
 import dagger.hilt.android.HiltAndroidApp
 
 /**
  * SensorApp: Optimized for background persistence.
- * Corrected: Added @HiltAndroidApp for dependency injection.
+ * Hardened for Revol30.1: Initializing SystemLogger delegate for forensic visibility.
  */
 @HiltAndroidApp
 class SensorApp : Application() {
@@ -19,6 +21,17 @@ class SensorApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        
+        // Initialize SystemLogger delegate to bridge to Logcat (Point 62 compliance)
+        SystemLogger.logDelegate = { level, tag, message ->
+            when(level) {
+                "I" -> Log.i("REV_$tag", message)
+                "W" -> Log.w("REV_$tag", message)
+                "E" -> Log.e("REV_$tag", message)
+                else -> Log.v("REV_$tag", message)
+            }
+        }
+
         createNotificationChannel()
     }
 

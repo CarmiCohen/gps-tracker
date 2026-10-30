@@ -15,6 +15,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,27 +31,38 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.gps19.core.ui.RevolutionTheme
 import com.gps19.core.ui.StatusGreen
 import com.gps19.core.ui.StatusRed
+import com.gps19.core.shared.SystemLogger
+import com.gps19.core.shared.ForensicIdentity
+import com.gps19.core.network.ForensicIdentityManager
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /**
  * AdminActivity: The "Admin Console" for the Sensor.
- * Hardened for API 34: Robust permission handling and FGS lifecycle management.
+ * Hardened for Revol30.1: Uses unified ForensicIdentityManager for identity stability.
  */
 @AndroidEntryPoint
 class AdminActivity : ComponentActivity() {
 
     @Inject
-    lateinit var dataStore: SensorDataStore
+    lateinit var identityManager: ForensicIdentityManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             RevolutionTheme {
-                val trackerId by dataStore.trackerId.collectAsStateWithLifecycle(initialValue = "LOADING...")
+                val trackerId by identityManager.selfId.collectAsStateWithLifecycle(initialValue = "LOADING...")
+                val logs by SystemLogger.logs.collectAsStateWithLifecycle()
                 
                 LaunchedEffect(Unit) {
-                    dataStore.ensureIdentityGenerated()
+                    identityManager.ensureIdentityGenerated(ForensicIdentity.PREFIX_SENSOR)
+                    // Periodic log snapshot update
+                    while(true) {
+                        SystemLogger.updateUiSnapshot()
+                        delay(1000)
+                    }
                 }
 
                 Surface(
@@ -72,6 +85,7 @@ class AdminActivity : ComponentActivity() {
                         PermissionGuard {
                             SensorAdminConsole(
                                 trackerId = trackerId,
+                                logs = logs,
                                 isMuzzled = isMuzzled,
                                 onIgnoreBatteryOptimization = { requestIgnoreBatteryOptimization() }
                             )
@@ -137,8 +151,15 @@ fun PermissionGuard(content: @Composable () -> Unit) {
 }
 
 @Composable
-fun SensorAdminConsole(trackerId: String, isMuzzled: Boolean, onIgnoreBatteryOptimization: () -> Unit) {
+fun SensorAdminConsole(trackerId: String, logs: List<SystemLogger.LogEntry>, isMuzzled: Boolean, onIgnoreBatteryOptimization: () -> Unit) {
     val context = LocalContext.current
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(logs.size) {
+        if (logs.isNotEmpty()) {
+            listState.animateScrollToItem(logs.size - 1)
+        }
+    }
     
     Column(modifier = Modifier.padding(16.dp)) {
         if (isMuzzled) {
@@ -203,8 +224,15 @@ fun SensorAdminConsole(trackerId: String, isMuzzled: Boolean, onIgnoreBatteryOpt
                 .background(Color.Black.copy(alpha = 0.1f))
                 .padding(4.dp)
         ) {
-            LazyColumn {
-                item { Text("09:41:02 - Sensing Engine Ready", fontSize = 12.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace) }
+            LazyColumn(state = listState) {
+                items(logs) { entry ->
+                    Text(
+                        text = entry.toString(),
+                        fontSize = 10.sp,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                        color = if (entry.level == "E") Color.Red else Color.Unspecified
+                    )
+                }
             }
         }
     }
