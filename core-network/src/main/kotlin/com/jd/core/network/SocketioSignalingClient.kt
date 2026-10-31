@@ -24,6 +24,7 @@ import javax.inject.Singleton
  * SocketioSignalingClient: Hardened implementation for Multi-Peer Resilience (ISSUE-REVOL30.0-F2).
  * Extended for Adaptive Telemetry Backfill (ISSUE-REVOL30.0-F5).
  * Hardened for Revol31.2: Exhaustive queue flushing and connection resilience (ISSUE-REVOL30.1-F2).
+ * Updated Revol31.9: Increased queue capacity to 5000 for Soak Audit (ISSUE-REVOL31.9-F1).
  * Refactored for testability via SocketFactory and injected Dispatcher.
  */
 @Singleton
@@ -34,7 +35,8 @@ class SocketioSignalingClient @Inject constructor(
 
     private var socket: Socket? = null
     private val clientScope = CoroutineScope(SupervisorJob() + ioDispatcher)
-    private val queue = SignalingQueue(maxCapacity = 100)
+    // Capacity increased to 5000 to support extended offline periods (R-ID 772 hardening)
+    private val queue = SignalingQueue(maxCapacity = 5000)
 
     private val _isConnected = MutableStateFlow(false)
     override val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
@@ -140,7 +142,7 @@ class SocketioSignalingClient @Inject constructor(
 
     private suspend fun flushQueue() {
         while (_isConnected.value) {
-            val batch = queue.pollBatch(20)
+            val batch = queue.pollBatch(50) // Increased batch size for faster recovery
             if (batch.isEmpty()) break
             batch.forEach { sendTelemetry(it) }
             yield()

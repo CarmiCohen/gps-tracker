@@ -15,7 +15,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 1
-        versionName = "Revol31.8"
+        versionName = "Revol31.9"
         testInstrumentationRunner = "com.jd.app.sensor.HiltTestRunner"
     }
 
@@ -72,6 +72,8 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
+    androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    androidTestImplementation("io.socket:socket.io-client:2.1.0")
     
     androidTestImplementation("com.google.dagger:hilt-android-testing:2.50")
     kspAndroidTest("com.google.dagger:hilt-android-compiler:2.50")
