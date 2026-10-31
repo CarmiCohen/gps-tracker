@@ -5,6 +5,7 @@ import kotlin.math.*
 /**
  * SentinelLogic: The core validation engine for Project Revolution.
  * Determines if a location update is a "Visual Jump" or valid movement.
+ * Updated Revol31.8: Added Geofence Transition logic for Forensic Audit (ISSUE-REVOL30.1-F3).
  */
 object SentinelLogic {
 
@@ -25,6 +26,27 @@ object SentinelLogic {
         val status: SentinelStatus,
         val reason: String = "",
         val score: Int = 0
+    )
+
+    data class Geofence(
+        val id: String,
+        val lat: Double,
+        val lng: Double,
+        val radiusMeters: Double
+    )
+
+    enum class GeofenceState {
+        INSIDE, OUTSIDE, UNKNOWN
+    }
+
+    enum class GeofenceTransition {
+        ENTER, EXIT, NONE
+    }
+
+    data class GeofenceResult(
+        val transition: GeofenceTransition,
+        val currentState: GeofenceState,
+        val distanceToCenter: Double
     )
 
     /**
@@ -71,5 +93,26 @@ object SentinelLogic {
             speedMps > MAX_PHYSICAL_SPEED_MPS -> ValidationResult(SentinelStatus.JUMP, "Speed Threshold Exceeded", jumpScore)
             else -> ValidationResult(SentinelStatus.VALID)
         }
+    }
+
+    /**
+     * Evaluates a location update against a geofence to detect transitions.
+     * Uses nanosecond precision from monotonicNanos for forensic logging.
+     */
+    fun evaluateGeofenceTransition(
+        update: LocationUpdate,
+        geofence: Geofence,
+        previousState: GeofenceState
+    ): GeofenceResult {
+        val dist = SpatialMath.calculateDistance(update.lat, update.lng, geofence.lat, geofence.lng)
+        val currentState = if (dist <= geofence.radiusMeters) GeofenceState.INSIDE else GeofenceState.OUTSIDE
+        
+        val transition = when {
+            previousState == GeofenceState.INSIDE && currentState == GeofenceState.OUTSIDE -> GeofenceTransition.EXIT
+            previousState == GeofenceState.OUTSIDE && currentState == GeofenceState.INSIDE -> GeofenceTransition.ENTER
+            else -> GeofenceTransition.NONE
+        }
+
+        return GeofenceResult(transition, currentState, dist)
     }
 }

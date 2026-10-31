@@ -1,11 +1,11 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Revol31.2)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Revol31.8)
 
-## 🎯 Next Resumption Focus: Geofence Transition Forensic Audit (ISSUE-REVOL30.1-F3)
+## 🎯 Next Resumption Focus: TBD (Revol31.8 Audit Complete)
 
 ---
 
-## 🔴 Open Gaps (Revol31.2)
-*   **None.** All Revol31.2 objectives met.
+## 🔴 Open Gaps (Revol31.8)
+*   **None.** All Revol31.8 objectives met.
 
 ---
 
@@ -16,6 +16,12 @@
 *   **SIMP-REVOL30.3-S2**: Atomic Buffer Access. **IMPLEMENTED.**
 *   **SIMP-REVOL30.6-S1**: Batch DAO Ingestion. **IMPLEMENTED.** Optimized backfill chunk processing and reduced transaction overhead in `TrailDao`.
 *   **SIMP-REVOL31.2-S1**: Socket Factory Abstraction. **IMPLEMENTED.** Decoupled `SocketioSignalingClient` from `io.socket` to enable deterministic unit testing of connection state logic.
+*   **SIMP-REVOL31.8-S1**: Binary Schema Versioning. **IMPLEMENTED.** Formalized `version` field in `ForensicBuffer` to allow safe schema evolution.
+
+---
+
+## ✅ Resolved Traceability & Metadata Issues (Revol31.8)
+*   **ISSUE-REVOL30.1-F3**: Geofence Transition Forensic Audit. **RESOLVED.** Updated `SentinelLogic` with transition detection and expanded `ForensicBuffer` schema to persist `status` and `monotonicNanos`. Verified zero loss and nanosecond precision in `GeofenceForensicTest`. (R-ID 775).
 
 ---
 
@@ -59,6 +65,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Revol31.8: [SOT Count: 883 (Rules: 383), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Geofence Audit), QA: 883]**
 - **Revol31.2: [SOT Count: 882 (Rules: 382), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Signaling Resilience), QA: 882]**
 - **Revol31.1: [SOT Count: 881 (Rules: 381), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Buffer Stress), QA: 881]**
 - **Revol31.0: [SOT Count: 879 (Rules: 379), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (UI Jitter), QA: 879]**

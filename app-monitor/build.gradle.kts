@@ -15,7 +15,7 @@ android {
         minSdk = 26
         targetSdk = 34
         versionCode = 1
-        versionName = "Revol31.2"
+        versionName = "Revol31.8"
         testInstrumentationRunner = "com.jd.app.monitor.HiltTestRunner"
     }
 

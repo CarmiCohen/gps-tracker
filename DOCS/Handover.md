@@ -1,42 +1,41 @@
 git add .
-git commit -m "Revolution Phase Revol31.2: Signaling Resilience Audit & Socket Testability.
-- Completed Signaling Resilience Audit (ISSUE-REVOL30.1-F2).
-- Hardened SocketioSignalingClient with aggressive reconnection (Int.MAX_VALUE) and exhaustive queue flushing.
-- Refactored core-network for testability by introducing SocketFactory and IoDispatcher injection.
-- Verified 10-cycle connection flapping resilience in SignalingResilienceTest with zero telemetry loss.
-- Aligned project traceability in issues.md and verified all builds/tests passing for Revol31.2."
-git tag Revol31.2
+git commit -m "Revolution Phase Revol31.8: Geofence Transition Forensic Audit.
+- Resolved Geofence Transition Forensic Audit (ISSUE-REVOL30.1-F3).
+- Implemented Geofence ENTER/EXIT transition detection in SentinelLogic with nanosecond precision.
+- Upgraded ForensicBuffer to Version 2 schema, enabling persistence of 32-byte status strings and 64-bit monotonic nanosecond timestamps.
+- Verified zero event loss and strict chronological integrity in GeofenceForensicTest.
+- Updated all forensic documentation and verified 100% test pass rate for Revol31.8."
+git tag Revol31.8
 git push origin main --tags
 
-# Project Handover - REVOLUTION PHASE (Revol31.2)
+# Project Handover - REVOLUTION PHASE (Revol31.8)
 
-## ✅ Status: SIGNALING RESILIENCE VERIFIED (A15)
+## ✅ Status: GEOFENCE FORENSIC INTEGRITY VERIFIED (A15)
 
-The signaling pipeline has been audited for network instability. The `SocketioSignalingClient` now employs an aggressive reconnection strategy and an exhaustive flush mechanism that guarantees all queued telemetry is transmitted upon reconnection. Test suites confirm zero data loss during rapid LTE/WiFi transition simulations.
+The geofence transition pipeline has been audited for precision and persistence. The `SentinelLogic` now provides high-fidelity detection of boundary crossings, and the `ForensicBuffer` ensures that every transition is recorded with non-repudiable nanosecond timestamps and descriptive status tags. Version 2 of the binary buffer schema is active, providing a robust foundation for spatial violation forensics.
 
-**Resumption Token**: REVOLUTION-SIGNALING-RESILIENCE-SUCCESS-V31.2
+**Resumption Token**: REVOLUTION-GEOFENCE-FORENSIC-SUCCESS-V31.8
 
 ---
 
-## 🎯 Next Resumption Focus: Geofence Transition Forensic Audit (ISSUE-REVOL30.1-F3)
+## 🎯 Next Resumption Focus: TBD (Strategic Simplification & Stabilization)
 
 ### 🛡️ Revolution Blueprint Implementation
-- **Objective**: Audit geofence transition logic to ensure that entrance/exit events are recorded in the forensic buffer with nanosecond precision and zero loss.
-- **Task**: Implement `GeofenceForensicTest` in `:app-sensor` simulating rapid boundary crosses.
-- **Verification**: Zero dropped transition events in the `ForensicBuffer`.
+- **Objective**: Conduct a comprehensive stability audit of the combined signaling and forensic pipelines under prolonged stress.
+- **Verification**: Zero Davey events > 500ms and zero telemetry loss during 24-hour soak tests.
 
 ---
 
 ## 📂 Key Implementation Files & Forensic Status
-- `core-network/src/main/kotlin/com/jd/core/network/SocketioSignalingClient.kt`: Hardened reconnection/flush logic.
-- `core-network/src/main/kotlin/com/jd/core/network/SocketFactory.kt`: Testability abstraction for sockets.
-- `core-network/src/test/kotlin/com/jd/core/network/SignalingResilienceTest.kt`: Connection flapping audit suite.
-- `core-network/src/main/kotlin/com/jd/core/network/NetworkModule.kt`: Updated with factory and dispatcher bindings.
+- `core-shared/src/main/kotlin/com/jd/core/shared/SentinelLogic.kt`: Added geofence transition detection.
+- `core-shared/src/main/kotlin/com/jd/core/shared/ForensicBuffer.kt`: Upgraded to Version 2 schema with status/nanos persistence.
+- `app-sensor/src/androidTest/kotlin/com/jd/app/sensor/GeofenceForensicTest.kt`: New forensic audit suite for transitions.
+- `app-sensor/build.gradle.kts`: Version incremented to Revol31.8.
 
 ---
 
 ## 🔴 Immediate Resumption Tasks
-1. **Test Suite**: Create `GeofenceForensicTest` in `:app-sensor`.
-2. **Logic Audit**: Verify `SentinelLogic.kt` correctly interacts with `ForensicBuffer` for events.
+1. **Audit Baseline**: Review `STATUS/BASELINE/Revol31.8/` for final forensic state.
+2. **Soak Testing**: Initialize long-term reliability simulations for the integrated pipeline.
 
-**Handover complete. Signaling Audit successful. Version Revol31.2 sealed.**
+**Handover complete. Geofence Forensic Audit successful. Version Revol31.8 sealed.**

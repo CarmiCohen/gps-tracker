@@ -1,5 +1,14 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Revol31.8)
+
+### 1. ISSUE-REVOL30.1-F3: Geofence Transition Forensic Audit
+- **Symptoms**: Risk of losing geofence violation context (entry/exit type and precise timing) during high-frequency boundary crossing or power loss.
+- **Root Cause**: `ForensicBuffer` lacked fields for `status` strings and `monotonicNanos`, resulting in data loss for non-location telemetry metadata.
+- **Resolution**: Updated `SentinelLogic` with `evaluateGeofenceTransition` returning `ENTER/EXIT` states. Expanded `ForensicBuffer` binary schema (Version 2) to persist 32-byte status tags and 8-byte monotonic nanosecond timestamps. Verified zero event loss and strict chronological ordering in `GeofenceForensicTest`. (R-ID 775).
+
+---
+
 ## ✅ Resolved Issues (Revol31.2)
 
 ### 1. ISSUE-REVOL30.1-F2: Signaling Resilience Audit

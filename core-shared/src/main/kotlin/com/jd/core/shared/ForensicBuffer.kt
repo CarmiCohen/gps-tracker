@@ -12,13 +12,14 @@ import java.util.concurrent.atomic.AtomicLong
  * Implements full bit-level persistence with Wrap-Around and Atomic Sync.
  * Hardened for Direct Boot recovery (R-ID 744, 748, 749).
  * Hardened for Revol31.1: Robust I/O and Disk Space checks (ISSUE-REVOL30.0-F8).
+ * Updated Revol31.8: Added persistence for status and monotonicNanos (ISSUE-REVOL30.1-F3).
  */
 class ForensicBuffer(
     private val storageDir: File,
     val capacity: Int = 10000
 ) {
     private val magic = 0x5245564F 
-    private val version = 1
+    private val version = 2 // Incremented for schema change
     private val entrySize = 128
     private val headerSize = 64
     
@@ -78,7 +79,9 @@ class ForensicBuffer(
             
             mappedBuffer = raf.channel.map(FileChannel.MapMode.READ_WRITE, 0, totalSize).apply {
                 order(ByteOrder.nativeOrder())
-                if (getInt(offMagic) != magic) {
+                val existingVersion = getInt(offVersion)
+                if (getInt(offMagic) != magic || existingVersion != version) {
+                    // Reset on version mismatch to avoid corruption
                     putInt(offMagic, magic)
                     putInt(offVersion, version)
                     commitHeader(0, 0, false, force = true)
@@ -146,6 +149,12 @@ class ForensicBuffer(
                     val speed = buffer.getFloat()
                     val seqId = buffer.getLong()
                     val vib = buffer.getFloat()
+                    
+                    // Added for Revol31.8
+                    val monotonicNanos = buffer.getLong()
+                    val statusBytes = ByteArray(32)
+                    buffer.get(statusBytes)
+                    val status = String(statusBytes).trim { it <= ' ' || it == '\u0000' }
 
                     if (seqId in startSeq..endSeq) {
                         val update = LocationUpdate().apply {
@@ -156,6 +165,8 @@ class ForensicBuffer(
                             this.speed = speed
                             this.sequenceId = seqId
                             this.sensorSnapshot.vibration = vib
+                            this.monotonicNanos = monotonicNanos
+                            this.status = status.ifEmpty { "VALID" }
                         }
                         result.add(update)
                     }
@@ -196,6 +207,13 @@ class ForensicBuffer(
                 buffer.putLong(update.sequenceId)
                 buffer.putFloat(update.sensorSnapshot.vibration)
                 
+                // Added for Revol31.8
+                buffer.putLong(update.monotonicNanos)
+                val statusBytes = update.status.toByteArray(Charsets.UTF_8)
+                val statusFixed = ByteArray(32)
+                System.arraycopy(statusBytes, 0, statusFixed, 0, minOf(statusBytes.size, 32))
+                buffer.put(statusFixed)
+
                 if (isCritical) buffer.force(offset, entrySize)
 
                 var next = currentWrite + 1
