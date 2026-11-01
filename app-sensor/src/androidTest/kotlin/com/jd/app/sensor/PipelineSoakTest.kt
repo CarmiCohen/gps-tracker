@@ -12,6 +12,7 @@ import io.socket.client.Socket
 import io.socket.emitter.Emitter
 import kotlinx.coroutines.*
 import kotlinx.coroutines.test.runTest
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Before
@@ -25,6 +26,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * PipelineSoakTest: High-stress reliability simulation for Revol31.9 (ISSUE-REVOL31.9-F1).
  * Exercises SentinelLogic, ForensicBuffer, and SocketioSignalingClient simultaneously.
  * Verifies R-ID 772, 773, and 775 under sustained load.
+ * Updated Nov1.2 to support Forensic Signaling Batching (ISSUE-REVOL33.0-F1).
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -55,8 +57,16 @@ class PipelineSoakTest {
             return this
         }
         override fun emit(event: String, vararg args: Any): Emitter {
-            if (event == "location_update") {
-                emittedCount.incrementAndGet()
+            when (event) {
+                "location_update" -> {
+                    emittedCount.incrementAndGet()
+                }
+                "location_batch" -> {
+                    val batch = args[0] as? JSONArray
+                    if (batch != null) {
+                        emittedCount.addAndGet(batch.length())
+                    }
+                }
             }
             return this
         }
@@ -79,6 +89,7 @@ class PipelineSoakTest {
         forensicBuffer.initialize()
 
         fakeSocket = FakeSocket()
+        // Use a real dispatcher here because SocketioSignalingClient uses it for the batch timer
         signalingClient = SocketioSignalingClient(FakeSocketFactory(fakeSocket), Dispatchers.Default)
     }
 
@@ -91,66 +102,69 @@ class PipelineSoakTest {
         val burstSize = 2000
         val testDeviceId = "SOAK_DEVICE_001"
         
-        // 1. Start Signaling (Disconnected)
-        signalingClient.connect("http://soak.relay", testDeviceId, "secret")
-        assertFalse(signalingClient.isConnected.value)
+        try {
+            // 1. Start Signaling (Disconnected)
+            signalingClient.connect("http://soak.relay", testDeviceId, "secret")
+            assertFalse(signalingClient.isConnected.value)
 
-        // 2. Generate Burst: Sentinel Logic -> Forensic Buffer -> Signaling Queue
-        val jobs = mutableListOf<Job>()
-        val lastUpdate = LocationUpdate().apply { lat = 37.0; lng = -122.0; timestamp = System.currentTimeMillis() }
-        
-        for (i in 0 until burstSize) {
-            val update = LocationUpdate().apply {
-                deviceId = testDeviceId
-                lat = 37.0 + (i * 0.00001)
-                lng = -122.0 + (i * 0.00001)
-                timestamp = System.currentTimeMillis() + (i * 100)
-                monotonicNanos = System.nanoTime()
-                sequenceId = i.toLong()
-            }
-
-            // A. Sentinel Validation
-            val validation = SentinelLogic.validateMovement(lastUpdate, update)
-            update.status = validation.status.name
-
-            // B. Forensic Persistence
-            forensicBuffer.writeTrace(update, isCritical = (i % 100 == 0))
-
-            // C. Signaling Transmission
-            signalingClient.sendTelemetry(update)
+            // 2. Generate Burst: Sentinel Logic -> Forensic Buffer -> Signaling Queue
+            val lastUpdate = LocationUpdate().apply { lat = 37.0; lng = -122.0; timestamp = System.currentTimeMillis() }
             
-            // D. Periodic Connection Flapping
-            if (i == 500) {
-                fakeSocket.simulateConnect()
-            } else if (i == 1000) {
-                fakeSocket.disconnect()
-            } else if (i == 1500) {
-                fakeSocket.simulateConnect()
+            for (i in 0 until burstSize) {
+                val update = LocationUpdate().apply {
+                    deviceId = testDeviceId
+                    lat = 37.0 + (i * 0.00001)
+                    lng = -122.0 + (i * 0.00001)
+                    timestamp = System.currentTimeMillis() + (i * 100)
+                    monotonicNanos = System.nanoTime()
+                    sequenceId = i.toLong()
+                }
+
+                // A. Sentinel Validation
+                val validation = SentinelLogic.validateMovement(lastUpdate, update)
+                update.status = validation.status.name
+
+                // B. Forensic Persistence
+                forensicBuffer.writeTrace(update, isCritical = (i % 100 == 0))
+
+                // C. Signaling Transmission
+                signalingClient.sendTelemetry(update)
+                
+                // D. Periodic Connection Flapping
+                if (i == 500) {
+                    fakeSocket.simulateConnect()
+                } else if (i == 1000) {
+                    fakeSocket.disconnect()
+                } else if (i == 1500) {
+                    fakeSocket.simulateConnect()
+                }
+                
+                if (i % 100 == 0) yield() // Allow background flushing
+            }
+
+            // 3. Final Reconnect and Flush
+            fakeSocket.simulateConnect()
+            
+            // Wait for queue to drain (max 10 seconds due to batching overhead)
+            withTimeout(10000) {
+                while (fakeSocket.emittedCount.get() < burstSize) {
+                    delay(100)
+                }
+            }
+
+            // 4. Verification
+            val stored = forensicBuffer.readTraces()
+            assertEquals("Forensic Buffer MUST contain all $burstSize events", burstSize, stored.size)
+            assertEquals("Signaling Relay MUST have received all $burstSize events", burstSize, fakeSocket.emittedCount.get())
+            
+            // Verify sequence integrity
+            stored.forEachIndexed { index, update ->
+                assertEquals("Sequence mismatch at $index", index.toLong(), update.sequenceId)
             }
             
-            if (i % 100 == 0) yield() // Allow background flushing
+            SystemLogger.i("SoakTest", "Completed 2000 event soak audit with zero loss.")
+        } finally {
+            signalingClient.disconnect()
         }
-
-        // 3. Final Reconnect and Flush
-        fakeSocket.simulateConnect()
-        
-        // Wait for queue to drain (max 5 seconds)
-        withTimeout(5000) {
-            while (fakeSocket.emittedCount.get() < burstSize) {
-                delay(100)
-            }
-        }
-
-        // 4. Verification
-        val stored = forensicBuffer.readTraces()
-        assertEquals("Forensic Buffer MUST contain all $burstSize events", burstSize, stored.size)
-        assertEquals("Signaling Relay MUST have received all $burstSize events", burstSize, fakeSocket.emittedCount.get())
-        
-        // Verify sequence integrity
-        stored.forEachIndexed { index, update ->
-            assertEquals("Sequence mismatch at $index", index.toLong(), update.sequenceId)
-        }
-        
-        SystemLogger.i("SoakTest", "Completed 2000 event soak audit with zero loss.")
     }
 }

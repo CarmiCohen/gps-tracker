@@ -1,5 +1,14 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov1.2)
+
+### 1. ISSUE-REVOL33.0-F1: Forensic Signaling Batching
+- **Symptoms**: High network packet overhead and potential throughput bottlenecks during high-frequency telemetry bursts (10Hz) or backfill recovery. Individual JSON payloads for every location update increase header overhead and battery consumption.
+- **Root Cause**: `SocketioSignalingClient` was sending each telemetry update as a standalone socket.io message. While reliable, this approach lacked efficiency during sustained data flows.
+- **Resolution**: Implemented **Adaptive Forensic Batching** in `SocketioSignalingClient`. Telemetry updates are now buffered in a `Mutex`-protected list and flushed based on a 500ms timer or a 10-item limit. Crucially, **Critical Event Protection** was integrated: any update with a non-standard status (e.g., "JUMP", geofence transitions) or any `ViolationEvent` triggers an immediate flush of the pending batch to ensure real-time responsiveness. Verified batching efficiency and priority handling in `SignalingBatchTest` and integrated reliability in `PipelineSoakTest`. (R-ID 81).
+
+---
+
 ## ✅ Resolved Issues (Nov1.1)
 
 ### 1. ISSUE-REVOL32.0-F1: Backfill Recovery Contention Audit

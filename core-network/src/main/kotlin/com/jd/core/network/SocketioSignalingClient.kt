@@ -14,6 +14,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import timber.log.Timber
@@ -25,7 +27,7 @@ import javax.inject.Singleton
  * Extended for Adaptive Telemetry Backfill (ISSUE-REVOL30.0-F5).
  * Hardened for Revol31.2: Exhaustive queue flushing and connection resilience (ISSUE-REVOL30.1-F2).
  * Updated Revol31.9: Increased queue capacity to 5000 for Soak Audit (ISSUE-REVOL31.9-F1).
- * Refactored for testability via SocketFactory and injected Dispatcher.
+ * Updated Nov1.2: Forensic Signaling Batching (ISSUE-REVOL33.0-F1).
  */
 @Singleton
 class SocketioSignalingClient @Inject constructor(
@@ -35,7 +37,6 @@ class SocketioSignalingClient @Inject constructor(
 
     private var socket: Socket? = null
     private val clientScope = CoroutineScope(SupervisorJob() + ioDispatcher)
-    // Capacity increased to 5000 to support extended offline periods (R-ID 772 hardening)
     private val queue = SignalingQueue(maxCapacity = 5000)
 
     private val _isConnected = MutableStateFlow(false)
@@ -55,6 +56,13 @@ class SocketioSignalingClient @Inject constructor(
 
     private var bytesSent: Long = 0
     private var currentDeviceId: String? = null
+
+    // Batching logic (ISSUE-REVOL33.0-F1)
+    private val pendingBatch = mutableListOf<LocationUpdate>()
+    private val batchMutex = Mutex()
+    private var batchFlushJob: Job? = null
+    private val BATCH_TIME_MS = 500L
+    private val BATCH_SIZE_LIMIT = 10
 
     override suspend fun connect(url: String, deviceId: String, secret: String, lastSequenceId: Long) {
         if (_isConnected.value && currentDeviceId == deviceId) return
@@ -81,11 +89,13 @@ class SocketioSignalingClient @Inject constructor(
                 clientScope.launch {
                     flushQueue()
                 }
+                startBatchTimer()
             }
 
             on(Socket.EVENT_DISCONNECT) {
                 _isConnected.value = false
                 SystemLogger.w("Signaling", "Disconnected from relay")
+                stopBatchTimer()
             }
 
             on(Socket.EVENT_CONNECT_ERROR) { args ->
@@ -93,10 +103,20 @@ class SocketioSignalingClient @Inject constructor(
             }
 
             on("location_relay") { args ->
-                val data = args[0] as? JSONObject ?: return@on
+                val data = args[0] ?: return@on
                 try {
-                    val update = parseLocationUpdate(data)
-                    _telemetryFlow.tryEmit(update)
+                    when (data) {
+                        is JSONObject -> {
+                            val update = parseLocationUpdate(data)
+                            _telemetryFlow.tryEmit(update)
+                        }
+                        is JSONArray -> {
+                            for (i in 0 until data.length()) {
+                                val update = parseLocationUpdate(data.getJSONObject(i))
+                                _telemetryFlow.tryEmit(update)
+                            }
+                        }
+                    }
                 } catch (e: Exception) {
                     Timber.e(e, "Failed to parse location_relay")
                 }
@@ -142,10 +162,37 @@ class SocketioSignalingClient @Inject constructor(
 
     private suspend fun flushQueue() {
         while (_isConnected.value) {
-            val batch = queue.pollBatch(50) // Increased batch size for faster recovery
+            val batch = queue.pollBatch(50) 
             if (batch.isEmpty()) break
-            batch.forEach { sendTelemetry(it) }
+            sendTelemetryBatch(batch)
             yield()
+        }
+    }
+
+    private fun startBatchTimer() {
+        batchFlushJob?.cancel()
+        batchFlushJob = clientScope.launch {
+            while (isActive) {
+                delay(BATCH_TIME_MS)
+                flushPendingBatch()
+            }
+        }
+    }
+
+    private fun stopBatchTimer() {
+        batchFlushJob?.cancel()
+        batchFlushJob = null
+    }
+
+    private suspend fun flushPendingBatch() {
+        val toSend = batchMutex.withLock {
+            if (pendingBatch.isEmpty()) return@withLock emptyList<LocationUpdate>()
+            val items = ArrayList(pendingBatch)
+            pendingBatch.clear()
+            items
+        }
+        if (toSend.isNotEmpty()) {
+            sendTelemetryBatch(toSend)
         }
     }
 
@@ -167,6 +214,7 @@ class SocketioSignalingClient @Inject constructor(
         socket = null
         _isConnected.value = false
         currentDeviceId = null
+        stopBatchTimer()
     }
 
     override fun getMonthlyDataUsageBytes(): Long = bytesSent
@@ -178,25 +226,52 @@ class SocketioSignalingClient @Inject constructor(
             queue.offer(update)
             return false
         }
-        
-        val payload = JSONObject().apply {
-            put("id", update.deviceId.ifEmpty { deviceId })
-            put("lat", update.lat)
-            put("lng", update.lng)
-            put("ts", update.timestamp)
-            put("seq", update.sequenceId)
-            put("status", update.status)
-            put("vib", update.sensorSnapshot.vibration)
+
+        // Critical status updates (Geofence transitions, etc.) bypass batching
+        if (update.status != "VALID") {
+            flushPendingBatch() // Flush pending first to maintain order
+            return sendTelemetryBatch(listOf(update))
+        }
+
+        batchMutex.withLock {
+            pendingBatch.add(update)
+            if (pendingBatch.size >= BATCH_SIZE_LIMIT) {
+                clientScope.launch { flushPendingBatch() }
+            }
         }
         
-        socket?.emit("location_update", payload)
-        bytesSent += payload.toString().length.toLong()
+        return true
+    }
+
+    override suspend fun sendTelemetryBatch(updates: List<LocationUpdate>): Boolean {
+        if (updates.isEmpty()) return true
+        val deviceId = currentDeviceId ?: return false
+        if (!_isConnected.value) return false
+
+        val batchArray = JSONArray()
+        updates.forEach { update ->
+            batchArray.put(JSONObject().apply {
+                put("id", update.deviceId.ifEmpty { deviceId })
+                put("lat", update.lat)
+                put("lng", update.lng)
+                put("ts", update.timestamp)
+                put("seq", update.sequenceId)
+                put("status", update.status)
+                put("vib", update.sensorSnapshot.vibration)
+            })
+        }
+
+        socket?.emit("location_batch", batchArray)
+        bytesSent += batchArray.toString().length.toLong()
         return true
     }
 
     override suspend fun sendViolation(event: ViolationEvent): Boolean {
         val deviceId = currentDeviceId ?: return false
         
+        // Critical event: flush pending telemetry to ensure context arrives first
+        flushPendingBatch()
+
         val payload = JSONObject().apply {
             put("id", deviceId)
             put("type", event.type)

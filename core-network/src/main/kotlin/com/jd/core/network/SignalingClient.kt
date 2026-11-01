@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.Flow
 /**
  * SignalingClient: Unified communication interface.
  * Corrected: Supports Historical Backfill and Data Usage Tracking (Points 77 & 80).
+ * Updated Nov1.2: Added telemetry batching for overhead optimization (ISSUE-REVOL33.0-F1).
  */
 interface SignalingClient {
     
@@ -45,6 +46,12 @@ interface SignalingClient {
     fun getMonthlyDataUsageBytes(): Long
 
     suspend fun sendTelemetry(update: LocationUpdate): Boolean
+
+    /**
+     * Optimized batch transmission for telemetry updates (R-ID 80).
+     */
+    suspend fun sendTelemetryBatch(updates: List<LocationUpdate>): Boolean
+
     suspend fun sendViolation(event: ViolationEvent): Boolean
 
     /**

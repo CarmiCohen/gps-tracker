@@ -1,41 +1,42 @@
 git add .
-git commit -m "Revolution Phase Nov1.1: Backfill Recovery Contention Resolution.
-- Resolved Backfill Recovery Contention (ISSUE-REVOL32.0-F1).
-- Implemented range-based deduplication in MonitorRepository with Mutex concurrency control (R-ID 80).
-- Added BackfillContentionTest to verify zero redundant requests during concurrent telemetry ingestion.
-- Updated build versions and SOT requirements to Nov1.1.
-- Verified 100% telemetry integrity under multi-peer contention."
-git tag Nov1.1
+git commit -m "Revolution Phase Nov1.2: Forensic Signaling Batching.
+- Resolved Forensic Signaling Batching (ISSUE-REVOL33.0-F1).
+- Implemented Adaptive Forensic Batching in SocketioSignalingClient (R-ID 81) with dual-trigger flush (500ms/10-item).
+- Integrated Critical Event Protection to ensure immediate delivery of ViolationEvents and Geofence transitions.
+- Hardened SignalingBatchTest and updated PipelineSoakTest to verify zero loss under 2000-event stress.
+- Updated build versions and SOT requirements to Nov1.2."
+git tag Nov1.2
 git push origin main --tags
 
-# Project Handover - REVOLUTION PHASE (Nov1.1)
+# Project Handover - REVOLUTION PHASE (Nov1.2)
 
-## ✅ Status: BACKFILL CONTENTION RESOLVED (Nov1.1)
+## ✅ Status: SIGNALING BATCHING IMPLEMENTED (Nov1.2)
 
-The telemetry backfill pipeline has been hardened against multi-peer contention. `MonitorRepository` now utilizes a `Mutex`-protected active request map to perform range-based deduplication, preventing redundant signaling traffic and potential ingestion jitter. `BackfillContentionTest` confirms that overlapping gap detections no longer trigger duplicate requests.
+The signaling pipeline now utilizes adaptive batching for telemetry updates, significantly reducing packet overhead during high-frequency bursts and recovery. `SocketioSignalingClient` buffers updates using a `Mutex`-protected list, flushing every 500ms or when the 10-item limit is reached. **Critical Event Protection** ensures that violations and geofence transitions bypass batching delays, maintaining real-time responsiveness.
 
-**Resumption Token**: REVOLUTION-BACKFILL-STABILIZATION-SUCCESS-V1.1
+**Resumption Token**: REVOLUTION-SIGNALING-BATCHING-SUCCESS-V1.2
 
 ---
 
-## 🎯 Next Resumption Focus: Forensic Signaling Batching (Revol33.0)
+## 🎯 Next Resumption Focus: Adaptive Sampling Logic (Revol34.0)
 
 ### 🛡️ Revolution Blueprint Implementation
-- **Objective**: Optimize signaling throughput by batching small telemetry updates into larger payloads during high-latency periods.
-- **Verification**: Zero impact on real-time violation delivery while reducing total packet overhead.
+- **Objective**: Optimize battery consumption by dynamically adjusting telemetry sampling rates based on movement velocity and power state.
+- **Verification**: Zero impact on violation detection latency while extending operational duration.
 
 ---
 
 ## 📂 Key Implementation Files & Forensic Status
-- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorRepository.kt`: Hardened with range-based deduplication.
-- `app-monitor/src/androidTest/kotlin/com/jd/app/monitor/BackfillContentionTest.kt`: New audit test for backfill integrity.
-- `app-monitor/build.gradle.kts`: Version incremented to Nov1.1.
-- `app-sensor/build.gradle.kts`: Version incremented to Nov1.1.
+- `core-network/src/main/kotlin/com/jd/core/network/SocketioSignalingClient.kt`: Hardened with adaptive batching and mutex control.
+- `core-network/src/test/kotlin/com/jd/core/network/SignalingBatchTest.kt`: New audit test for batching logic.
+- `app-sensor/src/androidTest/kotlin/com/jd/app/sensor/PipelineSoakTest.kt`: Updated to verify batching under stress.
+- `app-monitor/build.gradle.kts`: Version incremented to Nov1.2.
+- `app-sensor/build.gradle.kts`: Version incremented to Nov1.2.
 
 ---
 
 ## 🔴 Immediate Resumption Tasks
-1. **Batching Baseline**: Review `STATUS/BASELINE/Nov1.1/` for final forensic state.
-2. **Signal Profiling**: Initialize telemetry packet overhead profiling.
+1. **Sampling Baseline**: Review `STATUS/BASELINE/Nov1.2/` for final forensic state.
+2. **Power Profiling**: Initialize battery consumption baseline for 10Hz sampling.
 
-**Handover complete. Backfill Contention Resolution successful. Version Nov1.1 sealed.**
+**Handover complete. Signaling Batching successful. Version Nov1.2 sealed.**
