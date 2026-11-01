@@ -31,6 +31,7 @@ import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
+import kotlin.math.max
 
 /**
  * SensorService: Ultimate Hardened Version.
@@ -39,6 +40,7 @@ import javax.inject.Inject
  * Updated Nov1.0: Hardened FGS startup with API 34 permission guards (R-ID 10).
  * Updated Nov1.3: Adaptive Sampling Logic (Revol34.0 / R-ID 82).
  * Updated Nov1.4: Battery-Aware Thermal Throttling (Revol35.0 / R-ID 83).
+ * Updated Nov1.5: Forensic Heartbeat & Watchdog (Revol36.0 / R-ID 85).
  */
 @AndroidEntryPoint
 class SensorService : Service(), SensorEventListener {
@@ -110,7 +112,7 @@ class SensorService : Service(), SensorEventListener {
 
     override fun onCreate() {
         super.onCreate()
-        SystemLogger.i("SensorService", "onCreate called. Version: Nov1.4")
+        SystemLogger.i("SensorService", "onCreate called. Version: Nov1.5")
         
         val protectedContext = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             createDeviceProtectedStorageContext()
@@ -174,6 +176,7 @@ class SensorService : Service(), SensorEventListener {
             
             if (!isMuzzled) {
                 startSensingLoop()
+                startWatchdog()
             }
         } else {
             SystemLogger.e("SensorService", "Critical permissions missing for FGS. Self-stopping.")
@@ -292,6 +295,29 @@ class SensorService : Service(), SensorEventListener {
                 SystemLogger.e("SensorService", "Loop error: ${e.message}")
             } finally {
                 PoolRegistry.locationUpdatePool.release(update)
+            }
+        }
+    }
+
+    /**
+     * Watchdog: Monitors sensing loop health via TickOrchestrator heartbeat (R-ID 85).
+     * Restarts the loop if a stall > 3x interval (or 10s floor) is detected.
+     */
+    private fun startWatchdog() {
+        orchestrator.launchPeriodicLoop(
+            name = "forensic_watchdog",
+            scope = serviceScope,
+            intervalProvider = { 5000L } // Check every 5 seconds
+        ) {
+            val elapsedNanos = orchestrator.getNanosecondsSinceLastTick("sensing_loop")
+            if (elapsedNanos == -1L) return@launchPeriodicLoop
+            
+            val elapsedMs = elapsedNanos / 1_000_000
+            val threshold = max(currentIntervalMs * 3, 10000L) 
+            
+            if (elapsedMs > threshold) {
+                SystemLogger.e("Watchdog", "Sensing loop stall detected! (Elapsed: ${elapsedMs}ms, Threshold: ${threshold}ms). Restarting...")
+                startSensingLoop()
             }
         }
     }

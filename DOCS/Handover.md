@@ -1,44 +1,43 @@
 git add .
-git commit -m "Revolution Phase Nov1.4: Battery-Aware Thermal Throttling.
-- Resolved Battery-Aware Thermal Throttling (ISSUE-REVOL35.0-F1).
-- Implemented Multi-Stage Resource Throttling in SensingEngine (R-ID 83).
-- Integrated BatteryManager (ACTION_BATTERY_CHANGED) and PowerManager.OnThermalStatusChangedListener in SensorService.
-- Enforced interval caps: 1Hz (Warning: >40°C or <20% battery) and 0.1Hz (Critical: >45°C or <15% battery).
-- Validated constraint priority hierarchy (Thermal > Battery > Velocity) in ThermalThrottlingTest.
-- Hardened ProductionReadinessAuditTest and AdaptiveSamplingTest for new survival floors.
-- Updated build versions and SOT requirements to Nov1.4."
-git tag Nov1.4
+git commit -m "Revolution Phase Nov1.6: Hilt Infrastructure Hardening.
+- Resolved Dagger/DuplicateBindings in :app-monitor instrumentation tests (ISSUE-REVOL36.1-F1 / R-ID 84).
+- Standardized TestMonitorModule to replace all conflicting network and monitor modules.
+- Hardened FakeSignalingClient to support batching and backfill range tracking.
+- Verified forensic heartbeat, watchdog recovery, and backfill deduplication.
+- All 13 instrumentation tests (app-sensor) and 2 (app-monitor) PASSED.
+- Incremented versions and baselined forensic state to Nov1.6."
+git tag Nov1.6
 git push origin main --tags
 
-# Project Handover - REVOLUTION PHASE (Nov1.4)
+# Project Handover - REVOLUTION PHASE (Nov1.6)
 
-## ✅ Status: THERMAL & BATTERY THROTTLING IMPLEMENTED (Nov1.4)
+## ✅ Status: SUCCESS - HILT INFRASTRUCTURE & WATCHDOG STABILITY (Nov1.6)
 
-The system now proactively protects device health by dynamically capping telemetry frequency based on thermal and battery levels. `SensingEngine` enforces a multi-stage constraint strategy where hardware safety (Thermal/Battery) overrides performance modes (Velocity). `SensorService` reacts immediately to hardware state changes via broadcast receivers and system listeners, ensuring forensic continuity even under extreme stress.
+The multi-module test infrastructure has been hardened to prevent Dagger binding conflicts, ensuring that both `:app-sensor` and `:app-monitor` can execute their respective forensic audits in a hermetic environment. The **Forensic Watchdog** is fully operational, providing self-healing capabilities for the sensing loop, and the **Backfill Audit Infrastructure** is verified for range-based deduplication.
 
-**Resumption Token**: REVOLUTION-THERMAL-THROTTLING-SUCCESS-V1.4
+**Resumption Token**: REVOLUTION-HILT-WATCHDOG-V1.6
 
 ---
 
-## 🎯 Next Resumption Focus: Forensic Heartbeat & Watchdog (Revol36.0)
+## 🎯 Next Resumption Focus: Adaptive Power Scaling Logic (Revol37.0)
 
 ### 🛡️ Revolution Blueprint Implementation
-- **Objective**: Implement a dedicated watchdog to detect and recover from sensing loop stalls or signaling pipeline congestion.
-- **Verification**: Automatic loop restart and forensic "Heartbeat" events recorded in the buffer during idle periods.
+- **Objective**: Implement more granular power scaling based on R-ID 83 constraints.
+- **Verification**: Smooth interval transitions without heartbeat stalls.
 
 ---
 
 ## 📂 Key Implementation Files & Forensic Status
-- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorService.kt`: Hardened with BatteryManager and ThermalStatus listeners.
-- `core-shared/src/main/kotlin/com/jd/core/shared/SensingEngine.kt`: Multi-stage throttling logic (R-ID 83).
-- `app-sensor/src/androidTest/kotlin/com/jd/app/sensor/ThermalThrottlingTest.kt`: New audit test for throttling priority.
-- `app-monitor/build.gradle.kts`: Version incremented to Nov1.4.
-- `app-sensor/build.gradle.kts`: Version incremented to Nov1.4.
+- `app-monitor/src/androidTest/kotlin/com/jd/app/monitor/BackfillContentionTest.kt`: Hardened Hilt test overrides (R-ID 84).
+- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorService.kt`: Watchdog implementation (R-ID 85).
+- `core-shared/src/main/kotlin/com/jd/core/shared/TickOrchestrator.kt`: Heartbeat monitoring API.
+- `app-monitor/build.gradle.kts`: Version incremented to Nov1.6.
+- `app-sensor/build.gradle.kts`: Version incremented to Nov1.6.
 
 ---
 
 ## 🔴 Immediate Resumption Tasks
-1. **Heartbeat Baseline**: Review `STATUS/BASELINE/Nov1.4/` for final forensic state.
-2. **Watchdog Design**: Analyze `TickOrchestrator` for stall detection hooks.
+1. **Power Audit**: Review `ProductionReadinessAuditTest` for thermal scaling precision.
+2. **Watchdog Soak**: Run `PipelineSoakTest` with simulated loop stalls.
 
-**Handover complete. Throttling successful. Version Nov1.4 sealed.**
+**Handover complete. Infrastructure hardened, Watchdog active, all tests green.**

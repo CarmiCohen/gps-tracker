@@ -14,8 +14,8 @@ android {
         applicationId = "com.jd.app.monitor"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "Nov1.4"
+        versionCode = 7
+        versionName = "Nov1.6"
         testInstrumentationRunner = "com.jd.app.monitor.HiltTestRunner"
     }
 
@@ -41,6 +41,8 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/LICENSE.md"
+            excludes += "META-INF/LICENSE-notice.md"
         }
     }
 }

@@ -36,7 +36,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.0.0")
 
     // Signaling & Networking
-    implementation("io.socket:socket.io-client:2.1.0")
+    api("io.socket:socket.io-client:2.1.0") // Changed to api to expose Socket types for testing in consumer modules
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.2")
 

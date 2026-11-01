@@ -14,8 +14,8 @@ android {
         applicationId = "com.jd.app.sensor"
         minSdk = 26
         targetSdk = 34
-        versionCode = 5
-        versionName = "Nov1.4"
+        versionCode = 7
+        versionName = "Nov1.6"
         testInstrumentationRunner = "com.jd.app.sensor.HiltTestRunner"
     }
 
@@ -73,6 +73,7 @@ dependencies {
     // Testing
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
+    androidTestImplementation("androidx.test:rules:1.5.0")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     androidTestImplementation("io.socket:socket.io-client:2.1.0")

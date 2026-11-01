@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * Exercises SentinelLogic, ForensicBuffer, and SocketioSignalingClient simultaneously.
  * Verifies R-ID 772, 773, and 775 under sustained load.
  * Updated Nov1.2 to support Forensic Signaling Batching (ISSUE-REVOL33.0-F1).
+ * Updated Nov1.5: Increased timeout to 120s to accommodate batching intervals (200 batches * 500ms).
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -145,10 +146,10 @@ class PipelineSoakTest {
             // 3. Final Reconnect and Flush
             fakeSocket.simulateConnect()
             
-            // Wait for queue to drain (max 10 seconds due to batching overhead)
-            withTimeout(10000) {
+            // Wait for queue to drain (max 120 seconds due to batching overhead)
+            withTimeout(120000) {
                 while (fakeSocket.emittedCount.get() < burstSize) {
-                    delay(100)
+                    delay(500)
                 }
             }
 

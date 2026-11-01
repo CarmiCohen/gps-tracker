@@ -1,34 +1,37 @@
-# Chat Session - Nov1.4 (Resumed from Nov1.3)
+# Chat Session - Nov1.5 (Sealed & Baselined)
 
-## 🎯 Current Resumption Focus: Battery-Aware Thermal Throttling (Revol35.0)
+## 🎯 Current Status: REVOLUTION PHASE Nov1.5 COMPLETED
 
-### 🟢 Objectives
-- Implement multi-stage thermal and battery level throttling.
-- Prevent device shutdown during extreme heat or critical low power.
-- Smooth transition to 0.1Hz sampling and notification triggers when thresholds are breached.
+### 🟢 Objectives Accomplished
+- **Backfill Infrastructure Fix (R-ID 80 / ISSUE-REVOL35.0-F2)**: Resolved Hilt compilation failure in `:app-monitor` by moving `@TestInstallIn` modules to the top-level in `BackfillContentionTest.kt`.
+- **Forensic Watchdog Implementation (R-ID 85 / ISSUE-REVOL36.0-F1)**:
+    - Hardened `TickOrchestrator.kt` with a `lastTickNanos` registry and `getNanosecondsSinceLastTick(name)` API for heartbeat monitoring.
+    - Integrated `ForensicWatchdog` in `SensorService.kt` to monitor `sensing_loop` health.
+    - Implemented automated sensing loop restart if a stall > 3x interval is detected.
+    - Hardened `SocketioSignalingClient.kt` with `movePendingToQueue()` to ensure zero data loss during watchdog-triggered service resets.
+- **Dependency Scope Correction**: Updated `core-network/build.gradle.kts` to expose `socket.io-client` via `api` to allow `Socket` type access in instrumentation tests of consumer modules.
+- **Build Hardening**: Added packaging resource exclusions for `LICENSE.md` in `:app-monitor/build.gradle.kts` to resolve merge conflicts.
 
-### 📝 Planned Remediation
-1. **Explore**:
-    - [x] Identify battery and thermal monitoring APIs (PowerManager, Intent filters).
-    - [x] Analyze current power state handling in `SensorService`.
-2. **Issue Initialization**:
-    - [x] Update `chat_session.md` for Nov1.4.
-    - [x] Initialized `ISSUE-REVOL35.0-F1` in `issues.md`.
-3. **Implementation**:
-    - [x] Implement multi-stage throttling logic in `SensingEngine`.
-    - [x] Update `SensorService` to register `BatteryReceiver` for `ACTION_BATTERY_CHANGED`.
-    - [x] Integrate `OnThermalStatusChangedListener` in `SensorService` (API 29+).
-    - [x] Implement unified `refreshSamplingRate()` in `SensorService`.
-4. **Execution & Audit**:
-    - [x] Create `ThermalThrottlingTest` to verify interval scaling.
-    - [x] Build and run all stabilization tests (10/10 passed in `:app-sensor`).
-5. **Completion**: Follow the DEVELOPER_GUIDELINES.md completion sequence for Nov1.4.
+### 📝 Forensic Audit Results (Nov1.5)
+- **ProductionReadinessAuditTest**: PASSED (11/11 tests). Verified multi-stage throttling (Thermal > Battery > Velocity).
+- **WatchdogRecoveryTest**: PASSED. Verified heartbeat tracking and fresh tick detection.
+- **BackfillContentionTest**: PASSED. Verified range-based request deduplication in `:app-monitor`.
+- **PipelineSoakTest**: PASSED (2000-event burst with flapping). Verified zero forensic or telemetry loss.
+- **Total Verification**: 13/13 Instrumentation tests PASSED.
 
-### 🚀 Progress Tracking
-- [x] Initialized `chat_session.md` for Nov1.4.
-- [x] Hardened `SensingEngine` with multi-stage throttling logic (max constraint strategy).
-- [x] Refactored `SensorService` with `BatteryReceiver` and `ThermalStatusListener`.
-- [x] Verified throttling priorities in `ThermalThrottlingTest`.
-- [x] Updated all forensic documentation (`SOT`, `RESOLUTION_ARCHIVE`, `Handover`).
-- [x] Incremented version to Nov1.4.
-- [x] Version Nov1.4 Sealed.
+### 📊 Hardening Progress Dashboard
+- **Nov1.5: [SOT Count: 891 (Rules: 391), Open: H:0, M:0, L:0, Ideas: H:0, M:0, L:4, Testing: PASSED (Watchdog & Backfill), QA: 891]**
+
+### 📂 Key Implementation Files & Forensic Status
+- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorService.kt`: Watchdog logic (Line 296).
+- `core-shared/src/main/kotlin/com/jd/core/shared/TickOrchestrator.kt`: Heartbeat monitoring (Line 59).
+- `core-network/src/main/kotlin/com/jd/core/network/SocketioSignalingClient.kt`: Atomic queue recovery (Line 183).
+- `app-monitor/src/androidTest/kotlin/com/jd/app/monitor/BackfillContentionTest.kt`: Fixed Hilt module nesting.
+- `STATUS/BASELINE/Nov1.5/`: Comprehensive forensic state snapshot (issues, SOT, Handover, Resolution Archive).
+
+### 🚀 Next Resumption Focus: Adaptive Power Scaling Logic (Revol37.0)
+- **Objective**: Implement more granular power scaling based on R-ID 83 constraints.
+- **Verification**: Smooth interval transitions without heartbeat stalls.
+
+---
+**Exported per user request. All processing stopped.**

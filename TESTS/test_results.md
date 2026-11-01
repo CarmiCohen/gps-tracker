@@ -1,25 +1,32 @@
-# Test Results - GPS Tracker (vOct28.26)
+# Test Results - GPS Tracker (vNov1.4)
 
 ## 📊 Summary
-- **Date**: Oct 28, 2024
-- **Status**: 🔴 FAILED
+- **Date**: Nov 1, 2024
+- **Status**: 🔴 FAILED (Partial Success)
 - **Hardware**: SM-A155F (Android 14)
-- **Variant**: `Oct28.26_DEBUG`
+- **Variant**: `Nov1.4_DEBUG`
 
 ## 🏁 Test Execution Log
 
-### 1. Automated Tests
+### 1. Unit Tests
 | Artifact | Result | Notes |
 | :--- | :--- | :--- |
-| `:core:engine:test` | ✅ PASS | Core logic thresholds verified. |
-| `:app:testDebugUnitTest` | ✅ PASS | 43 tests passed. |
+| `:core-shared:test` | ✅ PASS | 5 tests passed. |
+| `:core-network:testDebugUnitTest` | ✅ PASS | 8 tests passed (SignalingBatchTest verified). |
+| `:core-ui:testDebugUnitTest` | ✅ PASS | Verified. |
+| `:app-monitor:testDebugUnitTest` | ✅ PASS | Verified. |
+| `:app-sensor:testDebugUnitTest` | ✅ PASS | Verified. |
 
-### 2. Chapter 0 - Operational Forensic Audit
-- **0.1 Logcat Anomaly**: ❌ **FAILED**. `Davey` event (775ms) and `StackLog` leak detected during startup.
-- **0.2 Event Continuity**: ⏳ SKIPPED (Testing Halted).
+### 2. Hardening & Stress Evaluations (Instrumented)
+| Evaluation | Result | Notes |
+| :--- | :--- | :--- |
+| **Thermal Throttling Audit** | ✅ PASS | `ThermalThrottlingTest` verified 10Hz->1Hz->0.1Hz logic. |
+| **Production Readiness** | ✅ PASS | `ProductionReadinessAuditTest` verified resource floors. |
+| **Pipeline Soak** | ✅ PASS | `PipelineSoakTest` verified telemetry throughput. |
+| **Backfill Contention** | ❌ **FAILED** | `BackfillContentionTest` compilation error (Hilt nesting). |
 
 ## 🔴 Identified Issues
-- **ISSUE-OCT28.26-F1**: Startup Audit Failure. Main-thread stall (775ms Davey) and diagnostic `StackLog` leak during network provider hydration on `Oct28.26_DEBUG`.
+- **ISSUE-REVOL35.0-F2**: `BackfillContentionTest` Compilation Failure. KSP/Hilt error: `@TestInstallIn` modules cannot be nested in a `@HiltAndroidTest`-annotated class.
 
 ---
-**Testing Session Terminated.** Forensic state locked per Developer Rule 8.
+**Testing Session Terminated.** Status files updated. Forensic state locked per Developer Rule 8 (Nov1.4 Update).

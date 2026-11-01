@@ -1,6 +1,6 @@
-# SOT Master Requirements & Hardening Status (Nov1.4)
+# SOT Master Requirements & Hardening Status (Nov1.6)
 
-## 🏗️ Architectural Master Rules (389 Rules)
+## 🏗️ Architectural Master Rules (391 Rules)
 
 ### 1. Lifecycle & Resource Management
 *   ... (Rules 1.1 to 1.307 as per Revol31.8 baseline)
@@ -11,8 +11,12 @@
 *   **1.312 Forensic Signaling Batching (R-ID 81)**: The `SignalingClient` MUST implement adaptive telemetry batching (time and size based) to optimize packet overhead during high-frequency bursts or recovery. Critical status updates (e.g., Geofence transitions) and Violation events MUST trigger an immediate batch flush to maintain real-time operational responsiveness. (Nov1.2 - ISSUE-REVOL33.0-F1).
 *   **1.313 Adaptive Telemetry Sampling (R-ID 82)**: The `SensorService` MUST implement velocity-based adaptive sampling to optimize battery life. Telemetry frequency MUST scale dynamically: 10Hz when moving (> 5 m/s), 1Hz during slow movement, and 0.1Hz when stationary. The `TickOrchestrator` MUST support preemption to ensure immediate adaptation to velocity changes. (Nov1.3 - ISSUE-REVOL34.0-F1).
 *   **1.314 Battery-Aware Thermal Throttling (R-ID 83)**: The `SensingEngine` MUST enforce multi-stage resource constraints. Sensing intervals MUST be capped at 1Hz during thermal warning (>40°C) or low battery (<20%), and 0.1Hz during critical thermal (>45°C) or critical battery (<15%). These constraints MUST override velocity-based performance modes to prevent device shutdown and ensure forensic continuity. (Nov1.4 - ISSUE-REVOL35.0-F1).
+*   **1.315 Multi-Project Test Infrastructure (R-ID 84)**: All cross-module telemetry audits (e.g., Backfill Contention) MUST utilize standardized mocks and dependency overrides to ensure consistent behavior across `:app-monitor` and `:app-sensor`. Mock implementations MUST support all `SignalingClient` optimizations including batching and backfill range tracking. (Nov1.5 - ISSUE-REVOL35.0-F2).
+*   **1.316 Forensic Heartbeat & Watchdog (R-ID 85)**: The `SensorService` MUST implement a dedicated watchdog to monitor the health of high-frequency sensing loops. The watchdog MUST utilize monotonic heartbeat timestamps from the `TickOrchestrator` and trigger an automated, safe restart of the loop if a stall exceeding 3x the intended interval (with a 10s floor) is detected. (Nov1.5 - ISSUE-REVOL36.0-F1).
 
 ## 🛡️ Core Hardening Baseline
+- **Nov1.6**: Hilt Test Infrastructure Hardening - PASSED. Resolved duplicate Dagger bindings in multi-module test environments.
+- **Nov1.5**: Forensic Heartbeat & Watchdog - PASSED. Implemented automated loop recovery and resolved cross-module test infrastructure.
 - **Nov1.4**: Battery-Aware Thermal Throttling - PASSED. Implemented multi-stage interval capping with active broadcast receivers and thermal listeners.
 - **Nov1.3**: Adaptive Telemetry Sampling - PASSED. Implemented velocity-based 10Hz/1Hz/0.1Hz sampling with TickOrchestrator preemption.
 - **Nov1.2**: Forensic Signaling Batching - PASSED. Implemented adaptive 500ms/10-item batching in SocketioSignalingClient with critical event protection.
@@ -20,6 +24,9 @@
 - **Nov1.0**: Foreground Service Permission Remediation - PASSED. Verified API 34 security guards and FGS type alignment.
 
 ## ✅ Verification Chapters
+*   **Chapter 5.18 (Nov1.6 Hilt Infrastructure)**: PASSED - Verified resolution of Dagger/Hilt duplicate bindings in BackfillContentionTest.
+*   **Chapter 5.17 (Nov1.5 Watchdog Audit)**: PASSED - Verified loop stall detection and heartbeat freshness in WatchdogRecoveryTest.
+*   **Chapter 5.16 (Nov1.5 Backfill Infrastructure)**: PASSED - Verified Hilt injection and batch-aware mock signaling in BackfillContentionTest.
 *   **Chapter 5.15 (Nov1.4 Throttling Audit)**: PASSED - Verified multi-stage priority logic (Thermal > Battery > Velocity) in ThermalThrottlingTest.
 *   **Chapter 5.14 (Nov1.3 Sampling Audit)**: PASSED - Verified velocity-based interval transitions and loop preemption in AdaptiveSamplingTest.
 *   **Chapter 5.13 (Nov1.2 Batching Audit)**: PASSED - Verified batching efficiency, timer-based flushing, and critical event priority in SignalingBatchTest.

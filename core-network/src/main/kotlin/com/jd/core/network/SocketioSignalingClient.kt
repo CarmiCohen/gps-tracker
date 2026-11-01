@@ -28,6 +28,7 @@ import javax.inject.Singleton
  * Hardened for Revol31.2: Exhaustive queue flushing and connection resilience (ISSUE-REVOL30.1-F2).
  * Updated Revol31.9: Increased queue capacity to 5000 for Soak Audit (ISSUE-REVOL31.9-F1).
  * Updated Nov1.2: Forensic Signaling Batching (ISSUE-REVOL33.0-F1).
+ * Updated Nov1.5: Resolved data loss during batch flush transitions.
  */
 @Singleton
 class SocketioSignalingClient @Inject constructor(
@@ -96,6 +97,7 @@ class SocketioSignalingClient @Inject constructor(
                 _isConnected.value = false
                 SystemLogger.w("Signaling", "Disconnected from relay")
                 stopBatchTimer()
+                clientScope.launch { movePendingToQueue() }
             }
 
             on(Socket.EVENT_CONNECT_ERROR) { args ->
@@ -164,7 +166,11 @@ class SocketioSignalingClient @Inject constructor(
         while (_isConnected.value) {
             val batch = queue.pollBatch(50) 
             if (batch.isEmpty()) break
-            sendTelemetryBatch(batch)
+            if (!sendTelemetryBatch(batch)) {
+                // If send failed (disconnected), put them back
+                batch.forEach { queue.offer(it) }
+                break
+            }
             yield()
         }
     }
@@ -192,7 +198,21 @@ class SocketioSignalingClient @Inject constructor(
             items
         }
         if (toSend.isNotEmpty()) {
-            sendTelemetryBatch(toSend)
+            if (!sendTelemetryBatch(toSend)) {
+                // Re-queue on failure
+                batchMutex.withLock {
+                    pendingBatch.addAll(0, toSend)
+                }
+            }
+        }
+    }
+
+    private suspend fun movePendingToQueue() {
+        batchMutex.withLock {
+            if (pendingBatch.isNotEmpty()) {
+                pendingBatch.forEach { queue.offer(it) }
+                pendingBatch.clear()
+            }
         }
     }
 

@@ -1,15 +1,32 @@
 package com.jd.app.monitor
 
+import android.content.Context
+import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.jd.core.network.ForensicIdentityManager
+import com.jd.core.network.IoDispatcher
 import com.jd.core.network.SignalingClient
+import com.jd.core.network.SocketFactory
 import com.jd.core.shared.BackfillRequest
 import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.LocationUpdate
+import dagger.Module
+import dagger.Provides
+import dagger.hilt.InstallIn
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
+import dagger.hilt.components.SingletonComponent
+import dagger.hilt.testing.TestInstallIn
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -19,19 +36,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import javax.inject.Inject
 import javax.inject.Singleton
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.components.SingletonComponent
-import dagger.hilt.testing.TestInstallIn
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * BackfillContentionTest: Audits the MonitorRepository under multi-peer backfill contention.
  * Verifies that redundant requests are minimized and data integrity is maintained.
+ * Fixed Nov1.5: Relocated Hilt module to top-level and replaced both MonitorModule and NetworkModule 
+ * to resolve duplicate binding for SignalingClient.
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -98,35 +108,64 @@ class BackfillContentionTest {
         mockClient.emitTelemetry(liveUpdate2)
 
         // Give it some time for processing
-        kotlinx.coroutines.delay(1000)
+        delay(1000)
 
         // Verify only one request was sent for the gap
         val redundantRequests = backfillRequests.filter { it.startSequenceId == 1L && it.endSequenceId == 99L }
         assertEquals("Redundant backfill requests detected", 1, redundantRequests.size)
     }
+}
 
-    @Module
-    @TestInstallIn(
-        components = [SingletonComponent::class],
-        replaces = [com.jd.app.monitor.MonitorModule::class]
-    )
-    object TestMonitorModule {
-        @Provides
-        @Singleton
-        fun provideSignalingClient(): SignalingClient = FakeSignalingClient()
+@Module
+@TestInstallIn(
+    components = [SingletonComponent::class],
+    replaces = [
+        com.jd.app.monitor.MonitorModule::class,
+        com.jd.core.network.NetworkModule::class
+    ]
+)
+object TestMonitorModule {
+    @Provides
+    @Singleton
+    fun provideSignalingClient(): SignalingClient = FakeSignalingClient()
 
-        @Provides
-        @Singleton
-        fun provideDatabase(): MonitorDatabase {
-            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-            return androidx.room.Room.inMemoryDatabaseBuilder(context, MonitorDatabase::class.java)
-                .allowMainThreadQueries()
-                .build()
-        }
+    @Provides
+    @Singleton
+    fun provideForensicIdentityManager(): ForensicIdentityManager {
+        return ForensicIdentityManager(ApplicationProvider.getApplicationContext())
+    }
 
-        @Provides
-        @Singleton
-        fun provideTrailDao(db: MonitorDatabase) = db.trailDao()
+    @Provides
+    @IoDispatcher
+    fun provideIoDispatcher(): CoroutineDispatcher = Dispatchers.IO
+
+    @Provides
+    @Singleton
+    fun provideDatabase(): MonitorDatabase {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        return Room.inMemoryDatabaseBuilder(context, MonitorDatabase::class.java)
+            .allowMainThreadQueries()
+            .build()
+    }
+
+    @Provides
+    @Singleton
+    fun provideTrailDao(db: MonitorDatabase) = db.trailDao()
+
+    @Provides
+    @Singleton
+    fun provideMonitorDataStore(): MonitorDataStore {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        return MonitorDataStore(context)
+    }
+
+    @Provides
+    @Singleton
+    fun provideMonitorRepository(
+        trailDao: TrailDao,
+        signalingClient: SignalingClient
+    ): MonitorRepository {
+        return MonitorRepository(trailDao, signalingClient)
     }
 }
 
@@ -151,6 +190,7 @@ class FakeSignalingClient : SignalingClient {
     override fun disconnect() {}
     override fun getMonthlyDataUsageBytes(): Long = 0
     override suspend fun sendTelemetry(update: LocationUpdate): Boolean = true
+    override suspend fun sendTelemetryBatch(updates: List<LocationUpdate>): Boolean = true
     override suspend fun sendViolation(event: com.jd.core.shared.ViolationEvent): Boolean = true
 
     override suspend fun requestBackfill(request: BackfillRequest): Boolean {
