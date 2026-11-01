@@ -2,6 +2,7 @@ package com.jd.app.monitor
 
 import com.jd.core.network.SignalingClient
 import com.jd.core.shared.BackfillRequest
+import com.jd.core.shared.BackfillResponse
 import com.jd.core.shared.LocationUpdate
 import com.jd.core.shared.SystemLogger
 import kotlinx.coroutines.CoroutineScope
@@ -9,6 +10,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -16,7 +19,7 @@ import javax.inject.Singleton
 /**
  * MonitorRepository: Orchestrates telemetry ingestion and Forensic Backfill (R-ID 768).
  * Detects sequence gaps in incoming data and requests missing ranges from the Sensor.
- * Hardened for Revol31.0: Uses batch ingestion for backfill chunks (SIMP-REVOL30.6-S1).
+ * Hardened for Nov1.1: Range-based deduplication to prevent redundant backfill requests (ISSUE-REVOL32.0-F1).
  */
 @Singleton
 class MonitorRepository @Inject constructor(
@@ -24,7 +27,8 @@ class MonitorRepository @Inject constructor(
     private val signalingClient: SignalingClient
 ) {
     private val repositoryScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val activeRequests = mutableSetOf<String>()
+    private val activeRequests = mutableMapOf<String, BackfillRequest>()
+    private val rangeMutex = Mutex()
 
     init {
         observeTelemetry()
@@ -60,7 +64,9 @@ class MonitorRepository @Inject constructor(
                 trailDao.insertAll(entities)
 
                 if (response.isComplete) {
-                    activeRequests.remove(response.requestId)
+                    rangeMutex.withLock {
+                        activeRequests.remove(response.requestId)
+                    }
                 }
             }
         }
@@ -89,13 +95,25 @@ class MonitorRepository @Inject constructor(
     )
 
     private suspend fun triggerBackfill(deviceId: String, start: Long, end: Long) {
-        val requestId = UUID.randomUUID().toString()
-        if (activeRequests.size > 5) return // Prevent flooding
+        rangeMutex.withLock {
+            // Hardening: Check if this range (or an overlapping one) is already being fetched
+            val isRedundant = activeRequests.values.any { 
+                it.deviceId == deviceId && it.startSequenceId <= start && it.endSequenceId >= end 
+            }
+            
+            if (isRedundant) {
+                SystemLogger.i("Backfill", "Request for $deviceId ($start..$end) skipped: overlap with active request.")
+                return
+            }
 
-        SystemLogger.w("Backfill", "Gap detected ($start to $end). Requesting backfill...")
-        val request = BackfillRequest(deviceId, start, end, requestId)
-        if (signalingClient.requestBackfill(request)) {
-            activeRequests.add(requestId)
+            if (activeRequests.size > 10) return // Increased limit for multi-peer scenarios
+
+            val requestId = UUID.randomUUID().toString()
+            SystemLogger.w("Backfill", "Gap detected ($start to $end). Requesting backfill...")
+            val request = BackfillRequest(deviceId, start, end, requestId)
+            if (signalingClient.requestBackfill(request)) {
+                activeRequests[requestId] = request
+            }
         }
     }
 }

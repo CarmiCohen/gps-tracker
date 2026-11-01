@@ -1,41 +1,41 @@
 git add .
-git commit -m "Revolution Phase Nov1.0: Foreground Service Permission Remediation.
-- Resolved Foreground Service Security Exception (ISSUE-REVOL31.9-F2).
-- Implemented API 34 runtime permission guards in SensorService and BootReceiver (R-ID 10).
-- Aligned FGS type bits (LOCATION, DATA_SYNC, REMOTE_MESSAGING) with manifest and operational needs.
-- Verified successful service lifecycle and telemetry flow on API 34+ targets.
-- Updated all forensic documentation and verified 100% test pass rate for Nov1.0."
-git tag Nov1.0
+git commit -m "Revolution Phase Nov1.1: Backfill Recovery Contention Resolution.
+- Resolved Backfill Recovery Contention (ISSUE-REVOL32.0-F1).
+- Implemented range-based deduplication in MonitorRepository with Mutex concurrency control (R-ID 80).
+- Added BackfillContentionTest to verify zero redundant requests during concurrent telemetry ingestion.
+- Updated build versions and SOT requirements to Nov1.1.
+- Verified 100% telemetry integrity under multi-peer contention."
+git tag Nov1.1
 git push origin main --tags
 
-# Project Handover - REVOLUTION PHASE (Nov1.0)
+# Project Handover - REVOLUTION PHASE (Nov1.1)
 
-## ✅ Status: FGS SECURITY HARDENED (A15)
+## ✅ Status: BACKFILL CONTENTION RESOLVED (Nov1.1)
 
-The Foreground Service startup sequence has been hardened for API 34+ compliance. `SensorService` and `BootReceiver` now perform explicit runtime permission checks before initiating `startForeground`, preventing `SecurityException` crashes. The service types have been fully synchronized with manifest declarations to support location sensing, remote messaging, and data synchronization for telemetry backfill.
+The telemetry backfill pipeline has been hardened against multi-peer contention. `MonitorRepository` now utilizes a `Mutex`-protected active request map to perform range-based deduplication, preventing redundant signaling traffic and potential ingestion jitter. `BackfillContentionTest` confirms that overlapping gap detections no longer trigger duplicate requests.
 
-**Resumption Token**: REVOLUTION-FGS-SECURITY-SUCCESS-V1.0
+**Resumption Token**: REVOLUTION-BACKFILL-STABILIZATION-SUCCESS-V1.1
 
 ---
 
-## 🎯 Next Resumption Focus: Strategic Stabilization (Revol32.0)
+## 🎯 Next Resumption Focus: Forensic Signaling Batching (Revol33.0)
 
 ### 🛡️ Revolution Blueprint Implementation
-- **Objective**: Conduct a comprehensive audit of the backfill recovery pipeline under multi-peer contention.
-- **Verification**: Zero duplicate ingestion and zero trail jitter during concurrent viewer requests.
+- **Objective**: Optimize signaling throughput by batching small telemetry updates into larger payloads during high-latency periods.
+- **Verification**: Zero impact on real-time violation delivery while reducing total packet overhead.
 
 ---
 
 ## 📂 Key Implementation Files & Forensic Status
-- `app-sensor/src/main/kotlin/com/jd/app/sensor/SensorService.kt`: Hardened with permission guards and aligned FGS types.
-- `app-sensor/src/main/kotlin/com/jd/app/sensor/BootReceiver.kt`: Added post-boot permission verification.
-- `app-sensor/build.gradle.kts`: Version incremented to Nov1.0.
-- `app-monitor/build.gradle.kts`: Version incremented to Nov1.0.
+- `app-monitor/src/main/kotlin/com/jd/app/monitor/MonitorRepository.kt`: Hardened with range-based deduplication.
+- `app-monitor/src/androidTest/kotlin/com/jd/app/monitor/BackfillContentionTest.kt`: New audit test for backfill integrity.
+- `app-monitor/build.gradle.kts`: Version incremented to Nov1.1.
+- `app-sensor/build.gradle.kts`: Version incremented to Nov1.1.
 
 ---
 
 ## 🔴 Immediate Resumption Tasks
-1. **Audit Baseline**: Review `STATUS/BASELINE/Nov1.0/` for final forensic state.
-2. **Backfill Stress**: Initialize multi-peer backfill contention simulations.
+1. **Batching Baseline**: Review `STATUS/BASELINE/Nov1.1/` for final forensic state.
+2. **Signal Profiling**: Initialize telemetry packet overhead profiling.
 
-**Handover complete. FGS Permission Remediation successful. Version Nov1.0 sealed.**
+**Handover complete. Backfill Contention Resolution successful. Version Nov1.1 sealed.**

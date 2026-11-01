@@ -1,5 +1,14 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov1.1)
+
+### 1. ISSUE-REVOL32.0-F1: Backfill Recovery Contention Audit
+- **Symptoms**: Risk of redundant backfill requests and duplicate telemetry ingestion in `MonitorRepository` when multiple peers trigger gap detection simultaneously or when live updates arrive during an active backfill. This leads to network flooding and potential UI jitter.
+- **Root Cause**: `MonitorRepository` lacked range-aware deduplication. Any gap detection would trigger a new `BackfillRequest` without checking if that specific range was already being fetched. Additionally, the ingestion pipeline needed to ensure atomicity during multi-peer responses.
+- **Resolution**: Hardened `MonitorRepository` with a `rangeMutex` and an `activeRequests` map to track pending backfill ranges. Implemented logic to skip new requests if they overlap with an existing active range. Verified zero redundant requests and data integrity under concurrent simulation in `BackfillContentionTest`. (R-ID 80).
+
+---
+
 ## ✅ Resolved Issues (Nov1.0)
 
 ### 1. ISSUE-REVOL31.9-F2: Foreground Service Permission Remediation

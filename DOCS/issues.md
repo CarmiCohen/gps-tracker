@@ -1,17 +1,22 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov1.0)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov1.1)
 
-## 🎯 Next Resumption Focus: Strategic Stabilization (Revol32.0)
+## 🎯 Next Resumption Focus: Forensic Signaling Batching (Revol33.0)
 
 ---
 
-## 🔴 Open Gaps (Nov1.0)
-*   *None. All forensic gaps resolved.*
+## 🔴 Open Gaps (Nov1.1)
+*   *None. All stabilization gaps for backfill contention resolved.*
 
 ---
 
 ## 🚀 Strategic Simplification Ideas
 *   **SIMP-REVOL30.0-S1**: Shared Test Fixtures. Consolidate hardware mocks into a test-only artifact within `:core-shared` to reduce duplication across app modules.
 *   **SIMP-REVOL31.9-S1**: Signaling Batch Tuning. **IMPLEMENTED.** Increased recovery batch size to 50 for faster telemetry catch-up.
+
+---
+
+## ✅ Resolved Traceability & Metadata Issues (Nov1.1)
+*   **ISSUE-REVOL32.0-F1**: Backfill Recovery Contention Audit. **RESOLVED.** Implemented range-based request deduplication in `MonitorRepository` using a `Mutex`-protected active request map. Verified zero redundant requests during concurrent gap detection in `BackfillContentionTest`. (R-ID 80).
 
 ---
 
@@ -41,6 +46,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov1.1: [SOT Count: 886 (Rules: 386), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Backfill Contention), QA: 886]**
 - **Nov1.0: [SOT Count: 885 (Rules: 385), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (FGS Permission), QA: 885]**
 - **Revol31.9: [SOT Count: 884 (Rules: 384), Open: H:1, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Soak Audit), QA: 884]**
 - **Revol31.8: [SOT Count: 883 (Rules: 383), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Geofence Audit), QA: 883]**
