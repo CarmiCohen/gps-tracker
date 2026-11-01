@@ -14,6 +14,7 @@ import java.util.concurrent.atomic.AtomicLong
 /**
  * AdaptiveSamplingTest: Verifies velocity-based sampling transitions (Revol34.0).
  * Ensures that changes in movement speed correctly adjust the sensing loop interval.
+ * Updated Nov1.4: Aligned with survival mode floor (0.1Hz).
  */
 @RunWith(AndroidJUnit4::class)
 class AdaptiveSamplingTest {
@@ -49,7 +50,7 @@ class AdaptiveSamplingTest {
 
         // 4. Survival Mode (Battery < 15%)
         currentInterval.set(SensingEngine.getOptimalIntervalMs(30f, false, 10, 10.0f))
-        assertEquals(1000L, currentInterval.get()) // Floor at 1Hz
+        assertEquals(10000L, currentInterval.get()) // Floor at 0.1Hz (Nov1.4 Throttling)
 
         job.cancel()
     }

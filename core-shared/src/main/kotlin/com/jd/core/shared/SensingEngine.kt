@@ -6,10 +6,12 @@ import kotlin.math.*
  * SensingEngine: 100% Kotlin implementation of high-frequency sensor logic.
  * Corrected Revol29.4: Aligned with R-ID 16 floor (1Hz) for low battery survival.
  * Updated Nov1.3: Integrated Velocity-Based Adaptive Sampling (Revol34.0 / R-ID 82).
+ * Updated Nov1.4: Integrated Multi-Stage Thermal & Battery Throttling (Revol35.0 / R-ID 83).
  */
 object SensingEngine {
 
-    private const val THERMAL_CRITICAL_CELSIUS = 45.0
+    const val THERMAL_WARNING_CELSIUS = 40.0
+    const val THERMAL_CRITICAL_CELSIUS = 45.0
     private const val GRAVITY_EARTH = 9.80665
 
     /**
@@ -38,7 +40,7 @@ object SensingEngine {
 
     /**
      * Determines the optimal sensing interval based on movement, heat, and power source.
-     * Aligned with Revol34.0: 10Hz (moving), 1Hz (slow), 0.1Hz (stationary).
+     * Aligned with Revol35.0: Multi-stage throttling (10Hz moving, 1Hz slow/warn, 0.1Hz stationary/crit).
      */
     fun getOptimalIntervalMs(
         currentTemp: Float, 
@@ -46,18 +48,33 @@ object SensingEngine {
         batteryLevel: Int,
         velocityMps: Float = 0f
     ): Long {
-        if (currentTemp >= THERMAL_CRITICAL_CELSIUS) return 1000L // Thermal Protection
+        // 1. Thermal Throttling (Highest Priority)
+        if (currentTemp >= THERMAL_CRITICAL_CELSIUS) return 10000L // 0.1Hz: Critical Protection
         
+        val thermalCap = if (currentTemp >= THERMAL_WARNING_CELSIUS) 1000L else 100L
+        
+        // 2. Battery Throttling
+        val batteryCap = when {
+            batteryLevel < 15 -> 10000L // 0.1Hz: Survival Mode
+            batteryLevel < 20 -> 1000L  // 1Hz: Low Battery
+            else -> 100L                // 10Hz: Nominal
+        }
+
+        // 3. Velocity-Based Base Interval
         val baseInterval = when {
-            velocityMps > 5.0f -> 100L   // 10Hz: Moving (> 18 km/h)
-            velocityMps > 0.5f -> 1000L  // 1Hz: Slow/Walking
+            velocityMps > 5.0f -> 100L   // 10Hz: Moving
+            velocityMps > 0.5f -> 1000L  // 1Hz: Slow
             else -> 10000L               // 0.1Hz: Stationary
         }
 
-        return when {
-            isCharging -> min(100L, baseInterval) // Max performance when charging
-            batteryLevel < 15 -> baseInterval.coerceAtLeast(1000L) // Survival Mode floor
-            else -> baseInterval
+        // Combine constraints: The longest interval wins (throttling)
+        // Except when charging, which allows performance mode if thermal is okay
+        val combinedInterval = max(baseInterval, max(thermalCap, batteryCap))
+
+        return if (isCharging && currentTemp < THERMAL_WARNING_CELSIUS) {
+            min(100L, combinedInterval)
+        } else {
+            combinedInterval
         }
     }
 

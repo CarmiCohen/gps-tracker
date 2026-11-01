@@ -17,6 +17,7 @@ import javax.inject.Inject
  * ProductionReadinessAuditTest: Ported to JD Revol31.2.
  * Exercises the Sensing Engine and Forensic Pipeline under high-pressure bursts.
  * Updated Nov1.3: Aligned with Adaptive Sampling (Revol34.0).
+ * Updated Nov1.4: Aligned with Multi-Stage Throttling (Revol35.0).
  */
 @HiltAndroidTest
 @RunWith(AndroidJUnit4::class)
@@ -54,29 +55,45 @@ class ProductionReadinessAuditTest {
      */
     @Test
     fun verifyThermalScalingLogic() {
-        val highTempInterval = SensingEngine.getOptimalIntervalMs(
-            currentTemp = 50f,
+        val criticalTempInterval = SensingEngine.getOptimalIntervalMs(
+            currentTemp = 46f,
             isCharging = false,
             batteryLevel = 50,
             velocityMps = 10f
         )
-        assertEquals("Thermal protection MUST scale to 1Hz", 1000L, highTempInterval)
+        assertEquals("Critical Thermal protection MUST scale to 0.1Hz", 10000L, criticalTempInterval)
         
-        val lowBatteryInterval = SensingEngine.getOptimalIntervalMs(
+        val warningTempInterval = SensingEngine.getOptimalIntervalMs(
+            currentTemp = 41f,
+            isCharging = false,
+            batteryLevel = 50,
+            velocityMps = 10f
+        )
+        assertEquals("Warning Thermal protection MUST scale to 1Hz", 1000L, warningTempInterval)
+        
+        val criticalBatteryInterval = SensingEngine.getOptimalIntervalMs(
             currentTemp = 30f,
             isCharging = false,
             batteryLevel = 10,
             velocityMps = 10f
         )
-        assertEquals("Power protection MUST scale to 1Hz even when moving", 1000L, lowBatteryInterval)
-        
-        val stationaryInterval = SensingEngine.getOptimalIntervalMs(
+        assertEquals("Critical Battery protection MUST scale to 0.1Hz", 10000L, criticalBatteryInterval)
+
+        val lowBatteryInterval = SensingEngine.getOptimalIntervalMs(
             currentTemp = 30f,
             isCharging = false,
-            batteryLevel = 80,
-            velocityMps = 0f
+            batteryLevel = 18,
+            velocityMps = 10f
         )
-        assertEquals("Stationary sensing should scale to 0.1Hz", 10000L, stationaryInterval)
+        assertEquals("Low Battery protection MUST scale to 1Hz", 1000L, lowBatteryInterval)
+        
+        val nominalInterval = SensingEngine.getOptimalIntervalMs(
+            currentTemp = 30f,
+            isCharging = true,
+            batteryLevel = 80,
+            velocityMps = 10f
+        )
+        assertEquals("Nominal sensing should maintain 10Hz when charging", 100L, nominalInterval)
     }
 
     /**

@@ -1,34 +1,34 @@
-# Chat Session - Nov1.3 (Resumed from Nov1.2)
+# Chat Session - Nov1.4 (Resumed from Nov1.3)
 
-## 🎯 Current Resumption Focus: Adaptive Sampling Logic (Revol34.0)
+## 🎯 Current Resumption Focus: Battery-Aware Thermal Throttling (Revol35.0)
 
 ### 🟢 Objectives
-- Optimize battery consumption by dynamically adjusting telemetry sampling rates.
-- Implement velocity-based sampling: 10Hz when moving (> 5 m/s), 1Hz when slow, 0.1Hz when stationary.
-- Ensure zero impact on violation detection latency.
+- Implement multi-stage thermal and battery level throttling.
+- Prevent device shutdown during extreme heat or critical low power.
+- Smooth transition to 0.1Hz sampling and notification triggers when thresholds are breached.
 
 ### 📝 Planned Remediation
 1. **Explore**:
-    - [x] Identify location sampling entry point in `SensorService`.
-    - [x] Analyze current sampling configuration (likely fixed 10Hz).
+    - [x] Identify battery and thermal monitoring APIs (PowerManager, Intent filters).
+    - [x] Analyze current power state handling in `SensorService`.
 2. **Issue Initialization**:
-    - [x] Update `chat_session.md` for Nov1.3.
-    - [x] Create `ISSUE-REVOL34.0-F1` in `issues.md`.
+    - [x] Update `chat_session.md` for Nov1.4.
+    - [x] Initialized `ISSUE-REVOL35.0-F1` in `issues.md`.
 3. **Implementation**:
-    - [x] Implement velocity-based logic in `SensingEngine`.
-    - [x] Update `SensorService` to use `FusedLocationProviderClient` and adjust intervals dynamically.
-    - [x] Integrated `TickOrchestrator.preemptLoop` for immediate state transition.
+    - [x] Implement multi-stage throttling logic in `SensingEngine`.
+    - [x] Update `SensorService` to register `BatteryReceiver` for `ACTION_BATTERY_CHANGED`.
+    - [x] Integrate `OnThermalStatusChangedListener` in `SensorService` (API 29+).
+    - [x] Implement unified `refreshSamplingRate()` in `SensorService`.
 4. **Execution & Audit**:
-    - [x] Create `AdaptiveSamplingTest` to verify interval transitions.
-    - [x] Build and run all stabilization tests (9/9 passed in `:app-sensor`).
-    - [x] Verified battery optimization via logic verification in `ProductionReadinessAuditTest`.
-5. **Completion**: Follow the DEVELOPER_GUIDELINES.md completion sequence for Nov1.3.
+    - [x] Create `ThermalThrottlingTest` to verify interval scaling.
+    - [x] Build and run all stabilization tests (10/10 passed in `:app-sensor`).
+5. **Completion**: Follow the DEVELOPER_GUIDELINES.md completion sequence for Nov1.4.
 
 ### 🚀 Progress Tracking
-- [x] Initialized `chat_session.md` for Nov1.3.
-- [x] Implemented velocity-aware interval calculation in `SensingEngine`.
-- [x] Refactored `SensorService` with `FusedLocationProviderClient`.
-- [x] Verified sub-second sampling adaptation in `AdaptiveSamplingTest`.
+- [x] Initialized `chat_session.md` for Nov1.4.
+- [x] Hardened `SensingEngine` with multi-stage throttling logic (max constraint strategy).
+- [x] Refactored `SensorService` with `BatteryReceiver` and `ThermalStatusListener`.
+- [x] Verified throttling priorities in `ThermalThrottlingTest`.
 - [x] Updated all forensic documentation (`SOT`, `RESOLUTION_ARCHIVE`, `Handover`).
-- [x] Incremented version to Nov1.3.
-- [x] Implementation completed. Starting Completion Phase.
+- [x] Incremented version to Nov1.4.
+- [x] Version Nov1.4 Sealed.

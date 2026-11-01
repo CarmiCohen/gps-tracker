@@ -1,5 +1,14 @@
 # Resolution Archive
 
+## ✅ Resolved Issues (Nov1.4)
+
+### 1. ISSUE-REVOL35.0-F1: Battery-Aware Thermal Throttling
+- **Symptoms**: Risk of device shutdown or permanent battery degradation during high-performance tracking (10Hz) under extreme heat or critical low power.
+- **Root Cause**: The sensing loop lacked hardware-aware constraints, prioritizing tracking fidelity over device survival.
+- **Resolution**: Implemented **Multi-Stage Resource Throttling** in `SensingEngine`. Telemetry intervals are now capped based on hardware health: 1Hz during Thermal Warning (>40°C) or Low Battery (<20%), and 0.1Hz during Critical Thermal (>45°C) or Critical Battery (<15%). Integrated `BatteryReceiver` and `OnThermalStatusChangedListener` in `SensorService` to trigger immediate sampling adaptation via loop preemption. Verified priority hierarchy (Thermal > Battery > Velocity) in `ThermalThrottlingTest`. (R-ID 83).
+
+---
+
 ## ✅ Resolved Issues (Nov1.3)
 
 ### 1. ISSUE-REVOL34.0-F1: Adaptive Sampling Logic

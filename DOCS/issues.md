@@ -1,11 +1,11 @@
-# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov1.3)
+# Project Issues & Hardening Tracking - REVOLUTION PHASE (Nov1.4)
 
-## 🎯 Next Resumption Focus: Battery-Aware Thermal Throttling (Revol35.0)
+## 🎯 Next Resumption Focus: Forensic Heartbeat & Watchdog (Revol36.0)
 
 ---
 
-## 🔴 Open Gaps (Nov1.3)
-*   *None. Adaptive sampling logic resolved.*
+## 🔴 Open Gaps (Nov1.4)
+*   *None. Battery-aware thermal throttling gaps resolved.*
 
 ---
 
@@ -13,6 +13,12 @@
 *   **SIMP-REVOL30.0-S1**: Shared Test Fixtures. Consolidate hardware mocks into a test-only artifact within `:core-shared` to reduce duplication across app modules.
 *   **SIMP-REVOL33.0-S1**: Batch Buffer Pooling. Consider using an object pool for telemetry batch JSON arrays to reduce GC pressure during long soak periods.
 *   **SIMP-REVOL34.0-S1**: Sampling State Machine. **IMPLEMENTED.** Sensing loop now dynamically adapts to velocity (10Hz/1Hz/0.1Hz) using FusedLocation speed.
+*   **SIMP-REVOL35.0-S1**: Thermal Status Mapping. Consider a more granular mapping of Android Thermal Status levels to specific Celsius offsets to improve throttling precision on diverse hardware.
+
+---
+
+## ✅ Resolved Traceability & Metadata Issues (Nov1.4)
+*   **ISSUE-REVOL35.0-F1**: Battery-Aware Thermal Throttling. **RESOLVED.** Implemented multi-stage thermal and battery level throttling (10Hz/1Hz/0.1Hz) in `SensingEngine` and `SensorService`. Integrated `BatteryReceiver` and `OnThermalStatusChangedListener` to ensure immediate loop adaptation. Verified constraint priority (Thermal > Battery > Velocity) in `ThermalThrottlingTest` and `ProductionReadinessAuditTest`. (R-ID 83).
 
 ---
 
@@ -37,6 +43,7 @@
 ---
 
 ## 📊 Hardening Progress Dashboard
+- **Nov1.4: [SOT Count: 889 (Rules: 389), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Thermal Throttling), QA: 889]**
 - **Nov1.3: [SOT Count: 888 (Rules: 388), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Adaptive Sampling), QA: 888]**
 - **Nov1.2: [SOT Count: 887 (Rules: 387), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:2, Testing: PASSED (Signaling Batching), QA: 887]**
 - **Nov1.1: [SOT Count: 886 (Rules: 386), Open: H:0, M:0, L:0, Ideas: H:1, M:0, L:1, Testing: PASSED (Backfill Contention), QA: 886]**
